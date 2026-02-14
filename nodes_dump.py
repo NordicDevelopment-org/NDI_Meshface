@@ -1,7 +1,7 @@
 import json
 import meshtastic.serial_interface
 
-iface = meshtastic.serial_interface.SerialInterface(devPath="/dev/ttyACM0")
+iface = meshtastic.serial_interface.SerialInterface(devPath="/dev/ttyUSB2")
 
 print(f"{len(iface.nodes)} nodes (by nodeId):")
 for node_id, info in iface.nodes.items():
