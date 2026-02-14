@@ -1,6 +1,6 @@
 import meshtastic.serial_interface
 
-PORT = "/dev/ttyUSB2"
+PORT = "/dev/ttyUSB1"
 
 iface = meshtastic.serial_interface.SerialInterface(devPath=PORT)
 

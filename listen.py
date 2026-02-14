@@ -22,7 +22,7 @@ pub.subscribe(on_receive, "meshtastic.receive")
 pub.subscribe(on_text, "meshtastic.receive.text")
 pub.subscribe(on_connection, "meshtastic.connection.established")
 
-iface = meshtastic.serial_interface.SerialInterface(devPath="/dev/ttyUSB2")
+iface = meshtastic.serial_interface.SerialInterface(devPath="/dev/ttyUSB1")
 
 try:
     while True:
