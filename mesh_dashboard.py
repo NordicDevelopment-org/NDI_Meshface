@@ -33,6 +33,9 @@ DEFAULT_PACKET_LIMIT = 250
 DEFAULT_HISTORY_DB = "mesh_dashboard_history.sqlite3"
 DEFAULT_HISTORY_MAX_ROWS = 5000
 DEFAULT_HISTORY_RETENTION_DAYS = 7
+DEFAULT_HISTORY_EVENT_MAX_ROWS = 200000
+DEFAULT_HISTORY_EVENT_RETENTION_DAYS = 30
+DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS = 365
 MIN_REAL_LINK_COUNT = 2
 
 SENSITIVE_FIELD_NAMES = {
@@ -220,10 +223,21 @@ def _safe_nodes_items(iface: Any) -> list[Tuple[Any, Any]]:
 
 
 class HistoryStore:
-    def __init__(self, db_path: str, max_rows: int, retention_days: int) -> None:
+    def __init__(
+        self,
+        db_path: str,
+        max_rows: int,
+        retention_days: int,
+        event_max_rows: int,
+        event_retention_days: int,
+        rollup_retention_days: int,
+    ) -> None:
         self.db_path = db_path
         self.max_rows = max(100, int(max_rows))
         self.retention_seconds = max(0, int(retention_days)) * 86400
+        self.event_max_rows = max(1000, int(event_max_rows))
+        self.event_retention_seconds = max(0, int(event_retention_days)) * 86400
+        self.rollup_retention_seconds = max(0, int(rollup_retention_days)) * 86400
         self._writes_since_prune = 0
         self._lock = threading.Lock()
 
@@ -278,10 +292,87 @@ class HistoryStore:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS packet_events (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              created_unix INTEGER NOT NULL,
+              from_id TEXT,
+              to_id TEXT,
+              portnum TEXT,
+              rx_snr REAL,
+              rx_rssi REAL,
+              hops INTEGER,
+              hop_start INTEGER,
+              hop_limit INTEGER,
+              channel TEXT,
+              want_ack INTEGER,
+              priority TEXT,
+              summary_json TEXT
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS node_metrics_1m (
+              bucket_unix INTEGER NOT NULL,
+              node_id TEXT NOT NULL,
+              packet_count INTEGER NOT NULL,
+              snr_sum REAL NOT NULL,
+              snr_count INTEGER NOT NULL,
+              snr_min REAL,
+              snr_max REAL,
+              rssi_sum REAL NOT NULL,
+              rssi_count INTEGER NOT NULL,
+              rssi_min REAL,
+              rssi_max REAL,
+              hops_sum INTEGER NOT NULL,
+              hops_count INTEGER NOT NULL,
+              hops_min INTEGER,
+              hops_max INTEGER,
+              last_seen_unix INTEGER NOT NULL,
+              PRIMARY KEY(bucket_unix, node_id)
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS link_metrics_1m (
+              bucket_unix INTEGER NOT NULL,
+              from_id TEXT NOT NULL,
+              to_id TEXT NOT NULL,
+              packet_count INTEGER NOT NULL,
+              snr_sum REAL NOT NULL,
+              snr_count INTEGER NOT NULL,
+              snr_min REAL,
+              snr_max REAL,
+              rssi_sum REAL NOT NULL,
+              rssi_count INTEGER NOT NULL,
+              rssi_min REAL,
+              rssi_max REAL,
+              hops_sum INTEGER NOT NULL,
+              hops_count INTEGER NOT NULL,
+              hops_min INTEGER,
+              hops_max INTEGER,
+              last_seen_unix INTEGER NOT NULL,
+              PRIMARY KEY(bucket_unix, from_id, to_id)
+            )
+            """
+        )
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_packets_created_unix ON packets(created_unix)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_created_unix ON chat(created_unix)")
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_connections_last_seen_unix ON connections(last_seen_unix)"
+        )
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_packet_events_created_unix ON packet_events(created_unix)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_packet_events_from_id ON packet_events(from_id)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_packet_events_to_id ON packet_events(to_id)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_packet_events_portnum ON packet_events(portnum)")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_node_metrics_1m_last_seen_unix ON node_metrics_1m(last_seen_unix)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_link_metrics_1m_last_seen_unix ON link_metrics_1m(last_seen_unix)"
         )
 
     def close(self) -> None:
@@ -294,6 +385,13 @@ class HistoryStore:
             self._conn.execute("DELETE FROM packets WHERE created_unix < ?", (cutoff,))
             self._conn.execute("DELETE FROM chat WHERE created_unix < ?", (cutoff,))
             self._conn.execute("DELETE FROM connections WHERE last_seen_unix < ?", (cutoff,))
+        if self.event_retention_seconds > 0:
+            event_cutoff = int(time.time()) - self.event_retention_seconds
+            self._conn.execute("DELETE FROM packet_events WHERE created_unix < ?", (event_cutoff,))
+        if self.rollup_retention_seconds > 0:
+            rollup_cutoff = int(time.time()) - self.rollup_retention_seconds
+            self._conn.execute("DELETE FROM node_metrics_1m WHERE last_seen_unix < ?", (rollup_cutoff,))
+            self._conn.execute("DELETE FROM link_metrics_1m WHERE last_seen_unix < ?", (rollup_cutoff,))
 
         if self.max_rows > 0:
             self._conn.execute(
@@ -320,6 +418,14 @@ class HistoryStore:
                 )
                 """,
                 (self.max_rows,),
+            )
+        if self.event_max_rows > 0:
+            self._conn.execute(
+                """
+                DELETE FROM packet_events
+                WHERE id <= (SELECT COALESCE(MAX(id), 0) - ? FROM packet_events)
+                """,
+                (self.event_max_rows,),
             )
 
     def _maybe_prune_unlocked(self) -> None:
@@ -480,6 +586,360 @@ class HistoryStore:
             self._maybe_prune_unlocked()
             self._conn.commit()
 
+    @staticmethod
+    def _merge_metric(
+        sum_value: Any,
+        count_value: Any,
+        min_value: Any,
+        max_value: Any,
+        sample: Optional[float],
+    ) -> Tuple[float, int, Optional[float], Optional[float]]:
+        merged_sum = float(sum_value or 0.0)
+        merged_count = int(count_value or 0)
+        merged_min = _to_float(min_value)
+        merged_max = _to_float(max_value)
+
+        if sample is None:
+            return merged_sum, merged_count, merged_min, merged_max
+
+        merged_sum += sample
+        merged_count += 1
+        merged_min = sample if merged_min is None else min(merged_min, sample)
+        merged_max = sample if merged_max is None else max(merged_max, sample)
+        return merged_sum, merged_count, merged_min, merged_max
+
+    @staticmethod
+    def _bucket_minute(epoch_seconds: int) -> int:
+        return int(epoch_seconds) - (int(epoch_seconds) % 60)
+
+    @staticmethod
+    def _clean_node_id(node_id: Any) -> Optional[str]:
+        value = str(node_id or "").strip()
+        if not value or value in ("Unknown", "n/a", "^all"):
+            return None
+        return value
+
+    def _upsert_node_metric_unlocked(
+        self,
+        bucket_unix: int,
+        node_id: str,
+        event_unix: int,
+        rx_snr: Optional[float],
+        rx_rssi: Optional[float],
+        hops: Optional[int],
+    ) -> None:
+        row = self._conn.execute(
+            """
+            SELECT packet_count,
+                   snr_sum, snr_count, snr_min, snr_max,
+                   rssi_sum, rssi_count, rssi_min, rssi_max,
+                   hops_sum, hops_count, hops_min, hops_max,
+                   last_seen_unix
+            FROM node_metrics_1m
+            WHERE bucket_unix = ? AND node_id = ?
+            """,
+            (bucket_unix, node_id),
+        ).fetchone()
+
+        if row is None:
+            snr_sum, snr_count, snr_min, snr_max = self._merge_metric(0.0, 0, None, None, rx_snr)
+            rssi_sum, rssi_count, rssi_min, rssi_max = self._merge_metric(0.0, 0, None, None, rx_rssi)
+            hops_sum, hops_count, hops_min, hops_max = self._merge_metric(
+                0.0,
+                0,
+                None,
+                None,
+                float(hops) if hops is not None else None,
+            )
+            self._conn.execute(
+                """
+                INSERT INTO node_metrics_1m(
+                  bucket_unix, node_id, packet_count,
+                  snr_sum, snr_count, snr_min, snr_max,
+                  rssi_sum, rssi_count, rssi_min, rssi_max,
+                  hops_sum, hops_count, hops_min, hops_max,
+                  last_seen_unix
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    bucket_unix,
+                    node_id,
+                    1,
+                    snr_sum,
+                    snr_count,
+                    snr_min,
+                    snr_max,
+                    rssi_sum,
+                    rssi_count,
+                    rssi_min,
+                    rssi_max,
+                    int(hops_sum),
+                    hops_count,
+                    int(hops_min) if hops_min is not None else None,
+                    int(hops_max) if hops_max is not None else None,
+                    event_unix,
+                ),
+            )
+            return
+
+        (
+            packet_count,
+            snr_sum,
+            snr_count,
+            snr_min,
+            snr_max,
+            rssi_sum,
+            rssi_count,
+            rssi_min,
+            rssi_max,
+            hops_sum,
+            hops_count,
+            hops_min,
+            hops_max,
+            last_seen_unix,
+        ) = row
+
+        snr_sum, snr_count, snr_min, snr_max = self._merge_metric(snr_sum, snr_count, snr_min, snr_max, rx_snr)
+        rssi_sum, rssi_count, rssi_min, rssi_max = self._merge_metric(
+            rssi_sum,
+            rssi_count,
+            rssi_min,
+            rssi_max,
+            rx_rssi,
+        )
+        hops_sum_f, hops_count, hops_min_f, hops_max_f = self._merge_metric(
+            hops_sum,
+            hops_count,
+            hops_min,
+            hops_max,
+            float(hops) if hops is not None else None,
+        )
+
+        self._conn.execute(
+            """
+            UPDATE node_metrics_1m
+            SET packet_count = ?,
+                snr_sum = ?, snr_count = ?, snr_min = ?, snr_max = ?,
+                rssi_sum = ?, rssi_count = ?, rssi_min = ?, rssi_max = ?,
+                hops_sum = ?, hops_count = ?, hops_min = ?, hops_max = ?,
+                last_seen_unix = ?
+            WHERE bucket_unix = ? AND node_id = ?
+            """,
+            (
+                int(packet_count or 0) + 1,
+                snr_sum,
+                snr_count,
+                snr_min,
+                snr_max,
+                rssi_sum,
+                rssi_count,
+                rssi_min,
+                rssi_max,
+                int(hops_sum_f),
+                hops_count,
+                int(hops_min_f) if hops_min_f is not None else None,
+                int(hops_max_f) if hops_max_f is not None else None,
+                max(_to_int(last_seen_unix) or event_unix, event_unix),
+                bucket_unix,
+                node_id,
+            ),
+        )
+
+    def _upsert_link_metric_unlocked(
+        self,
+        bucket_unix: int,
+        from_id: str,
+        to_id: str,
+        event_unix: int,
+        rx_snr: Optional[float],
+        rx_rssi: Optional[float],
+        hops: Optional[int],
+    ) -> None:
+        row = self._conn.execute(
+            """
+            SELECT packet_count,
+                   snr_sum, snr_count, snr_min, snr_max,
+                   rssi_sum, rssi_count, rssi_min, rssi_max,
+                   hops_sum, hops_count, hops_min, hops_max,
+                   last_seen_unix
+            FROM link_metrics_1m
+            WHERE bucket_unix = ? AND from_id = ? AND to_id = ?
+            """,
+            (bucket_unix, from_id, to_id),
+        ).fetchone()
+
+        if row is None:
+            snr_sum, snr_count, snr_min, snr_max = self._merge_metric(0.0, 0, None, None, rx_snr)
+            rssi_sum, rssi_count, rssi_min, rssi_max = self._merge_metric(0.0, 0, None, None, rx_rssi)
+            hops_sum, hops_count, hops_min, hops_max = self._merge_metric(
+                0.0,
+                0,
+                None,
+                None,
+                float(hops) if hops is not None else None,
+            )
+            self._conn.execute(
+                """
+                INSERT INTO link_metrics_1m(
+                  bucket_unix, from_id, to_id, packet_count,
+                  snr_sum, snr_count, snr_min, snr_max,
+                  rssi_sum, rssi_count, rssi_min, rssi_max,
+                  hops_sum, hops_count, hops_min, hops_max,
+                  last_seen_unix
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    bucket_unix,
+                    from_id,
+                    to_id,
+                    1,
+                    snr_sum,
+                    snr_count,
+                    snr_min,
+                    snr_max,
+                    rssi_sum,
+                    rssi_count,
+                    rssi_min,
+                    rssi_max,
+                    int(hops_sum),
+                    hops_count,
+                    int(hops_min) if hops_min is not None else None,
+                    int(hops_max) if hops_max is not None else None,
+                    event_unix,
+                ),
+            )
+            return
+
+        (
+            packet_count,
+            snr_sum,
+            snr_count,
+            snr_min,
+            snr_max,
+            rssi_sum,
+            rssi_count,
+            rssi_min,
+            rssi_max,
+            hops_sum,
+            hops_count,
+            hops_min,
+            hops_max,
+            last_seen_unix,
+        ) = row
+
+        snr_sum, snr_count, snr_min, snr_max = self._merge_metric(snr_sum, snr_count, snr_min, snr_max, rx_snr)
+        rssi_sum, rssi_count, rssi_min, rssi_max = self._merge_metric(
+            rssi_sum,
+            rssi_count,
+            rssi_min,
+            rssi_max,
+            rx_rssi,
+        )
+        hops_sum_f, hops_count, hops_min_f, hops_max_f = self._merge_metric(
+            hops_sum,
+            hops_count,
+            hops_min,
+            hops_max,
+            float(hops) if hops is not None else None,
+        )
+
+        self._conn.execute(
+            """
+            UPDATE link_metrics_1m
+            SET packet_count = ?,
+                snr_sum = ?, snr_count = ?, snr_min = ?, snr_max = ?,
+                rssi_sum = ?, rssi_count = ?, rssi_min = ?, rssi_max = ?,
+                hops_sum = ?, hops_count = ?, hops_min = ?, hops_max = ?,
+                last_seen_unix = ?
+            WHERE bucket_unix = ? AND from_id = ? AND to_id = ?
+            """,
+            (
+                int(packet_count or 0) + 1,
+                snr_sum,
+                snr_count,
+                snr_min,
+                snr_max,
+                rssi_sum,
+                rssi_count,
+                rssi_min,
+                rssi_max,
+                int(hops_sum_f),
+                hops_count,
+                int(hops_min_f) if hops_min_f is not None else None,
+                int(hops_max_f) if hops_max_f is not None else None,
+                max(_to_int(last_seen_unix) or event_unix, event_unix),
+                bucket_unix,
+                from_id,
+                to_id,
+            ),
+        )
+
+    def _save_packet_event_and_rollups_unlocked(self, summary: Dict[str, Any]) -> None:
+        event_unix = _to_int(summary.get("rx_time_unix"))
+        if event_unix is None or event_unix <= 0:
+            event_unix = int(time.time())
+
+        from_id = self._clean_node_id(summary.get("from"))
+        to_id = self._clean_node_id(summary.get("to"))
+        portnum_raw = summary.get("portnum")
+        portnum = str(portnum_raw) if portnum_raw is not None else None
+        rx_snr = _to_float(summary.get("rx_snr"))
+        rx_rssi = _to_float(summary.get("rx_rssi"))
+        hops = _to_int(summary.get("hops"))
+        hop_start = _to_int(summary.get("hop_start"))
+        hop_limit = _to_int(summary.get("hop_limit"))
+        channel_raw = summary.get("channel")
+        channel = str(channel_raw) if channel_raw is not None else None
+        priority_raw = summary.get("priority")
+        priority = str(priority_raw) if priority_raw is not None else None
+        want_ack = 1 if summary.get("want_ack") else 0
+
+        self._conn.execute(
+            """
+            INSERT INTO packet_events(
+              created_unix, from_id, to_id, portnum,
+              rx_snr, rx_rssi, hops, hop_start, hop_limit,
+              channel, want_ack, priority, summary_json
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event_unix,
+                from_id,
+                to_id,
+                portnum,
+                rx_snr,
+                rx_rssi,
+                hops,
+                hop_start,
+                hop_limit,
+                channel,
+                want_ack,
+                priority,
+                json.dumps(summary, separators=(",", ":")),
+            ),
+        )
+
+        bucket_unix = self._bucket_minute(event_unix)
+        if from_id:
+            self._upsert_node_metric_unlocked(
+                bucket_unix=bucket_unix,
+                node_id=from_id,
+                event_unix=event_unix,
+                rx_snr=rx_snr,
+                rx_rssi=rx_rssi,
+                hops=hops,
+            )
+        if from_id and to_id and from_id != to_id:
+            self._upsert_link_metric_unlocked(
+                bucket_unix=bucket_unix,
+                from_id=from_id,
+                to_id=to_id,
+                event_unix=event_unix,
+                rx_snr=rx_snr,
+                rx_rssi=rx_rssi,
+                hops=hops,
+            )
+
     def save_packet(self, packet_entry: Dict[str, Any]) -> None:
         summary = packet_entry.get("summary")
         packet = packet_entry.get("packet")
@@ -491,6 +951,8 @@ class HistoryStore:
                 "INSERT INTO packets(created_unix, summary_json, packet_json) VALUES(?, ?, ?)",
                 (int(time.time()), summary_json, packet_json),
             )
+            if isinstance(summary, dict):
+                self._save_packet_event_and_rollups_unlocked(summary)
             self._maybe_prune_unlocked()
             self._conn.commit()
 
@@ -643,10 +1105,12 @@ class DashboardTracker:
             "to_num": _to_int(packet.get("to")),
             "portnum": str(portnum) if portnum is not None else None,
             "rx_time": _format_epoch(packet.get("rxTime")),
+            "rx_time_unix": rx_time,
             "rx_rssi": packet.get("rxRssi"),
             "rx_snr": packet.get("rxSnr"),
             "hop_start": packet.get("hopStart"),
             "hop_limit": packet.get("hopLimit"),
+            "hops": hops,
             "want_ack": packet.get("wantAck"),
             "priority": packet.get("priority"),
             "channel": packet.get("channel"),
@@ -2618,6 +3082,9 @@ def run_dashboard(args: argparse.Namespace) -> None:
                 db_path=history_db_path,
                 max_rows=args.history_max_rows,
                 retention_days=args.history_retention_days,
+                event_max_rows=args.history_event_max_rows,
+                event_retention_days=args.history_event_retention_days,
+                rollup_retention_days=args.history_rollup_retention_days,
             )
         except Exception as exc:
             print(f"History disabled: cannot open {history_db_path}: {exc}")
@@ -2666,7 +3133,9 @@ def run_dashboard(args: argparse.Namespace) -> None:
     if history_store is not None:
         print(
             f"History DB: {history_db_path} "
-            f"(retention {args.history_retention_days}d, max {args.history_max_rows} rows)"
+            f"(retention {args.history_retention_days}d, max {args.history_max_rows} rows; "
+            f"events {args.history_event_retention_days}d/{args.history_event_max_rows} rows; "
+            f"rollups {args.history_rollup_retention_days}d)"
         )
     else:
         print("History DB: disabled")
@@ -2748,7 +3217,7 @@ def main() -> None:
     parser.add_argument(
         "--history-db",
         default=os.environ.get("MESH_DASH_HISTORY_DB", DEFAULT_HISTORY_DB),
-        help=f"SQLite DB path for persisted chat/packet history (default: {DEFAULT_HISTORY_DB})",
+        help=f"SQLite DB path for persisted chat/packet history and rollups (default: {DEFAULT_HISTORY_DB})",
     )
     parser.add_argument(
         "--history-max-rows",
@@ -2763,6 +3232,33 @@ def main() -> None:
         help=(
             "Delete persisted rows older than this many days; "
             f"use 0 to disable age-based pruning (default: {DEFAULT_HISTORY_RETENTION_DAYS})"
+        ),
+    )
+    parser.add_argument(
+        "--history-event-max-rows",
+        type=int,
+        default=DEFAULT_HISTORY_EVENT_MAX_ROWS,
+        help=(
+            "Max rows for append-only packet event history "
+            f"(default: {DEFAULT_HISTORY_EVENT_MAX_ROWS})"
+        ),
+    )
+    parser.add_argument(
+        "--history-event-retention-days",
+        type=int,
+        default=DEFAULT_HISTORY_EVENT_RETENTION_DAYS,
+        help=(
+            "Delete packet event rows older than this many days; "
+            f"use 0 to disable age-based pruning (default: {DEFAULT_HISTORY_EVENT_RETENTION_DAYS})"
+        ),
+    )
+    parser.add_argument(
+        "--history-rollup-retention-days",
+        type=int,
+        default=DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS,
+        help=(
+            "Delete rollup rows older than this many days; "
+            f"use 0 to disable age-based pruning (default: {DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS})"
         ),
     )
     parser.add_argument(
