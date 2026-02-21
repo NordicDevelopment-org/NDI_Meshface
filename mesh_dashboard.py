@@ -1504,6 +1504,7 @@ def _collect_nodes(iface: Any) -> Dict[str, Any]:
             "is_licensed": user.get("isLicensed"),
             "last_heard": _format_epoch(last_heard_epoch),
             "last_heard_epoch": last_heard_epoch,
+            "last_heard_unix": last_heard_epoch,
             "snr": info.get("snr"),
             "hops_away": info.get("hopsAway"),
             "battery_level": metrics.get("batteryLevel"),
@@ -2044,16 +2045,13 @@ def _render_html(
       content: " \25BC";
       opacity: 0.9;
     }}
-    #nodes-table tbody tr.node-selectable,
-    #chat-table tbody tr.chat-selectable {{
+    #nodes-table tbody tr.node-selectable {{
       cursor: pointer;
     }}
-    #nodes-table tbody tr.node-selectable:hover,
-    #chat-table tbody tr.chat-selectable:hover {{
+    #nodes-table tbody tr.node-selectable:hover {{
       background: #edf8f1;
     }}
-    #nodes-table tbody tr.selected-node,
-    #chat-table tbody tr.selected-node {{
+    #nodes-table tbody tr.selected-node {{
       background: #d8efe1;
     }}
     .mono {{ font-family: "IBM Plex Mono", "Consolas", "Menlo", monospace; }}
@@ -2073,12 +2071,207 @@ def _render_html(
       min-height: 0;
       gap: 7px;
     }}
-    .chat .scroll {{
-      flex: 1;
+    .chat-shell {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(145px, 190px);
+      grid-template-areas: "log members";
+      gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
+    }}
+    .chat-member-pane {{
+      grid-area: members;
+      grid-column: 2;
+      border: 1px solid #d6e5d2;
+      border-radius: 7px;
+      background: #f8fcf8;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }}
+    .chat-member-list {{
+      padding: 4px;
+      overflow: auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }}
+    .chat-member-item {{
+      display: grid;
+      grid-template-columns: 11px minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      border: 1px solid #c7dac5;
+      background: #ecf7ef;
+      color: #204233;
+      border-radius: 6px;
+      padding: 3px 6px;
+      font-size: 10px;
+      line-height: 1.2;
+      cursor: pointer;
+    }}
+    .chat-member-item:hover {{
+      background: #e2f0e7;
+    }}
+    .chat-member-item.status-warn {{
+      background: #fff9e7;
+      color: #5d4a1b;
+      border-color: #ecd89c;
+    }}
+    .chat-member-item.status-stale {{
+      background: #fff0f0;
+      color: #6a3333;
+      border-color: #e6b5b5;
+    }}
+    .chat-member-item.status-unknown {{
+      background: #f2f5f2;
+      color: #607268;
+      border-color: #d8e3d8;
+    }}
+    .chat-member-item.selected-node {{
+      background: #d8efe1;
+      border-color: #99c5aa;
+      color: #16402c;
+    }}
+    .chat-member-status {{
+      width: 10px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      color: #2aa85a;
+    }}
+    .chat-member-status.status-online {{
+      color: #2aa85a;
+    }}
+    .chat-member-status.status-warn {{
+      color: #d2a022;
+    }}
+    .chat-member-status.status-stale {{
+      color: #d15757;
+    }}
+    .chat-member-status.status-unknown {{
+      color: #99aaa0;
+    }}
+    .chat-member-main {{
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      gap: 1px;
+    }}
+    .chat-member-name {{
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+      color: inherit;
+    }}
+    .chat-member-name.status-warn {{
+      color: #6d541d;
+    }}
+    .chat-member-name.status-stale {{
+      color: #7b3d3d;
+    }}
+    .chat-member-name.status-unknown {{
+      color: #667a70;
+      opacity: 0.8;
+    }}
+    .chat-member-id {{
+      font-size: 9px;
+      color: #6c8578;
+      opacity: 0.46;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }}
+    .chat-main-pane {{
+      grid-area: log;
+      grid-column: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      gap: 6px;
+      overflow: hidden;
+    }}
+    .chat-log-scroll {{
+      flex: 1 1 auto;
       max-height: none;
       min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }}
+    .chat-feed {{
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      width: 100%;
+      min-height: 0;
+      margin-top: auto;
+    }}
+    .chat-feed-item {{
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #d7e6d6;
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: #fbfefb;
+      color: #163523;
+    }}
+    .chat-feed-item.chat-selectable {{
+      cursor: pointer;
+    }}
+    .chat-feed-item.chat-selectable:hover {{
+      background: #eef8f0;
+      border-color: #c2dbc7;
+    }}
+    .chat-feed-item.selected-node {{
+      background: #d8efe1;
+      border-color: #99c5aa;
+    }}
+    .chat-feed-meta {{
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 10px;
+      color: #5a7462;
+      line-height: 1.2;
+      margin-bottom: 3px;
+    }}
+    .chat-feed-arrow {{
+      color: #6e8c78;
+      opacity: 0.75;
+    }}
+    .chat-feed-time {{
+      margin-left: auto;
+      font-size: 10px;
+      color: #6a8572;
+      white-space: nowrap;
+    }}
+    .chat-feed-text {{
+      font-size: 12px;
+      color: #173827;
+      line-height: 1.35;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .chat-feed-empty {{
+      border: 1px dashed #d2e2d4;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: #5d7566;
+      background: #f8fcf8;
     }}
     .chat-composer {{
+      order: 3;
+      margin-top: auto;
+      position: relative;
       display: flex;
       gap: 6px;
       align-items: center;
@@ -2119,7 +2312,59 @@ def _render_html(
       opacity: 0.6;
       cursor: default;
     }}
+    #chat-emoji-btn {{
+      border: 1px solid #9cc9ad;
+      background: #f1f9f4;
+      color: #184a32;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    #chat-emoji-btn:hover {{
+      background: #e6f2ea;
+    }}
+    #chat-emoji-btn:disabled {{
+      opacity: 0.6;
+      cursor: default;
+    }}
+    .chat-emoji-panel {{
+      position: absolute;
+      right: 58px;
+      bottom: calc(100% + 6px);
+      width: min(320px, 92%);
+      border: 1px solid #c9dbcc;
+      border-radius: 8px;
+      background: #fbfefb;
+      box-shadow: 0 8px 20px rgba(16, 36, 24, 0.18);
+      padding: 6px;
+      z-index: 9;
+    }}
+    .chat-emoji-panel[hidden] {{
+      display: none !important;
+    }}
+    .chat-emoji-grid {{
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 4px;
+    }}
+    .chat-emoji-item {{
+      border: 1px solid #d9e7da;
+      border-radius: 6px;
+      background: #ffffff;
+      padding: 5px 4px;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+    }}
+    .chat-emoji-item:hover {{
+      background: #ecf5ef;
+      border-color: #b4d0bd;
+    }}
     .chat-send-status {{
+      order: 2;
       min-height: 14px;
       font-size: 10px;
       color: #446551;
@@ -2129,21 +2374,6 @@ def _render_html(
       color: #b43b3b;
       font-weight: 600;
     }}
-    #chat-table {{
-      table-layout: auto;
-    }}
-    #chat-table th:nth-child(1), #chat-table td:nth-child(1) {{ width: 20%; white-space: nowrap; }}
-    #chat-table th:nth-child(2), #chat-table td:nth-child(2) {{ width: 16%; white-space: nowrap; }}
-    #chat-table th:nth-child(3), #chat-table td:nth-child(3) {{ width: 10%; white-space: nowrap; }}
-    #chat-table th:nth-child(4), #chat-table td:nth-child(4) {{
-      width: 54%;
-      white-space: normal;
-      overflow: visible;
-      text-overflow: clip;
-      word-break: break-word;
-      line-height: 1.25;
-    }}
-    #chat-table td {{ vertical-align: top; }}
     .chat-endpoint {{
       display: inline-flex;
       align-items: baseline;
@@ -2157,6 +2387,17 @@ def _render_html(
       white-space: nowrap;
       max-width: 100%;
     }}
+    .chat-name.status-warn {{
+      color: #7a6322;
+    }}
+    .chat-name.status-stale {{
+      color: #8a4545;
+      opacity: 0.9;
+    }}
+    .chat-name.status-unknown {{
+      color: #667a70;
+      opacity: 0.72;
+    }}
     .chat-id-bg {{
       font-size: 9px;
       color: #6c8578;
@@ -2164,8 +2405,24 @@ def _render_html(
       letter-spacing: 0.12px;
       white-space: nowrap;
     }}
+    .chat-id-bg.status-warn {{
+      color: #7f6b2d;
+      opacity: 0.45;
+    }}
+    .chat-id-bg.status-stale {{
+      color: #875151;
+      opacity: 0.4;
+    }}
+    .chat-id-bg.status-unknown {{
+      opacity: 0.36;
+    }}
     .scroll {{
       max-height: 300px;
+      overflow: auto;
+    }}
+    .chat-log-scroll.scroll {{
+      max-height: none;
+      height: 100%;
       overflow: auto;
     }}
     .scroll.wheel-scroll-active,
@@ -2311,6 +2568,17 @@ def _render_html(
       .map-frame {{ max-width: none; }}
       .nodes .scroll {{ max-height: 360px; }}
     }}
+    @media (max-width: 760px) {{
+      .chat-shell {{
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "log"
+          "members";
+      }}
+      .chat-member-pane {{
+        max-height: 140px;
+      }}
+    }}
   </style>
 </head>
 <body>
@@ -2357,27 +2625,29 @@ def _render_html(
         <div id="chat-caption" style="font-size:12px;color:#3e5a46;margin-bottom:8px;">
           Showing decoded text messages from recent packets.
         </div>
-        <div class="scroll">
-          <table id="chat-table">
-            <thead>
-              <tr>
-                <th>Time</th><th>From</th><th>To</th><th>Text</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <div class="chat-shell">
+          <div class="chat-member-pane">
+            <div id="chat-room-list" class="chat-member-list"></div>
+          </div>
+          <div class="chat-main-pane">
+            <div class="scroll chat-log-scroll">
+              <div id="chat-feed" class="chat-feed"></div>
+            </div>
+            <div class="chat-composer">
+              <input
+                id="chat-input"
+                type="text"
+                maxlength="280"
+                placeholder="Message the room (^all)..."
+                autocomplete="off"
+              />
+              <button id="chat-emoji-btn" type="button" title="Insert emoji" aria-label="Insert emoji" aria-expanded="false">🙂</button>
+              <button id="chat-send-btn" type="button">Send</button>
+              <div id="chat-emoji-panel" class="chat-emoji-panel" hidden></div>
+            </div>
+            <div id="chat-send-status" class="chat-send-status"></div>
+          </div>
         </div>
-        <div class="chat-composer">
-          <input
-            id="chat-input"
-            type="text"
-            maxlength="280"
-            placeholder="Message the room (^all)..."
-            autocomplete="off"
-          />
-          <button id="chat-send-btn" type="button">Send</button>
-        </div>
-        <div id="chat-send-status" class="chat-send-status"></div>
       </div>
     </section>
 
@@ -2526,10 +2796,12 @@ def _render_html(
     const nodeNameCacheStorageKey = "meshDashboardNodeNameCacheV1";
     const splitStorageKey = "meshDashboardLayoutSplitState";
     const chatBottomStickThresholdPx = 28;
+    const chatWarnWindowSeconds = 10 * 60;
+    const chatStaleWindowSeconds = 30 * 60;
+    const chatRosterMaxEntries = 180;
     const consoleMaxLines = 1200;
     const tableSortState = {{
       "nodes-table": {{ index: 0, dir: "desc" }},
-      "chat-table": {{ index: 0, dir: "asc" }},
       "links-table": {{ index: 2, dir: "desc" }},
       "ports-table": {{ index: 1, dir: "desc" }},
       "packets-table": {{ index: 0, dir: "desc" }},
@@ -2816,9 +3088,9 @@ def _render_html(
     }}
 
     function getChatScroller() {{
-      const table = document.getElementById("chat-table");
-      if (!(table instanceof HTMLTableElement)) return null;
-      const scroller = table.closest(".scroll");
+      const feed = document.getElementById("chat-feed");
+      if (!(feed instanceof HTMLElement)) return null;
+      const scroller = feed.closest(".scroll");
       return scroller instanceof HTMLElement ? scroller : null;
     }}
 
@@ -2844,6 +3116,45 @@ def _render_html(
       return num / (1024 ** 3);
     }}
 
+    function parseDashboardTimeToUnix(value) {{
+      const text = String(value == null ? "" : value).trim();
+      if (!text) return null;
+      const iso = text.includes("T") ? text : text.replace(" ", "T");
+      const parsed = Date.parse(iso);
+      if (!Number.isFinite(parsed)) return null;
+      return Math.floor(parsed / 1000);
+    }}
+
+    function nodeLastHeardUnix(node) {{
+      if (!node || typeof node !== "object") return null;
+      const raw = Number(node.last_heard_unix);
+      if (Number.isFinite(raw) && raw > 0) {{
+        return Math.floor(raw);
+      }}
+      return parseDashboardTimeToUnix(node.last_heard);
+    }}
+
+    function freshnessStatus(lastSeenUnix, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const ts = Number(lastSeenUnix);
+      if (!Number.isFinite(ts) || ts <= 0) return "unknown";
+      const age = Math.max(0, nowUnix - ts);
+      if (age <= chatWarnWindowSeconds) return "online";
+      if (age <= chatStaleWindowSeconds) return "warn";
+      return "stale";
+    }}
+
+    function statusRank(status) {{
+      const key = String(status || "unknown");
+      if (key === "online") return 0;
+      if (key === "warn") return 1;
+      if (key === "stale") return 2;
+      return 3;
+    }}
+
+    function pickFresherStatus(currentStatus, nextStatus) {{
+      return statusRank(nextStatus) < statusRank(currentStatus) ? nextStatus : currentStatus;
+    }}
+
     function setChatSendStatus(message, isError = false) {{
       const el = document.getElementById("chat-send-status");
       if (!(el instanceof HTMLElement)) return;
@@ -2854,13 +3165,20 @@ def _render_html(
     function setChatSendBusy(isBusy) {{
       chatSendInFlight = !!isBusy;
       const btn = document.getElementById("chat-send-btn");
+      const emojiBtn = document.getElementById("chat-emoji-btn");
       const input = document.getElementById("chat-input");
       if (btn instanceof HTMLButtonElement) {{
         btn.disabled = chatSendInFlight;
         btn.textContent = chatSendInFlight ? "Sending..." : "Send";
       }}
+      if (emojiBtn instanceof HTMLButtonElement) {{
+        emojiBtn.disabled = chatSendInFlight;
+      }}
       if (input instanceof HTMLInputElement) {{
         input.disabled = chatSendInFlight;
+      }}
+      if (chatSendInFlight) {{
+        closeChatEmojiPanel();
       }}
     }}
 
@@ -2901,6 +3219,92 @@ def _render_html(
       }}
     }}
 
+    function closeChatEmojiPanel() {{
+      const panel = document.getElementById("chat-emoji-panel");
+      const btn = document.getElementById("chat-emoji-btn");
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = true;
+      }}
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", "false");
+      }}
+    }}
+
+    function insertEmojiAtCursor(emoji) {{
+      const input = document.getElementById("chat-input");
+      if (!(input instanceof HTMLInputElement)) return;
+      const value = input.value || "";
+      const start = Number.isFinite(input.selectionStart) ? input.selectionStart : value.length;
+      const end = Number.isFinite(input.selectionEnd) ? input.selectionEnd : value.length;
+      input.value = value.slice(0, start) + emoji + value.slice(end);
+      const next = start + emoji.length;
+      input.focus({{ preventScroll: true }});
+      input.setSelectionRange(next, next);
+    }}
+
+    function bindEmojiPicker() {{
+      const panel = document.getElementById("chat-emoji-panel");
+      const btn = document.getElementById("chat-emoji-btn");
+      if (!(panel instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
+
+      if (panel.dataset.init !== "1") {{
+        const emojis = [
+          "😀", "😁", "😂", "🤣", "😊", "😉", "😎", "🤔",
+          "👍", "👎", "👏", "🙏", "✅", "❌", "⚠️", "🔥",
+          "❤️", "💯", "📡", "📶", "🛰️", "🏠", "🚗", "🎯",
+        ];
+        panel.innerHTML = `<div class="chat-emoji-grid">${{emojis.map((emoji) => (
+          `<button type="button" class="chat-emoji-item" data-emoji="${{escAttr(emoji)}}" title="${{escAttr(emoji)}}">${{escAttr(emoji)}}</button>`
+        )).join("")}}</div>`;
+        panel.dataset.init = "1";
+      }}
+
+      if (btn.dataset.emojiBound !== "1") {{
+        btn.dataset.emojiBound = "1";
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          if (chatSendInFlight) return;
+          const shouldOpen = panel.hidden;
+          if (shouldOpen) {{
+            panel.hidden = false;
+            btn.setAttribute("aria-expanded", "true");
+          }} else {{
+            closeChatEmojiPanel();
+          }}
+        }});
+      }}
+
+      if (panel.dataset.bound !== "1") {{
+        panel.dataset.bound = "1";
+        panel.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const emojiBtn = target.closest(".chat-emoji-item");
+          if (!(emojiBtn instanceof HTMLButtonElement)) return;
+          const emoji = String(emojiBtn.getAttribute("data-emoji") || emojiBtn.textContent || "").trim();
+          if (!emoji) return;
+          insertEmojiAtCursor(emoji);
+          closeChatEmojiPanel();
+        }});
+      }}
+
+      if (document.body.dataset.chatEmojiCloseBound !== "1") {{
+        document.body.dataset.chatEmojiCloseBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          if (!target.closest("#chat-emoji-panel") && !target.closest("#chat-emoji-btn")) {{
+            closeChatEmojiPanel();
+          }}
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key === "Escape") {{
+            closeChatEmojiPanel();
+          }}
+        }});
+      }}
+    }}
+
     function bindChatComposer() {{
       const btn = document.getElementById("chat-send-btn");
       if (btn instanceof HTMLButtonElement && btn.dataset.bound !== "1") {{
@@ -2920,6 +3324,8 @@ def _render_html(
           }}
         }});
       }}
+
+      bindEmojiPicker();
     }}
 
     function nodeLabel(node) {{
@@ -3362,9 +3768,13 @@ def _render_html(
         const nodeId = normalizeNodeId(row.dataset.nodeId || "");
         row.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
       }}
-      for (const row of document.querySelectorAll("#chat-table tbody tr")) {{
-        const nodeId = normalizeNodeId(row.dataset.nodeId || "");
-        row.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item")) {{
+        const nodeId = normalizeNodeId(item.dataset.nodeId || "");
+        item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+      }}
+      for (const member of document.querySelectorAll("#chat-room-list .chat-member-item")) {{
+        const nodeId = normalizeNodeId(member.dataset.nodeId || "");
+        member.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
       }}
     }}
 
@@ -3375,7 +3785,8 @@ def _render_html(
       }}
 
       let didScroll = false;
-      for (const tableId of ["nodes-table", "chat-table"]) {{
+      // Keep chat stable; selection auto-scroll only applies to the node list.
+      for (const tableId of ["nodes-table"]) {{
         let targetRow = null;
         for (const row of document.querySelectorAll(`#${{tableId}} tbody tr`)) {{
           if (normalizeNodeId(row.dataset.nodeId || "") === selectedNodeId) {{
@@ -3526,10 +3937,10 @@ def _render_html(
       }}
     }}
 
-    function bindChatRowClicks() {{
-      for (const row of document.querySelectorAll("#chat-table tbody tr.chat-selectable")) {{
-        row.addEventListener("click", () => {{
-          selectNode(row.dataset.nodeId || "", true);
+    function bindChatFeedClicks() {{
+      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item.chat-selectable")) {{
+        item.addEventListener("click", () => {{
+          selectNode(item.dataset.nodeId || "", true);
         }});
       }}
     }}
@@ -3971,9 +4382,8 @@ def _render_html(
       const s = state.summary || {{}};
       const chatScroller = getChatScroller();
       const shouldStickBottom = !!(chatScroller && (chatStickToBottom || isNearBottom(chatScroller)));
-      // Keep chat behaving like chat, not a generic sortable table.
-      tableSortState["chat-table"] = {{ index: 0, dir: "asc" }};
       updateNodeNameCache(state.nodes || []);
+      const nowUnix = Math.floor(Date.now() / 1000);
       const nodesById = new Map(
         (state.nodes || []).map((node) => [normalizeNodeId(node.id || ""), node])
       );
@@ -3981,24 +4391,79 @@ def _render_html(
       const chatEndpointParts = (nodeId) => {{
         const clean = normalizeNodeId(nodeId);
         if (!clean) {{
-          return {{ label: "n/a", idTag: "", title: "n/a" }};
+          return {{ label: "n/a", idTag: "", title: "n/a", status: "unknown" }};
         }}
         if (clean === "^all") {{
-          return {{ label: "All", idTag: "", title: "^all" }};
+          return {{ label: "All", idTag: "", title: "^all", status: "unknown" }};
         }}
         if (clean === "local") {{
-          return {{ label: "Local", idTag: "", title: "local" }};
+          return {{ label: "Local", idTag: "", title: "local", status: "online" }};
         }}
         const node = nodesById.get(clean);
         const name = preferredNodeName(node) || nodeNameCache.get(clean) || "Unknown node";
+        const lastHeard = nodeLastHeardUnix(node);
+        const status = freshnessStatus(lastHeard, nowUnix);
         return {{
           label: name,
           idTag: clean,
           title: `${{name}} (${{clean}})`,
+          status,
         }};
       }};
 
-      const rows = (traffic.recent_chat || []).slice().reverse().slice(0, 120).map((msg) => {{
+      const participants = new Map();
+      const touchParticipant = (meta, msgTimeUnix) => {{
+        if (!meta || !meta.idTag || !isSelectableNodeId(meta.idTag)) return;
+        const existing = participants.get(meta.idTag);
+        if (!existing) {{
+          participants.set(meta.idTag, {{
+            id: meta.idTag,
+            name: meta.label || meta.idTag,
+            status: String(meta.status || "unknown"),
+            lastMessageUnix: msgTimeUnix || null,
+          }});
+          return;
+        }}
+        if (meta.label && meta.label !== "Unknown node") {{
+          existing.name = meta.label;
+        }}
+        existing.status = pickFresherStatus(existing.status, String(meta.status || "unknown"));
+        if (msgTimeUnix && (!existing.lastMessageUnix || msgTimeUnix > existing.lastMessageUnix)) {{
+          existing.lastMessageUnix = msgTimeUnix;
+        }}
+      }};
+
+      for (const node of (state.nodes || [])) {{
+        const nodeId = normalizeNodeId(node.id || "");
+        if (!isSelectableNodeId(nodeId)) continue;
+        const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || nodeId;
+        const lastHeard = nodeLastHeardUnix(node);
+        const status = freshnessStatus(lastHeard, nowUnix);
+        const existing = participants.get(nodeId);
+        if (!existing) {{
+          participants.set(nodeId, {{
+            id: nodeId,
+            name,
+            status,
+            lastMessageUnix: lastHeard || null,
+          }});
+        }} else {{
+          existing.name = existing.name || name;
+          existing.status = pickFresherStatus(existing.status, status);
+          if (lastHeard && (!existing.lastMessageUnix || lastHeard > existing.lastMessageUnix)) {{
+            existing.lastMessageUnix = lastHeard;
+          }}
+        }}
+      }}
+
+      const escapeChatText = (value) => {{
+        const clean = String(value == null ? "" : value);
+        const escaped = escAttr(clean);
+        return escaped.replace(/\\n/g, "<br/>");
+      }};
+
+      const messages = (traffic.recent_chat || []).slice(-240);
+      const feedItems = messages.map((msg) => {{
         const sourceNode = normalizeNodeId(msg.from);
         const fallbackNode = normalizeNodeId(msg.to);
         const primarySelectable = isSelectableNodeId(sourceNode) ? sourceNode : "";
@@ -4007,26 +4472,67 @@ def _render_html(
         const selectableClass = nodeId ? "chat-selectable" : "";
         const fromMeta = chatEndpointParts(sourceNode);
         const toMeta = chatEndpointParts(fallbackNode);
-        return `<tr data-node-id="${{escAttr(nodeId)}}" class="${{selectableClass}}">
-          <td data-sort="${{escAttr(msg.rx_time || msg.captured_at || "")}}">${{msg.rx_time || msg.captured_at || "n/a"}}</td>
-          <td data-sort="${{escAttr(fromMeta.label)}}" title="${{escAttr(fromMeta.title)}}">
-            <span class="chat-endpoint">
-              <span class="chat-name">${{escAttr(fromMeta.label)}}</span>
-              ${{fromMeta.idTag ? `<span class="chat-id-bg">${{escAttr(fromMeta.idTag)}}</span>` : ""}}
+        const msgTimeUnix = parseDashboardTimeToUnix(msg.rx_time || msg.captured_at || "");
+        touchParticipant(fromMeta, msgTimeUnix);
+        touchParticipant(toMeta, msgTimeUnix);
+        const timeText = msg.rx_time || msg.captured_at || "n/a";
+        const textHtml = escapeChatText(msg.text || "");
+        return `<div data-node-id="${{escAttr(nodeId)}}" class="chat-feed-item ${{selectableClass}}">
+          <div class="chat-feed-meta">
+            <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
+              <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
+              ${{fromMeta.idTag ? `<span class="chat-id-bg status-${{fromMeta.status}}">${{escAttr(fromMeta.idTag)}}</span>` : ""}}
             </span>
-          </td>
-          <td data-sort="${{escAttr(toMeta.label)}}" title="${{escAttr(toMeta.title)}}">
-            <span class="chat-endpoint">
-              <span class="chat-name">${{escAttr(toMeta.label)}}</span>
-              ${{toMeta.idTag ? `<span class="chat-id-bg">${{escAttr(toMeta.idTag)}}</span>` : ""}}
+            <span class="chat-feed-arrow">&rarr;</span>
+            <span class="chat-endpoint" title="${{escAttr(toMeta.title)}}">
+              <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
+              ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
-          </td>
-          <td data-sort="${{escAttr(msg.text || "")}}">${{msg.text || ""}}</td>
-        </tr>`;
+            <span class="chat-feed-time">${{escAttr(timeText)}}</span>
+          </div>
+          <div class="chat-feed-text">${{textHtml || "&nbsp;"}}</div>
+        </div>`;
       }});
-      fillTable("chat-table", rows);
+      const feed = document.getElementById("chat-feed");
+      if (feed) {{
+        feed.innerHTML = feedItems.length > 0
+          ? feedItems.join("")
+          : '<div class="chat-feed-empty">No chat messages yet.</div>';
+      }}
+
+      const roomList = document.getElementById("chat-room-list");
+      const roster = Array.from(participants.values())
+        .sort((a, b) => {{
+          const rankDiff = statusRank(a.status) - statusRank(b.status);
+          if (rankDiff !== 0) return rankDiff;
+          const aTime = a.lastMessageUnix || 0;
+          const bTime = b.lastMessageUnix || 0;
+          if (aTime !== bTime) return bTime - aTime;
+          return String(a.name || a.id).localeCompare(String(b.name || b.id));
+        }})
+        .slice(0, chatRosterMaxEntries);
+      const onlineCount = roster.filter((item) => item.status === "online").length;
+      const warnCount = roster.filter((item) => item.status === "warn").length;
+      const staleCount = roster.filter((item) => item.status === "stale").length;
+      if (roomList) {{
+        roomList.innerHTML = roster.map((item) => (
+          `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(`${{item.name}} (${{item.id}})`)}}">
+            <span class="chat-member-status status-${{item.status}}">●</span>
+            <span class="chat-member-main">
+              <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
+              <span class="chat-member-id">${{escAttr(item.id)}}</span>
+            </span>
+          </div>`
+        )).join("");
+        for (const member of roomList.querySelectorAll(".chat-member-item")) {{
+          member.addEventListener("click", () => {{
+            selectNode(member.dataset.nodeId || "", true);
+          }});
+        }}
+      }}
+
       bindChatAutoScroll();
-      bindChatRowClicks();
+      bindChatFeedClicks();
       highlightNodeSelection();
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
@@ -4040,7 +4546,7 @@ def _render_html(
       const caption = document.getElementById("chat-caption");
       if (caption) {{
         const preset = s.modem_preset || "unknown";
-        caption.textContent = `LoRa preset: ${{preset}}. Showing decoded text messages from recent packets.`;
+        caption.textContent = `LoRa preset: ${{preset}}. Room: ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.`;
       }}
     }}
 
