@@ -991,10 +991,20 @@ def _render_html(
     .layout {{
       --split-left-pct: 64%;
       --splitter-size: 8px;
+      --split-top-px: 500px;
+      --split-mid-px: 300px;
       display: grid;
       gap: 8px;
       padding: 8px;
       grid-template-columns: minmax(380px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
+      grid-template-rows:
+        auto
+        minmax(260px, var(--split-top-px))
+        var(--splitter-size)
+        minmax(200px, var(--split-mid-px))
+        var(--splitter-size)
+        auto
+        auto;
       align-items: stretch;
     }}
     .card {{
@@ -1069,12 +1079,25 @@ def _render_html(
       flex-direction: column;
       min-height: 0;
     }}
-    .map-data {{ grid-column: 3; grid-row: 3; }}
-    .nodes {{ grid-column: 1; grid-row: 3; }}
-    .nodes .scroll {{ max-height: 470px; }}
-    .packets {{ grid-column: 1; grid-row: 4; }}
-    .raw {{ grid-column: 3; grid-row: 4; }}
-    .console {{ grid-column: 1 / span 3; grid-row: 5; }}
+    .map-data {{ grid-column: 3; grid-row: 4; }}
+    .nodes {{
+      grid-column: 1;
+      grid-row: 4;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .nodes .body {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .nodes .scroll {{
+      max-height: none;
+      min-height: 0;
+    }}
+    .packets {{ grid-column: 1; grid-row: 6; }}
+    .raw {{ grid-column: 3; grid-row: 6; }}
+    .console {{ grid-column: 1 / span 3; grid-row: 7; }}
     .splitter {{
       grid-column: 2;
       position: relative;
@@ -1087,8 +1110,8 @@ def _render_html(
       min-width: 6px;
     }}
     .splitter[data-row="2"] {{ grid-row: 2; }}
-    .splitter[data-row="3"] {{ grid-row: 3; }}
     .splitter[data-row="4"] {{ grid-row: 4; }}
+    .splitter[data-row="6"] {{ grid-row: 6; }}
     .splitter::before {{
       content: "";
       position: absolute;
@@ -1103,8 +1126,39 @@ def _render_html(
     .splitter:hover::before, .splitter.active::before {{
       background: #2f855a;
     }}
-    body.resizing-panels, body.resizing-panels * {{
+    .hsplitter {{
+      grid-column: 1 / span 3;
+      position: relative;
+      border-radius: 8px;
+      border: 1px solid #d1e0cb;
+      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+      cursor: row-resize;
+      touch-action: none;
+      user-select: none;
+      min-height: 6px;
+    }}
+    .hsplitter[data-target="top"] {{ grid-row: 3; }}
+    .hsplitter[data-target="mid"] {{ grid-row: 5; }}
+    .hsplitter::before {{
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      background: #b8cab9;
+      border-radius: 1px;
+    }}
+    .hsplitter:hover::before, .hsplitter.active::before {{
+      background: #2f855a;
+    }}
+    body.resizing-panels-x, body.resizing-panels-x * {{
       cursor: col-resize !important;
+      user-select: none !important;
+    }}
+    body.resizing-panels-y, body.resizing-panels-y * {{
+      cursor: row-resize !important;
       user-select: none !important;
     }}
     table {{
@@ -1179,7 +1233,7 @@ def _render_html(
     .chat .scroll {{
       flex: 1;
       max-height: none;
-      min-height: 220px;
+      min-height: 0;
     }}
     #chat-table {{
       table-layout: auto;
@@ -1299,8 +1353,11 @@ def _render_html(
       word-break: break-word;
     }}
     @media (max-width: 1100px) {{
-      .layout {{ grid-template-columns: 1fr; }}
-      .splitter {{ display: none; }}
+      .layout {{
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+      }}
+      .splitter, .hsplitter {{ display: none; }}
       .summary, .map, .map-data, .nodes, .chat, .packets, .raw, .console {{ grid-column: 1; grid-row: auto; }}
       .map-frame {{ max-width: none; }}
       .nodes .scroll {{ max-height: 360px; }}
@@ -1371,6 +1428,8 @@ def _render_html(
       </div>
     </section>
 
+    <div class="hsplitter" data-target="top" title="Drag to resize top and middle panels"></div>
+
     <section class="card nodes">
       <h2>Nodes</h2>
       <div class="body scroll">
@@ -1385,7 +1444,7 @@ def _render_html(
       </div>
     </section>
 
-    <div class="splitter" data-row="3" title="Drag to resize columns"></div>
+    <div class="splitter" data-row="4" title="Drag to resize columns"></div>
 
     <section class="card map-data">
       <h2>Map Data</h2>
@@ -1407,6 +1466,8 @@ def _render_html(
       </div>
     </section>
 
+    <div class="hsplitter" data-target="mid" title="Drag to resize middle and lower panels"></div>
+
     <section class="card packets">
       <h2>Recent Packets</h2>
       <div class="body scroll">
@@ -1421,7 +1482,7 @@ def _render_html(
       </div>
     </section>
 
-    <div class="splitter" data-row="4" title="Drag to resize columns"></div>
+    <div class="splitter" data-row="6" title="Drag to resize columns"></div>
 
     <section class="card raw">
       <h2>Raw Data</h2>
@@ -1473,7 +1534,7 @@ def _render_html(
     const edgeLayer = L.layerGroup().addTo(map);
     const nodeMarkers = new Map();
     const selectionStorageKey = "meshDashboardSelectedNodeId";
-    const splitStorageKey = "meshDashboardSplitPct";
+    const splitStorageKey = "meshDashboardLayoutSplitState";
     const consoleMaxLines = 1200;
     const tableSortState = {{
       "nodes-table": {{ index: 0, dir: "desc" }},
@@ -1493,6 +1554,8 @@ def _render_html(
     let lastMapSignature = "";
     let mapResizeRaf = null;
     let splitPct = 64;
+    let splitTopPx = 500;
+    let splitMidPx = 300;
     let consoleAutoscroll = true;
     let fitDone = false;
     let mapResizeObserver = null;
@@ -1513,6 +1576,9 @@ def _render_html(
     }}
 
     function syncMapSize() {{
+      splitTopPx = clampTopSplitPx(splitTopPx);
+      splitMidPx = clampMidSplitPx(splitMidPx);
+      applySplitState();
       requestMapResize();
     }}
 
@@ -1825,26 +1891,58 @@ def _render_html(
       return Math.max(42, Math.min(78, value));
     }}
 
-    function applySplitPct(value) {{
+    function clampTopSplitPx(value) {{
+      const max = Math.max(340, Math.min(900, window.innerHeight - 210));
+      return Math.max(260, Math.min(max, value));
+    }}
+
+    function clampMidSplitPx(value) {{
+      const max = Math.max(240, Math.min(760, window.innerHeight - 280));
+      return Math.max(190, Math.min(max, value));
+    }}
+
+    function applySplitState() {{
       const layout = document.querySelector(".layout");
-      if (!layout) return;
-      layout.style.setProperty("--split-left-pct", `${{value}}%`);
+      if (!(layout instanceof HTMLElement)) return;
+      layout.style.setProperty("--split-left-pct", `${{splitPct}}%`);
+      layout.style.setProperty("--split-top-px", `${{splitTopPx}}px`);
+      layout.style.setProperty("--split-mid-px", `${{splitMidPx}}px`);
     }}
 
     function loadSplitState() {{
       try {{
-        const stored = Number.parseFloat(window.localStorage.getItem(splitStorageKey) || "");
-        if (Number.isFinite(stored)) {{
-          splitPct = clampSplitPct(stored);
+        const raw = window.localStorage.getItem(splitStorageKey) || "";
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {{
+            if (Number.isFinite(parsed.col_pct)) {{
+              splitPct = clampSplitPct(Number(parsed.col_pct));
+            }}
+            if (Number.isFinite(parsed.top_px)) {{
+              splitTopPx = clampTopSplitPx(Number(parsed.top_px));
+            }}
+            if (Number.isFinite(parsed.mid_px)) {{
+              splitMidPx = clampMidSplitPx(Number(parsed.mid_px));
+            }}
+          }} else if (Number.isFinite(parsed)) {{
+            splitPct = clampSplitPct(Number(parsed));
+          }}
         }}
       }} catch (_err) {{
       }}
-      applySplitPct(splitPct);
+      applySplitState();
     }}
 
     function persistSplitState() {{
       try {{
-        window.localStorage.setItem(splitStorageKey, String(splitPct));
+        window.localStorage.setItem(
+          splitStorageKey,
+          JSON.stringify({{
+            col_pct: splitPct,
+            top_px: splitTopPx,
+            mid_px: splitMidPx,
+          }})
+        );
       }} catch (_err) {{
       }}
     }}
@@ -1853,7 +1951,7 @@ def _render_html(
       const layout = document.querySelector(".layout");
       if (!(layout instanceof HTMLElement)) return;
 
-      for (const splitter of document.querySelectorAll(".splitter")) {{
+      for (const splitter of document.querySelectorAll(".splitter, .hsplitter")) {{
         if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") continue;
         splitter.dataset.bound = "1";
 
@@ -1861,20 +1959,34 @@ def _render_html(
           if (window.matchMedia("(max-width: 1100px)").matches) return;
           ev.preventDefault();
           splitter.classList.add("active");
-          document.body.classList.add("resizing-panels");
+          const isHorizontal = splitter.classList.contains("hsplitter");
+          document.body.classList.add(isHorizontal ? "resizing-panels-y" : "resizing-panels-x");
           splitter.setPointerCapture(ev.pointerId);
-
           const rect = layout.getBoundingClientRect();
+          const startY = ev.clientY;
+          const target = splitter.dataset.target || "";
+          const startTop = splitTopPx;
+          const startMid = splitMidPx;
+
           const onMove = (moveEv) => {{
-            const pct = clampSplitPct(((moveEv.clientX - rect.left) / rect.width) * 100);
-            splitPct = pct;
-            applySplitPct(splitPct);
+            if (isHorizontal) {{
+              const deltaY = moveEv.clientY - startY;
+              if (target === "top") {{
+                splitTopPx = clampTopSplitPx(startTop + deltaY);
+              }} else if (target === "mid") {{
+                splitMidPx = clampMidSplitPx(startMid + deltaY);
+              }}
+            }} else {{
+              const pct = clampSplitPct(((moveEv.clientX - rect.left) / rect.width) * 100);
+              splitPct = pct;
+            }}
+            applySplitState();
             requestMapResize();
           }};
 
           const onUp = () => {{
             splitter.classList.remove("active");
-            document.body.classList.remove("resizing-panels");
+            document.body.classList.remove("resizing-panels-x", "resizing-panels-y");
             persistSplitState();
             requestMapResize();
             splitter.removeEventListener("pointermove", onMove);
