@@ -2191,13 +2191,14 @@ def _render_html(
     .chat-main-pane {{
       grid-area: log;
       grid-column: 1;
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto auto;
+      row-gap: 6px;
       min-height: 0;
-      gap: 6px;
       overflow: hidden;
     }}
     .chat-log-scroll {{
+      grid-row: 1;
       flex: 1 1 auto;
       max-height: none;
       min-height: 0;
@@ -2269,8 +2270,7 @@ def _render_html(
       background: #f8fcf8;
     }}
     .chat-composer {{
-      order: 3;
-      margin-top: auto;
+      grid-row: 3;
       position: relative;
       display: flex;
       gap: 6px;
@@ -2364,11 +2364,14 @@ def _render_html(
       border-color: #b4d0bd;
     }}
     .chat-send-status {{
-      order: 2;
-      min-height: 14px;
+      grid-row: 2;
+      min-height: 0;
       font-size: 10px;
       color: #446551;
       line-height: 1.25;
+    }}
+    .chat-send-status:empty {{
+      display: none;
     }}
     .chat-send-status.error {{
       color: #b43b3b;
@@ -2422,7 +2425,7 @@ def _render_html(
     }}
     .chat-log-scroll.scroll {{
       max-height: none;
-      height: 100%;
+      height: auto;
       overflow: auto;
     }}
     .scroll.wheel-scroll-active,
@@ -4462,7 +4465,7 @@ def _render_html(
         return escaped.replace(/\\n/g, "<br/>");
       }};
 
-      const messages = (traffic.recent_chat || []).slice(-240);
+      const messages = traffic.recent_chat || [];
       const feedItems = messages.map((msg) => {{
         const sourceNode = normalizeNodeId(msg.from);
         const fallbackNode = normalizeNodeId(msg.to);
