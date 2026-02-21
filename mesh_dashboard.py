@@ -9,7 +9,7 @@ from collections import Counter, deque
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import meshtastic
 from mesh_connection import add_mesh_connection_args, mesh_target_label, open_mesh_interface
@@ -36,6 +36,8 @@ DEFAULT_HISTORY_RETENTION_DAYS = 7
 DEFAULT_HISTORY_EVENT_MAX_ROWS = 200000
 DEFAULT_HISTORY_EVENT_RETENTION_DAYS = 30
 DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS = 365
+DEFAULT_NODE_HISTORY_HOURS = 72
+DEFAULT_NODE_HISTORY_MAX_POINTS = 1440
 MIN_REAL_LINK_COUNT = 2
 
 SENSITIVE_FIELD_NAMES = {
@@ -496,6 +498,129 @@ class HistoryStore:
                 }
             )
         return out
+
+    def load_node_history(self, node_id: str, window_hours: int, max_points: int) -> Dict[str, Any]:
+        clean_node_id = str(node_id or "").strip()
+        if not clean_node_id:
+            return {"node_id": "", "window_hours": max(1, int(window_hours)), "points": [], "summary": {}}
+
+        hours = max(1, int(window_hours))
+        limit = max(20, min(10000, int(max_points)))
+        cutoff = int(time.time()) - (hours * 3600)
+
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT bucket_unix, packet_count,
+                       snr_sum, snr_count, snr_min, snr_max,
+                       rssi_sum, rssi_count, rssi_min, rssi_max,
+                       hops_sum, hops_count, hops_min, hops_max,
+                       last_seen_unix
+                FROM node_metrics_1m
+                WHERE node_id = ? AND bucket_unix >= ?
+                ORDER BY bucket_unix DESC
+                LIMIT ?
+                """,
+                (clean_node_id, cutoff, limit),
+            ).fetchall()
+
+        points: list[Dict[str, Any]] = []
+        total_packets = 0
+        snr_min_all: Optional[float] = None
+        snr_max_all: Optional[float] = None
+        rssi_min_all: Optional[float] = None
+        rssi_max_all: Optional[float] = None
+        first_bucket: Optional[int] = None
+        last_bucket: Optional[int] = None
+        last_seen: Optional[int] = None
+
+        for row in reversed(rows):
+            (
+                bucket_unix,
+                packet_count,
+                snr_sum,
+                snr_count,
+                snr_min,
+                snr_max,
+                rssi_sum,
+                rssi_count,
+                rssi_min,
+                rssi_max,
+                hops_sum,
+                hops_count,
+                hops_min,
+                hops_max,
+                last_seen_unix,
+            ) = row
+
+            bucket = _to_int(bucket_unix)
+            if bucket is None:
+                continue
+
+            packets = _to_int(packet_count) or 0
+            total_packets += packets
+            first_bucket = bucket if first_bucket is None else min(first_bucket, bucket)
+            last_bucket = bucket if last_bucket is None else max(last_bucket, bucket)
+            seen_val = _to_int(last_seen_unix)
+            if seen_val is not None:
+                last_seen = seen_val if last_seen is None else max(last_seen, seen_val)
+
+            snr_count_i = _to_int(snr_count) or 0
+            rssi_count_i = _to_int(rssi_count) or 0
+            hops_count_i = _to_int(hops_count) or 0
+            snr_avg = (_to_float(snr_sum) or 0.0) / snr_count_i if snr_count_i > 0 else None
+            rssi_avg = (_to_float(rssi_sum) or 0.0) / rssi_count_i if rssi_count_i > 0 else None
+            hops_avg = (_to_float(hops_sum) or 0.0) / hops_count_i if hops_count_i > 0 else None
+
+            snr_min_v = _to_float(snr_min)
+            snr_max_v = _to_float(snr_max)
+            rssi_min_v = _to_float(rssi_min)
+            rssi_max_v = _to_float(rssi_max)
+
+            if snr_min_v is not None:
+                snr_min_all = snr_min_v if snr_min_all is None else min(snr_min_all, snr_min_v)
+            if snr_max_v is not None:
+                snr_max_all = snr_max_v if snr_max_all is None else max(snr_max_all, snr_max_v)
+            if rssi_min_v is not None:
+                rssi_min_all = rssi_min_v if rssi_min_all is None else min(rssi_min_all, rssi_min_v)
+            if rssi_max_v is not None:
+                rssi_max_all = rssi_max_v if rssi_max_all is None else max(rssi_max_all, rssi_max_v)
+
+            points.append(
+                {
+                    "bucket_unix": bucket,
+                    "bucket_time": _format_epoch(bucket),
+                    "packet_count": packets,
+                    "avg_snr": round(snr_avg, 2) if snr_avg is not None else None,
+                    "min_snr": snr_min_v,
+                    "max_snr": snr_max_v,
+                    "avg_rssi": round(rssi_avg, 2) if rssi_avg is not None else None,
+                    "min_rssi": rssi_min_v,
+                    "max_rssi": rssi_max_v,
+                    "avg_hops": round(hops_avg, 2) if hops_avg is not None else None,
+                    "min_hops": _to_int(hops_min),
+                    "max_hops": _to_int(hops_max),
+                    "hops_samples": hops_count_i,
+                    "last_seen": _format_epoch(last_seen_unix),
+                }
+            )
+
+        return {
+            "node_id": clean_node_id,
+            "window_hours": hours,
+            "points": points,
+            "summary": {
+                "total_packets": total_packets,
+                "points": len(points),
+                "first_bucket": _format_epoch(first_bucket),
+                "last_bucket": _format_epoch(last_bucket),
+                "last_seen": _format_epoch(last_seen),
+                "snr_min": snr_min_all,
+                "snr_max": snr_max_all,
+                "rssi_min": rssi_min_all,
+                "rssi_max": rssi_max_all,
+            },
+        }
 
     def save_connection_event(
         self,
@@ -1398,6 +1523,8 @@ def _render_html(
     history_enabled: bool,
     history_max_rows: int,
     history_retention_days: int,
+    node_history_hours: int,
+    node_history_max_points: int,
 ) -> str:
     safety_label = "Secrets visible" if show_secrets else "Secrets redacted"
     history_label = "History: off"
@@ -1543,7 +1670,129 @@ def _render_html(
       flex-direction: column;
       min-height: 0;
     }}
-    .map-data {{ grid-column: 3; grid-row: 4; }}
+    .map-data {{
+      grid-column: 3;
+      grid-row: 4;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .map-data .body {{
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }}
+    .map-data-live, .map-data-node {{
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1 1 auto;
+    }}
+    .map-data-live[hidden], .map-data-node[hidden] {{
+      display: none !important;
+    }}
+    .history-caption {{
+      font-size: 12px;
+      color: #3e5a46;
+      line-height: 1.35;
+    }}
+    .history-tabs {{
+      display: flex;
+      gap: 6px;
+      border-bottom: 1px solid #d7e5d2;
+      padding-bottom: 6px;
+    }}
+    .history-tab-btn {{
+      border: 1px solid #c2d8c7;
+      background: #f3faf5;
+      color: #1f5d40;
+      border-radius: 999px;
+      font-size: 11px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }}
+    .history-tab-btn.active {{
+      background: #dff1e6;
+      border-color: #87b99a;
+      color: #14442d;
+      font-weight: 600;
+    }}
+    .history-panel[hidden] {{
+      display: none !important;
+    }}
+    #signal-chart-wrap {{
+      position: relative;
+      width: 100%;
+      min-height: 220px;
+      height: 220px;
+      border: 1px solid #d7e5d2;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fbfffc 0%, #eef8f1 100%);
+      overflow: hidden;
+    }}
+    #signal-chart {{
+      width: 100%;
+      height: 100%;
+      display: block;
+    }}
+    .signal-empty {{
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #5d7467;
+      font-size: 12px;
+      text-align: center;
+      padding: 10px;
+      background: rgba(250, 255, 251, 0.9);
+    }}
+    .signal-legend {{
+      margin-top: 6px;
+      font-size: 11px;
+      color: #284a37;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }}
+    .legend-chip {{
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }}
+    .legend-chip::before {{
+      content: "";
+      width: 11px;
+      height: 2px;
+      border-radius: 1px;
+      background: currentColor;
+    }}
+    .overview-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 6px;
+    }}
+    .overview-item {{
+      border: 1px solid #d7e5d2;
+      border-radius: 8px;
+      background: #f9fdf9;
+      padding: 6px 7px;
+    }}
+    .overview-item .k {{
+      color: #5e6e64;
+      font-size: 10px;
+      text-transform: uppercase;
+    }}
+    .overview-item .v {{
+      margin-top: 2px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #193a28;
+      line-height: 1.2;
+    }}
     .nodes {{
       grid-column: 1;
       grid-row: 4;
@@ -1884,7 +2133,7 @@ def _render_html(
     <div class="splitter" data-row="2" title="Drag to resize columns"></div>
 
     <section class="card map">
-      <h2>Network Map</h2>
+      <h2 id="map-card-title">Network Map</h2>
       <div class="body">
         <div class="map-frame">
           <div id="map"></div>
@@ -1911,21 +2160,44 @@ def _render_html(
     <div class="splitter" data-row="4" title="Drag to resize columns"></div>
 
     <section class="card map-data">
-      <h2>Map Data</h2>
+      <h2 id="map-data-title">Map Data</h2>
       <div class="body">
-        <h3 style="margin:0 0 8px 0;font-size:13px;">Top Ports</h3>
-        <div class="scroll" style="max-height:150px;">
-          <table id="ports-table">
-            <thead><tr><th>Port</th><th>Count</th></tr></thead>
-            <tbody></tbody>
-          </table>
+        <div id="map-data-live" class="map-data-live">
+          <h3 style="margin:0 0 2px 0;font-size:13px;">Top Ports</h3>
+          <div class="scroll" style="max-height:150px;">
+            <table id="ports-table">
+              <thead><tr><th>Port</th><th>Count</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <h3 style="margin:2px 0 2px 0;font-size:13px;">Top Links</h3>
+          <div class="scroll" style="max-height:170px;">
+            <table id="links-table">
+              <thead><tr><th>From</th><th>To</th><th>Count</th><th>Hops</th><th>Status</th><th>Last</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
-        <h3 style="margin:10px 0 8px 0;font-size:13px;">Top Links</h3>
-        <div class="scroll" style="max-height:170px;">
-          <table id="links-table">
-            <thead><tr><th>From</th><th>To</th><th>Count</th><th>Hops</th><th>Status</th><th>Last</th></tr></thead>
-            <tbody></tbody>
-          </table>
+
+        <div id="map-data-node" class="map-data-node" hidden>
+          <div id="node-history-caption" class="history-caption">Select a node to view historical data.</div>
+          <div class="history-tabs">
+            <button class="history-tab-btn active" id="tab-btn-signal" data-tab="signal" type="button">Signal</button>
+            <button class="history-tab-btn" id="tab-btn-overview" data-tab="overview" type="button">Overview</button>
+          </div>
+          <div id="tab-panel-signal" class="history-panel">
+            <div id="signal-chart-wrap">
+              <svg id="signal-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Node signal history"></svg>
+              <div id="signal-empty" class="signal-empty" hidden>No historical signal points yet for this node.</div>
+            </div>
+            <div class="signal-legend">
+              <span class="legend-chip" style="color:#1f6f53;">Avg SNR (dB)</span>
+              <span class="legend-chip" style="color:#265d7b;">Avg RSSI (dBm)</span>
+            </div>
+          </div>
+          <div id="tab-panel-overview" class="history-panel" hidden>
+            <div id="node-history-overview" class="overview-grid"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -1979,6 +2251,8 @@ def _render_html(
   ></script>
   <script>
     const refreshMs = {refresh_ms};
+    const nodeHistoryHours = {node_history_hours};
+    const nodeHistoryMaxPoints = {node_history_max_points};
     const map = L.map("map", {{
       preferCanvas: true,
       zoomAnimation: false,
@@ -2014,7 +2288,9 @@ def _render_html(
     const consoleSeen = new Set();
     const wheelPaneSelector = ".scroll, #live-console, details pre";
     let selectedNodeId = null;
+    let activeHistoryTab = "signal";
     let pendingSelectionScroll = false;
+    let latestState = null;
     let lastMapSignature = "";
     let mapResizeRaf = null;
     let splitPct = 64;
@@ -2028,6 +2304,7 @@ def _render_html(
     let mapWheelZoomActive = false;
     let mapWheelJustArmed = false;
     let mapWheelLease = null;
+    const nodeHistoryCache = new Map();
 
     function requestMapResize() {{
       if (mapResizeRaf !== null) {{
@@ -2714,6 +2991,70 @@ def _render_html(
       marker.openPopup();
     }}
 
+    function selectedNodeFrom(nodes) {{
+      if (!selectedNodeId) return null;
+      for (const node of (nodes || [])) {{
+        if (String(node.id || "") === selectedNodeId) {{
+          return node;
+        }}
+      }}
+      return null;
+    }}
+
+    function setMapDataMode(mode) {{
+      const live = document.getElementById("map-data-live");
+      const node = document.getElementById("map-data-node");
+      const title = document.getElementById("map-data-title");
+      const nodeMode = mode === "node";
+      if (live) live.hidden = nodeMode;
+      if (node) node.hidden = !nodeMode;
+      if (title) title.textContent = nodeMode ? "Node History" : "Map Data";
+    }}
+
+    function setHistoryTab(tabName) {{
+      activeHistoryTab = tabName === "overview" ? "overview" : "signal";
+      for (const btn of document.querySelectorAll(".history-tab-btn")) {{
+        const isActive = btn.dataset.tab === activeHistoryTab;
+        btn.classList.toggle("active", isActive);
+      }}
+      const signalPanel = document.getElementById("tab-panel-signal");
+      const overviewPanel = document.getElementById("tab-panel-overview");
+      if (signalPanel) signalPanel.hidden = activeHistoryTab !== "signal";
+      if (overviewPanel) overviewPanel.hidden = activeHistoryTab !== "overview";
+    }}
+
+    function bindHistoryTabs() {{
+      for (const btn of document.querySelectorAll(".history-tab-btn")) {{
+        if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") continue;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => {{
+          setHistoryTab(btn.dataset.tab || "signal");
+        }});
+      }}
+      setHistoryTab(activeHistoryTab);
+    }}
+
+    function renderNodeHistoryLoading(nodeId) {{
+      setMapDataMode("node");
+      const caption = document.getElementById("node-history-caption");
+      if (caption) {{
+        caption.textContent = `Loading history for ${{nodeId}}...`;
+      }}
+      const overview = document.getElementById("node-history-overview");
+      if (overview) {{
+        overview.innerHTML = "";
+      }}
+      const svg = document.getElementById("signal-chart");
+      if (svg) {{
+        svg.innerHTML = "";
+      }}
+      const empty = document.getElementById("signal-empty");
+      if (empty) {{
+        empty.hidden = false;
+        empty.textContent = "Loading historical signal points...";
+      }}
+    }}
+
     function selectNode(nodeId, shouldFocus = true) {{
       if (!isSelectableNodeId(nodeId)) return;
       selectedNodeId = String(nodeId);
@@ -2723,6 +3064,10 @@ def _render_html(
       highlightNodeSelection();
       updateMapSelection(shouldFocus);
       scrollSelectionIntoView();
+      renderNodeHistoryLoading(selectedNodeId);
+      if (latestState) {{
+        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || []);
+      }}
     }}
 
     function clearNodeSelection() {{
@@ -2733,6 +3078,11 @@ def _render_html(
       highlightNodeSelection();
       updateMapSelection(false);
       map.closePopup();
+      setMapDataMode("live");
+      if (latestState) {{
+        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || []);
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null);
+      }}
     }}
 
     function bindNodeRowClicks() {{
@@ -2786,6 +3136,18 @@ def _render_html(
     }}
 
     function buildMapSignature(nodes, edges) {{
+      const selection = isSelectableNodeId(selectedNodeId) ? String(selectedNodeId) : "";
+      if (selection) {{
+        const selectedNode = selectedNodeFrom(nodes);
+        if (
+          selectedNode &&
+          typeof selectedNode.lat === "number" &&
+          typeof selectedNode.lon === "number"
+        ) {{
+          return `sel:${{selection}}:${{selectedNode.lat.toFixed(5)}},${{selectedNode.lon.toFixed(5)}}`;
+        }}
+        return `sel:${{selection}}:no-position`;
+      }}
       const nodeSig = (nodes || [])
         .filter((node) => typeof node.lat === "number" && typeof node.lon === "number")
         .map((node) => `${{node.id}}:${{node.lat.toFixed(5)}},${{node.lon.toFixed(5)}}`)
@@ -2793,7 +3155,7 @@ def _render_html(
       const edgeSig = (edges || [])
         .map((edge) => `${{edge.from}}>${{edge.to}}:${{edge.lifetime_count ?? edge.count ?? 0}}:${{edge.last_rx_time || ""}}:${{edge.last_hops ?? ""}}`)
         .join("|");
-      return `${{nodeSig}}#${{edgeSig}}`;
+      return `all#${{nodeSig}}#${{edgeSig}}`;
     }}
 
     function renderMap(nodes, edges) {{
@@ -2809,6 +3171,44 @@ def _render_html(
       nodeMarkers.clear();
       const features = [];
       const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+      const selectionMode = isSelectableNodeId(selectedNodeId);
+      const mapTitle = document.getElementById("map-card-title");
+      if (mapTitle) {{
+        mapTitle.textContent = selectionMode ? "Selected Node Map" : "Network Map";
+      }}
+
+      if (selectionMode) {{
+        const selectedNode = selectedNodeFrom(nodes);
+        if (
+          selectedNode &&
+          typeof selectedNode.lat === "number" &&
+          typeof selectedNode.lon === "number"
+        ) {{
+          const marker = L.circleMarker(
+            [selectedNode.lat, selectedNode.lon],
+            markerStyle(true)
+          );
+          marker.bindPopup(`
+            <b>${{nodeLabel(selectedNode)}}</b><br/>
+            ${{selectedNode.id}}<br/>
+            Num: ${{selectedNode.num ?? "n/a"}}<br/>
+            SNR: ${{selectedNode.snr ?? "n/a"}}<br/>
+            Last: ${{selectedNode.last_heard || "n/a"}}
+          `);
+          marker.on("click", () => {{
+            selectNode(String(selectedNode.id || ""), false);
+          }});
+          marker.addTo(nodeLayer);
+          nodeMarkers.set(String(selectedNode.id || ""), marker);
+          features.push(marker);
+          map.setView([selectedNode.lat, selectedNode.lon], Math.max(map.getZoom(), 11), {{ animate: false }});
+          marker.openPopup();
+        }} else {{
+          map.closePopup();
+        }}
+        requestMapResize();
+        return;
+      }}
 
       for (const node of nodes) {{
         if (typeof node.lat !== "number" || typeof node.lon !== "number") continue;
@@ -2913,7 +3313,154 @@ def _render_html(
       }}
     }}
 
-    function renderTraffic(traffic) {{
+    function formatMetricValue(value, decimals = 2, suffix = "") {{
+      const num = Number(value);
+      if (!Number.isFinite(num)) return "n/a";
+      return `${{num.toFixed(decimals)}}${{suffix}}`;
+    }}
+
+    function renderSignalChart(points) {{
+      const svg = document.getElementById("signal-chart");
+      const empty = document.getElementById("signal-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+
+      const rows = Array.isArray(points) ? points : [];
+      const width = 900;
+      const height = 220;
+      const padLeft = 44;
+      const padRight = 44;
+      const padTop = 12;
+      const padBottom = 24;
+      const plotW = width - padLeft - padRight;
+      const plotH = height - padTop - padBottom;
+
+      const snrVals = rows.map((p) => Number(p.avg_snr)).filter((v) => Number.isFinite(v));
+      const rssiVals = rows.map((p) => Number(p.avg_rssi)).filter((v) => Number.isFinite(v));
+      if (snrVals.length === 0 && rssiVals.length === 0) {{
+        svg.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = "No historical signal points yet for this node.";
+        return;
+      }}
+      empty.hidden = true;
+
+      const withSpread = (vals, fallbackMin, fallbackMax) => {{
+        if (!vals.length) return [fallbackMin, fallbackMax];
+        let lo = Math.min(...vals);
+        let hi = Math.max(...vals);
+        if (Math.abs(hi - lo) < 0.001) {{
+          lo -= 1;
+          hi += 1;
+        }}
+        return [lo, hi];
+      }};
+
+      const [snrMin, snrMax] = withSpread(snrVals, -20, 20);
+      const [rssiMin, rssiMax] = withSpread(rssiVals, -130, -60);
+      const xAt = (idx, total) => (
+        padLeft + ((Math.max(0, idx) / Math.max(1, total - 1)) * plotW)
+      );
+      const yFrom = (value, minVal, maxVal) => (
+        padTop + ((maxVal - value) / (maxVal - minVal)) * plotH
+      );
+
+      const buildPath = (metricKey, minVal, maxVal) => {{
+        const n = rows.length;
+        let d = "";
+        let started = false;
+        for (let i = 0; i < n; i += 1) {{
+          const raw = Number(rows[i][metricKey]);
+          if (!Number.isFinite(raw)) continue;
+          const x = xAt(i, n);
+          const y = yFrom(raw, minVal, maxVal);
+          d += `${{started ? " L " : "M "}}${{x.toFixed(2)}} ${{y.toFixed(2)}}`;
+          started = true;
+        }}
+        return d;
+      }};
+
+      const snrPath = buildPath("avg_snr", snrMin, snrMax);
+      const rssiPath = buildPath("avg_rssi", rssiMin, rssiMax);
+      const midY = padTop + (plotH / 2);
+
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.innerHTML = `
+        <rect x="0" y="0" width="${{width}}" height="${{height}}" fill="none"></rect>
+        <line x1="${{padLeft}}" y1="${{midY.toFixed(2)}}" x2="${{width - padRight}}" y2="${{midY.toFixed(2)}}" stroke="#dce8df" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="#dce8df" stroke-width="1"></line>
+        <line x1="${{width - padRight}}" y1="${{padTop}}" x2="${{width - padRight}}" y2="${{height - padBottom}}" stroke="#dce8df" stroke-width="1"></line>
+        ${{snrPath ? `<path d="${{snrPath}}" fill="none" stroke="#1f6f53" stroke-width="2"></path>` : ""}}
+        ${{rssiPath ? `<path d="${{rssiPath}}" fill="none" stroke="#265d7b" stroke-width="2"></path>` : ""}}
+        <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="#1f6f53">${{formatMetricValue(snrMax, 1)}}</text>
+        <text x="${{padLeft - 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="end" fill="#1f6f53">${{formatMetricValue(snrMin, 1)}}</text>
+        <text x="${{width - padRight + 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="start" fill="#265d7b">${{formatMetricValue(rssiMax, 0)}}</text>
+        <text x="${{width - padRight + 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="start" fill="#265d7b">${{formatMetricValue(rssiMin, 0)}}</text>
+      `;
+    }}
+
+    function renderNodeHistoryOverview(history, node) {{
+      const summary = history.summary || {{}};
+      const target = document.getElementById("node-history-overview");
+      if (!target) return;
+      const label = node ? nodeLabel(node) : (history.node_id || selectedNodeId || "node");
+      const items = [
+        ["Node", `${{label}}`],
+        ["Node ID", `${{history.node_id || selectedNodeId || "n/a"}}`],
+        ["Points", `${{summary.points ?? (history.points || []).length ?? 0}}`],
+        ["Packets", `${{summary.total_packets ?? 0}}`],
+        ["Window", `${{history.window_hours ?? nodeHistoryHours}}h`],
+        ["Last Seen", `${{summary.last_seen || "n/a"}}`],
+        ["SNR Range", `${{formatMetricValue(summary.snr_min, 1)}} to ${{formatMetricValue(summary.snr_max, 1)}} dB`],
+        ["RSSI Range", `${{formatMetricValue(summary.rssi_min, 0)}} to ${{formatMetricValue(summary.rssi_max, 0)}} dBm`],
+      ];
+      target.innerHTML = items.map(([k, v]) => (
+        `<div class="overview-item"><div class="k">${{k}}</div><div class="v">${{v}}</div></div>`
+      )).join("");
+    }}
+
+    function renderNodeHistory(history, nodes) {{
+      setMapDataMode("node");
+      const node = selectedNodeFrom(nodes);
+      const caption = document.getElementById("node-history-caption");
+      if (caption) {{
+        const name = node ? nodeLabel(node) : (history.node_id || selectedNodeId || "node");
+        const span = history.summary || {{}};
+        const loc = (node && typeof node.lat === "number" && typeof node.lon === "number")
+          ? `Current location: ${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}.`
+          : "No current location available from live node state.";
+        caption.textContent = `${{name}} (${{history.node_id || selectedNodeId || "n/a"}}). ${{loc}} History window: ${{history.window_hours || nodeHistoryHours}}h, packets: ${{span.total_packets ?? 0}}.`;
+      }}
+      renderSignalChart(history.points || []);
+      renderNodeHistoryOverview(history, node);
+      setHistoryTab(activeHistoryTab);
+    }}
+
+    async function fetchNodeHistory(nodeId) {{
+      if (!isSelectableNodeId(nodeId)) return null;
+      const cached = nodeHistoryCache.get(nodeId);
+      const nowMs = Date.now();
+      if (cached && (nowMs - (cached.fetchedAt || 0)) < Math.max(refreshMs, 2500)) {{
+        return cached.data;
+      }}
+      const url = `/api/history/node?node_id=${{encodeURIComponent(nodeId)}}&hours=${{nodeHistoryHours}}&points=${{nodeHistoryMaxPoints}}`;
+      const resp = await fetch(url, {{ cache: "no-store" }});
+      if (!resp.ok) throw new Error(`history API ${{resp.status}}`);
+      const data = await resp.json();
+      nodeHistoryCache.set(nodeId, {{ fetchedAt: nowMs, data }});
+      return data;
+    }}
+
+    function renderTraffic(traffic, nodes, nodeHistory) {{
+      if (isSelectableNodeId(selectedNodeId)) {{
+        if (nodeHistory && nodeHistory.node_id === selectedNodeId) {{
+          renderNodeHistory(nodeHistory, nodes);
+        }} else {{
+          renderNodeHistoryLoading(selectedNodeId);
+        }}
+        return;
+      }}
+
+      setMapDataMode("live");
       const ports = (traffic.port_counts || []).slice(0, 30).map((item) => (
         `<tr><td data-sort="${{escAttr(item.portnum ?? "")}}">${{item.portnum}}</td><td data-sort="${{escAttr(item.count ?? "")}}">${{item.count}}</td></tr>`
       ));
@@ -2999,10 +3546,23 @@ def _render_html(
         const resp = await fetch("/api/state", {{ cache: "no-store" }});
         if (!resp.ok) throw new Error(`API ${{resp.status}}`);
         const state = await resp.json();
+        latestState = state;
+        let nodeHistory = null;
+        if (isSelectableNodeId(selectedNodeId)) {{
+          try {{
+            nodeHistory = await fetchNodeHistory(selectedNodeId);
+          }} catch (historyErr) {{
+            renderNodeHistoryLoading(selectedNodeId);
+            const caption = document.getElementById("node-history-caption");
+            if (caption) {{
+              caption.textContent = `History error for ${{selectedNodeId}}: ${{historyErr.message}}`;
+            }}
+          }}
+        }}
         renderSummary(state);
         renderMap(state.nodes || [], (state.traffic || {{}}).edges || []);
         renderNodes(state.nodes || []);
-        renderTraffic(state.traffic || {{}});
+        renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory);
         renderChat(state);
         renderPackets(state.traffic || {{}});
         renderConsole(state.traffic || {{}});
@@ -3018,8 +3578,14 @@ def _render_html(
     bindSplitters();
     bindSelectionControls();
     bindConsoleControls();
+    bindHistoryTabs();
     bindWheelPassthrough();
     renderSelectionStatus();
+    if (isSelectableNodeId(selectedNodeId)) {{
+      renderNodeHistoryLoading(selectedNodeId);
+    }} else {{
+      setMapDataMode("live");
+    }}
     requestMapResize();
 
     poll();
@@ -3030,7 +3596,7 @@ def _render_html(
 """
 
 
-def _make_http_handler(html_text: str, state_fn):
+def _make_http_handler(html_text: str, state_fn, node_history_fn=None):
     class DashboardHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             try:
@@ -3048,6 +3614,24 @@ def _make_http_handler(html_text: str, state_fn):
 
                 if path == "/api/state":
                     payload = json.dumps(state_fn(), separators=(",", ":")).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
+                    return
+
+                if path == "/api/history/node":
+                    query = parse_qs(parsed.query)
+                    node_id = (query.get("node_id", [""])[0] or "").strip()
+                    hours_override = _to_int(query.get("hours", [""])[0])
+                    points_override = _to_int(query.get("points", [""])[0])
+                    if node_history_fn is None:
+                        response_obj = {"node_id": node_id, "points": [], "summary": {}}
+                    else:
+                        response_obj = node_history_fn(node_id, hours_override, points_override)
+                    payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json; charset=utf-8")
                     self.send_header("Cache-Control", "no-store")
@@ -3105,6 +3689,26 @@ def run_dashboard(args: argparse.Namespace) -> None:
             show_secrets=args.show_secrets,
         )
 
+    def node_history_fn(
+        node_id: str,
+        hours_override: Optional[int] = None,
+        points_override: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        clean_node_id = str(node_id or "").strip()
+        if history_store is None:
+            return {"node_id": clean_node_id, "points": [], "summary": {}}
+        hours = hours_override if isinstance(hours_override, int) and hours_override > 0 else args.node_history_hours
+        points = (
+            points_override
+            if isinstance(points_override, int) and points_override > 0
+            else args.node_history_max_points
+        )
+        return history_store.load_node_history(
+            node_id=clean_node_id,
+            window_hours=hours,
+            max_points=points,
+        )
+
     html = _render_html(
         refresh_ms=args.refresh_ms,
         packet_limit=args.packet_limit,
@@ -3112,8 +3716,10 @@ def run_dashboard(args: argparse.Namespace) -> None:
         history_enabled=history_store is not None,
         history_max_rows=args.history_max_rows,
         history_retention_days=args.history_retention_days,
+        node_history_hours=args.node_history_hours,
+        node_history_max_points=args.node_history_max_points,
     )
-    handler_cls = _make_http_handler(html, state_fn)
+    handler_cls = _make_http_handler(html, state_fn, node_history_fn=node_history_fn)
     server = ThreadingHTTPServer((args.http_host, args.http_port), handler_cls)
     bound_host, bound_port = server.server_address[:2]
 
@@ -3265,6 +3871,21 @@ def main() -> None:
         "--no-history",
         action="store_true",
         help="Disable persisted SQLite history (memory-only live buffers).",
+    )
+    parser.add_argument(
+        "--node-history-hours",
+        type=int,
+        default=DEFAULT_NODE_HISTORY_HOURS,
+        help=f"Default selected-node history window in hours (default: {DEFAULT_NODE_HISTORY_HOURS})",
+    )
+    parser.add_argument(
+        "--node-history-max-points",
+        type=int,
+        default=DEFAULT_NODE_HISTORY_MAX_POINTS,
+        help=(
+            "Max selected-node history points returned by /api/history/node "
+            f"(default: {DEFAULT_NODE_HISTORY_MAX_POINTS})"
+        ),
     )
     args = parser.parse_args()
     _apply_default_gateway(args)
