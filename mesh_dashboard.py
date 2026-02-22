@@ -1954,6 +1954,20 @@ def _render_html(
     .topbar .sub .sub-text {{
       margin-right: 2px;
     }}
+    .theme-btn {{
+      border: 1px solid rgba(214, 238, 223, 0.55);
+      background: rgba(248, 255, 251, 0.12);
+      color: #f2fff7;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      line-height: 1.2;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .theme-btn:hover {{
+      background: rgba(248, 255, 251, 0.22);
+    }}
     .workspace-shell {{
       --rail-width: 72px;
       --chat-panel-width: 250px;
@@ -2933,10 +2947,99 @@ def _render_html(
       background: #dff0e4;
       border-color: #94bd9f;
     }}
+    .chat-reaction-chip:focus-visible {{
+      outline: 2px solid #8fbca0;
+      outline-offset: 1px;
+    }}
+    .chat-reaction-emoji {{
+      font-size: 12px;
+      line-height: 1;
+    }}
     .chat-reaction-count {{
       font-size: 10px;
       font-weight: 700;
       color: #355f48;
+    }}
+    .chat-reaction-popover {{
+      position: fixed;
+      z-index: 1300;
+      min-width: 220px;
+      max-width: 320px;
+      border: 1px solid #bdd4c3;
+      border-radius: 12px;
+      background: #fbfefc;
+      box-shadow: 0 10px 24px rgba(8, 35, 20, 0.18);
+      color: #193926;
+      padding: 8px;
+    }}
+    .chat-reaction-popover[hidden] {{
+      display: none !important;
+    }}
+    .chat-reaction-popover-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1f4f35;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #deebe1;
+    }}
+    .chat-reaction-popover-emoji {{
+      font-size: 15px;
+      line-height: 1;
+    }}
+    .chat-reaction-popover-count {{
+      color: #4c705b;
+      font-size: 11px;
+      font-weight: 600;
+    }}
+    .chat-reaction-popover-list {{
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 220px;
+      overflow: auto;
+      padding-right: 2px;
+    }}
+    .chat-reaction-popover-row {{
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      line-height: 1.25;
+      color: #20452f;
+      padding: 2px 1px;
+    }}
+    .chat-reaction-popover-avatar {{
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid #bfd7c7;
+      background: #ecf7f0;
+      color: #25523a;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      flex: 0 0 auto;
+    }}
+    .chat-reaction-popover-name {{
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .chat-reaction-popover-more {{
+      margin-top: 3px;
+      padding-top: 6px;
+      border-top: 1px solid #deebe1;
+      font-size: 11px;
+      color: #597767;
     }}
     .chat-feed-empty {{
       border: 1px dashed #d2e2d4;
@@ -3296,6 +3399,240 @@ def _render_html(
       white-space: pre-wrap;
       word-break: break-word;
     }}
+    [data-theme="dark"] {{
+      --bg: #0f1512;
+      --ink: #e4f1e8;
+      --panel: #16201b;
+      --line: #32453b;
+      --muted: #8ea99b;
+      --shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+      color-scheme: dark;
+    }}
+    [data-theme="dark"] body {{
+      background:
+        radial-gradient(circle at 20% -10%, #1b2922 0, transparent 45%),
+        radial-gradient(circle at 80% 0%, #1a2b22 0, transparent 40%),
+        var(--bg);
+      color: var(--ink);
+    }}
+    [data-theme="dark"] .topbar {{
+      background: linear-gradient(100deg, #101c16, #1a2f25);
+      color: #e6f7ed;
+    }}
+    [data-theme="dark"] .topbar .sub .revision-text {{
+      color: #dbf7e8;
+    }}
+    [data-theme="dark"] .theme-btn {{
+      border-color: rgba(168, 205, 184, 0.45);
+      background: rgba(166, 215, 190, 0.18);
+      color: #e5f8ec;
+    }}
+    [data-theme="dark"] .theme-btn:hover {{
+      background: rgba(166, 215, 190, 0.28);
+    }}
+    [data-theme="dark"] .pill,
+    [data-theme="dark"] .selection-btn {{
+      background: #22342a;
+      border-color: #355041;
+      color: #d6e8dd;
+    }}
+    [data-theme="dark"] .selection-btn:disabled {{
+      opacity: 0.65;
+    }}
+    [data-theme="dark"] .disk-meter {{
+      background: rgba(12, 21, 17, 0.45);
+      border-color: #2f483b;
+      color: #d0e5d8;
+    }}
+    [data-theme="dark"] .disk-track {{
+      background: rgba(185, 231, 207, 0.18);
+    }}
+    [data-theme="dark"] .teams-rail,
+    [data-theme="dark"] .chat-left-panel,
+    [data-theme="dark"] .card {{
+      background: #17231c;
+      border-color: #33483c;
+      color: #dbece3;
+    }}
+    [data-theme="dark"] .teams-rail-title,
+    [data-theme="dark"] .chat-left-title,
+    [data-theme="dark"] .chat-left-label,
+    [data-theme="dark"] .chat-left-sub,
+    [data-theme="dark"] .card h2,
+    [data-theme="dark"] .metric .label {{
+      color: #9fbead;
+    }}
+    [data-theme="dark"] .workspace-shell,
+    [data-theme="dark"] .workspace-main {{
+      color: #dbece3;
+    }}
+    [data-theme="dark"] .rail-btn,
+    [data-theme="dark"] .chat-channel-item,
+    [data-theme="dark"] .chat-member-item,
+    [data-theme="dark"] .metric {{
+      background: #213229;
+      border-color: #3a5346;
+      color: #d8ebe0;
+    }}
+    [data-theme="dark"] .rail-btn:hover,
+    [data-theme="dark"] .chat-channel-item:hover,
+    [data-theme="dark"] .chat-member-item:hover,
+    [data-theme="dark"] .metric:hover {{
+      background: #284034;
+    }}
+    [data-theme="dark"] .rail-btn.active {{
+      background: #2f855a;
+      border-color: #3f9868;
+      color: #ebfff3;
+    }}
+    [data-theme="dark"] .chat-left-head,
+    [data-theme="dark"] .chat-left-section {{
+      background: #1b2b22;
+      border-color: #33483c;
+    }}
+    [data-theme="dark"] .chat-feed-item {{
+      background: #1a2a21;
+      border-color: #31473b;
+      color: #d9ece1;
+    }}
+    [data-theme="dark"] .chat-feed-item.chat-selectable:hover {{
+      background: #24392f;
+      border-color: #436553;
+    }}
+    [data-theme="dark"] .chat-feed-item.selected-node {{
+      background: #2b4638;
+      border-color: #5a8a72;
+    }}
+    [data-theme="dark"] .chat-feed-meta,
+    [data-theme="dark"] .chat-feed-time,
+    [data-theme="dark"] .chat-feed-arrow,
+    [data-theme="dark"] .chat-reply-inline,
+    [data-theme="dark"] .chat-reply-inline .chat-reply-inline-text {{
+      color: #98b7a7;
+    }}
+    [data-theme="dark"] .chat-reply-inline .chat-reply-inline-label,
+    [data-theme="dark"] .chat-feed-text,
+    [data-theme="dark"] .chat-endpoint .chat-name {{
+      color: #deeee4;
+    }}
+    [data-theme="dark"] .chat-endpoint .chat-id-bg,
+    [data-theme="dark"] .chat-feed-hops {{
+      background: #24382f;
+      border-color: #416253;
+      color: #c9e2d4;
+    }}
+    [data-theme="dark"] .chat-reaction-chip,
+    [data-theme="dark"] .chat-reply-btn,
+    [data-theme="dark"] .chat-react-btn,
+    [data-theme="dark"] .chat-retry-btn {{
+      background: #263a30;
+      border-color: #426452;
+      color: #d5e9de;
+    }}
+    [data-theme="dark"] .chat-reaction-chip:hover,
+    [data-theme="dark"] .chat-reply-btn:hover,
+    [data-theme="dark"] .chat-react-btn:hover,
+    [data-theme="dark"] .chat-retry-btn:hover {{
+      background: #30493c;
+      border-color: #547d66;
+    }}
+    [data-theme="dark"] .chat-delivery-pill.state-pending {{
+      background: #4a3b1f;
+      border-color: #8c7240;
+      color: #f4dd9f;
+    }}
+    [data-theme="dark"] .chat-delivery-pill.state-acked {{
+      background: #1e3d2d;
+      border-color: #4c8b6a;
+      color: #bde9d0;
+    }}
+    [data-theme="dark"] .chat-delivery-pill.state-nak,
+    [data-theme="dark"] .chat-delivery-pill.state-timeout,
+    [data-theme="dark"] .chat-delivery-pill.state-error {{
+      background: #4a2525;
+      border-color: #8f4b4b;
+      color: #ffbebe;
+    }}
+    [data-theme="dark"] .chat-reaction-popover {{
+      background: #1a2921;
+      border-color: #385546;
+      color: #d7ebe0;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.46);
+    }}
+    [data-theme="dark"] .chat-reaction-popover-head,
+    [data-theme="dark"] .chat-reaction-popover-more {{
+      border-color: #315043;
+    }}
+    [data-theme="dark"] .chat-reaction-popover-avatar {{
+      background: #243b30;
+      border-color: #446a57;
+      color: #d3eadf;
+    }}
+    [data-theme="dark"] .chat-composer,
+    [data-theme="dark"] .chat-reply-context,
+    [data-theme="dark"] #chat-input,
+    [data-theme="dark"] #chat-send-btn,
+    [data-theme="dark"] #chat-emoji-btn,
+    [data-theme="dark"] .chat-emoji-panel,
+    [data-theme="dark"] .chat-emoji-item {{
+      background: #22352b;
+      border-color: #3b5949;
+      color: #deeee5;
+    }}
+    [data-theme="dark"] #chat-input::placeholder {{
+      color: #93b09f;
+    }}
+    [data-theme="dark"] #chat-input:focus {{
+      outline-color: #6a9c7f;
+      background: #273f33;
+    }}
+    [data-theme="dark"] #chat-send-btn:hover,
+    [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] .chat-emoji-item:hover {{
+      background: #2f4a3c;
+      border-color: #5b866f;
+    }}
+    [data-theme="dark"] table,
+    [data-theme="dark"] th,
+    [data-theme="dark"] td,
+    [data-theme="dark"] details {{
+      border-color: #355041;
+      color: #d8eae0;
+    }}
+    [data-theme="dark"] th {{
+      background: #22362b;
+    }}
+    [data-theme="dark"] td {{
+      background: #18261f;
+    }}
+    [data-theme="dark"] tr:nth-child(even) td {{
+      background: #1c2d24;
+    }}
+    [data-theme="dark"] .console-controls {{
+      color: #a8c6b6;
+    }}
+    [data-theme="dark"] .console-controls button {{
+      background: #22352b;
+      border-color: #3e5e4d;
+      color: #d9ece2;
+    }}
+    [data-theme="dark"] .console-controls button:hover {{
+      background: #2b4337;
+    }}
+    [data-theme="dark"] #live-console,
+    [data-theme="dark"] pre {{
+      background: #07120d;
+      color: #bff0d5;
+    }}
+    [data-theme="dark"] .leaflet-container {{
+      background: #101814;
+    }}
+    [data-theme="dark"] .leaflet-tile {{
+      filter: brightness(0.62) invert(0.9) hue-rotate(180deg) saturate(0.45);
+    }}
+    [data-theme="dark"] a {{
+      color: #8fc9ff;
+    }}
     @media (max-width: 1100px) {{
       .workspace-shell {{
         grid-template-columns: 1fr;
@@ -3357,6 +3694,7 @@ def _render_html(
       <span class="pill">Packet buffer: {packet_limit}</span>
       <span class="pill">{history_label}</span>
       <span class="pill">Refresh: {refresh_ms} ms</span>
+      <button id="theme-toggle-btn" class="theme-btn" type="button" title="Theme mode: Auto (system), Dark, or Light">Theme: Auto</button>
       <span class="pill selection-pill" id="selected-node-pill">Selected: none</span>
       <button id="clear-selection-btn" class="selection-btn" type="button" disabled>Clear</button>
       <span id="disk-meter" class="disk-meter" title="Disk free on dashboard host">
@@ -3442,6 +3780,7 @@ def _render_html(
               <div id="chat-emoji-panel" class="chat-emoji-panel" hidden></div>
             </div>
             <div id="chat-send-status" class="chat-send-status"></div>
+            <div id="chat-reaction-popover" class="chat-reaction-popover" hidden></div>
           </div>
         </div>
       </div>
@@ -3593,6 +3932,8 @@ def _render_html(
     const splitStorageKey = "meshDashboardLayoutSplitState";
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
+    const themeStorageKey = "meshDashboardThemePreference";
+    const themeModes = ["auto", "dark", "light"];
     const chatBottomStickThresholdPx = 28;
     const chatWarnWindowSeconds = 10 * 60;
     const chatStaleWindowSeconds = 30 * 60;
@@ -3613,6 +3954,7 @@ def _render_html(
     const knownLayoutViews = new Set(["chat", "network", "packets", "data", "all"]);
     const knownChatChannels = new Set(["all", "direct"]);
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
+    const reactionPopoverMaxNames = 12;
     const sortableTables = new Set(Object.keys(tableSortState));
     const consoleLines = [];
     const consoleKeyQueue = [];
@@ -3645,6 +3987,10 @@ def _render_html(
     let chatReplyTargetId = null;
     let chatReplyTargetName = "";
     let chatReplyTargetText = "";
+    let chatReactionPopoverAnchor = null;
+    let chatReactionPopoverHideTimer = null;
+    let themePreference = "auto";
+    let themeMediaQuery = null;
     const nodeHistoryCache = new Map();
     const nodeNameCache = new Map();
 
@@ -3930,6 +4276,78 @@ def _render_html(
       el.textContent = value == null ? "n/a" : String(value);
     }}
 
+    function normalizeThemeMode(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return themeModes.includes(clean) ? clean : "auto";
+    }}
+
+    function systemPreferredTheme() {{
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {{
+        return "dark";
+      }}
+      return "light";
+    }}
+
+    function updateThemeToggleLabel(resolvedTheme) {{
+      const btn = document.getElementById("theme-toggle-btn");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const prefText = themePreference === "auto" ? "Auto" : (themePreference === "dark" ? "Dark" : "Light");
+      const resolvedText = resolvedTheme === "dark" ? "Dark" : "Light";
+      btn.textContent = `Theme: ${{prefText}}`;
+      btn.title = `Theme mode: ${{prefText}} (currently ${{resolvedText}}). Click to cycle Auto/Dark/Light.`;
+      btn.setAttribute("aria-label", btn.title);
+    }}
+
+    function applyThemePreference(mode, persist = true) {{
+      const normalized = normalizeThemeMode(mode);
+      themePreference = normalized;
+      const resolvedTheme = normalized === "auto" ? systemPreferredTheme() : normalized;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-pref", normalized);
+      updateThemeToggleLabel(resolvedTheme);
+
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(themeStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function bindThemeToggle() {{
+      const btn = document.getElementById("theme-toggle-btn");
+      if (btn instanceof HTMLButtonElement && btn.dataset.bound !== "1") {{
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => {{
+          const idx = themeModes.indexOf(themePreference);
+          const next = themeModes[(idx + 1) % themeModes.length];
+          applyThemePreference(next, true);
+        }});
+      }}
+
+      if (!themeMediaQuery && window.matchMedia) {{
+        themeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        const onThemeChange = () => {{
+          if (themePreference === "auto") {{
+            applyThemePreference("auto", false);
+          }}
+        }};
+        if (typeof themeMediaQuery.addEventListener === "function") {{
+          themeMediaQuery.addEventListener("change", onThemeChange);
+        }} else if (typeof themeMediaQuery.addListener === "function") {{
+          themeMediaQuery.addListener(onThemeChange);
+        }}
+      }}
+    }}
+
+    function loadThemePreference() {{
+      let stored = "auto";
+      try {{
+        stored = window.localStorage.getItem(themeStorageKey) || "auto";
+      }} catch (_err) {{
+      }}
+      applyThemePreference(stored, false);
+    }}
+
     function getChatScroller() {{
       const feed = document.getElementById("chat-feed");
       if (!(feed instanceof HTMLElement)) return null;
@@ -4039,6 +4457,178 @@ def _render_html(
     function isRetryableDeliveryState(state) {{
       const clean = normalizeDeliveryState(state);
       return clean === "nak" || clean === "timeout" || clean === "error";
+    }}
+
+    function reactionPopoverElement() {{
+      const popover = document.getElementById("chat-reaction-popover");
+      return popover instanceof HTMLElement ? popover : null;
+    }}
+
+    function clearReactionPopoverHideTimer() {{
+      if (chatReactionPopoverHideTimer !== null) {{
+        clearTimeout(chatReactionPopoverHideTimer);
+        chatReactionPopoverHideTimer = null;
+      }}
+    }}
+
+    function scheduleReactionPopoverHide(delayMs = 120) {{
+      clearReactionPopoverHideTimer();
+      chatReactionPopoverHideTimer = window.setTimeout(() => {{
+        closeReactionPopover(true);
+      }}, Math.max(0, Number(delayMs) || 0));
+    }}
+
+    function normalizeReactionName(value) {{
+      const clean = String(value == null ? "" : value).replace(/\\s+/g, " ").trim();
+      if (!clean) return "Unknown node";
+      return clean;
+    }}
+
+    function reactionNameInitials(value) {{
+      const clean = normalizeReactionName(value).replace(/[^A-Za-z0-9 ]+/g, " ").trim();
+      if (!clean) return "?";
+      const parts = clean.split(/\\s+/).filter(Boolean);
+      if (parts.length <= 1) {{
+        return parts[0].slice(0, 2).toUpperCase();
+      }}
+      return `${{parts[0][0] || ""}}${{parts[1][0] || ""}}`.toUpperCase() || "?";
+    }}
+
+    function parseReactionChipNames(chip) {{
+      if (!(chip instanceof HTMLButtonElement)) return [];
+      const raw = String(chip.dataset.reactors || "").trim();
+      if (!raw) return [];
+      try {{
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .map((item) => normalizeReactionName(item))
+          .filter((name, idx, arr) => !!name && arr.indexOf(name) === idx);
+      }} catch (_err) {{
+        return [];
+      }}
+    }}
+
+    function positionReactionPopover(anchor, popover) {{
+      if (!(anchor instanceof HTMLElement) || !(popover instanceof HTMLElement) || popover.hidden) {{
+        return;
+      }}
+      const anchorRect = anchor.getBoundingClientRect();
+      const margin = 8;
+      const width = popover.offsetWidth || 240;
+      const height = popover.offsetHeight || 140;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1280;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 720;
+
+      let left = anchorRect.left + (anchorRect.width / 2) - (width / 2);
+      if (left < margin) left = margin;
+      if ((left + width) > (viewportWidth - margin)) {{
+        left = Math.max(margin, viewportWidth - width - margin);
+      }}
+
+      let top = anchorRect.top - height - 10;
+      if (top < margin) {{
+        top = anchorRect.bottom + 10;
+      }}
+      if ((top + height) > (viewportHeight - margin)) {{
+        top = Math.max(margin, viewportHeight - height - margin);
+      }}
+
+      popover.style.left = `${{Math.round(left)}}px`;
+      popover.style.top = `${{Math.round(top)}}px`;
+    }}
+
+    function openReactionPopoverForChip(chip) {{
+      if (!(chip instanceof HTMLButtonElement)) return;
+      const popover = reactionPopoverElement();
+      if (!(popover instanceof HTMLElement)) return;
+
+      const emoji = String(chip.dataset.emoji || "").trim() || "🙂";
+      const names = parseReactionChipNames(chip);
+      const rawCount = Number(chip.dataset.reactorCount || "");
+      const count = Number.isFinite(rawCount) && rawCount > 0 ? Math.trunc(rawCount) : names.length;
+      const shownNames = names.slice(0, reactionPopoverMaxNames);
+      const listRows = shownNames.map((name) => (
+        `<div class="chat-reaction-popover-row">
+          <span class="chat-reaction-popover-avatar">${{escAttr(reactionNameInitials(name))}}</span>
+          <span class="chat-reaction-popover-name">${{escAttr(name)}}</span>
+        </div>`
+      )).join("");
+      const unknownCount = Math.max(0, count - shownNames.length);
+
+      popover.innerHTML = `
+        <div class="chat-reaction-popover-head">
+          <span><span class="chat-reaction-popover-emoji">${{escAttr(emoji)}}</span> Reactions</span>
+          <span class="chat-reaction-popover-count">${{count}}</span>
+        </div>
+        <div class="chat-reaction-popover-list">
+          ${{listRows || `<div class="chat-reaction-popover-row"><span class="chat-reaction-popover-name">No named reactors yet</span></div>`}}
+        </div>
+        ${{unknownCount > 0 ? `<div class="chat-reaction-popover-more">+${{unknownCount}} more</div>` : ""}}
+      `;
+      popover.hidden = false;
+      chatReactionPopoverAnchor = chip;
+      positionReactionPopover(chip, popover);
+    }}
+
+    function closeReactionPopover(force = false) {{
+      const popover = reactionPopoverElement();
+      if (!(popover instanceof HTMLElement)) return;
+      if (!force && popover.hidden) return;
+      clearReactionPopoverHideTimer();
+      popover.hidden = true;
+      popover.innerHTML = "";
+      chatReactionPopoverAnchor = null;
+    }}
+
+    function bindReactionPopover() {{
+      const popover = reactionPopoverElement();
+      if (!(popover instanceof HTMLElement) || popover.dataset.bound === "1") return;
+      popover.dataset.bound = "1";
+
+      popover.addEventListener("pointerenter", () => {{
+        clearReactionPopoverHideTimer();
+      }});
+      popover.addEventListener("pointerleave", () => {{
+        scheduleReactionPopoverHide(120);
+      }});
+
+      document.addEventListener("pointerdown", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) {{
+          closeReactionPopover(true);
+          return;
+        }}
+        if (target.closest(".chat-reaction-chip") || target.closest("#chat-reaction-popover")) {{
+          return;
+        }}
+        closeReactionPopover(true);
+      }});
+
+      document.addEventListener("keydown", (ev) => {{
+        if (ev.key === "Escape") {{
+          closeReactionPopover(true);
+        }}
+      }});
+
+      window.addEventListener("resize", () => {{
+        const el = reactionPopoverElement();
+        if (!(el instanceof HTMLElement) || el.hidden) return;
+        if (!(chatReactionPopoverAnchor instanceof HTMLElement)) {{
+          closeReactionPopover(true);
+          return;
+        }}
+        positionReactionPopover(chatReactionPopoverAnchor, el);
+      }});
+      window.addEventListener("scroll", () => {{
+        const el = reactionPopoverElement();
+        if (!(el instanceof HTMLElement) || el.hidden) return;
+        if (!(chatReactionPopoverAnchor instanceof HTMLElement)) {{
+          closeReactionPopover(true);
+          return;
+        }}
+        positionReactionPopover(chatReactionPopoverAnchor, el);
+      }}, true);
     }}
 
     function compactInlineMessage(value, maxLen = 88) {{
@@ -5172,6 +5762,7 @@ def _render_html(
     }}
 
     function bindChatReactionControls() {{
+      bindReactionPopover();
       for (const btn of document.querySelectorAll("#chat-feed .chat-react-btn")) {{
         if (!(btn instanceof HTMLButtonElement)) continue;
         btn.addEventListener("click", (ev) => {{
@@ -5189,9 +5780,34 @@ def _render_html(
 
       for (const chip of document.querySelectorAll("#chat-feed .chat-reaction-chip")) {{
         if (!(chip instanceof HTMLButtonElement)) continue;
+        chip.addEventListener("pointerenter", () => {{
+          clearReactionPopoverHideTimer();
+          openReactionPopoverForChip(chip);
+        }});
+        chip.addEventListener("pointerleave", (ev) => {{
+          const related = ev.relatedTarget;
+          const popover = reactionPopoverElement();
+          if (
+            related instanceof Node
+            && popover instanceof HTMLElement
+            && popover.contains(related)
+          ) {{
+            return;
+          }}
+          scheduleReactionPopoverHide(120);
+        }});
+        chip.addEventListener("focus", () => {{
+          clearReactionPopoverHideTimer();
+          openReactionPopoverForChip(chip);
+        }});
+        chip.addEventListener("blur", () => {{
+          scheduleReactionPopoverHide(80);
+        }});
         chip.addEventListener("click", (ev) => {{
           ev.preventDefault();
           ev.stopPropagation();
+          clearReactionPopoverHideTimer();
+          openReactionPopoverForChip(chip);
           if (chatSendInFlight) return;
           const replyId = Number(chip.dataset.replyId || "");
           const emoji = String(chip.dataset.emoji || "").trim();
@@ -5933,12 +6549,10 @@ def _render_html(
           ? Array.from(messageReactions.values())
               .sort((a, b) => (b.count - a.count) || String(a.emoji).localeCompare(String(b.emoji)))
               .map((bucket) => {{
-                const tooltipNames = Array.from(new Set(bucket.names)).slice(0, 8);
-                const tooltip = tooltipNames.length > 0
-                  ? `${{bucket.emoji}}: ${{tooltipNames.join(", ")}}`
-                  : `${{bucket.emoji}} reaction`;
-                return `<button type="button" class="chat-reaction-chip" data-reply-id="${{escAttr(messageId)}}" data-emoji="${{escAttr(bucket.emoji)}}" title="${{escAttr(tooltip)}}">
-                  <span>${{escAttr(bucket.emoji)}}</span><span class="chat-reaction-count">${{bucket.count}}</span>
+                const reactorNames = Array.from(new Set(bucket.names)).slice(0, 40);
+                const aria = `${{bucket.emoji}} reaction, ${{bucket.count}} total`;
+                return `<button type="button" class="chat-reaction-chip" data-reply-id="${{escAttr(messageId)}}" data-emoji="${{escAttr(bucket.emoji)}}" data-reactor-count="${{escAttr(bucket.count)}}" data-reactors="${{escAttr(JSON.stringify(reactorNames))}}" aria-label="${{escAttr(aria)}}">
+                  <span class="chat-reaction-emoji">${{escAttr(bucket.emoji)}}</span><span class="chat-reaction-count">${{bucket.count}}</span>
                 </button>`;
               }})
               .join("")
@@ -6000,6 +6614,7 @@ def _render_html(
       }}
       const feed = document.getElementById("chat-feed");
       if (feed) {{
+        closeReactionPopover(true);
         feed.innerHTML = feedItems.length > 0
           ? feedItems.join("")
           : `<div class="chat-feed-empty">No ${{channelLabel(activeChatChannel).toLowerCase()}} messages yet.</div>`;
@@ -6132,11 +6747,13 @@ def _render_html(
     loadSplitState();
     loadLayoutView();
     loadChatChannel();
+    loadThemePreference();
     bindLayoutNav();
     bindSplitters();
     bindSelectionControls();
     bindConsoleControls();
     bindChatComposer();
+    bindThemeToggle();
     bindChatAutoScroll();
     bindHistoryTabs();
     bindWheelPassthrough();
