@@ -2757,19 +2757,28 @@ def _render_html(
       padding: 6px;
       flex: 1 1 auto;
     }}
-    .list-search-input {{
+    .list-search-input,
+    #chat-input {{
       width: 100%;
       border: 1px solid #c2d8c7;
       border-radius: 7px;
       padding: 5px 7px;
       font-size: 11px;
+      line-height: 1.25;
       color: #183223;
       background: #f9fdf9;
+      box-sizing: border-box;
+      appearance: none;
+      -webkit-appearance: none;
+      min-height: 27px;
     }}
-    .list-search-input:focus {{
+    .list-search-input:focus,
+    #chat-input:focus {{
       outline: 2px solid #9ac5aa;
       outline-offset: 0;
+      border-color: #9ac5aa;
       background: #ffffff;
+      box-shadow: none;
     }}
     .chat-user-search-wrap {{
       padding: 0;
@@ -4385,19 +4394,23 @@ def _render_html(
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 0;
       align-items: stretch;
       min-height: 0;
     }}
     .chat-composer-top {{
-      display: flex;
+      display: none;
       align-items: center;
       gap: 6px;
       min-height: 0;
     }}
+    .chat-composer-top.has-reply {{
+      display: flex;
+      margin-bottom: 5px;
+    }}
     .chat-composer-input-row {{
       display: flex;
-      align-items: center;
+      align-items: stretch;
       gap: 6px;
       min-height: 0;
     }}
@@ -4442,20 +4455,9 @@ def _render_html(
       background: #edf6f0;
     }}
     #chat-input {{
-      flex: 1;
+      flex: 1 1 auto;
+      width: auto;
       min-width: 0;
-      border: 1px solid #c2d8c7;
-      border-radius: 7px;
-      padding: 5px 7px;
-      font-size: 11px;
-      color: #183223;
-      background: #f9fdf9;
-    }}
-    #chat-input:focus {{
-      outline: none;
-      border-color: #9ac5aa;
-      background: #ffffff;
-      box-shadow: none;
     }}
     #chat-send-btn {{
       border: 1px solid #9cc9ad;
@@ -4947,7 +4949,6 @@ def _render_html(
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .chat-left-bottom-bar,
     [data-theme="dark"] .chat-reply-context,
-    [data-theme="dark"] #chat-input,
     [data-theme="dark"] #chat-send-btn,
     [data-theme="dark"] #chat-emoji-btn,
     [data-theme="dark"] .chat-emoji-panel,
@@ -4955,13 +4956,6 @@ def _render_html(
       background: #22352b;
       border-color: #3b5949;
       color: #deeee5;
-    }}
-    [data-theme="dark"] #chat-input::placeholder {{
-      color: #93b09f;
-    }}
-    [data-theme="dark"] #chat-input:focus {{
-      outline-color: #6a9c7f;
-      background: #273f33;
     }}
     [data-theme="dark"] #chat-send-btn:hover,
     [data-theme="dark"] #chat-emoji-btn:hover,
@@ -5148,17 +5142,15 @@ def _render_html(
     [data-theme="dark"] .chat-retry-btn,
     [data-theme="dark"] #chat-send-btn,
     [data-theme="dark"] #chat-emoji-btn,
+    [data-theme="dark"] .list-search-input,
     [data-theme="dark"] #chat-input {{
       background: #07140d;
       border-color: #2b8a59;
       color: #c6ffdb;
     }}
+    [data-theme="dark"] .list-search-input::placeholder,
     [data-theme="dark"] #chat-input::placeholder {{
       color: #90d9ac;
-    }}
-    [data-theme="dark"] #chat-input:focus {{
-      outline-color: #39af72;
-      background: #0b1e13;
     }}
     [data-theme="dark"] .chat-reaction-popover {{
       background: #060d08;
@@ -5304,7 +5296,6 @@ def _render_html(
     [data-theme="dark"] .chat-reaction-popover-avatar,
     [data-theme="dark"] .chat-composer,
     [data-theme="dark"] .chat-reply-context,
-    [data-theme="dark"] #chat-input,
     [data-theme="dark"] #chat-send-btn,
     [data-theme="dark"] #chat-emoji-btn,
     [data-theme="dark"] .chat-emoji-panel,
@@ -5412,10 +5403,6 @@ def _render_html(
       color: #d8ffdf;
       background: #1f4f35;
       border-color: #3fb950;
-    }}
-    [data-theme="dark"] #chat-input::placeholder {{
-      color: var(--ui-text-soft) !important;
-      opacity: 0.9;
     }}
     [data-theme="dark"] .history-tabs {{
       border-bottom-color: var(--ui-border);
@@ -5608,8 +5595,12 @@ def _render_html(
     }}
     [data-theme="dark"] .list-search-input:focus,
     [data-theme="dark"] #chat-input:focus {{
+      outline: 2px solid var(--ui-accent);
+      outline-offset: 0;
+      border-color: var(--ui-accent);
       outline-color: var(--ui-accent);
       background: #0b1e13;
+      box-shadow: none;
     }}
     [data-theme="dark"] .chat-member-empty {{
       border-color: var(--ui-border);
@@ -5703,11 +5694,10 @@ def _render_html(
       background: #1b2430;
       color: var(--ui-text);
     }}
-    [data-theme="dark"] #chat-input:focus {{
-      outline: none;
-      border-color: #3f5b73;
-      background: #101a24;
-      box-shadow: none;
+    [data-theme="dark"] .chat-compose-shell,
+    [data-theme="dark"] .card.chat .chat-compose-shell {{
+      background: var(--ui-panel-alt);
+      border-color: var(--ui-border);
     }}
     [data-theme="dark"] a {{
       color: var(--ui-link);
@@ -5876,7 +5866,8 @@ def _render_html(
                 <div class="chat-composer-input-row">
                   <input
                     id="chat-input"
-                    type="text"
+                    class="list-search-input"
+                    type="search"
                     maxlength="280"
                     placeholder="Message the room (^all)..."
                     autocomplete="off"
@@ -6874,11 +6865,15 @@ def _render_html(
 
     function renderChatReplyContext() {{
       const context = document.getElementById("chat-reply-context");
+      const top = document.querySelector(".chat-composer-top");
       const label = document.getElementById("chat-reply-label");
       if (!(context instanceof HTMLElement) || !(label instanceof HTMLElement)) return;
       const replyId = Number(chatReplyTargetId);
       if (!Number.isInteger(replyId) || replyId <= 0) {{
         context.hidden = true;
+        if (top instanceof HTMLElement) {{
+          top.classList.remove("has-reply");
+        }}
         label.textContent = "";
         return;
       }}
@@ -6886,6 +6881,9 @@ def _render_html(
       const snippet = compactInlineMessage(chatReplyTargetText, 96);
       label.textContent = `Replying to ${{fromName}}: ${{snippet}}`;
       context.hidden = false;
+      if (top instanceof HTMLElement) {{
+        top.classList.add("has-reply");
+      }}
     }}
 
     function clearChatReplyTarget() {{
