@@ -2453,11 +2453,13 @@ def _render_html(
     }}
 
     .layout.view-network {{
+      height: calc(100vh - 130px);
+      min-height: 560px;
       grid-template-rows:
         auto
         minmax(220px, var(--split-top-px))
         var(--splitter-size)
-        minmax(220px, var(--split-mid-px));
+        minmax(0, 1fr);
     }}
     .layout.view-network .nodes {{
       grid-column: 1;
@@ -2470,6 +2472,13 @@ def _render_html(
     .layout.view-network .map {{
       grid-column: 1 / span 3;
       grid-row: 4;
+      min-height: 0;
+    }}
+    .layout.view-network .map .body {{
+      min-height: 0;
+    }}
+    .layout.view-network .map-frame {{
+      min-height: 0;
     }}
     .layout.view-network .chat,
     .layout.view-network .packets,
@@ -4088,6 +4097,10 @@ def _render_html(
       .layout {{
         grid-template-columns: 1fr;
         grid-template-rows: auto;
+      }}
+      .layout.view-network {{
+        height: auto;
+        min-height: 0;
       }}
       .splitter, .hsplitter {{ display: none; }}
       .summary, .map, .map-data, .nodes, .chat, .packets, .raw, .console {{ grid-column: 1; grid-row: auto; }}
