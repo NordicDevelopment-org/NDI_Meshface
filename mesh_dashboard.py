@@ -25,7 +25,6 @@ from meshdash.revision import (
 )
 from meshdash.nodes import (
     get_local_node_id as _get_local_node_id_helper,
-    safe_nodes_items as _safe_nodes_items_helper,
     utc_now as _utc_now_helper,
 )
 from meshdash.runtime import (
@@ -41,7 +40,7 @@ from meshdash.services import (
 from meshdash.cli import build_dashboard_parser as _build_dashboard_parser_helper
 from meshdash.dashboard_runtime import run_dashboard_runtime as _run_dashboard_runtime_helper
 from meshdash.history_store import HistoryStore
-from meshdash.tracker import DashboardTracker
+from meshdash.tracker import DashboardTracker, seed_tracker_from_node_db as _seed_tracker_from_node_db_helper
 from meshdash.html import render_html as _render_html_helper
 from meshdash.http_api import make_http_handler as _make_http_handler_helper
 try:
@@ -162,15 +161,6 @@ def _to_jsonable(value: Any, depth: int = 0) -> Any:
     return _to_jsonable_helper(value, depth=depth)
 
 
-def _seed_tracker_from_node_db(tracker: DashboardTracker, iface: Any) -> None:
-    for _num, node in _safe_nodes_items_helper(iface, retries=3, sleep_seconds=0.01):
-        if not isinstance(node, dict):
-            continue
-        last_packet = node.get("lastReceived")
-        if isinstance(last_packet, dict):
-            tracker.seed_packet(last_packet, iface)
-
-
 def _build_state(
     iface: Any,
     tracker: DashboardTracker,
@@ -252,7 +242,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
         history_store_cls=HistoryStore,
         dashboard_tracker_cls=DashboardTracker,
         subscribe_fn=pub.subscribe,
-        seed_tracker_fn=_seed_tracker_from_node_db,
+        seed_tracker_fn=_seed_tracker_from_node_db_helper,
         revision_info_fn=_revision_info,
         build_state_fn=_build_state,
         build_node_history_loader_fn=_build_node_history_loader,

@@ -31,6 +31,7 @@ from .history_store import HistoryStore
 from .nodes import (
     get_node_id_from_num as _get_node_id_from_num_helper,
     parse_utc_text_to_unix as _parse_utc_text_to_unix,
+    safe_nodes_items as _safe_nodes_items,
     utc_now as _utc_now,
 )
 
@@ -431,4 +432,12 @@ class DashboardTracker:
             "recent_chat": recent_chat,
         }
 
+
+def seed_tracker_from_node_db(tracker: DashboardTracker, iface: Any) -> None:
+    for _num, node in _safe_nodes_items(iface, retries=3, sleep_seconds=0.01):
+        if not isinstance(node, dict):
+            continue
+        last_packet = node.get("lastReceived")
+        if isinstance(last_packet, dict):
+            tracker.seed_packet(last_packet, iface)
 

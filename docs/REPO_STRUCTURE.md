@@ -16,7 +16,7 @@
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
 - `meshdash/services.py`: shared history/online loader builders, chat-send service logic, and empty payload helpers.
 - `meshdash/state.py`: node/local snapshot + assembled `/api/state` payload helpers.
-- `meshdash/tracker.py`: extracted packet/chat tracking, edge synthesis, and snapshot logic.
+- `meshdash/tracker.py`: extracted packet/chat tracking, edge synthesis, snapshots, and seed-from-node-db helper.
 - `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshtastic-dashboard.service`: systemd unit template for VM deployment.
 - `README.md`: setup, deploy loop, and operations.
