@@ -1492,6 +1492,9 @@ class DashboardTracker:
                 "channel": packet.get("channel"),
                 "rx_time": _format_epoch(packet.get("rxTime")),
                 "text": decoded_text if isinstance(decoded_text, str) else "",
+                "hops": hops,
+                "hop_start": packet.get("hopStart"),
+                "hop_limit": packet.get("hopLimit"),
             }
             if packet_id is not None and packet_id > 0:
                 chat_entry["message_id"] = packet_id
@@ -2387,6 +2390,16 @@ def _render_html(
       margin-left: auto;
       font-size: 10px;
       color: #6a8572;
+      white-space: nowrap;
+    }}
+    .chat-feed-hops {{
+      font-size: 10px;
+      color: #3f6b52;
+      background: #edf6ef;
+      border: 1px solid #c9dece;
+      border-radius: 999px;
+      padding: 1px 7px;
+      line-height: 1.3;
       white-space: nowrap;
     }}
     .chat-feed-actions {{
@@ -4838,6 +4851,18 @@ def _render_html(
         touchParticipant(toMeta, msgTimeUnix);
         const timeText = msg.rx_time || msg.captured_at || "n/a";
         const textHtml = escapeChatText(msg.text || "");
+        const hopNum = Number(msg.hops);
+        const hasHop = Number.isFinite(hopNum) && hopNum >= 0;
+        const hopStart = Number(msg.hop_start ?? msg.hopStart);
+        const hopLimit = Number(msg.hop_limit ?? msg.hopLimit);
+        const hopLabel = hasHop
+          ? `${{Math.trunc(hopNum)}} hop${{Math.trunc(hopNum) === 1 ? "" : "s"}}`
+          : "";
+        const hopTitle = (
+          Number.isFinite(hopStart) && Number.isFinite(hopLimit)
+            ? `hopStart=${{Math.trunc(hopStart)}}, hopLimit=${{Math.trunc(hopLimit)}}`
+            : "Hop count"
+        );
         const messageId = messageIdOf(msg);
         const messageReactions = messageId ? reactionBuckets.get(String(messageId)) : null;
         const reactionChips = messageReactions
@@ -4871,6 +4896,7 @@ def _render_html(
               <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
+            ${{hasHop ? `<span class="chat-feed-hops" title="${{escAttr(hopTitle)}}">${{escAttr(hopLabel)}}</span>` : ""}}
             <span class="chat-feed-actions">${{reactButton}}</span>
             <span class="chat-feed-time">${{escAttr(timeText)}}</span>
           </div>
