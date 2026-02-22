@@ -113,15 +113,6 @@ def _revision_info() -> Dict[str, str]:
     )
 
 
-def _get_local_node_id(iface: Any) -> str:
-    return _get_local_node_id_helper(
-        iface,
-        meshtastic_module=meshtastic,
-        to_jsonable_fn=_to_jsonable_helper,
-        to_int_fn=_to_int,
-    )
-
-
 def run_dashboard(args: argparse.Namespace) -> None:
     if meshtastic is None:
         raise RuntimeError(
@@ -152,7 +143,12 @@ def run_dashboard(args: argparse.Namespace) -> None:
             portnums_pb2_module=portnums_pb2,
             **kwargs,
         ),
-        get_local_node_id_fn=_get_local_node_id,
+        get_local_node_id_fn=lambda iface: _get_local_node_id_helper(
+            iface,
+            meshtastic_module=meshtastic,
+            to_jsonable_fn=_to_jsonable_helper,
+            to_int_fn=_to_int,
+        ),
         normalize_single_emoji_fn=_normalize_single_emoji,
         to_int_fn=_to_int,
         utc_now_fn=_utc_now_helper,
