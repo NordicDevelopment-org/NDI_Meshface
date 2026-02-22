@@ -64,6 +64,10 @@ from meshdash.history_store import HistoryStore
 from meshdash.tracker import DashboardTracker, seed_tracker_from_node_db as _seed_tracker_from_node_db_helper
 from meshdash.html import render_html as _render_html_helper
 from meshdash.http_api import make_http_handler as _make_http_handler_helper
+from meshdash.wiring import (
+    build_dashboard_runtime_dependencies as _build_dashboard_runtime_dependencies_helper,
+    ensure_runtime_dependencies as _ensure_runtime_dependencies_helper,
+)
 try:
     from pubsub import pub
 except Exception:
@@ -98,57 +102,39 @@ def _revision_info() -> Dict[str, str]:
 
 
 def run_dashboard(args: argparse.Namespace) -> None:
-    if meshtastic is None:
-        raise RuntimeError(
-            "meshtastic Python package is required. Install with: pip install meshtastic"
-        )
-    if pub is None:
-        raise RuntimeError(
-            "pypubsub is required. Install with: pip install pypubsub"
-        )
-    _run_dashboard_runtime_helper(
-        args,
+    _ensure_runtime_dependencies_helper(
+        meshtastic_module=meshtastic,
+        pub_module=pub,
+    )
+    runtime_dependencies = _build_dashboard_runtime_dependencies_helper(
+        meshtastic_module=meshtastic,
+        pub_module=pub,
         mesh_target_label_fn=mesh_target_label,
         open_mesh_interface_fn=open_mesh_interface,
         history_store_cls=HistoryStore,
         dashboard_tracker_cls=DashboardTracker,
-        subscribe_fn=pub.subscribe,
         seed_tracker_fn=_seed_tracker_from_node_db_helper,
         revision_info_fn=_revision_info,
-        build_state_fn=lambda **kwargs: _build_state_helper(
-            sensitive_field_names=SENSITIVE_FIELD_NAMES,
-            **kwargs,
-        ),
+        build_state_fn=_build_state_helper,
+        sensitive_field_names=SENSITIVE_FIELD_NAMES,
         build_node_history_loader_fn=_build_node_history_loader,
         build_online_activity_loader_fn=_build_online_activity_loader,
         send_chat_message_fn=_send_chat_message_helper,
-        send_reaction_packet_fn=lambda **kwargs: _send_emoji_reaction_packet_helper(
-            mesh_pb2_module=mesh_pb2,
-            portnums_pb2_module=portnums_pb2,
-            **kwargs,
-        ),
-        get_local_node_id_fn=lambda iface: _get_local_node_id_helper(
-            iface,
-            meshtastic_module=meshtastic,
-            to_jsonable_fn=_to_jsonable_helper,
-            to_int_fn=_to_int,
-        ),
+        send_emoji_reaction_packet_fn=_send_emoji_reaction_packet_helper,
+        mesh_pb2_module=mesh_pb2,
+        portnums_pb2_module=portnums_pb2,
+        get_local_node_id_fn=_get_local_node_id_helper,
+        to_jsonable_fn=_to_jsonable_helper,
         normalize_single_emoji_fn=_normalize_single_emoji,
         to_int_fn=_to_int,
         utc_now_fn=_utc_now_helper,
         render_html_fn=_render_html_helper,
-        make_http_handler_fn=lambda html_text, state_fn, node_history_fn=None, online_activity_fn=None, send_chat_fn=None: _make_http_handler_helper(
-            html_text=html_text,
-            state_fn=state_fn,
-            node_history_fn=node_history_fn,
-            online_activity_fn=online_activity_fn,
-            send_chat_fn=send_chat_fn,
-            default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
-            to_int_fn=_to_int,
-        ),
+        make_http_handler_fn=_make_http_handler_helper,
+        default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
         guess_lan_ipv4_fn=_guess_lan_ipv4_helper,
         default_chat_max_bytes=DEFAULT_CHAT_MAX_BYTES,
     )
+    _run_dashboard_runtime_helper(args, **runtime_dependencies)
 
 
 def main() -> None:
