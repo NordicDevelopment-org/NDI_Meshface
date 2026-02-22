@@ -6,9 +6,8 @@ import threading
 import time
 from collections import Counter, deque
 from datetime import datetime, timezone
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import parse_qs, urlparse
 
 try:
     import meshtastic
@@ -68,6 +67,7 @@ from meshdash.state import (
     collect_nodes as _collect_nodes_helper,
 )
 from meshdash.html import render_html as _render_html_helper
+from meshdash.http_api import make_http_handler as _make_http_handler_helper
 try:
     from pubsub import pub
 except Exception:
@@ -2044,198 +2044,15 @@ def _make_http_handler(
     online_activity_fn=None,
     send_chat_fn=None,
 ):
-    class DashboardHandler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:
-            try:
-                parsed = urlparse(self.path)
-                path = parsed.path
-
-                if path in ("/", "/index.html"):
-                    body = html_text.encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.send_header("Content-Length", str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
-                    return
-
-                if path == "/api/state":
-                    payload = json.dumps(state_fn(), separators=(",", ":")).encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
-                    return
-
-                if path == "/api/history/node":
-                    query = parse_qs(parsed.query)
-                    node_id = (query.get("node_id", [""])[0] or "").strip()
-                    hours_override = _to_int(query.get("hours", [""])[0])
-                    points_override = _to_int(query.get("points", [""])[0])
-                    if node_history_fn is None:
-                        response_obj = {"node_id": node_id, "points": [], "positions": [], "summary": {}}
-                    else:
-                        response_obj = node_history_fn(node_id, hours_override, points_override)
-                    payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
-                    return
-
-                if path == "/api/history/online":
-                    query = parse_qs(parsed.query)
-                    hours_override = _to_int(query.get("hours", [""])[0])
-                    if online_activity_fn is None:
-                        clean_hours = (
-                            hours_override
-                            if isinstance(hours_override, int) and hours_override > 0
-                            else DEFAULT_NODE_HISTORY_HOURS
-                        )
-                        response_obj = {
-                            "window_hours": clean_hours,
-                            "timezone": "local",
-                            "timezone_label": "local",
-                            "points": [],
-                            "hourly_profile": [
-                                {
-                                    "hour": hour,
-                                    "label": f"{hour:02d}:00",
-                                    "avg_online_nodes": None,
-                                    "sample_hours": 0,
-                                    "peak_online_nodes": 0,
-                                }
-                                for hour in range(24)
-                            ],
-                            "summary": {
-                                "sample_hours": 0,
-                                "distinct_nodes": 0,
-                                "max_online_nodes": 0,
-                                "avg_online_nodes": None,
-                                "best_hour": None,
-                                "best_hour_label": None,
-                                "best_hour_avg_online_nodes": None,
-                                "window_start": None,
-                                "window_end": None,
-                            },
-                        }
-                    else:
-                        response_obj = online_activity_fn(hours_override)
-                    payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
-                    return
-
-                self.send_response(404)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(b"Not Found")
-            except (BrokenPipeError, ConnectionResetError):
-                return
-
-        def do_POST(self) -> None:
-            try:
-                parsed = urlparse(self.path)
-                path = parsed.path
-                if path != "/api/chat/send":
-                    self.send_response(404)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(b'{"ok":false,"error":"Not Found"}')
-                    return
-
-                if send_chat_fn is None:
-                    payload = json.dumps(
-                        {"ok": False, "error": "Chat send is not enabled on this dashboard instance"},
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    self.send_response(503)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
-                    return
-
-                content_length = _to_int(self.headers.get("Content-Length")) or 0
-                if content_length <= 0 or content_length > 8192:
-                    payload = json.dumps(
-                        {"ok": False, "error": "Invalid request size"},
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    self.send_response(400)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
-                    return
-
-                raw = self.rfile.read(content_length)
-                try:
-                    body = json.loads(raw.decode("utf-8"))
-                except Exception:
-                    body = {}
-
-                text = body.get("text") if isinstance(body, dict) else None
-                destination = body.get("destination") if isinstance(body, dict) else None
-                channel_index = _to_int(body.get("channel_index")) if isinstance(body, dict) else None
-                reply_id = _to_int(body.get("reply_id")) if isinstance(body, dict) else None
-                retry_of = _to_int(body.get("retry_of")) if isinstance(body, dict) else None
-                emoji = body.get("emoji") if isinstance(body, dict) else None
-
-                try:
-                    response_obj = send_chat_fn(
-                        text=text,
-                        destination=destination,
-                        channel_index=channel_index,
-                        reply_id=reply_id,
-                        retry_of=retry_of,
-                        emoji=emoji,
-                    )
-                except ValueError as exc:
-                    payload = json.dumps(
-                        {"ok": False, "error": str(exc)},
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    self.send_response(400)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
-                    return
-                except Exception as exc:
-                    payload = json.dumps(
-                        {"ok": False, "error": f"Send failed: {exc}"},
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    self.send_response(500)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
-                    return
-
-                payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json; charset=utf-8")
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
-            except (BrokenPipeError, ConnectionResetError):
-                return
-
-        def log_message(self, format: str, *args: Any) -> None:
-            return
-
-    return DashboardHandler
+    return _make_http_handler_helper(
+        html_text=html_text,
+        state_fn=state_fn,
+        node_history_fn=node_history_fn,
+        online_activity_fn=online_activity_fn,
+        send_chat_fn=send_chat_fn,
+        default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
+        to_int_fn=_to_int,
+    )
 
 
 def run_dashboard(args: argparse.Namespace) -> None:

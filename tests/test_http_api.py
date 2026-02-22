@@ -1,0 +1,92 @@
+import io
+import json
+
+from meshdash.http_api import make_http_handler
+
+
+def _run_get(handler_cls, path: str):
+    handler = handler_cls.__new__(handler_cls)
+    handler.path = path
+    handler.headers = {}
+    handler.rfile = io.BytesIO()
+    handler.wfile = io.BytesIO()
+    sent = {"status": None, "headers": []}
+
+    handler.send_response = lambda code: sent.__setitem__("status", code)
+    handler.send_header = lambda key, value: sent["headers"].append((key, value))
+    handler.end_headers = lambda: None
+
+    handler.do_GET()
+    return sent, handler.wfile.getvalue()
+
+
+def _run_post(handler_cls, path: str, body: dict):
+    payload = json.dumps(body).encode("utf-8")
+    handler = handler_cls.__new__(handler_cls)
+    handler.path = path
+    handler.headers = {"Content-Length": str(len(payload))}
+    handler.rfile = io.BytesIO(payload)
+    handler.wfile = io.BytesIO()
+    sent = {"status": None, "headers": []}
+
+    handler.send_response = lambda code: sent.__setitem__("status", code)
+    handler.send_header = lambda key, value: sent["headers"].append((key, value))
+    handler.end_headers = lambda: None
+
+    handler.do_POST()
+    return sent, handler.wfile.getvalue()
+
+
+def test_http_api_state_and_history_endpoints():
+    handler_cls = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=lambda: {"ok": True, "nodes": 3},
+        node_history_fn=lambda node_id, hours, points: {
+            "node_id": node_id,
+            "hours": hours,
+            "points_req": points,
+            "points": [],
+            "positions": [],
+            "summary": {},
+        },
+        online_activity_fn=None,
+        send_chat_fn=None,
+        default_node_history_hours=72,
+    )
+
+    sent, data = _run_get(handler_cls, "/api/state")
+    assert sent["status"] == 200
+    assert json.loads(data.decode("utf-8"))["ok"] is True
+
+    sent, data = _run_get(handler_cls, "/api/history/node?node_id=!abc123&hours=6&points=50")
+    assert sent["status"] == 200
+    body = json.loads(data.decode("utf-8"))
+    assert body["node_id"] == "!abc123"
+    assert body["hours"] == 6
+    assert body["points_req"] == 50
+
+    sent, data = _run_get(handler_cls, "/api/history/online?hours=12")
+    assert sent["status"] == 200
+    online = json.loads(data.decode("utf-8"))
+    assert online["window_hours"] == 12
+    assert len(online["hourly_profile"]) == 24
+
+
+def test_http_api_chat_send_success_and_disabled():
+    enabled_handler = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=lambda: {"ok": True},
+        send_chat_fn=lambda **kwargs: {"ok": True, "echo": kwargs.get("text", "")},
+    )
+    sent, data = _run_post(enabled_handler, "/api/chat/send", {"text": "hello"})
+    assert sent["status"] == 200
+    assert json.loads(data.decode("utf-8"))["echo"] == "hello"
+
+    disabled_handler = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=lambda: {"ok": True},
+        send_chat_fn=None,
+    )
+    sent, data = _run_post(disabled_handler, "/api/chat/send", {"text": "hello"})
+    assert sent["status"] == 503
+    assert "not enabled" in json.loads(data.decode("utf-8"))["error"].lower()

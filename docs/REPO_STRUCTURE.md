@@ -7,6 +7,7 @@
 - `meshdash/chat.py`: chat-entry and delivery-state transition helpers.
 - `meshdash/html.py`: extracted dashboard HTML renderer and frontend template.
 - `meshdash/helpers.py`: extracted pure utility helpers used by runtime and tests.
+- `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
 - `meshdash/nodes.py`: extracted node/interface/time utilities for dashboard runtime.
 - `meshdash/revision.py`: revision/version/git metadata helpers for header build info.
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
