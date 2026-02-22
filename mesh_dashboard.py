@@ -2429,12 +2429,14 @@ def _render_html(
       flex: 1;
       min-height: 0;
       gap: 7px;
+      overflow: hidden;
     }}
     .chat-shell {{
-      display: block;
+      display: flex;
+      flex-direction: column;
       flex: 1 1 auto;
       min-height: 0;
-      height: 100%;
+      overflow: hidden;
     }}
     .chat-member-pane {{
       grid-area: members;
@@ -2548,6 +2550,7 @@ def _render_html(
       display: grid;
       grid-template-rows: minmax(0, 1fr) auto auto;
       row-gap: 6px;
+      flex: 1 1 auto;
       min-height: 0;
       overflow: hidden;
     }}
@@ -2840,7 +2843,7 @@ def _render_html(
     }}
     .chat-log-scroll.scroll {{
       max-height: none;
-      height: auto;
+      height: 100%;
       overflow: auto;
     }}
     .scroll.wheel-scroll-active,
