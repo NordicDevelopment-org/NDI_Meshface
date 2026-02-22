@@ -302,13 +302,16 @@ def _get_node_id_from_num(iface: Any, node_num: Any) -> Optional[str]:
     return f"!{numeric:08x}"
 
 
-def _extract_position(node_info: Dict[str, Any]) -> Optional[Tuple[float, float]]:
-    position = node_info.get("position")
+def _extract_position_fields(position: Any) -> Optional[Tuple[float, float]]:
     if not isinstance(position, dict):
         return None
 
     lat = position.get("latitude")
     lon = position.get("longitude")
+    if lat is None:
+        lat = position.get("lat")
+    if lon is None:
+        lon = position.get("lon")
 
     if lat is None and position.get("latitudeI") is not None:
         lat = _to_float(position.get("latitudeI"))
@@ -317,13 +320,74 @@ def _extract_position(node_info: Dict[str, Any]) -> Optional[Tuple[float, float]
         lon = _to_float(position.get("longitudeI"))
         lon = lon * 1e-7 if lon is not None else None
 
+    if lat is None and position.get("latitude_i") is not None:
+        lat = _to_float(position.get("latitude_i"))
+        lat = lat * 1e-7 if lat is not None else None
+    if lon is None and position.get("longitude_i") is not None:
+        lon = _to_float(position.get("longitude_i"))
+        lon = lon * 1e-7 if lon is not None else None
+
     lat_f = _to_float(lat)
     lon_f = _to_float(lon)
     if lat_f is None or lon_f is None:
         return None
     if lat_f == 0.0 and lon_f == 0.0:
         return None
+    if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
+        return None
     return lat_f, lon_f
+
+
+def _extract_position(node_info: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+    return _extract_position_fields(node_info.get("position"))
+
+
+def _extract_packet_position(packet: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if not isinstance(packet, dict):
+        return None
+
+    candidates: list[Dict[str, Any]] = []
+    decoded = packet.get("decoded")
+    if isinstance(decoded, dict):
+        for key in ("position", "gps", "location"):
+            candidate = decoded.get(key)
+            if isinstance(candidate, dict):
+                candidates.append(candidate)
+        candidates.append(decoded)
+
+    for key in ("position", "gps", "location"):
+        candidate = packet.get(key)
+        if isinstance(candidate, dict):
+            candidates.append(candidate)
+    candidates.append(packet)
+
+    for candidate in candidates:
+        coords = _extract_position_fields(candidate)
+        if coords is None:
+            continue
+
+        altitude = _to_float(candidate.get("altitude"))
+        if altitude is None:
+            altitude = _to_float(candidate.get("altitude_m"))
+        if altitude is None:
+            altitude = _to_float(candidate.get("altitudeM"))
+
+        sats = _to_int(candidate.get("satsInView"))
+        if sats is None:
+            sats = _to_int(candidate.get("sats_in_view"))
+        if sats is None:
+            sats = _to_int(candidate.get("satellites"))
+
+        out: Dict[str, Any] = {
+            "lat": coords[0],
+            "lon": coords[1],
+        }
+        if altitude is not None:
+            out["altitude"] = altitude
+        if sats is not None and sats >= 0:
+            out["sats_in_view"] = sats
+        return out
+    return None
 
 
 def _safe_nodes_items(iface: Any) -> list[Tuple[Any, Any]]:
@@ -427,6 +491,19 @@ class HistoryStore:
         )
         self._conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS node_positions (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              created_unix INTEGER NOT NULL,
+              node_id TEXT NOT NULL,
+              lat REAL NOT NULL,
+              lon REAL NOT NULL,
+              altitude REAL,
+              sats_in_view INTEGER
+            )
+            """
+        )
+        self._conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS node_metrics_1m (
               bucket_unix INTEGER NOT NULL,
               node_id TEXT NOT NULL,
@@ -481,6 +558,10 @@ class HistoryStore:
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_packet_events_from_id ON packet_events(from_id)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_packet_events_to_id ON packet_events(to_id)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_packet_events_portnum ON packet_events(portnum)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_node_positions_created_unix ON node_positions(created_unix)")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_node_positions_node_id_created_unix ON node_positions(node_id, created_unix)"
+        )
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_node_metrics_1m_last_seen_unix ON node_metrics_1m(last_seen_unix)"
         )
@@ -501,6 +582,7 @@ class HistoryStore:
         if self.event_retention_seconds > 0:
             event_cutoff = int(time.time()) - self.event_retention_seconds
             self._conn.execute("DELETE FROM packet_events WHERE created_unix < ?", (event_cutoff,))
+            self._conn.execute("DELETE FROM node_positions WHERE created_unix < ?", (event_cutoff,))
         if self.rollup_retention_seconds > 0:
             rollup_cutoff = int(time.time()) - self.rollup_retention_seconds
             self._conn.execute("DELETE FROM node_metrics_1m WHERE last_seen_unix < ?", (rollup_cutoff,))
@@ -537,6 +619,13 @@ class HistoryStore:
                 """
                 DELETE FROM packet_events
                 WHERE id <= (SELECT COALESCE(MAX(id), 0) - ? FROM packet_events)
+                """,
+                (self.event_max_rows,),
+            )
+            self._conn.execute(
+                """
+                DELETE FROM node_positions
+                WHERE id <= (SELECT COALESCE(MAX(id), 0) - ? FROM node_positions)
                 """,
                 (self.event_max_rows,),
             )
@@ -613,7 +702,13 @@ class HistoryStore:
     def load_node_history(self, node_id: str, window_hours: int, max_points: int) -> Dict[str, Any]:
         clean_node_id = str(node_id or "").strip()
         if not clean_node_id:
-            return {"node_id": "", "window_hours": max(1, int(window_hours)), "points": [], "summary": {}}
+            return {
+                "node_id": "",
+                "window_hours": max(1, int(window_hours)),
+                "points": [],
+                "positions": [],
+                "summary": {},
+            }
 
         hours = max(1, int(window_hours))
         limit = max(20, min(10000, int(max_points)))
@@ -634,8 +729,19 @@ class HistoryStore:
                 """,
                 (clean_node_id, cutoff, limit),
             ).fetchall()
+            position_rows = self._conn.execute(
+                """
+                SELECT created_unix, lat, lon, altitude, sats_in_view
+                FROM node_positions
+                WHERE node_id = ? AND created_unix >= ?
+                ORDER BY created_unix DESC
+                LIMIT ?
+                """,
+                (clean_node_id, cutoff, limit),
+            ).fetchall()
 
         points: list[Dict[str, Any]] = []
+        positions: list[Dict[str, Any]] = []
         total_packets = 0
         snr_min_all: Optional[float] = None
         snr_max_all: Optional[float] = None
@@ -644,6 +750,8 @@ class HistoryStore:
         first_bucket: Optional[int] = None
         last_bucket: Optional[int] = None
         last_seen: Optional[int] = None
+        trail_start: Optional[int] = None
+        trail_end: Optional[int] = None
 
         for row in reversed(rows):
             (
@@ -716,10 +824,34 @@ class HistoryStore:
                 }
             )
 
+        for created_unix, lat, lon, altitude, sats_in_view in reversed(position_rows):
+            point_unix = _to_int(created_unix)
+            lat_f = _to_float(lat)
+            lon_f = _to_float(lon)
+            if point_unix is None or lat_f is None or lon_f is None:
+                continue
+            if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
+                continue
+            if lat_f == 0.0 and lon_f == 0.0:
+                continue
+            trail_start = point_unix if trail_start is None else min(trail_start, point_unix)
+            trail_end = point_unix if trail_end is None else max(trail_end, point_unix)
+            positions.append(
+                {
+                    "time_unix": point_unix,
+                    "time": _format_epoch(point_unix),
+                    "lat": lat_f,
+                    "lon": lon_f,
+                    "altitude": _to_float(altitude),
+                    "sats_in_view": _to_int(sats_in_view),
+                }
+            )
+
         return {
             "node_id": clean_node_id,
             "window_hours": hours,
             "points": points,
+            "positions": positions,
             "summary": {
                 "total_packets": total_packets,
                 "points": len(points),
@@ -730,6 +862,9 @@ class HistoryStore:
                 "snr_max": snr_max_all,
                 "rssi_min": rssi_min_all,
                 "rssi_max": rssi_max_all,
+                "trail_points": len(positions),
+                "trail_start": _format_epoch(trail_start),
+                "trail_end": _format_epoch(trail_end),
             },
         }
 
@@ -978,6 +1113,66 @@ class HistoryStore:
         if not value or value in ("Unknown", "n/a", "^all"):
             return None
         return value
+
+    def _save_node_position_unlocked(self, node_id: str, event_unix: int, position_data: Any) -> None:
+        coords = _extract_position_fields(position_data)
+        if coords is None:
+            return
+
+        altitude: Optional[float] = None
+        sats: Optional[int] = None
+        if isinstance(position_data, dict):
+            altitude = _to_float(position_data.get("altitude"))
+            if altitude is None:
+                altitude = _to_float(position_data.get("altitude_m"))
+            if altitude is None:
+                altitude = _to_float(position_data.get("altitudeM"))
+
+            sats = _to_int(position_data.get("sats_in_view"))
+            if sats is None:
+                sats = _to_int(position_data.get("satsInView"))
+            if sats is None:
+                sats = _to_int(position_data.get("satellites"))
+
+        latest = self._conn.execute(
+            """
+            SELECT created_unix, lat, lon
+            FROM node_positions
+            WHERE node_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (node_id,),
+        ).fetchone()
+        if latest is not None:
+            latest_unix, latest_lat, latest_lon = latest
+            latest_unix_i = _to_int(latest_unix)
+            latest_lat_f = _to_float(latest_lat)
+            latest_lon_f = _to_float(latest_lon)
+            if (
+                latest_unix_i is not None
+                and latest_lat_f is not None
+                and latest_lon_f is not None
+                and abs(coords[0] - latest_lat_f) < 1e-7
+                and abs(coords[1] - latest_lon_f) < 1e-7
+                and abs(event_unix - latest_unix_i) < 30
+            ):
+                return
+
+        self._conn.execute(
+            """
+            INSERT INTO node_positions(created_unix, node_id, lat, lon, altitude, sats_in_view)
+            VALUES(?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event_unix,
+                node_id,
+                coords[0],
+                coords[1],
+                altitude,
+                sats if sats is not None and sats >= 0 else None,
+            ),
+        )
 
     def _upsert_node_metric_unlocked(
         self,
@@ -1253,6 +1448,7 @@ class HistoryStore:
         priority_raw = summary.get("priority")
         priority = str(priority_raw) if priority_raw is not None else None
         want_ack = 1 if summary.get("want_ack") else 0
+        position_data = summary.get("position")
 
         self._conn.execute(
             """
@@ -1288,6 +1484,11 @@ class HistoryStore:
                 rx_snr=rx_snr,
                 rx_rssi=rx_rssi,
                 hops=hops,
+            )
+            self._save_node_position_unlocked(
+                node_id=from_id,
+                event_unix=event_unix,
+                position_data=position_data,
             )
         if from_id and to_id and from_id != to_id:
             self._upsert_link_metric_unlocked(
@@ -1563,6 +1764,7 @@ class DashboardTracker:
         decoded = packet.get("decoded", {})
         portnum = decoded.get("portnum") if isinstance(decoded, dict) else None
         packet_id = _to_int(packet.get("id"))
+        packet_position = _extract_packet_position(packet)
         reply_id = _extract_reply_id(decoded)
         emoji_codepoint = _extract_emoji_codepoint(decoded)
         emoji_glyph = _emoji_from_codepoint(emoji_codepoint)
@@ -1674,6 +1876,8 @@ class DashboardTracker:
             "emoji_codepoint": emoji_codepoint,
             "is_reaction": is_reaction,
         }
+        if packet_position is not None:
+            packet_summary["position"] = packet_position
 
         packet_entry = {
             "summary": packet_summary,
@@ -4588,6 +4792,7 @@ def _render_html(
     const mapFrameElement = mapElement ? mapElement.closest(".map-frame") : null;
     const nodeLayer = L.layerGroup().addTo(map);
     const edgeLayer = L.layerGroup().addTo(map);
+    const trailLayer = L.layerGroup().addTo(map);
     const nodeMarkers = new Map();
     const selectionStorageKey = "meshDashboardSelectedNodeId";
     const nodeNameCacheStorageKey = "meshDashboardNodeNameCacheV1";
@@ -6564,7 +6769,14 @@ def _render_html(
       scrollSelectionIntoView();
       renderNodeHistoryLoading(selectedNodeId);
       if (latestState) {{
-        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || []);
+        let cachedNodeHistory = null;
+        if (isSelectableNodeId(selectedNodeId)) {{
+          const cached = nodeHistoryCache.get(selectedNodeId);
+          if (cached && cached.data) {{
+            cachedNodeHistory = cached.data;
+          }}
+        }}
+        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
       }}
       applyChatChannel(activeChatChannel, false);
     }}
@@ -6579,7 +6791,7 @@ def _render_html(
       map.closePopup();
       setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
       if (latestState) {{
-        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || []);
+        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], null);
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null, null);
       }}
       applyChatChannel(activeChatChannel, false);
@@ -6785,18 +6997,33 @@ def _render_html(
       }}
     }}
 
-    function buildMapSignature(nodes, edges) {{
+    function buildMapSignature(nodes, edges, nodeHistory) {{
       const selection = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
       if (selection) {{
+        let trailSig = "no-trail";
+        const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
+        if (historyNodeId && historyNodeId === selection) {{
+          const rawTrail = Array.isArray(nodeHistory.positions) ? nodeHistory.positions : [];
+          const compact = [];
+          for (const point of rawTrail) {{
+            const lat = Number(point && point.lat);
+            const lon = Number(point && point.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            const when = Number(point && point.time_unix);
+            const ts = Number.isFinite(when) ? String(Math.round(when)) : "";
+            compact.push(`${{lat.toFixed(5)}},${{lon.toFixed(5)}}@${{ts}}`);
+          }}
+          trailSig = compact.join("|");
+        }}
         const selectedNode = selectedNodeFrom(nodes);
         if (
           selectedNode &&
           typeof selectedNode.lat === "number" &&
           typeof selectedNode.lon === "number"
         ) {{
-          return `sel:${{selection}}:${{selectedNode.lat.toFixed(5)}},${{selectedNode.lon.toFixed(5)}}`;
+          return `sel:${{selection}}:${{selectedNode.lat.toFixed(5)}},${{selectedNode.lon.toFixed(5)}}:trail:${{trailSig}}`;
         }}
-        return `sel:${{selection}}:no-position`;
+        return `sel:${{selection}}:no-position:trail:${{trailSig}}`;
       }}
       const nodeSig = (nodes || [])
         .filter((node) => typeof node.lat === "number" && typeof node.lon === "number")
@@ -6808,8 +7035,8 @@ def _render_html(
       return `all#${{nodeSig}}#${{edgeSig}}`;
     }}
 
-    function renderMap(nodes, edges) {{
-      const signature = buildMapSignature(nodes, edges);
+    function renderMap(nodes, edges, nodeHistory = null) {{
+      const signature = buildMapSignature(nodes, edges, nodeHistory);
       if (signature === lastMapSignature) {{
         updateMapSelection(false);
         return;
@@ -6818,6 +7045,7 @@ def _render_html(
 
       nodeLayer.clearLayers();
       edgeLayer.clearLayers();
+      trailLayer.clearLayers();
       nodeMarkers.clear();
       const features = [];
       const byId = Object.fromEntries(nodes.map((n) => [normalizeNodeId(n.id), n]));
@@ -6829,21 +7057,92 @@ def _render_html(
 
       if (selectionMode) {{
         const selectedNode = selectedNodeFrom(nodes);
-        if (
-          selectedNode &&
-          typeof selectedNode.lat === "number" &&
-          typeof selectedNode.lon === "number"
-        ) {{
+        const selectionId = normalizeNodeId(selectedNodeId || "");
+        const selectedNodeIdNormalized = normalizeNodeId((selectedNode && selectedNode.id) || "");
+        const hasSelectedPosition = !!selectedNode
+          && typeof selectedNode.lat === "number"
+          && typeof selectedNode.lon === "number";
+        const canUseHistory = !!nodeHistory
+          && normalizeNodeId((nodeHistory && nodeHistory.node_id) || "") === selectionId;
+        const rawTrail = canUseHistory && Array.isArray(nodeHistory.positions)
+          ? nodeHistory.positions
+          : [];
+        const trailPoints = rawTrail
+          .map((point) => {{
+            const lat = Number(point && point.lat);
+            const lon = Number(point && point.lon);
+            const timeUnix = Number(point && point.time_unix);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            return {{
+              lat,
+              lon,
+              time_unix: Number.isFinite(timeUnix) ? Math.round(timeUnix) : null,
+              time: point && point.time ? String(point.time) : null,
+            }};
+          }})
+          .filter((point) => point !== null);
+
+        if (trailPoints.length >= 2) {{
+          const line = L.polyline(
+            trailPoints.map((point) => [point.lat, point.lon]),
+            {{
+              color: "#d06a1b",
+              opacity: 0.78,
+              weight: 4,
+              lineCap: "round",
+              lineJoin: "round",
+            }}
+          );
+          line.bindTooltip(`Location trail (${{trailPoints.length}} points)`, {{ sticky: true, opacity: 0.9 }});
+          line.addTo(trailLayer);
+          features.push(line);
+        }}
+        if (trailPoints.length > 0) {{
+          const startPoint = trailPoints[0];
+          const endPoint = trailPoints[trailPoints.length - 1];
+          const startMarker = L.circleMarker([startPoint.lat, startPoint.lon], {{
+            radius: 5,
+            color: "#2f855a",
+            fillColor: "#2f855a",
+            fillOpacity: 0.92,
+            weight: 1,
+            bubblingMouseEvents: false,
+          }});
+          startMarker.bindTooltip(`Trail start: ${{startPoint.time || "n/a"}}`, {{ sticky: true, opacity: 0.88 }});
+          startMarker.addTo(trailLayer);
+          features.push(startMarker);
+          if (trailPoints.length > 1) {{
+            const endMarker = L.circleMarker([endPoint.lat, endPoint.lon], {{
+              radius: 6,
+              color: "#b91c1c",
+              fillColor: "#b91c1c",
+              fillOpacity: 0.96,
+              weight: 1,
+              bubblingMouseEvents: false,
+            }});
+            endMarker.bindTooltip(`Trail latest: ${{endPoint.time || "n/a"}}`, {{ sticky: true, opacity: 0.88 }});
+            endMarker.addTo(trailLayer);
+            features.push(endMarker);
+          }}
+        }}
+
+        if (hasSelectedPosition) {{
+          const trailPointsCount = trailPoints.length;
+          const trailLast = trailPointsCount > 0
+            ? (trailPoints[trailPointsCount - 1].time || "n/a")
+            : "n/a";
           const marker = L.circleMarker(
             [selectedNode.lat, selectedNode.lon],
             markerStyle(true)
           );
           marker.bindPopup(`
             <b>${{nodeLabel(selectedNode)}}</b><br/>
-            ${{normalizeNodeId(selectedNode.id) || selectedNode.id}}<br/>
+            ${{selectedNodeIdNormalized || selectedNode.id}}<br/>
             Num: ${{selectedNode.num ?? "n/a"}}<br/>
             SNR: ${{selectedNode.snr ?? "n/a"}}<br/>
-            Last: ${{selectedNode.last_heard || "n/a"}}
+            Last: ${{selectedNode.last_heard || "n/a"}}<br/>
+            Trail points: ${{trailPointsCount}}<br/>
+            Trail latest: ${{trailLast}}
           `);
           marker.on("click", () => {{
             selectNode(normalizeNodeId(selectedNode.id || ""), false);
@@ -6851,8 +7150,21 @@ def _render_html(
           marker.addTo(nodeLayer);
           nodeMarkers.set(normalizeNodeId(selectedNode.id || ""), marker);
           features.push(marker);
-          map.setView([selectedNode.lat, selectedNode.lon], Math.max(map.getZoom(), 11), {{ animate: false }});
+          if (trailPoints.length > 1) {{
+            const trailBounds = L.latLngBounds(trailPoints.map((point) => [point.lat, point.lon]));
+            trailBounds.extend([selectedNode.lat, selectedNode.lon]);
+            if (trailBounds.isValid()) {{
+              map.fitBounds(trailBounds.pad(0.2), {{ animate: false, maxZoom: 16 }});
+            }}
+          }} else {{
+            map.setView([selectedNode.lat, selectedNode.lon], Math.max(map.getZoom(), 11), {{ animate: false }});
+          }}
           marker.openPopup();
+        }} else if (trailPoints.length > 0) {{
+          const trailBounds = L.latLngBounds(trailPoints.map((point) => [point.lat, point.lon]));
+          if (trailBounds.isValid()) {{
+            map.fitBounds(trailBounds.pad(0.2), {{ animate: false, maxZoom: 16 }});
+          }}
         }} else {{
           map.closePopup();
         }}
@@ -7266,9 +7578,11 @@ def _render_html(
         ["Node", `${{label}}`],
         ["Node ID", `${{historyNodeId || selectedNodeId || "n/a"}}`],
         ["Points", `${{summary.points ?? (history.points || []).length ?? 0}}`],
+        ["Trail Points", `${{summary.trail_points ?? (history.positions || []).length ?? 0}}`],
         ["Packets", `${{summary.total_packets ?? 0}}`],
         ["Window", `${{history.window_hours ?? nodeHistoryHours}}h`],
         ["Last Seen", `${{summary.last_seen || "n/a"}}`],
+        ["Trail Range", `${{summary.trail_start || "n/a"}} to ${{summary.trail_end || "n/a"}}`],
         ["SNR Range", `${{formatMetricValue(summary.snr_min, 1)}} to ${{formatMetricValue(summary.snr_max, 1)}} dB`],
         ["RSSI Range", `${{formatMetricValue(summary.rssi_min, 0)}} to ${{formatMetricValue(summary.rssi_max, 0)}} dBm`],
       ];
@@ -7285,10 +7599,13 @@ def _render_html(
       if (caption) {{
         const name = node ? nodeLabel(node) : (historyNodeId || selectedNodeId || "node");
         const span = history.summary || {{}};
+        const trailPoints = Number.isFinite(Number(span.trail_points))
+          ? Number(span.trail_points)
+          : (Array.isArray(history.positions) ? history.positions.length : 0);
         const loc = (node && typeof node.lat === "number" && typeof node.lon === "number")
           ? `Current location: ${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}.`
           : "No current location available from live node state.";
-        caption.textContent = `${{name}} (${{historyNodeId || selectedNodeId || "n/a"}}). ${{loc}} History window: ${{history.window_hours || nodeHistoryHours}}h, packets: ${{span.total_packets ?? 0}}.`;
+        caption.textContent = `${{name}} (${{historyNodeId || selectedNodeId || "n/a"}}). ${{loc}} History window: ${{history.window_hours || nodeHistoryHours}}h, packets: ${{span.total_packets ?? 0}}, trail points: ${{trailPoints}}.`;
       }}
       renderSignalChart(history.points || []);
       renderNodeHistoryOverview(history, node);
@@ -7879,7 +8196,7 @@ def _render_html(
           }}
         }}
         renderSummary(state);
-        renderMap(state.nodes || [], (state.traffic || {{}}).edges || []);
+        renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], nodeHistory);
         renderNodes(state.nodes || []);
         renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory, onlineActivity);
         renderChat(state);
@@ -7962,7 +8279,7 @@ def _make_http_handler(
                     hours_override = _to_int(query.get("hours", [""])[0])
                     points_override = _to_int(query.get("points", [""])[0])
                     if node_history_fn is None:
-                        response_obj = {"node_id": node_id, "points": [], "summary": {}}
+                        response_obj = {"node_id": node_id, "points": [], "positions": [], "summary": {}}
                     else:
                         response_obj = node_history_fn(node_id, hours_override, points_override)
                     payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
@@ -8180,7 +8497,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
     ) -> Dict[str, Any]:
         clean_node_id = str(node_id or "").strip()
         if history_store is None:
-            return {"node_id": clean_node_id, "points": [], "summary": {}}
+            return {"node_id": clean_node_id, "points": [], "positions": [], "summary": {}}
         hours = hours_override if isinstance(hours_override, int) and hours_override > 0 else args.node_history_hours
         points = (
             points_override

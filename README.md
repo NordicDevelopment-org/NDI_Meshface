@@ -26,7 +26,7 @@ Planning docs:
 
 - Live network map with node markers and link lines.
 - Click-to-select node from map, node list, or chat.
-- Node history panel with signal plots (SNR/RSSI) and rollup stats.
+- Node history panel with signal plots (SNR/RSSI), rollup stats, and selected-node location trails.
 - Name-first chat room view with send box at the bottom.
 - Theme toggle (`Light`/`Dark`) that defaults to browser/system preference until user sets an explicit mode.
 - Recent packets, map stats, raw config views.
