@@ -2022,6 +2022,11 @@ def _render_html(
     .rail-btn:hover {{
       background: #e7f3eb;
     }}
+    .rail-btn.has-unread {{
+      border-color: #2f855a;
+      box-shadow: inset 0 0 0 1px rgba(47, 133, 90, 0.22);
+      font-weight: 700;
+    }}
     .rail-btn.active {{
       background: #2f855a;
       border-color: #256f4a;
@@ -4023,6 +4028,10 @@ def _render_html(
       color: #eef6ff !important;
       box-shadow: inset 0 0 0 1px rgba(121, 192, 255, 0.15);
     }}
+    [data-theme="dark"] .rail-btn.has-unread {{
+      border-color: #3fb950 !important;
+      box-shadow: inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+    }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
       background: #1b313f;
       border-color: #446381 !important;
@@ -4440,6 +4449,10 @@ def _render_html(
     let themeMediaQuery = null;
     let mapTileLayer = null;
     let mapTileTheme = "";
+    let chatUnreadCount = 0;
+    let chatUnreadInitialized = false;
+    const chatSeenMessageKeys = new Set();
+    const chatSeenMessageOrder = [];
     const nodeHistoryCache = new Map();
     const nodeNameCache = new Map();
 
@@ -5702,6 +5715,58 @@ def _render_html(
       applySplitState();
     }}
 
+    function chatMessageKey(msg) {{
+      if (!msg || typeof msg !== "object") return "";
+      const msgId = Number(msg.message_id ?? msg.messageId ?? msg.packet_id ?? msg.packetId);
+      if (Number.isInteger(msgId) && msgId > 0) {{
+        return `id:${{msgId}}`;
+      }}
+      const from = normalizeNodeId(msg.from || "");
+      const to = normalizeNodeId(msg.to || "");
+      const rx = String(msg.rx_time || msg.captured_at || "").trim();
+      const text = String(msg.text || "");
+      const channel = String(msg.channel ?? "");
+      if (!from && !to && !rx && !text) {{
+        return "";
+      }}
+      return `sig:${{from}}|${{to}}|${{rx}}|${{channel}}|${{text}}`;
+    }}
+
+    function rememberSeenChatMessage(key) {{
+      if (!key || chatSeenMessageKeys.has(key)) return false;
+      chatSeenMessageKeys.add(key);
+      chatSeenMessageOrder.push(key);
+      if (chatSeenMessageOrder.length > 6000) {{
+        while (chatSeenMessageOrder.length > 4500) {{
+          const stale = chatSeenMessageOrder.shift();
+          if (stale) chatSeenMessageKeys.delete(stale);
+        }}
+      }}
+      return true;
+    }}
+
+    function setChatRailUnread(count) {{
+      const btn = document.querySelector('.teams-rail .rail-btn[data-view="chat"]');
+      if (!(btn instanceof HTMLButtonElement)) return;
+      if (!btn.dataset.baseTitle) {{
+        btn.dataset.baseTitle = btn.getAttribute("title") || "Teams-style chat workspace";
+      }}
+      const safeCount = Math.max(0, Math.trunc(Number(count) || 0));
+      const labelCount = safeCount > 99 ? "99+" : String(safeCount);
+      btn.textContent = safeCount > 0 ? `Chat (${{labelCount}})` : "Chat";
+      btn.classList.toggle("has-unread", safeCount > 0);
+      const baseTitle = btn.dataset.baseTitle || "Teams-style chat workspace";
+      btn.title = safeCount > 0
+        ? `${{baseTitle}}. ${{safeCount}} unread message${{safeCount === 1 ? "" : "s"}}.`
+        : baseTitle;
+      btn.setAttribute("aria-label", btn.title);
+    }}
+
+    function clearChatUnread() {{
+      chatUnreadCount = 0;
+      setChatRailUnread(0);
+    }}
+
     function persistSplitState() {{
       try {{
         window.localStorage.setItem(
@@ -5749,6 +5814,10 @@ def _render_html(
           clearTimeout(activeWheelPaneLease);
           activeWheelPaneLease = null;
         }}
+        clearChatUnread();
+      }}
+      if (!chatPanelOpen) {{
+        setChatRailUnread(chatUnreadCount);
       }}
       if (typeof window.meshRefreshWheelHints === "function") {{
         window.meshRefreshWheelHints();
@@ -6946,6 +7015,32 @@ def _render_html(
       }}
 
       const baseMessages = rawMessages.filter((msg) => !isReactionMessage(msg));
+      const messageKeys = baseMessages
+        .map((msg) => chatMessageKey(msg))
+        .filter((key) => !!key);
+      if (!chatUnreadInitialized) {{
+        for (const key of messageKeys) {{
+          rememberSeenChatMessage(key);
+        }}
+        chatUnreadInitialized = true;
+      }} else if (activeLayoutView === "chat") {{
+        for (const key of messageKeys) {{
+          rememberSeenChatMessage(key);
+        }}
+        chatUnreadCount = 0;
+      }} else {{
+        let freshCount = 0;
+        for (const key of messageKeys) {{
+          if (rememberSeenChatMessage(key)) {{
+            freshCount += 1;
+          }}
+        }}
+        if (freshCount > 0) {{
+          chatUnreadCount = Math.min(999, chatUnreadCount + freshCount);
+        }}
+      }}
+      setChatRailUnread(chatUnreadCount);
+
       const messageIndex = new Map();
       for (const msg of baseMessages) {{
         const msgId = messageIdOf(msg);
