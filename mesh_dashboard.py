@@ -7509,6 +7509,13 @@ def _render_html(
       if (next === "network" && mapDataFocus === "activity") {{
         mapDataFocus = "auto";
       }}
+      if (next === "network" && isSelectableNodeId(selectedNodeId)) {{
+        pendingSelectionScroll = true;
+        highlightNodeSelection();
+        window.requestAnimationFrame(() => {{
+          scrollSelectionIntoView();
+        }});
+      }}
       syncNodeHistoryDock();
       if (latestState) {{
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null, null);
@@ -7795,6 +7802,15 @@ def _render_html(
       }}
     }}
 
+    function isVisibleForSelectionScroll(el) {{
+      if (!(el instanceof HTMLElement)) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 2 || rect.height <= 2) return false;
+      const style = window.getComputedStyle(el);
+      if (!style || style.display === "none" || style.visibility === "hidden") return false;
+      return true;
+    }}
+
     function scrollSelectionIntoView() {{
       if (!selectedNodeId) {{
         pendingSelectionScroll = false;
@@ -7815,8 +7831,7 @@ def _render_html(
 
         const table = document.getElementById(tableId);
         const scroller = table ? table.closest(".scroll") : null;
-        if (!(scroller instanceof HTMLElement)) {{
-          didScroll = true;
+        if (!isVisibleForSelectionScroll(scroller)) {{
           continue;
         }}
 
@@ -7838,7 +7853,7 @@ def _render_html(
       }}
 
       const favoritesList = document.getElementById("favorites-list");
-      if (favoritesList instanceof HTMLElement) {{
+      if (isVisibleForSelectionScroll(favoritesList)) {{
         let favoriteItem = null;
         for (const row of favoritesList.querySelectorAll(".favorite-node-item")) {{
           if (normalizeNodeId(row.dataset.nodeId || "") === selectedNodeId) {{
