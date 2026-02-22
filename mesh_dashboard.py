@@ -3009,6 +3009,56 @@ def _render_html(
       gap: 12px;
       flex-wrap: wrap;
     }}
+    .signal-timeline {{
+      position: relative;
+      height: 34px;
+      margin-top: 6px;
+    }}
+    .signal-timeline-track {{
+      position: absolute;
+      top: 8px;
+      height: 1px;
+      background: #c6d8cc;
+      border-radius: 1px;
+      pointer-events: none;
+    }}
+    .signal-timeline-mark {{
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }}
+    .signal-timeline-mark.edge-start {{
+      transform: translateX(0);
+    }}
+    .signal-timeline-mark.edge-end {{
+      transform: translateX(-100%);
+    }}
+    .signal-timeline-tick {{
+      width: 1px;
+      height: 7px;
+      margin-top: 5px;
+      background: #6d8577;
+      border-radius: 1px;
+    }}
+    .signal-timeline-label {{
+      margin-top: 3px;
+      font-size: 10px;
+      color: #4f6759;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }}
+    .signal-timeline-empty {{
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #5d7467;
+      font-size: 11px;
+      text-align: center;
+      padding: 2px 4px;
+    }}
     .activity-legend-nodes {{
       color: #1f6f53;
     }}
@@ -5048,6 +5098,16 @@ def _render_html(
       color: var(--ui-text-soft);
       background: rgba(13, 17, 23, 0.9);
     }}
+    [data-theme="dark"] .signal-timeline-track {{
+      background: #344353;
+    }}
+    [data-theme="dark"] .signal-timeline-tick {{
+      background: #70879f;
+    }}
+    [data-theme="dark"] .signal-timeline-label,
+    [data-theme="dark"] .signal-timeline-empty {{
+      color: #a4b7c9;
+    }}
     [data-theme="dark"] .overview-item {{
       border-color: var(--ui-border);
       background: var(--ui-panel-alt);
@@ -5483,6 +5543,7 @@ def _render_html(
               <svg id="signal-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Node signal history"></svg>
               <div id="signal-empty" class="signal-empty" hidden>No historical signal points yet for this node.</div>
             </div>
+            <div id="signal-timeline" class="signal-timeline" aria-label="Signal timeline"></div>
             <div class="signal-legend">
               <span class="legend-chip" style="color:#1f6f53;">Avg SNR (dB)</span>
               <span class="legend-chip" style="color:#265d7b;">Avg RSSI (dBm)</span>
@@ -7742,6 +7803,7 @@ def _render_html(
         empty.hidden = false;
         empty.textContent = "Loading historical signal points...";
       }}
+      setSignalTimelineMessage("Loading timeline...");
     }}
 
     function selectNode(nodeId, shouldFocus = true, toggleIfSelected = true) {{
@@ -8495,6 +8557,119 @@ def _render_html(
       return `${{num.toFixed(decimals)}}${{suffix}}`;
     }}
 
+    function setSignalTimelineMessage(message) {{
+      const timeline = document.getElementById("signal-timeline");
+      if (!(timeline instanceof HTMLElement)) return;
+      timeline.innerHTML = "";
+      const text = String(message || "").trim();
+      if (!text) return;
+      const note = document.createElement("div");
+      note.className = "signal-timeline-empty";
+      note.textContent = text;
+      timeline.appendChild(note);
+    }}
+
+    function signalPointUnix(point) {{
+      const direct = Number(point && point.bucket_unix);
+      if (Number.isFinite(direct) && direct > 0) {{
+        return Math.trunc(direct);
+      }}
+      const stamp = String(
+        (point && (point.bucket_time || point.bucket_local)) || ""
+      ).trim();
+      if (!stamp) return null;
+      const normalized = stamp.includes("T")
+        ? stamp
+        : stamp.replace(" ", "T");
+      const parsed = Date.parse(normalized);
+      if (Number.isFinite(parsed)) {{
+        return Math.trunc(parsed / 1000);
+      }}
+      return null;
+    }}
+
+    function formatSignalTimelineLabel(unixTs, includeDate) {{
+      if (!Number.isFinite(unixTs)) return "";
+      const dt = new Date(unixTs * 1000);
+      if (Number.isNaN(dt.getTime())) return "";
+      const hh = String(dt.getHours()).padStart(2, "0");
+      const mm = String(dt.getMinutes()).padStart(2, "0");
+      const timeLabel = `${{hh}}:${{mm}}`;
+      if (!includeDate) return timeLabel;
+      const mon = String(dt.getMonth() + 1).padStart(2, "0");
+      const day = String(dt.getDate()).padStart(2, "0");
+      return `${{mon}}/${{day}} ${{timeLabel}}`;
+    }}
+
+    function renderSignalTimeline(rows, padLeft, padRight, width) {{
+      const timeline = document.getElementById("signal-timeline");
+      if (!(timeline instanceof HTMLElement)) return;
+
+      const total = Array.isArray(rows) ? rows.length : 0;
+      if (!total) {{
+        setSignalTimelineMessage("Timeline available when history points are present.");
+        return;
+      }}
+
+      const timestamps = rows.map((row) => signalPointUnix(row));
+      const valid = timestamps.filter((ts) => Number.isFinite(ts));
+      if (!valid.length) {{
+        setSignalTimelineMessage("Timeline unavailable (missing timestamps).");
+        return;
+      }}
+
+      const axisStartPct = Math.max(0, Math.min(100, (padLeft / width) * 100));
+      const axisEndPct = Math.max(axisStartPct, Math.min(100, ((width - padRight) / width) * 100));
+      const axisWidthPct = axisEndPct - axisStartPct;
+      const startUnix = valid[0];
+      const endUnix = valid[valid.length - 1];
+      const spanCrossesDay = Math.floor(startUnix / 86400) !== Math.floor(endUnix / 86400);
+
+      const maxTicks = 5;
+      const desired = Math.max(2, Math.min(maxTicks, total));
+      const indexSet = new Set();
+      for (let i = 0; i < desired; i += 1) {{
+        const idx = Math.round((i * (total - 1)) / Math.max(1, desired - 1));
+        indexSet.add(Math.max(0, Math.min(total - 1, idx)));
+      }}
+      indexSet.add(0);
+      indexSet.add(total - 1);
+      const indices = Array.from(indexSet).sort((a, b) => a - b);
+
+      timeline.innerHTML = "";
+      const track = document.createElement("div");
+      track.className = "signal-timeline-track";
+      track.style.left = `${{axisStartPct.toFixed(3)}}%`;
+      track.style.right = `${{(100 - axisEndPct).toFixed(3)}}%`;
+      timeline.appendChild(track);
+
+      for (let i = 0; i < indices.length; i += 1) {{
+        const idx = indices[i];
+        const pointUnix = timestamps[idx];
+        const ratio = (total <= 1) ? 0 : (idx / (total - 1));
+        const leftPct = axisStartPct + (ratio * axisWidthPct);
+        const mark = document.createElement("div");
+        mark.className = "signal-timeline-mark";
+        if (i === 0) mark.classList.add("edge-start");
+        if (i === indices.length - 1) mark.classList.add("edge-end");
+        mark.style.left = `${{leftPct.toFixed(3)}}%`;
+
+        const tick = document.createElement("div");
+        tick.className = "signal-timeline-tick";
+        mark.appendChild(tick);
+
+        const label = document.createElement("div");
+        label.className = "signal-timeline-label";
+        const includeDate = spanCrossesDay && (i === 0 || i === indices.length - 1);
+        label.textContent = formatSignalTimelineLabel(pointUnix, includeDate);
+        if (Number.isFinite(pointUnix)) {{
+          label.title = new Date(pointUnix * 1000).toLocaleString();
+        }}
+        mark.appendChild(label);
+        timeline.appendChild(mark);
+      }}
+    }}
+
     function renderSignalChart(points) {{
       const svg = document.getElementById("signal-chart");
       const empty = document.getElementById("signal-empty");
@@ -8516,6 +8691,7 @@ def _render_html(
         svg.innerHTML = "";
         empty.hidden = false;
         empty.textContent = "No historical signal points yet for this node.";
+        renderSignalTimeline(rows, padLeft, padRight, width);
         return;
       }}
       empty.hidden = true;
@@ -8588,6 +8764,7 @@ def _render_html(
         <text x="${{width - padRight + 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="start" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMax, 0)}}</text>
         <text x="${{width - padRight + 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="start" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMin, 0)}}</text>
       `;
+      renderSignalTimeline(rows, padLeft, padRight, width);
     }}
 
     function renderOnlineActivityLoading() {{
