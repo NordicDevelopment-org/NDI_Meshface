@@ -2640,6 +2640,21 @@ def _render_html(
       gap: 4px;
       margin-left: 2px;
     }}
+    .chat-reply-btn {{
+      border: 1px solid #bfd6c3;
+      background: #f4fbf6;
+      color: #24533a;
+      border-radius: 999px;
+      padding: 1px 7px;
+      font-size: 10px;
+      line-height: 1.4;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .chat-reply-btn:hover {{
+      background: #e6f2e9;
+      border-color: #9dc3a7;
+    }}
     .chat-react-btn {{
       border: 1px solid #bdd4c1;
       background: #f5fbf6;
@@ -2662,6 +2677,37 @@ def _render_html(
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: break-word;
+    }}
+    .chat-feed-text.chat-reply-trigger {{
+      cursor: pointer;
+    }}
+    .chat-feed-text.chat-reply-trigger:hover {{
+      color: #0f4d2f;
+    }}
+    .chat-reply-inline {{
+      margin-bottom: 5px;
+      border-left: 3px solid #a9cbb3;
+      padding: 2px 0 2px 8px;
+      color: #3f6050;
+      font-size: 10px;
+      line-height: 1.25;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }}
+    .chat-reply-inline .chat-reply-inline-label {{
+      color: #2a513d;
+      font-weight: 600;
+    }}
+    .chat-reply-inline .chat-reply-inline-text {{
+      color: #587364;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .chat-reply-inline.missing {{
+      border-left-color: #d6d6d6;
+      color: #6f7c76;
     }}
     .chat-reaction-row {{
       margin-top: 5px;
@@ -2705,11 +2751,64 @@ def _render_html(
       grid-row: 3;
       position: relative;
       display: flex;
-      gap: 6px;
-      align-items: center;
+      flex-direction: column;
+      gap: 5px;
+      align-items: stretch;
       border-top: 1px solid #d8e7d3;
       padding-top: 6px;
       min-height: 0;
+    }}
+    .chat-composer-top {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 0;
+    }}
+    .chat-composer-input-row {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 0;
+    }}
+    .chat-reply-context {{
+      flex: 1 1 auto;
+      min-width: 0;
+      border: 1px solid #c4d9c9;
+      border-radius: 7px;
+      background: #f3faf5;
+      color: #234635;
+      font-size: 11px;
+      line-height: 1.25;
+      padding: 4px 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }}
+    .chat-reply-context[hidden] {{
+      display: none !important;
+    }}
+    .chat-reply-label {{
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .chat-reply-clear-btn {{
+      border: 1px solid #bdd4c1;
+      background: #ffffff;
+      color: #2c5a42;
+      border-radius: 999px;
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }}
+    .chat-reply-clear-btn:hover {{
+      background: #edf6f0;
     }}
     #chat-input {{
       flex: 1;
@@ -2764,7 +2863,7 @@ def _render_html(
     }}
     .chat-emoji-panel {{
       position: absolute;
-      right: 58px;
+      right: 0;
       bottom: calc(100% + 6px);
       width: min(320px, 92%);
       border: 1px solid #c9dbcc;
@@ -3124,15 +3223,23 @@ def _render_html(
               <div id="chat-feed" class="chat-feed"></div>
             </div>
             <div class="chat-composer">
-              <input
-                id="chat-input"
-                type="text"
-                maxlength="280"
-                placeholder="Message the room (^all)..."
-                autocomplete="off"
-              />
-              <button id="chat-emoji-btn" type="button" title="Insert emoji" aria-label="Insert emoji" aria-expanded="false">🙂</button>
-              <button id="chat-send-btn" type="button">Send</button>
+              <div class="chat-composer-top">
+                <div id="chat-reply-context" class="chat-reply-context" hidden>
+                  <span id="chat-reply-label" class="chat-reply-label"></span>
+                  <button id="chat-reply-clear-btn" class="chat-reply-clear-btn" type="button" title="Cancel reply" aria-label="Cancel reply">&times;</button>
+                </div>
+                <button id="chat-emoji-btn" type="button" title="Insert emoji" aria-label="Insert emoji" aria-expanded="false">🙂</button>
+              </div>
+              <div class="chat-composer-input-row">
+                <input
+                  id="chat-input"
+                  type="text"
+                  maxlength="280"
+                  placeholder="Message the room (^all)..."
+                  autocomplete="off"
+                />
+                <button id="chat-send-btn" type="button">Send</button>
+              </div>
               <div id="chat-emoji-panel" class="chat-emoji-panel" hidden></div>
             </div>
             <div id="chat-send-status" class="chat-send-status"></div>
@@ -3335,6 +3442,9 @@ def _render_html(
     let activeChatChannel = "all";
     let chatEmojiMode = "compose";
     let chatReactionTargetId = null;
+    let chatReplyTargetId = null;
+    let chatReplyTargetName = "";
+    let chatReplyTargetText = "";
     const nodeHistoryCache = new Map();
     const nodeNameCache = new Map();
 
@@ -3697,8 +3807,57 @@ def _render_html(
       return key === "direct" ? "Peer-to-peer" : "Everyone";
     }}
 
+    function compactInlineMessage(value, maxLen = 88) {{
+      const text = String(value == null ? "" : value).replace(/\\s+/g, " ").trim();
+      if (!text) return "(no text)";
+      if (text.length <= maxLen) return text;
+      return `${{text.slice(0, Math.max(8, maxLen - 1)).trimEnd()}}…`;
+    }}
+
+    function renderChatReplyContext() {{
+      const context = document.getElementById("chat-reply-context");
+      const label = document.getElementById("chat-reply-label");
+      if (!(context instanceof HTMLElement) || !(label instanceof HTMLElement)) return;
+      const replyId = Number(chatReplyTargetId);
+      if (!Number.isInteger(replyId) || replyId <= 0) {{
+        context.hidden = true;
+        label.textContent = "";
+        return;
+      }}
+      const fromName = String(chatReplyTargetName || "Unknown node").trim() || "Unknown node";
+      const snippet = compactInlineMessage(chatReplyTargetText, 96);
+      label.textContent = `Replying to ${{fromName}}: ${{snippet}}`;
+      context.hidden = false;
+    }}
+
+    function clearChatReplyTarget() {{
+      chatReplyTargetId = null;
+      chatReplyTargetName = "";
+      chatReplyTargetText = "";
+      renderChatReplyContext();
+    }}
+
+    function setChatReplyTarget(replyId, fromName, text) {{
+      const parsed = Number(replyId);
+      if (!Number.isInteger(parsed) || parsed <= 0) {{
+        setChatSendStatus("Cannot reply: target message id is missing.", true);
+        return;
+      }}
+      chatReplyTargetId = parsed;
+      chatReplyTargetName = String(fromName || "Unknown node").trim() || "Unknown node";
+      chatReplyTargetText = String(text || "");
+      renderChatReplyContext();
+      const input = document.getElementById("chat-input");
+      if (input instanceof HTMLInputElement) {{
+        input.focus({{ preventScroll: true }});
+      }}
+      setChatSendStatus(`Reply target set: ${{chatReplyTargetName}}`, false);
+    }}
+
     function applyChatChannel(channelKey, persist = true) {{
-      activeChatChannel = normalizeChatChannel(channelKey);
+      const nextChannel = normalizeChatChannel(channelKey);
+      const changed = activeChatChannel !== nextChannel;
+      activeChatChannel = nextChannel;
       if (persist) {{
         try {{
           window.localStorage.setItem(chatChannelStorageKey, activeChatChannel);
@@ -3718,6 +3877,11 @@ def _render_html(
         }} else {{
           input.placeholder = "Message the room (^all)...";
         }}
+      }}
+      if (changed) {{
+        clearChatReplyTarget();
+      }} else {{
+        renderChatReplyContext();
       }}
       if (latestState) {{
         renderChat(latestState);
@@ -3753,6 +3917,7 @@ def _render_html(
       chatSendInFlight = !!isBusy;
       const btn = document.getElementById("chat-send-btn");
       const emojiBtn = document.getElementById("chat-emoji-btn");
+      const replyClearBtn = document.getElementById("chat-reply-clear-btn");
       const input = document.getElementById("chat-input");
       if (btn instanceof HTMLButtonElement) {{
         btn.disabled = chatSendInFlight;
@@ -3760,6 +3925,9 @@ def _render_html(
       }}
       if (emojiBtn instanceof HTMLButtonElement) {{
         emojiBtn.disabled = chatSendInFlight;
+      }}
+      if (replyClearBtn instanceof HTMLButtonElement) {{
+        replyClearBtn.disabled = chatSendInFlight;
       }}
       if (input instanceof HTMLInputElement) {{
         input.disabled = chatSendInFlight;
@@ -3811,20 +3979,27 @@ def _render_html(
         }}
         destination = selectedNodeId;
       }}
+      const replyId = Number(chatReplyTargetId);
+      const requestBody = {{
+        text,
+        destination,
+        channel_index: 0,
+      }};
+      if (Number.isInteger(replyId) && replyId > 0) {{
+        requestBody.reply_id = replyId;
+      }}
       const payload = await sendChatPayload(
-        {{
-          text,
-          destination,
-          channel_index: 0,
-        }},
+        requestBody,
         null
       );
       if (payload && payload.ok) {{
         input.value = "";
+        const replied = Number.isInteger(replyId) && replyId > 0;
+        clearChatReplyTarget();
         if (destination === "^all") {{
-          setChatSendStatus(`Sent to Everyone at ${{payload.sent_at || "now"}}`);
+          setChatSendStatus(`${{replied ? "Reply sent" : "Sent"}} to Everyone at ${{payload.sent_at || "now"}}`);
         }} else {{
-          setChatSendStatus(`Sent direct to ${{destination}} at ${{payload.sent_at || "now"}}`);
+          setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} at ${{payload.sent_at || "now"}}`);
         }}
       }}
     }}
@@ -3981,6 +4156,15 @@ def _render_html(
         }});
       }}
 
+      const replyClearBtn = document.getElementById("chat-reply-clear-btn");
+      if (replyClearBtn instanceof HTMLButtonElement && replyClearBtn.dataset.bound !== "1") {{
+        replyClearBtn.dataset.bound = "1";
+        replyClearBtn.addEventListener("click", () => {{
+          clearChatReplyTarget();
+        }});
+      }}
+
+      renderChatReplyContext();
       bindEmojiPicker();
     }}
 
@@ -4685,9 +4869,25 @@ def _render_html(
     }}
 
     function bindChatFeedClicks() {{
-      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item.chat-selectable")) {{
-        item.addEventListener("click", () => {{
-          selectNode(item.dataset.nodeId || "", true);
+      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item")) {{
+        if (!(item instanceof HTMLElement)) continue;
+        item.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (target instanceof Element && target.closest(".chat-reply-trigger, .chat-reply-btn")) {{
+            ev.preventDefault();
+            ev.stopPropagation();
+            const replyId = Number(item.dataset.messageId || "");
+            const replyName = item.dataset.replyName || "Unknown node";
+            const replyText = item.dataset.replyText || "";
+            if (activeChatChannel === "direct" && item.classList.contains("chat-selectable")) {{
+              selectNode(item.dataset.nodeId || "", false);
+            }}
+            setChatReplyTarget(replyId, replyName, replyText);
+            return;
+          }}
+          if (item.classList.contains("chat-selectable")) {{
+            selectNode(item.dataset.nodeId || "", true);
+          }}
         }});
       }}
     }}
@@ -5345,6 +5545,13 @@ def _render_html(
       }}
 
       const baseMessages = rawMessages.filter((msg) => !isReactionMessage(msg));
+      const messageIndex = new Map();
+      for (const msg of baseMessages) {{
+        const msgId = messageIdOf(msg);
+        if (msgId) {{
+          messageIndex.set(String(msgId), msg);
+        }}
+      }}
       for (const msg of baseMessages) {{
         const key = classifyMessageChannel(msg);
         if (key === "direct") {{
@@ -5392,6 +5599,7 @@ def _render_html(
         }}
         const timeText = msg.rx_time || msg.captured_at || "n/a";
         const textHtml = escapeChatText(msg.text || "");
+        const textCompact = compactInlineMessage(msg.text || "", 140);
         const hopNum = Number(msg.hops);
         const hasHop = Number.isFinite(hopNum) && hopNum >= 0;
         const hopStart = Number(msg.hop_start ?? msg.hopStart);
@@ -5405,6 +5613,24 @@ def _render_html(
             : "Hop count"
         );
         const messageId = messageIdOf(msg);
+        const canReply = Number.isInteger(messageId) && messageId > 0;
+        const replyToId = replyIdOf(msg);
+        let replyPreview = "";
+        if (Number.isInteger(replyToId) && replyToId > 0) {{
+          const parentMsg = messageIndex.get(String(replyToId));
+          if (parentMsg) {{
+            const parentFromMeta = chatEndpointParts(normalizeNodeId(parentMsg.from || ""));
+            const parentText = compactInlineMessage(parentMsg.text || "", 110);
+            replyPreview = `<div class="chat-reply-inline" title="Reply to packet #${{replyToId}}">
+              <span class="chat-reply-inline-label">Replying to ${{escAttr(parentFromMeta.label || "Unknown node")}}</span>
+              <span class="chat-reply-inline-text">${{escAttr(parentText)}}</span>
+            </div>`;
+          }} else {{
+            replyPreview = `<div class="chat-reply-inline missing" title="Reply to packet #${{replyToId}}">
+              <span class="chat-reply-inline-label">Replying to packet #${{replyToId}}</span>
+            </div>`;
+          }}
+        }}
         const messageReactions = messageId ? reactionBuckets.get(String(messageId)) : null;
         const reactionChips = messageReactions
           ? Array.from(messageReactions.values())
@@ -5420,13 +5646,16 @@ def _render_html(
               }})
               .join("")
           : "";
+        const replyButton = canReply
+          ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message">Reply</button>`
+          : "";
         const reactButton = messageId
           ? `<button type="button" class="chat-react-btn" data-reply-id="${{escAttr(messageId)}}" title="React to this message">😊+</button>`
           : "";
         const reactionRow = reactionChips
           ? `<div class="chat-reaction-row">${{reactionChips}}</div>`
           : "";
-        return `<div data-node-id="${{escAttr(nodeId)}}" class="chat-feed-item ${{selectableClass}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-message-id="${{escAttr(messageId || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}">
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
@@ -5438,10 +5667,11 @@ def _render_html(
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
             ${{hasHop ? `<span class="chat-feed-hops" title="${{escAttr(hopTitle)}}">${{escAttr(hopLabel)}}</span>` : ""}}
-            <span class="chat-feed-actions">${{reactButton}}</span>
+            <span class="chat-feed-actions">${{replyButton}}${{reactButton}}</span>
             <span class="chat-feed-time">${{escAttr(timeText)}}</span>
           </div>
-          <div class="chat-feed-text">${{textHtml || "&nbsp;"}}</div>
+          ${{replyPreview}}
+          <div class="chat-feed-text${{canReply ? " chat-reply-trigger" : ""}}"${{canReply ? ` title="Click to reply to this message"` : ""}}>${{textHtml || "&nbsp;"}}</div>
           ${{reactionRow}}
         </div>`;
       }});
@@ -5496,6 +5726,7 @@ def _render_html(
         leftSub.textContent = `${{channelLabel(activeChatChannel)}}: ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale`;
       }}
 
+      renderChatReplyContext();
       bindChatAutoScroll();
       bindChatFeedClicks();
       bindChatReactionControls();
