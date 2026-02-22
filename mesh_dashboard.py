@@ -2786,6 +2786,24 @@ def _render_html(
       line-height: 1.3;
       margin: 2px 4px 0 4px;
     }}
+    .favorites-search-wrap {{
+      flex: 1 1 auto;
+      min-width: 0;
+    }}
+    .favorites-clear-btn {{
+      border: 1px solid #c2d8c7;
+      background: #f4faf3;
+      color: #214434;
+      border-radius: 7px;
+      padding: 5px 9px;
+      font-size: 11px;
+      line-height: 1.2;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .favorites-clear-btn:hover {{
+      background: #e7f3eb;
+    }}
     .layout {{
       --split-left-pct: 64%;
       --splitter-size: 8px;
@@ -3036,6 +3054,119 @@ def _render_html(
       flex-direction: column;
       min-height: 0;
     }}
+    .favorites {{
+      grid-column: 1 / span 3;
+      grid-row: 4;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .favorites .body {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .favorites-toolbar {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }}
+    .favorites-caption {{
+      font-size: 11px;
+      color: #4a6958;
+      line-height: 1.25;
+    }}
+    .favorites-list {{
+      flex: 1 1 auto;
+      min-height: 200px;
+      max-height: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }}
+    .favorites-empty {{
+      border: 1px dashed #d2e2d4;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+      color: #5d7566;
+      background: #f8fcf8;
+      line-height: 1.3;
+    }}
+    .favorite-node-item {{
+      border: 1px solid #c7dac5;
+      background: #ecf7ef;
+      color: #204233;
+      border-radius: 8px;
+      padding: 6px 7px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 7px;
+      align-items: start;
+      cursor: pointer;
+    }}
+    .favorite-node-item:hover {{
+      background: #e2f0e7;
+    }}
+    .favorite-node-item.status-warn {{
+      background: #fff9e7;
+      color: #5d4a1b;
+      border-color: #ecd89c;
+    }}
+    .favorite-node-item.status-stale {{
+      background: #fff0f0;
+      color: #6a3333;
+      border-color: #e6b5b5;
+    }}
+    .favorite-node-item.status-unknown {{
+      background: #f2f5f2;
+      color: #607268;
+      border-color: #d8e3d8;
+    }}
+    .favorite-node-item.selected-node {{
+      background: #d8efe1;
+      border-color: #99c5aa;
+      color: #16402c;
+      box-shadow: inset 2px 0 0 #2f855a;
+    }}
+    .favorite-node-main {{
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
+    .favorite-node-name-row {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }}
+    .favorite-node-name {{
+      font-size: 12px;
+      font-weight: 600;
+      color: inherit;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }}
+    .favorite-node-id {{
+      font-size: 10px;
+      color: #5d7566;
+      opacity: 0.95;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }}
+    .favorite-node-meta {{
+      font-size: 10px;
+      color: #5a7462;
+      line-height: 1.25;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }}
     .nodes .body {{
       display: flex;
       flex-direction: column;
@@ -3162,7 +3293,7 @@ def _render_html(
       height: calc(100vh - 96px);
       height: calc(100dvh - 96px);
       min-height: 560px;
-      grid-template-columns: minmax(350px, 40%) var(--splitter-size) minmax(320px, 1fr);
+      grid-template-columns: minmax(350px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
       grid-template-rows: minmax(0, 1fr);
     }}
     .layout.view-network .nodes {{
@@ -3277,6 +3408,48 @@ def _render_html(
       display: none !important;
     }}
     .layout.view-data .hsplitter[data-target="low"] {{ grid-row: 3; }}
+
+    .layout.view-saved {{
+      height: calc(100vh - 96px);
+      height: calc(100dvh - 96px);
+      min-height: 560px;
+      grid-template-columns: minmax(350px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+    }}
+    .layout.view-saved .favorites {{
+      display: flex;
+      grid-column: 1;
+      grid-row: 1;
+      min-height: 0;
+    }}
+    .layout.view-saved .map {{
+      display: flex;
+      grid-column: 3;
+      grid-row: 1;
+      min-height: 0;
+    }}
+    .layout.view-saved .map .body {{
+      min-height: 0;
+    }}
+    .layout.view-saved .map-frame {{
+      min-height: 0;
+    }}
+    .layout.view-saved .summary,
+    .layout.view-saved .map-data,
+    .layout.view-saved .chat,
+    .layout.view-saved .nodes,
+    .layout.view-saved .packets,
+    .layout.view-saved .raw,
+    .layout.view-saved .console,
+    .layout.view-saved .hsplitter[data-target="top"],
+    .layout.view-saved .hsplitter[data-target="mid"],
+    .layout.view-saved .hsplitter[data-target="low"] {{
+      display: none !important;
+    }}
+    .layout.view-saved .splitter {{
+      display: block;
+      grid-row: 1;
+    }}
     table {{
       width: 100%;
       border-collapse: collapse;
@@ -3336,15 +3509,51 @@ def _render_html(
       box-shadow: inset 3px 0 0 #2f855a;
     }}
     .mono {{ font-family: "IBM Plex Mono", "Consolas", "Menlo", monospace; }}
-    #nodes-table th:nth-child(1), #nodes-table td:nth-child(1) {{ width: 14%; }}
-    #nodes-table th:nth-child(2), #nodes-table td:nth-child(2) {{ width: 13%; }}
-    #nodes-table th:nth-child(3), #nodes-table td:nth-child(3) {{ width: 18%; }}
-    #nodes-table th:nth-child(4), #nodes-table td:nth-child(4) {{ width: 16%; }}
+    #nodes-table th:nth-child(1), #nodes-table td:nth-child(1) {{ width: 13%; }}
+    #nodes-table th:nth-child(2), #nodes-table td:nth-child(2) {{ width: 12%; }}
+    #nodes-table th:nth-child(3), #nodes-table td:nth-child(3) {{ width: 20%; }}
+    #nodes-table th:nth-child(4), #nodes-table td:nth-child(4) {{ width: 14%; }}
     #nodes-table th:nth-child(5), #nodes-table td:nth-child(5) {{ width: 6%; }}
     #nodes-table th:nth-child(6), #nodes-table td:nth-child(6) {{ width: 6%; }}
     #nodes-table th:nth-child(7), #nodes-table td:nth-child(7) {{ width: 7%; }}
-    #nodes-table th:nth-child(8), #nodes-table td:nth-child(8) {{ width: 10%; }}
+    #nodes-table th:nth-child(8), #nodes-table td:nth-child(8) {{ width: 9%; }}
     #nodes-table th:nth-child(9), #nodes-table td:nth-child(9) {{ width: 10%; }}
+    #nodes-table th:nth-child(10), #nodes-table td:nth-child(10) {{ width: 3%; }}
+    #nodes-table th:nth-child(10), #nodes-table td:nth-child(10) {{
+      text-align: right;
+    }}
+    #nodes-table td:nth-child(10) {{
+      padding-right: 4px;
+      overflow: visible;
+      text-overflow: clip;
+    }}
+    #nodes-table th:nth-child(10) {{
+      color: #6a856f;
+      font-size: 9px;
+      letter-spacing: 0;
+      text-transform: none;
+    }}
+    #nodes-table td:nth-child(3) {{
+      overflow: visible;
+      text-overflow: clip;
+    }}
+    .node-name-row {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      max-width: 100%;
+      width: 100%;
+    }}
+    .node-name-label {{
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }}
     .chat .body {{
       display: flex;
       flex-direction: column;
@@ -3443,11 +3652,79 @@ def _render_html(
       gap: 1px;
     }}
     .chat-member-name-row {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      max-width: 100%;
+      width: 100%;
+    }}
+    .chat-member-name-left {{
       display: inline-flex;
       align-items: center;
       gap: 4px;
       min-width: 0;
+      flex: 1 1 auto;
       max-width: 100%;
+    }}
+    .favorite-toggle-btn {{
+      border: 1px solid rgba(103, 132, 115, 0.35);
+      background: transparent;
+      color: #6b7f72;
+      border-radius: 999px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 3px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex: 0 0 auto;
+      line-height: 1;
+      font-size: 9px;
+      opacity: 0.76;
+      transition: color 120ms ease, border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+    }}
+    .favorite-toggle-btn:hover {{
+      background: rgba(72, 110, 87, 0.08);
+      border-color: rgba(63, 103, 80, 0.55);
+      color: #355d48;
+      opacity: 1;
+    }}
+    .favorite-toggle-btn.active {{
+      border-color: rgba(182, 153, 62, 0.82);
+      background: rgba(255, 241, 178, 0.4);
+      color: #6f5600;
+      opacity: 0.95;
+    }}
+    .favorite-toggle-icon {{
+      line-height: 1;
+      transform: translateY(-0.5px);
+    }}
+    .node-favorite-btn {{
+      min-width: 16px;
+      height: 16px;
+      font-size: 9px;
+    }}
+    .chat-favorite-btn {{
+      min-width: 15px;
+      height: 15px;
+      font-size: 8px;
+      padding: 0 2px;
+    }}
+    .favorites-card-star {{
+      min-width: 18px;
+      height: 18px;
+      font-size: 9px;
+      padding: 0 5px;
+    }}
+    .node-name-row .favorite-toggle-btn,
+    .chat-member-name-row .favorite-toggle-btn {{
+      margin-left: auto;
+    }}
+    .node-name-row .favorite-toggle-btn {{
+      margin-left: 0;
+      justify-self: end;
     }}
     .chat-member-name {{
       overflow: hidden;
@@ -4875,6 +5152,73 @@ def _render_html(
       background: var(--ui-panel-alt);
       color: var(--ui-text-soft);
     }}
+    [data-theme="dark"] .favorites-clear-btn {{
+      border-color: #35556d;
+      background: #16273a;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .favorites-clear-btn:hover {{
+      background: #223448;
+      border-color: #4e6a86;
+    }}
+    [data-theme="dark"] .favorites-empty {{
+      border-color: var(--ui-border);
+      background: var(--ui-panel-alt);
+      color: var(--ui-text-soft);
+    }}
+    [data-theme="dark"] .favorite-node-item {{
+      border-color: #35556d;
+      background: #16273a;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .favorite-node-item:hover {{
+      background: #223448;
+      border-color: #4e6a86;
+    }}
+    [data-theme="dark"] .favorite-node-item.status-warn {{
+      background: #40351f;
+      color: #ffe4a0;
+      border-color: #725f2e;
+    }}
+    [data-theme="dark"] .favorite-node-item.status-stale {{
+      background: #412323;
+      color: #ffc5c5;
+      border-color: #744040;
+    }}
+    [data-theme="dark"] .favorite-node-item.status-unknown {{
+      background: #222f2a;
+      color: #bbcdc4;
+      border-color: #3e544c;
+    }}
+    [data-theme="dark"] .favorite-node-item.selected-node {{
+      background: #1f3342 !important;
+      border-color: #4a6b87 !important;
+      color: #eef6ff !important;
+      box-shadow: inset 2px 0 0 #79c0ff;
+    }}
+    [data-theme="dark"] .favorite-node-id,
+    [data-theme="dark"] .favorite-node-meta,
+    [data-theme="dark"] .favorites-caption {{
+      color: #a9bfd3;
+    }}
+    [data-theme="dark"] .favorite-toggle-btn {{
+      border-color: rgba(124, 161, 190, 0.36);
+      background: transparent;
+      color: #93abc0;
+      opacity: 0.76;
+    }}
+    [data-theme="dark"] .favorite-toggle-btn:hover {{
+      background: rgba(121, 192, 255, 0.08);
+      border-color: rgba(121, 192, 255, 0.56);
+      color: #dcefff;
+      opacity: 1;
+    }}
+    [data-theme="dark"] .favorite-toggle-btn.active {{
+      border-color: rgba(219, 191, 90, 0.86);
+      background: rgba(216, 180, 0, 0.16);
+      color: #e9cf78;
+      opacity: 0.95;
+    }}
     [data-theme="dark"] .chat-reaction-popover {{
       box-shadow: var(--ui-shadow);
     }}
@@ -4938,8 +5282,12 @@ def _render_html(
         height: auto;
         min-height: 0;
       }}
+      .layout.view-saved {{
+        height: auto;
+        min-height: 0;
+      }}
       .splitter, .hsplitter {{ display: none; }}
-      .summary, .map, .map-data, .nodes, .chat, .packets, .raw, .console {{ grid-column: 1; grid-row: auto; }}
+      .summary, .map, .map-data, .nodes, .favorites, .chat, .packets, .raw, .console {{ grid-column: 1; grid-row: auto; }}
       .map-frame {{ max-width: none; }}
       .nodes .scroll {{ max-height: 360px; }}
     }}
@@ -4978,6 +5326,7 @@ def _render_html(
       <div class="teams-rail-title">Views</div>
       <button class="rail-btn active" data-view="chat" type="button" title="Teams-style chat workspace">Chat</button>
       <button class="rail-btn" data-view="network" type="button" title="Topology, nodes, and links">Network</button>
+      <button class="rail-btn" data-view="saved" type="button" title="Saved favorite nodes">Saved</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
       <button class="rail-btn" data-view="data" type="button" title="Raw node/config views">Data</button>
       <button class="rail-btn" data-view="all" type="button" title="Show every panel">All</button>
@@ -5079,13 +5428,27 @@ def _render_html(
           <table id="nodes-table">
               <thead>
                 <tr>
-                <th>Last Heard</th><th>ID</th><th>Name</th><th>HW</th><th>SNR</th><th>Hops</th><th>Battery</th><th>Saved</th><th>Pos</th>
+                <th>Last Heard</th><th>ID</th><th>Name</th><th>HW</th><th>SNR</th><th>Hops</th><th>Battery</th><th>Saved</th><th>Pos</th><th>★</th>
                 </tr>
               </thead>
             <tbody></tbody>
           </table>
         </div>
         <div id="network-node-history-host" class="network-node-history-host" hidden></div>
+      </div>
+    </section>
+
+    <section class="card favorites">
+      <h2>Saved Nodes</h2>
+      <div class="body favorites-body">
+        <div class="favorites-toolbar">
+          <div class="favorites-search-wrap">
+            <input id="favorites-search-input" class="list-search-input" type="search" placeholder="Search saved by ID or name" autocomplete="off" />
+          </div>
+          <button id="favorites-clear-btn" class="favorites-clear-btn" type="button" title="Remove all saved nodes">Clear Saved</button>
+        </div>
+        <div id="favorites-caption" class="favorites-caption">No saved nodes yet.</div>
+        <div id="favorites-list" class="scroll favorites-list"></div>
       </div>
     </section>
 
@@ -5159,7 +5522,7 @@ def _render_html(
       </div>
     </section>
 
-    <div class="splitter" data-row="8" title="Drag to resize packet/raw columns"></div>
+    <div class="splitter" data-row="8" title="Drag to resize side panels"></div>
 
     <section class="card raw">
       <h2>Raw Data</h2>
@@ -5231,6 +5594,7 @@ def _render_html(
     const trailLayer = L.layerGroup().addTo(map);
     const nodeMarkers = new Map();
     const selectionStorageKey = "meshDashboardSelectedNodeId";
+    const favoritesStorageKey = "meshDashboardFavoriteNodeIdsV1";
     const nodeNameCacheStorageKey = "meshDashboardNodeNameCacheV1";
     const splitStorageKey = "meshDashboardLayoutSplitState";
     const layoutViewStorageKey = "meshDashboardLayoutView";
@@ -5254,7 +5618,7 @@ def _render_html(
       "packets-table": {{ index: 0, dir: "desc" }},
     }};
     const wheelActivationLeaseMs = 1400;
-    const knownLayoutViews = new Set(["chat", "network", "packets", "data", "all"]);
+    const knownLayoutViews = new Set(["chat", "network", "saved", "packets", "data", "all"]);
     const knownChatChannels = new Set(["all", "direct"]);
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const reactionPopoverMaxNames = 12;
@@ -5309,6 +5673,8 @@ def _render_html(
     const nodeHistoryCache = new Map();
     const onlineActivityCache = new Map();
     const nodeNameCache = new Map();
+    const favoriteNodeIds = new Set();
+    let favoritesSearchQuery = "";
 
     function applyMapTiles(themeName) {{
       const nextTheme = themeName === "dark" ? "dark" : "light";
@@ -5351,13 +5717,18 @@ def _render_html(
       mapResizeObserver.observe(mapFrameElement);
     }}
 
+    function isMapWheelGuardEnabled() {{
+      return activeLayoutView !== "network" && activeLayoutView !== "saved";
+    }}
+
     function setMapWheelZoomActive(active) {{
-      const next = !!active;
+      const guardEnabled = isMapWheelGuardEnabled();
+      const next = guardEnabled ? !!active : true;
       if (mapWheelZoomActive === next) {{
         return;
       }}
       mapWheelZoomActive = next;
-      if (!mapWheelZoomActive) {{
+      if (!mapWheelZoomActive || !guardEnabled) {{
         mapWheelJustArmed = false;
         if (mapWheelLease !== null) {{
           clearTimeout(mapWheelLease);
@@ -5370,18 +5741,23 @@ def _render_html(
         map.scrollWheelZoom.disable();
       }}
       if (mapFrameElement) {{
-        mapFrameElement.classList.toggle("map-wheel-active", mapWheelZoomActive);
-        mapFrameElement.setAttribute(
-          "title",
-          mapWheelZoomActive
-            ? "Map wheel zoom active. Click outside map (or press Esc) to return wheel scrolling to page."
-            : "Click map to enable wheel zoom."
-        );
+        if (guardEnabled) {{
+          mapFrameElement.classList.toggle("map-wheel-active", mapWheelZoomActive);
+          mapFrameElement.setAttribute(
+            "title",
+            mapWheelZoomActive
+              ? "Map wheel zoom active. Click outside map (or press Esc) to return wheel scrolling to page."
+              : "Click map to enable wheel zoom."
+          );
+        }} else {{
+          mapFrameElement.classList.remove("map-wheel-active");
+          mapFrameElement.setAttribute("title", "Scroll wheel zoom is enabled.");
+        }}
       }}
     }}
 
     function touchMapWheelLease() {{
-      if (!mapWheelZoomActive) {{
+      if (!mapWheelZoomActive || !isMapWheelGuardEnabled()) {{
         return;
       }}
       if (mapWheelLease !== null) {{
@@ -5397,9 +5773,12 @@ def _render_html(
         return;
       }}
       mapFrameElement.dataset.wheelMapBound = "1";
-      setMapWheelZoomActive(false);
+      setMapWheelZoomActive(activeLayoutView === "network" || activeLayoutView === "saved");
 
       mapFrameElement.addEventListener("pointerdown", (ev) => {{
+        if (!isMapWheelGuardEnabled()) {{
+          return;
+        }}
         if (!(ev.target instanceof Element)) {{
           return;
         }}
@@ -5418,6 +5797,9 @@ def _render_html(
       }}, {{ passive: true }});
 
       document.addEventListener("pointerdown", (ev) => {{
+        if (!isMapWheelGuardEnabled()) {{
+          return;
+        }}
         if (!(ev.target instanceof Element)) {{
           setMapWheelZoomActive(false);
           return;
@@ -5427,6 +5809,9 @@ def _render_html(
         }}
       }});
       document.addEventListener("keydown", (ev) => {{
+        if (!isMapWheelGuardEnabled()) {{
+          return;
+        }}
         if (ev.key === "Escape") {{
           setMapWheelZoomActive(false);
         }}
@@ -5434,10 +5819,20 @@ def _render_html(
     }}
 
     function bindWheelPassthrough() {{
-      const isWheelPassthroughEnabled = () => activeLayoutView !== "chat";
+      const isWheelPassthroughEnabled = () => (
+        activeLayoutView !== "chat" && activeLayoutView !== "network" && activeLayoutView !== "saved"
+      );
 
       const refreshWheelPaneHints = () => {{
         const enabled = isWheelPassthroughEnabled();
+        if (!enabled && activeWheelPane instanceof HTMLElement) {{
+          activeWheelPane.classList.remove("wheel-scroll-active");
+          activeWheelPane = null;
+        }}
+        if (!enabled && activeWheelPaneLease !== null) {{
+          clearTimeout(activeWheelPaneLease);
+          activeWheelPaneLease = null;
+        }}
         for (const el of document.querySelectorAll(wheelPaneSelector)) {{
           if (!(el instanceof HTMLElement)) continue;
           if (enabled) {{
@@ -6451,6 +6846,94 @@ def _render_html(
       return idKey.includes(query) || nameKey.includes(query);
     }}
 
+    function loadFavoriteNodes() {{
+      favoriteNodeIds.clear();
+      try {{
+        const raw = window.localStorage.getItem(favoritesStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        for (const entry of parsed) {{
+          const nodeId = normalizeNodeId(entry);
+          if (isSelectableNodeId(nodeId)) {{
+            favoriteNodeIds.add(nodeId);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistFavoriteNodes() {{
+      try {{
+        const ids = Array.from(favoriteNodeIds).slice(0, 2000);
+        window.localStorage.setItem(favoritesStorageKey, JSON.stringify(ids));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function isFavoriteNode(nodeId) {{
+      const normalized = normalizeNodeId(nodeId);
+      return isSelectableNodeId(normalized) && favoriteNodeIds.has(normalized);
+    }}
+
+    function favoriteToggleButtonHtml(nodeId, extraClass = "") {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized)) return "";
+      const active = favoriteNodeIds.has(normalized);
+      const title = active ? "Remove from saved nodes" : "Save node";
+      return `<button type="button" class="favorite-toggle-btn ${{extraClass}}${{active ? " active" : ""}}" data-node-id="${{escAttr(normalized)}}" title="${{title}}" aria-label="${{title}}" aria-pressed="${{active ? "true" : "false"}}"><span class="favorite-toggle-icon">${{active ? "★" : "☆"}}</span></button>`;
+    }}
+
+    function renderSavedRailStatus() {{
+      const btn = document.querySelector('.teams-rail .rail-btn[data-view="saved"]');
+      if (!(btn instanceof HTMLButtonElement)) return;
+      if (!btn.dataset.baseTitle) {{
+        btn.dataset.baseTitle = btn.getAttribute("title") || "Saved favorite nodes";
+      }}
+      const count = Math.max(0, favoriteNodeIds.size);
+      const shown = count > 99 ? "99+" : String(count);
+      btn.textContent = count > 0 ? `Saved (${{shown}})` : "Saved";
+      const baseTitle = btn.dataset.baseTitle || "Saved favorite nodes";
+      btn.title = count > 0
+        ? `${{baseTitle}}. ${{count}} saved node${{count === 1 ? "" : "s"}}.`
+        : baseTitle;
+      btn.setAttribute("aria-label", btn.title);
+    }}
+
+    function refreshFavoriteToggleButtons() {{
+      for (const btn of document.querySelectorAll(".favorite-toggle-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const nodeId = normalizeNodeId(btn.dataset.nodeId || "");
+        const active = isFavoriteNode(nodeId);
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+        const title = active ? "Remove from saved nodes" : "Save node";
+        btn.title = title;
+        btn.setAttribute("aria-label", title);
+        const icon = btn.querySelector(".favorite-toggle-icon");
+        if (icon) {{
+          icon.textContent = active ? "★" : "☆";
+        }}
+      }}
+      renderSavedRailStatus();
+    }}
+
+    function toggleFavoriteNode(nodeId, forceActive = null) {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized)) return;
+      const targetActive = forceActive == null ? !favoriteNodeIds.has(normalized) : !!forceActive;
+      if (targetActive) {{
+        favoriteNodeIds.add(normalized);
+      }} else {{
+        favoriteNodeIds.delete(normalized);
+      }}
+      persistFavoriteNodes();
+      refreshFavoriteToggleButtons();
+      if (latestState) {{
+        renderFavorites(latestState);
+      }}
+    }}
+
     function loadStoredSelection() {{
       try {{
         const stored = window.localStorage.getItem(selectionStorageKey);
@@ -6731,6 +7214,7 @@ def _render_html(
       if (chatLeftPanel instanceof HTMLElement) {{
         chatLeftPanel.hidden = !chatPanelOpen;
       }}
+      setMapWheelZoomActive(next === "network" || next === "saved");
       if (chatPanelOpen) {{
         if (activeWheelPane instanceof HTMLElement) {{
           activeWheelPane.classList.remove("wheel-scroll-active");
@@ -7043,6 +7527,10 @@ def _render_html(
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
         member.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
       }}
+      for (const item of document.querySelectorAll("#favorites-list .favorite-node-item")) {{
+        const nodeId = normalizeNodeId(item.dataset.nodeId || "");
+        item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+      }}
     }}
 
     function scrollSelectionIntoView() {{
@@ -7085,6 +7573,31 @@ def _render_html(
           scroller.scrollTo({{ top: scroller.scrollTop + delta, behavior: "smooth" }});
         }}
         didScroll = true;
+      }}
+
+      const favoritesList = document.getElementById("favorites-list");
+      if (favoritesList instanceof HTMLElement) {{
+        let favoriteItem = null;
+        for (const row of favoritesList.querySelectorAll(".favorite-node-item")) {{
+          if (normalizeNodeId(row.dataset.nodeId || "") === selectedNodeId) {{
+            favoriteItem = row;
+            break;
+          }}
+        }}
+        if (favoriteItem instanceof HTMLElement) {{
+          const listRect = favoritesList.getBoundingClientRect();
+          const rowRect = favoriteItem.getBoundingClientRect();
+          const topSafe = listRect.top + 3;
+          const bottomSafe = listRect.bottom - 3;
+          if (rowRect.top < topSafe) {{
+            const delta = rowRect.top - topSafe;
+            favoritesList.scrollTo({{ top: favoritesList.scrollTop + delta, behavior: "smooth" }});
+          }} else if (rowRect.bottom > bottomSafe) {{
+            const delta = rowRect.bottom - bottomSafe;
+            favoritesList.scrollTo({{ top: favoritesList.scrollTop + delta, behavior: "smooth" }});
+          }}
+          didScroll = true;
+        }}
       }}
 
       pendingSelectionScroll = !didScroll;
@@ -7389,6 +7902,51 @@ def _render_html(
       btn.addEventListener("click", () => {{
         clearNodeSelection();
       }});
+    }}
+
+    function bindFavoriteToggleControls() {{
+      if (document.body.dataset.favoritesBound === "1") return;
+      document.body.dataset.favoritesBound = "1";
+      document.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const btn = target.closest(".favorite-toggle-btn");
+        if (!(btn instanceof HTMLButtonElement)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        toggleFavoriteNode(btn.dataset.nodeId || "");
+      }}, true);
+    }}
+
+    function bindFavoritesControls() {{
+      const searchInput = document.getElementById("favorites-search-input");
+      if (searchInput instanceof HTMLInputElement) {{
+        if (searchInput.dataset.bound !== "1") {{
+          searchInput.dataset.bound = "1";
+          searchInput.addEventListener("input", () => {{
+            favoritesSearchQuery = normalizeSearchQuery(searchInput.value);
+            if (latestState) {{
+              renderFavorites(latestState);
+            }}
+          }});
+        }}
+        searchInput.value = favoritesSearchQuery;
+      }}
+
+      const clearBtn = document.getElementById("favorites-clear-btn");
+      if (clearBtn instanceof HTMLButtonElement && clearBtn.dataset.bound !== "1") {{
+        clearBtn.dataset.bound = "1";
+        clearBtn.addEventListener("click", () => {{
+          if (favoriteNodeIds.size === 0) return;
+          if (!window.confirm("Remove all saved nodes?")) return;
+          favoriteNodeIds.clear();
+          persistFavoriteNodes();
+          refreshFavoriteToggleButtons();
+          if (latestState) {{
+            renderFavorites(latestState);
+          }}
+        }});
+      }}
     }}
 
     function bindNodeListSearchControls() {{
@@ -7785,17 +8343,22 @@ def _render_html(
           return `<tr data-node-id="${{escAttr(nodeId)}}" class="${{selectable ? "node-selectable" : ""}}">
           <td data-sort="${{escAttr(node.last_heard ?? "")}}">${{node.last_heard ?? "n/a"}}</td>
           <td class="mono" data-sort="${{escAttr(nodeId)}}" title="${{escAttr(String(node.id || nodeId || ""))}}">${{nodeId || "n/a"}}</td>
-          <td data-sort="${{escAttr(name)}}">${{name}}</td>
+          <td data-sort="${{escAttr(name)}}">
+            <span class="node-name-row">
+              <span class="node-name-label">${{name}}</span>
+            </span>
+          </td>
           <td data-sort="${{escAttr(node.hardware_model ?? "")}}">${{node.hardware_model ?? "n/a"}}</td>
           <td data-sort="${{escAttr(node.snr ?? "")}}">${{node.snr ?? "n/a"}}</td>
           <td data-sort="${{escAttr(node.hops_away ?? "")}}">${{node.hops_away ?? "n/a"}}</td>
           <td data-sort="${{escAttr(node.battery_level ?? "")}}">${{node.battery_level ?? "n/a"}}</td>
           <td data-sort="${{escAttr(savedPackets)}}" title="${{escAttr(savedTitle)}}">${{savedPackets}}</td>
           <td data-sort="${{escAttr(pos)}}">${{pos}}</td>
+          <td data-sort="${{escAttr(isFavoriteNode(nodeId) ? 1 : 0)}}">${{favoriteToggleButtonHtml(nodeId, "node-favorite-btn")}}</td>
         </tr>`;
       }});
       if (rows.length === 0) {{
-        rows.push('<tr><td colspan="9">No nodes match this search.</td></tr>');
+        rows.push('<tr><td colspan="10">No nodes match this search.</td></tr>');
       }}
       fillTable("nodes-table", rows);
       bindNodeRowClicks();
@@ -7803,6 +8366,127 @@ def _render_html(
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
       }}
+    }}
+
+    function renderFavorites(state) {{
+      const list = document.getElementById("favorites-list");
+      const caption = document.getElementById("favorites-caption");
+      if (!(list instanceof HTMLElement)) return;
+
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const nodesById = new Map(nodes.map((node) => [normalizeNodeId(node.id || ""), node]));
+      const historyCapsById = new Map(
+        Object.entries((safeState.history_caps && typeof safeState.history_caps === "object") ? safeState.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
+
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const entries = Array.from(favoriteNodeIds)
+        .map((nodeId) => {{
+          const node = nodesById.get(nodeId);
+          const caps = historyCapsById.get(nodeId);
+          const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
+          const liveLastSeen = nodeLastHeardUnix(node);
+          const capsLastSeen = Number(caps && caps.last_seen_unix);
+          const lastSeenUnix = Number.isFinite(liveLastSeen)
+            ? liveLastSeen
+            : (Number.isFinite(capsLastSeen) ? Math.trunc(capsLastSeen) : null);
+          const status = freshnessStatus(lastSeenUnix, nowUnix);
+          const lastSeenText = String(
+            (node && node.last_heard)
+            || (caps && (caps.last_seen || caps.last_position_time))
+            || "n/a"
+          );
+          const batteryRaw = Number(
+            (node && node.battery_level != null)
+              ? node.battery_level
+              : (caps && caps.battery_level)
+          );
+          const battery = Number.isFinite(batteryRaw) ? `${{Math.max(0, Math.min(100, Math.round(batteryRaw)))}}%` : "n/a";
+          const hopsRaw = Number(
+            (node && node.hops_away != null)
+              ? node.hops_away
+              : (caps && caps.last_hops)
+          );
+          const hops = Number.isFinite(hopsRaw) && hopsRaw >= 0 ? String(Math.trunc(hopsRaw)) : "n/a";
+          const pos = (
+            node
+            && typeof node.lat === "number"
+            && Number.isFinite(node.lat)
+            && typeof node.lon === "number"
+            && Number.isFinite(node.lon)
+          )
+            ? `${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}`
+            : ((caps && caps.has_position === true) ? "history" : "n/a");
+          const searchable = `${{normalizeSearchQuery(nodeId)}} ${{normalizeSearchQuery(name)}}`;
+          return {{
+            id: nodeId,
+            name,
+            status,
+            lastSeenText,
+            battery,
+            hops,
+            pos,
+            searchable,
+          }};
+        }})
+        .sort((a, b) => {{
+          const rankDiff = statusRank(a.status) - statusRank(b.status);
+          if (rankDiff !== 0) return rankDiff;
+          return String(a.name || a.id).localeCompare(String(b.name || b.id));
+        }});
+
+      const query = normalizeSearchQuery(favoritesSearchQuery);
+      const filtered = query
+        ? entries.filter((entry) => entry.searchable.includes(query))
+        : entries;
+      const onlineCount = entries.filter((entry) => entry.status === "online").length;
+      const warnCount = entries.filter((entry) => entry.status === "warn").length;
+      const staleCount = entries.filter((entry) => entry.status === "stale").length;
+      if (caption) {{
+        caption.textContent = `Saved nodes: ${{entries.length}} total (${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale)`;
+      }}
+
+      if (entries.length === 0) {{
+        list.innerHTML = '<div class="favorites-empty">No saved nodes yet. Click ☆ next to a node name to save it.</div>';
+        return;
+      }}
+      if (filtered.length === 0) {{
+        list.innerHTML = '<div class="favorites-empty">No saved nodes match this search.</div>';
+        return;
+      }}
+
+      list.innerHTML = filtered.map((entry) => (
+        `<div class="favorite-node-item status-${{entry.status}}${{selectedNodeId === entry.id ? " selected-node" : ""}}" data-node-id="${{escAttr(entry.id)}}" title="${{escAttr(`${{entry.name}} (${{entry.id}})` )}}">
+          <div class="favorite-node-main">
+            <div class="favorite-node-name-row">
+              <span class="favorite-node-name">${{escAttr(entry.name)}}</span>
+              <span class="favorite-node-id">${{escAttr(entry.id)}}</span>
+            </div>
+            <div class="favorite-node-meta">
+              <span>Last: ${{escAttr(entry.lastSeenText)}}</span>
+              <span>Batt: ${{escAttr(entry.battery)}}</span>
+              <span>Hops: ${{escAttr(entry.hops)}}</span>
+              <span>Pos: ${{escAttr(entry.pos)}}</span>
+            </div>
+          </div>
+          ${{favoriteToggleButtonHtml(entry.id, "favorites-card-star")}}
+        </div>`
+      )).join("");
+
+      for (const item of list.querySelectorAll(".favorite-node-item")) {{
+        if (!(item instanceof HTMLElement)) continue;
+        item.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (target instanceof Element && target.closest(".favorite-toggle-btn")) {{
+            return;
+          }}
+          selectNode(item.dataset.nodeId || "", true, false);
+        }});
+      }}
+      refreshFavoriteToggleButtons();
     }}
 
     function formatMetricValue(value, decimals = 2, suffix = "") {{
@@ -8688,8 +9372,11 @@ def _render_html(
                 <span class="chat-member-status status-${{item.status}}">●</span>
                 <span class="chat-member-main">
                   <span class="chat-member-name-row">
-                    <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
-                    ${{meta.html ? `<span class="chat-name-meta">${{meta.html}}</span>` : ""}}
+                    <span class="chat-member-name-left">
+                      <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
+                      ${{meta.html ? `<span class="chat-name-meta">${{meta.html}}</span>` : ""}}
+                    </span>
+                    ${{favoriteToggleButtonHtml(item.id, "chat-favorite-btn")}}
                   </span>
                   <span class="chat-member-id">${{escAttr(item.id)}}</span>
                 </span>
@@ -8803,6 +9490,7 @@ def _render_html(
         renderNodes(state.nodes || []);
         renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory, onlineActivity);
         renderChat(state);
+        renderFavorites(state);
         renderPackets(state.traffic || {{}});
         renderConsole(state.traffic || {{}});
         renderRaw(state);
@@ -8814,13 +9502,17 @@ def _render_html(
 
     loadStoredSelection();
     loadNodeNameCache();
+    loadFavoriteNodes();
     loadSplitState();
     loadLayoutView();
     loadChatChannel();
     loadThemePreference();
     bindLayoutNav();
+    renderSavedRailStatus();
     bindSplitters();
     bindSelectionControls();
+    bindFavoriteToggleControls();
+    bindFavoritesControls();
     bindNodeListSearchControls();
     bindConsoleControls();
     bindChatComposer();
@@ -8835,6 +9527,7 @@ def _render_html(
     }} else {{
       setMapDataMode("live");
     }}
+    renderFavorites({{}});
     requestMapResize();
 
     poll();
