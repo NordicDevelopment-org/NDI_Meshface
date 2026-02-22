@@ -48,6 +48,7 @@ from meshdash.services import (
     build_online_activity_loader as _build_online_activity_loader,
     send_chat_message as _send_chat_message_helper,
 )
+from meshdash.cli import build_dashboard_parser as _build_dashboard_parser_helper
 from meshdash.history_store import HistoryStore
 from meshdash.tracker import DashboardTracker
 from meshdash.html import render_html as _render_html_helper
@@ -407,133 +408,26 @@ def run_dashboard(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    env_gateway_host = os.environ.get("MESH_GATEWAY_HOST", DEFAULT_GATEWAY_HOST)
-    env_gateway_port = os.environ.get("MESH_GATEWAY_PORT")
-    try:
-        resolved_gateway_port = int(env_gateway_port) if env_gateway_port else DEFAULT_GATEWAY_PORT
-    except ValueError:
-        resolved_gateway_port = DEFAULT_GATEWAY_PORT
-
-    parser = argparse.ArgumentParser(
-        description="Serve a high-detail Meshtastic dashboard with map, node tables, configs, and packet logs."
-    )
-    add_mesh_connection_args(parser, default_mesh_port=DEFAULT_MESH_PORT)
-    parser.add_argument(
-        "--default-gateway-host",
-        default=env_gateway_host,
-        help=(
-            "Fallback TCP host for dashboard mode when --mesh-host is not provided "
-            f"(default: {env_gateway_host})."
-        ),
-    )
-    parser.add_argument(
-        "--default-gateway-port",
-        type=int,
-        default=resolved_gateway_port,
-        help=(
-            "Fallback TCP port used with --default-gateway-host when --mesh-host is not provided "
-            f"(default: {resolved_gateway_port})."
-        ),
-    )
-    parser.add_argument(
-        "--no-default-gateway",
-        action="store_true",
-        help="Disable default gateway fallback and use serial unless --mesh-host is set.",
-    )
-    parser.add_argument(
-        "--http-host",
-        default=DEFAULT_HTTP_HOST,
-        help=f"HTTP bind host (default: {DEFAULT_HTTP_HOST})",
-    )
-    parser.add_argument(
-        "--http-port",
-        type=int,
-        default=DEFAULT_HTTP_PORT,
-        help=f"HTTP bind port (default: {DEFAULT_HTTP_PORT})",
-    )
-    parser.add_argument(
-        "--refresh-ms",
-        type=int,
-        default=DEFAULT_REFRESH_MS,
-        help=f"Browser polling interval in milliseconds (default: {DEFAULT_REFRESH_MS})",
-    )
-    parser.add_argument(
-        "--packet-limit",
-        type=int,
-        default=DEFAULT_PACKET_LIMIT,
-        help=f"Recent packet history buffer size (default: {DEFAULT_PACKET_LIMIT})",
-    )
-    parser.add_argument(
-        "--show-secrets",
-        action="store_true",
-        help="Display sensitive config values (private keys/passwords/PSKs) in raw JSON panels.",
-    )
-    parser.add_argument(
-        "--history-db",
-        default=os.environ.get("MESH_DASH_HISTORY_DB", DEFAULT_HISTORY_DB),
-        help=f"SQLite DB path for persisted chat/packet history and rollups (default: {DEFAULT_HISTORY_DB})",
-    )
-    parser.add_argument(
-        "--history-max-rows",
-        type=int,
-        default=DEFAULT_HISTORY_MAX_ROWS,
-        help=f"Max persisted rows per history table (default: {DEFAULT_HISTORY_MAX_ROWS})",
-    )
-    parser.add_argument(
-        "--history-retention-days",
-        type=int,
-        default=DEFAULT_HISTORY_RETENTION_DAYS,
-        help=(
-            "Delete persisted rows older than this many days; "
-            f"use 0 to disable age-based pruning (default: {DEFAULT_HISTORY_RETENTION_DAYS})"
-        ),
-    )
-    parser.add_argument(
-        "--history-event-max-rows",
-        type=int,
-        default=DEFAULT_HISTORY_EVENT_MAX_ROWS,
-        help=(
-            "Max rows for append-only packet event history "
-            f"(default: {DEFAULT_HISTORY_EVENT_MAX_ROWS})"
-        ),
-    )
-    parser.add_argument(
-        "--history-event-retention-days",
-        type=int,
-        default=DEFAULT_HISTORY_EVENT_RETENTION_DAYS,
-        help=(
-            "Delete packet event rows older than this many days; "
-            f"use 0 to disable age-based pruning (default: {DEFAULT_HISTORY_EVENT_RETENTION_DAYS})"
-        ),
-    )
-    parser.add_argument(
-        "--history-rollup-retention-days",
-        type=int,
-        default=DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS,
-        help=(
-            "Delete rollup rows older than this many days; "
-            f"use 0 to disable age-based pruning (default: {DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS})"
-        ),
-    )
-    parser.add_argument(
-        "--no-history",
-        action="store_true",
-        help="Disable persisted SQLite history (memory-only live buffers).",
-    )
-    parser.add_argument(
-        "--node-history-hours",
-        type=int,
-        default=DEFAULT_NODE_HISTORY_HOURS,
-        help=f"Default selected-node history window in hours (default: {DEFAULT_NODE_HISTORY_HOURS})",
-    )
-    parser.add_argument(
-        "--node-history-max-points",
-        type=int,
-        default=DEFAULT_NODE_HISTORY_MAX_POINTS,
-        help=(
-            "Max selected-node history points returned by /api/history/node "
-            f"(default: {DEFAULT_NODE_HISTORY_MAX_POINTS})"
-        ),
+    parser = _build_dashboard_parser_helper(
+        add_mesh_connection_args_fn=add_mesh_connection_args,
+        default_mesh_port=DEFAULT_MESH_PORT,
+        default_gateway_host=DEFAULT_GATEWAY_HOST,
+        default_gateway_port=DEFAULT_GATEWAY_PORT,
+        env_gateway_host=os.environ.get("MESH_GATEWAY_HOST", DEFAULT_GATEWAY_HOST),
+        env_gateway_port=os.environ.get("MESH_GATEWAY_PORT"),
+        default_http_host=DEFAULT_HTTP_HOST,
+        default_http_port=DEFAULT_HTTP_PORT,
+        default_refresh_ms=DEFAULT_REFRESH_MS,
+        default_packet_limit=DEFAULT_PACKET_LIMIT,
+        default_history_db=DEFAULT_HISTORY_DB,
+        env_history_db=os.environ.get("MESH_DASH_HISTORY_DB"),
+        default_history_max_rows=DEFAULT_HISTORY_MAX_ROWS,
+        default_history_retention_days=DEFAULT_HISTORY_RETENTION_DAYS,
+        default_history_event_max_rows=DEFAULT_HISTORY_EVENT_MAX_ROWS,
+        default_history_event_retention_days=DEFAULT_HISTORY_EVENT_RETENTION_DAYS,
+        default_history_rollup_retention_days=DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS,
+        default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
+        default_node_history_max_points=DEFAULT_NODE_HISTORY_MAX_POINTS,
     )
     args = parser.parse_args()
     _apply_default_gateway(args)
