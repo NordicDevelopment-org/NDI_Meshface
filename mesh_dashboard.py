@@ -5208,13 +5208,13 @@ def _render_html(
           ev.preventDefault();
           ev.stopPropagation();
           if (chatSendInFlight) return;
-          retryChatMessage({
+          retryChatMessage({{
             text: btn.dataset.retryText || "",
             destination: btn.dataset.retryDestination || "^all",
             channel_index: Number(btn.dataset.retryChannel || "0"),
             reply_id: Number(btn.dataset.retryReplyId || ""),
             retry_of: Number(btn.dataset.retryOf || ""),
-          });
+          }});
         }});
       }}
     }}
