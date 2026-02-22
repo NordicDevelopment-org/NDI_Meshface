@@ -2810,6 +2810,7 @@ def _render_html(
       --split-top-px: 430px;
       --split-mid-px: 250px;
       --split-low-px: 240px;
+      --network-nodes-list-pct: 52%;
       display: grid;
       gap: 8px;
       padding: 0;
@@ -3356,18 +3357,53 @@ def _render_html(
       min-height: 0;
       overflow: hidden;
     }}
+    .network-node-stack {{
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 0;
+    }}
     .nodes-table-scroll {{
       flex: 1 1 auto;
       max-height: none;
       min-height: 0;
+    }}
+    .network-node-splitter {{
+      display: none;
+      position: relative;
+      border-radius: 8px;
+      border: 1px solid #d1e0cb;
+      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+      cursor: row-resize;
+      touch-action: none;
+      user-select: none;
+      min-height: 6px;
+      flex: 0 0 var(--splitter-size);
+      margin: 8px 0;
+    }}
+    .network-node-splitter::before {{
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      background: #b8cab9;
+      border-radius: 1px;
+    }}
+    .network-node-splitter:hover::before,
+    .network-node-splitter.active::before {{
+      background: #2f855a;
     }}
     .network-node-history-host {{
       display: none;
       flex-direction: column;
       gap: 8px;
       min-height: 0;
-      padding-top: 8px;
-      border-top: 1px solid #d7e5d2;
+      padding-top: 0;
+      border-top: none;
     }}
     .network-node-history-host:not([hidden]) {{
       display: flex;
@@ -3498,12 +3534,16 @@ def _render_html(
       overflow: hidden;
     }}
     .layout.view-network .nodes-table-scroll {{
-      flex: 1 1 52%;
-      min-height: 180px;
+      flex: 0 0 var(--network-nodes-list-pct);
+      min-height: 150px;
+    }}
+    .layout.view-network .network-node-splitter {{
+      display: block;
     }}
     .layout.view-network .network-node-history-host {{
-      flex: 1 1 48%;
-      min-height: 240px;
+      flex: 1 1 auto;
+      min-height: 200px;
+      overflow: auto;
     }}
     .layout.view-network .network-node-history-host #map-data-node {{
       display: flex;
@@ -3511,14 +3551,20 @@ def _render_html(
       min-height: 0;
       gap: 8px;
     }}
+    .layout.view-network .network-node-history-host #tab-panel-signal {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }}
     .layout.view-network .network-node-history-host #tab-panel-signal,
     .layout.view-network .network-node-history-host #tab-panel-overview {{
       flex: 1 1 auto;
       min-height: 0;
     }}
     .layout.view-network .network-node-history-host #signal-chart-wrap {{
-      height: 190px;
-      min-height: 190px;
+      height: auto;
+      min-height: 160px;
+      flex: 1 1 auto;
     }}
     .layout.view-network .map .body {{
       min-height: 0;
@@ -3542,11 +3588,14 @@ def _render_html(
     }}
 
     .layout.view-packets {{
+      height: calc(100vh - 96px);
+      height: calc(100dvh - 96px);
+      min-height: 560px;
       grid-template-rows:
         auto
         minmax(240px, var(--split-top-px))
         var(--splitter-size)
-        minmax(170px, var(--split-low-px));
+        minmax(170px, 1fr);
     }}
     .layout.view-packets .packets {{
       grid-column: 1 / span 3;
@@ -3569,11 +3618,14 @@ def _render_html(
     .layout.view-packets .hsplitter[data-target="low"] {{ grid-row: 3; }}
 
     .layout.view-data {{
+      height: calc(100vh - 96px);
+      height: calc(100dvh - 96px);
+      min-height: 560px;
       grid-template-rows:
         auto
         minmax(240px, var(--split-top-px))
         var(--splitter-size)
-        minmax(170px, var(--split-low-px));
+        minmax(170px, 1fr);
     }}
     .layout.view-data .raw {{
       grid-column: 1 / span 3;
@@ -3618,12 +3670,19 @@ def _render_html(
       min-height: 0;
       display: flex;
       flex-direction: column;
+      gap: 8px;
     }}
     .layout.view-saved .map-frame {{
-      display: none;
+      display: block;
+      order: 2;
+      flex: 0 0 clamp(170px, 28vh, 280px);
+      min-height: 170px;
     }}
     .layout.view-saved .saved-node-details {{
       display: flex;
+      order: 1;
+      flex: 1 1 auto;
+      min-height: 0;
     }}
     .layout.view-saved .summary,
     .layout.view-saved .map-data,
@@ -4455,6 +4514,12 @@ def _render_html(
       padding: 1px 5px;
       white-space: nowrap;
     }}
+    .chat-name-chip.offline {{
+      border-color: #cfd7d2;
+      background: #eff3f0;
+      color: #65756c;
+      opacity: 0.8;
+    }}
     .chat-name-chip.gps {{
       font-size: 10px;
       line-height: 1;
@@ -5205,6 +5270,12 @@ def _render_html(
       border-color: #2b8a59;
       color: #c6ffdb;
     }}
+    [data-theme="dark"] .chat-name-chip.offline {{
+      background: #212933;
+      border-color: #41505f;
+      color: #9aabbb;
+      opacity: 0.82;
+    }}
     [data-theme="dark"] .chat-channel-unread-from {{
       color: #a8bed2;
     }}
@@ -5306,7 +5377,18 @@ def _render_html(
       background: var(--ui-panel-alt);
     }}
     [data-theme="dark"] .network-node-history-host {{
-      border-top-color: var(--ui-border);
+      border-top: none;
+    }}
+    [data-theme="dark"] .network-node-splitter {{
+      border-color: var(--ui-border);
+      background: linear-gradient(90deg, #1a2430, #16202c);
+    }}
+    [data-theme="dark"] .network-node-splitter::before {{
+      background: #44566a;
+    }}
+    [data-theme="dark"] .network-node-splitter:hover::before,
+    [data-theme="dark"] .network-node-splitter.active::before {{
+      background: #79c0ff;
     }}
     [data-theme="dark"] .network-node-history-host.empty::before {{
       border-color: var(--ui-border);
@@ -5539,6 +5621,17 @@ def _render_html(
         height: auto;
         min-height: 0;
       }}
+      .layout.view-packets {{
+        height: auto;
+        min-height: 0;
+      }}
+      .layout.view-data {{
+        height: auto;
+        min-height: 0;
+      }}
+      .network-node-splitter {{
+        display: none !important;
+      }}
       .splitter, .hsplitter {{ display: none; }}
       .summary, .map, .map-data, .nodes, .favorites, .chat, .packets, .raw, .console {{ grid-column: 1; grid-row: auto; }}
       .map-frame {{ max-width: none; }}
@@ -5678,17 +5771,20 @@ def _render_html(
         <div class="nodes-search-wrap">
           <input id="nodes-search-input" class="list-search-input" type="search" placeholder="Search by ID or name" autocomplete="off" />
         </div>
-        <div class="scroll nodes-table-scroll">
-          <table id="nodes-table">
-              <thead>
-                <tr>
-                <th>Last Heard</th><th>ID</th><th>Name</th><th>HW</th><th>SNR</th><th>Hops</th><th>Battery</th><th>Saved</th><th>Pos</th><th>★</th>
-                </tr>
-              </thead>
-            <tbody></tbody>
-          </table>
+        <div class="network-node-stack">
+          <div class="scroll nodes-table-scroll">
+            <table id="nodes-table">
+                <thead>
+                  <tr>
+                  <th>Last Heard</th><th>ID</th><th>Name</th><th>HW</th><th>SNR</th><th>Hops</th><th>Battery</th><th>Saved</th><th>Pos</th><th>★</th>
+                  </tr>
+                </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="network-node-splitter" class="network-node-splitter" title="Drag to resize node list and history panel"></div>
+          <div id="network-node-history-host" class="network-node-history-host" hidden></div>
         </div>
-        <div id="network-node-history-host" class="network-node-history-host" hidden></div>
       </div>
     </section>
 
@@ -5852,6 +5948,7 @@ def _render_html(
     const favoritesStorageKey = "meshDashboardFavoriteNodeIdsV1";
     const nodeNameCacheStorageKey = "meshDashboardNodeNameCacheV1";
     const splitStorageKey = "meshDashboardLayoutSplitState";
+    const networkNodesSplitStorageKey = "meshDashboardNetworkNodesSplitPct";
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const themeStorageKey = "meshDashboardThemePreference";
@@ -5894,6 +5991,7 @@ def _render_html(
     let splitTopPx = 430;
     let splitMidPx = 250;
     let splitLowPx = 240;
+    let networkNodesListPct = 52;
     let consoleAutoscroll = true;
     let fitDone = false;
     let mapResizeObserver = null;
@@ -7291,6 +7389,10 @@ def _render_html(
       return Math.max(160, Math.min(max, value));
     }}
 
+    function clampNetworkNodesListPct(value) {{
+      return Math.max(28, Math.min(78, value));
+    }}
+
     function applySplitState() {{
       const layout = document.querySelector(".layout");
       if (!(layout instanceof HTMLElement)) return;
@@ -7298,6 +7400,12 @@ def _render_html(
       layout.style.setProperty("--split-top-px", `${{splitTopPx}}px`);
       layout.style.setProperty("--split-mid-px", `${{splitMidPx}}px`);
       layout.style.setProperty("--split-low-px", `${{splitLowPx}}px`);
+    }}
+
+    function applyNetworkNodesSplitState() {{
+      const layout = document.getElementById("dashboard-layout");
+      if (!(layout instanceof HTMLElement)) return;
+      layout.style.setProperty("--network-nodes-list-pct", `${{networkNodesListPct}}%`);
     }}
 
     function loadSplitState() {{
@@ -7325,6 +7433,27 @@ def _render_html(
       }} catch (_err) {{
       }}
       applySplitState();
+    }}
+
+    function loadNetworkNodesSplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(networkNodesSplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            networkNodesListPct = clampNetworkNodesListPct(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applyNetworkNodesSplitState();
+    }}
+
+    function persistNetworkNodesSplitState() {{
+      try {{
+        window.localStorage.setItem(networkNodesSplitStorageKey, String(networkNodesListPct));
+      }} catch (_err) {{
+      }}
     }}
 
     function chatMessageKey(msg) {{
@@ -7573,7 +7702,11 @@ def _render_html(
               }} else if (target === "mid") {{
                 splitMidPx = clampMidSplitPx(startMid + deltaY);
               }} else if (target === "low") {{
-                splitLowPx = clampLowSplitPx(startLow + deltaY);
+                if (activeLayoutView === "packets" || activeLayoutView === "data") {{
+                  splitTopPx = clampTopSplitPx(startTop + deltaY);
+                }} else {{
+                  splitLowPx = clampLowSplitPx(startLow + deltaY);
+                }}
               }}
             }} else {{
               const pct = clampSplitPct(((moveEv.clientX - rect.left) / rect.width) * 100);
@@ -7598,6 +7731,57 @@ def _render_html(
           splitter.addEventListener("pointercancel", onUp);
         }});
       }}
+    }}
+
+    function bindNetworkNodeSplitter() {{
+      const splitter = document.getElementById("network-node-splitter");
+      if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;
+      const stack = splitter.closest(".network-node-stack");
+      if (!(stack instanceof HTMLElement)) return;
+      splitter.dataset.bound = "1";
+
+      splitter.addEventListener("pointerdown", (ev) => {{
+        if (window.matchMedia("(max-width: 1100px)").matches) return;
+        ev.preventDefault();
+        splitter.classList.add("active");
+        document.body.classList.add("resizing-panels-y");
+        splitter.setPointerCapture(ev.pointerId);
+
+        const tablePane = stack.querySelector(".nodes-table-scroll");
+        if (!(tablePane instanceof HTMLElement)) {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-y");
+          return;
+        }}
+
+        const updateFromClientY = (clientY) => {{
+          const rect = stack.getBoundingClientRect();
+          if (rect.height < 80) return;
+          const relativeY = clientY - rect.top;
+          const pct = clampNetworkNodesListPct((relativeY / rect.height) * 100);
+          networkNodesListPct = pct;
+          applyNetworkNodesSplitState();
+        }};
+
+        updateFromClientY(ev.clientY);
+
+        const onMove = (moveEv) => {{
+          updateFromClientY(moveEv.clientY);
+        }};
+
+        const onUp = () => {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-y");
+          persistNetworkNodesSplitState();
+          splitter.removeEventListener("pointermove", onMove);
+          splitter.removeEventListener("pointerup", onUp);
+          splitter.removeEventListener("pointercancel", onUp);
+        }};
+
+        splitter.addEventListener("pointermove", onMove);
+        splitter.addEventListener("pointerup", onUp);
+        splitter.addEventListener("pointercancel", onUp);
+      }});
     }}
 
     function normalizeSortValue(raw) {{
@@ -8451,32 +8635,41 @@ def _render_html(
           features.push(line);
         }}
         if (trailPoints.length > 0) {{
-          const startPoint = trailPoints[0];
           const endPoint = trailPoints[trailPoints.length - 1];
-          const startMarker = L.circleMarker([startPoint.lat, startPoint.lon], {{
-            radius: 5,
-            color: "#2f855a",
-            fillColor: "#2f855a",
-            fillOpacity: 0.92,
-            weight: 1,
-            bubblingMouseEvents: false,
-          }});
-          startMarker.bindTooltip(`Trail start: ${{startPoint.time || "n/a"}}`, {{ sticky: true, opacity: 0.88 }});
-          startMarker.addTo(trailLayer);
-          features.push(startMarker);
-          if (trailPoints.length > 1) {{
-            const endMarker = L.circleMarker([endPoint.lat, endPoint.lon], {{
-              radius: 6,
-              color: "#b91c1c",
-              fillColor: "#b91c1c",
-              fillOpacity: 0.96,
-              weight: 1,
+          for (let i = 0; i < trailPoints.length; i += 1) {{
+            const point = trailPoints[i];
+            const isLatestPoint = i === (trailPoints.length - 1);
+            const ratio = trailPoints.length <= 1 ? 1 : (i / (trailPoints.length - 1));
+            const marker = L.circleMarker([point.lat, point.lon], {{
+              radius: isLatestPoint ? 5.8 : (i === 0 ? 3.6 : 2.6),
+              color: isLatestPoint ? "#f97316" : "#2f855a",
+              fillColor: isLatestPoint ? "#f97316" : "#63d297",
+              fillOpacity: isLatestPoint ? 0.96 : (0.2 + (ratio * 0.5)),
+              weight: isLatestPoint ? 2 : 1,
               bubblingMouseEvents: false,
             }});
-            endMarker.bindTooltip(`Trail latest: ${{endPoint.time || "n/a"}}`, {{ sticky: true, opacity: 0.88 }});
-            endMarker.addTo(trailLayer);
-            features.push(endMarker);
+            const pointTime = point.time || "n/a";
+            marker.bindTooltip(
+              isLatestPoint
+                ? `Newest trail point: ${{pointTime}}`
+                : `Trail point ${{i + 1}}/${{trailPoints.length}}: ${{pointTime}}`,
+              {{ sticky: true, opacity: 0.88 }}
+            );
+            marker.addTo(trailLayer);
+            features.push(marker);
           }}
+
+          const latestHalo = L.circleMarker([endPoint.lat, endPoint.lon], {{
+            radius: 10,
+            color: "#f97316",
+            fillColor: "#f97316",
+            fillOpacity: 0.16,
+            weight: 2,
+            bubblingMouseEvents: false,
+          }});
+          latestHalo.bindTooltip(`Newest trail point: ${{endPoint.time || "n/a"}}`, {{ sticky: true, opacity: 0.9 }});
+          latestHalo.addTo(trailLayer);
+          features.push(latestHalo);
         }}
 
         if (hasSelectedPosition) {{
@@ -9352,7 +9545,7 @@ def _render_html(
       const padLeft = 44;
       const padRight = 44;
       const padTop = 12;
-      const padBottom = 24;
+      const padBottom = 30;
       const plotW = width - padLeft - padRight;
       const plotH = height - padTop - padBottom;
 
@@ -9431,9 +9624,9 @@ def _render_html(
         ${{snrPath ? `<path d="${{snrPath}}" fill="none" stroke="${{chartPalette.snr}}" stroke-width="2"></path>` : ""}}
         ${{rssiPath ? `<path d="${{rssiPath}}" fill="none" stroke="${{chartPalette.rssi}}" stroke-width="2"></path>` : ""}}
         <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMax, 1)}}</text>
-        <text x="${{padLeft - 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMin, 1)}}</text>
+        <text x="${{padLeft - 4}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMin, 1)}}</text>
         <text x="${{width - padRight + 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="start" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMax, 0)}}</text>
-        <text x="${{width - padRight + 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="start" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMin, 0)}}</text>
+        <text x="${{width - padRight + 4}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="start" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMin, 0)}}</text>
       `;
       renderSignalTimeline(rows, padLeft, padRight, width);
     }}
@@ -9761,6 +9954,14 @@ def _render_html(
           return {{ html: "", title: "" }};
         }}
 
+        const liveLastSeen = nodeLastHeardUnix(node);
+        const capsLastSeen = Number(historyCaps && historyCaps.last_seen_unix);
+        const lastSeenUnix = Number.isFinite(liveLastSeen)
+          ? liveLastSeen
+          : (Number.isFinite(capsLastSeen) ? Math.trunc(capsLastSeen) : null);
+        const freshness = freshnessStatus(lastSeenUnix, nowUnix);
+        const chipStateClass = freshness === "online" ? "online" : "offline";
+
         const chips = [];
         const titleParts = [];
         const liveHasPosition = !!node
@@ -9770,7 +9971,7 @@ def _render_html(
           && Number.isFinite(node.lon);
         const historyHasPosition = !!historyCaps && historyCaps.has_position === true;
         if (liveHasPosition || historyHasPosition) {{
-          chips.push('<span class="chat-name-chip gps" title="GPS position available">&#x1F4CD;</span>');
+          chips.push(`<span class="chat-name-chip gps ${{chipStateClass}}" title="GPS position available">&#x1F4CD;</span>`);
           titleParts.push(liveHasPosition ? "GPS available" : "GPS last known");
         }}
 
@@ -9781,7 +9982,7 @@ def _render_html(
         );
         if (Number.isFinite(batteryRaw)) {{
           const batteryPct = Math.max(0, Math.min(100, Math.round(batteryRaw)));
-          chips.push(`<span class="chat-name-chip battery" title="Battery level">${{batteryPct}}%</span>`);
+          chips.push(`<span class="chat-name-chip battery ${{chipStateClass}}" title="Battery level">${{batteryPct}}%</span>`);
           titleParts.push(
             (node && node.battery_level != null)
               ? `Battery ${{batteryPct}}%`
@@ -9792,11 +9993,11 @@ def _render_html(
         const hopsRaw = Number(
           (node && node.hops_away != null)
             ? node.hops_away
-            : (historyCaps && historyCaps.last_hops)
+          : (historyCaps && historyCaps.last_hops)
         );
         if (Number.isFinite(hopsRaw) && hopsRaw >= 0) {{
           const hops = Math.trunc(hopsRaw);
-          chips.push(`<span class="chat-name-chip hops" title="Hops away">${{hops}}h</span>`);
+          chips.push(`<span class="chat-name-chip hops ${{chipStateClass}}" title="Hops away">${{hops}}h</span>`);
           titleParts.push(
             (node && node.hops_away != null)
               ? `${{hops}} hop${{hops === 1 ? "" : "s"}} away`
@@ -10353,12 +10554,14 @@ def _render_html(
     loadNodeNameCache();
     loadFavoriteNodes();
     loadSplitState();
+    loadNetworkNodesSplitState();
     loadLayoutView();
     loadChatChannel();
     loadThemePreference();
     bindLayoutNav();
     renderSavedRailStatus();
     bindSplitters();
+    bindNetworkNodeSplitter();
     bindSelectionControls();
     bindFavoriteToggleControls();
     bindFavoritesControls();
