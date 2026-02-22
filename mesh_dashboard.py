@@ -84,10 +84,6 @@ SENSITIVE_FIELD_NAMES = {
 }
 
 
-def _utc_now() -> str:
-    return _utc_now_helper()
-
-
 def _sanitize_revision_token(raw: Any, fallback: str) -> str:
     return _sanitize_revision_token_helper(raw, fallback)
 
@@ -139,89 +135,12 @@ def _send_emoji_reaction_packet(
     return iface._sendPacket(packet, destinationId=destination_id, wantAck=bool(want_ack))
 
 
-def _guess_lan_ipv4() -> Optional[str]:
-    return _guess_lan_ipv4_helper()
-
-
 def _get_local_node_id(iface: Any) -> str:
     broadcast_num = getattr(meshtastic, "BROADCAST_NUM", None) if meshtastic is not None else None
     return _get_local_node_id_helper(
         iface,
         broadcast_num=broadcast_num,
-        to_jsonable_fn=_to_jsonable,
-        to_int_fn=_to_int,
-    )
-
-
-def _apply_default_gateway(args: argparse.Namespace) -> None:
-    _apply_default_gateway_helper(args, default_mesh_port=DEFAULT_MESH_PORT)
-
-
-def _to_jsonable(value: Any, depth: int = 0) -> Any:
-    return _to_jsonable_helper(value, depth=depth)
-
-
-def _build_state(
-    iface: Any,
-    tracker: DashboardTracker,
-    started_at: float,
-    target: str,
-    show_secrets: bool,
-    storage_probe_path: Optional[str],
-    revision_info: Dict[str, str],
-) -> Dict[str, Any]:
-    return _build_state_helper(
-        iface=iface,
-        tracker=tracker,
-        started_at=started_at,
-        target=target,
-        show_secrets=show_secrets,
-        storage_probe_path=storage_probe_path,
-        revision_info=revision_info,
-        sensitive_field_names=SENSITIVE_FIELD_NAMES,
-    )
-
-
-def _render_html(
-    refresh_ms: int,
-    packet_limit: int,
-    show_secrets: bool,
-    history_enabled: bool,
-    history_max_rows: int,
-    history_retention_days: int,
-    node_history_hours: int,
-    node_history_max_points: int,
-    revision_label: str,
-    revision_title: str,
-) -> str:
-    return _render_html_helper(
-        refresh_ms=refresh_ms,
-        packet_limit=packet_limit,
-        show_secrets=show_secrets,
-        history_enabled=history_enabled,
-        history_max_rows=history_max_rows,
-        history_retention_days=history_retention_days,
-        node_history_hours=node_history_hours,
-        node_history_max_points=node_history_max_points,
-        revision_label=revision_label,
-        revision_title=revision_title,
-    )
-
-
-def _make_http_handler(
-    html_text: str,
-    state_fn,
-    node_history_fn=None,
-    online_activity_fn=None,
-    send_chat_fn=None,
-):
-    return _make_http_handler_helper(
-        html_text=html_text,
-        state_fn=state_fn,
-        node_history_fn=node_history_fn,
-        online_activity_fn=online_activity_fn,
-        send_chat_fn=send_chat_fn,
-        default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
+        to_jsonable_fn=_to_jsonable_helper,
         to_int_fn=_to_int,
     )
 
@@ -244,7 +163,10 @@ def run_dashboard(args: argparse.Namespace) -> None:
         subscribe_fn=pub.subscribe,
         seed_tracker_fn=_seed_tracker_from_node_db_helper,
         revision_info_fn=_revision_info,
-        build_state_fn=_build_state,
+        build_state_fn=lambda **kwargs: _build_state_helper(
+            sensitive_field_names=SENSITIVE_FIELD_NAMES,
+            **kwargs,
+        ),
         build_node_history_loader_fn=_build_node_history_loader,
         build_online_activity_loader_fn=_build_online_activity_loader,
         send_chat_message_fn=_send_chat_message_helper,
@@ -252,10 +174,18 @@ def run_dashboard(args: argparse.Namespace) -> None:
         get_local_node_id_fn=_get_local_node_id,
         normalize_single_emoji_fn=_normalize_single_emoji,
         to_int_fn=_to_int,
-        utc_now_fn=_utc_now,
-        render_html_fn=_render_html,
-        make_http_handler_fn=_make_http_handler,
-        guess_lan_ipv4_fn=_guess_lan_ipv4,
+        utc_now_fn=_utc_now_helper,
+        render_html_fn=_render_html_helper,
+        make_http_handler_fn=lambda html_text, state_fn, node_history_fn=None, online_activity_fn=None, send_chat_fn=None: _make_http_handler_helper(
+            html_text=html_text,
+            state_fn=state_fn,
+            node_history_fn=node_history_fn,
+            online_activity_fn=online_activity_fn,
+            send_chat_fn=send_chat_fn,
+            default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
+            to_int_fn=_to_int,
+        ),
+        guess_lan_ipv4_fn=_guess_lan_ipv4_helper,
         default_chat_max_bytes=DEFAULT_CHAT_MAX_BYTES,
     )
 
@@ -283,7 +213,7 @@ def main() -> None:
         default_node_history_max_points=DEFAULT_NODE_HISTORY_MAX_POINTS,
     )
     args = parser.parse_args()
-    _apply_default_gateway(args)
+    _apply_default_gateway_helper(args, default_mesh_port=DEFAULT_MESH_PORT)
     run_dashboard(args)
 
 
