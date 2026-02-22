@@ -3078,6 +3078,13 @@ def _render_html(
       min-width: 0;
       gap: 1px;
     }}
+    .chat-member-name-row {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+      max-width: 100%;
+    }}
     .chat-member-name {{
       overflow: hidden;
       text-overflow: ellipsis;
@@ -3595,6 +3602,31 @@ def _render_html(
       gap: 5px;
       max-width: 100%;
       min-width: 0;
+    }}
+    .chat-name-meta {{
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      flex-wrap: nowrap;
+      min-width: 0;
+    }}
+    .chat-name-chip {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #c9dece;
+      border-radius: 999px;
+      background: #edf6ef;
+      color: #3f6b52;
+      font-size: 9px;
+      line-height: 1.25;
+      padding: 1px 5px;
+      white-space: nowrap;
+    }}
+    .chat-name-chip.gps {{
+      font-size: 10px;
+      line-height: 1;
+      padding: 1px 4px;
     }}
     .chat-name {{
       overflow: hidden;
@@ -4335,6 +4367,11 @@ def _render_html(
     [data-theme="dark"] .chat-channel-name,
     [data-theme="dark"] .overview-item .v {{
       color: var(--ui-text) !important;
+    }}
+    [data-theme="dark"] .chat-name-chip {{
+      background: #07140d;
+      border-color: #2b8a59;
+      color: #c6ffdb;
     }}
     [data-theme="dark"] .chat-channel-unread-from {{
       color: #a8bed2;
@@ -7694,26 +7731,70 @@ def _render_html(
         (state.nodes || []).map((node) => [normalizeNodeId(node.id || ""), node])
       );
 
+      const nodeIdentityMeta = (nodeId) => {{
+        const clean = normalizeNodeId(nodeId);
+        if (!clean || !isSelectableNodeId(clean)) {{
+          return {{ html: "", title: "" }};
+        }}
+        const node = nodesById.get(clean);
+        if (!node || typeof node !== "object") {{
+          return {{ html: "", title: "" }};
+        }}
+
+        const chips = [];
+        const titleParts = [];
+        if (
+          typeof node.lat === "number"
+          && Number.isFinite(node.lat)
+          && typeof node.lon === "number"
+          && Number.isFinite(node.lon)
+        ) {{
+          chips.push('<span class="chat-name-chip gps" title="GPS position available">&#x1F4CD;</span>');
+          titleParts.push("GPS available");
+        }}
+
+        const batteryRaw = Number(node.battery_level);
+        if (Number.isFinite(batteryRaw)) {{
+          const batteryPct = Math.max(0, Math.min(100, Math.round(batteryRaw)));
+          chips.push(`<span class="chat-name-chip battery" title="Battery level">${{batteryPct}}%</span>`);
+          titleParts.push(`Battery ${{batteryPct}}%`);
+        }}
+
+        const hopsRaw = Number(node.hops_away);
+        if (Number.isFinite(hopsRaw) && hopsRaw >= 0) {{
+          const hops = Math.trunc(hopsRaw);
+          chips.push(`<span class="chat-name-chip hops" title="Hops away">${{hops}}h</span>`);
+          titleParts.push(`${{hops}} hop${{hops === 1 ? "" : "s"}} away`);
+        }}
+
+        return {{
+          html: chips.join(""),
+          title: titleParts.join(", "),
+        }};
+      }};
+
       const chatEndpointParts = (nodeId) => {{
         const clean = normalizeNodeId(nodeId);
         if (!clean) {{
-          return {{ label: "n/a", idTag: "", title: "n/a", status: "unknown" }};
+          return {{ label: "n/a", idTag: "", title: "n/a", status: "unknown", metaHtml: "" }};
         }}
         if (clean === "^all") {{
-          return {{ label: "All", idTag: "", title: "^all", status: "unknown" }};
+          return {{ label: "All", idTag: "", title: "^all", status: "unknown", metaHtml: "" }};
         }}
         if (clean === "local") {{
-          return {{ label: "Local", idTag: "", title: "local", status: "online" }};
+          return {{ label: "Local", idTag: "", title: "local", status: "online", metaHtml: "" }};
         }}
         const node = nodesById.get(clean);
         const name = preferredNodeName(node) || nodeNameCache.get(clean) || "Unknown node";
         const lastHeard = nodeLastHeardUnix(node);
         const status = freshnessStatus(lastHeard, nowUnix);
+        const meta = nodeIdentityMeta(clean);
         return {{
           label: name,
           idTag: clean,
-          title: `${{name}} (${{clean}})`,
+          title: `${{name}} (${{clean}})${{meta.title ? ` - ${{meta.title}}` : ""}}`,
           status,
+          metaHtml: meta.html,
         }};
       }};
 
@@ -8038,11 +8119,13 @@ def _render_html(
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
+              ${{fromMeta.metaHtml ? `<span class="chat-name-meta">${{fromMeta.metaHtml}}</span>` : ""}}
               ${{fromMeta.idTag ? `<span class="chat-id-bg status-${{fromMeta.status}}">${{escAttr(fromMeta.idTag)}}</span>` : ""}}
             </span>
             <span class="chat-feed-arrow">&rarr;</span>
             <span class="chat-endpoint" title="${{escAttr(toMeta.title)}}">
               <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
+              ${{toMeta.metaHtml ? `<span class="chat-name-meta">${{toMeta.metaHtml}}</span>` : ""}}
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
             ${{hasHop ? `<span class="chat-feed-hops" title="${{escAttr(hopTitle)}}">${{escAttr(hopLabel)}}</span>` : ""}}
@@ -8088,13 +8171,20 @@ def _render_html(
       const staleCount = roster.filter((item) => item.status === "stale").length;
       if (roomList) {{
         roomList.innerHTML = roster.map((item) => (
-          `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(`${{item.name}} (${{item.id}})`)}}">
+          (() => {{
+            const meta = nodeIdentityMeta(item.id);
+            const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}}`;
+            return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(memberTitle)}}">
             <span class="chat-member-status status-${{item.status}}">●</span>
             <span class="chat-member-main">
-              <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
+              <span class="chat-member-name-row">
+                <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
+                ${{meta.html ? `<span class="chat-name-meta">${{meta.html}}</span>` : ""}}
+              </span>
               <span class="chat-member-id">${{escAttr(item.id)}}</span>
             </span>
-          </div>`
+          </div>`;
+          }})()
         )).join("");
         for (const member of roomList.querySelectorAll(".chat-member-item")) {{
           member.addEventListener("click", () => {{
