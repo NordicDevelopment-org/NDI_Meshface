@@ -1,9 +1,7 @@
 import argparse
 import json
 import os
-import socket
 import sqlite3
-import subprocess
 import threading
 import time
 from collections import Counter, deque
@@ -23,28 +21,57 @@ except Exception:
     _package_version = "0.0.0"
 from meshdash.helpers import (
     calculate_hops as _calculate_hops,
-    disk_space_info as _disk_space_info,
     emoji_from_codepoint as _emoji_from_codepoint,
+    extract_packet_battery_level as _extract_packet_battery_level,
+    extract_packet_position as _extract_packet_position,
     extract_emoji_codepoint as _extract_emoji_codepoint,
+    extract_position_fields as _extract_position_fields,
     extract_reply_id as _extract_reply_id,
     format_epoch as _format_epoch,
+    is_sensitive_key as _is_sensitive_key_helper,
+    message_to_dict as _message_to_dict_helper,
     normalize_single_emoji as _normalize_single_emoji,
+    redact_secrets as _redact_secrets_helper,
     safe_json_loads as _safe_json_loads,
+    to_jsonable as _to_jsonable_helper,
     to_float as _to_float,
     to_int as _to_int,
+)
+from meshdash.chat import (
+    build_local_chat_entry as _build_local_chat_entry,
+    chat_message_id as _chat_message_id_helper,
+    expire_pending_deliveries as _expire_pending_deliveries_helper,
+    extract_routing_delivery_update as _extract_routing_delivery_update_helper,
+    set_delivery_state as _set_delivery_state_helper,
+)
+from meshdash.revision import (
+    detect_git_commit as _detect_git_commit_helper,
+    revision_info as _build_revision_info,
+    sanitize_revision_token as _sanitize_revision_token_helper,
+)
+from meshdash.nodes import (
+    extract_position as _extract_position_helper,
+    get_local_node_id as _get_local_node_id_helper,
+    get_local_node_num as _get_local_node_num_helper,
+    get_node_id_from_num as _get_node_id_from_num_helper,
+    parse_utc_text_to_unix as _parse_utc_text_to_unix_helper,
+    safe_nodes_items as _safe_nodes_items_helper,
+    utc_now as _utc_now_helper,
+)
+from meshdash.runtime import (
+    apply_default_gateway as _apply_default_gateway_helper,
+    guess_lan_ipv4 as _guess_lan_ipv4_helper,
+)
+from meshdash.state import (
+    build_state as _build_state_helper,
+    collect_local_state as _collect_local_state_helper,
+    collect_nodes as _collect_nodes_helper,
 )
 from meshdash.theme import build_theme_css as _build_theme_css
 try:
     from pubsub import pub
 except Exception:
     pub = None
-
-try:
-    from google.protobuf.json_format import MessageToDict
-    from google.protobuf.message import Message
-except Exception:
-    Message = None
-    MessageToDict = None
 
 try:
     from meshtastic.protobuf import mesh_pb2, portnums_pb2
@@ -85,74 +112,39 @@ SENSITIVE_FIELD_NAMES = {
 
 
 def _utc_now() -> str:
-    return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+    return _utc_now_helper()
 
 
 def _parse_utc_text_to_unix(value: Any) -> Optional[int]:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    try:
-        parsed = datetime.strptime(text, "%Y-%m-%d %H:%M:%SZ")
-    except Exception:
-        return None
-    return int(parsed.replace(tzinfo=timezone.utc).timestamp())
+    return _parse_utc_text_to_unix_helper(value)
 
 
 def _sanitize_revision_token(raw: Any, fallback: str) -> str:
-    text = str(raw or "").strip()
-    if not text:
-        return fallback
-    safe = "".join(ch for ch in text if ch.isalnum() or ch in ("-", "_", ".", "+"))
-    return safe or fallback
+    return _sanitize_revision_token_helper(raw, fallback)
 
 
 def _detect_git_commit() -> Optional[str]:
-    explicit = str(os.environ.get("MESH_DASH_GIT_COMMIT", "")).strip()
-    if explicit:
-        return _sanitize_revision_token(explicit, UNKNOWN_GIT_COMMIT)
-
-    search_roots: list[str] = []
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cwd = os.getcwd()
-    for root in (script_dir, cwd):
-        if root and root not in search_roots:
-            search_roots.append(root)
-
-    for root in search_roots:
-        try:
-            proc = subprocess.run(
-                ["git", "-C", root, "rev-parse", "--short=12", "HEAD"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=1.0,
-            )
-        except Exception:
-            continue
-        if proc.returncode == 0:
-            commit = _sanitize_revision_token(proc.stdout, "")
-            if commit:
-                return commit
-    return None
+    explicit = os.environ.get("MESH_DASH_GIT_COMMIT", "")
+    return _detect_git_commit_helper(
+        explicit_commit=explicit,
+        script_dir=script_dir,
+        cwd=cwd,
+        unknown_git_commit=UNKNOWN_GIT_COMMIT,
+        sanitize_token=_sanitize_revision_token,
+    )
 
 
 def _revision_info() -> Dict[str, str]:
     version_raw = os.environ.get("MESH_DASH_VERSION", DEFAULT_APP_VERSION)
-    version = _sanitize_revision_token(version_raw, "0.0.0")
-    if version.lower().startswith("v"):
-        version = version[1:] or "0.0.0"
-
-    commit = _detect_git_commit() or UNKNOWN_GIT_COMMIT
-    label = f"Rev: v{version} ({commit})"
-    title = f"Dashboard revision: version {version}, commit {commit}"
-
-    return {
-        "version": version,
-        "commit": commit,
-        "label": label,
-        "title": title,
-    }
+    return _build_revision_info(
+        version_raw=version_raw,
+        default_version=DEFAULT_APP_VERSION,
+        unknown_git_commit=UNKNOWN_GIT_COMMIT,
+        detect_commit=_detect_git_commit,
+        sanitize_token=_sanitize_revision_token,
+    )
 
 
 def _send_emoji_reaction_packet(
@@ -179,268 +171,59 @@ def _send_emoji_reaction_packet(
 
 
 def _guess_lan_ipv4() -> Optional[str]:
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.connect(("8.8.8.8", 80))
-            ip = sock.getsockname()[0]
-            if ip and not ip.startswith("127."):
-                return ip
-    except OSError:
-        pass
-
-    try:
-        addr_info = socket.getaddrinfo(socket.gethostname(), None, family=socket.AF_INET)
-        for _family, _type, _proto, _canonname, sockaddr in addr_info:
-            ip = sockaddr[0]
-            if ip and not ip.startswith("127."):
-                return ip
-    except socket.gaierror:
-        pass
-
-    return None
+    return _guess_lan_ipv4_helper()
 
 
 def _get_local_node_num(iface: Any) -> Optional[int]:
-    my_info = _to_jsonable(getattr(iface, "myInfo", None))
-    if isinstance(my_info, dict):
-        for key in ("my_node_num", "myNodeNum", "node_num", "nodeNum", "num"):
-            value = _to_int(my_info.get(key))
-            if value is not None:
-                return value
-
-    local = getattr(iface, "localNode", None)
-    if local is not None:
-        for key in ("nodeNum", "node_num", "num"):
-            value = _to_int(getattr(local, key, None))
-            if value is not None:
-                return value
-    return None
+    return _get_local_node_num_helper(iface, to_jsonable_fn=_to_jsonable, to_int_fn=_to_int)
 
 
 def _get_local_node_id(iface: Any) -> str:
-    node_num = _get_local_node_num(iface)
-    if node_num is None:
-        return "local"
-    node_id = _get_node_id_from_num(iface, node_num)
-    if node_id:
-        return node_id
-    return f"!{node_num:08x}"
+    broadcast_num = getattr(meshtastic, "BROADCAST_NUM", None) if meshtastic is not None else None
+    return _get_local_node_id_helper(
+        iface,
+        broadcast_num=broadcast_num,
+        to_jsonable_fn=_to_jsonable,
+        to_int_fn=_to_int,
+    )
 
 
 def _apply_default_gateway(args: argparse.Namespace) -> None:
-    # If user did not provide --mesh-host and left serial at the default path,
-    # prefer the shared TCP gateway for this dashboard.
-    if args.no_default_gateway:
-        return
-    if args.mesh_host:
-        return
-    if args.mesh_port != DEFAULT_MESH_PORT:
-        return
-    if not args.default_gateway_host:
-        return
-    args.mesh_host = args.default_gateway_host
-    args.mesh_tcp_port = args.default_gateway_port
+    _apply_default_gateway_helper(args, default_mesh_port=DEFAULT_MESH_PORT)
 
 
 def _message_to_dict(value: Any) -> Any:
-    if Message is not None and MessageToDict is not None and isinstance(value, Message):
-        return MessageToDict(value, preserving_proto_field_name=True)
-    return None
+    return _message_to_dict_helper(value)
 
 
 def _to_jsonable(value: Any, depth: int = 0) -> Any:
-    if depth > 12:
-        return "<max-depth>"
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, bytes):
-        return value.hex()
-    as_message = _message_to_dict(value)
-    if as_message is not None:
-        return _to_jsonable(as_message, depth + 1)
-    if isinstance(value, dict):
-        out: Dict[str, Any] = {}
-        for key, val in value.items():
-            out[str(key)] = _to_jsonable(val, depth + 1)
-        return out
-    if isinstance(value, (list, tuple, set)):
-        return [_to_jsonable(item, depth + 1) for item in value]
-    return str(value)
+    return _to_jsonable_helper(value, depth=depth)
 
 
 def _is_sensitive_key(key: str) -> bool:
-    key_l = key.lower()
-    if key_l in SENSITIVE_FIELD_NAMES:
-        return True
-    return key_l.endswith("_password") or key_l.endswith("_private_key")
+    return _is_sensitive_key_helper(key, SENSITIVE_FIELD_NAMES)
 
 
 def _redact_secrets(value: Any, parent_key: Optional[str] = None) -> Any:
-    if parent_key and _is_sensitive_key(parent_key):
-        return "<redacted>"
-    if isinstance(value, dict):
-        return {
-            key: _redact_secrets(val, key)
-            for key, val in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact_secrets(item, parent_key) for item in value]
-    return value
+    return _redact_secrets_helper(value, SENSITIVE_FIELD_NAMES, parent_key=parent_key)
 
 
 def _get_node_id_from_num(iface: Any, node_num: Any) -> Optional[str]:
-    numeric = _to_int(node_num)
-    if numeric is None:
-        return None
-    if numeric == meshtastic.BROADCAST_NUM:
-        return "^all"
-
-    info = (iface.nodesByNum or {}).get(numeric, {})
-    user = info.get("user", {}) if isinstance(info, dict) else {}
-    node_id = user.get("id") if isinstance(user, dict) else None
-    if node_id:
-        return str(node_id)
-    return f"!{numeric:08x}"
-
-
-def _extract_position_fields(position: Any) -> Optional[Tuple[float, float]]:
-    if not isinstance(position, dict):
-        return None
-
-    lat = position.get("latitude")
-    lon = position.get("longitude")
-    if lat is None:
-        lat = position.get("lat")
-    if lon is None:
-        lon = position.get("lon")
-
-    if lat is None and position.get("latitudeI") is not None:
-        lat = _to_float(position.get("latitudeI"))
-        lat = lat * 1e-7 if lat is not None else None
-    if lon is None and position.get("longitudeI") is not None:
-        lon = _to_float(position.get("longitudeI"))
-        lon = lon * 1e-7 if lon is not None else None
-
-    if lat is None and position.get("latitude_i") is not None:
-        lat = _to_float(position.get("latitude_i"))
-        lat = lat * 1e-7 if lat is not None else None
-    if lon is None and position.get("longitude_i") is not None:
-        lon = _to_float(position.get("longitude_i"))
-        lon = lon * 1e-7 if lon is not None else None
-
-    lat_f = _to_float(lat)
-    lon_f = _to_float(lon)
-    if lat_f is None or lon_f is None:
-        return None
-    if lat_f == 0.0 and lon_f == 0.0:
-        return None
-    if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
-        return None
-    return lat_f, lon_f
+    broadcast_num = getattr(meshtastic, "BROADCAST_NUM", None) if meshtastic is not None else None
+    return _get_node_id_from_num_helper(
+        iface,
+        node_num,
+        broadcast_num=broadcast_num,
+        to_int_fn=_to_int,
+    )
 
 
 def _extract_position(node_info: Dict[str, Any]) -> Optional[Tuple[float, float]]:
-    return _extract_position_fields(node_info.get("position"))
-
-
-def _extract_packet_position(packet: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    if not isinstance(packet, dict):
-        return None
-
-    candidates: list[Dict[str, Any]] = []
-    decoded = packet.get("decoded")
-    if isinstance(decoded, dict):
-        for key in ("position", "gps", "location"):
-            candidate = decoded.get(key)
-            if isinstance(candidate, dict):
-                candidates.append(candidate)
-        candidates.append(decoded)
-
-    for key in ("position", "gps", "location"):
-        candidate = packet.get(key)
-        if isinstance(candidate, dict):
-            candidates.append(candidate)
-    candidates.append(packet)
-
-    for candidate in candidates:
-        coords = _extract_position_fields(candidate)
-        if coords is None:
-            continue
-
-        altitude = _to_float(candidate.get("altitude"))
-        if altitude is None:
-            altitude = _to_float(candidate.get("altitude_m"))
-        if altitude is None:
-            altitude = _to_float(candidate.get("altitudeM"))
-
-        sats = _to_int(candidate.get("satsInView"))
-        if sats is None:
-            sats = _to_int(candidate.get("sats_in_view"))
-        if sats is None:
-            sats = _to_int(candidate.get("satellites"))
-
-        out: Dict[str, Any] = {
-            "lat": coords[0],
-            "lon": coords[1],
-        }
-        if altitude is not None:
-            out["altitude"] = altitude
-        if sats is not None and sats >= 0:
-            out["sats_in_view"] = sats
-        return out
-    return None
-
-
-def _extract_packet_battery_level(packet: Dict[str, Any]) -> Optional[int]:
-    if not isinstance(packet, dict):
-        return None
-
-    candidates: list[Dict[str, Any]] = []
-    decoded = packet.get("decoded")
-    if isinstance(decoded, dict):
-        telemetry = decoded.get("telemetry")
-        if isinstance(telemetry, dict):
-            candidates.append(telemetry)
-            metrics = telemetry.get("deviceMetrics") or telemetry.get("device_metrics")
-            if isinstance(metrics, dict):
-                candidates.append(metrics)
-        metrics = decoded.get("deviceMetrics") or decoded.get("device_metrics") or decoded.get("metrics")
-        if isinstance(metrics, dict):
-            candidates.append(metrics)
-        candidates.append(decoded)
-
-    telemetry = packet.get("telemetry")
-    if isinstance(telemetry, dict):
-        candidates.append(telemetry)
-        metrics = telemetry.get("deviceMetrics") or telemetry.get("device_metrics")
-        if isinstance(metrics, dict):
-            candidates.append(metrics)
-    metrics = packet.get("deviceMetrics") or packet.get("device_metrics") or packet.get("metrics")
-    if isinstance(metrics, dict):
-        candidates.append(metrics)
-    candidates.append(packet)
-
-    for candidate in candidates:
-        for key in ("batteryLevel", "battery_level", "batteryPercent", "battery_percent", "battery"):
-            raw = candidate.get(key)
-            if raw is None:
-                continue
-            level_f = _to_float(raw)
-            if level_f is None:
-                continue
-            level = int(round(level_f))
-            if 0 <= level <= 100:
-                return level
-    return None
+    return _extract_position_helper(node_info, extract_position_fields_fn=_extract_position_fields)
 
 
 def _safe_nodes_items(iface: Any) -> list[Tuple[Any, Any]]:
-    for _ in range(3):
-        try:
-            return list((iface.nodesByNum or {}).items())
-        except RuntimeError:
-            time.sleep(0.01)
-    return []
+    return _safe_nodes_items_helper(iface, retries=3, sleep_seconds=0.01)
 
 
 class HistoryStore:
@@ -1858,14 +1641,7 @@ class DashboardTracker:
         return self._history_store.load_node_capabilities()
 
     def _chat_message_id(self, entry: Any) -> Optional[int]:
-        if not isinstance(entry, dict):
-            return None
-        return _to_int(
-            entry.get("message_id")
-            or entry.get("messageId")
-            or entry.get("packet_id")
-            or entry.get("packetId")
-        )
+        return _chat_message_id_helper(entry, to_int_fn=_to_int)
 
     def _set_delivery_state_unlocked(
         self,
@@ -1873,92 +1649,28 @@ class DashboardTracker:
         state: str,
         error: Optional[str] = None,
     ) -> bool:
-        clean_message_id = _to_int(message_id)
-        if clean_message_id is None or clean_message_id <= 0:
-            return False
-
-        target: Optional[Dict[str, Any]] = None
-        for entry in reversed(self.recent_chat):
-            if not isinstance(entry, dict):
-                continue
-            if entry.get("local_echo") is not True:
-                continue
-            if self._chat_message_id(entry) != clean_message_id:
-                continue
-            target = entry
-            break
-
-        if target is None:
-            return False
-
-        target["delivery_state"] = str(state or "sent")
-        target["delivery_updated_at"] = _utc_now()
-        target["delivery_updated_unix"] = int(time.time())
-        if error:
-            target["delivery_error"] = str(error)
-        else:
-            target.pop("delivery_error", None)
-        return True
+        return _set_delivery_state_helper(
+            self.recent_chat,
+            message_id=message_id,
+            state=state,
+            error=error,
+            to_int_fn=_to_int,
+            now_text_fn=_utc_now,
+            now_unix_fn=lambda: int(time.time()),
+        )
 
     def _extract_routing_delivery_update_unlocked(self, decoded: Any) -> Optional[Dict[str, Any]]:
-        if not isinstance(decoded, dict):
-            return None
-        portnum = str(decoded.get("portnum") or "")
-        if portnum != "ROUTING_APP":
-            return None
-        routing = decoded.get("routing")
-        if not isinstance(routing, dict):
-            return None
-
-        request_id = (
-            _to_int(routing.get("requestId"))
-            or _to_int(routing.get("request_id"))
-            or _to_int(decoded.get("requestId"))
-            or _to_int(decoded.get("request_id"))
-        )
-        if request_id is None or request_id <= 0:
-            return None
-
-        error_reason = str(
-            routing.get("errorReason")
-            or routing.get("error_reason")
-            or ""
-        ).strip()
-        if not error_reason or error_reason.upper() == "NONE":
-            return {"request_id": request_id, "state": "acked", "error": None}
-        return {"request_id": request_id, "state": "nak", "error": error_reason}
+        return _extract_routing_delivery_update_helper(decoded, to_int_fn=_to_int)
 
     def _expire_pending_deliveries_unlocked(self) -> None:
-        now_unix = int(time.time())
-        timeout_seconds = max(1, int(self._chat_delivery_timeout_seconds))
-        for entry in self.recent_chat:
-            if not isinstance(entry, dict):
-                continue
-            if entry.get("local_echo") is not True:
-                continue
-            if entry.get("ack_requested") is not True:
-                continue
-            if str(entry.get("delivery_state") or "") != "pending":
-                continue
-
-            pending_since = (
-                _to_int(entry.get("delivery_updated_unix"))
-                or _parse_utc_text_to_unix(entry.get("delivery_updated_at"))
-                or _parse_utc_text_to_unix(entry.get("captured_at"))
-                or _parse_utc_text_to_unix(entry.get("rx_time"))
-            )
-            if pending_since is None:
-                pending_since = now_unix
-                entry["delivery_updated_unix"] = pending_since
-                entry["delivery_updated_at"] = _utc_now()
-
-            if now_unix - pending_since < timeout_seconds:
-                continue
-
-            entry["delivery_state"] = "timeout"
-            entry["delivery_error"] = "No ACK received before timeout"
-            entry["delivery_updated_unix"] = now_unix
-            entry["delivery_updated_at"] = _utc_now()
+        _expire_pending_deliveries_helper(
+            self.recent_chat,
+            timeout_seconds=self._chat_delivery_timeout_seconds,
+            to_int_fn=_to_int,
+            parse_utc_text_to_unix_fn=_parse_utc_text_to_unix,
+            now_unix_fn=lambda: int(time.time()),
+            now_text_fn=_utc_now,
+        )
 
     def record_local_chat(
         self,
@@ -1974,59 +1686,27 @@ class DashboardTracker:
         ack_requested: bool = False,
         retry_of: Optional[int] = None,
     ) -> None:
-        clean_text = str(text or "").strip()
-        clean_message_id = _to_int(message_id)
-        clean_reply_id = _to_int(reply_id)
-        clean_emoji_codepoint = _to_int(emoji_codepoint)
-        clean_emoji = str(emoji or "").strip() or _emoji_from_codepoint(clean_emoji_codepoint)
-        if clean_emoji and clean_emoji_codepoint is None:
-            clean_emoji_codepoint = ord(clean_emoji[0])
-        has_reaction = bool(
-            is_reaction or (clean_reply_id is not None and clean_reply_id > 0 and clean_emoji)
-        )
-        if not clean_text and not has_reaction:
-            return
         now_text = _utc_now()
         now_unix = int(time.time())
-        should_track_delivery = bool(ack_requested and not has_reaction and str(to_id or "^all") != "^all")
-        delivery_state = "sent"
-        delivery_error: Optional[str] = None
-        if should_track_delivery:
-            if clean_message_id is not None and clean_message_id > 0:
-                delivery_state = "pending"
-            else:
-                delivery_state = "error"
-                delivery_error = "Delivery tracking unavailable (missing packet id)"
-        entry = {
-            "captured_at": now_text,
-            "from": str(from_id or "local"),
-            "to": str(to_id or "^all"),
-            "portnum": "TEXT_MESSAGE_APP",
-            "channel": int(channel_index) if isinstance(channel_index, int) else 0,
-            "rx_time": now_text,
-            "text": clean_text,
-            "local_echo": True,
-            "delivery_state": delivery_state,
-            "delivery_updated_at": now_text,
-            "delivery_updated_unix": now_unix,
-        }
-        if clean_message_id is not None and clean_message_id > 0:
-            entry["message_id"] = clean_message_id
-        if clean_reply_id is not None and clean_reply_id > 0:
-            entry["reply_id"] = clean_reply_id
-        if clean_emoji:
-            entry["emoji"] = clean_emoji
-        if clean_emoji_codepoint is not None and clean_emoji_codepoint > 0:
-            entry["emoji_codepoint"] = clean_emoji_codepoint
-        if has_reaction:
-            entry["is_reaction"] = True
-        if should_track_delivery:
-            entry["ack_requested"] = True
-        if delivery_error:
-            entry["delivery_error"] = delivery_error
-        clean_retry_of = _to_int(retry_of)
-        if clean_retry_of is not None and clean_retry_of > 0:
-            entry["retry_of"] = clean_retry_of
+        entry = _build_local_chat_entry(
+            text=text,
+            from_id=from_id,
+            to_id=to_id,
+            channel_index=channel_index,
+            message_id=message_id,
+            reply_id=reply_id,
+            emoji=emoji,
+            emoji_codepoint=emoji_codepoint,
+            is_reaction=is_reaction,
+            ack_requested=ack_requested,
+            retry_of=retry_of,
+            now_text=now_text,
+            now_unix=now_unix,
+            to_int_fn=_to_int,
+            emoji_from_codepoint_fn=_emoji_from_codepoint,
+        )
+        if entry is None:
+            return
         with self._lock:
             self.recent_chat.append(entry)
             if self._history_store is not None:
@@ -2303,94 +1983,11 @@ def _seed_tracker_from_node_db(tracker: DashboardTracker, iface: Any) -> None:
 
 
 def _collect_nodes(iface: Any) -> Dict[str, Any]:
-    rows: list[Dict[str, Any]] = []
-    full_nodes: list[Dict[str, Any]] = []
-    nodes_by_id: Dict[str, Dict[str, Any]] = {}
-
-    for node_num, raw_info in _safe_nodes_items(iface):
-        if not isinstance(raw_info, dict):
-            continue
-
-        info = _to_jsonable(raw_info)
-        if not isinstance(info, dict):
-            continue
-
-        node_num_int = _to_int(info.get("num", node_num))
-        user = info.get("user", {}) if isinstance(info.get("user"), dict) else {}
-        node_id = user.get("id")
-        if not node_id and node_num_int is not None:
-            node_id = f"!{node_num_int:08x}"
-
-        if not node_id:
-            continue
-
-        metrics = info.get("deviceMetrics", {}) if isinstance(info.get("deviceMetrics"), dict) else {}
-        position = _extract_position(info)
-        last_heard_epoch = _to_int(info.get("lastHeard")) or 0
-
-        row = {
-            "id": str(node_id),
-            "num": node_num_int,
-            "short_name": user.get("shortName"),
-            "long_name": user.get("longName"),
-            "hardware_model": user.get("hwModel"),
-            "role": user.get("role"),
-            "is_licensed": user.get("isLicensed"),
-            "last_heard": _format_epoch(last_heard_epoch),
-            "last_heard_epoch": last_heard_epoch,
-            "last_heard_unix": last_heard_epoch,
-            "snr": info.get("snr"),
-            "hops_away": info.get("hopsAway"),
-            "battery_level": metrics.get("batteryLevel"),
-            "voltage": metrics.get("voltage"),
-            "channel_utilization": metrics.get("channelUtilization"),
-            "air_util_tx": metrics.get("airUtilTx"),
-            "lat": position[0] if position else None,
-            "lon": position[1] if position else None,
-        }
-        rows.append(row)
-        nodes_by_id[str(node_id)] = row
-        full_nodes.append(
-            {
-                "id": str(node_id),
-                "num": node_num_int,
-                "info": info,
-            }
-        )
-
-    rows.sort(key=lambda item: item.get("last_heard_epoch", 0), reverse=True)
-    for row in rows:
-        row.pop("last_heard_epoch", None)
-
-    full_nodes.sort(key=lambda item: item.get("num") or 0)
-    nodes_with_position = sum(
-        1 for node in rows if node.get("lat") is not None and node.get("lon") is not None
-    )
-
-    return {
-        "rows": rows,
-        "full": full_nodes,
-        "by_id": nodes_by_id,
-        "with_position_count": nodes_with_position,
-    }
+    return _collect_nodes_helper(iface)
 
 
 def _collect_local_state(iface: Any) -> Dict[str, Any]:
-    local = getattr(iface, "localNode", None)
-    if local is None:
-        local = iface.getNode("^local")
-
-    state: Dict[str, Any] = {}
-
-    state["local_config"] = _to_jsonable(getattr(local, "localConfig", None))
-    state["module_config"] = _to_jsonable(getattr(local, "moduleConfig", None))
-    channels = getattr(local, "channels", None)
-    if channels is None:
-        state["channels"] = []
-    else:
-        state["channels"] = [_to_jsonable(channel) for channel in channels]
-
-    return state
+    return _collect_local_state_helper(iface)
 
 
 def _build_state(
@@ -2402,71 +1999,16 @@ def _build_state(
     storage_probe_path: Optional[str],
     revision_info: Dict[str, str],
 ) -> Dict[str, Any]:
-    nodes = _collect_nodes(iface)
-    tracker_data = tracker.snapshot(nodes["by_id"])
-    node_saved_counts = tracker.load_node_saved_counts()
-    node_capabilities = tracker.load_node_capabilities()
-    for row in nodes["rows"]:
-        stats = node_saved_counts.get(str(row.get("id") or ""), {})
-        row["saved_packets"] = int(stats.get("saved_packets") or 0)
-        row["saved_points"] = int(stats.get("saved_points") or 0)
-        row["saved_last_seen"] = stats.get("saved_last_seen")
-
-    my_info = _to_jsonable(getattr(iface, "myInfo", None))
-    metadata = _to_jsonable(getattr(iface, "metadata", None))
-
-    local_state: Dict[str, Any]
-    local_error: Optional[str] = None
-    try:
-        local_state = _collect_local_state(iface)
-    except Exception as exc:
-        local_state = {}
-        local_error = str(exc)
-
-    modem_preset = None
-    try:
-        modem_preset = (
-            (local_state.get("local_config") or {})
-            .get("lora", {})
-            .get("modem_preset")
-        )
-    except Exception:
-        modem_preset = None
-
-    state = {
-        "generated_at": _utc_now(),
-        "summary": {
-            "target": target,
-            "uptime_seconds": int(max(0, time.time() - started_at)),
-            "node_count": len(nodes["rows"]),
-            "nodes_with_position": nodes["with_position_count"],
-            "live_packet_count": tracker_data["live_packet_count"],
-            "edge_count": len(tracker_data["edges"]),
-            "real_edge_count": tracker_data["real_edge_count"],
-            "recent_packet_buffer": len(tracker_data["recent_packets"]),
-            "modem_preset": modem_preset,
-            "disk": _disk_space_info(storage_probe_path),
-            "revision": revision_info,
-        },
-        "my_info": my_info,
-        "metadata": metadata,
-        "local_state": local_state,
-        "local_state_error": local_error,
-        "nodes": nodes["rows"],
-        "history_caps": node_capabilities,
-        "nodes_full": nodes["full"],
-        "traffic": {
-            "edges": tracker_data["edges"],
-            "port_counts": tracker_data["port_counts"],
-            "recent_packets": tracker_data["recent_packets"],
-            "recent_chat": tracker_data["recent_chat"],
-        },
-    }
-
-    if not show_secrets:
-        state = _redact_secrets(state)
-
-    return state
+    return _build_state_helper(
+        iface=iface,
+        tracker=tracker,
+        started_at=started_at,
+        target=target,
+        show_secrets=show_secrets,
+        storage_probe_path=storage_probe_path,
+        revision_info=revision_info,
+        sensitive_field_names=SENSITIVE_FIELD_NAMES,
+    )
 
 
 def _render_html(

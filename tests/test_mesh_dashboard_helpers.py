@@ -2,10 +2,17 @@ from meshdash.helpers import (
     calculate_hops,
     disk_space_info,
     emoji_from_codepoint,
+    extract_packet_battery_level,
+    extract_packet_position,
     extract_emoji_codepoint,
+    extract_position_fields,
     extract_reply_id,
     format_epoch,
+    is_sensitive_key,
+    message_to_dict,
     normalize_single_emoji,
+    redact_secrets,
+    to_jsonable,
     to_int,
 )
 
@@ -62,3 +69,90 @@ def test_disk_space_info_has_expected_shape_for_current_dir():
     assert isinstance(info, dict)
     assert "path" in info
     assert any(key in info for key in ("free_bytes", "error"))
+
+
+def test_extract_position_fields_accepts_scaled_int_coordinates():
+    coords = extract_position_fields({"latitudeI": 449000000, "longitudeI": -930000000})
+    assert coords == (44.9, -93.0)
+    assert extract_position_fields({"latitude": 0, "longitude": 0}) is None
+
+
+def test_extract_packet_position_prefers_decoded_position_payload():
+    packet = {
+        "decoded": {
+            "position": {
+                "latitude": 44.95,
+                "longitude": -93.26,
+                "altitude_m": 240,
+                "satsInView": 9,
+            }
+        }
+    }
+    assert extract_packet_position(packet) == {
+        "lat": 44.95,
+        "lon": -93.26,
+        "altitude": 240.0,
+        "sats_in_view": 9,
+    }
+
+
+def test_extract_packet_battery_level_supports_telemetry_metrics():
+    packet = {
+        "decoded": {
+            "telemetry": {
+                "deviceMetrics": {
+                    "batteryLevel": 87.4,
+                }
+            }
+        }
+    }
+    assert extract_packet_battery_level(packet) == 87
+    assert extract_packet_battery_level({"decoded": {"batteryLevel": 105}}) is None
+
+
+def test_message_to_dict_returns_none_for_non_protobuf_values():
+    assert message_to_dict({"a": 1}) is None
+    assert message_to_dict("plain text") is None
+
+
+def test_to_jsonable_converts_bytes_and_non_jsonable_types():
+    payload = {
+        "binary": b"\x01\x02",
+        "set_data": {1, 2},
+        "nested": {"value": 9},
+    }
+    out = to_jsonable(payload)
+    assert out["binary"] == "0102"
+    assert sorted(out["set_data"]) == [1, 2]
+    assert out["nested"]["value"] == 9
+
+
+def test_to_jsonable_stops_at_max_depth():
+    value = current = {}
+    for _ in range(14):
+        nxt = {}
+        current["next"] = nxt
+        current = nxt
+    out = to_jsonable(value)
+    cursor = out
+    for _ in range(13):
+        cursor = cursor["next"]
+    assert cursor == "<max-depth>"
+
+
+def test_is_sensitive_key_and_redact_secrets_mask_expected_fields():
+    names = {"password", "private_key", "psk"}
+    assert is_sensitive_key("password", names) is True
+    assert is_sensitive_key("admin_password", names) is True
+    assert is_sensitive_key("radio_private_key", names) is True
+    assert is_sensitive_key("username", names) is False
+
+    source = {
+        "username": "alice",
+        "password": "secret",
+        "nested": [{"wifi_psk": "topsecret"}, {"ok": True}],
+    }
+    redacted = redact_secrets(source, names | {"wifi_psk"})
+    assert redacted["username"] == "alice"
+    assert redacted["password"] == "<redacted>"
+    assert redacted["nested"][0]["wifi_psk"] == "<redacted>"

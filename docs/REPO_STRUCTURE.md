@@ -4,7 +4,12 @@
 
 - `mesh_dashboard.py`: main dashboard web app and API server.
 - `mesh_connection.py`: Meshtastic serial/TCP connection abstraction.
+- `meshdash/chat.py`: chat-entry and delivery-state transition helpers.
 - `meshdash/helpers.py`: extracted pure utility helpers used by runtime and tests.
+- `meshdash/nodes.py`: extracted node/interface/time utilities for dashboard runtime.
+- `meshdash/revision.py`: revision/version/git metadata helpers for header build info.
+- `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
+- `meshdash/state.py`: node/local snapshot + assembled `/api/state` payload helpers.
 - `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshtastic-dashboard.service`: systemd unit template for VM deployment.
 - `README.md`: setup, deploy loop, and operations.
