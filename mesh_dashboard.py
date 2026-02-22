@@ -2117,10 +2117,25 @@ def _render_html(
       color: #173e2b;
       font-weight: 700;
     }}
+    .chat-channel-main {{
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
     .chat-channel-name {{
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }}
+    .chat-channel-unread-from {{
+      font-size: 9px;
+      color: #486959;
+      opacity: 0.95;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
     }}
     .chat-channel-meta {{
       font-size: 9px;
@@ -3990,6 +4005,9 @@ def _render_html(
     [data-theme="dark"] .overview-item .v {{
       color: var(--ui-text) !important;
     }}
+    [data-theme="dark"] .chat-channel-unread-from {{
+      color: #a8bed2;
+    }}
     [data-theme="dark"] .chat-channel-unread {{
       color: #d8ffdf;
       background: #1f4f35;
@@ -4474,6 +4492,7 @@ def _render_html(
     let mapTileTheme = "";
     let chatUnreadCount = 0;
     const chatUnreadByChannel = {{ all: 0, direct: 0 }};
+    const chatUnreadLatestByChannel = {{ all: "", direct: "" }};
     let chatUnreadInitialized = false;
     const chatSeenMessageKeys = new Set();
     const chatSeenMessageOrder = [];
@@ -5778,6 +5797,12 @@ def _render_html(
       chatUnreadByChannel[key] = safe;
     }}
 
+    function setChatChannelUnreadLatest(channelKey, name) {{
+      const key = normalizeChatChannel(channelKey);
+      const clean = String(name || "").replace(/\\s+/g, " ").trim();
+      chatUnreadLatestByChannel[key] = clean;
+    }}
+
     function totalChatUnread() {{
       return Math.max(0, Number(chatUnreadByChannel.all || 0))
         + Math.max(0, Number(chatUnreadByChannel.direct || 0));
@@ -5809,8 +5834,11 @@ def _render_html(
       if (channelKey == null) {{
         setChatChannelUnread("all", 0);
         setChatChannelUnread("direct", 0);
+        setChatChannelUnreadLatest("all", "");
+        setChatChannelUnreadLatest("direct", "");
       }} else {{
         setChatChannelUnread(channelKey, 0);
+        setChatChannelUnreadLatest(channelKey, "");
       }}
       syncChatRailUnread();
     }}
@@ -7065,6 +7093,7 @@ def _render_html(
         .map((msg) => ({{
           key: chatMessageKey(msg),
           channel: classifyMessageChannel(msg),
+          sender: chatEndpointParts(normalizeNodeId(msg.from || "")).label || "Unknown node",
         }}))
         .filter((entry) => !!entry.key);
       if (!chatUnreadInitialized) {{
@@ -7074,24 +7103,30 @@ def _render_html(
         chatUnreadInitialized = true;
       }} else {{
         const freshByChannel = {{ all: 0, direct: 0 }};
+        const latestSenderByChannel = {{ all: "", direct: "" }};
         for (const entry of keyedMessages) {{
           if (rememberSeenChatMessage(entry.key)) {{
             const key = entry.channel === "direct" ? "direct" : "all";
             freshByChannel[key] += 1;
+            latestSenderByChannel[key] = String(entry.sender || "").trim();
           }}
         }}
         if (activeLayoutView === "chat") {{
           const otherKey = activeChatChannel === "direct" ? "all" : "direct";
           if (freshByChannel[otherKey] > 0) {{
             setChatChannelUnread(otherKey, Number(chatUnreadByChannel[otherKey] || 0) + freshByChannel[otherKey]);
+            setChatChannelUnreadLatest(otherKey, latestSenderByChannel[otherKey] || chatUnreadLatestByChannel[otherKey] || "");
           }}
           setChatChannelUnread(activeChatChannel, 0);
+          setChatChannelUnreadLatest(activeChatChannel, "");
         }} else {{
           if (freshByChannel.all > 0) {{
             setChatChannelUnread("all", Number(chatUnreadByChannel.all || 0) + freshByChannel.all);
+            setChatChannelUnreadLatest("all", latestSenderByChannel.all || chatUnreadLatestByChannel.all || "");
           }}
           if (freshByChannel.direct > 0) {{
             setChatChannelUnread("direct", Number(chatUnreadByChannel.direct || 0) + freshByChannel.direct);
+            setChatChannelUnreadLatest("direct", latestSenderByChannel.direct || chatUnreadLatestByChannel.direct || "");
           }}
         }}
       }}
@@ -7121,8 +7156,15 @@ def _render_html(
         ].map((entry) => {{
           const unread = Math.max(0, Number(chatUnreadByChannel[entry.key] || 0));
           const unreadLabel = unread > 99 ? "99+" : String(unread);
+          const unreadFrom = String(chatUnreadLatestByChannel[entry.key] || "").trim();
+          const unreadFromLine = (unread > 0 && unreadFrom)
+            ? `<span class="chat-channel-unread-from" title="Latest unread from ${{escAttr(unreadFrom)}}">new: ${{escAttr(unreadFrom)}}</span>`
+            : "";
           return `<button type="button" class="chat-channel-item${{activeChatChannel === entry.key ? " active" : ""}}" data-channel="${{entry.key}}">
-            <span class="chat-channel-name">${{entry.label}}</span>
+            <span class="chat-channel-main">
+              <span class="chat-channel-name">${{entry.label}}</span>
+              ${{unreadFromLine}}
+            </span>
             <span class="chat-channel-meta-wrap">
               <span class="chat-channel-meta">${{entry.count}}</span>
               ${{unread > 0 ? `<span class="chat-channel-unread" title="${{unread}} unread">${{unreadLabel}}</span>` : ""}}
