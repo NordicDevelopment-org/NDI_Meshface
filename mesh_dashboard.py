@@ -23,9 +23,10 @@ from meshdash.revision import (
     revision_info as _build_revision_info,
     sanitize_revision_token as _sanitize_revision_token_helper,
 )
-from meshdash.nodes import (
+from meshdash.nodes import utc_now as _utc_now_helper
+from meshdash.mesh_ops import (
     get_local_node_id as _get_local_node_id_helper,
-    utc_now as _utc_now_helper,
+    send_emoji_reaction_packet as _send_emoji_reaction_packet_helper,
 )
 from meshdash.runtime import (
     apply_default_gateway as _apply_default_gateway_helper,
@@ -112,34 +113,10 @@ def _revision_info() -> Dict[str, str]:
     )
 
 
-def _send_emoji_reaction_packet(
-    iface: Any,
-    destination_id: str,
-    channel_index: int,
-    reply_id: int,
-    emoji_codepoint: int,
-    emoji_text: str,
-    want_ack: bool = False,
-) -> Any:
-    if mesh_pb2 is None or portnums_pb2 is None:
-        raise RuntimeError("Meshtastic protobuf modules are unavailable for emoji reactions")
-    if not hasattr(iface, "_sendPacket"):
-        raise RuntimeError("Meshtastic interface does not support low-level packet send")
-
-    packet = mesh_pb2.MeshPacket()
-    packet.channel = int(channel_index)
-    packet.decoded.portnum = portnums_pb2.PortNum.TEXT_MESSAGE_APP
-    packet.decoded.reply_id = int(reply_id)
-    packet.decoded.emoji = int(emoji_codepoint)
-    packet.decoded.payload = str(emoji_text or "").encode("utf-8")
-    return iface._sendPacket(packet, destinationId=destination_id, wantAck=bool(want_ack))
-
-
 def _get_local_node_id(iface: Any) -> str:
-    broadcast_num = getattr(meshtastic, "BROADCAST_NUM", None) if meshtastic is not None else None
     return _get_local_node_id_helper(
         iface,
-        broadcast_num=broadcast_num,
+        meshtastic_module=meshtastic,
         to_jsonable_fn=_to_jsonable_helper,
         to_int_fn=_to_int,
     )
@@ -170,7 +147,11 @@ def run_dashboard(args: argparse.Namespace) -> None:
         build_node_history_loader_fn=_build_node_history_loader,
         build_online_activity_loader_fn=_build_online_activity_loader,
         send_chat_message_fn=_send_chat_message_helper,
-        send_reaction_packet_fn=_send_emoji_reaction_packet,
+        send_reaction_packet_fn=lambda **kwargs: _send_emoji_reaction_packet_helper(
+            mesh_pb2_module=mesh_pb2,
+            portnums_pb2_module=portnums_pb2,
+            **kwargs,
+        ),
         get_local_node_id_fn=_get_local_node_id,
         normalize_single_emoji_fn=_normalize_single_emoji,
         to_int_fn=_to_int,
