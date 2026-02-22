@@ -5,6 +5,7 @@
 - `mesh_dashboard.py`: main dashboard web app and API server.
 - `mesh_connection.py`: Meshtastic serial/TCP connection abstraction.
 - `meshdash/chat.py`: chat-entry and delivery-state transition helpers.
+- `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers.
 - `meshdash/cli.py`: CLI parser/bootstrap argument definitions and env default resolution.
 - `meshdash/dashboard_runtime.py`: dashboard runtime orchestration and server lifecycle.
 - `meshdash/html.py`: extracted dashboard HTML renderer and frontend template.

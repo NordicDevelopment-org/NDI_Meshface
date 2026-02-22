@@ -18,10 +18,9 @@ from meshdash.helpers import (
     to_jsonable as _to_jsonable_helper,
     to_int as _to_int,
 )
-from meshdash.revision import (
-    detect_git_commit as _detect_git_commit_helper,
-    revision_info as _build_revision_info,
-    sanitize_revision_token as _sanitize_revision_token_helper,
+from meshdash.app_meta import (
+    detect_git_commit_from_env as _detect_git_commit_from_env_helper,
+    revision_info_from_env as _revision_info_from_env_helper,
 )
 from meshdash.nodes import utc_now as _utc_now_helper
 from meshdash.mesh_ops import (
@@ -86,26 +85,20 @@ SENSITIVE_FIELD_NAMES = {
 
 
 def _detect_git_commit() -> Optional[str]:
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    cwd = os.getcwd()
-    explicit = os.environ.get("MESH_DASH_GIT_COMMIT", "")
-    return _detect_git_commit_helper(
-        explicit_commit=explicit,
-        script_dir=script_dir,
-        cwd=cwd,
+    return _detect_git_commit_from_env_helper(
+        script_file=__file__,
+        cwd=os.getcwd(),
+        explicit_commit=os.environ.get("MESH_DASH_GIT_COMMIT", ""),
         unknown_git_commit=UNKNOWN_GIT_COMMIT,
-        sanitize_token=_sanitize_revision_token_helper,
     )
 
 
 def _revision_info() -> Dict[str, str]:
-    version_raw = os.environ.get("MESH_DASH_VERSION", DEFAULT_APP_VERSION)
-    return _build_revision_info(
-        version_raw=version_raw,
+    return _revision_info_from_env_helper(
+        env_version=os.environ.get("MESH_DASH_VERSION"),
         default_version=DEFAULT_APP_VERSION,
         unknown_git_commit=UNKNOWN_GIT_COMMIT,
-        detect_commit=_detect_git_commit,
-        sanitize_token=_sanitize_revision_token_helper,
+        detect_commit_fn=_detect_git_commit,
     )
 
 
