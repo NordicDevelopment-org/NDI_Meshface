@@ -7,12 +7,14 @@
 - `meshdash/chat.py`: chat-entry and delivery-state transition helpers.
 - `meshdash/html.py`: extracted dashboard HTML renderer and frontend template.
 - `meshdash/helpers.py`: extracted pure utility helpers used by runtime and tests.
+- `meshdash/history_store.py`: extracted SQLite history persistence/rollup store.
 - `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
 - `meshdash/nodes.py`: extracted node/interface/time utilities for dashboard runtime.
 - `meshdash/revision.py`: revision/version/git metadata helpers for header build info.
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
 - `meshdash/services.py`: shared history/online loader builders, chat-send service logic, and empty payload helpers.
 - `meshdash/state.py`: node/local snapshot + assembled `/api/state` payload helpers.
+- `meshdash/tracker.py`: extracted packet/chat tracking, edge synthesis, and snapshot logic.
 - `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshtastic-dashboard.service`: systemd unit template for VM deployment.
 - `README.md`: setup, deploy loop, and operations.
