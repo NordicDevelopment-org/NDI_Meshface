@@ -4055,38 +4055,41 @@ def _render_html(
       min-height: 0;
       display: flex;
       flex-direction: column;
-      border: 1px solid #d1e2d4;
-      border-radius: 8px;
-      background: #f1f8f3;
-      padding: 4px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
     }}
     .chat-feed {{
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 0;
       width: 100%;
       min-height: 0;
       margin-top: auto;
     }}
+    .chat-feed-item:last-child {{
+      border-bottom: 0;
+    }}
     .chat-feed-item {{
       width: 100%;
       box-sizing: border-box;
-      border: 1px solid #c7dac5;
-      border-radius: 6px;
-      padding: 4px 6px;
-      background: #ecf7ef;
+      border: 0;
+      border-radius: 0;
+      border-bottom: 1px solid #d7e5d2;
+      padding: 6px 7px;
+      background: transparent;
       color: #204233;
     }}
     .chat-feed-item.chat-selectable {{
       cursor: pointer;
     }}
     .chat-feed-item.chat-selectable:hover {{
-      background: #e2f0e7;
-      border-color: #bad2c0;
+      background: #eef6f1;
     }}
     .chat-feed-item.selected-node {{
-      background: #d8efe1;
-      border-color: #99c5aa;
+      background: #e7f2eb;
+      box-shadow: inset 2px 0 0 #2f855a;
     }}
     .chat-feed-meta {{
       display: flex;
@@ -4449,16 +4452,21 @@ def _render_html(
       background: #f9fdf9;
     }}
     #chat-input:focus {{
-      outline: 2px solid #9ac5aa;
-      outline-offset: 0;
+      outline: none;
+      border-color: #9ac5aa;
       background: #ffffff;
+      box-shadow: none;
     }}
     #chat-send-btn {{
       border: 1px solid #9cc9ad;
       background: #e3f4ea;
       color: #184a32;
       border-radius: 8px;
-      padding: 6px 12px;
+      height: 27px;
+      padding: 0 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-size: 11px;
       font-weight: 600;
       cursor: pointer;
@@ -4476,7 +4484,11 @@ def _render_html(
       background: #f1f9f4;
       color: #184a32;
       border-radius: 8px;
-      padding: 6px 8px;
+      height: 27px;
+      padding: 0 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-size: 13px;
       line-height: 1;
       cursor: pointer;
@@ -5352,17 +5364,21 @@ def _render_html(
       background: #070d07;
     }}
     [data-theme="dark"] .card.chat .chat-log-scroll {{
-      background: #070d07;
-      border-color: var(--ui-border);
+      background: transparent;
+      border: 0;
     }}
     [data-theme="dark"] .card.chat .chat-feed-item {{
-      background: #1b2430;
-      border-color: #2f3b4b;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid #2f3b4b;
+      border-radius: 0;
       color: var(--ui-text);
     }}
+    [data-theme="dark"] .card.chat .chat-feed-item:last-child {{
+      border-bottom: 0;
+    }}
     [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable:hover {{
-      background: #253140;
-      border-color: #43556b;
+      background: #1f2d3a;
     }}
     [data-theme="dark"] .card.chat .chat-compose-shell {{
       background: #101a24;
@@ -5549,7 +5565,6 @@ def _render_html(
     }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
       background: #1b313f;
-      border-color: #446381 !important;
       box-shadow: inset 2px 0 0 var(--ui-accent);
     }}
     [data-theme="dark"] .chat-member-item.selected-node {{
@@ -5687,6 +5702,12 @@ def _render_html(
     [data-theme="dark"] .leaflet-popup-tip {{
       background: #1b2430;
       color: var(--ui-text);
+    }}
+    [data-theme="dark"] #chat-input:focus {{
+      outline: none;
+      border-color: #3f5b73;
+      background: #101a24;
+      box-shadow: none;
     }}
     [data-theme="dark"] a {{
       color: var(--ui-link);
