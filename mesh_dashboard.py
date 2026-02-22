@@ -3,6 +3,7 @@ import json
 import os
 import socket
 import sqlite3
+import subprocess
 import threading
 import time
 from collections import Counter, deque
@@ -16,6 +17,10 @@ try:
 except Exception:
     meshtastic = None
 from mesh_connection import add_mesh_connection_args, mesh_target_label, open_mesh_interface
+try:
+    from meshdash import __version__ as _package_version
+except Exception:
+    _package_version = "0.0.0"
 from meshdash.helpers import (
     calculate_hops as _calculate_hops,
     disk_space_info as _disk_space_info,
@@ -64,6 +69,8 @@ DEFAULT_NODE_HISTORY_HOURS = 72
 DEFAULT_NODE_HISTORY_MAX_POINTS = 1440
 DEFAULT_CHAT_MAX_BYTES = 220
 MIN_REAL_LINK_COUNT = 2
+DEFAULT_APP_VERSION = _package_version or "0.1.0"
+UNKNOWN_GIT_COMMIT = "nogit"
 
 SENSITIVE_FIELD_NAMES = {
     "private_key",
@@ -77,6 +84,62 @@ SENSITIVE_FIELD_NAMES = {
 
 def _utc_now() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+
+
+def _sanitize_revision_token(raw: Any, fallback: str) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return fallback
+    safe = "".join(ch for ch in text if ch.isalnum() or ch in ("-", "_", ".", "+"))
+    return safe or fallback
+
+
+def _detect_git_commit() -> Optional[str]:
+    explicit = str(os.environ.get("MESH_DASH_GIT_COMMIT", "")).strip()
+    if explicit:
+        return _sanitize_revision_token(explicit, UNKNOWN_GIT_COMMIT)
+
+    search_roots: list[str] = []
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cwd = os.getcwd()
+    for root in (script_dir, cwd):
+        if root and root not in search_roots:
+            search_roots.append(root)
+
+    for root in search_roots:
+        try:
+            proc = subprocess.run(
+                ["git", "-C", root, "rev-parse", "--short=12", "HEAD"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=1.0,
+            )
+        except Exception:
+            continue
+        if proc.returncode == 0:
+            commit = _sanitize_revision_token(proc.stdout, "")
+            if commit:
+                return commit
+    return None
+
+
+def _revision_info() -> Dict[str, str]:
+    version_raw = os.environ.get("MESH_DASH_VERSION", DEFAULT_APP_VERSION)
+    version = _sanitize_revision_token(version_raw, "0.0.0")
+    if version.lower().startswith("v"):
+        version = version[1:] or "0.0.0"
+
+    commit = _detect_git_commit() or UNKNOWN_GIT_COMMIT
+    label = f"Rev: v{version} ({commit})"
+    title = f"Dashboard revision: version {version}, commit {commit}"
+
+    return {
+        "version": version,
+        "commit": commit,
+        "label": label,
+        "title": title,
+    }
 
 
 def _send_emoji_reaction_packet(
@@ -1597,6 +1660,7 @@ def _build_state(
     target: str,
     show_secrets: bool,
     storage_probe_path: Optional[str],
+    revision_info: Dict[str, str],
 ) -> Dict[str, Any]:
     nodes = _collect_nodes(iface)
     tracker_data = tracker.snapshot(nodes["by_id"])
@@ -1641,6 +1705,7 @@ def _build_state(
             "recent_packet_buffer": len(tracker_data["recent_packets"]),
             "modem_preset": modem_preset,
             "disk": _disk_space_info(storage_probe_path),
+            "revision": revision_info,
         },
         "my_info": my_info,
         "metadata": metadata,
@@ -1671,6 +1736,8 @@ def _render_html(
     history_retention_days: int,
     node_history_hours: int,
     node_history_max_points: int,
+    revision_label: str,
+    revision_title: str,
 ) -> str:
     safety_label = "Secrets visible" if show_secrets else "Secrets redacted"
     history_label = "History: off"
@@ -2563,7 +2630,7 @@ def _render_html(
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      margin-left: 2px;
+      margin-left: auto;
       padding: 2px 7px;
       border-radius: 999px;
       border: 1px solid rgba(226, 248, 233, 0.35);
@@ -2593,6 +2660,11 @@ def _render_html(
     }}
     .disk-fill.danger {{
       background: #ff7676;
+    }}
+    .topbar .sub .revision-text {{
+      color: #e7fff0;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      letter-spacing: 0.1px;
     }}
     .warn {{ color: var(--danger); font-weight: 600; }}
     .console .body {{
@@ -2680,7 +2752,7 @@ def _render_html(
   <div class="topbar">
     <h1>Meshtastic Deep Dashboard</h1>
     <div class="sub">
-      <span class="sub-text">Live node, traffic, config, and packet views.</span>
+      <span id="revision-text" class="sub-text revision-text" title="{revision_title}">{revision_label}</span>
       <span class="pill">{safety_label}</span>
       <span class="pill">Packet buffer: {packet_limit}</span>
       <span class="pill">{history_label}</span>
@@ -4163,6 +4235,25 @@ def _render_html(
         err.textContent = state.local_state_error ? `  Local state error: ${{state.local_state_error}}` : "";
       }}
 
+      const revision = s.revision || {{}};
+      const revisionText = document.getElementById("revision-text");
+      if (revisionText) {{
+        const fallbackLabel = String(revision.label || "").trim();
+        const version = String(revision.version || "").trim();
+        const commit = String(revision.commit || "").trim();
+        if (fallbackLabel) {{
+          revisionText.textContent = fallbackLabel;
+        }} else if (version || commit) {{
+          const versionText = version ? `v${{version}}` : "unknown";
+          const commitText = commit || "nogit";
+          revisionText.textContent = `Rev: ${{versionText}} (${{commitText}})`;
+        }}
+        const title = String(revision.title || "").trim();
+        if (title) {{
+          revisionText.title = title;
+        }}
+      }}
+
       const disk = s.disk || {{}};
       const diskLabel = document.getElementById("disk-label");
       const diskFill = document.getElementById("disk-fill");
@@ -5126,6 +5217,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
     if not tracker.has_recent_packets():
         _seed_tracker_from_node_db(tracker, iface)
     started_at = time.time()
+    revision_info = _revision_info()
 
     def state_fn() -> Dict[str, Any]:
         return _build_state(
@@ -5135,6 +5227,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
             target=target,
             show_secrets=args.show_secrets,
             storage_probe_path=history_db_path,
+            revision_info=revision_info,
         )
 
     def node_history_fn(
@@ -5252,6 +5345,8 @@ def run_dashboard(args: argparse.Namespace) -> None:
         history_retention_days=args.history_retention_days,
         node_history_hours=args.node_history_hours,
         node_history_max_points=args.node_history_max_points,
+        revision_label=revision_info["label"],
+        revision_title=revision_info["title"],
     )
     handler_cls = _make_http_handler(
         html,
@@ -5275,6 +5370,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
         print(f"Open: http://{args.http_host}:{bound_port}")
     if not args.show_secrets:
         print("Secrets are redacted. Use --show-secrets to display full values.")
+    print(f"Revision: v{revision_info['version']} ({revision_info['commit']})")
     if history_store is not None:
         print(
             f"History DB: {history_db_path} "
