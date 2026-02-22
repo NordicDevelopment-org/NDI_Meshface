@@ -2266,25 +2266,19 @@ def _render_html(
     .layout.view-chat {{
       grid-template-rows:
         auto
-        minmax(240px, var(--split-top-px))
-        var(--splitter-size)
-        minmax(200px, var(--split-mid-px))
-        var(--splitter-size)
-        minmax(220px, var(--split-low-px));
+        minmax(280px, var(--split-top-px));
     }}
     .layout.view-chat .chat {{ grid-row: 2; }}
-    .layout.view-chat .map {{ grid-row: 4; }}
-    .layout.view-chat .map-data {{ grid-row: 6; }}
+    .layout.view-chat .map,
+    .layout.view-chat .map-data,
     .layout.view-chat .nodes,
     .layout.view-chat .packets,
     .layout.view-chat .raw,
     .layout.view-chat .console,
     .layout.view-chat .splitter,
-    .layout.view-chat .hsplitter[data-target="low"] {{
+    .layout.view-chat .hsplitter {{
       display: none !important;
     }}
-    .layout.view-chat .hsplitter[data-target="top"] {{ grid-row: 3; }}
-    .layout.view-chat .hsplitter[data-target="mid"] {{ grid-row: 5; }}
 
     .layout.view-network {{
       grid-template-rows:
