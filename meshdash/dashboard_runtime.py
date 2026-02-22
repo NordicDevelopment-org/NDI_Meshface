@@ -4,6 +4,12 @@ import time
 from http.server import ThreadingHTTPServer
 from typing import Any, Callable, Optional
 
+from .runtime_lifecycle import (
+    close_runtime_resources,
+    emit_startup_status,
+    serve_until_stopped,
+)
+
 
 def run_dashboard_runtime(
     args: Any,
@@ -127,37 +133,26 @@ def run_dashboard_runtime(
     server = threading_http_server_cls((args.http_host, args.http_port), handler_cls)
     bound_host, bound_port = server.server_address[:2]
 
-    print("Dashboard server running.")
-    print(f"Bound to: {bound_host}:{bound_port}")
-    if args.http_host in ("0.0.0.0", "::"):
-        print(f"Open from this computer: http://127.0.0.1:{bound_port}")
-        lan_ip = guess_lan_ipv4_fn()
-        if lan_ip:
-            print(f"Open from Wi-Fi devices: http://{lan_ip}:{bound_port}")
-        else:
-            print(f"Open from Wi-Fi devices: http://<this-computer-ip>:{bound_port}")
-    else:
-        print(f"Open: http://{args.http_host}:{bound_port}")
-    if not args.show_secrets:
-        print("Secrets are redacted. Use --show-secrets to display full values.")
-    print(f"Revision: v{revision_info['version']} ({revision_info['commit']})")
-    if history_store is not None:
-        print(
-            f"History DB: {history_db_path} "
-            f"(retention {args.history_retention_days}d, max {args.history_max_rows} rows; "
-            f"events {args.history_event_retention_days}d/{args.history_event_max_rows} rows; "
-            f"rollups {args.history_rollup_retention_days}d)"
-        )
-    else:
-        print("History DB: disabled")
-    print("Press Ctrl+C to stop.")
-
+    emit_startup_status(
+        http_host=args.http_host,
+        bound_host=bound_host,
+        bound_port=bound_port,
+        show_secrets=args.show_secrets,
+        revision_info=revision_info,
+        history_enabled=history_store is not None,
+        history_db_path=history_db_path,
+        history_retention_days=args.history_retention_days,
+        history_max_rows=args.history_max_rows,
+        history_event_retention_days=args.history_event_retention_days,
+        history_event_max_rows=args.history_event_max_rows,
+        history_rollup_retention_days=args.history_rollup_retention_days,
+        guess_lan_ipv4_fn=guess_lan_ipv4_fn,
+    )
     try:
-        server.serve_forever(poll_interval=0.5)
-    except KeyboardInterrupt:
-        print("Stopping dashboard...")
+        serve_until_stopped(server, poll_interval=0.5)
     finally:
-        server.server_close()
-        iface.close()
-        if history_store is not None:
-            history_store.close()
+        close_runtime_resources(
+            server=server,
+            iface=iface,
+            history_store=history_store,
+        )

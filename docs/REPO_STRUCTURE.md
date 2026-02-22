@@ -19,6 +19,7 @@
 - `meshdash/nodes.py`: extracted node/interface/time utilities for dashboard runtime.
 - `meshdash/revision.py`: revision/version/git metadata helpers for header build info.
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
+- `meshdash/runtime_lifecycle.py`: startup status output, serve-loop interrupt handling, and shutdown cleanup helpers.
 - `meshdash/services.py`: shared history/online loader builders, chat-send service logic, and empty payload helpers.
 - `meshdash/state.py`: node/local snapshot + assembled `/api/state` payload helpers.
 - `meshdash/tracker.py`: extracted packet/chat tracking, edge synthesis, snapshots, and seed-from-node-db helper.
