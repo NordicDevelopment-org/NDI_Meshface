@@ -2863,7 +2863,7 @@ def _render_html(
     }}
     .chat-emoji-panel {{
       position: absolute;
-      right: 0;
+      right: 58px;
       bottom: calc(100% + 6px);
       width: min(320px, 92%);
       border: 1px solid #c9dbcc;
@@ -3228,7 +3228,6 @@ def _render_html(
                   <span id="chat-reply-label" class="chat-reply-label"></span>
                   <button id="chat-reply-clear-btn" class="chat-reply-clear-btn" type="button" title="Cancel reply" aria-label="Cancel reply">&times;</button>
                 </div>
-                <button id="chat-emoji-btn" type="button" title="Insert emoji" aria-label="Insert emoji" aria-expanded="false">🙂</button>
               </div>
               <div class="chat-composer-input-row">
                 <input
@@ -3238,6 +3237,7 @@ def _render_html(
                   placeholder="Message the room (^all)..."
                   autocomplete="off"
                 />
+                <button id="chat-emoji-btn" type="button" title="Insert emoji" aria-label="Insert emoji" aria-expanded="false">🙂</button>
                 <button id="chat-send-btn" type="button">Send</button>
               </div>
               <div id="chat-emoji-panel" class="chat-emoji-panel" hidden></div>
