@@ -66,6 +66,10 @@ from meshdash.state import (
     collect_local_state as _collect_local_state_helper,
     collect_nodes as _collect_nodes_helper,
 )
+from meshdash.services import (
+    build_node_history_loader as _build_node_history_loader,
+    build_online_activity_loader as _build_online_activity_loader,
+)
 from meshdash.html import render_html as _render_html_helper
 from meshdash.http_api import make_http_handler as _make_http_handler_helper
 try:
@@ -2103,57 +2107,15 @@ def run_dashboard(args: argparse.Namespace) -> None:
             revision_info=revision_info,
         )
 
-    def node_history_fn(
-        node_id: str,
-        hours_override: Optional[int] = None,
-        points_override: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        clean_node_id = str(node_id or "").strip()
-        if history_store is None:
-            return {"node_id": clean_node_id, "points": [], "positions": [], "summary": {}}
-        hours = hours_override if isinstance(hours_override, int) and hours_override > 0 else args.node_history_hours
-        points = (
-            points_override
-            if isinstance(points_override, int) and points_override > 0
-            else args.node_history_max_points
-        )
-        return history_store.load_node_history(
-            node_id=clean_node_id,
-            window_hours=hours,
-            max_points=points,
-        )
-
-    def online_activity_fn(hours_override: Optional[int] = None) -> Dict[str, Any]:
-        hours = hours_override if isinstance(hours_override, int) and hours_override > 0 else args.node_history_hours
-        if history_store is None:
-            return {
-                "window_hours": hours,
-                "timezone": "local",
-                "timezone_label": "local",
-                "points": [],
-                "hourly_profile": [
-                    {
-                        "hour": hour,
-                        "label": f"{hour:02d}:00",
-                        "avg_online_nodes": None,
-                        "sample_hours": 0,
-                        "peak_online_nodes": 0,
-                    }
-                    for hour in range(24)
-                ],
-                "summary": {
-                    "sample_hours": 0,
-                    "distinct_nodes": 0,
-                    "max_online_nodes": 0,
-                    "avg_online_nodes": None,
-                    "best_hour": None,
-                    "best_hour_label": None,
-                    "best_hour_avg_online_nodes": None,
-                    "window_start": None,
-                    "window_end": None,
-                },
-            }
-        return history_store.load_online_activity(window_hours=hours)
+    node_history_fn = _build_node_history_loader(
+        history_store=history_store,
+        default_hours=args.node_history_hours,
+        default_points=args.node_history_max_points,
+    )
+    online_activity_fn = _build_online_activity_loader(
+        history_store=history_store,
+        default_hours=args.node_history_hours,
+    )
 
     def send_chat_fn(
         text: Any,

@@ -4,6 +4,7 @@ from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, urlparse
 
 from .helpers import to_int
+from .services import empty_node_history, empty_online_activity
 
 
 def make_http_handler(
@@ -46,7 +47,7 @@ def make_http_handler(
                     hours_override = to_int_fn(query.get("hours", [""])[0])
                     points_override = to_int_fn(query.get("points", [""])[0])
                     if node_history_fn is None:
-                        response_obj = {"node_id": node_id, "points": [], "positions": [], "summary": {}}
+                        response_obj = empty_node_history(node_id)
                     else:
                         response_obj = node_history_fn(node_id, hours_override, points_override)
                     payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
@@ -67,33 +68,7 @@ def make_http_handler(
                             if isinstance(hours_override, int) and hours_override > 0
                             else default_node_history_hours
                         )
-                        response_obj = {
-                            "window_hours": clean_hours,
-                            "timezone": "local",
-                            "timezone_label": "local",
-                            "points": [],
-                            "hourly_profile": [
-                                {
-                                    "hour": hour,
-                                    "label": f"{hour:02d}:00",
-                                    "avg_online_nodes": None,
-                                    "sample_hours": 0,
-                                    "peak_online_nodes": 0,
-                                }
-                                for hour in range(24)
-                            ],
-                            "summary": {
-                                "sample_hours": 0,
-                                "distinct_nodes": 0,
-                                "max_online_nodes": 0,
-                                "avg_online_nodes": None,
-                                "best_hour": None,
-                                "best_hour_label": None,
-                                "best_hour_avg_online_nodes": None,
-                                "window_start": None,
-                                "window_end": None,
-                            },
-                        }
+                        response_obj = empty_online_activity(clean_hours)
                     else:
                         response_obj = online_activity_fn(hours_override)
                     payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
