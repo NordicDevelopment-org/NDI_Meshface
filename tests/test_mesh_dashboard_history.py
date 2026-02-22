@@ -161,3 +161,69 @@ def test_tracker_extracts_packet_position_and_persists_trail(tmp_path):
         assert history["summary"]["trail_points"] == 1
     finally:
         store.close()
+
+
+def test_load_node_capabilities_returns_last_known_values(tmp_path):
+    store = _new_history_store(str(tmp_path / "capabilities_history.sqlite3"))
+    try:
+        now = int(time.time())
+        packet = _packet_entry("!nodecafe", now - 90)
+        packet["summary"]["hops"] = 3
+        packet["summary"]["battery_level"] = 81
+        packet["summary"]["position"] = {
+            "lat": 44.9801,
+            "lon": -93.2555,
+        }
+        store.save_packet(packet)
+
+        caps = store.load_node_capabilities()
+        assert "!nodecafe" in caps
+        node = caps["!nodecafe"]
+        assert node["has_position"] is True
+        assert node["last_hops"] == 3
+        assert node["battery_level"] == 81
+        assert node["last_seen_unix"] == now - 90
+        assert node["last_position_unix"] == now - 90
+        assert node["battery_updated_unix"] == now - 90
+    finally:
+        store.close()
+
+
+def test_tracker_extracts_battery_into_node_capabilities(tmp_path):
+    store = _new_history_store(str(tmp_path / "tracker_battery_history.sqlite3"))
+    tracker = md.DashboardTracker(packet_limit=32, history_store=store)
+    iface = types.SimpleNamespace(nodesByNum={})
+    try:
+        now = int(time.time())
+        packet = {
+            "id": now,
+            "fromId": "!nodebatt",
+            "toId": "^all",
+            "rxTime": now,
+            "rxSnr": 4.5,
+            "rxRssi": -101,
+            "hopStart": 5,
+            "hopLimit": 3,
+            "decoded": {
+                "portnum": "TELEMETRY_APP",
+                "telemetry": {
+                    "deviceMetrics": {
+                        "batteryLevel": 77,
+                    },
+                },
+                "position": {
+                    "latitudeI": 449706726,
+                    "longitudeI": -932659313,
+                },
+            },
+        }
+        tracker.on_receive(packet, iface)
+
+        caps = store.load_node_capabilities()
+        assert "!nodebatt" in caps
+        node = caps["!nodebatt"]
+        assert node["has_position"] is True
+        assert node["last_hops"] == 2
+        assert node["battery_level"] == 77
+    finally:
+        store.close()

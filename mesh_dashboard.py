@@ -390,6 +390,49 @@ def _extract_packet_position(packet: Dict[str, Any]) -> Optional[Dict[str, Any]]
     return None
 
 
+def _extract_packet_battery_level(packet: Dict[str, Any]) -> Optional[int]:
+    if not isinstance(packet, dict):
+        return None
+
+    candidates: list[Dict[str, Any]] = []
+    decoded = packet.get("decoded")
+    if isinstance(decoded, dict):
+        telemetry = decoded.get("telemetry")
+        if isinstance(telemetry, dict):
+            candidates.append(telemetry)
+            metrics = telemetry.get("deviceMetrics") or telemetry.get("device_metrics")
+            if isinstance(metrics, dict):
+                candidates.append(metrics)
+        metrics = decoded.get("deviceMetrics") or decoded.get("device_metrics") or decoded.get("metrics")
+        if isinstance(metrics, dict):
+            candidates.append(metrics)
+        candidates.append(decoded)
+
+    telemetry = packet.get("telemetry")
+    if isinstance(telemetry, dict):
+        candidates.append(telemetry)
+        metrics = telemetry.get("deviceMetrics") or telemetry.get("device_metrics")
+        if isinstance(metrics, dict):
+            candidates.append(metrics)
+    metrics = packet.get("deviceMetrics") or packet.get("device_metrics") or packet.get("metrics")
+    if isinstance(metrics, dict):
+        candidates.append(metrics)
+    candidates.append(packet)
+
+    for candidate in candidates:
+        for key in ("batteryLevel", "battery_level", "batteryPercent", "battery_percent", "battery"):
+            raw = candidate.get(key)
+            if raw is None:
+                continue
+            level_f = _to_float(raw)
+            if level_f is None:
+                continue
+            level = int(round(level_f))
+            if 0 <= level <= 100:
+                return level
+    return None
+
+
 def _safe_nodes_items(iface: Any) -> list[Tuple[Any, Any]]:
     for _ in range(3):
         try:
@@ -430,6 +473,7 @@ class HistoryStore:
         with self._lock:
             self._init_schema_unlocked()
             self._prune_unlocked()
+            self._maybe_backfill_node_capabilities_unlocked()
             self._conn.commit()
 
     def _init_schema_unlocked(self) -> None:
@@ -504,6 +548,19 @@ class HistoryStore:
         )
         self._conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS node_capabilities (
+              node_id TEXT PRIMARY KEY,
+              last_seen_unix INTEGER NOT NULL,
+              has_position INTEGER NOT NULL DEFAULT 0,
+              last_position_unix INTEGER,
+              last_hops INTEGER,
+              battery_level INTEGER,
+              battery_updated_unix INTEGER
+            )
+            """
+        )
+        self._conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS node_metrics_1m (
               bucket_unix INTEGER NOT NULL,
               node_id TEXT NOT NULL,
@@ -563,11 +620,101 @@ class HistoryStore:
             "CREATE INDEX IF NOT EXISTS idx_node_positions_node_id_created_unix ON node_positions(node_id, created_unix)"
         )
         self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_node_capabilities_last_seen_unix ON node_capabilities(last_seen_unix)"
+        )
+        self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_node_metrics_1m_last_seen_unix ON node_metrics_1m(last_seen_unix)"
         )
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_link_metrics_1m_last_seen_unix ON link_metrics_1m(last_seen_unix)"
         )
+
+    def _maybe_backfill_node_capabilities_unlocked(self) -> None:
+        existing = self._conn.execute("SELECT COUNT(*) FROM node_capabilities").fetchone()
+        if existing and int(existing[0] or 0) > 0:
+            return
+
+        merged: Dict[str, Dict[str, Any]] = {}
+
+        metric_rows = self._conn.execute(
+            """
+            SELECT node_id, MAX(last_seen_unix)
+            FROM node_metrics_1m
+            GROUP BY node_id
+            """
+        ).fetchall()
+        for node_id, last_seen_unix in metric_rows:
+            clean_node_id = str(node_id or "").strip()
+            seen = _to_int(last_seen_unix)
+            if not clean_node_id or seen is None:
+                continue
+            merged.setdefault(clean_node_id, {})
+            merged[clean_node_id]["last_seen_unix"] = seen
+
+        position_rows = self._conn.execute(
+            """
+            SELECT node_id, MAX(created_unix)
+            FROM node_positions
+            GROUP BY node_id
+            """
+        ).fetchall()
+        for node_id, last_position_unix in position_rows:
+            clean_node_id = str(node_id or "").strip()
+            pos_unix = _to_int(last_position_unix)
+            if not clean_node_id or pos_unix is None:
+                continue
+            node = merged.setdefault(clean_node_id, {})
+            node["has_position"] = True
+            node["last_position_unix"] = pos_unix
+            node["last_seen_unix"] = max(_to_int(node.get("last_seen_unix")) or pos_unix, pos_unix)
+
+        hop_rows = self._conn.execute(
+            """
+            SELECT events.from_id, events.hops, events.created_unix
+            FROM packet_events AS events
+            JOIN (
+              SELECT from_id, MAX(id) AS max_id
+              FROM packet_events
+              WHERE from_id IS NOT NULL AND hops IS NOT NULL
+              GROUP BY from_id
+            ) AS latest
+              ON latest.from_id = events.from_id AND latest.max_id = events.id
+            """
+        ).fetchall()
+        for node_id, last_hops, hop_seen_unix in hop_rows:
+            clean_node_id = str(node_id or "").strip()
+            hops = _to_int(last_hops)
+            seen = _to_int(hop_seen_unix)
+            if not clean_node_id:
+                continue
+            node = merged.setdefault(clean_node_id, {})
+            if hops is not None and hops >= 0:
+                node["last_hops"] = hops
+            if seen is not None:
+                node["last_seen_unix"] = max(_to_int(node.get("last_seen_unix")) or seen, seen)
+
+        for node_id, values in merged.items():
+            seen = _to_int(values.get("last_seen_unix"))
+            if seen is None or seen <= 0:
+                continue
+            has_position = 1 if values.get("has_position") else 0
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO node_capabilities(
+                  node_id, last_seen_unix, has_position, last_position_unix,
+                  last_hops, battery_level, battery_updated_unix
+                ) VALUES(?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    node_id,
+                    seen,
+                    has_position,
+                    _to_int(values.get("last_position_unix")),
+                    _to_int(values.get("last_hops")),
+                    None,
+                    None,
+                ),
+            )
 
     def close(self) -> None:
         with self._lock:
@@ -583,6 +730,7 @@ class HistoryStore:
             event_cutoff = int(time.time()) - self.event_retention_seconds
             self._conn.execute("DELETE FROM packet_events WHERE created_unix < ?", (event_cutoff,))
             self._conn.execute("DELETE FROM node_positions WHERE created_unix < ?", (event_cutoff,))
+            self._conn.execute("DELETE FROM node_capabilities WHERE last_seen_unix < ?", (event_cutoff,))
         if self.rollup_retention_seconds > 0:
             rollup_cutoff = int(time.time()) - self.rollup_retention_seconds
             self._conn.execute("DELETE FROM node_metrics_1m WHERE last_seen_unix < ?", (rollup_cutoff,))
@@ -992,6 +1140,43 @@ class HistoryStore:
             }
         return out
 
+    def load_node_capabilities(self) -> Dict[str, Dict[str, Any]]:
+        out: Dict[str, Dict[str, Any]] = {}
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT node_id, last_seen_unix, has_position, last_position_unix,
+                       last_hops, battery_level, battery_updated_unix
+                FROM node_capabilities
+                ORDER BY last_seen_unix DESC
+                """
+            ).fetchall()
+
+        for (
+            node_id,
+            last_seen_unix,
+            has_position,
+            last_position_unix,
+            last_hops,
+            battery_level,
+            battery_updated_unix,
+        ) in rows:
+            clean_node_id = str(node_id or "").strip()
+            if not clean_node_id:
+                continue
+            out[clean_node_id] = {
+                "last_seen_unix": _to_int(last_seen_unix),
+                "last_seen": _format_epoch(last_seen_unix),
+                "has_position": bool(_to_int(has_position)),
+                "last_position_unix": _to_int(last_position_unix),
+                "last_position_time": _format_epoch(last_position_unix),
+                "last_hops": _to_int(last_hops),
+                "battery_level": _to_int(battery_level),
+                "battery_updated_unix": _to_int(battery_updated_unix),
+                "battery_updated_time": _format_epoch(battery_updated_unix),
+            }
+        return out
+
     def save_connection_event(
         self,
         from_id: str,
@@ -1171,6 +1356,90 @@ class HistoryStore:
                 coords[1],
                 altitude,
                 sats if sats is not None and sats >= 0 else None,
+            ),
+        )
+
+    def _upsert_node_capability_unlocked(
+        self,
+        node_id: str,
+        event_unix: int,
+        has_position: bool,
+        last_hops: Optional[int],
+        battery_level: Optional[int],
+    ) -> None:
+        clean_hops = last_hops if isinstance(last_hops, int) and last_hops >= 0 else None
+        clean_battery = battery_level if isinstance(battery_level, int) and 0 <= battery_level <= 100 else None
+
+        row = self._conn.execute(
+            """
+            SELECT last_seen_unix, has_position, last_position_unix,
+                   last_hops, battery_level, battery_updated_unix
+            FROM node_capabilities
+            WHERE node_id = ?
+            """,
+            (node_id,),
+        ).fetchone()
+
+        if row is None:
+            self._conn.execute(
+                """
+                INSERT INTO node_capabilities(
+                  node_id, last_seen_unix, has_position, last_position_unix,
+                  last_hops, battery_level, battery_updated_unix
+                ) VALUES(?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    node_id,
+                    event_unix,
+                    1 if has_position else 0,
+                    event_unix if has_position else None,
+                    clean_hops,
+                    clean_battery,
+                    event_unix if clean_battery is not None else None,
+                ),
+            )
+            return
+
+        (
+            last_seen_unix,
+            row_has_position,
+            row_last_position_unix,
+            row_last_hops,
+            row_battery_level,
+            row_battery_updated_unix,
+        ) = row
+        merged_last_seen = max(_to_int(last_seen_unix) or event_unix, event_unix)
+        merged_has_position = bool(_to_int(row_has_position)) or has_position
+        merged_last_position_unix = _to_int(row_last_position_unix)
+        if has_position:
+            merged_last_position_unix = event_unix
+
+        merged_last_hops = clean_hops if clean_hops is not None else _to_int(row_last_hops)
+        merged_battery_level = _to_int(row_battery_level)
+        merged_battery_updated_unix = _to_int(row_battery_updated_unix)
+        if clean_battery is not None:
+            merged_battery_level = clean_battery
+            merged_battery_updated_unix = event_unix
+
+        self._conn.execute(
+            """
+            UPDATE node_capabilities
+            SET last_seen_unix = ?,
+                has_position = ?,
+                last_position_unix = ?,
+                last_hops = ?,
+                battery_level = ?,
+                battery_updated_unix = ?
+            WHERE node_id = ?
+            """,
+            (
+                merged_last_seen,
+                1 if merged_has_position else 0,
+                merged_last_position_unix,
+                merged_last_hops,
+                merged_battery_level,
+                merged_battery_updated_unix,
+                node_id,
             ),
         )
 
@@ -1449,6 +1718,7 @@ class HistoryStore:
         priority = str(priority_raw) if priority_raw is not None else None
         want_ack = 1 if summary.get("want_ack") else 0
         position_data = summary.get("position")
+        battery_level = _to_int(summary.get("battery_level"))
 
         self._conn.execute(
             """
@@ -1489,6 +1759,13 @@ class HistoryStore:
                 node_id=from_id,
                 event_unix=event_unix,
                 position_data=position_data,
+            )
+            self._upsert_node_capability_unlocked(
+                node_id=from_id,
+                event_unix=event_unix,
+                has_position=_extract_position_fields(position_data) is not None,
+                last_hops=hops,
+                battery_level=battery_level,
             )
         if from_id and to_id and from_id != to_id:
             self._upsert_link_metric_unlocked(
@@ -1573,6 +1850,11 @@ class DashboardTracker:
         if self._history_store is None:
             return {}
         return self._history_store.load_node_saved_counts()
+
+    def load_node_capabilities(self) -> Dict[str, Dict[str, Any]]:
+        if self._history_store is None:
+            return {}
+        return self._history_store.load_node_capabilities()
 
     def _chat_message_id(self, entry: Any) -> Optional[int]:
         if not isinstance(entry, dict):
@@ -1765,6 +2047,7 @@ class DashboardTracker:
         portnum = decoded.get("portnum") if isinstance(decoded, dict) else None
         packet_id = _to_int(packet.get("id"))
         packet_position = _extract_packet_position(packet)
+        packet_battery = _extract_packet_battery_level(packet)
         reply_id = _extract_reply_id(decoded)
         emoji_codepoint = _extract_emoji_codepoint(decoded)
         emoji_glyph = _emoji_from_codepoint(emoji_codepoint)
@@ -1878,6 +2161,8 @@ class DashboardTracker:
         }
         if packet_position is not None:
             packet_summary["position"] = packet_position
+        if packet_battery is not None:
+            packet_summary["battery_level"] = packet_battery
 
         packet_entry = {
             "summary": packet_summary,
@@ -2119,6 +2404,7 @@ def _build_state(
     nodes = _collect_nodes(iface)
     tracker_data = tracker.snapshot(nodes["by_id"])
     node_saved_counts = tracker.load_node_saved_counts()
+    node_capabilities = tracker.load_node_capabilities()
     for row in nodes["rows"]:
         stats = node_saved_counts.get(str(row.get("id") or ""), {})
         row["saved_packets"] = int(stats.get("saved_packets") or 0)
@@ -2166,6 +2452,7 @@ def _build_state(
         "local_state": local_state,
         "local_state_error": local_error,
         "nodes": nodes["rows"],
+        "history_caps": node_capabilities,
         "nodes_full": nodes["full"],
         "traffic": {
             "edges": tracker_data["edges"],
@@ -2468,6 +2755,36 @@ def _render_html(
     .chat-left-panel .chat-member-list {{
       padding: 6px;
       flex: 1 1 auto;
+    }}
+    .list-search-input {{
+      width: 100%;
+      border: 1px solid #c2d8c7;
+      border-radius: 7px;
+      padding: 5px 7px;
+      font-size: 11px;
+      color: #183223;
+      background: #f9fdf9;
+    }}
+    .list-search-input:focus {{
+      outline: 2px solid #9ac5aa;
+      outline-offset: 0;
+      background: #ffffff;
+    }}
+    .chat-user-search-wrap {{
+      padding: 2px 6px 0 6px;
+    }}
+    .nodes-search-wrap {{
+      padding: 0 0 2px 0;
+    }}
+    .chat-member-empty {{
+      border: 1px dashed #d2e2d4;
+      border-radius: 8px;
+      padding: 9px;
+      font-size: 11px;
+      color: #5d7566;
+      background: #f8fcf8;
+      line-height: 1.3;
+      margin: 2px 4px 0 4px;
     }}
     .layout {{
       --split-left-pct: 64%;
@@ -4540,6 +4857,24 @@ def _render_html(
       outline-color: var(--ui-accent);
       box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.2);
     }}
+    [data-theme="dark"] .list-search-input {{
+      background: #07140d;
+      border-color: #2b8a59;
+      color: #c6ffdb;
+    }}
+    [data-theme="dark"] .list-search-input::placeholder {{
+      color: var(--ui-text-soft);
+      opacity: 0.9;
+    }}
+    [data-theme="dark"] .list-search-input:focus {{
+      outline-color: var(--ui-accent);
+      background: #0b1e13;
+    }}
+    [data-theme="dark"] .chat-member-empty {{
+      border-color: var(--ui-border);
+      background: var(--ui-panel-alt);
+      color: var(--ui-text-soft);
+    }}
     [data-theme="dark"] .chat-reaction-popover {{
       box-shadow: var(--ui-shadow);
     }}
@@ -4658,6 +4993,9 @@ def _render_html(
       </div>
       <div class="chat-left-section">
         <div id="chat-users-title" class="chat-left-label">Users</div>
+        <div class="chat-user-search-wrap">
+          <input id="chat-user-search-input" class="list-search-input" type="search" placeholder="Search by ID or name" autocomplete="off" />
+        </div>
         <div id="chat-room-list" class="chat-member-list"></div>
       </div>
     </aside>
@@ -4734,6 +5072,9 @@ def _render_html(
     <section class="card nodes">
       <h2 id="nodes-card-title">Nodes</h2>
       <div class="body nodes-body">
+        <div class="nodes-search-wrap">
+          <input id="nodes-search-input" class="list-search-input" type="search" placeholder="Search by ID or name" autocomplete="off" />
+        </div>
         <div class="scroll nodes-table-scroll">
           <table id="nodes-table">
               <thead>
@@ -4953,6 +5294,8 @@ def _render_html(
     let chatReplyTargetText = "";
     let chatReactionPopoverAnchor = null;
     let chatReactionPopoverHideTimer = null;
+    let nodesSearchQuery = "";
+    let chatUserSearchQuery = "";
     let themePreference = "auto";
     let themeMediaQuery = null;
     let mapTileLayer = null;
@@ -6097,6 +6440,17 @@ def _render_html(
       return !!normalized && normalized !== "^all" && normalized !== "Unknown" && normalized !== "n/a";
     }}
 
+    function normalizeSearchQuery(value) {{
+      return String(value == null ? "" : value).trim().toLowerCase();
+    }}
+
+    function matchesIdOrNameQuery(nodeId, nodeName, query) {{
+      if (!query) return true;
+      const idKey = normalizeSearchQuery(nodeId);
+      const nameKey = normalizeSearchQuery(nodeName);
+      return idKey.includes(query) || nameKey.includes(query);
+    }}
+
     function loadStoredSelection() {{
       try {{
         const stored = window.localStorage.getItem(selectionStorageKey);
@@ -7037,6 +7391,36 @@ def _render_html(
       }});
     }}
 
+    function bindNodeListSearchControls() {{
+      const nodesInput = document.getElementById("nodes-search-input");
+      if (nodesInput instanceof HTMLInputElement) {{
+        if (nodesInput.dataset.bound !== "1") {{
+          nodesInput.dataset.bound = "1";
+          nodesInput.addEventListener("input", () => {{
+            nodesSearchQuery = normalizeSearchQuery(nodesInput.value);
+            if (latestState) {{
+              renderNodes(latestState.nodes || []);
+            }}
+          }});
+        }}
+        nodesInput.value = nodesSearchQuery;
+      }}
+
+      const chatInput = document.getElementById("chat-user-search-input");
+      if (chatInput instanceof HTMLInputElement) {{
+        if (chatInput.dataset.bound !== "1") {{
+          chatInput.dataset.bound = "1";
+          chatInput.addEventListener("input", () => {{
+            chatUserSearchQuery = normalizeSearchQuery(chatInput.value);
+            if (latestState) {{
+              renderChat(latestState);
+            }}
+          }});
+        }}
+        chatInput.value = chatUserSearchQuery;
+      }}
+    }}
+
     map.on("click", () => {{
       if (mapWheelJustArmed) {{
         mapWheelJustArmed = false;
@@ -7375,7 +7759,14 @@ def _render_html(
     }}
 
     function renderNodes(nodes) {{
-        const rows = nodes.map((node) => {{
+      const query = normalizeSearchQuery(nodesSearchQuery);
+      const filteredNodes = (nodes || []).filter((node) => {{
+        const nodeId = normalizeNodeId(node.id || "");
+        const name = nodeLabel(node);
+        return matchesIdOrNameQuery(nodeId, name, query);
+      }});
+
+      const rows = filteredNodes.map((node) => {{
           const nodeId = normalizeNodeId(node.id || "");
           const selectable = isSelectableNodeId(nodeId);
           const pos = (typeof node.lat === "number" && typeof node.lon === "number")
@@ -7403,6 +7794,9 @@ def _render_html(
           <td data-sort="${{escAttr(pos)}}">${{pos}}</td>
         </tr>`;
       }});
+      if (rows.length === 0) {{
+        rows.push('<tr><td colspan="9">No nodes match this search.</td></tr>');
+      }}
       fillTable("nodes-table", rows);
       bindNodeRowClicks();
       highlightNodeSelection();
@@ -7818,6 +8212,11 @@ def _render_html(
       const nodesById = new Map(
         (state.nodes || []).map((node) => [normalizeNodeId(node.id || ""), node])
       );
+      const historyCapsById = new Map(
+        Object.entries((state && state.history_caps && typeof state.history_caps === "object") ? state.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
 
       const nodeIdentityMeta = (nodeId) => {{
         const clean = normalizeNodeId(nodeId);
@@ -7825,34 +8224,52 @@ def _render_html(
           return {{ html: "", title: "" }};
         }}
         const node = nodesById.get(clean);
-        if (!node || typeof node !== "object") {{
+        const historyCaps = historyCapsById.get(clean);
+        if ((!node || typeof node !== "object") && (!historyCaps || typeof historyCaps !== "object")) {{
           return {{ html: "", title: "" }};
         }}
 
         const chips = [];
         const titleParts = [];
-        if (
-          typeof node.lat === "number"
+        const liveHasPosition = !!node
+          && typeof node.lat === "number"
           && Number.isFinite(node.lat)
           && typeof node.lon === "number"
-          && Number.isFinite(node.lon)
-        ) {{
+          && Number.isFinite(node.lon);
+        const historyHasPosition = !!historyCaps && historyCaps.has_position === true;
+        if (liveHasPosition || historyHasPosition) {{
           chips.push('<span class="chat-name-chip gps" title="GPS position available">&#x1F4CD;</span>');
-          titleParts.push("GPS available");
+          titleParts.push(liveHasPosition ? "GPS available" : "GPS last known");
         }}
 
-        const batteryRaw = Number(node.battery_level);
+        const batteryRaw = Number(
+          (node && node.battery_level != null)
+            ? node.battery_level
+            : (historyCaps && historyCaps.battery_level)
+        );
         if (Number.isFinite(batteryRaw)) {{
           const batteryPct = Math.max(0, Math.min(100, Math.round(batteryRaw)));
           chips.push(`<span class="chat-name-chip battery" title="Battery level">${{batteryPct}}%</span>`);
-          titleParts.push(`Battery ${{batteryPct}}%`);
+          titleParts.push(
+            (node && node.battery_level != null)
+              ? `Battery ${{batteryPct}}%`
+              : `Battery last known ${{batteryPct}}%`
+          );
         }}
 
-        const hopsRaw = Number(node.hops_away);
+        const hopsRaw = Number(
+          (node && node.hops_away != null)
+            ? node.hops_away
+            : (historyCaps && historyCaps.last_hops)
+        );
         if (Number.isFinite(hopsRaw) && hopsRaw >= 0) {{
           const hops = Math.trunc(hopsRaw);
           chips.push(`<span class="chat-name-chip hops" title="Hops away">${{hops}}h</span>`);
-          titleParts.push(`${{hops}} hop${{hops === 1 ? "" : "s"}} away`);
+          titleParts.push(
+            (node && node.hops_away != null)
+              ? `${{hops}} hop${{hops === 1 ? "" : "s"}} away`
+              : `${{hops}} hop${{hops === 1 ? "" : "s"}} last known`
+          );
         }}
 
         return {{
@@ -8254,26 +8671,34 @@ def _render_html(
           return String(a.name || a.id).localeCompare(String(b.name || b.id));
         }})
         .slice(0, chatRosterMaxEntries);
+      const rosterQuery = normalizeSearchQuery(chatUserSearchQuery);
+      const rosterFiltered = roster.filter((item) => (
+        matchesIdOrNameQuery(item.id, item.name, rosterQuery)
+      ));
       const onlineCount = roster.filter((item) => item.status === "online").length;
       const warnCount = roster.filter((item) => item.status === "warn").length;
       const staleCount = roster.filter((item) => item.status === "stale").length;
       if (roomList) {{
-        roomList.innerHTML = roster.map((item) => (
-          (() => {{
-            const meta = nodeIdentityMeta(item.id);
-            const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}}`;
-            return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(memberTitle)}}">
-            <span class="chat-member-status status-${{item.status}}">●</span>
-            <span class="chat-member-main">
-              <span class="chat-member-name-row">
-                <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
-                ${{meta.html ? `<span class="chat-name-meta">${{meta.html}}</span>` : ""}}
-              </span>
-              <span class="chat-member-id">${{escAttr(item.id)}}</span>
-            </span>
-          </div>`;
-          }})()
-        )).join("");
+        roomList.innerHTML = rosterFiltered.length > 0
+          ? rosterFiltered.map((item) => (
+              (() => {{
+                const meta = nodeIdentityMeta(item.id);
+                const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}}`;
+                return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(memberTitle)}}">
+                <span class="chat-member-status status-${{item.status}}">●</span>
+                <span class="chat-member-main">
+                  <span class="chat-member-name-row">
+                    <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
+                    ${{meta.html ? `<span class="chat-name-meta">${{meta.html}}</span>` : ""}}
+                  </span>
+                  <span class="chat-member-id">${{escAttr(item.id)}}</span>
+                </span>
+              </div>`;
+              }})()
+            )).join("")
+          : (rosterQuery
+              ? '<div class="chat-member-empty">No users match this search.</div>'
+              : "");
         for (const member of roomList.querySelectorAll(".chat-member-item")) {{
           member.addEventListener("click", () => {{
             selectNode(member.dataset.nodeId || "", true);
@@ -8396,6 +8821,7 @@ def _render_html(
     bindLayoutNav();
     bindSplitters();
     bindSelectionControls();
+    bindNodeListSearchControls();
     bindConsoleControls();
     bindChatComposer();
     bindThemeToggle();
