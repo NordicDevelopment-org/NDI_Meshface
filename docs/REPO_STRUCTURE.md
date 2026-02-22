@@ -5,6 +5,7 @@
 - `mesh_dashboard.py`: main dashboard web app and API server.
 - `mesh_connection.py`: Meshtastic serial/TCP connection abstraction.
 - `meshdash/chat.py`: chat-entry and delivery-state transition helpers.
+- `meshdash/html.py`: extracted dashboard HTML renderer and frontend template.
 - `meshdash/helpers.py`: extracted pure utility helpers used by runtime and tests.
 - `meshdash/nodes.py`: extracted node/interface/time utilities for dashboard runtime.
 - `meshdash/revision.py`: revision/version/git metadata helpers for header build info.
