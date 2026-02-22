@@ -2906,6 +2906,137 @@ def _render_html(
       border-color: #8ab79b;
       box-shadow: inset 0 0 0 2px rgba(138, 183, 155, 0.55);
     }}
+    .saved-node-details {{
+      display: none;
+      flex: 1 1 auto;
+      min-height: 0;
+      border: 1px solid #d7e5d2;
+      border-radius: 8px;
+      background: #f9fdf9;
+      padding: 8px;
+      overflow: auto;
+    }}
+    .saved-node-details-empty {{
+      border: 1px dashed #c6d8cc;
+      border-radius: 8px;
+      background: #f7fcf8;
+      color: #446355;
+      font-size: 12px;
+      line-height: 1.35;
+      padding: 12px;
+    }}
+    .saved-node-details-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #d7e5d2;
+      padding-bottom: 8px;
+      flex-wrap: wrap;
+    }}
+    .saved-node-title-wrap {{
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
+    .saved-node-title {{
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a3b2b;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .saved-node-subtitle {{
+      font-size: 11px;
+      color: #4d6759;
+      line-height: 1.2;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }}
+    .saved-node-status {{
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+      border: 1px solid #c7dac5;
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: #edf5ef;
+      color: #2f4f3d;
+      white-space: nowrap;
+    }}
+    .saved-node-status.status-online {{
+      border-color: #2f855a;
+      background: #e9f8ee;
+      color: #1d5a3b;
+    }}
+    .saved-node-status.status-warn {{
+      border-color: #d3a856;
+      background: #fff8e8;
+      color: #7a5a1f;
+    }}
+    .saved-node-status.status-stale {{
+      border-color: #ce8e8e;
+      background: #fff2f2;
+      color: #7a2f2f;
+    }}
+    .saved-node-sections {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }}
+    .saved-node-section {{
+      border: 1px solid #d7e5d2;
+      border-radius: 8px;
+      background: #fbfffb;
+      padding: 8px;
+    }}
+    .saved-node-section-title {{
+      margin: 0 0 6px 0;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.35px;
+      color: #5b7467;
+    }}
+    .saved-node-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 6px;
+    }}
+    .saved-node-stat {{
+      border: 1px solid #deeadf;
+      border-radius: 8px;
+      background: #f6fcf7;
+      padding: 6px 7px;
+      min-width: 0;
+    }}
+    .saved-node-stat-k {{
+      font-size: 10px;
+      color: #5a7264;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      line-height: 1.2;
+    }}
+    .saved-node-stat-v {{
+      margin-top: 2px;
+      font-size: 12px;
+      color: #183926;
+      font-weight: 600;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }}
+    .saved-node-note {{
+      margin-top: 6px;
+      font-size: 10px;
+      color: #5d7467;
+      line-height: 1.25;
+    }}
     #map {{
       width: 100%;
       height: 100%;
@@ -3485,9 +3616,14 @@ def _render_html(
     }}
     .layout.view-saved .map .body {{
       min-height: 0;
+      display: flex;
+      flex-direction: column;
     }}
     .layout.view-saved .map-frame {{
-      min-height: 0;
+      display: none;
+    }}
+    .layout.view-saved .saved-node-details {{
+      display: flex;
     }}
     .layout.view-saved .summary,
     .layout.view-saved .map-data,
@@ -5113,6 +5249,58 @@ def _render_html(
     [data-theme="dark"] .signal-timeline-empty {{
       color: #a4b7c9;
     }}
+    [data-theme="dark"] .saved-node-details {{
+      border-color: var(--ui-border);
+      background: var(--ui-panel-alt);
+    }}
+    [data-theme="dark"] .saved-node-details-empty {{
+      border-color: var(--ui-border);
+      background: #121b24;
+      color: #a9bfd3;
+    }}
+    [data-theme="dark"] .saved-node-details-head {{
+      border-bottom-color: var(--ui-border);
+    }}
+    [data-theme="dark"] .saved-node-title {{
+      color: #e6eef8;
+    }}
+    [data-theme="dark"] .saved-node-subtitle,
+    [data-theme="dark"] .saved-node-section-title,
+    [data-theme="dark"] .saved-node-stat-k,
+    [data-theme="dark"] .saved-node-note {{
+      color: #9db3c8;
+    }}
+    [data-theme="dark"] .saved-node-status {{
+      border-color: rgba(124, 161, 190, 0.36);
+      background: rgba(121, 192, 255, 0.08);
+      color: #cfe4f8;
+    }}
+    [data-theme="dark"] .saved-node-status.status-online {{
+      border-color: rgba(63, 185, 80, 0.7);
+      background: rgba(47, 133, 90, 0.3);
+      color: #cbf7d8;
+    }}
+    [data-theme="dark"] .saved-node-status.status-warn {{
+      border-color: rgba(234, 179, 8, 0.72);
+      background: rgba(161, 98, 7, 0.3);
+      color: #ffe9b0;
+    }}
+    [data-theme="dark"] .saved-node-status.status-stale {{
+      border-color: rgba(248, 113, 113, 0.74);
+      background: rgba(153, 27, 27, 0.34);
+      color: #ffd6d6;
+    }}
+    [data-theme="dark"] .saved-node-section {{
+      border-color: var(--ui-border);
+      background: #111823;
+    }}
+    [data-theme="dark"] .saved-node-stat {{
+      border-color: var(--ui-border);
+      background: #101722;
+    }}
+    [data-theme="dark"] .saved-node-stat-v {{
+      color: #e6eef8;
+    }}
     [data-theme="dark"] .overview-item {{
       border-color: var(--ui-border);
       background: var(--ui-panel-alt);
@@ -5478,6 +5666,7 @@ def _render_html(
         <div class="map-frame">
           <div id="map"></div>
         </div>
+        <div id="saved-node-details" class="saved-node-details" aria-live="polite"></div>
       </div>
     </section>
 
@@ -7280,6 +7469,12 @@ def _render_html(
       if (chatLeftPanel instanceof HTMLElement) {{
         chatLeftPanel.hidden = !chatPanelOpen;
       }}
+      const mapTitle = document.getElementById("map-card-title");
+      if (mapTitle) {{
+        mapTitle.textContent = next === "saved"
+          ? "Saved Node Details"
+          : (isSelectableNodeId(selectedNodeId) ? "Selected Node Map" : "Network Map");
+      }}
       setMapWheelZoomActive(next === "network" || next === "saved");
       if (chatPanelOpen) {{
         if (activeWheelPane instanceof HTMLElement) {{
@@ -7317,6 +7512,7 @@ def _render_html(
       syncNodeHistoryDock();
       if (latestState) {{
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null, null);
+        renderSavedNodeDetails(latestState, null);
       }}
       requestMapResize();
     }}
@@ -7809,6 +8005,7 @@ def _render_html(
         empty.textContent = "Loading historical signal points...";
       }}
       setSignalTimelineMessage("Loading timeline...");
+      renderSavedNodeDetails(latestState || {{}}, null, nodeId);
     }}
 
     function selectNode(nodeId, shouldFocus = true, toggleIfSelected = true) {{
@@ -7852,6 +8049,9 @@ def _render_html(
       if (latestState) {{
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], null);
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null, null);
+        renderSavedNodeDetails(latestState, null);
+      }} else {{
+        renderSavedNodeDetails({{}}, null);
       }}
       applyChatChannel(activeChatChannel, false);
     }}
@@ -8186,7 +8386,11 @@ def _render_html(
       const selectionMode = isSelectableNodeId(selectedNodeId);
       const mapTitle = document.getElementById("map-card-title");
       if (mapTitle) {{
-        mapTitle.textContent = selectionMode ? "Selected Node Map" : "Network Map";
+        if (activeLayoutView === "saved") {{
+          mapTitle.textContent = "Saved Node Details";
+        }} else {{
+          mapTitle.textContent = selectionMode ? "Selected Node Map" : "Network Map";
+        }}
       }}
 
       if (selectionMode) {{
@@ -8435,12 +8639,459 @@ def _render_html(
       }}
     }}
 
+    function savedDetailText(value, fallback = "n/a") {{
+      const text = String(value == null ? "" : value).trim();
+      if (text) return text;
+      return String(fallback == null ? "n/a" : fallback);
+    }}
+
+    function savedDetailPercent(value, decimals = 1) {{
+      const num = Number(value);
+      if (!Number.isFinite(num)) return "n/a";
+      return `${{num.toFixed(decimals)}}%`;
+    }}
+
+    function savedDetailCoord(lat, lon) {{
+      const latNum = Number(lat);
+      const lonNum = Number(lon);
+      if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) return "n/a";
+      return `${{latNum.toFixed(5)}}, ${{lonNum.toFixed(5)}}`;
+    }}
+
+    function savedDetailDurationHours(startUnix, endUnix) {{
+      const start = Number(startUnix);
+      const end = Number(endUnix);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "n/a";
+      const hours = (end - start) / 3600;
+      return `${{hours.toFixed(1)}}h`;
+    }}
+
+    function savedDetailSectionHtml(title, items, note = "") {{
+      const rows = items.map(([label, value]) => (
+        `<div class="saved-node-stat">
+          <div class="saved-node-stat-k">${{escAttr(label)}}</div>
+          <div class="saved-node-stat-v">${{escAttr(savedDetailText(value))}}</div>
+        </div>`
+      )).join("");
+      const noteHtml = note
+        ? `<div class="saved-node-note">${{escAttr(note)}}</div>`
+        : "";
+      return `<section class="saved-node-section">
+        <h3 class="saved-node-section-title">${{escAttr(title)}}</h3>
+        <div class="saved-node-grid">${{rows}}</div>
+        ${{noteHtml}}
+      </section>`;
+    }}
+
+    function computeSavedChatStats(nodeId, messages) {{
+      const stats = {{
+        touches: 0,
+        sent: 0,
+        received: 0,
+        broadcastSent: 0,
+        directSent: 0,
+        reactionsSent: 0,
+        peers: new Set(),
+        lastChatText: "n/a",
+        lastChatUnix: null,
+      }};
+      for (const msg of (messages || [])) {{
+        const fromId = normalizeNodeId(msg && msg.from);
+        const toId = normalizeNodeId(msg && msg.to);
+        const isTouch = fromId === nodeId || toId === nodeId;
+        if (!isTouch) continue;
+        stats.touches += 1;
+
+        const timeText = String((msg && (msg.rx_time || msg.captured_at)) || "").trim();
+        const timeUnix = parseDashboardTimeToUnix(timeText);
+        if (Number.isFinite(timeUnix) && (!Number.isFinite(stats.lastChatUnix) || timeUnix > stats.lastChatUnix)) {{
+          stats.lastChatUnix = timeUnix;
+          stats.lastChatText = timeText || "n/a";
+        }}
+
+        const replyId = Number(msg && (msg.reply_id ?? msg.replyId));
+        const emoji = String((msg && msg.emoji) || "").trim();
+        const isReaction = msg && msg.is_reaction === true
+          ? true
+          : (Number.isFinite(replyId) && replyId > 0 && !!emoji);
+
+        if (fromId === nodeId) {{
+          stats.sent += 1;
+          if (isReaction) stats.reactionsSent += 1;
+          if (classifyMessageChannel(msg) === "direct") {{
+            stats.directSent += 1;
+          }} else {{
+            stats.broadcastSent += 1;
+          }}
+          if (isSelectableNodeId(toId)) {{
+            stats.peers.add(toId);
+          }}
+        }}
+        if (toId === nodeId) {{
+          stats.received += 1;
+          if (isSelectableNodeId(fromId)) {{
+            stats.peers.add(fromId);
+          }}
+        }}
+      }}
+      return stats;
+    }}
+
+    function computeSavedLinkStats(nodeId, edges) {{
+      const stats = {{
+        links: 0,
+        peers: new Set(),
+        lifetimePackets: 0,
+        sessionPackets: 0,
+        hopsWeighted: 0,
+        hopsWeight: 0,
+        lastSeenText: "n/a",
+        lastSeenUnix: null,
+        ports: new Set(),
+        topPeer: "",
+        topPeerPackets: 0,
+      }};
+      for (const edge of (edges || [])) {{
+        const fromId = normalizeNodeId(edge && edge.from);
+        const toId = normalizeNodeId(edge && edge.to);
+        if (fromId !== nodeId && toId !== nodeId) continue;
+        stats.links += 1;
+
+        const peerId = fromId === nodeId ? toId : fromId;
+        if (isSelectableNodeId(peerId)) {{
+          stats.peers.add(peerId);
+        }}
+
+        const lifetimeCount = Number(edge && (edge.lifetime_count ?? edge.count));
+        const sessionCount = Number(edge && (edge.session_count ?? edge.count));
+        if (Number.isFinite(lifetimeCount) && lifetimeCount > 0) {{
+          stats.lifetimePackets += lifetimeCount;
+          if (lifetimeCount > stats.topPeerPackets && isSelectableNodeId(peerId)) {{
+            stats.topPeerPackets = lifetimeCount;
+            stats.topPeer = peerId;
+          }}
+        }}
+        if (Number.isFinite(sessionCount) && sessionCount > 0) {{
+          stats.sessionPackets += sessionCount;
+        }}
+
+        const avgHops = Number(edge && edge.avg_hops);
+        const hopsWeight = Number.isFinite(lifetimeCount) && lifetimeCount > 0 ? lifetimeCount : 1;
+        if (Number.isFinite(avgHops)) {{
+          stats.hopsWeighted += avgHops * hopsWeight;
+          stats.hopsWeight += hopsWeight;
+        }}
+
+        const lastText = String((edge && edge.last_rx_time) || "").trim();
+        const lastUnix = parseDashboardTimeToUnix(lastText);
+        if (Number.isFinite(lastUnix) && (!Number.isFinite(stats.lastSeenUnix) || lastUnix > stats.lastSeenUnix)) {{
+          stats.lastSeenUnix = lastUnix;
+          stats.lastSeenText = lastText || "n/a";
+        }}
+
+        for (const port of (edge && Array.isArray(edge.portnums) ? edge.portnums : [])) {{
+          const cleanPort = String(port || "").trim();
+          if (cleanPort) stats.ports.add(cleanPort);
+        }}
+      }}
+      return stats;
+    }}
+
+    function renderSavedNodeDetails(state, nodeHistory = null, loadingNodeId = "") {{
+      const host = document.getElementById("saved-node-details");
+      if (!(host instanceof HTMLElement)) return;
+
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodeId = normalizeNodeId(selectedNodeId || "");
+      const loadingId = normalizeNodeId(loadingNodeId || "");
+
+      if (favoriteNodeIds.size === 0) {{
+        host.innerHTML = '<div class="saved-node-details-empty">No saved nodes yet. Star a node in Chat, Network, or Saved list to start tracking it here.</div>';
+        return;
+      }}
+
+      if (!isSelectableNodeId(nodeId)) {{
+        host.innerHTML = '<div class="saved-node-details-empty">Select a saved node to view historical summary, links, and recent chat activity.</div>';
+        return;
+      }}
+      if (!favoriteNodeIds.has(nodeId)) {{
+        host.innerHTML = '<div class="saved-node-details-empty">Selected node is not in Saved. Pick a node from the Saved list on the left.</div>';
+        return;
+      }}
+
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const node = nodes.find((entry) => normalizeNodeId(entry.id || "") === nodeId) || null;
+      const historyCapsById = new Map(
+        Object.entries((safeState.history_caps && typeof safeState.history_caps === "object") ? safeState.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([entryNodeId, caps]) => isSelectableNodeId(entryNodeId) && caps && typeof caps === "object")
+      );
+      const caps = historyCapsById.get(nodeId) || null;
+
+      const requestedHistory = (
+        nodeHistory
+        && typeof nodeHistory === "object"
+        && normalizeNodeId(nodeHistory.node_id || "") === nodeId
+      ) ? nodeHistory : null;
+      const cachedEntry = nodeHistoryCache.get(nodeId);
+      const cachedHistory = (
+        cachedEntry
+        && cachedEntry.data
+        && normalizeNodeId(cachedEntry.data.node_id || "") === nodeId
+      ) ? cachedEntry.data : null;
+      const history = requestedHistory || cachedHistory;
+      const historySummary = (history && typeof history.summary === "object") ? history.summary : {{}};
+      const historyPoints = Array.isArray(history && history.points) ? history.points : [];
+      const historyPositions = Array.isArray(history && history.positions) ? history.positions : [];
+      const historyLoading = loadingId === nodeId && !history;
+
+      const nodeName = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const liveLastSeenUnix = nodeLastHeardUnix(node);
+      const capsLastSeenUnix = Number(caps && caps.last_seen_unix);
+      const historyLastSeenUnix = parseDashboardTimeToUnix(historySummary.last_seen || "");
+      const lastSeenUnix = Number.isFinite(liveLastSeenUnix)
+        ? liveLastSeenUnix
+        : (Number.isFinite(capsLastSeenUnix)
+            ? Math.trunc(capsLastSeenUnix)
+            : (Number.isFinite(historyLastSeenUnix) ? historyLastSeenUnix : null));
+      const status = freshnessStatus(lastSeenUnix, nowUnix);
+      const statusLabel = status === "online"
+        ? "Online"
+        : (status === "warn" ? "Aging" : (status === "stale" ? "Stale" : "Unknown"));
+
+      const batteryRaw = Number(
+        (node && node.battery_level != null)
+          ? node.battery_level
+          : NaN
+      );
+      const capsBatteryRaw = Number(caps && caps.battery_level);
+      const batteryValue = Number.isFinite(batteryRaw)
+        ? batteryRaw
+        : (Number.isFinite(capsBatteryRaw) ? capsBatteryRaw : null);
+      const batteryText = Number.isFinite(batteryValue)
+        ? `${{Math.max(0, Math.min(100, Math.round(batteryValue)))}}%`
+        : "n/a";
+      const hopsRaw = Number(
+        (node && node.hops_away != null)
+          ? node.hops_away
+          : NaN
+      );
+      const capsHopsRaw = Number(caps && caps.last_hops);
+      const hopsValue = Number.isFinite(hopsRaw)
+        ? hopsRaw
+        : (Number.isFinite(capsHopsRaw) ? capsHopsRaw : null);
+      const hopsText = Number.isFinite(hopsValue) && hopsValue >= 0 ? String(Math.trunc(hopsValue)) : "n/a";
+
+      const livePosText = (
+        node
+        && Number.isFinite(Number(node.lat))
+        && Number.isFinite(Number(node.lon))
+      )
+        ? savedDetailCoord(node.lat, node.lon)
+        : "n/a";
+      const voltageValue = (
+        node
+        && node.voltage != null
+        && Number.isFinite(Number(node.voltage))
+      ) ? Number(node.voltage) : null;
+      const channelUtilValue = (
+        node
+        && node.channel_utilization != null
+        && Number.isFinite(Number(node.channel_utilization))
+      ) ? Number(node.channel_utilization) : null;
+      const airUtilTxValue = (
+        node
+        && node.air_util_tx != null
+        && Number.isFinite(Number(node.air_util_tx))
+      ) ? Number(node.air_util_tx) : null;
+      const latestTrail = historyPositions.length
+        ? historyPositions[historyPositions.length - 1]
+        : null;
+      const latestTrailAltitude = (
+        latestTrail
+        && latestTrail.altitude != null
+        && Number.isFinite(Number(latestTrail.altitude))
+      ) ? Number(latestTrail.altitude) : null;
+      const latestTrailSats = (
+        latestTrail
+        && latestTrail.sats_in_view != null
+        && Number.isFinite(Number(latestTrail.sats_in_view))
+      ) ? Number(latestTrail.sats_in_view) : null;
+      const latestTrailPos = latestTrail ? savedDetailCoord(latestTrail.lat, latestTrail.lon) : "n/a";
+      const latestPosText = livePosText !== "n/a" ? livePosText : latestTrailPos;
+      const positionSource = livePosText !== "n/a"
+        ? "Live"
+        : (latestTrailPos !== "n/a" ? "History" : "n/a");
+      const positionCapable = (caps && caps.has_position === true) || latestTrailPos !== "n/a"
+        ? "Yes"
+        : "No";
+
+      const historyWindowHours = Number(history && history.window_hours);
+      const historyWindowText = Number.isFinite(historyWindowHours) && historyWindowHours > 0
+        ? `${{Math.round(historyWindowHours)}}h`
+        : `${{nodeHistoryHours}}h`;
+      const historyPointCount = Number.isFinite(Number(historySummary.points))
+        ? Number(historySummary.points)
+        : historyPoints.length;
+      const historyTotalPackets = Number.isFinite(Number(historySummary.total_packets))
+        ? Number(historySummary.total_packets)
+        : historyPoints.reduce((sum, point) => sum + Math.max(0, Number(point && point.packet_count) || 0), 0);
+      const activeMinutes = historyPoints.reduce((sum, point) => (
+        sum + ((Number(point && point.packet_count) || 0) > 0 ? 1 : 0)
+      ), 0);
+      const activeHoursText = `${{(activeMinutes / 60).toFixed(1)}}h`;
+      const firstPointUnix = historyPoints.length
+        ? Number(historyPoints[0] && historyPoints[0].bucket_unix)
+        : null;
+      const lastPointUnix = historyPoints.length
+        ? Number(historyPoints[historyPoints.length - 1] && historyPoints[historyPoints.length - 1].bucket_unix)
+        : null;
+      const coveredHoursText = savedDetailDurationHours(firstPointUnix, lastPointUnix);
+      const peakPacketsPerMinute = historyPoints.reduce((peak, point) => {{
+        const count = Number(point && point.packet_count);
+        if (!Number.isFinite(count)) return peak;
+        return Math.max(peak, count);
+      }}, 0);
+
+      let snrWeighted = 0;
+      let snrWeight = 0;
+      let rssiWeighted = 0;
+      let rssiWeight = 0;
+      let hopsWeighted = 0;
+      let hopsWeight = 0;
+      for (const point of historyPoints) {{
+        const weight = Math.max(1, Number(point && point.packet_count) || 0);
+        const snr = Number(point && point.avg_snr);
+        const rssi = Number(point && point.avg_rssi);
+        const hops = Number(point && point.avg_hops);
+        if (Number.isFinite(snr)) {{
+          snrWeighted += snr * weight;
+          snrWeight += weight;
+        }}
+        if (Number.isFinite(rssi)) {{
+          rssiWeighted += rssi * weight;
+          rssiWeight += weight;
+        }}
+        if (Number.isFinite(hops)) {{
+          hopsWeighted += hops * weight;
+          hopsWeight += weight;
+        }}
+      }}
+      const snrAvg = snrWeight > 0 ? (snrWeighted / snrWeight) : null;
+      const rssiAvg = rssiWeight > 0 ? (rssiWeighted / rssiWeight) : null;
+      const hopsAvg = hopsWeight > 0 ? (hopsWeighted / hopsWeight) : null;
+      const snrRange = `${{formatMetricValue(historySummary.snr_min, 1)}} to ${{formatMetricValue(historySummary.snr_max, 1)}} dB`;
+      const rssiRange = `${{formatMetricValue(historySummary.rssi_min, 0)}} to ${{formatMetricValue(historySummary.rssi_max, 0)}} dBm`;
+
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
+      const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      const chatStats = computeSavedChatStats(nodeId, chatMessages);
+      const linkStats = computeSavedLinkStats(nodeId, edges);
+      const linkAvgHops = linkStats.hopsWeight > 0
+        ? formatMetricValue(linkStats.hopsWeighted / linkStats.hopsWeight, 2)
+        : "n/a";
+
+      const subtitleBits = [
+        nodeId,
+        `Last seen: ${{savedDetailText((node && node.last_heard) || (caps && caps.last_seen) || historySummary.last_seen)}}`,
+      ];
+      if (historyLoading) {{
+        subtitleBits.push("Loading historical data...");
+      }}
+
+      const nodeSection = savedDetailSectionHtml("Node", [
+        ["Node ID", nodeId],
+        ["Node Num", node && node.num != null ? String(node.num) : "n/a"],
+        ["Hardware", (node && node.hardware_model) || "n/a"],
+        ["Role", (node && node.role) || "n/a"],
+        ["Status", statusLabel],
+        ["Battery", batteryText],
+        ["Hops Away", hopsText],
+        ["Voltage", Number.isFinite(voltageValue) ? `${{voltageValue.toFixed(2)}}V` : "n/a"],
+        ["Channel Util", Number.isFinite(channelUtilValue) ? savedDetailPercent(channelUtilValue) : "n/a"],
+        ["Air Util TX", Number.isFinite(airUtilTxValue) ? savedDetailPercent(airUtilTxValue) : "n/a"],
+        ["GPS Capable", positionCapable],
+        ["Last Position Ping", savedDetailText((caps && caps.last_position_time) || (latestTrail && latestTrail.time))],
+      ]);
+
+      const historySection = savedDetailSectionHtml("History", [
+        ["Window", historyWindowText],
+        ["Samples (1m)", String(historyPointCount)],
+        ["Active Hours", activeHoursText],
+        ["Covered Range", coveredHoursText],
+        ["Total Packets", String(historyTotalPackets)],
+        ["Peak Packets/min", String(Math.round(peakPacketsPerMinute || 0))],
+        ["First Bucket", savedDetailText(historySummary.first_bucket)],
+        ["Last Bucket", savedDetailText(historySummary.last_bucket)],
+        ["History Last Seen", savedDetailText(historySummary.last_seen)],
+        ["Avg SNR", Number.isFinite(snrAvg) ? `${{formatMetricValue(snrAvg, 2)}} dB` : "n/a"],
+        ["SNR Range", snrRange],
+        ["Avg RSSI", Number.isFinite(rssiAvg) ? `${{formatMetricValue(rssiAvg, 1)}} dBm` : "n/a"],
+        ["RSSI Range", rssiRange],
+        ["Avg Hops", Number.isFinite(hopsAvg) ? formatMetricValue(hopsAvg, 2) : "n/a"],
+        ["Trail Points", String(Number.isFinite(Number(historySummary.trail_points)) ? Number(historySummary.trail_points) : historyPositions.length)],
+      ], historyLoading ? "Historical points are loading for this node." : "");
+
+      const locationSection = savedDetailSectionHtml("Location", [
+        ["Current/Latest Position", latestPosText],
+        ["Position Source", positionSource],
+        ["Latest Position Time", livePosText !== "n/a" ? savedDetailText((node && node.last_heard) || (caps && caps.last_seen)) : savedDetailText(latestTrail && latestTrail.time)],
+        ["Altitude", Number.isFinite(latestTrailAltitude) ? `${{formatMetricValue(latestTrailAltitude, 0)}} m` : "n/a"],
+        ["Satellites", Number.isFinite(latestTrailSats) ? String(Math.round(latestTrailSats)) : "n/a"],
+        ["Trail Start", savedDetailText(historySummary.trail_start)],
+        ["Trail End", savedDetailText(historySummary.trail_end)],
+      ]);
+
+      const chatSection = savedDetailSectionHtml("Chat (Recent Buffer)", [
+        ["Messages Touching Node", String(chatStats.touches)],
+        ["Sent", String(chatStats.sent)],
+        ["Received", String(chatStats.received)],
+        ["Broadcast Sent", String(chatStats.broadcastSent)],
+        ["Direct Sent", String(chatStats.directSent)],
+        ["Reactions Sent", String(chatStats.reactionsSent)],
+        ["Active Peers", String(chatStats.peers.size)],
+        ["Last Chat", savedDetailText(chatStats.lastChatText)],
+      ], `Based on current in-memory chat buffer (${{chatMessages.length}} messages).`);
+
+      const linksSection = savedDetailSectionHtml("Links", [
+        ["Directed Links", String(linkStats.links)],
+        ["Linked Peers", String(linkStats.peers.size)],
+        ["Lifetime Packets", String(Math.round(linkStats.lifetimePackets))],
+        ["Session Packets", String(Math.round(linkStats.sessionPackets))],
+        ["Avg Link Hops", linkAvgHops],
+        ["Last Link Activity", savedDetailText(linkStats.lastSeenText)],
+        ["Top Peer", savedDetailText(linkStats.topPeer)],
+        ["Top Peer Packets", linkStats.topPeer ? String(Math.round(linkStats.topPeerPackets)) : "n/a"],
+        ["Seen Ports", linkStats.ports.size > 0 ? Array.from(linkStats.ports).slice(0, 10).join(", ") : "n/a"],
+      ]);
+
+      host.innerHTML = `
+        <div class="saved-node-details-head">
+          <div class="saved-node-title-wrap">
+            <div class="saved-node-title">${{escAttr(nodeName)}}</div>
+            <div class="saved-node-subtitle">${{subtitleBits.map((part) => escAttr(part)).join("<span>•</span>")}}</div>
+          </div>
+          <span class="saved-node-status status-${{escAttr(status)}}">${{escAttr(statusLabel)}}</span>
+        </div>
+        <div class="saved-node-sections">
+          ${{nodeSection}}
+          ${{historySection}}
+          ${{locationSection}}
+          ${{chatSection}}
+          ${{linksSection}}
+        </div>
+      `;
+    }}
+
     function renderFavorites(state) {{
       const list = document.getElementById("favorites-list");
       const caption = document.getElementById("favorites-caption");
       if (!(list instanceof HTMLElement)) return;
 
       const safeState = (state && typeof state === "object") ? state : {{}};
+      renderSavedNodeDetails(safeState, null);
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       const nodesById = new Map(nodes.map((node) => [normalizeNodeId(node.id || ""), node]));
       const historyCapsById = new Map(
@@ -9673,6 +10324,7 @@ def _render_html(
         renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory, onlineActivity);
         renderChat(state);
         renderFavorites(state);
+        renderSavedNodeDetails(state, nodeHistory);
         renderPackets(state.traffic || {{}});
         renderConsole(state.traffic || {{}});
         renderRaw(state);
