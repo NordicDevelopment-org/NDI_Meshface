@@ -4443,8 +4443,8 @@ def _render_html(
       min-width: 0;
       border: 1px solid #c2d8c7;
       border-radius: 7px;
-      padding: 6px 8px;
-      font-size: 12px;
+      padding: 5px 7px;
+      font-size: 11px;
       color: #183223;
       background: #f9fdf9;
     }}
@@ -5353,7 +5353,7 @@ def _render_html(
     }}
     [data-theme="dark"] .card.chat .chat-log-scroll {{
       background: #070d07;
-      border-color: #236744;
+      border-color: var(--ui-border);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item {{
       background: #1b2430;
@@ -5578,20 +5578,21 @@ def _render_html(
     [data-theme="dark"] .card {{
       transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
     }}
-    [data-theme="dark"] #chat-input:focus {{
-      outline-color: var(--ui-accent);
-      box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.2);
-    }}
-    [data-theme="dark"] .list-search-input {{
+    [data-theme="dark"] .list-search-input,
+    [data-theme="dark"] #chat-input {{
       background: #07140d;
       border-color: #2b8a59;
       color: #c6ffdb;
+      font-size: 11px;
+      padding: 5px 7px;
     }}
-    [data-theme="dark"] .list-search-input::placeholder {{
+    [data-theme="dark"] .list-search-input::placeholder,
+    [data-theme="dark"] #chat-input::placeholder {{
       color: var(--ui-text-soft);
       opacity: 0.9;
     }}
-    [data-theme="dark"] .list-search-input:focus {{
+    [data-theme="dark"] .list-search-input:focus,
+    [data-theme="dark"] #chat-input:focus {{
       outline-color: var(--ui-accent);
       background: #0b1e13;
     }}
