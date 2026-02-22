@@ -23,6 +23,12 @@ except Exception:
     Message = None
     MessageToDict = None
 
+try:
+    from meshtastic.protobuf import mesh_pb2, portnums_pb2
+except Exception:
+    mesh_pb2 = None
+    portnums_pb2 = None
+
 
 DEFAULT_MESH_PORT = "/dev/ttyACM0"
 DEFAULT_GATEWAY_HOST = "192.168.1.241"
@@ -82,6 +88,91 @@ def _safe_json_loads(value: str, default: Any) -> Any:
         return json.loads(value)
     except (TypeError, json.JSONDecodeError):
         return default
+
+
+def _extract_reply_id(decoded: Any) -> Optional[int]:
+    if not isinstance(decoded, dict):
+        return None
+    for key in ("replyId", "reply_id"):
+        value = _to_int(decoded.get(key))
+        if value is not None and value > 0:
+            return value
+    return None
+
+
+def _extract_emoji_codepoint(decoded: Any) -> Optional[int]:
+    if not isinstance(decoded, dict):
+        return None
+    raw = decoded.get("emoji")
+    if raw is None:
+        return None
+
+    if isinstance(raw, str):
+        clean = raw.strip()
+        if not clean:
+            return None
+        as_int = _to_int(clean)
+        if as_int is not None:
+            return as_int if as_int > 0 else None
+        return ord(clean[0])
+
+    as_int = _to_int(raw)
+    if as_int is None or as_int <= 0:
+        return None
+    return as_int
+
+
+def _emoji_from_codepoint(codepoint: Optional[int]) -> Optional[str]:
+    value = _to_int(codepoint)
+    if value is None or value <= 0:
+        return None
+    try:
+        return chr(value)
+    except (OverflowError, ValueError):
+        return None
+
+
+def _normalize_single_emoji(value: Any) -> Tuple[Optional[str], Optional[int]]:
+    if value is None:
+        return None, None
+    text = str(value).strip()
+    if not text:
+        return None, None
+
+    as_int = _to_int(text)
+    if as_int is not None and as_int > 0:
+        emoji = _emoji_from_codepoint(as_int)
+        if emoji:
+            return emoji, as_int
+        return None, None
+
+    codepoint = ord(text[0])
+    emoji = _emoji_from_codepoint(codepoint)
+    if emoji:
+        return emoji, codepoint
+    return None, None
+
+
+def _send_emoji_reaction_packet(
+    iface: Any,
+    destination_id: str,
+    channel_index: int,
+    reply_id: int,
+    emoji_codepoint: int,
+    emoji_text: str,
+) -> Any:
+    if mesh_pb2 is None or portnums_pb2 is None:
+        raise RuntimeError("Meshtastic protobuf modules are unavailable for emoji reactions")
+    if not hasattr(iface, "_sendPacket"):
+        raise RuntimeError("Meshtastic interface does not support low-level packet send")
+
+    packet = mesh_pb2.MeshPacket()
+    packet.channel = int(channel_index)
+    packet.decoded.portnum = portnums_pb2.PortNum.TEXT_MESSAGE_APP
+    packet.decoded.reply_id = int(reply_id)
+    packet.decoded.emoji = int(emoji_codepoint)
+    packet.decoded.payload = str(emoji_text or "").encode("utf-8")
+    return iface._sendPacket(packet, destinationId=destination_id, wantAck=False)
 
 
 def _calculate_hops(hop_start: Any, hop_limit: Any) -> Optional[int]:
@@ -1220,9 +1311,23 @@ class DashboardTracker:
         from_id: str = "local",
         to_id: str = "^all",
         channel_index: int = 0,
+        message_id: Optional[int] = None,
+        reply_id: Optional[int] = None,
+        emoji: Optional[str] = None,
+        emoji_codepoint: Optional[int] = None,
+        is_reaction: bool = False,
     ) -> None:
         clean_text = str(text or "").strip()
-        if not clean_text:
+        clean_message_id = _to_int(message_id)
+        clean_reply_id = _to_int(reply_id)
+        clean_emoji_codepoint = _to_int(emoji_codepoint)
+        clean_emoji = str(emoji or "").strip() or _emoji_from_codepoint(clean_emoji_codepoint)
+        if clean_emoji and clean_emoji_codepoint is None:
+            clean_emoji_codepoint = ord(clean_emoji[0])
+        has_reaction = bool(
+            is_reaction or (clean_reply_id is not None and clean_reply_id > 0 and clean_emoji)
+        )
+        if not clean_text and not has_reaction:
             return
         entry = {
             "captured_at": _utc_now(),
@@ -1233,6 +1338,16 @@ class DashboardTracker:
             "rx_time": _utc_now(),
             "text": clean_text,
         }
+        if clean_message_id is not None and clean_message_id > 0:
+            entry["message_id"] = clean_message_id
+        if clean_reply_id is not None and clean_reply_id > 0:
+            entry["reply_id"] = clean_reply_id
+        if clean_emoji:
+            entry["emoji"] = clean_emoji
+        if clean_emoji_codepoint is not None and clean_emoji_codepoint > 0:
+            entry["emoji_codepoint"] = clean_emoji_codepoint
+        if has_reaction:
+            entry["is_reaction"] = True
         with self._lock:
             self.recent_chat.append(entry)
             if self._history_store is not None:
@@ -1252,6 +1367,11 @@ class DashboardTracker:
 
         decoded = packet.get("decoded", {})
         portnum = decoded.get("portnum") if isinstance(decoded, dict) else None
+        packet_id = _to_int(packet.get("id"))
+        reply_id = _extract_reply_id(decoded)
+        emoji_codepoint = _extract_emoji_codepoint(decoded)
+        emoji_glyph = _emoji_from_codepoint(emoji_codepoint)
+        is_reaction = bool(reply_id is not None and reply_id > 0 and emoji_glyph)
         if portnum is not None:
             self.port_counts[str(portnum)] += 1
 
@@ -1330,6 +1450,7 @@ class DashboardTracker:
         packet_summary = {
             "captured_at": _utc_now(),
             "live": include_live_count,
+            "packet_id": packet_id,
             "from": from_id,
             "to": to_id,
             "from_num": _to_int(packet.get("from")),
@@ -1346,6 +1467,10 @@ class DashboardTracker:
             "priority": packet.get("priority"),
             "channel": packet.get("channel"),
             "decoded_text": decoded.get("text") if isinstance(decoded, dict) else None,
+            "reply_id": reply_id,
+            "emoji": emoji_glyph,
+            "emoji_codepoint": emoji_codepoint,
+            "is_reaction": is_reaction,
         }
 
         packet_entry = {
@@ -1357,7 +1482,8 @@ class DashboardTracker:
             self._history_store.save_packet(packet_entry)
 
         decoded_text = decoded.get("text") if isinstance(decoded, dict) else None
-        if isinstance(decoded_text, str) and decoded_text.strip():
+        has_text = isinstance(decoded_text, str) and decoded_text.strip()
+        if has_text or is_reaction:
             chat_entry = {
                 "captured_at": _utc_now(),
                 "from": from_id,
@@ -1365,8 +1491,18 @@ class DashboardTracker:
                 "portnum": str(portnum) if portnum is not None else None,
                 "channel": packet.get("channel"),
                 "rx_time": _format_epoch(packet.get("rxTime")),
-                "text": decoded_text,
+                "text": decoded_text if isinstance(decoded_text, str) else "",
             }
+            if packet_id is not None and packet_id > 0:
+                chat_entry["message_id"] = packet_id
+            if reply_id is not None and reply_id > 0:
+                chat_entry["reply_id"] = reply_id
+            if emoji_glyph:
+                chat_entry["emoji"] = emoji_glyph
+            if emoji_codepoint is not None and emoji_codepoint > 0:
+                chat_entry["emoji_codepoint"] = emoji_codepoint
+            if is_reaction:
+                chat_entry["is_reaction"] = True
             self.recent_chat.append(chat_entry)
             if self._history_store is not None and include_live_count:
                 self._history_store.save_chat(chat_entry)
@@ -2253,6 +2389,27 @@ def _render_html(
       color: #6a8572;
       white-space: nowrap;
     }}
+    .chat-feed-actions {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 2px;
+    }}
+    .chat-react-btn {{
+      border: 1px solid #bdd4c1;
+      background: #f5fbf6;
+      color: #26543a;
+      border-radius: 999px;
+      padding: 1px 7px;
+      font-size: 11px;
+      line-height: 1.4;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .chat-react-btn:hover {{
+      background: #e8f4eb;
+      border-color: #9ec2a8;
+    }}
     .chat-feed-text {{
       font-size: 12px;
       color: #173827;
@@ -2260,6 +2417,36 @@ def _render_html(
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: break-word;
+    }}
+    .chat-reaction-row {{
+      margin-top: 5px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+    }}
+    .chat-reaction-chip {{
+      border: 1px solid #b9d2bf;
+      background: #ecf7ef;
+      color: #1f4e35;
+      border-radius: 999px;
+      padding: 1px 8px;
+      font-size: 11px;
+      line-height: 1.3;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }}
+    .chat-reaction-chip:hover {{
+      background: #dff0e4;
+      border-color: #94bd9f;
+    }}
+    .chat-reaction-count {{
+      font-size: 10px;
+      font-weight: 700;
+      color: #355f48;
     }}
     .chat-feed-empty {{
       border: 1px dashed #d2e2d4;
@@ -2802,6 +2989,11 @@ def _render_html(
     const chatWarnWindowSeconds = 10 * 60;
     const chatStaleWindowSeconds = 30 * 60;
     const chatRosterMaxEntries = 180;
+    const chatEmojiChoices = [
+      "😀", "😁", "😂", "🤣", "😊", "😉", "😎", "🤔",
+      "👍", "👎", "👏", "🙏", "✅", "❌", "⚠️", "🔥",
+      "❤️", "💯", "📡", "📶", "🛰️", "🏠", "🚗", "🎯",
+    ];
     const consoleMaxLines = 1200;
     const tableSortState = {{
       "nodes-table": {{ index: 0, dir: "desc" }},
@@ -2834,6 +3026,8 @@ def _render_html(
     let mapWheelLease = null;
     let chatSendInFlight = false;
     let chatStickToBottom = true;
+    let chatEmojiMode = "compose";
+    let chatReactionTargetId = null;
     const nodeHistoryCache = new Map();
     const nodeNameCache = new Map();
 
@@ -3185,8 +3379,33 @@ def _render_html(
       }}
     }}
 
+    async function sendChatPayload(body, successMessage) {{
+      if (chatSendInFlight) return null;
+      setChatSendBusy(true);
+      setChatSendStatus("Sending...");
+      try {{
+        const resp = await fetch("/api/chat/send", {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(body || {{}}),
+        }});
+        const payload = await resp.json().catch(() => ({{}}));
+        if (!resp.ok || !payload.ok) {{
+          const msg = payload && payload.error ? payload.error : `send failed (${{resp.status}})`;
+          throw new Error(msg);
+        }}
+        setChatSendStatus(successMessage || `Sent at ${{payload.sent_at || "now"}}`);
+        await poll();
+        return payload;
+      }} catch (err) {{
+        setChatSendStatus(`Send error: ${{err.message || err}}`, true);
+        return null;
+      }} finally {{
+        setChatSendBusy(false);
+      }}
+    }}
+
     async function sendChatMessage() {{
-      if (chatSendInFlight) return;
       const input = document.getElementById("chat-input");
       if (!(input instanceof HTMLInputElement)) return;
       const text = input.value.trim();
@@ -3194,37 +3413,68 @@ def _render_html(
         setChatSendStatus("Enter a message before sending.", true);
         return;
       }}
-
-      setChatSendBusy(true);
-      setChatSendStatus("Sending...");
-      try {{
-        const resp = await fetch("/api/chat/send", {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{
-            text,
-            destination: "^all",
-            channel_index: 0,
-          }}),
-        }});
-        const payload = await resp.json().catch(() => ({{}}));
-        if (!resp.ok || !payload.ok) {{
-          const msg = payload && payload.error ? payload.error : `send failed (${{resp.status}})`;
-          throw new Error(msg);
-        }}
+      const payload = await sendChatPayload(
+        {{
+          text,
+          destination: "^all",
+          channel_index: 0,
+        }},
+        null
+      );
+      if (payload && payload.ok) {{
         input.value = "";
         setChatSendStatus(`Sent to room at ${{payload.sent_at || "now"}}`);
-        await poll();
-      }} catch (err) {{
-        setChatSendStatus(`Send error: ${{err.message || err}}`, true);
-      }} finally {{
-        setChatSendBusy(false);
+      }}
+    }}
+
+    async function sendChatReaction(replyId, emoji) {{
+      const replyNum = Number(replyId);
+      const cleanEmoji = String(emoji || "").trim();
+      if (!Number.isInteger(replyNum) || replyNum <= 0) {{
+        setChatSendStatus("Cannot react: target message id is missing.", true);
+        return;
+      }}
+      if (!cleanEmoji) {{
+        setChatSendStatus("Choose an emoji reaction.", true);
+        return;
+      }}
+      const payload = await sendChatPayload(
+        {{
+          destination: "^all",
+          channel_index: 0,
+          reply_id: replyNum,
+          emoji: cleanEmoji,
+        }},
+        null
+      );
+      if (payload && payload.ok) {{
+        setChatSendStatus(`Reacted ${{cleanEmoji}} at ${{payload.sent_at || "now"}}`);
+      }}
+    }}
+
+    function openChatEmojiPanel(mode = "compose", reactionTargetId = null) {{
+      const panel = document.getElementById("chat-emoji-panel");
+      const btn = document.getElementById("chat-emoji-btn");
+      if (!(panel instanceof HTMLElement)) return;
+      chatEmojiMode = mode === "react" ? "react" : "compose";
+      const parsedTarget = Number(reactionTargetId);
+      chatReactionTargetId = (
+        chatEmojiMode === "react" && Number.isInteger(parsedTarget) && parsedTarget > 0
+      ) ? parsedTarget : null;
+      panel.hidden = false;
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", "true");
+      }}
+      if (chatEmojiMode === "react") {{
+        setChatSendStatus("Pick a reaction emoji...");
       }}
     }}
 
     function closeChatEmojiPanel() {{
       const panel = document.getElementById("chat-emoji-panel");
       const btn = document.getElementById("chat-emoji-btn");
+      chatEmojiMode = "compose";
+      chatReactionTargetId = null;
       if (panel instanceof HTMLElement) {{
         panel.hidden = true;
       }}
@@ -3251,12 +3501,7 @@ def _render_html(
       if (!(panel instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
 
       if (panel.dataset.init !== "1") {{
-        const emojis = [
-          "😀", "😁", "😂", "🤣", "😊", "😉", "😎", "🤔",
-          "👍", "👎", "👏", "🙏", "✅", "❌", "⚠️", "🔥",
-          "❤️", "💯", "📡", "📶", "🛰️", "🏠", "🚗", "🎯",
-        ];
-        panel.innerHTML = `<div class="chat-emoji-grid">${{emojis.map((emoji) => (
+        panel.innerHTML = `<div class="chat-emoji-grid">${{chatEmojiChoices.map((emoji) => (
           `<button type="button" class="chat-emoji-item" data-emoji="${{escAttr(emoji)}}" title="${{escAttr(emoji)}}">${{escAttr(emoji)}}</button>`
         )).join("")}}</div>`;
         panel.dataset.init = "1";
@@ -3267,10 +3512,8 @@ def _render_html(
         btn.addEventListener("click", (ev) => {{
           ev.preventDefault();
           if (chatSendInFlight) return;
-          const shouldOpen = panel.hidden;
-          if (shouldOpen) {{
-            panel.hidden = false;
-            btn.setAttribute("aria-expanded", "true");
+          if (panel.hidden) {{
+            openChatEmojiPanel("compose", null);
           }} else {{
             closeChatEmojiPanel();
           }}
@@ -3286,7 +3529,11 @@ def _render_html(
           if (!(emojiBtn instanceof HTMLButtonElement)) return;
           const emoji = String(emojiBtn.getAttribute("data-emoji") || emojiBtn.textContent || "").trim();
           if (!emoji) return;
-          insertEmojiAtCursor(emoji);
+          if (chatEmojiMode === "react" && Number.isInteger(chatReactionTargetId) && chatReactionTargetId > 0) {{
+            sendChatReaction(chatReactionTargetId, emoji);
+          }} else {{
+            insertEmojiAtCursor(emoji);
+          }}
           closeChatEmojiPanel();
         }});
       }}
@@ -3948,6 +4195,36 @@ def _render_html(
       }}
     }}
 
+    function bindChatReactionControls() {{
+      for (const btn of document.querySelectorAll("#chat-feed .chat-react-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (chatSendInFlight) return;
+          const replyId = Number(btn.dataset.replyId || "");
+          if (!Number.isInteger(replyId) || replyId <= 0) {{
+            setChatSendStatus("Cannot react: target message id is missing.", true);
+            return;
+          }}
+          openChatEmojiPanel("react", replyId);
+        }});
+      }}
+
+      for (const chip of document.querySelectorAll("#chat-feed .chat-reaction-chip")) {{
+        if (!(chip instanceof HTMLButtonElement)) continue;
+        chip.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (chatSendInFlight) return;
+          const replyId = Number(chip.dataset.replyId || "");
+          const emoji = String(chip.dataset.emoji || "").trim();
+          if (!Number.isInteger(replyId) || replyId <= 0 || !emoji) return;
+          sendChatReaction(replyId, emoji);
+        }});
+      }}
+    }}
+
     function bindSelectionControls() {{
       const btn = document.getElementById("clear-selection-btn");
       if (!btn || btn.dataset.bound === "1") return;
@@ -4465,7 +4742,88 @@ def _render_html(
         return escaped.replace(/\\n/g, "<br/>");
       }};
 
-      const messages = traffic.recent_chat || [];
+      const parseMessageId = (value) => {{
+        const num = Number(value);
+        if (!Number.isFinite(num) || num <= 0) return null;
+        return Math.trunc(num);
+      }};
+
+      const messageIdOf = (msg) => {{
+        if (!msg || typeof msg !== "object") return null;
+        return parseMessageId(msg.message_id ?? msg.messageId ?? msg.packet_id ?? msg.packetId);
+      }};
+
+      const replyIdOf = (msg) => {{
+        if (!msg || typeof msg !== "object") return null;
+        return parseMessageId(msg.reply_id ?? msg.replyId);
+      }};
+
+      const emojiOf = (msg) => {{
+        if (!msg || typeof msg !== "object") return "";
+        const direct = String(msg.emoji || "").trim();
+        if (direct) return direct;
+        const codepoint = Number(msg.emoji_codepoint ?? msg.emojiCodepoint);
+        if (Number.isInteger(codepoint) && codepoint > 0) {{
+          try {{
+            return String.fromCodePoint(codepoint);
+          }} catch (_err) {{
+            return "";
+          }}
+        }}
+        return "";
+      }};
+
+      const isReactionMessage = (msg) => {{
+        if (!msg || typeof msg !== "object") return false;
+        if (msg.is_reaction === true) return true;
+        const replyId = replyIdOf(msg);
+        const emoji = emojiOf(msg);
+        return !!(replyId && emoji);
+      }};
+
+      const rawMessages = traffic.recent_chat || [];
+      const reactionBuckets = new Map();
+      for (const msg of rawMessages) {{
+        if (!isReactionMessage(msg)) continue;
+        const replyId = replyIdOf(msg);
+        const emoji = emojiOf(msg);
+        if (!replyId || !emoji) continue;
+
+        const key = String(replyId);
+        let perMessage = reactionBuckets.get(key);
+        if (!(perMessage instanceof Map)) {{
+          perMessage = new Map();
+          reactionBuckets.set(key, perMessage);
+        }}
+
+        let bucket = perMessage.get(emoji);
+        if (!bucket) {{
+          bucket = {{
+            emoji,
+            count: 0,
+            reactors: new Set(),
+            names: [],
+            lastUnix: 0,
+          }};
+          perMessage.set(emoji, bucket);
+        }}
+
+        const reactorId = normalizeNodeId(msg.from || "");
+        const reactorMeta = chatEndpointParts(reactorId);
+        const reactorName = reactorMeta.label || reactorId || "Unknown node";
+        const dedupeKey = reactorId || `${{reactorName}}:${{msg.rx_time || msg.captured_at || bucket.count}}`;
+        if (!bucket.reactors.has(dedupeKey)) {{
+          bucket.reactors.add(dedupeKey);
+          bucket.count += 1;
+          bucket.names.push(reactorName);
+        }}
+        const reactionTime = parseDashboardTimeToUnix(msg.rx_time || msg.captured_at || "");
+        if (reactionTime && reactionTime > bucket.lastUnix) {{
+          bucket.lastUnix = reactionTime;
+        }}
+      }}
+
+      const messages = rawMessages.filter((msg) => !isReactionMessage(msg));
       const feedItems = messages.map((msg) => {{
         const sourceNode = normalizeNodeId(msg.from);
         const fallbackNode = normalizeNodeId(msg.to);
@@ -4480,6 +4838,28 @@ def _render_html(
         touchParticipant(toMeta, msgTimeUnix);
         const timeText = msg.rx_time || msg.captured_at || "n/a";
         const textHtml = escapeChatText(msg.text || "");
+        const messageId = messageIdOf(msg);
+        const messageReactions = messageId ? reactionBuckets.get(String(messageId)) : null;
+        const reactionChips = messageReactions
+          ? Array.from(messageReactions.values())
+              .sort((a, b) => (b.count - a.count) || String(a.emoji).localeCompare(String(b.emoji)))
+              .map((bucket) => {{
+                const tooltipNames = Array.from(new Set(bucket.names)).slice(0, 8);
+                const tooltip = tooltipNames.length > 0
+                  ? `${{bucket.emoji}}: ${{tooltipNames.join(", ")}}`
+                  : `${{bucket.emoji}} reaction`;
+                return `<button type="button" class="chat-reaction-chip" data-reply-id="${{escAttr(messageId)}}" data-emoji="${{escAttr(bucket.emoji)}}" title="${{escAttr(tooltip)}}">
+                  <span>${{escAttr(bucket.emoji)}}</span><span class="chat-reaction-count">${{bucket.count}}</span>
+                </button>`;
+              }})
+              .join("")
+          : "";
+        const reactButton = messageId
+          ? `<button type="button" class="chat-react-btn" data-reply-id="${{escAttr(messageId)}}" title="React to this message">😊+</button>`
+          : "";
+        const reactionRow = reactionChips
+          ? `<div class="chat-reaction-row">${{reactionChips}}</div>`
+          : "";
         return `<div data-node-id="${{escAttr(nodeId)}}" class="chat-feed-item ${{selectableClass}}">
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
@@ -4491,9 +4871,11 @@ def _render_html(
               <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
+            <span class="chat-feed-actions">${{reactButton}}</span>
             <span class="chat-feed-time">${{escAttr(timeText)}}</span>
           </div>
           <div class="chat-feed-text">${{textHtml || "&nbsp;"}}</div>
+          ${{reactionRow}}
         </div>`;
       }});
       const feed = document.getElementById("chat-feed");
@@ -4536,6 +4918,7 @@ def _render_html(
 
       bindChatAutoScroll();
       bindChatFeedClicks();
+      bindChatReactionControls();
       highlightNodeSelection();
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
@@ -4740,12 +5123,16 @@ def _make_http_handler(html_text: str, state_fn, node_history_fn=None, send_chat
                 text = body.get("text") if isinstance(body, dict) else None
                 destination = body.get("destination") if isinstance(body, dict) else None
                 channel_index = _to_int(body.get("channel_index")) if isinstance(body, dict) else None
+                reply_id = _to_int(body.get("reply_id")) if isinstance(body, dict) else None
+                emoji = body.get("emoji") if isinstance(body, dict) else None
 
                 try:
                     response_obj = send_chat_fn(
                         text=text,
                         destination=destination,
                         channel_index=channel_index,
+                        reply_id=reply_id,
+                        emoji=emoji,
                     )
                 except ValueError as exc:
                     payload = json.dumps(
@@ -4848,16 +5235,31 @@ def run_dashboard(args: argparse.Namespace) -> None:
         text: Any,
         destination: Any = None,
         channel_index: Optional[int] = None,
+        reply_id: Optional[int] = None,
+        emoji: Any = None,
     ) -> Dict[str, Any]:
         clean_text = str(text or "").strip()
-        if not clean_text:
+        clean_reply_id = _to_int(reply_id)
+        clean_emoji, clean_emoji_codepoint = _normalize_single_emoji(emoji)
+
+        has_reaction = bool(
+            clean_reply_id is not None and clean_reply_id > 0 and clean_emoji and clean_emoji_codepoint
+        )
+        if clean_emoji and not has_reaction:
+            raise ValueError("Emoji reactions require a valid reply_id")
+        if clean_reply_id is not None and clean_reply_id <= 0:
+            raise ValueError("reply_id must be a positive packet id")
+        if has_reaction and clean_text:
+            raise ValueError("Emoji reactions must not include text")
+        if not clean_text and not has_reaction:
             raise ValueError("Message cannot be empty")
 
-        payload_bytes = clean_text.encode("utf-8")
-        if len(payload_bytes) > DEFAULT_CHAT_MAX_BYTES:
-            raise ValueError(
-                f"Message is too long ({len(payload_bytes)} bytes). Limit is {DEFAULT_CHAT_MAX_BYTES} bytes."
-            )
+        if clean_text:
+            payload_bytes = clean_text.encode("utf-8")
+            if len(payload_bytes) > DEFAULT_CHAT_MAX_BYTES:
+                raise ValueError(
+                    f"Message is too long ({len(payload_bytes)} bytes). Limit is {DEFAULT_CHAT_MAX_BYTES} bytes."
+                )
 
         dest = str(destination or "^all").strip() or "^all"
         if dest.lower() in ("all", "broadcast"):
@@ -4866,24 +5268,54 @@ def run_dashboard(args: argparse.Namespace) -> None:
             raise ValueError("Destination must be '^all' or a node id like !abcdef12")
 
         chan = channel_index if isinstance(channel_index, int) and channel_index >= 0 else 0
+        sent_packet: Any
         with send_lock:
-            iface.sendText(clean_text, destinationId=dest, channelIndex=chan)
+            if has_reaction:
+                sent_packet = _send_emoji_reaction_packet(
+                    iface=iface,
+                    destination_id=dest,
+                    channel_index=chan,
+                    reply_id=clean_reply_id,
+                    emoji_codepoint=clean_emoji_codepoint,
+                    emoji_text=clean_emoji,
+                )
+            else:
+                sent_packet = iface.sendText(
+                    clean_text,
+                    destinationId=dest,
+                    channelIndex=chan,
+                    replyId=clean_reply_id if clean_reply_id and clean_reply_id > 0 else None,
+                )
 
         local_id = _get_local_node_id(iface)
+        sent_packet_id = _to_int(getattr(sent_packet, "id", None))
         tracker.record_local_chat(
-            text=clean_text,
+            text=clean_text if clean_text else "",
             from_id=local_id,
             to_id=dest,
             channel_index=chan,
+            message_id=sent_packet_id,
+            reply_id=clean_reply_id,
+            emoji=clean_emoji,
+            emoji_codepoint=clean_emoji_codepoint,
+            is_reaction=has_reaction,
         )
-        return {
+        response = {
             "ok": True,
             "sent_at": _utc_now(),
             "from": local_id,
             "to": dest,
             "channel_index": chan,
-            "text": clean_text,
+            "message_id": sent_packet_id,
+            "reply_id": clean_reply_id,
         }
+        if has_reaction:
+            response["reaction"] = clean_emoji
+            response["reaction_codepoint"] = clean_emoji_codepoint
+            response["text"] = ""
+        else:
+            response["text"] = clean_text
+        return response
 
     html = _render_html(
         refresh_ms=args.refresh_ms,
