@@ -33,6 +33,7 @@ from meshdash.helpers import (
     to_float as _to_float,
     to_int as _to_int,
 )
+from meshdash.theme import build_theme_css as _build_theme_css
 try:
     from pubsub import pub
 except Exception:
@@ -2486,6 +2487,7 @@ def _render_html(
         history_label = (
             f"History: on ({history_retention_days}d retention, {history_max_rows} rows max)"
         )
+    theme_css = _build_theme_css()
     return f"""<!doctype html>
 <html>
 <head>
@@ -2499,17 +2501,7 @@ def _render_html(
     crossorigin=""
   />
   <style>
-    :root {{
-      --bg: #f3f7f1;
-      --ink: #112015;
-      --panel: #ffffff;
-      --line: #c6d6c0;
-      --accent: #2f855a;
-      --accent-2: #1f6f53;
-      --danger: #c53030;
-      --muted: #5e6e64;
-      --shadow: 0 10px 24px rgba(18, 40, 20, 0.08);
-    }}
+{theme_css}
     * {{ box-sizing: border-box; }}
     html, body {{
       margin: 0;
@@ -5214,20 +5206,6 @@ def _render_html(
     }}
     [data-theme="dark"] a {{
       color: #86ffd2;
-    }}
-    /* Readability-first dark theme override */
-    [data-theme="dark"] {{
-      --ui-bg: #0d1117;
-      --ui-bg-elev: #111827;
-      --ui-panel: #161b22;
-      --ui-panel-alt: #1b2430;
-      --ui-border: #2f3b4b;
-      --ui-text: #e6edf3;
-      --ui-text-soft: #9fb0c3;
-      --ui-accent: #3fb950;
-      --ui-accent-soft: #2ea043;
-      --ui-link: #79c0ff;
-      --ui-shadow: 0 10px 24px rgba(1, 4, 9, 0.36);
     }}
     [data-theme="dark"] body {{
       background: linear-gradient(180deg, #0a1016 0%, #0d1117 42%, #0f141b 100%);

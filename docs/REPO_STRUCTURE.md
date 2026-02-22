@@ -5,9 +5,11 @@
 - `mesh_dashboard.py`: main dashboard web app and API server.
 - `mesh_connection.py`: Meshtastic serial/TCP connection abstraction.
 - `meshdash/helpers.py`: extracted pure utility helpers used by runtime and tests.
+- `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshtastic-dashboard.service`: systemd unit template for VM deployment.
 - `README.md`: setup, deploy loop, and operations.
 - `docs/PROJECT_PLAN.md`: product direction and phased roadmap.
+- `docs/REFACTOR_ROADMAP.md`: modularization plan for incremental refactor.
 - `tests/`: pytest coverage for core helper behavior.
 
 ## Archive Surface

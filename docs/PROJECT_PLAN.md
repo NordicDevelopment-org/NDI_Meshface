@@ -50,6 +50,7 @@ Build a **Teams-like chat experience for Meshtastic networks** with integrated n
 2. Improve testability with pure helper functions + pytest
 3. Incrementally split large modules only after test coverage is in place
 4. Keep all deprecated tools in `archive/` with clear labels
+5. Execute staged modularization in `docs/REFACTOR_ROADMAP.md`
 
 ## Definition of Done For New Features
 
