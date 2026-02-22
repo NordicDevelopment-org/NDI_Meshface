@@ -1,0 +1,26 @@
+# Repository Structure
+
+## Active Surface
+
+- `mesh_dashboard.py`: main dashboard web app and API server.
+- `mesh_connection.py`: Meshtastic serial/TCP connection abstraction.
+- `meshdash/helpers.py`: extracted pure utility helpers used by runtime and tests.
+- `meshtastic-dashboard.service`: systemd unit template for VM deployment.
+- `README.md`: setup, deploy loop, and operations.
+- `docs/PROJECT_PLAN.md`: product direction and phased roadmap.
+- `tests/`: pytest coverage for core helper behavior.
+
+## Archive Surface
+
+- `archive/scripts/`: legacy utility scripts no longer part of active runtime.
+- `archive/services/`: archived service units not used by dashboard server.
+- `archive/docs/`: older setup references retained for historical context.
+
+## Conventions
+
+- Keep dashboard runtime entrypoint stable (`mesh_dashboard.py`).
+- Prefer adding pure helper functions for new logic to improve testability.
+- Any script not used by dashboard runtime belongs in `archive/`.
+- Every substantial feature should include:
+  - tests in `tests/`
+  - docs update in `README.md` or `docs/`

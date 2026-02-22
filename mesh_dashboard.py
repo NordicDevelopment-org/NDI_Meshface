@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-import shutil
 import socket
 import sqlite3
 import threading
@@ -12,9 +11,27 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
-import meshtastic
+try:
+    import meshtastic
+except Exception:
+    meshtastic = None
 from mesh_connection import add_mesh_connection_args, mesh_target_label, open_mesh_interface
-from pubsub import pub
+from meshdash.helpers import (
+    calculate_hops as _calculate_hops,
+    disk_space_info as _disk_space_info,
+    emoji_from_codepoint as _emoji_from_codepoint,
+    extract_emoji_codepoint as _extract_emoji_codepoint,
+    extract_reply_id as _extract_reply_id,
+    format_epoch as _format_epoch,
+    normalize_single_emoji as _normalize_single_emoji,
+    safe_json_loads as _safe_json_loads,
+    to_float as _to_float,
+    to_int as _to_int,
+)
+try:
+    from pubsub import pub
+except Exception:
+    pub = None
 
 try:
     from google.protobuf.json_format import MessageToDict
@@ -62,97 +79,6 @@ def _utc_now() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
 
 
-def _to_int(value: Any) -> Optional[int]:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _to_float(value: Any) -> Optional[float]:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _format_epoch(epoch_value: Any) -> Optional[str]:
-    epoch = _to_int(epoch_value)
-    if epoch is None or epoch <= 0:
-        return None
-    return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
-
-
-def _safe_json_loads(value: str, default: Any) -> Any:
-    try:
-        return json.loads(value)
-    except (TypeError, json.JSONDecodeError):
-        return default
-
-
-def _extract_reply_id(decoded: Any) -> Optional[int]:
-    if not isinstance(decoded, dict):
-        return None
-    for key in ("replyId", "reply_id"):
-        value = _to_int(decoded.get(key))
-        if value is not None and value > 0:
-            return value
-    return None
-
-
-def _extract_emoji_codepoint(decoded: Any) -> Optional[int]:
-    if not isinstance(decoded, dict):
-        return None
-    raw = decoded.get("emoji")
-    if raw is None:
-        return None
-
-    if isinstance(raw, str):
-        clean = raw.strip()
-        if not clean:
-            return None
-        as_int = _to_int(clean)
-        if as_int is not None:
-            return as_int if as_int > 0 else None
-        return ord(clean[0])
-
-    as_int = _to_int(raw)
-    if as_int is None or as_int <= 0:
-        return None
-    return as_int
-
-
-def _emoji_from_codepoint(codepoint: Optional[int]) -> Optional[str]:
-    value = _to_int(codepoint)
-    if value is None or value <= 0:
-        return None
-    try:
-        return chr(value)
-    except (OverflowError, ValueError):
-        return None
-
-
-def _normalize_single_emoji(value: Any) -> Tuple[Optional[str], Optional[int]]:
-    if value is None:
-        return None, None
-    text = str(value).strip()
-    if not text:
-        return None, None
-
-    as_int = _to_int(text)
-    if as_int is not None and as_int > 0:
-        emoji = _emoji_from_codepoint(as_int)
-        if emoji:
-            return emoji, as_int
-        return None, None
-
-    codepoint = ord(text[0])
-    emoji = _emoji_from_codepoint(codepoint)
-    if emoji:
-        return emoji, codepoint
-    return None, None
-
-
 def _send_emoji_reaction_packet(
     iface: Any,
     destination_id: str,
@@ -173,17 +99,6 @@ def _send_emoji_reaction_packet(
     packet.decoded.emoji = int(emoji_codepoint)
     packet.decoded.payload = str(emoji_text or "").encode("utf-8")
     return iface._sendPacket(packet, destinationId=destination_id, wantAck=False)
-
-
-def _calculate_hops(hop_start: Any, hop_limit: Any) -> Optional[int]:
-    start = _to_int(hop_start)
-    limit = _to_int(hop_limit)
-    if start is None or limit is None:
-        return None
-    hops = start - limit
-    if hops < 0:
-        return None
-    return hops
 
 
 def _guess_lan_ipv4() -> Optional[str]:
@@ -233,29 +148,6 @@ def _get_local_node_id(iface: Any) -> str:
     if node_id:
         return node_id
     return f"!{node_num:08x}"
-
-
-def _disk_space_info(path: Optional[str]) -> Dict[str, Any]:
-    probe = os.path.abspath(os.path.expanduser(path or "."))
-    if os.path.isfile(probe):
-        probe = os.path.dirname(probe) or "."
-    try:
-        usage = shutil.disk_usage(probe)
-        total = int(usage.total)
-        free = int(usage.free)
-        used = int(usage.used)
-        free_pct = round((free / total) * 100.0, 1) if total > 0 else None
-        used_pct = round((used / total) * 100.0, 1) if total > 0 else None
-        return {
-            "path": probe,
-            "total_bytes": total,
-            "used_bytes": used,
-            "free_bytes": free,
-            "free_pct": free_pct,
-            "used_pct": used_pct,
-        }
-    except Exception as exc:
-        return {"path": probe, "error": str(exc)}
 
 
 def _apply_default_gateway(args: argparse.Namespace) -> None:
@@ -5200,6 +5092,14 @@ def _make_http_handler(html_text: str, state_fn, node_history_fn=None, send_chat
 
 
 def run_dashboard(args: argparse.Namespace) -> None:
+    if meshtastic is None:
+        raise RuntimeError(
+            "meshtastic Python package is required. Install with: pip install meshtastic"
+        )
+    if pub is None:
+        raise RuntimeError(
+            "pypubsub is required. Install with: pip install pypubsub"
+        )
     target = mesh_target_label(args)
     print(f"Connecting to {target} ...")
     iface = open_mesh_interface(args)

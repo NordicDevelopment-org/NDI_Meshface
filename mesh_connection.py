@@ -1,7 +1,11 @@
 import argparse
 
-import meshtastic.serial_interface
-import meshtastic.tcp_interface
+try:
+    import meshtastic.serial_interface as _meshtastic_serial_interface
+    import meshtastic.tcp_interface as _meshtastic_tcp_interface
+except Exception:
+    _meshtastic_serial_interface = None
+    _meshtastic_tcp_interface = None
 
 
 DEFAULT_MESH_PORT = "/dev/ttyACM0"
@@ -30,12 +34,16 @@ def add_mesh_connection_args(
 
 
 def open_mesh_interface(args: argparse.Namespace):
+    if _meshtastic_serial_interface is None or _meshtastic_tcp_interface is None:
+        raise RuntimeError(
+            "meshtastic Python package is required. Install with: pip install meshtastic"
+        )
     if getattr(args, "mesh_host", None):
-        return meshtastic.tcp_interface.TCPInterface(
+        return _meshtastic_tcp_interface.TCPInterface(
             hostname=args.mesh_host,
             portNumber=args.mesh_tcp_port,
         )
-    return meshtastic.serial_interface.SerialInterface(devPath=args.mesh_port)
+    return _meshtastic_serial_interface.SerialInterface(devPath=args.mesh_port)
 
 
 def mesh_target_label(args: argparse.Namespace) -> str:

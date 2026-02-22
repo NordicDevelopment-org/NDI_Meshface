@@ -4,6 +4,15 @@ Web dashboard for Meshtastic networks with live map, node tables, chat room, and
 
 This repo is focused on running `mesh_dashboard.py` as a website you can open from desktop/mobile on your LAN.
 
+## Project Direction
+
+This project is moving toward a **Teams-like mesh chat experience** where chat is primary and map/node/history panels act as contextual intelligence in the same window.
+
+Planning docs:
+
+- `docs/PROJECT_PLAN.md`
+- `docs/REPO_STRUCTURE.md`
+
 ## What This Website Does
 
 - Live network map with node markers and link lines.
@@ -18,6 +27,7 @@ This repo is focused on running `mesh_dashboard.py` as a website you can open fr
 
 - `mesh_dashboard.py`: main web app.
 - `mesh_connection.py`: serial/TCP connection helper.
+- `meshdash/helpers.py`: shared pure helper functions (time/parsing/hops/reaction helpers).
 - `meshtastic-dashboard.service`: systemd unit for dashboard website.
 - `README.md`: setup + operations guide for this dashboard server.
 
@@ -165,6 +175,20 @@ ls -lh /home/j/mesh/mesh_dashboard_history.sqlite3
 ```
 
 If UI seems stale after deploy, hard-refresh browser (`Ctrl+Shift+R`).
+
+## Development and Tests
+
+Install dev dependency:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Run tests:
+
+```bash
+pytest
+```
 
 ## Security Notes
 
