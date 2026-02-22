@@ -1,4 +1,3 @@
-import json
 from http.server import BaseHTTPRequestHandler
 from typing import Any, Callable, Optional
 from urllib.parse import urlparse
@@ -10,6 +9,7 @@ from .api_inputs import (
     validate_content_length,
 )
 from .helpers import to_int
+from .http_responses import write_html_response, write_json_response, write_text_response
 from .services import empty_node_history, empty_online_activity
 
 
@@ -29,22 +29,11 @@ def make_http_handler(
                 path = parsed.path
 
                 if path in ("/", "/index.html"):
-                    body = html_text.encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.send_header("Content-Length", str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
+                    write_html_response(self, html_text=html_text)
                     return
 
                 if path == "/api/state":
-                    payload = json.dumps(state_fn(), separators=(",", ":")).encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
+                    write_json_response(self, status_code=200, payload_obj=state_fn(), no_store=True)
                     return
 
                 if path == "/api/history/node":
@@ -56,13 +45,7 @@ def make_http_handler(
                         response_obj = empty_node_history(node_id)
                     else:
                         response_obj = node_history_fn(node_id, hours_override, points_override)
-                    payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
+                    write_json_response(self, status_code=200, payload_obj=response_obj, no_store=True)
                     return
 
                 if path == "/api/history/online":
@@ -79,19 +62,10 @@ def make_http_handler(
                         response_obj = empty_online_activity(clean_hours)
                     else:
                         response_obj = online_activity_fn(hours_override)
-                    payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
+                    write_json_response(self, status_code=200, payload_obj=response_obj, no_store=True)
                     return
 
-                self.send_response(404)
-                self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(b"Not Found")
+                write_text_response(self, status_code=404, text="Not Found")
             except (BrokenPipeError, ConnectionResetError):
                 return
 
@@ -100,22 +74,19 @@ def make_http_handler(
                 parsed = urlparse(self.path)
                 path = parsed.path
                 if path != "/api/chat/send":
-                    self.send_response(404)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.end_headers()
-                    self.wfile.write(b'{"ok":false,"error":"Not Found"}')
+                    write_json_response(
+                        self,
+                        status_code=404,
+                        payload_obj={"ok": False, "error": "Not Found"},
+                    )
                     return
 
                 if send_chat_fn is None:
-                    payload = json.dumps(
-                        {"ok": False, "error": "Chat send is not enabled on this dashboard instance"},
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    self.send_response(503)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
+                    write_json_response(
+                        self,
+                        status_code=503,
+                        payload_obj={"ok": False, "error": "Chat send is not enabled on this dashboard instance"},
+                    )
                     return
 
                 try:
@@ -124,15 +95,11 @@ def make_http_handler(
                         to_int_fn=to_int_fn,
                     )
                 except ValueError:
-                    payload = json.dumps(
-                        {"ok": False, "error": "Invalid request size"},
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    self.send_response(400)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
+                    write_json_response(
+                        self,
+                        status_code=400,
+                        payload_obj={"ok": False, "error": "Invalid request size"},
+                    )
                     return
 
                 raw = self.rfile.read(content_length)
@@ -148,35 +115,21 @@ def make_http_handler(
                         emoji=chat_request["emoji"],
                     )
                 except ValueError as exc:
-                    payload = json.dumps(
-                        {"ok": False, "error": str(exc)},
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    self.send_response(400)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
+                    write_json_response(
+                        self,
+                        status_code=400,
+                        payload_obj={"ok": False, "error": str(exc)},
+                    )
                     return
                 except Exception as exc:
-                    payload = json.dumps(
-                        {"ok": False, "error": f"Send failed: {exc}"},
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    self.send_response(500)
-                    self.send_header("Content-Type", "application/json; charset=utf-8")
-                    self.send_header("Content-Length", str(len(payload)))
-                    self.end_headers()
-                    self.wfile.write(payload)
+                    write_json_response(
+                        self,
+                        status_code=500,
+                        payload_obj={"ok": False, "error": f"Send failed: {exc}"},
+                    )
                     return
 
-                payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json; charset=utf-8")
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
+                write_json_response(self, status_code=200, payload_obj=response_obj, no_store=True)
             except (BrokenPipeError, ConnectionResetError):
                 return
 
