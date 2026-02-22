@@ -3837,6 +3837,89 @@ def _render_html(
     [data-theme="dark"] a {{
       color: #86ffd2;
     }}
+    /* Fallout mode: white borders + green text */
+    [data-theme="dark"] {{
+      --fallout-text: #a4ffbf;
+      --fallout-text-soft: #7ae89f;
+      --fallout-border: #ffffff;
+    }}
+    [data-theme="dark"] body,
+    [data-theme="dark"] .workspace-shell,
+    [data-theme="dark"] .workspace-main,
+    [data-theme="dark"] .workspace-shell * {{
+      color: var(--fallout-text);
+    }}
+    [data-theme="dark"] .topbar,
+    [data-theme="dark"] .teams-rail,
+    [data-theme="dark"] .chat-left-panel,
+    [data-theme="dark"] .card,
+    [data-theme="dark"] .pill,
+    [data-theme="dark"] .selection-btn,
+    [data-theme="dark"] .theme-btn,
+    [data-theme="dark"] .disk-meter,
+    [data-theme="dark"] .rail-btn,
+    [data-theme="dark"] .chat-channel-item,
+    [data-theme="dark"] .chat-member-item,
+    [data-theme="dark"] .metric,
+    [data-theme="dark"] .chat-feed-item,
+    [data-theme="dark"] .chat-endpoint .chat-id-bg,
+    [data-theme="dark"] .chat-feed-hops,
+    [data-theme="dark"] .chat-reaction-chip,
+    [data-theme="dark"] .chat-reply-btn,
+    [data-theme="dark"] .chat-react-btn,
+    [data-theme="dark"] .chat-retry-btn,
+    [data-theme="dark"] .chat-delivery-pill,
+    [data-theme="dark"] .chat-reaction-popover,
+    [data-theme="dark"] .chat-reaction-popover-head,
+    [data-theme="dark"] .chat-reaction-popover-more,
+    [data-theme="dark"] .chat-reaction-popover-avatar,
+    [data-theme="dark"] .chat-composer,
+    [data-theme="dark"] .chat-reply-context,
+    [data-theme="dark"] #chat-input,
+    [data-theme="dark"] #chat-send-btn,
+    [data-theme="dark"] #chat-emoji-btn,
+    [data-theme="dark"] .chat-emoji-panel,
+    [data-theme="dark"] .chat-emoji-item,
+    [data-theme="dark"] table,
+    [data-theme="dark"] th,
+    [data-theme="dark"] td,
+    [data-theme="dark"] details,
+    [data-theme="dark"] #live-console,
+    [data-theme="dark"] pre,
+    [data-theme="dark"] .console-controls button {{
+      border-color: var(--fallout-border) !important;
+    }}
+    [data-theme="dark"] .chat-feed-meta,
+    [data-theme="dark"] .chat-feed-time,
+    [data-theme="dark"] .chat-feed-arrow,
+    [data-theme="dark"] .chat-reply-inline,
+    [data-theme="dark"] .chat-reply-inline .chat-reply-inline-text,
+    [data-theme="dark"] .chat-reaction-count,
+    [data-theme="dark"] .chat-member-id,
+    [data-theme="dark"] .chat-channel-meta,
+    [data-theme="dark"] .chat-send-status,
+    [data-theme="dark"] .metric .label,
+    [data-theme="dark"] .chat-left-label,
+    [data-theme="dark"] .chat-left-sub,
+    [data-theme="dark"] .teams-rail-title {{
+      color: var(--fallout-text-soft) !important;
+    }}
+    [data-theme="dark"] #chat-input::placeholder {{
+      color: var(--fallout-text-soft) !important;
+      opacity: 0.95;
+    }}
+    [data-theme="dark"] .rail-btn.active {{
+      background: #0f3b22;
+      border-color: var(--fallout-border) !important;
+      color: #e9fff0 !important;
+    }}
+    [data-theme="dark"] .chat-feed-item.selected-node {{
+      background: #123520;
+      border-color: var(--fallout-border) !important;
+    }}
+    [data-theme="dark"] .leaflet-tile {{
+      filter: brightness(0.35) invert(0.95) hue-rotate(150deg) saturate(1.05) contrast(1.22);
+    }}
     @media (max-width: 1100px) {{
       .workspace-shell {{
         grid-template-columns: 1fr;
