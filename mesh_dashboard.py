@@ -68,6 +68,7 @@ DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS = 365
 DEFAULT_NODE_HISTORY_HOURS = 72
 DEFAULT_NODE_HISTORY_MAX_POINTS = 1440
 DEFAULT_CHAT_MAX_BYTES = 220
+DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS = 90
 MIN_REAL_LINK_COUNT = 2
 DEFAULT_APP_VERSION = _package_version or "0.1.0"
 UNKNOWN_GIT_COMMIT = "nogit"
@@ -84,6 +85,17 @@ SENSITIVE_FIELD_NAMES = {
 
 def _utc_now() -> str:
     return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+
+
+def _parse_utc_text_to_unix(value: Any) -> Optional[int]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.strptime(text, "%Y-%m-%d %H:%M:%SZ")
+    except Exception:
+        return None
+    return int(parsed.replace(tzinfo=timezone.utc).timestamp())
 
 
 def _sanitize_revision_token(raw: Any, fallback: str) -> str:
@@ -149,6 +161,7 @@ def _send_emoji_reaction_packet(
     reply_id: int,
     emoji_codepoint: int,
     emoji_text: str,
+    want_ack: bool = False,
 ) -> Any:
     if mesh_pb2 is None or portnums_pb2 is None:
         raise RuntimeError("Meshtastic protobuf modules are unavailable for emoji reactions")
@@ -161,7 +174,7 @@ def _send_emoji_reaction_packet(
     packet.decoded.reply_id = int(reply_id)
     packet.decoded.emoji = int(emoji_codepoint)
     packet.decoded.payload = str(emoji_text or "").encode("utf-8")
-    return iface._sendPacket(packet, destinationId=destination_id, wantAck=False)
+    return iface._sendPacket(packet, destinationId=destination_id, wantAck=bool(want_ack))
 
 
 def _guess_lan_ipv4() -> Optional[str]:
@@ -1220,6 +1233,7 @@ class DashboardTracker:
     def __init__(self, packet_limit: int, history_store: Optional[HistoryStore] = None) -> None:
         self._lock = threading.Lock()
         self._history_store = history_store
+        self._chat_delivery_timeout_seconds = DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS
         self.live_packet_count = 0
         self.edges: Dict[Tuple[str, str], Dict[str, Any]] = {}
         self._historical_edges: Dict[Tuple[str, str], Dict[str, Any]] = {}
@@ -1260,6 +1274,109 @@ class DashboardTracker:
             return {}
         return self._history_store.load_node_saved_counts()
 
+    def _chat_message_id(self, entry: Any) -> Optional[int]:
+        if not isinstance(entry, dict):
+            return None
+        return _to_int(
+            entry.get("message_id")
+            or entry.get("messageId")
+            or entry.get("packet_id")
+            or entry.get("packetId")
+        )
+
+    def _set_delivery_state_unlocked(
+        self,
+        message_id: Any,
+        state: str,
+        error: Optional[str] = None,
+    ) -> bool:
+        clean_message_id = _to_int(message_id)
+        if clean_message_id is None or clean_message_id <= 0:
+            return False
+
+        target: Optional[Dict[str, Any]] = None
+        for entry in reversed(self.recent_chat):
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("local_echo") is not True:
+                continue
+            if self._chat_message_id(entry) != clean_message_id:
+                continue
+            target = entry
+            break
+
+        if target is None:
+            return False
+
+        target["delivery_state"] = str(state or "sent")
+        target["delivery_updated_at"] = _utc_now()
+        target["delivery_updated_unix"] = int(time.time())
+        if error:
+            target["delivery_error"] = str(error)
+        else:
+            target.pop("delivery_error", None)
+        return True
+
+    def _extract_routing_delivery_update_unlocked(self, decoded: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(decoded, dict):
+            return None
+        portnum = str(decoded.get("portnum") or "")
+        if portnum != "ROUTING_APP":
+            return None
+        routing = decoded.get("routing")
+        if not isinstance(routing, dict):
+            return None
+
+        request_id = (
+            _to_int(routing.get("requestId"))
+            or _to_int(routing.get("request_id"))
+            or _to_int(decoded.get("requestId"))
+            or _to_int(decoded.get("request_id"))
+        )
+        if request_id is None or request_id <= 0:
+            return None
+
+        error_reason = str(
+            routing.get("errorReason")
+            or routing.get("error_reason")
+            or ""
+        ).strip()
+        if not error_reason or error_reason.upper() == "NONE":
+            return {"request_id": request_id, "state": "acked", "error": None}
+        return {"request_id": request_id, "state": "nak", "error": error_reason}
+
+    def _expire_pending_deliveries_unlocked(self) -> None:
+        now_unix = int(time.time())
+        timeout_seconds = max(1, int(self._chat_delivery_timeout_seconds))
+        for entry in self.recent_chat:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("local_echo") is not True:
+                continue
+            if entry.get("ack_requested") is not True:
+                continue
+            if str(entry.get("delivery_state") or "") != "pending":
+                continue
+
+            pending_since = (
+                _to_int(entry.get("delivery_updated_unix"))
+                or _parse_utc_text_to_unix(entry.get("delivery_updated_at"))
+                or _parse_utc_text_to_unix(entry.get("captured_at"))
+                or _parse_utc_text_to_unix(entry.get("rx_time"))
+            )
+            if pending_since is None:
+                pending_since = now_unix
+                entry["delivery_updated_unix"] = pending_since
+                entry["delivery_updated_at"] = _utc_now()
+
+            if now_unix - pending_since < timeout_seconds:
+                continue
+
+            entry["delivery_state"] = "timeout"
+            entry["delivery_error"] = "No ACK received before timeout"
+            entry["delivery_updated_unix"] = now_unix
+            entry["delivery_updated_at"] = _utc_now()
+
     def record_local_chat(
         self,
         text: str,
@@ -1271,6 +1388,8 @@ class DashboardTracker:
         emoji: Optional[str] = None,
         emoji_codepoint: Optional[int] = None,
         is_reaction: bool = False,
+        ack_requested: bool = False,
+        retry_of: Optional[int] = None,
     ) -> None:
         clean_text = str(text or "").strip()
         clean_message_id = _to_int(message_id)
@@ -1284,14 +1403,29 @@ class DashboardTracker:
         )
         if not clean_text and not has_reaction:
             return
+        now_text = _utc_now()
+        now_unix = int(time.time())
+        should_track_delivery = bool(ack_requested and not has_reaction and str(to_id or "^all") != "^all")
+        delivery_state = "sent"
+        delivery_error: Optional[str] = None
+        if should_track_delivery:
+            if clean_message_id is not None and clean_message_id > 0:
+                delivery_state = "pending"
+            else:
+                delivery_state = "error"
+                delivery_error = "Delivery tracking unavailable (missing packet id)"
         entry = {
-            "captured_at": _utc_now(),
+            "captured_at": now_text,
             "from": str(from_id or "local"),
             "to": str(to_id or "^all"),
             "portnum": "TEXT_MESSAGE_APP",
             "channel": int(channel_index) if isinstance(channel_index, int) else 0,
-            "rx_time": _utc_now(),
+            "rx_time": now_text,
             "text": clean_text,
+            "local_echo": True,
+            "delivery_state": delivery_state,
+            "delivery_updated_at": now_text,
+            "delivery_updated_unix": now_unix,
         }
         if clean_message_id is not None and clean_message_id > 0:
             entry["message_id"] = clean_message_id
@@ -1303,6 +1437,13 @@ class DashboardTracker:
             entry["emoji_codepoint"] = clean_emoji_codepoint
         if has_reaction:
             entry["is_reaction"] = True
+        if should_track_delivery:
+            entry["ack_requested"] = True
+        if delivery_error:
+            entry["delivery_error"] = delivery_error
+        clean_retry_of = _to_int(retry_of)
+        if clean_retry_of is not None and clean_retry_of > 0:
+            entry["retry_of"] = clean_retry_of
         with self._lock:
             self.recent_chat.append(entry)
             if self._history_store is not None:
@@ -1327,6 +1468,13 @@ class DashboardTracker:
         emoji_codepoint = _extract_emoji_codepoint(decoded)
         emoji_glyph = _emoji_from_codepoint(emoji_codepoint)
         is_reaction = bool(reply_id is not None and reply_id > 0 and emoji_glyph)
+        delivery_update = self._extract_routing_delivery_update_unlocked(decoded)
+        if delivery_update is not None:
+            self._set_delivery_state_unlocked(
+                delivery_update.get("request_id"),
+                str(delivery_update.get("state") or "sent"),
+                delivery_update.get("error"),
+            )
         if portnum is not None:
             self.port_counts[str(portnum)] += 1
 
@@ -1465,8 +1613,11 @@ class DashboardTracker:
             if self._history_store is not None and include_live_count:
                 self._history_store.save_chat(chat_entry)
 
+        self._expire_pending_deliveries_unlocked()
+
     def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         with self._lock:
+            self._expire_pending_deliveries_unlocked()
             edge_rows: list[Dict[str, Any]] = []
             real_edge_count = 0
             combined_keys = set(self.edges.keys()) | set(self._historical_edges.keys())
@@ -2670,6 +2821,54 @@ def _render_html(
       background: #e8f4eb;
       border-color: #9ec2a8;
     }}
+    .chat-retry-btn {{
+      border: 1px solid #d5bb80;
+      background: #fff8e7;
+      color: #7a4e12;
+      border-radius: 999px;
+      padding: 1px 8px;
+      font-size: 10px;
+      line-height: 1.4;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .chat-retry-btn:hover {{
+      background: #fff2d3;
+      border-color: #be9c54;
+    }}
+    .chat-delivery-pill {{
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid #cfdccc;
+      border-radius: 999px;
+      padding: 1px 7px;
+      font-size: 10px;
+      line-height: 1.35;
+      white-space: nowrap;
+      margin-left: 2px;
+    }}
+    .chat-delivery-pill.state-pending {{
+      background: #fff8e5;
+      border-color: #e0c88f;
+      color: #7a5a20;
+    }}
+    .chat-delivery-pill.state-sent {{
+      background: #eff6ef;
+      border-color: #c5d8c7;
+      color: #3c6648;
+    }}
+    .chat-delivery-pill.state-acked {{
+      background: #e7f5eb;
+      border-color: #9ec8aa;
+      color: #1f6138;
+    }}
+    .chat-delivery-pill.state-nak,
+    .chat-delivery-pill.state-timeout,
+    .chat-delivery-pill.state-error {{
+      background: #fff0f0;
+      border-color: #dfadad;
+      color: #8a2c2c;
+    }}
     .chat-feed-text {{
       font-size: 12px;
       color: #173827;
@@ -3413,6 +3612,7 @@ def _render_html(
     const wheelActivationLeaseMs = 1400;
     const knownLayoutViews = new Set(["chat", "network", "packets", "data", "all"]);
     const knownChatChannels = new Set(["all", "direct"]);
+    const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const sortableTables = new Set(Object.keys(tableSortState));
     const consoleLines = [];
     const consoleKeyQueue = [];
@@ -3807,6 +4007,40 @@ def _render_html(
       return key === "direct" ? "Peer-to-peer" : "Everyone";
     }}
 
+    function normalizeDeliveryState(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return knownDeliveryStates.has(clean) ? clean : "";
+    }}
+
+    function deliveryStateLabel(state) {{
+      const clean = normalizeDeliveryState(state);
+      if (clean === "pending") return "Pending";
+      if (clean === "acked") return "Delivered";
+      if (clean === "nak") return "Failed";
+      if (clean === "timeout") return "Timed out";
+      if (clean === "error") return "Error";
+      if (clean === "sent") return "Sent";
+      return "";
+    }}
+
+    function deliveryStateTitle(state, errorText = "") {{
+      const clean = normalizeDeliveryState(state);
+      const detail = String(errorText || "").trim();
+      if (!clean) return "";
+      if (detail) return `${{deliveryStateLabel(clean)}}. ${{detail}}`;
+      if (clean === "pending") return "Awaiting mesh ACK";
+      if (clean === "acked") return "ACK received";
+      if (clean === "nak") return "NAK received";
+      if (clean === "timeout") return "No ACK received before timeout";
+      if (clean === "error") return "Delivery status error";
+      return "Message sent";
+    }}
+
+    function isRetryableDeliveryState(state) {{
+      const clean = normalizeDeliveryState(state);
+      return clean === "nak" || clean === "timeout" || clean === "error";
+    }}
+
     function compactInlineMessage(value, maxLen = 88) {{
       const text = String(value == null ? "" : value).replace(/\\s+/g, " ").trim();
       if (!text) return "(no text)";
@@ -3999,7 +4233,12 @@ def _render_html(
         if (destination === "^all") {{
           setChatSendStatus(`${{replied ? "Reply sent" : "Sent"}} to Everyone at ${{payload.sent_at || "now"}}`);
         }} else {{
-          setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} at ${{payload.sent_at || "now"}}`);
+          const awaitingAck = payload.ack_requested === true && normalizeDeliveryState(payload.delivery_state) === "pending";
+          if (awaitingAck) {{
+            setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} at ${{payload.sent_at || "now"}} (awaiting ACK)`);
+          }} else {{
+            setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} at ${{payload.sent_at || "now"}}`);
+          }}
         }}
       }}
     }}
@@ -4030,6 +4269,46 @@ def _render_html(
       );
       if (payload && payload.ok) {{
         setChatSendStatus(`Reacted ${{cleanEmoji}} at ${{payload.sent_at || "now"}}`);
+      }}
+    }}
+
+    async function retryChatMessage(options) {{
+      const text = String((options && options.text) || "").trim();
+      if (!text) {{
+        setChatSendStatus("Cannot retry: message text is empty.", true);
+        return;
+      }}
+
+      let destination = String((options && options.destination) || "^all").trim() || "^all";
+      if (destination.toLowerCase() === "all" || destination.toLowerCase() === "broadcast") {{
+        destination = "^all";
+      }}
+      if (!(destination === "^all" || destination.startsWith("!"))) {{
+        setChatSendStatus("Cannot retry: destination is invalid.", true);
+        return;
+      }}
+
+      const channelRaw = Number(options && options.channel_index);
+      const channelIndex = Number.isInteger(channelRaw) && channelRaw >= 0 ? channelRaw : 0;
+      const replyRaw = Number(options && options.reply_id);
+      const retryOfRaw = Number(options && options.retry_of);
+
+      const body = {{
+        text,
+        destination,
+        channel_index: channelIndex,
+      }};
+      if (Number.isInteger(replyRaw) && replyRaw > 0) {{
+        body.reply_id = replyRaw;
+      }}
+      if (Number.isInteger(retryOfRaw) && retryOfRaw > 0) {{
+        body.retry_of = retryOfRaw;
+      }}
+
+      const payload = await sendChatPayload(body, null);
+      if (payload && payload.ok) {{
+        const destLabel = destination === "^all" ? "Everyone" : destination;
+        setChatSendStatus(`Retried to ${{destLabel}} at ${{payload.sent_at || "now"}}`);
       }}
     }}
 
@@ -4922,6 +5201,24 @@ def _render_html(
       }}
     }}
 
+    function bindChatRetryControls() {{
+      for (const btn of document.querySelectorAll("#chat-feed .chat-retry-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (chatSendInFlight) return;
+          retryChatMessage({
+            text: btn.dataset.retryText || "",
+            destination: btn.dataset.retryDestination || "^all",
+            channel_index: Number(btn.dataset.retryChannel || "0"),
+            reply_id: Number(btn.dataset.retryReplyId || ""),
+            retry_of: Number(btn.dataset.retryOf || ""),
+          });
+        }});
+      }}
+    }}
+
     function bindSelectionControls() {{
       const btn = document.getElementById("clear-selection-btn");
       if (!btn || btn.dataset.bound === "1") return;
@@ -5646,11 +5943,27 @@ def _render_html(
               }})
               .join("")
           : "";
+        const isLocalEcho = msg.local_echo === true || msg.localEcho === true;
+        const deliveryState = normalizeDeliveryState(msg.delivery_state ?? msg.deliveryState);
+        const deliveryError = String(msg.delivery_error ?? msg.deliveryError ?? "").trim();
+        const deliveryLabel = isLocalEcho ? deliveryStateLabel(deliveryState) : "";
+        const deliveryTitle = isLocalEcho ? deliveryStateTitle(deliveryState, deliveryError) : "";
+        const deliveryChip = (isLocalEcho && deliveryLabel)
+          ? `<span class="chat-delivery-pill state-${{escAttr(deliveryState)}}" title="${{escAttr(deliveryTitle)}}">${{escAttr(deliveryLabel)}}</span>`
+          : "";
+        const retryReplyId = Number.isInteger(replyToId) && replyToId > 0 ? replyToId : "";
         const replyButton = canReply
           ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message">Reply</button>`
           : "";
         const reactButton = messageId
           ? `<button type="button" class="chat-react-btn" data-reply-id="${{escAttr(messageId)}}" title="React to this message">😊+</button>`
+          : "";
+        const retryButton = (
+          isLocalEcho
+          && isRetryableDeliveryState(deliveryState)
+          && String(msg.text || "").trim()
+        )
+          ? `<button type="button" class="chat-retry-btn" data-retry-text="${{escAttr(String(msg.text || ""))}}" data-retry-destination="${{escAttr(String(msg.to || "^all"))}}" data-retry-channel="${{escAttr(msg.channel ?? 0)}}" data-retry-reply-id="${{escAttr(retryReplyId)}}" data-retry-of="${{escAttr(messageId || "")}}" title="Retry this message">Retry</button>`
           : "";
         const reactionRow = reactionChips
           ? `<div class="chat-reaction-row">${{reactionChips}}</div>`
@@ -5667,7 +5980,8 @@ def _render_html(
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
             ${{hasHop ? `<span class="chat-feed-hops" title="${{escAttr(hopTitle)}}">${{escAttr(hopLabel)}}</span>` : ""}}
-            <span class="chat-feed-actions">${{replyButton}}${{reactButton}}</span>
+            <span class="chat-feed-actions">${{replyButton}}${{reactButton}}${{retryButton}}</span>
+            ${{deliveryChip}}
             <span class="chat-feed-time">${{escAttr(timeText)}}</span>
           </div>
           ${{replyPreview}}
@@ -5730,6 +6044,7 @@ def _render_html(
       bindChatAutoScroll();
       bindChatFeedClicks();
       bindChatReactionControls();
+      bindChatRetryControls();
       highlightNodeSelection();
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
@@ -5938,6 +6253,7 @@ def _make_http_handler(html_text: str, state_fn, node_history_fn=None, send_chat
                 destination = body.get("destination") if isinstance(body, dict) else None
                 channel_index = _to_int(body.get("channel_index")) if isinstance(body, dict) else None
                 reply_id = _to_int(body.get("reply_id")) if isinstance(body, dict) else None
+                retry_of = _to_int(body.get("retry_of")) if isinstance(body, dict) else None
                 emoji = body.get("emoji") if isinstance(body, dict) else None
 
                 try:
@@ -5946,6 +6262,7 @@ def _make_http_handler(html_text: str, state_fn, node_history_fn=None, send_chat
                         destination=destination,
                         channel_index=channel_index,
                         reply_id=reply_id,
+                        retry_of=retry_of,
                         emoji=emoji,
                     )
                 except ValueError as exc:
@@ -6060,10 +6377,12 @@ def run_dashboard(args: argparse.Namespace) -> None:
         destination: Any = None,
         channel_index: Optional[int] = None,
         reply_id: Optional[int] = None,
+        retry_of: Optional[int] = None,
         emoji: Any = None,
     ) -> Dict[str, Any]:
         clean_text = str(text or "").strip()
         clean_reply_id = _to_int(reply_id)
+        clean_retry_of = _to_int(retry_of)
         clean_emoji, clean_emoji_codepoint = _normalize_single_emoji(emoji)
 
         has_reaction = bool(
@@ -6092,6 +6411,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
             raise ValueError("Destination must be '^all' or a node id like !abcdef12")
 
         chan = channel_index if isinstance(channel_index, int) and channel_index >= 0 else 0
+        should_request_ack = bool(dest != "^all" and not has_reaction)
         sent_packet: Any
         with send_lock:
             if has_reaction:
@@ -6102,17 +6422,25 @@ def run_dashboard(args: argparse.Namespace) -> None:
                     reply_id=clean_reply_id,
                     emoji_codepoint=clean_emoji_codepoint,
                     emoji_text=clean_emoji,
+                    want_ack=False,
                 )
             else:
                 sent_packet = iface.sendText(
                     clean_text,
                     destinationId=dest,
+                    wantAck=should_request_ack,
                     channelIndex=chan,
                     replyId=clean_reply_id if clean_reply_id and clean_reply_id > 0 else None,
                 )
 
         local_id = _get_local_node_id(iface)
         sent_packet_id = _to_int(getattr(sent_packet, "id", None))
+        delivery_state = "sent"
+        if should_request_ack:
+            if sent_packet_id is not None and sent_packet_id > 0:
+                delivery_state = "pending"
+            else:
+                delivery_state = "error"
         tracker.record_local_chat(
             text=clean_text if clean_text else "",
             from_id=local_id,
@@ -6123,6 +6451,8 @@ def run_dashboard(args: argparse.Namespace) -> None:
             emoji=clean_emoji,
             emoji_codepoint=clean_emoji_codepoint,
             is_reaction=has_reaction,
+            ack_requested=should_request_ack,
+            retry_of=clean_retry_of,
         )
         response = {
             "ok": True,
@@ -6132,7 +6462,11 @@ def run_dashboard(args: argparse.Namespace) -> None:
             "channel_index": chan,
             "message_id": sent_packet_id,
             "reply_id": clean_reply_id,
+            "ack_requested": should_request_ack,
+            "delivery_state": delivery_state,
         }
+        if clean_retry_of is not None and clean_retry_of > 0:
+            response["retry_of"] = clean_retry_of
         if has_reaction:
             response["reaction"] = clean_emoji
             response["reaction_codepoint"] = clean_emoji_codepoint

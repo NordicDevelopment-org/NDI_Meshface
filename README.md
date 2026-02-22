@@ -156,6 +156,8 @@ Important knobs:
 - Current UI sends to broadcast room (`^all`) on channel `0`.
 - Message byte limit is enforced (`220` UTF-8 bytes).
 - Sent messages are also echoed into dashboard chat history immediately.
+- Direct peer-to-peer text messages request mesh ACK and now show delivery state (`Pending`, `Delivered`, `Failed`, `Timed out`) in chat.
+- Failed direct sends can be retried from the message row using `Retry`.
 
 ## Troubleshooting
 
