@@ -1806,19 +1806,23 @@ def _render_html(
     .layout {{
       --split-left-pct: 64%;
       --splitter-size: 8px;
-      --split-top-px: 500px;
-      --split-mid-px: 300px;
+      --split-top-px: 430px;
+      --split-mid-px: 250px;
+      --split-low-px: 240px;
       display: grid;
       gap: 8px;
       padding: 8px;
       grid-template-columns: minmax(380px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
       grid-template-rows:
         auto
-        minmax(260px, var(--split-top-px))
+        minmax(240px, var(--split-top-px))
         var(--splitter-size)
-        minmax(200px, var(--split-mid-px))
+        minmax(180px, var(--split-mid-px))
         var(--splitter-size)
+        minmax(260px, 380px)
         auto
+        minmax(160px, var(--split-low-px))
+        var(--splitter-size)
         auto;
       align-items: stretch;
     }}
@@ -1855,8 +1859,8 @@ def _render_html(
     .metric .value {{ font-size: 15px; font-weight: 700; margin-top: 2px; line-height: 1.1; }}
     .summary {{ grid-column: 1 / span 3; grid-row: 1; }}
     .map {{
-      grid-column: 3;
-      grid-row: 2;
+      grid-column: 1 / span 3;
+      grid-row: 6;
       display: flex;
       flex-direction: column;
       min-height: 0;
@@ -1888,15 +1892,15 @@ def _render_html(
       min-height: 0;
     }}
     .chat {{
-      grid-column: 1;
+      grid-column: 1 / span 3;
       grid-row: 2;
       display: flex;
       flex-direction: column;
       min-height: 0;
     }}
     .map-data {{
-      grid-column: 3;
-      grid-row: 4;
+      grid-column: 1 / span 3;
+      grid-row: 7;
       display: flex;
       flex-direction: column;
       min-height: 0;
@@ -2021,7 +2025,7 @@ def _render_html(
       line-height: 1.2;
     }}
     .nodes {{
-      grid-column: 1;
+      grid-column: 1 / span 3;
       grid-row: 4;
       display: flex;
       flex-direction: column;
@@ -2035,9 +2039,9 @@ def _render_html(
       max-height: none;
       min-height: 0;
     }}
-    .packets {{ grid-column: 1; grid-row: 6; }}
-    .raw {{ grid-column: 3; grid-row: 6; }}
-    .console {{ grid-column: 1 / span 3; grid-row: 7; }}
+    .packets {{ grid-column: 1; grid-row: 8; }}
+    .raw {{ grid-column: 3; grid-row: 8; }}
+    .console {{ grid-column: 1 / span 3; grid-row: 10; }}
     .splitter {{
       grid-column: 2;
       position: relative;
@@ -2049,9 +2053,7 @@ def _render_html(
       user-select: none;
       min-width: 6px;
     }}
-    .splitter[data-row="2"] {{ grid-row: 2; }}
-    .splitter[data-row="4"] {{ grid-row: 4; }}
-    .splitter[data-row="6"] {{ grid-row: 6; }}
+    .splitter[data-row="8"] {{ grid-row: 8; }}
     .splitter::before {{
       content: "";
       position: absolute;
@@ -2079,6 +2081,7 @@ def _render_html(
     }}
     .hsplitter[data-target="top"] {{ grid-row: 3; }}
     .hsplitter[data-target="mid"] {{ grid-row: 5; }}
+    .hsplitter[data-target="low"] {{ grid-row: 9; }}
     .hsplitter::before {{
       content: "";
       position: absolute;
@@ -2818,8 +2821,6 @@ def _render_html(
       </div>
     </section>
 
-    <div class="splitter" data-row="2" title="Drag to resize columns"></div>
-
     <section class="card map">
       <h2 id="map-card-title">Network Map</h2>
       <div class="body">
@@ -2844,8 +2845,6 @@ def _render_html(
         </table>
       </div>
     </section>
-
-    <div class="splitter" data-row="4" title="Drag to resize columns"></div>
 
     <section class="card map-data">
       <h2 id="map-data-title">Map Data</h2>
@@ -2906,7 +2905,7 @@ def _render_html(
       </div>
     </section>
 
-    <div class="splitter" data-row="6" title="Drag to resize columns"></div>
+    <div class="splitter" data-row="8" title="Drag to resize packet/raw columns"></div>
 
     <section class="card raw">
       <h2>Raw Data</h2>
@@ -2919,6 +2918,8 @@ def _render_html(
         <details><summary>nodes_full</summary><pre id="raw-nodes-full"></pre></details>
       </div>
     </section>
+
+    <div class="hsplitter" data-target="low" title="Drag to resize lower panels and console"></div>
 
     <section class="card console">
       <h2>Realtime Console</h2>
@@ -2991,8 +2992,9 @@ def _render_html(
     let lastMapSignature = "";
     let mapResizeRaf = null;
     let splitPct = 64;
-    let splitTopPx = 500;
-    let splitMidPx = 300;
+    let splitTopPx = 430;
+    let splitMidPx = 250;
+    let splitLowPx = 240;
     let consoleAutoscroll = true;
     let fitDone = false;
     let mapResizeObserver = null;
@@ -3021,6 +3023,7 @@ def _render_html(
     function syncMapSize() {{
       splitTopPx = clampTopSplitPx(splitTopPx);
       splitMidPx = clampMidSplitPx(splitMidPx);
+      splitLowPx = clampLowSplitPx(splitLowPx);
       applySplitState();
       requestMapResize();
     }}
@@ -3698,13 +3701,18 @@ def _render_html(
     }}
 
     function clampTopSplitPx(value) {{
-      const max = Math.max(340, Math.min(900, window.innerHeight - 210));
-      return Math.max(260, Math.min(max, value));
+      const max = Math.max(300, Math.min(760, window.innerHeight - 320));
+      return Math.max(220, Math.min(max, value));
     }}
 
     function clampMidSplitPx(value) {{
-      const max = Math.max(240, Math.min(760, window.innerHeight - 280));
-      return Math.max(190, Math.min(max, value));
+      const max = Math.max(220, Math.min(620, window.innerHeight - 380));
+      return Math.max(160, Math.min(max, value));
+    }}
+
+    function clampLowSplitPx(value) {{
+      const max = Math.max(220, Math.min(560, window.innerHeight - 320));
+      return Math.max(160, Math.min(max, value));
     }}
 
     function applySplitState() {{
@@ -3713,6 +3721,7 @@ def _render_html(
       layout.style.setProperty("--split-left-pct", `${{splitPct}}%`);
       layout.style.setProperty("--split-top-px", `${{splitTopPx}}px`);
       layout.style.setProperty("--split-mid-px", `${{splitMidPx}}px`);
+      layout.style.setProperty("--split-low-px", `${{splitLowPx}}px`);
     }}
 
     function loadSplitState() {{
@@ -3729,6 +3738,9 @@ def _render_html(
             }}
             if (Number.isFinite(parsed.mid_px)) {{
               splitMidPx = clampMidSplitPx(Number(parsed.mid_px));
+            }}
+            if (Number.isFinite(parsed.low_px)) {{
+              splitLowPx = clampLowSplitPx(Number(parsed.low_px));
             }}
           }} else if (Number.isFinite(parsed)) {{
             splitPct = clampSplitPct(Number(parsed));
@@ -3747,6 +3759,7 @@ def _render_html(
             col_pct: splitPct,
             top_px: splitTopPx,
             mid_px: splitMidPx,
+            low_px: splitLowPx,
           }})
         );
       }} catch (_err) {{
@@ -3773,6 +3786,7 @@ def _render_html(
           const target = splitter.dataset.target || "";
           const startTop = splitTopPx;
           const startMid = splitMidPx;
+          const startLow = splitLowPx;
 
           const onMove = (moveEv) => {{
             if (isHorizontal) {{
@@ -3781,6 +3795,8 @@ def _render_html(
                 splitTopPx = clampTopSplitPx(startTop + deltaY);
               }} else if (target === "mid") {{
                 splitMidPx = clampMidSplitPx(startMid + deltaY);
+              }} else if (target === "low") {{
+                splitLowPx = clampLowSplitPx(startLow + deltaY);
               }}
             }} else {{
               const pct = clampSplitPct(((moveEv.clientX - rect.left) / rect.width) * 100);
