@@ -2129,6 +2129,24 @@ def _render_html(
       white-space: nowrap;
       flex: 0 0 auto;
     }}
+    .chat-channel-meta-wrap {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+    }}
+    .chat-channel-unread {{
+      font-size: 9px;
+      line-height: 1;
+      font-weight: 700;
+      color: #13442d;
+      background: #dff1e6;
+      border: 1px solid #9bc7ab;
+      border-radius: 999px;
+      padding: 1px 5px;
+      min-width: 18px;
+      text-align: center;
+    }}
     .chat-left-panel .chat-member-list {{
       padding: 6px;
       flex: 1 1 auto;
@@ -3972,6 +3990,11 @@ def _render_html(
     [data-theme="dark"] .overview-item .v {{
       color: var(--ui-text) !important;
     }}
+    [data-theme="dark"] .chat-channel-unread {{
+      color: #d8ffdf;
+      background: #1f4f35;
+      border-color: #3fb950;
+    }}
     [data-theme="dark"] #chat-input::placeholder {{
       color: var(--ui-text-soft) !important;
       opacity: 0.9;
@@ -4450,6 +4473,7 @@ def _render_html(
     let mapTileLayer = null;
     let mapTileTheme = "";
     let chatUnreadCount = 0;
+    const chatUnreadByChannel = {{ all: 0, direct: 0 }};
     let chatUnreadInitialized = false;
     const chatSeenMessageKeys = new Set();
     const chatSeenMessageOrder = [];
@@ -5167,6 +5191,9 @@ def _render_html(
       const nextChannel = normalizeChatChannel(channelKey);
       const changed = activeChatChannel !== nextChannel;
       activeChatChannel = nextChannel;
+      if (activeLayoutView === "chat") {{
+        clearChatUnread(activeChatChannel);
+      }}
       if (persist) {{
         try {{
           window.localStorage.setItem(chatChannelStorageKey, activeChatChannel);
@@ -5745,6 +5772,22 @@ def _render_html(
       return true;
     }}
 
+    function setChatChannelUnread(channelKey, count) {{
+      const key = normalizeChatChannel(channelKey);
+      const safe = Math.max(0, Math.min(999, Math.trunc(Number(count) || 0)));
+      chatUnreadByChannel[key] = safe;
+    }}
+
+    function totalChatUnread() {{
+      return Math.max(0, Number(chatUnreadByChannel.all || 0))
+        + Math.max(0, Number(chatUnreadByChannel.direct || 0));
+    }}
+
+    function syncChatRailUnread() {{
+      chatUnreadCount = Math.min(999, totalChatUnread());
+      setChatRailUnread(chatUnreadCount);
+    }}
+
     function setChatRailUnread(count) {{
       const btn = document.querySelector('.teams-rail .rail-btn[data-view="chat"]');
       if (!(btn instanceof HTMLButtonElement)) return;
@@ -5762,9 +5805,14 @@ def _render_html(
       btn.setAttribute("aria-label", btn.title);
     }}
 
-    function clearChatUnread() {{
-      chatUnreadCount = 0;
-      setChatRailUnread(0);
+    function clearChatUnread(channelKey = null) {{
+      if (channelKey == null) {{
+        setChatChannelUnread("all", 0);
+        setChatChannelUnread("direct", 0);
+      }} else {{
+        setChatChannelUnread(channelKey, 0);
+      }}
+      syncChatRailUnread();
     }}
 
     function persistSplitState() {{
@@ -5814,11 +5862,9 @@ def _render_html(
           clearTimeout(activeWheelPaneLease);
           activeWheelPaneLease = null;
         }}
-        clearChatUnread();
+        clearChatUnread(activeChatChannel);
       }}
-      if (!chatPanelOpen) {{
-        setChatRailUnread(chatUnreadCount);
-      }}
+      syncChatRailUnread();
       if (typeof window.meshRefreshWheelHints === "function") {{
         window.meshRefreshWheelHints();
       }}
@@ -7015,31 +7061,41 @@ def _render_html(
       }}
 
       const baseMessages = rawMessages.filter((msg) => !isReactionMessage(msg));
-      const messageKeys = baseMessages
-        .map((msg) => chatMessageKey(msg))
-        .filter((key) => !!key);
+      const keyedMessages = baseMessages
+        .map((msg) => ({{
+          key: chatMessageKey(msg),
+          channel: classifyMessageChannel(msg),
+        }}))
+        .filter((entry) => !!entry.key);
       if (!chatUnreadInitialized) {{
-        for (const key of messageKeys) {{
-          rememberSeenChatMessage(key);
+        for (const entry of keyedMessages) {{
+          rememberSeenChatMessage(entry.key);
         }}
         chatUnreadInitialized = true;
-      }} else if (activeLayoutView === "chat") {{
-        for (const key of messageKeys) {{
-          rememberSeenChatMessage(key);
-        }}
-        chatUnreadCount = 0;
       }} else {{
-        let freshCount = 0;
-        for (const key of messageKeys) {{
-          if (rememberSeenChatMessage(key)) {{
-            freshCount += 1;
+        const freshByChannel = {{ all: 0, direct: 0 }};
+        for (const entry of keyedMessages) {{
+          if (rememberSeenChatMessage(entry.key)) {{
+            const key = entry.channel === "direct" ? "direct" : "all";
+            freshByChannel[key] += 1;
           }}
         }}
-        if (freshCount > 0) {{
-          chatUnreadCount = Math.min(999, chatUnreadCount + freshCount);
+        if (activeLayoutView === "chat") {{
+          const otherKey = activeChatChannel === "direct" ? "all" : "direct";
+          if (freshByChannel[otherKey] > 0) {{
+            setChatChannelUnread(otherKey, Number(chatUnreadByChannel[otherKey] || 0) + freshByChannel[otherKey]);
+          }}
+          setChatChannelUnread(activeChatChannel, 0);
+        }} else {{
+          if (freshByChannel.all > 0) {{
+            setChatChannelUnread("all", Number(chatUnreadByChannel.all || 0) + freshByChannel.all);
+          }}
+          if (freshByChannel.direct > 0) {{
+            setChatChannelUnread("direct", Number(chatUnreadByChannel.direct || 0) + freshByChannel.direct);
+          }}
         }}
       }}
-      setChatRailUnread(chatUnreadCount);
+      syncChatRailUnread();
 
       const messageIndex = new Map();
       for (const msg of baseMessages) {{
@@ -7062,12 +7118,17 @@ def _render_html(
         channelList.innerHTML = [
           {{ key: "all", label: "Everyone", count: channelCounts.all }},
           {{ key: "direct", label: "Peer-to-peer", count: channelCounts.direct }},
-        ].map((entry) => (
-          `<button type="button" class="chat-channel-item${{activeChatChannel === entry.key ? " active" : ""}}" data-channel="${{entry.key}}">
+        ].map((entry) => {{
+          const unread = Math.max(0, Number(chatUnreadByChannel[entry.key] || 0));
+          const unreadLabel = unread > 99 ? "99+" : String(unread);
+          return `<button type="button" class="chat-channel-item${{activeChatChannel === entry.key ? " active" : ""}}" data-channel="${{entry.key}}">
             <span class="chat-channel-name">${{entry.label}}</span>
-            <span class="chat-channel-meta">${{entry.count}}</span>
-          </button>`
-        )).join("");
+            <span class="chat-channel-meta-wrap">
+              <span class="chat-channel-meta">${{entry.count}}</span>
+              ${{unread > 0 ? `<span class="chat-channel-unread" title="${{unread}} unread">${{unreadLabel}}</span>` : ""}}
+            </span>
+          </button>`;
+        }}).join("");
         for (const btn of channelList.querySelectorAll(".chat-channel-item")) {{
           if (!(btn instanceof HTMLButtonElement)) continue;
           btn.addEventListener("click", () => {{
