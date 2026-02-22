@@ -2662,12 +2662,13 @@ def _render_html(
       padding: 7px 6px 6px 6px;
       background: #f7fcf7;
     }}
-    .chat-left-section:last-child {{
+    .chat-left-section.chat-users-section {{
       border-bottom: none;
       flex: 1 1 auto;
       min-height: 0;
       display: flex;
       flex-direction: column;
+      gap: 6px;
     }}
     .chat-left-label {{
       font-size: 10px;
@@ -2771,7 +2772,14 @@ def _render_html(
       background: #ffffff;
     }}
     .chat-user-search-wrap {{
-      padding: 2px 6px 0 6px;
+      padding: 0;
+    }}
+    .chat-left-bottom-bar {{
+      border: 1px solid #c8dacc;
+      border-radius: 10px;
+      background: #f3faf5;
+      padding: 6px;
+      flex: 0 0 auto;
     }}
     .nodes-search-wrap {{
       padding: 0 0 2px 0;
@@ -2843,6 +2851,28 @@ def _render_html(
       font-size: 13px;
       border-bottom: 1px solid var(--line);
       background: #f8fbf7;
+    }}
+    .card.chat {{
+      border: 1px solid #c6d6c0;
+      background: #f6fbf5;
+      display: flex;
+      flex-direction: column;
+    }}
+    .chat-card-head {{
+      border-bottom: 1px solid #d2e1d0;
+      background: #edf6ec;
+      padding: 8px 10px 7px 10px;
+    }}
+    .chat-card-head h2 {{
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      color: #274935;
+      letter-spacing: 0.15px;
+      text-transform: uppercase;
+      border: 0;
+      background: transparent;
+      padding: 0;
     }}
     .card .body {{
       padding: 8px 10px;
@@ -3485,14 +3515,13 @@ def _render_html(
       user-select: none !important;
     }}
     .layout.view-chat {{
-      height: calc(100vh - 130px);
+      height: calc(100vh - 96px);
+      height: calc(100dvh - 96px);
       min-height: 520px;
-      grid-template-rows:
-        auto
-        minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
     }}
     .layout.view-chat .chat {{
-      grid-row: 2;
+      grid-row: 1;
       min-height: 0;
     }}
     .layout.view-chat .map,
@@ -3809,14 +3838,23 @@ def _render_html(
       flex-direction: column;
       flex: 1;
       min-height: 0;
-      gap: 7px;
+      gap: 0;
+      padding: 0;
+      background: #f7fcf7;
       overflow: hidden;
+    }}
+    #chat-caption {{
+      font-size: 10px;
+      color: #4a6958;
+      margin: 3px 0 0 0;
+      line-height: 1.25;
     }}
     .chat-shell {{
       display: flex;
       flex-direction: column;
       flex: 1 1 auto;
       min-height: 0;
+      padding: 7px 6px 6px 6px;
       overflow: hidden;
     }}
     .chat-member-pane {{
@@ -4004,7 +4042,7 @@ def _render_html(
     }}
     .chat-main-pane {{
       display: grid;
-      grid-template-rows: minmax(0, 1fr) auto auto;
+      grid-template-rows: minmax(0, 1fr) auto;
       row-gap: 6px;
       flex: 1 1 auto;
       min-height: 0;
@@ -4017,6 +4055,10 @@ def _render_html(
       min-height: 0;
       display: flex;
       flex-direction: column;
+      border: 1px solid #d1e2d4;
+      border-radius: 8px;
+      background: #f1f8f3;
+      padding: 4px;
     }}
     .chat-feed {{
       display: flex;
@@ -4029,18 +4071,18 @@ def _render_html(
     .chat-feed-item {{
       width: 100%;
       box-sizing: border-box;
-      border: 1px solid #d7e6d6;
-      border-radius: 8px;
-      padding: 6px 8px;
-      background: #fbfefb;
-      color: #163523;
+      border: 1px solid #c7dac5;
+      border-radius: 6px;
+      padding: 4px 6px;
+      background: #ecf7ef;
+      color: #204233;
     }}
     .chat-feed-item.chat-selectable {{
       cursor: pointer;
     }}
     .chat-feed-item.chat-selectable:hover {{
-      background: #eef8f0;
-      border-color: #c2dbc7;
+      background: #e2f0e7;
+      border-color: #bad2c0;
     }}
     .chat-feed-item.selected-node {{
       background: #d8efe1;
@@ -4326,15 +4368,22 @@ def _render_html(
       color: #5d7566;
       background: #f8fcf8;
     }}
+    .chat-compose-shell {{
+      border: 1px solid #c8dacc;
+      border-radius: 10px;
+      background: #f3faf5;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-height: 0;
+    }}
     .chat-composer {{
-      grid-row: 3;
       position: relative;
       display: flex;
       flex-direction: column;
       gap: 5px;
       align-items: stretch;
-      border-top: 1px solid #d8e7d3;
-      padding-top: 6px;
       min-height: 0;
     }}
     .chat-composer-top {{
@@ -4474,7 +4523,6 @@ def _render_html(
       border-color: #b4d0bd;
     }}
     .chat-send-status {{
-      grid-row: 2;
       min-height: 0;
       font-size: 10px;
       color: #446551;
@@ -4798,6 +4846,13 @@ def _render_html(
       background: #1b2b22;
       border-color: #33483c;
     }}
+    [data-theme="dark"] .card.chat .chat-card-head {{
+      background: #1b2b22;
+      border-color: #33483c;
+    }}
+    [data-theme="dark"] .card.chat .chat-shell {{
+      background: #1b2b22;
+    }}
     [data-theme="dark"] .chat-feed-item {{
       background: #1a2a21;
       border-color: #31473b;
@@ -4877,6 +4932,8 @@ def _render_html(
       color: #d3eadf;
     }}
     [data-theme="dark"] .chat-composer,
+    [data-theme="dark"] .chat-compose-shell,
+    [data-theme="dark"] .chat-left-bottom-bar,
     [data-theme="dark"] .chat-reply-context,
     [data-theme="dark"] #chat-input,
     [data-theme="dark"] #chat-send-btn,
@@ -4996,6 +5053,8 @@ def _render_html(
     [data-theme="dark"] .metric,
     [data-theme="dark"] .chat-feed-item,
     [data-theme="dark"] .chat-composer,
+    [data-theme="dark"] .chat-compose-shell,
+    [data-theme="dark"] .chat-left-bottom-bar,
     [data-theme="dark"] .chat-reply-context,
     [data-theme="dark"] .chat-emoji-panel,
     [data-theme="dark"] .chat-emoji-item,
@@ -5012,6 +5071,13 @@ def _render_html(
       background: #070d07;
       border-color: #236744;
       color: #c1ffd5;
+    }}
+    [data-theme="dark"] .card.chat .chat-card-head {{
+      background: #070d07;
+      border-color: #236744;
+    }}
+    [data-theme="dark"] .card.chat .chat-shell {{
+      background: #070d07;
     }}
     [data-theme="dark"] .rail-btn:hover,
     [data-theme="dark"] .chat-channel-item:hover,
@@ -5269,6 +5335,53 @@ def _render_html(
       background: #07140d;
       border-color: #2b8a59;
       color: #c6ffdb;
+    }}
+    [data-theme="dark"] .card.chat {{
+      background: var(--ui-panel);
+      border-color: var(--ui-border);
+    }}
+    [data-theme="dark"] .card.chat .chat-card-head {{
+      background: #070d07;
+      border-bottom: 1px solid #236744;
+      border-color: #236744;
+    }}
+    [data-theme="dark"] .card.chat .body {{
+      background: #070d07;
+    }}
+    [data-theme="dark"] .card.chat .chat-shell {{
+      background: #070d07;
+    }}
+    [data-theme="dark"] .card.chat .chat-log-scroll {{
+      background: #070d07;
+      border-color: #236744;
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item {{
+      background: #1b2430;
+      border-color: #2f3b4b;
+      color: var(--ui-text);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable:hover {{
+      background: #253140;
+      border-color: #43556b;
+    }}
+    [data-theme="dark"] .card.chat .chat-compose-shell {{
+      background: #101a24;
+      border-color: #2f3b4b;
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-hops,
+    [data-theme="dark"] .card.chat .chat-endpoint .chat-id-bg,
+    [data-theme="dark"] .card.chat .chat-reaction-chip,
+    [data-theme="dark"] .card.chat .chat-reply-btn,
+    [data-theme="dark"] .card.chat .chat-react-btn,
+    [data-theme="dark"] .card.chat .chat-retry-btn {{
+      background: #16273a;
+      border-color: #35556d;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .chat-compose-shell,
+    [data-theme="dark"] .chat-left-bottom-bar {{
+      background: var(--ui-panel-alt);
+      border-color: var(--ui-border);
     }}
     [data-theme="dark"] .chat-name-chip.offline {{
       background: #212933;
@@ -5686,12 +5799,14 @@ def _render_html(
         <div class="chat-left-label">Channels</div>
         <div id="chat-channel-list" class="chat-channel-list"></div>
       </div>
-      <div class="chat-left-section">
+      <div class="chat-left-section chat-users-section">
         <div id="chat-users-title" class="chat-left-label">Users</div>
-        <div class="chat-user-search-wrap">
-          <input id="chat-user-search-input" class="list-search-input" type="search" placeholder="Search by ID or name" autocomplete="off" />
-        </div>
         <div id="chat-room-list" class="chat-member-list"></div>
+        <div class="chat-left-bottom-bar">
+          <div class="chat-user-search-wrap">
+            <input id="chat-user-search-input" class="list-search-input" type="search" placeholder="Search by ID or name" autocomplete="off" />
+          </div>
+        </div>
       </div>
     </aside>
     <main class="workspace-main">
@@ -5716,37 +5831,41 @@ def _render_html(
     </section>
 
     <section class="card chat">
-      <h2>MediumFast Chat</h2>
-      <div class="body">
-        <div id="chat-caption" style="font-size:12px;color:#3e5a46;margin-bottom:8px;">
+      <div class="chat-card-head">
+        <h2>MediumFast Chat</h2>
+        <div id="chat-caption">
           Showing decoded text messages from recent packets.
         </div>
+      </div>
+      <div class="body">
         <div class="chat-shell">
           <div class="chat-main-pane">
             <div class="scroll chat-log-scroll">
               <div id="chat-feed" class="chat-feed"></div>
             </div>
-            <div class="chat-composer">
-              <div class="chat-composer-top">
-                <div id="chat-reply-context" class="chat-reply-context" hidden>
-                  <span id="chat-reply-label" class="chat-reply-label"></span>
-                  <button id="chat-reply-clear-btn" class="chat-reply-clear-btn" type="button" title="Cancel reply" aria-label="Cancel reply">&times;</button>
+            <div class="chat-compose-shell">
+              <div class="chat-composer">
+                <div class="chat-composer-top">
+                  <div id="chat-reply-context" class="chat-reply-context" hidden>
+                    <span id="chat-reply-label" class="chat-reply-label"></span>
+                    <button id="chat-reply-clear-btn" class="chat-reply-clear-btn" type="button" title="Cancel reply" aria-label="Cancel reply">&times;</button>
+                  </div>
                 </div>
+                <div class="chat-composer-input-row">
+                  <input
+                    id="chat-input"
+                    type="text"
+                    maxlength="280"
+                    placeholder="Message the room (^all)..."
+                    autocomplete="off"
+                  />
+                  <button id="chat-emoji-btn" type="button" title="Insert emoji" aria-label="Insert emoji" aria-expanded="false">🙂</button>
+                  <button id="chat-send-btn" type="button">Send</button>
+                </div>
+                <div id="chat-emoji-panel" class="chat-emoji-panel" hidden></div>
               </div>
-              <div class="chat-composer-input-row">
-                <input
-                  id="chat-input"
-                  type="text"
-                  maxlength="280"
-                  placeholder="Message the room (^all)..."
-                  autocomplete="off"
-                />
-                <button id="chat-emoji-btn" type="button" title="Insert emoji" aria-label="Insert emoji" aria-expanded="false">🙂</button>
-                <button id="chat-send-btn" type="button">Send</button>
-              </div>
-              <div id="chat-emoji-panel" class="chat-emoji-panel" hidden></div>
+              <div id="chat-send-status" class="chat-send-status"></div>
             </div>
-            <div id="chat-send-status" class="chat-send-status"></div>
             <div id="chat-reaction-popover" class="chat-reaction-popover" hidden></div>
           </div>
         </div>
