@@ -1803,6 +1803,60 @@ def _render_html(
     .topbar .sub .sub-text {{
       margin-right: 2px;
     }}
+    .workspace-shell {{
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 8px;
+      padding: 8px;
+      align-items: start;
+    }}
+    .workspace-main {{
+      min-width: 0;
+    }}
+    .teams-rail {{
+      position: sticky;
+      top: 84px;
+      height: calc(100vh - 96px);
+      min-height: 420px;
+      border: 1px solid #c6d6c0;
+      border-radius: 10px;
+      background: #eef6ee;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px 6px;
+      overflow-y: auto;
+    }}
+    .teams-rail-title {{
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.35px;
+      color: #355445;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 2px;
+    }}
+    .rail-btn {{
+      border: 1px solid #c4d8c6;
+      background: #f4faf3;
+      color: #234735;
+      border-radius: 8px;
+      padding: 6px 4px;
+      font-size: 10px;
+      line-height: 1.2;
+      text-align: center;
+      cursor: pointer;
+    }}
+    .rail-btn:hover {{
+      background: #e7f3eb;
+    }}
+    .rail-btn.active {{
+      background: #2f855a;
+      border-color: #256f4a;
+      color: #effff4;
+      font-weight: 700;
+    }}
     .layout {{
       --split-left-pct: 64%;
       --splitter-size: 8px;
@@ -1811,7 +1865,7 @@ def _render_html(
       --split-low-px: 240px;
       display: grid;
       gap: 8px;
-      padding: 8px;
+      padding: 0;
       grid-template-columns: minmax(380px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
       grid-template-rows:
         auto
@@ -2104,6 +2158,105 @@ def _render_html(
       cursor: row-resize !important;
       user-select: none !important;
     }}
+    .layout.view-chat {{
+      grid-template-rows:
+        auto
+        minmax(240px, var(--split-top-px))
+        var(--splitter-size)
+        minmax(200px, var(--split-mid-px))
+        var(--splitter-size)
+        minmax(220px, var(--split-low-px));
+    }}
+    .layout.view-chat .chat {{ grid-row: 2; }}
+    .layout.view-chat .map {{ grid-row: 4; }}
+    .layout.view-chat .map-data {{ grid-row: 6; }}
+    .layout.view-chat .nodes,
+    .layout.view-chat .packets,
+    .layout.view-chat .raw,
+    .layout.view-chat .console,
+    .layout.view-chat .splitter,
+    .layout.view-chat .hsplitter[data-target="low"] {{
+      display: none !important;
+    }}
+    .layout.view-chat .hsplitter[data-target="top"] {{ grid-row: 3; }}
+    .layout.view-chat .hsplitter[data-target="mid"] {{ grid-row: 5; }}
+
+    .layout.view-network {{
+      grid-template-rows:
+        auto
+        minmax(220px, var(--split-top-px))
+        var(--splitter-size)
+        minmax(220px, var(--split-mid-px))
+        var(--splitter-size)
+        minmax(220px, var(--split-low-px));
+    }}
+    .layout.view-network .nodes {{ grid-row: 2; }}
+    .layout.view-network .map {{ grid-row: 4; }}
+    .layout.view-network .map-data {{ grid-row: 6; }}
+    .layout.view-network .chat,
+    .layout.view-network .packets,
+    .layout.view-network .raw,
+    .layout.view-network .console,
+    .layout.view-network .splitter,
+    .layout.view-network .hsplitter[data-target="low"] {{
+      display: none !important;
+    }}
+    .layout.view-network .hsplitter[data-target="top"] {{ grid-row: 3; }}
+    .layout.view-network .hsplitter[data-target="mid"] {{ grid-row: 5; }}
+
+    .layout.view-packets {{
+      grid-template-rows:
+        auto
+        minmax(240px, var(--split-top-px))
+        var(--splitter-size)
+        minmax(170px, var(--split-low-px));
+    }}
+    .layout.view-packets .packets {{
+      grid-column: 1 / span 3;
+      grid-row: 2;
+    }}
+    .layout.view-packets .console {{
+      grid-column: 1 / span 3;
+      grid-row: 4;
+    }}
+    .layout.view-packets .chat,
+    .layout.view-packets .nodes,
+    .layout.view-packets .map,
+    .layout.view-packets .map-data,
+    .layout.view-packets .raw,
+    .layout.view-packets .splitter,
+    .layout.view-packets .hsplitter[data-target="top"],
+    .layout.view-packets .hsplitter[data-target="mid"] {{
+      display: none !important;
+    }}
+    .layout.view-packets .hsplitter[data-target="low"] {{ grid-row: 3; }}
+
+    .layout.view-data {{
+      grid-template-rows:
+        auto
+        minmax(240px, var(--split-top-px))
+        var(--splitter-size)
+        minmax(170px, var(--split-low-px));
+    }}
+    .layout.view-data .raw {{
+      grid-column: 1 / span 3;
+      grid-row: 2;
+    }}
+    .layout.view-data .console {{
+      grid-column: 1 / span 3;
+      grid-row: 4;
+    }}
+    .layout.view-data .chat,
+    .layout.view-data .nodes,
+    .layout.view-data .map,
+    .layout.view-data .map-data,
+    .layout.view-data .packets,
+    .layout.view-data .splitter,
+    .layout.view-data .hsplitter[data-target="top"],
+    .layout.view-data .hsplitter[data-target="mid"] {{
+      display: none !important;
+    }}
+    .layout.view-data .hsplitter[data-target="low"] {{ grid-row: 3; }}
     table {{
       width: 100%;
       border-collapse: collapse;
@@ -2729,6 +2882,27 @@ def _render_html(
       word-break: break-word;
     }}
     @media (max-width: 1100px) {{
+      .workspace-shell {{
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: 6px;
+      }}
+      .teams-rail {{
+        position: static;
+        height: auto;
+        min-height: 0;
+        flex-direction: row;
+        align-items: center;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 6px;
+      }}
+      .teams-rail-title {{
+        display: none;
+      }}
+      .rail-btn {{
+        min-width: 74px;
+      }}
       .layout {{
         grid-template-columns: 1fr;
         grid-template-rows: auto;
@@ -2747,6 +2921,10 @@ def _render_html(
       }}
       .chat-member-pane {{
         max-height: 140px;
+      }}
+      .rail-btn {{
+        min-width: 68px;
+        font-size: 9px;
       }}
     }}
   </style>
@@ -2769,7 +2947,17 @@ def _render_html(
     </div>
   </div>
 
-  <div class="layout">
+  <div class="workspace-shell">
+    <aside class="teams-rail" aria-label="Dashboard views">
+      <div class="teams-rail-title">Views</div>
+      <button class="rail-btn active" data-view="chat" type="button" title="Teams-style chat workspace">Chat</button>
+      <button class="rail-btn" data-view="network" type="button" title="Topology, nodes, and links">Network</button>
+      <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
+      <button class="rail-btn" data-view="data" type="button" title="Raw node/config views">Data</button>
+      <button class="rail-btn" data-view="all" type="button" title="Show every panel">All</button>
+    </aside>
+    <main class="workspace-main">
+  <div id="dashboard-layout" class="layout view-chat">
     <section class="card summary">
       <h2>Summary</h2>
       <div class="body">
@@ -2932,6 +3120,8 @@ def _render_html(
       </div>
     </section>
   </div>
+    </main>
+  </div>
 
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -2963,6 +3153,7 @@ def _render_html(
     const selectionStorageKey = "meshDashboardSelectedNodeId";
     const nodeNameCacheStorageKey = "meshDashboardNodeNameCacheV1";
     const splitStorageKey = "meshDashboardLayoutSplitState";
+    const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatBottomStickThresholdPx = 28;
     const chatWarnWindowSeconds = 10 * 60;
     const chatStaleWindowSeconds = 30 * 60;
@@ -2980,6 +3171,7 @@ def _render_html(
       "packets-table": {{ index: 0, dir: "desc" }},
     }};
     const wheelActivationLeaseMs = 1400;
+    const knownLayoutViews = new Set(["chat", "network", "packets", "data", "all"]);
     const sortableTables = new Set(Object.keys(tableSortState));
     const consoleLines = [];
     const consoleKeyQueue = [];
@@ -3005,6 +3197,7 @@ def _render_html(
     let mapWheelLease = null;
     let chatSendInFlight = false;
     let chatStickToBottom = true;
+    let activeLayoutView = "chat";
     let chatEmojiMode = "compose";
     let chatReactionTargetId = null;
     const nodeHistoryCache = new Map();
@@ -3763,6 +3956,60 @@ def _render_html(
           }})
         );
       }} catch (_err) {{
+      }}
+    }}
+
+    function normalizeLayoutView(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return knownLayoutViews.has(clean) ? clean : "chat";
+    }}
+
+    function applyLayoutView(viewName, persist = true) {{
+      const layout = document.getElementById("dashboard-layout");
+      if (!(layout instanceof HTMLElement)) return;
+      const next = normalizeLayoutView(viewName);
+      activeLayoutView = next;
+      for (const name of knownLayoutViews) {{
+        layout.classList.remove(`view-${{name}}`);
+      }}
+      layout.classList.add(`view-${{next}}`);
+
+      for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const isActive = normalizeLayoutView(btn.dataset.view || "") === next;
+        btn.classList.toggle("active", isActive);
+        btn.setAttribute("aria-current", isActive ? "page" : "false");
+      }}
+
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(layoutViewStorageKey, next);
+        }} catch (_err) {{
+        }}
+      }}
+
+      if (latestState) {{
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null);
+      }}
+      requestMapResize();
+    }}
+
+    function loadLayoutView() {{
+      let preferred = "chat";
+      try {{
+        preferred = normalizeLayoutView(window.localStorage.getItem(layoutViewStorageKey) || "chat");
+      }} catch (_err) {{
+      }}
+      applyLayoutView(preferred, false);
+    }}
+
+    function bindLayoutNav() {{
+      for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
+        if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") continue;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => {{
+          applyLayoutView(btn.dataset.view || "chat", true);
+        }});
       }}
     }}
 
@@ -4957,7 +5204,7 @@ def _render_html(
       const caption = document.getElementById("chat-caption");
       if (caption) {{
         const preset = s.modem_preset || "unknown";
-        caption.textContent = `LoRa preset: ${{preset}}. Room: ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.`;
+        caption.textContent = `LoRa preset: ${{preset}}. Room: ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale. Click a name to inspect node history.`;
       }}
     }}
 
@@ -5029,6 +5276,8 @@ def _render_html(
     loadStoredSelection();
     loadNodeNameCache();
     loadSplitState();
+    loadLayoutView();
+    bindLayoutNav();
     bindSplitters();
     bindSelectionControls();
     bindConsoleControls();
