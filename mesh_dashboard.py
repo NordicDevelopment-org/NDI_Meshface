@@ -733,6 +733,105 @@ class HistoryStore:
             },
         }
 
+    def load_online_activity(self, window_hours: int) -> Dict[str, Any]:
+        hours = max(1, min(24 * 365, int(window_hours)))
+        cutoff = int(time.time()) - (hours * 3600)
+
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT bucket_unix - (bucket_unix % 3600) AS hour_bucket,
+                       COUNT(DISTINCT node_id) AS online_nodes
+                FROM node_metrics_1m
+                WHERE bucket_unix >= ?
+                GROUP BY hour_bucket
+                ORDER BY hour_bucket ASC
+                """,
+                (cutoff,),
+            ).fetchall()
+            distinct_row = self._conn.execute(
+                "SELECT COUNT(DISTINCT node_id) FROM node_metrics_1m WHERE bucket_unix >= ?",
+                (cutoff,),
+            ).fetchone()
+
+        timezone_label = datetime.now().astimezone().tzname() or "local"
+        points: list[Dict[str, Any]] = []
+        by_hour: Dict[int, list[int]] = {hour: [] for hour in range(24)}
+        total_online = 0
+        max_online = 0
+        first_bucket: Optional[int] = None
+        last_bucket: Optional[int] = None
+
+        for raw_bucket, raw_online in rows:
+            bucket = _to_int(raw_bucket)
+            if bucket is None:
+                continue
+            online_nodes = max(0, _to_int(raw_online) or 0)
+            local_dt = datetime.fromtimestamp(bucket)
+            hour_local = local_dt.hour
+            by_hour.setdefault(hour_local, []).append(online_nodes)
+            total_online += online_nodes
+            max_online = max(max_online, online_nodes)
+            first_bucket = bucket if first_bucket is None else min(first_bucket, bucket)
+            last_bucket = bucket if last_bucket is None else max(last_bucket, bucket)
+            points.append(
+                {
+                    "bucket_unix": bucket,
+                    "bucket_time": _format_epoch(bucket),
+                    "bucket_local": local_dt.strftime("%Y-%m-%d %H:00"),
+                    "hour_local": hour_local,
+                    "hour_label": f"{hour_local:02d}:00",
+                    "online_nodes": online_nodes,
+                }
+            )
+
+        best_hour: Optional[int] = None
+        best_avg: Optional[float] = None
+        hourly_profile: list[Dict[str, Any]] = []
+        for hour in range(24):
+            samples = by_hour.get(hour, [])
+            sample_count = len(samples)
+            avg_online = (sum(samples) / sample_count) if sample_count > 0 else None
+            peak_online = max(samples) if sample_count > 0 else 0
+            if avg_online is not None:
+                if best_avg is None or avg_online > best_avg + 1e-9:
+                    best_hour = hour
+                    best_avg = avg_online
+                elif best_hour is not None and abs(avg_online - best_avg) <= 1e-9 and hour < best_hour:
+                    best_hour = hour
+            hourly_profile.append(
+                {
+                    "hour": hour,
+                    "label": f"{hour:02d}:00",
+                    "avg_online_nodes": round(avg_online, 2) if avg_online is not None else None,
+                    "sample_hours": sample_count,
+                    "peak_online_nodes": peak_online,
+                }
+            )
+
+        sample_hours = len(points)
+        avg_online_nodes = (total_online / sample_hours) if sample_hours > 0 else None
+        distinct_nodes = int((distinct_row[0] if distinct_row else 0) or 0)
+
+        return {
+            "window_hours": hours,
+            "timezone": "local",
+            "timezone_label": timezone_label,
+            "points": points,
+            "hourly_profile": hourly_profile,
+            "summary": {
+                "sample_hours": sample_hours,
+                "distinct_nodes": distinct_nodes,
+                "max_online_nodes": max_online,
+                "avg_online_nodes": round(avg_online_nodes, 2) if avg_online_nodes is not None else None,
+                "best_hour": best_hour,
+                "best_hour_label": f"{best_hour:02d}:00" if best_hour is not None else None,
+                "best_hour_avg_online_nodes": round(best_avg, 2) if best_avg is not None else None,
+                "window_start": _format_epoch(first_bucket),
+                "window_end": _format_epoch(last_bucket),
+            },
+        }
+
     def load_node_saved_counts(self) -> Dict[str, Dict[str, Any]]:
         out: Dict[str, Dict[str, Any]] = {}
         with self._lock:
@@ -2219,6 +2318,24 @@ def _render_html(
       padding: 6px 7px;
       background: #fcfffc;
     }}
+    .metric-action {{
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+    }}
+    .metric-action:hover {{
+      background: #f2faf4;
+      border-color: #a8c7b4;
+    }}
+    .metric-action:focus-visible {{
+      outline: 2px solid #2f855a;
+      outline-offset: 2px;
+    }}
+    .metric-action.active {{
+      border-color: #2f855a;
+      box-shadow: inset 0 0 0 1px rgba(47, 133, 90, 0.2);
+      background: #eef8f1;
+    }}
     .metric .label {{ font-size: 10px; color: var(--muted); }}
     .metric .value {{ font-size: 15px; font-weight: 700; margin-top: 2px; line-height: 1.1; }}
     .summary {{ grid-column: 1 / span 3; grid-row: 1; }}
@@ -2276,14 +2393,14 @@ def _render_html(
       flex-direction: column;
       gap: 8px;
     }}
-    .map-data-live, .map-data-node {{
+    .map-data-live, .map-data-node, .map-data-activity {{
       min-height: 0;
       display: flex;
       flex-direction: column;
       gap: 8px;
       flex: 1 1 auto;
     }}
-    .map-data-live[hidden], .map-data-node[hidden] {{
+    .map-data-live[hidden], .map-data-node[hidden], .map-data-activity[hidden] {{
       display: none !important;
     }}
     .history-caption {{
@@ -2315,7 +2432,7 @@ def _render_html(
     .history-panel[hidden] {{
       display: none !important;
     }}
-    #signal-chart-wrap {{
+    #signal-chart-wrap, #online-activity-chart-wrap {{
       position: relative;
       width: 100%;
       min-height: 220px;
@@ -2325,7 +2442,7 @@ def _render_html(
       background: linear-gradient(180deg, #fbfffc 0%, #eef8f1 100%);
       overflow: hidden;
     }}
-    #signal-chart {{
+    #signal-chart, #online-activity-chart {{
       width: 100%;
       height: 100%;
       display: block;
@@ -2352,6 +2469,9 @@ def _render_html(
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
+    }}
+    .activity-legend-nodes {{
+      color: #1f6f53;
     }}
     .legend-chip {{
       display: inline-flex;
@@ -4037,7 +4157,8 @@ def _render_html(
       border-color: #3d5973;
       color: #ebf3ff;
     }}
-    [data-theme="dark"] #signal-chart-wrap {{
+    [data-theme="dark"] #signal-chart-wrap,
+    [data-theme="dark"] #online-activity-chart-wrap {{
       background: linear-gradient(180deg, #141c27 0%, #111823 100%);
       border-color: var(--ui-border);
     }}
@@ -4048,6 +4169,14 @@ def _render_html(
     [data-theme="dark"] .overview-item {{
       border-color: var(--ui-border);
       background: var(--ui-panel-alt);
+    }}
+    [data-theme="dark"] .metric-action.active {{
+      background: #223447;
+      border-color: #4f6d8a;
+      box-shadow: inset 0 0 0 1px rgba(121, 192, 255, 0.2);
+    }}
+    [data-theme="dark"] .activity-legend-nodes {{
+      color: #a5d2ff !important;
     }}
     [data-theme="dark"] .theme-btn:hover,
     [data-theme="dark"] .selection-btn:hover,
@@ -4243,7 +4372,7 @@ def _render_html(
       <div class="body">
         <div class="metrics">
           <div class="metric"><div class="label">Target</div><div class="value" id="m-target">n/a</div></div>
-          <div class="metric"><div class="label">Known Nodes</div><div class="value" id="m-nodes">0</div></div>
+          <div class="metric metric-action" id="metric-known-nodes" role="button" tabindex="0" aria-pressed="false" title="Show online node activity by hour"><div class="label">Known Nodes</div><div class="value" id="m-nodes">0</div></div>
           <div class="metric"><div class="label">Nodes With Position</div><div class="value" id="m-pos-nodes">0</div></div>
           <div class="metric"><div class="label">Live Packets</div><div class="value" id="m-live-packets">0</div></div>
           <div class="metric"><div class="label">Directed Links</div><div class="value" id="m-links">0</div></div>
@@ -4359,6 +4488,17 @@ def _render_html(
           <div id="tab-panel-overview" class="history-panel" hidden>
             <div id="node-history-overview" class="overview-grid"></div>
           </div>
+        </div>
+        <div id="map-data-activity" class="map-data-activity" hidden>
+          <div id="online-activity-caption" class="history-caption">Click Known Nodes to view when nodes are typically online.</div>
+          <div id="online-activity-chart-wrap">
+            <svg id="online-activity-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Online nodes by hour"></svg>
+            <div id="online-activity-empty" class="signal-empty" hidden>No historical online-activity points yet.</div>
+          </div>
+          <div class="signal-legend">
+            <span class="legend-chip activity-legend-nodes">Online nodes / hour</span>
+          </div>
+          <div id="online-activity-overview" class="overview-grid"></div>
         </div>
       </div>
     </section>
@@ -4483,6 +4623,8 @@ def _render_html(
     const consoleSeen = new Set();
     const wheelPaneSelector = ".scroll, #live-console, details pre";
     let selectedNodeId = null;
+    let mapDataFocus = "auto";
+    let activeMapDataMode = "live";
     let activeHistoryTab = "signal";
     let pendingSelectionScroll = false;
     let latestState = null;
@@ -4522,6 +4664,7 @@ def _render_html(
     const chatSeenMessageKeys = new Set();
     const chatSeenMessageOrder = [];
     const nodeHistoryCache = new Map();
+    const onlineActivityCache = new Map();
     const nodeNameCache = new Map();
 
     function applyMapTiles(themeName) {{
@@ -4856,6 +4999,12 @@ def _render_html(
         const cached = nodeHistoryCache.get(selectedNodeId);
         if (cached && cached.data && Array.isArray(cached.data.points)) {{
           renderSignalChart(cached.data.points);
+        }}
+      }}
+      if (activeMapDataMode === "activity") {{
+        const cachedActivity = onlineActivityCache.get(String(nodeHistoryHours));
+        if (cachedActivity && cachedActivity.data && Array.isArray(cachedActivity.data.points)) {{
+          renderOnlineActivityChart(cachedActivity.data.points);
         }}
       }}
 
@@ -5937,7 +6086,7 @@ def _render_html(
       }}
 
       if (latestState) {{
-        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null);
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null, null);
       }}
       requestMapResize();
     }}
@@ -6282,14 +6431,76 @@ def _render_html(
       return null;
     }}
 
+    function updateKnownNodesMetricState() {{
+      const metric = document.getElementById("metric-known-nodes");
+      if (!(metric instanceof HTMLElement)) return;
+      const active = activeMapDataMode === "activity";
+      metric.classList.toggle("active", active);
+      metric.setAttribute("aria-pressed", active ? "true" : "false");
+    }}
+
     function setMapDataMode(mode) {{
+      const normalized = mode === "node" || mode === "activity" ? mode : "live";
+      activeMapDataMode = normalized;
       const live = document.getElementById("map-data-live");
       const node = document.getElementById("map-data-node");
+      const activity = document.getElementById("map-data-activity");
       const title = document.getElementById("map-data-title");
-      const nodeMode = mode === "node";
-      if (live) live.hidden = nodeMode;
-      if (node) node.hidden = !nodeMode;
-      if (title) title.textContent = nodeMode ? "Node History" : "Map Data";
+      if (live) live.hidden = normalized !== "live";
+      if (node) node.hidden = normalized !== "node";
+      if (activity) activity.hidden = normalized !== "activity";
+      if (title) {{
+        title.textContent = normalized === "node"
+          ? "Node History"
+          : (normalized === "activity" ? "Online Activity" : "Map Data");
+      }}
+      updateKnownNodesMetricState();
+    }}
+
+    function toggleKnownNodesActivityMode() {{
+      if (mapDataFocus === "activity") {{
+        mapDataFocus = "auto";
+        if (latestState) {{
+          let cachedNodeHistory = null;
+          if (isSelectableNodeId(selectedNodeId)) {{
+            const cached = nodeHistoryCache.get(selectedNodeId);
+            if (cached && cached.data) {{
+              cachedNodeHistory = cached.data;
+            }}
+          }}
+          renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
+        }} else {{
+          setMapDataMode("live");
+        }}
+        return;
+      }}
+
+      mapDataFocus = "activity";
+      renderOnlineActivityLoading();
+      fetchOnlineActivity(nodeHistoryHours)
+        .then((data) => {{
+          if (mapDataFocus !== "activity") return;
+          renderOnlineActivity(data);
+        }})
+        .catch((err) => {{
+          if (mapDataFocus !== "activity") return;
+          renderOnlineActivityError(err instanceof Error ? err.message : String(err || "unknown error"));
+        }});
+    }}
+
+    function bindKnownNodesMetricControl() {{
+      const metric = document.getElementById("metric-known-nodes");
+      if (!(metric instanceof HTMLElement) || metric.dataset.bound === "1") return;
+      metric.dataset.bound = "1";
+      metric.addEventListener("click", () => {{
+        toggleKnownNodesActivityMode();
+      }});
+      metric.addEventListener("keydown", (ev) => {{
+        if (ev.key !== "Enter" && ev.key !== " ") return;
+        ev.preventDefault();
+        toggleKnownNodesActivityMode();
+      }});
+      updateKnownNodesMetricState();
     }}
 
     function setHistoryTab(tabName) {{
@@ -6344,6 +6555,7 @@ def _render_html(
         return;
       }}
       selectedNodeId = normalized;
+      mapDataFocus = "auto";
       pendingSelectionScroll = true;
       persistSelection();
       renderSelectionStatus();
@@ -6365,10 +6577,10 @@ def _render_html(
       highlightNodeSelection();
       updateMapSelection(false);
       map.closePopup();
-      setMapDataMode("live");
+      setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
       if (latestState) {{
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || []);
-        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null);
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null, null);
       }}
       applyChatChannel(activeChatChannel, false);
     }}
@@ -6863,6 +7075,187 @@ def _render_html(
       `;
     }}
 
+    function renderOnlineActivityLoading() {{
+      setMapDataMode("activity");
+      const caption = document.getElementById("online-activity-caption");
+      if (caption) {{
+        caption.textContent = "Loading online-node activity history...";
+      }}
+      const overview = document.getElementById("online-activity-overview");
+      if (overview) {{
+        overview.innerHTML = "";
+      }}
+      const svg = document.getElementById("online-activity-chart");
+      if (svg) {{
+        svg.innerHTML = "";
+      }}
+      const empty = document.getElementById("online-activity-empty");
+      if (empty) {{
+        empty.hidden = false;
+        empty.textContent = "Loading historical online activity...";
+      }}
+    }}
+
+    function renderOnlineActivityError(message) {{
+      setMapDataMode("activity");
+      const caption = document.getElementById("online-activity-caption");
+      if (caption) {{
+        caption.textContent = `Online activity error: ${{message || "unknown error"}}`;
+      }}
+      const overview = document.getElementById("online-activity-overview");
+      if (overview) {{
+        overview.innerHTML = "";
+      }}
+      const svg = document.getElementById("online-activity-chart");
+      if (svg) {{
+        svg.innerHTML = "";
+      }}
+      const empty = document.getElementById("online-activity-empty");
+      if (empty) {{
+        empty.hidden = false;
+        empty.textContent = "Unable to load online-activity history.";
+      }}
+    }}
+
+    function renderOnlineActivityChart(points) {{
+      const svg = document.getElementById("online-activity-chart");
+      const empty = document.getElementById("online-activity-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+
+      const rows = Array.isArray(points) ? points : [];
+      const values = rows.map((p) => Number(p.online_nodes)).filter((v) => Number.isFinite(v));
+      if (values.length === 0) {{
+        svg.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = "No historical online-activity points yet.";
+        return;
+      }}
+      empty.hidden = true;
+
+      const width = 900;
+      const height = 220;
+      const padLeft = 46;
+      const padRight = 10;
+      const padTop = 12;
+      const padBottom = 24;
+      const plotW = width - padLeft - padRight;
+      const plotH = height - padTop - padBottom;
+
+      let minVal = Math.min(0, ...values);
+      let maxVal = Math.max(...values);
+      if ((maxVal - minVal) < 1) {{
+        maxVal = minVal + 1;
+      }}
+
+      const xAt = (idx, total) => (
+        padLeft + ((Math.max(0, idx) / Math.max(1, total - 1)) * plotW)
+      );
+      const yFrom = (value, minValue, maxValue) => (
+        padTop + ((maxValue - value) / (maxValue - minValue)) * plotH
+      );
+
+      const n = rows.length;
+      const pointsXY = [];
+      for (let i = 0; i < n; i += 1) {{
+        const raw = Number(rows[i].online_nodes);
+        if (!Number.isFinite(raw)) continue;
+        pointsXY.push({{
+          x: xAt(i, n),
+          y: yFrom(raw, minVal, maxVal),
+        }});
+      }}
+      if (!pointsXY.length) {{
+        svg.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = "No historical online-activity points yet.";
+        return;
+      }}
+
+      const path = pointsXY.map((pt, idx) => (
+        `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
+      )).join(" ");
+
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const chartPalette = darkTheme
+        ? {{
+            grid: "#324152",
+            line: "#79c0ff",
+            label: "#a4d0ff",
+          }}
+        : {{
+            grid: "#dce8df",
+            line: "#1f6f53",
+            label: "#1f6f53",
+          }};
+
+      const startLabel = rows[0] && (rows[0].bucket_local || rows[0].bucket_time || "");
+      const endLabel = rows[rows.length - 1] && (rows[rows.length - 1].bucket_local || rows[rows.length - 1].bucket_time || "");
+      const midY = padTop + (plotH / 2);
+
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.innerHTML = `
+        <rect x="0" y="0" width="${{width}}" height="${{height}}" fill="none"></rect>
+        <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{midY.toFixed(2)}}" x2="${{width - padRight}}" y2="${{midY.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{height - padBottom}}" x2="${{width - padRight}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
+        <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(maxVal, 0)}}</text>
+        <text x="${{padLeft - 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(minVal, 0)}}</text>
+        <text x="${{padLeft}}" y="${{height - 6}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">${{escAttr(startLabel || "")}}</text>
+        <text x="${{width - padRight}}" y="${{height - 6}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{escAttr(endLabel || "")}}</text>
+      `;
+    }}
+
+    function renderOnlineActivityOverview(activity) {{
+      const summary = activity.summary || {{}};
+      const target = document.getElementById("online-activity-overview");
+      if (!target) return;
+      const profile = Array.isArray(activity.hourly_profile) ? activity.hourly_profile : [];
+      const topHours = profile
+        .filter((row) => Number.isFinite(Number(row.avg_online_nodes)))
+        .sort((a, b) => Number(b.avg_online_nodes) - Number(a.avg_online_nodes))
+        .slice(0, 3);
+      const topHoursText = topHours.length
+        ? topHours.map((row) => `${{row.label}} (${{formatMetricValue(row.avg_online_nodes, 1)}})`).join(", ")
+        : "n/a";
+      const bestHourLabel = summary.best_hour_label || "n/a";
+      const bestHourAvgText = Number.isFinite(Number(summary.best_hour_avg_online_nodes))
+        ? ` (${{formatMetricValue(summary.best_hour_avg_online_nodes, 1)}} avg)`
+        : "";
+      const items = [
+        ["Window", `${{activity.window_hours ?? nodeHistoryHours}}h (${{activity.timezone_label || "local"}})`],
+        ["Samples", `${{summary.sample_hours ?? (activity.points || []).length ?? 0}}`],
+        ["Distinct Nodes", `${{summary.distinct_nodes ?? 0}}`],
+        ["Peak Online", `${{summary.max_online_nodes ?? 0}}`],
+        ["Average Online", `${{formatMetricValue(summary.avg_online_nodes, 1)}}`],
+        ["Best Hour", `${{bestHourLabel}}${{bestHourAvgText}}`],
+        ["Top Hours", `${{topHoursText}}`],
+        ["Range", `${{summary.window_start || "n/a"}} to ${{summary.window_end || "n/a"}}`],
+      ];
+      target.innerHTML = items.map(([k, v]) => (
+        `<div class="overview-item"><div class="k">${{k}}</div><div class="v">${{v}}</div></div>`
+      )).join("");
+    }}
+
+    function renderOnlineActivity(activity) {{
+      setMapDataMode("activity");
+      const summary = activity.summary || {{}};
+      const bestHourLabel = summary.best_hour_label || null;
+      const bestHourAvgText = Number.isFinite(Number(summary.best_hour_avg_online_nodes))
+        ? `${{formatMetricValue(summary.best_hour_avg_online_nodes, 1)}} avg nodes`
+        : "n/a avg nodes";
+      const caption = document.getElementById("online-activity-caption");
+      if (caption) {{
+        if (bestHourLabel) {{
+          caption.textContent = `Last ${{activity.window_hours || nodeHistoryHours}}h. Most common online time: ${{bestHourLabel}} (${{activity.timezone_label || "local"}}), ${{bestHourAvgText}}.`;
+        }} else {{
+          caption.textContent = `Last ${{activity.window_hours || nodeHistoryHours}}h. No saved online-activity history yet.`;
+        }}
+      }}
+      renderOnlineActivityChart(activity.points || []);
+      renderOnlineActivityOverview(activity);
+    }}
+
     function renderNodeHistoryOverview(history, node) {{
       const summary = history.summary || {{}};
       const target = document.getElementById("node-history-overview");
@@ -6917,7 +7310,34 @@ def _render_html(
       return data;
     }}
 
-    function renderTraffic(traffic, nodes, nodeHistory) {{
+    async function fetchOnlineActivity(hoursOverride = nodeHistoryHours) {{
+      const cleanHours = Math.max(1, Math.round(Number(hoursOverride) || nodeHistoryHours));
+      const cacheKey = String(cleanHours);
+      const cached = onlineActivityCache.get(cacheKey);
+      const nowMs = Date.now();
+      if (cached && (nowMs - (cached.fetchedAt || 0)) < Math.max(refreshMs, 2500)) {{
+        return cached.data;
+      }}
+      const url = `/api/history/online?hours=${{encodeURIComponent(cleanHours)}}`;
+      const resp = await fetch(url, {{ cache: "no-store" }});
+      if (!resp.ok) throw new Error(`online activity API ${{resp.status}}`);
+      const data = await resp.json();
+      onlineActivityCache.set(cacheKey, {{ fetchedAt: nowMs, data }});
+      return data;
+    }}
+
+    function renderTraffic(traffic, nodes, nodeHistory, onlineActivity) {{
+      if (mapDataFocus === "activity") {{
+        if (onlineActivity && !onlineActivity.error) {{
+          renderOnlineActivity(onlineActivity);
+        }} else if (onlineActivity && onlineActivity.error) {{
+          renderOnlineActivityError(onlineActivity.error);
+        }} else {{
+          renderOnlineActivityLoading();
+        }}
+        return;
+      }}
+
       if (isSelectableNodeId(selectedNodeId)) {{
         if (nodeHistory && normalizeNodeId(nodeHistory.node_id) === selectedNodeId) {{
           renderNodeHistory(nodeHistory, nodes);
@@ -7432,21 +7852,36 @@ def _render_html(
         const state = await resp.json();
         latestState = state;
         let nodeHistory = null;
-        if (isSelectableNodeId(selectedNodeId)) {{
+        if (mapDataFocus !== "activity" && isSelectableNodeId(selectedNodeId)) {{
           try {{
             nodeHistory = await fetchNodeHistory(selectedNodeId);
           }} catch (historyErr) {{
             renderNodeHistoryLoading(selectedNodeId);
             const caption = document.getElementById("node-history-caption");
+            const historyErrorText = historyErr instanceof Error
+              ? historyErr.message
+              : String(historyErr || "unknown error");
             if (caption) {{
-              caption.textContent = `History error for ${{selectedNodeId}}: ${{historyErr.message}}`;
+              caption.textContent = `History error for ${{selectedNodeId}}: ${{historyErrorText}}`;
             }}
+          }}
+        }}
+        let onlineActivity = null;
+        if (mapDataFocus === "activity") {{
+          try {{
+            onlineActivity = await fetchOnlineActivity(nodeHistoryHours);
+          }} catch (activityErr) {{
+            onlineActivity = {{
+              error: activityErr instanceof Error
+                ? activityErr.message
+                : String(activityErr || "unknown error"),
+            }};
           }}
         }}
         renderSummary(state);
         renderMap(state.nodes || [], (state.traffic || {{}}).edges || []);
         renderNodes(state.nodes || []);
-        renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory);
+        renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory, onlineActivity);
         renderChat(state);
         renderPackets(state.traffic || {{}});
         renderConsole(state.traffic || {{}});
@@ -7469,6 +7904,7 @@ def _render_html(
     bindConsoleControls();
     bindChatComposer();
     bindThemeToggle();
+    bindKnownNodesMetricControl();
     bindChatAutoScroll();
     bindHistoryTabs();
     bindWheelPassthrough();
@@ -7488,7 +7924,13 @@ def _render_html(
 """
 
 
-def _make_http_handler(html_text: str, state_fn, node_history_fn=None, send_chat_fn=None):
+def _make_http_handler(
+    html_text: str,
+    state_fn,
+    node_history_fn=None,
+    online_activity_fn=None,
+    send_chat_fn=None,
+):
     class DashboardHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             try:
@@ -7523,6 +7965,53 @@ def _make_http_handler(html_text: str, state_fn, node_history_fn=None, send_chat
                         response_obj = {"node_id": node_id, "points": [], "summary": {}}
                     else:
                         response_obj = node_history_fn(node_id, hours_override, points_override)
+                    payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
+                    return
+
+                if path == "/api/history/online":
+                    query = parse_qs(parsed.query)
+                    hours_override = _to_int(query.get("hours", [""])[0])
+                    if online_activity_fn is None:
+                        clean_hours = (
+                            hours_override
+                            if isinstance(hours_override, int) and hours_override > 0
+                            else DEFAULT_NODE_HISTORY_HOURS
+                        )
+                        response_obj = {
+                            "window_hours": clean_hours,
+                            "timezone": "local",
+                            "timezone_label": "local",
+                            "points": [],
+                            "hourly_profile": [
+                                {
+                                    "hour": hour,
+                                    "label": f"{hour:02d}:00",
+                                    "avg_online_nodes": None,
+                                    "sample_hours": 0,
+                                    "peak_online_nodes": 0,
+                                }
+                                for hour in range(24)
+                            ],
+                            "summary": {
+                                "sample_hours": 0,
+                                "distinct_nodes": 0,
+                                "max_online_nodes": 0,
+                                "avg_online_nodes": None,
+                                "best_hour": None,
+                                "best_hour_label": None,
+                                "best_hour_avg_online_nodes": None,
+                                "window_start": None,
+                                "window_end": None,
+                            },
+                        }
+                    else:
+                        response_obj = online_activity_fn(hours_override)
                     payload = json.dumps(response_obj, separators=(",", ":")).encode("utf-8")
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -7704,6 +8193,38 @@ def run_dashboard(args: argparse.Namespace) -> None:
             max_points=points,
         )
 
+    def online_activity_fn(hours_override: Optional[int] = None) -> Dict[str, Any]:
+        hours = hours_override if isinstance(hours_override, int) and hours_override > 0 else args.node_history_hours
+        if history_store is None:
+            return {
+                "window_hours": hours,
+                "timezone": "local",
+                "timezone_label": "local",
+                "points": [],
+                "hourly_profile": [
+                    {
+                        "hour": hour,
+                        "label": f"{hour:02d}:00",
+                        "avg_online_nodes": None,
+                        "sample_hours": 0,
+                        "peak_online_nodes": 0,
+                    }
+                    for hour in range(24)
+                ],
+                "summary": {
+                    "sample_hours": 0,
+                    "distinct_nodes": 0,
+                    "max_online_nodes": 0,
+                    "avg_online_nodes": None,
+                    "best_hour": None,
+                    "best_hour_label": None,
+                    "best_hour_avg_online_nodes": None,
+                    "window_start": None,
+                    "window_end": None,
+                },
+            }
+        return history_store.load_online_activity(window_hours=hours)
+
     def send_chat_fn(
         text: Any,
         destination: Any = None,
@@ -7823,6 +8344,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
         html,
         state_fn,
         node_history_fn=node_history_fn,
+        online_activity_fn=online_activity_fn,
         send_chat_fn=send_chat_fn,
     )
     server = ThreadingHTTPServer((args.http_host, args.http_port), handler_cls)
