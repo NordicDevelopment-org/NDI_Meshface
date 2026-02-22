@@ -4043,7 +4043,7 @@ def _render_html(
       background: #0f141a;
     }}
     [data-theme="dark"] .leaflet-tile {{
-      filter: brightness(0.55) invert(0.9) hue-rotate(172deg) saturate(0.6) contrast(1.08);
+      filter: none;
     }}
     [data-theme="dark"] .leaflet-popup-content-wrapper,
     [data-theme="dark"] .leaflet-popup-tip {{
@@ -4337,10 +4337,23 @@ def _render_html(
       inertia: false,
       scrollWheelZoom: false,
     }}).setView([39.5, -98.35], 4);
-    L.tileLayer("https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png", {{
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    }}).addTo(map);
+    const mapTileConfigs = {{
+      light: {{
+        url: "https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png",
+        options: {{
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap contributors",
+        }},
+      }},
+      dark: {{
+        url: "https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png",
+        options: {{
+          maxZoom: 20,
+          subdomains: "abcd",
+          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+        }},
+      }},
+    }};
 
     const mapElement = document.getElementById("map");
     const mapFrameElement = mapElement ? mapElement.closest(".map-frame") : null;
@@ -4411,8 +4424,23 @@ def _render_html(
     let chatReactionPopoverHideTimer = null;
     let themePreference = "auto";
     let themeMediaQuery = null;
+    let mapTileLayer = null;
+    let mapTileTheme = "";
     const nodeHistoryCache = new Map();
     const nodeNameCache = new Map();
+
+    function applyMapTiles(themeName) {{
+      const nextTheme = themeName === "dark" ? "dark" : "light";
+      if (mapTileLayer && mapTileTheme === nextTheme) {{
+        return;
+      }}
+      const cfg = mapTileConfigs[nextTheme] || mapTileConfigs.light;
+      if (mapTileLayer) {{
+        map.removeLayer(mapTileLayer);
+      }}
+      mapTileLayer = L.tileLayer(cfg.url, cfg.options).addTo(map);
+      mapTileTheme = nextTheme;
+    }}
 
     function requestMapResize() {{
       if (mapResizeRaf !== null) {{
@@ -4727,6 +4755,7 @@ def _render_html(
       const resolvedTheme = normalized === "auto" ? systemPreferredTheme() : normalized;
       document.documentElement.setAttribute("data-theme", resolvedTheme);
       document.documentElement.setAttribute("data-theme-pref", normalized);
+      applyMapTiles(resolvedTheme);
       updateThemeToggleLabel(resolvedTheme);
       if (isSelectableNodeId(selectedNodeId)) {{
         const cached = nodeHistoryCache.get(selectedNodeId);
