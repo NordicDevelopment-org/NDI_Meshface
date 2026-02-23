@@ -34,6 +34,12 @@ from .history_capabilities import (
     decode_node_capabilities_rows as _decode_node_capabilities_rows_helper,
     decode_node_saved_counts_rows as _decode_node_saved_counts_rows_helper,
 )
+from .history_backfill import backfill_node_capabilities as _backfill_node_capabilities_helper
+from .history_capability_upsert import (
+    build_node_capability_insert_values as _build_node_capability_insert_values_helper,
+    merge_node_capability_row as _merge_node_capability_row_helper,
+    normalize_node_capability_inputs as _normalize_node_capability_inputs_helper,
+)
 from .history_prune import prune_history_tables as _prune_history_tables_helper
 from .history_schema import initialize_history_schema as _initialize_history_schema_helper
 
@@ -76,91 +82,7 @@ class HistoryStore:
         _initialize_history_schema_helper(self._conn)
 
     def _maybe_backfill_node_capabilities_unlocked(self) -> None:
-        existing = self._conn.execute("SELECT COUNT(*) FROM node_capabilities").fetchone()
-        if existing and int(existing[0] or 0) > 0:
-            return
-
-        merged: Dict[str, Dict[str, Any]] = {}
-
-        metric_rows = self._conn.execute(
-            """
-            SELECT node_id, MAX(last_seen_unix)
-            FROM node_metrics_1m
-            GROUP BY node_id
-            """
-        ).fetchall()
-        for node_id, last_seen_unix in metric_rows:
-            clean_node_id = str(node_id or "").strip()
-            seen = _to_int(last_seen_unix)
-            if not clean_node_id or seen is None:
-                continue
-            merged.setdefault(clean_node_id, {})
-            merged[clean_node_id]["last_seen_unix"] = seen
-
-        position_rows = self._conn.execute(
-            """
-            SELECT node_id, MAX(created_unix)
-            FROM node_positions
-            GROUP BY node_id
-            """
-        ).fetchall()
-        for node_id, last_position_unix in position_rows:
-            clean_node_id = str(node_id or "").strip()
-            pos_unix = _to_int(last_position_unix)
-            if not clean_node_id or pos_unix is None:
-                continue
-            node = merged.setdefault(clean_node_id, {})
-            node["has_position"] = True
-            node["last_position_unix"] = pos_unix
-            node["last_seen_unix"] = max(_to_int(node.get("last_seen_unix")) or pos_unix, pos_unix)
-
-        hop_rows = self._conn.execute(
-            """
-            SELECT events.from_id, events.hops, events.created_unix
-            FROM packet_events AS events
-            JOIN (
-              SELECT from_id, MAX(id) AS max_id
-              FROM packet_events
-              WHERE from_id IS NOT NULL AND hops IS NOT NULL
-              GROUP BY from_id
-            ) AS latest
-              ON latest.from_id = events.from_id AND latest.max_id = events.id
-            """
-        ).fetchall()
-        for node_id, last_hops, hop_seen_unix in hop_rows:
-            clean_node_id = str(node_id or "").strip()
-            hops = _to_int(last_hops)
-            seen = _to_int(hop_seen_unix)
-            if not clean_node_id:
-                continue
-            node = merged.setdefault(clean_node_id, {})
-            if hops is not None and hops >= 0:
-                node["last_hops"] = hops
-            if seen is not None:
-                node["last_seen_unix"] = max(_to_int(node.get("last_seen_unix")) or seen, seen)
-
-        for node_id, values in merged.items():
-            seen = _to_int(values.get("last_seen_unix"))
-            if seen is None or seen <= 0:
-                continue
-            has_position = 1 if values.get("has_position") else 0
-            self._conn.execute(
-                """
-                INSERT OR REPLACE INTO node_capabilities(
-                  node_id, last_seen_unix, has_position, last_position_unix,
-                  last_hops, battery_level, battery_updated_unix
-                ) VALUES(?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    node_id,
-                    seen,
-                    has_position,
-                    _to_int(values.get("last_position_unix")),
-                    _to_int(values.get("last_hops")),
-                    None,
-                    None,
-                ),
-            )
+        _backfill_node_capabilities_helper(self._conn, to_int_fn=_to_int)
 
     def close(self) -> None:
         with self._lock:
@@ -451,8 +373,10 @@ class HistoryStore:
         last_hops: Optional[int],
         battery_level: Optional[int],
     ) -> None:
-        clean_hops = last_hops if isinstance(last_hops, int) and last_hops >= 0 else None
-        clean_battery = battery_level if isinstance(battery_level, int) and 0 <= battery_level <= 100 else None
+        clean_hops, clean_battery = _normalize_node_capability_inputs_helper(
+            last_hops=last_hops,
+            battery_level=battery_level,
+        )
 
         row = self._conn.execute(
             """
@@ -472,38 +396,23 @@ class HistoryStore:
                   last_hops, battery_level, battery_updated_unix
                 ) VALUES(?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    node_id,
-                    event_unix,
-                    1 if has_position else 0,
-                    event_unix if has_position else None,
-                    clean_hops,
-                    clean_battery,
-                    event_unix if clean_battery is not None else None,
+                _build_node_capability_insert_values_helper(
+                    node_id=node_id,
+                    event_unix=event_unix,
+                    has_position=has_position,
+                    clean_hops=clean_hops,
+                    clean_battery=clean_battery,
                 ),
             )
             return
 
-        (
-            last_seen_unix,
-            row_has_position,
-            row_last_position_unix,
-            row_last_hops,
-            row_battery_level,
-            row_battery_updated_unix,
-        ) = row
-        merged_last_seen = max(_to_int(last_seen_unix) or event_unix, event_unix)
-        merged_has_position = bool(_to_int(row_has_position)) or has_position
-        merged_last_position_unix = _to_int(row_last_position_unix)
-        if has_position:
-            merged_last_position_unix = event_unix
-
-        merged_last_hops = clean_hops if clean_hops is not None else _to_int(row_last_hops)
-        merged_battery_level = _to_int(row_battery_level)
-        merged_battery_updated_unix = _to_int(row_battery_updated_unix)
-        if clean_battery is not None:
-            merged_battery_level = clean_battery
-            merged_battery_updated_unix = event_unix
+        merged = _merge_node_capability_row_helper(
+            row=row,
+            event_unix=event_unix,
+            has_position=has_position,
+            clean_hops=clean_hops,
+            clean_battery=clean_battery,
+        )
 
         self._conn.execute(
             """
@@ -517,12 +426,12 @@ class HistoryStore:
             WHERE node_id = ?
             """,
             (
-                merged_last_seen,
-                1 if merged_has_position else 0,
-                merged_last_position_unix,
-                merged_last_hops,
-                merged_battery_level,
-                merged_battery_updated_unix,
+                merged["last_seen_unix"],
+                1 if merged["has_position"] else 0,
+                merged["last_position_unix"],
+                merged["last_hops"],
+                merged["battery_level"],
+                merged["battery_updated_unix"],
                 node_id,
             ),
         )
