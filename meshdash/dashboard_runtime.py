@@ -9,6 +9,10 @@ from .runtime_lifecycle import (
     emit_startup_status,
     serve_until_stopped,
 )
+from .runtime_callbacks import (
+    build_send_chat_loader,
+    build_state_snapshot_loader,
+)
 
 
 def run_dashboard_runtime(
@@ -64,16 +68,16 @@ def run_dashboard_runtime(
     started_at = time.time()
     revision_info = revision_info_fn()
 
-    def state_fn() -> dict:
-        return build_state_fn(
-            iface=iface,
-            tracker=tracker,
-            started_at=started_at,
-            target=target,
-            show_secrets=args.show_secrets,
-            storage_probe_path=history_db_path,
-            revision_info=revision_info,
-        )
+    state_fn = build_state_snapshot_loader(
+        iface=iface,
+        tracker=tracker,
+        started_at=started_at,
+        target=target,
+        show_secrets=args.show_secrets,
+        storage_probe_path=history_db_path,
+        revision_info=revision_info,
+        build_state_fn=build_state_fn,
+    )
 
     node_history_fn = build_node_history_loader_fn(
         history_store=history_store,
@@ -85,31 +89,18 @@ def run_dashboard_runtime(
         default_hours=args.node_history_hours,
     )
 
-    def send_chat_fn(
-        text: Any,
-        destination: Any = None,
-        channel_index: Optional[int] = None,
-        reply_id: Optional[int] = None,
-        retry_of: Optional[int] = None,
-        emoji: Any = None,
-    ) -> dict:
-        return send_chat_message_fn(
-            text=text,
-            destination=destination,
-            channel_index=channel_index,
-            reply_id=reply_id,
-            retry_of=retry_of,
-            emoji=emoji,
-            iface=iface,
-            send_lock=send_lock,
-            send_reaction_packet_fn=send_reaction_packet_fn,
-            local_node_id_fn=lambda: get_local_node_id_fn(iface),
-            record_local_chat_fn=tracker.record_local_chat,
-            chat_max_bytes=default_chat_max_bytes,
-            normalize_single_emoji_fn=normalize_single_emoji_fn,
-            to_int_fn=to_int_fn,
-            now_text_fn=utc_now_fn,
-        )
+    send_chat_fn = build_send_chat_loader(
+        iface=iface,
+        tracker=tracker,
+        send_lock=send_lock,
+        send_chat_message_fn=send_chat_message_fn,
+        send_reaction_packet_fn=send_reaction_packet_fn,
+        get_local_node_id_fn=get_local_node_id_fn,
+        chat_max_bytes=default_chat_max_bytes,
+        normalize_single_emoji_fn=normalize_single_emoji_fn,
+        to_int_fn=to_int_fn,
+        utc_now_fn=utc_now_fn,
+    )
 
     html = render_html_fn(
         refresh_ms=args.refresh_ms,
