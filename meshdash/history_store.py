@@ -8,12 +8,10 @@ from typing import Any, Dict, Optional
 
 from .helpers import (
     extract_position_fields as _extract_position_fields,
-    to_float as _to_float,
     to_int as _to_int,
 )
 from .history_rollups import (
     bucket_minute as _bucket_minute_helper,
-    clean_node_id as _clean_node_id_helper,
 )
 from .history_readers import (
     decode_connections_rows as _decode_connections_rows_helper,
@@ -45,6 +43,10 @@ from .history_positions import (
 from .history_metric_rows import (
     build_metric_rollup_values as _build_metric_rollup_values_helper,
     merge_metric_rollup_row as _merge_metric_rollup_row_helper,
+)
+from .history_packet_events import (
+    build_packet_event_insert_values as _build_packet_event_insert_values_helper,
+    normalize_packet_event_summary as _normalize_packet_event_summary_helper,
 )
 from .history_prune import prune_history_tables as _prune_history_tables_helper
 from .history_schema import initialize_history_schema as _initialize_history_schema_helper
@@ -590,26 +592,15 @@ class HistoryStore:
         )
 
     def _save_packet_event_and_rollups_unlocked(self, summary: Dict[str, Any]) -> None:
-        event_unix = _to_int(summary.get("rx_time_unix"))
-        if event_unix is None or event_unix <= 0:
-            event_unix = int(time.time())
-
-        from_id = _clean_node_id_helper(summary.get("from"))
-        to_id = _clean_node_id_helper(summary.get("to"))
-        portnum_raw = summary.get("portnum")
-        portnum = str(portnum_raw) if portnum_raw is not None else None
-        rx_snr = _to_float(summary.get("rx_snr"))
-        rx_rssi = _to_float(summary.get("rx_rssi"))
-        hops = _to_int(summary.get("hops"))
-        hop_start = _to_int(summary.get("hop_start"))
-        hop_limit = _to_int(summary.get("hop_limit"))
-        channel_raw = summary.get("channel")
-        channel = str(channel_raw) if channel_raw is not None else None
-        priority_raw = summary.get("priority")
-        priority = str(priority_raw) if priority_raw is not None else None
-        want_ack = 1 if summary.get("want_ack") else 0
-        position_data = summary.get("position")
-        battery_level = _to_int(summary.get("battery_level"))
+        normalized = _normalize_packet_event_summary_helper(summary, now_unix_fn=time.time)
+        event_unix = normalized["event_unix"]
+        from_id = normalized["from_id"]
+        to_id = normalized["to_id"]
+        rx_snr = normalized["rx_snr"]
+        rx_rssi = normalized["rx_rssi"]
+        hops = normalized["hops"]
+        position_data = normalized["position_data"]
+        battery_level = normalized["battery_level"]
 
         self._conn.execute(
             """
@@ -619,21 +610,7 @@ class HistoryStore:
               channel, want_ack, priority, summary_json
             ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (
-                event_unix,
-                from_id,
-                to_id,
-                portnum,
-                rx_snr,
-                rx_rssi,
-                hops,
-                hop_start,
-                hop_limit,
-                channel,
-                want_ack,
-                priority,
-                json.dumps(summary, separators=(",", ":")),
-            ),
+            _build_packet_event_insert_values_helper(normalized),
         )
 
         bucket_unix = _bucket_minute_helper(event_unix)
