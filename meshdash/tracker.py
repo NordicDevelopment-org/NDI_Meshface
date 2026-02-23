@@ -37,6 +37,9 @@ from .nodes import (
 from .tracker_snapshot import (
     build_edge_snapshot_rows as _build_edge_snapshot_rows_helper,
 )
+from .tracker_edges import (
+    record_direct_edge_observation as _record_direct_edge_observation_helper,
+)
 
 
 DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS = 90
@@ -206,77 +209,24 @@ class DashboardTracker:
         if portnum is not None:
             self.port_counts[str(portnum)] += 1
 
-        is_direct_link = (
-            bool(from_id)
-            and bool(to_id)
-            and from_id not in ("Unknown",)
-            and to_id not in ("^all", "Unknown")
-            and str(from_id) != str(to_id)
+        direct_key = _record_direct_edge_observation_helper(
+            session_edges=self.edges,
+            historical_edges=self._historical_edges,
+            from_id=from_id,
+            to_id=to_id,
+            rx_time=rx_time,
+            portnum=portnum,
+            hops=hops,
+            include_live_count=include_live_count,
         )
-        if is_direct_link:
-            key = (str(from_id), str(to_id))
-            edge = self.edges.setdefault(
-                key,
-                {
-                    "from": str(from_id),
-                    "to": str(to_id),
-                    "count": 0,
-                    "first_rx_time": None,
-                    "last_rx_time": None,
-                    "portnums": set(),
-                    "last_hops": None,
-                    "hops_sum": 0,
-                    "hops_count": 0,
-                },
+        if direct_key is not None and include_live_count and self._history_store is not None:
+            self._history_store.save_connection_event(
+                from_id=direct_key[0],
+                to_id=direct_key[1],
+                rx_time=rx_time,
+                portnum=str(portnum) if portnum is not None else None,
+                hops=hops,
             )
-            edge["count"] += 1
-            if rx_time is not None and (edge["first_rx_time"] is None or rx_time < edge["first_rx_time"]):
-                edge["first_rx_time"] = rx_time
-            if rx_time is not None and (edge["last_rx_time"] is None or rx_time > edge["last_rx_time"]):
-                edge["last_rx_time"] = rx_time
-
-            if portnum is not None:
-                edge["portnums"].add(str(portnum))
-            if hops is not None:
-                edge["last_hops"] = hops
-                edge["hops_sum"] += hops
-                edge["hops_count"] += 1
-
-            if include_live_count:
-                hist = self._historical_edges.setdefault(
-                    key,
-                    {
-                        "from": str(from_id),
-                        "to": str(to_id),
-                        "count": 0,
-                        "first_rx_time": None,
-                        "last_rx_time": None,
-                        "portnums": set(),
-                        "last_hops": None,
-                        "hops_sum": 0,
-                        "hops_count": 0,
-                    },
-                )
-                hist["count"] += 1
-                if rx_time is not None and (hist["first_rx_time"] is None or rx_time < hist["first_rx_time"]):
-                    hist["first_rx_time"] = rx_time
-                if rx_time is not None and (hist["last_rx_time"] is None or rx_time > hist["last_rx_time"]):
-                    hist["last_rx_time"] = rx_time
-                if portnum is not None:
-                    hist["portnums"].add(str(portnum))
-                if hops is not None:
-                    hist["last_hops"] = hops
-                    hist["hops_sum"] += hops
-                    hist["hops_count"] += 1
-
-                if self._history_store is not None:
-                    self._history_store.save_connection_event(
-                        from_id=str(from_id),
-                        to_id=str(to_id),
-                        rx_time=rx_time,
-                        portnum=str(portnum) if portnum is not None else None,
-                        hops=hops,
-                    )
 
         packet_summary = {
             "captured_at": _utc_now(),
