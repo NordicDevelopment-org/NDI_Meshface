@@ -1,8 +1,6 @@
-import time
 from typing import Any, Dict, Optional
 
 from .helpers import (
-    disk_space_info,
     redact_secrets,
     to_jsonable,
 )
@@ -10,6 +8,12 @@ from .nodes import utc_now
 from .state_nodes import (
     collect_local_state as _collect_local_state_helper,
     collect_nodes as _collect_nodes_helper,
+)
+from .state_summary import (
+    apply_node_saved_counts as _apply_node_saved_counts_helper,
+    build_summary_payload as _build_summary_payload_helper,
+    collect_local_state_safe as _collect_local_state_safe_helper,
+    modem_preset_from_local_state as _modem_preset_from_local_state_helper,
 )
 
 
@@ -35,48 +39,29 @@ def build_state(
     tracker_data = tracker.snapshot(nodes["by_id"])
     node_saved_counts = tracker.load_node_saved_counts()
     node_capabilities = tracker.load_node_capabilities()
-    for row in nodes["rows"]:
-        stats = node_saved_counts.get(str(row.get("id") or ""), {})
-        row["saved_packets"] = int(stats.get("saved_packets") or 0)
-        row["saved_points"] = int(stats.get("saved_points") or 0)
-        row["saved_last_seen"] = stats.get("saved_last_seen")
+    _apply_node_saved_counts_helper(nodes["rows"], node_saved_counts)
 
     my_info = to_jsonable(getattr(iface, "myInfo", None))
     metadata = to_jsonable(getattr(iface, "metadata", None))
 
-    local_state: Dict[str, Any]
-    local_error: Optional[str] = None
-    try:
-        local_state = collect_local_state(iface)
-    except Exception as exc:
-        local_state = {}
-        local_error = str(exc)
-
-    modem_preset = None
-    try:
-        modem_preset = (
-            (local_state.get("local_config") or {})
-            .get("lora", {})
-            .get("modem_preset")
-        )
-    except Exception:
-        modem_preset = None
+    local_state, local_error = _collect_local_state_safe_helper(
+        iface,
+        collect_local_state_fn=collect_local_state,
+    )
+    modem_preset = _modem_preset_from_local_state_helper(local_state)
 
     state = {
         "generated_at": utc_now(),
-        "summary": {
-            "target": target,
-            "uptime_seconds": int(max(0, time.time() - started_at)),
-            "node_count": len(nodes["rows"]),
-            "nodes_with_position": nodes["with_position_count"],
-            "live_packet_count": tracker_data["live_packet_count"],
-            "edge_count": len(tracker_data["edges"]),
-            "real_edge_count": tracker_data["real_edge_count"],
-            "recent_packet_buffer": len(tracker_data["recent_packets"]),
-            "modem_preset": modem_preset,
-            "disk": disk_space_info(storage_probe_path),
-            "revision": revision_info,
-        },
+        "summary": _build_summary_payload_helper(
+            target=target,
+            started_at=started_at,
+            node_rows=nodes["rows"],
+            nodes_with_position=nodes["with_position_count"],
+            tracker_data=tracker_data,
+            storage_probe_path=storage_probe_path,
+            revision_info=revision_info,
+            modem_preset=modem_preset,
+        ),
         "my_info": my_info,
         "metadata": metadata,
         "local_state": local_state,

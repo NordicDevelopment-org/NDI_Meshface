@@ -24,6 +24,7 @@
 - `meshdash/services.py`: shared history/online loader builders, chat-send service logic, and empty payload helpers.
 - `meshdash/state.py`: node/local snapshot + assembled `/api/state` payload helpers.
 - `meshdash/state_nodes.py`: node/local snapshot collection helpers extracted from state assembly.
+- `meshdash/state_summary.py`: summary/local-state enrichment helpers for `/api/state`.
 - `meshdash/tracker.py`: extracted packet/chat tracking, edge synthesis, snapshots, and seed-from-node-db helper.
 - `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshdash/wiring.py`: dependency checks and runtime wiring assembly for dashboard startup.
