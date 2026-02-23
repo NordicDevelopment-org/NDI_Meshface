@@ -8,8 +8,6 @@ from typing import Any, Dict, Optional
 
 from .helpers import (
     extract_position_fields as _extract_position_fields,
-    format_epoch as _format_epoch,
-    safe_json_loads as _safe_json_loads,
     to_float as _to_float,
     to_int as _to_int,
 )
@@ -31,6 +29,10 @@ from .history_connections import (
     build_connection_insert_values as _build_connection_insert_values_helper,
     merge_connection_row as _merge_connection_row_helper,
     normalize_connection_event_input as _normalize_connection_event_input_helper,
+)
+from .history_capabilities import (
+    decode_node_capabilities_rows as _decode_node_capabilities_rows_helper,
+    decode_node_saved_counts_rows as _decode_node_saved_counts_rows_helper,
 )
 from .history_prune import prune_history_tables as _prune_history_tables_helper
 from .history_schema import initialize_history_schema as _initialize_history_schema_helper
@@ -285,7 +287,6 @@ class HistoryStore:
         )
 
     def load_node_saved_counts(self) -> Dict[str, Dict[str, Any]]:
-        out: Dict[str, Dict[str, Any]] = {}
         with self._lock:
             rows = self._conn.execute(
                 """
@@ -297,20 +298,9 @@ class HistoryStore:
                 GROUP BY node_id
                 """
             ).fetchall()
-
-        for node_id, saved_packets, saved_points, saved_last_seen_unix in rows:
-            clean_node_id = str(node_id or "").strip()
-            if not clean_node_id:
-                continue
-            out[clean_node_id] = {
-                "saved_packets": int(saved_packets or 0),
-                "saved_points": int(saved_points or 0),
-                "saved_last_seen": _format_epoch(saved_last_seen_unix),
-            }
-        return out
+        return _decode_node_saved_counts_rows_helper(rows)
 
     def load_node_capabilities(self) -> Dict[str, Dict[str, Any]]:
-        out: Dict[str, Dict[str, Any]] = {}
         with self._lock:
             rows = self._conn.execute(
                 """
@@ -320,31 +310,7 @@ class HistoryStore:
                 ORDER BY last_seen_unix DESC
                 """
             ).fetchall()
-
-        for (
-            node_id,
-            last_seen_unix,
-            has_position,
-            last_position_unix,
-            last_hops,
-            battery_level,
-            battery_updated_unix,
-        ) in rows:
-            clean_node_id = str(node_id or "").strip()
-            if not clean_node_id:
-                continue
-            out[clean_node_id] = {
-                "last_seen_unix": _to_int(last_seen_unix),
-                "last_seen": _format_epoch(last_seen_unix),
-                "has_position": bool(_to_int(has_position)),
-                "last_position_unix": _to_int(last_position_unix),
-                "last_position_time": _format_epoch(last_position_unix),
-                "last_hops": _to_int(last_hops),
-                "battery_level": _to_int(battery_level),
-                "battery_updated_unix": _to_int(battery_updated_unix),
-                "battery_updated_time": _format_epoch(battery_updated_unix),
-            }
-        return out
+        return _decode_node_capabilities_rows_helper(rows)
 
     def save_connection_event(
         self,
