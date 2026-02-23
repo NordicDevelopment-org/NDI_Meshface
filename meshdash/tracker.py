@@ -10,10 +10,6 @@ except Exception:
 
 from .chat import (
     build_local_chat_entry as _build_local_chat_entry,
-    chat_message_id as _chat_message_id_helper,
-    expire_pending_deliveries as _expire_pending_deliveries_helper,
-    extract_routing_delivery_update as _extract_routing_delivery_update_helper,
-    set_delivery_state as _set_delivery_state_helper,
 )
 from .helpers import (
     calculate_hops as _calculate_hops,
@@ -23,7 +19,6 @@ from .helpers import (
     extract_packet_position as _extract_packet_position,
     extract_reply_id as _extract_reply_id,
     format_epoch as _format_epoch,
-    safe_json_loads as _safe_json_loads,
     to_int as _to_int,
     to_jsonable as _to_jsonable,
 )
@@ -71,6 +66,15 @@ from .tracker_packet_artifacts import (
 from .tracker_observation import (
     apply_tracker_observation as _apply_tracker_observation_helper,
 )
+from .tracker_receive import (
+    process_parsed_tracker_packet as _process_parsed_tracker_packet_helper,
+)
+from .tracker_local_entry import (
+    build_tracker_local_entry as _build_tracker_local_entry_helper,
+)
+from .tracker_callbacks import (
+    build_tracker_delivery_callbacks as _build_tracker_delivery_callbacks_helper,
+)
 
 
 DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS = 90
@@ -98,6 +102,17 @@ class DashboardTracker:
         self.port_counts: Counter[str] = Counter()
         self.recent_packets: deque[Dict[str, Any]] = deque(maxlen=packet_limit)
         self.recent_chat: deque[Dict[str, Any]] = deque(maxlen=packet_limit)
+        delivery_callbacks = _build_tracker_delivery_callbacks_helper(
+            self.recent_chat,
+            get_timeout_seconds_fn=lambda: self._chat_delivery_timeout_seconds,
+            to_int_fn=_to_int,
+            parse_utc_text_to_unix_fn=_parse_utc_text_to_unix,
+            utc_now_fn=_utc_now,
+            now_unix_fn=time.time,
+        )
+        self._set_delivery_state_fn = delivery_callbacks["set_delivery_state"]
+        self._extract_delivery_update_fn = delivery_callbacks["extract_delivery_update"]
+        self._expire_pending_deliveries_fn = delivery_callbacks["expire_pending_deliveries"]
 
         if self._history_store is not None:
             bootstrap = _load_tracker_history_bootstrap_helper(
@@ -128,38 +143,6 @@ class DashboardTracker:
             return {}
         return self._history_store.load_node_capabilities()
 
-    def _chat_message_id(self, entry: Any) -> Optional[int]:
-        return _chat_message_id_helper(entry, to_int_fn=_to_int)
-
-    def _set_delivery_state_unlocked(
-        self,
-        message_id: Any,
-        state: str,
-        error: Optional[str] = None,
-    ) -> bool:
-        return _set_delivery_state_helper(
-            self.recent_chat,
-            message_id=message_id,
-            state=state,
-            error=error,
-            to_int_fn=_to_int,
-            now_text_fn=_utc_now,
-            now_unix_fn=lambda: int(time.time()),
-        )
-
-    def _extract_routing_delivery_update_unlocked(self, decoded: Any) -> Optional[Dict[str, Any]]:
-        return _extract_routing_delivery_update_helper(decoded, to_int_fn=_to_int)
-
-    def _expire_pending_deliveries_unlocked(self) -> None:
-        _expire_pending_deliveries_helper(
-            self.recent_chat,
-            timeout_seconds=self._chat_delivery_timeout_seconds,
-            to_int_fn=_to_int,
-            parse_utc_text_to_unix_fn=_parse_utc_text_to_unix,
-            now_unix_fn=lambda: int(time.time()),
-            now_text_fn=_utc_now,
-        )
-
     def record_local_chat(
         self,
         text: str,
@@ -174,9 +157,7 @@ class DashboardTracker:
         ack_requested: bool = False,
         retry_of: Optional[int] = None,
     ) -> None:
-        now_text = _utc_now()
-        now_unix = int(time.time())
-        entry = _build_local_chat_entry(
+        entry = _build_tracker_local_entry_helper(
             text=text,
             from_id=from_id,
             to_id=to_id,
@@ -188,8 +169,9 @@ class DashboardTracker:
             is_reaction=is_reaction,
             ack_requested=ack_requested,
             retry_of=retry_of,
-            now_text=now_text,
-            now_unix=now_unix,
+            build_local_chat_entry_fn=_build_local_chat_entry,
+            utc_now_fn=_utc_now,
+            now_unix_fn=time.time,
             to_int_fn=_to_int,
             emoji_from_codepoint_fn=_emoji_from_codepoint,
         )
@@ -221,50 +203,36 @@ class DashboardTracker:
             extract_emoji_codepoint_fn=_extract_emoji_codepoint,
             emoji_from_codepoint_fn=_emoji_from_codepoint,
         )
-        rx_time = parsed["rx_time"]
-        hops = parsed["hops"]
-        portnum = parsed["portnum"]
-        direct_key = _apply_tracker_observation_helper(
+        _process_parsed_tracker_packet_helper(
+            packet=packet,
             parsed=parsed,
             include_live_count=include_live_count,
             session_edges=self.edges,
             historical_edges=self._historical_edges,
             port_counts=self.port_counts,
+            apply_tracker_observation_fn=_apply_tracker_observation_helper,
             apply_routing_delivery_update_fn=_apply_routing_delivery_update_helper,
-            extract_update_fn=self._extract_routing_delivery_update_unlocked,
-            set_delivery_state_fn=self._set_delivery_state_unlocked,
+            extract_update_fn=self._extract_delivery_update_fn,
+            set_delivery_state_fn=self._set_delivery_state_fn,
             record_direct_edge_observation_fn=_record_direct_edge_observation_helper,
-        )
-
-        packet_entry, chat_entry = _build_tracker_packet_artifacts_helper(
-            packet=packet,
-            parsed=parsed,
-            include_live_count=include_live_count,
+            build_tracker_packet_artifacts_fn=_build_tracker_packet_artifacts_helper,
             build_packet_summary_fn=_build_packet_summary_helper,
             build_chat_entry_from_packet_fn=_build_chat_entry_from_packet_helper,
             utc_now_fn=_utc_now,
             format_epoch_fn=_format_epoch,
             to_int_fn=_to_int,
             to_jsonable_fn=_to_jsonable,
-        )
-        _apply_tracker_storage_updates_helper(
+            apply_tracker_storage_updates_fn=_apply_tracker_storage_updates_helper,
             recent_packets=self.recent_packets,
             recent_chat=self.recent_chat,
             history_store=self._history_store,
-            include_live_count=include_live_count,
-            direct_key=direct_key,
-            rx_time=rx_time,
-            portnum=portnum,
-            hops=hops,
-            packet_entry=packet_entry,
-            chat_entry=chat_entry,
         )
 
-        self._expire_pending_deliveries_unlocked()
+        self._expire_pending_deliveries_fn()
 
     def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         with self._lock:
-            self._expire_pending_deliveries_unlocked()
+            self._expire_pending_deliveries_fn()
             return _build_tracker_snapshot_payload_helper(
                 session_edges=self.edges,
                 historical_edges=self._historical_edges,

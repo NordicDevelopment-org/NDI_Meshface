@@ -4,6 +4,9 @@ from .history_metric_rows import (
     build_metric_rollup_values as _build_metric_rollup_values,
     merge_metric_rollup_row as _merge_metric_rollup_row,
 )
+from .history_metric_upsert import (
+    upsert_metric_rollup_row as _upsert_metric_rollup_row_helper,
+)
 
 
 def upsert_node_metric(
@@ -16,92 +19,18 @@ def upsert_node_metric(
     rx_rssi: Optional[float],
     hops: Optional[int],
 ) -> None:
-    row = conn.execute(
-        """
-        SELECT packet_count,
-               snr_sum, snr_count, snr_min, snr_max,
-               rssi_sum, rssi_count, rssi_min, rssi_max,
-               hops_sum, hops_count, hops_min, hops_max,
-               last_seen_unix
-        FROM node_metrics_1m
-        WHERE bucket_unix = ? AND node_id = ?
-        """,
-        (bucket_unix, node_id),
-    ).fetchone()
-
-    if row is None:
-        rolled = _build_metric_rollup_values(
-            event_unix=event_unix,
-            rx_snr=rx_snr,
-            rx_rssi=rx_rssi,
-            hops=hops,
-        )
-        conn.execute(
-            """
-            INSERT INTO node_metrics_1m(
-              bucket_unix, node_id, packet_count,
-              snr_sum, snr_count, snr_min, snr_max,
-              rssi_sum, rssi_count, rssi_min, rssi_max,
-              hops_sum, hops_count, hops_min, hops_max,
-              last_seen_unix
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                bucket_unix,
-                node_id,
-                rolled["packet_count"],
-                rolled["snr_sum"],
-                rolled["snr_count"],
-                rolled["snr_min"],
-                rolled["snr_max"],
-                rolled["rssi_sum"],
-                rolled["rssi_count"],
-                rolled["rssi_min"],
-                rolled["rssi_max"],
-                rolled["hops_sum"],
-                rolled["hops_count"],
-                rolled["hops_min"],
-                rolled["hops_max"],
-                rolled["last_seen_unix"],
-            ),
-        )
-        return
-
-    merged = _merge_metric_rollup_row(
-        row=row,
+    _upsert_metric_rollup_row_helper(
+        conn,
+        table_name="node_metrics_1m",
+        key_fields=("node_id",),
+        key_values=(node_id,),
+        bucket_unix=bucket_unix,
         event_unix=event_unix,
         rx_snr=rx_snr,
         rx_rssi=rx_rssi,
         hops=hops,
-    )
-    conn.execute(
-        """
-        UPDATE node_metrics_1m
-        SET packet_count = ?,
-            snr_sum = ?, snr_count = ?, snr_min = ?, snr_max = ?,
-            rssi_sum = ?, rssi_count = ?, rssi_min = ?, rssi_max = ?,
-            hops_sum = ?, hops_count = ?, hops_min = ?, hops_max = ?,
-            last_seen_unix = ?
-        WHERE bucket_unix = ? AND node_id = ?
-        """,
-        (
-            merged["packet_count"],
-            merged["snr_sum"],
-            merged["snr_count"],
-            merged["snr_min"],
-            merged["snr_max"],
-            merged["rssi_sum"],
-            merged["rssi_count"],
-            merged["rssi_min"],
-            merged["rssi_max"],
-            merged["hops_sum"],
-            merged["hops_count"],
-            merged["hops_min"],
-            merged["hops_max"],
-            merged["last_seen_unix"],
-            bucket_unix,
-            node_id,
-        ),
+        build_metric_rollup_values_fn=_build_metric_rollup_values,
+        merge_metric_rollup_row_fn=_merge_metric_rollup_row,
     )
 
 
@@ -116,92 +45,16 @@ def upsert_link_metric(
     rx_rssi: Optional[float],
     hops: Optional[int],
 ) -> None:
-    row = conn.execute(
-        """
-        SELECT packet_count,
-               snr_sum, snr_count, snr_min, snr_max,
-               rssi_sum, rssi_count, rssi_min, rssi_max,
-               hops_sum, hops_count, hops_min, hops_max,
-               last_seen_unix
-        FROM link_metrics_1m
-        WHERE bucket_unix = ? AND from_id = ? AND to_id = ?
-        """,
-        (bucket_unix, from_id, to_id),
-    ).fetchone()
-
-    if row is None:
-        rolled = _build_metric_rollup_values(
-            event_unix=event_unix,
-            rx_snr=rx_snr,
-            rx_rssi=rx_rssi,
-            hops=hops,
-        )
-        conn.execute(
-            """
-            INSERT INTO link_metrics_1m(
-              bucket_unix, from_id, to_id, packet_count,
-              snr_sum, snr_count, snr_min, snr_max,
-              rssi_sum, rssi_count, rssi_min, rssi_max,
-              hops_sum, hops_count, hops_min, hops_max,
-              last_seen_unix
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                bucket_unix,
-                from_id,
-                to_id,
-                rolled["packet_count"],
-                rolled["snr_sum"],
-                rolled["snr_count"],
-                rolled["snr_min"],
-                rolled["snr_max"],
-                rolled["rssi_sum"],
-                rolled["rssi_count"],
-                rolled["rssi_min"],
-                rolled["rssi_max"],
-                rolled["hops_sum"],
-                rolled["hops_count"],
-                rolled["hops_min"],
-                rolled["hops_max"],
-                rolled["last_seen_unix"],
-            ),
-        )
-        return
-
-    merged = _merge_metric_rollup_row(
-        row=row,
+    _upsert_metric_rollup_row_helper(
+        conn,
+        table_name="link_metrics_1m",
+        key_fields=("from_id", "to_id"),
+        key_values=(from_id, to_id),
+        bucket_unix=bucket_unix,
         event_unix=event_unix,
         rx_snr=rx_snr,
         rx_rssi=rx_rssi,
         hops=hops,
-    )
-    conn.execute(
-        """
-        UPDATE link_metrics_1m
-        SET packet_count = ?,
-            snr_sum = ?, snr_count = ?, snr_min = ?, snr_max = ?,
-            rssi_sum = ?, rssi_count = ?, rssi_min = ?, rssi_max = ?,
-            hops_sum = ?, hops_count = ?, hops_min = ?, hops_max = ?,
-            last_seen_unix = ?
-        WHERE bucket_unix = ? AND from_id = ? AND to_id = ?
-        """,
-        (
-            merged["packet_count"],
-            merged["snr_sum"],
-            merged["snr_count"],
-            merged["snr_min"],
-            merged["snr_max"],
-            merged["rssi_sum"],
-            merged["rssi_count"],
-            merged["rssi_min"],
-            merged["rssi_max"],
-            merged["hops_sum"],
-            merged["hops_count"],
-            merged["hops_min"],
-            merged["hops_max"],
-            merged["last_seen_unix"],
-            bucket_unix,
-            from_id,
-            to_id,
-        ),
+        build_metric_rollup_values_fn=_build_metric_rollup_values,
+        merge_metric_rollup_row_fn=_merge_metric_rollup_row,
     )

@@ -1,5 +1,12 @@
 from typing import Any, Callable, Dict
 
+from .wiring_adapters import (
+    build_http_handler_factory as _build_http_handler_factory_helper,
+    build_local_node_id_getter as _build_local_node_id_getter_helper,
+    build_reaction_sender as _build_reaction_sender_helper,
+    build_state_builder as _build_state_builder_helper,
+)
+
 
 def ensure_runtime_dependencies(*, meshtastic_module: Any, pub_module: Any) -> None:
     if meshtastic_module is None:
@@ -41,6 +48,27 @@ def build_dashboard_runtime_dependencies(
     guess_lan_ipv4_fn: Callable[[], Any],
     default_chat_max_bytes: int,
 ) -> Dict[str, Any]:
+    build_state_with_sensitive_fields = _build_state_builder_helper(
+        build_state_fn=build_state_fn,
+        sensitive_field_names=sensitive_field_names,
+    )
+    send_reaction_packet = _build_reaction_sender_helper(
+        send_emoji_reaction_packet_fn=send_emoji_reaction_packet_fn,
+        mesh_pb2_module=mesh_pb2_module,
+        portnums_pb2_module=portnums_pb2_module,
+    )
+    get_local_node_id = _build_local_node_id_getter_helper(
+        get_local_node_id_fn=get_local_node_id_fn,
+        meshtastic_module=meshtastic_module,
+        to_jsonable_fn=to_jsonable_fn,
+        to_int_fn=to_int_fn,
+    )
+    make_http_handler = _build_http_handler_factory_helper(
+        make_http_handler_fn=make_http_handler_fn,
+        default_node_history_hours=default_node_history_hours,
+        to_int_fn=to_int_fn,
+    )
+
     return {
         "mesh_target_label_fn": mesh_target_label_fn,
         "open_mesh_interface_fn": open_mesh_interface_fn,
@@ -49,37 +77,17 @@ def build_dashboard_runtime_dependencies(
         "subscribe_fn": pub_module.subscribe,
         "seed_tracker_fn": seed_tracker_fn,
         "revision_info_fn": revision_info_fn,
-        "build_state_fn": lambda **kwargs: build_state_fn(
-            sensitive_field_names=sensitive_field_names,
-            **kwargs,
-        ),
+        "build_state_fn": build_state_with_sensitive_fields,
         "build_node_history_loader_fn": build_node_history_loader_fn,
         "build_online_activity_loader_fn": build_online_activity_loader_fn,
         "send_chat_message_fn": send_chat_message_fn,
-        "send_reaction_packet_fn": lambda **kwargs: send_emoji_reaction_packet_fn(
-            mesh_pb2_module=mesh_pb2_module,
-            portnums_pb2_module=portnums_pb2_module,
-            **kwargs,
-        ),
-        "get_local_node_id_fn": lambda iface: get_local_node_id_fn(
-            iface,
-            meshtastic_module=meshtastic_module,
-            to_jsonable_fn=to_jsonable_fn,
-            to_int_fn=to_int_fn,
-        ),
+        "send_reaction_packet_fn": send_reaction_packet,
+        "get_local_node_id_fn": get_local_node_id,
         "normalize_single_emoji_fn": normalize_single_emoji_fn,
         "to_int_fn": to_int_fn,
         "utc_now_fn": utc_now_fn,
         "render_html_fn": render_html_fn,
-        "make_http_handler_fn": lambda html_text, state_fn, node_history_fn=None, online_activity_fn=None, send_chat_fn=None: make_http_handler_fn(
-            html_text=html_text,
-            state_fn=state_fn,
-            node_history_fn=node_history_fn,
-            online_activity_fn=online_activity_fn,
-            send_chat_fn=send_chat_fn,
-            default_node_history_hours=default_node_history_hours,
-            to_int_fn=to_int_fn,
-        ),
+        "make_http_handler_fn": make_http_handler,
         "guess_lan_ipv4_fn": guess_lan_ipv4_fn,
         "default_chat_max_bytes": default_chat_max_bytes,
     }

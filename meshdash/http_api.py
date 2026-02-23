@@ -10,6 +10,7 @@ from .api_inputs import (
 )
 from .helpers import to_int
 from .http_responses import write_html_response, write_json_response, write_text_response
+from .http_routes import handle_dashboard_get, handle_dashboard_post
 from .services import empty_node_history, empty_online_activity
 
 
@@ -26,110 +27,39 @@ def make_http_handler(
         def do_GET(self) -> None:
             try:
                 parsed = urlparse(self.path)
-                path = parsed.path
-
-                if path in ("/", "/index.html"):
-                    write_html_response(self, html_text=html_text)
-                    return
-
-                if path == "/api/state":
-                    write_json_response(self, status_code=200, payload_obj=state_fn(), no_store=True)
-                    return
-
-                if path == "/api/history/node":
-                    node_id, hours_override, points_override = parse_node_history_query(
-                        parsed.query,
-                        to_int_fn=to_int_fn,
-                    )
-                    if node_history_fn is None:
-                        response_obj = empty_node_history(node_id)
-                    else:
-                        response_obj = node_history_fn(node_id, hours_override, points_override)
-                    write_json_response(self, status_code=200, payload_obj=response_obj, no_store=True)
-                    return
-
-                if path == "/api/history/online":
-                    hours_override = parse_online_activity_query(
-                        parsed.query,
-                        to_int_fn=to_int_fn,
-                    )
-                    if online_activity_fn is None:
-                        clean_hours = (
-                            hours_override
-                            if isinstance(hours_override, int) and hours_override > 0
-                            else default_node_history_hours
-                        )
-                        response_obj = empty_online_activity(clean_hours)
-                    else:
-                        response_obj = online_activity_fn(hours_override)
-                    write_json_response(self, status_code=200, payload_obj=response_obj, no_store=True)
-                    return
-
-                write_text_response(self, status_code=404, text="Not Found")
+                handle_dashboard_get(
+                    self,
+                    path=parsed.path,
+                    query=parsed.query,
+                    html_text=html_text,
+                    state_fn=state_fn,
+                    node_history_fn=node_history_fn,
+                    online_activity_fn=online_activity_fn,
+                    default_node_history_hours=default_node_history_hours,
+                    to_int_fn=to_int_fn,
+                    parse_node_history_query_fn=parse_node_history_query,
+                    parse_online_activity_query_fn=parse_online_activity_query,
+                    empty_node_history_fn=empty_node_history,
+                    empty_online_activity_fn=empty_online_activity,
+                    write_html_response_fn=write_html_response,
+                    write_json_response_fn=write_json_response,
+                    write_text_response_fn=write_text_response,
+                )
             except (BrokenPipeError, ConnectionResetError):
                 return
 
         def do_POST(self) -> None:
             try:
                 parsed = urlparse(self.path)
-                path = parsed.path
-                if path != "/api/chat/send":
-                    write_json_response(
-                        self,
-                        status_code=404,
-                        payload_obj={"ok": False, "error": "Not Found"},
-                    )
-                    return
-
-                if send_chat_fn is None:
-                    write_json_response(
-                        self,
-                        status_code=503,
-                        payload_obj={"ok": False, "error": "Chat send is not enabled on this dashboard instance"},
-                    )
-                    return
-
-                try:
-                    content_length = validate_content_length(
-                        self.headers,
-                        to_int_fn=to_int_fn,
-                    )
-                except ValueError:
-                    write_json_response(
-                        self,
-                        status_code=400,
-                        payload_obj={"ok": False, "error": "Invalid request size"},
-                    )
-                    return
-
-                raw = self.rfile.read(content_length)
-                chat_request = parse_chat_send_body(raw, to_int_fn=to_int_fn)
-
-                try:
-                    response_obj = send_chat_fn(
-                        text=chat_request["text"],
-                        destination=chat_request["destination"],
-                        channel_index=chat_request["channel_index"],
-                        reply_id=chat_request["reply_id"],
-                        retry_of=chat_request["retry_of"],
-                        emoji=chat_request["emoji"],
-                    )
-                except ValueError as exc:
-                    write_json_response(
-                        self,
-                        status_code=400,
-                        payload_obj={"ok": False, "error": str(exc)},
-                    )
-                    return
-                except Exception as exc:
-                    write_json_response(
-                        self,
-                        status_code=500,
-                        payload_obj={"ok": False, "error": f"Send failed: {exc}"},
-                    )
-                    return
-
-                write_json_response(self, status_code=200, payload_obj=response_obj, no_store=True)
+                handle_dashboard_post(
+                    self,
+                    path=parsed.path,
+                    send_chat_fn=send_chat_fn,
+                    to_int_fn=to_int_fn,
+                    validate_content_length_fn=validate_content_length,
+                    parse_chat_send_body_fn=parse_chat_send_body,
+                    write_json_response_fn=write_json_response,
+                )
             except (BrokenPipeError, ConnectionResetError):
                 return
 

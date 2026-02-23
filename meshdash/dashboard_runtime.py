@@ -13,6 +13,16 @@ from .runtime_callbacks import (
     build_send_chat_loader,
     build_state_snapshot_loader,
 )
+from .dashboard_setup import (
+    open_optional_history_store,
+    seed_tracker_if_empty,
+)
+from .dashboard_loaders import (
+    build_dashboard_runtime_loaders,
+)
+from .dashboard_server import (
+    build_dashboard_server,
+)
 
 
 def run_dashboard_runtime(
@@ -44,85 +54,65 @@ def run_dashboard_runtime(
     print(f"Connecting to {target} ...")
     iface = open_mesh_interface_fn(args)
 
-    history_store: Optional[Any] = None
     history_db_path = os.path.abspath(os.path.expanduser(args.history_db))
-    if not args.no_history:
-        try:
-            history_store = history_store_cls(
-                db_path=history_db_path,
-                max_rows=args.history_max_rows,
-                retention_days=args.history_retention_days,
-                event_max_rows=args.history_event_max_rows,
-                event_retention_days=args.history_event_retention_days,
-                rollup_retention_days=args.history_rollup_retention_days,
-            )
-        except Exception as exc:
-            print(f"History disabled: cannot open {history_db_path}: {exc}")
-            history_store = None
+    history_store: Optional[Any] = open_optional_history_store(
+        args,
+        history_store_cls=history_store_cls,
+        history_db_path=history_db_path,
+    )
 
     tracker = dashboard_tracker_cls(packet_limit=args.packet_limit, history_store=history_store)
     send_lock = threading.Lock()
     subscribe_fn(tracker.on_receive, "meshtastic.receive")
-    if not tracker.has_recent_packets():
-        seed_tracker_fn(tracker, iface)
+    seed_tracker_if_empty(tracker, iface, seed_tracker_fn=seed_tracker_fn)
     started_at = time.time()
     revision_info = revision_info_fn()
 
-    state_fn = build_state_snapshot_loader(
-        iface=iface,
-        tracker=tracker,
-        started_at=started_at,
-        target=target,
-        show_secrets=args.show_secrets,
-        storage_probe_path=history_db_path,
-        revision_info=revision_info,
-        build_state_fn=build_state_fn,
-    )
-
-    node_history_fn = build_node_history_loader_fn(
-        history_store=history_store,
-        default_hours=args.node_history_hours,
-        default_points=args.node_history_max_points,
-    )
-    online_activity_fn = build_online_activity_loader_fn(
-        history_store=history_store,
-        default_hours=args.node_history_hours,
-    )
-
-    send_chat_fn = build_send_chat_loader(
+    loaders = build_dashboard_runtime_loaders(
         iface=iface,
         tracker=tracker,
         send_lock=send_lock,
+        started_at=started_at,
+        target=target,
+        show_secrets=args.show_secrets,
+        history_db_path=history_db_path,
+        revision_info=revision_info,
+        history_store=history_store,
+        default_node_history_hours=args.node_history_hours,
+        default_node_history_points=args.node_history_max_points,
         send_chat_message_fn=send_chat_message_fn,
         send_reaction_packet_fn=send_reaction_packet_fn,
         get_local_node_id_fn=get_local_node_id_fn,
-        chat_max_bytes=default_chat_max_bytes,
+        default_chat_max_bytes=default_chat_max_bytes,
         normalize_single_emoji_fn=normalize_single_emoji_fn,
         to_int_fn=to_int_fn,
         utc_now_fn=utc_now_fn,
+        build_state_fn=build_state_fn,
+        build_state_snapshot_loader_fn=build_state_snapshot_loader,
+        build_node_history_loader_fn=build_node_history_loader_fn,
+        build_online_activity_loader_fn=build_online_activity_loader_fn,
+        build_send_chat_loader_fn=build_send_chat_loader,
     )
+    state_fn = loaders["state_fn"]
+    node_history_fn = loaders["node_history_fn"]
+    online_activity_fn = loaders["online_activity_fn"]
+    send_chat_fn = loaders["send_chat_fn"]
 
-    html = render_html_fn(
-        refresh_ms=args.refresh_ms,
-        packet_limit=args.packet_limit,
-        show_secrets=args.show_secrets,
+    server_parts = build_dashboard_server(
+        args=args,
+        revision_info=revision_info,
         history_enabled=history_store is not None,
-        history_max_rows=args.history_max_rows,
-        history_retention_days=args.history_retention_days,
-        node_history_hours=args.node_history_hours,
-        node_history_max_points=args.node_history_max_points,
-        revision_label=revision_info["label"],
-        revision_title=revision_info["title"],
-    )
-    handler_cls = make_http_handler_fn(
-        html,
-        state_fn,
+        state_fn=state_fn,
         node_history_fn=node_history_fn,
         online_activity_fn=online_activity_fn,
         send_chat_fn=send_chat_fn,
+        render_html_fn=render_html_fn,
+        make_http_handler_fn=make_http_handler_fn,
+        threading_http_server_cls=threading_http_server_cls,
     )
-    server = threading_http_server_cls((args.http_host, args.http_port), handler_cls)
-    bound_host, bound_port = server.server_address[:2]
+    server = server_parts["server"]
+    bound_host = server_parts["bound_host"]
+    bound_port = server_parts["bound_port"]
 
     emit_startup_status(
         http_host=args.http_host,

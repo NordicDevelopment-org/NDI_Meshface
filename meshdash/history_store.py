@@ -2,7 +2,6 @@ import os
 import sqlite3
 import threading
 import time
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .helpers import to_int as _to_int
@@ -34,6 +33,17 @@ from .history_connection_writes import (
 from .history_raw_writes import (
     save_chat_record as _save_chat_record_helper,
     save_packet_record as _save_packet_record_helper,
+)
+from .history_read_api import (
+    load_connections_data as _load_connections_data_helper,
+    load_node_capabilities_data as _load_node_capabilities_data_helper,
+    load_node_saved_counts_data as _load_node_saved_counts_data_helper,
+    load_recent_chat_data as _load_recent_chat_data_helper,
+    load_recent_packets_data as _load_recent_packets_data_helper,
+)
+from .history_read_history import (
+    load_node_history_data as _load_node_history_data_helper,
+    load_online_activity_data as _load_online_activity_data_helper,
 )
 from .history_maintenance import (
     next_prune_counter as _next_prune_counter_helper,
@@ -113,73 +123,67 @@ class HistoryStore:
 
     def load_recent_packets(self, limit: int) -> list[Dict[str, Any]]:
         with self._lock:
-            rows = _fetch_recent_packet_rows_helper(self._conn, limit=limit)
-        return _decode_recent_packets_rows_helper(rows)
+            return _load_recent_packets_data_helper(
+                self._conn,
+                limit=limit,
+                fetch_recent_packet_rows_fn=_fetch_recent_packet_rows_helper,
+                decode_recent_packets_rows_fn=_decode_recent_packets_rows_helper,
+            )
 
     def load_recent_chat(self, limit: int) -> list[Dict[str, Any]]:
         with self._lock:
-            rows = _fetch_recent_chat_rows_helper(self._conn, limit=limit)
-        return _decode_recent_chat_rows_helper(rows)
+            return _load_recent_chat_data_helper(
+                self._conn,
+                limit=limit,
+                fetch_recent_chat_rows_fn=_fetch_recent_chat_rows_helper,
+                decode_recent_chat_rows_fn=_decode_recent_chat_rows_helper,
+            )
 
     def load_connections(self) -> list[Dict[str, Any]]:
         with self._lock:
-            rows = _fetch_connection_rows_helper(self._conn)
-        return _decode_connections_rows_helper(rows)
+            return _load_connections_data_helper(
+                self._conn,
+                fetch_connection_rows_fn=_fetch_connection_rows_helper,
+                decode_connections_rows_fn=_decode_connections_rows_helper,
+            )
 
     def load_node_history(self, node_id: str, window_hours: int, max_points: int) -> Dict[str, Any]:
-        clean_node_id = str(node_id or "").strip()
-        hours = max(1, int(window_hours))
-        if not clean_node_id:
-            return _build_node_history_payload_helper(
-                node_id="",
-                window_hours=hours,
-                metric_rows=[],
-                position_rows=[],
-            )
-        limit = max(20, min(10000, int(max_points)))
-        cutoff = int(time.time()) - (hours * 3600)
-
         with self._lock:
-            rows, position_rows = _fetch_node_history_rows_helper(
+            return _load_node_history_data_helper(
                 self._conn,
-                node_id=clean_node_id,
-                cutoff=cutoff,
-                limit=limit,
+                node_id=node_id,
+                window_hours=window_hours,
+                max_points=max_points,
+                fetch_node_history_rows_fn=_fetch_node_history_rows_helper,
+                build_node_history_payload_fn=_build_node_history_payload_helper,
+                now_unix_fn=time.time,
             )
-
-        return _build_node_history_payload_helper(
-            node_id=clean_node_id,
-            window_hours=hours,
-            metric_rows=rows,
-            position_rows=position_rows,
-        )
 
     def load_online_activity(self, window_hours: int) -> Dict[str, Any]:
-        hours = max(1, min(24 * 365, int(window_hours)))
-        cutoff = int(time.time()) - (hours * 3600)
-
         with self._lock:
-            rows, distinct_nodes = _fetch_online_activity_rows_helper(
+            return _load_online_activity_data_helper(
                 self._conn,
-                cutoff=cutoff,
+                window_hours=window_hours,
+                fetch_online_activity_rows_fn=_fetch_online_activity_rows_helper,
+                build_online_activity_payload_fn=_build_online_activity_payload_helper,
+                now_unix_fn=time.time,
             )
-
-        return _build_online_activity_payload_helper(
-            window_hours=hours,
-            hour_rows=rows,
-            distinct_nodes=distinct_nodes,
-            timezone_label=datetime.now().astimezone().tzname() or "local",
-        )
 
     def load_node_saved_counts(self) -> Dict[str, Dict[str, Any]]:
         with self._lock:
-            rows = _fetch_node_saved_count_rows_helper(self._conn)
-        return _decode_node_saved_counts_rows_helper(rows)
+            return _load_node_saved_counts_data_helper(
+                self._conn,
+                fetch_node_saved_count_rows_fn=_fetch_node_saved_count_rows_helper,
+                decode_node_saved_counts_rows_fn=_decode_node_saved_counts_rows_helper,
+            )
 
     def load_node_capabilities(self) -> Dict[str, Dict[str, Any]]:
         with self._lock:
-            rows = _fetch_node_capability_rows_helper(self._conn)
-        return _decode_node_capabilities_rows_helper(rows)
+            return _load_node_capabilities_data_helper(
+                self._conn,
+                fetch_node_capability_rows_fn=_fetch_node_capability_rows_helper,
+                decode_node_capabilities_rows_fn=_decode_node_capabilities_rows_helper,
+            )
 
     def save_connection_event(
         self,
