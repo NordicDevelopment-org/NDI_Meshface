@@ -14,7 +14,6 @@ from .helpers import (
 from .history_rollups import (
     bucket_minute as _bucket_minute_helper,
     clean_node_id as _clean_node_id_helper,
-    merge_metric as _merge_metric_helper,
 )
 from .history_readers import (
     decode_connections_rows as _decode_connections_rows_helper,
@@ -42,6 +41,10 @@ from .history_capability_upsert import (
 )
 from .history_positions import (
     insert_node_position_if_changed as _insert_node_position_if_changed_helper,
+)
+from .history_metric_rows import (
+    build_metric_rollup_values as _build_metric_rollup_values_helper,
+    merge_metric_rollup_row as _merge_metric_rollup_row_helper,
 )
 from .history_prune import prune_history_tables as _prune_history_tables_helper
 from .history_schema import initialize_history_schema as _initialize_history_schema_helper
@@ -410,14 +413,11 @@ class HistoryStore:
         ).fetchone()
 
         if row is None:
-            snr_sum, snr_count, snr_min, snr_max = _merge_metric_helper(0.0, 0, None, None, rx_snr)
-            rssi_sum, rssi_count, rssi_min, rssi_max = _merge_metric_helper(0.0, 0, None, None, rx_rssi)
-            hops_sum, hops_count, hops_min, hops_max = _merge_metric_helper(
-                0.0,
-                0,
-                None,
-                None,
-                float(hops) if hops is not None else None,
+            rolled = _build_metric_rollup_values_helper(
+                event_unix=event_unix,
+                rx_snr=rx_snr,
+                rx_rssi=rx_rssi,
+                hops=hops,
             )
             self._conn.execute(
                 """
@@ -432,57 +432,30 @@ class HistoryStore:
                 (
                     bucket_unix,
                     node_id,
-                    1,
-                    snr_sum,
-                    snr_count,
-                    snr_min,
-                    snr_max,
-                    rssi_sum,
-                    rssi_count,
-                    rssi_min,
-                    rssi_max,
-                    int(hops_sum),
-                    hops_count,
-                    int(hops_min) if hops_min is not None else None,
-                    int(hops_max) if hops_max is not None else None,
-                    event_unix,
+                    rolled["packet_count"],
+                    rolled["snr_sum"],
+                    rolled["snr_count"],
+                    rolled["snr_min"],
+                    rolled["snr_max"],
+                    rolled["rssi_sum"],
+                    rolled["rssi_count"],
+                    rolled["rssi_min"],
+                    rolled["rssi_max"],
+                    rolled["hops_sum"],
+                    rolled["hops_count"],
+                    rolled["hops_min"],
+                    rolled["hops_max"],
+                    rolled["last_seen_unix"],
                 ),
             )
             return
 
-        (
-            packet_count,
-            snr_sum,
-            snr_count,
-            snr_min,
-            snr_max,
-            rssi_sum,
-            rssi_count,
-            rssi_min,
-            rssi_max,
-            hops_sum,
-            hops_count,
-            hops_min,
-            hops_max,
-            last_seen_unix,
-        ) = row
-
-        snr_sum, snr_count, snr_min, snr_max = _merge_metric_helper(
-            snr_sum, snr_count, snr_min, snr_max, rx_snr
-        )
-        rssi_sum, rssi_count, rssi_min, rssi_max = _merge_metric_helper(
-            rssi_sum,
-            rssi_count,
-            rssi_min,
-            rssi_max,
-            rx_rssi,
-        )
-        hops_sum_f, hops_count, hops_min_f, hops_max_f = _merge_metric_helper(
-            hops_sum,
-            hops_count,
-            hops_min,
-            hops_max,
-            float(hops) if hops is not None else None,
+        merged = _merge_metric_rollup_row_helper(
+            row=row,
+            event_unix=event_unix,
+            rx_snr=rx_snr,
+            rx_rssi=rx_rssi,
+            hops=hops,
         )
 
         self._conn.execute(
@@ -496,20 +469,20 @@ class HistoryStore:
             WHERE bucket_unix = ? AND node_id = ?
             """,
             (
-                int(packet_count or 0) + 1,
-                snr_sum,
-                snr_count,
-                snr_min,
-                snr_max,
-                rssi_sum,
-                rssi_count,
-                rssi_min,
-                rssi_max,
-                int(hops_sum_f),
-                hops_count,
-                int(hops_min_f) if hops_min_f is not None else None,
-                int(hops_max_f) if hops_max_f is not None else None,
-                max(_to_int(last_seen_unix) or event_unix, event_unix),
+                merged["packet_count"],
+                merged["snr_sum"],
+                merged["snr_count"],
+                merged["snr_min"],
+                merged["snr_max"],
+                merged["rssi_sum"],
+                merged["rssi_count"],
+                merged["rssi_min"],
+                merged["rssi_max"],
+                merged["hops_sum"],
+                merged["hops_count"],
+                merged["hops_min"],
+                merged["hops_max"],
+                merged["last_seen_unix"],
                 bucket_unix,
                 node_id,
             ),
@@ -539,14 +512,11 @@ class HistoryStore:
         ).fetchone()
 
         if row is None:
-            snr_sum, snr_count, snr_min, snr_max = _merge_metric_helper(0.0, 0, None, None, rx_snr)
-            rssi_sum, rssi_count, rssi_min, rssi_max = _merge_metric_helper(0.0, 0, None, None, rx_rssi)
-            hops_sum, hops_count, hops_min, hops_max = _merge_metric_helper(
-                0.0,
-                0,
-                None,
-                None,
-                float(hops) if hops is not None else None,
+            rolled = _build_metric_rollup_values_helper(
+                event_unix=event_unix,
+                rx_snr=rx_snr,
+                rx_rssi=rx_rssi,
+                hops=hops,
             )
             self._conn.execute(
                 """
@@ -562,57 +532,30 @@ class HistoryStore:
                     bucket_unix,
                     from_id,
                     to_id,
-                    1,
-                    snr_sum,
-                    snr_count,
-                    snr_min,
-                    snr_max,
-                    rssi_sum,
-                    rssi_count,
-                    rssi_min,
-                    rssi_max,
-                    int(hops_sum),
-                    hops_count,
-                    int(hops_min) if hops_min is not None else None,
-                    int(hops_max) if hops_max is not None else None,
-                    event_unix,
+                    rolled["packet_count"],
+                    rolled["snr_sum"],
+                    rolled["snr_count"],
+                    rolled["snr_min"],
+                    rolled["snr_max"],
+                    rolled["rssi_sum"],
+                    rolled["rssi_count"],
+                    rolled["rssi_min"],
+                    rolled["rssi_max"],
+                    rolled["hops_sum"],
+                    rolled["hops_count"],
+                    rolled["hops_min"],
+                    rolled["hops_max"],
+                    rolled["last_seen_unix"],
                 ),
             )
             return
 
-        (
-            packet_count,
-            snr_sum,
-            snr_count,
-            snr_min,
-            snr_max,
-            rssi_sum,
-            rssi_count,
-            rssi_min,
-            rssi_max,
-            hops_sum,
-            hops_count,
-            hops_min,
-            hops_max,
-            last_seen_unix,
-        ) = row
-
-        snr_sum, snr_count, snr_min, snr_max = _merge_metric_helper(
-            snr_sum, snr_count, snr_min, snr_max, rx_snr
-        )
-        rssi_sum, rssi_count, rssi_min, rssi_max = _merge_metric_helper(
-            rssi_sum,
-            rssi_count,
-            rssi_min,
-            rssi_max,
-            rx_rssi,
-        )
-        hops_sum_f, hops_count, hops_min_f, hops_max_f = _merge_metric_helper(
-            hops_sum,
-            hops_count,
-            hops_min,
-            hops_max,
-            float(hops) if hops is not None else None,
+        merged = _merge_metric_rollup_row_helper(
+            row=row,
+            event_unix=event_unix,
+            rx_snr=rx_snr,
+            rx_rssi=rx_rssi,
+            hops=hops,
         )
 
         self._conn.execute(
@@ -626,20 +569,20 @@ class HistoryStore:
             WHERE bucket_unix = ? AND from_id = ? AND to_id = ?
             """,
             (
-                int(packet_count or 0) + 1,
-                snr_sum,
-                snr_count,
-                snr_min,
-                snr_max,
-                rssi_sum,
-                rssi_count,
-                rssi_min,
-                rssi_max,
-                int(hops_sum_f),
-                hops_count,
-                int(hops_min_f) if hops_min_f is not None else None,
-                int(hops_max_f) if hops_max_f is not None else None,
-                max(_to_int(last_seen_unix) or event_unix, event_unix),
+                merged["packet_count"],
+                merged["snr_sum"],
+                merged["snr_count"],
+                merged["snr_min"],
+                merged["snr_max"],
+                merged["rssi_sum"],
+                merged["rssi_count"],
+                merged["rssi_min"],
+                merged["rssi_max"],
+                merged["hops_sum"],
+                merged["hops_count"],
+                merged["hops_min"],
+                merged["hops_max"],
+                merged["last_seen_unix"],
                 bucket_unix,
                 from_id,
                 to_id,
