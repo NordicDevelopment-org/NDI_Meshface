@@ -23,6 +23,7 @@
 - `meshdash/history_backfill.py`: one-time node capability backfill builder from existing history tables.
 - `meshdash/history_capability_upsert.py`: node capability upsert input normalization and row-merge helpers.
 - `meshdash/history_connections.py`: connection-event normalization and row-merge helpers.
+- `meshdash/history_positions.py`: node position insert/de-dupe helpers for history capture.
 - `meshdash/history_views.py`: node history/online activity empty payload and loader builders.
 - `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
 - `meshdash/http_responses.py`: shared HTTP response emitters for JSON/HTML/text.
