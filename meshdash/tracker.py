@@ -53,6 +53,9 @@ from .tracker_ingest import (
 from .tracker_storage import (
     apply_tracker_storage_updates as _apply_tracker_storage_updates_helper,
 )
+from .tracker_delivery import (
+    apply_routing_delivery_update as _apply_routing_delivery_update_helper,
+)
 
 
 DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS = 90
@@ -213,13 +216,11 @@ class DashboardTracker:
         emoji_codepoint = parsed["emoji_codepoint"]
         emoji_glyph = parsed["emoji_glyph"]
         is_reaction = parsed["is_reaction"]
-        delivery_update = self._extract_routing_delivery_update_unlocked(decoded)
-        if delivery_update is not None:
-            self._set_delivery_state_unlocked(
-                delivery_update.get("request_id"),
-                str(delivery_update.get("state") or "sent"),
-                delivery_update.get("error"),
-            )
+        _apply_routing_delivery_update_helper(
+            decoded,
+            extract_update_fn=self._extract_routing_delivery_update_unlocked,
+            set_delivery_state_fn=self._set_delivery_state_unlocked,
+        )
         if portnum is not None:
             self.port_counts[str(portnum)] += 1
 
