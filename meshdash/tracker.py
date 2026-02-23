@@ -40,6 +40,9 @@ from .tracker_snapshot import (
 from .tracker_edges import (
     record_direct_edge_observation as _record_direct_edge_observation_helper,
 )
+from .tracker_history_edges import (
+    build_historical_edges as _build_historical_edges_helper,
+)
 
 
 DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS = 90
@@ -73,19 +76,9 @@ class DashboardTracker:
                 self.recent_packets.append(entry)
             for entry in self._history_store.load_recent_chat(packet_limit):
                 self.recent_chat.append(entry)
-            for edge in self._history_store.load_connections():
-                key = (str(edge["from"]), str(edge["to"]))
-                self._historical_edges[key] = {
-                    "from": str(edge["from"]),
-                    "to": str(edge["to"]),
-                    "count": int(edge["count"]),
-                    "first_rx_time": edge.get("first_rx_time"),
-                    "last_rx_time": edge.get("last_rx_time"),
-                    "portnums": set(edge.get("portnums") or []),
-                    "last_hops": edge.get("last_hops"),
-                    "hops_sum": int(edge.get("hops_sum") or 0),
-                    "hops_count": int(edge.get("hops_count") or 0),
-                }
+            self._historical_edges = _build_historical_edges_helper(
+                self._history_store.load_connections()
+            )
 
     def on_receive(self, packet: Dict[str, Any], interface: Any) -> None:
         with self._lock:
