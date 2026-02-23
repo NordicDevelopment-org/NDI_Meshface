@@ -4,7 +4,7 @@ import sqlite3
 import threading
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from .helpers import (
     extract_position_fields as _extract_position_fields,
@@ -12,6 +12,11 @@ from .helpers import (
     safe_json_loads as _safe_json_loads,
     to_float as _to_float,
     to_int as _to_int,
+)
+from .history_rollups import (
+    bucket_minute as _bucket_minute_helper,
+    clean_node_id as _clean_node_id_helper,
+    merge_metric as _merge_metric_helper,
 )
 
 
@@ -839,39 +844,6 @@ class HistoryStore:
             self._maybe_prune_unlocked()
             self._conn.commit()
 
-    @staticmethod
-    def _merge_metric(
-        sum_value: Any,
-        count_value: Any,
-        min_value: Any,
-        max_value: Any,
-        sample: Optional[float],
-    ) -> Tuple[float, int, Optional[float], Optional[float]]:
-        merged_sum = float(sum_value or 0.0)
-        merged_count = int(count_value or 0)
-        merged_min = _to_float(min_value)
-        merged_max = _to_float(max_value)
-
-        if sample is None:
-            return merged_sum, merged_count, merged_min, merged_max
-
-        merged_sum += sample
-        merged_count += 1
-        merged_min = sample if merged_min is None else min(merged_min, sample)
-        merged_max = sample if merged_max is None else max(merged_max, sample)
-        return merged_sum, merged_count, merged_min, merged_max
-
-    @staticmethod
-    def _bucket_minute(epoch_seconds: int) -> int:
-        return int(epoch_seconds) - (int(epoch_seconds) % 60)
-
-    @staticmethod
-    def _clean_node_id(node_id: Any) -> Optional[str]:
-        value = str(node_id or "").strip()
-        if not value or value in ("Unknown", "n/a", "^all"):
-            return None
-        return value
-
     def _save_node_position_unlocked(self, node_id: str, event_unix: int, position_data: Any) -> None:
         coords = _extract_position_fields(position_data)
         if coords is None:
@@ -1039,9 +1011,9 @@ class HistoryStore:
         ).fetchone()
 
         if row is None:
-            snr_sum, snr_count, snr_min, snr_max = self._merge_metric(0.0, 0, None, None, rx_snr)
-            rssi_sum, rssi_count, rssi_min, rssi_max = self._merge_metric(0.0, 0, None, None, rx_rssi)
-            hops_sum, hops_count, hops_min, hops_max = self._merge_metric(
+            snr_sum, snr_count, snr_min, snr_max = _merge_metric_helper(0.0, 0, None, None, rx_snr)
+            rssi_sum, rssi_count, rssi_min, rssi_max = _merge_metric_helper(0.0, 0, None, None, rx_rssi)
+            hops_sum, hops_count, hops_min, hops_max = _merge_metric_helper(
                 0.0,
                 0,
                 None,
@@ -1096,15 +1068,17 @@ class HistoryStore:
             last_seen_unix,
         ) = row
 
-        snr_sum, snr_count, snr_min, snr_max = self._merge_metric(snr_sum, snr_count, snr_min, snr_max, rx_snr)
-        rssi_sum, rssi_count, rssi_min, rssi_max = self._merge_metric(
+        snr_sum, snr_count, snr_min, snr_max = _merge_metric_helper(
+            snr_sum, snr_count, snr_min, snr_max, rx_snr
+        )
+        rssi_sum, rssi_count, rssi_min, rssi_max = _merge_metric_helper(
             rssi_sum,
             rssi_count,
             rssi_min,
             rssi_max,
             rx_rssi,
         )
-        hops_sum_f, hops_count, hops_min_f, hops_max_f = self._merge_metric(
+        hops_sum_f, hops_count, hops_min_f, hops_max_f = _merge_metric_helper(
             hops_sum,
             hops_count,
             hops_min,
@@ -1166,9 +1140,9 @@ class HistoryStore:
         ).fetchone()
 
         if row is None:
-            snr_sum, snr_count, snr_min, snr_max = self._merge_metric(0.0, 0, None, None, rx_snr)
-            rssi_sum, rssi_count, rssi_min, rssi_max = self._merge_metric(0.0, 0, None, None, rx_rssi)
-            hops_sum, hops_count, hops_min, hops_max = self._merge_metric(
+            snr_sum, snr_count, snr_min, snr_max = _merge_metric_helper(0.0, 0, None, None, rx_snr)
+            rssi_sum, rssi_count, rssi_min, rssi_max = _merge_metric_helper(0.0, 0, None, None, rx_rssi)
+            hops_sum, hops_count, hops_min, hops_max = _merge_metric_helper(
                 0.0,
                 0,
                 None,
@@ -1224,15 +1198,17 @@ class HistoryStore:
             last_seen_unix,
         ) = row
 
-        snr_sum, snr_count, snr_min, snr_max = self._merge_metric(snr_sum, snr_count, snr_min, snr_max, rx_snr)
-        rssi_sum, rssi_count, rssi_min, rssi_max = self._merge_metric(
+        snr_sum, snr_count, snr_min, snr_max = _merge_metric_helper(
+            snr_sum, snr_count, snr_min, snr_max, rx_snr
+        )
+        rssi_sum, rssi_count, rssi_min, rssi_max = _merge_metric_helper(
             rssi_sum,
             rssi_count,
             rssi_min,
             rssi_max,
             rx_rssi,
         )
-        hops_sum_f, hops_count, hops_min_f, hops_max_f = self._merge_metric(
+        hops_sum_f, hops_count, hops_min_f, hops_max_f = _merge_metric_helper(
             hops_sum,
             hops_count,
             hops_min,
@@ -1276,8 +1252,8 @@ class HistoryStore:
         if event_unix is None or event_unix <= 0:
             event_unix = int(time.time())
 
-        from_id = self._clean_node_id(summary.get("from"))
-        to_id = self._clean_node_id(summary.get("to"))
+        from_id = _clean_node_id_helper(summary.get("from"))
+        to_id = _clean_node_id_helper(summary.get("to"))
         portnum_raw = summary.get("portnum")
         portnum = str(portnum_raw) if portnum_raw is not None else None
         rx_snr = _to_float(summary.get("rx_snr"))
@@ -1318,7 +1294,7 @@ class HistoryStore:
             ),
         )
 
-        bucket_unix = self._bucket_minute(event_unix)
+        bucket_unix = _bucket_minute_helper(event_unix)
         if from_id:
             self._upsert_node_metric_unlocked(
                 bucket_unix=bucket_unix,
@@ -1377,5 +1353,3 @@ class HistoryStore:
             )
             self._maybe_prune_unlocked()
             self._conn.commit()
-
-
