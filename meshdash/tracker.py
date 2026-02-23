@@ -47,6 +47,9 @@ from .tracker_entries import (
     build_chat_entry_from_packet as _build_chat_entry_from_packet_helper,
     build_packet_summary as _build_packet_summary_helper,
 )
+from .tracker_ingest import (
+    parse_tracker_packet as _parse_tracker_packet_helper,
+)
 
 
 DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS = 90
@@ -182,20 +185,31 @@ class DashboardTracker:
     def _record_packet_unlocked(
         self, packet: Dict[str, Any], interface: Any, include_live_count: bool
     ) -> None:
-        from_id = packet.get("fromId") or _get_node_id_from_num(interface, packet.get("from"))
-        to_id = packet.get("toId") or _get_node_id_from_num(interface, packet.get("to"))
-        rx_time = _to_int(packet.get("rxTime"))
-        hops = _calculate_hops(packet.get("hopStart"), packet.get("hopLimit"))
-
-        decoded = packet.get("decoded", {})
-        portnum = decoded.get("portnum") if isinstance(decoded, dict) else None
-        packet_id = _to_int(packet.get("id"))
-        packet_position = _extract_packet_position(packet)
-        packet_battery = _extract_packet_battery_level(packet)
-        reply_id = _extract_reply_id(decoded)
-        emoji_codepoint = _extract_emoji_codepoint(decoded)
-        emoji_glyph = _emoji_from_codepoint(emoji_codepoint)
-        is_reaction = bool(reply_id is not None and reply_id > 0 and emoji_glyph)
+        parsed = _parse_tracker_packet_helper(
+            packet,
+            interface,
+            get_node_id_from_num_fn=_get_node_id_from_num,
+            to_int_fn=_to_int,
+            calculate_hops_fn=_calculate_hops,
+            extract_packet_position_fn=_extract_packet_position,
+            extract_packet_battery_level_fn=_extract_packet_battery_level,
+            extract_reply_id_fn=_extract_reply_id,
+            extract_emoji_codepoint_fn=_extract_emoji_codepoint,
+            emoji_from_codepoint_fn=_emoji_from_codepoint,
+        )
+        from_id = parsed["from_id"]
+        to_id = parsed["to_id"]
+        rx_time = parsed["rx_time"]
+        hops = parsed["hops"]
+        decoded = parsed["decoded"]
+        portnum = parsed["portnum"]
+        packet_id = parsed["packet_id"]
+        packet_position = parsed["packet_position"]
+        packet_battery = parsed["packet_battery"]
+        reply_id = parsed["reply_id"]
+        emoji_codepoint = parsed["emoji_codepoint"]
+        emoji_glyph = parsed["emoji_glyph"]
+        is_reaction = parsed["is_reaction"]
         delivery_update = self._extract_routing_delivery_update_unlocked(decoded)
         if delivery_update is not None:
             self._set_delivery_state_unlocked(
