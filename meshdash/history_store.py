@@ -27,6 +27,11 @@ from .history_analytics import (
     build_node_history_payload as _build_node_history_payload_helper,
     build_online_activity_payload as _build_online_activity_payload_helper,
 )
+from .history_connections import (
+    build_connection_insert_values as _build_connection_insert_values_helper,
+    merge_connection_row as _merge_connection_row_helper,
+    normalize_connection_event_input as _normalize_connection_event_input_helper,
+)
 from .history_prune import prune_history_tables as _prune_history_tables_helper
 from .history_schema import initialize_history_schema as _initialize_history_schema_helper
 
@@ -349,9 +354,11 @@ class HistoryStore:
         portnum: Optional[str],
         hops: Optional[int],
     ) -> None:
-        event_unix = rx_time if isinstance(rx_time, int) and rx_time > 0 else int(time.time())
-        clean_port = str(portnum) if portnum is not None else None
-        clean_hops = hops if isinstance(hops, int) and hops >= 0 else None
+        event_unix, clean_port, clean_hops = _normalize_connection_event_input_helper(
+            rx_time=rx_time,
+            portnum=portnum,
+            hops=hops,
+        )
 
         with self._lock:
             row = self._conn.execute(
@@ -364,9 +371,6 @@ class HistoryStore:
             ).fetchone()
 
             if row is None:
-                ports: set[str] = set()
-                if clean_port:
-                    ports.add(clean_port)
                 self._conn.execute(
                     """
                     INSERT INTO connections(
@@ -374,38 +378,21 @@ class HistoryStore:
                       portnums_json, last_hops, hops_sum, hops_count
                     ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        from_id,
-                        to_id,
-                        event_unix,
-                        event_unix,
-                        1,
-                        json.dumps(sorted(ports), separators=(",", ":")),
-                        clean_hops,
-                        clean_hops if clean_hops is not None else 0,
-                        1 if clean_hops is not None else 0,
+                    _build_connection_insert_values_helper(
+                        from_id=from_id,
+                        to_id=to_id,
+                        event_unix=event_unix,
+                        clean_port=clean_port,
+                        clean_hops=clean_hops,
                     ),
                 )
             else:
-                first_seen_unix, last_seen_unix, seen_count, portnums_json, last_hops, hops_sum, hops_count = row
-                ports = _safe_json_loads(portnums_json, [])
-                if not isinstance(ports, list):
-                    ports = []
-                port_set = {str(p) for p in ports if p is not None}
-                if clean_port:
-                    port_set.add(clean_port)
-
-                merged_first = min(_to_int(first_seen_unix) or event_unix, event_unix)
-                merged_last = max(_to_int(last_seen_unix) or event_unix, event_unix)
-                merged_count = (_to_int(seen_count) or 0) + 1
-
-                merged_hops_sum = _to_int(hops_sum) or 0
-                merged_hops_count = _to_int(hops_count) or 0
-                merged_last_hops = _to_int(last_hops)
-                if clean_hops is not None:
-                    merged_hops_sum += clean_hops
-                    merged_hops_count += 1
-                    merged_last_hops = clean_hops
+                merged = _merge_connection_row_helper(
+                    row=row,
+                    event_unix=event_unix,
+                    clean_port=clean_port,
+                    clean_hops=clean_hops,
+                )
 
                 self._conn.execute(
                     """
@@ -415,13 +402,13 @@ class HistoryStore:
                     WHERE from_id = ? AND to_id = ?
                     """,
                     (
-                        merged_first,
-                        merged_last,
-                        merged_count,
-                        json.dumps(sorted(port_set), separators=(",", ":")),
-                        merged_last_hops,
-                        merged_hops_sum,
-                        merged_hops_count,
+                        merged["first_seen_unix"],
+                        merged["last_seen_unix"],
+                        merged["seen_count"],
+                        merged["portnums_json"],
+                        merged["last_hops"],
+                        merged["hops_sum"],
+                        merged["hops_count"],
                         from_id,
                         to_id,
                     ),

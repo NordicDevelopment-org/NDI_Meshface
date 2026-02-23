@@ -19,6 +19,7 @@
 - `meshdash/history_readers.py`: row-to-payload decoders for recent packets/chat/connections reads.
 - `meshdash/history_rollups.py`: metric rollup math helpers shared by history persistence paths.
 - `meshdash/history_analytics.py`: historical node/online aggregation payload builders.
+- `meshdash/history_connections.py`: connection-event normalization and row-merge helpers.
 - `meshdash/history_views.py`: node history/online activity empty payload and loader builders.
 - `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
 - `meshdash/http_responses.py`: shared HTTP response emitters for JSON/HTML/text.
