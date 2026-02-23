@@ -22,6 +22,7 @@
 - `meshdash/history_capabilities.py`: node saved-count and capability row decoders.
 - `meshdash/history_backfill.py`: one-time node capability backfill builder from existing history tables.
 - `meshdash/history_capability_upsert.py`: node capability upsert input normalization and row-merge helpers.
+- `meshdash/history_connection_writes.py`: connection event insert/merge writer for the history connections table.
 - `meshdash/history_connections.py`: connection-event normalization and row-merge helpers.
 - `meshdash/history_metric_rows.py`: shared metric-rollup insert/merge builders for node/link history tables.
 - `meshdash/history_packet_events.py`: packet-event summary normalization and DB insert-value builders.

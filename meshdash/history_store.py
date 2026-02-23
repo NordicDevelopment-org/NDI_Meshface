@@ -16,14 +16,12 @@ from .history_analytics import (
     build_node_history_payload as _build_node_history_payload_helper,
     build_online_activity_payload as _build_online_activity_payload_helper,
 )
-from .history_connections import (
-    build_connection_insert_values as _build_connection_insert_values_helper,
-    merge_connection_row as _merge_connection_row_helper,
-    normalize_connection_event_input as _normalize_connection_event_input_helper,
-)
 from .history_capabilities import (
     decode_node_capabilities_rows as _decode_node_capabilities_rows_helper,
     decode_node_saved_counts_rows as _decode_node_saved_counts_rows_helper,
+)
+from .history_connection_writes import (
+    save_connection_event as _save_connection_event_helper,
 )
 from .history_backfill import backfill_node_capabilities as _backfill_node_capabilities_helper
 from .history_writes import (
@@ -231,65 +229,16 @@ class HistoryStore:
         portnum: Optional[str],
         hops: Optional[int],
     ) -> None:
-        event_unix, clean_port, clean_hops = _normalize_connection_event_input_helper(
-            rx_time=rx_time,
-            portnum=portnum,
-            hops=hops,
-        )
-
         with self._lock:
-            row = self._conn.execute(
-                """
-                SELECT first_seen_unix, last_seen_unix, seen_count, portnums_json, last_hops, hops_sum, hops_count
-                FROM connections
-                WHERE from_id = ? AND to_id = ?
-                """,
-                (from_id, to_id),
-            ).fetchone()
-
-            if row is None:
-                self._conn.execute(
-                    """
-                    INSERT INTO connections(
-                      from_id, to_id, first_seen_unix, last_seen_unix, seen_count,
-                      portnums_json, last_hops, hops_sum, hops_count
-                    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    _build_connection_insert_values_helper(
-                        from_id=from_id,
-                        to_id=to_id,
-                        event_unix=event_unix,
-                        clean_port=clean_port,
-                        clean_hops=clean_hops,
-                    ),
-                )
-            else:
-                merged = _merge_connection_row_helper(
-                    row=row,
-                    event_unix=event_unix,
-                    clean_port=clean_port,
-                    clean_hops=clean_hops,
-                )
-
-                self._conn.execute(
-                    """
-                    UPDATE connections
-                    SET first_seen_unix = ?, last_seen_unix = ?, seen_count = ?,
-                        portnums_json = ?, last_hops = ?, hops_sum = ?, hops_count = ?
-                    WHERE from_id = ? AND to_id = ?
-                    """,
-                    (
-                        merged["first_seen_unix"],
-                        merged["last_seen_unix"],
-                        merged["seen_count"],
-                        merged["portnums_json"],
-                        merged["last_hops"],
-                        merged["hops_sum"],
-                        merged["hops_count"],
-                        from_id,
-                        to_id,
-                    ),
-                )
+            _save_connection_event_helper(
+                self._conn,
+                from_id=from_id,
+                to_id=to_id,
+                rx_time=rx_time,
+                portnum=portnum,
+                hops=hops,
+                now_unix_fn=time.time,
+            )
 
             self._maybe_prune_unlocked()
             self._conn.commit()
