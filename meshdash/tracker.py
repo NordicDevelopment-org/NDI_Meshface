@@ -43,6 +43,9 @@ from .tracker_edges import (
 from .tracker_history_edges import (
     build_historical_edges as _build_historical_edges_helper,
 )
+from .tracker_bootstrap import (
+    load_tracker_history_bootstrap as _load_tracker_history_bootstrap_helper,
+)
 from .tracker_entries import (
     build_chat_entry_from_packet as _build_chat_entry_from_packet_helper,
     build_packet_summary as _build_packet_summary_helper,
@@ -85,13 +88,14 @@ class DashboardTracker:
         self.recent_chat: deque[Dict[str, Any]] = deque(maxlen=packet_limit)
 
         if self._history_store is not None:
-            for entry in self._history_store.load_recent_packets(packet_limit):
-                self.recent_packets.append(entry)
-            for entry in self._history_store.load_recent_chat(packet_limit):
-                self.recent_chat.append(entry)
-            self._historical_edges = _build_historical_edges_helper(
-                self._history_store.load_connections()
+            bootstrap = _load_tracker_history_bootstrap_helper(
+                self._history_store,
+                packet_limit=packet_limit,
+                build_historical_edges_fn=_build_historical_edges_helper,
             )
+            self.recent_packets.extend(bootstrap["recent_packets"])
+            self.recent_chat.extend(bootstrap["recent_chat"])
+            self._historical_edges = bootstrap["historical_edges"]
 
     def on_receive(self, packet: Dict[str, Any], interface: Any) -> None:
         with self._lock:
