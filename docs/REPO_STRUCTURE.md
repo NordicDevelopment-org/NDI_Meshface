@@ -49,6 +49,7 @@
 - `meshdash/tracker_ingest.py`: packet ingest normalization/parsing helpers used by tracker receive flow.
 - `meshdash/tracker_history_edges.py`: historical connection-row normalization for tracker bootstrap state.
 - `meshdash/tracker_snapshot.py`: edge snapshot row builder shared by tracker state rendering.
+- `meshdash/tracker_storage.py`: tracker receive-path storage fanout (recent deques + optional history writes).
 - `meshdash/wiring.py`: dependency checks and runtime wiring assembly for dashboard startup.
 - `meshtastic-dashboard.service`: systemd unit template for VM deployment.
 - `README.md`: setup, deploy loop, and operations.

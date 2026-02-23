@@ -50,6 +50,9 @@ from .tracker_entries import (
 from .tracker_ingest import (
     parse_tracker_packet as _parse_tracker_packet_helper,
 )
+from .tracker_storage import (
+    apply_tracker_storage_updates as _apply_tracker_storage_updates_helper,
+)
 
 
 DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS = 90
@@ -230,14 +233,6 @@ class DashboardTracker:
             hops=hops,
             include_live_count=include_live_count,
         )
-        if direct_key is not None and include_live_count and self._history_store is not None:
-            self._history_store.save_connection_event(
-                from_id=direct_key[0],
-                to_id=direct_key[1],
-                rx_time=rx_time,
-                portnum=str(portnum) if portnum is not None else None,
-                hops=hops,
-            )
 
         packet_summary = _build_packet_summary_helper(
             packet=packet,
@@ -263,9 +258,6 @@ class DashboardTracker:
             "summary": packet_summary,
             "packet": _to_jsonable(packet),
         }
-        self.recent_packets.append(packet_entry)
-        if self._history_store is not None and include_live_count:
-            self._history_store.save_packet(packet_entry)
 
         chat_entry = _build_chat_entry_from_packet_helper(
             packet=packet,
@@ -281,10 +273,18 @@ class DashboardTracker:
             utc_now_fn=_utc_now,
             format_epoch_fn=_format_epoch,
         )
-        if chat_entry is not None:
-            self.recent_chat.append(chat_entry)
-            if self._history_store is not None and include_live_count:
-                self._history_store.save_chat(chat_entry)
+        _apply_tracker_storage_updates_helper(
+            recent_packets=self.recent_packets,
+            recent_chat=self.recent_chat,
+            history_store=self._history_store,
+            include_live_count=include_live_count,
+            direct_key=direct_key,
+            rx_time=rx_time,
+            portnum=portnum,
+            hops=hops,
+            packet_entry=packet_entry,
+            chat_entry=chat_entry,
+        )
 
         self._expire_pending_deliveries_unlocked()
 
