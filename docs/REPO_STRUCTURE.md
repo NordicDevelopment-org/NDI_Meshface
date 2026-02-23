@@ -5,6 +5,7 @@
 - `mesh_dashboard.py`: main dashboard web app and API server.
 - `mesh_connection.py`: Meshtastic serial/TCP connection abstraction.
 - `meshdash/chat.py`: chat-entry and delivery-state transition helpers.
+- `meshdash/chat_send.py`: chat send/reaction payload normalization, validation, and response builders.
 - `meshdash/config.py`: centralized dashboard defaults/constants and sensitive-key policy.
 - `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers.
 - `meshdash/api_inputs.py`: shared API query/body parsing and request-size validation helpers.
