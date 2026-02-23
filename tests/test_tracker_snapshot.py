@@ -1,4 +1,9 @@
-from meshdash.tracker_snapshot import build_edge_snapshot_rows
+from collections import Counter, deque
+
+from meshdash.tracker_snapshot import (
+    build_edge_snapshot_rows,
+    build_tracker_snapshot_payload,
+)
 
 
 def _fmt_epoch(value):
@@ -87,3 +92,34 @@ def test_build_edge_snapshot_rows_adds_geo_fields_for_session_only_edges():
     assert row["src_lon"] == -93.1
     assert row["dst_lat"] == 45.0
     assert row["dst_lon"] == -93.2
+
+
+def test_build_tracker_snapshot_payload_assembles_expected_shape():
+    packets = deque([{"summary": {"id": 1}}], maxlen=4)
+    chat = deque([{"text": "hello"}], maxlen=4)
+    ports = Counter({"TEXT_MESSAGE_APP": 3, "NODEINFO_APP": 1})
+
+    payload = build_tracker_snapshot_payload(
+        session_edges={},
+        historical_edges={},
+        nodes_by_id={},
+        port_counts=ports,
+        recent_packets=packets,
+        recent_chat=chat,
+        live_packet_count=7,
+        min_real_link_count=2,
+        format_epoch_fn=_fmt_epoch,
+        build_edge_snapshot_rows_fn=lambda **_kwargs: ([{"from": "!a", "to": "!b"}], 1),
+    )
+
+    assert payload == {
+        "live_packet_count": 7,
+        "real_edge_count": 1,
+        "edges": [{"from": "!a", "to": "!b"}],
+        "port_counts": [
+            {"portnum": "TEXT_MESSAGE_APP", "count": 3},
+            {"portnum": "NODEINFO_APP", "count": 1},
+        ],
+        "recent_packets": [{"summary": {"id": 1}}],
+        "recent_chat": [{"text": "hello"}],
+    }

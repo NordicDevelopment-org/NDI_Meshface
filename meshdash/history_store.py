@@ -1,4 +1,3 @@
-import json
 import os
 import sqlite3
 import threading
@@ -31,6 +30,14 @@ from .history_capabilities import (
 )
 from .history_connection_writes import (
     save_connection_event as _save_connection_event_helper,
+)
+from .history_raw_writes import (
+    save_chat_record as _save_chat_record_helper,
+    save_packet_record as _save_packet_record_helper,
+)
+from .history_maintenance import (
+    next_prune_counter as _next_prune_counter_helper,
+    prune_history_tables_now as _prune_history_tables_now_helper,
 )
 from .history_backfill import backfill_node_capabilities as _backfill_node_capabilities_helper
 from .history_writes import (
@@ -85,21 +92,23 @@ class HistoryStore:
             self._conn.close()
 
     def _prune_unlocked(self) -> None:
-        _prune_history_tables_helper(
+        _prune_history_tables_now_helper(
             self._conn,
-            now_unix=int(time.time()),
             retention_seconds=self.retention_seconds,
             event_retention_seconds=self.event_retention_seconds,
             rollup_retention_seconds=self.rollup_retention_seconds,
             max_rows=self.max_rows,
             event_max_rows=self.event_max_rows,
+            prune_history_tables_fn=_prune_history_tables_helper,
+            now_unix_fn=time.time,
         )
 
     def _maybe_prune_unlocked(self) -> None:
-        self._writes_since_prune += 1
-        if self._writes_since_prune < 50:
+        self._writes_since_prune, should_prune = _next_prune_counter_helper(
+            self._writes_since_prune
+        )
+        if not should_prune:
             return
-        self._writes_since_prune = 0
         self._prune_unlocked()
 
     def load_recent_packets(self, limit: int) -> list[Dict[str, Any]]:
@@ -195,28 +204,18 @@ class HistoryStore:
             self._conn.commit()
 
     def save_packet(self, packet_entry: Dict[str, Any]) -> None:
-        summary = packet_entry.get("summary")
-        packet = packet_entry.get("packet")
-        summary_json = json.dumps(summary, separators=(",", ":"))
-        packet_json = json.dumps(packet, separators=(",", ":"))
-
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO packets(created_unix, summary_json, packet_json) VALUES(?, ?, ?)",
-                (int(time.time()), summary_json, packet_json),
+            _save_packet_record_helper(
+                self._conn,
+                packet_entry,
+                now_unix_fn=time.time,
+                save_packet_event_and_rollups_fn=_save_packet_event_and_rollups_helper,
             )
-            if isinstance(summary, dict):
-                _save_packet_event_and_rollups_helper(self._conn, summary, now_unix_fn=time.time)
             self._maybe_prune_unlocked()
             self._conn.commit()
 
     def save_chat(self, chat_entry: Dict[str, Any]) -> None:
-        message_json = json.dumps(chat_entry, separators=(",", ":"))
-
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO chat(created_unix, message_json) VALUES(?, ?)",
-                (int(time.time()), message_json),
-            )
+            _save_chat_record_helper(self._conn, chat_entry, now_unix_fn=time.time)
             self._maybe_prune_unlocked()
             self._conn.commit()

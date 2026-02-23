@@ -31,11 +31,11 @@ from .history_store import HistoryStore
 from .nodes import (
     get_node_id_from_num as _get_node_id_from_num_helper,
     parse_utc_text_to_unix as _parse_utc_text_to_unix,
-    safe_nodes_items as _safe_nodes_items,
     utc_now as _utc_now,
 )
 from .tracker_snapshot import (
     build_edge_snapshot_rows as _build_edge_snapshot_rows_helper,
+    build_tracker_snapshot_payload as _build_tracker_snapshot_payload_helper,
 )
 from .tracker_edges import (
     record_direct_edge_observation as _record_direct_edge_observation_helper,
@@ -58,6 +58,18 @@ from .tracker_storage import (
 )
 from .tracker_delivery import (
     apply_routing_delivery_update as _apply_routing_delivery_update_helper,
+)
+from .tracker_local_chat import (
+    append_local_chat_entry as _append_local_chat_entry_helper,
+)
+from .tracker_seed import (
+    seed_tracker_from_node_db as _seed_tracker_from_node_db_helper,
+)
+from .tracker_packet_artifacts import (
+    build_tracker_packet_artifacts as _build_tracker_packet_artifacts_helper,
+)
+from .tracker_observation import (
+    apply_tracker_observation as _apply_tracker_observation_helper,
 )
 
 
@@ -184,9 +196,11 @@ class DashboardTracker:
         if entry is None:
             return
         with self._lock:
-            self.recent_chat.append(entry)
-            if self._history_store is not None:
-                self._history_store.save_chat(entry)
+            _append_local_chat_entry_helper(
+                recent_chat=self.recent_chat,
+                history_store=self._history_store,
+                entry=entry,
+            )
 
     def seed_packet(self, packet: Dict[str, Any], interface: Any) -> None:
         with self._lock:
@@ -207,76 +221,31 @@ class DashboardTracker:
             extract_emoji_codepoint_fn=_extract_emoji_codepoint,
             emoji_from_codepoint_fn=_emoji_from_codepoint,
         )
-        from_id = parsed["from_id"]
-        to_id = parsed["to_id"]
         rx_time = parsed["rx_time"]
         hops = parsed["hops"]
-        decoded = parsed["decoded"]
         portnum = parsed["portnum"]
-        packet_id = parsed["packet_id"]
-        packet_position = parsed["packet_position"]
-        packet_battery = parsed["packet_battery"]
-        reply_id = parsed["reply_id"]
-        emoji_codepoint = parsed["emoji_codepoint"]
-        emoji_glyph = parsed["emoji_glyph"]
-        is_reaction = parsed["is_reaction"]
-        _apply_routing_delivery_update_helper(
-            decoded,
-            extract_update_fn=self._extract_routing_delivery_update_unlocked,
-            set_delivery_state_fn=self._set_delivery_state_unlocked,
-        )
-        if portnum is not None:
-            self.port_counts[str(portnum)] += 1
-
-        direct_key = _record_direct_edge_observation_helper(
+        direct_key = _apply_tracker_observation_helper(
+            parsed=parsed,
+            include_live_count=include_live_count,
             session_edges=self.edges,
             historical_edges=self._historical_edges,
-            from_id=from_id,
-            to_id=to_id,
-            rx_time=rx_time,
-            portnum=portnum,
-            hops=hops,
-            include_live_count=include_live_count,
+            port_counts=self.port_counts,
+            apply_routing_delivery_update_fn=_apply_routing_delivery_update_helper,
+            extract_update_fn=self._extract_routing_delivery_update_unlocked,
+            set_delivery_state_fn=self._set_delivery_state_unlocked,
+            record_direct_edge_observation_fn=_record_direct_edge_observation_helper,
         )
 
-        packet_summary = _build_packet_summary_helper(
+        packet_entry, chat_entry = _build_tracker_packet_artifacts_helper(
             packet=packet,
-            decoded=decoded,
-            from_id=from_id,
-            to_id=to_id,
-            packet_id=packet_id,
-            rx_time=rx_time,
-            hops=hops,
-            reply_id=reply_id,
-            emoji_glyph=emoji_glyph,
-            emoji_codepoint=emoji_codepoint,
-            is_reaction=is_reaction,
-            packet_position=packet_position,
-            packet_battery=packet_battery,
+            parsed=parsed,
+            include_live_count=include_live_count,
+            build_packet_summary_fn=_build_packet_summary_helper,
+            build_chat_entry_from_packet_fn=_build_chat_entry_from_packet_helper,
             utc_now_fn=_utc_now,
             format_epoch_fn=_format_epoch,
             to_int_fn=_to_int,
-        )
-        packet_summary["live"] = include_live_count
-
-        packet_entry = {
-            "summary": packet_summary,
-            "packet": _to_jsonable(packet),
-        }
-
-        chat_entry = _build_chat_entry_from_packet_helper(
-            packet=packet,
-            decoded=decoded,
-            from_id=from_id,
-            to_id=to_id,
-            packet_id=packet_id,
-            hops=hops,
-            reply_id=reply_id,
-            emoji_glyph=emoji_glyph,
-            emoji_codepoint=emoji_codepoint,
-            is_reaction=is_reaction,
-            utc_now_fn=_utc_now,
-            format_epoch_fn=_format_epoch,
+            to_jsonable_fn=_to_jsonable,
         )
         _apply_tracker_storage_updates_helper(
             recent_packets=self.recent_packets,
@@ -296,35 +265,19 @@ class DashboardTracker:
     def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         with self._lock:
             self._expire_pending_deliveries_unlocked()
-            edge_rows, real_edge_count = _build_edge_snapshot_rows_helper(
+            return _build_tracker_snapshot_payload_helper(
                 session_edges=self.edges,
                 historical_edges=self._historical_edges,
                 nodes_by_id=nodes_by_id,
+                port_counts=self.port_counts,
+                recent_packets=self.recent_packets,
+                recent_chat=self.recent_chat,
+                live_packet_count=self.live_packet_count,
                 min_real_link_count=MIN_REAL_LINK_COUNT,
                 format_epoch_fn=_format_epoch,
+                build_edge_snapshot_rows_fn=_build_edge_snapshot_rows_helper,
             )
-            port_rows = [
-                {"portnum": portnum, "count": count}
-                for portnum, count in self.port_counts.most_common()
-            ]
-            recent_packets = list(self.recent_packets)
-            recent_chat = list(self.recent_chat)
-            live_packet_count = self.live_packet_count
-
-        return {
-            "live_packet_count": live_packet_count,
-            "real_edge_count": real_edge_count,
-            "edges": edge_rows,
-            "port_counts": port_rows,
-            "recent_packets": recent_packets,
-            "recent_chat": recent_chat,
-        }
 
 
 def seed_tracker_from_node_db(tracker: DashboardTracker, iface: Any) -> None:
-    for _num, node in _safe_nodes_items(iface, retries=3, sleep_seconds=0.01):
-        if not isinstance(node, dict):
-            continue
-        last_packet = node.get("lastReceived")
-        if isinstance(last_packet, dict):
-            tracker.seed_packet(last_packet, iface)
+    _seed_tracker_from_node_db_helper(tracker, iface)

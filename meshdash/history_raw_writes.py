@@ -1,0 +1,36 @@
+import json
+import time
+from typing import Any, Callable, Dict, Optional
+
+
+def save_packet_record(
+    conn: Any,
+    packet_entry: Dict[str, Any],
+    *,
+    now_unix_fn: Callable[[], float] = time.time,
+    save_packet_event_and_rollups_fn: Optional[Callable[..., None]] = None,
+) -> None:
+    summary = packet_entry.get("summary")
+    packet = packet_entry.get("packet")
+    summary_json = json.dumps(summary, separators=(",", ":"))
+    packet_json = json.dumps(packet, separators=(",", ":"))
+
+    conn.execute(
+        "INSERT INTO packets(created_unix, summary_json, packet_json) VALUES(?, ?, ?)",
+        (int(now_unix_fn()), summary_json, packet_json),
+    )
+    if isinstance(summary, dict) and save_packet_event_and_rollups_fn is not None:
+        save_packet_event_and_rollups_fn(conn, summary, now_unix_fn=now_unix_fn)
+
+
+def save_chat_record(
+    conn: Any,
+    chat_entry: Dict[str, Any],
+    *,
+    now_unix_fn: Callable[[], float] = time.time,
+) -> None:
+    message_json = json.dumps(chat_entry, separators=(",", ":"))
+    conn.execute(
+        "INSERT INTO chat(created_unix, message_json) VALUES(?, ?)",
+        (int(now_unix_fn()), message_json),
+    )

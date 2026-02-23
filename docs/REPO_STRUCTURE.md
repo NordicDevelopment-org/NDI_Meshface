@@ -22,13 +22,17 @@
 - `meshdash/history_capabilities.py`: node saved-count and capability row decoders.
 - `meshdash/history_backfill.py`: one-time node capability backfill builder from existing history tables.
 - `meshdash/history_capability_upsert.py`: node capability upsert input normalization and row-merge helpers.
+- `meshdash/history_capability_writes.py`: node capability upsert writer for history persistence.
 - `meshdash/history_connection_writes.py`: connection event insert/merge writer for the history connections table.
 - `meshdash/history_connections.py`: connection-event normalization and row-merge helpers.
 - `meshdash/history_metric_rows.py`: shared metric-rollup insert/merge builders for node/link history tables.
+- `meshdash/history_metric_writes.py`: node/link metric rollup upsert writers for history persistence.
+- `meshdash/history_maintenance.py`: prune scheduling/counter helpers for history store maintenance.
 - `meshdash/history_packet_events.py`: packet-event summary normalization and DB insert-value builders.
 - `meshdash/history_positions.py`: node position insert/de-dupe helpers for history capture.
+- `meshdash/history_raw_writes.py`: raw packet/chat row writers used by history store persistence paths.
 - `meshdash/history_queries.py`: shared SQL row fetchers for history read/aggregation surfaces.
-- `meshdash/history_writes.py`: packet-event rollup orchestration and history upsert write helpers.
+- `meshdash/history_writes.py`: packet-event rollup orchestration helper.
 - `meshdash/history_views.py`: node history/online activity empty payload and loader builders.
 - `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
 - `meshdash/http_responses.py`: shared HTTP response emitters for JSON/HTML/text.
@@ -50,7 +54,11 @@
 - `meshdash/tracker_entries.py`: packet summary/chat row builders used by tracker packet ingestion.
 - `meshdash/tracker_ingest.py`: packet ingest normalization/parsing helpers used by tracker receive flow.
 - `meshdash/tracker_history_edges.py`: historical connection-row normalization for tracker bootstrap state.
-- `meshdash/tracker_snapshot.py`: edge snapshot row builder shared by tracker state rendering.
+- `meshdash/tracker_local_chat.py`: local chat append/history-write helper used by tracker send flow.
+- `meshdash/tracker_packet_artifacts.py`: packet/chat artifact builders for tracker receive flow.
+- `meshdash/tracker_observation.py`: delivery/direct-edge/port-count observation helper for tracker receive flow.
+- `meshdash/tracker_seed.py`: tracker seed helper that replays node-db `lastReceived` packets.
+- `meshdash/tracker_snapshot.py`: edge snapshot and full tracker snapshot payload builders.
 - `meshdash/tracker_storage.py`: tracker receive-path storage fanout (recent deques + optional history writes).
 - `meshdash/wiring.py`: dependency checks and runtime wiring assembly for dashboard startup.
 - `meshtastic-dashboard.service`: systemd unit template for VM deployment.
