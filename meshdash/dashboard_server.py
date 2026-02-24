@@ -1,4 +1,14 @@
+from dataclasses import dataclass
 from typing import Any, Callable, Dict
+
+
+@dataclass(frozen=True)
+class DashboardServerParts:
+    server: Any
+    html: str
+    handler_cls: Any
+    bound_host: str
+    bound_port: int
 
 
 def build_dashboard_server(
@@ -13,7 +23,7 @@ def build_dashboard_server(
     render_html_fn: Callable[..., str],
     make_http_handler_fn: Callable[..., Any],
     threading_http_server_cls: Any,
-) -> Dict[str, Any]:
+) -> DashboardServerParts:
     html = render_html_fn(
         refresh_ms=args.refresh_ms,
         packet_limit=args.packet_limit,
@@ -35,10 +45,10 @@ def build_dashboard_server(
     )
     server = threading_http_server_cls((args.http_host, args.http_port), handler_cls)
     bound_host, bound_port = server.server_address[:2]
-    return {
-        "server": server,
-        "html": html,
-        "handler_cls": handler_cls,
-        "bound_host": bound_host,
-        "bound_port": bound_port,
-    }
+    return DashboardServerParts(
+        server=server,
+        html=html,
+        handler_cls=handler_cls,
+        bound_host=str(bound_host),
+        bound_port=int(bound_port),
+    )

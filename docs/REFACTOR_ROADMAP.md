@@ -183,3 +183,24 @@ Allow operator theme presets without editing code.
 
 - Users can switch palette presets at runtime.
 - Default theme remains the stable baseline.
+
+## Phase 7: Typed Runtime Wiring Contracts
+
+### Target
+
+Reduce string-key coupling between runtime builders and orchestration modules.
+
+### Delivered
+
+- Added `DashboardRuntimeContext` dataclass in `meshdash/dashboard_runtime_context.py` and moved runtime consumer access to typed attributes.
+- Added `DashboardServerParts` dataclass in `meshdash/dashboard_server.py` and moved runner access to typed attributes.
+
+### Steps
+
+1. Introduce typed loader bundle for `build_dashboard_runtime_loaders()` return values.
+2. Replace remaining ad-hoc dict payloads in runtime orchestration boundaries.
+
+### Exit criteria
+
+- Runtime orchestration uses typed object contracts for core boot/server handoff.
+- Fewer string-key regressions during future refactors.

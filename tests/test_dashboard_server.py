@@ -1,6 +1,6 @@
 import argparse
 
-from meshdash.dashboard_server import build_dashboard_server
+from meshdash.dashboard_server import DashboardServerParts, build_dashboard_server
 
 
 class _FakeServer:
@@ -49,10 +49,11 @@ def test_build_dashboard_server_renders_handler_and_binds_server():
         threading_http_server_cls=_FakeServer,
     )
 
-    assert parts["html"] == "<html></html>"
-    assert isinstance(parts["server"], _FakeServer)
-    assert parts["bound_host"] == "127.0.0.1"
-    assert parts["bound_port"] == 8877
+    assert isinstance(parts, DashboardServerParts)
+    assert parts.html == "<html></html>"
+    assert isinstance(parts.server, _FakeServer)
+    assert parts.bound_host == "127.0.0.1"
+    assert parts.bound_port == 8877
     assert observed["render"]["revision_label"] == "rev-label"
     assert observed["render"]["history_enabled"] is True
     assert observed["handler"]["html_text"] == "<html></html>"

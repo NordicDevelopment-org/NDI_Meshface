@@ -78,9 +78,9 @@ def run_dashboard_runtime(
         make_http_handler_fn=make_http_handler_fn,
         threading_http_server_cls=threading_http_server_cls,
     )
-    server = server_parts["server"]
-    bound_host = server_parts["bound_host"]
-    bound_port = server_parts["bound_port"]
+    server = server_parts.server
+    bound_host = server_parts.bound_host
+    bound_port = server_parts.bound_port
 
     emit_startup_status(
         http_host=args.http_host,
