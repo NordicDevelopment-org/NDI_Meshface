@@ -19,7 +19,10 @@
 - `meshdash/dashboard_setup.py`: runtime setup helpers for optional history store and tracker seeding.
 - `meshdash/html.py`: stable HTML renderer facade used by runtime wiring/tests.
 - `meshdash/html_context.py`: HTML render-context builder (theme CSS + safety/history labels).
-- `meshdash/html_template.py`: full dashboard HTML/CSS/JS template implementation.
+- `meshdash/html_css.py`: dashboard stylesheet template builder used by HTML renderer.
+- `meshdash/html_js.py`: dashboard frontend JavaScript template builder used by HTML renderer.
+- `meshdash/html_sections.py`: dashboard HTML shell/section template builder (structure + placeholders).
+- `meshdash/html_template.py`: thin HTML composer combining context + CSS + JS + section shell.
 - `meshdash/helpers.py`: stable helper facade re-exporting utility APIs for runtime/test compatibility.
 - `meshdash/helpers_core.py`: core primitive/json/secrets/formatting/emoji/disk helper implementations.
 - `meshdash/helpers_packet.py`: packet-oriented extraction helpers (reply/emoji/hops/position/battery).
