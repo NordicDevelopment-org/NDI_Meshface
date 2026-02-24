@@ -1,4 +1,4 @@
-from meshdash.dashboard_loaders import build_dashboard_runtime_loaders
+from meshdash.dashboard_loaders import DashboardRuntimeLoaders, build_dashboard_runtime_loaders
 
 
 def test_build_dashboard_runtime_loaders_wires_all_loader_factories():
@@ -46,10 +46,11 @@ def test_build_dashboard_runtime_loaders_wires_all_loader_factories():
         build_send_chat_loader_fn=_send_chat_loader,
     )
 
-    assert callable(result["state_fn"])
-    assert callable(result["node_history_fn"])
-    assert callable(result["online_activity_fn"])
-    assert callable(result["send_chat_fn"])
+    assert isinstance(result, DashboardRuntimeLoaders)
+    assert callable(result.state_fn)
+    assert callable(result.node_history_fn)
+    assert callable(result.online_activity_fn)
+    assert callable(result.send_chat_fn)
     assert captured["state"]["iface"] == "iface"
     assert captured["state"]["build_state_fn"] == "build_state_fn"
     assert captured["node_history"]["default_hours"] == 72

@@ -194,11 +194,12 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 
 - Added `DashboardRuntimeContext` dataclass in `meshdash/dashboard_runtime_context.py` and moved runtime consumer access to typed attributes.
 - Added `DashboardServerParts` dataclass in `meshdash/dashboard_server.py` and moved runner access to typed attributes.
+- Added `DashboardRuntimeLoaders` dataclass in `meshdash/dashboard_runtime_loaders.py` and moved runtime context assembly off string-key loader dicts.
 
 ### Steps
 
-1. Introduce typed loader bundle for `build_dashboard_runtime_loaders()` return values.
-2. Replace remaining ad-hoc dict payloads in runtime orchestration boundaries.
+1. Replace remaining ad-hoc dict payloads in runtime orchestration boundaries.
+2. Consider stricter type aliases/protocols for callback signatures used in runtime wiring.
 
 ### Exit criteria
 

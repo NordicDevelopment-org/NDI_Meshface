@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
 from .dashboard_loaders import (
+    DashboardRuntimeLoaders,
     build_dashboard_runtime_loaders,
 )
 from .dashboard_setup import (
@@ -60,7 +61,7 @@ def build_dashboard_runtime_context(
     ),
     open_optional_history_store_fn: Callable[..., Optional[Any]] = open_optional_history_store,
     seed_tracker_if_empty_fn: Callable[..., None] = seed_tracker_if_empty,
-    build_dashboard_runtime_loaders_fn: Callable[..., Dict[str, Callable[..., Any]]] = build_dashboard_runtime_loaders,
+    build_dashboard_runtime_loaders_fn: Callable[..., DashboardRuntimeLoaders] = build_dashboard_runtime_loaders,
 ) -> DashboardRuntimeContext:
     target = mesh_target_label_fn(args)
     print_fn(f"Connecting to {target} ...")
@@ -115,9 +116,9 @@ def build_dashboard_runtime_context(
         send_lock=send_lock,
         started_at=started_at,
         revision_info=revision_info,
-        state_fn=loaders["state_fn"],
-        node_history_fn=loaders["node_history_fn"],
-        online_activity_fn=loaders["online_activity_fn"],
-        send_chat_fn=loaders["send_chat_fn"],
+        state_fn=loaders.state_fn,
+        node_history_fn=loaders.node_history_fn,
+        online_activity_fn=loaders.online_activity_fn,
+        send_chat_fn=loaders.send_chat_fn,
         history_enabled=history_store is not None,
     )

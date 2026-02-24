@@ -29,8 +29,8 @@
 - `meshdash/dashboard_runner.py`: stable dashboard-runner facade re-exporting runtime entrypoint.
 - `meshdash/dashboard_runner_impl.py`: dashboard runtime server lifecycle orchestration using runtime context helpers.
 - `meshdash/dashboard_runtime_context.py`: dashboard runtime bootstrap context helper + typed runtime context dataclass.
-- `meshdash/dashboard_loaders.py`: stable runtime-loaders facade re-exporting loader assembly entrypoint.
-- `meshdash/dashboard_runtime_loaders.py`: runtime loader assembly helpers for state/history/activity/chat closures.
+- `meshdash/dashboard_loaders.py`: stable runtime-loaders facade re-exporting loader assembly entrypoint + typed loader bundle.
+- `meshdash/dashboard_runtime_loaders.py`: runtime loader assembly helpers for state/history/activity/chat closures and typed loader contract.
 - `meshdash/dashboard_server.py`: runtime server build helper for HTML render, handler wiring, HTTP bind, and typed server-parts return.
 - `meshdash/dashboard_setup.py`: runtime setup helpers for optional history store and tracker seeding.
 - `meshdash/html.py`: stable HTML renderer facade used by runtime wiring/tests.

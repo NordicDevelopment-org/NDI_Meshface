@@ -1,5 +1,6 @@
 import argparse
 
+from meshdash.dashboard_loaders import DashboardRuntimeLoaders
 from meshdash.dashboard_runtime_context import (
     DashboardRuntimeContext,
     build_dashboard_runtime_context,
@@ -59,12 +60,12 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
 
     def _build_dashboard_runtime_loaders(**kwargs):
         calls["build_dashboard_runtime_loaders"] = kwargs
-        return {
-            "state_fn": send_state,
-            "node_history_fn": send_node_history,
-            "online_activity_fn": send_online,
-            "send_chat_fn": send_chat,
-        }
+        return DashboardRuntimeLoaders(
+            state_fn=send_state,
+            node_history_fn=send_node_history,
+            online_activity_fn=send_online,
+            send_chat_fn=send_chat,
+        )
 
     printed = []
     context = build_dashboard_runtime_context(

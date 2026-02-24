@@ -1,4 +1,13 @@
-from typing import Any, Callable, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Optional
+
+
+@dataclass(frozen=True)
+class DashboardRuntimeLoaders:
+    state_fn: Callable[[], dict]
+    node_history_fn: Callable[..., dict]
+    online_activity_fn: Callable[..., dict]
+    send_chat_fn: Callable[..., dict]
 
 
 def build_dashboard_runtime_loaders(
@@ -26,7 +35,7 @@ def build_dashboard_runtime_loaders(
     build_node_history_loader_fn: Callable[..., Callable[..., dict]],
     build_online_activity_loader_fn: Callable[..., Callable[..., dict]],
     build_send_chat_loader_fn: Callable[..., Callable[..., dict]],
-) -> Dict[str, Callable[..., Any]]:
+) -> DashboardRuntimeLoaders:
     state_fn = build_state_snapshot_loader_fn(
         iface=iface,
         tracker=tracker,
@@ -61,9 +70,9 @@ def build_dashboard_runtime_loaders(
         utc_now_fn=utc_now_fn,
     )
 
-    return {
-        "state_fn": state_fn,
-        "node_history_fn": node_history_fn,
-        "online_activity_fn": online_activity_fn,
-        "send_chat_fn": send_chat_fn,
-    }
+    return DashboardRuntimeLoaders(
+        state_fn=state_fn,
+        node_history_fn=node_history_fn,
+        online_activity_fn=online_activity_fn,
+        send_chat_fn=send_chat_fn,
+    )
