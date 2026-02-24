@@ -12,7 +12,10 @@
 - `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers.
 - `meshdash/api_inputs.py`: shared API query/body parsing and request-size validation helpers.
 - `meshdash/cli.py`: CLI parser/bootstrap argument definitions and env default resolution.
-- `meshdash/cli_arguments.py`: grouped CLI argument registration helpers for gateway/http/history views.
+- `meshdash/cli_arguments.py`: stable CLI-arguments facade re-exporting grouped argument helpers.
+- `meshdash/cli_args_gateway.py`: default-gateway related CLI argument registration helpers.
+- `meshdash/cli_args_http.py`: HTTP runtime CLI argument registration helpers.
+- `meshdash/cli_args_history.py`: history + node-history CLI argument registration helpers.
 - `meshdash/dashboard_runtime.py`: dashboard runtime orchestration and server lifecycle.
 - `meshdash/dashboard_loaders.py`: runtime loader assembly helpers for state/history/activity/chat closures.
 - `meshdash/dashboard_server.py`: runtime server build helper for HTML render, handler wiring, and HTTP bind.
