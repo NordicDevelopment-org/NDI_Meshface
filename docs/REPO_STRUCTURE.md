@@ -88,7 +88,8 @@
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
 - `meshdash/runtime_callbacks.py`: runtime closure builders for state snapshots and chat send actions.
 - `meshdash/runtime_lifecycle.py`: startup status output, serve-loop interrupt handling, and shutdown cleanup helpers.
-- `meshdash/services.py`: shared history/online loader builders, chat-send service logic, and empty payload helpers.
+- `meshdash/services.py`: stable services facade re-exporting history loaders and chat-send service entrypoint.
+- `meshdash/services_chat.py`: chat-send orchestration service implementation.
 - `meshdash/state.py`: node/local snapshot + assembled `/api/state` payload helpers.
 - `meshdash/state_nodes.py`: stable state-node facade re-exporting node/local collectors.
 - `meshdash/state_node_rows.py`: node row/full-node snapshot collection helpers.
