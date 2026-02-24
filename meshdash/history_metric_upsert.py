@@ -1,78 +1,14 @@
-from typing import Any, Callable, Iterable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
-
-_METRIC_FIELDS: tuple[str, ...] = (
-    "packet_count",
-    "snr_sum",
-    "snr_count",
-    "snr_min",
-    "snr_max",
-    "rssi_sum",
-    "rssi_count",
-    "rssi_min",
-    "rssi_max",
-    "hops_sum",
-    "hops_count",
-    "hops_min",
-    "hops_max",
-    "last_seen_unix",
+from .history_metric_upsert_queries import (
+    select_existing_row as _select_existing_row_helper,
 )
-
-
-def _where_clause(*, key_fields: Sequence[str]) -> str:
-    where_parts = ["bucket_unix = ?"] + [f"{field} = ?" for field in key_fields]
-    return " AND ".join(where_parts)
-
-
-def _select_existing_row(
-    conn: Any,
-    *,
-    table_name: str,
-    key_fields: Sequence[str],
-    bucket_unix: int,
-    key_values: Sequence[Any],
-) -> Optional[Iterable[Any]]:
-    sql = (
-        f"SELECT {', '.join(_METRIC_FIELDS)} "
-        f"FROM {table_name} "
-        f"WHERE {_where_clause(key_fields=key_fields)}"
-    )
-    return conn.execute(sql, (bucket_unix, *key_values)).fetchone()
-
-
-def _insert_metric_row(
-    conn: Any,
-    *,
-    table_name: str,
-    key_fields: Sequence[str],
-    bucket_unix: int,
-    key_values: Sequence[Any],
-    rolled: dict,
-) -> None:
-    fields = ("bucket_unix", *key_fields, *_METRIC_FIELDS)
-    placeholders = ", ".join("?" for _ in fields)
-    sql = f"INSERT INTO {table_name}({', '.join(fields)}) VALUES({placeholders})"
-    values = (bucket_unix, *key_values, *[rolled[field] for field in _METRIC_FIELDS])
-    conn.execute(sql, values)
-
-
-def _update_metric_row(
-    conn: Any,
-    *,
-    table_name: str,
-    key_fields: Sequence[str],
-    bucket_unix: int,
-    key_values: Sequence[Any],
-    merged: dict,
-) -> None:
-    assignments = ", ".join(f"{field} = ?" for field in _METRIC_FIELDS)
-    sql = (
-        f"UPDATE {table_name} "
-        f"SET {assignments} "
-        f"WHERE {_where_clause(key_fields=key_fields)}"
-    )
-    values = (*[merged[field] for field in _METRIC_FIELDS], bucket_unix, *key_values)
-    conn.execute(sql, values)
+from .history_metric_upsert_writes import (
+    insert_metric_row as _insert_metric_row_helper,
+)
+from .history_metric_upsert_writes import (
+    update_metric_row as _update_metric_row_helper,
+)
 
 
 def upsert_metric_rollup_row(
@@ -89,7 +25,7 @@ def upsert_metric_rollup_row(
     build_metric_rollup_values_fn: Callable[..., dict],
     merge_metric_rollup_row_fn: Callable[..., dict],
 ) -> None:
-    row = _select_existing_row(
+    row = _select_existing_row_helper(
         conn,
         table_name=table_name,
         key_fields=key_fields,
@@ -104,7 +40,7 @@ def upsert_metric_rollup_row(
             rx_rssi=rx_rssi,
             hops=hops,
         )
-        _insert_metric_row(
+        _insert_metric_row_helper(
             conn,
             table_name=table_name,
             key_fields=key_fields,
@@ -121,7 +57,7 @@ def upsert_metric_rollup_row(
         rx_rssi=rx_rssi,
         hops=hops,
     )
-    _update_metric_row(
+    _update_metric_row_helper(
         conn,
         table_name=table_name,
         key_fields=key_fields,

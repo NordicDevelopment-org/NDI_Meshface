@@ -64,7 +64,9 @@
 - `meshdash/history_connection_writes.py`: connection event insert/merge writer for the history connections table.
 - `meshdash/history_connections.py`: connection-event normalization and row-merge helpers.
 - `meshdash/history_metric_rows.py`: shared metric-rollup insert/merge builders for node/link history tables.
-- `meshdash/history_metric_upsert.py`: shared table-agnostic metric rollup upsert orchestration for node/link tables.
+- `meshdash/history_metric_upsert.py`: shared metric rollup upsert orchestrator for node/link tables.
+- `meshdash/history_metric_upsert_queries.py`: metric upsert select/query helpers and shared metric field definitions.
+- `meshdash/history_metric_upsert_writes.py`: metric upsert insert/update SQL writer helpers.
 - `meshdash/history_metric_writes.py`: node/link metric rollup upsert writers for history persistence.
 - `meshdash/history_maintenance.py`: prune scheduling/counter helpers for history store maintenance.
 - `meshdash/history_packet_events.py`: packet-event summary normalization and DB insert-value builders.
