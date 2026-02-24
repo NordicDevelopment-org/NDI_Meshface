@@ -1,10 +1,6 @@
 from collections import Counter, deque
 
-import meshdash.tracker_runtime_receive as tracker_runtime_receive
-from meshdash.tracker_runtime_receive import (
-    record_tracker_receive_unlocked,
-    record_tracker_receive_unlocked_for_tracker,
-)
+from meshdash.tracker_runtime_receive import record_tracker_receive_unlocked
 
 
 def test_record_tracker_receive_unlocked_forwards_tracker_context_and_expires():
@@ -117,51 +113,3 @@ def test_record_tracker_receive_unlocked_forwards_tracker_context_and_expires():
         "to_jsonable_fn": sentinel_to_jsonable,
     }
     assert observed["expired"] is True
-
-
-def test_record_tracker_receive_unlocked_for_tracker_binds_node_resolver(monkeypatch):
-    observed = {}
-
-    def _record_tracker_receive_unlocked(tracker, **kwargs):
-        observed["tracker"] = tracker
-        observed["kwargs"] = kwargs
-
-    def _resolve_tracker_node_id_from_num(iface, node_num, *, get_node_id_from_num_fn, **_kwargs):
-        observed["resolve_args"] = (iface, node_num, get_node_id_from_num_fn)
-        return "!resolved"
-
-    monkeypatch.setattr(
-        tracker_runtime_receive,
-        "record_tracker_receive_unlocked",
-        _record_tracker_receive_unlocked,
-    )
-    monkeypatch.setattr(
-        tracker_runtime_receive,
-        "_resolve_tracker_node_id_from_num",
-        _resolve_tracker_node_id_from_num,
-    )
-
-    tracker = object()
-    packet = {"id": 7}
-    interface = object()
-    sentinel_get_node_id = object()
-    sentinel_record = object()
-
-    record_tracker_receive_unlocked_for_tracker(
-        tracker,
-        packet=packet,
-        interface=interface,
-        include_live_count=False,
-        get_node_id_from_num_fn=sentinel_get_node_id,
-        record_tracker_packet_unlocked_fn=sentinel_record,
-    )
-
-    assert observed["tracker"] is tracker
-    assert observed["kwargs"]["packet"] == packet
-    assert observed["kwargs"]["interface"] is interface
-    assert observed["kwargs"]["include_live_count"] is False
-    assert observed["kwargs"]["record_tracker_packet_unlocked_fn"] is sentinel_record
-
-    bound_resolver = observed["kwargs"]["get_node_id_from_num_fn"]
-    assert bound_resolver("iface-x", 12345) == "!resolved"
-    assert observed["resolve_args"] == ("iface-x", 12345, sentinel_get_node_id)

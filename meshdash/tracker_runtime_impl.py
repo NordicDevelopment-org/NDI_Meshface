@@ -7,11 +7,10 @@ from .helpers import (
 )
 from .history_store import HistoryStore
 from .nodes import (
-    get_node_id_from_num as _get_node_id_from_num_helper,
     parse_utc_text_to_unix as _parse_utc_text_to_unix,
     utc_now as _utc_now,
 )
-from .tracker_runtime_receive import (
+from .tracker_runtime_receive_bindings import (
     record_tracker_receive_unlocked_for_tracker as _record_tracker_receive_unlocked_for_tracker_helper,
 )
 from .tracker_runtime_init import (
@@ -124,7 +123,6 @@ class DashboardTracker:
             packet=packet,
             interface=interface,
             include_live_count=include_live_count,
-            get_node_id_from_num_fn=_get_node_id_from_num_helper,
         )
 
     def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
