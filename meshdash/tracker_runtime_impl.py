@@ -7,19 +7,8 @@ try:
 except Exception:
     meshtastic = None
 
-from .chat import (
-    build_local_chat_entry as _build_local_chat_entry,
-)
 from .helpers import (
-    calculate_hops as _calculate_hops,
-    emoji_from_codepoint as _emoji_from_codepoint,
-    extract_emoji_codepoint as _extract_emoji_codepoint,
-    extract_packet_battery_level as _extract_packet_battery_level,
-    extract_packet_position as _extract_packet_position,
-    extract_reply_id as _extract_reply_id,
-    format_epoch as _format_epoch,
     to_int as _to_int,
-    to_jsonable as _to_jsonable,
 )
 from .history_store import HistoryStore
 from .nodes import (
@@ -30,63 +19,28 @@ from .nodes import (
 from .tracker_node_resolver import (
     get_tracker_node_id_from_num as _get_tracker_node_id_from_num_helper,
 )
-from .tracker_runtime_record import (
-    record_tracker_packet_unlocked as _record_tracker_packet_unlocked_helper,
+from .tracker_runtime_receive import (
+    record_tracker_receive_unlocked as _record_tracker_receive_unlocked_helper,
 )
 from .tracker_runtime_init import (
     initialize_dashboard_tracker_runtime as _initialize_dashboard_tracker_runtime_helper,
 )
 from .tracker_runtime_chat import (
-    record_tracker_local_chat as _record_tracker_local_chat_helper,
+    record_tracker_local_chat_for_tracker as _record_tracker_local_chat_for_tracker_helper,
 )
 from .tracker_runtime_state import (
-    build_tracker_snapshot as _build_tracker_snapshot_helper,
-    load_tracker_node_capabilities as _load_tracker_node_capabilities_helper,
-    load_tracker_node_saved_counts as _load_tracker_node_saved_counts_helper,
+    build_tracker_snapshot_for_tracker as _build_tracker_snapshot_for_tracker_helper,
+    load_tracker_node_capabilities_for_tracker as _load_tracker_node_capabilities_for_tracker_helper,
+    load_tracker_node_saved_counts_for_tracker as _load_tracker_node_saved_counts_for_tracker_helper,
 )
-from .tracker_snapshot import (
-    build_edge_snapshot_rows as _build_edge_snapshot_rows_helper,
-    build_tracker_snapshot_payload as _build_tracker_snapshot_payload_helper,
-)
-from .tracker_edges import (
-    record_direct_edge_observation as _record_direct_edge_observation_helper,
+from .tracker_seed import (
+    seed_tracker_from_node_db as _seed_tracker_from_node_db_helper,
 )
 from .tracker_history_edges import (
     build_historical_edges as _build_historical_edges_helper,
 )
 from .tracker_bootstrap import (
     load_tracker_history_bootstrap as _load_tracker_history_bootstrap_helper,
-)
-from .tracker_entries import (
-    build_chat_entry_from_packet as _build_chat_entry_from_packet_helper,
-    build_packet_summary as _build_packet_summary_helper,
-)
-from .tracker_ingest import (
-    parse_tracker_packet as _parse_tracker_packet_helper,
-)
-from .tracker_storage import (
-    apply_tracker_storage_updates as _apply_tracker_storage_updates_helper,
-)
-from .tracker_delivery import (
-    apply_routing_delivery_update as _apply_routing_delivery_update_helper,
-)
-from .tracker_local_chat import (
-    append_local_chat_entry as _append_local_chat_entry_helper,
-)
-from .tracker_seed import (
-    seed_tracker_from_node_db as _seed_tracker_from_node_db_helper,
-)
-from .tracker_packet_artifacts import (
-    build_tracker_packet_artifacts as _build_tracker_packet_artifacts_helper,
-)
-from .tracker_observation import (
-    apply_tracker_observation as _apply_tracker_observation_helper,
-)
-from .tracker_receive import (
-    process_parsed_tracker_packet as _process_parsed_tracker_packet_helper,
-)
-from .tracker_local_entry import (
-    build_tracker_local_entry as _build_tracker_local_entry_helper,
 )
 from .tracker_callbacks import (
     build_tracker_delivery_callbacks as _build_tracker_delivery_callbacks_helper,
@@ -140,10 +94,10 @@ class DashboardTracker:
             return bool(self.recent_packets)
 
     def load_node_saved_counts(self) -> Dict[str, Dict[str, Any]]:
-        return _load_tracker_node_saved_counts_helper(self._history_store)
+        return _load_tracker_node_saved_counts_for_tracker_helper(self)
 
     def load_node_capabilities(self) -> Dict[str, Dict[str, Any]]:
-        return _load_tracker_node_capabilities_helper(self._history_store)
+        return _load_tracker_node_capabilities_for_tracker_helper(self)
 
     def record_local_chat(
         self,
@@ -160,7 +114,8 @@ class DashboardTracker:
         retry_of: Optional[int] = None,
     ) -> None:
         with self._lock:
-            _record_tracker_local_chat_helper(
+            _record_tracker_local_chat_for_tracker_helper(
+                self,
                 text=text,
                 from_id=from_id,
                 to_id=to_id,
@@ -172,15 +127,7 @@ class DashboardTracker:
                 is_reaction=is_reaction,
                 ack_requested=ack_requested,
                 retry_of=retry_of,
-                recent_chat=self.recent_chat,
-                history_store=self._history_store,
-                build_tracker_local_entry_fn=_build_tracker_local_entry_helper,
-                append_local_chat_entry_fn=_append_local_chat_entry_helper,
-                build_local_chat_entry_fn=_build_local_chat_entry,
-                utc_now_fn=_utc_now,
                 now_unix_fn=time.time,
-                to_int_fn=_to_int,
-                emoji_from_codepoint_fn=_emoji_from_codepoint,
             )
 
     def seed_packet(self, packet: Dict[str, Any], interface: Any) -> None:
@@ -190,57 +137,20 @@ class DashboardTracker:
     def _record_packet_unlocked(
         self, packet: Dict[str, Any], interface: Any, include_live_count: bool
     ) -> None:
-        _record_tracker_packet_unlocked_helper(
+        _record_tracker_receive_unlocked_helper(
+            self,
             packet=packet,
             interface=interface,
             include_live_count=include_live_count,
-            session_edges=self.edges,
-            historical_edges=self._historical_edges,
-            port_counts=self.port_counts,
-            recent_packets=self.recent_packets,
-            recent_chat=self.recent_chat,
-            history_store=self._history_store,
-            extract_delivery_update_fn=self._extract_delivery_update_fn,
-            set_delivery_state_fn=self._set_delivery_state_fn,
-            apply_tracker_observation_fn=_apply_tracker_observation_helper,
-            apply_routing_delivery_update_fn=_apply_routing_delivery_update_helper,
-            record_direct_edge_observation_fn=_record_direct_edge_observation_helper,
-            build_tracker_packet_artifacts_fn=_build_tracker_packet_artifacts_helper,
-            build_packet_summary_fn=_build_packet_summary_helper,
-            build_chat_entry_from_packet_fn=_build_chat_entry_from_packet_helper,
-            apply_tracker_storage_updates_fn=_apply_tracker_storage_updates_helper,
-            parse_tracker_packet_fn=_parse_tracker_packet_helper,
-            process_parsed_tracker_packet_fn=_process_parsed_tracker_packet_helper,
             get_node_id_from_num_fn=_get_node_id_from_num,
-            to_int_fn=_to_int,
-            calculate_hops_fn=_calculate_hops,
-            extract_packet_position_fn=_extract_packet_position,
-            extract_packet_battery_level_fn=_extract_packet_battery_level,
-            extract_reply_id_fn=_extract_reply_id,
-            extract_emoji_codepoint_fn=_extract_emoji_codepoint,
-            emoji_from_codepoint_fn=_emoji_from_codepoint,
-            utc_now_fn=_utc_now,
-            format_epoch_fn=_format_epoch,
-            to_jsonable_fn=_to_jsonable,
         )
-
-        self._expire_pending_deliveries_fn()
 
     def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         with self._lock:
-            return _build_tracker_snapshot_helper(
-                session_edges=self.edges,
-                historical_edges=self._historical_edges,
+            return _build_tracker_snapshot_for_tracker_helper(
+                self,
                 nodes_by_id=nodes_by_id,
-                port_counts=self.port_counts,
-                recent_packets=self.recent_packets,
-                recent_chat=self.recent_chat,
-                live_packet_count=self.live_packet_count,
                 min_real_link_count=MIN_REAL_LINK_COUNT,
-                format_epoch_fn=_format_epoch,
-                build_edge_snapshot_rows_fn=_build_edge_snapshot_rows_helper,
-                expire_pending_deliveries_fn=self._expire_pending_deliveries_fn,
-                build_tracker_snapshot_payload_fn=_build_tracker_snapshot_payload_helper,
             )
 
 
