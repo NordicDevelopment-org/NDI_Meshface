@@ -81,7 +81,9 @@
 - `meshdash/history_views.py`: node history/online activity empty payload and loader builders.
 - `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
 - `meshdash/http_handler.py`: shared HTTP `BaseHTTPRequestHandler` shell for GET/POST dispatch wiring.
-- `meshdash/http_routes.py`: GET/POST route handlers used by dashboard HTTP API class.
+- `meshdash/http_routes.py`: stable HTTP-routes facade re-exporting GET/POST route handlers.
+- `meshdash/http_routes_get.py`: dashboard GET route handlers (`/`, `/api/state`, history endpoints).
+- `meshdash/http_routes_post.py`: dashboard POST route handler (`/api/chat/send`) and send error mapping.
 - `meshdash/http_responses.py`: shared HTTP response emitters for JSON/HTML/text.
 - `meshdash/mesh_ops.py`: Meshtastic/protobuf-specific packet send and local node-id helpers.
 - `meshdash/nodes.py`: stable node-utilities facade re-exporting identity/time/snapshot helpers.
