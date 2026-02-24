@@ -1,5 +1,7 @@
 from typing import Any
 
+from .tracker_callbacks import TrackerDeliveryCallbacks
+
 
 def initialize_dashboard_tracker_runtime(
     tracker: Any,
@@ -28,7 +30,7 @@ def initialize_dashboard_tracker_runtime(
     tracker.recent_packets = buffers.recent_packets
     tracker.recent_chat = buffers.recent_chat
 
-    delivery_callbacks = build_tracker_delivery_callbacks_fn(
+    delivery_callbacks: TrackerDeliveryCallbacks = build_tracker_delivery_callbacks_fn(
         tracker.recent_chat,
         get_timeout_seconds_fn=lambda: tracker._chat_delivery_timeout_seconds,
         to_int_fn=to_int_fn,
@@ -36,9 +38,9 @@ def initialize_dashboard_tracker_runtime(
         utc_now_fn=utc_now_fn,
         now_unix_fn=now_unix_fn,
     )
-    tracker._set_delivery_state_fn = delivery_callbacks["set_delivery_state"]
-    tracker._extract_delivery_update_fn = delivery_callbacks["extract_delivery_update"]
-    tracker._expire_pending_deliveries_fn = delivery_callbacks["expire_pending_deliveries"]
+    tracker._set_delivery_state_fn = delivery_callbacks.set_delivery_state
+    tracker._extract_delivery_update_fn = delivery_callbacks.extract_delivery_update
+    tracker._expire_pending_deliveries_fn = delivery_callbacks.expire_pending_deliveries
 
     tracker._historical_edges = apply_tracker_history_bootstrap_fn(
         history_store=tracker._history_store,

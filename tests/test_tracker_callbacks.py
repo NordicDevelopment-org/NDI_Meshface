@@ -1,4 +1,4 @@
-from meshdash.tracker_callbacks import build_tracker_delivery_callbacks
+from meshdash.tracker_callbacks import TrackerDeliveryCallbacks, build_tracker_delivery_callbacks
 
 
 def test_build_tracker_delivery_callbacks_wires_set_extract_and_expire():
@@ -12,9 +12,10 @@ def test_build_tracker_delivery_callbacks_wires_set_extract_and_expire():
         now_unix_fn=lambda: 100,
     )
 
-    set_fn = callbacks["set_delivery_state"]
-    extract_fn = callbacks["extract_delivery_update"]
-    expire_fn = callbacks["expire_pending_deliveries"]
+    assert isinstance(callbacks, TrackerDeliveryCallbacks)
+    set_fn = callbacks.set_delivery_state
+    extract_fn = callbacks.extract_delivery_update
+    expire_fn = callbacks.expire_pending_deliveries
 
     recent_chat.append(
         {

@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from meshdash.tracker_callbacks import TrackerDeliveryCallbacks
 from meshdash.tracker_runtime_init import initialize_dashboard_tracker_runtime
 
 
@@ -40,11 +41,11 @@ def test_initialize_dashboard_tracker_runtime_wires_state_callbacks_and_bootstra
             "utc_now_fn": utc_now_fn,
             "now_unix_fn": now_unix_fn,
         }
-        return {
-            "set_delivery_state": set_fn,
-            "extract_delivery_update": extract_fn,
-            "expire_pending_deliveries": expire_fn,
-        }
+        return TrackerDeliveryCallbacks(
+            set_delivery_state=set_fn,
+            extract_delivery_update=extract_fn,
+            expire_pending_deliveries=expire_fn,
+        )
 
     historical_edges = {"new": 4}
 

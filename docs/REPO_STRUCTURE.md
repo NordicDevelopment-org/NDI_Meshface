@@ -121,7 +121,7 @@
 - `meshdash/tracker.py`: stable tracker facade re-exporting tracker class and seed helper.
 - `meshdash/tracker_runtime.py`: stable tracker-runtime facade re-exporting tracker class + seed helper.
 - `meshdash/tracker_runtime_impl.py`: tracker runtime orchestration class wiring callbacks/bootstrap/snapshot helpers.
-- `meshdash/tracker_runtime_init.py`: tracker constructor/runtime initialization wiring for buffers, callbacks, and bootstrap state.
+- `meshdash/tracker_runtime_init.py`: tracker constructor/runtime initialization wiring for buffers, typed delivery callbacks, and bootstrap state.
 - `meshdash/tracker_runtime_record.py`: tracker receive-path runtime packet record wiring (parse + process handoff).
 - `meshdash/tracker_runtime_receive.py`: tracker receive wrapper binding runtime state into packet-record helper.
 - `meshdash/tracker_runtime_receive_bindings.py`: tracker-bound node-id resolver + receive wiring defaults used by runtime class.
@@ -132,7 +132,7 @@
 - `meshdash/theme_presets.py`: theme preset defaults + JSON loader/validator + preset selection helpers.
 - `meshdash/tracker_edges.py`: direct-link edge observation and edge-state update helpers for tracker ingestion.
 - `meshdash/tracker_bootstrap.py`: history-backed bootstrap loader for tracker recent buffers and edge baseline.
-- `meshdash/tracker_callbacks.py`: bound delivery callback builders for tracker state and receive flow.
+- `meshdash/tracker_callbacks.py`: bound delivery callback builders for tracker state and receive flow via a typed callback bundle.
 - `meshdash/tracker_delivery.py`: routing delivery-update application helper for chat ACK/NAK tracking.
 - `meshdash/tracker_delivery_state.py`: tracker delivery-state callback helpers for set/extract/expire flows.
 - `meshdash/tracker_entries.py`: packet summary/chat row builders used by tracker packet ingestion.

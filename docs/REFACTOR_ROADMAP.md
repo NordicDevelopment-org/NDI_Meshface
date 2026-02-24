@@ -195,6 +195,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added `DashboardRuntimeContext` dataclass in `meshdash/dashboard_runtime_context.py` and moved runtime consumer access to typed attributes.
 - Added `DashboardServerParts` dataclass in `meshdash/dashboard_server.py` and moved runner access to typed attributes.
 - Added `DashboardRuntimeLoaders` dataclass in `meshdash/dashboard_runtime_loaders.py` and moved runtime context assembly off string-key loader dicts.
+- Added `TrackerDeliveryCallbacks` dataclass in `meshdash/tracker_callbacks.py` and moved tracker runtime init wiring off callback dict keys.
 
 ### Steps
 
