@@ -40,7 +40,9 @@
 - `meshdash/history_readers.py`: row-to-payload decoders for recent packets/chat/connections reads.
 - `meshdash/history_rollups.py`: metric rollup math helpers shared by history persistence paths.
 - `meshdash/history_analytics.py`: stable analytics facade re-exporting node/online payload builders.
-- `meshdash/history_node_analytics.py`: node-history signal/position payload aggregation helpers.
+- `meshdash/history_node_analytics.py`: node-history payload orchestrator (metrics + positions + summary).
+- `meshdash/history_node_metrics.py`: node-history metric row normalization and summary aggregation helpers.
+- `meshdash/history_node_positions.py`: node-history position trail normalization helpers.
 - `meshdash/history_online_analytics.py`: online-activity hourly profile and summary payload builders.
 - `meshdash/history_capabilities.py`: node saved-count and capability row decoders.
 - `meshdash/history_backfill.py`: one-time node capability backfill builder from existing history tables.

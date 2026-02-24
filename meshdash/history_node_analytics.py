@@ -1,8 +1,12 @@
 from typing import Any, Dict, Iterable, Optional
 
 from .helpers import format_epoch as _format_epoch
-from .helpers import to_float as _to_float
-from .helpers import to_int as _to_int
+from .history_node_metrics import (
+    build_metric_history_points as _build_metric_history_points_helper,
+)
+from .history_node_positions import (
+    build_position_history_points as _build_position_history_points_helper,
+)
 
 
 def build_node_history_payload(
@@ -36,99 +40,21 @@ def build_node_history_payload(
     trail_start: Optional[int] = None
     trail_end: Optional[int] = None
 
-    for row in reversed(list(metric_rows)):
-        (
-            bucket_unix,
-            packet_count,
-            snr_sum,
-            snr_count,
-            snr_min,
-            snr_max,
-            rssi_sum,
-            rssi_count,
-            rssi_min,
-            rssi_max,
-            hops_sum,
-            hops_count,
-            hops_min,
-            hops_max,
-            last_seen_unix,
-        ) = row
+    metric_data = _build_metric_history_points_helper(metric_rows)
+    points = metric_data["points"]
+    total_packets = metric_data["total_packets"]
+    first_bucket = metric_data["first_bucket"]
+    last_bucket = metric_data["last_bucket"]
+    last_seen = metric_data["last_seen"]
+    snr_min_all = metric_data["snr_min"]
+    snr_max_all = metric_data["snr_max"]
+    rssi_min_all = metric_data["rssi_min"]
+    rssi_max_all = metric_data["rssi_max"]
 
-        bucket = _to_int(bucket_unix)
-        if bucket is None:
-            continue
-
-        packets = _to_int(packet_count) or 0
-        total_packets += packets
-        first_bucket = bucket if first_bucket is None else min(first_bucket, bucket)
-        last_bucket = bucket if last_bucket is None else max(last_bucket, bucket)
-        seen_val = _to_int(last_seen_unix)
-        if seen_val is not None:
-            last_seen = seen_val if last_seen is None else max(last_seen, seen_val)
-
-        snr_count_i = _to_int(snr_count) or 0
-        rssi_count_i = _to_int(rssi_count) or 0
-        hops_count_i = _to_int(hops_count) or 0
-        snr_avg = (_to_float(snr_sum) or 0.0) / snr_count_i if snr_count_i > 0 else None
-        rssi_avg = (_to_float(rssi_sum) or 0.0) / rssi_count_i if rssi_count_i > 0 else None
-        hops_avg = (_to_float(hops_sum) or 0.0) / hops_count_i if hops_count_i > 0 else None
-
-        snr_min_v = _to_float(snr_min)
-        snr_max_v = _to_float(snr_max)
-        rssi_min_v = _to_float(rssi_min)
-        rssi_max_v = _to_float(rssi_max)
-
-        if snr_min_v is not None:
-            snr_min_all = snr_min_v if snr_min_all is None else min(snr_min_all, snr_min_v)
-        if snr_max_v is not None:
-            snr_max_all = snr_max_v if snr_max_all is None else max(snr_max_all, snr_max_v)
-        if rssi_min_v is not None:
-            rssi_min_all = rssi_min_v if rssi_min_all is None else min(rssi_min_all, rssi_min_v)
-        if rssi_max_v is not None:
-            rssi_max_all = rssi_max_v if rssi_max_all is None else max(rssi_max_all, rssi_max_v)
-
-        points.append(
-            {
-                "bucket_unix": bucket,
-                "bucket_time": _format_epoch(bucket),
-                "packet_count": packets,
-                "avg_snr": round(snr_avg, 2) if snr_avg is not None else None,
-                "min_snr": snr_min_v,
-                "max_snr": snr_max_v,
-                "avg_rssi": round(rssi_avg, 2) if rssi_avg is not None else None,
-                "min_rssi": rssi_min_v,
-                "max_rssi": rssi_max_v,
-                "avg_hops": round(hops_avg, 2) if hops_avg is not None else None,
-                "min_hops": _to_int(hops_min),
-                "max_hops": _to_int(hops_max),
-                "hops_samples": hops_count_i,
-                "last_seen": _format_epoch(last_seen_unix),
-            }
-        )
-
-    for created_unix, lat, lon, altitude, sats_in_view in reversed(list(position_rows)):
-        point_unix = _to_int(created_unix)
-        lat_f = _to_float(lat)
-        lon_f = _to_float(lon)
-        if point_unix is None or lat_f is None or lon_f is None:
-            continue
-        if not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
-            continue
-        if lat_f == 0.0 and lon_f == 0.0:
-            continue
-        trail_start = point_unix if trail_start is None else min(trail_start, point_unix)
-        trail_end = point_unix if trail_end is None else max(trail_end, point_unix)
-        positions.append(
-            {
-                "time_unix": point_unix,
-                "time": _format_epoch(point_unix),
-                "lat": lat_f,
-                "lon": lon_f,
-                "altitude": _to_float(altitude),
-                "sats_in_view": _to_int(sats_in_view),
-            }
-        )
+    position_data = _build_position_history_points_helper(position_rows)
+    positions = position_data["positions"]
+    trail_start = position_data["trail_start"]
+    trail_end = position_data["trail_end"]
 
     return {
         "node_id": clean_node_id,
