@@ -102,6 +102,16 @@ Separate state assembly from HTTP wiring.
 
 Break `HistoryStore` into smaller repositories.
 
+### Delivered
+
+- Introduced runtime-focused `HistoryStore` split helpers:
+  - `meshdash/history_store_runtime_init.py`
+  - `meshdash/history_store_runtime_maintenance.py`
+- `meshdash/history_store_runtime_impl.py` now delegates constructor field/connection setup and close/prune lifecycle to those helpers.
+- Added targeted tests:
+  - `tests/test_history_store_runtime_init.py`
+  - `tests/test_history_store_runtime_maintenance.py`
+
 ### Steps
 
 1. `meshdash/history/db.py` (connection + schema)

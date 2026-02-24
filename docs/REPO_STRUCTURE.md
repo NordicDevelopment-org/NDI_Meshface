@@ -53,6 +53,8 @@
 - `meshdash/history_store.py`: stable history-store facade re-exporting `HistoryStore`.
 - `meshdash/history_store_runtime.py`: stable history-store runtime facade re-exporting `HistoryStore`.
 - `meshdash/history_store_runtime_impl.py`: SQLite history persistence/rollup `HistoryStore` implementation.
+- `meshdash/history_store_runtime_init.py`: `HistoryStore` constructor/runtime field + connection initialization helper.
+- `meshdash/history_store_runtime_maintenance.py`: `HistoryStore` close/prune runtime maintenance helpers.
 - `meshdash/history_store_connection.py`: `HistoryStore` DB open/init/prune helper routines.
 - `meshdash/history_schema.py`: schema initialization facade applying table + index statement groups.
 - `meshdash/history_schema_tables.py`: history DB table creation statement definitions.

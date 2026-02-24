@@ -1,13 +1,12 @@
-import threading
-import time
 from typing import Any, Dict, Optional
 
-from .history_maintenance import (
-    next_prune_counter as _next_prune_counter_helper,
+from .history_store_runtime_init import (
+    initialize_history_store_runtime as _initialize_history_store_runtime_helper,
 )
-from .history_store_connection import (
-    open_and_initialize_history_connection as _open_and_initialize_history_connection_helper,
-    prune_history_connection as _prune_history_connection_helper,
+from .history_store_runtime_maintenance import (
+    close_history_store as _close_history_store_helper,
+    maybe_prune_history_store_unlocked as _maybe_prune_history_store_unlocked_helper,
+    prune_history_store_unlocked as _prune_history_store_unlocked_helper,
 )
 from .history_store_reads import (
     load_connections as _load_connections_helper,
@@ -35,44 +34,29 @@ class HistoryStore:
         event_retention_days: int,
         rollup_retention_days: int,
     ) -> None:
-        self.db_path = db_path
-        self.max_rows = max(100, int(max_rows))
-        self.retention_seconds = max(0, int(retention_days)) * 86400
-        self.event_max_rows = max(1000, int(event_max_rows))
-        self.event_retention_seconds = max(0, int(event_retention_days)) * 86400
-        self.rollup_retention_seconds = max(0, int(rollup_retention_days)) * 86400
-        self._writes_since_prune = 0
-        self._lock = threading.Lock()
-        self._conn = _open_and_initialize_history_connection_helper(
-            db_path=self.db_path,
-            retention_seconds=self.retention_seconds,
-            event_retention_seconds=self.event_retention_seconds,
-            rollup_retention_seconds=self.rollup_retention_seconds,
-            max_rows=self.max_rows,
-            event_max_rows=self.event_max_rows,
+        _initialize_history_store_runtime_helper(
+            self,
+            db_path=db_path,
+            max_rows=max_rows,
+            retention_days=retention_days,
+            event_max_rows=event_max_rows,
+            event_retention_days=event_retention_days,
+            rollup_retention_days=rollup_retention_days,
         )
 
     def close(self) -> None:
-        with self._lock:
-            self._conn.close()
+        _close_history_store_helper(self)
 
     def _prune_unlocked(self) -> None:
-        _prune_history_connection_helper(
-            self._conn,
-            retention_seconds=self.retention_seconds,
-            event_retention_seconds=self.event_retention_seconds,
-            rollup_retention_seconds=self.rollup_retention_seconds,
-            max_rows=self.max_rows,
-            event_max_rows=self.event_max_rows,
+        _prune_history_store_unlocked_helper(
+            self,
         )
 
     def _maybe_prune_unlocked(self) -> None:
-        self._writes_since_prune, should_prune = _next_prune_counter_helper(
-            self._writes_since_prune
+        _maybe_prune_history_store_unlocked_helper(
+            self,
+            prune_unlocked_fn=self._prune_unlocked,
         )
-        if not should_prune:
-            return
-        self._prune_unlocked()
 
     def load_recent_packets(self, limit: int) -> list[Dict[str, Any]]:
         return _load_recent_packets_helper(self, limit)
