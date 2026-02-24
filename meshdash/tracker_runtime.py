@@ -33,6 +33,9 @@ from .tracker_node_resolver import (
 from .tracker_runtime_record import (
     record_tracker_packet_unlocked as _record_tracker_packet_unlocked_helper,
 )
+from .tracker_runtime_init import (
+    initialize_dashboard_tracker_runtime as _initialize_dashboard_tracker_runtime_helper,
+)
 from .tracker_snapshot import (
     build_edge_snapshot_rows as _build_edge_snapshot_rows_helper,
     build_tracker_snapshot_payload as _build_tracker_snapshot_payload_helper,
@@ -103,34 +106,20 @@ def _get_node_id_from_num(iface: Any, node_num: Any) -> Optional[str]:
 class DashboardTracker:
     def __init__(self, packet_limit: int, history_store: Optional[HistoryStore] = None) -> None:
         self._lock = threading.Lock()
-        self._history_store = history_store
-        self._chat_delivery_timeout_seconds = DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS
-        self.live_packet_count = 0
-        buffers = _initialize_tracker_buffers_helper(packet_limit)
-        self.edges = buffers.edges
-        self._historical_edges = buffers.historical_edges
-        self.port_counts = buffers.port_counts
-        self.recent_packets = buffers.recent_packets
-        self.recent_chat = buffers.recent_chat
-        delivery_callbacks = _build_tracker_delivery_callbacks_helper(
-            self.recent_chat,
-            get_timeout_seconds_fn=lambda: self._chat_delivery_timeout_seconds,
-            to_int_fn=_to_int,
-            parse_utc_text_to_unix_fn=_parse_utc_text_to_unix,
-            utc_now_fn=_utc_now,
-            now_unix_fn=time.time,
-        )
-        self._set_delivery_state_fn = delivery_callbacks["set_delivery_state"]
-        self._extract_delivery_update_fn = delivery_callbacks["extract_delivery_update"]
-        self._expire_pending_deliveries_fn = delivery_callbacks["expire_pending_deliveries"]
-
-        self._historical_edges = _apply_tracker_history_bootstrap_helper(
-            history_store=self._history_store,
+        _initialize_dashboard_tracker_runtime_helper(
+            self,
             packet_limit=packet_limit,
-            recent_packets=self.recent_packets,
-            recent_chat=self.recent_chat,
+            history_store=history_store,
+            default_chat_delivery_timeout_seconds=DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS,
+            initialize_tracker_buffers_fn=_initialize_tracker_buffers_helper,
+            build_tracker_delivery_callbacks_fn=_build_tracker_delivery_callbacks_helper,
+            apply_tracker_history_bootstrap_fn=_apply_tracker_history_bootstrap_helper,
             load_tracker_history_bootstrap_fn=_load_tracker_history_bootstrap_helper,
             build_historical_edges_fn=_build_historical_edges_helper,
+            parse_utc_text_to_unix_fn=_parse_utc_text_to_unix,
+            utc_now_fn=_utc_now,
+            to_int_fn=_to_int,
+            now_unix_fn=time.time,
         )
 
     def on_receive(self, packet: Dict[str, Any], interface: Any) -> None:
