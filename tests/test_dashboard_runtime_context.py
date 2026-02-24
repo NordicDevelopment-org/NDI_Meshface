@@ -1,0 +1,158 @@
+import argparse
+
+from meshdash.dashboard_runtime_context import build_dashboard_runtime_context
+
+
+def test_build_dashboard_runtime_context_wires_runtime_dependencies():
+    args = argparse.Namespace(
+        history_db="state/history.sqlite3",
+        no_history=False,
+        history_max_rows=5000,
+        history_retention_days=7,
+        history_event_max_rows=200000,
+        history_event_retention_days=30,
+        history_rollup_retention_days=365,
+        packet_limit=250,
+        show_secrets=False,
+        node_history_hours=72,
+        node_history_max_points=1440,
+    )
+    calls = {}
+
+    iface = object()
+    history_store = object()
+    history_store_cls = object()
+    send_state = lambda: {"ok": True}
+    send_node_history = lambda *_a, **_k: {"ok": True}
+    send_online = lambda *_a, **_k: {"ok": True}
+    send_chat = lambda *_a, **_k: {"ok": True}
+    revision_info = {"label": "Rev", "title": "Rev Title"}
+
+    def _mesh_target_label(_args):
+        calls["mesh_target_args"] = _args
+        return "192.168.1.10:4403 (tcp)"
+
+    def _open_mesh_interface(_args):
+        calls["open_mesh_interface_args"] = _args
+        return iface
+
+    def _open_optional_history_store(_args, **kwargs):
+        calls["open_optional_history_store"] = (_args, kwargs)
+        return history_store
+
+    class _Tracker:
+        def __init__(self, packet_limit, history_store):
+            self.packet_limit = packet_limit
+            self.history_store = history_store
+
+        def on_receive(self, _packet, _interface):
+            return None
+
+    def _subscribe(callback, topic):
+        calls["subscribe"] = (callback, topic)
+
+    def _seed_tracker_if_empty(tracker, iface_obj, **kwargs):
+        calls["seed_tracker_if_empty"] = (tracker, iface_obj, kwargs)
+
+    def _build_dashboard_runtime_loaders(**kwargs):
+        calls["build_dashboard_runtime_loaders"] = kwargs
+        return {
+            "state_fn": send_state,
+            "node_history_fn": send_node_history,
+            "online_activity_fn": send_online,
+            "send_chat_fn": send_chat,
+        }
+
+    printed = []
+    context = build_dashboard_runtime_context(
+        args,
+        mesh_target_label_fn=_mesh_target_label,
+        open_mesh_interface_fn=_open_mesh_interface,
+        history_store_cls=history_store_cls,
+        dashboard_tracker_cls=_Tracker,
+        subscribe_fn=_subscribe,
+        seed_tracker_fn="seed-fn",
+        revision_info_fn=lambda: revision_info,
+        send_chat_message_fn="send-chat-message-fn",
+        send_reaction_packet_fn="send-reaction-packet-fn",
+        get_local_node_id_fn="get-local-node-id-fn",
+        normalize_single_emoji_fn="normalize-single-emoji-fn",
+        to_int_fn="to-int-fn",
+        utc_now_fn="utc-now-fn",
+        build_state_fn="build-state-fn",
+        build_state_snapshot_loader_fn="build-state-snapshot-loader-fn",
+        build_node_history_loader_fn="build-node-history-loader-fn",
+        build_online_activity_loader_fn="build-online-activity-loader-fn",
+        build_send_chat_loader_fn="build-send-chat-loader-fn",
+        default_chat_max_bytes=220,
+        print_fn=printed.append,
+        lock_factory=lambda: "send-lock",
+        now_unix_fn=lambda: 123.5,
+        resolve_history_db_path_fn=lambda path: f"/abs/{path}",
+        open_optional_history_store_fn=_open_optional_history_store,
+        seed_tracker_if_empty_fn=_seed_tracker_if_empty,
+        build_dashboard_runtime_loaders_fn=_build_dashboard_runtime_loaders,
+    )
+
+    assert printed == ["Connecting to 192.168.1.10:4403 (tcp) ..."]
+    assert context["target"] == "192.168.1.10:4403 (tcp)"
+    assert context["iface"] is iface
+    assert context["history_db_path"] == "/abs/state/history.sqlite3"
+    assert context["history_store"] is history_store
+    assert isinstance(context["tracker"], _Tracker)
+    assert context["tracker"].packet_limit == 250
+    assert context["tracker"].history_store is history_store
+    assert context["send_lock"] == "send-lock"
+    assert context["started_at"] == 123.5
+    assert context["revision_info"] is revision_info
+    assert context["state_fn"] is send_state
+    assert context["node_history_fn"] is send_node_history
+    assert context["online_activity_fn"] is send_online
+    assert context["send_chat_fn"] is send_chat
+    assert context["history_enabled"] is True
+
+    assert calls["mesh_target_args"] is args
+    assert calls["open_mesh_interface_args"] is args
+
+    open_args, open_kwargs = calls["open_optional_history_store"]
+    assert open_args is args
+    assert open_kwargs == {
+        "history_store_cls": history_store_cls,
+        "history_db_path": "/abs/state/history.sqlite3",
+    }
+
+    subscribe_callback, subscribe_topic = calls["subscribe"]
+    assert subscribe_topic == "meshtastic.receive"
+    assert subscribe_callback.__self__ is context["tracker"]
+    assert subscribe_callback.__func__.__name__ == "on_receive"
+
+    seeded_tracker, seeded_iface, seed_kwargs = calls["seed_tracker_if_empty"]
+    assert seeded_tracker is context["tracker"]
+    assert seeded_iface is iface
+    assert seed_kwargs == {"seed_tracker_fn": "seed-fn"}
+
+    assert calls["build_dashboard_runtime_loaders"] == {
+        "iface": iface,
+        "tracker": context["tracker"],
+        "send_lock": "send-lock",
+        "started_at": 123.5,
+        "target": "192.168.1.10:4403 (tcp)",
+        "show_secrets": False,
+        "history_db_path": "/abs/state/history.sqlite3",
+        "revision_info": revision_info,
+        "history_store": history_store,
+        "default_node_history_hours": 72,
+        "default_node_history_points": 1440,
+        "send_chat_message_fn": "send-chat-message-fn",
+        "send_reaction_packet_fn": "send-reaction-packet-fn",
+        "get_local_node_id_fn": "get-local-node-id-fn",
+        "default_chat_max_bytes": 220,
+        "normalize_single_emoji_fn": "normalize-single-emoji-fn",
+        "to_int_fn": "to-int-fn",
+        "utc_now_fn": "utc-now-fn",
+        "build_state_fn": "build-state-fn",
+        "build_state_snapshot_loader_fn": "build-state-snapshot-loader-fn",
+        "build_node_history_loader_fn": "build-node-history-loader-fn",
+        "build_online_activity_loader_fn": "build-online-activity-loader-fn",
+        "build_send_chat_loader_fn": "build-send-chat-loader-fn",
+    }
