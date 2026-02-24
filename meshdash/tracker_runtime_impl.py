@@ -2,11 +2,6 @@ import threading
 import time
 from typing import Any, Dict, Optional
 
-try:
-    import meshtastic
-except Exception:
-    meshtastic = None
-
 from .helpers import (
     to_int as _to_int,
 )
@@ -16,11 +11,8 @@ from .nodes import (
     parse_utc_text_to_unix as _parse_utc_text_to_unix,
     utc_now as _utc_now,
 )
-from .tracker_node_resolver import (
-    get_tracker_node_id_from_num as _get_tracker_node_id_from_num_helper,
-)
 from .tracker_runtime_receive import (
-    record_tracker_receive_unlocked as _record_tracker_receive_unlocked_helper,
+    record_tracker_receive_unlocked_for_tracker as _record_tracker_receive_unlocked_for_tracker_helper,
 )
 from .tracker_runtime_init import (
     initialize_dashboard_tracker_runtime as _initialize_dashboard_tracker_runtime_helper,
@@ -53,16 +45,6 @@ from .tracker_setup import (
 
 DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS = 90
 MIN_REAL_LINK_COUNT = 2
-
-
-def _get_node_id_from_num(iface: Any, node_num: Any) -> Optional[str]:
-    return _get_tracker_node_id_from_num_helper(
-        iface,
-        node_num,
-        meshtastic_module=meshtastic,
-        to_int_fn=_to_int,
-        get_node_id_from_num_fn=_get_node_id_from_num_helper,
-    )
 
 
 class DashboardTracker:
@@ -137,12 +119,12 @@ class DashboardTracker:
     def _record_packet_unlocked(
         self, packet: Dict[str, Any], interface: Any, include_live_count: bool
     ) -> None:
-        _record_tracker_receive_unlocked_helper(
+        _record_tracker_receive_unlocked_for_tracker_helper(
             self,
             packet=packet,
             interface=interface,
             include_live_count=include_live_count,
-            get_node_id_from_num_fn=_get_node_id_from_num,
+            get_node_id_from_num_fn=_get_node_id_from_num_helper,
         )
 
     def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
