@@ -29,7 +29,10 @@
 - `meshdash/assets/dashboard.html.tmpl`: extracted dashboard HTML shell template asset.
 - `meshdash/helpers.py`: stable helper facade re-exporting utility APIs for runtime/test compatibility.
 - `meshdash/helpers_core.py`: core primitive/json/secrets/formatting/emoji/disk helper implementations.
-- `meshdash/helpers_packet.py`: packet-oriented extraction helpers (reply/emoji/hops/position/battery).
+- `meshdash/helpers_packet.py`: stable packet-helper facade re-exporting packet extraction APIs.
+- `meshdash/helpers_packet_meta.py`: packet metadata helpers (reply-id, emoji codepoint, hop count).
+- `meshdash/helpers_packet_position.py`: packet position/altitude/satellite extraction helpers.
+- `meshdash/helpers_packet_battery.py`: packet battery-level extraction helper.
 - `meshdash/history_store.py`: extracted SQLite history persistence/rollup store.
 - `meshdash/history_store_connection.py`: `HistoryStore` DB open/init/prune helper routines.
 - `meshdash/history_schema.py`: schema/index creation statements for history DB initialization.
