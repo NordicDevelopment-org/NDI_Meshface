@@ -24,6 +24,7 @@
 - `meshdash/cli_args_gateway.py`: default-gateway related CLI argument registration helpers.
 - `meshdash/cli_args_http.py`: HTTP runtime CLI argument registration helpers.
 - `meshdash/cli_args_history.py`: history + node-history CLI argument registration helpers.
+- `meshdash/cli_args_theme.py`: theme preset CLI argument registration helpers.
 - `meshdash/dashboard_runtime.py`: stable dashboard-runtime facade re-exporting runner entrypoint.
 - `meshdash/dashboard_runner.py`: stable dashboard-runner facade re-exporting runtime entrypoint.
 - `meshdash/dashboard_runner_impl.py`: dashboard runtime server lifecycle orchestration using runtime context helpers.

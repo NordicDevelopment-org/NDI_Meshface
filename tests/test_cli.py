@@ -7,7 +7,12 @@ def _fake_add_mesh_connection_args(parser, default_mesh_port):
     parser.add_argument("--mesh-tcp-port", type=int, default=4403)
 
 
-def _build_parser(env_gateway_port=None, env_history_db=None):
+def _build_parser(
+    env_gateway_port=None,
+    env_history_db=None,
+    env_theme_presets=None,
+    env_theme_preset=None,
+):
     return build_dashboard_parser(
         add_mesh_connection_args_fn=_fake_add_mesh_connection_args,
         default_mesh_port="/dev/ttyACM0",
@@ -28,6 +33,8 @@ def _build_parser(env_gateway_port=None, env_history_db=None):
         default_history_rollup_retention_days=365,
         default_node_history_hours=72,
         default_node_history_max_points=1440,
+        env_theme_presets=env_theme_presets,
+        env_theme_preset=env_theme_preset,
     )
 
 
@@ -38,7 +45,12 @@ def test_resolve_default_gateway_port():
 
 
 def test_build_dashboard_parser_uses_env_defaults():
-    parser = _build_parser(env_gateway_port="5500", env_history_db="/tmp/custom.sqlite3")
+    parser = _build_parser(
+        env_gateway_port="5500",
+        env_history_db="/tmp/custom.sqlite3",
+        env_theme_presets="/tmp/theme.json",
+        env_theme_preset="forest",
+    )
     args = parser.parse_args([])
     assert args.default_gateway_host == "10.0.0.5"
     assert args.default_gateway_port == 5500
@@ -46,6 +58,8 @@ def test_build_dashboard_parser_uses_env_defaults():
     assert args.http_port == 8877
     assert args.node_history_hours == 72
     assert args.node_history_max_points == 1440
+    assert args.theme_presets == "/tmp/theme.json"
+    assert args.theme_preset == "forest"
 
 
 def test_build_dashboard_parser_falls_back_on_invalid_gateway_port():
@@ -53,3 +67,5 @@ def test_build_dashboard_parser_falls_back_on_invalid_gateway_port():
     args = parser.parse_args([])
     assert args.default_gateway_port == 4403
     assert args.history_db == "mesh_dashboard_history.sqlite3"
+    assert args.theme_presets is None
+    assert args.theme_preset == "default"

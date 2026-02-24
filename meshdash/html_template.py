@@ -15,12 +15,16 @@ def render_html(
     node_history_max_points: int,
     revision_label: str,
     revision_title: str,
+    light_theme_vars: dict | None = None,
+    dark_theme_vars: dict | None = None,
 ) -> str:
     render_context = _build_html_render_context_helper(
         show_secrets=show_secrets,
         history_enabled=history_enabled,
         history_max_rows=history_max_rows,
         history_retention_days=history_retention_days,
+        light_theme_vars=light_theme_vars,
+        dark_theme_vars=dark_theme_vars,
     )
     style_css = _build_dashboard_css_helper(theme_css=render_context["theme_css"])
     app_js = _build_dashboard_js_helper(

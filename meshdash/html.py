@@ -12,6 +12,8 @@ def render_html(
     node_history_max_points: int,
     revision_label: str,
     revision_title: str,
+    light_theme_vars: dict | None = None,
+    dark_theme_vars: dict | None = None,
 ) -> str:
     return _render_html_template(
         refresh_ms=refresh_ms,
@@ -24,4 +26,6 @@ def render_html(
         node_history_max_points=node_history_max_points,
         revision_label=revision_label,
         revision_title=revision_title,
+        light_theme_vars=light_theme_vars,
+        dark_theme_vars=dark_theme_vars,
     )

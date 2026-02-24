@@ -58,6 +58,10 @@ from meshdash.services import (
     build_online_activity_loader as _build_online_activity_loader,
     send_chat_message as _send_chat_message_helper,
 )
+from meshdash.theme_presets import (
+    load_theme_presets as _load_theme_presets_helper,
+    select_theme_preset as _select_theme_preset_helper,
+)
 from meshdash.cli import build_dashboard_parser as _build_dashboard_parser_helper
 from meshdash.dashboard_runtime import run_dashboard_runtime as _run_dashboard_runtime_helper
 from meshdash.history_store import HistoryStore
@@ -101,6 +105,22 @@ def _revision_info() -> Dict[str, str]:
     )
 
 
+def _build_render_html_fn_with_theme(args: argparse.Namespace):
+    presets = _load_theme_presets_helper(getattr(args, "theme_presets", None))
+    selected = _select_theme_preset_helper(presets, getattr(args, "theme_preset", None))
+    light_theme_vars = selected.get("light")
+    dark_theme_vars = selected.get("dark")
+
+    def _render_html_with_theme(**kwargs):
+        return _render_html_helper(
+            **kwargs,
+            light_theme_vars=light_theme_vars,
+            dark_theme_vars=dark_theme_vars,
+        )
+
+    return _render_html_with_theme
+
+
 def run_dashboard(args: argparse.Namespace) -> None:
     _ensure_runtime_dependencies_helper(
         meshtastic_module=meshtastic,
@@ -128,7 +148,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
         normalize_single_emoji_fn=_normalize_single_emoji,
         to_int_fn=_to_int,
         utc_now_fn=_utc_now_helper,
-        render_html_fn=_render_html_helper,
+        render_html_fn=_build_render_html_fn_with_theme(args),
         make_http_handler_fn=_make_http_handler_helper,
         default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
         guess_lan_ipv4_fn=_guess_lan_ipv4_helper,
@@ -158,6 +178,8 @@ def main() -> None:
         default_history_rollup_retention_days=DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS,
         default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
         default_node_history_max_points=DEFAULT_NODE_HISTORY_MAX_POINTS,
+        env_theme_presets=os.environ.get("MESH_DASH_THEME_PRESETS"),
+        env_theme_preset=os.environ.get("MESH_DASH_THEME_PRESET"),
     )
     args = parser.parse_args()
     _apply_default_gateway_helper(args, default_mesh_port=DEFAULT_MESH_PORT)

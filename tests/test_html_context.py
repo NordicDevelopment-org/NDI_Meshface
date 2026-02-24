@@ -22,3 +22,16 @@ def test_build_html_render_context_when_history_disabled():
     )
     assert context["safety_label"] == "Secrets visible"
     assert context["history_label"] == "History: off"
+
+
+def test_build_html_render_context_accepts_theme_token_overrides():
+    context = build_html_render_context(
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=100,
+        history_retention_days=1,
+        light_theme_vars={"--bg": "#ffffff"},
+        dark_theme_vars={"--ui-bg": "#000000"},
+    )
+    assert "--bg: #ffffff;" in context["theme_css"]
+    assert "--ui-bg: #000000;" in context["theme_css"]

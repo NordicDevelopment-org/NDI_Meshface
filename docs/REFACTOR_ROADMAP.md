@@ -168,6 +168,9 @@ Allow operator theme presets without editing code.
   - JSON preset loader with schema validation and safe fallback
   - preset selector with default fallback
 - Extended `build_theme_css()` in `meshdash/theme.py` to accept optional token-map overrides.
+- Added runtime integration for preset selection:
+  - new CLI/env theme args (`--theme-presets`, `--theme-preset`)
+  - selected preset tokens now flow into HTML theme CSS rendering
 - Added `tests/test_theme_presets.py`.
 
 ### Steps

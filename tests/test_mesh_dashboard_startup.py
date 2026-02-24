@@ -34,3 +34,44 @@ def test_revision_info_uses_nogit_fallback(monkeypatch):
     monkeypatch.setattr(md, "_detect_git_commit", lambda: None)
     info = md._revision_info()
     assert info["commit"] == md.UNKNOWN_GIT_COMMIT
+
+
+def test_build_render_html_fn_with_theme_uses_selected_preset(monkeypatch):
+    args = argparse.Namespace(theme_presets="/tmp/themes.json", theme_preset="forest")
+    selected = {"light": {"--bg": "#ffffff"}, "dark": {"--ui-bg": "#000000"}}
+    calls = {}
+
+    monkeypatch.setattr(
+        md,
+        "_load_theme_presets_helper",
+        lambda path: {"default": {"light": {}, "dark": {}}, "forest": selected},
+    )
+    monkeypatch.setattr(
+        md,
+        "_select_theme_preset_helper",
+        lambda presets, preset_name: presets[preset_name],
+    )
+
+    def _render_html_helper(**kwargs):
+        calls.update(kwargs)
+        return "<html></html>"
+
+    monkeypatch.setattr(md, "_render_html_helper", _render_html_helper)
+
+    render_fn = md._build_render_html_fn_with_theme(args)
+    html = render_fn(
+        refresh_ms=3000,
+        packet_limit=250,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=5000,
+        history_retention_days=7,
+        node_history_hours=72,
+        node_history_max_points=1440,
+        revision_label="Rev: test",
+        revision_title="Rev",
+    )
+
+    assert html == "<html></html>"
+    assert calls["light_theme_vars"] == selected["light"]
+    assert calls["dark_theme_vars"] == selected["dark"]

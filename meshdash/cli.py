@@ -6,6 +6,7 @@ from .cli_arguments import (
     add_history_args as _add_history_args_helper,
     add_http_runtime_args as _add_http_runtime_args_helper,
     add_node_history_args as _add_node_history_args_helper,
+    add_theme_args as _add_theme_args_helper,
 )
 
 
@@ -37,10 +38,14 @@ def build_dashboard_parser(
     default_history_rollup_retention_days: int,
     default_node_history_hours: int,
     default_node_history_max_points: int,
+    env_theme_presets: Optional[str],
+    env_theme_preset: Optional[str],
 ) -> argparse.ArgumentParser:
     resolved_gateway_port = resolve_default_gateway_port(env_gateway_port, default_gateway_port)
     resolved_gateway_host = str(env_gateway_host or default_gateway_host)
     resolved_history_db = str(env_history_db or default_history_db)
+    resolved_theme_presets = str(env_theme_presets) if env_theme_presets else None
+    resolved_theme_preset = str(env_theme_preset or "default")
 
     parser = argparse.ArgumentParser(
         description="Serve a high-detail Meshtastic dashboard with map, node tables, configs, and packet logs."
@@ -72,5 +77,10 @@ def build_dashboard_parser(
         parser,
         default_node_history_hours=default_node_history_hours,
         default_node_history_max_points=default_node_history_max_points,
+    )
+    _add_theme_args_helper(
+        parser,
+        resolved_theme_presets=resolved_theme_presets,
+        resolved_theme_preset=resolved_theme_preset,
     )
     return parser
