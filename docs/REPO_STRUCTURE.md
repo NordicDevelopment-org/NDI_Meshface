@@ -17,7 +17,8 @@
 - `meshdash/cli_args_http.py`: HTTP runtime CLI argument registration helpers.
 - `meshdash/cli_args_history.py`: history + node-history CLI argument registration helpers.
 - `meshdash/dashboard_runtime.py`: stable dashboard-runtime facade re-exporting runner entrypoint.
-- `meshdash/dashboard_runner.py`: dashboard runtime orchestration and server lifecycle implementation.
+- `meshdash/dashboard_runner.py`: stable dashboard-runner facade re-exporting runtime entrypoint.
+- `meshdash/dashboard_runner_impl.py`: dashboard runtime orchestration and server lifecycle implementation.
 - `meshdash/dashboard_loaders.py`: stable runtime-loaders facade re-exporting loader assembly entrypoint.
 - `meshdash/dashboard_runtime_loaders.py`: runtime loader assembly helpers for state/history/activity/chat closures.
 - `meshdash/dashboard_server.py`: runtime server build helper for HTML render, handler wiring, and HTTP bind.
