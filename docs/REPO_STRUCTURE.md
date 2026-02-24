@@ -16,7 +16,8 @@
 - `meshdash/cli_args_gateway.py`: default-gateway related CLI argument registration helpers.
 - `meshdash/cli_args_http.py`: HTTP runtime CLI argument registration helpers.
 - `meshdash/cli_args_history.py`: history + node-history CLI argument registration helpers.
-- `meshdash/dashboard_runtime.py`: dashboard runtime orchestration and server lifecycle.
+- `meshdash/dashboard_runtime.py`: stable dashboard-runtime facade re-exporting runner entrypoint.
+- `meshdash/dashboard_runner.py`: dashboard runtime orchestration and server lifecycle implementation.
 - `meshdash/dashboard_loaders.py`: runtime loader assembly helpers for state/history/activity/chat closures.
 - `meshdash/dashboard_server.py`: runtime server build helper for HTML render, handler wiring, and HTTP bind.
 - `meshdash/dashboard_setup.py`: runtime setup helpers for optional history store and tracker seeding.
@@ -79,7 +80,10 @@
 - `meshdash/http_routes.py`: GET/POST route handlers used by dashboard HTTP API class.
 - `meshdash/http_responses.py`: shared HTTP response emitters for JSON/HTML/text.
 - `meshdash/mesh_ops.py`: Meshtastic/protobuf-specific packet send and local node-id helpers.
-- `meshdash/nodes.py`: extracted node/interface/time utilities for dashboard runtime.
+- `meshdash/nodes.py`: stable node-utilities facade re-exporting identity/time/snapshot helpers.
+- `meshdash/nodes_identity.py`: node-id/local-id resolution helpers from interface snapshots.
+- `meshdash/nodes_time.py`: UTC text/time helpers for dashboard state/history metadata.
+- `meshdash/nodes_snapshot.py`: node snapshot safe-iteration and position extraction helpers.
 - `meshdash/revision.py`: revision/version/git metadata helpers for header build info.
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
 - `meshdash/runtime_callbacks.py`: runtime closure builders for state snapshots and chat send actions.
@@ -90,7 +94,8 @@
 - `meshdash/state_node_rows.py`: node row/full-node snapshot collection helpers.
 - `meshdash/state_local.py`: local-node config/module/channel snapshot collection helper.
 - `meshdash/state_summary.py`: summary/local-state enrichment helpers for `/api/state`.
-- `meshdash/tracker.py`: extracted packet/chat tracking, edge synthesis, snapshots, and seed-from-node-db helper.
+- `meshdash/tracker.py`: stable tracker facade re-exporting tracker class and seed helper.
+- `meshdash/tracker_runtime.py`: packet/chat tracking, edge synthesis, snapshots, and seed-from-node-db implementation.
 - `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshdash/tracker_edges.py`: direct-link edge observation and edge-state update helpers for tracker ingestion.
 - `meshdash/tracker_bootstrap.py`: history-backed bootstrap loader for tracker recent buffers and edge baseline.
