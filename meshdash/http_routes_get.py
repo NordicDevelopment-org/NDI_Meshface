@@ -1,5 +1,13 @@
 from typing import Any, Callable, Optional
 
+from .api_history import (
+    build_node_history_response as _build_node_history_response_helper,
+    build_online_activity_response as _build_online_activity_response_helper,
+)
+from .api_system import (
+    handle_state_get as _handle_state_get_helper,
+)
+
 
 def handle_dashboard_get(
     handler: Any,
@@ -25,35 +33,33 @@ def handle_dashboard_get(
         return
 
     if path == "/api/state":
-        write_json_response_fn(handler, status_code=200, payload_obj=state_fn(), no_store=True)
+        _handle_state_get_helper(
+            handler,
+            state_fn=state_fn,
+            write_json_response_fn=write_json_response_fn,
+        )
         return
 
     if path == "/api/history/node":
-        node_id, hours_override, points_override = parse_node_history_query_fn(
-            query,
+        response_obj = _build_node_history_response_helper(
+            query=query,
+            node_history_fn=node_history_fn,
             to_int_fn=to_int_fn,
+            parse_node_history_query_fn=parse_node_history_query_fn,
+            empty_node_history_fn=empty_node_history_fn,
         )
-        if node_history_fn is None:
-            response_obj = empty_node_history_fn(node_id)
-        else:
-            response_obj = node_history_fn(node_id, hours_override, points_override)
         write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
         return
 
     if path == "/api/history/online":
-        hours_override = parse_online_activity_query_fn(
-            query,
+        response_obj = _build_online_activity_response_helper(
+            query=query,
+            online_activity_fn=online_activity_fn,
+            default_node_history_hours=default_node_history_hours,
             to_int_fn=to_int_fn,
+            parse_online_activity_query_fn=parse_online_activity_query_fn,
+            empty_online_activity_fn=empty_online_activity_fn,
         )
-        if online_activity_fn is None:
-            clean_hours = (
-                hours_override
-                if isinstance(hours_override, int) and hours_override > 0
-                else default_node_history_hours
-            )
-            response_obj = empty_online_activity_fn(clean_hours)
-        else:
-            response_obj = online_activity_fn(hours_override)
         write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
         return
 

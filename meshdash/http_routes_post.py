@@ -1,5 +1,9 @@
 from typing import Any, Callable, Optional
 
+from .api_chat import (
+    handle_chat_send_post as _handle_chat_send_post_helper,
+)
+
 
 def handle_dashboard_post(
     handler: Any,
@@ -19,52 +23,11 @@ def handle_dashboard_post(
         )
         return
 
-    if send_chat_fn is None:
-        write_json_response_fn(
-            handler,
-            status_code=503,
-            payload_obj={"ok": False, "error": "Chat send is not enabled on this dashboard instance"},
-        )
-        return
-
-    try:
-        content_length = validate_content_length_fn(
-            handler.headers,
-            to_int_fn=to_int_fn,
-        )
-    except ValueError:
-        write_json_response_fn(
-            handler,
-            status_code=400,
-            payload_obj={"ok": False, "error": "Invalid request size"},
-        )
-        return
-
-    raw = handler.rfile.read(content_length)
-    chat_request = parse_chat_send_body_fn(raw, to_int_fn=to_int_fn)
-
-    try:
-        response_obj = send_chat_fn(
-            text=chat_request["text"],
-            destination=chat_request["destination"],
-            channel_index=chat_request["channel_index"],
-            reply_id=chat_request["reply_id"],
-            retry_of=chat_request["retry_of"],
-            emoji=chat_request["emoji"],
-        )
-    except ValueError as exc:
-        write_json_response_fn(
-            handler,
-            status_code=400,
-            payload_obj={"ok": False, "error": str(exc)},
-        )
-        return
-    except Exception as exc:
-        write_json_response_fn(
-            handler,
-            status_code=500,
-            payload_obj={"ok": False, "error": f"Send failed: {exc}"},
-        )
-        return
-
-    write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
+    _handle_chat_send_post_helper(
+        handler,
+        send_chat_fn=send_chat_fn,
+        to_int_fn=to_int_fn,
+        validate_content_length_fn=validate_content_length_fn,
+        parse_chat_send_body_fn=parse_chat_send_body_fn,
+        write_json_response_fn=write_json_response_fn,
+    )
