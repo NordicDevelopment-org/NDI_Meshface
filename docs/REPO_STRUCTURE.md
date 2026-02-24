@@ -18,7 +18,8 @@
 - `meshdash/cli_args_history.py`: history + node-history CLI argument registration helpers.
 - `meshdash/dashboard_runtime.py`: stable dashboard-runtime facade re-exporting runner entrypoint.
 - `meshdash/dashboard_runner.py`: dashboard runtime orchestration and server lifecycle implementation.
-- `meshdash/dashboard_loaders.py`: runtime loader assembly helpers for state/history/activity/chat closures.
+- `meshdash/dashboard_loaders.py`: stable runtime-loaders facade re-exporting loader assembly entrypoint.
+- `meshdash/dashboard_runtime_loaders.py`: runtime loader assembly helpers for state/history/activity/chat closures.
 - `meshdash/dashboard_server.py`: runtime server build helper for HTML render, handler wiring, and HTTP bind.
 - `meshdash/dashboard_setup.py`: runtime setup helpers for optional history store and tracker seeding.
 - `meshdash/html.py`: stable HTML renderer facade used by runtime wiring/tests.
@@ -87,7 +88,9 @@
 - `meshdash/nodes_snapshot.py`: node snapshot safe-iteration and position extraction helpers.
 - `meshdash/revision.py`: revision/version/git metadata helpers for header build info.
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
-- `meshdash/runtime_callbacks.py`: runtime closure builders for state snapshots and chat send actions.
+- `meshdash/runtime_callbacks.py`: stable runtime-callbacks facade re-exporting closure builders.
+- `meshdash/runtime_state_loader.py`: state snapshot closure builder.
+- `meshdash/runtime_send_loader.py`: chat-send closure builder.
 - `meshdash/runtime_lifecycle.py`: startup status output, serve-loop interrupt handling, and shutdown cleanup helpers.
 - `meshdash/services.py`: stable services facade re-exporting history loaders and chat-send service entrypoint.
 - `meshdash/services_chat.py`: chat-send orchestration service implementation.
