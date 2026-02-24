@@ -106,7 +106,8 @@
 - `meshdash/runtime_lifecycle.py`: startup status output, serve-loop interrupt handling, and shutdown cleanup helpers.
 - `meshdash/services.py`: stable services facade re-exporting history loaders and chat-send service entrypoint.
 - `meshdash/services_chat.py`: chat-send orchestration service implementation.
-- `meshdash/state.py`: node/local snapshot + assembled `/api/state` payload helpers.
+- `meshdash/state.py`: stable state facade re-exporting node/local collectors and state payload builder.
+- `meshdash/state_service.py`: `/api/state` payload assembly service (tracker snapshot + local/summary composition + redaction).
 - `meshdash/state_nodes.py`: stable state-node facade re-exporting node/local collectors.
 - `meshdash/state_node_rows.py`: node row/full-node snapshot collection helpers.
 - `meshdash/state_local.py`: local-node config/module/channel snapshot collection helper.

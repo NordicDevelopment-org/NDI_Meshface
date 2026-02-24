@@ -72,11 +72,20 @@ Split `_render_html()` into composable builders while keeping server behavior un
 
 Separate state assembly from HTTP wiring.
 
+### Delivered
+
+- Added `meshdash/state_service.py` with dedicated `/api/state` assembly orchestration:
+  - tracker snapshot data fanout
+  - node saved-count/capability merge
+  - local-state safe load + modem preset extraction
+  - summary payload composition
+  - secret redaction gate
+- `meshdash/state.py` is now a thin compatibility facade over the service.
+- Added `tests/test_state_service.py`.
+
 ### Steps
 
-1. Create `meshdash/state/service.py` for:
-   - snapshot state shape
-   - node/chat/packet projections
+1. Expand service coverage for failure/partial-data cases (missing metadata, tracker exceptions).
 2. Keep request handlers thin:
    - parse request
    - call service
