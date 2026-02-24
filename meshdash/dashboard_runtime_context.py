@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
 from .dashboard_loaders import (
@@ -10,6 +11,23 @@ from .dashboard_setup import (
     open_optional_history_store,
     seed_tracker_if_empty,
 )
+
+
+@dataclass(frozen=True)
+class DashboardRuntimeContext:
+    target: str
+    iface: Any
+    history_db_path: str
+    history_store: Optional[Any]
+    tracker: Any
+    send_lock: Any
+    started_at: float
+    revision_info: Dict[str, Any]
+    state_fn: Callable[[], dict]
+    node_history_fn: Callable[..., dict]
+    online_activity_fn: Callable[..., dict]
+    send_chat_fn: Callable[..., dict]
+    history_enabled: bool
 
 
 def build_dashboard_runtime_context(
@@ -43,7 +61,7 @@ def build_dashboard_runtime_context(
     open_optional_history_store_fn: Callable[..., Optional[Any]] = open_optional_history_store,
     seed_tracker_if_empty_fn: Callable[..., None] = seed_tracker_if_empty,
     build_dashboard_runtime_loaders_fn: Callable[..., Dict[str, Callable[..., Any]]] = build_dashboard_runtime_loaders,
-) -> Dict[str, Any]:
+) -> DashboardRuntimeContext:
     target = mesh_target_label_fn(args)
     print_fn(f"Connecting to {target} ...")
     iface = open_mesh_interface_fn(args)
@@ -88,18 +106,18 @@ def build_dashboard_runtime_context(
         build_send_chat_loader_fn=build_send_chat_loader_fn,
     )
 
-    return {
-        "target": target,
-        "iface": iface,
-        "history_db_path": history_db_path,
-        "history_store": history_store,
-        "tracker": tracker,
-        "send_lock": send_lock,
-        "started_at": started_at,
-        "revision_info": revision_info,
-        "state_fn": loaders["state_fn"],
-        "node_history_fn": loaders["node_history_fn"],
-        "online_activity_fn": loaders["online_activity_fn"],
-        "send_chat_fn": loaders["send_chat_fn"],
-        "history_enabled": history_store is not None,
-    }
+    return DashboardRuntimeContext(
+        target=target,
+        iface=iface,
+        history_db_path=history_db_path,
+        history_store=history_store,
+        tracker=tracker,
+        send_lock=send_lock,
+        started_at=started_at,
+        revision_info=revision_info,
+        state_fn=loaders["state_fn"],
+        node_history_fn=loaders["node_history_fn"],
+        online_activity_fn=loaders["online_activity_fn"],
+        send_chat_fn=loaders["send_chat_fn"],
+        history_enabled=history_store is not None,
+    )

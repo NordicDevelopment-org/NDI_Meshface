@@ -68,12 +68,12 @@ def run_dashboard_runtime(
 
     server_parts = build_dashboard_server(
         args=args,
-        revision_info=context["revision_info"],
-        history_enabled=context["history_enabled"],
-        state_fn=context["state_fn"],
-        node_history_fn=context["node_history_fn"],
-        online_activity_fn=context["online_activity_fn"],
-        send_chat_fn=context["send_chat_fn"],
+        revision_info=context.revision_info,
+        history_enabled=context.history_enabled,
+        state_fn=context.state_fn,
+        node_history_fn=context.node_history_fn,
+        online_activity_fn=context.online_activity_fn,
+        send_chat_fn=context.send_chat_fn,
         render_html_fn=render_html_fn,
         make_http_handler_fn=make_http_handler_fn,
         threading_http_server_cls=threading_http_server_cls,
@@ -87,9 +87,9 @@ def run_dashboard_runtime(
         bound_host=bound_host,
         bound_port=bound_port,
         show_secrets=args.show_secrets,
-        revision_info=context["revision_info"],
-        history_enabled=context["history_enabled"],
-        history_db_path=context["history_db_path"],
+        revision_info=context.revision_info,
+        history_enabled=context.history_enabled,
+        history_db_path=context.history_db_path,
         history_retention_days=args.history_retention_days,
         history_max_rows=args.history_max_rows,
         history_event_retention_days=args.history_event_retention_days,
@@ -102,6 +102,6 @@ def run_dashboard_runtime(
     finally:
         close_runtime_resources(
             server=server,
-            iface=context["iface"],
-            history_store=context["history_store"],
+            iface=context.iface,
+            history_store=context.history_store,
         )

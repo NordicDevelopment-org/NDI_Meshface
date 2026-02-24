@@ -1,6 +1,9 @@
 import argparse
 
-from meshdash.dashboard_runtime_context import build_dashboard_runtime_context
+from meshdash.dashboard_runtime_context import (
+    DashboardRuntimeContext,
+    build_dashboard_runtime_context,
+)
 
 
 def test_build_dashboard_runtime_context_wires_runtime_dependencies():
@@ -95,21 +98,22 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
     )
 
     assert printed == ["Connecting to 192.168.1.10:4403 (tcp) ..."]
-    assert context["target"] == "192.168.1.10:4403 (tcp)"
-    assert context["iface"] is iface
-    assert context["history_db_path"] == "/abs/state/history.sqlite3"
-    assert context["history_store"] is history_store
-    assert isinstance(context["tracker"], _Tracker)
-    assert context["tracker"].packet_limit == 250
-    assert context["tracker"].history_store is history_store
-    assert context["send_lock"] == "send-lock"
-    assert context["started_at"] == 123.5
-    assert context["revision_info"] is revision_info
-    assert context["state_fn"] is send_state
-    assert context["node_history_fn"] is send_node_history
-    assert context["online_activity_fn"] is send_online
-    assert context["send_chat_fn"] is send_chat
-    assert context["history_enabled"] is True
+    assert isinstance(context, DashboardRuntimeContext)
+    assert context.target == "192.168.1.10:4403 (tcp)"
+    assert context.iface is iface
+    assert context.history_db_path == "/abs/state/history.sqlite3"
+    assert context.history_store is history_store
+    assert isinstance(context.tracker, _Tracker)
+    assert context.tracker.packet_limit == 250
+    assert context.tracker.history_store is history_store
+    assert context.send_lock == "send-lock"
+    assert context.started_at == 123.5
+    assert context.revision_info is revision_info
+    assert context.state_fn is send_state
+    assert context.node_history_fn is send_node_history
+    assert context.online_activity_fn is send_online
+    assert context.send_chat_fn is send_chat
+    assert context.history_enabled is True
 
     assert calls["mesh_target_args"] is args
     assert calls["open_mesh_interface_args"] is args
@@ -123,17 +127,17 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
 
     subscribe_callback, subscribe_topic = calls["subscribe"]
     assert subscribe_topic == "meshtastic.receive"
-    assert subscribe_callback.__self__ is context["tracker"]
+    assert subscribe_callback.__self__ is context.tracker
     assert subscribe_callback.__func__.__name__ == "on_receive"
 
     seeded_tracker, seeded_iface, seed_kwargs = calls["seed_tracker_if_empty"]
-    assert seeded_tracker is context["tracker"]
+    assert seeded_tracker is context.tracker
     assert seeded_iface is iface
     assert seed_kwargs == {"seed_tracker_fn": "seed-fn"}
 
     assert calls["build_dashboard_runtime_loaders"] == {
         "iface": iface,
-        "tracker": context["tracker"],
+        "tracker": context.tracker,
         "send_lock": "send-lock",
         "started_at": 123.5,
         "target": "192.168.1.10:4403 (tcp)",
