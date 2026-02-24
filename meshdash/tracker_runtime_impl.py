@@ -36,6 +36,14 @@ from .tracker_runtime_record import (
 from .tracker_runtime_init import (
     initialize_dashboard_tracker_runtime as _initialize_dashboard_tracker_runtime_helper,
 )
+from .tracker_runtime_chat import (
+    record_tracker_local_chat as _record_tracker_local_chat_helper,
+)
+from .tracker_runtime_state import (
+    build_tracker_snapshot as _build_tracker_snapshot_helper,
+    load_tracker_node_capabilities as _load_tracker_node_capabilities_helper,
+    load_tracker_node_saved_counts as _load_tracker_node_saved_counts_helper,
+)
 from .tracker_snapshot import (
     build_edge_snapshot_rows as _build_edge_snapshot_rows_helper,
     build_tracker_snapshot_payload as _build_tracker_snapshot_payload_helper,
@@ -132,14 +140,10 @@ class DashboardTracker:
             return bool(self.recent_packets)
 
     def load_node_saved_counts(self) -> Dict[str, Dict[str, Any]]:
-        if self._history_store is None:
-            return {}
-        return self._history_store.load_node_saved_counts()
+        return _load_tracker_node_saved_counts_helper(self._history_store)
 
     def load_node_capabilities(self) -> Dict[str, Dict[str, Any]]:
-        if self._history_store is None:
-            return {}
-        return self._history_store.load_node_capabilities()
+        return _load_tracker_node_capabilities_helper(self._history_store)
 
     def record_local_chat(
         self,
@@ -155,31 +159,28 @@ class DashboardTracker:
         ack_requested: bool = False,
         retry_of: Optional[int] = None,
     ) -> None:
-        entry = _build_tracker_local_entry_helper(
-            text=text,
-            from_id=from_id,
-            to_id=to_id,
-            channel_index=channel_index,
-            message_id=message_id,
-            reply_id=reply_id,
-            emoji=emoji,
-            emoji_codepoint=emoji_codepoint,
-            is_reaction=is_reaction,
-            ack_requested=ack_requested,
-            retry_of=retry_of,
-            build_local_chat_entry_fn=_build_local_chat_entry,
-            utc_now_fn=_utc_now,
-            now_unix_fn=time.time,
-            to_int_fn=_to_int,
-            emoji_from_codepoint_fn=_emoji_from_codepoint,
-        )
-        if entry is None:
-            return
         with self._lock:
-            _append_local_chat_entry_helper(
+            _record_tracker_local_chat_helper(
+                text=text,
+                from_id=from_id,
+                to_id=to_id,
+                channel_index=channel_index,
+                message_id=message_id,
+                reply_id=reply_id,
+                emoji=emoji,
+                emoji_codepoint=emoji_codepoint,
+                is_reaction=is_reaction,
+                ack_requested=ack_requested,
+                retry_of=retry_of,
                 recent_chat=self.recent_chat,
                 history_store=self._history_store,
-                entry=entry,
+                build_tracker_local_entry_fn=_build_tracker_local_entry_helper,
+                append_local_chat_entry_fn=_append_local_chat_entry_helper,
+                build_local_chat_entry_fn=_build_local_chat_entry,
+                utc_now_fn=_utc_now,
+                now_unix_fn=time.time,
+                to_int_fn=_to_int,
+                emoji_from_codepoint_fn=_emoji_from_codepoint,
             )
 
     def seed_packet(self, packet: Dict[str, Any], interface: Any) -> None:
@@ -227,8 +228,7 @@ class DashboardTracker:
 
     def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         with self._lock:
-            self._expire_pending_deliveries_fn()
-            return _build_tracker_snapshot_payload_helper(
+            return _build_tracker_snapshot_helper(
                 session_edges=self.edges,
                 historical_edges=self._historical_edges,
                 nodes_by_id=nodes_by_id,
@@ -239,6 +239,8 @@ class DashboardTracker:
                 min_real_link_count=MIN_REAL_LINK_COUNT,
                 format_epoch_fn=_format_epoch,
                 build_edge_snapshot_rows_fn=_build_edge_snapshot_rows_helper,
+                expire_pending_deliveries_fn=self._expire_pending_deliveries_fn,
+                build_tracker_snapshot_payload_fn=_build_tracker_snapshot_payload_helper,
             )
 
 
