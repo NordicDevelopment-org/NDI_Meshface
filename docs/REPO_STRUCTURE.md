@@ -38,7 +38,9 @@
 - `meshdash/helpers_packet_battery.py`: packet battery-level extraction helper.
 - `meshdash/history_store.py`: extracted SQLite history persistence/rollup store.
 - `meshdash/history_store_connection.py`: `HistoryStore` DB open/init/prune helper routines.
-- `meshdash/history_schema.py`: schema/index creation statements for history DB initialization.
+- `meshdash/history_schema.py`: schema initialization facade applying table + index statement groups.
+- `meshdash/history_schema_tables.py`: history DB table creation statement definitions.
+- `meshdash/history_schema_indexes.py`: history DB index creation statement definitions.
 - `meshdash/history_prune.py`: retention and max-row pruning operations for history tables.
 - `meshdash/history_readers.py`: row-to-payload decoders for recent packets/chat/connections reads.
 - `meshdash/history_rollups.py`: metric rollup math helpers shared by history persistence paths.
