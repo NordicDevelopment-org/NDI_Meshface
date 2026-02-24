@@ -10,7 +10,9 @@
 - `meshdash/chat_delivery_state.py`: chat local-echo message id extraction and delivery-state mutation helpers.
 - `meshdash/chat_delivery_extract.py`: routing ACK/NAK decode helper for chat delivery updates.
 - `meshdash/chat_delivery_timeout.py`: pending delivery timeout sweep helper for local chat entries.
-- `meshdash/chat_send.py`: chat send/reaction payload normalization, validation, and response builders.
+- `meshdash/chat_send.py`: stable chat-send facade re-exporting payload prepare + response helper APIs.
+- `meshdash/chat_send_prepare.py`: chat-send payload normalization/validation and ack-request policy helper.
+- `meshdash/chat_send_response.py`: send delivery-state + API response payload builder helpers.
 - `meshdash/config.py`: centralized dashboard defaults/constants and sensitive-key policy.
 - `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers.
 - `meshdash/api_inputs.py`: shared API query/body parsing and request-size validation helpers.
