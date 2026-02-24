@@ -6,7 +6,10 @@
 - `mesh_connection.py`: Meshtastic serial/TCP connection abstraction.
 - `meshdash/chat.py`: stable chat helper facade re-exporting chat entry/delivery APIs.
 - `meshdash/chat_entry.py`: local chat-entry builder helper for direct/reaction message rows.
-- `meshdash/chat_delivery.py`: chat delivery-state and routing ACK/NAK extraction helpers.
+- `meshdash/chat_delivery.py`: stable chat-delivery facade re-exporting delivery id/state/extract/timeout helpers.
+- `meshdash/chat_delivery_state.py`: chat local-echo message id extraction and delivery-state mutation helpers.
+- `meshdash/chat_delivery_extract.py`: routing ACK/NAK decode helper for chat delivery updates.
+- `meshdash/chat_delivery_timeout.py`: pending delivery timeout sweep helper for local chat entries.
 - `meshdash/chat_send.py`: chat send/reaction payload normalization, validation, and response builders.
 - `meshdash/config.py`: centralized dashboard defaults/constants and sensitive-key policy.
 - `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers.
