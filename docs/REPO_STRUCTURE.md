@@ -102,7 +102,9 @@
 - `meshdash/state_local.py`: local-node config/module/channel snapshot collection helper.
 - `meshdash/state_summary.py`: summary/local-state enrichment helpers for `/api/state`.
 - `meshdash/tracker.py`: stable tracker facade re-exporting tracker class and seed helper.
-- `meshdash/tracker_runtime.py`: packet/chat tracking, edge synthesis, snapshots, and seed-from-node-db implementation.
+- `meshdash/tracker_runtime.py`: tracker runtime orchestration class wiring callbacks/bootstrap/snapshot helpers.
+- `meshdash/tracker_runtime_record.py`: tracker receive-path runtime packet record wiring (parse + process handoff).
+- `meshdash/tracker_node_resolver.py`: tracker node-id resolver wrapper that binds Meshtastic broadcast behavior.
 - `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshdash/tracker_edges.py`: direct-link edge observation and edge-state update helpers for tracker ingestion.
 - `meshdash/tracker_bootstrap.py`: history-backed bootstrap loader for tracker recent buffers and edge baseline.
@@ -117,7 +119,7 @@
 - `meshdash/tracker_packet_artifacts.py`: packet/chat artifact builders for tracker receive flow.
 - `meshdash/tracker_observation.py`: delivery/direct-edge/port-count observation helper for tracker receive flow.
 - `meshdash/tracker_seed.py`: tracker seed helper that replays node-db `lastReceived` packets.
-- `meshdash/tracker_setup.py`: tracker buffer/bootstrap setup helpers used by tracker constructor.
+- `meshdash/tracker_setup.py`: tracker buffer/bootstrap setup helpers (including `TrackerBuffers`) used by tracker constructor.
 - `meshdash/tracker_receive.py`: receive-flow orchestration helper that wires parse results into storage.
 - `meshdash/tracker_snapshot.py`: edge snapshot and full tracker snapshot payload builders.
 - `meshdash/tracker_storage.py`: tracker receive-path storage fanout (recent deques + optional history writes).

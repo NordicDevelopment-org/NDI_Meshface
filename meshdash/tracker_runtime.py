@@ -27,6 +27,12 @@ from .nodes import (
     parse_utc_text_to_unix as _parse_utc_text_to_unix,
     utc_now as _utc_now,
 )
+from .tracker_node_resolver import (
+    get_tracker_node_id_from_num as _get_tracker_node_id_from_num_helper,
+)
+from .tracker_runtime_record import (
+    record_tracker_packet_unlocked as _record_tracker_packet_unlocked_helper,
+)
 from .tracker_snapshot import (
     build_edge_snapshot_rows as _build_edge_snapshot_rows_helper,
     build_tracker_snapshot_payload as _build_tracker_snapshot_payload_helper,
@@ -85,12 +91,12 @@ MIN_REAL_LINK_COUNT = 2
 
 
 def _get_node_id_from_num(iface: Any, node_num: Any) -> Optional[str]:
-    broadcast_num = getattr(meshtastic, "BROADCAST_NUM", None) if meshtastic is not None else None
-    return _get_node_id_from_num_helper(
+    return _get_tracker_node_id_from_num_helper(
         iface,
         node_num,
-        broadcast_num=broadcast_num,
+        meshtastic_module=meshtastic,
         to_int_fn=_to_int,
+        get_node_id_from_num_fn=_get_node_id_from_num_helper,
     )
 
 
@@ -101,11 +107,11 @@ class DashboardTracker:
         self._chat_delivery_timeout_seconds = DEFAULT_CHAT_DELIVERY_TIMEOUT_SECONDS
         self.live_packet_count = 0
         buffers = _initialize_tracker_buffers_helper(packet_limit)
-        self.edges = buffers["edges"]
-        self._historical_edges = buffers["historical_edges"]
-        self.port_counts = buffers["port_counts"]
-        self.recent_packets = buffers["recent_packets"]
-        self.recent_chat = buffers["recent_chat"]
+        self.edges = buffers.edges
+        self._historical_edges = buffers.historical_edges
+        self.port_counts = buffers.port_counts
+        self.recent_packets = buffers.recent_packets
+        self.recent_chat = buffers.recent_chat
         delivery_callbacks = _build_tracker_delivery_callbacks_helper(
             self.recent_chat,
             get_timeout_seconds_fn=lambda: self._chat_delivery_timeout_seconds,
@@ -194,9 +200,27 @@ class DashboardTracker:
     def _record_packet_unlocked(
         self, packet: Dict[str, Any], interface: Any, include_live_count: bool
     ) -> None:
-        parsed = _parse_tracker_packet_helper(
-            packet,
-            interface,
+        _record_tracker_packet_unlocked_helper(
+            packet=packet,
+            interface=interface,
+            include_live_count=include_live_count,
+            session_edges=self.edges,
+            historical_edges=self._historical_edges,
+            port_counts=self.port_counts,
+            recent_packets=self.recent_packets,
+            recent_chat=self.recent_chat,
+            history_store=self._history_store,
+            extract_delivery_update_fn=self._extract_delivery_update_fn,
+            set_delivery_state_fn=self._set_delivery_state_fn,
+            apply_tracker_observation_fn=_apply_tracker_observation_helper,
+            apply_routing_delivery_update_fn=_apply_routing_delivery_update_helper,
+            record_direct_edge_observation_fn=_record_direct_edge_observation_helper,
+            build_tracker_packet_artifacts_fn=_build_tracker_packet_artifacts_helper,
+            build_packet_summary_fn=_build_packet_summary_helper,
+            build_chat_entry_from_packet_fn=_build_chat_entry_from_packet_helper,
+            apply_tracker_storage_updates_fn=_apply_tracker_storage_updates_helper,
+            parse_tracker_packet_fn=_parse_tracker_packet_helper,
+            process_parsed_tracker_packet_fn=_process_parsed_tracker_packet_helper,
             get_node_id_from_num_fn=_get_node_id_from_num,
             to_int_fn=_to_int,
             calculate_hops_fn=_calculate_hops,
@@ -205,30 +229,9 @@ class DashboardTracker:
             extract_reply_id_fn=_extract_reply_id,
             extract_emoji_codepoint_fn=_extract_emoji_codepoint,
             emoji_from_codepoint_fn=_emoji_from_codepoint,
-        )
-        _process_parsed_tracker_packet_helper(
-            packet=packet,
-            parsed=parsed,
-            include_live_count=include_live_count,
-            session_edges=self.edges,
-            historical_edges=self._historical_edges,
-            port_counts=self.port_counts,
-            apply_tracker_observation_fn=_apply_tracker_observation_helper,
-            apply_routing_delivery_update_fn=_apply_routing_delivery_update_helper,
-            extract_update_fn=self._extract_delivery_update_fn,
-            set_delivery_state_fn=self._set_delivery_state_fn,
-            record_direct_edge_observation_fn=_record_direct_edge_observation_helper,
-            build_tracker_packet_artifacts_fn=_build_tracker_packet_artifacts_helper,
-            build_packet_summary_fn=_build_packet_summary_helper,
-            build_chat_entry_from_packet_fn=_build_chat_entry_from_packet_helper,
             utc_now_fn=_utc_now,
             format_epoch_fn=_format_epoch,
-            to_int_fn=_to_int,
             to_jsonable_fn=_to_jsonable,
-            apply_tracker_storage_updates_fn=_apply_tracker_storage_updates_helper,
-            recent_packets=self.recent_packets,
-            recent_chat=self.recent_chat,
-            history_store=self._history_store,
         )
 
         self._expire_pending_deliveries_fn()

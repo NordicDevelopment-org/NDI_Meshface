@@ -1,4 +1,5 @@
 from meshdash.tracker_setup import (
+    TrackerBuffers,
     apply_tracker_history_bootstrap,
     initialize_tracker_buffers,
 )
@@ -6,12 +7,13 @@ from meshdash.tracker_setup import (
 
 def test_initialize_tracker_buffers_creates_expected_collections():
     buffers = initialize_tracker_buffers(5)
-    assert buffers["edges"] == {}
-    assert buffers["historical_edges"] == {}
-    assert list(buffers["recent_packets"]) == []
-    assert list(buffers["recent_chat"]) == []
-    assert buffers["recent_packets"].maxlen == 5
-    assert buffers["recent_chat"].maxlen == 5
+    assert isinstance(buffers, TrackerBuffers)
+    assert buffers.edges == {}
+    assert buffers.historical_edges == {}
+    assert list(buffers.recent_packets) == []
+    assert list(buffers.recent_chat) == []
+    assert buffers.recent_packets.maxlen == 5
+    assert buffers.recent_chat.maxlen == 5
 
 
 def test_apply_tracker_history_bootstrap_handles_none_history_store():

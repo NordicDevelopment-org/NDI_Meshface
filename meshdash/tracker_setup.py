@@ -1,15 +1,25 @@
 from collections import Counter, deque
+from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
 
-def initialize_tracker_buffers(packet_limit: int) -> Dict[str, Any]:
-    return {
-        "edges": {},
-        "historical_edges": {},
-        "port_counts": Counter(),
-        "recent_packets": deque(maxlen=packet_limit),
-        "recent_chat": deque(maxlen=packet_limit),
-    }
+@dataclass
+class TrackerBuffers:
+    edges: Dict[Any, Dict[str, Any]]
+    historical_edges: Dict[Any, Dict[str, Any]]
+    port_counts: Any
+    recent_packets: Any
+    recent_chat: Any
+
+
+def initialize_tracker_buffers(packet_limit: int) -> TrackerBuffers:
+    return TrackerBuffers(
+        edges={},
+        historical_edges={},
+        port_counts=Counter(),
+        recent_packets=deque(maxlen=packet_limit),
+        recent_chat=deque(maxlen=packet_limit),
+    )
 
 
 def apply_tracker_history_bootstrap(
