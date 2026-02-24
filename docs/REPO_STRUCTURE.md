@@ -31,7 +31,12 @@
 - `meshdash/assets/dashboard.js.tmpl`: extracted dashboard JavaScript template asset.
 - `meshdash/assets/dashboard.html.tmpl`: extracted dashboard HTML shell template asset.
 - `meshdash/helpers.py`: stable helper facade re-exporting utility APIs for runtime/test compatibility.
-- `meshdash/helpers_core.py`: core primitive/json/secrets/formatting/emoji/disk helper implementations.
+- `meshdash/helpers_core.py`: stable core-helper facade re-exporting primitive/json/secrets/emoji/disk APIs.
+- `meshdash/helpers_types.py`: numeric/time primitive helpers (`to_int`, `to_float`, epoch formatting).
+- `meshdash/helpers_json.py`: JSON/protobuf conversion and generic JSON-safe value normalization helpers.
+- `meshdash/helpers_security.py`: sensitive-key detection and recursive redaction helpers.
+- `meshdash/helpers_emoji.py`: emoji/codepoint normalization helpers.
+- `meshdash/helpers_disk.py`: disk-capacity probe helper for runtime summary payloads.
 - `meshdash/helpers_packet.py`: stable packet-helper facade re-exporting packet extraction APIs.
 - `meshdash/helpers_packet_meta.py`: packet metadata helpers (reply-id, emoji codepoint, hop count).
 - `meshdash/helpers_packet_position.py`: packet position/altitude/satellite extraction helpers.
