@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 
 from .api_inputs import (
     parse_chat_send_request,
-    parse_node_history_query,
+    parse_node_history_request,
     parse_online_activity_query,
     validate_content_length,
 )
@@ -34,7 +34,7 @@ def make_http_handler(
         online_activity_fn=online_activity_fn,
         default_node_history_hours=default_node_history_hours,
         to_int_fn=to_int_fn,
-        parse_node_history_query_fn=parse_node_history_query,
+        parse_node_history_request_fn=parse_node_history_request,
         parse_online_activity_query_fn=parse_online_activity_query,
         empty_node_history_fn=empty_node_history,
         empty_online_activity_fn=empty_online_activity,

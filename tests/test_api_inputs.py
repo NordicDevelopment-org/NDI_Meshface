@@ -3,6 +3,7 @@ import pytest
 from meshdash.api_inputs import (
     parse_chat_send_request,
     parse_chat_send_body,
+    parse_node_history_request,
     parse_node_history_query,
     parse_online_activity_query,
     validate_content_length,
@@ -23,6 +24,16 @@ def test_parse_node_history_query_extracts_overrides():
     assert node_id == "!abc123"
     assert hours == 6
     assert points == 1440
+
+
+def test_parse_node_history_request_extracts_overrides():
+    query = parse_node_history_request(
+        "node_id=%20!abc123%20&hours=6&points=1440",
+        to_int_fn=_to_int,
+    )
+    assert query.node_id == "!abc123"
+    assert query.hours_override == 6
+    assert query.points_override == 1440
 
 
 def test_parse_online_activity_query_extracts_hours():

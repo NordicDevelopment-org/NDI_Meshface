@@ -220,7 +220,11 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
   - `parse_chat_send_request(...)` now used by POST route wiring + chat API handler
+- Added typed node-history query parse contract:
+  - `NodeHistoryQuery` dataclass in `meshdash/api_inputs.py`
+  - `parse_node_history_request(...)` now used by GET route wiring + history API handler
 - Kept `parse_chat_send_body(...)` as a compatibility helper for dict-shaped callers.
+- Kept `parse_node_history_query(...)` as a compatibility helper for tuple-shaped callers.
 
 ### Steps
 

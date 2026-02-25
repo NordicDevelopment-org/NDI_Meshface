@@ -1,6 +1,6 @@
 import io
 
-from meshdash.api_inputs import ChatSendRequest
+from meshdash.api_inputs import ChatSendRequest, NodeHistoryQuery
 from meshdash.http_route_contracts import (
     DashboardGetRouteDependencies,
     DashboardPostRouteDependencies,
@@ -26,7 +26,11 @@ def test_handle_dashboard_get_returns_state_and_404():
         online_activity_fn=None,
         default_node_history_hours=72,
         to_int_fn=lambda value: int(value) if value else None,
-        parse_node_history_query_fn=lambda *_args, **_kwargs: ("", None, None),
+        parse_node_history_request_fn=lambda *_args, **_kwargs: NodeHistoryQuery(
+            node_id="",
+            hours_override=None,
+            points_override=None,
+        ),
         parse_online_activity_query_fn=lambda *_args, **_kwargs: None,
         empty_node_history_fn=lambda node_id: {"node_id": node_id},
         empty_online_activity_fn=lambda hours: {"window_hours": hours},

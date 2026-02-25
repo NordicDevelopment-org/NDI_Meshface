@@ -1,3 +1,4 @@
+from meshdash.api_inputs import NodeHistoryQuery
 from meshdash.api_history import (
     build_node_history_response,
     build_online_activity_response,
@@ -13,7 +14,11 @@ def test_build_node_history_response_uses_loader_when_available():
             "max_points": points,
         },
         to_int_fn=lambda value: int(value) if value else None,
-        parse_node_history_query_fn=lambda query, **kwargs: ("!abcd1234", 24, 120),
+        parse_node_history_request_fn=lambda query, **kwargs: NodeHistoryQuery(
+            node_id="!abcd1234",
+            hours_override=24,
+            points_override=120,
+        ),
         empty_node_history_fn=lambda node_id: {"node_id": node_id, "points": []},
     )
 
@@ -29,7 +34,11 @@ def test_build_node_history_response_falls_back_to_empty_shape():
         query="node_id=!abcd1234",
         node_history_fn=None,
         to_int_fn=lambda value: int(value) if value else None,
-        parse_node_history_query_fn=lambda query, **kwargs: ("!abcd1234", None, None),
+        parse_node_history_request_fn=lambda query, **kwargs: NodeHistoryQuery(
+            node_id="!abcd1234",
+            hours_override=None,
+            points_override=None,
+        ),
         empty_node_history_fn=lambda node_id: {"node_id": node_id, "points": []},
     )
 

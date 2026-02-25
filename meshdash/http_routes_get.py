@@ -34,7 +34,7 @@ def handle_dashboard_get(
             query=query,
             node_history_fn=deps.node_history_fn,
             to_int_fn=deps.to_int_fn,
-            parse_node_history_query_fn=deps.parse_node_history_query_fn,
+            parse_node_history_request_fn=deps.parse_node_history_request_fn,
             empty_node_history_fn=deps.empty_node_history_fn,
         )
         deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)

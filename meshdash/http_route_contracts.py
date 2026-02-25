@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from .api_inputs import ChatSendRequest
+from .api_inputs import ChatSendRequest, NodeHistoryQuery
 
 StateFn = Callable[[], dict]
 NodeHistoryFn = Callable[[str, Optional[int], Optional[int]], dict]
@@ -9,7 +9,7 @@ OnlineActivityFn = Callable[[Optional[int]], dict]
 SendChatFn = Callable[..., dict]
 
 ToIntFn = Callable[[Any], Optional[int]]
-ParseNodeHistoryQueryFn = Callable[..., tuple[str, Optional[int], Optional[int]]]
+ParseNodeHistoryRequestFn = Callable[..., NodeHistoryQuery]
 ParseOnlineActivityQueryFn = Callable[..., Optional[int]]
 EmptyNodeHistoryFn = Callable[[str], dict]
 EmptyOnlineActivityFn = Callable[[int], dict]
@@ -29,7 +29,7 @@ class DashboardGetRouteDependencies:
     online_activity_fn: Optional[OnlineActivityFn]
     default_node_history_hours: int
     to_int_fn: ToIntFn
-    parse_node_history_query_fn: ParseNodeHistoryQueryFn
+    parse_node_history_request_fn: ParseNodeHistoryRequestFn
     parse_online_activity_query_fn: ParseOnlineActivityQueryFn
     empty_node_history_fn: EmptyNodeHistoryFn
     empty_online_activity_fn: EmptyOnlineActivityFn
