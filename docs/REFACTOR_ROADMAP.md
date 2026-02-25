@@ -275,6 +275,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
   - `CollectedNodes` + `coerce_collected_nodes(...)` in `meshdash/state_node_contracts.py`
   - `collect_nodes_typed(...)` in `meshdash/state_node_rows.py` with legacy dict wrapper preserved
   - `state_service` now consumes the typed node contract internally while accepting legacy mapping-shaped injections in tests/callers.
+- Added `meshdash/state_service_contracts.py` to centralize state assembly collaborator callback aliases (`collect_nodes`, local-state safe collection, summary builder, redaction, revision payload).
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
   - `parse_chat_send_request(...)` now used by POST route wiring + chat API handler

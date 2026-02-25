@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 from .helpers import (
     redact_secrets as _redact_secrets,
@@ -7,9 +7,18 @@ from .helpers import (
 from .nodes import (
     utc_now as _utc_now,
 )
-from .revision import RevisionInfo
 from .runtime_types import ToJsonableFn, UtcNowFn
-from .state_node_contracts import CollectedNodes, coerce_collected_nodes
+from .state_node_contracts import coerce_collected_nodes
+from .state_service_contracts import (
+    ApplyNodeSavedCountsFn,
+    BuildSummaryPayloadFn,
+    CollectLocalStateFn,
+    CollectLocalStateSafeFn,
+    CollectNodesFn,
+    ModemPresetFromLocalStateFn,
+    RedactSecretsFn,
+    RevisionPayload,
+)
 from .state_nodes import (
     collect_local_state as _collect_local_state_helper,
     collect_nodes as _collect_nodes_helper,
@@ -30,16 +39,16 @@ def build_dashboard_state(
     target: str,
     show_secrets: bool,
     storage_probe_path: Optional[str],
-    revision_info: RevisionInfo | Dict[str, str],
+    revision_info: RevisionPayload,
     sensitive_field_names: set[str],
-    collect_nodes_fn: Callable[[Any], CollectedNodes | Dict[str, Any]] = _collect_nodes_helper,
-    collect_local_state_fn: Callable[[Any], Dict[str, Any]] = _collect_local_state_helper,
-    collect_local_state_safe_fn: Callable[..., tuple[Dict[str, Any], Optional[str]]] = _collect_local_state_safe_helper,
-    modem_preset_from_local_state_fn: Callable[[Dict[str, Any]], Optional[str]] = _modem_preset_from_local_state_helper,
-    apply_node_saved_counts_fn: Callable[[list[Dict[str, Any]], Dict[str, Dict[str, Any]]], None] = _apply_node_saved_counts_helper,
-    build_summary_payload_fn: Callable[..., Dict[str, Any]] = _build_summary_payload_helper,
+    collect_nodes_fn: CollectNodesFn = _collect_nodes_helper,
+    collect_local_state_fn: CollectLocalStateFn = _collect_local_state_helper,
+    collect_local_state_safe_fn: CollectLocalStateSafeFn = _collect_local_state_safe_helper,
+    modem_preset_from_local_state_fn: ModemPresetFromLocalStateFn = _modem_preset_from_local_state_helper,
+    apply_node_saved_counts_fn: ApplyNodeSavedCountsFn = _apply_node_saved_counts_helper,
+    build_summary_payload_fn: BuildSummaryPayloadFn = _build_summary_payload_helper,
     to_jsonable_fn: ToJsonableFn = _to_jsonable,
-    redact_secrets_fn: Callable[[Any, set[str]], Any] = _redact_secrets,
+    redact_secrets_fn: RedactSecretsFn = _redact_secrets,
     utc_now_fn: UtcNowFn = _utc_now,
 ) -> Dict[str, Any]:
     nodes = coerce_collected_nodes(collect_nodes_fn(iface))

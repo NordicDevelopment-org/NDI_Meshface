@@ -135,6 +135,7 @@
 - `meshdash/services.py`: stable services facade re-exporting history loaders and chat-send service entrypoint.
 - `meshdash/services_chat.py`: chat-send orchestration service implementation.
 - `meshdash/state.py`: stable state facade re-exporting node/local collectors and state payload builder.
+- `meshdash/state_service_contracts.py`: callback/type aliases for state assembly collaborator injections (nodes/local/summary/redaction/revision payload).
 - `meshdash/state_service.py`: `/api/state` payload assembly service (tracker snapshot + local/summary composition + redaction).
 - `meshdash/state_nodes.py`: stable state-node facade re-exporting node/local collectors.
 - `meshdash/state_node_contracts.py`: typed node-collection contract + compatibility coercion helper for state assembly.
