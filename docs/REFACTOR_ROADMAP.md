@@ -261,6 +261,8 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - `runtime_state_loader` now accepts `RevisionInfo` and performs dict conversion at the state-payload boundary.
 - Reused shared HTTP route type aliases across API domain modules (`api_system`, `api_chat`, `api_history_node`, `api_history_online`) to reduce duplicated callable signatures.
 - Added shared HTTP handler protocol contracts in `meshdash/http_handler_contracts.py` and applied them across API/route/response dispatch modules (`api_chat`, `api_system`, `http_routes_*`, `http_api_*`, `http_responses`, `http_handler`) so HTTP boundaries no longer rely on raw `Any` handler typing.
+- Added tracker runtime-init protocol contracts in `meshdash/tracker_runtime_init_contracts.py` and applied them across tracker constructor/setup wiring (`tracker_runtime_init.py`, `tracker_setup.py`) so startup dependency boundaries use explicit contracts instead of raw `Any`.
+- Added tracker bootstrap protocol contracts in `meshdash/tracker_bootstrap_contracts.py` and applied them to bootstrap/init wiring (`tracker_bootstrap.py`, `tracker_setup.py`, `tracker_runtime_init_contracts.py`) so history-store bootstrap expectations are explicitly typed.
 - Added typed tracker packet-ingest dependency contract:
   - `TrackerPacketRuntimeDependencies` in `meshdash/tracker_runtime_packet_contracts.py`
   - `record_tracker_packet_unlocked_with_dependencies(...)` in `meshdash/tracker_runtime_record.py`

@@ -1,23 +1,31 @@
-from typing import Any
-
+from .runtime_types import NowUnixFn, ParseUtcTextToUnixFn, ToIntFn, UtcNowFn
 from .tracker_callbacks import TrackerDeliveryCallbacks
+from .tracker_runtime_init_contracts import (
+    ApplyTrackerHistoryBootstrapFn,
+    BuildHistoricalEdgesFn,
+    BuildTrackerDeliveryCallbacksFn,
+    InitializeTrackerBuffersFn,
+    LoadTrackerHistoryBootstrapFn,
+    TrackerInitRuntimeState,
+    TrackerRuntimeHistoryStore,
+)
 
 
 def initialize_dashboard_tracker_runtime(
-    tracker: Any,
+    tracker: TrackerInitRuntimeState,
     *,
     packet_limit: int,
-    history_store: Any,
+    history_store: TrackerRuntimeHistoryStore | None,
     default_chat_delivery_timeout_seconds: int,
-    initialize_tracker_buffers_fn: Any,
-    build_tracker_delivery_callbacks_fn: Any,
-    apply_tracker_history_bootstrap_fn: Any,
-    load_tracker_history_bootstrap_fn: Any,
-    build_historical_edges_fn: Any,
-    parse_utc_text_to_unix_fn: Any,
-    utc_now_fn: Any,
-    to_int_fn: Any,
-    now_unix_fn: Any,
+    initialize_tracker_buffers_fn: InitializeTrackerBuffersFn,
+    build_tracker_delivery_callbacks_fn: BuildTrackerDeliveryCallbacksFn,
+    apply_tracker_history_bootstrap_fn: ApplyTrackerHistoryBootstrapFn,
+    load_tracker_history_bootstrap_fn: LoadTrackerHistoryBootstrapFn,
+    build_historical_edges_fn: BuildHistoricalEdgesFn,
+    parse_utc_text_to_unix_fn: ParseUtcTextToUnixFn,
+    utc_now_fn: UtcNowFn,
+    to_int_fn: ToIntFn,
+    now_unix_fn: NowUnixFn,
 ) -> None:
     tracker._history_store = history_store
     tracker._chat_delivery_timeout_seconds = int(default_chat_delivery_timeout_seconds)

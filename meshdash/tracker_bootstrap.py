@@ -1,19 +1,21 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Tuple
+from typing import Any
 
+from .runtime_types import TrackerEdgeMap
+from .tracker_bootstrap_contracts import BuildHistoricalEdgesFn, TrackerBootstrapHistoryStore
 
 @dataclass(frozen=True)
 class TrackerHistoryBootstrap:
-    recent_packets: list[Dict[str, Any]]
-    recent_chat: list[Dict[str, Any]]
-    historical_edges: Dict[Tuple[str, str], Dict[str, Any]]
+    recent_packets: list[dict[str, Any]]
+    recent_chat: list[dict[str, Any]]
+    historical_edges: TrackerEdgeMap
 
 
 def load_tracker_history_bootstrap(
-    history_store: Any,
+    history_store: TrackerBootstrapHistoryStore,
     *,
     packet_limit: int,
-    build_historical_edges_fn: Callable[[Iterable[Dict[str, Any]]], Dict[Tuple[str, str], Dict[str, Any]]],
+    build_historical_edges_fn: BuildHistoricalEdgesFn,
 ) -> TrackerHistoryBootstrap:
     recent_packets = list(history_store.load_recent_packets(packet_limit))
     recent_chat = list(history_store.load_recent_chat(packet_limit))
