@@ -37,7 +37,9 @@
 - `meshdash/dashboard_runtime_loader_contracts.py`: typed runtime-loader dependency dataclass contract.
 - `meshdash/dashboard_runtime_loader_dependencies.py`: helper mapping legacy loader-assembly args into `DashboardRuntimeLoaderDependencies`.
 - `meshdash/dashboard_runtime_loaders.py`: runtime loader assembly helpers for state/history/activity/chat closures (typed dependency path + compatibility wrapper).
-- `meshdash/dashboard_server.py`: runtime server build helper for HTML render, handler wiring, HTTP bind, and typed server-parts return.
+- `meshdash/dashboard_server_contracts.py`: typed dashboard-server dependency dataclass contract.
+- `meshdash/dashboard_server_dependencies.py`: helper mapping legacy server-build args into `DashboardServerDependencies`.
+- `meshdash/dashboard_server.py`: runtime server build helper for HTML render/handler wiring/HTTP bind (typed dependency path + compatibility wrapper) and typed server-parts return.
 - `meshdash/dashboard_setup.py`: runtime setup helpers for optional history store and tracker seeding.
 - `meshdash/html.py`: stable HTML renderer facade used by runtime wiring/tests.
 - `meshdash/html_assets.py`: cached template-asset loader/formatter for frontend CSS/JS bodies.
