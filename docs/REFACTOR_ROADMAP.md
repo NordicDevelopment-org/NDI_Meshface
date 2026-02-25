@@ -247,6 +247,11 @@ Reduce string-key coupling between runtime builders and orchestration modules.
   - `build_send_chat_runtime_dependencies_from_legacy_args(...)` in `meshdash/runtime_send_dependencies.py`
   - `build_send_chat_loader_with_dependencies(...)` in `meshdash/runtime_send_loader.py`
   - existing `build_send_chat_loader(...)` preserved as compatibility wrapper.
+- Added typed state-snapshot runtime dependency contract:
+  - `StateSnapshotRuntimeDependencies` in `meshdash/runtime_state_contracts.py`
+  - `build_state_snapshot_runtime_dependencies_from_legacy_args(...)` in `meshdash/runtime_state_dependencies.py`
+  - `build_state_snapshot_loader_with_dependencies(...)` in `meshdash/runtime_state_loader.py`
+  - existing `build_state_snapshot_loader(...)` preserved as compatibility wrapper.
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
   - `parse_chat_send_request(...)` now used by POST route wiring + chat API handler

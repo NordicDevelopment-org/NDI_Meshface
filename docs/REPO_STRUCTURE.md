@@ -119,7 +119,9 @@
 - `meshdash/revision.py`: revision/version/git metadata helpers and `RevisionInfo` typed contract for runtime wiring.
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
 - `meshdash/runtime_callbacks.py`: stable runtime-callbacks facade re-exporting closure builders.
-- `meshdash/runtime_state_loader.py`: state snapshot closure builder with typed revision input and payload-boundary conversion.
+- `meshdash/runtime_state_contracts.py`: typed state-snapshot runtime dependency dataclass contract.
+- `meshdash/runtime_state_dependencies.py`: helper mapping legacy state-loader arguments into `StateSnapshotRuntimeDependencies`.
+- `meshdash/runtime_state_loader.py`: state snapshot closure builders (typed dependency path + compatibility wrapper).
 - `meshdash/runtime_send_contracts.py`: typed chat-send runtime dependency dataclass contract.
 - `meshdash/runtime_send_dependencies.py`: helper mapping legacy runtime send arguments into `SendChatRuntimeDependencies`.
 - `meshdash/runtime_send_loader.py`: chat-send closure builders (typed dependency path + compatibility wrapper).
