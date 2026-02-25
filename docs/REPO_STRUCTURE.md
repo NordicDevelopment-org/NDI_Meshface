@@ -131,7 +131,7 @@
 - `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshdash/theme_presets.py`: theme preset defaults + JSON loader/validator + preset selection helpers.
 - `meshdash/tracker_edges.py`: direct-link edge observation and edge-state update helpers for tracker ingestion.
-- `meshdash/tracker_bootstrap.py`: history-backed bootstrap loader for tracker recent buffers and edge baseline.
+- `meshdash/tracker_bootstrap.py`: history-backed bootstrap loader for tracker recent buffers and edge baseline (`TrackerHistoryBootstrap`).
 - `meshdash/tracker_callbacks.py`: bound delivery callback builders for tracker state and receive flow via a typed callback bundle.
 - `meshdash/tracker_delivery.py`: routing delivery-update application helper for chat ACK/NAK tracking.
 - `meshdash/tracker_delivery_state.py`: tracker delivery-state callback helpers for set/extract/expire flows.

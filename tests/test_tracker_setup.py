@@ -1,3 +1,4 @@
+from meshdash.tracker_bootstrap import TrackerHistoryBootstrap
 from meshdash.tracker_setup import (
     TrackerBuffers,
     apply_tracker_history_bootstrap,
@@ -24,7 +25,11 @@ def test_apply_tracker_history_bootstrap_handles_none_history_store():
         packet_limit=5,
         recent_packets=recent_packets,
         recent_chat=recent_chat,
-        load_tracker_history_bootstrap_fn=lambda *_a, **_k: {"historical_edges": {"bad": "call"}},
+        load_tracker_history_bootstrap_fn=lambda *_a, **_k: TrackerHistoryBootstrap(
+            recent_packets=[],
+            recent_chat=[],
+            historical_edges={"bad": "call"},
+        ),
         build_historical_edges_fn=lambda *_a, **_k: {},
     )
     assert historical == {}
@@ -41,11 +46,11 @@ def test_apply_tracker_history_bootstrap_extends_recent_buffers():
         bootstrap_calls["store"] = store
         bootstrap_calls["packet_limit"] = packet_limit
         bootstrap_calls["builder"] = build_historical_edges_fn
-        return {
-            "recent_packets": [{"id": 1}],
-            "recent_chat": [{"message_id": 2}],
-            "historical_edges": {("a", "b"): {"count": 3}},
-        }
+        return TrackerHistoryBootstrap(
+            recent_packets=[{"id": 1}],
+            recent_chat=[{"message_id": 2}],
+            historical_edges={("a", "b"): {"count": 3}},
+        )
 
     historical = apply_tracker_history_bootstrap(
         history_store="history-store",
