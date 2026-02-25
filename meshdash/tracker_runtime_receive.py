@@ -39,8 +39,9 @@ from .tracker_receive import (
 from .tracker_runtime_record import (
     record_tracker_packet_unlocked_with_dependencies as _record_tracker_packet_unlocked_with_dependencies_helper,
 )
-from .tracker_runtime_packet_contracts import (
-    TrackerPacketRuntimeDependencies,
+from .tracker_runtime_receive_dependencies import (
+    build_tracker_packet_runtime_dependencies as _build_tracker_packet_runtime_dependencies_helper,
+    tracker_packet_runtime_dependencies_to_legacy_kwargs as _tracker_packet_runtime_dependencies_to_legacy_kwargs_helper,
 )
 from .tracker_storage import (
     apply_tracker_storage_updates as _apply_tracker_storage_updates_helper,
@@ -76,15 +77,9 @@ def record_tracker_receive_unlocked(
     format_epoch_fn: Any = _format_epoch,
     to_jsonable_fn: Any = _to_jsonable,
 ) -> None:
-    deps = TrackerPacketRuntimeDependencies(
-        session_edges=tracker.edges,
-        historical_edges=tracker._historical_edges,
-        port_counts=tracker.port_counts,
-        recent_packets=tracker.recent_packets,
-        recent_chat=tracker.recent_chat,
-        history_store=tracker._history_store,
-        extract_delivery_update_fn=tracker._extract_delivery_update_fn,
-        set_delivery_state_fn=tracker._set_delivery_state_fn,
+    deps = _build_tracker_packet_runtime_dependencies_helper(
+        tracker,
+        get_node_id_from_num_fn=get_node_id_from_num_fn,
         apply_tracker_observation_fn=apply_tracker_observation_fn,
         apply_routing_delivery_update_fn=apply_routing_delivery_update_fn,
         record_direct_edge_observation_fn=record_direct_edge_observation_fn,
@@ -94,7 +89,6 @@ def record_tracker_receive_unlocked(
         apply_tracker_storage_updates_fn=apply_tracker_storage_updates_fn,
         parse_tracker_packet_fn=parse_tracker_packet_fn,
         process_parsed_tracker_packet_fn=process_parsed_tracker_packet_fn,
-        get_node_id_from_num_fn=get_node_id_from_num_fn,
         to_int_fn=to_int_fn,
         calculate_hops_fn=calculate_hops_fn,
         extract_packet_position_fn=extract_packet_position_fn,
@@ -111,34 +105,7 @@ def record_tracker_receive_unlocked(
             packet=packet,
             interface=interface,
             include_live_count=include_live_count,
-            session_edges=deps.session_edges,
-            historical_edges=deps.historical_edges,
-            port_counts=deps.port_counts,
-            recent_packets=deps.recent_packets,
-            recent_chat=deps.recent_chat,
-            history_store=deps.history_store,
-            extract_delivery_update_fn=deps.extract_delivery_update_fn,
-            set_delivery_state_fn=deps.set_delivery_state_fn,
-            apply_tracker_observation_fn=deps.apply_tracker_observation_fn,
-            apply_routing_delivery_update_fn=deps.apply_routing_delivery_update_fn,
-            record_direct_edge_observation_fn=deps.record_direct_edge_observation_fn,
-            build_tracker_packet_artifacts_fn=deps.build_tracker_packet_artifacts_fn,
-            build_packet_summary_fn=deps.build_packet_summary_fn,
-            build_chat_entry_from_packet_fn=deps.build_chat_entry_from_packet_fn,
-            apply_tracker_storage_updates_fn=deps.apply_tracker_storage_updates_fn,
-            parse_tracker_packet_fn=deps.parse_tracker_packet_fn,
-            process_parsed_tracker_packet_fn=deps.process_parsed_tracker_packet_fn,
-            get_node_id_from_num_fn=deps.get_node_id_from_num_fn,
-            to_int_fn=deps.to_int_fn,
-            calculate_hops_fn=deps.calculate_hops_fn,
-            extract_packet_position_fn=deps.extract_packet_position_fn,
-            extract_packet_battery_level_fn=deps.extract_packet_battery_level_fn,
-            extract_reply_id_fn=deps.extract_reply_id_fn,
-            extract_emoji_codepoint_fn=deps.extract_emoji_codepoint_fn,
-            emoji_from_codepoint_fn=deps.emoji_from_codepoint_fn,
-            utc_now_fn=deps.utc_now_fn,
-            format_epoch_fn=deps.format_epoch_fn,
-            to_jsonable_fn=deps.to_jsonable_fn,
+            **_tracker_packet_runtime_dependencies_to_legacy_kwargs_helper(deps),
         )
     else:
         record_tracker_packet_unlocked_with_dependencies_fn(
