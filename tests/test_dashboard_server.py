@@ -1,6 +1,7 @@
 import argparse
 
 from meshdash.dashboard_server import DashboardServerParts, build_dashboard_server
+from meshdash.revision import RevisionInfo
 
 
 class _FakeServer:
@@ -38,7 +39,7 @@ def test_build_dashboard_server_renders_handler_and_binds_server():
 
     parts = build_dashboard_server(
         args=args,
-        revision_info={"label": "rev-label", "title": "rev-title"},
+        revision_info=RevisionInfo(version="0.1.0", commit="abc", label="rev-label", title="rev-title"),
         history_enabled=True,
         state_fn=lambda: {"ok": True},
         node_history_fn=lambda *_a, **_k: {"history": True},

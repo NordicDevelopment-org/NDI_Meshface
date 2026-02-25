@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict
 
+from .revision import RevisionInfo
 from .wiring_adapters import (
     build_http_handler_factory as _build_http_handler_factory_helper,
     build_local_node_id_getter as _build_local_node_id_getter_helper,
@@ -28,7 +29,7 @@ def build_dashboard_runtime_dependencies(
     history_store_cls: Any,
     dashboard_tracker_cls: Any,
     seed_tracker_fn: Callable[..., None],
-    revision_info_fn: Callable[[], dict],
+    revision_info_fn: Callable[[], RevisionInfo],
     build_state_fn: Callable[..., dict],
     sensitive_field_names: set[str],
     build_node_history_loader_fn: Callable[..., Callable[..., dict]],

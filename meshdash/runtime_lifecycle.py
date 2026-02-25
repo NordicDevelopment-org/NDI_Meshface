@@ -1,5 +1,7 @@
 from typing import Any, Callable, Optional
 
+from .revision import RevisionInfo
+
 
 def emit_startup_status(
     *,
@@ -7,7 +9,7 @@ def emit_startup_status(
     bound_host: str,
     bound_port: int,
     show_secrets: bool,
-    revision_info: dict,
+    revision_info: RevisionInfo,
     history_enabled: bool,
     history_db_path: str,
     history_retention_days: int,
@@ -32,7 +34,7 @@ def emit_startup_status(
 
     if not show_secrets:
         out_fn("Secrets are redacted. Use --show-secrets to display full values.")
-    out_fn(f"Revision: v{revision_info['version']} ({revision_info['commit']})")
+    out_fn(f"Revision: v{revision_info.version} ({revision_info.commit})")
 
     if history_enabled:
         out_fn(

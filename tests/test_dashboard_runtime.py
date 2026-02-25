@@ -1,6 +1,7 @@
 import argparse
 
 from meshdash.dashboard_runtime import run_dashboard_runtime
+from meshdash.revision import RevisionInfo
 
 
 class _FakeIface:
@@ -110,7 +111,12 @@ def test_run_dashboard_runtime_wires_core_dependencies():
         dashboard_tracker_cls=_FakeTracker,
         subscribe_fn=_subscribe,
         seed_tracker_fn=_seed_tracker,
-        revision_info_fn=lambda: {"label": "Rev: v0.1.0 (test)", "title": "Rev", "version": "0.1.0", "commit": "test"},
+        revision_info_fn=lambda: RevisionInfo(
+            version="0.1.0",
+            commit="test",
+            label="Rev: v0.1.0 (test)",
+            title="Rev",
+        ),
         build_state_fn=lambda **kwargs: {"ok": True},
         build_node_history_loader_fn=lambda **kwargs: (lambda *_a, **_k: {}),
         build_online_activity_loader_fn=lambda **kwargs: (lambda *_a, **_k: {}),

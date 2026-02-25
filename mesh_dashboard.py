@@ -1,7 +1,6 @@
 import argparse
-import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 try:
     import meshtastic
@@ -65,6 +64,7 @@ from meshdash.theme_presets import (
 from meshdash.cli import build_dashboard_parser as _build_dashboard_parser_helper
 from meshdash.dashboard_runtime import run_dashboard_runtime as _run_dashboard_runtime_helper
 from meshdash.history_store import HistoryStore
+from meshdash.revision import RevisionInfo
 from meshdash.tracker import DashboardTracker, seed_tracker_from_node_db as _seed_tracker_from_node_db_helper
 from meshdash.html import render_html as _render_html_helper
 from meshdash.http_api import make_http_handler as _make_http_handler_helper
@@ -96,7 +96,7 @@ def _detect_git_commit() -> Optional[str]:
     )
 
 
-def _revision_info() -> Dict[str, str]:
+def _revision_info() -> RevisionInfo:
     return _revision_info_from_env_helper(
         env_version=os.environ.get("MESH_DASH_VERSION"),
         default_version=DEFAULT_APP_VERSION,

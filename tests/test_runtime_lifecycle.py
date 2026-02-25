@@ -3,6 +3,7 @@ from meshdash.runtime_lifecycle import (
     emit_startup_status,
     serve_until_stopped,
 )
+from meshdash.revision import RevisionInfo
 
 
 def test_emit_startup_status_public_bind_history_enabled():
@@ -13,7 +14,7 @@ def test_emit_startup_status_public_bind_history_enabled():
         bound_host="0.0.0.0",
         bound_port=8877,
         show_secrets=False,
-        revision_info={"version": "0.1.0", "commit": "abc123"},
+        revision_info=RevisionInfo(version="0.1.0", commit="abc123", label="L", title="T"),
         history_enabled=True,
         history_db_path="/tmp/history.sqlite3",
         history_retention_days=7,
@@ -43,7 +44,7 @@ def test_emit_startup_status_bound_host_history_disabled_no_redaction_line():
         bound_host="127.0.0.1",
         bound_port=8877,
         show_secrets=True,
-        revision_info={"version": "0.1.0", "commit": "abc123"},
+        revision_info=RevisionInfo(version="0.1.0", commit="abc123", label="L", title="T"),
         history_enabled=False,
         history_db_path="/tmp/history.sqlite3",
         history_retention_days=7,

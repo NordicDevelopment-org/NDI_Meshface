@@ -14,7 +14,7 @@
 - `meshdash/chat_send_prepare.py`: chat-send payload normalization/validation and ack-request policy helper.
 - `meshdash/chat_send_response.py`: send delivery-state + API response payload builder helpers.
 - `meshdash/config.py`: centralized dashboard defaults/constants and sensitive-key policy.
-- `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers.
+- `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers returning typed revision info.
 - `meshdash/api_inputs.py`: shared API query/body parsing and request-size validation helpers.
 - `meshdash/api_chat.py`: domain handler for chat-send API POST flow (`/api/chat/send`).
 - `meshdash/api_system.py`: domain handler for system state API response (`/api/state`).
@@ -104,7 +104,7 @@
 - `meshdash/nodes_identity.py`: node-id/local-id resolution helpers from interface snapshots.
 - `meshdash/nodes_time.py`: UTC text/time helpers for dashboard state/history metadata.
 - `meshdash/nodes_snapshot.py`: node snapshot safe-iteration and position extraction helpers.
-- `meshdash/revision.py`: revision/version/git metadata helpers for header build info.
+- `meshdash/revision.py`: revision/version/git metadata helpers and `RevisionInfo` typed contract for runtime wiring.
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
 - `meshdash/runtime_callbacks.py`: stable runtime-callbacks facade re-exporting closure builders.
 - `meshdash/runtime_state_loader.py`: state snapshot closure builder.

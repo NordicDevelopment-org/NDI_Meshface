@@ -5,6 +5,7 @@ from meshdash.dashboard_runtime_context import (
     DashboardRuntimeContext,
     build_dashboard_runtime_context,
 )
+from meshdash.revision import RevisionInfo
 
 
 def test_build_dashboard_runtime_context_wires_runtime_dependencies():
@@ -30,7 +31,7 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
     send_node_history = lambda *_a, **_k: {"ok": True}
     send_online = lambda *_a, **_k: {"ok": True}
     send_chat = lambda *_a, **_k: {"ok": True}
-    revision_info = {"label": "Rev", "title": "Rev Title"}
+    revision_info = RevisionInfo(version="0.1.0", commit="abc", label="Rev", title="Rev Title")
 
     def _mesh_target_label(_args):
         calls["mesh_target_args"] = _args
@@ -144,7 +145,7 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
         "target": "192.168.1.10:4403 (tcp)",
         "show_secrets": False,
         "history_db_path": "/abs/state/history.sqlite3",
-        "revision_info": revision_info,
+        "revision_info": revision_info.as_dict(),
         "history_store": history_store,
         "default_node_history_hours": 72,
         "default_node_history_points": 1440,

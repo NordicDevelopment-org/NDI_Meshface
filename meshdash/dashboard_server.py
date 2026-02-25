@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict
+from typing import Any, Callable
+
+from .revision import RevisionInfo
 
 
 @dataclass(frozen=True)
@@ -14,7 +16,7 @@ class DashboardServerParts:
 def build_dashboard_server(
     *,
     args: Any,
-    revision_info: Dict[str, str],
+    revision_info: RevisionInfo,
     history_enabled: bool,
     state_fn: Callable[[], dict],
     node_history_fn: Callable[..., dict],
@@ -33,8 +35,8 @@ def build_dashboard_server(
         history_retention_days=args.history_retention_days,
         node_history_hours=args.node_history_hours,
         node_history_max_points=args.node_history_max_points,
-        revision_label=revision_info["label"],
-        revision_title=revision_info["title"],
+        revision_label=revision_info.label,
+        revision_title=revision_info.title,
     )
     handler_cls = make_http_handler_fn(
         html,

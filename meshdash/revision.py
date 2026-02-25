@@ -1,5 +1,22 @@
 import subprocess
-from typing import Any, Callable, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Optional
+
+
+@dataclass(frozen=True)
+class RevisionInfo:
+    version: str
+    commit: str
+    label: str
+    title: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "version": self.version,
+            "commit": self.commit,
+            "label": self.label,
+            "title": self.title,
+        }
 
 
 def sanitize_revision_token(raw: Any, fallback: str) -> str:
@@ -50,7 +67,7 @@ def revision_info(
     unknown_git_commit: str,
     detect_commit: Callable[[], Optional[str]],
     sanitize_token: Callable[[Any, str], str] = sanitize_revision_token,
-) -> Dict[str, str]:
+) -> RevisionInfo:
     version = sanitize_token(version_raw or default_version, "0.0.0")
     if version.lower().startswith("v"):
         version = version[1:] or "0.0.0"
@@ -59,10 +76,9 @@ def revision_info(
     label = f"Rev: v{version} ({commit})"
     title = f"Dashboard revision: version {version}, commit {commit}"
 
-    return {
-        "version": version,
-        "commit": commit,
-        "label": label,
-        "title": title,
-    }
-
+    return RevisionInfo(
+        version=version,
+        commit=commit,
+        label=label,
+        title=title,
+    )

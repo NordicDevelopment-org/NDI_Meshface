@@ -1,4 +1,4 @@
-from meshdash.revision import detect_git_commit, revision_info, sanitize_revision_token
+from meshdash.revision import RevisionInfo, detect_git_commit, revision_info, sanitize_revision_token
 
 
 def test_sanitize_revision_token_filters_characters():
@@ -22,7 +22,8 @@ def test_revision_info_uses_detect_commit_callback():
         unknown_git_commit="nogit",
         detect_commit=lambda: "deadbeef",
     )
-    assert info["version"] == "2.0.1"
-    assert info["commit"] == "deadbeef"
-    assert info["label"] == "Rev: v2.0.1 (deadbeef)"
-    assert "version 2.0.1" in info["title"]
+    assert isinstance(info, RevisionInfo)
+    assert info.version == "2.0.1"
+    assert info.commit == "deadbeef"
+    assert info.label == "Rev: v2.0.1 (deadbeef)"
+    assert "version 2.0.1" in info.title

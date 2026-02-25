@@ -2,12 +2,13 @@ import os
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from .dashboard_loaders import (
     DashboardRuntimeLoaders,
     build_dashboard_runtime_loaders,
 )
+from .revision import RevisionInfo
 from .dashboard_setup import (
     open_optional_history_store,
     seed_tracker_if_empty,
@@ -23,7 +24,7 @@ class DashboardRuntimeContext:
     tracker: Any
     send_lock: Any
     started_at: float
-    revision_info: Dict[str, Any]
+    revision_info: RevisionInfo
     state_fn: Callable[[], dict]
     node_history_fn: Callable[..., dict]
     online_activity_fn: Callable[..., dict]
@@ -40,7 +41,7 @@ def build_dashboard_runtime_context(
     dashboard_tracker_cls: Any,
     subscribe_fn: Callable[[Any, str], None],
     seed_tracker_fn: Callable[[Any, Any], None],
-    revision_info_fn: Callable[[], dict],
+    revision_info_fn: Callable[[], RevisionInfo],
     send_chat_message_fn: Callable[..., dict],
     send_reaction_packet_fn: Callable[..., Any],
     get_local_node_id_fn: Callable[[Any], str],
@@ -89,7 +90,7 @@ def build_dashboard_runtime_context(
         target=target,
         show_secrets=args.show_secrets,
         history_db_path=history_db_path,
-        revision_info=revision_info,
+        revision_info=revision_info.as_dict(),
         history_store=history_store,
         default_node_history_hours=args.node_history_hours,
         default_node_history_points=args.node_history_max_points,

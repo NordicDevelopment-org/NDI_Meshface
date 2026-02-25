@@ -16,6 +16,7 @@ from .dashboard_runtime_context import (
 from .dashboard_server import (
     build_dashboard_server,
 )
+from .revision import RevisionInfo
 
 
 def run_dashboard_runtime(
@@ -27,7 +28,7 @@ def run_dashboard_runtime(
     dashboard_tracker_cls: Any,
     subscribe_fn: Callable[[Any, str], None],
     seed_tracker_fn: Callable[[Any, Any], None],
-    revision_info_fn: Callable[[], dict],
+    revision_info_fn: Callable[[], RevisionInfo],
     build_state_fn: Callable[..., dict],
     build_node_history_loader_fn: Callable[..., Callable[..., dict]],
     build_online_activity_loader_fn: Callable[..., Callable[..., dict]],

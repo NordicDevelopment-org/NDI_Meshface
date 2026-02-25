@@ -1,7 +1,8 @@
 import os
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from .revision import (
+    RevisionInfo,
     detect_git_commit as _detect_git_commit_helper,
     revision_info as _build_revision_info_helper,
     sanitize_revision_token as _sanitize_revision_token_helper,
@@ -33,9 +34,9 @@ def revision_info_from_env(
     default_version: str,
     unknown_git_commit: str,
     detect_commit_fn: Callable[[], Optional[str]],
-    build_revision_info_fn: Callable[..., Dict[str, str]] = _build_revision_info_helper,
+    build_revision_info_fn: Callable[..., RevisionInfo] = _build_revision_info_helper,
     sanitize_token_fn: Callable[[Any, str], str] = _sanitize_revision_token_helper,
-) -> Dict[str, str]:
+) -> RevisionInfo:
     version_raw = env_version or default_version
     return build_revision_info_fn(
         version_raw=version_raw,
