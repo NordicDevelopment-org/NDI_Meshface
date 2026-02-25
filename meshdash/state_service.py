@@ -7,6 +7,7 @@ from .helpers import (
 from .nodes import (
     utc_now as _utc_now,
 )
+from .revision import RevisionInfo
 from .runtime_types import ToJsonableFn, UtcNowFn
 from .state_nodes import (
     collect_local_state as _collect_local_state_helper,
@@ -28,7 +29,7 @@ def build_dashboard_state(
     target: str,
     show_secrets: bool,
     storage_probe_path: Optional[str],
-    revision_info: Dict[str, str],
+    revision_info: RevisionInfo | Dict[str, str],
     sensitive_field_names: set[str],
     collect_nodes_fn: Callable[[Any], Dict[str, Any]] = _collect_nodes_helper,
     collect_local_state_fn: Callable[[Any], Dict[str, Any]] = _collect_local_state_helper,

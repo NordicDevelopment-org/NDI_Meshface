@@ -47,7 +47,7 @@ def build_state_snapshot_loader_with_dependencies(
             target=dependencies.target,
             show_secrets=dependencies.show_secrets,
             storage_probe_path=dependencies.storage_probe_path,
-            revision_info=dependencies.revision_info.as_dict(),
+            revision_info=dependencies.revision_info,
         )
 
     return state_fn

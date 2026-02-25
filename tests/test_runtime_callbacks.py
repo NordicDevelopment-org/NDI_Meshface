@@ -26,7 +26,8 @@ def test_build_state_snapshot_loader_forwards_bound_context():
     assert captured["tracker"] == "tracker"
     assert captured["target"] == "mesh-target"
     assert captured["storage_probe_path"] == "/tmp/db.sqlite3"
-    assert captured["revision_info"]["version"] == "0.1.0"
+    assert isinstance(captured["revision_info"], RevisionInfo)
+    assert captured["revision_info"].version == "0.1.0"
 
 
 def test_build_send_chat_loader_forwards_all_parameters():

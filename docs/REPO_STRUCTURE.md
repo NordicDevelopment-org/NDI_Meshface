@@ -139,7 +139,7 @@
 - `meshdash/state_nodes.py`: stable state-node facade re-exporting node/local collectors.
 - `meshdash/state_node_rows.py`: node row/full-node snapshot collection helpers.
 - `meshdash/state_local.py`: local-node config/module/channel snapshot collection helper.
-- `meshdash/state_summary.py`: summary/local-state enrichment helpers for `/api/state`.
+- `meshdash/state_summary.py`: summary/local-state enrichment helpers for `/api/state` (accepts typed `RevisionInfo` with dict compatibility at payload boundary).
 - `meshdash/tracker.py`: stable tracker facade re-exporting tracker class and seed helper.
 - `meshdash/tracker_runtime.py`: stable tracker-runtime facade re-exporting tracker class + seed helper.
 - `meshdash/tracker_runtime_impl.py`: tracker runtime orchestration class wiring callbacks/bootstrap/snapshot helpers.

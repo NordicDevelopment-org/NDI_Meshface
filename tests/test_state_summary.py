@@ -4,6 +4,7 @@ from meshdash.state_summary import (
     collect_local_state_safe,
     modem_preset_from_local_state,
 )
+from meshdash.revision import RevisionInfo
 
 
 def test_apply_node_saved_counts_merges_stats_into_rows():
@@ -65,3 +66,26 @@ def test_build_summary_payload_uses_injected_time_and_disk_info():
     assert summary["recent_packet_buffer"] == 1
     assert summary["modem_preset"] == "MEDIUM_FAST"
     assert summary["disk"]["free_percent"] == 80.0
+
+
+def test_build_summary_payload_accepts_revision_info_contract():
+    summary = build_summary_payload(
+        target="target",
+        started_at=100.0,
+        node_rows=[],
+        nodes_with_position=0,
+        tracker_data={
+            "live_packet_count": 0,
+            "edges": [],
+            "real_edge_count": 0,
+            "recent_packets": [],
+        },
+        storage_probe_path=None,
+        revision_info=RevisionInfo(version="0.1.0", commit="abc123", label="L", title="T"),
+        modem_preset=None,
+        now_ts_fn=lambda: 100.0,
+        disk_space_info_fn=lambda _path: {"free_percent": "n/a"},
+    )
+
+    assert summary["revision"]["version"] == "0.1.0"
+    assert summary["revision"]["commit"] == "abc123"
