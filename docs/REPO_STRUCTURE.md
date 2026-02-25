@@ -103,6 +103,8 @@
 - `meshdash/history_writes.py`: packet-event rollup orchestration helper.
 - `meshdash/history_views.py`: node history/online activity empty payload and loader builders.
 - `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
+- `meshdash/http_api_get.py`: GET-side HTTP route dependency builder + dispatch helpers.
+- `meshdash/http_api_post.py`: POST-side HTTP route dependency builder + dispatch helpers.
 - `meshdash/http_handler.py`: shared HTTP `BaseHTTPRequestHandler` shell for GET/POST dispatch wiring.
 - `meshdash/http_route_contracts.py`: typed GET/POST route dependency contracts used by HTTP API dispatch wiring.
 - `meshdash/http_routes.py`: stable HTTP-routes facade re-exporting GET/POST route handlers.

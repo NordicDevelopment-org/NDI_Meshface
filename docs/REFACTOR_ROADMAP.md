@@ -152,6 +152,10 @@ Route handlers by domain.
 - Added `meshdash/api_chat.py` for `/api/chat/send` POST domain handling.
 - `meshdash/http_routes_get.py` now delegates domain payload/response logic into those modules.
 - `meshdash/http_routes_post.py` now delegates chat-send behavior into `api_chat`.
+- Split HTTP API wiring into focused dispatch modules:
+  - `meshdash/http_api_get.py`
+  - `meshdash/http_api_post.py`
+  - `meshdash/http_api.py` now serves as the orchestration facade.
 - Added typed HTTP route dependency contracts:
   - `meshdash/http_route_contracts.py`
   - `DashboardGetRouteDependencies`

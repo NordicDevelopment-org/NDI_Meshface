@@ -1,0 +1,61 @@
+from typing import Any
+from urllib.parse import urlparse
+
+from .api_input_history import parse_node_history_request, parse_online_activity_request
+from .helpers import to_int
+from .http_responses import write_html_response, write_json_response, write_text_response
+from .http_route_contracts import DashboardGetRouteDependencies, NodeHistoryFn, OnlineActivityFn, StateFn, ToIntFn
+from .http_routes import handle_dashboard_get
+from .services import empty_node_history, empty_online_activity
+
+
+def build_get_route_dependencies(
+    *,
+    html_text: str,
+    state_fn: StateFn,
+    node_history_fn: NodeHistoryFn | None,
+    online_activity_fn: OnlineActivityFn | None,
+    default_node_history_hours: int,
+    to_int_fn: ToIntFn = to_int,
+) -> DashboardGetRouteDependencies:
+    return DashboardGetRouteDependencies(
+        html_text=html_text,
+        state_fn=state_fn,
+        node_history_fn=node_history_fn,
+        online_activity_fn=online_activity_fn,
+        default_node_history_hours=default_node_history_hours,
+        to_int_fn=to_int_fn,
+        parse_node_history_request_fn=parse_node_history_request,
+        parse_online_activity_request_fn=parse_online_activity_request,
+        empty_node_history_fn=empty_node_history,
+        empty_online_activity_fn=empty_online_activity,
+        write_html_response_fn=write_html_response,
+        write_json_response_fn=write_json_response,
+        write_text_response_fn=write_text_response,
+    )
+
+
+def dispatch_get_request(
+    handler: Any,
+    *,
+    deps: DashboardGetRouteDependencies,
+    parse_url_fn=urlparse,
+    handle_get_fn=handle_dashboard_get,
+) -> None:
+    parsed = parse_url_fn(handler.path)
+    handle_get_fn(
+        handler,
+        path=parsed.path,
+        query=parsed.query,
+        deps=deps,
+    )
+
+
+def make_get_dispatch(
+    *,
+    deps: DashboardGetRouteDependencies,
+):
+    def _dispatch_get(handler: Any) -> None:
+        dispatch_get_request(handler, deps=deps)
+
+    return _dispatch_get
