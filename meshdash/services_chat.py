@@ -1,9 +1,17 @@
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 from .chat_send import (
     build_chat_send_response,
     delivery_state_for_send,
     prepare_chat_send_input,
+)
+from .runtime_types import (
+    LocalNodeIdFn,
+    NormalizeSingleEmojiFn,
+    RecordLocalChatFn,
+    SendReactionPacketFn,
+    ToIntFn,
+    UtcNowFn,
 )
 
 
@@ -17,13 +25,13 @@ def send_chat_message(
     emoji: Any = None,
     iface: Any,
     send_lock: Any,
-    send_reaction_packet_fn: Callable[..., Any],
-    local_node_id_fn: Callable[[], str],
-    record_local_chat_fn: Callable[..., None],
+    send_reaction_packet_fn: SendReactionPacketFn,
+    local_node_id_fn: LocalNodeIdFn,
+    record_local_chat_fn: RecordLocalChatFn,
     chat_max_bytes: int,
-    normalize_single_emoji_fn: Callable[[Any], tuple[Optional[str], Optional[int]]],
-    to_int_fn: Callable[[Any], Optional[int]],
-    now_text_fn: Callable[[], str],
+    normalize_single_emoji_fn: NormalizeSingleEmojiFn,
+    to_int_fn: ToIntFn,
+    now_text_fn: UtcNowFn,
 ) -> Dict[str, Any]:
     prepared = prepare_chat_send_input(
         text=text,

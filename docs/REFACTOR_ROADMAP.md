@@ -270,6 +270,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
   - `build_dashboard_server_with_dependencies(...)` in `meshdash/dashboard_server.py`
   - existing `build_dashboard_server(...)` preserved as compatibility wrapper.
 - State summary/revision flow now accepts typed `RevisionInfo` through runtime state loading while preserving dict compatibility at the state/summary payload boundary.
+- `meshdash/services_chat.py` now uses shared runtime callable aliases for reaction/local-node/time and chat normalization callbacks (no remaining ad-hoc `Callable[..., Any]` in runtime-adjacent modules).
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
   - `parse_chat_send_request(...)` now used by POST route wiring + chat API handler
