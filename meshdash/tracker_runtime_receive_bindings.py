@@ -18,7 +18,7 @@ from .tracker_runtime_receive import (
     record_tracker_receive_unlocked as _record_tracker_receive_unlocked_helper,
 )
 from .tracker_runtime_record import (
-    record_tracker_packet_unlocked as _record_tracker_packet_unlocked_helper,
+    record_tracker_packet_unlocked_with_dependencies as _record_tracker_packet_unlocked_with_dependencies_helper,
 )
 
 
@@ -46,7 +46,8 @@ def record_tracker_receive_unlocked_for_tracker(
     interface: Any,
     include_live_count: bool,
     get_node_id_from_num_fn: Any = _get_node_id_from_num_helper,
-    record_tracker_packet_unlocked_fn: Any = _record_tracker_packet_unlocked_helper,
+    record_tracker_packet_unlocked_fn: Any = None,
+    record_tracker_packet_unlocked_with_dependencies_fn: Any = _record_tracker_packet_unlocked_with_dependencies_helper,
     resolve_tracker_node_id_from_num_fn: Any = _resolve_tracker_node_id_from_num,
     record_tracker_receive_unlocked_fn: Any = _record_tracker_receive_unlocked_helper,
 ) -> None:
@@ -61,4 +62,5 @@ def record_tracker_receive_unlocked_for_tracker(
             get_node_id_from_num_fn=get_node_id_from_num_fn,
         ),
         record_tracker_packet_unlocked_fn=record_tracker_packet_unlocked_fn,
+        record_tracker_packet_unlocked_with_dependencies_fn=record_tracker_packet_unlocked_with_dependencies_fn,
     )

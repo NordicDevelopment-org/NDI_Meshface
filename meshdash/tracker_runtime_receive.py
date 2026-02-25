@@ -37,7 +37,10 @@ from .tracker_receive import (
     process_parsed_tracker_packet as _process_parsed_tracker_packet_helper,
 )
 from .tracker_runtime_record import (
-    record_tracker_packet_unlocked as _record_tracker_packet_unlocked_helper,
+    record_tracker_packet_unlocked_with_dependencies as _record_tracker_packet_unlocked_with_dependencies_helper,
+)
+from .tracker_runtime_packet_contracts import (
+    TrackerPacketRuntimeDependencies,
 )
 from .tracker_storage import (
     apply_tracker_storage_updates as _apply_tracker_storage_updates_helper,
@@ -51,7 +54,8 @@ def record_tracker_receive_unlocked(
     interface: Any,
     include_live_count: bool,
     get_node_id_from_num_fn: Any,
-    record_tracker_packet_unlocked_fn: Any = _record_tracker_packet_unlocked_helper,
+    record_tracker_packet_unlocked_fn: Any = None,
+    record_tracker_packet_unlocked_with_dependencies_fn: Any = _record_tracker_packet_unlocked_with_dependencies_helper,
     apply_tracker_observation_fn: Any = _apply_tracker_observation_helper,
     apply_routing_delivery_update_fn: Any = _apply_routing_delivery_update_helper,
     record_direct_edge_observation_fn: Any = _record_direct_edge_observation_helper,
@@ -72,10 +76,7 @@ def record_tracker_receive_unlocked(
     format_epoch_fn: Any = _format_epoch,
     to_jsonable_fn: Any = _to_jsonable,
 ) -> None:
-    record_tracker_packet_unlocked_fn(
-        packet=packet,
-        interface=interface,
-        include_live_count=include_live_count,
+    deps = TrackerPacketRuntimeDependencies(
         session_edges=tracker.edges,
         historical_edges=tracker._historical_edges,
         port_counts=tracker.port_counts,
@@ -105,4 +106,45 @@ def record_tracker_receive_unlocked(
         format_epoch_fn=format_epoch_fn,
         to_jsonable_fn=to_jsonable_fn,
     )
+    if record_tracker_packet_unlocked_fn is not None:
+        record_tracker_packet_unlocked_fn(
+            packet=packet,
+            interface=interface,
+            include_live_count=include_live_count,
+            session_edges=deps.session_edges,
+            historical_edges=deps.historical_edges,
+            port_counts=deps.port_counts,
+            recent_packets=deps.recent_packets,
+            recent_chat=deps.recent_chat,
+            history_store=deps.history_store,
+            extract_delivery_update_fn=deps.extract_delivery_update_fn,
+            set_delivery_state_fn=deps.set_delivery_state_fn,
+            apply_tracker_observation_fn=deps.apply_tracker_observation_fn,
+            apply_routing_delivery_update_fn=deps.apply_routing_delivery_update_fn,
+            record_direct_edge_observation_fn=deps.record_direct_edge_observation_fn,
+            build_tracker_packet_artifacts_fn=deps.build_tracker_packet_artifacts_fn,
+            build_packet_summary_fn=deps.build_packet_summary_fn,
+            build_chat_entry_from_packet_fn=deps.build_chat_entry_from_packet_fn,
+            apply_tracker_storage_updates_fn=deps.apply_tracker_storage_updates_fn,
+            parse_tracker_packet_fn=deps.parse_tracker_packet_fn,
+            process_parsed_tracker_packet_fn=deps.process_parsed_tracker_packet_fn,
+            get_node_id_from_num_fn=deps.get_node_id_from_num_fn,
+            to_int_fn=deps.to_int_fn,
+            calculate_hops_fn=deps.calculate_hops_fn,
+            extract_packet_position_fn=deps.extract_packet_position_fn,
+            extract_packet_battery_level_fn=deps.extract_packet_battery_level_fn,
+            extract_reply_id_fn=deps.extract_reply_id_fn,
+            extract_emoji_codepoint_fn=deps.extract_emoji_codepoint_fn,
+            emoji_from_codepoint_fn=deps.emoji_from_codepoint_fn,
+            utc_now_fn=deps.utc_now_fn,
+            format_epoch_fn=deps.format_epoch_fn,
+            to_jsonable_fn=deps.to_jsonable_fn,
+        )
+    else:
+        record_tracker_packet_unlocked_with_dependencies_fn(
+            packet=packet,
+            interface=interface,
+            include_live_count=include_live_count,
+            deps=deps,
+        )
     tracker._expire_pending_deliveries_fn()

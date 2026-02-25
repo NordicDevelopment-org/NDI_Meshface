@@ -234,6 +234,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added typed tracker packet-ingest dependency contract:
   - `TrackerPacketRuntimeDependencies` in `meshdash/tracker_runtime_packet_contracts.py`
   - `record_tracker_packet_unlocked_with_dependencies(...)` in `meshdash/tracker_runtime_record.py`
+  - `tracker_runtime_receive` now routes through the typed path by default while preserving legacy callback override compatibility.
   - existing `record_tracker_packet_unlocked(...)` preserved as compatibility wrapper.
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`

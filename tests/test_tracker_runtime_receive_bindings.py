@@ -23,6 +23,7 @@ def test_record_tracker_receive_unlocked_for_tracker_binds_node_resolver():
     interface = object()
     sentinel_get_node_id = object()
     sentinel_record = object()
+    sentinel_record_with_deps = object()
 
     record_tracker_receive_unlocked_for_tracker(
         tracker,
@@ -31,6 +32,7 @@ def test_record_tracker_receive_unlocked_for_tracker_binds_node_resolver():
         include_live_count=False,
         get_node_id_from_num_fn=sentinel_get_node_id,
         record_tracker_packet_unlocked_fn=sentinel_record,
+        record_tracker_packet_unlocked_with_dependencies_fn=sentinel_record_with_deps,
         resolve_tracker_node_id_from_num_fn=_resolve_tracker_node_id_from_num_fn,
         record_tracker_receive_unlocked_fn=_record_tracker_receive_unlocked,
     )
@@ -40,6 +42,10 @@ def test_record_tracker_receive_unlocked_for_tracker_binds_node_resolver():
     assert observed["kwargs"]["interface"] is interface
     assert observed["kwargs"]["include_live_count"] is False
     assert observed["kwargs"]["record_tracker_packet_unlocked_fn"] is sentinel_record
+    assert (
+        observed["kwargs"]["record_tracker_packet_unlocked_with_dependencies_fn"]
+        is sentinel_record_with_deps
+    )
 
     bound_resolver = observed["kwargs"]["get_node_id_from_num_fn"]
     assert bound_resolver("iface-x", 12345) == "!resolved"

@@ -1,5 +1,6 @@
 from collections import Counter, deque
 
+from meshdash.tracker_runtime_packet_contracts import TrackerPacketRuntimeDependencies
 from meshdash.tracker_runtime_receive import record_tracker_receive_unlocked
 
 
@@ -112,4 +113,58 @@ def test_record_tracker_receive_unlocked_forwards_tracker_context_and_expires():
         "format_epoch_fn": sentinel_format_epoch,
         "to_jsonable_fn": sentinel_to_jsonable,
     }
+    assert observed["expired"] is True
+
+
+def test_record_tracker_receive_unlocked_uses_typed_path_by_default():
+    observed = {}
+
+    def _record_tracker_packet_unlocked_with_dependencies(**kwargs):
+        observed["record_kwargs"] = kwargs
+
+    def _expire(self):
+        observed["expired"] = True
+
+    tracker = type(
+        "_Tracker",
+        (),
+        {
+            "edges": {"edge": 1},
+            "_historical_edges": {"historical": 2},
+            "port_counts": Counter(),
+            "recent_packets": deque(maxlen=8),
+            "recent_chat": deque(maxlen=8),
+            "_history_store": "history-store",
+            "_extract_delivery_update_fn": "extract-delivery",
+            "_set_delivery_state_fn": "set-delivery",
+            "_expire_pending_deliveries_fn": _expire,
+        },
+    )()
+
+    packet = {"id": 99}
+    interface = object()
+    sentinel_get_node_id = object()
+
+    record_tracker_receive_unlocked(
+        tracker,
+        packet=packet,
+        interface=interface,
+        include_live_count=False,
+        get_node_id_from_num_fn=sentinel_get_node_id,
+        record_tracker_packet_unlocked_with_dependencies_fn=_record_tracker_packet_unlocked_with_dependencies,
+    )
+
+    record_kwargs = observed["record_kwargs"]
+    assert record_kwargs["packet"] is packet
+    assert record_kwargs["interface"] is interface
+    assert record_kwargs["include_live_count"] is False
+    deps = record_kwargs["deps"]
+    assert isinstance(deps, TrackerPacketRuntimeDependencies)
+    assert deps.get_node_id_from_num_fn is sentinel_get_node_id
+    assert deps.session_edges is tracker.edges
+    assert deps.historical_edges is tracker._historical_edges
+    assert deps.port_counts is tracker.port_counts
+    assert deps.recent_packets is tracker.recent_packets
+    assert deps.recent_chat is tracker.recent_chat
+    assert deps.history_store == "history-store"
     assert observed["expired"] is True
