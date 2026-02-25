@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
 
+from .revision import RevisionInfo
+
 from .state_nodes import (
     collect_local_state as _collect_local_state_helper,
     collect_nodes as _collect_nodes_helper,
@@ -24,7 +26,7 @@ def build_state(
     target: str,
     show_secrets: bool,
     storage_probe_path: Optional[str],
-    revision_info: Dict[str, str],
+    revision_info: RevisionInfo | Dict[str, str],
     sensitive_field_names: set[str],
 ) -> Dict[str, Any]:
     return _build_dashboard_state_helper(
