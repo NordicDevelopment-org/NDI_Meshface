@@ -1,5 +1,52 @@
 from typing import Any, Dict
 
+from .tracker_runtime_packet_contracts import TrackerPacketRuntimeDependencies
+
+
+def record_tracker_packet_unlocked_with_dependencies(
+    *,
+    packet: Dict[str, Any],
+    interface: Any,
+    include_live_count: bool,
+    deps: TrackerPacketRuntimeDependencies,
+) -> None:
+    parsed = deps.parse_tracker_packet_fn(
+        packet,
+        interface,
+        get_node_id_from_num_fn=deps.get_node_id_from_num_fn,
+        to_int_fn=deps.to_int_fn,
+        calculate_hops_fn=deps.calculate_hops_fn,
+        extract_packet_position_fn=deps.extract_packet_position_fn,
+        extract_packet_battery_level_fn=deps.extract_packet_battery_level_fn,
+        extract_reply_id_fn=deps.extract_reply_id_fn,
+        extract_emoji_codepoint_fn=deps.extract_emoji_codepoint_fn,
+        emoji_from_codepoint_fn=deps.emoji_from_codepoint_fn,
+    )
+    deps.process_parsed_tracker_packet_fn(
+        packet=packet,
+        parsed=parsed,
+        include_live_count=include_live_count,
+        session_edges=deps.session_edges,
+        historical_edges=deps.historical_edges,
+        port_counts=deps.port_counts,
+        apply_tracker_observation_fn=deps.apply_tracker_observation_fn,
+        apply_routing_delivery_update_fn=deps.apply_routing_delivery_update_fn,
+        extract_update_fn=deps.extract_delivery_update_fn,
+        set_delivery_state_fn=deps.set_delivery_state_fn,
+        record_direct_edge_observation_fn=deps.record_direct_edge_observation_fn,
+        build_tracker_packet_artifacts_fn=deps.build_tracker_packet_artifacts_fn,
+        build_packet_summary_fn=deps.build_packet_summary_fn,
+        build_chat_entry_from_packet_fn=deps.build_chat_entry_from_packet_fn,
+        utc_now_fn=deps.utc_now_fn,
+        format_epoch_fn=deps.format_epoch_fn,
+        to_int_fn=deps.to_int_fn,
+        to_jsonable_fn=deps.to_jsonable_fn,
+        apply_tracker_storage_updates_fn=deps.apply_tracker_storage_updates_fn,
+        recent_packets=deps.recent_packets,
+        recent_chat=deps.recent_chat,
+        history_store=deps.history_store,
+    )
+
 
 def record_tracker_packet_unlocked(
     *,
@@ -35,9 +82,24 @@ def record_tracker_packet_unlocked(
     format_epoch_fn: Any,
     to_jsonable_fn: Any,
 ) -> None:
-    parsed = parse_tracker_packet_fn(
-        packet,
-        interface,
+    deps = TrackerPacketRuntimeDependencies(
+        session_edges=session_edges,
+        historical_edges=historical_edges,
+        port_counts=port_counts,
+        recent_packets=recent_packets,
+        recent_chat=recent_chat,
+        history_store=history_store,
+        extract_delivery_update_fn=extract_delivery_update_fn,
+        set_delivery_state_fn=set_delivery_state_fn,
+        apply_tracker_observation_fn=apply_tracker_observation_fn,
+        apply_routing_delivery_update_fn=apply_routing_delivery_update_fn,
+        record_direct_edge_observation_fn=record_direct_edge_observation_fn,
+        build_tracker_packet_artifacts_fn=build_tracker_packet_artifacts_fn,
+        build_packet_summary_fn=build_packet_summary_fn,
+        build_chat_entry_from_packet_fn=build_chat_entry_from_packet_fn,
+        apply_tracker_storage_updates_fn=apply_tracker_storage_updates_fn,
+        parse_tracker_packet_fn=parse_tracker_packet_fn,
+        process_parsed_tracker_packet_fn=process_parsed_tracker_packet_fn,
         get_node_id_from_num_fn=get_node_id_from_num_fn,
         to_int_fn=to_int_fn,
         calculate_hops_fn=calculate_hops_fn,
@@ -46,28 +108,13 @@ def record_tracker_packet_unlocked(
         extract_reply_id_fn=extract_reply_id_fn,
         extract_emoji_codepoint_fn=extract_emoji_codepoint_fn,
         emoji_from_codepoint_fn=emoji_from_codepoint_fn,
-    )
-    process_parsed_tracker_packet_fn(
-        packet=packet,
-        parsed=parsed,
-        include_live_count=include_live_count,
-        session_edges=session_edges,
-        historical_edges=historical_edges,
-        port_counts=port_counts,
-        apply_tracker_observation_fn=apply_tracker_observation_fn,
-        apply_routing_delivery_update_fn=apply_routing_delivery_update_fn,
-        extract_update_fn=extract_delivery_update_fn,
-        set_delivery_state_fn=set_delivery_state_fn,
-        record_direct_edge_observation_fn=record_direct_edge_observation_fn,
-        build_tracker_packet_artifacts_fn=build_tracker_packet_artifacts_fn,
-        build_packet_summary_fn=build_packet_summary_fn,
-        build_chat_entry_from_packet_fn=build_chat_entry_from_packet_fn,
         utc_now_fn=utc_now_fn,
         format_epoch_fn=format_epoch_fn,
-        to_int_fn=to_int_fn,
         to_jsonable_fn=to_jsonable_fn,
-        apply_tracker_storage_updates_fn=apply_tracker_storage_updates_fn,
-        recent_packets=recent_packets,
-        recent_chat=recent_chat,
-        history_store=history_store,
+    )
+    record_tracker_packet_unlocked_with_dependencies(
+        packet=packet,
+        interface=interface,
+        include_live_count=include_live_count,
+        deps=deps,
     )
