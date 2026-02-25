@@ -1,11 +1,25 @@
-from typing import Any, Callable
+from typing import Any
+
+from .runtime_types import (
+    BuildStateFn,
+    GetLocalNodeIdFn,
+    MakeHttpHandlerFn,
+    NodeHistoryFn,
+    OnlineActivityFn,
+    RawGetLocalNodeIdFn,
+    SendChatFn,
+    SendReactionPacketFn,
+    StateFn,
+    ToIntFn,
+    ToJsonableFn,
+)
 
 
 def build_state_builder(
     *,
-    build_state_fn: Callable[..., dict],
+    build_state_fn: BuildStateFn,
     sensitive_field_names: set[str],
-) -> Callable[..., dict]:
+) -> BuildStateFn:
     def state_with_sensitive_fields(**kwargs: Any) -> dict:
         return build_state_fn(
             sensitive_field_names=sensitive_field_names,
@@ -17,10 +31,10 @@ def build_state_builder(
 
 def build_reaction_sender(
     *,
-    send_emoji_reaction_packet_fn: Callable[..., Any],
+    send_emoji_reaction_packet_fn: SendReactionPacketFn,
     mesh_pb2_module: Any,
     portnums_pb2_module: Any,
-) -> Callable[..., Any]:
+) -> SendReactionPacketFn:
     def send_reaction_packet(**kwargs: Any) -> Any:
         return send_emoji_reaction_packet_fn(
             mesh_pb2_module=mesh_pb2_module,
@@ -33,11 +47,11 @@ def build_reaction_sender(
 
 def build_local_node_id_getter(
     *,
-    get_local_node_id_fn: Callable[..., str],
+    get_local_node_id_fn: RawGetLocalNodeIdFn,
     meshtastic_module: Any,
-    to_jsonable_fn: Callable[[Any], Any],
-    to_int_fn: Callable[[Any], Any],
-) -> Callable[[Any], str]:
+    to_jsonable_fn: ToJsonableFn,
+    to_int_fn: ToIntFn,
+) -> GetLocalNodeIdFn:
     def get_local_node_id(iface: Any) -> str:
         return get_local_node_id_fn(
             iface,
@@ -51,16 +65,16 @@ def build_local_node_id_getter(
 
 def build_http_handler_factory(
     *,
-    make_http_handler_fn: Callable[..., Any],
+    make_http_handler_fn: MakeHttpHandlerFn,
     default_node_history_hours: int,
-    to_int_fn: Callable[[Any], Any],
-) -> Callable[..., Any]:
+    to_int_fn: ToIntFn,
+) -> MakeHttpHandlerFn:
     def make_http_handler(
         html_text: str,
-        state_fn: Callable[[], dict],
-        node_history_fn: Any = None,
-        online_activity_fn: Any = None,
-        send_chat_fn: Any = None,
+        state_fn: StateFn,
+        node_history_fn: NodeHistoryFn | None = None,
+        online_activity_fn: OnlineActivityFn | None = None,
+        send_chat_fn: SendChatFn | None = None,
     ) -> Any:
         return make_http_handler_fn(
             html_text=html_text,

@@ -16,6 +16,7 @@ BuildStateSnapshotLoaderFn = Callable[..., Callable[[], dict]]
 
 SendChatMessageFn = Callable[..., dict]
 SendReactionPacketFn = Callable[..., Any]
+RawGetLocalNodeIdFn = Callable[..., str]
 GetLocalNodeIdFn = Callable[[Any], str]
 LocalNodeIdFn = Callable[[], str]
 RecordLocalChatFn = Callable[..., None]
