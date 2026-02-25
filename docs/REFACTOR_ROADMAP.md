@@ -153,6 +153,10 @@ Route handlers by domain.
   - `DashboardPostRouteDependencies`
 - `meshdash/http_api.py` now builds immutable route dependency objects and passes them into route handlers.
 - `meshdash/http_routes_get.py` and `meshdash/http_routes_post.py` now consume typed dependency bundles instead of long keyword argument lists.
+- Split API input parsing by domain:
+  - `meshdash/api_input_chat.py`
+  - `meshdash/api_input_history.py`
+  - `meshdash/api_inputs.py` now acts as compatibility facade.
 - Added focused tests:
   - `tests/test_api_system.py`
   - `tests/test_api_history.py`
