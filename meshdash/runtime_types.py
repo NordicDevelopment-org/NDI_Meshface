@@ -50,6 +50,8 @@ ParseTrackerPacketFn = Callable[..., TrackerParsedPacket]
 ProcessParsedTrackerPacketFn = Callable[..., None]
 RecordTrackerPacketUnlockedFn = Callable[..., None]
 RecordTrackerPacketUnlockedWithDependenciesFn = Callable[..., None]
+RecordTrackerReceiveUnlockedFn = Callable[..., None]
+ResolveTrackerNodeIdFromNumFn = Callable[..., Optional[str]]
 
 GetNodeIdFromNumFn = Callable[[Any, Any], Optional[str]]
 CalculateHopsFn = Callable[[Any, Any], Optional[int]]

@@ -231,6 +231,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added `meshdash/runtime_types.py` shared callback/type aliases and applied them across runner/context/wiring contracts.
 - Extended `meshdash/runtime_types.py` with tracker receive/record callback aliases and applied them in tracker packet/runtime dependency modules.
 - Applied shared tracker callback aliases across `tracker_ingest.py` and `tracker_receive.py` so parse/process layers share the same contract vocabulary as runtime receive/record wiring.
+- Applied shared tracker callback aliases in `tracker_runtime_receive_bindings.py` for resolver and dispatch hook signatures.
 - Added `TrackerReceiveRuntimeState` protocol in `meshdash/tracker_runtime_types.py` and applied it to receive-path dependency assembly/wiring entrypoints.
 - `runtime_state_loader` now accepts `RevisionInfo` and performs dict conversion at the state-payload boundary.
 - Reused shared HTTP route type aliases across API domain modules (`api_system`, `api_chat`, `api_history_node`, `api_history_online`) to reduce duplicated callable signatures.

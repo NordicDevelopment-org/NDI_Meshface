@@ -27,6 +27,9 @@ from .runtime_types import (
     GetNodeIdFromNumFn,
     RecordTrackerPacketUnlockedFn,
     RecordTrackerPacketUnlockedWithDependenciesFn,
+    RecordTrackerReceiveUnlockedFn,
+    ResolveTrackerNodeIdFromNumFn,
+    ToIntFn,
     TrackerPacket,
 )
 
@@ -36,9 +39,9 @@ def _resolve_tracker_node_id_from_num(
     node_num: Any,
     *,
     meshtastic_module: Any = meshtastic,
-    to_int_fn: Any = _to_int,
-    get_node_id_from_num_fn: Any = _get_node_id_from_num_helper,
-) -> Any:
+    to_int_fn: ToIntFn = _to_int,
+    get_node_id_from_num_fn: GetNodeIdFromNumFn = _get_node_id_from_num_helper,
+) -> str | None:
     return _get_tracker_node_id_from_num_helper(
         iface,
         node_num,
@@ -57,8 +60,8 @@ def record_tracker_receive_unlocked_for_tracker(
     get_node_id_from_num_fn: GetNodeIdFromNumFn = _get_node_id_from_num_helper,
     record_tracker_packet_unlocked_fn: RecordTrackerPacketUnlockedFn | None = None,
     record_tracker_packet_unlocked_with_dependencies_fn: RecordTrackerPacketUnlockedWithDependenciesFn = _record_tracker_packet_unlocked_with_dependencies_helper,
-    resolve_tracker_node_id_from_num_fn: Any = _resolve_tracker_node_id_from_num,
-    record_tracker_receive_unlocked_fn: Any = _record_tracker_receive_unlocked_helper,
+    resolve_tracker_node_id_from_num_fn: ResolveTrackerNodeIdFromNumFn = _resolve_tracker_node_id_from_num,
+    record_tracker_receive_unlocked_fn: RecordTrackerReceiveUnlockedFn = _record_tracker_receive_unlocked_helper,
 ) -> None:
     record_tracker_receive_unlocked_fn(
         tracker,
