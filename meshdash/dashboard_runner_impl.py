@@ -1,5 +1,5 @@
 from http.server import ThreadingHTTPServer
-from typing import Any, Callable, Optional
+from typing import Any
 
 from .runtime_lifecycle import (
     close_runtime_resources,
@@ -16,31 +16,49 @@ from .dashboard_runtime_context import (
 from .dashboard_server import (
     build_dashboard_server,
 )
-from .revision import RevisionInfo
+from .runtime_types import (
+    BuildNodeHistoryLoaderFn,
+    BuildOnlineActivityLoaderFn,
+    BuildStateFn,
+    GetLocalNodeIdFn,
+    GuessLanIpv4Fn,
+    MakeHttpHandlerFn,
+    MeshTargetLabelFn,
+    NormalizeSingleEmojiFn,
+    OpenMeshInterfaceFn,
+    RenderHtmlFn,
+    RevisionInfoFn,
+    SendChatMessageFn,
+    SendReactionPacketFn,
+    SeedTrackerFn,
+    SubscribeFn,
+    ToIntFn,
+    UtcNowFn,
+)
 
 
 def run_dashboard_runtime(
     args: Any,
     *,
-    mesh_target_label_fn: Callable[[Any], str],
-    open_mesh_interface_fn: Callable[[Any], Any],
+    mesh_target_label_fn: MeshTargetLabelFn,
+    open_mesh_interface_fn: OpenMeshInterfaceFn,
     history_store_cls: Any,
     dashboard_tracker_cls: Any,
-    subscribe_fn: Callable[[Any, str], None],
-    seed_tracker_fn: Callable[[Any, Any], None],
-    revision_info_fn: Callable[[], RevisionInfo],
-    build_state_fn: Callable[..., dict],
-    build_node_history_loader_fn: Callable[..., Callable[..., dict]],
-    build_online_activity_loader_fn: Callable[..., Callable[..., dict]],
-    send_chat_message_fn: Callable[..., dict],
-    send_reaction_packet_fn: Callable[..., Any],
-    get_local_node_id_fn: Callable[[Any], str],
-    normalize_single_emoji_fn: Callable[[Any], tuple[Optional[str], Optional[int]]],
-    to_int_fn: Callable[[Any], Optional[int]],
-    utc_now_fn: Callable[[], str],
-    render_html_fn: Callable[..., str],
-    make_http_handler_fn: Callable[..., Any],
-    guess_lan_ipv4_fn: Callable[[], Optional[str]],
+    subscribe_fn: SubscribeFn,
+    seed_tracker_fn: SeedTrackerFn,
+    revision_info_fn: RevisionInfoFn,
+    build_state_fn: BuildStateFn,
+    build_node_history_loader_fn: BuildNodeHistoryLoaderFn,
+    build_online_activity_loader_fn: BuildOnlineActivityLoaderFn,
+    send_chat_message_fn: SendChatMessageFn,
+    send_reaction_packet_fn: SendReactionPacketFn,
+    get_local_node_id_fn: GetLocalNodeIdFn,
+    normalize_single_emoji_fn: NormalizeSingleEmojiFn,
+    to_int_fn: ToIntFn,
+    utc_now_fn: UtcNowFn,
+    render_html_fn: RenderHtmlFn,
+    make_http_handler_fn: MakeHttpHandlerFn,
+    guess_lan_ipv4_fn: GuessLanIpv4Fn,
     default_chat_max_bytes: int,
     threading_http_server_cls: Any = ThreadingHTTPServer,
 ) -> None:

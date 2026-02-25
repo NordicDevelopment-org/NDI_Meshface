@@ -1,7 +1,24 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from .revision import RevisionInfo
+from .runtime_types import (
+    BuildNodeHistoryLoaderFn,
+    BuildOnlineActivityLoaderFn,
+    BuildStateFn,
+    GetLocalNodeIdFn,
+    GuessLanIpv4Fn,
+    MakeHttpHandlerFn,
+    MeshTargetLabelFn,
+    NormalizeSingleEmojiFn,
+    OpenMeshInterfaceFn,
+    RevisionInfoFn,
+    RenderHtmlFn,
+    SendChatMessageFn,
+    SendReactionPacketFn,
+    SubscribeFn,
+    ToIntFn,
+    UtcNowFn,
+)
 from .wiring_adapters import (
     build_http_handler_factory as _build_http_handler_factory_helper,
     build_local_node_id_getter as _build_local_node_id_getter_helper,
@@ -12,25 +29,25 @@ from .wiring_adapters import (
 
 @dataclass(frozen=True)
 class DashboardRuntimeDependencies:
-    mesh_target_label_fn: Callable[[Any], str]
-    open_mesh_interface_fn: Callable[[Any], Any]
+    mesh_target_label_fn: MeshTargetLabelFn
+    open_mesh_interface_fn: OpenMeshInterfaceFn
     history_store_cls: Any
     dashboard_tracker_cls: Any
-    subscribe_fn: Callable[[Any, str], None]
+    subscribe_fn: SubscribeFn
     seed_tracker_fn: Callable[..., None]
-    revision_info_fn: Callable[[], RevisionInfo]
-    build_state_fn: Callable[..., dict]
-    build_node_history_loader_fn: Callable[..., Callable[..., dict]]
-    build_online_activity_loader_fn: Callable[..., Callable[..., dict]]
-    send_chat_message_fn: Callable[..., dict]
-    send_reaction_packet_fn: Callable[..., Any]
-    get_local_node_id_fn: Callable[..., str]
-    normalize_single_emoji_fn: Callable[[Any], Any]
-    to_int_fn: Callable[[Any], Any]
-    utc_now_fn: Callable[[], str]
-    render_html_fn: Callable[..., str]
-    make_http_handler_fn: Callable[..., Any]
-    guess_lan_ipv4_fn: Callable[[], Any]
+    revision_info_fn: RevisionInfoFn
+    build_state_fn: BuildStateFn
+    build_node_history_loader_fn: BuildNodeHistoryLoaderFn
+    build_online_activity_loader_fn: BuildOnlineActivityLoaderFn
+    send_chat_message_fn: SendChatMessageFn
+    send_reaction_packet_fn: SendReactionPacketFn
+    get_local_node_id_fn: GetLocalNodeIdFn
+    normalize_single_emoji_fn: NormalizeSingleEmojiFn
+    to_int_fn: ToIntFn
+    utc_now_fn: UtcNowFn
+    render_html_fn: RenderHtmlFn
+    make_http_handler_fn: MakeHttpHandlerFn
+    guess_lan_ipv4_fn: GuessLanIpv4Fn
     default_chat_max_bytes: int
 
 
@@ -49,29 +66,29 @@ def build_dashboard_runtime_dependencies(
     *,
     meshtastic_module: Any,
     pub_module: Any,
-    mesh_target_label_fn: Callable[[Any], str],
-    open_mesh_interface_fn: Callable[[Any], Any],
+    mesh_target_label_fn: MeshTargetLabelFn,
+    open_mesh_interface_fn: OpenMeshInterfaceFn,
     history_store_cls: Any,
     dashboard_tracker_cls: Any,
     seed_tracker_fn: Callable[..., None],
-    revision_info_fn: Callable[[], RevisionInfo],
-    build_state_fn: Callable[..., dict],
+    revision_info_fn: RevisionInfoFn,
+    build_state_fn: BuildStateFn,
     sensitive_field_names: set[str],
-    build_node_history_loader_fn: Callable[..., Callable[..., dict]],
-    build_online_activity_loader_fn: Callable[..., Callable[..., dict]],
-    send_chat_message_fn: Callable[..., dict],
-    send_emoji_reaction_packet_fn: Callable[..., Any],
+    build_node_history_loader_fn: BuildNodeHistoryLoaderFn,
+    build_online_activity_loader_fn: BuildOnlineActivityLoaderFn,
+    send_chat_message_fn: SendChatMessageFn,
+    send_emoji_reaction_packet_fn: SendReactionPacketFn,
     mesh_pb2_module: Any,
     portnums_pb2_module: Any,
-    get_local_node_id_fn: Callable[..., str],
+    get_local_node_id_fn: GetLocalNodeIdFn,
     to_jsonable_fn: Callable[[Any], Any],
-    normalize_single_emoji_fn: Callable[[Any], Any],
-    to_int_fn: Callable[[Any], Any],
-    utc_now_fn: Callable[[], str],
-    render_html_fn: Callable[..., str],
-    make_http_handler_fn: Callable[..., Any],
+    normalize_single_emoji_fn: NormalizeSingleEmojiFn,
+    to_int_fn: ToIntFn,
+    utc_now_fn: UtcNowFn,
+    render_html_fn: RenderHtmlFn,
+    make_http_handler_fn: MakeHttpHandlerFn,
     default_node_history_hours: int,
-    guess_lan_ipv4_fn: Callable[[], Any],
+    guess_lan_ipv4_fn: GuessLanIpv4Fn,
     default_chat_max_bytes: int,
 ) -> DashboardRuntimeDependencies:
     build_state_with_sensitive_fields = _build_state_builder_helper(
