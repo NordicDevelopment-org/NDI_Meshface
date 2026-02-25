@@ -17,6 +17,8 @@ BuildStateSnapshotLoaderFn = Callable[..., Callable[[], dict]]
 SendChatMessageFn = Callable[..., dict]
 SendReactionPacketFn = Callable[..., Any]
 GetLocalNodeIdFn = Callable[[Any], str]
+LocalNodeIdFn = Callable[[], str]
+RecordLocalChatFn = Callable[..., None]
 
 NormalizeSingleEmojiFn = Callable[[Any], tuple[Optional[str], Optional[int]]]
 ToIntFn = Callable[[Any], Optional[int]]
