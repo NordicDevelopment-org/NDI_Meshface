@@ -2,6 +2,15 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .runtime_types import (
+    ExtractDeliveryUpdateFn,
+    GetTimeoutSecondsFn,
+    NowUnixFn,
+    ParseUtcTextToUnixFn,
+    SetDeliveryStateFn,
+    ToIntFn,
+    UtcNowFn,
+)
 from .tracker_delivery_state import (
     expire_tracker_pending_deliveries as _expire_tracker_pending_deliveries_helper,
     extract_tracker_delivery_update as _extract_tracker_delivery_update_helper,
@@ -11,19 +20,19 @@ from .tracker_delivery_state import (
 
 @dataclass(frozen=True)
 class TrackerDeliveryCallbacks:
-    set_delivery_state: Callable[..., bool]
-    extract_delivery_update: Callable[..., Any]
+    set_delivery_state: SetDeliveryStateFn
+    extract_delivery_update: ExtractDeliveryUpdateFn
     expire_pending_deliveries: Callable[[], None]
 
 
 def build_tracker_delivery_callbacks(
     recent_chat: Any,
     *,
-    get_timeout_seconds_fn: Callable[[], int],
-    to_int_fn,
-    parse_utc_text_to_unix_fn,
-    utc_now_fn,
-    now_unix_fn=time.time,
+    get_timeout_seconds_fn: GetTimeoutSecondsFn,
+    to_int_fn: ToIntFn,
+    parse_utc_text_to_unix_fn: ParseUtcTextToUnixFn,
+    utc_now_fn: UtcNowFn,
+    now_unix_fn: NowUnixFn = time.time,
 ) -> TrackerDeliveryCallbacks:
     def _set_delivery_state(message_id: Any, state: str, error: Any = None) -> bool:
         return _set_tracker_delivery_state_helper(
