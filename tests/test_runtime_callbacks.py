@@ -1,4 +1,5 @@
 from meshdash.runtime_callbacks import build_send_chat_loader, build_state_snapshot_loader
+from meshdash.revision import RevisionInfo
 
 
 def test_build_state_snapshot_loader_forwards_bound_context():
@@ -15,7 +16,7 @@ def test_build_state_snapshot_loader_forwards_bound_context():
         target="mesh-target",
         show_secrets=False,
         storage_probe_path="/tmp/db.sqlite3",
-        revision_info={"version": "0.1.0"},
+        revision_info=RevisionInfo(version="0.1.0", commit="abc", label="L", title="T"),
         build_state_fn=_build_state_fn,
     )
     result = state_fn()

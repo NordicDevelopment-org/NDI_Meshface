@@ -1,4 +1,6 @@
-from typing import Any, Callable, Dict
+from typing import Any, Callable
+
+from .revision import RevisionInfo
 
 
 def build_state_snapshot_loader(
@@ -9,7 +11,7 @@ def build_state_snapshot_loader(
     target: str,
     show_secrets: bool,
     storage_probe_path: str,
-    revision_info: Dict[str, str],
+    revision_info: RevisionInfo,
     build_state_fn: Callable[..., dict],
 ) -> Callable[[], dict]:
     def state_fn() -> dict:
@@ -20,7 +22,7 @@ def build_state_snapshot_loader(
             target=target,
             show_secrets=show_secrets,
             storage_probe_path=storage_probe_path,
-            revision_info=revision_info,
+            revision_info=revision_info.as_dict(),
         )
 
     return state_fn

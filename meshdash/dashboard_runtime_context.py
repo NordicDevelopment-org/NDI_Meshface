@@ -108,7 +108,7 @@ def build_dashboard_runtime_context(
         target=target,
         show_secrets=args.show_secrets,
         history_db_path=history_db_path,
-        revision_info=revision_info.as_dict(),
+        revision_info=revision_info,
         history_store=history_store,
         default_node_history_hours=args.node_history_hours,
         default_node_history_points=args.node_history_max_points,

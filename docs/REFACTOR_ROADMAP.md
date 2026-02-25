@@ -201,6 +201,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added `DashboardRuntimeDependencies` dataclass in `meshdash/wiring_runtime.py` and moved startup dependency assembly off ad-hoc dict payloads.
 - `mesh_dashboard.py` now passes runtime dependency attributes explicitly into `run_dashboard_runtime()` (no kwargs dict shim).
 - Added `meshdash/runtime_types.py` shared callback/type aliases and applied them across runner/context/wiring contracts.
+- `runtime_state_loader` now accepts `RevisionInfo` and performs dict conversion at the state-payload boundary.
 
 ### Steps
 

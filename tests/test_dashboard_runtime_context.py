@@ -145,7 +145,7 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
         "target": "192.168.1.10:4403 (tcp)",
         "show_secrets": False,
         "history_db_path": "/abs/state/history.sqlite3",
-        "revision_info": revision_info.as_dict(),
+        "revision_info": revision_info,
         "history_store": history_store,
         "default_node_history_hours": 72,
         "default_node_history_points": 1440,

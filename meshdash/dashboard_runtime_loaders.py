@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
+from .revision import RevisionInfo
+
 
 @dataclass(frozen=True)
 class DashboardRuntimeLoaders:
@@ -19,7 +21,7 @@ def build_dashboard_runtime_loaders(
     target: str,
     show_secrets: bool,
     history_db_path: str,
-    revision_info: dict,
+    revision_info: RevisionInfo,
     history_store: Optional[Any],
     default_node_history_hours: int,
     default_node_history_points: int,

@@ -1,4 +1,5 @@
 from meshdash.dashboard_loaders import DashboardRuntimeLoaders, build_dashboard_runtime_loaders
+from meshdash.revision import RevisionInfo
 
 
 def test_build_dashboard_runtime_loaders_wires_all_loader_factories():
@@ -28,7 +29,7 @@ def test_build_dashboard_runtime_loaders_wires_all_loader_factories():
         target="target",
         show_secrets=False,
         history_db_path="/tmp/db.sqlite3",
-        revision_info={"version": "0.1.0"},
+        revision_info=RevisionInfo(version="0.1.0", commit="abc", label="L", title="T"),
         history_store="history",
         default_node_history_hours=72,
         default_node_history_points=1440,
