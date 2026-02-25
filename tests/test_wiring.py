@@ -89,6 +89,5 @@ def test_build_dashboard_runtime_dependencies_wraps_injected_context():
     assert calls["http"]["default_node_history_hours"] == 72
     assert callable(calls["http"]["to_int_fn"])
 
-    run_kwargs = deps.to_runner_kwargs()
-    assert run_kwargs["mesh_target_label_fn"]("ignored") == "target"
-    assert run_kwargs["subscribe_fn"] is fake_pub.subscribe
+    assert deps.mesh_target_label_fn("ignored") == "target"
+    assert deps.subscribe_fn is fake_pub.subscribe

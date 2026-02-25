@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict
+from typing import Any, Callable
 
 from .revision import RevisionInfo
 from .wiring_adapters import (
@@ -32,30 +32,6 @@ class DashboardRuntimeDependencies:
     make_http_handler_fn: Callable[..., Any]
     guess_lan_ipv4_fn: Callable[[], Any]
     default_chat_max_bytes: int
-
-    def to_runner_kwargs(self) -> Dict[str, Any]:
-        return {
-            "mesh_target_label_fn": self.mesh_target_label_fn,
-            "open_mesh_interface_fn": self.open_mesh_interface_fn,
-            "history_store_cls": self.history_store_cls,
-            "dashboard_tracker_cls": self.dashboard_tracker_cls,
-            "subscribe_fn": self.subscribe_fn,
-            "seed_tracker_fn": self.seed_tracker_fn,
-            "revision_info_fn": self.revision_info_fn,
-            "build_state_fn": self.build_state_fn,
-            "build_node_history_loader_fn": self.build_node_history_loader_fn,
-            "build_online_activity_loader_fn": self.build_online_activity_loader_fn,
-            "send_chat_message_fn": self.send_chat_message_fn,
-            "send_reaction_packet_fn": self.send_reaction_packet_fn,
-            "get_local_node_id_fn": self.get_local_node_id_fn,
-            "normalize_single_emoji_fn": self.normalize_single_emoji_fn,
-            "to_int_fn": self.to_int_fn,
-            "utc_now_fn": self.utc_now_fn,
-            "render_html_fn": self.render_html_fn,
-            "make_http_handler_fn": self.make_http_handler_fn,
-            "guess_lan_ipv4_fn": self.guess_lan_ipv4_fn,
-            "default_chat_max_bytes": self.default_chat_max_bytes,
-        }
 
 
 def ensure_runtime_dependencies(*, meshtastic_module: Any, pub_module: Any) -> None:

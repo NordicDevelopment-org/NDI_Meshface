@@ -154,7 +154,29 @@ def run_dashboard(args: argparse.Namespace) -> None:
         guess_lan_ipv4_fn=_guess_lan_ipv4_helper,
         default_chat_max_bytes=DEFAULT_CHAT_MAX_BYTES,
     )
-    _run_dashboard_runtime_helper(args, **runtime_dependencies.to_runner_kwargs())
+    _run_dashboard_runtime_helper(
+        args,
+        mesh_target_label_fn=runtime_dependencies.mesh_target_label_fn,
+        open_mesh_interface_fn=runtime_dependencies.open_mesh_interface_fn,
+        history_store_cls=runtime_dependencies.history_store_cls,
+        dashboard_tracker_cls=runtime_dependencies.dashboard_tracker_cls,
+        subscribe_fn=runtime_dependencies.subscribe_fn,
+        seed_tracker_fn=runtime_dependencies.seed_tracker_fn,
+        revision_info_fn=runtime_dependencies.revision_info_fn,
+        build_state_fn=runtime_dependencies.build_state_fn,
+        build_node_history_loader_fn=runtime_dependencies.build_node_history_loader_fn,
+        build_online_activity_loader_fn=runtime_dependencies.build_online_activity_loader_fn,
+        send_chat_message_fn=runtime_dependencies.send_chat_message_fn,
+        send_reaction_packet_fn=runtime_dependencies.send_reaction_packet_fn,
+        get_local_node_id_fn=runtime_dependencies.get_local_node_id_fn,
+        normalize_single_emoji_fn=runtime_dependencies.normalize_single_emoji_fn,
+        to_int_fn=runtime_dependencies.to_int_fn,
+        utc_now_fn=runtime_dependencies.utc_now_fn,
+        render_html_fn=runtime_dependencies.render_html_fn,
+        make_http_handler_fn=runtime_dependencies.make_http_handler_fn,
+        guess_lan_ipv4_fn=runtime_dependencies.guess_lan_ipv4_fn,
+        default_chat_max_bytes=runtime_dependencies.default_chat_max_bytes,
+    )
 
 
 def main() -> None:
