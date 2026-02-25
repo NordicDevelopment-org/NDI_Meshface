@@ -1,13 +1,48 @@
 import threading
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 from .history_store_connection import (
     open_and_initialize_history_connection as _open_and_initialize_history_connection_helper,
     open_and_initialize_history_connection_with_policy as _open_and_initialize_history_connection_with_policy_helper,
 )
 from .history_store_policy import (
+    HistoryStorePolicy,
     build_history_store_policy as _build_history_store_policy_helper,
 )
+
+
+class BuildHistoryStorePolicyFn(Protocol):
+    def __call__(
+        self,
+        *,
+        max_rows: int,
+        retention_days: int,
+        event_max_rows: int,
+        event_retention_days: int,
+        rollup_retention_days: int,
+    ) -> HistoryStorePolicy: ...
+
+
+class OpenHistoryConnectionWithPolicyFn(Protocol):
+    def __call__(
+        self,
+        *,
+        db_path: str,
+        policy: HistoryStorePolicy,
+    ) -> Any: ...
+
+
+class OpenHistoryConnectionLegacyFn(Protocol):
+    def __call__(
+        self,
+        *,
+        db_path: str,
+        retention_seconds: int,
+        event_retention_seconds: int,
+        rollup_retention_seconds: int,
+        max_rows: int,
+        event_max_rows: int,
+    ) -> Any: ...
 
 
 def initialize_history_store_runtime(
@@ -20,9 +55,9 @@ def initialize_history_store_runtime(
     event_retention_days: int,
     rollup_retention_days: int,
     lock_factory: Callable[[], Any] = threading.Lock,
-    build_history_store_policy_fn: Callable[..., Any] = _build_history_store_policy_helper,
-    open_and_initialize_history_connection_with_policy_fn: Callable[..., Any] = _open_and_initialize_history_connection_with_policy_helper,
-    open_and_initialize_history_connection_fn: Callable[..., Any] = _open_and_initialize_history_connection_helper,
+    build_history_store_policy_fn: BuildHistoryStorePolicyFn = _build_history_store_policy_helper,
+    open_and_initialize_history_connection_with_policy_fn: OpenHistoryConnectionWithPolicyFn = _open_and_initialize_history_connection_with_policy_helper,
+    open_and_initialize_history_connection_fn: OpenHistoryConnectionLegacyFn = _open_and_initialize_history_connection_helper,
 ) -> None:
     policy = build_history_store_policy_fn(
         max_rows=max_rows,
