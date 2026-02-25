@@ -13,7 +13,8 @@ from .runtime_types import (
 from .tracker_bootstrap_contracts import BuildHistoricalEdgesFn, TrackerBootstrapHistoryStore
 from .tracker_bootstrap import TrackerHistoryBootstrap
 from .tracker_callbacks import TrackerDeliveryCallbacks
-from .tracker_snapshot_build_contracts import ExpirePendingDeliveriesFn, TrackerHistoryStore
+from .tracker_snapshot_build_contracts import ExpirePendingDeliveriesFn
+from .tracker_runtime_types import TrackerRuntimeHistoryStore
 
 
 class TrackerBuffersLike(Protocol):
@@ -25,7 +26,7 @@ class TrackerBuffersLike(Protocol):
 
 
 class TrackerInitRuntimeState(Protocol):
-    _history_store: "TrackerRuntimeHistoryStore | None"
+    _history_store: TrackerRuntimeHistoryStore | None
     _chat_delivery_timeout_seconds: int
     live_packet_count: int
     edges: TrackerEdgeMap
@@ -55,10 +56,6 @@ class BuildTrackerDeliveryCallbacksFn(Protocol):
         now_unix_fn: NowUnixFn,
     ) -> TrackerDeliveryCallbacks:
         ...
-
-
-class TrackerRuntimeHistoryStore(TrackerHistoryStore, TrackerBootstrapHistoryStore, Protocol):
-    pass
 
 
 class LoadTrackerHistoryBootstrapFn(Protocol):

@@ -6,15 +6,20 @@ from .runtime_types import (
     TrackerEdgeMap,
 )
 from .tracker_snapshot_build_contracts import TrackerHistoryStore
+from .tracker_storage_contracts import RecentChatBuffer, RecentPacketBuffer, TrackerHistoryWriter
+
+
+class TrackerRuntimeHistoryStore(TrackerHistoryStore, TrackerHistoryWriter, Protocol):
+    pass
 
 
 class TrackerReceiveRuntimeState(Protocol):
     edges: TrackerEdgeMap
     _historical_edges: TrackerEdgeMap
     port_counts: Any
-    recent_packets: Any
-    recent_chat: Any
-    _history_store: TrackerHistoryStore | None
+    recent_packets: RecentPacketBuffer
+    recent_chat: RecentChatBuffer
+    _history_store: TrackerRuntimeHistoryStore | None
     _extract_delivery_update_fn: ExtractDeliveryUpdateFn
     _set_delivery_state_fn: SetDeliveryStateFn
 
