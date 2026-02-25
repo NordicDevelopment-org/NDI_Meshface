@@ -63,7 +63,7 @@ RecordTrackerPacketUnlockedWithDependenciesFn = Callable[..., None]
 RecordTrackerReceiveUnlockedFn = Callable[..., None]
 ResolveTrackerNodeIdFromNumFn = Callable[..., Optional[str]]
 
-GetNodeIdFromNumFn = Callable[[Any, Any], Optional[str]]
+GetNodeIdFromNumFn = Callable[[object, object], Optional[str]]
 CalculateHopsFn = Callable[[Any, Any], Optional[int]]
 ExtractPacketPositionFn = Callable[[TrackerPacket], Optional[TrackerPacket]]
 ExtractPacketBatteryLevelFn = Callable[[TrackerPacket], Optional[int]]

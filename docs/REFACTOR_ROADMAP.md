@@ -266,6 +266,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added tracker storage protocol contracts in `meshdash/tracker_storage_contracts.py` and applied them to packet runtime dependency/dataclass wiring (`tracker_storage.py`, `tracker_runtime_packet_contracts.py`, `tracker_runtime_record.py`, `tracker_runtime_record_dependencies.py`) so receive-path storage surfaces no longer rely on raw `Any` for buffers/history writes.
 - Added tracker seed protocol contracts in `meshdash/tracker_seed_contracts.py` and applied them to seed/receive binding entrypoints (`tracker_seed.py`, `tracker_runtime_receive_bindings.py`) to reduce top-level runtime `Any` surfaces around tracker bootstrap packet replay.
 - Tightened tracker receive/record interface typing (`tracker_runtime_receive.py`, `tracker_runtime_record.py`) by replacing raw `Any` interface surfaces with `object` where no concrete interface API is consumed.
+- Tightened node-id resolver identity surfaces (`tracker_node_resolver.py`, `nodes_identity.py`, `runtime_types.py`) so interface/node-number callback contracts use explicit `object` inputs instead of raw `Any`.
 - Added typed tracker packet-ingest dependency contract:
   - `TrackerPacketRuntimeDependencies` in `meshdash/tracker_runtime_packet_contracts.py`
   - `record_tracker_packet_unlocked_with_dependencies(...)` in `meshdash/tracker_runtime_record.py`

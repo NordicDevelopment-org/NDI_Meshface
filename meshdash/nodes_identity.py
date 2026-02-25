@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Optional
 
 from .helpers import to_int as _to_int
 from .helpers import to_jsonable as _to_jsonable
@@ -6,8 +6,8 @@ from .runtime_types import ToIntFn, ToJsonableFn
 
 
 def get_node_id_from_num(
-    iface: Any,
-    node_num: Any,
+    iface: object,
+    node_num: object,
     *,
     broadcast_num: Optional[int],
     to_int_fn: ToIntFn = _to_int,
@@ -28,7 +28,7 @@ def get_node_id_from_num(
 
 
 def get_local_node_num(
-    iface: Any,
+    iface: object,
     *,
     to_jsonable_fn: ToJsonableFn = _to_jsonable,
     to_int_fn: ToIntFn = _to_int,
@@ -50,7 +50,7 @@ def get_local_node_num(
 
 
 def get_local_node_id(
-    iface: Any,
+    iface: object,
     *,
     broadcast_num: Optional[int],
     to_jsonable_fn: ToJsonableFn = _to_jsonable,

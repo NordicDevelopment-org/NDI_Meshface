@@ -1,13 +1,15 @@
-from typing import Any, Callable, Optional
+from typing import Optional
+
+from .runtime_types import GetNodeIdFromNumFn, ToIntFn
 
 
 def get_tracker_node_id_from_num(
-    iface: Any,
-    node_num: Any,
+    iface: object,
+    node_num: object,
     *,
-    meshtastic_module: Any,
-    to_int_fn: Callable[[Any], Optional[int]],
-    get_node_id_from_num_fn: Callable[..., Optional[str]],
+    meshtastic_module: object,
+    to_int_fn: ToIntFn,
+    get_node_id_from_num_fn: GetNodeIdFromNumFn,
 ) -> Optional[str]:
     broadcast_num = (
         getattr(meshtastic_module, "BROADCAST_NUM", None)
