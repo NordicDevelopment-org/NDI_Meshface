@@ -1,19 +1,31 @@
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
+from .runtime_types import (
+    CalculateHopsFn,
+    EmojiFromCodepointFn,
+    ExtractEmojiCodepointFn,
+    ExtractPacketBatteryLevelFn,
+    ExtractPacketPositionFn,
+    ExtractReplyIdFn,
+    GetNodeIdFromNumFn,
+    ToIntFn,
+    TrackerPacket,
+    TrackerParsedPacket,
+)
 
 def parse_tracker_packet(
-    packet: Dict[str, Any],
+    packet: TrackerPacket,
     interface: Any,
     *,
-    get_node_id_from_num_fn: Callable[[Any, Any], Optional[str]],
-    to_int_fn: Callable[[Any], Optional[int]],
-    calculate_hops_fn: Callable[[Any, Any], Optional[int]],
-    extract_packet_position_fn: Callable[[Dict[str, Any]], Optional[Dict[str, Any]]],
-    extract_packet_battery_level_fn: Callable[[Dict[str, Any]], Optional[int]],
-    extract_reply_id_fn: Callable[[Any], Optional[int]],
-    extract_emoji_codepoint_fn: Callable[[Any], Optional[int]],
-    emoji_from_codepoint_fn: Callable[[Optional[int]], Optional[str]],
-) -> Dict[str, Any]:
+    get_node_id_from_num_fn: GetNodeIdFromNumFn,
+    to_int_fn: ToIntFn,
+    calculate_hops_fn: CalculateHopsFn,
+    extract_packet_position_fn: ExtractPacketPositionFn,
+    extract_packet_battery_level_fn: ExtractPacketBatteryLevelFn,
+    extract_reply_id_fn: ExtractReplyIdFn,
+    extract_emoji_codepoint_fn: ExtractEmojiCodepointFn,
+    emoji_from_codepoint_fn: EmojiFromCodepointFn,
+) -> TrackerParsedPacket:
     from_id = packet.get("fromId") or get_node_id_from_num_fn(interface, packet.get("from"))
     to_id = packet.get("toId") or get_node_id_from_num_fn(interface, packet.get("to"))
     rx_time = to_int_fn(packet.get("rxTime"))
