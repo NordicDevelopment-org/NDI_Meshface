@@ -144,6 +144,10 @@ Route handlers by domain.
 - Added initial domain API modules used by GET route dispatch:
   - `meshdash/api_system.py` for `/api/state`
   - `meshdash/api_history.py` for `/api/history/node` and `/api/history/online`
+- Split history API domain helpers into focused modules:
+  - `meshdash/api_history_node.py`
+  - `meshdash/api_history_online.py`
+  - `meshdash/api_history.py` now acts as compatibility facade.
 - Added `meshdash/api_chat.py` for `/api/chat/send` POST domain handling.
 - `meshdash/http_routes_get.py` now delegates domain payload/response logic into those modules.
 - `meshdash/http_routes_post.py` now delegates chat-send behavior into `api_chat`.

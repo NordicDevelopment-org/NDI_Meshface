@@ -20,7 +20,9 @@
 - `meshdash/api_input_history.py`: history GET query parsing contracts (`NodeHistoryQuery`, `OnlineActivityQuery`).
 - `meshdash/api_chat.py`: domain handler for chat-send API POST flow (`/api/chat/send`).
 - `meshdash/api_system.py`: domain handler for system state API response (`/api/state`).
-- `meshdash/api_history.py`: domain helpers for history API responses (`/api/history/node`, `/api/history/online`).
+- `meshdash/api_history.py`: stable history API facade re-exporting node/online response builders.
+- `meshdash/api_history_node.py`: `/api/history/node` response helper.
+- `meshdash/api_history_online.py`: `/api/history/online` response helper.
 - `meshdash/cli.py`: CLI parser/bootstrap argument definitions and env default resolution.
 - `meshdash/cli_arguments.py`: stable CLI-arguments facade re-exporting grouped argument helpers.
 - `meshdash/cli_args_gateway.py`: default-gateway related CLI argument registration helpers.
