@@ -94,6 +94,7 @@
 - `meshdash/history_positions.py`: node position insert/de-dupe helpers for history capture.
 - `meshdash/history_raw_writes.py`: raw packet/chat row writers used by history store persistence paths.
 - `meshdash/history_read_api.py`: shared history read-side loader helpers for packets/chat/connections/capabilities.
+- `meshdash/history_read_contracts.py`: shared protocol/type aliases for history read fetch/decode/payload callback contracts.
 - `meshdash/history_read_history.py`: shared node-history and online-activity read-orchestration helpers.
 - `meshdash/history_queries.py`: shared SQL row fetchers for history read/aggregation surfaces.
 - `meshdash/history_store_reads.py`: `HistoryStore` read-operation wrappers using read/query/decoder helpers.
