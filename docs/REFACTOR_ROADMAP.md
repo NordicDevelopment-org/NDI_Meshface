@@ -108,16 +108,21 @@ Break `HistoryStore` into smaller repositories.
   - `meshdash/history_store_runtime_init.py`
   - `meshdash/history_store_runtime_maintenance.py`
 - `meshdash/history_store_runtime_impl.py` now delegates constructor field/connection setup and close/prune lifecycle to those helpers.
+- Split history IO wrappers into domain modules while keeping facade compatibility:
+  - `meshdash/history_store_packets.py`
+  - `meshdash/history_store_chat.py`
+  - `meshdash/history_store_connections.py`
+  - `meshdash/history_store_nodes.py`
 - Added targeted tests:
   - `tests/test_history_store_runtime_init.py`
   - `tests/test_history_store_runtime_maintenance.py`
+  - `tests/test_history_store_io_wrappers.py` domain-wrapper coverage
 
 ### Steps
 
-1. `meshdash/history/db.py` (connection + schema)
-2. `meshdash/history/packets.py`
-3. `meshdash/history/chat.py`
-4. `meshdash/history/nodes.py`
+1. `meshdash/history/db.py` (connection + schema) optional namespace consolidation.
+2. Decide whether to deprecate/keep `history_store_reads.py` and `history_store_writes.py` compatibility facades.
+3. Add tighter tests around node-history and online-activity domain wrappers.
 
 ### Exit criteria
 

@@ -91,6 +91,10 @@
 - `meshdash/history_queries.py`: shared SQL row fetchers for history read/aggregation surfaces.
 - `meshdash/history_store_reads.py`: `HistoryStore` read-operation wrappers using read/query/decoder helpers.
 - `meshdash/history_store_writes.py`: `HistoryStore` write-operation wrappers with prune+commit flow.
+- `meshdash/history_store_packets.py`: packet-domain `HistoryStore` wrappers (`load_recent_packets`, `save_packet`).
+- `meshdash/history_store_chat.py`: chat-domain `HistoryStore` wrappers (`load_recent_chat`, `save_chat`).
+- `meshdash/history_store_connections.py`: connection-domain `HistoryStore` wrappers (`load_connections`, `save_connection_event`).
+- `meshdash/history_store_nodes.py`: node-domain `HistoryStore` wrappers (node history/activity/capabilities/counts).
 - `meshdash/history_writes.py`: packet-event rollup orchestration helper.
 - `meshdash/history_views.py`: node history/online activity empty payload and loader builders.
 - `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
