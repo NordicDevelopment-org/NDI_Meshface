@@ -257,6 +257,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
   - `build_dashboard_runtime_loader_dependencies_from_legacy_args(...)` in `meshdash/dashboard_runtime_loader_dependencies.py`
   - `build_dashboard_runtime_loaders_with_dependencies(...)` in `meshdash/dashboard_runtime_loaders.py`
   - existing `build_dashboard_runtime_loaders(...)` preserved as compatibility wrapper.
+- `build_dashboard_runtime_context(...)` now routes through the typed dashboard-loader dependency path by default while preserving legacy loader injection override compatibility.
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
   - `parse_chat_send_request(...)` now used by POST route wiring + chat API handler

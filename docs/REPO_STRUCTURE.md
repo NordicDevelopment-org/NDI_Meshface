@@ -32,7 +32,7 @@
 - `meshdash/dashboard_runtime.py`: stable dashboard-runtime facade re-exporting runner entrypoint.
 - `meshdash/dashboard_runner.py`: stable dashboard-runner facade re-exporting runtime entrypoint.
 - `meshdash/dashboard_runner_impl.py`: dashboard runtime server lifecycle orchestration using runtime context helpers.
-- `meshdash/dashboard_runtime_context.py`: dashboard runtime bootstrap context helper + typed runtime context dataclass.
+- `meshdash/dashboard_runtime_context.py`: dashboard runtime bootstrap context helper + typed runtime context dataclass (typed loader dependency path by default, legacy override retained).
 - `meshdash/dashboard_loaders.py`: stable runtime-loaders facade re-exporting loader assembly entrypoint + typed loader bundle.
 - `meshdash/dashboard_runtime_loader_contracts.py`: typed runtime-loader dependency dataclass contract.
 - `meshdash/dashboard_runtime_loader_dependencies.py`: helper mapping legacy loader-assembly args into `DashboardRuntimeLoaderDependencies`.

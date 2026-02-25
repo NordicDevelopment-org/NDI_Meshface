@@ -162,3 +162,99 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
         "build_online_activity_loader_fn": "build-online-activity-loader-fn",
         "build_send_chat_loader_fn": "build-send-chat-loader-fn",
     }
+
+
+def test_build_dashboard_runtime_context_uses_typed_loader_dependency_path_by_default():
+    args = argparse.Namespace(
+        history_db="state/history.sqlite3",
+        no_history=False,
+        history_max_rows=5000,
+        history_retention_days=7,
+        history_event_max_rows=200000,
+        history_event_retention_days=30,
+        history_rollup_retention_days=365,
+        packet_limit=250,
+        show_secrets=False,
+        node_history_hours=72,
+        node_history_max_points=1440,
+    )
+    calls = {}
+
+    iface = object()
+    history_store = object()
+    history_store_cls = object()
+    send_state = lambda: {"ok": True}
+    send_node_history = lambda *_a, **_k: {"ok": True}
+    send_online = lambda *_a, **_k: {"ok": True}
+    send_chat = lambda *_a, **_k: {"ok": True}
+    revision_info = RevisionInfo(version="0.1.0", commit="abc", label="Rev", title="Rev Title")
+
+    def _mesh_target_label(_args):
+        return "192.168.1.10:4403 (tcp)"
+
+    def _open_mesh_interface(_args):
+        return iface
+
+    def _open_optional_history_store(_args, **_kwargs):
+        return history_store
+
+    class _Tracker:
+        def __init__(self, packet_limit, history_store):
+            self.packet_limit = packet_limit
+            self.history_store = history_store
+
+        def on_receive(self, _packet, _interface):
+            return None
+
+    def _build_runtime_loader_dependencies(**kwargs):
+        calls["build_runtime_loader_dependencies"] = kwargs
+        return {"deps": True}
+
+    def _build_runtime_loaders_with_dependencies(*, dependencies):
+        calls["build_runtime_loaders_with_dependencies"] = dependencies
+        return DashboardRuntimeLoaders(
+            state_fn=send_state,
+            node_history_fn=send_node_history,
+            online_activity_fn=send_online,
+            send_chat_fn=send_chat,
+        )
+
+    context = build_dashboard_runtime_context(
+        args,
+        mesh_target_label_fn=_mesh_target_label,
+        open_mesh_interface_fn=_open_mesh_interface,
+        history_store_cls=history_store_cls,
+        dashboard_tracker_cls=_Tracker,
+        subscribe_fn=lambda *_a: None,
+        seed_tracker_fn="seed-fn",
+        revision_info_fn=lambda: revision_info,
+        send_chat_message_fn="send-chat-message-fn",
+        send_reaction_packet_fn="send-reaction-packet-fn",
+        get_local_node_id_fn="get-local-node-id-fn",
+        normalize_single_emoji_fn="normalize-single-emoji-fn",
+        to_int_fn="to-int-fn",
+        utc_now_fn="utc-now-fn",
+        build_state_fn="build-state-fn",
+        build_state_snapshot_loader_fn="build-state-snapshot-loader-fn",
+        build_node_history_loader_fn="build-node-history-loader-fn",
+        build_online_activity_loader_fn="build-online-activity-loader-fn",
+        build_send_chat_loader_fn="build-send-chat-loader-fn",
+        default_chat_max_bytes=220,
+        lock_factory=lambda: "send-lock",
+        now_unix_fn=lambda: 123.5,
+        resolve_history_db_path_fn=lambda path: f"/abs/{path}",
+        open_optional_history_store_fn=_open_optional_history_store,
+        seed_tracker_if_empty_fn=lambda *_a, **_k: None,
+        build_dashboard_runtime_loader_dependencies_from_legacy_args_fn=_build_runtime_loader_dependencies,
+        build_dashboard_runtime_loaders_with_dependencies_fn=_build_runtime_loaders_with_dependencies,
+    )
+
+    assert isinstance(context, DashboardRuntimeContext)
+    assert context.state_fn is send_state
+    assert context.node_history_fn is send_node_history
+    assert context.online_activity_fn is send_online
+    assert context.send_chat_fn is send_chat
+    assert calls["build_runtime_loader_dependencies"]["iface"] is iface
+    assert calls["build_runtime_loader_dependencies"]["history_store"] is history_store
+    assert calls["build_runtime_loader_dependencies"]["revision_info"] is revision_info
+    assert calls["build_runtime_loaders_with_dependencies"] == {"deps": True}

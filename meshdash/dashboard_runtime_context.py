@@ -4,10 +4,12 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from .dashboard_loaders import (
-    DashboardRuntimeLoaders,
-    build_dashboard_runtime_loaders,
+from .dashboard_loaders import DashboardRuntimeLoaders
+from .dashboard_runtime_loader_contracts import DashboardRuntimeLoaderDependencies
+from .dashboard_runtime_loader_dependencies import (
+    build_dashboard_runtime_loader_dependencies_from_legacy_args,
 )
+from .dashboard_runtime_loaders import build_dashboard_runtime_loaders_with_dependencies
 from .revision import RevisionInfo
 from .runtime_types import (
     BuildNodeHistoryLoaderFn,
@@ -17,12 +19,16 @@ from .runtime_types import (
     BuildStateSnapshotLoaderFn,
     GetLocalNodeIdFn,
     MeshTargetLabelFn,
+    NodeHistoryFn,
     NormalizeSingleEmojiFn,
     OpenMeshInterfaceFn,
+    OnlineActivityFn,
     RevisionInfoFn,
+    SendChatFn,
     SendChatMessageFn,
     SendReactionPacketFn,
     SeedTrackerFn,
+    StateFn,
     SubscribeFn,
     ToIntFn,
     UtcNowFn,
@@ -43,10 +49,10 @@ class DashboardRuntimeContext:
     send_lock: Any
     started_at: float
     revision_info: RevisionInfo
-    state_fn: Callable[[], dict]
-    node_history_fn: Callable[..., dict]
-    online_activity_fn: Callable[..., dict]
-    send_chat_fn: Callable[..., dict]
+    state_fn: StateFn
+    node_history_fn: NodeHistoryFn
+    online_activity_fn: OnlineActivityFn
+    send_chat_fn: SendChatFn
     history_enabled: bool
 
 
@@ -80,7 +86,13 @@ def build_dashboard_runtime_context(
     ),
     open_optional_history_store_fn: Callable[..., Optional[Any]] = open_optional_history_store,
     seed_tracker_if_empty_fn: Callable[..., None] = seed_tracker_if_empty,
-    build_dashboard_runtime_loaders_fn: Callable[..., DashboardRuntimeLoaders] = build_dashboard_runtime_loaders,
+    build_dashboard_runtime_loaders_fn: Optional[Callable[..., DashboardRuntimeLoaders]] = None,
+    build_dashboard_runtime_loader_dependencies_from_legacy_args_fn: Callable[
+        ..., DashboardRuntimeLoaderDependencies
+    ] = build_dashboard_runtime_loader_dependencies_from_legacy_args,
+    build_dashboard_runtime_loaders_with_dependencies_fn: Callable[
+        ..., DashboardRuntimeLoaders
+    ] = build_dashboard_runtime_loaders_with_dependencies,
 ) -> DashboardRuntimeContext:
     target = mesh_target_label_fn(args)
     print_fn(f"Connecting to {target} ...")
@@ -100,31 +112,43 @@ def build_dashboard_runtime_context(
     started_at = now_unix_fn()
     revision_info = revision_info_fn()
 
-    loaders = build_dashboard_runtime_loaders_fn(
-        iface=iface,
-        tracker=tracker,
-        send_lock=send_lock,
-        started_at=started_at,
-        target=target,
-        show_secrets=args.show_secrets,
-        history_db_path=history_db_path,
-        revision_info=revision_info,
-        history_store=history_store,
-        default_node_history_hours=args.node_history_hours,
-        default_node_history_points=args.node_history_max_points,
-        send_chat_message_fn=send_chat_message_fn,
-        send_reaction_packet_fn=send_reaction_packet_fn,
-        get_local_node_id_fn=get_local_node_id_fn,
-        default_chat_max_bytes=default_chat_max_bytes,
-        normalize_single_emoji_fn=normalize_single_emoji_fn,
-        to_int_fn=to_int_fn,
-        utc_now_fn=utc_now_fn,
-        build_state_fn=build_state_fn,
-        build_state_snapshot_loader_fn=build_state_snapshot_loader_fn,
-        build_node_history_loader_fn=build_node_history_loader_fn,
-        build_online_activity_loader_fn=build_online_activity_loader_fn,
-        build_send_chat_loader_fn=build_send_chat_loader_fn,
-    )
+    loader_kwargs = {
+        "iface": iface,
+        "tracker": tracker,
+        "send_lock": send_lock,
+        "started_at": started_at,
+        "target": target,
+        "show_secrets": args.show_secrets,
+        "history_db_path": history_db_path,
+        "revision_info": revision_info,
+        "history_store": history_store,
+        "default_node_history_hours": args.node_history_hours,
+        "default_node_history_points": args.node_history_max_points,
+        "send_chat_message_fn": send_chat_message_fn,
+        "send_reaction_packet_fn": send_reaction_packet_fn,
+        "get_local_node_id_fn": get_local_node_id_fn,
+        "default_chat_max_bytes": default_chat_max_bytes,
+        "normalize_single_emoji_fn": normalize_single_emoji_fn,
+        "to_int_fn": to_int_fn,
+        "utc_now_fn": utc_now_fn,
+        "build_state_fn": build_state_fn,
+        "build_state_snapshot_loader_fn": build_state_snapshot_loader_fn,
+        "build_node_history_loader_fn": build_node_history_loader_fn,
+        "build_online_activity_loader_fn": build_online_activity_loader_fn,
+        "build_send_chat_loader_fn": build_send_chat_loader_fn,
+    }
+
+    if build_dashboard_runtime_loaders_fn is not None:
+        loaders = build_dashboard_runtime_loaders_fn(**loader_kwargs)
+    else:
+        loader_dependencies = (
+            build_dashboard_runtime_loader_dependencies_from_legacy_args_fn(
+                **loader_kwargs
+            )
+        )
+        loaders = build_dashboard_runtime_loaders_with_dependencies_fn(
+            dependencies=loader_dependencies
+        )
 
     return DashboardRuntimeContext(
         target=target,
