@@ -1,13 +1,12 @@
-from typing import Any
-
 from .nodes import safe_nodes_items as _safe_nodes_items
+from .tracker_seed_contracts import SafeNodesItemsFn, TrackerSeedTarget
 
 
 def seed_tracker_from_node_db(
-    tracker: Any,
-    iface: Any,
+    tracker: TrackerSeedTarget,
+    iface: object,
     *,
-    safe_nodes_items_fn=_safe_nodes_items,
+    safe_nodes_items_fn: SafeNodesItemsFn = _safe_nodes_items,
 ) -> None:
     for _num, node in safe_nodes_items_fn(iface, retries=3, sleep_seconds=0.01):
         if not isinstance(node, dict):

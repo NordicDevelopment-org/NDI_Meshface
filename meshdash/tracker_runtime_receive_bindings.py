@@ -1,5 +1,3 @@
-from typing import Any
-
 try:
     import meshtastic
 except Exception:
@@ -35,10 +33,10 @@ from .runtime_types import (
 
 
 def _resolve_tracker_node_id_from_num(
-    iface: Any,
-    node_num: Any,
+    iface: object,
+    node_num: object,
     *,
-    meshtastic_module: Any = meshtastic,
+    meshtastic_module: object = meshtastic,
     to_int_fn: ToIntFn = _to_int,
     get_node_id_from_num_fn: GetNodeIdFromNumFn = _get_node_id_from_num_helper,
 ) -> str | None:
@@ -55,7 +53,7 @@ def record_tracker_receive_unlocked_for_tracker(
     tracker: TrackerReceiveRuntimeState,
     *,
     packet: TrackerPacket,
-    interface: Any,
+    interface: object,
     include_live_count: bool,
     get_node_id_from_num_fn: GetNodeIdFromNumFn = _get_node_id_from_num_helper,
     record_tracker_packet_unlocked_fn: RecordTrackerPacketUnlockedFn | None = None,

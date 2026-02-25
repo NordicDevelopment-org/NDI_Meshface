@@ -177,6 +177,7 @@
 - `meshdash/tracker_packet_artifacts.py`: packet/chat artifact builders for tracker receive flow.
 - `meshdash/tracker_observation.py`: delivery/direct-edge/port-count observation helper for tracker receive flow.
 - `meshdash/tracker_seed.py`: tracker seed helper that replays node-db `lastReceived` packets.
+- `meshdash/tracker_seed_contracts.py`: typed protocol contracts for tracker seed targets and node-iteration callback surfaces.
 - `meshdash/tracker_setup.py`: tracker buffer/bootstrap setup helpers (including `TrackerBuffers`) used by tracker constructor.
 - `meshdash/tracker_receive.py`: receive-flow orchestration helper that wires parse results into storage.
 - `meshdash/tracker_snapshot.py`: edge snapshot and full tracker snapshot payload builders.
