@@ -10,6 +10,7 @@ from .history_maintenance import (
 )
 from .history_prune import prune_history_tables as _prune_history_tables_helper
 from .history_schema import initialize_history_schema as _initialize_history_schema_helper
+from .history_store_policy import HistoryStorePolicy
 
 
 def open_and_initialize_history_connection(
@@ -44,6 +45,21 @@ def open_and_initialize_history_connection(
     return conn
 
 
+def open_and_initialize_history_connection_with_policy(
+    *,
+    db_path: str,
+    policy: HistoryStorePolicy,
+) -> Any:
+    return open_and_initialize_history_connection(
+        db_path=db_path,
+        retention_seconds=policy.retention_seconds,
+        event_retention_seconds=policy.event_retention_seconds,
+        rollup_retention_seconds=policy.rollup_retention_seconds,
+        max_rows=policy.max_rows,
+        event_max_rows=policy.event_max_rows,
+    )
+
+
 def prune_history_connection(
     conn: Any,
     *,
@@ -62,4 +78,19 @@ def prune_history_connection(
         event_max_rows=event_max_rows,
         prune_history_tables_fn=_prune_history_tables_helper,
         now_unix_fn=time.time,
+    )
+
+
+def prune_history_connection_with_policy(
+    conn: Any,
+    *,
+    policy: HistoryStorePolicy,
+) -> None:
+    prune_history_connection(
+        conn,
+        retention_seconds=policy.retention_seconds,
+        event_retention_seconds=policy.event_retention_seconds,
+        rollup_retention_seconds=policy.rollup_retention_seconds,
+        max_rows=policy.max_rows,
+        event_max_rows=policy.event_max_rows,
     )

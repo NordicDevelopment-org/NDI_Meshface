@@ -3,6 +3,7 @@ from typing import Any, Callable
 
 from .history_store_connection import (
     open_and_initialize_history_connection as _open_and_initialize_history_connection_helper,
+    open_and_initialize_history_connection_with_policy as _open_and_initialize_history_connection_with_policy_helper,
 )
 from .history_store_policy import (
     build_history_store_policy as _build_history_store_policy_helper,
@@ -20,6 +21,7 @@ def initialize_history_store_runtime(
     rollup_retention_days: int,
     lock_factory: Callable[[], Any] = threading.Lock,
     build_history_store_policy_fn: Callable[..., Any] = _build_history_store_policy_helper,
+    open_and_initialize_history_connection_with_policy_fn: Callable[..., Any] = _open_and_initialize_history_connection_with_policy_helper,
     open_and_initialize_history_connection_fn: Callable[..., Any] = _open_and_initialize_history_connection_helper,
 ) -> None:
     policy = build_history_store_policy_fn(
@@ -38,11 +40,23 @@ def initialize_history_store_runtime(
     store.rollup_retention_seconds = policy.rollup_retention_seconds
     store._writes_since_prune = 0
     store._lock = lock_factory()
-    store._conn = open_and_initialize_history_connection_fn(
-        db_path=store.db_path,
-        retention_seconds=policy.retention_seconds,
-        event_retention_seconds=policy.event_retention_seconds,
-        rollup_retention_seconds=policy.rollup_retention_seconds,
-        max_rows=policy.max_rows,
-        event_max_rows=policy.event_max_rows,
-    )
+    if (
+        open_and_initialize_history_connection_with_policy_fn
+        is _open_and_initialize_history_connection_with_policy_helper
+        and open_and_initialize_history_connection_fn
+        is not _open_and_initialize_history_connection_helper
+    ):
+        # Backward compatibility for callers/tests still injecting the scalar signature.
+        store._conn = open_and_initialize_history_connection_fn(
+            db_path=store.db_path,
+            retention_seconds=policy.retention_seconds,
+            event_retention_seconds=policy.event_retention_seconds,
+            rollup_retention_seconds=policy.rollup_retention_seconds,
+            max_rows=policy.max_rows,
+            event_max_rows=policy.event_max_rows,
+        )
+    else:
+        store._conn = open_and_initialize_history_connection_with_policy_fn(
+            db_path=store.db_path,
+            policy=policy,
+        )

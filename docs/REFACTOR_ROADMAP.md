@@ -115,6 +115,7 @@ Break `HistoryStore` into smaller repositories.
   - `meshdash/history_store_nodes.py`
 - Added centralized history retention/limit policy helper:
   - `meshdash/history_store_policy.py`
+- Added policy-aware history connection/prune entrypoints in `meshdash/history_store_connection.py` and wired runtime init/maintenance to policy-first flow.
 - Added targeted tests:
   - `tests/test_history_store_runtime_init.py`
   - `tests/test_history_store_runtime_maintenance.py`
