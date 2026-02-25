@@ -80,12 +80,35 @@ Separate state assembly from HTTP wiring.
   - local-state safe load + modem preset extraction
   - summary payload composition
   - secret redaction gate
+- Added `meshdash/state_tracker.py` with safe tracker read helpers:
+  - snapshot fallback to empty typed tracker snapshot on exception
+  - saved-count/capability fallback to empty mappings on exception
+  - explicit tracker error fields in state payload for degraded paths (`tracker_error`, `tracker_saved_counts_error`, `tracker_capabilities_error`)
+- State service now handles node collection failures with empty-node fallback + explicit `nodes_error` payload field.
+- State service now safely JSON-normalizes `my_info` / `metadata` with explicit degraded-path fields (`my_info_error`, `metadata_error`) instead of raising.
+- Added typed state payload contracts in `meshdash/state_payload_contracts.py`:
+  - `StateTrafficPayload` and `DashboardStatePayload` with dict conversion at API boundary
+  - compatibility coercion helpers for mapping-shaped callers.
+- Replaced loose callable aliases in `meshdash/state_service_contracts.py` with explicit collaborator protocol signatures (node collectors, summary builder, redaction, and safe tracker loaders).
+- Split state-service entrypoints:
+  - `build_dashboard_state_typed(...)` composes typed payload contracts
+  - `build_dashboard_state(...)` remains compatibility wrapper for redaction + dict return shape.
+- Aligned state runtime dependency contracts to state service boundaries:
+  - `StateSnapshotRuntimeDependencies.tracker` now uses `StateTracker` protocol
+  - `storage_probe_path` now typed as `Optional[str]` through runtime state loader/dependency assembly.
+- State service now guards summary assembly failures:
+  - emits `summary_error` and falls back to a minimal summary payload instead of raising.
+- `/api/state` now normalizes both typed and dict state payload returns through `coerce_dashboard_state_payload(...)` at the API boundary before JSON writing.
+- Centralized state API-boundary normalization in `normalize_state_payload_for_api(...)` within `meshdash/state_payload_contracts.py`, keeping handler modules transport-thin.
+- Replaced loose callable aliases in `meshdash/http_route_contracts.py` with explicit parser/writer protocol signatures for GET/POST dependency wiring.
+- Normalized API input parser integer-coercion typing (`api_input_chat.py`, `api_input_history.py`) to shared `runtime_types.ToIntFn` alias.
+- Updated `http_api.make_http_handler(...)` to consume shared route-contract types (`StateFn`, `NodeHistoryFn`, `OnlineActivityFn`, `SendChatFn`, `ToIntFn`) instead of local raw callable signatures.
 - `meshdash/state.py` is now a thin compatibility facade over the service.
-- Added `tests/test_state_service.py`.
+- Added `tests/test_state_service.py` and `tests/test_state_tracker.py`.
 
 ### Steps
 
-1. Expand service coverage for failure/partial-data cases (missing metadata, tracker exceptions).
+1. Expand service coverage for failure/partial-data cases (remaining: metadata/service-edge variants).
 2. Keep request handlers thin:
    - parse request
    - call service
@@ -237,6 +260,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added `TrackerReceiveRuntimeState` protocol in `meshdash/tracker_runtime_types.py` and applied it to receive-path dependency assembly/wiring entrypoints.
 - `runtime_state_loader` now accepts `RevisionInfo` and performs dict conversion at the state-payload boundary.
 - Reused shared HTTP route type aliases across API domain modules (`api_system`, `api_chat`, `api_history_node`, `api_history_online`) to reduce duplicated callable signatures.
+- Added shared HTTP handler protocol contracts in `meshdash/http_handler_contracts.py` and applied them across API/route/response dispatch modules (`api_chat`, `api_system`, `http_routes_*`, `http_api_*`, `http_responses`, `http_handler`) so HTTP boundaries no longer rely on raw `Any` handler typing.
 - Added typed tracker packet-ingest dependency contract:
   - `TrackerPacketRuntimeDependencies` in `meshdash/tracker_runtime_packet_contracts.py`
   - `record_tracker_packet_unlocked_with_dependencies(...)` in `meshdash/tracker_runtime_record.py`
@@ -275,6 +299,16 @@ Reduce string-key coupling between runtime builders and orchestration modules.
   - `CollectedNodes` + `coerce_collected_nodes(...)` in `meshdash/state_node_contracts.py`
   - `collect_nodes_typed(...)` in `meshdash/state_node_rows.py` with legacy dict wrapper preserved
   - `state_service` now consumes the typed node contract internally while accepting legacy mapping-shaped injections in tests/callers.
+- Added typed tracker-snapshot contract for state fanout:
+  - `TrackerSnapshot` + `coerce_tracker_snapshot(...)` in `meshdash/tracker_snapshot_contracts.py`
+  - `build_tracker_snapshot_payload_typed(...)` in `meshdash/tracker_snapshot.py` with legacy dict wrapper preserved
+  - `build_tracker_snapshot_typed(...)` / `build_tracker_snapshot_for_tracker_typed(...)` in `meshdash/tracker_runtime_state.py` with existing dict-return APIs preserved
+  - `DashboardTracker.snapshot_typed(...)` in `meshdash/tracker_runtime_impl.py` while `snapshot(...)` remains dict-compatible
+  - `state_service` and `state_summary` now consume typed tracker snapshot contracts internally while accepting legacy mapping-shaped payloads.
+- Added tracker snapshot assembly protocol contracts in `meshdash/tracker_snapshot_build_contracts.py` and applied them through `tracker_snapshot.py`, `tracker_runtime_state.py`, and `tracker_runtime_types.py` so snapshot/store callback boundaries use explicit typed protocols instead of raw `Any`.
+- Added explicit tracker collaborator protocols for service/runtime boundaries:
+  - `StateTracker` protocol in `meshdash/state_service_contracts.py` for `/api/state` service dependencies
+  - `TrackerSnapshotRuntimeState` protocol in `meshdash/tracker_runtime_types.py` for snapshot assembly helpers.
 - Added `meshdash/state_service_contracts.py` to centralize state assembly collaborator callback aliases (`collect_nodes`, local-state safe collection, summary builder, redaction, revision payload).
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`

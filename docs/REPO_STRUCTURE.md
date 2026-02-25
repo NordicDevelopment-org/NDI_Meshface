@@ -19,7 +19,7 @@
 - `meshdash/api_input_chat.py`: chat POST input parsing + request-size validation (`ChatSendRequest`).
 - `meshdash/api_input_history.py`: history GET query parsing contracts (`NodeHistoryQuery`, `OnlineActivityQuery`).
 - `meshdash/api_chat.py`: domain handler for chat-send API POST flow (`/api/chat/send`).
-- `meshdash/api_system.py`: domain handler for system state API response (`/api/state`).
+- `meshdash/api_system.py`: domain handler for system state API response (`/api/state`) with typed-or-legacy state payload normalization at write boundary.
 - `meshdash/api_history.py`: stable history API facade re-exporting node/online response builders.
 - `meshdash/api_history_node.py`: `/api/history/node` response helper.
 - `meshdash/api_history_online.py`: `/api/history/online` response helper.
@@ -111,7 +111,8 @@
 - `meshdash/http_api_get.py`: GET-side HTTP route dependency builder + dispatch helpers.
 - `meshdash/http_api_post.py`: POST-side HTTP route dependency builder + dispatch helpers.
 - `meshdash/http_handler.py`: shared HTTP `BaseHTTPRequestHandler` shell for GET/POST dispatch wiring.
-- `meshdash/http_route_contracts.py`: typed GET/POST route dependency contracts used by HTTP API dispatch wiring.
+- `meshdash/http_handler_contracts.py`: shared HTTP handler/body protocol contracts for request/response route typing.
+- `meshdash/http_route_contracts.py`: typed GET/POST route dependency contracts used by HTTP API dispatch wiring (explicit parser/writer protocol signatures + typed-or-legacy state payload return contract).
 - `meshdash/http_routes.py`: stable HTTP-routes facade re-exporting GET/POST route handlers.
 - `meshdash/http_routes_get.py`: dashboard GET route handlers (`/`, `/api/state`, history endpoints).
 - `meshdash/http_routes_post.py`: dashboard POST route handler (`/api/chat/send`) and send error mapping.
@@ -124,7 +125,7 @@
 - `meshdash/revision.py`: revision/version/git metadata helpers and `RevisionInfo` typed contract for runtime wiring.
 - `meshdash/runtime.py`: startup/runtime networking + default gateway helpers.
 - `meshdash/runtime_callbacks.py`: stable runtime-callbacks facade re-exporting closure builders.
-- `meshdash/runtime_state_contracts.py`: typed state-snapshot runtime dependency dataclass contract.
+- `meshdash/runtime_state_contracts.py`: typed state-snapshot runtime dependency dataclass contract aligned to state service tracker protocol.
 - `meshdash/runtime_state_dependencies.py`: helper mapping legacy state-loader arguments into `StateSnapshotRuntimeDependencies`.
 - `meshdash/runtime_state_loader.py`: state snapshot closure builders (typed dependency path + compatibility wrapper).
 - `meshdash/runtime_send_contracts.py`: typed chat-send runtime dependency dataclass contract.
@@ -135,26 +136,29 @@
 - `meshdash/services.py`: stable services facade re-exporting history loaders and chat-send service entrypoint.
 - `meshdash/services_chat.py`: chat-send orchestration service implementation.
 - `meshdash/state.py`: stable state facade re-exporting node/local collectors and state payload builder.
-- `meshdash/state_service_contracts.py`: callback/type aliases for state assembly collaborator injections (nodes/local/summary/redaction/revision payload).
-- `meshdash/state_service.py`: `/api/state` payload assembly service (tracker snapshot + local/summary composition + redaction).
+- `meshdash/state_service_contracts.py`: explicit protocol contracts for state assembly collaborators (node/local collectors, summary/redaction hooks, and `StateTracker` safe-loader boundaries).
+- `meshdash/state_service.py`: `/api/state` payload assembly service (typed payload builder + compatibility dict/redaction wrapper, with explicit degraded-path error fields for node/tracker/summary/metadata serialization paths).
+- `meshdash/state_tracker.py`: safe tracker data readers used by state service (exception-to-fallback snapshot/count/capability behavior).
 - `meshdash/state_nodes.py`: stable state-node facade re-exporting node/local collectors.
 - `meshdash/state_node_contracts.py`: typed node-collection contract + compatibility coercion helper for state assembly.
+- `meshdash/state_payload_contracts.py`: typed state/traffic payload contracts + compatibility coercion/normalization helpers for API-boundary dict conversion.
 - `meshdash/state_node_rows.py`: node row/full-node snapshot collection helpers (`collect_nodes_typed` + dict compatibility wrapper).
 - `meshdash/state_local.py`: local-node config/module/channel snapshot collection helper.
-- `meshdash/state_summary.py`: summary/local-state enrichment helpers for `/api/state` (accepts typed `RevisionInfo` with dict compatibility at payload boundary).
+- `meshdash/state_summary.py`: summary/local-state enrichment helpers for `/api/state` (accepts typed `RevisionInfo` and `TrackerSnapshot` with dict compatibility at payload boundary).
 - `meshdash/tracker.py`: stable tracker facade re-exporting tracker class and seed helper.
 - `meshdash/tracker_runtime.py`: stable tracker-runtime facade re-exporting tracker class + seed helper.
-- `meshdash/tracker_runtime_impl.py`: tracker runtime orchestration class wiring callbacks/bootstrap/snapshot helpers.
+- `meshdash/tracker_runtime_impl.py`: tracker runtime orchestration class wiring callbacks/bootstrap/snapshot helpers (typed `snapshot_typed` + dict-compatible `snapshot`).
 - `meshdash/tracker_runtime_init.py`: tracker constructor/runtime initialization wiring for buffers, typed delivery callbacks, and bootstrap state.
 - `meshdash/tracker_runtime_record.py`: tracker receive-path runtime packet record wiring (parse + process handoff).
 - `meshdash/tracker_runtime_record_dependencies.py`: helper that maps legacy tracker record callback args into `TrackerPacketRuntimeDependencies`.
 - `meshdash/tracker_runtime_packet_contracts.py`: typed packet-ingest dependency contract for tracker runtime receive-path orchestration.
-- `meshdash/tracker_runtime_types.py`: typed tracker runtime protocol contracts for receive-path state dependencies.
+- `meshdash/tracker_runtime_types.py`: typed tracker runtime protocol contracts for receive/snapshot-path state dependencies.
 - `meshdash/tracker_runtime_receive.py`: tracker receive wrapper that assembles typed packet-runtime dependencies and routes packet ingest into tracker record helpers.
 - `meshdash/tracker_runtime_receive_dependencies.py`: tracker receive dependency assembly + compatibility mapping helpers from typed packet contracts to legacy callback kwargs.
 - `meshdash/tracker_runtime_receive_bindings.py`: tracker-bound node-id resolver + receive wiring defaults used by runtime class.
 - `meshdash/tracker_runtime_chat.py`: runtime helper for local chat record flow (entry build + append/history fanout).
-- `meshdash/tracker_runtime_state.py`: runtime helpers for node saved/capability reads and snapshot assembly.
+- `meshdash/tracker_runtime_state.py`: runtime helpers for node saved/capability reads and snapshot assembly (`*_typed` contract path + dict compatibility wrappers).
+- `meshdash/tracker_snapshot_build_contracts.py`: typed protocol contracts for tracker snapshot assembly callbacks/history-store readers.
 - `meshdash/tracker_node_resolver.py`: tracker node-id resolver wrapper that binds Meshtastic broadcast behavior.
 - `meshdash/theme.py`: centralized light/dark theme tokens and CSS builder.
 - `meshdash/theme_presets.py`: theme preset defaults + JSON loader/validator + preset selection helpers.
@@ -174,6 +178,7 @@
 - `meshdash/tracker_setup.py`: tracker buffer/bootstrap setup helpers (including `TrackerBuffers`) used by tracker constructor.
 - `meshdash/tracker_receive.py`: receive-flow orchestration helper that wires parse results into storage.
 - `meshdash/tracker_snapshot.py`: edge snapshot and full tracker snapshot payload builders.
+- `meshdash/tracker_snapshot_contracts.py`: typed tracker snapshot contract + compatibility coercion helper for state assembly.
 - `meshdash/tracker_storage.py`: tracker receive-path storage fanout (recent deques + optional history writes).
 - `meshdash/wiring.py`: stable wiring facade re-exporting runtime dependency wiring APIs and typed runtime dependency contract.
 - `meshdash/wiring_runtime.py`: dependency checks and runtime wiring assembly for dashboard startup (`DashboardRuntimeDependencies`).

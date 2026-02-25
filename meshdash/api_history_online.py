@@ -1,5 +1,3 @@
-from typing import Any
-
 from .http_route_contracts import (
     EmptyOnlineActivityFn,
     OnlineActivityFn,

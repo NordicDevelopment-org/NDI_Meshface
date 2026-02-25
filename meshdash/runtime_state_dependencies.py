@@ -1,17 +1,18 @@
-from typing import Any
+from typing import Any, Optional
 
 from .revision import RevisionInfo
 from .runtime_state_contracts import StateSnapshotRuntimeDependencies
+from .state_service_contracts import StateTracker
 
 
 def build_state_snapshot_runtime_dependencies_from_legacy_args(
     *,
     iface: Any,
-    tracker: Any,
+    tracker: StateTracker,
     started_at: float,
     target: str,
     show_secrets: bool,
-    storage_probe_path: str,
+    storage_probe_path: Optional[str],
     revision_info: RevisionInfo,
 ) -> StateSnapshotRuntimeDependencies:
     return StateSnapshotRuntimeDependencies(

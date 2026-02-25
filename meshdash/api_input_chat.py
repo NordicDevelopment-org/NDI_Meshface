@@ -1,12 +1,14 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Mapping, Optional
+
+from .runtime_types import ToIntFn
 
 
 def validate_content_length(
     headers: Mapping[str, Any],
     *,
-    to_int_fn: Callable[[Any], Optional[int]],
+    to_int_fn: ToIntFn,
     max_bytes: int = 8192,
 ) -> int:
     content_length = to_int_fn(headers.get("Content-Length")) or 0
@@ -28,7 +30,7 @@ class ChatSendRequest:
 def parse_chat_send_request(
     raw_body: bytes,
     *,
-    to_int_fn: Callable[[Any], Optional[int]],
+    to_int_fn: ToIntFn,
 ) -> ChatSendRequest:
     try:
         body = json.loads(raw_body.decode("utf-8"))
@@ -48,7 +50,7 @@ def parse_chat_send_request(
 def parse_chat_send_body(
     raw_body: bytes,
     *,
-    to_int_fn: Callable[[Any], Optional[int]],
+    to_int_fn: ToIntFn,
 ) -> dict:
     request = parse_chat_send_request(raw_body, to_int_fn=to_int_fn)
     return {

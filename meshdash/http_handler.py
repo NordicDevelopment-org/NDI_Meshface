@@ -1,11 +1,13 @@
 from http.server import BaseHTTPRequestHandler
 from typing import Any, Callable
 
+from .http_handler_contracts import DashboardHttpHandler
+
 
 def build_dashboard_handler_class(
     *,
-    dispatch_get_fn: Callable[[Any], None],
-    dispatch_post_fn: Callable[[Any], None],
+    dispatch_get_fn: Callable[[DashboardHttpHandler], None],
+    dispatch_post_fn: Callable[[DashboardHttpHandler], None],
 ) -> Any:
     class DashboardHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:

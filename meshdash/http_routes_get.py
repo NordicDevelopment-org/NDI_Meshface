@@ -1,5 +1,3 @@
-from typing import Any
-
 from .api_history import (
     build_node_history_response as _build_node_history_response_helper,
     build_online_activity_response as _build_online_activity_response_helper,
@@ -7,11 +5,12 @@ from .api_history import (
 from .api_system import (
     handle_state_get as _handle_state_get_helper,
 )
+from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardGetRouteDependencies
 
 
 def handle_dashboard_get(
-    handler: Any,
+    handler: DashboardHttpHandler,
     *,
     path: str,
     query: str,

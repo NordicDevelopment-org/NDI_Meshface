@@ -1,5 +1,4 @@
-from typing import Any
-
+from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import (
     ParseChatSendRequestFn,
     SendChatFn,
@@ -10,7 +9,7 @@ from .http_route_contracts import (
 
 
 def handle_chat_send_post(
-    handler: Any,
+    handler: DashboardHttpHandler,
     *,
     send_chat_fn: SendChatFn | None,
     to_int_fn: ToIntFn,

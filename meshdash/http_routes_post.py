@@ -1,13 +1,12 @@
-from typing import Any
-
 from .api_chat import (
     handle_chat_send_post as _handle_chat_send_post_helper,
 )
+from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardPostRouteDependencies
 
 
 def handle_dashboard_post(
-    handler: Any,
+    handler: DashboardHttpHandler,
     *,
     path: str,
     deps: DashboardPostRouteDependencies,

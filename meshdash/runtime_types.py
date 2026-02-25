@@ -1,6 +1,7 @@
 from typing import Any, Callable, Dict, Optional, Tuple
 
 from .revision import RevisionInfo
+from .state_payload_contracts import DashboardStatePayload
 
 MeshTargetLabelFn = Callable[[Any], str]
 OpenMeshInterfaceFn = Callable[[Any], Any]
@@ -8,7 +9,9 @@ SubscribeFn = Callable[[Any, str], None]
 SeedTrackerFn = Callable[[Any, Any], None]
 RevisionInfoFn = Callable[[], RevisionInfo]
 
-BuildStateFn = Callable[..., dict]
+StatePayload = DashboardStatePayload | dict[str, Any]
+
+BuildStateFn = Callable[..., StatePayload]
 BuildNodeHistoryLoaderFn = Callable[..., Callable[..., dict]]
 BuildOnlineActivityLoaderFn = Callable[..., Callable[..., dict]]
 BuildSendChatLoaderFn = Callable[..., Callable[..., dict]]
@@ -33,7 +36,7 @@ MakeHttpHandlerFn = Callable[..., Any]
 ThreadingHttpServerCls = Callable[[tuple[str, int], Any], Any]
 GuessLanIpv4Fn = Callable[[], Optional[str]]
 
-StateFn = Callable[[], dict]
+StateFn = Callable[[], StatePayload]
 NodeHistoryFn = Callable[..., dict]
 OnlineActivityFn = Callable[..., dict]
 SendChatFn = Callable[..., dict]

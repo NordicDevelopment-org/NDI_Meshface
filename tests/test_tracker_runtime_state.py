@@ -1,12 +1,15 @@
 import meshdash.tracker_runtime_state as tracker_runtime_state
 from meshdash.tracker_runtime_state import (
     build_tracker_snapshot,
+    build_tracker_snapshot_for_tracker_typed,
     build_tracker_snapshot_for_tracker,
+    build_tracker_snapshot_typed,
     load_tracker_node_capabilities,
     load_tracker_node_capabilities_for_tracker,
     load_tracker_node_saved_counts,
     load_tracker_node_saved_counts_for_tracker,
 )
+from meshdash.tracker_snapshot_contracts import TrackerSnapshot
 
 
 class _FakeHistoryStore:
@@ -95,6 +98,44 @@ def test_build_tracker_snapshot_expires_then_builds_payload():
     }
 
 
+def test_build_tracker_snapshot_typed_coerces_payload_mapping():
+    observed = {}
+
+    def _expire():
+        observed["expired"] = True
+
+    def _build_payload(**kwargs):
+        observed["payload_kwargs"] = kwargs
+        return {
+            "live_packet_count": 7,
+            "real_edge_count": 2,
+            "edges": [{"from": "!a", "to": "!b"}],
+            "port_counts": [{"portnum": "TEXT_MESSAGE_APP", "count": 3}],
+            "recent_packets": [{"summary": {"id": 1}}],
+            "recent_chat": [{"text": "hello"}],
+        }
+
+    payload = build_tracker_snapshot_typed(
+        nodes_by_id={"!a": {"id": "!a"}},
+        expire_pending_deliveries_fn=_expire,
+        session_edges={},
+        historical_edges={},
+        port_counts={"TEXT_MESSAGE_APP": 3},
+        recent_packets=[{"summary": {"id": 1}}],
+        recent_chat=[{"text": "hello"}],
+        live_packet_count=7,
+        min_real_link_count=2,
+        format_epoch_fn=object(),
+        build_edge_snapshot_rows_fn=object(),
+        build_tracker_snapshot_payload_typed_fn=_build_payload,
+    )
+
+    assert isinstance(payload, TrackerSnapshot)
+    assert observed["expired"] is True
+    assert payload.live_packet_count == 7
+    assert payload.edges[0]["from"] == "!a"
+
+
 def test_load_tracker_node_saved_counts_for_tracker_uses_tracker_store(monkeypatch):
     observed = {}
 
@@ -180,4 +221,65 @@ def test_build_tracker_snapshot_for_tracker_uses_runtime_state(monkeypatch):
         "format_epoch_fn": sentinel_format,
         "build_edge_snapshot_rows_fn": sentinel_build_rows,
         "build_tracker_snapshot_payload_fn": sentinel_build_payload,
+    }
+
+
+def test_build_tracker_snapshot_for_tracker_typed_uses_runtime_state(monkeypatch):
+    observed = {}
+
+    def _build_snapshot_typed(**kwargs):
+        observed["kwargs"] = kwargs
+        return TrackerSnapshot(
+            live_packet_count=9,
+            real_edge_count=2,
+            edges=[{"from": "!a", "to": "!b"}],
+            port_counts=[{"portnum": "TEXT_MESSAGE_APP", "count": 3}],
+            recent_packets=[{"summary": {"id": 1}}],
+            recent_chat=[{"text": "hello"}],
+        )
+
+    monkeypatch.setattr(tracker_runtime_state, "build_tracker_snapshot_typed", _build_snapshot_typed)
+
+    tracker = type(
+        "_Tracker",
+        (),
+        {
+            "_expire_pending_deliveries_fn": lambda self: None,
+            "edges": {"e": 1},
+            "_historical_edges": {"h": 2},
+            "port_counts": {"TEXT_MESSAGE_APP": 3},
+            "recent_packets": [{"summary": {"id": 1}}],
+            "recent_chat": [{"text": "hello"}],
+            "live_packet_count": 9,
+        },
+    )()
+    nodes_by_id = {"!a": {"name": "A"}}
+    sentinel_format = object()
+    sentinel_build_rows = object()
+    sentinel_build_payload_typed = object()
+
+    payload = build_tracker_snapshot_for_tracker_typed(
+        tracker,
+        nodes_by_id=nodes_by_id,
+        min_real_link_count=2,
+        format_epoch_fn=sentinel_format,
+        build_edge_snapshot_rows_fn=sentinel_build_rows,
+        build_tracker_snapshot_payload_typed_fn=sentinel_build_payload_typed,
+    )
+
+    assert isinstance(payload, TrackerSnapshot)
+    assert payload.live_packet_count == 9
+    assert observed["kwargs"] == {
+        "nodes_by_id": nodes_by_id,
+        "expire_pending_deliveries_fn": tracker._expire_pending_deliveries_fn,
+        "session_edges": {"e": 1},
+        "historical_edges": {"h": 2},
+        "port_counts": {"TEXT_MESSAGE_APP": 3},
+        "recent_packets": [{"summary": {"id": 1}}],
+        "recent_chat": [{"text": "hello"}],
+        "live_packet_count": 9,
+        "min_real_link_count": 2,
+        "format_epoch_fn": sentinel_format,
+        "build_edge_snapshot_rows_fn": sentinel_build_rows,
+        "build_tracker_snapshot_payload_typed_fn": sentinel_build_payload_typed,
     }

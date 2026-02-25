@@ -1,13 +1,15 @@
 import json
 from typing import Any
 
+from .http_handler_contracts import DashboardHttpHandler
+
 
 def json_bytes(payload_obj: Any) -> bytes:
     return json.dumps(payload_obj, separators=(",", ":")).encode("utf-8")
 
 
 def write_json_response(
-    handler: Any,
+    handler: DashboardHttpHandler,
     *,
     status_code: int,
     payload_obj: Any,
@@ -23,7 +25,7 @@ def write_json_response(
     handler.wfile.write(payload)
 
 
-def write_html_response(handler: Any, *, html_text: str) -> None:
+def write_html_response(handler: DashboardHttpHandler, *, html_text: str) -> None:
     payload = html_text.encode("utf-8")
     handler.send_response(200)
     handler.send_header("Content-Type", "text/html; charset=utf-8")
@@ -32,7 +34,7 @@ def write_html_response(handler: Any, *, html_text: str) -> None:
     handler.wfile.write(payload)
 
 
-def write_text_response(handler: Any, *, status_code: int, text: str) -> None:
+def write_text_response(handler: DashboardHttpHandler, *, status_code: int, text: str) -> None:
     payload = text.encode("utf-8")
     handler.send_response(status_code)
     handler.send_header("Content-Type", "text/plain; charset=utf-8")

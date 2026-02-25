@@ -1,5 +1,9 @@
 from typing import Any, Dict, Optional, Tuple
 
+from .runtime_types import FormatEpochFn
+from .tracker_snapshot_build_contracts import BuildEdgeSnapshotRowsFn
+from .tracker_snapshot_contracts import TrackerSnapshot
+
 
 def build_edge_snapshot_rows(
     *,
@@ -7,7 +11,7 @@ def build_edge_snapshot_rows(
     historical_edges: Dict[Tuple[str, str], Dict[str, Any]],
     nodes_by_id: Dict[str, Dict[str, Any]],
     min_real_link_count: int,
-    format_epoch_fn,
+    format_epoch_fn: FormatEpochFn,
 ) -> tuple[list[Dict[str, Any]], int]:
     edge_rows: list[Dict[str, Any]] = []
     real_edge_count = 0
@@ -80,7 +84,7 @@ def build_edge_snapshot_rows(
     return edge_rows, real_edge_count
 
 
-def build_tracker_snapshot_payload(
+def build_tracker_snapshot_payload_typed(
     *,
     session_edges: Dict[Tuple[str, str], Dict[str, Any]],
     historical_edges: Dict[Tuple[str, str], Dict[str, Any]],
@@ -90,9 +94,9 @@ def build_tracker_snapshot_payload(
     recent_chat: Any,
     live_packet_count: int,
     min_real_link_count: int,
-    format_epoch_fn,
-    build_edge_snapshot_rows_fn=build_edge_snapshot_rows,
-) -> Dict[str, Any]:
+    format_epoch_fn: FormatEpochFn,
+    build_edge_snapshot_rows_fn: BuildEdgeSnapshotRowsFn = build_edge_snapshot_rows,
+) -> TrackerSnapshot:
     edge_rows, real_edge_count = build_edge_snapshot_rows_fn(
         session_edges=session_edges,
         historical_edges=historical_edges,
@@ -105,11 +109,38 @@ def build_tracker_snapshot_payload(
         for portnum, count in port_counts.most_common()
     ]
 
-    return {
-        "live_packet_count": live_packet_count,
-        "real_edge_count": real_edge_count,
-        "edges": edge_rows,
-        "port_counts": port_rows,
-        "recent_packets": list(recent_packets),
-        "recent_chat": list(recent_chat),
-    }
+    return TrackerSnapshot(
+        live_packet_count=live_packet_count,
+        real_edge_count=real_edge_count,
+        edges=edge_rows,
+        port_counts=port_rows,
+        recent_packets=list(recent_packets),
+        recent_chat=list(recent_chat),
+    )
+
+
+def build_tracker_snapshot_payload(
+    *,
+    session_edges: Dict[Tuple[str, str], Dict[str, Any]],
+    historical_edges: Dict[Tuple[str, str], Dict[str, Any]],
+    nodes_by_id: Dict[str, Dict[str, Any]],
+    port_counts: Any,
+    recent_packets: Any,
+    recent_chat: Any,
+    live_packet_count: int,
+    min_real_link_count: int,
+    format_epoch_fn: FormatEpochFn,
+    build_edge_snapshot_rows_fn: BuildEdgeSnapshotRowsFn = build_edge_snapshot_rows,
+) -> Dict[str, Any]:
+    return build_tracker_snapshot_payload_typed(
+        session_edges=session_edges,
+        historical_edges=historical_edges,
+        nodes_by_id=nodes_by_id,
+        port_counts=port_counts,
+        recent_packets=recent_packets,
+        recent_chat=recent_chat,
+        live_packet_count=live_packet_count,
+        min_real_link_count=min_real_link_count,
+        format_epoch_fn=format_epoch_fn,
+        build_edge_snapshot_rows_fn=build_edge_snapshot_rows_fn,
+    ).as_dict()

@@ -5,6 +5,7 @@ from meshdash.state_summary import (
     modem_preset_from_local_state,
 )
 from meshdash.revision import RevisionInfo
+from meshdash.tracker_snapshot_contracts import TrackerSnapshot
 
 
 def test_apply_node_saved_counts_merges_stats_into_rows():
@@ -74,12 +75,14 @@ def test_build_summary_payload_accepts_revision_info_contract():
         started_at=100.0,
         node_rows=[],
         nodes_with_position=0,
-        tracker_data={
-            "live_packet_count": 0,
-            "edges": [],
-            "real_edge_count": 0,
-            "recent_packets": [],
-        },
+        tracker_data=TrackerSnapshot(
+            live_packet_count=0,
+            real_edge_count=0,
+            edges=[],
+            port_counts=[],
+            recent_packets=[],
+            recent_chat=[],
+        ),
         storage_probe_path=None,
         revision_info=RevisionInfo(version="0.1.0", commit="abc123", label="L", title="T"),
         modem_preset=None,

@@ -20,10 +20,11 @@ from .tracker_runtime_chat import (
     record_tracker_local_chat_for_tracker as _record_tracker_local_chat_for_tracker_helper,
 )
 from .tracker_runtime_state import (
-    build_tracker_snapshot_for_tracker as _build_tracker_snapshot_for_tracker_helper,
+    build_tracker_snapshot_for_tracker_typed as _build_tracker_snapshot_for_tracker_typed_helper,
     load_tracker_node_capabilities_for_tracker as _load_tracker_node_capabilities_for_tracker_helper,
     load_tracker_node_saved_counts_for_tracker as _load_tracker_node_saved_counts_for_tracker_helper,
 )
+from .tracker_snapshot_contracts import TrackerSnapshot
 from .tracker_seed import (
     seed_tracker_from_node_db as _seed_tracker_from_node_db_helper,
 )
@@ -125,13 +126,16 @@ class DashboardTracker:
             include_live_count=include_live_count,
         )
 
-    def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    def snapshot_typed(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> TrackerSnapshot:
         with self._lock:
-            return _build_tracker_snapshot_for_tracker_helper(
+            return _build_tracker_snapshot_for_tracker_typed_helper(
                 self,
                 nodes_by_id=nodes_by_id,
                 min_real_link_count=MIN_REAL_LINK_COUNT,
             )
+
+    def snapshot(self, nodes_by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        return self.snapshot_typed(nodes_by_id).as_dict()
 
 
 def seed_tracker_from_node_db(tracker: DashboardTracker, iface: Any) -> None:

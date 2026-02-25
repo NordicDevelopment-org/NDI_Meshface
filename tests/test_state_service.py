@@ -1,4 +1,5 @@
-from meshdash.state_service import build_dashboard_state
+from meshdash.state_payload_contracts import DashboardStatePayload
+from meshdash.state_service import build_dashboard_state, build_dashboard_state_typed
 
 
 class _DummyTracker:
@@ -27,6 +28,17 @@ class _DummyTracker:
 
     def load_node_capabilities(self):
         return {"!a": {"gps_capable": True}}
+
+
+class _FailingTracker:
+    def snapshot(self, by_id):
+        raise RuntimeError("snapshot boom")
+
+    def load_node_saved_counts(self):
+        raise RuntimeError("saved boom")
+
+    def load_node_capabilities(self):
+        raise RuntimeError("caps boom")
 
 
 def test_build_dashboard_state_builds_payload_and_redacts():
@@ -86,10 +98,17 @@ def test_build_dashboard_state_builds_payload_and_redacts():
     assert observed["saved_counts"]["!a"]["saved_packets"] == 7
     assert observed["summary_kwargs"]["target"] == "192.168.1.109:4403 (tcp)"
     assert observed["summary_kwargs"]["modem_preset"] == "LONG_FAST"
-    assert observed["summary_kwargs"]["tracker_data"]["live_packet_count"] == 4
+    assert observed["summary_kwargs"]["tracker_data"].live_packet_count == 4
+    assert observed["redact_state"]["summary_error"] is None
     assert observed["redact_state"]["nodes"][0]["saved_packets"] == 7
     assert observed["redact_state"]["history_caps"]["!a"]["gps_capable"] is True
     assert observed["redact_state"]["traffic"]["recent_chat"][0]["text"] == "hello"
+    assert observed["redact_state"]["my_info_error"] is None
+    assert observed["redact_state"]["metadata_error"] is None
+    assert observed["redact_state"]["tracker_error"] is None
+    assert observed["redact_state"]["nodes_error"] is None
+    assert observed["redact_state"]["tracker_saved_counts_error"] is None
+    assert observed["redact_state"]["tracker_capabilities_error"] is None
     assert observed["sensitive_names"] == {"password"}
 
 
@@ -125,4 +144,184 @@ def test_build_dashboard_state_returns_unredacted_payload_when_show_secrets():
 
     assert payload["generated_at"] == "2026-02-24T00:00:00Z"
     assert payload["summary"]["summary_ok"] is True
+    assert payload["summary_error"] is None
+    assert payload["my_info_error"] is None
+    assert payload["metadata_error"] is None
     assert redact_called["value"] is False
+    assert payload["nodes_error"] is None
+
+
+def test_build_dashboard_state_handles_tracker_failures_without_crashing():
+    tracker = _FailingTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {
+            "live_packet_count": kwargs["tracker_data"].live_packet_count
+        },
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["summary"]["live_packet_count"] == 0
+    assert payload["tracker_error"] == "snapshot boom"
+    assert payload["nodes_error"] is None
+    assert payload["tracker_saved_counts_error"] == "saved boom"
+    assert payload["tracker_capabilities_error"] == "caps boom"
+    assert payload["history_caps"] == {}
+    assert payload["traffic"]["edges"] == []
+    assert payload["traffic"]["recent_packets"] == []
+
+
+def test_build_dashboard_state_handles_collect_nodes_failure_without_crashing():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: (_ for _ in ()).throw(RuntimeError("nodes boom")),
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {
+            "node_count": len(kwargs["node_rows"]),
+            "nodes_with_position": kwargs["nodes_with_position"],
+        },
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["nodes_error"] == "nodes boom"
+    assert payload["nodes"] == []
+    assert payload["nodes_full"] == []
+    assert payload["summary"]["node_count"] == 0
+    assert payload["summary"]["nodes_with_position"] == 0
+    assert tracker.snapshot_by_id == {}
+
+
+def test_build_dashboard_state_handles_to_jsonable_failures_without_crashing():
+    tracker = _DummyTracker()
+
+    def _to_jsonable(value):
+        if value == "fail-me":
+            raise RuntimeError("json boom")
+        return value
+
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": "fail-me", "metadata": "fail-me"})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        to_jsonable_fn=_to_jsonable,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["my_info"] is None
+    assert payload["metadata"] is None
+    assert payload["my_info_error"] == "json boom"
+    assert payload["metadata_error"] == "json boom"
+    assert payload["summary_error"] is None
+
+
+def test_build_dashboard_state_typed_returns_contract_payload():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state_typed(
+        iface=type("_Iface", (), {"myInfo": {"id": "!a"}, "metadata": {"board": "x1"}})(),
+        tracker=tracker,
+        target="target",
+        started_at=0.0,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        to_jsonable_fn=lambda value: value,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert isinstance(payload, DashboardStatePayload)
+    assert payload.generated_at == "2026-02-24T00:00:00Z"
+    assert payload.summary["summary_ok"] is True
+    assert payload.summary_error is None
+    assert payload.traffic.recent_chat[0]["text"] == "hello"
+
+
+def test_build_dashboard_state_handles_summary_builder_failure_without_crashing():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0", "commit": "abc"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: (_ for _ in ()).throw(RuntimeError("summary boom")),
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["summary_error"] == "summary boom"
+    assert payload["summary"]["target"] == "target"
+    assert payload["summary"]["node_count"] == 1
+    assert payload["summary"]["live_packet_count"] == 4

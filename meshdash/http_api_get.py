@@ -1,12 +1,18 @@
-from typing import Any
+from typing import Callable, Protocol
 from urllib.parse import urlparse
 
 from .api_input_history import parse_node_history_request, parse_online_activity_request
 from .helpers import to_int
+from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_html_response, write_json_response, write_text_response
 from .http_route_contracts import DashboardGetRouteDependencies, NodeHistoryFn, OnlineActivityFn, StateFn, ToIntFn
 from .http_routes import handle_dashboard_get
 from .services import empty_node_history, empty_online_activity
+
+
+class ParsedUrl(Protocol):
+    path: str
+    query: str
 
 
 def build_get_route_dependencies(
@@ -36,10 +42,10 @@ def build_get_route_dependencies(
 
 
 def dispatch_get_request(
-    handler: Any,
+    handler: DashboardHttpHandler,
     *,
     deps: DashboardGetRouteDependencies,
-    parse_url_fn=urlparse,
+    parse_url_fn: Callable[[str], ParsedUrl] = urlparse,
     handle_get_fn=handle_dashboard_get,
 ) -> None:
     parsed = parse_url_fn(handler.path)
@@ -55,7 +61,7 @@ def make_get_dispatch(
     *,
     deps: DashboardGetRouteDependencies,
 ):
-    def _dispatch_get(handler: Any) -> None:
+    def _dispatch_get(handler: DashboardHttpHandler) -> None:
         dispatch_get_request(handler, deps=deps)
 
     return _dispatch_get

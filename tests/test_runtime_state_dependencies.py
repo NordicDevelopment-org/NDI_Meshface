@@ -28,3 +28,18 @@ def test_build_state_snapshot_runtime_dependencies_from_legacy_args_maps_fields(
     assert deps.show_secrets is False
     assert deps.storage_probe_path == "/tmp/db.sqlite3"
     assert deps.revision_info is revision
+
+
+def test_build_state_snapshot_runtime_dependencies_accepts_optional_storage_probe_path():
+    revision = RevisionInfo(version="0.1.0", commit="abc", label="L", title="T")
+    deps = build_state_snapshot_runtime_dependencies_from_legacy_args(
+        iface=object(),
+        tracker=object(),
+        started_at=123.0,
+        target="mesh-target",
+        show_secrets=False,
+        storage_probe_path=None,
+        revision_info=revision,
+    )
+
+    assert deps.storage_probe_path is None

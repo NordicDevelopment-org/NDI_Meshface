@@ -3,7 +3,9 @@ from collections import Counter, deque
 from meshdash.tracker_snapshot import (
     build_edge_snapshot_rows,
     build_tracker_snapshot_payload,
+    build_tracker_snapshot_payload_typed,
 )
+from meshdash.tracker_snapshot_contracts import TrackerSnapshot
 
 
 def _fmt_epoch(value):
@@ -123,3 +125,26 @@ def test_build_tracker_snapshot_payload_assembles_expected_shape():
         "recent_packets": [{"summary": {"id": 1}}],
         "recent_chat": [{"text": "hello"}],
     }
+
+
+def test_build_tracker_snapshot_payload_typed_returns_contract():
+    payload = build_tracker_snapshot_payload_typed(
+        session_edges={},
+        historical_edges={},
+        nodes_by_id={},
+        port_counts=Counter({"TEXT_MESSAGE_APP": 1}),
+        recent_packets=deque([{"summary": {"id": 1}}], maxlen=4),
+        recent_chat=deque([{"text": "hello"}], maxlen=4),
+        live_packet_count=2,
+        min_real_link_count=2,
+        format_epoch_fn=_fmt_epoch,
+        build_edge_snapshot_rows_fn=lambda **_kwargs: ([{"from": "!a", "to": "!b"}], 1),
+    )
+
+    assert isinstance(payload, TrackerSnapshot)
+    assert payload.live_packet_count == 2
+    assert payload.real_edge_count == 1
+    assert payload.edges[0]["from"] == "!a"
+    assert payload.port_counts[0]["portnum"] == "TEXT_MESSAGE_APP"
+    assert payload.recent_packets[0]["summary"]["id"] == 1
+    assert payload.recent_chat[0]["text"] == "hello"

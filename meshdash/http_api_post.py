@@ -1,11 +1,16 @@
-from typing import Any
+from typing import Callable, Protocol
 from urllib.parse import urlparse
 
 from .api_input_chat import parse_chat_send_request, validate_content_length
 from .helpers import to_int
+from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_json_response
 from .http_route_contracts import DashboardPostRouteDependencies, SendChatFn, ToIntFn
 from .http_routes import handle_dashboard_post
+
+
+class ParsedUrl(Protocol):
+    path: str
 
 
 def build_post_route_dependencies(
@@ -23,10 +28,10 @@ def build_post_route_dependencies(
 
 
 def dispatch_post_request(
-    handler: Any,
+    handler: DashboardHttpHandler,
     *,
     deps: DashboardPostRouteDependencies,
-    parse_url_fn=urlparse,
+    parse_url_fn: Callable[[str], ParsedUrl] = urlparse,
     handle_post_fn=handle_dashboard_post,
 ) -> None:
     parsed = parse_url_fn(handler.path)
@@ -41,7 +46,7 @@ def make_post_dispatch(
     *,
     deps: DashboardPostRouteDependencies,
 ):
-    def _dispatch_post(handler: Any) -> None:
+    def _dispatch_post(handler: DashboardHttpHandler) -> None:
         dispatch_post_request(handler, deps=deps)
 
     return _dispatch_post

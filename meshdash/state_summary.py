@@ -2,6 +2,7 @@ import time
 from typing import Any, Callable, Dict, Optional
 
 from .revision import RevisionInfo
+from .tracker_snapshot_contracts import TrackerSnapshot, coerce_tracker_snapshot
 
 from .helpers import disk_space_info
 
@@ -41,13 +42,14 @@ def build_summary_payload(
     started_at: float,
     node_rows: list[Dict[str, Any]],
     nodes_with_position: int,
-    tracker_data: Dict[str, Any],
+    tracker_data: TrackerSnapshot | Dict[str, Any],
     storage_probe_path: Optional[str],
     revision_info: RevisionInfo | Dict[str, str],
     modem_preset: Optional[str],
     now_ts_fn: Callable[[], float] = time.time,
     disk_space_info_fn: Callable[[Optional[str]], Dict[str, Any]] = disk_space_info,
 ) -> Dict[str, Any]:
+    tracker_snapshot = coerce_tracker_snapshot(tracker_data)
     if isinstance(revision_info, RevisionInfo):
         revision_payload = revision_info.as_dict()
     else:
@@ -57,10 +59,10 @@ def build_summary_payload(
         "uptime_seconds": int(max(0, now_ts_fn() - started_at)),
         "node_count": len(node_rows),
         "nodes_with_position": nodes_with_position,
-        "live_packet_count": tracker_data["live_packet_count"],
-        "edge_count": len(tracker_data["edges"]),
-        "real_edge_count": tracker_data["real_edge_count"],
-        "recent_packet_buffer": len(tracker_data["recent_packets"]),
+        "live_packet_count": tracker_snapshot.live_packet_count,
+        "edge_count": len(tracker_snapshot.edges),
+        "real_edge_count": tracker_snapshot.real_edge_count,
+        "recent_packet_buffer": len(tracker_snapshot.recent_packets),
         "modem_preset": modem_preset,
         "disk": disk_space_info_fn(storage_probe_path),
         "revision": revision_payload,

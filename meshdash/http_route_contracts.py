@@ -1,24 +1,114 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Mapping, Optional, Protocol
 
 from .api_inputs import ChatSendRequest, NodeHistoryQuery, OnlineActivityQuery
+from .http_handler_contracts import DashboardHttpHandler
+from .state_payload_contracts import DashboardStatePayload
 
-StateFn = Callable[[], dict]
-NodeHistoryFn = Callable[[str, Optional[int], Optional[int]], dict]
-OnlineActivityFn = Callable[[Optional[int]], dict]
-SendChatFn = Callable[..., dict]
+StatePayload = DashboardStatePayload | dict[str, Any]
 
-ToIntFn = Callable[[Any], Optional[int]]
-ParseNodeHistoryRequestFn = Callable[..., NodeHistoryQuery]
-ParseOnlineActivityRequestFn = Callable[..., OnlineActivityQuery]
-EmptyNodeHistoryFn = Callable[[str], dict]
-EmptyOnlineActivityFn = Callable[[int], dict]
-ValidateContentLengthFn = Callable[..., int]
-ParseChatSendRequestFn = Callable[..., ChatSendRequest]
 
-WriteHtmlResponseFn = Callable[..., None]
-WriteJsonResponseFn = Callable[..., None]
-WriteTextResponseFn = Callable[..., None]
+class StateFn(Protocol):
+    def __call__(self) -> StatePayload:
+        ...
+
+
+class NodeHistoryFn(Protocol):
+    def __call__(
+        self,
+        node_id: str,
+        hours_override: Optional[int],
+        points_override: Optional[int],
+    ) -> dict[str, Any]:
+        ...
+
+
+class OnlineActivityFn(Protocol):
+    def __call__(self, hours_override: Optional[int]) -> dict[str, Any]:
+        ...
+
+
+class SendChatFn(Protocol):
+    def __call__(self, **kwargs: Any) -> dict[str, Any]:
+        ...
+
+
+class ToIntFn(Protocol):
+    def __call__(self, value: Any) -> Optional[int]:
+        ...
+
+
+class ParseNodeHistoryRequestFn(Protocol):
+    def __call__(
+        self,
+        raw_query: str,
+        *,
+        to_int_fn: ToIntFn,
+    ) -> NodeHistoryQuery:
+        ...
+
+
+class ParseOnlineActivityRequestFn(Protocol):
+    def __call__(
+        self,
+        raw_query: str,
+        *,
+        to_int_fn: ToIntFn,
+    ) -> OnlineActivityQuery:
+        ...
+
+
+class EmptyNodeHistoryFn(Protocol):
+    def __call__(self, node_id: str) -> dict[str, Any]:
+        ...
+
+
+class EmptyOnlineActivityFn(Protocol):
+    def __call__(self, hours: int) -> dict[str, Any]:
+        ...
+
+
+class ValidateContentLengthFn(Protocol):
+    def __call__(
+        self,
+        headers: Mapping[str, Any],
+        *,
+        to_int_fn: ToIntFn,
+        max_bytes: int = 8192,
+    ) -> int:
+        ...
+
+
+class ParseChatSendRequestFn(Protocol):
+    def __call__(
+        self,
+        raw_body: bytes,
+        *,
+        to_int_fn: ToIntFn,
+    ) -> ChatSendRequest:
+        ...
+
+
+class WriteHtmlResponseFn(Protocol):
+    def __call__(self, handler: DashboardHttpHandler, *, html_text: str) -> None:
+        ...
+
+
+class WriteJsonResponseFn(Protocol):
+    def __call__(
+        self,
+        handler: DashboardHttpHandler,
+        *,
+        status_code: int,
+        payload_obj: Any,
+        no_store: bool = False,
+    ) -> None:
+        ...
+
+
+class WriteTextResponseFn(Protocol):
+    def __call__(self, handler: DashboardHttpHandler, *, status_code: int, text: str) -> None:
+        ...
 
 
 @dataclass(frozen=True)
