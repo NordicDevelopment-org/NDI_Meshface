@@ -1,22 +1,19 @@
-from typing import Any, Callable, Optional
+from typing import Any
 
 from .api_chat import (
     handle_chat_send_post as _handle_chat_send_post_helper,
 )
+from .http_route_contracts import DashboardPostRouteDependencies
 
 
 def handle_dashboard_post(
     handler: Any,
     *,
     path: str,
-    send_chat_fn: Optional[Callable[..., dict]],
-    to_int_fn: Callable[[Any], Optional[int]],
-    validate_content_length_fn: Callable[..., int],
-    parse_chat_send_body_fn: Callable[..., dict],
-    write_json_response_fn: Callable[..., None],
+    deps: DashboardPostRouteDependencies,
 ) -> None:
     if path != "/api/chat/send":
-        write_json_response_fn(
+        deps.write_json_response_fn(
             handler,
             status_code=404,
             payload_obj={"ok": False, "error": "Not Found"},
@@ -25,9 +22,9 @@ def handle_dashboard_post(
 
     _handle_chat_send_post_helper(
         handler,
-        send_chat_fn=send_chat_fn,
-        to_int_fn=to_int_fn,
-        validate_content_length_fn=validate_content_length_fn,
-        parse_chat_send_body_fn=parse_chat_send_body_fn,
-        write_json_response_fn=write_json_response_fn,
+        send_chat_fn=deps.send_chat_fn,
+        to_int_fn=deps.to_int_fn,
+        validate_content_length_fn=deps.validate_content_length_fn,
+        parse_chat_send_request_fn=deps.parse_chat_send_request_fn,
+        write_json_response_fn=deps.write_json_response_fn,
     )

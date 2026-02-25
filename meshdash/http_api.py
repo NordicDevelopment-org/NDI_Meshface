@@ -2,13 +2,17 @@ from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
 from .api_inputs import (
-    parse_chat_send_body,
+    parse_chat_send_request,
     parse_node_history_query,
     parse_online_activity_query,
     validate_content_length,
 )
 from .helpers import to_int
 from .http_handler import build_dashboard_handler_class
+from .http_route_contracts import (
+    DashboardGetRouteDependencies,
+    DashboardPostRouteDependencies,
+)
 from .http_responses import write_html_response, write_json_response, write_text_response
 from .http_routes import handle_dashboard_get, handle_dashboard_post
 from .services import empty_node_history, empty_online_activity
@@ -23,25 +27,36 @@ def make_http_handler(
     default_node_history_hours: int = 72,
     to_int_fn: Callable[[Any], Optional[int]] = to_int,
 ):
+    get_deps = DashboardGetRouteDependencies(
+        html_text=html_text,
+        state_fn=state_fn,
+        node_history_fn=node_history_fn,
+        online_activity_fn=online_activity_fn,
+        default_node_history_hours=default_node_history_hours,
+        to_int_fn=to_int_fn,
+        parse_node_history_query_fn=parse_node_history_query,
+        parse_online_activity_query_fn=parse_online_activity_query,
+        empty_node_history_fn=empty_node_history,
+        empty_online_activity_fn=empty_online_activity,
+        write_html_response_fn=write_html_response,
+        write_json_response_fn=write_json_response,
+        write_text_response_fn=write_text_response,
+    )
+    post_deps = DashboardPostRouteDependencies(
+        send_chat_fn=send_chat_fn,
+        to_int_fn=to_int_fn,
+        validate_content_length_fn=validate_content_length,
+        parse_chat_send_request_fn=parse_chat_send_request,
+        write_json_response_fn=write_json_response,
+    )
+
     def _dispatch_get(handler: Any) -> None:
         parsed = urlparse(handler.path)
         handle_dashboard_get(
             handler,
             path=parsed.path,
             query=parsed.query,
-            html_text=html_text,
-            state_fn=state_fn,
-            node_history_fn=node_history_fn,
-            online_activity_fn=online_activity_fn,
-            default_node_history_hours=default_node_history_hours,
-            to_int_fn=to_int_fn,
-            parse_node_history_query_fn=parse_node_history_query,
-            parse_online_activity_query_fn=parse_online_activity_query,
-            empty_node_history_fn=empty_node_history,
-            empty_online_activity_fn=empty_online_activity,
-            write_html_response_fn=write_html_response,
-            write_json_response_fn=write_json_response,
-            write_text_response_fn=write_text_response,
+            deps=get_deps,
         )
 
     def _dispatch_post(handler: Any) -> None:
@@ -49,11 +64,7 @@ def make_http_handler(
         handle_dashboard_post(
             handler,
             path=parsed.path,
-            send_chat_fn=send_chat_fn,
-            to_int_fn=to_int_fn,
-            validate_content_length_fn=validate_content_length,
-            parse_chat_send_body_fn=parse_chat_send_body,
-            write_json_response_fn=write_json_response,
+            deps=post_deps,
         )
 
     return build_dashboard_handler_class(

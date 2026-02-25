@@ -1,5 +1,7 @@
 from typing import Any, Callable, Optional
 
+from .api_inputs import ChatSendRequest
+
 
 def handle_chat_send_post(
     handler: Any,
@@ -7,7 +9,7 @@ def handle_chat_send_post(
     send_chat_fn: Optional[Callable[..., dict]],
     to_int_fn: Callable[[Any], Optional[int]],
     validate_content_length_fn: Callable[..., int],
-    parse_chat_send_body_fn: Callable[..., dict],
+    parse_chat_send_request_fn: Callable[..., ChatSendRequest],
     write_json_response_fn: Callable[..., None],
 ) -> None:
     if send_chat_fn is None:
@@ -32,16 +34,16 @@ def handle_chat_send_post(
         return
 
     raw = handler.rfile.read(content_length)
-    chat_request = parse_chat_send_body_fn(raw, to_int_fn=to_int_fn)
+    chat_request = parse_chat_send_request_fn(raw, to_int_fn=to_int_fn)
 
     try:
         response_obj = send_chat_fn(
-            text=chat_request["text"],
-            destination=chat_request["destination"],
-            channel_index=chat_request["channel_index"],
-            reply_id=chat_request["reply_id"],
-            retry_of=chat_request["retry_of"],
-            emoji=chat_request["emoji"],
+            text=chat_request.text,
+            destination=chat_request.destination,
+            channel_index=chat_request.channel_index,
+            reply_id=chat_request.reply_id,
+            retry_of=chat_request.retry_of,
+            emoji=chat_request.emoji,
         )
     except ValueError as exc:
         write_json_response_fn(

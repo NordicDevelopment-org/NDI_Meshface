@@ -1,5 +1,6 @@
 import io
 
+from meshdash.api_inputs import ChatSendRequest
 from meshdash.api_chat import handle_chat_send_post
 
 
@@ -20,7 +21,14 @@ def test_handle_chat_send_post_returns_503_when_disabled():
         send_chat_fn=None,
         to_int_fn=lambda value: int(value) if value else None,
         validate_content_length_fn=lambda *_args, **_kwargs: 2,
-        parse_chat_send_body_fn=lambda *_args, **_kwargs: {},
+        parse_chat_send_request_fn=lambda *_args, **_kwargs: ChatSendRequest(
+            text=None,
+            destination=None,
+            channel_index=None,
+            reply_id=None,
+            retry_of=None,
+            emoji=None,
+        ),
         write_json_response_fn=lambda *_args, **kwargs: calls.append(kwargs),
     )
 
@@ -36,7 +44,14 @@ def test_handle_chat_send_post_returns_400_on_invalid_content_length():
         send_chat_fn=lambda **_kwargs: {"ok": True},
         to_int_fn=lambda value: int(value) if value else None,
         validate_content_length_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("bad size")),
-        parse_chat_send_body_fn=lambda *_args, **_kwargs: {},
+        parse_chat_send_request_fn=lambda *_args, **_kwargs: ChatSendRequest(
+            text=None,
+            destination=None,
+            channel_index=None,
+            reply_id=None,
+            retry_of=None,
+            emoji=None,
+        ),
         write_json_response_fn=lambda *_args, **kwargs: calls.append(kwargs),
     )
 
@@ -52,14 +67,14 @@ def test_handle_chat_send_post_returns_400_for_value_errors():
         send_chat_fn=lambda **_kwargs: (_ for _ in ()).throw(ValueError("bad request")),
         to_int_fn=lambda value: int(value) if value else None,
         validate_content_length_fn=lambda *_args, **_kwargs: 2,
-        parse_chat_send_body_fn=lambda *_args, **_kwargs: {
-            "text": "x",
-            "destination": "^all",
-            "channel_index": 0,
-            "reply_id": None,
-            "retry_of": None,
-            "emoji": None,
-        },
+        parse_chat_send_request_fn=lambda *_args, **_kwargs: ChatSendRequest(
+            text="x",
+            destination="^all",
+            channel_index=0,
+            reply_id=None,
+            retry_of=None,
+            emoji=None,
+        ),
         write_json_response_fn=lambda *_args, **kwargs: calls.append(kwargs),
     )
 
@@ -75,14 +90,14 @@ def test_handle_chat_send_post_returns_200_on_success():
         send_chat_fn=lambda **_kwargs: {"ok": True, "message_id": 123},
         to_int_fn=lambda value: int(value) if value else None,
         validate_content_length_fn=lambda *_args, **_kwargs: 2,
-        parse_chat_send_body_fn=lambda *_args, **_kwargs: {
-            "text": "hello",
-            "destination": "^all",
-            "channel_index": 0,
-            "reply_id": None,
-            "retry_of": None,
-            "emoji": None,
-        },
+        parse_chat_send_request_fn=lambda *_args, **_kwargs: ChatSendRequest(
+            text="hello",
+            destination="^all",
+            channel_index=0,
+            reply_id=None,
+            retry_of=None,
+            emoji=None,
+        ),
         write_json_response_fn=lambda *_args, **kwargs: calls.append(kwargs),
     )
 

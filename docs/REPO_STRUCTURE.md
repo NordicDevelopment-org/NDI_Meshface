@@ -15,7 +15,7 @@
 - `meshdash/chat_send_response.py`: send delivery-state + API response payload builder helpers.
 - `meshdash/config.py`: centralized dashboard defaults/constants and sensitive-key policy.
 - `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers returning typed revision info.
-- `meshdash/api_inputs.py`: shared API query/body parsing and request-size validation helpers.
+- `meshdash/api_inputs.py`: shared API query/body parsing, typed `ChatSendRequest` contract, and request-size validation helpers.
 - `meshdash/api_chat.py`: domain handler for chat-send API POST flow (`/api/chat/send`).
 - `meshdash/api_system.py`: domain handler for system state API response (`/api/state`).
 - `meshdash/api_history.py`: domain helpers for history API responses (`/api/history/node`, `/api/history/online`).
@@ -100,6 +100,7 @@
 - `meshdash/history_views.py`: node history/online activity empty payload and loader builders.
 - `meshdash/http_api.py`: extracted HTTP handler factory for dashboard API routes.
 - `meshdash/http_handler.py`: shared HTTP `BaseHTTPRequestHandler` shell for GET/POST dispatch wiring.
+- `meshdash/http_route_contracts.py`: typed GET/POST route dependency contracts used by HTTP API dispatch wiring.
 - `meshdash/http_routes.py`: stable HTTP-routes facade re-exporting GET/POST route handlers.
 - `meshdash/http_routes_get.py`: dashboard GET route handlers (`/`, `/api/state`, history endpoints).
 - `meshdash/http_routes_post.py`: dashboard POST route handler (`/api/chat/send`) and send error mapping.

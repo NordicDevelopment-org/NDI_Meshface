@@ -147,6 +147,12 @@ Route handlers by domain.
 - Added `meshdash/api_chat.py` for `/api/chat/send` POST domain handling.
 - `meshdash/http_routes_get.py` now delegates domain payload/response logic into those modules.
 - `meshdash/http_routes_post.py` now delegates chat-send behavior into `api_chat`.
+- Added typed HTTP route dependency contracts:
+  - `meshdash/http_route_contracts.py`
+  - `DashboardGetRouteDependencies`
+  - `DashboardPostRouteDependencies`
+- `meshdash/http_api.py` now builds immutable route dependency objects and passes them into route handlers.
+- `meshdash/http_routes_get.py` and `meshdash/http_routes_post.py` now consume typed dependency bundles instead of long keyword argument lists.
 - Added focused tests:
   - `tests/test_api_system.py`
   - `tests/test_api_history.py`
@@ -211,6 +217,10 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - `mesh_dashboard.py` now passes runtime dependency attributes explicitly into `run_dashboard_runtime()` (no kwargs dict shim).
 - Added `meshdash/runtime_types.py` shared callback/type aliases and applied them across runner/context/wiring contracts.
 - `runtime_state_loader` now accepts `RevisionInfo` and performs dict conversion at the state-payload boundary.
+- Added typed chat-send parse contract:
+  - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
+  - `parse_chat_send_request(...)` now used by POST route wiring + chat API handler
+- Kept `parse_chat_send_body(...)` as a compatibility helper for dict-shaped callers.
 
 ### Steps
 

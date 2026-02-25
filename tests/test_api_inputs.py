@@ -1,6 +1,7 @@
 import pytest
 
 from meshdash.api_inputs import (
+    parse_chat_send_request,
     parse_chat_send_body,
     parse_node_history_query,
     parse_online_activity_query,
@@ -52,6 +53,19 @@ def test_parse_chat_send_body_normalizes_payload():
     assert payload["emoji"] == "😀"
 
 
+def test_parse_chat_send_request_normalizes_payload():
+    payload = parse_chat_send_request(
+        b'{"text":"hello","destination":"!abc","channel_index":"2","reply_id":"99","retry_of":"5","emoji":"\\ud83d\\ude00"}',
+        to_int_fn=_to_int,
+    )
+    assert payload.text == "hello"
+    assert payload.destination == "!abc"
+    assert payload.channel_index == 2
+    assert payload.reply_id == 99
+    assert payload.retry_of == 5
+    assert payload.emoji == "😀"
+
+
 def test_parse_chat_send_body_handles_invalid_or_non_dict_json():
     invalid = parse_chat_send_body(b"{not-json}", to_int_fn=_to_int)
     assert invalid == {
@@ -66,3 +80,13 @@ def test_parse_chat_send_body_handles_invalid_or_non_dict_json():
     array_payload = parse_chat_send_body(b'["not","a","dict"]', to_int_fn=_to_int)
     assert array_payload["text"] is None
     assert array_payload["channel_index"] is None
+
+
+def test_parse_chat_send_request_handles_invalid_or_non_dict_json():
+    invalid = parse_chat_send_request(b"{not-json}", to_int_fn=_to_int)
+    assert invalid.text is None
+    assert invalid.channel_index is None
+
+    array_payload = parse_chat_send_request(b'["not","a","dict"]', to_int_fn=_to_int)
+    assert array_payload.text is None
+    assert array_payload.channel_index is None
