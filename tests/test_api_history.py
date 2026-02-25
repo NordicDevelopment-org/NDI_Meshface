@@ -1,4 +1,4 @@
-from meshdash.api_inputs import NodeHistoryQuery
+from meshdash.api_inputs import NodeHistoryQuery, OnlineActivityQuery
 from meshdash.api_history import (
     build_node_history_response,
     build_online_activity_response,
@@ -51,7 +51,7 @@ def test_build_online_activity_response_uses_loader_when_available():
         online_activity_fn=lambda hours: {"window_hours": hours, "hourly_profile": []},
         default_node_history_hours=72,
         to_int_fn=lambda value: int(value) if value else None,
-        parse_online_activity_query_fn=lambda query, **kwargs: 48,
+        parse_online_activity_request_fn=lambda query, **kwargs: OnlineActivityQuery(hours_override=48),
         empty_online_activity_fn=lambda hours: {"window_hours": hours, "hourly_profile": []},
     )
 
@@ -64,7 +64,7 @@ def test_build_online_activity_response_falls_back_to_default_window():
         online_activity_fn=None,
         default_node_history_hours=72,
         to_int_fn=lambda value: int(value) if value else None,
-        parse_online_activity_query_fn=lambda query, **kwargs: 0,
+        parse_online_activity_request_fn=lambda query, **kwargs: OnlineActivityQuery(hours_override=0),
         empty_online_activity_fn=lambda hours: {"window_hours": hours, "hourly_profile": []},
     )
 

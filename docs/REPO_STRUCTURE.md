@@ -15,7 +15,7 @@
 - `meshdash/chat_send_response.py`: send delivery-state + API response payload builder helpers.
 - `meshdash/config.py`: centralized dashboard defaults/constants and sensitive-key policy.
 - `meshdash/app_meta.py`: environment/version/commit metadata assembly helpers returning typed revision info.
-- `meshdash/api_inputs.py`: shared API query/body parsing, typed `ChatSendRequest` and `NodeHistoryQuery` contracts, and request-size validation helpers.
+- `meshdash/api_inputs.py`: shared API query/body parsing, typed `ChatSendRequest`/`NodeHistoryQuery`/`OnlineActivityQuery` contracts, and request-size validation helpers.
 - `meshdash/api_chat.py`: domain handler for chat-send API POST flow (`/api/chat/send`).
 - `meshdash/api_system.py`: domain handler for system state API response (`/api/state`).
 - `meshdash/api_history.py`: domain helpers for history API responses (`/api/history/node`, `/api/history/online`).

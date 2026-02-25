@@ -46,7 +46,7 @@ def handle_dashboard_get(
             online_activity_fn=deps.online_activity_fn,
             default_node_history_hours=deps.default_node_history_hours,
             to_int_fn=deps.to_int_fn,
-            parse_online_activity_query_fn=deps.parse_online_activity_query_fn,
+            parse_online_activity_request_fn=deps.parse_online_activity_request_fn,
             empty_online_activity_fn=deps.empty_online_activity_fn,
         )
         deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)

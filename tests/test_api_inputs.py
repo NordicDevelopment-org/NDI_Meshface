@@ -5,6 +5,7 @@ from meshdash.api_inputs import (
     parse_chat_send_body,
     parse_node_history_request,
     parse_node_history_query,
+    parse_online_activity_request,
     parse_online_activity_query,
     validate_content_length,
 )
@@ -39,6 +40,13 @@ def test_parse_node_history_request_extracts_overrides():
 def test_parse_online_activity_query_extracts_hours():
     assert parse_online_activity_query("hours=24", to_int_fn=_to_int) == 24
     assert parse_online_activity_query("", to_int_fn=_to_int) is None
+
+
+def test_parse_online_activity_request_extracts_hours():
+    query = parse_online_activity_request("hours=24", to_int_fn=_to_int)
+    assert query.hours_override == 24
+    query_empty = parse_online_activity_request("", to_int_fn=_to_int)
+    assert query_empty.hours_override is None
 
 
 def test_validate_content_length_accepts_valid_and_rejects_invalid():

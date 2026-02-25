@@ -223,8 +223,12 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added typed node-history query parse contract:
   - `NodeHistoryQuery` dataclass in `meshdash/api_inputs.py`
   - `parse_node_history_request(...)` now used by GET route wiring + history API handler
+- Added typed online-activity query parse contract:
+  - `OnlineActivityQuery` dataclass in `meshdash/api_inputs.py`
+  - `parse_online_activity_request(...)` now used by GET route wiring + history API handler
 - Kept `parse_chat_send_body(...)` as a compatibility helper for dict-shaped callers.
 - Kept `parse_node_history_query(...)` as a compatibility helper for tuple-shaped callers.
+- Kept `parse_online_activity_query(...)` as a compatibility helper for scalar callers.
 
 ### Steps
 
