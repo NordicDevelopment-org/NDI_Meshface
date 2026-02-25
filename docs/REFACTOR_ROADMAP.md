@@ -226,6 +226,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - `mesh_dashboard.py` now passes runtime dependency attributes explicitly into `run_dashboard_runtime()` (no kwargs dict shim).
 - Added `meshdash/runtime_types.py` shared callback/type aliases and applied them across runner/context/wiring contracts.
 - `runtime_state_loader` now accepts `RevisionInfo` and performs dict conversion at the state-payload boundary.
+- Reused shared HTTP route type aliases across API domain modules (`api_system`, `api_chat`, `api_history_node`, `api_history_online`) to reduce duplicated callable signatures.
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
   - `parse_chat_send_request(...)` now used by POST route wiring + chat API handler

@@ -1,16 +1,22 @@
-from typing import Any, Callable, Optional
+from typing import Any
 
-from .api_inputs import ChatSendRequest
+from .http_route_contracts import (
+    ParseChatSendRequestFn,
+    SendChatFn,
+    ToIntFn,
+    ValidateContentLengthFn,
+    WriteJsonResponseFn,
+)
 
 
 def handle_chat_send_post(
     handler: Any,
     *,
-    send_chat_fn: Optional[Callable[..., dict]],
-    to_int_fn: Callable[[Any], Optional[int]],
-    validate_content_length_fn: Callable[..., int],
-    parse_chat_send_request_fn: Callable[..., ChatSendRequest],
-    write_json_response_fn: Callable[..., None],
+    send_chat_fn: SendChatFn | None,
+    to_int_fn: ToIntFn,
+    validate_content_length_fn: ValidateContentLengthFn,
+    parse_chat_send_request_fn: ParseChatSendRequestFn,
+    write_json_response_fn: WriteJsonResponseFn,
 ) -> None:
     if send_chat_fn is None:
         write_json_response_fn(

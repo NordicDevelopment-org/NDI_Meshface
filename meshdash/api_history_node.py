@@ -1,15 +1,20 @@
-from typing import Any, Callable, Optional
+from typing import Any
 
-from .api_input_history import NodeHistoryQuery
+from .http_route_contracts import (
+    EmptyNodeHistoryFn,
+    NodeHistoryFn,
+    ParseNodeHistoryRequestFn,
+    ToIntFn,
+)
 
 
 def build_node_history_response(
     *,
     query: str,
-    node_history_fn: Optional[Callable[[str, Optional[int], Optional[int]], dict]],
-    to_int_fn: Callable[[Any], Optional[int]],
-    parse_node_history_request_fn: Callable[..., NodeHistoryQuery],
-    empty_node_history_fn: Callable[[str], dict],
+    node_history_fn: NodeHistoryFn | None,
+    to_int_fn: ToIntFn,
+    parse_node_history_request_fn: ParseNodeHistoryRequestFn,
+    empty_node_history_fn: EmptyNodeHistoryFn,
 ) -> dict:
     query_obj = parse_node_history_request_fn(
         query,

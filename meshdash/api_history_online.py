@@ -1,16 +1,21 @@
-from typing import Any, Callable, Optional
+from typing import Any
 
-from .api_input_history import OnlineActivityQuery
+from .http_route_contracts import (
+    EmptyOnlineActivityFn,
+    OnlineActivityFn,
+    ParseOnlineActivityRequestFn,
+    ToIntFn,
+)
 
 
 def build_online_activity_response(
     *,
     query: str,
-    online_activity_fn: Optional[Callable[[Optional[int]], dict]],
+    online_activity_fn: OnlineActivityFn | None,
     default_node_history_hours: int,
-    to_int_fn: Callable[[Any], Optional[int]],
-    parse_online_activity_request_fn: Callable[..., OnlineActivityQuery],
-    empty_online_activity_fn: Callable[[int], dict],
+    to_int_fn: ToIntFn,
+    parse_online_activity_request_fn: ParseOnlineActivityRequestFn,
+    empty_online_activity_fn: EmptyOnlineActivityFn,
 ) -> dict:
     query_obj = parse_online_activity_request_fn(
         query,
