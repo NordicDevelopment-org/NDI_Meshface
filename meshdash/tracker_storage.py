@@ -1,12 +1,13 @@
-from collections import deque
 from typing import Any, Dict, Optional, Tuple
+
+from .tracker_storage_contracts import RecentChatBuffer, RecentPacketBuffer, TrackerHistoryWriter
 
 
 def apply_tracker_storage_updates(
     *,
-    recent_packets: deque[Dict[str, Any]],
-    recent_chat: deque[Dict[str, Any]],
-    history_store: Any,
+    recent_packets: RecentPacketBuffer,
+    recent_chat: RecentChatBuffer,
+    history_store: TrackerHistoryWriter | None,
     include_live_count: bool,
     direct_key: Optional[Tuple[str, str]],
     rx_time: Optional[int],

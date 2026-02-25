@@ -26,6 +26,7 @@ from .runtime_types import (
     UtcNowFn,
     ToIntFn,
 )
+from .tracker_storage_contracts import RecentChatBuffer, RecentPacketBuffer, TrackerHistoryWriter
 
 
 @dataclass(frozen=True)
@@ -33,9 +34,9 @@ class TrackerPacketRuntimeDependencies:
     session_edges: TrackerEdgeMap
     historical_edges: TrackerEdgeMap
     port_counts: Any
-    recent_packets: Any
-    recent_chat: Any
-    history_store: Any
+    recent_packets: RecentPacketBuffer
+    recent_chat: RecentChatBuffer
+    history_store: TrackerHistoryWriter | None
     extract_delivery_update_fn: ExtractDeliveryUpdateFn
     set_delivery_state_fn: SetDeliveryStateFn
     apply_tracker_observation_fn: ApplyTrackerObservationFn

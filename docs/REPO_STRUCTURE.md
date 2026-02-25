@@ -182,6 +182,7 @@
 - `meshdash/tracker_snapshot.py`: edge snapshot and full tracker snapshot payload builders.
 - `meshdash/tracker_snapshot_contracts.py`: typed tracker snapshot contract + compatibility coercion helper for state assembly.
 - `meshdash/tracker_storage.py`: tracker receive-path storage fanout (recent deques + optional history writes).
+- `meshdash/tracker_storage_contracts.py`: typed protocol contracts for tracker storage recent buffers and history-writer callbacks.
 - `meshdash/wiring.py`: stable wiring facade re-exporting runtime dependency wiring APIs and typed runtime dependency contract.
 - `meshdash/wiring_runtime.py`: dependency checks and runtime wiring assembly for dashboard startup (`DashboardRuntimeDependencies`).
 - `meshdash/wiring_adapters.py`: wiring wrapper builders for state/reaction/local-node/http dependency adapters.
