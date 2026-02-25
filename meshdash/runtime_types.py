@@ -30,6 +30,7 @@ ParseUtcTextToUnixFn = Callable[[Any], Optional[float]]
 
 RenderHtmlFn = Callable[..., str]
 MakeHttpHandlerFn = Callable[..., Any]
+ThreadingHttpServerCls = Callable[[tuple[str, int], Any], Any]
 GuessLanIpv4Fn = Callable[[], Optional[str]]
 
 StateFn = Callable[[], dict]

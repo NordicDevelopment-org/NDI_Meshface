@@ -32,6 +32,7 @@ from .runtime_types import (
     SendReactionPacketFn,
     SeedTrackerFn,
     SubscribeFn,
+    ThreadingHttpServerCls,
     ToIntFn,
     UtcNowFn,
 )
@@ -60,7 +61,7 @@ def run_dashboard_runtime(
     make_http_handler_fn: MakeHttpHandlerFn,
     guess_lan_ipv4_fn: GuessLanIpv4Fn,
     default_chat_max_bytes: int,
-    threading_http_server_cls: Any = ThreadingHTTPServer,
+    threading_http_server_cls: ThreadingHttpServerCls = ThreadingHTTPServer,
 ) -> None:
     context = build_dashboard_runtime_context(
         args,

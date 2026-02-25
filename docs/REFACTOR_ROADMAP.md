@@ -260,6 +260,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - `build_dashboard_runtime_context(...)` now routes through the typed dashboard-loader dependency path by default while preserving legacy loader injection override compatibility.
 - Applied shared runtime callback aliases in `meshdash/wiring_adapters.py` so state/reaction/local-node/http adapter wrappers use the same contract vocabulary as runtime wiring.
 - Applied shared runtime callback aliases in `meshdash/tracker_callbacks.py` (delivery callback bundle + timeout/clock parsers) to reduce ad-hoc callable typing in tracker runtime wiring.
+- Applied shared runtime callback aliases in `meshdash/dashboard_server.py`, `meshdash/dashboard_runner_impl.py`, and `meshdash/wiring_runtime.py` to reduce remaining ad-hoc runtime/server callable signatures.
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
   - `parse_chat_send_request(...)` now used by POST route wiring + chat API handler

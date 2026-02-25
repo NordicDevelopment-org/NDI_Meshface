@@ -1,7 +1,16 @@
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from .revision import RevisionInfo
+from .runtime_types import (
+    MakeHttpHandlerFn,
+    NodeHistoryFn,
+    OnlineActivityFn,
+    RenderHtmlFn,
+    SendChatFn,
+    StateFn,
+    ThreadingHttpServerCls,
+)
 
 
 @dataclass(frozen=True)
@@ -18,13 +27,13 @@ def build_dashboard_server(
     args: Any,
     revision_info: RevisionInfo,
     history_enabled: bool,
-    state_fn: Callable[[], dict],
-    node_history_fn: Callable[..., dict],
-    online_activity_fn: Callable[..., dict],
-    send_chat_fn: Callable[..., dict],
-    render_html_fn: Callable[..., str],
-    make_http_handler_fn: Callable[..., Any],
-    threading_http_server_cls: Any,
+    state_fn: StateFn,
+    node_history_fn: NodeHistoryFn,
+    online_activity_fn: OnlineActivityFn,
+    send_chat_fn: SendChatFn,
+    render_html_fn: RenderHtmlFn,
+    make_http_handler_fn: MakeHttpHandlerFn,
+    threading_http_server_cls: ThreadingHttpServerCls,
 ) -> DashboardServerParts:
     html = render_html_fn(
         refresh_ms=args.refresh_ms,

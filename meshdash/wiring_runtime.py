@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from .runtime_types import (
     BuildNodeHistoryLoaderFn,
@@ -15,8 +15,10 @@ from .runtime_types import (
     RenderHtmlFn,
     SendChatMessageFn,
     SendReactionPacketFn,
+    SeedTrackerFn,
     SubscribeFn,
     ToIntFn,
+    ToJsonableFn,
     UtcNowFn,
 )
 from .wiring_adapters import (
@@ -34,7 +36,7 @@ class DashboardRuntimeDependencies:
     history_store_cls: Any
     dashboard_tracker_cls: Any
     subscribe_fn: SubscribeFn
-    seed_tracker_fn: Callable[..., None]
+    seed_tracker_fn: SeedTrackerFn
     revision_info_fn: RevisionInfoFn
     build_state_fn: BuildStateFn
     build_node_history_loader_fn: BuildNodeHistoryLoaderFn
@@ -70,7 +72,7 @@ def build_dashboard_runtime_dependencies(
     open_mesh_interface_fn: OpenMeshInterfaceFn,
     history_store_cls: Any,
     dashboard_tracker_cls: Any,
-    seed_tracker_fn: Callable[..., None],
+    seed_tracker_fn: SeedTrackerFn,
     revision_info_fn: RevisionInfoFn,
     build_state_fn: BuildStateFn,
     sensitive_field_names: set[str],
@@ -81,7 +83,7 @@ def build_dashboard_runtime_dependencies(
     mesh_pb2_module: Any,
     portnums_pb2_module: Any,
     get_local_node_id_fn: GetLocalNodeIdFn,
-    to_jsonable_fn: Callable[[Any], Any],
+    to_jsonable_fn: ToJsonableFn,
     normalize_single_emoji_fn: NormalizeSingleEmojiFn,
     to_int_fn: ToIntFn,
     utc_now_fn: UtcNowFn,
