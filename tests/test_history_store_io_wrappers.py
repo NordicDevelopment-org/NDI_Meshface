@@ -1,3 +1,6 @@
+import threading
+
+import meshdash.history_store_nodes as history_store_nodes_module
 from meshdash.history_store import HistoryStore
 from meshdash.history_store_chat import (
     load_recent_chat as load_recent_chat_domain,
@@ -9,6 +12,8 @@ from meshdash.history_store_connections import (
 )
 from meshdash.history_store_nodes import (
     load_node_capabilities as load_node_capabilities_domain,
+    load_node_history as load_node_history_domain,
+    load_online_activity as load_online_activity_domain,
     load_node_saved_counts as load_node_saved_counts_domain,
 )
 from meshdash.history_store_packets import (
@@ -142,3 +147,82 @@ def test_history_store_domain_node_modules_return_mapping_shapes(tmp_path):
         assert isinstance(saved_counts, dict)
     finally:
         store.close()
+
+
+def test_history_store_domain_node_history_and_online_wrappers_delegate(monkeypatch):
+    calls = {"node_history": None, "online_activity": None}
+
+    def _fake_load_node_history_data(
+        conn,
+        *,
+        node_id,
+        window_hours,
+        max_points,
+        fetch_node_history_rows_fn,
+        build_node_history_payload_fn,
+        now_unix_fn,
+    ):
+        calls["node_history"] = {
+            "conn": conn,
+            "node_id": node_id,
+            "window_hours": window_hours,
+            "max_points": max_points,
+            "fetch_fn": fetch_node_history_rows_fn,
+            "build_fn": build_node_history_payload_fn,
+            "now_unix": now_unix_fn(),
+        }
+        return {"ok": True, "kind": "node"}
+
+    def _fake_load_online_activity_data(
+        conn,
+        *,
+        window_hours,
+        fetch_online_activity_rows_fn,
+        build_online_activity_payload_fn,
+        now_unix_fn,
+    ):
+        calls["online_activity"] = {
+            "conn": conn,
+            "window_hours": window_hours,
+            "fetch_fn": fetch_online_activity_rows_fn,
+            "build_fn": build_online_activity_payload_fn,
+            "now_unix": now_unix_fn(),
+        }
+        return {"ok": True, "kind": "online"}
+
+    monkeypatch.setattr(
+        history_store_nodes_module,
+        "_load_node_history_data_helper",
+        _fake_load_node_history_data,
+    )
+    monkeypatch.setattr(
+        history_store_nodes_module,
+        "_load_online_activity_data_helper",
+        _fake_load_online_activity_data,
+    )
+
+    class _Store:
+        def __init__(self):
+            self._conn = object()
+            self._lock = threading.Lock()
+
+    store = _Store()
+    node_payload = load_node_history_domain(store, "!abc123", 24, 200)
+    online_payload = load_online_activity_domain(store, 48)
+
+    assert node_payload == {"ok": True, "kind": "node"}
+    assert online_payload == {"ok": True, "kind": "online"}
+
+    assert calls["node_history"]["conn"] is store._conn
+    assert calls["node_history"]["node_id"] == "!abc123"
+    assert calls["node_history"]["window_hours"] == 24
+    assert calls["node_history"]["max_points"] == 200
+    assert callable(calls["node_history"]["fetch_fn"])
+    assert callable(calls["node_history"]["build_fn"])
+    assert isinstance(calls["node_history"]["now_unix"], float)
+
+    assert calls["online_activity"]["conn"] is store._conn
+    assert calls["online_activity"]["window_hours"] == 48
+    assert callable(calls["online_activity"]["fetch_fn"])
+    assert callable(calls["online_activity"]["build_fn"])
+    assert isinstance(calls["online_activity"]["now_unix"], float)
