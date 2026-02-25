@@ -240,6 +240,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
   - `record_tracker_packet_unlocked_with_dependencies(...)` in `meshdash/tracker_runtime_record.py`
   - `tracker_runtime_receive` now routes through the typed path by default while preserving legacy callback override compatibility.
   - `tracker_runtime_receive_dependencies.py` now centralizes dependency assembly and legacy kwargs mapping for receive-path compatibility.
+  - `tracker_runtime_record_dependencies.py` now centralizes legacy-arg to typed-dependency mapping for tracker record compatibility.
   - existing `record_tracker_packet_unlocked(...)` preserved as compatibility wrapper.
 - Added typed chat-send parse contract:
   - `ChatSendRequest` dataclass in `meshdash/api_inputs.py`
