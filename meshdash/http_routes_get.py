@@ -5,6 +5,9 @@ from .api_history import (
 from .api_system import (
     handle_state_get as _handle_state_get_helper,
 )
+from .api_theme import (
+    handle_theme_settings_get as _handle_theme_settings_get_helper,
+)
 from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardGetRouteDependencies
 
@@ -24,6 +27,14 @@ def handle_dashboard_get(
         _handle_state_get_helper(
             handler,
             state_fn=deps.state_fn,
+            write_json_response_fn=deps.write_json_response_fn,
+        )
+        return
+
+    if path == "/api/settings/theme":
+        _handle_theme_settings_get_helper(
+            handler,
+            get_theme_settings_fn=deps.get_theme_settings_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )
         return

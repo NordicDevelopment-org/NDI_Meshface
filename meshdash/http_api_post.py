@@ -2,10 +2,16 @@ from typing import Callable, Protocol
 from urllib.parse import urlparse
 
 from .api_input_chat import parse_chat_send_request, validate_content_length
+from .api_input_theme import parse_theme_settings_request
 from .helpers import to_int
 from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_json_response
-from .http_route_contracts import DashboardPostRouteDependencies, SendChatFn, ToIntFn
+from .http_route_contracts import (
+    DashboardPostRouteDependencies,
+    SendChatFn,
+    SetThemePresetFn,
+    ToIntFn,
+)
 from .http_routes import handle_dashboard_post
 
 
@@ -16,6 +22,7 @@ class ParsedUrl(Protocol):
 def build_post_route_dependencies(
     *,
     send_chat_fn: SendChatFn | None,
+    set_theme_preset_fn: SetThemePresetFn | None = None,
     to_int_fn: ToIntFn = to_int,
 ) -> DashboardPostRouteDependencies:
     return DashboardPostRouteDependencies(
@@ -24,6 +31,8 @@ def build_post_route_dependencies(
         validate_content_length_fn=validate_content_length,
         parse_chat_send_request_fn=parse_chat_send_request,
         write_json_response_fn=write_json_response,
+        set_theme_preset_fn=set_theme_preset_fn,
+        parse_theme_settings_request_fn=parse_theme_settings_request,
     )
 
 

@@ -5,7 +5,14 @@ from .api_input_history import parse_node_history_request, parse_online_activity
 from .helpers import to_int
 from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_html_response, write_json_response, write_text_response
-from .http_route_contracts import DashboardGetRouteDependencies, NodeHistoryFn, OnlineActivityFn, StateFn, ToIntFn
+from .http_route_contracts import (
+    DashboardGetRouteDependencies,
+    GetThemeSettingsFn,
+    NodeHistoryFn,
+    OnlineActivityFn,
+    StateFn,
+    ToIntFn,
+)
 from .http_routes import handle_dashboard_get
 from .services import empty_node_history, empty_online_activity
 
@@ -22,6 +29,7 @@ def build_get_route_dependencies(
     node_history_fn: NodeHistoryFn | None,
     online_activity_fn: OnlineActivityFn | None,
     default_node_history_hours: int,
+    get_theme_settings_fn: GetThemeSettingsFn | None = None,
     to_int_fn: ToIntFn = to_int,
 ) -> DashboardGetRouteDependencies:
     return DashboardGetRouteDependencies(
@@ -38,6 +46,7 @@ def build_get_route_dependencies(
         write_html_response_fn=write_html_response,
         write_json_response_fn=write_json_response,
         write_text_response_fn=write_text_response,
+        get_theme_settings_fn=get_theme_settings_fn,
     )
 
 

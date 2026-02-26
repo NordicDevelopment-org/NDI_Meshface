@@ -265,6 +265,11 @@ Allow operator theme presets without editing code.
 - Added runtime integration for preset selection:
   - new CLI/env theme args (`--theme-presets`, `--theme-preset`)
   - selected preset tokens now flow into HTML theme CSS rendering
+- Added runtime theme settings persistence and API:
+  - new CLI/env setting path (`--theme-settings-file`, `MESH_DASH_THEME_SETTINGS_FILE`)
+  - `meshdash/theme_settings.py` manages selected preset state with local JSON persistence
+  - `/api/settings/theme` GET/POST endpoints expose and update selected preset at runtime
+- Added topbar preset selector wired to `/api/settings/theme` so preset changes apply without restart.
 - Added `tests/test_theme_presets.py`.
 
 ### Steps

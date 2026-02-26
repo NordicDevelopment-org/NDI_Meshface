@@ -59,8 +59,8 @@ from meshdash.services import (
 )
 from meshdash.theme_presets import (
     load_theme_presets as _load_theme_presets_helper,
-    select_theme_preset as _select_theme_preset_helper,
 )
+from meshdash.theme_settings import ThemePresetSettings as _ThemePresetSettings
 from meshdash.cli import build_dashboard_parser as _build_dashboard_parser_helper
 from meshdash.dashboard_runtime import run_dashboard_runtime as _run_dashboard_runtime_helper
 from meshdash.history_store import HistoryStore
@@ -105,23 +105,60 @@ def _revision_info() -> RevisionInfo:
     )
 
 
-def _build_render_html_fn_with_theme(args: argparse.Namespace):
+def _build_theme_preset_settings(args: argparse.Namespace) -> _ThemePresetSettings:
     presets = _load_theme_presets_helper(getattr(args, "theme_presets", None))
-    selected = _select_theme_preset_helper(presets, getattr(args, "theme_preset", None))
-    light_theme_vars = selected.get("light")
-    dark_theme_vars = selected.get("dark")
+    return _ThemePresetSettings(
+        presets=presets,
+        selected_preset=getattr(args, "theme_preset", None),
+        settings_path=getattr(args, "theme_settings_file", None),
+    )
+
+
+def _build_render_html_fn_with_theme(
+    args: argparse.Namespace,
+    *,
+    theme_preset_settings: _ThemePresetSettings | None = None,
+):
+    settings = theme_preset_settings or _build_theme_preset_settings(args)
 
     def _render_html_with_theme(**kwargs):
+        selected = settings.selected_preset_tokens()
         return _render_html_helper(
             **kwargs,
-            light_theme_vars=light_theme_vars,
-            dark_theme_vars=dark_theme_vars,
+            light_theme_vars=selected.get("light"),
+            dark_theme_vars=selected.get("dark"),
         )
 
     return _render_html_with_theme
 
 
+def _build_make_http_handler_with_theme_settings(theme_settings: _ThemePresetSettings):
+    def _make_http_handler_with_theme_settings(
+        html_text: str,
+        state_fn,
+        node_history_fn=None,
+        online_activity_fn=None,
+        send_chat_fn=None,
+        default_node_history_hours: int = 72,
+        to_int_fn=_to_int,
+    ):
+        return _make_http_handler_helper(
+            html_text=html_text,
+            state_fn=state_fn,
+            node_history_fn=node_history_fn,
+            online_activity_fn=online_activity_fn,
+            send_chat_fn=send_chat_fn,
+            get_theme_settings_fn=theme_settings.get_settings_payload,
+            set_theme_preset_fn=theme_settings.set_selected_preset,
+            default_node_history_hours=default_node_history_hours,
+            to_int_fn=to_int_fn,
+        )
+
+    return _make_http_handler_with_theme_settings
+
+
 def run_dashboard(args: argparse.Namespace) -> None:
+    theme_preset_settings = _build_theme_preset_settings(args)
     _ensure_runtime_dependencies_helper(
         meshtastic_module=meshtastic,
         pub_module=pub,
@@ -148,8 +185,11 @@ def run_dashboard(args: argparse.Namespace) -> None:
         normalize_single_emoji_fn=_normalize_single_emoji,
         to_int_fn=_to_int,
         utc_now_fn=_utc_now_helper,
-        render_html_fn=_build_render_html_fn_with_theme(args),
-        make_http_handler_fn=_make_http_handler_helper,
+        render_html_fn=_build_render_html_fn_with_theme(
+            args,
+            theme_preset_settings=theme_preset_settings,
+        ),
+        make_http_handler_fn=_build_make_http_handler_with_theme_settings(theme_preset_settings),
         default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
         guess_lan_ipv4_fn=_guess_lan_ipv4_helper,
         default_chat_max_bytes=DEFAULT_CHAT_MAX_BYTES,
@@ -202,6 +242,7 @@ def main() -> None:
         default_node_history_max_points=DEFAULT_NODE_HISTORY_MAX_POINTS,
         env_theme_presets=os.environ.get("MESH_DASH_THEME_PRESETS"),
         env_theme_preset=os.environ.get("MESH_DASH_THEME_PRESET"),
+        env_theme_settings_file=os.environ.get("MESH_DASH_THEME_SETTINGS_FILE"),
     )
     args = parser.parse_args()
     _apply_default_gateway_helper(args, default_mesh_port=DEFAULT_MESH_PORT)

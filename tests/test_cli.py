@@ -12,6 +12,7 @@ def _build_parser(
     env_history_db=None,
     env_theme_presets=None,
     env_theme_preset=None,
+    env_theme_settings_file=None,
 ):
     return build_dashboard_parser(
         add_mesh_connection_args_fn=_fake_add_mesh_connection_args,
@@ -35,6 +36,7 @@ def _build_parser(
         default_node_history_max_points=1440,
         env_theme_presets=env_theme_presets,
         env_theme_preset=env_theme_preset,
+        env_theme_settings_file=env_theme_settings_file,
     )
 
 
@@ -50,6 +52,7 @@ def test_build_dashboard_parser_uses_env_defaults():
         env_history_db="/tmp/custom.sqlite3",
         env_theme_presets="/tmp/theme.json",
         env_theme_preset="forest",
+        env_theme_settings_file="/tmp/theme_settings.json",
     )
     args = parser.parse_args([])
     assert args.default_gateway_host == "10.0.0.5"
@@ -60,6 +63,7 @@ def test_build_dashboard_parser_uses_env_defaults():
     assert args.node_history_max_points == 1440
     assert args.theme_presets == "/tmp/theme.json"
     assert args.theme_preset == "forest"
+    assert args.theme_settings_file == "/tmp/theme_settings.json"
 
 
 def test_build_dashboard_parser_falls_back_on_invalid_gateway_port():
@@ -69,3 +73,4 @@ def test_build_dashboard_parser_falls_back_on_invalid_gateway_port():
     assert args.history_db == "mesh_dashboard_history.sqlite3"
     assert args.theme_presets is None
     assert args.theme_preset == "default"
+    assert args.theme_settings_file == "mesh_dashboard_theme_settings.json"

@@ -7,6 +7,7 @@ from meshdash.api_inputs import (
     parse_node_history_query,
     parse_online_activity_request,
     parse_online_activity_query,
+    parse_theme_settings_request,
     validate_content_length,
 )
 
@@ -109,3 +110,11 @@ def test_parse_chat_send_request_handles_invalid_or_non_dict_json():
     array_payload = parse_chat_send_request(b'["not","a","dict"]', to_int_fn=_to_int)
     assert array_payload.text is None
     assert array_payload.channel_index is None
+
+
+def test_parse_theme_settings_request_normalizes_payload():
+    request = parse_theme_settings_request(b'{"preset_name":"forest"}')
+    assert request.preset_name == "forest"
+
+    invalid = parse_theme_settings_request(b"{invalid-json}")
+    assert invalid.preset_name is None

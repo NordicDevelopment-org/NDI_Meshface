@@ -12,6 +12,10 @@ from .api_input_history import (
     parse_online_activity_query,
     parse_online_activity_request,
 )
+from .api_input_theme import (
+    ThemeSettingsRequest,
+    parse_theme_settings_request,
+)
 
 __all__ = [
     "ChatSendRequest",
@@ -23,5 +27,7 @@ __all__ = [
     "parse_node_history_request",
     "parse_online_activity_query",
     "parse_online_activity_request",
+    "ThemeSettingsRequest",
+    "parse_theme_settings_request",
     "validate_content_length",
 ]

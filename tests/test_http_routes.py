@@ -1,6 +1,11 @@
 import io
 
-from meshdash.api_inputs import ChatSendRequest, NodeHistoryQuery, OnlineActivityQuery
+from meshdash.api_inputs import (
+    ChatSendRequest,
+    NodeHistoryQuery,
+    OnlineActivityQuery,
+    ThemeSettingsRequest,
+)
 from meshdash.http_route_contracts import (
     DashboardGetRouteDependencies,
     DashboardPostRouteDependencies,
@@ -37,6 +42,7 @@ def test_handle_dashboard_get_returns_state_and_404():
         write_html_response_fn=lambda *_args, **_kwargs: None,
         write_json_response_fn=lambda *_args, **kwargs: calls["json"].append(kwargs),
         write_text_response_fn=lambda *_args, **kwargs: calls["text"].append(kwargs),
+        get_theme_settings_fn=lambda: {"ok": True, "selected_preset": "default"},
     )
 
     handle_dashboard_get(
@@ -47,6 +53,15 @@ def test_handle_dashboard_get_returns_state_and_404():
     )
     assert calls["json"][0]["status_code"] == 200
     assert calls["json"][0]["payload_obj"]["ok"] is True
+
+    handle_dashboard_get(
+        handler,
+        path="/api/settings/theme",
+        query="",
+        deps=deps,
+    )
+    assert calls["json"][1]["status_code"] == 200
+    assert calls["json"][1]["payload_obj"]["selected_preset"] == "default"
 
     handle_dashboard_get(
         handler,
@@ -105,3 +120,27 @@ def test_handle_dashboard_post_handles_disabled_and_success():
     )
     assert calls["json"][1]["status_code"] == 200
     assert calls["json"][1]["payload_obj"]["ok"] is True
+
+    theme_deps = DashboardPostRouteDependencies(
+        send_chat_fn=None,
+        to_int_fn=lambda value: int(value) if value else None,
+        validate_content_length_fn=lambda *_args, **_kwargs: 2,
+        parse_chat_send_request_fn=lambda *_args, **_kwargs: ChatSendRequest(
+            text=None,
+            destination=None,
+            channel_index=None,
+            reply_id=None,
+            retry_of=None,
+            emoji=None,
+        ),
+        write_json_response_fn=lambda *_args, **kwargs: calls["json"].append(kwargs),
+        set_theme_preset_fn=lambda preset_name: {"ok": True, "selected_preset": str(preset_name)},
+        parse_theme_settings_request_fn=lambda _raw: ThemeSettingsRequest(preset_name="forest"),
+    )
+    handle_dashboard_post(
+        handler,
+        path="/api/settings/theme",
+        deps=theme_deps,
+    )
+    assert calls["json"][2]["status_code"] == 200
+    assert calls["json"][2]["payload_obj"]["selected_preset"] == "forest"

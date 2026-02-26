@@ -7,6 +7,7 @@ def add_theme_args(
     *,
     resolved_theme_presets: Optional[str],
     resolved_theme_preset: str,
+    resolved_theme_settings_file: Optional[str],
 ) -> None:
     parser.add_argument(
         "--theme-presets",
@@ -22,5 +23,13 @@ def add_theme_args(
         help=(
             "Theme preset name from --theme-presets (or built-ins). "
             f"Falls back to 'default' (default: {resolved_theme_preset})."
+        ),
+    )
+    parser.add_argument(
+        "--theme-settings-file",
+        default=resolved_theme_settings_file,
+        help=(
+            "JSON file used to persist runtime theme preset selection "
+            "(default: %(default)s)."
         ),
     )

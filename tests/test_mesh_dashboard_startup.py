@@ -37,20 +37,19 @@ def test_revision_info_uses_nogit_fallback(monkeypatch):
 
 
 def test_build_render_html_fn_with_theme_uses_selected_preset(monkeypatch):
-    args = argparse.Namespace(theme_presets="/tmp/themes.json", theme_preset="forest")
+    args = argparse.Namespace(
+        theme_presets="/tmp/themes.json",
+        theme_preset="forest",
+        theme_settings_file="/tmp/theme_settings.json",
+    )
     selected = {"light": {"--bg": "#ffffff"}, "dark": {"--ui-bg": "#000000"}}
     calls = {}
 
-    monkeypatch.setattr(
-        md,
-        "_load_theme_presets_helper",
-        lambda path: {"default": {"light": {}, "dark": {}}, "forest": selected},
-    )
-    monkeypatch.setattr(
-        md,
-        "_select_theme_preset_helper",
-        lambda presets, preset_name: presets[preset_name],
-    )
+    class _Settings:
+        def selected_preset_tokens(self):
+            return selected
+
+    monkeypatch.setattr(md, "_build_theme_preset_settings", lambda _args: _Settings())
 
     def _render_html_helper(**kwargs):
         calls.update(kwargs)
@@ -75,3 +74,27 @@ def test_build_render_html_fn_with_theme_uses_selected_preset(monkeypatch):
     assert html == "<html></html>"
     assert calls["light_theme_vars"] == selected["light"]
     assert calls["dark_theme_vars"] == selected["dark"]
+
+
+def test_build_make_http_handler_with_theme_settings_binds_theme_callbacks(monkeypatch):
+    calls = {}
+
+    class _Settings:
+        def get_settings_payload(self):
+            return {"ok": True, "selected_preset": "default"}
+
+        def set_selected_preset(self, preset_name):
+            return {"ok": True, "selected_preset": str(preset_name)}
+
+    def _fake_make_http_handler_helper(**kwargs):
+        calls.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(md, "_make_http_handler_helper", _fake_make_http_handler_helper)
+    settings = _Settings()
+    build_handler = md._build_make_http_handler_with_theme_settings(settings)
+    handler_obj = build_handler("<html>", lambda: {"ok": True})
+
+    assert handler_obj is not None
+    assert calls["get_theme_settings_fn"]() == {"ok": True, "selected_preset": "default"}
+    assert calls["set_theme_preset_fn"]("forest") == {"ok": True, "selected_preset": "forest"}

@@ -17,3 +17,4 @@ def test_build_html_shell_injects_style_js_and_header_tokens():
     assert 'title="rev-title">Rev: test<' in html
     assert "Packet buffer: 250" in html
     assert "Refresh: 3000 ms" in html
+    assert 'id="theme-preset-select"' in html

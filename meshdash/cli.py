@@ -50,12 +50,14 @@ def build_dashboard_parser(
     default_node_history_max_points: int,
     env_theme_presets: Optional[str],
     env_theme_preset: Optional[str],
+    env_theme_settings_file: Optional[str],
 ) -> argparse.ArgumentParser:
     resolved_gateway_port = resolve_default_gateway_port(env_gateway_port, default_gateway_port)
     resolved_gateway_host = str(env_gateway_host or default_gateway_host)
     resolved_history_db = str(env_history_db or default_history_db)
     resolved_theme_presets = str(env_theme_presets) if env_theme_presets else None
     resolved_theme_preset = str(env_theme_preset or "default")
+    resolved_theme_settings_file = str(env_theme_settings_file or "mesh_dashboard_theme_settings.json")
 
     parser = argparse.ArgumentParser(
         description="Serve a high-detail Meshtastic dashboard with map, node tables, configs, and packet logs."
@@ -92,5 +94,6 @@ def build_dashboard_parser(
         parser,
         resolved_theme_presets=resolved_theme_presets,
         resolved_theme_preset=resolved_theme_preset,
+        resolved_theme_settings_file=resolved_theme_settings_file,
     )
     return parser

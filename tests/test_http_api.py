@@ -90,3 +90,41 @@ def test_http_api_chat_send_success_and_disabled():
     sent, data = _run_post(disabled_handler, "/api/chat/send", {"text": "hello"})
     assert sent["status"] == 503
     assert "not enabled" in json.loads(data.decode("utf-8"))["error"].lower()
+
+
+def test_http_api_theme_settings_get_and_post():
+    selected = {"name": "default"}
+    presets = {
+        "default": {"light": {"--bg": "#fff"}, "dark": {"--bg": "#000"}},
+        "forest": {"light": {"--bg": "#efe"}, "dark": {"--bg": "#131"}},
+    }
+
+    def _get_theme_settings():
+        return {
+            "ok": True,
+            "selected_preset": selected["name"],
+            "available_presets": ["default", "forest"],
+            "presets": presets,
+        }
+
+    def _set_theme_preset(preset_name):
+        selected["name"] = str(preset_name)
+        return _get_theme_settings()
+
+    handler_cls = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=lambda: {"ok": True},
+        get_theme_settings_fn=_get_theme_settings,
+        set_theme_preset_fn=_set_theme_preset,
+    )
+
+    sent, data = _run_get(handler_cls, "/api/settings/theme")
+    assert sent["status"] == 200
+    body = json.loads(data.decode("utf-8"))
+    assert body["selected_preset"] == "default"
+    assert "forest" in body["available_presets"]
+
+    sent, data = _run_post(handler_cls, "/api/settings/theme", {"preset_name": "forest"})
+    assert sent["status"] == 200
+    updated = json.loads(data.decode("utf-8"))
+    assert updated["selected_preset"] == "forest"

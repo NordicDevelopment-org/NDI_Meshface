@@ -1,7 +1,12 @@
 from dataclasses import dataclass
 from typing import Mapping, Optional, Protocol
 
-from .api_inputs import ChatSendRequest, NodeHistoryQuery, OnlineActivityQuery
+from .api_inputs import (
+    ChatSendRequest,
+    NodeHistoryQuery,
+    OnlineActivityQuery,
+    ThemeSettingsRequest,
+)
 from .http_handler_contracts import DashboardHttpHandler
 from .state_payload_contracts import DashboardStatePayload
 
@@ -38,6 +43,16 @@ class SendChatFn(Protocol):
         retry_of: Optional[int] = None,
         emoji: object = None,
     ) -> dict[str, object]:
+        ...
+
+
+class GetThemeSettingsFn(Protocol):
+    def __call__(self) -> dict[str, object]:
+        ...
+
+
+class SetThemePresetFn(Protocol):
+    def __call__(self, preset_name: object) -> dict[str, object]:
         ...
 
 
@@ -97,6 +112,11 @@ class ParseChatSendRequestFn(Protocol):
         ...
 
 
+class ParseThemeSettingsRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> ThemeSettingsRequest:
+        ...
+
+
 class WriteHtmlResponseFn(Protocol):
     def __call__(self, handler: DashboardHttpHandler, *, html_text: str) -> None:
         ...
@@ -134,6 +154,7 @@ class DashboardGetRouteDependencies:
     write_html_response_fn: WriteHtmlResponseFn
     write_json_response_fn: WriteJsonResponseFn
     write_text_response_fn: WriteTextResponseFn
+    get_theme_settings_fn: Optional[GetThemeSettingsFn] = None
 
 
 @dataclass(frozen=True)
@@ -143,3 +164,5 @@ class DashboardPostRouteDependencies:
     validate_content_length_fn: ValidateContentLengthFn
     parse_chat_send_request_fn: ParseChatSendRequestFn
     write_json_response_fn: WriteJsonResponseFn
+    set_theme_preset_fn: Optional[SetThemePresetFn] = None
+    parse_theme_settings_request_fn: Optional[ParseThemeSettingsRequestFn] = None
