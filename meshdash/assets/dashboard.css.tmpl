@@ -366,6 +366,7 @@
       --split-low-px: 240px;
       --network-nodes-list-pct: 52%;
       --saved-node-pane-pct: 50%;
+      --saved-node-main-pct: 56%;
       display: grid;
       gap: 8px;
       padding: 0;
@@ -538,7 +539,7 @@
       border-radius: 8px;
       background: #f9fdf9;
       padding: 8px;
-      overflow: auto;
+      overflow: hidden;
     }}
     .saved-map-splitter {{
       display: none;
@@ -580,6 +581,58 @@
       flex-direction: column;
       gap: 8px;
       min-height: 0;
+    }}
+    .saved-node-stack {{
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 0;
+    }}
+    .saved-node-main-scroll {{
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 2px;
+    }}
+    .saved-node-history-splitter {{
+      display: none;
+      position: relative;
+      border-radius: 8px;
+      border: 1px solid #d1e0cb;
+      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+      cursor: row-resize;
+      touch-action: none;
+      user-select: none;
+      min-height: 6px;
+      flex: 0 0 var(--splitter-size);
+      margin: 8px 0;
+    }}
+    .saved-node-history-splitter::before {{
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      background: #b8cab9;
+      border-radius: 1px;
+    }}
+    .saved-node-history-splitter:hover::before,
+    .saved-node-history-splitter.active::before {{
+      background: #2f855a;
+    }}
+    .saved-node-history-host {{
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      overflow: hidden;
+    }}
+    .saved-node-history-host:not(:empty) {{
+      display: flex;
+      flex: 1 1 auto;
     }}
     .saved-node-section {{
       border: 1px solid #d7e5d2;
@@ -1283,6 +1336,48 @@
       grid-column: 2;
       grid-row: 1;
       min-height: 0;
+    }}
+    .layout.view-saved .saved-node-stack {{
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 0;
+    }}
+    .layout.view-saved .saved-node-main-scroll {{
+      flex: 0 0 var(--saved-node-main-pct);
+      min-height: 0;
+      overflow: auto;
+    }}
+    .layout.view-saved .saved-node-history-splitter {{
+      display: block;
+    }}
+    .layout.view-saved .saved-node-history-host {{
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .layout.view-saved .saved-node-history-host #map-data-node {{
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 8px;
+    }}
+    .layout.view-saved .saved-node-history-host #tab-panel-signal {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      gap: 8px;
+    }}
+    .layout.view-saved .saved-node-history-host #tab-panel-signal,
+    .layout.view-saved .saved-node-history-host #tab-panel-overview {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .layout.view-saved .saved-node-history-host #signal-chart-wrap {{
+      height: 260px;
+      min-height: 220px;
     }}
     .layout.view-saved .map-data,
     .layout.view-saved .chat,
@@ -3101,6 +3196,20 @@
       border-color: var(--ui-border);
       background: linear-gradient(90deg, #1a2430, #16202c);
     }}
+    [data-theme="dark"] .saved-node-history-host {{
+      border-top: none;
+    }}
+    [data-theme="dark"] .saved-node-history-splitter {{
+      border-color: var(--ui-border);
+      background: linear-gradient(90deg, #1a2430, #16202c);
+    }}
+    [data-theme="dark"] .saved-node-history-splitter::before {{
+      background: #44566a;
+    }}
+    [data-theme="dark"] .saved-node-history-splitter:hover::before,
+    [data-theme="dark"] .saved-node-history-splitter.active::before {{
+      background: #79c0ff;
+    }}
     [data-theme="dark"] .saved-map-splitter {{
       border-color: var(--ui-border);
       background: linear-gradient(180deg, #1a2430, #16202c);
@@ -3366,6 +3475,12 @@
       }}
       .saved-map-splitter {{
         display: none !important;
+      }}
+      .saved-node-history-splitter {{
+        display: none !important;
+      }}
+      .layout.view-saved .saved-node-main-scroll {{
+        flex: 1 1 auto;
       }}
       .layout.view-packets {{
         height: auto;

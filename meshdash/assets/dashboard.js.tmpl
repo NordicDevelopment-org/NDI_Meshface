@@ -39,6 +39,7 @@
     const splitStorageKey = "meshDashboardLayoutSplitState";
     const networkNodesSplitStorageKey = "meshDashboardNetworkNodesSplitPct";
     const savedNodeSplitStorageKey = "meshDashboardSavedNodePanePct";
+    const savedNodeHistorySplitStorageKey = "meshDashboardSavedNodeMainPct";
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const themeStorageKey = "meshDashboardThemePreference";
@@ -84,6 +85,7 @@
     let splitLowPx = 240;
     let networkNodesListPct = 52;
     let savedNodePanePct = 50;
+    let savedNodeMainPct = 56;
     let consoleAutoscroll = true;
     let fitDone = false;
     let mapResizeObserver = null;
@@ -1777,6 +1779,10 @@
       return Math.max(30, Math.min(70, value));
     }}
 
+    function clampSavedNodeMainPct(value) {{
+      return Math.max(28, Math.min(78, value));
+    }}
+
     function applySplitState() {{
       const layout = document.querySelector(".layout");
       if (!(layout instanceof HTMLElement)) return;
@@ -1796,6 +1802,12 @@
       const layout = document.getElementById("dashboard-layout");
       if (!(layout instanceof HTMLElement)) return;
       layout.style.setProperty("--saved-node-pane-pct", `${{savedNodePanePct}}%`);
+    }}
+
+    function applySavedNodeHistorySplitState() {{
+      const layout = document.getElementById("dashboard-layout");
+      if (!(layout instanceof HTMLElement)) return;
+      layout.style.setProperty("--saved-node-main-pct", `${{savedNodeMainPct}}%`);
     }}
 
     function loadSplitState() {{
@@ -1853,6 +1865,20 @@
       applySavedNodeSplitState();
     }}
 
+    function loadSavedNodeHistorySplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(savedNodeHistorySplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            savedNodeMainPct = clampSavedNodeMainPct(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applySavedNodeHistorySplitState();
+    }}
+
     function persistNetworkNodesSplitState() {{
       try {{
         window.localStorage.setItem(networkNodesSplitStorageKey, String(networkNodesListPct));
@@ -1863,6 +1889,13 @@
     function persistSavedNodeSplitState() {{
       try {{
         window.localStorage.setItem(savedNodeSplitStorageKey, String(savedNodePanePct));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistSavedNodeHistorySplitState() {{
+      try {{
+        window.localStorage.setItem(savedNodeHistorySplitStorageKey, String(savedNodeMainPct));
       }} catch (_err) {{
       }}
     }}
@@ -1973,13 +2006,17 @@
       const nodeHistoryPanel = document.getElementById("map-data-node");
       const mapDataBody = document.getElementById("map-data-body");
       const networkHost = document.getElementById("network-node-history-host");
+      const savedHost = document.getElementById("saved-node-history-host");
       const nodesTitle = document.getElementById("nodes-card-title");
       if (!(nodeHistoryPanel instanceof HTMLElement)) return;
       if (!(mapDataBody instanceof HTMLElement)) return;
       if (!(networkHost instanceof HTMLElement)) return;
 
       const dockInNodes = activeLayoutView === "network";
-      const target = dockInNodes ? networkHost : mapDataBody;
+      const dockInSaved = activeLayoutView === "saved" && (savedHost instanceof HTMLElement);
+      const target = dockInNodes
+        ? networkHost
+        : (dockInSaved ? savedHost : mapDataBody);
       if (nodeHistoryPanel.parentElement !== target) {{
         target.appendChild(nodeHistoryPanel);
       }}
@@ -2231,6 +2268,58 @@
           document.body.classList.remove("resizing-panels-x");
           persistSavedNodeSplitState();
           requestMapResize();
+          splitter.removeEventListener("pointermove", onMove);
+          splitter.removeEventListener("pointerup", onUp);
+          splitter.removeEventListener("pointercancel", onUp);
+        }};
+
+        splitter.addEventListener("pointermove", onMove);
+        splitter.addEventListener("pointerup", onUp);
+        splitter.addEventListener("pointercancel", onUp);
+      }});
+    }}
+
+    function bindSavedNodeHistorySplitter() {{
+      const splitter = document.getElementById("saved-node-history-splitter");
+      if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;
+      const stack = splitter.closest(".saved-node-stack");
+      if (!(stack instanceof HTMLElement)) return;
+      splitter.dataset.bound = "1";
+
+      splitter.addEventListener("pointerdown", (ev) => {{
+        if (activeLayoutView !== "saved") return;
+        if (window.matchMedia("(max-width: 1100px)").matches) return;
+        ev.preventDefault();
+        splitter.classList.add("active");
+        document.body.classList.add("resizing-panels-y");
+        splitter.setPointerCapture(ev.pointerId);
+
+        const mainPane = stack.querySelector(".saved-node-main-scroll");
+        if (!(mainPane instanceof HTMLElement)) {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-y");
+          return;
+        }}
+
+        const updateFromClientY = (clientY) => {{
+          const rect = stack.getBoundingClientRect();
+          if (rect.height < 80) return;
+          const relativeY = clientY - rect.top;
+          const pct = clampSavedNodeMainPct((relativeY / rect.height) * 100);
+          savedNodeMainPct = pct;
+          applySavedNodeHistorySplitState();
+        }};
+
+        updateFromClientY(ev.clientY);
+
+        const onMove = (moveEv) => {{
+          updateFromClientY(moveEv.clientY);
+        }};
+
+        const onUp = () => {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-y");
+          persistSavedNodeHistorySplitState();
           splitter.removeEventListener("pointermove", onMove);
           splitter.removeEventListener("pointerup", onUp);
           splitter.removeEventListener("pointercancel", onUp);
@@ -3605,6 +3694,16 @@
     function renderSavedNodeDetails(state, nodeHistory = null, loadingNodeId = "") {{
       const host = document.getElementById("saved-node-details");
       if (!(host instanceof HTMLElement)) return;
+      const dockedHistoryPanel = document.getElementById("map-data-node");
+      const mapDataBody = document.getElementById("map-data-body");
+      // Preserve the shared history panel node before replacing host.innerHTML.
+      if (
+        dockedHistoryPanel instanceof HTMLElement
+        && mapDataBody instanceof HTMLElement
+        && host.contains(dockedHistoryPanel)
+      ) {{
+        mapDataBody.appendChild(dockedHistoryPanel);
+      }}
 
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nodeId = normalizeNodeId(selectedNodeId || "");
@@ -3614,6 +3713,7 @@
         host.innerHTML = favoriteNodeIds.size === 0
           ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Star nodes to build your Saved Nodes subsection.</div>'
           : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from Saved Nodes.</div>';
+        syncNodeHistoryDock();
         return;
       }}
 
@@ -3849,14 +3949,22 @@
       ]);
 
       host.innerHTML = `
-        <div class="saved-node-sections">
-          ${{nodeSection}}
-          ${{historySection}}
-          ${{locationSection}}
-          ${{chatSection}}
-          ${{linksSection}}
+        <div class="saved-node-stack">
+          <div class="saved-node-main-scroll">
+            <div class="saved-node-sections">
+              ${{nodeSection}}
+              ${{historySection}}
+              ${{locationSection}}
+              ${{chatSection}}
+              ${{linksSection}}
+            </div>
+          </div>
+          <div id="saved-node-history-splitter" class="saved-node-history-splitter" title="Drag to resize node info and history panels"></div>
+          <div id="saved-node-history-host" class="saved-node-history-host"></div>
         </div>
       `;
+      bindSavedNodeHistorySplitter();
+      syncNodeHistoryDock();
     }}
 
     function renderFavorites(state) {{
@@ -5127,6 +5235,7 @@
     loadSplitState();
     loadNetworkNodesSplitState();
     loadSavedNodeSplitState();
+    loadSavedNodeHistorySplitState();
     loadLayoutView();
     loadChatChannel();
     loadThemePreference();
@@ -5135,6 +5244,7 @@
     bindSplitters();
     bindNetworkNodeSplitter();
     bindSavedNodeSplitter();
+    bindSavedNodeHistorySplitter();
     bindSelectionControls();
     bindStarredNodeControl();
     bindFavoriteToggleControls();
