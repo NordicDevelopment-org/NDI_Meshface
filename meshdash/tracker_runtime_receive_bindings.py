@@ -40,13 +40,16 @@ def _resolve_tracker_node_id_from_num(
     to_int_fn: ToIntFn = _to_int,
     get_node_id_from_num_fn: GetNodeIdFromNumFn = _get_node_id_from_num_helper,
 ) -> str | None:
-    return _get_tracker_node_id_from_num_helper(
-        iface,
-        node_num,
-        meshtastic_module=meshtastic_module,
-        to_int_fn=to_int_fn,
-        get_node_id_from_num_fn=get_node_id_from_num_fn,
-    )
+    try:
+        return _get_tracker_node_id_from_num_helper(
+            iface,
+            node_num,
+            meshtastic_module=meshtastic_module,
+            to_int_fn=to_int_fn,
+            get_node_id_from_num_fn=get_node_id_from_num_fn,
+        )
+    except Exception:
+        return None
 
 
 def record_tracker_receive_unlocked_for_tracker(

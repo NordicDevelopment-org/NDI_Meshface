@@ -91,3 +91,27 @@ def test_resolve_tracker_node_id_from_num_forwards_dependencies(monkeypatch):
         "to_int_fn": sentinel_to_int,
         "get_node_id_from_num_fn": sentinel_get_node_id,
     }
+
+
+def test_resolve_tracker_node_id_from_num_returns_none_on_resolver_failure(monkeypatch):
+    def _raise_get_tracker_node_id_from_num(
+        iface, node_num, *, meshtastic_module, to_int_fn, get_node_id_from_num_fn
+    ):
+        raise RuntimeError("resolver boom")
+
+    monkeypatch.setattr(
+        tracker_runtime_receive_bindings,
+        "_get_tracker_node_id_from_num_helper",
+        _raise_get_tracker_node_id_from_num,
+    )
+
+    assert (
+        _resolve_tracker_node_id_from_num(
+            "iface-z",
+            123,
+            meshtastic_module=object(),
+            to_int_fn=object(),
+            get_node_id_from_num_fn=object(),
+        )
+        is None
+    )
