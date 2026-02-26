@@ -334,6 +334,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Tightened state assembly collaborator contracts toward typed internal payloads:
   - `state_service_contracts.py` now expects typed `CollectedNodes` and `TrackerSnapshot` for `CollectNodesFn`/`BuildSummaryPayloadFn`, and typed snapshot returns on `StateTracker.snapshot(...)`.
   - `state_summary.py` now consumes typed `TrackerSnapshot` directly in `build_summary_payload(...)` (no internal snapshot coercion), keeping dict-shape compatibility at upstream safe-load/coercion boundaries.
+- Tightened chat POST route dependency contract in `http_route_contracts.py` by replacing open-ended `SendChatFn(**kwargs)` with explicit chat-send parameter signatures (`text`, `destination`, `channel_index`, `reply_id`, `retry_of`, `emoji`) to match runtime send-call contracts.
 - Removed the receive-path legacy dependency dict shim by adding `record_tracker_packet_unlocked_from_dependencies(...)` in `meshdash/tracker_runtime_receive_dependencies.py`; `tracker_runtime_receive.py` now forwards typed dependency objects directly to legacy callbacks.
 - Added typed tracker packet-ingest dependency contract:
   - `TrackerPacketRuntimeDependencies` in `meshdash/tracker_runtime_packet_contracts.py`

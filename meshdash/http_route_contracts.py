@@ -29,7 +29,15 @@ class OnlineActivityFn(Protocol):
 
 
 class SendChatFn(Protocol):
-    def __call__(self, **kwargs: object) -> dict[str, object]:
+    def __call__(
+        self,
+        text: object,
+        destination: object = None,
+        channel_index: Optional[int] = None,
+        reply_id: Optional[int] = None,
+        retry_of: Optional[int] = None,
+        emoji: object = None,
+    ) -> dict[str, object]:
         ...
 
 
