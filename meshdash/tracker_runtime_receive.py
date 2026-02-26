@@ -126,19 +126,21 @@ def record_tracker_receive_unlocked(
         format_epoch_fn=format_epoch_fn,
         to_jsonable_fn=to_jsonable_fn,
     )
-    if record_tracker_packet_unlocked_fn is not None:
-        _record_tracker_packet_unlocked_from_dependencies_helper(
-            record_tracker_packet_unlocked_fn,
-            packet=packet,
-            interface=interface,
-            include_live_count=include_live_count,
-            deps=deps,
-        )
-    else:
-        record_tracker_packet_unlocked_with_dependencies_fn(
-            packet=packet,
-            interface=interface,
-            include_live_count=include_live_count,
-            deps=deps,
-        )
-    tracker._expire_pending_deliveries_fn()
+    try:
+        if record_tracker_packet_unlocked_fn is not None:
+            _record_tracker_packet_unlocked_from_dependencies_helper(
+                record_tracker_packet_unlocked_fn,
+                packet=packet,
+                interface=interface,
+                include_live_count=include_live_count,
+                deps=deps,
+            )
+        else:
+            record_tracker_packet_unlocked_with_dependencies_fn(
+                packet=packet,
+                interface=interface,
+                include_live_count=include_live_count,
+                deps=deps,
+            )
+    finally:
+        tracker._expire_pending_deliveries_fn()

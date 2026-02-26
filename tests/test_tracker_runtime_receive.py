@@ -1,5 +1,7 @@
 from collections import Counter, deque
 
+import pytest
+
 from meshdash.tracker_runtime_packet_contracts import TrackerPacketRuntimeDependencies
 from meshdash.tracker_runtime_receive import record_tracker_receive_unlocked
 
@@ -167,4 +169,80 @@ def test_record_tracker_receive_unlocked_uses_typed_path_by_default():
     assert deps.recent_packets is tracker.recent_packets
     assert deps.recent_chat is tracker.recent_chat
     assert deps.history_store == "history-store"
+    assert observed["expired"] is True
+
+
+def test_record_tracker_receive_unlocked_expires_when_legacy_record_path_raises():
+    observed = {}
+
+    def _record_tracker_packet_unlocked(**_kwargs):
+        raise RuntimeError("legacy record boom")
+
+    def _expire(self):
+        observed["expired"] = True
+
+    tracker = type(
+        "_Tracker",
+        (),
+        {
+            "edges": {"edge": 1},
+            "_historical_edges": {"historical": 2},
+            "port_counts": Counter(),
+            "recent_packets": deque(maxlen=8),
+            "recent_chat": deque(maxlen=8),
+            "_history_store": "history-store",
+            "_extract_delivery_update_fn": "extract-delivery",
+            "_set_delivery_state_fn": "set-delivery",
+            "_expire_pending_deliveries_fn": _expire,
+        },
+    )()
+
+    with pytest.raises(RuntimeError, match="legacy record boom"):
+        record_tracker_receive_unlocked(
+            tracker,
+            packet={"id": 1},
+            interface=object(),
+            include_live_count=True,
+            get_node_id_from_num_fn=object(),
+            record_tracker_packet_unlocked_fn=_record_tracker_packet_unlocked,
+        )
+
+    assert observed["expired"] is True
+
+
+def test_record_tracker_receive_unlocked_expires_when_typed_record_path_raises():
+    observed = {}
+
+    def _record_tracker_packet_unlocked_with_dependencies(**_kwargs):
+        raise RuntimeError("typed record boom")
+
+    def _expire(self):
+        observed["expired"] = True
+
+    tracker = type(
+        "_Tracker",
+        (),
+        {
+            "edges": {"edge": 1},
+            "_historical_edges": {"historical": 2},
+            "port_counts": Counter(),
+            "recent_packets": deque(maxlen=8),
+            "recent_chat": deque(maxlen=8),
+            "_history_store": "history-store",
+            "_extract_delivery_update_fn": "extract-delivery",
+            "_set_delivery_state_fn": "set-delivery",
+            "_expire_pending_deliveries_fn": _expire,
+        },
+    )()
+
+    with pytest.raises(RuntimeError, match="typed record boom"):
+        record_tracker_receive_unlocked(
+            tracker,
+            packet={"id": 2},
+            interface=object(),
+            include_live_count=False,
+            get_node_id_from_num_fn=object(),
+            record_tracker_packet_unlocked_with_dependencies_fn=_record_tracker_packet_unlocked_with_dependencies,
+        )
+
     assert observed["expired"] is True
