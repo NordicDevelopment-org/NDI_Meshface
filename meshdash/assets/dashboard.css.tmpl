@@ -1213,7 +1213,7 @@
       height: calc(100vh - 96px);
       height: calc(100dvh - 96px);
       min-height: 560px;
-      grid-template-columns: minmax(320px, 1fr) var(--splitter-size) minmax(320px, 1fr);
+      grid-template-columns: minmax(320px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
       grid-template-rows: auto minmax(0, 1fr);
     }}
     .layout.view-network .summary {{
@@ -1281,6 +1281,15 @@
     .layout.view-network .splitter {{
       display: block;
       grid-row: 2;
+      border-color: #d1e0cb;
+      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+    }}
+    .layout.view-network .splitter::before {{
+      background: #b8cab9;
+    }}
+    .layout.view-network .splitter:hover::before,
+    .layout.view-network .splitter.active::before {{
+      background: #2f855a;
     }}
 
     .layout.view-packets {{
@@ -3251,6 +3260,10 @@
       border-color: var(--ui-border);
       background: linear-gradient(90deg, #1a2430, #16202c);
     }}
+    [data-theme="dark"] .layout.view-network .splitter {{
+      border-color: var(--ui-border);
+      background: linear-gradient(90deg, #1a2430, #16202c);
+    }}
     [data-theme="dark"] .saved-node-history-host {{
       border-top: none;
     }}
@@ -3281,6 +3294,13 @@
     }}
     [data-theme="dark"] .network-node-splitter:hover::before,
     [data-theme="dark"] .network-node-splitter.active::before {{
+      background: #79c0ff;
+    }}
+    [data-theme="dark"] .layout.view-network .splitter::before {{
+      background: #44566a;
+    }}
+    [data-theme="dark"] .layout.view-network .splitter:hover::before,
+    [data-theme="dark"] .layout.view-network .splitter.active::before {{
       background: #79c0ff;
     }}
     [data-theme="dark"] .network-node-history-host.empty::before {{
