@@ -1214,21 +1214,38 @@
       height: calc(100dvh - 96px);
       min-height: 560px;
       grid-template-columns: minmax(320px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
-      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, 1fr);
     }}
     .layout.view-network .summary {{
       display: block;
       grid-column: 1 / span 3;
       grid-row: 1;
     }}
+    .layout.view-network .map {{
+      display: contents;
+    }}
+    .layout.view-network .map-card-head {{
+      display: flex;
+      grid-column: 1 / span 3;
+      grid-row: 2;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+    }}
+    .layout.view-network .map-card-head h2 {{
+      display: block;
+    }}
     .layout.view-network .nodes {{
       grid-column: 1;
-      grid-row: 2;
+      grid-row: 3;
       min-height: 0;
+    }}
+    .layout.view-network .nodes > h2 {{
+      display: none !important;
     }}
     .layout.view-network .map {{
       grid-column: 3;
-      grid-row: 2;
+      grid-row: 3;
       min-height: 0;
     }}
     .layout.view-network .nodes .body {{
@@ -1263,13 +1280,13 @@
       padding: 0 !important;
     }}
     .layout.view-network .map .body {{
+      grid-column: 3;
+      grid-row: 3;
       min-height: 0;
-    }}
-    .layout.view-network .map-card-head {{
-      justify-content: flex-end;
-    }}
-    .layout.view-network .map-card-head h2 {{
-      display: none;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      background: var(--panel);
     }}
     .layout.view-network .map-frame {{
       min-height: 0;
@@ -1286,7 +1303,7 @@
     }}
     .layout.view-network .splitter {{
       display: block;
-      grid-row: 2;
+      grid-row: 3;
       border-color: #d1e0cb;
       background: linear-gradient(90deg, #f4faf3, #edf5ea);
     }}
