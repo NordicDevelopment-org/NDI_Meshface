@@ -30,6 +30,11 @@ def test_empty_history_payload_shapes():
     assert online_empty["window_hours"] == 12
     assert len(online_empty["hourly_profile"]) == 24
 
+    online_invalid = empty_online_activity(0)
+    assert online_invalid["window_hours"] == 72
+    online_non_int = empty_online_activity("bad")  # type: ignore[arg-type]
+    assert online_non_int["window_hours"] == 72
+
 
 def test_history_loaders_apply_defaults_and_overrides():
     store = _FakeHistoryStore()
@@ -49,6 +54,13 @@ def test_history_loaders_apply_defaults_and_overrides():
     assert online_payload["window_hours"] == 72
     online_payload = online_loader(24)
     assert online_payload["window_hours"] == 24
+
+    node_payload = node_loader("!node3", 0, -1)
+    assert node_payload["window_hours"] == 72
+    assert node_payload["max_points"] == 1440
+
+    online_payload = online_loader(0)
+    assert online_payload["window_hours"] == 72
 
 
 def test_history_loaders_without_store_return_empty_payloads():

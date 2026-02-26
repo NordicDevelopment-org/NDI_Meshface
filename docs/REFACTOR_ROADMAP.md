@@ -59,6 +59,9 @@ Split `_render_html()` into composable builders while keeping server behavior un
   - `tests/test_html_asset_template_contracts.py` now asserts each asset template exposes only expected replacement tokens and leaves no unresolved single-token placeholders after render.
 - Added baseline CI workflow:
   - `.github/workflows/ci.yml` runs pytest on push/pull_request so template and renderer checks execute automatically.
+- Added template lint checks for asset hygiene:
+  - `tests/test_html_asset_lint.py` validates LF-only newlines, no tab characters, no trailing whitespace, and final newline for `meshdash/assets/*`.
+  - CI now runs the template lint test explicitly before full pytest.
 
 ### Steps
 
@@ -189,11 +192,12 @@ Break `HistoryStore` into smaller repositories.
   - centralized history runtime store/lock/prune protocol contracts in `meshdash/history_store_runtime_contracts.py` with `history_store_runtime_init.py` and `history_store_runtime_maintenance.py` now consuming the shared contracts.
   - `tests/test_history_db_namespace.py` coverage for namespace export and round-trip open/prune behavior.
   - `tests/test_history_store_compat_facades.py` coverage for read/write compatibility-facade exports.
+  - `tests/test_history_views.py` coverage for non-positive/invalid hour and point overrides in node-history and online-activity wrappers.
 
 ### Steps
 
 1. Continue routing history modules through `meshdash/history/db.py` namespace where it reduces import sprawl.
-2. Add tighter tests around node-history and online-activity domain wrappers.
+2. [done] Add tighter tests around node-history and online-activity domain wrappers.
 
 ### Exit criteria
 

@@ -1,0 +1,30 @@
+import re
+from pathlib import Path
+
+
+_ASSETS_DIR = Path(__file__).resolve().parents[1] / "meshdash" / "assets"
+_TEMPLATE_FILES = (
+    "dashboard.css.tmpl",
+    "dashboard.html.tmpl",
+    "dashboard.js.tmpl",
+)
+_TRAILING_SPACE_RE = re.compile(r"[ \t]+$", re.MULTILINE)
+
+
+def test_asset_templates_use_unix_newlines_and_no_tabs():
+    for template_name in _TEMPLATE_FILES:
+        raw = (_ASSETS_DIR / template_name).read_text(encoding="utf-8")
+        assert "\r" not in raw
+        assert "\t" not in raw
+
+
+def test_asset_templates_have_no_trailing_whitespace():
+    for template_name in _TEMPLATE_FILES:
+        raw = (_ASSETS_DIR / template_name).read_text(encoding="utf-8")
+        assert _TRAILING_SPACE_RE.search(raw) is None
+
+
+def test_asset_templates_end_with_newline():
+    for template_name in _TEMPLATE_FILES:
+        raw = (_ASSETS_DIR / template_name).read_text(encoding="utf-8")
+        assert raw.endswith("\n")
