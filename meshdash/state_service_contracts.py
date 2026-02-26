@@ -51,7 +51,7 @@ class BuildSummaryPayloadFn(Protocol):
         nodes_with_position: int,
         tracker_data: TrackerSnapshot,
         storage_probe_path: Optional[str],
-        revision_info: RevisionPayload,
+        revision_info: RevisionInfo,
         modem_preset: Optional[str],
     ) -> dict[str, object]:
         ...

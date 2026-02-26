@@ -1,6 +1,6 @@
 from typing import Dict, Optional
 
-from .revision import RevisionInfo
+from .revision import RevisionInfo, coerce_revision_info
 from .helpers import (
     redact_secrets as _redact_secrets,
     to_jsonable as _to_jsonable,
@@ -59,14 +59,9 @@ def _build_summary_payload_fallback(
     node_rows: list[dict[str, object]],
     nodes_with_position: int,
     tracker_data: object,
-    revision_info: RevisionPayload,
+    revision_info: RevisionInfo,
     modem_preset: Optional[str],
 ) -> dict[str, object]:
-    if isinstance(revision_info, RevisionInfo):
-        revision_payload = revision_info.as_dict()
-    else:
-        revision_payload = dict(revision_info)
-
     return {
         "target": target,
         "uptime_seconds": 0,
@@ -78,7 +73,7 @@ def _build_summary_payload_fallback(
         "recent_packet_buffer": len(tracker_data.recent_packets),
         "modem_preset": modem_preset,
         "disk": {"free_percent": "n/a"},
-        "revision": revision_payload,
+        "revision": revision_info.as_dict(),
     }
 
 
@@ -89,7 +84,7 @@ def build_dashboard_state_typed(
     target: str,
     started_at: float,
     storage_probe_path: Optional[str],
-    revision_info: RevisionPayload,
+    revision_info: RevisionInfo,
     collect_nodes_fn: CollectNodesFn = _collect_nodes_helper,
     collect_local_state_fn: CollectLocalStateFn = _collect_local_state_helper,
     collect_local_state_safe_fn: CollectLocalStateSafeFn = _collect_local_state_safe_helper,
@@ -207,7 +202,7 @@ def build_dashboard_state(
         target=target,
         started_at=started_at,
         storage_probe_path=storage_probe_path,
-        revision_info=revision_info,
+        revision_info=coerce_revision_info(revision_info),
         collect_nodes_fn=collect_nodes_fn,
         collect_local_state_fn=collect_local_state_fn,
         collect_local_state_safe_fn=collect_local_state_safe_fn,

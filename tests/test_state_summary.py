@@ -55,7 +55,7 @@ def test_build_summary_payload_uses_injected_time_and_disk_info():
             recent_chat=[],
         ),
         storage_probe_path=".",
-        revision_info={"version": "0.1.0", "commit": "abc123"},
+        revision_info=RevisionInfo(version="0.1.0", commit="abc123", label="L", title="T"),
         modem_preset="MEDIUM_FAST",
         now_ts_fn=lambda: 35.0,
         disk_space_info_fn=lambda path: {"free_percent": 80.0},

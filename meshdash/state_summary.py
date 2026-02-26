@@ -44,16 +44,12 @@ def build_summary_payload(
     nodes_with_position: int,
     tracker_data: TrackerSnapshot,
     storage_probe_path: Optional[str],
-    revision_info: RevisionInfo | dict[str, str],
+    revision_info: RevisionInfo,
     modem_preset: Optional[str],
     now_ts_fn: Callable[[], float] = time.time,
     disk_space_info_fn: Callable[[Optional[str]], dict[str, object]] = disk_space_info,
 ) -> dict[str, object]:
     tracker_snapshot = tracker_data
-    if isinstance(revision_info, RevisionInfo):
-        revision_payload = revision_info.as_dict()
-    else:
-        revision_payload = dict(revision_info)
     return {
         "target": target,
         "uptime_seconds": int(max(0, now_ts_fn() - started_at)),
@@ -65,5 +61,5 @@ def build_summary_payload(
         "recent_packet_buffer": len(tracker_snapshot.recent_packets),
         "modem_preset": modem_preset,
         "disk": disk_space_info_fn(storage_probe_path),
-        "revision": revision_payload,
+        "revision": revision_info.as_dict(),
     }

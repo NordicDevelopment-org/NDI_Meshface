@@ -1,4 +1,5 @@
 from meshdash.state_payload_contracts import DashboardStatePayload
+from meshdash.revision import RevisionInfo
 from meshdash.state_service import build_dashboard_state, build_dashboard_state_typed
 
 
@@ -271,7 +272,7 @@ def test_build_dashboard_state_typed_returns_contract_payload():
         target="target",
         started_at=0.0,
         storage_probe_path=".",
-        revision_info={"version": "0.1.0"},
+        revision_info=RevisionInfo(version="0.1.0", commit="abc", label="L", title="T"),
         collect_nodes_fn=lambda iface: {
             "rows": [{"id": "!a"}],
             "full": [{"id": "!a", "info": {}}],

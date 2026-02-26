@@ -374,6 +374,9 @@ Reduce string-key coupling between runtime builders and orchestration modules.
   - `build_dashboard_server_with_dependencies(...)` in `meshdash/dashboard_server.py`
   - existing `build_dashboard_server(...)` preserved as compatibility wrapper.
 - State summary/revision flow now accepts typed `RevisionInfo` through runtime state loading while preserving dict compatibility at the state/summary payload boundary.
+- Tightened state-service revision boundary:
+  - `build_dashboard_state_typed(...)`, summary contracts, and summary fallback now require typed `RevisionInfo`
+  - `build_dashboard_state(...)` retains mapping compatibility via `coerce_revision_info(...)` at the API wrapper boundary.
 - `meshdash/services_chat.py` now uses shared runtime callable aliases for reaction/local-node/time and chat normalization callbacks (no remaining ad-hoc `Callable[..., Any]` in runtime-adjacent modules).
 - Added typed node-collection contract for state assembly:
   - `CollectedNodes` + `coerce_collected_nodes(...)` in `meshdash/state_node_contracts.py`

@@ -1,6 +1,6 @@
 import subprocess
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Mapping, Optional
 
 
 @dataclass(frozen=True)
@@ -17,6 +17,26 @@ class RevisionInfo:
             "label": self.label,
             "title": self.title,
         }
+
+
+def coerce_revision_info(value: RevisionInfo | Mapping[str, object]) -> RevisionInfo:
+    if isinstance(value, RevisionInfo):
+        return value
+    if not isinstance(value, Mapping):
+        raise TypeError(f"Expected RevisionInfo or mapping, got {type(value)!r}")
+
+    version = str(value.get("version") or "0.0.0")
+    commit = str(value.get("commit") or "nogit")
+    label = str(value.get("label") or f"Rev: v{version} ({commit})")
+    title = str(
+        value.get("title") or f"Dashboard revision: version {version}, commit {commit}"
+    )
+    return RevisionInfo(
+        version=version,
+        commit=commit,
+        label=label,
+        title=title,
+    )
 
 
 def sanitize_revision_token(raw: object, fallback: str) -> str:
