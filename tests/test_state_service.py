@@ -427,6 +427,106 @@ def test_build_dashboard_state_handles_invalid_summary_shape_without_crashing():
     assert payload["summary"]["node_count"] == 1
 
 
+def test_build_dashboard_state_handles_invalid_tracker_snapshot_shape_without_crashing():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {
+            "live_packet_count": kwargs["tracker_data"].live_packet_count
+        },
+        load_tracker_snapshot_safe_fn=lambda tracker, nodes_by_id: ("bad-snapshot", None),
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["tracker_error"] == "Expected TrackerSnapshot or mapping, got <class 'str'>"
+    assert payload["summary"]["live_packet_count"] == 0
+    assert payload["traffic"]["edges"] == []
+
+
+def test_build_dashboard_state_handles_invalid_saved_counts_shape_without_crashing():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        load_tracker_node_saved_counts_safe_fn=lambda tracker: ("bad-saved", None),
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["tracker_saved_counts_error"] == "Expected node saved counts mapping"
+    assert payload["summary"]["summary_ok"] is True
+
+
+def test_build_dashboard_state_handles_invalid_capabilities_shape_without_crashing():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        load_tracker_node_capabilities_safe_fn=lambda tracker: ("bad-caps", None),
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["tracker_capabilities_error"] == "Expected node capabilities mapping"
+    assert payload["history_caps"] == {}
+    assert payload["summary"]["summary_ok"] is True
+
+
 def test_build_dashboard_state_typed_returns_contract_payload():
     tracker = _DummyTracker()
     payload = build_dashboard_state_typed(

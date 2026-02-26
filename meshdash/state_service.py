@@ -41,6 +41,7 @@ from .state_summary import (
     collect_local_state_safe as _collect_local_state_safe_helper,
     modem_preset_from_local_state as _modem_preset_from_local_state_helper,
 )
+from .tracker_snapshot_contracts import coerce_tracker_snapshot, empty_tracker_snapshot
 
 
 def _to_jsonable_safe(
@@ -78,6 +79,23 @@ def _build_summary_payload_fallback(
     }
 
 
+def _coerce_nested_mapping_rows(
+    value: object,
+    *,
+    label: str,
+) -> dict[str, dict[str, object]]:
+    if not isinstance(value, Mapping):
+        raise TypeError(f"Expected {label} mapping")
+
+    out: dict[str, dict[str, object]] = {}
+    for key, nested in value.items():
+        if isinstance(nested, Mapping):
+            out[str(key)] = dict(nested)
+        else:
+            out[str(key)] = {}
+    return out
+
+
 def build_dashboard_state_typed(
     *,
     iface: object,
@@ -104,9 +122,35 @@ def build_dashboard_state_typed(
     except Exception as exc:
         nodes = CollectedNodes(rows=[], full=[], by_id={}, with_position_count=0)
         nodes_error = str(exc)
-    tracker_data, tracker_error = load_tracker_snapshot_safe_fn(tracker, nodes.by_id)
-    node_saved_counts, node_saved_counts_error = load_tracker_node_saved_counts_safe_fn(tracker)
-    node_capabilities, node_capabilities_error = load_tracker_node_capabilities_safe_fn(tracker)
+    tracker_data_raw, tracker_error = load_tracker_snapshot_safe_fn(tracker, nodes.by_id)
+    try:
+        tracker_data = coerce_tracker_snapshot(tracker_data_raw)
+    except Exception as exc:
+        tracker_data = empty_tracker_snapshot()
+        if tracker_error is None:
+            tracker_error = str(exc)
+
+    node_saved_counts_raw, node_saved_counts_error = load_tracker_node_saved_counts_safe_fn(tracker)
+    try:
+        node_saved_counts = _coerce_nested_mapping_rows(
+            node_saved_counts_raw,
+            label="node saved counts",
+        )
+    except Exception as exc:
+        node_saved_counts = {}
+        if node_saved_counts_error is None:
+            node_saved_counts_error = str(exc)
+
+    node_capabilities_raw, node_capabilities_error = load_tracker_node_capabilities_safe_fn(tracker)
+    try:
+        node_capabilities = _coerce_nested_mapping_rows(
+            node_capabilities_raw,
+            label="node capabilities",
+        )
+    except Exception as exc:
+        node_capabilities = {}
+        if node_capabilities_error is None:
+            node_capabilities_error = str(exc)
     try:
         apply_node_saved_counts_fn(nodes.rows, node_saved_counts)
     except Exception as exc:
