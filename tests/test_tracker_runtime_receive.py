@@ -280,3 +280,71 @@ def test_record_tracker_receive_unlocked_expires_when_dependency_build_raises():
         )
 
     assert observed["expired"] is True
+
+
+def test_record_tracker_receive_unlocked_preserves_processing_error_when_expire_also_raises():
+    def _record_tracker_packet_unlocked(**_kwargs):
+        raise RuntimeError("record boom")
+
+    def _expire(self):
+        raise RuntimeError("expire boom")
+
+    tracker = type(
+        "_Tracker",
+        (),
+        {
+            "edges": {"edge": 1},
+            "_historical_edges": {"historical": 2},
+            "port_counts": Counter(),
+            "recent_packets": deque(maxlen=8),
+            "recent_chat": deque(maxlen=8),
+            "_history_store": "history-store",
+            "_extract_delivery_update_fn": "extract-delivery",
+            "_set_delivery_state_fn": "set-delivery",
+            "_expire_pending_deliveries_fn": _expire,
+        },
+    )()
+
+    with pytest.raises(RuntimeError, match="record boom"):
+        record_tracker_receive_unlocked(
+            tracker,
+            packet={"id": 4},
+            interface=object(),
+            include_live_count=True,
+            get_node_id_from_num_fn=object(),
+            record_tracker_packet_unlocked_fn=_record_tracker_packet_unlocked,
+        )
+
+
+def test_record_tracker_receive_unlocked_raises_expire_error_when_processing_succeeds():
+    def _record_tracker_packet_unlocked(**_kwargs):
+        return None
+
+    def _expire(self):
+        raise RuntimeError("expire boom")
+
+    tracker = type(
+        "_Tracker",
+        (),
+        {
+            "edges": {"edge": 1},
+            "_historical_edges": {"historical": 2},
+            "port_counts": Counter(),
+            "recent_packets": deque(maxlen=8),
+            "recent_chat": deque(maxlen=8),
+            "_history_store": "history-store",
+            "_extract_delivery_update_fn": "extract-delivery",
+            "_set_delivery_state_fn": "set-delivery",
+            "_expire_pending_deliveries_fn": _expire,
+        },
+    )()
+
+    with pytest.raises(RuntimeError, match="expire boom"):
+        record_tracker_receive_unlocked(
+            tracker,
+            packet={"id": 5},
+            interface=object(),
+            include_live_count=False,
+            get_node_id_from_num_fn=object(),
+            record_tracker_packet_unlocked_fn=_record_tracker_packet_unlocked,
+        )

@@ -103,6 +103,7 @@ def record_tracker_receive_unlocked(
     format_epoch_fn: FormatEpochFn = _format_epoch,
     to_jsonable_fn: ToJsonableFn = _to_jsonable,
 ) -> None:
+    processing_error: Exception | None = None
     try:
         deps = _build_tracker_packet_runtime_dependencies_helper(
             tracker,
@@ -142,5 +143,14 @@ def record_tracker_receive_unlocked(
                 include_live_count=include_live_count,
                 deps=deps,
             )
+    except Exception as exc:
+        processing_error = exc
+        raise
     finally:
-        tracker._expire_pending_deliveries_fn()
+        try:
+            tracker._expire_pending_deliveries_fn()
+        except Exception:
+            # Keep the original packet-processing failure if both processing and
+            # expiration fail in the same receive call.
+            if processing_error is None:
+                raise
