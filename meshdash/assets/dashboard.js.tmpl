@@ -560,12 +560,26 @@
     }}
 
     function parseDashboardTimeToUnix(value) {{
+      const numericRaw = Number(value);
+      if (Number.isFinite(numericRaw) && numericRaw > 0) {{
+        // Accept either Unix seconds or milliseconds.
+        return Math.floor(numericRaw > 1e12 ? (numericRaw / 1000) : numericRaw);
+      }}
       const text = String(value == null ? "" : value).trim();
       if (!text) return null;
       const iso = text.includes("T") ? text : text.replace(" ", "T");
       const parsed = Date.parse(iso);
       if (!Number.isFinite(parsed)) return null;
       return Math.floor(parsed / 1000);
+    }}
+
+    function latestUnixTimestamp(...values) {{
+      let latest = 0;
+      for (const value of values) {{
+        const ts = parseDashboardTimeToUnix(value);
+        if (ts && ts > latest) latest = ts;
+      }}
+      return latest > 0 ? latest : null;
     }}
 
     function nodeLastHeardUnix(node) {{
@@ -592,10 +606,6 @@
       if (key === "warn") return 1;
       if (key === "stale") return 2;
       return 3;
-    }}
-
-    function pickFresherStatus(currentStatus, nextStatus) {{
-      return statusRank(nextStatus) < statusRank(currentStatus) ? nextStatus : currentStatus;
     }}
 
     function normalizeChatChannel(raw) {{
@@ -3007,7 +3017,7 @@
         stats.touches += 1;
 
         const timeText = String((msg && (msg.rx_time || msg.captured_at)) || "").trim();
-        const timeUnix = parseDashboardTimeToUnix(timeText);
+        const timeUnix = latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at);
         if (Number.isFinite(timeUnix) && (!Number.isFinite(stats.lastChatUnix) || timeUnix > stats.lastChatUnix)) {{
           stats.lastChatUnix = timeUnix;
           stats.lastChatText = timeText || "n/a";
@@ -4107,21 +4117,22 @@
         }};
       }};
 
-      const chatEndpointParts = (nodeId) => {{
+      const chatEndpointParts = (nodeId, messageUnixHint = null) => {{
         const clean = normalizeNodeId(nodeId);
         if (!clean) {{
-          return {{ label: "n/a", idTag: "", title: "n/a", status: "unknown", metaHtml: "" }};
+          return {{ label: "n/a", idTag: "", title: "n/a", status: "unknown", metaHtml: "", lastSeenUnix: null }};
         }}
         if (clean === "^all") {{
-          return {{ label: "All", idTag: "", title: "^all", status: "unknown", metaHtml: "" }};
+          return {{ label: "All", idTag: "", title: "^all", status: "unknown", metaHtml: "", lastSeenUnix: null }};
         }}
         if (clean === "local") {{
-          return {{ label: "Local", idTag: "", title: "local", status: "online", metaHtml: "" }};
+          return {{ label: "Local", idTag: "", title: "local", status: "online", metaHtml: "", lastSeenUnix: nowUnix }};
         }}
         const node = nodesById.get(clean);
         const name = preferredNodeName(node) || nodeNameCache.get(clean) || "Unknown node";
         const lastHeard = nodeLastHeardUnix(node);
-        const status = freshnessStatus(lastHeard, nowUnix);
+        const freshestSeen = latestUnixTimestamp(lastHeard, messageUnixHint);
+        const status = freshnessStatus(freshestSeen, nowUnix);
         const meta = nodeIdentityMeta(clean);
         return {{
           label: name,
@@ -4129,6 +4140,7 @@
           title: `${{name}} (${{clean}})${{meta.title ? ` - ${{meta.title}}` : ""}}`,
           status,
           metaHtml: meta.html,
+          lastSeenUnix: freshestSeen,
         }};
       }};
 
@@ -4136,22 +4148,26 @@
       const channelCounts = {{ all: 0, direct: 0 }};
       const touchParticipant = (meta, msgTimeUnix) => {{
         if (!meta || !meta.idTag || !isSelectableNodeId(meta.idTag)) return;
+        const messageUnix = parseDashboardTimeToUnix(msgTimeUnix);
+        const freshestSeen = latestUnixTimestamp(meta.lastSeenUnix, messageUnix);
         const existing = participants.get(meta.idTag);
         if (!existing) {{
           participants.set(meta.idTag, {{
             id: meta.idTag,
             name: meta.label || meta.idTag,
-            status: String(meta.status || "unknown"),
-            lastMessageUnix: msgTimeUnix || null,
+            status: freshnessStatus(freshestSeen, nowUnix),
+            lastSeenUnix: freshestSeen,
+            lastMessageUnix: messageUnix || null,
           }});
           return;
         }}
         if (meta.label && meta.label !== "Unknown node") {{
           existing.name = meta.label;
         }}
-        existing.status = pickFresherStatus(existing.status, String(meta.status || "unknown"));
-        if (msgTimeUnix && (!existing.lastMessageUnix || msgTimeUnix > existing.lastMessageUnix)) {{
-          existing.lastMessageUnix = msgTimeUnix;
+        existing.lastSeenUnix = latestUnixTimestamp(existing.lastSeenUnix, freshestSeen);
+        existing.status = freshnessStatus(existing.lastSeenUnix, nowUnix);
+        if (messageUnix && (!existing.lastMessageUnix || messageUnix > existing.lastMessageUnix)) {{
+          existing.lastMessageUnix = messageUnix;
         }}
       }};
 
@@ -4161,22 +4177,26 @@
         const node = nodesById.get(clean);
         const name = preferredNodeName(node) || nodeNameCache.get(clean) || clean;
         const lastHeard = nodeLastHeardUnix(node);
-        const status = freshnessStatus(lastHeard, nowUnix);
+        const messageUnix = parseDashboardTimeToUnix(msgTimeUnix);
+        const freshestSeen = latestUnixTimestamp(lastHeard, messageUnix);
+        const status = freshnessStatus(freshestSeen, nowUnix);
         const existing = participants.get(clean);
         if (!existing) {{
           participants.set(clean, {{
             id: clean,
             name,
             status,
-            lastMessageUnix: msgTimeUnix || lastHeard || null,
+            lastSeenUnix: freshestSeen,
+            lastMessageUnix: latestUnixTimestamp(messageUnix, lastHeard),
           }});
           return;
         }}
         if (name && name !== "Unknown node") {{
           existing.name = name;
         }}
-        existing.status = pickFresherStatus(existing.status, status);
-        const recent = msgTimeUnix || lastHeard || null;
+        existing.lastSeenUnix = latestUnixTimestamp(existing.lastSeenUnix, freshestSeen);
+        existing.status = freshnessStatus(existing.lastSeenUnix, nowUnix);
+        const recent = latestUnixTimestamp(messageUnix, lastHeard);
         if (recent && (!existing.lastMessageUnix || recent > existing.lastMessageUnix)) {{
           existing.lastMessageUnix = recent;
         }}
@@ -4263,7 +4283,7 @@
           bucket.count += 1;
           bucket.names.push(reactorName);
         }}
-        const reactionTime = parseDashboardTimeToUnix(msg.rx_time || msg.captured_at || "");
+        const reactionTime = latestUnixTimestamp(msg.rx_time, msg.captured_at);
         if (reactionTime && reactionTime > bucket.lastUnix) {{
           bucket.lastUnix = reactionTime;
         }}
@@ -4368,9 +4388,9 @@
         const fallbackSelectable = isSelectableNodeId(fallbackNode) ? fallbackNode : "";
         const nodeId = primarySelectable || fallbackSelectable;
         const selectableClass = nodeId ? "chat-selectable" : "";
-        const fromMeta = chatEndpointParts(sourceNode);
-        const toMeta = chatEndpointParts(fallbackNode);
-        const msgTimeUnix = parseDashboardTimeToUnix(msg.rx_time || msg.captured_at || "");
+        const msgTimeUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
+        const fromMeta = chatEndpointParts(sourceNode, msgTimeUnix);
+        const toMeta = chatEndpointParts(fallbackNode, msgTimeUnix);
         touchParticipant(fromMeta, msgTimeUnix);
         if (activeChatChannel === "direct") {{
           touchParticipant(toMeta, msgTimeUnix);
@@ -4475,7 +4495,7 @@
       if (activeChatChannel === "all" && participants.size === 0) {{
         for (const msg of baseMessages) {{
           if (classifyMessageChannel(msg) !== "all") continue;
-          touchNodeById(msg.from, parseDashboardTimeToUnix(msg.rx_time || msg.captured_at || ""));
+          touchNodeById(msg.from, latestUnixTimestamp(msg.rx_time, msg.captured_at));
         }}
       }}
       if (activeChatChannel === "direct" && isSelectableNodeId(selectedNodeId)) {{
