@@ -144,7 +144,13 @@
     </section>
 
     <section class="card map">
-      <h2 id="map-card-title">Network Map</h2>
+      <div class="map-card-head">
+        <h2 id="map-card-title">Network Map</h2>
+        <label id="map-heatmap-wrap" class="map-heatmap-wrap" title="Overlay realtime signal heatmap">
+          <input id="map-heatmap-toggle" type="checkbox" checked />
+          <span>Signal Heatmap</span>
+        </label>
+      </div>
       <div class="body">
         <div id="saved-node-details" class="saved-node-details" aria-live="polite"></div>
         <div id="saved-map-splitter" class="saved-map-splitter" title="Drag to resize node details and map"></div>
@@ -297,6 +303,10 @@
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script
+    src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"
     crossorigin=""
   ></script>
   <script>

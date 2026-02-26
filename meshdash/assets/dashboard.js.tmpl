@@ -32,6 +32,53 @@
     const nodeLayer = L.layerGroup().addTo(map);
     const edgeLayer = L.layerGroup().addTo(map);
     const trailLayer = L.layerGroup().addTo(map);
+    const signalHeatmapPaneName = "signalHeatmapPane";
+    const signalHeatmapGradient = {{
+      0.02: "#1f4f79",
+      0.24: "#2f855a",
+      0.58: "#45ad69",
+      0.82: "#d1a02d",
+      1.0: "#b22222",
+    }};
+    const signalHeatmapLayerOptions = {{
+      maxZoom: 14,
+      gradient: signalHeatmapGradient,
+    }};
+    const signalHeatFreshFullSeconds = 8 * 60;
+    const signalHeatFreshDropSeconds = 40 * 60;
+    const signalHeatProfileDefaults = {{
+      snrMin: -12,
+      snrMax: 10,
+      rssiMin: -125,
+      rssiMax: -88,
+    }};
+    const signalHeatDevKnobsStorageKey = "meshDashboardSignalHeatDevKnobsV1";
+    const signalHeatDevKnobDefaults = {{
+      radius: 26,
+      blur: 20,
+      minOpacity: 0.46,
+      intensityFloor: 0.015,
+      intensityGamma: 1.22,
+      freshnessFloor: 0.84,
+      freshnessGain: 0.16,
+      greenBias: 0.62,
+      geoRadiusLock: 1,
+      coverageKm: 2.8,
+      blurRatio: 0.78,
+    }};
+    const signalHeatDevKnobBounds = {{
+      radius: [14, 46],
+      blur: [10, 36],
+      minOpacity: [0.04, 0.88],
+      intensityFloor: [0, 0.3],
+      intensityGamma: [0.6, 2.4],
+      freshnessFloor: [0.5, 1],
+      freshnessGain: [0, 0.5],
+      greenBias: [0, 1],
+      geoRadiusLock: [0, 1],
+      coverageKm: [0.25, 24],
+      blurRatio: [0.35, 1.4],
+    }};
     const nodeMarkers = new Map();
     const selectionStorageKey = "meshDashboardSelectedNodeId";
     const favoritesStorageKey = "meshDashboardFavoriteNodeIdsV1";
@@ -43,6 +90,7 @@
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const themeStorageKey = "meshDashboardThemePreference";
+    const signalHeatmapStorageKey = "meshDashboardSignalHeatmapEnabledV1";
     const themeSettingsEndpoint = "/api/settings/theme";
     const themeAcceptedModes = new Set(["auto", "dark", "light"]);
     const chatBottomStickThresholdPx = 28;
@@ -116,6 +164,9 @@
     let themeMediaQuery = null;
     let mapTileLayer = null;
     let mapTileTheme = "";
+    let signalHeatmapEnabled = true;
+    let signalHeatmapLayer = null;
+    let signalHeatDevKnobs = Object.assign({{}}, signalHeatDevKnobDefaults);
     let chatUnreadCount = 0;
     const chatUnreadByChannel = {{ all: 0, direct: 0 }};
     const chatUnreadLatestByChannel = {{ all: "", direct: "" }};
@@ -181,6 +232,357 @@
         requestMapResize();
       }});
       mapResizeObserver.observe(mapFrameElement);
+    }}
+
+    function supportsSignalHeatmap() {{
+      return !!(window.L && typeof L.heatLayer === "function");
+    }}
+
+    function clampUnitInterval(value) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return 0;
+      return Math.max(0, Math.min(1, numeric));
+    }}
+
+    function clampNumber(value, minValue, maxValue, fallbackValue) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return fallbackValue;
+      if (Number.isFinite(minValue) && numeric < minValue) return minValue;
+      if (Number.isFinite(maxValue) && numeric > maxValue) return maxValue;
+      return numeric;
+    }}
+
+    function metersPerPixelAtLatitude(lat, zoom) {{
+      const latRadians = (Number(lat) * Math.PI) / 180;
+      const cosLat = Math.max(0.01, Math.cos(latRadians));
+      const zoomLevel = Number.isFinite(Number(zoom)) ? Number(zoom) : 0;
+      return (156543.03392 * cosLat) / Math.pow(2, zoomLevel);
+    }}
+
+    function sanitizeSignalHeatDevKnobs(raw) {{
+      const next = Object.assign({{}}, signalHeatDevKnobDefaults);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {{
+        return next;
+      }}
+      for (const [name, bounds] of Object.entries(signalHeatDevKnobBounds)) {{
+        if (!Object.prototype.hasOwnProperty.call(raw, name)) continue;
+        const [minValue, maxValue] = bounds;
+        next[name] = clampNumber(raw[name], minValue, maxValue, signalHeatDevKnobDefaults[name]);
+      }}
+      next.freshnessFloor = clampNumber(next.freshnessFloor, 0.4, 1, signalHeatDevKnobDefaults.freshnessFloor);
+      next.freshnessGain = clampNumber(next.freshnessGain, 0, 1 - next.freshnessFloor, signalHeatDevKnobDefaults.freshnessGain);
+      return next;
+    }}
+
+    function parseSignalHeatDevKnobsFromUrl() {{
+      if (!(window.URLSearchParams && window.location && typeof window.location.search === "string")) {{
+        return null;
+      }}
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = {{}};
+      const mapping = [
+        ["radius", "heat_radius"],
+        ["blur", "heat_blur"],
+        ["minOpacity", "heat_min_opacity"],
+        ["intensityFloor", "heat_floor"],
+        ["intensityGamma", "heat_gamma"],
+        ["freshnessFloor", "heat_fresh_floor"],
+        ["freshnessGain", "heat_fresh_gain"],
+        ["greenBias", "heat_green_bias"],
+        ["geoRadiusLock", "heat_geo_lock"],
+        ["coverageKm", "heat_coverage_km"],
+        ["blurRatio", "heat_blur_ratio"],
+      ];
+      for (const [knobName, paramName] of mapping) {{
+        if (!params.has(paramName)) continue;
+        fromUrl[knobName] = params.get(paramName);
+      }}
+      return Object.keys(fromUrl).length > 0 ? fromUrl : null;
+    }}
+
+    function persistSignalHeatDevKnobs() {{
+      try {{
+        window.localStorage.setItem(signalHeatDevKnobsStorageKey, JSON.stringify(signalHeatDevKnobs));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function syncSignalHeatmapAfterKnobChange() {{
+      if (!latestState || !Array.isArray(latestState.nodes)) return;
+      syncSignalHeatmapLayer(latestState.nodes, activeLayoutView === "saved");
+    }}
+
+    function setSignalHeatDevKnobs(overrides, persist = true) {{
+      signalHeatDevKnobs = sanitizeSignalHeatDevKnobs(
+        Object.assign({{}}, signalHeatDevKnobs, overrides || {{}})
+      );
+      if (persist) {{
+        persistSignalHeatDevKnobs();
+      }}
+      syncSignalHeatmapAfterKnobChange();
+      return Object.assign({{}}, signalHeatDevKnobs);
+    }}
+
+    function loadSignalHeatDevKnobs() {{
+      let stored = null;
+      try {{
+        const raw = window.localStorage.getItem(signalHeatDevKnobsStorageKey);
+        if (raw) {{
+          stored = JSON.parse(raw);
+        }}
+      }} catch (_err) {{
+      }}
+      const fromUrl = parseSignalHeatDevKnobsFromUrl();
+      signalHeatDevKnobs = sanitizeSignalHeatDevKnobs(
+        Object.assign({{}}, signalHeatDevKnobDefaults, stored || {{}}, fromUrl || {{}})
+      );
+    }}
+
+    function bindSignalHeatDevApi() {{
+      const api = {{
+        get: () => Object.assign({{}}, signalHeatDevKnobs),
+        set: (overrides = {{}}, persist = true) => setSignalHeatDevKnobs(overrides, !!persist),
+        reset: (persist = true) => {{
+          signalHeatDevKnobs = Object.assign({{}}, signalHeatDevKnobDefaults);
+          if (persist) {{
+            persistSignalHeatDevKnobs();
+          }}
+          syncSignalHeatmapAfterKnobChange();
+          return Object.assign({{}}, signalHeatDevKnobs);
+        }},
+      }};
+      window.meshHeatmapDev = api;
+    }}
+
+    function ensureSignalHeatmapLayer() {{
+      if (!supportsSignalHeatmap()) {{
+        return null;
+      }}
+      if (signalHeatmapLayer) {{
+        return signalHeatmapLayer;
+      }}
+      let pane = map.getPane(signalHeatmapPaneName);
+      if (!pane) {{
+        pane = map.createPane(signalHeatmapPaneName);
+      }}
+      if (pane) {{
+        pane.style.zIndex = "430";
+        pane.style.pointerEvents = "none";
+      }}
+      const initialVisual = {{
+        radius: signalHeatDevKnobs.radius,
+        blur: signalHeatDevKnobs.blur,
+        minOpacity: signalHeatDevKnobs.minOpacity,
+      }};
+      signalHeatmapLayer = L.heatLayer(
+        [],
+        Object.assign({{ pane: signalHeatmapPaneName }}, signalHeatmapLayerOptions, initialVisual)
+      );
+      return signalHeatmapLayer;
+    }}
+
+    function resolveSignalHeatProfile() {{
+      const presetRaw = latestState && latestState.summary
+        ? String(latestState.summary.modem_preset || "")
+        : "";
+      const preset = presetRaw.trim().toUpperCase();
+      if (preset.startsWith("LONG_")) {{
+        return {{
+          snrMin: -16,
+          snrMax: 8,
+          rssiMin: -128,
+          rssiMax: -92,
+          label: preset || "LONG_*",
+        }};
+      }}
+      if (preset.startsWith("SHORT_")) {{
+        return {{
+          snrMin: -10,
+          snrMax: 12,
+          rssiMin: -120,
+          rssiMax: -84,
+          label: preset || "SHORT_*",
+        }};
+      }}
+      if (preset.startsWith("MEDIUM_")) {{
+        return {{
+          snrMin: -12,
+          snrMax: 10,
+          rssiMin: -125,
+          rssiMax: -88,
+          label: preset,
+        }};
+      }}
+      return {{
+        snrMin: signalHeatProfileDefaults.snrMin,
+        snrMax: signalHeatProfileDefaults.snrMax,
+        rssiMin: signalHeatProfileDefaults.rssiMin,
+        rssiMax: signalHeatProfileDefaults.rssiMax,
+        label: preset || "DEFAULT",
+      }};
+    }}
+
+    function normalizeSignalForHeat(rawValue, minValue, maxValue) {{
+      const raw = Number(rawValue);
+      if (!Number.isFinite(raw)) return null;
+      const min = Number(minValue);
+      const max = Number(maxValue);
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
+      const clamped = Math.max(min, Math.min(max, raw));
+      return (clamped - min) / (max - min);
+    }}
+
+    function signalHeatAgeFactor(node, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const heardUnix = nodeLastHeardUnix(node);
+      if (!Number.isFinite(heardUnix) || heardUnix <= 0) {{
+        return 0.45;
+      }}
+      const ageSeconds = Math.max(0, nowUnix - heardUnix);
+      if (ageSeconds <= signalHeatFreshFullSeconds) {{
+        return 1;
+      }}
+      if (ageSeconds >= signalHeatFreshDropSeconds) {{
+        return 0.08;
+      }}
+      const span = signalHeatFreshDropSeconds - signalHeatFreshFullSeconds;
+      if (span <= 0) {{
+        return 0.08;
+      }}
+      const ratio = (ageSeconds - signalHeatFreshFullSeconds) / span;
+      return 1 - (Math.max(0, Math.min(1, ratio)) * 0.92);
+    }}
+
+    function signalHeatWeight(node, profile, nowUnix) {{
+      if (!node || typeof node !== "object") return null;
+      const activeProfile = profile || signalHeatProfileDefaults;
+      const snrWeight = normalizeSignalForHeat(node.snr, activeProfile.snrMin, activeProfile.snrMax);
+      const rssiWeight = normalizeSignalForHeat(node.rssi, activeProfile.rssiMin, activeProfile.rssiMax);
+      let signalWeight = null;
+      if (Number.isFinite(snrWeight) && Number.isFinite(rssiWeight)) {{
+        // Use both when available so intensity reflects the full reported signal context.
+        signalWeight = ((snrWeight * 0.62) + (rssiWeight * 0.38));
+      }} else if (Number.isFinite(snrWeight)) {{
+        signalWeight = snrWeight;
+      }} else if (Number.isFinite(rssiWeight)) {{
+        signalWeight = rssiWeight;
+      }}
+      if (!Number.isFinite(signalWeight)) return null;
+      const ageWeight = signalHeatAgeFactor(node, nowUnix);
+      const greenBiasedSignal = Math.pow(
+        clampUnitInterval(signalWeight),
+        1 + (clampUnitInterval(signalHeatDevKnobs.greenBias) * 0.55)
+      );
+      const freshnessWeight = signalHeatDevKnobs.freshnessFloor + (ageWeight * signalHeatDevKnobs.freshnessGain);
+      return clampUnitInterval(greenBiasedSignal * freshnessWeight);
+    }}
+
+    function collectSignalHeatmapPoints(nodes, profile) {{
+      const points = [];
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const intensityFloor = signalHeatDevKnobs.intensityFloor;
+      for (const node of (nodes || [])) {{
+        const lat = Number(node && node.lat);
+        const lon = Number(node && node.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        const weight = signalHeatWeight(node, profile, nowUnix);
+        if (!Number.isFinite(weight)) continue;
+        const eased = Math.pow(clampUnitInterval(weight), signalHeatDevKnobs.intensityGamma);
+        const intensity = intensityFloor + (eased * (1 - intensityFloor));
+        points.push([lat, lon, Math.max(intensityFloor, Math.min(1, intensity))]);
+      }}
+      return points;
+    }}
+
+    function resolveSignalHeatVisualOptions(pointsCount) {{
+      const geoLocked = signalHeatDevKnobs.geoRadiusLock >= 0.5;
+      const zoom = Number(map.getZoom());
+      const safeCount = Number.isFinite(pointsCount) ? Math.max(0, Math.round(pointsCount)) : 0;
+      let radius = signalHeatDevKnobs.radius;
+      let blur = signalHeatDevKnobs.blur;
+
+      if (geoLocked) {{
+        const center = map.getCenter();
+        const centerLat = center && Number.isFinite(center.lat) ? center.lat : 0;
+        const metersPerPixel = metersPerPixelAtLatitude(centerLat, zoom);
+        const targetMeters = Math.max(100, signalHeatDevKnobs.coverageKm * 1000);
+        radius = clampNumber(Math.round(targetMeters / Math.max(1, metersPerPixel)), 10, 64, signalHeatDevKnobs.radius);
+        blur = clampNumber(Math.round(radius * signalHeatDevKnobs.blurRatio), 8, 54, signalHeatDevKnobs.blur);
+      }} else {{
+        if (safeCount >= 36 || (safeCount >= 24 && zoom >= 11)) {{
+          radius = Math.max(16, radius - 2);
+          blur = Math.max(12, blur - 2);
+        }} else if (safeCount >= 18 || zoom >= 10) {{
+          radius = Math.max(15, radius - 1);
+          blur = Math.max(11, blur - 1);
+        }}
+        if (zoom >= 13) {{
+          radius = Math.max(14, radius - 2);
+          blur = Math.max(10, blur - 2);
+        }}
+      }}
+
+      return {{
+        radius,
+        blur,
+        minOpacity: signalHeatDevKnobs.minOpacity,
+      }};
+    }}
+
+    function updateSignalHeatmapControl(
+      pointsCount = null,
+      supported = supportsSignalHeatmap(),
+      profileLabel = ""
+    ) {{
+      const wrap = document.getElementById("map-heatmap-wrap");
+      const toggle = document.getElementById("map-heatmap-toggle");
+      const inNetworkMapContext = activeLayoutView !== "saved";
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !inNetworkMapContext;
+        wrap.classList.toggle("disabled", !supported);
+        const profileText = profileLabel ? `Tuned for ${{profileLabel}}.` : "";
+        const geoText = signalHeatDevKnobs.geoRadiusLock >= 0.5
+          ? " Coverage is geo-locked (km-stable across zoom/latitude)."
+          : "";
+        const devText = " Dev knobs: window.meshHeatmapDev.get()/set()/reset().";
+        const baseTitle = supported
+          ? `Overlay realtime signal heatmap from positioned nodes, weighted by reported SNR/RSSI. ${{profileText}} Nodes fade after ~40 minutes.${{geoText}}${{devText}}`
+          : "Heatmap overlay is unavailable (leaflet.heat not loaded).";
+        if (Number.isFinite(pointsCount)) {{
+          wrap.title = `${{baseTitle}} Active nodes with signal+position: ${{pointsCount}}.`;
+        }} else {{
+          wrap.title = baseTitle;
+        }}
+      }}
+      if (toggle instanceof HTMLInputElement) {{
+        toggle.checked = signalHeatmapEnabled;
+        toggle.disabled = !supported;
+      }}
+    }}
+
+    function syncSignalHeatmapLayer(nodes, forceHide = false) {{
+      const layer = ensureSignalHeatmapLayer();
+      const profile = resolveSignalHeatProfile();
+      const points = layer ? collectSignalHeatmapPoints(nodes, profile) : [];
+      updateSignalHeatmapControl(points.length, !!layer, profile.label || "");
+      if (!layer) {{
+        return;
+      }}
+      const visual = resolveSignalHeatVisualOptions(points.length);
+      if (typeof layer.setOptions === "function") {{
+        layer.setOptions(visual);
+      }}
+      layer.setLatLngs(points);
+      const shouldShow = !forceHide
+        && activeLayoutView !== "saved"
+        && signalHeatmapEnabled
+        && points.length > 0;
+      if (shouldShow) {{
+        if (!map.hasLayer(layer)) {{
+          layer.addTo(map);
+        }}
+      }} else if (map.hasLayer(layer)) {{
+        map.removeLayer(layer);
+      }}
     }}
 
     function isMapWheelGuardEnabled() {{
@@ -455,6 +857,15 @@
       requestMapResize();
       bindMapContainerObserver();
       bindMapWheelActivation();
+      map.on("zoomend", () => {{
+        const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+        syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+      }});
+      map.on("moveend", () => {{
+        if (signalHeatDevKnobs.geoRadiusLock < 0.5) return;
+        const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+        syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+      }});
     }});
     window.addEventListener("resize", () => {{
       setTimeout(syncMapSize, 120);
@@ -754,6 +1165,44 @@
       }} catch (_err) {{
       }}
       applyThemePreference(stored, false);
+    }}
+
+    function persistSignalHeatmapPreference() {{
+      try {{
+        window.localStorage.setItem(signalHeatmapStorageKey, signalHeatmapEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadSignalHeatmapPreference() {{
+      signalHeatmapEnabled = true;
+      try {{
+        const stored = window.localStorage.getItem(signalHeatmapStorageKey);
+        if (stored === "0") {{
+          signalHeatmapEnabled = false;
+        }} else if (stored === "1") {{
+          signalHeatmapEnabled = true;
+        }}
+      }} catch (_err) {{
+      }}
+      updateSignalHeatmapControl(null, supportsSignalHeatmap());
+    }}
+
+    function bindSignalHeatmapControl() {{
+      const toggle = document.getElementById("map-heatmap-toggle");
+      if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === "1") {{
+        return;
+      }}
+      toggle.dataset.bound = "1";
+      toggle.checked = signalHeatmapEnabled;
+      toggle.addEventListener("change", () => {{
+        signalHeatmapEnabled = !!toggle.checked;
+        persistSignalHeatmapPreference();
+        const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+        syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+      }});
+      const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+      syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
     }}
 
     function getChatScroller() {{
@@ -2067,6 +2516,8 @@
           mapTitle.textContent = isSelectableNodeId(selectedNodeId) ? "Selected Node Map" : "Network Map";
         }}
       }}
+      const mapNodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+      syncSignalHeatmapLayer(mapNodes, next === "saved");
       setMapWheelZoomActive(next === "network" || next === "saved");
       if (chatPanelOpen) {{
         if (activeWheelPane instanceof HTMLElement) {{
@@ -3227,8 +3678,10 @@
     }}
 
     function renderMap(nodes, edges, nodeHistory = null) {{
+      const hideHeatmap = activeLayoutView === "saved";
       const signature = buildMapSignature(nodes, edges, nodeHistory);
       if (signature === lastMapSignature) {{
+        syncSignalHeatmapLayer(nodes, hideHeatmap);
         updateMapSelection(false);
         return;
       }}
@@ -3243,6 +3696,7 @@
       const selectionMode = isSelectableNodeId(selectedNodeId);
       const savedSelectionMode = selectionMode && activeLayoutView === "saved";
       const networkSelectionMode = selectionMode && activeLayoutView === "network";
+      syncSignalHeatmapLayer(nodes, hideHeatmap);
       const mapTitle = document.getElementById("map-card-title");
       if (mapTitle) {{
         if (activeLayoutView === "saved") {{
@@ -3348,6 +3802,7 @@
             ${{selectedNodeIdNormalized || selectedNode.id}}<br/>
             Num: ${{selectedNode.num ?? "n/a"}}<br/>
             SNR: ${{selectedNode.snr ?? "n/a"}}<br/>
+            RSSI: ${{selectedNode.rssi ?? "n/a"}}<br/>
             Last: ${{selectedNode.last_heard || "n/a"}}<br/>
             Trail points: ${{trailPointsCount}}<br/>
             Trail latest: ${{trailLast}}
@@ -3390,6 +3845,7 @@
           ${{normalizedId || node.id}}<br/>
           Num: ${{node.num ?? "n/a"}}<br/>
           SNR: ${{node.snr ?? "n/a"}}<br/>
+          RSSI: ${{node.rssi ?? "n/a"}}<br/>
           Last: ${{node.last_heard || "n/a"}}
         `);
         marker.on("click", () => {{
@@ -5640,6 +6096,8 @@
     loadNetworkNodesSplitState();
     loadSavedNodeSplitState();
     loadSavedNodeHistorySplitState();
+    loadSignalHeatDevKnobs();
+    loadSignalHeatmapPreference();
     loadLayoutView();
     loadChatChannel();
     loadThemePreference();
@@ -5658,6 +6116,8 @@
     bindChatComposer();
     bindThemeToggle();
     bindThemePresetSelector();
+    bindSignalHeatDevApi();
+    bindSignalHeatmapControl();
     bindKnownNodesMetricControl();
     bindChatAutoScroll();
     bindHistoryTabs();

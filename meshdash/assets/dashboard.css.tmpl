@@ -404,6 +404,57 @@
       border-bottom: 1px solid #d2e1d0;
       background: #edf6ec;
     }}
+    .map-card-head {{
+      margin: 0;
+      padding: 8px 10px 7px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-bottom: 1px solid #d2e1d0;
+      background: #edf6ec;
+    }}
+    .map-card-head h2 {{
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15px;
+      text-transform: uppercase;
+      color: #274935;
+      border: 0;
+      background: transparent;
+      padding: 0;
+    }}
+    .map-heatmap-wrap {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #bfd4c3;
+      border-radius: 999px;
+      background: #f7fcf7;
+      color: #274935;
+      padding: 2px 9px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1px;
+      line-height: 1.2;
+      user-select: none;
+      white-space: nowrap;
+    }}
+    .map-heatmap-wrap input {{
+      margin: 0;
+      width: 12px;
+      height: 12px;
+      accent-color: #2f855a;
+      cursor: pointer;
+    }}
+    .map-heatmap-wrap.disabled {{
+      opacity: 0.65;
+      cursor: not-allowed;
+    }}
+    .map-heatmap-wrap.disabled input {{
+      cursor: not-allowed;
+    }}
     .card.chat {{
       border: 1px solid #c6d6c0;
       background: #f6fbf5;
@@ -3420,6 +3471,24 @@
     [data-theme="dark"] .leaflet-popup-tip {{
       background: #1b2430;
       color: var(--ui-text);
+    }}
+    [data-theme="dark"] .map-card-head {{
+      background: #121c16;
+      border-bottom-color: #2b4336;
+    }}
+    [data-theme="dark"] .map-card-head h2 {{
+      color: #d8efe0;
+      border: 0;
+      background: transparent;
+      padding: 0;
+    }}
+    [data-theme="dark"] .map-heatmap-wrap {{
+      background: #16231d;
+      border-color: #355343;
+      color: #cbe8d7;
+    }}
+    [data-theme="dark"] .map-heatmap-wrap input {{
+      accent-color: #5aa878;
     }}
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .card.chat .chat-compose-shell {{
