@@ -22,9 +22,15 @@ from .history_read_history import (
     load_node_history_data as _load_node_history_data_helper,
     load_online_activity_data as _load_online_activity_data_helper,
 )
+from .history_store_runtime_contracts import HistoryStoreReadState
 
 
-def load_node_history(store: object, node_id: str, window_hours: int, max_points: int) -> dict[str, object]:
+def load_node_history(
+    store: HistoryStoreReadState,
+    node_id: str,
+    window_hours: int,
+    max_points: int,
+) -> dict[str, object]:
     with store._lock:
         return _load_node_history_data_helper(
             store._conn,
@@ -37,7 +43,7 @@ def load_node_history(store: object, node_id: str, window_hours: int, max_points
         )
 
 
-def load_online_activity(store: object, window_hours: int) -> dict[str, object]:
+def load_online_activity(store: HistoryStoreReadState, window_hours: int) -> dict[str, object]:
     with store._lock:
         return _load_online_activity_data_helper(
             store._conn,
@@ -48,7 +54,7 @@ def load_online_activity(store: object, window_hours: int) -> dict[str, object]:
         )
 
 
-def load_node_saved_counts(store: object) -> dict[str, dict[str, object]]:
+def load_node_saved_counts(store: HistoryStoreReadState) -> dict[str, dict[str, object]]:
     with store._lock:
         return _load_node_saved_counts_data_helper(
             store._conn,
@@ -57,7 +63,7 @@ def load_node_saved_counts(store: object) -> dict[str, dict[str, object]]:
         )
 
 
-def load_node_capabilities(store: object) -> dict[str, dict[str, object]]:
+def load_node_capabilities(store: HistoryStoreReadState) -> dict[str, dict[str, object]]:
     with store._lock:
         return _load_node_capabilities_data_helper(
             store._conn,

@@ -12,12 +12,16 @@ from .history_read_api import (
 from .history_readers import (
     decode_recent_packets_rows as _decode_recent_packets_rows_helper,
 )
+from .history_store_runtime_contracts import (
+    HistoryStoreReadState,
+    HistoryStoreWriteState,
+)
 from .history_writes import (
     save_packet_event_and_rollups as _save_packet_event_and_rollups_helper,
 )
 
 
-def load_recent_packets(store: object, limit: int) -> list[dict[str, object]]:
+def load_recent_packets(store: HistoryStoreReadState, limit: int) -> list[dict[str, object]]:
     with store._lock:
         return _load_recent_packets_data_helper(
             store._conn,
@@ -27,7 +31,7 @@ def load_recent_packets(store: object, limit: int) -> list[dict[str, object]]:
         )
 
 
-def save_packet(store: object, packet_entry: dict[str, object]) -> None:
+def save_packet(store: HistoryStoreWriteState, packet_entry: dict[str, object]) -> None:
     with store._lock:
         _save_packet_record_helper(
             store._conn,

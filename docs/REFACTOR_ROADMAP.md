@@ -165,6 +165,10 @@ Break `HistoryStore` into smaller repositories.
 - Kept `history_store_reads.py` and `history_store_writes.py` as explicit compatibility facades:
   - documented as legacy import surfaces for existing callers
   - added direct tests confirming facade exports remain identity re-exports of domain modules.
+- Added minimal history-store IO protocols in `meshdash/history_store_runtime_contracts.py`:
+  - `HistoryStoreReadState` (`_lock`, `_conn`)
+  - `HistoryStoreWriteState` (`_lock`, `_conn`, `_maybe_prune_unlocked()`)
+  - applied those contracts across `history_store_packets.py`, `history_store_chat.py`, `history_store_connections.py`, and `history_store_nodes.py`.
 - Added targeted tests:
   - `tests/test_history_store_runtime_init.py`
   - `tests/test_history_store_runtime_maintenance.py`

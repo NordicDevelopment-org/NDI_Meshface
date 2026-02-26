@@ -12,9 +12,13 @@ from .history_read_api import (
 from .history_readers import (
     decode_recent_chat_rows as _decode_recent_chat_rows_helper,
 )
+from .history_store_runtime_contracts import (
+    HistoryStoreReadState,
+    HistoryStoreWriteState,
+)
 
 
-def load_recent_chat(store: object, limit: int) -> list[dict[str, object]]:
+def load_recent_chat(store: HistoryStoreReadState, limit: int) -> list[dict[str, object]]:
     with store._lock:
         return _load_recent_chat_data_helper(
             store._conn,
@@ -24,7 +28,7 @@ def load_recent_chat(store: object, limit: int) -> list[dict[str, object]]:
         )
 
 
-def save_chat(store: object, chat_entry: dict[str, object]) -> None:
+def save_chat(store: HistoryStoreWriteState, chat_entry: dict[str, object]) -> None:
     with store._lock:
         _save_chat_record_helper(store._conn, chat_entry, now_unix_fn=time.time)
         store._maybe_prune_unlocked()

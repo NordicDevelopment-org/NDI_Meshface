@@ -13,9 +13,13 @@ from .history_read_api import (
 from .history_readers import (
     decode_connections_rows as _decode_connections_rows_helper,
 )
+from .history_store_runtime_contracts import (
+    HistoryStoreReadState,
+    HistoryStoreWriteState,
+)
 
 
-def load_connections(store: object) -> list[dict[str, object]]:
+def load_connections(store: HistoryStoreReadState) -> list[dict[str, object]]:
     with store._lock:
         return _load_connections_data_helper(
             store._conn,
@@ -25,7 +29,7 @@ def load_connections(store: object) -> list[dict[str, object]]:
 
 
 def save_connection_event(
-    store: object,
+    store: HistoryStoreWriteState,
     *,
     from_id: str,
     to_id: str,

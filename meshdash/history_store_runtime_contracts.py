@@ -12,7 +12,17 @@ class HistoryStoreLock(Protocol):
         ...
 
 
-class HistoryStoreRuntimeState(Protocol):
+class HistoryStoreReadState(Protocol):
+    _lock: HistoryStoreLock
+    _conn: SqlConnection
+
+
+class HistoryStoreWriteState(HistoryStoreReadState, Protocol):
+    def _maybe_prune_unlocked(self) -> None:
+        ...
+
+
+class HistoryStoreRuntimeState(HistoryStoreWriteState, Protocol):
     db_path: str
     _policy: HistoryStorePolicy | None
     max_rows: int
@@ -21,8 +31,6 @@ class HistoryStoreRuntimeState(Protocol):
     event_retention_seconds: int
     rollup_retention_seconds: int
     _writes_since_prune: int
-    _lock: HistoryStoreLock
-    _conn: SqlConnection
 
 
 class BuildHistoryStorePolicyFn(Protocol):
