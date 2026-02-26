@@ -162,6 +162,9 @@ Break `HistoryStore` into smaller repositories.
   - `meshdash/history/db.py` re-exporting schema + history-connection open/prune APIs
   - `meshdash/history/__init__.py` exposing DB entrypoints at package boundary
   - runtime history init/maintenance now import connection/prune helpers through the namespace facade.
+- Kept `history_store_reads.py` and `history_store_writes.py` as explicit compatibility facades:
+  - documented as legacy import surfaces for existing callers
+  - added direct tests confirming facade exports remain identity re-exports of domain modules.
 - Added targeted tests:
   - `tests/test_history_store_runtime_init.py`
   - `tests/test_history_store_runtime_maintenance.py`
@@ -173,12 +176,12 @@ Break `HistoryStore` into smaller repositories.
   - shared SQL execution protocols in `meshdash/sql_contracts.py` and adoption across history read/write modules to reduce duplicate SQL typing contracts.
   - centralized history runtime store/lock/prune protocol contracts in `meshdash/history_store_runtime_contracts.py` with `history_store_runtime_init.py` and `history_store_runtime_maintenance.py` now consuming the shared contracts.
   - `tests/test_history_db_namespace.py` coverage for namespace export and round-trip open/prune behavior.
+  - `tests/test_history_store_compat_facades.py` coverage for read/write compatibility-facade exports.
 
 ### Steps
 
-1. Decide whether to deprecate/keep `history_store_reads.py` and `history_store_writes.py` compatibility facades.
-2. Continue routing history modules through `meshdash/history/db.py` namespace where it reduces import sprawl.
-3. Add tighter tests around node-history and online-activity domain wrappers.
+1. Continue routing history modules through `meshdash/history/db.py` namespace where it reduces import sprawl.
+2. Add tighter tests around node-history and online-activity domain wrappers.
 
 ### Exit criteria
 

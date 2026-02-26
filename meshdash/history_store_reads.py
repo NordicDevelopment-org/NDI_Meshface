@@ -1,3 +1,10 @@
+"""Compatibility facade for legacy read imports.
+
+New code should prefer domain modules (`history_store_packets`, `history_store_chat`,
+`history_store_connections`, `history_store_nodes`), but this module is retained to
+avoid import churn for existing callers.
+"""
+
 from .history_store_chat import load_recent_chat
 from .history_store_connections import load_connections
 from .history_store_nodes import (
