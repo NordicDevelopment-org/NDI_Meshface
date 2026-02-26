@@ -55,8 +55,6 @@ BuildPacketSummaryFn = Callable[..., TrackerPacket]
 BuildChatEntryFromPacketFn = Callable[..., Optional[TrackerPacket]]
 BuildTrackerPacketArtifactsFn = Callable[..., tuple[TrackerPacket, Optional[TrackerPacket]]]
 ApplyTrackerStorageUpdatesFn = Callable[..., None]
-ParseTrackerPacketFn = Callable[..., TrackerParsedPacket]
-ProcessParsedTrackerPacketFn = Callable[..., None]
 GetNodeIdFromNumFn = Callable[[object, object], Optional[str]]
 CalculateHopsFn = Callable[[object, object], Optional[int]]
 ExtractPacketPositionFn = Callable[[TrackerPacket], Optional[TrackerPacket]]
@@ -124,6 +122,54 @@ class ApplyTrackerObservationFn(Protocol):
         set_delivery_state_fn: SetDeliveryStateFn,
         record_direct_edge_observation_fn: RecordDirectEdgeObservationFn,
     ) -> DirectEdgeKey:
+        ...
+
+
+class ParseTrackerPacketFn(Protocol):
+    def __call__(
+        self,
+        packet: TrackerPacket,
+        interface: object,
+        *,
+        get_node_id_from_num_fn: GetNodeIdFromNumFn,
+        to_int_fn: ToIntFn,
+        calculate_hops_fn: CalculateHopsFn,
+        extract_packet_position_fn: ExtractPacketPositionFn,
+        extract_packet_battery_level_fn: ExtractPacketBatteryLevelFn,
+        extract_reply_id_fn: ExtractReplyIdFn,
+        extract_emoji_codepoint_fn: ExtractEmojiCodepointFn,
+        emoji_from_codepoint_fn: EmojiFromCodepointFn,
+    ) -> TrackerParsedPacket:
+        ...
+
+
+class ProcessParsedTrackerPacketFn(Protocol):
+    def __call__(
+        self,
+        *,
+        packet: TrackerPacket,
+        parsed: TrackerParsedPacket,
+        include_live_count: bool,
+        session_edges: TrackerEdgeMap,
+        historical_edges: TrackerEdgeMap,
+        port_counts: MutableMapping[str, int],
+        apply_tracker_observation_fn: ApplyTrackerObservationFn,
+        apply_routing_delivery_update_fn: ApplyRoutingDeliveryUpdateFn,
+        extract_update_fn: ExtractDeliveryUpdateFn,
+        set_delivery_state_fn: SetDeliveryStateFn,
+        record_direct_edge_observation_fn: RecordDirectEdgeObservationFn,
+        build_tracker_packet_artifacts_fn: BuildTrackerPacketArtifactsFn,
+        build_packet_summary_fn: BuildPacketSummaryFn,
+        build_chat_entry_from_packet_fn: BuildChatEntryFromPacketFn,
+        utc_now_fn: UtcNowFn,
+        format_epoch_fn: FormatEpochFn,
+        to_int_fn: ToIntFn,
+        to_jsonable_fn: ToJsonableFn,
+        apply_tracker_storage_updates_fn: ApplyTrackerStorageUpdatesFn,
+        recent_packets: object,
+        recent_chat: object,
+        history_store: object,
+    ) -> None:
         ...
 
 

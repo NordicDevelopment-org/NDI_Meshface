@@ -316,6 +316,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
 - Added send-path protocol contracts in `meshdash/send_chat_contracts.py` and applied them through `runtime_send_contracts.py`, `runtime_send_dependencies.py`, `runtime_send_loader.py`, and `services_chat.py` so send interface/lock dependency boundaries are explicitly typed.
 - Tightened tracker receive/record runtime callback contracts in `meshdash/runtime_types.py` by replacing broad callback aliases with explicit protocol signatures for packet recorders, receive dispatch, and node-id resolution callbacks.
 - Tightened tracker observation/delivery callback contracts in `meshdash/runtime_types.py` with explicit protocol signatures for delivery-update extraction, delivery-state updates, routing-delivery application, and direct-edge observation callbacks; applied those shared contracts in `tracker_observation.py` and `tracker_delivery.py`.
+- Tightened tracker parse/process callback contracts in `meshdash/runtime_types.py` with explicit protocol signatures for packet parsing and parsed-packet processing collaborators used by receive/runtime record wiring.
 - Removed the receive-path legacy dependency dict shim by adding `record_tracker_packet_unlocked_from_dependencies(...)` in `meshdash/tracker_runtime_receive_dependencies.py`; `tracker_runtime_receive.py` now forwards typed dependency objects directly to legacy callbacks.
 - Added typed tracker packet-ingest dependency contract:
   - `TrackerPacketRuntimeDependencies` in `meshdash/tracker_runtime_packet_contracts.py`
