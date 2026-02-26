@@ -375,7 +375,7 @@ Reduce string-key coupling between runtime builders and orchestration modules.
   - `tracker_runtime_receive_dependencies.py` now centralizes dependency assembly and legacy kwargs mapping for receive-path compatibility.
   - `tracker_runtime_record_dependencies.py` now centralizes legacy-arg to typed-dependency mapping for tracker record compatibility.
   - existing `record_tracker_packet_unlocked(...)` preserved as compatibility wrapper.
-- `tracker_runtime_receive.record_tracker_receive_unlocked(...)` now expires pending deliveries in a `finally` block so receive-path expiration is guaranteed even when injected packet-record callbacks raise.
+- `tracker_runtime_receive.record_tracker_receive_unlocked(...)` now expires pending deliveries in a `finally` block so receive-path expiration is guaranteed even when dependency assembly or injected packet-record callbacks raise.
 - Added typed chat-send runtime dependency contract:
   - `SendChatRuntimeDependencies` in `meshdash/runtime_send_contracts.py`
   - `build_send_chat_runtime_dependencies_from_legacy_args(...)` in `meshdash/runtime_send_dependencies.py`

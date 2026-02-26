@@ -246,3 +246,37 @@ def test_record_tracker_receive_unlocked_expires_when_typed_record_path_raises()
         )
 
     assert observed["expired"] is True
+
+
+def test_record_tracker_receive_unlocked_expires_when_dependency_build_raises():
+    observed = {}
+
+    def _expire(self):
+        observed["expired"] = True
+
+    tracker = type(
+        "_Tracker",
+        (),
+        {
+            "edges": {"edge": 1},
+            "_historical_edges": {"historical": 2},
+            "port_counts": Counter(),
+            "recent_packets": deque(maxlen=8),
+            "recent_chat": deque(maxlen=8),
+            # Intentionally missing `_history_store` to force dependency build failure.
+            "_extract_delivery_update_fn": "extract-delivery",
+            "_set_delivery_state_fn": "set-delivery",
+            "_expire_pending_deliveries_fn": _expire,
+        },
+    )()
+
+    with pytest.raises(AttributeError):
+        record_tracker_receive_unlocked(
+            tracker,
+            packet={"id": 3},
+            interface=object(),
+            include_live_count=True,
+            get_node_id_from_num_fn=object(),
+        )
+
+    assert observed["expired"] is True
