@@ -90,6 +90,9 @@ Separate state assembly from HTTP wiring.
 - State service now guards collaborator failures in local-state and saved-count merge paths:
   - catches raised exceptions from injected `collect_local_state_safe_fn`, `modem_preset_from_local_state_fn`, and `apply_node_saved_counts_fn`
   - preserves response payload shape with `local_state_error`, `tracker_saved_counts_error`, and safe modem-preset fallback.
+- State service now validates collaborator return shapes for local-state and summary payload builders:
+  - non-mapping `local_state` returns now degrade to `{}` with explicit `local_state_error`
+  - non-mapping summary returns now trigger `summary_error` and use typed fallback summary payload.
 - Added typed state payload contracts in `meshdash/state_payload_contracts.py`:
   - `StateTrafficPayload` and `DashboardStatePayload` with dict conversion at API boundary
   - compatibility coercion helpers for mapping-shaped callers.

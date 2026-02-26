@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Dict, Optional
 
 from .revision import RevisionInfo, coerce_revision_info
@@ -130,6 +131,13 @@ def build_dashboard_state_typed(
     except Exception as exc:
         local_state, local_error = {}, str(exc)
 
+    if not isinstance(local_state, Mapping):
+        local_state = {}
+        if local_error is None:
+            local_error = "Expected local_state mapping from collect_local_state_safe_fn"
+    elif not isinstance(local_state, dict):
+        local_state = dict(local_state)
+
     modem_preset: Optional[str]
     try:
         modem_preset = modem_preset_from_local_state_fn(local_state)
@@ -149,6 +157,10 @@ def build_dashboard_state_typed(
             revision_info=revision_info,
             modem_preset=modem_preset,
         )
+        if not isinstance(summary, Mapping):
+            raise TypeError("Expected summary payload mapping from build_summary_payload_fn")
+        if not isinstance(summary, dict):
+            summary = dict(summary)
     except Exception as exc:
         summary_error = str(exc)
         summary = _build_summary_payload_fallback(
