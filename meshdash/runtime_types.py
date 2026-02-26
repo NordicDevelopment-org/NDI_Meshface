@@ -1,3 +1,4 @@
+from collections.abc import MutableMapping
 from typing import TYPE_CHECKING, Callable, Optional, Protocol
 
 from .revision import RevisionInfo
@@ -50,12 +51,6 @@ TrackerParsedPacket = dict[str, object]
 TrackerEdgeMap = dict[object, dict[str, object]]
 DirectEdgeKey = Optional[tuple[str, str]]
 
-ExtractDeliveryUpdateFn = Callable[..., object]
-SetDeliveryStateFn = Callable[..., None]
-ApplyTrackerObservationFn = Callable[..., DirectEdgeKey]
-ApplyRoutingDeliveryUpdateFn = Callable[..., object]
-RecordDirectEdgeObservationFn = Callable[..., object]
-
 BuildPacketSummaryFn = Callable[..., TrackerPacket]
 BuildChatEntryFromPacketFn = Callable[..., Optional[TrackerPacket]]
 BuildTrackerPacketArtifactsFn = Callable[..., tuple[TrackerPacket, Optional[TrackerPacket]]]
@@ -71,6 +66,65 @@ ExtractEmojiCodepointFn = Callable[[object], Optional[int]]
 EmojiFromCodepointFn = Callable[[Optional[int]], Optional[str]]
 FormatEpochFn = Callable[[object], str]
 ToJsonableFn = Callable[[object], object]
+
+
+class ExtractDeliveryUpdateFn(Protocol):
+    def __call__(self, decoded: object) -> Optional[dict[str, object]]:
+        ...
+
+
+class SetDeliveryStateFn(Protocol):
+    def __call__(
+        self,
+        message_id: object,
+        state: str,
+        error: Optional[str] = None,
+    ) -> bool:
+        ...
+
+
+class ApplyRoutingDeliveryUpdateFn(Protocol):
+    def __call__(
+        self,
+        decoded: object,
+        *,
+        extract_update_fn: ExtractDeliveryUpdateFn,
+        set_delivery_state_fn: SetDeliveryStateFn,
+    ) -> bool:
+        ...
+
+
+class RecordDirectEdgeObservationFn(Protocol):
+    def __call__(
+        self,
+        *,
+        session_edges: TrackerEdgeMap,
+        historical_edges: TrackerEdgeMap,
+        from_id: object,
+        to_id: object,
+        rx_time: Optional[int],
+        portnum: Optional[object],
+        hops: Optional[int],
+        include_live_count: bool,
+    ) -> DirectEdgeKey:
+        ...
+
+
+class ApplyTrackerObservationFn(Protocol):
+    def __call__(
+        self,
+        *,
+        parsed: TrackerParsedPacket,
+        include_live_count: bool,
+        session_edges: TrackerEdgeMap,
+        historical_edges: TrackerEdgeMap,
+        port_counts: MutableMapping[str, int],
+        apply_routing_delivery_update_fn: ApplyRoutingDeliveryUpdateFn,
+        extract_update_fn: ExtractDeliveryUpdateFn,
+        set_delivery_state_fn: SetDeliveryStateFn,
+        record_direct_edge_observation_fn: RecordDirectEdgeObservationFn,
+    ) -> DirectEdgeKey:
+        ...
 
 
 class RecordTrackerPacketUnlockedFn(Protocol):

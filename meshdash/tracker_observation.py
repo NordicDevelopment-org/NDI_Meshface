@@ -1,21 +1,28 @@
 from collections.abc import MutableMapping
-from typing import Callable, Optional
 
-from .tracker_snapshot_build_contracts import EdgeKey, EdgeRow
+from .runtime_types import (
+    ApplyRoutingDeliveryUpdateFn,
+    DirectEdgeKey,
+    ExtractDeliveryUpdateFn,
+    RecordDirectEdgeObservationFn,
+    SetDeliveryStateFn,
+    TrackerEdgeMap,
+    TrackerParsedPacket,
+)
 
 
 def apply_tracker_observation(
     *,
-    parsed: dict[str, object],
+    parsed: TrackerParsedPacket,
     include_live_count: bool,
-    session_edges: dict[EdgeKey, EdgeRow],
-    historical_edges: dict[EdgeKey, EdgeRow],
+    session_edges: TrackerEdgeMap,
+    historical_edges: TrackerEdgeMap,
     port_counts: MutableMapping[str, int],
-    apply_routing_delivery_update_fn: Callable[..., object],
-    extract_update_fn: object,
-    set_delivery_state_fn: object,
-    record_direct_edge_observation_fn: Callable[..., Optional[EdgeKey]],
-) -> Optional[EdgeKey]:
+    apply_routing_delivery_update_fn: ApplyRoutingDeliveryUpdateFn,
+    extract_update_fn: ExtractDeliveryUpdateFn,
+    set_delivery_state_fn: SetDeliveryStateFn,
+    record_direct_edge_observation_fn: RecordDirectEdgeObservationFn,
+) -> DirectEdgeKey:
     decoded = parsed["decoded"]
     from_id = parsed["from_id"]
     to_id = parsed["to_id"]
