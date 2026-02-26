@@ -20,18 +20,8 @@ RevisionInfoFn = Callable[[], RevisionInfo]
 
 StatePayload = DashboardStatePayload | dict[str, object]
 
-BuildStateFn = Callable[..., StatePayload]
-BuildNodeHistoryLoaderFn = Callable[..., Callable[..., dict]]
-BuildOnlineActivityLoaderFn = Callable[..., Callable[..., dict]]
-BuildSendChatLoaderFn = Callable[..., Callable[..., dict]]
-BuildStateSnapshotLoaderFn = Callable[..., Callable[[], dict]]
-
-SendChatMessageFn = Callable[..., dict]
-SendReactionPacketFn = Callable[..., object]
-RawGetLocalNodeIdFn = Callable[..., str]
 GetLocalNodeIdFn = Callable[[object], str]
 LocalNodeIdFn = Callable[[], str]
-RecordLocalChatFn = Callable[..., None]
 
 NormalizeSingleEmojiFn = Callable[[object], tuple[Optional[str], Optional[int]]]
 ToIntFn = Callable[[object], Optional[int]]
@@ -122,6 +112,178 @@ ExtractEmojiCodepointFn = Callable[[object], Optional[int]]
 EmojiFromCodepointFn = Callable[[Optional[int]], Optional[str]]
 FormatEpochFn = Callable[[object], str]
 ToJsonableFn = Callable[[object], object]
+
+
+class RawGetLocalNodeIdFn(Protocol):
+    def __call__(
+        self,
+        iface: object,
+        *,
+        meshtastic_module: object,
+        to_jsonable_fn: ToJsonableFn,
+        to_int_fn: ToIntFn,
+    ) -> str:
+        ...
+
+
+class RecordLocalChatFn(Protocol):
+    def __call__(
+        self,
+        *,
+        text: str,
+        from_id: str = "local",
+        to_id: str = "^all",
+        channel_index: int = 0,
+        message_id: Optional[int] = None,
+        reply_id: Optional[int] = None,
+        emoji: Optional[str] = None,
+        emoji_codepoint: Optional[int] = None,
+        is_reaction: bool = False,
+        ack_requested: bool = False,
+        retry_of: Optional[int] = None,
+    ) -> None:
+        ...
+
+
+class SendReactionPacketFn(Protocol):
+    def __call__(
+        self,
+        *,
+        iface: object,
+        destination_id: str,
+        channel_index: int,
+        reply_id: int,
+        emoji_codepoint: int,
+        emoji_text: str,
+        want_ack: bool,
+    ) -> object:
+        ...
+
+
+class SendReactionPacketWithModulesFn(Protocol):
+    def __call__(
+        self,
+        *,
+        iface: object,
+        destination_id: str,
+        channel_index: int,
+        reply_id: int,
+        emoji_codepoint: int,
+        emoji_text: str,
+        want_ack: bool,
+        mesh_pb2_module: object,
+        portnums_pb2_module: object,
+    ) -> object:
+        ...
+
+
+class SendChatMessageFn(Protocol):
+    def __call__(
+        self,
+        *,
+        text: object,
+        destination: object = None,
+        channel_index: Optional[int] = None,
+        reply_id: Optional[int] = None,
+        retry_of: Optional[int] = None,
+        emoji: object = None,
+        iface: object,
+        send_lock: object,
+        send_reaction_packet_fn: SendReactionPacketFn,
+        local_node_id_fn: LocalNodeIdFn,
+        record_local_chat_fn: RecordLocalChatFn,
+        chat_max_bytes: int,
+        normalize_single_emoji_fn: NormalizeSingleEmojiFn,
+        to_int_fn: ToIntFn,
+        now_text_fn: UtcNowFn,
+    ) -> dict[str, object]:
+        ...
+
+
+class BuildStateWithSensitiveFn(Protocol):
+    def __call__(
+        self,
+        *,
+        iface: object,
+        tracker: object,
+        started_at: float,
+        target: str,
+        show_secrets: bool,
+        storage_probe_path: Optional[str],
+        revision_info: object,
+        sensitive_field_names: set[str],
+    ) -> StatePayload:
+        ...
+
+
+class BuildStateFn(Protocol):
+    def __call__(
+        self,
+        *,
+        iface: object,
+        tracker: object,
+        started_at: float,
+        target: str,
+        show_secrets: bool,
+        storage_probe_path: Optional[str],
+        revision_info: object,
+    ) -> StatePayload:
+        ...
+
+
+class BuildStateSnapshotLoaderFn(Protocol):
+    def __call__(
+        self,
+        *,
+        iface: object,
+        tracker: object,
+        started_at: float,
+        target: str,
+        show_secrets: bool,
+        storage_probe_path: Optional[str],
+        revision_info: RevisionInfo,
+        build_state_fn: BuildStateFn,
+    ) -> StateFn:
+        ...
+
+
+class BuildNodeHistoryLoaderFn(Protocol):
+    def __call__(
+        self,
+        history_store: object | None,
+        *,
+        default_hours: int,
+        default_points: int,
+    ) -> NodeHistoryFn:
+        ...
+
+
+class BuildOnlineActivityLoaderFn(Protocol):
+    def __call__(
+        self,
+        history_store: object | None,
+        *,
+        default_hours: int,
+    ) -> OnlineActivityFn:
+        ...
+
+
+class BuildSendChatLoaderFn(Protocol):
+    def __call__(
+        self,
+        *,
+        iface: object,
+        tracker: object,
+        send_lock: object,
+        send_chat_message_fn: SendChatMessageFn,
+        send_reaction_packet_fn: SendReactionPacketFn,
+        get_local_node_id_fn: GetLocalNodeIdFn,
+        chat_max_bytes: int,
+        normalize_single_emoji_fn: NormalizeSingleEmojiFn,
+        to_int_fn: ToIntFn,
+        utc_now_fn: UtcNowFn,
+    ) -> SendChatFn:
+        ...
 
 
 class BuildPacketSummaryFn(Protocol):

@@ -1,5 +1,6 @@
 from .runtime_types import (
     BuildStateFn,
+    BuildStateWithSensitiveFn,
     GetLocalNodeIdFn,
     MakeHttpHandlerFn,
     NodeHistoryFn,
@@ -7,6 +8,7 @@ from .runtime_types import (
     RawGetLocalNodeIdFn,
     SendChatFn,
     SendReactionPacketFn,
+    SendReactionPacketWithModulesFn,
     StateFn,
     ToIntFn,
     ToJsonableFn,
@@ -15,7 +17,7 @@ from .runtime_types import (
 
 def build_state_builder(
     *,
-    build_state_fn: BuildStateFn,
+    build_state_fn: BuildStateWithSensitiveFn,
     sensitive_field_names: set[str],
 ) -> BuildStateFn:
     def state_with_sensitive_fields(**kwargs: object) -> dict[str, object]:
@@ -29,7 +31,7 @@ def build_state_builder(
 
 def build_reaction_sender(
     *,
-    send_emoji_reaction_packet_fn: SendReactionPacketFn,
+    send_emoji_reaction_packet_fn: SendReactionPacketWithModulesFn,
     mesh_pb2_module: object,
     portnums_pb2_module: object,
 ) -> SendReactionPacketFn:
