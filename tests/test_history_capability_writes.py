@@ -1,7 +1,7 @@
 import sqlite3
 
 from meshdash.history_capability_writes import upsert_node_capability
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def test_upsert_node_capability_inserts_new_node():

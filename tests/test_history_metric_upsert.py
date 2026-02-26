@@ -2,7 +2,7 @@ import sqlite3
 
 from meshdash.history_metric_rows import build_metric_rollup_values, merge_metric_rollup_row
 from meshdash.history_metric_upsert import upsert_metric_rollup_row
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def test_upsert_metric_rollup_row_handles_node_metric_insert_and_merge():

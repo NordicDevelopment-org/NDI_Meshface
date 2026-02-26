@@ -1,7 +1,7 @@
 import sqlite3
 
 from meshdash.history_metric_writes import upsert_link_metric, upsert_node_metric
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def test_upsert_node_metric_inserts_and_merges_existing_bucket():

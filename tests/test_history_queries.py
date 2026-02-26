@@ -9,7 +9,7 @@ from meshdash.history_queries import (
     fetch_recent_chat_rows,
     fetch_recent_packet_rows,
 )
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def _insert_metric(conn, bucket_unix, node_id, packet_count, last_seen_unix):

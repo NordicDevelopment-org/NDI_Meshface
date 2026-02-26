@@ -1,4 +1,4 @@
-from meshdash.history_store_connection import (
+from meshdash.history.db import (
     open_and_initialize_history_connection,
     open_and_initialize_history_connection_with_policy,
     prune_history_connection,

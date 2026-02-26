@@ -1,7 +1,7 @@
 import sqlite3
 
 from meshdash.history_positions import insert_node_position_if_changed
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def test_insert_node_position_if_changed_inserts_valid_position():

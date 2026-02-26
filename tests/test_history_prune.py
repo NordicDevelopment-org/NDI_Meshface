@@ -1,7 +1,7 @@
 import sqlite3
 
 from meshdash.history_prune import prune_history_tables
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def test_prune_history_tables_applies_retention_and_row_limits():

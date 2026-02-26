@@ -1,7 +1,7 @@
 import sqlite3
 
 from meshdash.history_backfill import backfill_node_capabilities
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def _to_int(value):

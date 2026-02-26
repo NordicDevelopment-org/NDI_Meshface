@@ -169,6 +169,9 @@ Break `HistoryStore` into smaller repositories.
   - `HistoryStoreReadState` (`_lock`, `_conn`)
   - `HistoryStoreWriteState` (`_lock`, `_conn`, `_maybe_prune_unlocked()`)
   - applied those contracts across `history_store_packets.py`, `history_store_chat.py`, `history_store_connections.py`, and `history_store_nodes.py`.
+- Routed history DB integration tests toward the namespace entrypoint:
+  - history write/read/prune/metric tests now import `initialize_history_schema` from `meshdash.history.db`
+  - history connection tests now import open/prune helpers from `meshdash.history.db`.
 - Added targeted tests:
   - `tests/test_history_store_runtime_init.py`
   - `tests/test_history_store_runtime_maintenance.py`

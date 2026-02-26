@@ -1,7 +1,7 @@
 import sqlite3
 
 from meshdash.history_connection_writes import save_connection_event
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def test_save_connection_event_inserts_new_connection():

@@ -1,7 +1,7 @@
 import sqlite3
 
 from meshdash.history_raw_writes import save_chat_record, save_packet_record
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 
 
 def test_save_packet_record_inserts_packet_and_calls_rollup_writer():

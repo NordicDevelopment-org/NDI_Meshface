@@ -1,6 +1,6 @@
 import sqlite3
 
-from meshdash.history_schema import initialize_history_schema
+from meshdash.history.db import initialize_history_schema
 from meshdash.history_writes import save_packet_event_and_rollups
 
 
