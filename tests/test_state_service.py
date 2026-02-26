@@ -1,3 +1,5 @@
+from types import MappingProxyType
+
 from meshdash.state_payload_contracts import DashboardStatePayload
 from meshdash.revision import RevisionInfo
 from meshdash.state_service import build_dashboard_state, build_dashboard_state_typed
@@ -589,3 +591,135 @@ def test_build_dashboard_state_handles_summary_builder_failure_without_crashing(
     assert payload["summary"]["target"] == "target"
     assert payload["summary"]["node_count"] == 1
     assert payload["summary"]["live_packet_count"] == 4
+
+
+def test_build_dashboard_state_coerces_mapping_summary_payload_to_dict():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: MappingProxyType({"summary_ok": True}),
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["summary"]["summary_ok"] is True
+    assert payload["summary_error"] is None
+
+
+def test_build_dashboard_state_coerces_mapping_local_state_and_preserves_error():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: (
+            MappingProxyType({"local_config": {"lora": {"modem_preset": "LONG_FAST"}}}),
+            "local warning",
+        ),
+        modem_preset_from_local_state_fn=lambda state: "LONG_FAST",
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"modem_preset": kwargs["modem_preset"]},
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert isinstance(payload["local_state"], dict)
+    assert payload["local_state"]["local_config"]["lora"]["modem_preset"] == "LONG_FAST"
+    assert payload["local_state_error"] == "local warning"
+    assert payload["summary"]["modem_preset"] == "LONG_FAST"
+
+
+def test_build_dashboard_state_coerces_non_mapping_nested_saved_counts_to_empty_mapping():
+    tracker = _DummyTracker()
+    observed = {}
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, node_saved_counts: observed.update(node_saved_counts),
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        load_tracker_node_saved_counts_safe_fn=lambda tracker: ({"!a": "bad-shape"}, None),
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert observed["!a"] == {}
+    assert payload["tracker_saved_counts_error"] is None
+
+
+def test_build_dashboard_state_coerces_non_mapping_nested_capabilities_to_empty_mapping():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        load_tracker_node_capabilities_safe_fn=lambda tracker: ({"!a": "bad-shape"}, None),
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["history_caps"]["!a"] == {}
+    assert payload["tracker_capabilities_error"] is None

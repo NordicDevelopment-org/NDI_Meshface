@@ -131,10 +131,11 @@ Separate state assembly from HTTP wiring.
 - Updated `http_api.make_http_handler(...)` to consume shared route-contract types (`StateFn`, `NodeHistoryFn`, `OnlineActivityFn`, `SendChatFn`, `ToIntFn`) instead of local raw callable signatures.
 - `meshdash/state.py` is now a thin compatibility facade over the service.
 - Added `tests/test_state_service.py` and `tests/test_state_tracker.py`.
+- Expanded state-service edge coverage in `tests/test_state_service.py` for metadata/local-state mapping coercion and non-mapping nested tracker saved-count/capability rows.
 
 ### Steps
 
-1. Expand service coverage for failure/partial-data cases (remaining: metadata/service-edge variants).
+1. [done] Expand service coverage for failure/partial-data cases (remaining: metadata/service-edge variants).
 2. Keep request handlers thin:
    - parse request
    - call service
@@ -196,7 +197,7 @@ Break `HistoryStore` into smaller repositories.
 
 ### Steps
 
-1. Continue routing history modules through `meshdash/history/db.py` namespace where it reduces import sprawl.
+1. [done] Continue routing history modules through `meshdash/history/db.py` namespace where it reduces import sprawl.
 2. [done] Add tighter tests around node-history and online-activity domain wrappers.
 
 ### Exit criteria
