@@ -226,3 +226,76 @@ def test_history_store_domain_node_history_and_online_wrappers_delegate(monkeypa
     assert callable(calls["online_activity"]["fetch_fn"])
     assert callable(calls["online_activity"]["build_fn"])
     assert isinstance(calls["online_activity"]["now_unix"], float)
+
+
+def test_history_store_domain_saved_count_and_capability_wrappers_delegate(monkeypatch):
+    calls = {"saved_counts": None, "capabilities": None}
+
+    def _fake_load_node_saved_counts_data(
+        conn,
+        *,
+        fetch_node_saved_count_rows_fn,
+        decode_node_saved_counts_rows_fn,
+    ):
+        calls["saved_counts"] = {
+            "conn": conn,
+            "fetch_fn": fetch_node_saved_count_rows_fn,
+            "decode_fn": decode_node_saved_counts_rows_fn,
+        }
+        return {"!a": {"saved_packets": 7}}
+
+    def _fake_load_node_capabilities_data(
+        conn,
+        *,
+        fetch_node_capability_rows_fn,
+        decode_node_capabilities_rows_fn,
+    ):
+        calls["capabilities"] = {
+            "conn": conn,
+            "fetch_fn": fetch_node_capability_rows_fn,
+            "decode_fn": decode_node_capabilities_rows_fn,
+        }
+        return {"!a": {"gps_capable": True}}
+
+    monkeypatch.setattr(
+        history_store_nodes_module,
+        "_load_node_saved_counts_data_helper",
+        _fake_load_node_saved_counts_data,
+    )
+    monkeypatch.setattr(
+        history_store_nodes_module,
+        "_load_node_capabilities_data_helper",
+        _fake_load_node_capabilities_data,
+    )
+
+    class _Store:
+        def __init__(self):
+            self._conn = object()
+            self._lock = threading.Lock()
+
+    store = _Store()
+    saved_counts = load_node_saved_counts_domain(store)
+    capabilities = load_node_capabilities_domain(store)
+
+    assert saved_counts == {"!a": {"saved_packets": 7}}
+    assert capabilities == {"!a": {"gps_capable": True}}
+
+    assert calls["saved_counts"]["conn"] is store._conn
+    assert (
+        calls["saved_counts"]["fetch_fn"]
+        is history_store_nodes_module._fetch_node_saved_count_rows_helper
+    )
+    assert (
+        calls["saved_counts"]["decode_fn"]
+        is history_store_nodes_module._decode_node_saved_counts_rows_helper
+    )
+
+    assert calls["capabilities"]["conn"] is store._conn
+    assert (
+        calls["capabilities"]["fetch_fn"]
+        is history_store_nodes_module._fetch_node_capability_rows_helper
+    )
+    assert (
+        calls["capabilities"]["decode_fn"]
+        is history_store_nodes_module._decode_node_capabilities_rows_helper
+    )

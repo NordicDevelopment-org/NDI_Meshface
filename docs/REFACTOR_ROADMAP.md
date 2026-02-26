@@ -178,7 +178,7 @@ Break `HistoryStore` into smaller repositories.
   - `tests/test_history_store_runtime_maintenance.py`
   - `tests/test_history_store_io_wrappers.py` domain-wrapper coverage
   - `tests/test_history_store_policy.py`
-  - tighter node-history and online-activity wrapper delegation assertions in `tests/test_history_store_io_wrappers.py`
+  - tighter node-history / online-activity / saved-count / capability wrapper delegation assertions in `tests/test_history_store_io_wrappers.py`
   - shared callback protocol/type aliases for history read modules in `meshdash/history_read_contracts.py` and usage in `history_read_api.py` / `history_read_history.py`
   - explicit callback protocol contracts in `meshdash/history_store_runtime_init.py` for policy builder and history connection openers
   - shared SQL execution protocols in `meshdash/sql_contracts.py` and adoption across history read/write modules to reduce duplicate SQL typing contracts.
