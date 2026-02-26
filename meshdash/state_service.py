@@ -106,7 +106,11 @@ def build_dashboard_state_typed(
     tracker_data, tracker_error = load_tracker_snapshot_safe_fn(tracker, nodes.by_id)
     node_saved_counts, node_saved_counts_error = load_tracker_node_saved_counts_safe_fn(tracker)
     node_capabilities, node_capabilities_error = load_tracker_node_capabilities_safe_fn(tracker)
-    apply_node_saved_counts_fn(nodes.rows, node_saved_counts)
+    try:
+        apply_node_saved_counts_fn(nodes.rows, node_saved_counts)
+    except Exception as exc:
+        if node_saved_counts_error is None:
+            node_saved_counts_error = str(exc)
 
     my_info, my_info_error = _to_jsonable_safe(
         getattr(iface, "myInfo", None),

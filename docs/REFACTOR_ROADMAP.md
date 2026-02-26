@@ -87,9 +87,9 @@ Separate state assembly from HTTP wiring.
   - explicit tracker error fields in state payload for degraded paths (`tracker_error`, `tracker_saved_counts_error`, `tracker_capabilities_error`)
 - State service now handles node collection failures with empty-node fallback + explicit `nodes_error` payload field.
 - State service now safely JSON-normalizes `my_info` / `metadata` with explicit degraded-path fields (`my_info_error`, `metadata_error`) instead of raising.
-- State service now guards local-state collaborator failures:
-  - catches raised exceptions from injected `collect_local_state_safe_fn` / `modem_preset_from_local_state_fn`
-  - preserves response payload shape with `local_state_error` + safe modem-preset fallback.
+- State service now guards collaborator failures in local-state and saved-count merge paths:
+  - catches raised exceptions from injected `collect_local_state_safe_fn`, `modem_preset_from_local_state_fn`, and `apply_node_saved_counts_fn`
+  - preserves response payload shape with `local_state_error`, `tracker_saved_counts_error`, and safe modem-preset fallback.
 - Added typed state payload contracts in `meshdash/state_payload_contracts.py`:
   - `StateTrafficPayload` and `DashboardStatePayload` with dict conversion at API boundary
   - compatibility coercion helpers for mapping-shaped callers.

@@ -329,6 +329,40 @@ def test_build_dashboard_state_handles_modem_preset_extractor_failure_without_cr
     assert payload["summary"]["modem_preset"] is None
 
 
+def test_build_dashboard_state_handles_apply_node_saved_counts_failure_without_crashing():
+    tracker = _DummyTracker()
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: (_ for _ in ()).throw(
+            RuntimeError("apply boom")
+        ),
+        build_summary_payload_fn=lambda **kwargs: {"node_count": len(kwargs["node_rows"])},
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["tracker_saved_counts_error"] == "apply boom"
+    assert payload["summary"]["node_count"] == 1
+    assert payload["nodes"][0]["id"] == "!a"
+
+
 def test_build_dashboard_state_typed_returns_contract_payload():
     tracker = _DummyTracker()
     payload = build_dashboard_state_typed(
