@@ -159,9 +159,10 @@ Break `HistoryStore` into smaller repositories.
   - `meshdash/history_store_policy.py`
 - Added policy-aware history connection/prune entrypoints in `meshdash/history_store_connection.py` and wired runtime init/maintenance to policy-first flow.
 - Added optional history DB namespace consolidation entrypoint:
-  - `meshdash/history/db.py` re-exporting schema + history-connection open/prune APIs
+  - `meshdash/history/db.py` now hosts schema + history-connection open/prune implementation APIs
   - `meshdash/history/__init__.py` exposing DB entrypoints at package boundary
   - runtime history init/maintenance now import connection/prune helpers through the namespace facade.
+- Converted `meshdash/history_store_connection.py` into a compatibility facade re-exporting `meshdash.history.db` entrypoints.
 - Kept `history_store_reads.py` and `history_store_writes.py` as explicit compatibility facades:
   - documented as legacy import surfaces for existing callers
   - added direct tests confirming facade exports remain identity re-exports of domain modules.
