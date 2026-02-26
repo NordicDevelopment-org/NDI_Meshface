@@ -2012,19 +2012,16 @@
       if (!(mapDataBody instanceof HTMLElement)) return;
       if (!(networkHost instanceof HTMLElement)) return;
 
-      const dockInNodes = activeLayoutView === "network";
       const dockInSaved = activeLayoutView === "saved" && (savedHost instanceof HTMLElement);
-      const target = dockInNodes
-        ? networkHost
-        : (dockInSaved ? savedHost : mapDataBody);
+      const target = dockInSaved ? savedHost : mapDataBody;
       if (nodeHistoryPanel.parentElement !== target) {{
         target.appendChild(nodeHistoryPanel);
       }}
 
-      networkHost.hidden = !dockInNodes;
-      networkHost.classList.toggle("empty", dockInNodes && nodeHistoryPanel.hidden);
+      networkHost.hidden = true;
+      networkHost.classList.remove("empty");
       if (nodesTitle instanceof HTMLElement) {{
-        nodesTitle.textContent = dockInNodes ? "Node Explorer" : "Nodes";
+        nodesTitle.textContent = activeLayoutView === "network" ? "Node Explorer" : "Nodes";
       }}
     }}
 
@@ -2048,9 +2045,13 @@
       }}
       const mapTitle = document.getElementById("map-card-title");
       if (mapTitle) {{
-        mapTitle.textContent = next === "saved"
-          ? "Node Details"
-          : (isSelectableNodeId(selectedNodeId) ? "Selected Node Map" : "Network Map");
+        if (next === "saved") {{
+          mapTitle.textContent = "Node Details";
+        }} else if (next === "network") {{
+          mapTitle.textContent = "Network Map";
+        }} else {{
+          mapTitle.textContent = isSelectableNodeId(selectedNodeId) ? "Selected Node Map" : "Network Map";
+        }}
       }}
       setMapWheelZoomActive(next === "network" || next === "saved");
       if (chatPanelOpen) {{
@@ -2086,6 +2087,9 @@
       if (next === "network" && mapDataFocus === "activity") {{
         mapDataFocus = "auto";
       }}
+      if (next === "network") {{
+        fitDone = false;
+      }}
       if (next === "network" && isSelectableNodeId(selectedNodeId)) {{
         pendingSelectionScroll = true;
         highlightNodeSelection();
@@ -2095,8 +2099,16 @@
       }}
       syncNodeHistoryDock();
       if (latestState) {{
-        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null, null);
-        renderSavedNodeDetails(latestState, null);
+        let cachedNodeHistory = null;
+        if ((next === "saved" || next === "network") && isSelectableNodeId(selectedNodeId)) {{
+          const cached = nodeHistoryCache.get(selectedNodeId);
+          if (cached && cached.data) {{
+            cachedNodeHistory = cached.data;
+          }}
+        }}
+        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
+        renderSavedNodeDetails(latestState, cachedNodeHistory);
       }}
       requestMapResize();
     }}
@@ -2767,12 +2779,17 @@
       persistSelection();
       renderSelectionStatus();
       highlightNodeSelection();
-      updateMapSelection(shouldFocus);
+      const focusSelection = shouldFocus && activeLayoutView !== "network";
+      updateMapSelection(focusSelection);
       scrollSelectionIntoView();
-      renderNodeHistoryLoading(selectedNodeId);
+      if (activeLayoutView === "saved") {{
+        renderNodeHistoryLoading(selectedNodeId);
+      }} else {{
+        setMapDataMode("live");
+      }}
       if (latestState) {{
         let cachedNodeHistory = null;
-        if (isSelectableNodeId(selectedNodeId)) {{
+        if ((activeLayoutView === "saved" || activeLayoutView === "network") && isSelectableNodeId(selectedNodeId)) {{
           const cached = nodeHistoryCache.get(selectedNodeId);
           if (cached && cached.data) {{
             cachedNodeHistory = cached.data;
@@ -3135,7 +3152,9 @@
 
     function buildMapSignature(nodes, edges, nodeHistory) {{
       const selection = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
-      if (selection) {{
+      const savedSelectionMode = activeLayoutView === "saved" && !!selection;
+      const networkSelectionMode = activeLayoutView === "network" && !!selection;
+      if (savedSelectionMode) {{
         let trailSig = "no-trail";
         const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
         if (historyNodeId && historyNodeId === selection) {{
@@ -3168,6 +3187,24 @@
       const edgeSig = (edges || [])
         .map((edge) => `${{normalizeNodeId(edge.from)}}>${{normalizeNodeId(edge.to)}}:${{edge.lifetime_count ?? edge.count ?? 0}}:${{edge.last_rx_time || ""}}:${{edge.last_hops ?? ""}}`)
         .join("|");
+      if (networkSelectionMode) {{
+        let trailSig = "no-trail";
+        const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
+        if (historyNodeId && historyNodeId === selection) {{
+          const rawTrail = Array.isArray(nodeHistory.positions) ? nodeHistory.positions : [];
+          const compact = [];
+          for (const point of rawTrail) {{
+            const lat = Number(point && point.lat);
+            const lon = Number(point && point.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            const when = Number(point && point.time_unix);
+            const ts = Number.isFinite(when) ? String(Math.round(when)) : "";
+            compact.push(`${{lat.toFixed(5)}},${{lon.toFixed(5)}}@${{ts}}`);
+          }}
+          trailSig = compact.join("|");
+        }}
+        return `all#${{nodeSig}}#${{edgeSig}}#sel:${{selection}}#trail:${{trailSig}}`;
+      }}
       return `all#${{nodeSig}}#${{edgeSig}}`;
     }}
 
@@ -3186,16 +3223,20 @@
       const features = [];
       const byId = Object.fromEntries(nodes.map((n) => [normalizeNodeId(n.id), n]));
       const selectionMode = isSelectableNodeId(selectedNodeId);
+      const savedSelectionMode = selectionMode && activeLayoutView === "saved";
+      const networkSelectionMode = selectionMode && activeLayoutView === "network";
       const mapTitle = document.getElementById("map-card-title");
       if (mapTitle) {{
         if (activeLayoutView === "saved") {{
           mapTitle.textContent = "Node Details";
+        }} else if (activeLayoutView === "network") {{
+          mapTitle.textContent = "Network Map";
         }} else {{
           mapTitle.textContent = selectionMode ? "Selected Node Map" : "Network Map";
         }}
       }}
 
-      if (selectionMode) {{
+      if (savedSelectionMode) {{
         const selectedNode = selectedNodeFrom(nodes);
         const selectionId = normalizeNodeId(selectedNodeId || "");
         const selectedNodeIdNormalized = normalizeNodeId((selectedNode && selectedNode.id) || "");
@@ -3378,6 +3419,57 @@
         `);
         line.addTo(edgeLayer);
         features.push(line);
+      }}
+
+      if (networkSelectionMode) {{
+        const selectionId = normalizeNodeId(selectedNodeId || "");
+        const canUseHistory = !!nodeHistory
+          && normalizeNodeId((nodeHistory && nodeHistory.node_id) || "") === selectionId;
+        const rawTrail = canUseHistory && Array.isArray(nodeHistory.positions)
+          ? nodeHistory.positions
+          : [];
+        const trailPoints = rawTrail
+          .map((point) => {{
+            const lat = Number(point && point.lat);
+            const lon = Number(point && point.lon);
+            const timeUnix = Number(point && point.time_unix);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            return {{
+              lat,
+              lon,
+              time_unix: Number.isFinite(timeUnix) ? Math.round(timeUnix) : null,
+              time: point && point.time ? String(point.time) : null,
+            }};
+          }})
+          .filter((point) => point !== null);
+
+        if (trailPoints.length >= 2) {{
+          const line = L.polyline(
+            trailPoints.map((point) => [point.lat, point.lon]),
+            {{
+              color: "#d06a1b",
+              opacity: 0.72,
+              weight: 3,
+              lineCap: "round",
+              lineJoin: "round",
+            }}
+          );
+          line.bindTooltip(`Selected node trail (${{trailPoints.length}} points)`, {{ sticky: true, opacity: 0.9 }});
+          line.addTo(trailLayer);
+        }}
+        if (trailPoints.length > 0) {{
+          const endPoint = trailPoints[trailPoints.length - 1];
+          const latestHalo = L.circleMarker([endPoint.lat, endPoint.lon], {{
+            radius: 8,
+            color: "#f97316",
+            fillColor: "#f97316",
+            fillOpacity: 0.14,
+            weight: 2,
+            bubblingMouseEvents: false,
+          }});
+          latestHalo.bindTooltip(`Selected trail latest: ${{endPoint.time || "n/a"}}`, {{ sticky: true, opacity: 0.9 }});
+          latestHalo.addTo(trailLayer);
+        }}
       }}
 
       if (!fitDone && features.length > 0) {{
@@ -4568,7 +4660,8 @@
         return;
       }}
 
-      if (isSelectableNodeId(selectedNodeId)) {{
+      const showNodeHistory = activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId);
+      if (showNodeHistory) {{
         if (nodeHistory && normalizeNodeId(nodeHistory.node_id) === selectedNodeId) {{
           renderNodeHistory(nodeHistory, nodes);
         }} else {{
@@ -5187,7 +5280,10 @@
         const state = await resp.json();
         latestState = state;
         let nodeHistory = null;
-        if (mapDataFocus !== "activity" && isSelectableNodeId(selectedNodeId)) {{
+        const shouldLoadNodeHistory = (activeLayoutView === "saved" || activeLayoutView === "network")
+          && mapDataFocus !== "activity"
+          && isSelectableNodeId(selectedNodeId);
+        if (shouldLoadNodeHistory) {{
           try {{
             nodeHistory = await fetchNodeHistory(selectedNodeId);
           }} catch (historyErr) {{

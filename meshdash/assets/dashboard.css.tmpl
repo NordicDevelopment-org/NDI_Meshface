@@ -1152,7 +1152,7 @@
       height: calc(100vh - 96px);
       height: calc(100dvh - 96px);
       min-height: 560px;
-      grid-template-columns: minmax(350px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
+      grid-template-columns: minmax(320px, 1fr) var(--splitter-size) minmax(320px, 1fr);
       grid-template-rows: auto minmax(0, 1fr);
     }}
     .layout.view-network .summary {{
@@ -1174,38 +1174,32 @@
       min-height: 0;
       overflow: hidden;
     }}
+    .layout.view-network .network-node-stack {{
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 0;
+    }}
     .layout.view-network .nodes-table-scroll {{
-      flex: 0 0 var(--network-nodes-list-pct);
-      min-height: 150px;
+      flex: 1 1 auto !important;
+      min-height: 0;
+      max-height: none !important;
+      height: 100%;
     }}
     .layout.view-network .network-node-splitter {{
-      display: block;
+      display: none !important;
+      margin: 0 !important;
+      min-height: 0 !important;
+      max-height: 0 !important;
+      border: 0 !important;
+      padding: 0 !important;
     }}
     .layout.view-network .network-node-history-host {{
-      flex: 1 1 auto;
-      min-height: 200px;
-      overflow: auto;
-    }}
-    .layout.view-network .network-node-history-host #map-data-node {{
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      gap: 8px;
-    }}
-    .layout.view-network .network-node-history-host #tab-panel-signal {{
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }}
-    .layout.view-network .network-node-history-host #tab-panel-signal,
-    .layout.view-network .network-node-history-host #tab-panel-overview {{
-      flex: 1 1 auto;
-      min-height: 0;
-    }}
-    .layout.view-network .network-node-history-host #signal-chart-wrap {{
-      height: auto;
-      min-height: 160px;
-      flex: 1 1 auto;
+      display: none !important;
+      margin: 0 !important;
+      min-height: 0 !important;
+      max-height: 0 !important;
+      border: 0 !important;
+      padding: 0 !important;
     }}
     .layout.view-network .map .body {{
       min-height: 0;
