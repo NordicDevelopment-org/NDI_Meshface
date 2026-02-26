@@ -117,11 +117,22 @@ def build_dashboard_state_typed(
         to_jsonable_fn=to_jsonable_fn,
     )
 
-    local_state, local_error = collect_local_state_safe_fn(
-        iface,
-        collect_local_state_fn=collect_local_state_fn,
-    )
-    modem_preset = modem_preset_from_local_state_fn(local_state)
+    local_error: Optional[str]
+    try:
+        local_state, local_error = collect_local_state_safe_fn(
+            iface,
+            collect_local_state_fn=collect_local_state_fn,
+        )
+    except Exception as exc:
+        local_state, local_error = {}, str(exc)
+
+    modem_preset: Optional[str]
+    try:
+        modem_preset = modem_preset_from_local_state_fn(local_state)
+    except Exception as exc:
+        modem_preset = None
+        if local_error is None:
+            local_error = str(exc)
     summary_error: Optional[str] = None
     try:
         summary = build_summary_payload_fn(
