@@ -18,6 +18,7 @@ from .runtime_types import (
     TrackerParsedPacket,
     UtcNowFn,
 )
+from .tracker_storage_contracts import RecentChatBuffer, RecentPacketBuffer, TrackerHistoryWriter
 
 
 def process_parsed_tracker_packet(
@@ -41,9 +42,9 @@ def process_parsed_tracker_packet(
     to_int_fn: ToIntFn,
     to_jsonable_fn: ToJsonableFn,
     apply_tracker_storage_updates_fn: ApplyTrackerStorageUpdatesFn,
-    recent_packets: object,
-    recent_chat: object,
-    history_store: object,
+    recent_packets: RecentPacketBuffer,
+    recent_chat: RecentChatBuffer,
+    history_store: TrackerHistoryWriter | None,
 ) -> None:
     rx_time = parsed["rx_time"]
     hops = parsed["hops"]
