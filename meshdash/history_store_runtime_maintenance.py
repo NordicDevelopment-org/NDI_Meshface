@@ -1,7 +1,7 @@
 from .history_maintenance import (
     next_prune_counter as _next_prune_counter_helper,
 )
-from .history_store_connection import (
+from .history.db import (
     prune_history_connection as _prune_history_connection_helper,
     prune_history_connection_with_policy as _prune_history_connection_with_policy_helper,
 )

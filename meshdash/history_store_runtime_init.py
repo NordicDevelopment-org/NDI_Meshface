@@ -1,7 +1,7 @@
 import threading
 from typing import Callable
 
-from .history_store_connection import (
+from .history.db import (
     open_and_initialize_history_connection as _open_and_initialize_history_connection_helper,
     open_and_initialize_history_connection_with_policy as _open_and_initialize_history_connection_with_policy_helper,
 )
