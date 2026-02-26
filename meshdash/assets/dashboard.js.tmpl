@@ -38,6 +38,7 @@
     const nodeNameCacheStorageKey = "meshDashboardNodeNameCacheV1";
     const splitStorageKey = "meshDashboardLayoutSplitState";
     const networkNodesSplitStorageKey = "meshDashboardNetworkNodesSplitPct";
+    const savedNodeSplitStorageKey = "meshDashboardSavedNodePanePct";
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const themeStorageKey = "meshDashboardThemePreference";
@@ -82,6 +83,7 @@
     let splitMidPx = 250;
     let splitLowPx = 240;
     let networkNodesListPct = 52;
+    let savedNodePanePct = 50;
     let consoleAutoscroll = true;
     let fitDone = false;
     let mapResizeObserver = null;
@@ -1566,6 +1568,44 @@
       btn.setAttribute("aria-label", btn.title);
     }}
 
+    function renderStarredNodeSelect(state) {{
+      const select = document.getElementById("starred-node-select");
+      if (!(select instanceof HTMLSelectElement)) return;
+
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const nodesById = new Map(nodes.map((node) => [normalizeNodeId(node.id || ""), node]));
+      const entries = Array.from(favoriteNodeIds)
+        .map((nodeId) => {{
+          const node = nodesById.get(nodeId);
+          const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
+          return {{ id: nodeId, name }};
+        }})
+        .sort((a, b) => {{
+          const nameDiff = String(a.name || "").localeCompare(String(b.name || ""));
+          if (nameDiff !== 0) return nameDiff;
+          return String(a.id || "").localeCompare(String(b.id || ""));
+        }});
+
+      const placeholder = entries.length > 0
+        ? `Starred nodes (${{entries.length}})`
+        : "Starred nodes";
+      const options = [`<option value="">${{escAttr(placeholder)}}</option>`];
+      for (const entry of entries) {{
+        options.push(`<option value="${{escAttr(entry.id)}}">${{escAttr(`${{entry.name}} (${{entry.id}})` )}}</option>`);
+      }}
+      select.innerHTML = options.join("");
+
+      const selectedValue = (isSelectableNodeId(selectedNodeId) && favoriteNodeIds.has(selectedNodeId))
+        ? selectedNodeId
+        : "";
+      select.value = selectedValue;
+      select.disabled = entries.length === 0;
+      select.title = entries.length > 0
+        ? "Jump to a starred node"
+        : "No starred nodes yet";
+    }}
+
     function refreshFavoriteToggleButtons() {{
       for (const btn of document.querySelectorAll(".favorite-toggle-btn")) {{
         if (!(btn instanceof HTMLButtonElement)) continue;
@@ -1597,6 +1637,8 @@
       refreshFavoriteToggleButtons();
       if (latestState) {{
         renderFavorites(latestState);
+      }} else {{
+        renderStarredNodeSelect({{}});
       }}
     }}
 
@@ -1685,6 +1727,15 @@
           pill.textContent = "Selected: none";
         }}
       }}
+      const starredSelect = document.getElementById("starred-node-select");
+      if (starredSelect instanceof HTMLSelectElement) {{
+        const selectedValue = (isSelectableNodeId(selectedNodeId) && isFavoriteNode(selectedNodeId))
+          ? selectedNodeId
+          : "";
+        if (starredSelect.value !== selectedValue) {{
+          starredSelect.value = selectedValue;
+        }}
+      }}
       const btn = document.getElementById("clear-selection-btn");
       if (btn) {{
         btn.disabled = !selectedNodeId;
@@ -1722,6 +1773,10 @@
       return Math.max(28, Math.min(78, value));
     }}
 
+    function clampSavedNodePanePct(value) {{
+      return Math.max(30, Math.min(70, value));
+    }}
+
     function applySplitState() {{
       const layout = document.querySelector(".layout");
       if (!(layout instanceof HTMLElement)) return;
@@ -1735,6 +1790,12 @@
       const layout = document.getElementById("dashboard-layout");
       if (!(layout instanceof HTMLElement)) return;
       layout.style.setProperty("--network-nodes-list-pct", `${{networkNodesListPct}}%`);
+    }}
+
+    function applySavedNodeSplitState() {{
+      const layout = document.getElementById("dashboard-layout");
+      if (!(layout instanceof HTMLElement)) return;
+      layout.style.setProperty("--saved-node-pane-pct", `${{savedNodePanePct}}%`);
     }}
 
     function loadSplitState() {{
@@ -1778,9 +1839,30 @@
       applyNetworkNodesSplitState();
     }}
 
+    function loadSavedNodeSplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(savedNodeSplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            savedNodePanePct = clampSavedNodePanePct(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applySavedNodeSplitState();
+    }}
+
     function persistNetworkNodesSplitState() {{
       try {{
         window.localStorage.setItem(networkNodesSplitStorageKey, String(networkNodesListPct));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistSavedNodeSplitState() {{
+      try {{
+        window.localStorage.setItem(savedNodeSplitStorageKey, String(savedNodePanePct));
       }} catch (_err) {{
       }}
     }}
@@ -2102,6 +2184,53 @@
           splitter.classList.remove("active");
           document.body.classList.remove("resizing-panels-y");
           persistNetworkNodesSplitState();
+          splitter.removeEventListener("pointermove", onMove);
+          splitter.removeEventListener("pointerup", onUp);
+          splitter.removeEventListener("pointercancel", onUp);
+        }};
+
+        splitter.addEventListener("pointermove", onMove);
+        splitter.addEventListener("pointerup", onUp);
+        splitter.addEventListener("pointercancel", onUp);
+      }});
+    }}
+
+    function bindSavedNodeSplitter() {{
+      const splitter = document.getElementById("saved-map-splitter");
+      if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;
+      const pane = splitter.parentElement;
+      if (!(pane instanceof HTMLElement)) return;
+      splitter.dataset.bound = "1";
+
+      splitter.addEventListener("pointerdown", (ev) => {{
+        if (activeLayoutView !== "saved") return;
+        if (window.matchMedia("(max-width: 1100px)").matches) return;
+        ev.preventDefault();
+        splitter.classList.add("active");
+        document.body.classList.add("resizing-panels-x");
+        splitter.setPointerCapture(ev.pointerId);
+
+        const updateFromClientX = (clientX) => {{
+          const rect = pane.getBoundingClientRect();
+          if (rect.width < 120) return;
+          const relativeX = clientX - rect.left;
+          const pct = clampSavedNodePanePct((relativeX / rect.width) * 100);
+          savedNodePanePct = pct;
+          applySavedNodeSplitState();
+          requestMapResize();
+        }};
+
+        updateFromClientX(ev.clientX);
+
+        const onMove = (moveEv) => {{
+          updateFromClientX(moveEv.clientX);
+        }};
+
+        const onUp = () => {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-x");
+          persistSavedNodeSplitState();
+          requestMapResize();
           splitter.removeEventListener("pointermove", onMove);
           splitter.removeEventListener("pointerup", onUp);
           splitter.removeEventListener("pointercancel", onUp);
@@ -2699,6 +2828,17 @@
       }});
     }}
 
+    function bindStarredNodeControl() {{
+      const select = document.getElementById("starred-node-select");
+      if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+      select.addEventListener("change", () => {{
+        const nodeId = normalizeNodeId(select.value || "");
+        if (!isSelectableNodeId(nodeId)) return;
+        selectNode(nodeId, true, false);
+      }});
+    }}
+
     function bindFavoriteToggleControls() {{
       if (document.body.dataset.favoritesBound === "1") return;
       document.body.dataset.favoritesBound = "1";
@@ -2739,6 +2879,8 @@
           refreshFavoriteToggleButtons();
           if (latestState) {{
             renderFavorites(latestState);
+          }} else {{
+            renderStarredNodeSelect({{}});
           }}
         }});
       }}
@@ -2784,7 +2926,38 @@
 
     function renderSummary(state) {{
       const s = state.summary || {{}};
-      setText("m-target", s.target || "n/a");
+      let targetValue = s.target || "n/a";
+      let updatedValue = state.generated_at || "n/a";
+      let updatedFreshnessStatus = "";
+      let updatedFreshnessLabel = "";
+      if (activeLayoutView === "saved") {{
+        const selectedId = normalizeNodeId(selectedNodeId || "");
+        if (isSelectableNodeId(selectedId)) {{
+          const nodes = Array.isArray(state.nodes) ? state.nodes : [];
+          const node = nodes.find((entry) => normalizeNodeId(entry && entry.id) === selectedId) || null;
+          const historyCapsById = new Map(
+            Object.entries((state.history_caps && typeof state.history_caps === "object") ? state.history_caps : {{}})
+              .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+              .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+          );
+          const caps = historyCapsById.get(selectedId) || null;
+          const traffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
+          const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+          const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
+          const freshness = resolveNodeFreshness(node, caps, null, latestChatTouchByNode.get(selectedId) || null);
+          const status = freshnessStatus(freshness.unix, Math.floor(Date.now() / 1000));
+          const nodeName = preferredNodeName(node) || nodeNameCache.get(selectedId) || `Node ${{selectedId}}`;
+          targetValue = `${{nodeName}} (${{selectedId}})`;
+          updatedValue = savedDetailText(freshness.text, state.generated_at || "n/a");
+          updatedFreshnessStatus = status;
+          updatedFreshnessLabel = status === "online"
+            ? "Fresh"
+            : (status === "warn" ? "Aging" : (status === "stale" ? "Stale" : "Unknown"));
+        }} else {{
+          targetValue = "Select a node";
+        }}
+      }}
+      setText("m-target", targetValue);
       setText("m-nodes", s.node_count ?? 0);
       setText("m-pos-nodes", s.nodes_with_position ?? 0);
       setText("m-live-packets", s.live_packet_count ?? 0);
@@ -2792,7 +2965,19 @@
       setText("m-links", realLinks);
       setText("m-modem-preset", s.modem_preset || "n/a");
       setText("m-uptime", s.uptime_seconds ?? 0);
-      setText("updated-at", state.generated_at || "n/a");
+      setText("updated-at", updatedValue);
+      const updatedFreshness = document.getElementById("updated-freshness");
+      if (updatedFreshness instanceof HTMLElement) {{
+        updatedFreshness.classList.remove("status-online", "status-warn", "status-stale", "status-unknown");
+        if (activeLayoutView === "saved" && updatedFreshnessLabel) {{
+          updatedFreshness.hidden = false;
+          updatedFreshness.textContent = updatedFreshnessLabel;
+          updatedFreshness.classList.add(`status-${{updatedFreshnessStatus || "unknown"}}`);
+        }} else {{
+          updatedFreshness.hidden = true;
+          updatedFreshness.textContent = "";
+        }}
+      }}
       const err = document.getElementById("local-state-error");
       if (err) {{
         err.textContent = state.local_state_error ? `  Local state error: ${{state.local_state_error}}` : "";
@@ -3466,15 +3651,8 @@
         : null;
       const linkStats = computeSavedLinkStats(nodeId, edges);
 
-      const nodeName = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
-      const nowUnix = Math.floor(Date.now() / 1000);
       const freshness = resolveNodeFreshness(node, caps, historySummary, chatTouch);
       const freshnessSource = nodeFreshnessSourceLabel(freshness.source);
-      const lastSeenUnix = freshness.unix;
-      const status = freshnessStatus(lastSeenUnix, nowUnix);
-      const statusLabel = status === "online"
-        ? "Online"
-        : (status === "warn" ? "Aging" : (status === "stale" ? "Stale" : "Unknown"));
 
       const batteryRaw = Number(
         (node && node.battery_level != null)
@@ -3604,20 +3782,11 @@
         ? formatMetricValue(linkStats.hopsWeighted / linkStats.hopsWeight, 2)
         : "n/a";
 
-      const subtitleBits = [
-        nodeId,
-        `Last seen: ${{savedDetailText(freshness.text)}}`,
-      ];
-      if (historyLoading) {{
-        subtitleBits.push("Loading historical data...");
-      }}
-
       const nodeSection = savedDetailSectionHtml("Node", [
         ["Node ID", nodeId],
         ["Node Num", node && node.num != null ? String(node.num) : "n/a"],
         ["Hardware", (node && node.hardware_model) || "n/a"],
         ["Role", (node && node.role) || "n/a"],
-        ["Status", statusLabel],
         ["Freshness Source", freshnessSource],
         ["Battery", batteryText],
         ["Hops Away", hopsText],
@@ -3680,13 +3849,6 @@
       ]);
 
       host.innerHTML = `
-        <div class="saved-node-details-head">
-          <div class="saved-node-title-wrap">
-            <div class="saved-node-title">${{escAttr(nodeName)}}</div>
-            <div class="saved-node-subtitle">${{subtitleBits.map((part) => escAttr(part)).join("<span>•</span>")}}</div>
-          </div>
-          <span class="saved-node-status status-${{escAttr(status)}}">${{escAttr(statusLabel)}}</span>
-        </div>
         <div class="saved-node-sections">
           ${{nodeSection}}
           ${{historySection}}
@@ -3698,12 +3860,12 @@
     }}
 
     function renderFavorites(state) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      renderSavedNodeDetails(safeState, null);
+      renderStarredNodeSelect(safeState);
       const list = document.getElementById("favorites-list");
       const caption = document.getElementById("favorites-caption");
       if (!(list instanceof HTMLElement)) return;
-
-      const safeState = (state && typeof state === "object") ? state : {{}};
-      renderSavedNodeDetails(safeState, null);
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       const nodesById = new Map(nodes.map((node) => [normalizeNodeId(node.id || ""), node]));
       const historyCapsById = new Map(
@@ -4964,6 +5126,7 @@
     loadFavoriteNodes();
     loadSplitState();
     loadNetworkNodesSplitState();
+    loadSavedNodeSplitState();
     loadLayoutView();
     loadChatChannel();
     loadThemePreference();
@@ -4971,7 +5134,9 @@
     renderSavedRailStatus();
     bindSplitters();
     bindNetworkNodeSplitter();
+    bindSavedNodeSplitter();
     bindSelectionControls();
+    bindStarredNodeControl();
     bindFavoriteToggleControls();
     bindFavoritesControls();
     bindNodeListSearchControls();
