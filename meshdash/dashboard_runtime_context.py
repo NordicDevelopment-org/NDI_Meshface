@@ -6,7 +6,11 @@ from typing import Callable, Optional
 
 from .dashboard_loaders import DashboardRuntimeLoaders
 from .dashboard_args_contracts import DashboardArgs
-from .dashboard_runtime_loader_contracts import DashboardRuntimeLoaderDependencies
+from .dashboard_runtime_loader_contracts import (
+    BuildDashboardRuntimeLoaderDependenciesFromLegacyArgsFn,
+    BuildDashboardRuntimeLoadersFn,
+    BuildDashboardRuntimeLoadersWithDependenciesFn,
+)
 from .dashboard_runtime_loader_dependencies import (
     build_dashboard_runtime_loader_dependencies_from_legacy_args,
 )
@@ -16,6 +20,9 @@ from .dashboard_setup_contracts import (
     DashboardTrackerLike,
     HistoryStoreFactory,
     HistoryStoreLike,
+    OpenOptionalHistoryStoreFn,
+    PrintLineFn,
+    SeedTrackerIfEmptyFn,
 )
 from .revision import RevisionInfo
 from .runtime_types import (
@@ -86,21 +93,17 @@ def build_dashboard_runtime_context(
     build_online_activity_loader_fn: BuildOnlineActivityLoaderFn,
     build_send_chat_loader_fn: BuildSendChatLoaderFn,
     default_chat_max_bytes: int,
-    print_fn: Callable[[str], None] = print,
+    print_fn: PrintLineFn = print,
     lock_factory: Callable[[], SendLock] = threading.Lock,
     now_unix_fn: Callable[[], float] = time.time,
     resolve_history_db_path_fn: Callable[[str], str] = lambda path: os.path.abspath(
         os.path.expanduser(path)
     ),
-    open_optional_history_store_fn: Callable[..., Optional[HistoryStoreLike]] = open_optional_history_store,
-    seed_tracker_if_empty_fn: Callable[..., None] = seed_tracker_if_empty,
-    build_dashboard_runtime_loaders_fn: Optional[Callable[..., DashboardRuntimeLoaders]] = None,
-    build_dashboard_runtime_loader_dependencies_from_legacy_args_fn: Callable[
-        ..., DashboardRuntimeLoaderDependencies
-    ] = build_dashboard_runtime_loader_dependencies_from_legacy_args,
-    build_dashboard_runtime_loaders_with_dependencies_fn: Callable[
-        ..., DashboardRuntimeLoaders
-    ] = build_dashboard_runtime_loaders_with_dependencies,
+    open_optional_history_store_fn: OpenOptionalHistoryStoreFn = open_optional_history_store,
+    seed_tracker_if_empty_fn: SeedTrackerIfEmptyFn = seed_tracker_if_empty,
+    build_dashboard_runtime_loaders_fn: Optional[BuildDashboardRuntimeLoadersFn] = None,
+    build_dashboard_runtime_loader_dependencies_from_legacy_args_fn: BuildDashboardRuntimeLoaderDependenciesFromLegacyArgsFn = build_dashboard_runtime_loader_dependencies_from_legacy_args,
+    build_dashboard_runtime_loaders_with_dependencies_fn: BuildDashboardRuntimeLoadersWithDependenciesFn = build_dashboard_runtime_loaders_with_dependencies,
 ) -> DashboardRuntimeContext:
     target = mesh_target_label_fn(args)
     print_fn(f"Connecting to {target} ...")

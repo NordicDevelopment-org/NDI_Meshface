@@ -1,4 +1,7 @@
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from .dashboard_args_contracts import DashboardArgs
 
 
 class HistoryStoreLike(Protocol):
@@ -35,4 +38,36 @@ class DashboardTrackerFactory(Protocol):
         packet_limit: int,
         history_store: HistoryStoreLike | None,
     ) -> DashboardTrackerLike:
+        ...
+
+
+class PrintLineFn(Protocol):
+    def __call__(self, text: str) -> None:
+        ...
+
+
+class SeedTrackerBootstrapFn(Protocol):
+    def __call__(self, tracker: DashboardTrackerLike, iface: object) -> None:
+        ...
+
+
+class OpenOptionalHistoryStoreFn(Protocol):
+    def __call__(
+        self,
+        args: "DashboardArgs",
+        *,
+        history_store_cls: HistoryStoreFactory,
+        history_db_path: str,
+    ) -> HistoryStoreLike | None:
+        ...
+
+
+class SeedTrackerIfEmptyFn(Protocol):
+    def __call__(
+        self,
+        tracker: DashboardTrackerLike,
+        iface: object,
+        *,
+        seed_tracker_fn: SeedTrackerBootstrapFn,
+    ) -> None:
         ...
