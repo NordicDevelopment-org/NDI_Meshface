@@ -55,6 +55,10 @@ Split `_render_html()` into composable builders while keeping server behavior un
   - `tests/test_html_assets.py`
   - `tests/test_html_sections.py`
   - focused chat/network/saved structure assertions in `tests/test_html.py` to guard key DOM anchors used by frontend behavior.
+- Added template-asset token contract coverage:
+  - `tests/test_html_asset_template_contracts.py` now asserts each asset template exposes only expected replacement tokens and leaves no unresolved single-token placeholders after render.
+- Added baseline CI workflow:
+  - `.github/workflows/ci.yml` runs pytest on push/pull_request so template and renderer checks execute automatically.
 
 ### Steps
 
