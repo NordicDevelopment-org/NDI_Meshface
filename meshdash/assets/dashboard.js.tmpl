@@ -5132,19 +5132,75 @@
         return parseMessageId(msg.reply_id ?? msg.replyId);
       }};
 
-      const emojiOf = (msg) => {{
-        if (!msg || typeof msg !== "object") return "";
-        const direct = String(msg.emoji || "").trim();
-        if (direct) return direct;
-        const codepoint = Number(msg.emoji_codepoint ?? msg.emojiCodepoint);
-        if (Number.isInteger(codepoint) && codepoint > 0) {{
-          try {{
-            return String.fromCodePoint(codepoint);
-          }} catch (_err) {{
+      const emojiFromCodepointValue = (value) => {{
+        const codepoint = Number(value);
+        if (!Number.isInteger(codepoint) || codepoint <= 0) return "";
+        try {{
+          const glyph = String.fromCodePoint(codepoint);
+          // Filter non-printable control chars (often bad legacy payload values).
+          for (const ch of glyph) {{
+            const cp = ch.codePointAt(0);
+            if (!Number.isInteger(cp)) continue;
+            if ((cp >= 0 && cp <= 0x1f) || (cp >= 0x7f && cp <= 0x9f)) {{
+              return "";
+            }}
+          }}
+          return glyph;
+        }} catch (_err) {{
+          return "";
+        }}
+      }};
+
+      const emojiFromAny = (rawValue) => {{
+        if (rawValue == null) return "";
+        if (typeof rawValue === "number") {{
+          return emojiFromCodepointValue(rawValue);
+        }}
+        const raw = String(rawValue).trim();
+        if (!raw) return "";
+
+        // Decimal codepoint payloads (int or int-as-string).
+        if (/^\\d+$/.test(raw)) {{
+          return emojiFromCodepointValue(raw);
+        }}
+        // Hex codepoint payloads like "U+1F44D" or "1F44D".
+        const hex = raw.toUpperCase().replace(/^U\\+/, "");
+        if (/^[0-9A-F]{4,8}$/.test(hex)) {{
+          return emojiFromCodepointValue(parseInt(hex, 16));
+        }}
+
+        // Already a glyph/text payload; reject control chars.
+        for (const ch of raw) {{
+          const cp = ch.codePointAt(0);
+          if (!Number.isInteger(cp)) continue;
+          if ((cp >= 0 && cp <= 0x1f) || (cp >= 0x7f && cp <= 0x9f)) {{
             return "";
           }}
         }}
-        return "";
+        return raw;
+      }};
+
+      const emojiFromTextPayload = (rawValue) => {{
+        const text = String(rawValue == null ? "" : rawValue).trim();
+        if (!text) return "";
+        // Do not treat regular chat text as emoji fallback.
+        if (text.length > 8 || /\\s/.test(text)) return "";
+        if (/^[0-9A-Za-z.,;:!?'"`~_\\-]+$/.test(text)) return "";
+        const glyph = emojiFromAny(text);
+        if (!glyph) return "";
+        // Keep fallback conservative: one emoji (optionally with variation/joiners).
+        const clusters = Array.from(glyph);
+        if (clusters.length > 4) return "";
+        return glyph;
+      }};
+
+      const emojiOf = (msg) => {{
+        if (!msg || typeof msg !== "object") return "";
+        const direct = emojiFromAny(msg.emoji);
+        if (direct) return direct;
+        const fromCodepoint = emojiFromAny(msg.emoji_codepoint ?? msg.emojiCodepoint);
+        if (fromCodepoint) return fromCodepoint;
+        return emojiFromTextPayload(msg.text ?? msg.decoded_text ?? msg.payload_text);
       }};
 
       const isReactionMessage = (msg) => {{
