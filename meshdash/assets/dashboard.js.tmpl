@@ -6036,6 +6036,8 @@
     function setRaw(id, value) {{
       const el = document.getElementById(id);
       if (!el) return;
+      const details = el.closest && el.closest("details");
+      if (details && !details.open) return;
       el.textContent = JSON.stringify(value, null, 2);
     }}
 
@@ -6050,12 +6052,15 @@
 
     async function poll() {{
       try {{
-        const resp = await fetch("/api/state", {{ cache: "no-store" }});
+        const wantFullState = activeLayoutView === "data" || activeLayoutView === "all";
+        const stateUrl = wantFullState ? "/api/state" : "/api/state?lite=1";
+        const resp = await fetch(stateUrl, {{ cache: "no-store" }});
         if (!resp.ok) throw new Error(`API ${{resp.status}}`);
         const state = await resp.json();
         latestState = state;
         let nodeHistory = null;
-        const shouldLoadNodeHistory = (activeLayoutView === "saved" || activeLayoutView === "network")
+        const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
+        const shouldLoadNodeHistory = mapVisible
           && mapDataFocus !== "activity"
           && isSelectableNodeId(selectedNodeId);
         if (shouldLoadNodeHistory) {{
@@ -6073,7 +6078,7 @@
           }}
         }}
         let onlineActivity = null;
-        if (mapDataFocus === "activity") {{
+        if (mapVisible && mapDataFocus === "activity") {{
           try {{
             onlineActivity = await fetchOnlineActivity(nodeHistoryHours);
           }} catch (activityErr) {{
@@ -6084,16 +6089,44 @@
             }};
           }}
         }}
-        renderSummary(state);
-        renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], nodeHistory);
-        renderNodes(state.nodes || []);
-        renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory, onlineActivity);
-        renderChat(state);
-        renderFavorites(state);
-        renderSavedNodeDetails(state, nodeHistory);
-        renderPackets(state.traffic || {{}});
-        renderConsole(state.traffic || {{}});
-        renderRaw(state);
+        // UI rendering is view-specific; updating hidden panes is wasted work and can
+        // cause jank on slower devices.
+        if (activeLayoutView !== "chat") {{
+          renderSummary(state);
+        }}
+
+        if (mapVisible) {{
+          renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], nodeHistory);
+        }}
+
+        if (activeLayoutView === "network" || activeLayoutView === "all") {{
+          renderNodes(state.nodes || []);
+        }}
+
+        if (activeLayoutView === "all") {{
+          renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory, onlineActivity);
+        }}
+
+        if (activeLayoutView === "chat" || activeLayoutView === "all") {{
+          renderChat(state);
+        }}
+
+        if (activeLayoutView === "saved" || activeLayoutView === "all") {{
+          renderFavorites(state);
+          renderSavedNodeDetails(state, nodeHistory);
+        }}
+
+        if (activeLayoutView === "packets" || activeLayoutView === "all") {{
+          renderPackets(state.traffic || {{}});
+        }}
+
+        if (activeLayoutView === "packets" || activeLayoutView === "data" || activeLayoutView === "all") {{
+          renderConsole(state.traffic || {{}});
+        }}
+
+        if (wantFullState) {{
+          renderRaw(state);
+        }}
       }} catch (err) {{
         setText("updated-at", `error: ${{err.message}}`);
         appendConsoleLine(`error|${{Date.now()}}|${{err.message}}`, `[poll error] ${{err.message}}`);
@@ -6143,8 +6176,24 @@
     requestMapResize();
     void loadThemeSettingsFromServer();
 
-    poll();
-    setInterval(poll, refreshMs);
+    let pollInFlight = false;
+    async function pollOnce() {{
+      if (pollInFlight) return;
+      if (document.hidden) return;
+      pollInFlight = true;
+      try {{
+        await poll();
+      }} finally {{
+        pollInFlight = false;
+      }}
+    }}
+
+    document.addEventListener("visibilitychange", () => {{
+      if (!document.hidden) void pollOnce();
+    }});
+
+    void pollOnce();
+    setInterval(pollOnce, refreshMs);
     setInterval(() => {{
       void loadThemeSettingsFromServer(false);
     }}, 60000);

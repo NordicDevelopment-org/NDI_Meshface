@@ -18,7 +18,7 @@ def test_render_html_includes_revision_and_runtime_values():
     assert "Rev: v0.1.0 (abc123)" in html
     assert "History: on (7d retention, 5000 rows max)" in html
     assert "const refreshMs = 3000;" in html
-    assert "setInterval(poll, refreshMs);" in html
+    assert "setInterval(pollOnce, refreshMs);" in html
 
 
 def test_render_html_includes_chat_view_structure_tokens():
