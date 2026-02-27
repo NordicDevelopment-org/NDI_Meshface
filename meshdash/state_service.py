@@ -115,6 +115,8 @@ def build_dashboard_state_typed(
     load_tracker_node_capabilities_safe_fn: LoadTrackerNodeCapabilitiesSafeFn = _load_tracker_node_capabilities_safe_helper,
     to_jsonable_fn: ToJsonableFn = _to_jsonable,
     utc_now_fn: UtcNowFn = _utc_now,
+    include_debug: bool = True,
+    include_nodes_full: bool = True,
 ) -> DashboardStatePayload:
     nodes_error: Optional[str] = None
     try:
@@ -122,6 +124,14 @@ def build_dashboard_state_typed(
     except Exception as exc:
         nodes = CollectedNodes(rows=[], full=[], by_id={}, with_position_count=0)
         nodes_error = str(exc)
+
+    if not include_nodes_full and nodes.full:
+        nodes = CollectedNodes(
+            rows=nodes.rows,
+            full=[],
+            by_id=nodes.by_id,
+            with_position_count=nodes.with_position_count,
+        )
     tracker_data_raw, tracker_error = load_tracker_snapshot_safe_fn(tracker, nodes.by_id)
     try:
         tracker_data = coerce_tracker_snapshot(tracker_data_raw)
@@ -157,38 +167,44 @@ def build_dashboard_state_typed(
         if node_saved_counts_error is None:
             node_saved_counts_error = str(exc)
 
-    my_info, my_info_error = _to_jsonable_safe(
-        getattr(iface, "myInfo", None),
-        to_jsonable_fn=to_jsonable_fn,
-    )
-    metadata, metadata_error = _to_jsonable_safe(
-        getattr(iface, "metadata", None),
-        to_jsonable_fn=to_jsonable_fn,
-    )
-
-    local_error: Optional[str]
-    try:
-        local_state, local_error = collect_local_state_safe_fn(
-            iface,
-            collect_local_state_fn=collect_local_state_fn,
+    if include_debug:
+        my_info, my_info_error = _to_jsonable_safe(
+            getattr(iface, "myInfo", None),
+            to_jsonable_fn=to_jsonable_fn,
         )
-    except Exception as exc:
-        local_state, local_error = {}, str(exc)
+        metadata, metadata_error = _to_jsonable_safe(
+            getattr(iface, "metadata", None),
+            to_jsonable_fn=to_jsonable_fn,
+        )
 
-    if not isinstance(local_state, Mapping):
-        local_state = {}
-        if local_error is None:
-            local_error = "Expected local_state mapping from collect_local_state_safe_fn"
-    elif not isinstance(local_state, dict):
-        local_state = dict(local_state)
+        local_error: Optional[str]
+        try:
+            local_state, local_error = collect_local_state_safe_fn(
+                iface,
+                collect_local_state_fn=collect_local_state_fn,
+            )
+        except Exception as exc:
+            local_state, local_error = {}, str(exc)
 
-    modem_preset: Optional[str]
-    try:
-        modem_preset = modem_preset_from_local_state_fn(local_state)
-    except Exception as exc:
+        if not isinstance(local_state, Mapping):
+            local_state = {}
+            if local_error is None:
+                local_error = "Expected local_state mapping from collect_local_state_safe_fn"
+        elif not isinstance(local_state, dict):
+            local_state = dict(local_state)
+
+        modem_preset: Optional[str]
+        try:
+            modem_preset = modem_preset_from_local_state_fn(local_state)
+        except Exception as exc:
+            modem_preset = None
+            if local_error is None:
+                local_error = str(exc)
+    else:
+        my_info, my_info_error = None, None
+        metadata, metadata_error = None, None
+        local_state, local_error = {}, None
         modem_preset = None
-        if local_error is None:
-            local_error = str(exc)
     summary_error: Optional[str] = None
     try:
         summary = build_summary_payload_fn(
@@ -285,6 +301,63 @@ def build_dashboard_state(
         load_tracker_node_capabilities_safe_fn=load_tracker_node_capabilities_safe_fn,
         to_jsonable_fn=to_jsonable_fn,
         utc_now_fn=utc_now_fn,
+    )
+    state = state_payload.as_dict()
+
+    if show_secrets:
+        return state
+    return redact_secrets_fn(state, sensitive_field_names)
+
+
+def build_dashboard_state_lite(
+    *,
+    iface: object,
+    tracker: StateTracker,
+    started_at: float,
+    target: str,
+    show_secrets: bool,
+    storage_probe_path: Optional[str],
+    revision_info: RevisionPayload,
+    sensitive_field_names: set[str],
+    collect_nodes_fn: CollectNodesFn = _collect_nodes_helper,
+    collect_local_state_fn: CollectLocalStateFn = _collect_local_state_helper,
+    collect_local_state_safe_fn: CollectLocalStateSafeFn = _collect_local_state_safe_helper,
+    modem_preset_from_local_state_fn: ModemPresetFromLocalStateFn = _modem_preset_from_local_state_helper,
+    apply_node_saved_counts_fn: ApplyNodeSavedCountsFn = _apply_node_saved_counts_helper,
+    build_summary_payload_fn: BuildSummaryPayloadFn = _build_summary_payload_helper,
+    load_tracker_snapshot_safe_fn: LoadTrackerSnapshotSafeFn = _load_tracker_snapshot_safe_helper,
+    load_tracker_node_saved_counts_safe_fn: LoadTrackerNodeSavedCountsSafeFn = _load_tracker_node_saved_counts_safe_helper,
+    load_tracker_node_capabilities_safe_fn: LoadTrackerNodeCapabilitiesSafeFn = _load_tracker_node_capabilities_safe_helper,
+    to_jsonable_fn: ToJsonableFn = _to_jsonable,
+    redact_secrets_fn: RedactSecretsFn = _redact_secrets,
+    utc_now_fn: UtcNowFn = _utc_now,
+) -> Dict[str, object]:
+    """Build a slimmed-down state snapshot optimized for UI polling.
+
+    This skips expensive raw/debug fields (myInfo/metadata/local_state) and can
+    also be paired with a nodes collector that avoids building the full node
+    payload list.
+    """
+    state_payload = build_dashboard_state_typed(
+        iface=iface,
+        tracker=tracker,
+        target=target,
+        started_at=started_at,
+        storage_probe_path=storage_probe_path,
+        revision_info=coerce_revision_info(revision_info),
+        collect_nodes_fn=collect_nodes_fn,
+        collect_local_state_fn=collect_local_state_fn,
+        collect_local_state_safe_fn=collect_local_state_safe_fn,
+        modem_preset_from_local_state_fn=modem_preset_from_local_state_fn,
+        apply_node_saved_counts_fn=apply_node_saved_counts_fn,
+        build_summary_payload_fn=build_summary_payload_fn,
+        load_tracker_snapshot_safe_fn=load_tracker_snapshot_safe_fn,
+        load_tracker_node_saved_counts_safe_fn=load_tracker_node_saved_counts_safe_fn,
+        load_tracker_node_capabilities_safe_fn=load_tracker_node_capabilities_safe_fn,
+        to_jsonable_fn=to_jsonable_fn,
+        utc_now_fn=utc_now_fn,
+        include_debug=False,
+        include_nodes_full=False,
     )
     state = state_payload.as_dict()
 

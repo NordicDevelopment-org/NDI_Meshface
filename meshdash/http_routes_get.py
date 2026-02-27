@@ -26,6 +26,7 @@ def handle_dashboard_get(
     if path == "/api/state":
         _handle_state_get_helper(
             handler,
+            query=query,
             state_fn=deps.state_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )

@@ -51,4 +51,24 @@ def build_state_snapshot_loader_with_dependencies(
             revision_info=dependencies.revision_info,
         )
 
+    # Optional fast-path for lite polling: if the build_state_fn was wrapped
+    # with a `.lite` variant during wiring, expose it here too.
+    build_state_lite = getattr(build_state_fn, "lite", None)
+    if callable(build_state_lite):
+        def state_fn_lite() -> dict:
+            return build_state_lite(
+                iface=dependencies.iface,
+                tracker=dependencies.tracker,
+                started_at=dependencies.started_at,
+                target=dependencies.target,
+                show_secrets=dependencies.show_secrets,
+                storage_probe_path=dependencies.storage_probe_path,
+                revision_info=dependencies.revision_info,
+            )
+
+        try:
+            setattr(state_fn, "lite", state_fn_lite)
+        except Exception:
+            pass
+
     return state_fn

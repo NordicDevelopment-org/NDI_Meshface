@@ -51,7 +51,7 @@ from meshdash.runtime import (
     apply_default_gateway as _apply_default_gateway_helper,
     guess_lan_ipv4 as _guess_lan_ipv4_helper,
 )
-from meshdash.state import build_state as _build_state_helper
+from meshdash.state import build_state as _build_state_helper, build_state_lite as _build_state_lite_helper
 from meshdash.services import (
     build_node_history_loader as _build_node_history_loader,
     build_online_activity_loader as _build_online_activity_loader,
@@ -173,6 +173,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
         seed_tracker_fn=_seed_tracker_from_node_db_helper,
         revision_info_fn=_revision_info,
         build_state_fn=_build_state_helper,
+        build_state_lite_fn=_build_state_lite_helper,
         sensitive_field_names=SENSITIVE_FIELD_NAMES,
         build_node_history_loader_fn=_build_node_history_loader,
         build_online_activity_loader_fn=_build_online_activity_loader,
