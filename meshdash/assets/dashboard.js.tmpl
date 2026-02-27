@@ -112,6 +112,7 @@
     const wheelActivationLeaseMs = 1400;
     const knownLayoutViews = new Set(["chat", "network", "saved", "packets", "data", "all"]);
     const knownChatChannels = new Set(["all", "direct"]);
+    const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const reactionPopoverMaxNames = 12;
     const sortableTables = new Set(Object.keys(tableSortState));
@@ -1285,11 +1286,18 @@
 
     function normalizeChatChannel(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
-      return knownChatChannels.has(clean) ? clean : "all";
+      if (knownChatChannels.has(clean)) return clean;
+      if (clean.startsWith("room:")) {{
+        const slug = clean.slice(5).trim();
+        if (roomSlugRe.test(slug)) return `room:${{slug}}`;
+      }}
+      return "all";
     }}
 
     function channelLabel(key) {{
-      return key === "direct" ? "Peer-to-peer" : "Everyone";
+      if (key === "direct") return "Peer-to-peer";
+      if (typeof key === "string" && key.startsWith("room:")) return `#${{key.slice(5)}}`;
+      return "Everyone";
     }}
 
     function normalizeDeliveryState(raw) {{
@@ -1600,6 +1608,9 @@
 
     function classifyMessageChannel(msg) {{
       if (!msg || typeof msg !== "object") return "all";
+      if (typeof msg.scope === "string" && msg.scope.trim()) {{
+        return normalizeChatChannel(msg.scope);
+      }}
       const toId = normalizeNodeId(msg.to || msg.destination || "");
       if (!toId || toId === "^all" || toId === "all" || toId === "broadcast") {{
         return "all";

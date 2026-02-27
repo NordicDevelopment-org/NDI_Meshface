@@ -3,6 +3,8 @@ from .html_assets import render_asset_template as _render_asset_template_helper
 
 def build_html_shell(
     *,
+    app_title: str,
+    app_heading: str,
     style_css: str,
     app_js: str,
     revision_title: str,
@@ -14,6 +16,8 @@ def build_html_shell(
 ) -> str:
     return _render_asset_template_helper(
         "dashboard.html.tmpl",
+        app_title=app_title,
+        app_heading=app_heading,
         style_css=style_css,
         app_js=app_js,
         revision_title=revision_title,

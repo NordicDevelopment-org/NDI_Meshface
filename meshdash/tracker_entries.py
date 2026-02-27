@@ -1,5 +1,6 @@
 from typing import Optional
 
+from .chat_scope import chat_scope_for_destination
 from .runtime_types import FormatEpochFn, ToIntFn, UtcNowFn
 
 
@@ -80,6 +81,7 @@ def build_chat_entry_from_packet(
         "captured_at": utc_now_fn(),
         "from": from_id,
         "to": to_id,
+        "scope": chat_scope_for_destination(to_id),
         "portnum": str(portnum) if portnum is not None else None,
         "channel": packet.get("channel"),
         "rx_time": format_epoch_fn(packet.get("rxTime")),

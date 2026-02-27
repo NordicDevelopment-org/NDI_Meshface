@@ -15,6 +15,12 @@ DEFAULT_NODE_HISTORY_HOURS = 72
 DEFAULT_NODE_HISTORY_MAX_POINTS = 1440
 DEFAULT_CHAT_MAX_BYTES = 220
 
+# Meshyface Rooms sideband portnum (Meshtastic "private app" range is 256-511).
+#
+# 256 is commonly used as the generic PRIVATE_APP bucket, so we default to 257
+# to reduce accidental collisions with other experiments.
+DEFAULT_ROOMS_PORTNUM = 257
+
 DEFAULT_APP_VERSION_FALLBACK = "0.1.0"
 UNKNOWN_GIT_COMMIT = "nogit"
 

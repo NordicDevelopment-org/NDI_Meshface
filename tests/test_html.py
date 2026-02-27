@@ -14,7 +14,7 @@ def test_render_html_includes_revision_and_runtime_values():
         revision_label="Rev: v0.1.0 (abc123)",
         revision_title="v0.1.0 / abc123",
     )
-    assert "Meshtastic Dashboard" in html
+    assert "Meshyface" in html
     assert "Rev: v0.1.0 (abc123)" in html
     assert "History: on (7d retention, 5000 rows max)" in html
     assert "const refreshMs = 3000;" in html
