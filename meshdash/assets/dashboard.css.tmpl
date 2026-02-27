@@ -448,6 +448,54 @@
       accent-color: #2f855a;
       cursor: pointer;
     }}
+
+    .map-card-actions {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }}
+    .map-reset-view-btn {{
+      border: 1px solid #bfd4c3;
+      background: #f7fcf7;
+      color: #274935;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .map-reset-view-btn:hover {{
+      background: #e7f3eb;
+    }}
+
+    #nodes-table thead th {{
+      padding-right: 12px;
+    }}
+    .col-resizer {{
+      position: absolute;
+      top: 0;
+      right: -2px;
+      width: 7px;
+      height: 100%;
+      cursor: col-resize;
+      user-select: none;
+      touch-action: none;
+    }}
+    .col-resizer::after {{
+      content: "";
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      left: 3px;
+      width: 1px;
+      background: rgba(20, 62, 47, 0.22);
+      border-radius: 1px;
+    }}
+
     .map-heatmap-wrap.disabled {{
       opacity: 0.65;
       cursor: not-allowed;
@@ -1512,6 +1560,19 @@
     #nodes-table tbody tr.node-selectable:hover {{
       background: #edf8f1;
     }}
+    .node-status-dot {{
+      display: inline-block;
+      width: 10px;
+      margin-right: 4px;
+      font-size: 10px;
+      line-height: 1;
+      opacity: 0.85;
+      transform: translateY(-0.5px);
+    }}
+    .node-status-dot.status-online {{ color: #2f855a; }}
+    .node-status-dot.status-warn {{ color: #d1a02d; }}
+    .node-status-dot.status-stale {{ color: #b22222; }}
+    .node-status-dot.status-unknown {{ color: #607268; }}
     #nodes-table tbody tr.selected-node {{
       background: #d8efe1;
     }}
@@ -1523,16 +1584,6 @@
       box-shadow: inset 3px 0 0 #2f855a;
     }}
     .mono {{ font-family: "IBM Plex Mono", "Consolas", "Menlo", monospace; }}
-    #nodes-table th:nth-child(1), #nodes-table td:nth-child(1) {{ width: 13%; }}
-    #nodes-table th:nth-child(2), #nodes-table td:nth-child(2) {{ width: 12%; }}
-    #nodes-table th:nth-child(3), #nodes-table td:nth-child(3) {{ width: 20%; }}
-    #nodes-table th:nth-child(4), #nodes-table td:nth-child(4) {{ width: 14%; }}
-    #nodes-table th:nth-child(5), #nodes-table td:nth-child(5) {{ width: 6%; }}
-    #nodes-table th:nth-child(6), #nodes-table td:nth-child(6) {{ width: 6%; }}
-    #nodes-table th:nth-child(7), #nodes-table td:nth-child(7) {{ width: 7%; }}
-    #nodes-table th:nth-child(8), #nodes-table td:nth-child(8) {{ width: 9%; }}
-    #nodes-table th:nth-child(9), #nodes-table td:nth-child(9) {{ width: 10%; }}
-    #nodes-table th:nth-child(10), #nodes-table td:nth-child(10) {{ width: 3%; }}
     #nodes-table th:nth-child(10), #nodes-table td:nth-child(10) {{
       text-align: right;
     }}
@@ -3368,6 +3419,10 @@
       color: #bed3e8 !important;
       opacity: 0.9;
     }}
+    [data-theme="dark"] .node-status-dot.status-online {{ color: #3fb950; }}
+    [data-theme="dark"] .node-status-dot.status-warn {{ color: #d29922; }}
+    [data-theme="dark"] .node-status-dot.status-stale {{ color: #ff7b72; }}
+    [data-theme="dark"] .node-status-dot.status-unknown {{ color: #8b949e; }}
     [data-theme="dark"] #nodes-table tbody tr.selected-node td {{
       background: #243646 !important;
       border-color: #4a617a !important;
@@ -3516,6 +3571,19 @@
     [data-theme="dark"] .map-heatmap-wrap input {{
       accent-color: #5aa878;
     }}
+
+    [data-theme="dark"] .map-reset-view-btn {{
+      background: #16231d;
+      border-color: #355343;
+      color: #cbe8d7;
+    }}
+    [data-theme="dark"] .map-reset-view-btn:hover {{
+      background: #1b2b23;
+    }}
+    [data-theme="dark"] .col-resizer::after {{
+      background: rgba(120, 176, 151, 0.32);
+    }}
+
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .card.chat .chat-compose-shell {{
       background: var(--ui-panel-alt);
