@@ -309,7 +309,7 @@
 
     function syncSignalHeatmapAfterKnobChange() {{
       if (!latestState || !Array.isArray(latestState.nodes)) return;
-      syncSignalHeatmapLayer(latestState.nodes, false);
+      syncSignalHeatmapLayer(latestState.nodes, activeLayoutView === "saved");
     }}
 
     function setSignalHeatDevKnobs(overrides, persist = true) {{
@@ -493,27 +493,6 @@
       return points;
     }}
 
-    function collectSelectedNodeSignalPoint(nodes, profile) {{
-      const selectedId = normalizeNodeId(selectedNodeId || "");
-      if (!isSelectableNodeId(selectedId)) return [];
-      const selectedNode = (nodes || []).find(
-        (node) => normalizeNodeId(node && node.id) === selectedId
-      );
-      if (!selectedNode || typeof selectedNode !== "object") return [];
-      const lat = Number(selectedNode.lat);
-      const lon = Number(selectedNode.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
-
-      const nowUnix = Math.floor(Date.now() / 1000);
-      const weight = signalHeatWeight(selectedNode, profile, nowUnix);
-      if (!Number.isFinite(weight)) return [];
-
-      const intensityFloor = signalHeatDevKnobs.intensityFloor;
-      const eased = Math.pow(clampUnitInterval(weight), signalHeatDevKnobs.intensityGamma);
-      const intensity = intensityFloor + (eased * (1 - intensityFloor));
-      return [[lat, lon, Math.max(intensityFloor, Math.min(1, intensity))]];
-    }}
-
     function resolveSignalHeatVisualOptions(pointsCount) {{
       const geoLocked = signalHeatDevKnobs.geoRadiusLock >= 0.5;
       const zoom = Number(map.getZoom());
@@ -556,22 +535,17 @@
     ) {{
       const wrap = document.getElementById("map-heatmap-wrap");
       const toggle = document.getElementById("map-heatmap-toggle");
-      const inMapContext = activeLayoutView === "network"
-        || activeLayoutView === "saved"
-        || activeLayoutView === "all";
+      const inNetworkMapContext = activeLayoutView !== "saved";
       if (wrap instanceof HTMLElement) {{
-        wrap.hidden = !inMapContext;
+        wrap.hidden = !inNetworkMapContext;
         wrap.classList.toggle("disabled", !supported);
         const profileText = profileLabel ? `Tuned for ${{profileLabel}}.` : "";
         const geoText = signalHeatDevKnobs.geoRadiusLock >= 0.5
           ? " Coverage is geo-locked (km-stable across zoom/latitude)."
           : "";
         const devText = " Dev knobs: window.meshHeatmapDev.get()/set()/reset().";
-        const modeText = activeLayoutView === "saved"
-          ? " In Node Details, this indicates selected-node signal level at current position."
-          : "";
         const baseTitle = supported
-          ? `Overlay realtime signal heatmap from positioned nodes, weighted by reported SNR/RSSI. ${{profileText}} Nodes fade after ~40 minutes.${{modeText}}${{geoText}}${{devText}}`
+          ? `Overlay realtime signal heatmap from positioned nodes, weighted by reported SNR/RSSI. ${{profileText}} Nodes fade after ~40 minutes.${{geoText}}${{devText}}`
           : "Heatmap overlay is unavailable (leaflet.heat not loaded).";
         if (Number.isFinite(pointsCount)) {{
           wrap.title = `${{baseTitle}} Active nodes with signal+position: ${{pointsCount}}.`;
@@ -588,13 +562,7 @@
     function syncSignalHeatmapLayer(nodes, forceHide = false) {{
       const layer = ensureSignalHeatmapLayer();
       const profile = resolveSignalHeatProfile();
-      const points = layer
-        ? (
-          activeLayoutView === "saved"
-            ? collectSelectedNodeSignalPoint(nodes, profile)
-            : collectSignalHeatmapPoints(nodes, profile)
-        )
-        : [];
+      const points = layer ? collectSignalHeatmapPoints(nodes, profile) : [];
       updateSignalHeatmapControl(points.length, !!layer, profile.label || "");
       if (!layer) {{
         return;
@@ -604,11 +572,8 @@
         layer.setOptions(visual);
       }}
       layer.setLatLngs(points);
-      const mapHasVisibleCard = activeLayoutView === "network"
-        || activeLayoutView === "saved"
-        || activeLayoutView === "all";
       const shouldShow = !forceHide
-        && mapHasVisibleCard
+        && activeLayoutView !== "saved"
         && signalHeatmapEnabled
         && points.length > 0;
       if (shouldShow) {{
@@ -894,12 +859,12 @@
       bindMapWheelActivation();
       map.on("zoomend", () => {{
         const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
-        syncSignalHeatmapLayer(nodes, false);
+        syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
       }});
       map.on("moveend", () => {{
         if (signalHeatDevKnobs.geoRadiusLock < 0.5) return;
         const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
-        syncSignalHeatmapLayer(nodes, false);
+        syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
       }});
     }});
     window.addEventListener("resize", () => {{
@@ -1234,10 +1199,10 @@
         signalHeatmapEnabled = !!toggle.checked;
         persistSignalHeatmapPreference();
         const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
-        syncSignalHeatmapLayer(nodes, false);
+        syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
       }});
       const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
-      syncSignalHeatmapLayer(nodes, false);
+      syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
     }}
 
     function getChatScroller() {{
@@ -2546,13 +2511,13 @@
         if (next === "saved") {{
           mapTitle.textContent = "Node Details";
         }} else if (next === "network") {{
-          mapTitle.textContent = "Network Explorer";
+          mapTitle.textContent = "";
         }} else {{
           mapTitle.textContent = isSelectableNodeId(selectedNodeId) ? "Selected Node Map" : "Network Map";
         }}
       }}
       const mapNodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
-      syncSignalHeatmapLayer(mapNodes, false);
+      syncSignalHeatmapLayer(mapNodes, next === "saved");
       setMapWheelZoomActive(next === "network" || next === "saved");
       if (chatPanelOpen) {{
         if (activeWheelPane instanceof HTMLElement) {{
@@ -3713,9 +3678,10 @@
     }}
 
     function renderMap(nodes, edges, nodeHistory = null) {{
+      const hideHeatmap = activeLayoutView === "saved";
       const signature = buildMapSignature(nodes, edges, nodeHistory);
       if (signature === lastMapSignature) {{
-        syncSignalHeatmapLayer(nodes, false);
+        syncSignalHeatmapLayer(nodes, hideHeatmap);
         updateMapSelection(false);
         return;
       }}
@@ -3730,13 +3696,13 @@
       const selectionMode = isSelectableNodeId(selectedNodeId);
       const savedSelectionMode = selectionMode && activeLayoutView === "saved";
       const networkSelectionMode = selectionMode && activeLayoutView === "network";
-      syncSignalHeatmapLayer(nodes, false);
+      syncSignalHeatmapLayer(nodes, hideHeatmap);
       const mapTitle = document.getElementById("map-card-title");
       if (mapTitle) {{
         if (activeLayoutView === "saved") {{
           mapTitle.textContent = "Node Details";
         }} else if (activeLayoutView === "network") {{
-          mapTitle.textContent = "Network Explorer";
+          mapTitle.textContent = "";
         }} else {{
           mapTitle.textContent = selectionMode ? "Selected Node Map" : "Network Map";
         }}
