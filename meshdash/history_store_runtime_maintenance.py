@@ -20,6 +20,18 @@ from .history_store_policy import (
 def close_history_store(store: HistoryStoreRuntimeState) -> None:
     with store._lock:
         store._conn.close()
+    read_conn = getattr(store, "_read_conn", None)
+    if read_conn is None:
+        return
+    if read_conn is getattr(store, "_conn", None):
+        return
+    read_lock = getattr(store, "_read_lock", None) or getattr(store, "_lock", None)
+    if read_lock is None:
+        # Last resort.
+        read_conn.close()
+        return
+    with read_lock:
+        read_conn.close()
 
 
 def prune_history_store_unlocked(

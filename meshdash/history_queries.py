@@ -61,34 +61,40 @@ def fetch_node_history_rows(
 
 
 def fetch_online_activity_rows(conn: SqlConnection, cutoff: int) -> tuple[SqlRows, int]:
+    # node_hour_seen is a compact per-node-per-hour presence table maintained
+    # via triggers on node_metrics_1m. It's dramatically smaller than the
+    # 1-minute rollup, so these queries stay snappy even with large histories.
+    cutoff_hour = int(cutoff) - (int(cutoff) % 3600)
     hour_rows = conn.execute(
         """
-        SELECT bucket_unix - (bucket_unix % 3600) AS hour_bucket,
-               COUNT(DISTINCT node_id) AS online_nodes
-        FROM node_metrics_1m
-        WHERE bucket_unix >= ?
+        SELECT hour_bucket,
+               COUNT(*) AS online_nodes
+        FROM node_hour_seen
+        WHERE hour_bucket >= ?
         GROUP BY hour_bucket
         ORDER BY hour_bucket ASC
         """,
-        (cutoff,),
+        (cutoff_hour,),
     ).fetchall()
     distinct_row = conn.execute(
-        "SELECT COUNT(DISTINCT node_id) FROM node_metrics_1m WHERE bucket_unix >= ?",
-        (cutoff,),
+        "SELECT COUNT(DISTINCT node_id) FROM node_hour_seen WHERE hour_bucket >= ?",
+        (cutoff_hour,),
     ).fetchone()
     distinct_nodes = int((distinct_row[0] if distinct_row else 0) or 0)
     return hour_rows, distinct_nodes
 
 
 def fetch_node_saved_count_rows(conn: SqlConnection) -> SqlRows:
+    # NOTE: node_saved_counts is maintained by triggers on node_metrics_1m.
+    # This avoids scanning/grouping the entire rollup table on every /api/state
+    # refresh, which can become a major UI latency source.
     return conn.execute(
         """
         SELECT node_id,
-               SUM(packet_count) AS saved_packets,
-               COUNT(*) AS saved_points,
-               MAX(last_seen_unix) AS saved_last_seen_unix
-        FROM node_metrics_1m
-        GROUP BY node_id
+               saved_packets,
+               saved_points,
+               saved_last_seen_unix
+        FROM node_saved_counts
         """
     ).fetchall()
 

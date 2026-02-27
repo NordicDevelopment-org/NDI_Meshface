@@ -4,6 +4,7 @@ from typing import Callable
 from .history.db import (
     open_and_initialize_history_connection as _open_and_initialize_history_connection_helper,
     open_and_initialize_history_connection_with_policy as _open_and_initialize_history_connection_with_policy_helper,
+    open_history_read_connection as _open_history_read_connection_helper,
 )
 from .history_store_runtime_contracts import (
     BuildHistoryStorePolicyFn,
@@ -47,6 +48,10 @@ def initialize_history_store_runtime(
     store.rollup_retention_seconds = policy.rollup_retention_seconds
     store._writes_since_prune = 0
     store._lock = lock_factory()
+    # Read operations can happen frequently (UI polling) and should not be blocked
+    # by writer commits. We'll optionally provision a dedicated read connection.
+    store._read_lock = lock_factory()
+    store._read_conn = None
     if (
         open_and_initialize_history_connection_with_policy_fn
         is _open_and_initialize_history_connection_with_policy_helper
@@ -67,3 +72,19 @@ def initialize_history_store_runtime(
             db_path=store.db_path,
             policy=policy,
         )
+
+    # Only create a separate read connection when we're using the default
+    # connection opener *and* the DB path is file-backed. In-memory SQLite
+    # databases can't be shared across multiple connections.
+    if (
+        store.db_path
+        and str(store.db_path) not in (":memory:", "file::memory:")
+        and open_and_initialize_history_connection_with_policy_fn
+        is _open_and_initialize_history_connection_with_policy_helper
+        and open_and_initialize_history_connection_fn
+        is _open_and_initialize_history_connection_helper
+    ):
+        try:
+            store._read_conn = _open_history_read_connection_helper(db_path=store.db_path)
+        except Exception:
+            store._read_conn = None

@@ -112,4 +112,34 @@ TABLE_SCHEMA_STATEMENTS = [
       PRIMARY KEY(bucket_unix, from_id, to_id)
     )
     """,
+
+    # Fast per-node rollup of history storage totals.
+    #
+    # This is maintained via triggers on node_metrics_1m so that the dashboard
+    # UI (which polls /api/state frequently) does *not* need to GROUP BY over
+    # the entire metrics table on every refresh.
+    """
+    CREATE TABLE IF NOT EXISTS node_saved_counts (
+      node_id TEXT PRIMARY KEY,
+      saved_packets INTEGER NOT NULL DEFAULT 0,
+      saved_points INTEGER NOT NULL DEFAULT 0,
+      saved_last_seen_unix INTEGER NOT NULL DEFAULT 0
+    )
+    """,
+
+    # Per-node-per-hour presence table for fast "online activity" charts.
+    #
+    # The UI's online-activity view needs "how many distinct nodes were seen per hour"
+    # over a window. Computing this from node_metrics_1m requires scanning and
+    # COUNT(DISTINCT node_id) across potentially large history.
+    #
+    # node_hour_seen is maintained incrementally via triggers on node_metrics_1m
+    # and stays ~60x smaller than the 1-minute rollup.
+    """
+    CREATE TABLE IF NOT EXISTS node_hour_seen (
+      hour_bucket INTEGER NOT NULL,
+      node_id TEXT NOT NULL,
+      PRIMARY KEY(hour_bucket, node_id)
+    )
+    """,
 ]
