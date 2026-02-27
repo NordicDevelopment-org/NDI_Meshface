@@ -1,5 +1,10 @@
 # Meshtastic Dashboard as a Server Service
 
+> ⚠️ **Archived note:** this doc is kept for reference and may be out of date.
+> The active deployment guide is the root `README.md`.
+>
+> In particular, newer versions require copying the `meshdash/` package directory alongside `mesh_dashboard.py`.
+
 This runs `mesh_dashboard.py` as a persistent systemd service on your Debian VM.
 
 Recommended source for mesh data:
@@ -13,6 +18,7 @@ From your laptop (`j-dbox`):
 ```bash
 scp /home/j/mesh_py/mesh_dashboard.py j@192.168.1.241:/home/j/mesh/app/
 scp /home/j/mesh_py/mesh_connection.py j@192.168.1.241:/home/j/mesh/app/
+scp -r /home/j/mesh_py/meshdash j@192.168.1.241:/home/j/mesh/app/
 scp /home/j/mesh_py/meshtastic-dashboard.service j@192.168.1.241:/home/j/
 ```
 

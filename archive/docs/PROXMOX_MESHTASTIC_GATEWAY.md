@@ -1,5 +1,8 @@
 # Proxmox USB Meshtastic Gateway (RAK4631 or Heltec V3)
 
+> ⚠️ **Archived note:** this is a reference setup guide.
+> The dashboard itself is configured in the root `README.md`.
+
 This setup exposes a USB Meshtastic node as a TCP endpoint (like a LAN "radio server").
 
 - Works with `RAK4631` and `Heltec V3` when running Meshtastic firmware.

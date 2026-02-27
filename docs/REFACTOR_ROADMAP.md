@@ -1,5 +1,12 @@
 # Mesh Dashboard Refactor Roadmap
 
+> **Status note:** this document is intentionally detailed and reads like an engineering log.
+> Most of the modularization work described below has already landed in `meshdash/`.
+> For current, forward‑looking work (especially **Rooms**), start with:
+>
+> - `docs/ROADMAP.md`
+> - `docs/ROOMS_SPEC.md`
+
 ## Goals
 
 - Make UI/theme changes predictable and low-risk.

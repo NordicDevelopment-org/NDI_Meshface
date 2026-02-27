@@ -1,8 +1,14 @@
-# Meshtastic Deep Dashboard
+# Meshyface (working title)
 
-Web dashboard for Meshtastic networks with live map, node tables, chat room, and persisted history.
+**Meshyface** is a chat‑first, LAN‑hosted web UI for Meshtastic networks.
 
-This repo is focused on running `mesh_dashboard.py` as a website you can open from desktop/mobile on your LAN.
+It started life as **Meshtastic Deep Dashboard** (map + node intel + history). The direction now is:
+
+- **Teams‑style workspace** (chat is primary).
+- **90’s chatroom vibes** (explorable “rooms” that appear when you hear traffic).
+- Network/map/history stays in the same window as contextual intelligence.
+
+The runtime is still the same simple entrypoint: `mesh_dashboard.py`.
 
 ## Project Direction
 
@@ -11,6 +17,8 @@ This project is moving toward a **Teams-like mesh chat experience** where chat i
 Planning docs:
 
 - `docs/PROJECT_PLAN.md`
+- `docs/ROADMAP.md` (milestones + handoff plan)
+- `docs/ROOMS_SPEC.md` (rooms protocol + UX rules)
 - `docs/REPO_STRUCTURE.md`
 
 ## Milestones (UI Direction)
@@ -18,7 +26,7 @@ Planning docs:
 - [x] Add Teams-style left navigation rail with view modes (`Chat`, `Network`, `Packets`, `Data`, `All`).
 - [x] Add Chat-mode left expansion panel for roster-based node selection.
 - [x] Add chat scopes in sidebar (`Everyone`, direct peer-to-peer).
-- [ ] Add future named channels/groups beyond `Everyone` and peer-to-peer.
+- [ ] Add explorable public “Rooms” (AOL/Prodigy style) without spamming the normal public chat feed.
 - [ ] Unify right-side contextual pane behavior (map + node history + packet context) across all views.
 - [ ] Add saved view presets/layout profiles for desktop vs field testing workflows.
 
@@ -37,7 +45,7 @@ Planning docs:
 
 - `mesh_dashboard.py`: main web app.
 - `mesh_connection.py`: serial/TCP connection helper.
-- `meshdash/helpers.py`: shared pure helper functions (time/parsing/hops/reaction helpers).
+- `meshdash/`: backend modules + frontend templates (HTML/CSS/JS live under `meshdash/assets/`).
 - `meshtastic-dashboard.service`: systemd unit for dashboard website.
 - `README.md`: setup + operations guide for this dashboard server.
 
@@ -114,9 +122,13 @@ mkdir -p ~/mesh/{app,config,logs}
 
 ### 2) Copy app files to VM (from your workstation)
 
+⚠️ **Important:** the dashboard now depends on the `meshdash/` package directory.
+Copy it alongside `mesh_dashboard.py` and `mesh_connection.py`.
+
 ```bash
 scp ~/mesh_py/mesh_dashboard.py j@192.168.1.241:/home/j/mesh/app/
 scp ~/mesh_py/mesh_connection.py j@192.168.1.241:/home/j/mesh/app/
+scp -r ~/mesh_py/meshdash j@192.168.1.241:/home/j/mesh/app/
 scp ~/mesh_py/meshtastic-dashboard.service j@192.168.1.241:/home/j/
 ```
 
@@ -166,7 +178,7 @@ scp /home/j/mesh_py/mesh_dashboard.py j@192.168.1.241:/home/j/mesh/app/ && \
 tar -C /home/j/mesh_py --exclude='meshdash/__pycache__' --exclude='*.pyc' -cf - meshdash | \
 ssh j@192.168.1.241 'tar -C /home/j/mesh/app -xf -' && \
 ssh -t j@192.168.1.241 '
-python3 -m py_compile /home/j/mesh/app/mesh_dashboard.py /home/j/mesh/app/meshdash/*.py &&
+python3 -m compileall -q /home/j/mesh/app &&
 sudo systemctl restart meshtastic-dashboard &&
 SYSTEMD_PAGER=cat sudo systemctl --no-pager -l status meshtastic-dashboard
 '

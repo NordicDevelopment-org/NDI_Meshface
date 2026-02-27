@@ -1,19 +1,21 @@
-# Mesh Dashboard Product Plan
+# Meshyface Product Plan (working title)
 
 ## North Star
 
-Build a **Teams-like chat experience for Meshtastic networks** with integrated network awareness in one window:
+Build a **Teams‑like chat experience for Meshtastic networks** with a splash of **90’s chatroom culture**:
 
 - Chat is primary.
 - Network/map/history cards are contextual.
-- Operators can move from conversation -> node diagnostics -> link quality without changing tools.
+- Operators can move from conversation → node diagnostics → link quality without changing tools.
+- Public, explorable **Rooms** appear when you pick up traffic (AOL/Prodigy style).
 
 ## Product Direction
 
 1. Chat-first UX
-2. Live + historical telemetry side-by-side
-3. Persistent state for replay and benchmarking
-4. LAN-hosted, low-friction deployment
+2. Public Rooms (discoverable from traffic; joinable by name)
+3. Live + historical telemetry side-by-side
+4. Persistent state for replay and benchmarking
+5. LAN-hosted, low-friction deployment
 
 ## Milestones
 
@@ -58,3 +60,8 @@ Build a **Teams-like chat experience for Meshtastic networks** with integrated n
 - Persists correctly in history (if feature touches chat/traffic)
 - Has pytest coverage for parsing/state behavior
 - README/docs updated when behavior changes
+
+## Where the “Rooms” plan lives
+
+- Product + engineering milestones: `docs/ROADMAP.md`
+- Protocol + UX rules: `docs/ROOMS_SPEC.md`
