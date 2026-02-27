@@ -10,6 +10,11 @@ def build_dashboard_handler_class(
     dispatch_post_fn: Callable[[DashboardHttpHandler], None],
 ) -> type[BaseHTTPRequestHandler]:
     class DashboardHandler(BaseHTTPRequestHandler):
+        # BaseHTTPRequestHandler defaults to HTTP/1.0 which disables keep-alive.
+        # The dashboard polls frequently; HTTP/1.1 persistent connections cut
+        # latency and CPU by avoiding a new TCP handshake per request.
+        protocol_version = "HTTP/1.1"
+
         def do_GET(self) -> None:
             try:
                 dispatch_get_fn(self)

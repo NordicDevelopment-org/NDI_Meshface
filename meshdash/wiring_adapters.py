@@ -26,6 +26,14 @@ def build_state_builder(
             **kwargs,
         )
 
+    # Expose the sensitive key list for optional on-demand/raw endpoints.
+    # (Functions are objects in Python; attaching attributes keeps the public
+    # type surface unchanged while still enabling optimizations.)
+    try:
+        setattr(state_with_sensitive_fields, "_sensitive_field_names", sensitive_field_names)
+    except Exception:
+        pass
+
     return state_with_sensitive_fields
 
 

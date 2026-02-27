@@ -118,7 +118,13 @@ class ParseThemeSettingsRequestFn(Protocol):
 
 
 class WriteHtmlResponseFn(Protocol):
-    def __call__(self, handler: DashboardHttpHandler, *, html_text: str) -> None:
+    def __call__(
+        self,
+        handler: DashboardHttpHandler,
+        *,
+        html_text: str,
+        extra_headers: Optional[Mapping[str, str]] = None,
+    ) -> None:
         ...
 
 
@@ -130,12 +136,20 @@ class WriteJsonResponseFn(Protocol):
         status_code: int,
         payload_obj: object,
         no_store: bool = False,
+        extra_headers: Optional[Mapping[str, str]] = None,
     ) -> None:
         ...
 
 
 class WriteTextResponseFn(Protocol):
-    def __call__(self, handler: DashboardHttpHandler, *, status_code: int, text: str) -> None:
+    def __call__(
+        self,
+        handler: DashboardHttpHandler,
+        *,
+        status_code: int,
+        text: str,
+        extra_headers: Optional[Mapping[str, str]] = None,
+    ) -> None:
         ...
 
 

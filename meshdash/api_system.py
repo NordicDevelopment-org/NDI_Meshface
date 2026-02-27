@@ -40,16 +40,56 @@ def handle_state_get(
     query: str = "",
 ) -> None:
     lite = _truthy_query_flag(query, "lite")
+
+    # Resolve the function that will be used to build the payload.
+    selected_fn = state_fn
     if lite:
         state_lite_fn = getattr(state_fn, "lite", None)
         if callable(state_lite_fn):
-            payload_raw = state_lite_fn()
-        else:
-            payload_raw = state_fn()
-    else:
-        payload_raw = state_fn()
+            selected_fn = state_lite_fn
 
+    # Conditional GET: if the client already has this version, return 304.
+    etag_fn = getattr(selected_fn, "etag", None)
+    etag = None
+    if callable(etag_fn):
+        try:
+            etag = str(etag_fn())
+        except Exception:
+            etag = None
+
+    if etag:
+        # BaseHTTPRequestHandler's headers mapping is case-insensitive, but our
+        # Protocol is only a Mapping, so be defensive.
+        if_none_match = None
+        try:
+            if_none_match = handler.headers.get("If-None-Match")  # type: ignore[attr-defined]
+        except Exception:
+            if_none_match = None
+        if if_none_match is None:
+            for key, value in getattr(handler, "headers", {}).items():
+                try:
+                    if str(key).lower() == "if-none-match":
+                        if_none_match = value
+                        break
+                except Exception:
+                    continue
+        if if_none_match is not None and str(if_none_match).strip() == etag:
+            handler.send_response(304)
+            handler.send_header("Cache-Control", "no-store")
+            handler.send_header("ETag", etag)
+            handler.send_header("Content-Length", "0")
+            handler.end_headers()
+            return
+
+    payload_raw = selected_fn()
     payload = normalize_state_payload_for_api(payload_raw)
     if lite:
         payload = _lite_state_payload(payload)
-    write_json_response_fn(handler, status_code=200, payload_obj=payload, no_store=True)
+    kwargs = {
+        "status_code": 200,
+        "payload_obj": payload,
+        "no_store": True,
+    }
+    if etag:
+        kwargs["extra_headers"] = {"ETag": etag}
+    write_json_response_fn(handler, **kwargs)

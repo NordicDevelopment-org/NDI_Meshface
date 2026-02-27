@@ -126,6 +126,9 @@
     let activeHistoryTab = "signal";
     let pendingSelectionScroll = false;
     let latestState = null;
+    let stateEtag = "";
+    let uptimeBaseSeconds = null;
+    let uptimeBaseMs = 0;
     let lastMapSignature = "";
     let mapResizeRaf = null;
     let splitPct = 64;
@@ -175,6 +178,9 @@
     const chatSeenMessageKeys = new Set();
     const chatSeenMessageOrder = [];
     const nodeHistoryCache = new Map();
+    let nodeHistoryFetchSeq = 0;
+    let nodeHistoryFetchAbort = null;
+    let nodeHistoryFetchNodeId = "";
     const onlineActivityCache = new Map();
     const nodeNameCache = new Map();
     const favoriteNodeIds = new Set();
@@ -876,6 +882,21 @@
       const el = document.getElementById(id);
       if (!el) return;
       el.textContent = value == null ? "n/a" : String(value);
+    }}
+
+    function syncUptimeBase(uptimeSeconds) {{
+      const clean = Number(uptimeSeconds);
+      if (!Number.isFinite(clean)) return;
+      uptimeBaseSeconds = Math.max(0, Math.floor(clean));
+      uptimeBaseMs = Date.now();
+    }}
+
+    function updateUptimeDisplay() {{
+      if (typeof uptimeBaseSeconds !== "number" || !Number.isFinite(uptimeBaseSeconds)) {{
+        return;
+      }}
+      const delta = Math.max(0, (Date.now() - (uptimeBaseMs || 0)) / 1000);
+      setText("m-uptime", Math.floor(uptimeBaseSeconds + delta));
     }}
 
     function normalizeThemeMode(raw) {{
@@ -2586,6 +2607,8 @@
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
         renderSavedNodeDetails(latestState, cachedNodeHistory);
       }}
+      // Ensure node history loads immediately when switching into the map views.
+      void refreshSelectedNodeHistory(false);
       requestMapResize();
     }}
 
@@ -3162,6 +3185,8 @@
             }}
           }}
           renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
+          // Kick a refresh so we don't wait for the next poll to show node history.
+          void refreshSelectedNodeHistory(false);
         }} else {{
           setMapDataMode("live");
         }}
@@ -3169,6 +3194,7 @@
       }}
 
       mapDataFocus = "activity";
+      abortNodeHistoryFetch();
       renderOnlineActivityLoading();
       fetchOnlineActivity(nodeHistoryHours)
         .then((data) => {{
@@ -3260,26 +3286,38 @@
       const focusSelection = shouldFocus && activeLayoutView !== "network";
       updateMapSelection(focusSelection);
       scrollSelectionIntoView();
+      let cachedHistory = null;
+      if (latestState && (activeLayoutView === "saved" || activeLayoutView === "network")) {{
+        cachedHistory = cachedNodeHistory(selectedNodeId);
+      }}
+
       if (activeLayoutView === "saved") {{
-        renderNodeHistoryLoading(selectedNodeId);
+        if (cachedHistory) {{
+          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory, null);
+          renderSavedNodeDetails(latestState || {{}}, cachedHistory);
+        }} else {{
+          renderNodeHistoryLoading(selectedNodeId);
+        }}
+      }} else if (activeLayoutView === "network" || activeLayoutView === "all") {{
+        // Map-data panel is visible in these views.
+        renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory, null);
+        setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
       }} else {{
         setMapDataMode("live");
       }}
+
       if (latestState) {{
-        let cachedNodeHistory = null;
-        if ((activeLayoutView === "saved" || activeLayoutView === "network") && isSelectableNodeId(selectedNodeId)) {{
-          const cached = nodeHistoryCache.get(selectedNodeId);
-          if (cached && cached.data) {{
-            cachedNodeHistory = cached.data;
-          }}
-        }}
-        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
+        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedHistory);
       }}
+
+      // Kick an immediate history refresh so the signal plot/trail doesn't wait for the next poll.
+      void refreshSelectedNodeHistory(false);
       applyChatChannel(activeChatChannel, false);
     }}
 
     function clearNodeSelection() {{
       selectedNodeId = null;
+      abortNodeHistoryFetch();
       resetSignalChartZoom("");
       signalChartPoints = [];
       pendingSelectionScroll = false;
@@ -3550,7 +3588,8 @@
       const realLinks = s.real_edge_count ?? s.edge_count ?? 0;
       setText("m-links", realLinks);
       setText("m-modem-preset", s.modem_preset || "n/a");
-      setText("m-uptime", s.uptime_seconds ?? 0);
+      syncUptimeBase(s.uptime_seconds);
+      updateUptimeDisplay();
       setText("updated-at", updatedValue);
       const updatedFreshness = document.getElementById("updated-freshness");
       if (updatedFreshness instanceof HTMLElement) {{
@@ -5336,19 +5375,136 @@
       setHistoryTab(activeHistoryTab);
     }}
 
-    async function fetchNodeHistory(nodeId) {{
+    async function fetchNodeHistory(nodeId, opts = null) {{
       if (!isSelectableNodeId(nodeId)) return null;
+      const options = (opts && typeof opts === "object") ? opts : {{}};
+      const force = options.force === true;
+      const signal = options.signal || undefined;
       const cached = nodeHistoryCache.get(nodeId);
       const nowMs = Date.now();
-      if (cached && (nowMs - (cached.fetchedAt || 0)) < Math.max(refreshMs, 2500)) {{
+      // Node history changes much slower than live state; avoid hammering the DB.
+      const ttlMs = Math.max(refreshMs * 2, 8000);
+      if (!force && cached && (nowMs - (cached.fetchedAt || 0)) < ttlMs) {{
         return cached.data;
       }}
       const url = `/api/history/node?node_id=${{encodeURIComponent(nodeId)}}&hours=${{nodeHistoryHours}}&points=${{nodeHistoryMaxPoints}}`;
-      const resp = await fetch(url, {{ cache: "no-store" }});
+      const resp = await fetch(url, {{ cache: "no-store", signal }});
       if (!resp.ok) throw new Error(`history API ${{resp.status}}`);
       const data = await resp.json();
       nodeHistoryCache.set(nodeId, {{ fetchedAt: nowMs, data }});
       return data;
+    }}
+
+    function cachedNodeHistory(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) return null;
+      const cached = nodeHistoryCache.get(clean);
+      if (!cached || !cached.data) return null;
+      const dataId = normalizeNodeId(cached.data.node_id || "");
+      if (dataId && dataId !== clean) return null;
+      return cached.data;
+    }}
+
+    function abortNodeHistoryFetch() {{
+      if (nodeHistoryFetchAbort) {{
+        try {{
+          nodeHistoryFetchAbort.abort();
+        }} catch (_err) {{
+        }}
+      }}
+      nodeHistoryFetchAbort = null;
+      nodeHistoryFetchNodeId = "";
+    }}
+
+    function applyNodeHistoryToView(nodeHistory) {{
+      const state = latestState;
+      if (!state) return;
+      const nodes = state.nodes || [];
+      const traffic = (state.traffic || {{}});
+      const edges = traffic.edges || [];
+
+      if (activeLayoutView === "saved" || activeLayoutView === "network") {{
+        renderMap(nodes, edges, nodeHistory);
+      }}
+
+      // The signal plot lives in the map-data panel, rendered by renderTraffic.
+      if (activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all") {{
+        renderTraffic(traffic, nodes, nodeHistory, null);
+      }}
+
+      if (activeLayoutView === "saved") {{
+        renderSavedNodeDetails(state, nodeHistory);
+      }}
+    }}
+
+    async function refreshSelectedNodeHistory(force = false) {{
+      const nodeId = normalizeNodeId(selectedNodeId || "");
+      if (!isSelectableNodeId(nodeId)) {{
+        abortNodeHistoryFetch();
+        return null;
+      }}
+      if (!(activeLayoutView === "saved" || activeLayoutView === "network")) {{
+        // No need to load node history unless the map views that can use it are visible.
+        abortNodeHistoryFetch();
+        return null;
+      }}
+      if (mapDataFocus === "activity") {{
+        // When showing online activity, keep node history idle.
+        abortNodeHistoryFetch();
+        return null;
+      }}
+
+      const nowMs = Date.now();
+      const ttlMs = Math.max(refreshMs * 2, 8000);
+      const cached = nodeHistoryCache.get(nodeId);
+      const cachedData = cached && cached.data ? cached.data : null;
+      const cacheFresh = !!cachedData && (nowMs - (cached.fetchedAt || 0)) < ttlMs;
+
+      if (!force && cacheFresh) {{
+        // Ensure the UI is actually showing the cached history (selection changes can
+        // switch the UI into a loading state without re-rendering the chart).
+        applyNodeHistoryToView(cachedData);
+        return cachedData;
+      }}
+
+      if (!force && nodeHistoryFetchAbort && nodeHistoryFetchNodeId === nodeId) {{
+        return null;
+      }}
+
+      abortNodeHistoryFetch();
+      nodeHistoryFetchSeq += 1;
+      const seq = nodeHistoryFetchSeq;
+      nodeHistoryFetchNodeId = nodeId;
+      nodeHistoryFetchAbort = new AbortController();
+      const signal = nodeHistoryFetchAbort.signal;
+
+      if (!cachedData && activeLayoutView === "saved") {{
+        renderNodeHistoryLoading(nodeId);
+      }}
+
+      try {{
+        const data = await fetchNodeHistory(nodeId, {{ force: true, signal }});
+        if (seq !== nodeHistoryFetchSeq) return null;
+        if (normalizeNodeId(selectedNodeId || "") !== nodeId) return null;
+        if (!(activeLayoutView === "saved" || activeLayoutView === "network")) return null;
+        if (mapDataFocus === "activity") return null;
+        applyNodeHistoryToView(data);
+        return data;
+      }} catch (err) {{
+        if (err && err.name === "AbortError") return null;
+        if (seq !== nodeHistoryFetchSeq) return null;
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        const caption = document.getElementById("node-history-caption");
+        if (caption && activeLayoutView === "saved") {{
+          caption.textContent = `History error for ${{nodeId}}: ${{msg}}`;
+        }}
+        return null;
+      }} finally {{
+        if (seq === nodeHistoryFetchSeq) {{
+          nodeHistoryFetchAbort = null;
+          nodeHistoryFetchNodeId = "";
+        }}
+      }}
     }}
 
     async function fetchOnlineActivity(hoursOverride = nodeHistoryHours) {{
@@ -5356,7 +5512,8 @@
       const cacheKey = String(cleanHours);
       const cached = onlineActivityCache.get(cacheKey);
       const nowMs = Date.now();
-      if (cached && (nowMs - (cached.fetchedAt || 0)) < Math.max(refreshMs, 2500)) {{
+      // Online activity is an aggregate rollup; refresh less frequently.
+      if (cached && (nowMs - (cached.fetchedAt || 0)) < Math.max(refreshMs * 5, 30000)) {{
         return cached.data;
       }}
       const url = `/api/history/online?hours=${{encodeURIComponent(cleanHours)}}`;
@@ -6041,42 +6198,121 @@
       el.textContent = JSON.stringify(value, null, 2);
     }}
 
-    function renderRaw(state) {{
-      setRaw("raw-my-info", state.my_info);
-      setRaw("raw-metadata", state.metadata);
-      setRaw("raw-local-config", (state.local_state || {{}}).local_config);
-      setRaw("raw-module-config", (state.local_state || {{}}).module_config);
-      setRaw("raw-channels", (state.local_state || {{}}).channels);
-      setRaw("raw-nodes-full", state.nodes_full);
+    const rawDataCache = {{
+      myInfo: {{ fetchedAt: 0, data: null }},
+      metadata: {{ fetchedAt: 0, data: null }},
+      localState: {{ fetchedAt: 0, data: null }},
+      nodesFull: {{ fetchedAt: 0, data: null }},
+    }};
+
+    async function fetchRawJson(url, cacheEntry, ttlMs = 30000) {{
+      const nowMs = Date.now();
+      if (cacheEntry && cacheEntry.data != null && (nowMs - (cacheEntry.fetchedAt || 0)) < ttlMs) {{
+        return cacheEntry.data;
+      }}
+      const resp = await fetch(url, {{ cache: "no-store" }});
+      if (!resp.ok) throw new Error(`raw API ${{resp.status}}`);
+      const data = await resp.json();
+      if (cacheEntry) {{
+        cacheEntry.fetchedAt = nowMs;
+        cacheEntry.data = data;
+      }}
+      return data;
+    }}
+
+    async function loadRawMyInfo() {{
+      const data = await fetchRawJson("/api/raw/my_info", rawDataCache.myInfo, 60000);
+      setRaw("raw-my-info", data);
+      return data;
+    }}
+
+    async function loadRawMetadata() {{
+      const data = await fetchRawJson("/api/raw/metadata", rawDataCache.metadata, 60000);
+      setRaw("raw-metadata", data);
+      return data;
+    }}
+
+    async function loadRawLocalState() {{
+      const data = await fetchRawJson("/api/raw/local_state", rawDataCache.localState, 60000);
+      const obj = (data && typeof data === "object") ? data : {{}};
+      setRaw("raw-local-config", obj.local_config);
+      setRaw("raw-module-config", obj.module_config);
+      setRaw("raw-channels", obj.channels);
+      return data;
+    }}
+
+    async function loadRawNodesFull() {{
+      const data = await fetchRawJson("/api/raw/nodes_full", rawDataCache.nodesFull, 60000);
+      setRaw("raw-nodes-full", data);
+      return data;
+    }}
+
+    function bindRawDataFetch() {{
+      const pairs = [
+        ["raw-my-info", loadRawMyInfo],
+        ["raw-metadata", loadRawMetadata],
+        ["raw-local-config", loadRawLocalState],
+        ["raw-module-config", loadRawLocalState],
+        ["raw-channels", loadRawLocalState],
+        ["raw-nodes-full", loadRawNodesFull],
+      ];
+      for (const [preId, loader] of pairs) {{
+        const pre = document.getElementById(preId);
+        if (!pre) continue;
+        const details = pre.closest && pre.closest("details");
+        if (!details) continue;
+        details.addEventListener("toggle", () => {{
+          if (!details.open) return;
+          void loader().catch((err) => {{
+            const msg = err instanceof Error ? err.message : String(err || "unknown error");
+            setRaw(preId, {{ error: msg }});
+          }});
+        }});
+
+        if (details.open) {{
+          void loader().catch(() => {{}});
+        }}
+      }}
     }}
 
     async function poll() {{
       try {{
-        const wantFullState = activeLayoutView === "data" || activeLayoutView === "all";
-        const stateUrl = wantFullState ? "/api/state" : "/api/state?lite=1";
-        const resp = await fetch(stateUrl, {{ cache: "no-store" }});
-        if (!resp.ok) throw new Error(`API ${{resp.status}}`);
-        const state = await resp.json();
-        latestState = state;
-        let nodeHistory = null;
-        const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
-        const shouldLoadNodeHistory = mapVisible
-          && mapDataFocus !== "activity"
-          && isSelectableNodeId(selectedNodeId);
-        if (shouldLoadNodeHistory) {{
-          try {{
-            nodeHistory = await fetchNodeHistory(selectedNodeId);
-          }} catch (historyErr) {{
-            renderNodeHistoryLoading(selectedNodeId);
-            const caption = document.getElementById("node-history-caption");
-            const historyErrorText = historyErr instanceof Error
-              ? historyErr.message
-              : String(historyErr || "unknown error");
-            if (caption) {{
-              caption.textContent = `History error for ${{selectedNodeId}}: ${{historyErrorText}}`;
+        const stateUrl = "/api/state?lite=1";
+        const headers = {{}};
+        if (stateEtag) {{
+          headers["If-None-Match"] = stateEtag;
+        }}
+        const resp = await fetch(stateUrl, {{ cache: "no-store", headers }});
+        if (resp.status === 304) {{
+          // Nothing changed; keep the existing state and skip expensive DOM work.
+          // Still allow an on-demand node-history fetch if the user just changed selection.
+          if ((activeLayoutView === "saved" || activeLayoutView === "network")
+            && mapDataFocus !== "activity"
+            && isSelectableNodeId(selectedNodeId)) {{
+            const cached = nodeHistoryCache.get(selectedNodeId);
+            const nowMs = Date.now();
+            const ttlMs = Math.max(refreshMs * 2, 8000);
+            const stale = !(cached && cached.data) || (nowMs - (cached.fetchedAt || 0)) >= ttlMs;
+            if (stale) {{
+              void refreshSelectedNodeHistory(false);
             }}
           }}
+          return;
         }}
+        if (!resp.ok) throw new Error(`API ${{resp.status}}`);
+        const newEtag = resp.headers && resp.headers.get ? resp.headers.get("ETag") : null;
+        if (newEtag) {{
+          stateEtag = String(newEtag);
+        }}
+        const state = await resp.json();
+        latestState = state;
+
+        const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
+        const historyRelevant = (activeLayoutView === "saved" || activeLayoutView === "network")
+          && mapDataFocus !== "activity"
+          && isSelectableNodeId(selectedNodeId);
+        const cachedHistory = historyRelevant ? cachedNodeHistory(selectedNodeId) : null;
+
         let onlineActivity = null;
         if (mapVisible && mapDataFocus === "activity") {{
           try {{
@@ -6096,15 +6332,12 @@
         }}
 
         if (mapVisible) {{
-          renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], nodeHistory);
+          renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], cachedHistory);
+          renderTraffic(state.traffic || {{}}, state.nodes || [], cachedHistory, onlineActivity);
         }}
 
         if (activeLayoutView === "network" || activeLayoutView === "all") {{
           renderNodes(state.nodes || []);
-        }}
-
-        if (activeLayoutView === "all") {{
-          renderTraffic(state.traffic || {{}}, state.nodes || [], nodeHistory, onlineActivity);
         }}
 
         if (activeLayoutView === "chat" || activeLayoutView === "all") {{
@@ -6113,7 +6346,10 @@
 
         if (activeLayoutView === "saved" || activeLayoutView === "all") {{
           renderFavorites(state);
-          renderSavedNodeDetails(state, nodeHistory);
+          const loadingId = (activeLayoutView === "saved" && historyRelevant && !cachedHistory)
+            ? selectedNodeId
+            : null;
+          renderSavedNodeDetails(state, cachedHistory, loadingId);
         }}
 
         if (activeLayoutView === "packets" || activeLayoutView === "all") {{
@@ -6124,9 +6360,16 @@
           renderConsole(state.traffic || {{}});
         }}
 
-        if (wantFullState) {{
-          renderRaw(state);
+        if (historyRelevant) {{
+          const cached = nodeHistoryCache.get(selectedNodeId);
+          const nowMs = Date.now();
+          const ttlMs = Math.max(refreshMs * 2, 8000);
+          const stale = !(cached && cached.data) || (nowMs - (cached.fetchedAt || 0)) >= ttlMs;
+          if (stale) {{
+            void refreshSelectedNodeHistory(false);
+          }}
         }}
+
       }} catch (err) {{
         setText("updated-at", `error: ${{err.message}}`);
         appendConsoleLine(`error|${{Date.now()}}|${{err.message}}`, `[poll error] ${{err.message}}`);
@@ -6164,13 +6407,14 @@
     bindSignalHeatmapControl();
     bindKnownNodesMetricControl();
     bindChatAutoScroll();
+    bindRawDataFetch();
     bindHistoryTabs();
     bindWheelPassthrough();
     renderSelectionStatus();
-    if (isSelectableNodeId(selectedNodeId)) {{
+    if (activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId)) {{
       renderNodeHistoryLoading(selectedNodeId);
     }} else {{
-      setMapDataMode("live");
+      setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
     }}
     renderFavorites({{}});
     requestMapResize();
@@ -6194,6 +6438,10 @@
 
     void pollOnce();
     setInterval(pollOnce, refreshMs);
+    // Keep the uptime label moving even when the server returns cached/304 state.
+    setInterval(() => {{
+      if (!document.hidden) updateUptimeDisplay();
+    }}, 1000);
     setInterval(() => {{
       void loadThemeSettingsFromServer(false);
     }}, 60000);
