@@ -44,6 +44,18 @@
       maxZoom: 14,
       gradient: signalHeatmapGradient,
     }};
+
+    // Leaflet.heat applies a single radius/blur per layer (not per point).
+    // To make stronger signals "reach farther" we bucket points by signal score
+    // and render multiple heat layers with different radii.
+    const signalHeatBucketDefs = [
+      // Weak signal: smaller footprint
+      {{ id: "weak", min: 0.0, max: 0.34, radiusMul: 0.78, blurMul: 0.82 }},
+      // Medium signal: baseline footprint
+      {{ id: "mid", min: 0.34, max: 0.68, radiusMul: 1.0, blurMul: 1.0 }},
+      // Strong signal: larger footprint
+      {{ id: "strong", min: 0.68, max: 1.01, radiusMul: 1.34, blurMul: 1.12 }},
+    ];
     const signalHeatFreshFullSeconds = 8 * 60;
     const signalHeatFreshDropSeconds = 40 * 60;
     const signalHeatProfileDefaults = {{
@@ -56,6 +68,7 @@
     const signalHeatDevKnobDefaults = {{
       radius: 26,
       blur: 20,
+      radiusSignalGain: 1,
       minOpacity: 0.46,
       intensityFloor: 0.015,
       intensityGamma: 1.22,
@@ -69,6 +82,7 @@
     const signalHeatDevKnobBounds = {{
       radius: [14, 46],
       blur: [10, 36],
+      radiusSignalGain: [0, 1],
       minOpacity: [0.04, 0.88],
       intensityFloor: [0, 0.3],
       intensityGamma: [0.6, 2.4],
@@ -83,6 +97,7 @@
     const selectionStorageKey = "meshDashboardSelectedNodeId";
     const favoritesStorageKey = "meshDashboardFavoriteNodeIdsV1";
     const nodeNameCacheStorageKey = "meshDashboardNodeNameCacheV1";
+    const nodesTableColWidthsStorageKey = "meshDashboardNodesTableColWidthsV1";
     const splitStorageKey = "meshDashboardLayoutSplitState";
     const networkNodesSplitStorageKey = "meshDashboardNetworkNodesSplitPct";
     const savedNodeSplitStorageKey = "meshDashboardSavedNodePanePct";
@@ -125,6 +140,10 @@
     let activeMapDataMode = "live";
     let activeHistoryTab = "signal";
     let pendingSelectionScroll = false;
+    // Nodes table can be a hotspot when the mesh gets large. Track a cheap content hash so we
+    // can avoid rebuilding the list when only non-node state changes (e.g., packet counters).
+    let nodesTableLastHash = 0;
+    let nodesTableLastQuery = "";
     let latestState = null;
     let stateEtag = "";
     let uptimeBaseSeconds = null;
@@ -140,6 +159,8 @@
     let savedNodeMainPct = 56;
     let consoleAutoscroll = true;
     let fitDone = false;
+    let pendingMapHistoryFocus = false;
+    let programmaticMapMoveDepth = 0;
     let mapResizeObserver = null;
     let activeWheelPane = null;
     let activeWheelPaneLease = null;
@@ -169,7 +190,7 @@
     let mapTileLayer = null;
     let mapTileTheme = "";
     let signalHeatmapEnabled = true;
-    let signalHeatmapLayer = null;
+    let signalHeatmapLayers = null;
     let signalHeatDevKnobs = Object.assign({{}}, signalHeatDevKnobDefaults);
     let chatUnreadCount = 0;
     const chatUnreadByChannel = {{ all: 0, direct: 0 }};
@@ -290,6 +311,7 @@
       const mapping = [
         ["radius", "heat_radius"],
         ["blur", "heat_blur"],
+        ["radiusSignalGain", "heat_signal_gain"],
         ["minOpacity", "heat_min_opacity"],
         ["intensityFloor", "heat_floor"],
         ["intensityGamma", "heat_gamma"],
@@ -361,12 +383,12 @@
       window.meshHeatmapDev = api;
     }}
 
-    function ensureSignalHeatmapLayer() {{
+    function ensureSignalHeatmapLayers() {{
       if (!supportsSignalHeatmap()) {{
-        return null;
+        return [];
       }}
-      if (signalHeatmapLayer) {{
-        return signalHeatmapLayer;
+      if (Array.isArray(signalHeatmapLayers) && signalHeatmapLayers.length > 0) {{
+        return signalHeatmapLayers;
       }}
       let pane = map.getPane(signalHeatmapPaneName);
       if (!pane) {{
@@ -376,16 +398,38 @@
         pane.style.zIndex = "430";
         pane.style.pointerEvents = "none";
       }}
-      const initialVisual = {{
-        radius: signalHeatDevKnobs.radius,
-        blur: signalHeatDevKnobs.blur,
-        minOpacity: signalHeatDevKnobs.minOpacity,
-      }};
-      signalHeatmapLayer = L.heatLayer(
-        [],
-        Object.assign({{ pane: signalHeatmapPaneName }}, signalHeatmapLayerOptions, initialVisual)
-      );
-      return signalHeatmapLayer;
+      const baseRadius = signalHeatDevKnobs.radius;
+      const baseBlur = signalHeatDevKnobs.blur;
+      const baseOpacity = signalHeatDevKnobs.minOpacity;
+      const signalGain = clampUnitInterval(signalHeatDevKnobs.radiusSignalGain);
+
+      signalHeatmapLayers = signalHeatBucketDefs.map((bucket) => {{
+        const baseRadiusMul = Number(bucket.radiusMul) || 1;
+        const baseBlurMul = Number(bucket.blurMul) || 1;
+        const radiusMul = 1 + ((baseRadiusMul - 1) * signalGain);
+        const blurMul = 1 + ((baseBlurMul - 1) * signalGain);
+        const radius = clampNumber(
+          Math.round(baseRadius * radiusMul),
+          10,
+          96,
+          baseRadius
+        );
+        const blur = clampNumber(
+          Math.round(baseBlur * blurMul),
+          8,
+          86,
+          baseBlur
+        );
+        return L.heatLayer(
+          [],
+          Object.assign(
+            {{ pane: signalHeatmapPaneName }},
+            signalHeatmapLayerOptions,
+            {{ radius, blur, minOpacity: baseOpacity }}
+          )
+        );
+      }});
+      return signalHeatmapLayers;
     }}
 
     function resolveSignalHeatProfile() {{
@@ -459,14 +503,15 @@
       return 1 - (Math.max(0, Math.min(1, ratio)) * 0.92);
     }}
 
-    function signalHeatWeight(node, profile, nowUnix) {{
+    function signalHeatSignalScore(node, profile) {{
+      // Score that reflects raw signal quality (SNR/RSSI) but not freshness.
       if (!node || typeof node !== "object") return null;
       const activeProfile = profile || signalHeatProfileDefaults;
       const snrWeight = normalizeSignalForHeat(node.snr, activeProfile.snrMin, activeProfile.snrMax);
       const rssiWeight = normalizeSignalForHeat(node.rssi, activeProfile.rssiMin, activeProfile.rssiMax);
       let signalWeight = null;
       if (Number.isFinite(snrWeight) && Number.isFinite(rssiWeight)) {{
-        // Use both when available so intensity reflects the full reported signal context.
+        // Use both when available so the score reflects the full reported signal context.
         signalWeight = ((snrWeight * 0.62) + (rssiWeight * 0.38));
       }} else if (Number.isFinite(snrWeight)) {{
         signalWeight = snrWeight;
@@ -474,30 +519,58 @@
         signalWeight = rssiWeight;
       }}
       if (!Number.isFinite(signalWeight)) return null;
-      const ageWeight = signalHeatAgeFactor(node, nowUnix);
       const greenBiasedSignal = Math.pow(
         clampUnitInterval(signalWeight),
         1 + (clampUnitInterval(signalHeatDevKnobs.greenBias) * 0.55)
       );
-      const freshnessWeight = signalHeatDevKnobs.freshnessFloor + (ageWeight * signalHeatDevKnobs.freshnessGain);
-      return clampUnitInterval(greenBiasedSignal * freshnessWeight);
+      return clampUnitInterval(greenBiasedSignal);
     }}
 
-    function collectSignalHeatmapPoints(nodes, profile) {{
-      const points = [];
+    function signalHeatWeight(node, profile, nowUnix) {{
+      // Final weight used for intensity (includes freshness decay).
+      const signalScore = signalHeatSignalScore(node, profile);
+      if (!Number.isFinite(signalScore)) return null;
+      const ageWeight = signalHeatAgeFactor(node, nowUnix);
+      const freshnessWeight = signalHeatDevKnobs.freshnessFloor + (ageWeight * signalHeatDevKnobs.freshnessGain);
+      return clampUnitInterval(signalScore * freshnessWeight);
+    }}
+
+    function resolveSignalHeatBucketIndex(signalScore) {{
+      const score = clampUnitInterval(signalScore);
+      for (let i = 0; i < signalHeatBucketDefs.length; i++) {{
+        const bucket = signalHeatBucketDefs[i];
+        const min = Number(bucket && bucket.min);
+        const max = Number(bucket && bucket.max);
+        if (!Number.isFinite(min) || !Number.isFinite(max)) continue;
+        if (score >= min && score < max) {{
+          return i;
+        }}
+      }}
+      return Math.max(0, signalHeatBucketDefs.length - 1);
+    }}
+
+    function collectSignalHeatmapBuckets(nodes, profile) {{
+      const buckets = signalHeatBucketDefs.map(() => []);
       const nowUnix = Math.floor(Date.now() / 1000);
       const intensityFloor = signalHeatDevKnobs.intensityFloor;
       for (const node of (nodes || [])) {{
         const lat = Number(node && node.lat);
         const lon = Number(node && node.lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        if (!isValidMapCoord(lat, lon)) continue;
+
+        const signalScore = signalHeatSignalScore(node, profile);
+        if (!Number.isFinite(signalScore)) continue;
+
         const weight = signalHeatWeight(node, profile, nowUnix);
         if (!Number.isFinite(weight)) continue;
+
         const eased = Math.pow(clampUnitInterval(weight), signalHeatDevKnobs.intensityGamma);
         const intensity = intensityFloor + (eased * (1 - intensityFloor));
+        const idx = resolveSignalHeatBucketIndex(signalScore);
+        const points = buckets[idx] || buckets[0];
         points.push([lat, lon, Math.max(intensityFloor, Math.min(1, intensity))]);
       }}
-      return points;
+      return buckets;
     }}
 
     function resolveSignalHeatVisualOptions(pointsCount) {{
@@ -552,7 +625,7 @@
           : "";
         const devText = " Dev knobs: window.meshHeatmapDev.get()/set()/reset().";
         const baseTitle = supported
-          ? `Overlay realtime signal heatmap from positioned nodes, weighted by reported SNR/RSSI. ${{profileText}} Nodes fade after ~40 minutes.${{geoText}}${{devText}}`
+          ? `Overlay realtime signal heatmap from positioned nodes. Intensity and radius are derived from reported SNR/RSSI (freshness-faded). ${{profileText}} Nodes fade after ~40 minutes.${{geoText}}${{devText}}`
           : "Heatmap overlay is unavailable (leaflet.heat not loaded).";
         if (Number.isFinite(pointsCount)) {{
           wrap.title = `${{baseTitle}} Active nodes with signal+position: ${{pointsCount}}.`;
@@ -567,28 +640,57 @@
     }}
 
     function syncSignalHeatmapLayer(nodes, forceHide = false) {{
-      const layer = ensureSignalHeatmapLayer();
+      const layers = ensureSignalHeatmapLayers();
       const profile = resolveSignalHeatProfile();
-      const points = layer ? collectSignalHeatmapPoints(nodes, profile) : [];
-      updateSignalHeatmapControl(points.length, !!layer, profile.label || "");
-      if (!layer) {{
+      const supported = Array.isArray(layers) && layers.length > 0;
+      const buckets = supported ? collectSignalHeatmapBuckets(nodes, profile) : [];
+      const pointsCount = supported
+        ? buckets.reduce((acc, pts) => acc + (Array.isArray(pts) ? pts.length : 0), 0)
+        : 0;
+      updateSignalHeatmapControl(pointsCount, supported, profile.label || "");
+      if (!supported) {{
         return;
       }}
-      const visual = resolveSignalHeatVisualOptions(points.length);
-      if (typeof layer.setOptions === "function") {{
-        layer.setOptions(visual);
-      }}
-      layer.setLatLngs(points);
+      const baseVisual = resolveSignalHeatVisualOptions(pointsCount);
       const shouldShow = !forceHide
         && activeLayoutView !== "saved"
         && signalHeatmapEnabled
-        && points.length > 0;
-      if (shouldShow) {{
-        if (!map.hasLayer(layer)) {{
-          layer.addTo(map);
+        && pointsCount > 0;
+
+      for (let i = 0; i < layers.length; i++) {{
+        const layer = layers[i];
+        const bucket = signalHeatBucketDefs[i] || {{}};
+        const signalGain = clampUnitInterval(signalHeatDevKnobs.radiusSignalGain);
+        const baseRadiusMul = Number(bucket.radiusMul);
+        const baseBlurMul = Number(bucket.blurMul);
+        const radiusMul = 1 + ((Number.isFinite(baseRadiusMul) ? baseRadiusMul : 1) - 1) * signalGain;
+        const blurMul = 1 + ((Number.isFinite(baseBlurMul) ? baseBlurMul : 1) - 1) * signalGain;
+        const visual = {{
+          radius: clampNumber(
+            Math.round(baseVisual.radius * radiusMul),
+            10,
+            96,
+            baseVisual.radius
+          ),
+          blur: clampNumber(
+            Math.round(baseVisual.blur * blurMul),
+            8,
+            86,
+            baseVisual.blur
+          ),
+          minOpacity: baseVisual.minOpacity,
+        }};
+        if (typeof layer.setOptions === "function") {{
+          layer.setOptions(visual);
         }}
-      }} else if (map.hasLayer(layer)) {{
-        map.removeLayer(layer);
+        layer.setLatLngs((buckets[i] || []));
+        if (shouldShow) {{
+          if (!map.hasLayer(layer)) {{
+            layer.addTo(map);
+          }}
+        }} else if (map.hasLayer(layer)) {{
+          map.removeLayer(layer);
+        }}
       }}
     }}
 
@@ -864,6 +966,14 @@
       requestMapResize();
       bindMapContainerObserver();
       bindMapWheelActivation();
+      map.on("movestart", () => {{
+        if ((Number.isFinite(Number(programmaticMapMoveDepth)) ? programmaticMapMoveDepth : 0) > 0) return;
+        pendingMapHistoryFocus = false;
+      }});
+      map.on("zoomstart", () => {{
+        if ((Number.isFinite(Number(programmaticMapMoveDepth)) ? programmaticMapMoveDepth : 0) > 0) return;
+        pendingMapHistoryFocus = false;
+      }});
       map.on("zoomend", () => {{
         const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
         syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
@@ -1295,6 +1405,25 @@
       if (age <= chatWarnWindowSeconds) return "online";
       if (age <= chatStaleWindowSeconds) return "warn";
       return "stale";
+    }}
+
+    function applyNodesTableRowFreshness(row, nowUnix = Math.floor(Date.now() / 1000)) {{
+      if (!(row instanceof HTMLElement)) return;
+      const lastUnix = Number(row.dataset.lastHeardUnix);
+      const status = freshnessStatus(lastUnix, nowUnix) || "unknown";
+      row.classList.remove("status-online", "status-warn", "status-stale", "status-unknown");
+      row.classList.add(`status-${{status}}`);
+      const dot = row.querySelector(".node-status-dot");
+      if (dot instanceof HTMLElement) {{
+        dot.classList.remove("status-online", "status-warn", "status-stale", "status-unknown");
+        dot.classList.add(`status-${{status}}`);
+      }}
+    }}
+
+    function refreshNodesTableFreshness(nowUnix = Math.floor(Date.now() / 1000)) {{
+      for (const row of document.querySelectorAll("#nodes-table tbody tr[data-last-heard-unix]")) {{
+        applyNodesTableRowFreshness(row, nowUnix);
+      }}
     }}
 
     function statusRank(status) {{
@@ -2117,8 +2246,17 @@
         if (icon) {{
           icon.textContent = active ? "★" : "☆";
         }}
+        const cell = btn.closest && btn.closest("td");
+        if (cell instanceof HTMLElement) {{
+          cell.setAttribute("data-sort", active ? "1" : "0");
+        }}
       }}
       renderSavedRailStatus();
+
+      const nodesSort = tableSortState["nodes-table"];
+      if (nodesSort && Number(nodesSort.index) === 9) {{
+        sortTableRows("nodes-table");
+      }}
     }}
 
     function toggleFavoriteNode(nodeId, forceActive = null) {{
@@ -2374,6 +2512,153 @@
       applySavedNodeHistorySplitState();
     }}
 
+
+    function defaultNodesTableColPcts() {{
+      return [0.13, 0.12, 0.20, 0.14, 0.06, 0.06, 0.07, 0.09, 0.10, 0.03];
+    }}
+
+    function normalizeColPcts(pcts) {{
+      if (!Array.isArray(pcts) || pcts.length === 0) return null;
+      const nums = pcts.map((v) => Number(v));
+      if (nums.some((v) => !Number.isFinite(v) || v <= 0)) return null;
+      const total = nums.reduce((a, b) => a + b, 0);
+      if (!Number.isFinite(total) || total <= 0) return null;
+      return nums.map((v) => v / total);
+    }}
+
+    function applyNodesTableColPcts(pcts) {{
+      const cols = document.querySelectorAll("#nodes-table-cols col");
+      if (!cols || cols.length === 0) return;
+      const normalized = normalizeColPcts(pcts);
+      if (!normalized || normalized.length !== cols.length) return;
+      normalized.forEach((pct, idx) => {{
+        const col = cols[idx];
+        if (col instanceof HTMLElement) {{
+          col.style.width = `${{(pct * 100).toFixed(3)}}%`;
+        }}
+      }});
+    }}
+
+    function readNodesTableColPctsFromDom() {{
+      const table = document.getElementById("nodes-table");
+      const cols = document.querySelectorAll("#nodes-table-cols col");
+      if (!(table instanceof HTMLTableElement) || !cols || cols.length === 0) return null;
+      const headerRow = table.tHead && table.tHead.rows && table.tHead.rows[0] ? table.tHead.rows[0] : null;
+      if (!headerRow || !headerRow.cells || headerRow.cells.length !== cols.length) return null;
+      const tableWidth = table.getBoundingClientRect().width;
+      if (!Number.isFinite(tableWidth) || tableWidth <= 2) return null;
+
+      const widths = Array.from(headerRow.cells).map((cell) => {{
+        const rect = cell.getBoundingClientRect();
+        return rect && Number.isFinite(rect.width) ? rect.width : null;
+      }});
+      if (widths.some((w) => !Number.isFinite(w) || w <= 0)) return null;
+      const pcts = widths.map((w) => w / tableWidth);
+      return normalizeColPcts(pcts);
+    }}
+
+    function persistNodesTableColPcts() {{
+      const pcts = readNodesTableColPctsFromDom();
+      if (!pcts) return;
+      try {{
+        window.localStorage.setItem(nodesTableColWidthsStorageKey, JSON.stringify(pcts));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadNodesTableColPcts() {{
+      try {{
+        const raw = window.localStorage.getItem(nodesTableColWidthsStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        if (parsed.length !== 10) return;
+        applyNodesTableColPcts(parsed);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function bindNodesTableColResizers() {{
+      const table = document.getElementById("nodes-table");
+      if (!(table instanceof HTMLTableElement) || table.dataset.colResizeBound === "1") return;
+      table.dataset.colResizeBound = "1";
+
+      const cols = Array.from(document.querySelectorAll("#nodes-table-cols col"));
+      const handles = Array.from(table.querySelectorAll("thead .col-resizer"));
+      if (!cols.length || !handles.length) return;
+
+      const minWidthPxByIndex = {{
+        0: 92,  // Last Heard
+        1: 78,  // ID
+        2: 120, // Name
+        3: 80,  // HW
+        4: 54,  // SNR
+        5: 54,  // Hops
+        6: 64,  // Battery
+        7: 72,  // Saved
+        8: 110, // Pos
+        9: 34,  // Star
+      }};
+
+      handles.forEach((handle) => {{
+        if (!(handle instanceof HTMLElement)) return;
+        handle.addEventListener("mousedown", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const colIndexRaw = Number(handle.dataset.col);
+          const colIndex = Number.isFinite(colIndexRaw) ? Math.trunc(colIndexRaw) : -1;
+          if (colIndex < 0 || colIndex >= cols.length) return;
+
+          // Resize this column + its right neighbor (or left neighbor for the last column).
+          const leftIndex = colIndex === cols.length - 1 ? colIndex - 1 : colIndex;
+          const rightIndex = colIndex === cols.length - 1 ? colIndex : colIndex + 1;
+          if (leftIndex < 0 || rightIndex >= cols.length) return;
+
+          const leftCol = cols[leftIndex];
+          const rightCol = cols[rightIndex];
+          const headerRow = table.tHead && table.tHead.rows && table.tHead.rows[0] ? table.tHead.rows[0] : null;
+          if (!headerRow || !headerRow.cells || headerRow.cells.length <= rightIndex) return;
+          const startLeft = headerRow.cells[leftIndex].getBoundingClientRect().width;
+          const startRight = headerRow.cells[rightIndex].getBoundingClientRect().width;
+          const total = startLeft + startRight;
+          if (!Number.isFinite(total) || total <= 10) return;
+
+          const startX = ev.clientX;
+          const minLeft = minWidthPxByIndex[leftIndex] || 48;
+          const minRight = minWidthPxByIndex[rightIndex] || 48;
+
+          const onMove = (moveEv) => {{
+            moveEv.preventDefault();
+            const dx = moveEv.clientX - startX;
+            let newLeft = startLeft + dx;
+            newLeft = Math.max(minLeft, Math.min(total - minRight, newLeft));
+            const newRight = total - newLeft;
+            leftCol.style.width = `${{newLeft}}px`;
+            rightCol.style.width = `${{newRight}}px`;
+          }};
+
+          const onUp = () => {{
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseup", onUp);
+            // Convert to percentages so it survives window resizes nicely.
+            const pcts = readNodesTableColPctsFromDom();
+            if (pcts) {{
+              applyNodesTableColPcts(pcts);
+              persistNodesTableColPcts();
+            }}
+          }};
+
+          document.addEventListener("mousemove", onMove);
+          document.addEventListener("mouseup", onUp);
+        }});
+
+        handle.addEventListener("click", (ev) => {{
+          // Prevent triggering sort on header click.
+          ev.stopPropagation();
+        }});
+      }});
+    }}
+
     function persistNetworkNodesSplitState() {{
       try {{
         window.localStorage.setItem(networkNodesSplitStorageKey, String(networkNodesListPct));
@@ -2548,6 +2833,11 @@
           mapTitle.textContent = isSelectableNodeId(selectedNodeId) ? "Selected Node Map" : "Network Map";
         }}
       }}
+      const mapResetBtn = document.getElementById("map-reset-view-btn");
+      if (mapResetBtn instanceof HTMLButtonElement) {{
+        mapResetBtn.hidden = next === "saved";
+      }}
+
       const mapNodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
       syncSignalHeatmapLayer(mapNodes, next === "saved");
       setMapWheelZoomActive(next === "network" || next === "saved");
@@ -3122,15 +3412,76 @@
       pendingSelectionScroll = !didScroll;
     }}
 
+    function withProgrammaticMapMove(fn) {{
+      const depth = Number.isFinite(Number(programmaticMapMoveDepth)) ? Math.trunc(Number(programmaticMapMoveDepth)) : 0;
+      programmaticMapMoveDepth = depth + 1;
+      try {{
+        return fn();
+      }} finally {{
+        const after = Number.isFinite(Number(programmaticMapMoveDepth)) ? Math.trunc(Number(programmaticMapMoveDepth)) : 1;
+        programmaticMapMoveDepth = Math.max(0, after - 1);
+      }}
+    }}
+
+    function collectHistoryLatLngs(history) {{
+      const pts = [];
+      const raw = history && Array.isArray(history.positions) ? history.positions : [];
+      for (const point of raw) {{
+        const lat = Number(point && point.lat);
+        const lon = Number(point && point.lon);
+        if (!isValidMapCoord(lat, lon)) continue;
+        pts.push([lat, lon]);
+      }}
+      return pts;
+    }}
+
+    function focusSelectedNodeOnMap(historyOverride = null) {{
+      if (!selectedNodeId) return false;
+      const marker = nodeMarkers.get(selectedNodeId);
+      if (!marker) return false;
+      const history = historyOverride || cachedNodeHistory(selectedNodeId);
+      const trailPts = collectHistoryLatLngs(history);
+      const markerLatLng = marker.getLatLng();
+      let usedHistory = false;
+
+      if (trailPts.length > 1) {{
+        const bounds = L.latLngBounds(trailPts);
+        bounds.extend(markerLatLng);
+        if (bounds.isValid()) {{
+          withProgrammaticMapMove(() => {{
+            map.fitBounds(bounds.pad(0.22), {{ animate: false, maxZoom: 16 }});
+          }});
+          usedHistory = true;
+        }}
+      }}
+
+      if (!usedHistory) {{
+        const targetZoom = Math.min(16, Math.max(map.getZoom(), 11));
+        withProgrammaticMapMove(() => {{
+          map.setView(markerLatLng, targetZoom, {{ animate: false }});
+        }});
+      }}
+
+      requestMapResize();
+      marker.openPopup();
+      return usedHistory;
+    }}
+
     function updateMapSelection(shouldFocus = false) {{
       for (const [nodeId, marker] of nodeMarkers.entries()) {{
         marker.setStyle(markerStyle(!!selectedNodeId && nodeId === selectedNodeId));
       }}
       if (!shouldFocus || !selectedNodeId) return;
-      const marker = nodeMarkers.get(selectedNodeId);
-      if (!marker) return;
-      map.panTo(marker.getLatLng(), {{ animate: true, duration: 0.35 }});
-      marker.openPopup();
+      const usedHistory = focusSelectedNodeOnMap(null);
+      if (usedHistory) {{
+        pendingMapHistoryFocus = false;
+      }} else {{
+        const cached = cachedNodeHistory(selectedNodeId);
+        if (cached) {{
+          // History is loaded but has no valid trail points. Don't keep auto-fit pending.
+          pendingMapHistoryFocus = false;
+        }}
+      }}
     }}
 
     function selectedNodeFrom(nodes) {{
@@ -3283,8 +3634,8 @@
       persistSelection();
       renderSelectionStatus();
       highlightNodeSelection();
-      const focusSelection = shouldFocus && activeLayoutView !== "network";
-      updateMapSelection(focusSelection);
+      const focusSelection = shouldFocus && activeLayoutView !== "saved";
+      pendingMapHistoryFocus = focusSelection;
       scrollSelectionIntoView();
       let cachedHistory = null;
       if (latestState && (activeLayoutView === "saved" || activeLayoutView === "network")) {{
@@ -3310,6 +3661,8 @@
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedHistory);
       }}
 
+      updateMapSelection(focusSelection);
+
       // Kick an immediate history refresh so the signal plot/trail doesn't wait for the next poll.
       void refreshSelectedNodeHistory(false);
       applyChatChannel(activeChatChannel, false);
@@ -3317,6 +3670,7 @@
 
     function clearNodeSelection() {{
       selectedNodeId = null;
+      pendingMapHistoryFocus = false;
       abortNodeHistoryFetch();
       resetSignalChartZoom("");
       signalChartPoints = [];
@@ -3338,11 +3692,16 @@
     }}
 
     function bindNodeRowClicks() {{
-      for (const row of document.querySelectorAll("#nodes-table tbody tr.node-selectable")) {{
-        row.addEventListener("click", () => {{
-          selectNode(row.dataset.nodeId || "", true);
-        }});
-      }}
+      const tbody = document.querySelector("#nodes-table tbody");
+      if (!(tbody instanceof HTMLElement) || tbody.dataset.bound === "1") return;
+      tbody.dataset.bound = "1";
+      tbody.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const row = target.closest("tr.node-selectable");
+        if (!(row instanceof HTMLElement)) return;
+        selectNode(row.dataset.nodeId || "", true);
+      }});
     }}
 
     function bindChatFeedClicks() {{
@@ -3682,7 +4041,7 @@
           for (const point of rawTrail) {{
             const lat = Number(point && point.lat);
             const lon = Number(point && point.lon);
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            if (!isValidMapCoord(lat, lon)) continue;
             const when = Number(point && point.time_unix);
             const ts = Number.isFinite(when) ? String(Math.round(when)) : "";
             compact.push(`${{lat.toFixed(5)}},${{lon.toFixed(5)}}@${{ts}}`);
@@ -3715,7 +4074,7 @@
           for (const point of rawTrail) {{
             const lat = Number(point && point.lat);
             const lon = Number(point && point.lon);
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            if (!isValidMapCoord(lat, lon)) continue;
             const when = Number(point && point.time_unix);
             const ts = Number.isFinite(when) ? String(Math.round(when)) : "";
             compact.push(`${{lat.toFixed(5)}},${{lon.toFixed(5)}}@${{ts}}`);
@@ -3725,6 +4084,85 @@
         return `all#${{nodeSig}}#${{edgeSig}}#sel:${{selection}}#trail:${{trailSig}}`;
       }}
       return `all#${{nodeSig}}#${{edgeSig}}`;
+    }}
+
+
+    function isValidMapCoord(lat, lon) {{
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+      if (lat < -90 || lat > 90) return false;
+      if (lon < -180 || lon > 180) return false;
+      // Many devices report (0,0) before GPS lock. Treat that as "unknown" for overview fitting.
+      if (Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9) return false;
+      return true;
+    }}
+
+    function collectNodeLatLngs(nodes) {{
+      const pts = [];
+      for (const node of (nodes || [])) {{
+        const lat = Number(node && node.lat);
+        const lon = Number(node && node.lon);
+        if (!isValidMapCoord(lat, lon)) continue;
+        pts.push([lat, lon]);
+      }}
+      return pts;
+    }}
+
+    function computeTrimmedBounds(points, trimFrac = 0.05) {{
+      if (!Array.isArray(points) || points.length === 0) return null;
+      if (points.length === 1) {{
+        return L.latLngBounds(points[0], points[0]);
+      }}
+      const n = points.length;
+      const trimCount = Math.max(0, Math.floor(n * trimFrac));
+      const lats = points.map((p) => p[0]).slice().sort((a, b) => a - b);
+      const lons = points.map((p) => p[1]).slice().sort((a, b) => a - b);
+      const lo = Math.min(trimCount, Math.floor((n - 1) / 2));
+      const hi = n - 1 - lo;
+      const latMin = lats[lo];
+      const latMax = lats[hi];
+      const lonMin = lons[lo];
+      const lonMax = lons[hi];
+      const bounds = L.latLngBounds([latMin, lonMin], [latMax, lonMax]);
+      return bounds && bounds.isValid() ? bounds : null;
+    }}
+
+    function fitMapToMostNodes(nodes, opts = {{}}) {{
+      const points = collectNodeLatLngs(nodes);
+      if (!points.length) return false;
+
+      // If we only have one point, zoom in enough to be useful.
+      if (points.length === 1) {{
+        map.setView(points[0], Math.max(map.getZoom(), 12), {{ animate: false }});
+        requestMapResize();
+        return true;
+      }}
+
+      const trimFrac = points.length >= 14 ? 0.05 : 0;
+      let bounds = computeTrimmedBounds(points, trimFrac);
+      if (!bounds) {{
+        bounds = L.latLngBounds(points);
+      }}
+      if (!bounds || !bounds.isValid()) return false;
+
+      const pad = Number.isFinite(Number(opts.pad)) ? Number(opts.pad) : 0.18;
+      const maxZoom = Number.isFinite(Number(opts.maxZoom)) ? Number(opts.maxZoom) : 13;
+      map.fitBounds(bounds.pad(pad), {{ animate: false, maxZoom }});
+      requestMapResize();
+      return true;
+    }}
+
+    function bindMapResetControl() {{
+      const btn = document.getElementById("map-reset-view-btn");
+      if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {{
+        map.closePopup();
+        pendingMapHistoryFocus = false;
+        if (latestState) {{
+          const nodes = Array.isArray(latestState.nodes) ? latestState.nodes : [];
+          fitMapToMostNodes(nodes, {{ pad: 0.18, maxZoom: 13 }});
+        }}
+      }});
     }}
 
     function renderMap(nodes, edges, nodeHistory = null) {{
@@ -3775,7 +4213,7 @@
             const lat = Number(point && point.lat);
             const lon = Number(point && point.lon);
             const timeUnix = Number(point && point.time_unix);
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            if (!isValidMapCoord(lat, lon)) return null;
             return {{
               lat,
               lon,
@@ -3957,7 +4395,7 @@
             const lat = Number(point && point.lat);
             const lon = Number(point && point.lon);
             const timeUnix = Number(point && point.time_unix);
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            if (!isValidMapCoord(lat, lon)) return null;
             return {{
               lat,
               lon,
@@ -4018,10 +4456,12 @@
         }}
       }}
 
-      if (!fitDone && features.length > 0) {{
-        map.fitBounds(L.featureGroup(features).getBounds().pad(0.2));
-        fitDone = true;
-        requestMapResize();
+      if (!fitDone) {{
+        // Network overview: fit to the densest footprint and ignore obvious outliers (e.g., 0,0 before GPS lock).
+        const didFit = fitMapToMostNodes(nodes, {{ pad: 0.18, maxZoom: 13 }});
+        if (didFit) {{
+          fitDone = true;
+        }}
       }}
       updateMapSelection(false);
     }}
@@ -4032,21 +4472,149 @@
       tbody.innerHTML = rowsHtml.join("");
       if (sortableTables.has(tableId)) {{
         bindSortableHeader(tableId);
-        sortTableRows(tableId);
+        // The nodes list is pre-sorted during render; avoid expensive DOM sorting on every poll.
+        if (tableId !== "nodes-table") {{
+          sortTableRows(tableId);
+        }} else {{
+          updateSortIndicators(tableId);
+        }}
       }}
+    }}
+
+    function hashMixInt(hash, value) {{
+      const v = (Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0) | 0;
+      hash ^= v;
+      hash = Math.imul(hash, 16777619);
+      return hash >>> 0;
+    }}
+
+    function hashMixStr(hash, value) {{
+      const text = String(value == null ? "" : value);
+      for (let i = 0; i < text.length; i += 1) {{
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }}
+      return hash >>> 0;
+    }}
+
+    function hashNodeRow(node) {{
+      let h = 2166136261;
+      const nodeId = normalizeNodeId(node && node.id);
+      h = hashMixStr(h, nodeId);
+      h = hashMixInt(h, node && (node.last_heard_unix ?? node.last_heard_epoch ?? 0));
+      h = hashMixStr(h, node && (node.long_name || ""));
+      h = hashMixStr(h, node && (node.short_name || ""));
+      h = hashMixStr(h, node && (node.hardware_model || ""));
+      const snr = Number(node && node.snr);
+      h = hashMixInt(h, Number.isFinite(snr) ? Math.round(snr * 100) : 0);
+      h = hashMixInt(h, node && (node.hops_away ?? 0));
+      h = hashMixInt(h, node && (node.battery_level ?? 0));
+      h = hashMixInt(h, node && (node.saved_packets ?? 0));
+      const lat = Number(node && node.lat);
+      const lon = Number(node && node.lon);
+      h = hashMixInt(h, Number.isFinite(lat) ? Math.round(lat * 1e5) : 0);
+      h = hashMixInt(h, Number.isFinite(lon) ? Math.round(lon * 1e5) : 0);
+      return h >>> 0;
+    }}
+
+    function computeNodesTableHash(nodes, query) {{
+      let h = 2166136261;
+      h = hashMixStr(h, query || "");
+      let count = 0;
+      let xor = 0;
+      for (const node of (nodes || [])) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        const name = nodeLabel(node);
+        if (!matchesIdOrNameQuery(nodeId, name, query)) continue;
+        const nh = hashNodeRow(node);
+        xor ^= nh;
+        h = hashMixInt(h, nh);
+        count += 1;
+      }}
+      h = hashMixInt(h, count);
+      h = hashMixInt(h, xor);
+      return h >>> 0;
+    }}
+
+    function nodesTableSortRaw(node, colIndex) {{
+      if (!node) return "";
+      const nodeId = normalizeNodeId(node.id || "");
+      switch (colIndex) {{
+        case 0:
+          return Number(node.last_heard_unix ?? node.last_heard_epoch ?? 0) || 0;
+        case 1:
+          return nodeId;
+        case 2:
+          return nodeLabel(node);
+        case 3:
+          return String(node.hardware_model || "");
+        case 4:
+          return Number(node.snr);
+        case 5:
+          return Number(node.hops_away);
+        case 6:
+          return Number(node.battery_level);
+        case 7:
+          return Number(node.saved_packets);
+        case 8:
+          return (Number.isFinite(Number(node.lat)) && Number.isFinite(Number(node.lon)))
+            ? Number(node.lat)
+            : "";
+        case 9:
+          return isFavoriteNode(nodeId) ? 1 : 0;
+        default:
+          return "";
+      }}
+    }}
+
+    function sortNodesForTable(nodes) {{
+      const state = tableSortState["nodes-table"] || {{ index: 0, dir: "desc" }};
+      const col = Number.isFinite(Number(state.index)) ? Math.trunc(Number(state.index)) : 0;
+      const dir = state.dir === "asc" ? "asc" : "desc";
+      if (nodes.length <= 1) return nodes;
+      // The server already returns nodes sorted by last-heard descending.
+      if (col === 0 && dir === "desc") return nodes;
+      nodes.sort((a, b) => {{
+        const aValue = normalizeSortValue(nodesTableSortRaw(a, col));
+        const bValue = normalizeSortValue(nodesTableSortRaw(b, col));
+        const cmp = compareSortValues(aValue, bValue);
+        if (cmp !== 0) return dir === "asc" ? cmp : -cmp;
+        const aHeard = Number(a && (a.last_heard_unix ?? a.last_heard_epoch ?? 0)) || 0;
+        const bHeard = Number(b && (b.last_heard_unix ?? b.last_heard_epoch ?? 0)) || 0;
+        if (aHeard !== bHeard) return bHeard - aHeard;
+        const aId = normalizeNodeId(a && a.id);
+        const bId = normalizeNodeId(b && b.id);
+        return String(aId).localeCompare(String(bId));
+      }});
+      return nodes;
     }}
 
     function renderNodes(nodes) {{
       const query = normalizeSearchQuery(nodesSearchQuery);
+      const computedHash = computeNodesTableHash(nodes || [], query);
+      if (computedHash === nodesTableLastHash && query === nodesTableLastQuery) {{
+        return;
+      }}
+      nodesTableLastHash = computedHash;
+      nodesTableLastQuery = query;
+
       const filteredNodes = (nodes || []).filter((node) => {{
         const nodeId = normalizeNodeId(node.id || "");
         const name = nodeLabel(node);
         return matchesIdOrNameQuery(nodeId, name, query);
       }});
 
+      sortNodesForTable(filteredNodes);
+
+      const nowUnix = Math.floor(Date.now() / 1000);
+
       const rows = filteredNodes.map((node) => {{
           const nodeId = normalizeNodeId(node.id || "");
           const selectable = isSelectableNodeId(nodeId);
+          const selectedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
+          const lastUnix = nodeLastHeardUnix(node);
+          const status = freshnessStatus(lastUnix, nowUnix);
+          const statusClass = ` status-${{status || "unknown"}}`;
           const pos = (typeof node.lat === "number" && typeof node.lon === "number")
             ? `${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}`
             : "n/a";
@@ -4060,8 +4628,12 @@
           const savedTitle = savedPoints > 0
             ? `${{savedPackets}} packets across ${{savedPoints}} minute buckets`
             : "No saved history yet";
-          return `<tr data-node-id="${{escAttr(nodeId)}}" class="${{selectable ? "node-selectable" : ""}}">
-          <td data-sort="${{escAttr(node.last_heard ?? "")}}">${{node.last_heard ?? "n/a"}}</td>
+          const lastHeardText = node.last_heard ?? "n/a";
+          const lastSort = Number.isFinite(Number(node.last_heard_unix))
+            ? Number(node.last_heard_unix)
+            : (Number.isFinite(Number(lastUnix)) ? Number(lastUnix) : 0);
+          return `<tr data-node-id="${{escAttr(nodeId)}}" data-last-heard-unix="${{escAttr(lastSort)}}" class="${{selectable ? "node-selectable" : ""}}${{selectedClass}}${{statusClass}}">
+          <td data-sort="${{escAttr(lastSort)}}" title="${{escAttr(lastHeardText)}}"><span class="node-status-dot status-${{escAttr(status || "unknown")}}">●</span>${{lastHeardText}}</td>
           <td class="mono" data-sort="${{escAttr(nodeId)}}" title="${{escAttr(String(node.id || nodeId || ""))}}">${{nodeId || "n/a"}}</td>
           <td data-sort="${{escAttr(name)}}">
             <span class="node-name-row">
@@ -4080,9 +4652,15 @@
       if (rows.length === 0) {{
         rows.push('<tr><td colspan="10">No nodes match this search.</td></tr>');
       }}
+
+      const table = document.getElementById("nodes-table");
+      const scroller = table ? table.closest(".scroll") : null;
+      const scrollTop = scroller && "scrollTop" in scroller ? scroller.scrollTop : null;
       fillTable("nodes-table", rows);
-      bindNodeRowClicks();
-      highlightNodeSelection();
+      if (scrollTop != null && scroller) {{
+        scroller.scrollTop = scrollTop;
+      }}
+      refreshNodesTableFreshness(nowUnix);
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
       }}
@@ -5427,6 +6005,15 @@
         renderMap(nodes, edges, nodeHistory);
       }}
 
+      if (activeLayoutView === "network" && pendingMapHistoryFocus) {{
+        const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
+        const selectionId = normalizeNodeId(selectedNodeId || "");
+        if (historyNodeId && selectionId && historyNodeId === selectionId) {{
+          focusSelectedNodeOnMap(nodeHistory);
+          pendingMapHistoryFocus = false;
+        }}
+      }}
+
       // The signal plot lives in the map-data panel, rendered by renderTraffic.
       if (activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all") {{
         renderTraffic(traffic, nodes, nodeHistory, null);
@@ -6057,7 +6644,8 @@
         const reactionRow = reactionChips
           ? `<div class="chat-reaction-row">${{reactionChips}}</div>`
           : "";
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-message-id="${{escAttr(messageId || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}">
+        const selectedFeedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-message-id="${{escAttr(messageId || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}">
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
@@ -6383,6 +6971,7 @@
     loadNetworkNodesSplitState();
     loadSavedNodeSplitState();
     loadSavedNodeHistorySplitState();
+    loadNodesTableColPcts();
     loadSignalHeatDevKnobs();
     loadSignalHeatmapPreference();
     loadLayoutView();
@@ -6399,6 +6988,9 @@
     bindFavoriteToggleControls();
     bindFavoritesControls();
     bindNodeListSearchControls();
+    bindNodeRowClicks();
+    bindNodesTableColResizers();
+    bindMapResetControl();
     bindConsoleControls();
     bindChatComposer();
     bindThemeToggle();
@@ -6440,7 +7032,10 @@
     setInterval(pollOnce, refreshMs);
     // Keep the uptime label moving even when the server returns cached/304 state.
     setInterval(() => {{
-      if (!document.hidden) updateUptimeDisplay();
+      if (!document.hidden) {{
+        updateUptimeDisplay();
+        refreshNodesTableFreshness();
+      }}
     }}, 1000);
     setInterval(() => {{
       void loadThemeSettingsFromServer(false);
