@@ -200,6 +200,7 @@
     let uptimeBaseMs = 0;
     let lastMapSignature = "";
     let mapResizeRaf = null;
+    let mapResizeStabilizeTimers = [];
     let splitPct = 64;
     let splitTopPx = 430;
     let splitMidPx = 250;
@@ -293,6 +294,26 @@
         map.invalidateSize({{ pan: false, animate: false }});
         mapResizeRaf = null;
       }});
+    }}
+
+    function clearMapResizeStabilizeTimers() {{
+      if (!Array.isArray(mapResizeStabilizeTimers) || mapResizeStabilizeTimers.length === 0) return;
+      for (const timerId of mapResizeStabilizeTimers) {{
+        clearTimeout(timerId);
+      }}
+      mapResizeStabilizeTimers = [];
+    }}
+
+    function requestMapResizeStabilized() {{
+      clearMapResizeStabilizeTimers();
+      requestMapResize();
+      for (const delayMs of [90, 220, 420]) {{
+        const timerId = window.setTimeout(() => {{
+          mapResizeStabilizeTimers = mapResizeStabilizeTimers.filter((id) => id !== timerId);
+          requestMapResize();
+        }}, delayMs);
+        mapResizeStabilizeTimers.push(timerId);
+      }}
     }}
 
     function syncMapSize() {{
@@ -2472,6 +2493,7 @@
           cell.setAttribute("data-sort", active ? "1" : "0");
         }}
       }}
+      syncMapTitleFavoriteToggle();
       renderSavedRailStatus();
 
       const nodesSort = tableSortState["nodes-table"];
@@ -2596,6 +2618,63 @@
       if (btn) {{
         btn.disabled = !selectedNodeId;
       }}
+      refreshMapCardTitle();
+    }}
+
+    function setMapCardTitle(text) {{
+      const nextTitle = String(text || "");
+      const titleText = document.getElementById("map-card-title-text");
+      if (titleText instanceof HTMLElement) {{
+        titleText.textContent = nextTitle;
+        return;
+      }}
+      const titleFallback = document.getElementById("map-card-title");
+      if (titleFallback instanceof HTMLElement) {{
+        titleFallback.textContent = nextTitle;
+      }}
+    }}
+
+    function syncMapTitleFavoriteToggle() {{
+      const btn = document.getElementById("map-card-title-favorite-btn");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const canToggle = activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId);
+      btn.hidden = !canToggle;
+      if (!canToggle) {{
+        btn.dataset.nodeId = "";
+        btn.classList.remove("active");
+        btn.setAttribute("aria-pressed", "false");
+        const icon = btn.querySelector(".favorite-toggle-icon");
+        if (icon instanceof HTMLElement) {{
+          icon.textContent = "☆";
+        }}
+        btn.title = "Save node";
+        btn.setAttribute("aria-label", "Save node");
+        return;
+      }}
+
+      const nodeId = normalizeNodeId(selectedNodeId || "");
+      const active = isFavoriteNode(nodeId);
+      btn.dataset.nodeId = nodeId;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+      const title = active ? "Remove from saved nodes" : "Save node";
+      btn.title = title;
+      btn.setAttribute("aria-label", title);
+      const icon = btn.querySelector(".favorite-toggle-icon");
+      if (icon instanceof HTMLElement) {{
+        icon.textContent = active ? "★" : "☆";
+      }}
+    }}
+
+    function refreshMapCardTitle() {{
+      if (activeLayoutView === "saved") {{
+        setMapCardTitle("Node Details");
+      }} else if (activeLayoutView === "network") {{
+        setMapCardTitle("");
+      }} else {{
+        setMapCardTitle(isSelectableNodeId(selectedNodeId) ? "Selected Node Map" : "Network Map");
+      }}
+      syncMapTitleFavoriteToggle();
     }}
 
     function escAttr(value) {{
@@ -3003,6 +3082,11 @@
       return knownLayoutViews.has(clean) ? clean : "chat";
     }}
 
+    function isMapVisibleLayoutView(viewName) {{
+      const view = normalizeLayoutView(viewName);
+      return view === "network" || view === "saved" || view === "all";
+    }}
+
     function syncNodeHistoryDock() {{
       const nodeHistoryPanel = document.getElementById("map-data-node");
       const mapDataBody = document.getElementById("map-data-body");
@@ -3044,16 +3128,7 @@
       if (chatLeftPanel instanceof HTMLElement) {{
         chatLeftPanel.hidden = !chatPanelOpen;
       }}
-      const mapTitle = document.getElementById("map-card-title");
-      if (mapTitle) {{
-        if (next === "saved") {{
-          mapTitle.textContent = "Node Details";
-        }} else if (next === "network") {{
-          mapTitle.textContent = "";
-        }} else {{
-          mapTitle.textContent = isSelectableNodeId(selectedNodeId) ? "Selected Node Map" : "Network Map";
-        }}
-      }}
+      refreshMapCardTitle();
       const mapResetBtn = document.getElementById("map-reset-view-btn");
       if (mapResetBtn instanceof HTMLButtonElement) {{
         mapResetBtn.hidden = next === "saved";
@@ -3140,7 +3215,11 @@
       }}
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
-      requestMapResize();
+      if (isMapVisibleLayoutView(next)) {{
+        requestMapResizeStabilized();
+      }} else {{
+        clearMapResizeStabilizeTimers();
+      }}
     }}
 
     function loadLayoutView() {{
@@ -4419,6 +4498,15 @@
       const signature = buildMapSignature(nodes, edges, nodeHistory);
       if (signature === lastMapSignature) {{
         syncSignalHeatmapLayer(nodes, hideHeatmap);
+        if (activeLayoutView === "network" && !fitDone) {{
+          // View-switch fast path: still run initial network auto-fit even when map data is unchanged.
+          const didFit = fitMapToMostNodes(nodes, {{ pad: 0.18, maxZoom: 13 }});
+          if (didFit) {{
+            fitDone = true;
+          }} else {{
+            requestMapResize();
+          }}
+        }}
         updateMapSelection(false);
         return;
       }}
@@ -4434,16 +4522,7 @@
       const savedSelectionMode = selectionMode && activeLayoutView === "saved";
       const networkSelectionMode = selectionMode && activeLayoutView === "network";
       syncSignalHeatmapLayer(nodes, hideHeatmap);
-      const mapTitle = document.getElementById("map-card-title");
-      if (mapTitle) {{
-        if (activeLayoutView === "saved") {{
-          mapTitle.textContent = "Node Details";
-        }} else if (activeLayoutView === "network") {{
-          mapTitle.textContent = "";
-        }} else {{
-          mapTitle.textContent = selectionMode ? "Selected Node Map" : "Network Map";
-        }}
-      }}
+      refreshMapCardTitle();
 
       if (savedSelectionMode) {{
         const selectedNode = selectedNodeFrom(nodes);
