@@ -4213,8 +4213,7 @@
           renderChat(latestState);
         }}
         if (next === "saved" || next === "all") {{
-          renderFavorites(latestState);
-          renderSavedNodeDetails(latestState, cachedNodeHistory);
+          renderFavorites(latestState, cachedNodeHistory);
         }} else {{
           renderSavedNodeDetails(latestState, cachedNodeHistory);
         }}
@@ -6376,6 +6375,19 @@ async function applyLoraSettings() {{
       return `${{hours.toFixed(1)}}h`;
     }}
 
+    function savedDetailAge(unix, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const ts = Number(unix);
+      if (!Number.isFinite(ts) || ts <= 0) return "n/a";
+      const ageSec = Math.max(0, Math.floor(nowUnix - ts));
+      if (ageSec < 90) return `${{ageSec}}s ago`;
+      const ageMin = ageSec / 60;
+      if (ageMin < 90) return `${{Math.round(ageMin)}}m ago`;
+      const ageHr = ageMin / 60;
+      if (ageHr < 48) return `${{ageHr.toFixed(ageHr < 10 ? 1 : 0)}}h ago`;
+      const ageDay = ageHr / 24;
+      return `${{ageDay.toFixed(ageDay < 10 ? 1 : 0)}}d ago`;
+    }}
+
     function savedDetailSectionHtml(title, items, note = "") {{
       const rows = items.map(([label, value]) => (
         `<div class="saved-node-stat">
@@ -6593,6 +6605,20 @@ async function applyLoraSettings() {{
     function renderSavedNodeDetails(state, nodeHistory = null, loadingNodeId = "") {{
       const host = document.getElementById("saved-node-details");
       if (!(host instanceof HTMLElement)) return;
+      const previousMainScroll = host.querySelector(".saved-node-main-scroll");
+      const previousNodeId = normalizeNodeId(host.dataset.nodeId || "");
+      const previousScrollTop = (
+        previousMainScroll instanceof HTMLElement
+        && Number.isFinite(previousMainScroll.scrollTop)
+      ) ? previousMainScroll.scrollTop : 0;
+      const previousScrollHeight = (
+        previousMainScroll instanceof HTMLElement
+        && Number.isFinite(previousMainScroll.scrollHeight)
+      ) ? previousMainScroll.scrollHeight : 0;
+      const previousClientHeight = (
+        previousMainScroll instanceof HTMLElement
+        && Number.isFinite(previousMainScroll.clientHeight)
+      ) ? previousMainScroll.clientHeight : 0;
       const dockedHistoryPanel = document.getElementById("map-data-node");
       const mapDataBody = document.getElementById("map-data-body");
       // Preserve the shared history panel node before replacing host.innerHTML.
@@ -6609,6 +6635,7 @@ async function applyLoraSettings() {{
       const loadingId = normalizeNodeId(loadingNodeId || "");
 
       if (!isSelectableNodeId(nodeId)) {{
+        host.dataset.nodeId = "";
         host.innerHTML = favoriteNodeIds.size === 0
           ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Star nodes to build your Saved Nodes subsection.</div>'
           : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from Saved Nodes.</div>';
@@ -6652,6 +6679,7 @@ async function applyLoraSettings() {{
 
       const freshness = resolveNodeFreshness(node, caps, historySummary, chatTouch);
       const freshnessSource = nodeFreshnessSourceLabel(freshness.source);
+      const nowUnix = Math.floor(Date.now() / 1000);
 
       const batteryRaw = Number(
         (node && node.battery_level != null)
@@ -6712,10 +6740,30 @@ async function applyLoraSettings() {{
         && Number.isFinite(Number(latestTrail.sats_in_view))
       ) ? Number(latestTrail.sats_in_view) : null;
       const latestTrailPos = latestTrail ? savedDetailCoord(latestTrail.lat, latestTrail.lon) : "n/a";
-      const latestPosText = livePosText !== "n/a" ? livePosText : latestTrailPos;
-      const positionSource = livePosText !== "n/a"
-        ? "Live"
-        : (latestTrailPos !== "n/a" ? "History" : "n/a");
+      const livePositionAvailable = livePosText !== "n/a";
+      const historyPositionAvailable = latestTrailPos !== "n/a";
+      const latestPosText = livePositionAvailable ? livePosText : latestTrailPos;
+      const capsPosUnixRaw = Number(caps && caps.last_position_unix);
+      const capsPosUnix = Number.isFinite(capsPosUnixRaw) && capsPosUnixRaw > 0
+        ? Math.trunc(capsPosUnixRaw)
+        : null;
+      const trailPosUnix = (
+        latestTrail
+        && Number.isFinite(Number(latestTrail.time_unix))
+        && Number(latestTrail.time_unix) > 0
+      ) ? Math.trunc(Number(latestTrail.time_unix)) : null;
+      const latestPosTimeUnix = livePositionAvailable
+        ? (Number.isFinite(capsPosUnix) ? capsPosUnix : trailPosUnix)
+        : trailPosUnix;
+      const latestPosTimeText = livePositionAvailable
+        ? savedDetailText((caps && caps.last_position_time) || (latestTrail && latestTrail.time))
+        : savedDetailText(latestTrail && latestTrail.time);
+      const latestPosAgeText = savedDetailAge(latestPosTimeUnix, nowUnix);
+      const positionSource = livePositionAvailable
+        ? ((Number.isFinite(capsPosUnix) && (nowUnix - capsPosUnix) <= 300)
+          ? "Live (recent)"
+          : (Number.isFinite(capsPosUnix) ? "Live (stale)" : "Live (time unknown)"))
+        : (historyPositionAvailable ? "History trail" : "n/a");
       const positionCapable = (caps && caps.has_position === true) || latestTrailPos !== "n/a"
         ? "Yes"
         : "No";
@@ -6815,14 +6863,15 @@ async function applyLoraSettings() {{
       ], historyLoading ? "Historical points are loading for this node." : "");
 
       const locationSection = savedDetailSectionHtml("Location", [
-        ["Current/Latest Position", latestPosText],
+        ["Last Broadcast Position", latestPosText],
         ["Position Source", positionSource],
-        ["Latest Position Time", livePosText !== "n/a" ? savedDetailText((node && node.last_heard) || (caps && caps.last_seen)) : savedDetailText(latestTrail && latestTrail.time)],
+        ["Position Age", latestPosAgeText],
+        ["Latest Position Time", latestPosTimeText],
         ["Altitude", Number.isFinite(latestTrailAltitude) ? `${{formatMetricValue(latestTrailAltitude, 0)}} m` : "n/a"],
         ["Satellites", Number.isFinite(latestTrailSats) ? String(Math.round(latestTrailSats)) : "n/a"],
         ["Trail Start", savedDetailText(historySummary.trail_start)],
         ["Trail End", savedDetailText(historySummary.trail_end)],
-      ]);
+      ], "Radio screens can show a newer local GPS fix before that fix is broadcast to this dashboard.");
 
       const chatSection = savedDetailSectionHtml("Chat (Recent Buffer)", [
         ["Messages Touching Node", String(chatStats.touches)],
@@ -6862,13 +6911,39 @@ async function applyLoraSettings() {{
           <div id="saved-node-history-host" class="saved-node-history-host"></div>
         </div>
       `;
+      host.dataset.nodeId = nodeId;
       bindSavedNodeHistorySplitter();
       syncNodeHistoryDock();
+      if (previousNodeId === nodeId) {{
+        const restoreMainScroll = () => {{
+          const nextMainScroll = host.querySelector(".saved-node-main-scroll");
+          if (!(nextMainScroll instanceof HTMLElement)) return;
+          const prevMax = Math.max(0, previousScrollHeight - previousClientHeight);
+          const nextMax = Math.max(0, nextMainScroll.scrollHeight - nextMainScroll.clientHeight);
+          if (prevMax <= 0) {{
+            nextMainScroll.scrollTop = 0;
+            return;
+          }}
+          const nearBottom = (prevMax - previousScrollTop) <= 2;
+          if (nearBottom) {{
+            nextMainScroll.scrollTop = nextMax;
+            return;
+          }}
+          const ratio = previousScrollTop / prevMax;
+          nextMainScroll.scrollTop = Math.max(0, Math.min(nextMax, Math.round(ratio * nextMax)));
+        }};
+        // Run once immediately, then once after layout settles (history dock + flex sizing).
+        restoreMainScroll();
+        window.requestAnimationFrame(() => {{
+          if (normalizeNodeId(host.dataset.nodeId || "") !== nodeId) return;
+          restoreMainScroll();
+        }});
+      }}
     }}
 
-    function renderFavorites(state) {{
+    function renderFavorites(state, nodeHistory = null, loadingNodeId = "") {{
       const safeState = (state && typeof state === "object") ? state : {{}};
-      renderSavedNodeDetails(safeState, null);
+      renderSavedNodeDetails(safeState, nodeHistory, loadingNodeId);
       renderStarredNodeSelect(safeState);
       const list = document.getElementById("favorites-list");
       const caption = document.getElementById("favorites-caption");
@@ -8608,11 +8683,10 @@ async function applyLoraSettings() {{
         }}
 
         if (activeLayoutView === "saved" || activeLayoutView === "all") {{
-          renderFavorites(state);
           const loadingId = (activeLayoutView === "saved" && historyRelevant && !cachedHistory)
             ? selectedNodeId
             : null;
-          renderSavedNodeDetails(state, cachedHistory, loadingId);
+          renderFavorites(state, cachedHistory, loadingId);
         }}
 
         if (activeLayoutView === "packets" || activeLayoutView === "all") {{
