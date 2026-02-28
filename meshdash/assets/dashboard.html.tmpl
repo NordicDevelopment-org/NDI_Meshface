@@ -57,6 +57,7 @@
       <button class="rail-btn" data-view="saved" type="button" title="Node details and saved nodes">Node</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
       <button class="rail-btn" data-view="data" type="button" title="Raw node/config views">Data</button>
+      <button class="rail-btn" data-view="settings" type="button" title="Radio + dashboard settings">Settings</button>
       <button class="rail-btn" data-view="all" type="button" title="Show every panel">All</button>
     </aside>
     <aside id="chat-left-panel" class="chat-left-panel" hidden aria-label="Chat roster">
@@ -96,6 +97,159 @@
           Updated: <span id="updated-at">n/a</span>
           <span id="updated-freshness" class="summary-freshness" hidden>Unknown</span>
           <span id="local-state-error" class="warn"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card settings" aria-label="Settings">
+      <div class="settings-card-head">
+        <h2>Settings</h2>
+        <div class="settings-caption" id="settings-caption">
+          Configure the connected radio. Some changes (especially LoRa) may reboot the device.
+        </div>
+      </div>
+      <div class="body">
+        <div class="settings-grid">
+          <div class="settings-panel">
+            <h3>LoRa / Radio</h3>
+            <div class="settings-fields">
+              <label class="settings-field">
+                <span class="settings-label">Region</span>
+                <select id="settings-lora-region" class="settings-select" autocomplete="off">
+                  <option value="UNSET">UNSET</option>
+                  <option value="US">US</option>
+                  <option value="EU_433">EU_433</option>
+                  <option value="EU_868">EU_868</option>
+                  <option value="CN">CN</option>
+                  <option value="JP">JP</option>
+                  <option value="ANZ">ANZ</option>
+                  <option value="ANZ_433">ANZ_433</option>
+                  <option value="KR">KR</option>
+                  <option value="TW">TW</option>
+                  <option value="RU">RU</option>
+                  <option value="IN">IN</option>
+                  <option value="NZ_865">NZ_865</option>
+                  <option value="TH">TH</option>
+                  <option value="UA_433">UA_433</option>
+                  <option value="UA_868">UA_868</option>
+                  <option value="MY_433">MY_433</option>
+                  <option value="MY_919">MY_919</option>
+                  <option value="SG_923">SG_923</option>
+                  <option value="KZ_433">KZ_433</option>
+                  <option value="KZ_863">KZ_863</option>
+                  <option value="BR_902">BR_902</option>
+                  <option value="PH_433">PH_433</option>
+                  <option value="PH_868">PH_868</option>
+                  <option value="PH_915">PH_915</option>
+                  <option value="NP_865">NP_865</option>
+                  <option value="LORA_24">LORA_24</option>
+                </select>
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-label">Modem preset</span>
+                <select id="settings-lora-modem-preset" class="settings-select" autocomplete="off">
+                  <option value="LONG_FAST">LONG_FAST</option>
+                  <option value="LONG_MODERATE">LONG_MODERATE</option>
+                  <option value="LONG_SLOW">LONG_SLOW</option>
+                  <option value="VERY_LONG_SLOW">VERY_LONG_SLOW</option>
+                  <option value="MEDIUM_FAST">MEDIUM_FAST</option>
+                  <option value="MEDIUM_SLOW">MEDIUM_SLOW</option>
+                  <option value="SHORT_FAST">SHORT_FAST</option>
+                  <option value="SHORT_SLOW">SHORT_SLOW</option>
+                  <option value="SHORT_TURBO">SHORT_TURBO</option>
+                </select>
+              </label>
+
+              <label class="settings-field settings-inline">
+                <input id="settings-lora-use-preset" type="checkbox" />
+                <span>Use preset (ignore manual modem fields)</span>
+              </label>
+
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Max hops</span>
+                  <input id="settings-lora-hop-limit" class="settings-input" type="number" min="1" max="7" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">TX power (dBm)</span>
+                  <input id="settings-lora-tx-power" class="settings-input" type="number" min="0" max="30" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Frequency slot</span>
+                  <input id="settings-lora-channel-num" class="settings-input" type="number" min="0" step="1" />
+                </label>
+              </div>
+
+              <label class="settings-field settings-inline">
+                <input id="settings-lora-tx-enabled" type="checkbox" />
+                <span>Transmit enabled</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-panel">
+            <h3>Advanced LoRa</h3>
+            <div class="settings-fields">
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Bandwidth (kHz)</span>
+                  <input id="settings-lora-bandwidth" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Spread factor</span>
+                  <input id="settings-lora-spread-factor" class="settings-input" type="number" min="7" max="12" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Coding rate (denom)</span>
+                  <input id="settings-lora-coding-rate" class="settings-input" type="number" min="5" max="8" step="1" />
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Frequency offset (Hz)</span>
+                  <input id="settings-lora-frequency-offset" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Override frequency (MHz)</span>
+                  <input id="settings-lora-override-frequency" class="settings-input" type="number" min="0" step="0.001" />
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-ignore-mqtt" type="checkbox" />
+                  <span>Ignore MQTT</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-config-ok-to-mqtt" type="checkbox" />
+                  <span>OK to MQTT</span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-override-duty-cycle" type="checkbox" />
+                  <span>Override duty cycle limit</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-sx126x-rx-boosted-gain" type="checkbox" />
+                  <span>SX126x RX boosted gain</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-pa-fan-disabled" type="checkbox" />
+                  <span>PA fan disabled</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button id="settings-apply-lora" class="btn" type="button">Apply LoRa settings</button>
+          <button id="settings-reset" class="btn btn-secondary" type="button">Fetch settings</button>
+          <span id="settings-apply-status" class="settings-status"></span>
         </div>
       </div>
     </section>

@@ -803,6 +803,132 @@
       flex-direction: column;
       min-height: 0;
     }}
+
+    .settings {{
+      grid-column: 1 / span 3;
+      grid-row: 2 / 9;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .settings-card-head {{
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #d7e5d2;
+      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+    }}
+    .settings-card-head h2 {{
+      margin: 0;
+      font-size: 13px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: #0f2018;
+    }}
+    .settings-caption {{
+      font-size: 12px;
+      color: #2b4a37;
+      line-height: 1.35;
+    }}
+    .settings-grid {{
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+      gap: 12px;
+    }}
+    .settings-panel {{
+      border: 1px solid #d7e5d2;
+      border-radius: 12px;
+      background: #ffffff;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }}
+    .settings-panel h3 {{
+      margin: 0;
+      font-size: 12px;
+      color: #204231;
+      letter-spacing: 0.35px;
+      text-transform: uppercase;
+    }}
+    .settings-fields {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }}
+    .settings-row {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 12px;
+      align-items: flex-end;
+    }}
+    .settings-field {{
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 160px;
+    }}
+    .settings-field.settings-inline {{
+      flex-direction: row;
+      align-items: center;
+      min-width: 0;
+    }}
+    .settings-label {{
+      font-size: 10px;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+      color: #355b44;
+    }}
+    .settings-input, .settings-select {{
+      border: 1px solid #c8d7c4;
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-size: 12px;
+      background: #f8fbf7;
+      color: #0f2018;
+      outline: none;
+    }}
+    .settings-input:focus, .settings-select:focus {{
+      border-color: #2f855a;
+      box-shadow: 0 0 0 2px rgba(47, 133, 90, 0.18);
+    }}
+    .settings-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 12px;
+    }}
+    .btn {{
+      font-size: 12px;
+      line-height: 1.2;
+      border: 1px solid #c2d8c7;
+      color: #194c33;
+      background: #f0f8f2;
+      border-radius: 999px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }}
+    .btn:hover {{
+      background: #e1f2e7;
+    }}
+    .btn:disabled {{
+      opacity: 0.55;
+      cursor: default;
+    }}
+    .btn.btn-secondary {{
+      background: transparent;
+    }}
+    .settings-status {{
+      font-size: 12px;
+      color: #204231;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }}
     .map-data {{
       grid-column: 1 / span 3;
       grid-row: 7;
@@ -1417,6 +1543,33 @@
       display: none !important;
     }}
     .layout.view-data .hsplitter[data-target="low"] {{ grid-row: 3; }}
+
+    .layout.view-settings {{
+      height: calc(100vh - 96px);
+      height: calc(100dvh - 96px);
+      min-height: 560px;
+    }}
+    .layout.view-settings .settings {{
+      display: flex;
+    }}
+    .layout.view-settings .chat,
+    .layout.view-settings .nodes,
+    .layout.view-settings .map,
+    .layout.view-settings .map-data,
+    .layout.view-settings .favorites,
+    .layout.view-settings .packets,
+    .layout.view-settings .raw,
+    .layout.view-settings .splitter,
+    .layout.view-settings .hsplitter[data-target="top"],
+    .layout.view-settings .hsplitter[data-target="mid"],
+    .layout.view-settings .hsplitter[data-target="low"] {{
+      display: none !important;
+    }}
+    .layout.view-settings .console {{
+      display: flex;
+      grid-column: 1 / span 3;
+      grid-row: 10;
+    }}
 
     .layout.view-saved {{
       height: calc(100vh - 96px);
@@ -2660,6 +2813,48 @@
       background: #17231c;
       border-color: #33483c;
       color: #dbece3;
+    }}
+
+    [data-theme="dark"] .settings-card-head {{
+      background: #1b2b22;
+      border-bottom-color: #33483c;
+    }}
+    [data-theme="dark"] .settings-card-head h2 {{
+      color: #9fbead;
+    }}
+    [data-theme="dark"] .settings-caption {{
+      color: #98b7a7;
+    }}
+    [data-theme="dark"] .settings-panel {{
+      background: #1a2a21;
+      border-color: #31473b;
+      color: #dbece3;
+    }}
+    [data-theme="dark"] .settings-panel h3 {{
+      color: #9fbead;
+    }}
+    [data-theme="dark"] .settings-label {{
+      color: #98b7a7;
+    }}
+    [data-theme="dark"] .settings-input,
+    [data-theme="dark"] .settings-select {{
+      background: #22342a;
+      border-color: #3a5346;
+      color: #dbece3;
+    }}
+    [data-theme="dark"] .settings-status {{
+      color: #9fbead;
+    }}
+    [data-theme="dark"] .btn {{
+      border-color: #3a5346;
+      background: #22342a;
+      color: #b6d7c6;
+    }}
+    [data-theme="dark"] .btn:hover {{
+      background: #2a4033;
+    }}
+    [data-theme="dark"] .btn.btn-secondary {{
+      background: transparent;
     }}
     [data-theme="dark"] .teams-rail-title,
     [data-theme="dark"] .chat-left-title,
