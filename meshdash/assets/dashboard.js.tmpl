@@ -512,6 +512,15 @@
       return signalHeatmapLayers;
     }}
 
+    function forceHeatLayerPointerPassthrough(layer) {{
+      if (!layer || typeof layer !== "object") return;
+      const canvas = layer._canvas;
+      if (!(canvas instanceof HTMLCanvasElement)) return;
+      // Some leaflet.heat builds render into overlayPane (ignoring custom panes),
+      // which can block marker hover/click unless canvas hit-testing is disabled.
+      canvas.style.pointerEvents = "none";
+    }}
+
     function resolveSignalHeatProfile() {{
       const presetRaw = latestState && latestState.summary
         ? String(latestState.summary.modem_preset || "")
@@ -771,6 +780,7 @@
           if (!map.hasLayer(layer)) {{
             layer.addTo(map);
           }}
+          forceHeatLayerPointerPassthrough(layer);
         }} else if (map.hasLayer(layer)) {{
           map.removeLayer(layer);
         }}
