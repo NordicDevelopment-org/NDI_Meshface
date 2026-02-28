@@ -3723,6 +3723,30 @@
       return true;
     }}
 
+    function renderSelfRadioPill(state = latestState) {{
+      const pill = document.getElementById("self-radio-pill");
+      if (!(pill instanceof HTMLElement)) return;
+
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const selfId = resolveLocalNodeId(safeState);
+      if (!isCanonicalNodeId(selfId)) {{
+        pill.textContent = "n/a";
+        pill.title = "Connected local radio: unavailable";
+        return;
+      }}
+
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const selfNode = nodes.find((node) => normalizeNodeId(node && node.id) === selfId) || null;
+      const selfName = preferredNodeName(selfNode) || nodeNameCache.get(selfId) || "";
+      if (selfName) {{
+        pill.textContent = `${{selfName}} (${{selfId}})`;
+        pill.title = `Connected local radio: ${{selfName}} (${{selfId}})`;
+      }} else {{
+        pill.textContent = `${{selfId}}`;
+        pill.title = `Connected local radio: ${{selfId}}`;
+      }}
+    }}
+
     function normalizeSearchQuery(value) {{
       return String(value == null ? "" : value).trim().toLowerCase();
     }}
@@ -9331,6 +9355,7 @@ async function applyLoraSettings() {{
         if (resp.status === 304) {{
           // Nothing changed; keep the existing state and skip expensive DOM work.
           // Still allow an on-demand node-history fetch if the user just changed selection.
+          renderSelfRadioPill(latestState);
           if ((activeLayoutView === "saved" || activeLayoutView === "network")
             && mapDataFocus !== "activity"
             && isSelectableNodeId(selectedNodeId)) {{
@@ -9357,6 +9382,7 @@ async function applyLoraSettings() {{
           resolvedLocalNodeId = nextLocalNodeId;
         }}
         pruneSelfFromManualDirectPeers(state);
+        renderSelfRadioPill(state);
 
         const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
         const historyRelevant = (activeLayoutView === "saved" || activeLayoutView === "network")
@@ -9436,6 +9462,7 @@ async function applyLoraSettings() {{
 
     loadStoredSelection();
     loadNodeNameCache();
+    renderSelfRadioPill();
     loadFavoriteNodes();
     loadSplitState();
     loadNetworkNodesSplitState();
