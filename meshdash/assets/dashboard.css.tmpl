@@ -215,6 +215,180 @@
       margin: 0 0 5px 2px;
       font-weight: 700;
     }}
+    .chat-users-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      min-width: 0;
+    }}
+    .chat-users-head .chat-left-label {{
+      margin: 0;
+    }}
+    .chat-peer-add-toggle-btn {{
+      border: 1px solid #c2d8c7;
+      background: #f3faf5;
+      color: #214434;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 10px;
+      line-height: 1.2;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .chat-peer-add-toggle-btn:hover {{
+      background: #e7f3eb;
+    }}
+    .chat-peer-add-panel {{
+      border: 1px solid #d0dfd0;
+      border-radius: 8px;
+      background: #f5fbf6;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }}
+    .chat-peer-add-panel[hidden] {{
+      display: none !important;
+    }}
+    .chat-peer-add-row {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: center;
+    }}
+    .chat-peer-input {{
+      width: 100%;
+      min-width: 0;
+      border: 1px solid #c2d8c7;
+      border-radius: 7px;
+      padding: 5px 7px;
+      font-size: 11px;
+      line-height: 1.25;
+      color: #183223;
+      background: #f9fdf9;
+      box-sizing: border-box;
+      appearance: none;
+      -webkit-appearance: none;
+      min-height: 27px;
+    }}
+    .chat-peer-input:focus {{
+      outline: 2px solid #9ac5aa;
+      outline-offset: 0;
+      border-color: #9ac5aa;
+      background: #ffffff;
+      box-shadow: none;
+    }}
+    .chat-peer-add-btn {{
+      border: 1px solid #c2d8c7;
+      background: #f3faf5;
+      color: #214434;
+      border-radius: 7px;
+      padding: 5px 8px;
+      font-size: 10px;
+      line-height: 1.2;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .chat-peer-add-btn:hover {{
+      background: #e7f3eb;
+    }}
+    .chat-peer-add-btn:disabled,
+    .chat-peer-input:disabled {{
+      opacity: 0.65;
+      cursor: default;
+    }}
+    .chat-peer-add-help {{
+      font-size: 9px;
+      line-height: 1.25;
+      color: #5a7365;
+      padding: 0 2px;
+    }}
+    .chat-peer-saved-wrap {{
+      border-top: 1px dashed #c7d9cb;
+      padding-top: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 0;
+    }}
+    .chat-peer-saved-title {{
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      color: #49695a;
+      padding: 0 2px;
+      font-weight: 700;
+    }}
+    .chat-peer-saved-list {{
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 130px;
+      overflow: auto;
+      padding-right: 2px;
+    }}
+    .chat-peer-saved-empty {{
+      border: 1px dashed #cddfcf;
+      border-radius: 7px;
+      background: #f8fcf8;
+      color: #60776a;
+      font-size: 10px;
+      line-height: 1.25;
+      padding: 6px 7px;
+    }}
+    .chat-peer-saved-item {{
+      border: 1px solid #c7dac5;
+      background: #ecf7ef;
+      color: #214434;
+      border-radius: 7px;
+      padding: 3px 6px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      line-height: 1.2;
+    }}
+    .chat-peer-saved-main {{
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }}
+    .chat-peer-saved-name,
+    .chat-peer-saved-id {{
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .chat-peer-saved-id {{
+      font-size: 9px;
+      color: #5f7a6a;
+      opacity: 0.85;
+    }}
+    .chat-peer-saved-remove-btn {{
+      border: 1px solid rgba(103, 132, 115, 0.45);
+      background: transparent;
+      color: #5f7869;
+      border-radius: 999px;
+      min-width: 17px;
+      height: 17px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 10px;
+      line-height: 1;
+      opacity: 0.84;
+    }}
+    .chat-peer-saved-remove-btn:hover {{
+      background: rgba(209, 89, 89, 0.12);
+      border-color: rgba(167, 68, 68, 0.56);
+      color: #8d3a3a;
+      opacity: 1;
+    }}
     .chat-channel-list {{
       display: flex;
       flex-direction: column;
@@ -1971,6 +2145,18 @@
       flex: 1 1 auto;
       max-width: 100%;
     }}
+    .chat-member-peer-badge {{
+      border: 1px solid #9fc4af;
+      background: #e9f5ed;
+      color: #2a6546;
+      border-radius: 999px;
+      padding: 1px 5px;
+      font-size: 8px;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      flex: 0 0 auto;
+    }}
     .favorite-toggle-btn {{
       border: 1px solid rgba(103, 132, 115, 0.35);
       background: transparent;
@@ -2016,15 +2202,40 @@
       font-size: 8px;
       padding: 0 2px;
     }}
+    .chat-member-actions {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: auto;
+      flex: 0 0 auto;
+    }}
+    .chat-peer-remove-btn {{
+      border: 1px solid rgba(103, 132, 115, 0.45);
+      background: transparent;
+      color: #5f7869;
+      border-radius: 999px;
+      min-width: 15px;
+      height: 15px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 10px;
+      line-height: 1;
+      opacity: 0.78;
+    }}
+    .chat-peer-remove-btn:hover {{
+      background: rgba(209, 89, 89, 0.12);
+      border-color: rgba(167, 68, 68, 0.56);
+      color: #8d3a3a;
+      opacity: 1;
+    }}
     .favorites-card-star {{
       min-width: 18px;
       height: 18px;
       font-size: 9px;
       padding: 0 5px;
-    }}
-    .node-name-row .favorite-toggle-btn,
-    .chat-member-name-row .favorite-toggle-btn {{
-      margin-left: auto;
     }}
     .node-name-row .favorite-toggle-btn {{
       margin-left: 0;
@@ -3631,6 +3842,62 @@
       background: var(--ui-panel-alt);
       border-color: var(--ui-border);
     }}
+    [data-theme="dark"] .chat-peer-add-panel {{
+      background: #101a24;
+      border-color: var(--ui-border);
+    }}
+    [data-theme="dark"] .chat-peer-add-toggle-btn,
+    [data-theme="dark"] .chat-peer-add-btn,
+    [data-theme="dark"] .chat-peer-remove-btn {{
+      background: #16273a;
+      border-color: #35556d;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .chat-peer-input {{
+      background: #07140d;
+      border-color: #2b8a59;
+      color: #c6ffdb;
+    }}
+    [data-theme="dark"] .chat-peer-input:focus {{
+      outline: 2px solid var(--ui-accent);
+      outline-offset: 0;
+      border-color: var(--ui-accent);
+      outline-color: var(--ui-accent);
+      background: #0b1e13;
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .chat-member-peer-badge {{
+      border-color: #3f5b73;
+      background: #1f3342;
+      color: #c8ddf2;
+    }}
+    [data-theme="dark"] .chat-peer-saved-wrap {{
+      border-top-color: #334252;
+    }}
+    [data-theme="dark"] .chat-peer-saved-title {{
+      color: #9db3c8;
+    }}
+    [data-theme="dark"] .chat-peer-saved-empty {{
+      border-color: var(--ui-border);
+      background: #121b24;
+      color: #a9bfd3;
+    }}
+    [data-theme="dark"] .chat-peer-saved-item {{
+      background: #16273a;
+      border-color: #35556d;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .chat-peer-saved-id {{
+      color: #a9bfd3;
+    }}
+    [data-theme="dark"] .chat-peer-saved-remove-btn {{
+      background: #16273a;
+      border-color: #35556d;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .chat-peer-add-help {{
+      color: var(--ui-text-soft);
+    }}
     [data-theme="dark"] .chat-name-chip.offline {{
       background: #212933;
       border-color: #41505f;
@@ -3861,6 +4128,14 @@
       border-color: var(--ui-border);
       background: var(--ui-panel-alt);
       color: var(--ui-text-soft);
+    }}
+    [data-theme="dark"] .chat-peer-add-toggle-btn:hover,
+    [data-theme="dark"] .chat-peer-add-btn:hover,
+    [data-theme="dark"] .chat-peer-remove-btn:hover,
+    [data-theme="dark"] .chat-peer-saved-remove-btn:hover {{
+      background: #223448;
+      border-color: #4e6a86;
+      color: #eef6ff;
     }}
     [data-theme="dark"] .favorites-clear-btn {{
       border-color: #35556d;

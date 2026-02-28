@@ -171,6 +171,7 @@
     const savedNodeHistorySplitStorageKey = "meshDashboardSavedNodeMainPct";
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
+    const chatDirectPeersStorageKey = "meshDashboardDirectPeersV1";
     const themeStorageKey = "meshDashboardThemePreference";
     const signalHeatmapStorageKey = "meshDashboardSignalHeatmapEnabledV1";
     const signalHeatmapModeStorageKey = "meshDashboardSignalHeatmapModeV1";
@@ -592,6 +593,7 @@
     let chatReactionPopoverHideTimer = null;
     let nodesSearchQuery = "";
     let chatUserSearchQuery = "";
+    let chatPeerAddPanelOpen = false;
     let themePreference = "auto";
     let themePresetSelected = "default";
     let settingsDirty = false;
@@ -622,6 +624,8 @@
     const onlineActivityCache = new Map();
     const nodeNameCache = new Map();
     const favoriteNodeIds = new Set();
+    const manualDirectPeerIds = new Set();
+    let resolvedLocalNodeId = "";
     let favoritesSearchQuery = "";
     const signalChartLayout = {{
       width: 900,
@@ -2558,6 +2562,10 @@
           input.placeholder = "Message the room (^all)...";
         }}
       }}
+      if (activeChatChannel !== "direct") {{
+        chatPeerAddPanelOpen = false;
+      }}
+      renderChatPeerAddPanel(latestState);
       if (changed) {{
         clearChatReplyTarget();
       }} else {{
@@ -2575,6 +2583,280 @@
       }} catch (_err) {{
       }}
       applyChatChannel(preferred, false);
+    }}
+
+    function persistManualDirectPeers() {{
+      try {{
+        const ids = Array.from(manualDirectPeerIds)
+          .map((entry) => normalizeNodeId(entry))
+          .filter((entry) => isCanonicalNodeId(entry))
+          .sort((a, b) => a.localeCompare(b));
+        window.localStorage.setItem(chatDirectPeersStorageKey, JSON.stringify(ids));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadManualDirectPeers() {{
+      manualDirectPeerIds.clear();
+      try {{
+        const raw = window.localStorage.getItem(chatDirectPeersStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        for (const entry of parsed) {{
+          const nodeId = normalizeNodeId(entry);
+          if (!isCanonicalNodeId(nodeId)) continue;
+          manualDirectPeerIds.add(nodeId);
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function addManualDirectPeer(rawNodeId, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const shouldSelect = opts.select !== false;
+      const nodeId = normalizeNodeId(rawNodeId);
+      if (!nodeId) {{
+        return {{ ok: false, error: "Enter a node ID to add." }};
+      }}
+      if (!isCanonicalNodeId(nodeId)) {{
+        return {{ ok: false, error: "Use a node ID like !49b54790." }};
+      }}
+      if (isSelfNodeId(nodeId)) {{
+        return {{ ok: false, error: "Cannot add your own radio to peer-to-peer list." }};
+      }}
+      const added = !manualDirectPeerIds.has(nodeId);
+      manualDirectPeerIds.add(nodeId);
+      persistManualDirectPeers();
+      if (shouldSelect) {{
+        selectNode(nodeId, true, false);
+      }} else if (latestState) {{
+        renderChat(latestState);
+      }}
+      return {{ ok: true, added, id: nodeId }};
+    }}
+
+    function removeManualDirectPeer(rawNodeId) {{
+      const nodeId = normalizeNodeId(rawNodeId);
+      if (!isCanonicalNodeId(nodeId)) return false;
+      if (!manualDirectPeerIds.delete(nodeId)) return false;
+      persistManualDirectPeers();
+      if (selectedNodeId && normalizeNodeId(selectedNodeId) === nodeId) {{
+        clearNodeSelection();
+      }} else if (latestState) {{
+        renderChat(latestState);
+      }}
+      return true;
+    }}
+
+    function detectedPeerCandidates(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const selfId = resolveLocalNodeId(safeState);
+      const unique = new Map();
+      for (const node of nodes) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (isCanonicalNodeId(selfId) && nodeId === selfId) continue;
+        if (!isCanonicalNodeId(nodeId) || unique.has(nodeId)) continue;
+        const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || nodeId;
+        const lastSeenUnix = nodeLastHeardUnix(node);
+        unique.set(nodeId, {{ id: nodeId, name, lastSeenUnix }});
+      }}
+      return Array.from(unique.values()).sort((a, b) => {{
+        const aSeen = Number(a.lastSeenUnix) || 0;
+        const bSeen = Number(b.lastSeenUnix) || 0;
+        if (aSeen !== bSeen) return bSeen - aSeen;
+        const nameDiff = String(a.name || "").localeCompare(String(b.name || ""));
+        if (nameDiff !== 0) return nameDiff;
+        return String(a.id || "").localeCompare(String(b.id || ""));
+      }});
+    }}
+
+    function renderChatPeerAddPanel(state = latestState) {{
+      const toggleBtn = document.getElementById("chat-peer-add-toggle-btn");
+      const panel = document.getElementById("chat-peer-add-panel");
+      const detectedSelect = document.getElementById("chat-peer-detected-select");
+      const detectedAddBtn = document.getElementById("chat-peer-add-detected-btn");
+      const manualInput = document.getElementById("chat-peer-manual-input");
+      const manualAddBtn = document.getElementById("chat-peer-add-manual-btn");
+      const savedList = document.getElementById("chat-peer-saved-list");
+      const directMode = activeChatChannel === "direct";
+      if (toggleBtn instanceof HTMLButtonElement) {{
+        toggleBtn.hidden = !directMode;
+        toggleBtn.setAttribute("aria-expanded", directMode && chatPeerAddPanelOpen ? "true" : "false");
+      }}
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = !(directMode && chatPeerAddPanelOpen);
+      }}
+
+      const candidates = detectedPeerCandidates(state);
+      if (detectedSelect instanceof HTMLSelectElement) {{
+        const previousValue = normalizeNodeId(detectedSelect.value || "");
+        const options = ['<option value="">Detected nodes...</option>'];
+        for (const entry of candidates) {{
+          const savedSuffix = manualDirectPeerIds.has(entry.id) ? " (saved)" : "";
+          const label = `${{entry.name}} (${{entry.id}})${{savedSuffix}}`;
+          options.push(`<option value="${{escAttr(entry.id)}}">${{escAttr(label)}}</option>`);
+        }}
+        detectedSelect.innerHTML = options.join("");
+        if (previousValue && candidates.some((entry) => entry.id === previousValue)) {{
+          detectedSelect.value = previousValue;
+        }} else if (isCanonicalNodeId(selectedNodeId) && candidates.some((entry) => entry.id === selectedNodeId)) {{
+          detectedSelect.value = normalizeNodeId(selectedNodeId);
+        }} else {{
+          detectedSelect.value = "";
+        }}
+        detectedSelect.disabled = !directMode || candidates.length === 0;
+      }}
+      if (detectedAddBtn instanceof HTMLButtonElement) {{
+        const hasChoice = detectedSelect instanceof HTMLSelectElement
+          && isCanonicalNodeId(detectedSelect.value || "");
+        detectedAddBtn.disabled = !directMode || !hasChoice;
+      }}
+      if (manualInput instanceof HTMLInputElement) {{
+        manualInput.disabled = !directMode;
+      }}
+      if (manualAddBtn instanceof HTMLButtonElement) {{
+        manualAddBtn.disabled = !directMode;
+      }}
+
+      if (savedList instanceof HTMLElement) {{
+        const safeState = (state && typeof state === "object") ? state : {{}};
+        const selfId = resolveLocalNodeId(safeState);
+        const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+        const nodesById = new Map(
+          nodes.map((node) => [normalizeNodeId(node && node.id), node])
+        );
+        const savedPeers = Array.from(manualDirectPeerIds)
+          .map((entry) => normalizeNodeId(entry))
+          .filter((entry) => isCanonicalNodeId(entry))
+          .filter((entry) => !(isCanonicalNodeId(selfId) && entry === selfId))
+          .map((entry) => {{
+            const node = nodesById.get(entry);
+            const name = preferredNodeName(node) || nodeNameCache.get(entry) || entry;
+            return {{ id: entry, name }};
+          }})
+          .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
+        if (savedPeers.length === 0) {{
+          savedList.innerHTML = '<div class="chat-peer-saved-empty">No saved peers yet.</div>';
+        }} else {{
+          savedList.innerHTML = savedPeers.map((entry) => (
+            `<div class="chat-peer-saved-item">
+              <span class="chat-peer-saved-main">
+                <span class="chat-peer-saved-name">${{escAttr(entry.name)}}</span>
+                <span class="chat-peer-saved-id">${{escAttr(entry.id)}}</span>
+              </span>
+              <button type="button" class="chat-peer-saved-remove-btn" data-node-id="${{escAttr(entry.id)}}" title="Remove ${{escAttr(entry.id)}} from peer-to-peer list" aria-label="Remove ${{escAttr(entry.id)}} from peer-to-peer list">&times;</button>
+            </div>`
+          )).join("");
+        }}
+      }}
+    }}
+
+    function bindChatPeerControls() {{
+      const toggleBtn = document.getElementById("chat-peer-add-toggle-btn");
+      const detectedSelect = document.getElementById("chat-peer-detected-select");
+      const detectedAddBtn = document.getElementById("chat-peer-add-detected-btn");
+      const manualInput = document.getElementById("chat-peer-manual-input");
+      const manualAddBtn = document.getElementById("chat-peer-add-manual-btn");
+      const savedList = document.getElementById("chat-peer-saved-list");
+
+      if (toggleBtn instanceof HTMLButtonElement && toggleBtn.dataset.bound !== "1") {{
+        toggleBtn.dataset.bound = "1";
+        toggleBtn.addEventListener("click", () => {{
+          if (activeChatChannel !== "direct") return;
+          chatPeerAddPanelOpen = !chatPeerAddPanelOpen;
+          renderChatPeerAddPanel(latestState);
+          if (chatPeerAddPanelOpen && manualInput instanceof HTMLInputElement) {{
+            manualInput.focus({{ preventScroll: true }});
+          }}
+        }});
+      }}
+
+      if (detectedAddBtn instanceof HTMLButtonElement && detectedAddBtn.dataset.bound !== "1") {{
+        detectedAddBtn.dataset.bound = "1";
+        detectedAddBtn.addEventListener("click", () => {{
+          const chosenId = normalizeNodeId(
+            detectedSelect instanceof HTMLSelectElement ? detectedSelect.value : ""
+          );
+          const result = addManualDirectPeer(chosenId, {{ select: true }});
+          if (!result.ok) {{
+            setChatSendStatus(result.error || "Unable to add peer.", true);
+            return;
+          }}
+          setChatSendStatus(
+            result.added
+              ? `Peer ${{result.id}} added to peer-to-peer list.`
+              : `Peer ${{result.id}} is already in your peer-to-peer list.`
+          );
+          renderChatPeerAddPanel(latestState);
+        }});
+      }}
+
+      if (detectedSelect instanceof HTMLSelectElement && detectedSelect.dataset.bound !== "1") {{
+        detectedSelect.dataset.bound = "1";
+        detectedSelect.addEventListener("change", () => {{
+          renderChatPeerAddPanel(latestState);
+        }});
+      }}
+
+      const submitManualPeer = () => {{
+        const raw = manualInput instanceof HTMLInputElement ? manualInput.value : "";
+        const result = addManualDirectPeer(raw, {{ select: true }});
+        if (!result.ok) {{
+          setChatSendStatus(result.error || "Unable to add peer.", true);
+          if (manualInput instanceof HTMLInputElement) {{
+            manualInput.focus({{ preventScroll: true }});
+          }}
+          return;
+        }}
+        if (manualInput instanceof HTMLInputElement) {{
+          manualInput.value = "";
+          manualInput.focus({{ preventScroll: true }});
+        }}
+        setChatSendStatus(
+          result.added
+            ? `Peer ${{result.id}} added to peer-to-peer list.`
+            : `Peer ${{result.id}} is already in your peer-to-peer list.`
+        );
+        renderChatPeerAddPanel(latestState);
+      }};
+
+      if (manualAddBtn instanceof HTMLButtonElement && manualAddBtn.dataset.bound !== "1") {{
+        manualAddBtn.dataset.bound = "1";
+        manualAddBtn.addEventListener("click", () => {{
+          submitManualPeer();
+        }});
+      }}
+
+      if (manualInput instanceof HTMLInputElement && manualInput.dataset.bound !== "1") {{
+        manualInput.dataset.bound = "1";
+        manualInput.addEventListener("keydown", (ev) => {{
+          if (ev.key !== "Enter") return;
+          ev.preventDefault();
+          submitManualPeer();
+        }});
+      }}
+
+      if (savedList instanceof HTMLElement && savedList.dataset.bound !== "1") {{
+        savedList.dataset.bound = "1";
+        savedList.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const removeBtn = target.closest(".chat-peer-saved-remove-btn");
+          if (!(removeBtn instanceof HTMLButtonElement)) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          const nodeId = normalizeNodeId(removeBtn.dataset.nodeId || "");
+          if (!isCanonicalNodeId(nodeId)) return;
+          const removed = removeManualDirectPeer(nodeId);
+          if (!removed) return;
+          setChatSendStatus(`Peer ${{nodeId}} removed from peer-to-peer list.`);
+          renderChatPeerAddPanel(latestState);
+        }});
+      }}
+
+      renderChatPeerAddPanel(latestState);
     }}
 
     function normalizeChatEmojiGroup(raw) {{
@@ -2840,6 +3122,10 @@
           return;
         }}
         destination = selectedNodeId;
+        if (isSelfNodeId(destination)) {{
+          setChatSendStatus("Cannot send peer-to-peer message to your own radio.", true);
+          return;
+        }}
       }}
       const replyId = Number(chatReplyTargetId);
       const requestBody = {{
@@ -2885,6 +3171,10 @@
       let destination = "^all";
       if (activeChatChannel === "direct" && isSelectableNodeId(selectedNodeId)) {{
         destination = selectedNodeId;
+        if (isSelfNodeId(destination)) {{
+          setChatSendStatus("Cannot react in peer-to-peer mode to your own radio.", true);
+          return;
+        }}
       }}
       const payload = await sendChatPayload(
         {{
@@ -3259,9 +3549,89 @@
       return raw;
     }}
 
+    function isCanonicalNodeId(nodeId) {{
+      return /^![0-9a-f]{{8}}$/.test(normalizeNodeId(nodeId));
+    }}
+
     function isSelectableNodeId(nodeId) {{
       const normalized = normalizeNodeId(nodeId);
       return !!normalized && normalized !== "^all" && normalized !== "Unknown" && normalized !== "n/a";
+    }}
+
+    function parseNodeNum(value) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric < 0) return null;
+      return Math.trunc(numeric);
+    }}
+
+    function findNodeIdByNum(nodeNum, state = latestState) {{
+      const targetNum = parseNodeNum(nodeNum);
+      if (!Number.isInteger(targetNum) || targetNum < 0) return "";
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      for (const node of nodes) {{
+        const candidateNum = parseNodeNum(node && node.num);
+        if (candidateNum !== targetNum) continue;
+        const nodeId = normalizeNodeId(node && node.id);
+        if (isCanonicalNodeId(nodeId)) {{
+          return nodeId;
+        }}
+      }}
+      return "";
+    }}
+
+    function nodeNumFromMapping(value) {{
+      if (!value || typeof value !== "object") return null;
+      for (const key of ["my_node_num", "myNodeNum", "node_num", "nodeNum", "num"]) {{
+        const parsed = parseNodeNum(value[key]);
+        if (Number.isInteger(parsed) && parsed >= 0) {{
+          return parsed;
+        }}
+      }}
+      return null;
+    }}
+
+    function resolveLocalNodeId(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const direct = normalizeNodeId(safeState.local_node_id || safeState.localNodeId || "");
+      if (isCanonicalNodeId(direct)) {{
+        return direct;
+      }}
+
+      const infoNum = nodeNumFromMapping(safeState.my_info);
+      if (Number.isInteger(infoNum) && infoNum >= 0) {{
+        const fromInfo = findNodeIdByNum(infoNum, safeState);
+        if (isCanonicalNodeId(fromInfo)) {{
+          return fromInfo;
+        }}
+      }}
+
+      const localStateNum = nodeNumFromMapping(safeState.local_state);
+      if (Number.isInteger(localStateNum) && localStateNum >= 0) {{
+        const fromLocal = findNodeIdByNum(localStateNum, safeState);
+        if (isCanonicalNodeId(fromLocal)) {{
+          return fromLocal;
+        }}
+      }}
+
+      return isCanonicalNodeId(resolvedLocalNodeId) ? resolvedLocalNodeId : "";
+    }}
+
+    function isSelfNodeId(nodeId, state = latestState) {{
+      const clean = normalizeNodeId(nodeId);
+      if (!isCanonicalNodeId(clean)) return false;
+      const selfId = resolveLocalNodeId(state);
+      return isCanonicalNodeId(selfId) && clean === selfId;
+    }}
+
+    function pruneSelfFromManualDirectPeers(state = latestState) {{
+      const selfId = resolveLocalNodeId(state);
+      if (!isCanonicalNodeId(selfId) || !manualDirectPeerIds.has(selfId)) {{
+        return false;
+      }}
+      manualDirectPeerIds.delete(selfId);
+      persistManualDirectPeers();
+      return true;
     }}
 
     function normalizeSearchQuery(value) {{
@@ -7917,6 +8287,7 @@ async function applyLoraSettings() {{
       const shouldStickBottom = !!(chatScroller && (chatStickToBottom || isNearBottom(chatScroller)));
       updateNodeNameCache(state.nodes || []);
       const nowUnix = Math.floor(Date.now() / 1000);
+      const localNodeId = resolveLocalNodeId(state);
       const nodesById = new Map(
         (state.nodes || []).map((node) => [normalizeNodeId(node.id || ""), node])
       );
@@ -8042,6 +8413,9 @@ async function applyLoraSettings() {{
       const channelCounts = {{ all: 0, direct: 0 }};
       const touchParticipant = (meta, msgTimeUnix) => {{
         if (!meta || !meta.idTag || !isSelectableNodeId(meta.idTag)) return;
+        if (activeChatChannel === "direct" && isCanonicalNodeId(localNodeId) && meta.idTag === localNodeId) {{
+          return;
+        }}
         const messageUnix = parseDashboardTimeToUnix(msgTimeUnix);
         const existing = participants.get(meta.idTag);
         if (!existing) {{
@@ -8069,6 +8443,9 @@ async function applyLoraSettings() {{
       const touchNodeById = (nodeId, msgTimeUnix = null) => {{
         const clean = normalizeNodeId(nodeId);
         if (!isSelectableNodeId(clean)) return;
+        if (activeChatChannel === "direct" && isCanonicalNodeId(localNodeId) && clean === localNodeId) {{
+          return;
+        }}
         const snapshot = resolveChatNodeFreshness(clean);
         const node = snapshot.node;
         const name = preferredNodeName(node) || nodeNameCache.get(clean) || clean;
@@ -8418,7 +8795,34 @@ async function applyLoraSettings() {{
           touchNodeById(msg.from, latestUnixTimestamp(msg.rx_time, msg.captured_at));
         }}
       }}
-      if (activeChatChannel === "direct" && isSelectableNodeId(selectedNodeId)) {{
+      if (activeChatChannel === "direct") {{
+        for (const peerId of manualDirectPeerIds) {{
+          if (!isCanonicalNodeId(peerId)) continue;
+          if (isCanonicalNodeId(localNodeId) && peerId === localNodeId) continue;
+          const snapshot = resolveChatNodeFreshness(peerId);
+          const node = snapshot.node;
+          const name = preferredNodeName(node) || nodeNameCache.get(peerId) || peerId;
+          const existing = participants.get(peerId);
+          if (!existing) {{
+            participants.set(peerId, {{
+              id: peerId,
+              name,
+              status: snapshot.status,
+              lastSeenUnix: snapshot.lastSeenUnix,
+              lastMessageUnix: null,
+              p2pPinned: true,
+            }});
+            continue;
+          }}
+          existing.p2pPinned = true;
+          if (name && name !== "Unknown node") {{
+            existing.name = name;
+          }}
+          existing.lastSeenUnix = latestUnixTimestamp(existing.lastSeenUnix, snapshot.lastSeenUnix);
+          existing.status = freshnessStatus(existing.lastSeenUnix, nowUnix);
+        }}
+      }}
+      if (activeChatChannel === "direct" && isCanonicalNodeId(selectedNodeId)) {{
         touchNodeById(selectedNodeId);
       }}
       const feed = document.getElementById("chat-feed");
@@ -8432,6 +8836,8 @@ async function applyLoraSettings() {{
       const roomList = document.getElementById("chat-room-list");
       const roster = Array.from(participants.values())
         .sort((a, b) => {{
+          const pinDiff = Number(!!b.p2pPinned) - Number(!!a.p2pPinned);
+          if (pinDiff !== 0) return pinDiff;
           const rankDiff = statusRank(a.status) - statusRank(b.status);
           if (rankDiff !== 0) return rankDiff;
           const aTime = a.lastMessageUnix || 0;
@@ -8456,6 +8862,12 @@ async function applyLoraSettings() {{
               (() => {{
                 const meta = nodeIdentityMeta(item.id);
                 const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}}`;
+                const peerBadge = item.p2pPinned
+                  ? '<span class="chat-member-peer-badge" title="Saved peer-to-peer target">saved</span>'
+                  : "";
+                const removeBtn = (activeChatChannel === "direct" && item.p2pPinned)
+                  ? `<button type="button" class="chat-peer-remove-btn" data-node-id="${{escAttr(item.id)}}" title="Remove from peer-to-peer list" aria-label="Remove ${{escAttr(item.id)}} from peer-to-peer list">&times;</button>`
+                  : "";
                 return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(memberTitle)}}">
                 <span class="chat-member-status status-${{item.status}}">●</span>
                 <span class="chat-member-main">
@@ -8463,8 +8875,12 @@ async function applyLoraSettings() {{
                     <span class="chat-member-name-left">
                       <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
                       ${{meta.html ? `<span class="chat-name-meta">${{meta.html}}</span>` : ""}}
+                      ${{peerBadge}}
                     </span>
-                    ${{favoriteToggleButtonHtml(item.id, "chat-favorite-btn")}}
+                    <span class="chat-member-actions">
+                      ${{favoriteToggleButtonHtml(item.id, "chat-favorite-btn")}}
+                      ${{removeBtn}}
+                    </span>
                   </span>
                   <span class="chat-member-id">${{escAttr(item.id)}}</span>
                 </span>
@@ -8479,6 +8895,19 @@ async function applyLoraSettings() {{
             selectNode(member.dataset.nodeId || "", true);
           }});
         }}
+        for (const removeBtn of roomList.querySelectorAll(".chat-peer-remove-btn")) {{
+          if (!(removeBtn instanceof HTMLButtonElement)) continue;
+          removeBtn.addEventListener("click", (ev) => {{
+            ev.preventDefault();
+            ev.stopPropagation();
+            const nodeId = normalizeNodeId(removeBtn.dataset.nodeId || "");
+            if (!isCanonicalNodeId(nodeId)) return;
+            const removed = removeManualDirectPeer(nodeId);
+            if (!removed) return;
+            setChatSendStatus(`Peer ${{nodeId}} removed from peer-to-peer list.`);
+            renderChatPeerAddPanel(latestState);
+          }});
+        }}
       }}
       const leftSub = document.getElementById("chat-left-sub");
       if (leftSub) {{
@@ -8490,6 +8919,7 @@ async function applyLoraSettings() {{
       bindChatFeedClicks();
       bindChatReactionControls();
       bindChatRetryControls();
+      renderChatPeerAddPanel(state);
       highlightNodeSelection();
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
@@ -8642,6 +9072,11 @@ async function applyLoraSettings() {{
         }}
         const state = await resp.json();
         latestState = state;
+        const nextLocalNodeId = resolveLocalNodeId(state);
+        if (isCanonicalNodeId(nextLocalNodeId)) {{
+          resolvedLocalNodeId = nextLocalNodeId;
+        }}
+        pruneSelfFromManualDirectPeers(state);
 
         const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
         const historyRelevant = (activeLayoutView === "saved" || activeLayoutView === "network")
@@ -8731,6 +9166,7 @@ async function applyLoraSettings() {{
     loadSignalHeatmapModePreference();
     loadSignalHeatmapPreference();
     loadLayoutView();
+    loadManualDirectPeers();
     loadChatChannel();
     loadChatEmojiPickerState();
     loadChatEmojiUsage();
@@ -8751,6 +9187,7 @@ async function applyLoraSettings() {{
     bindMapResetControl();
     bindConsoleControls();
     bindChatComposer();
+    bindChatPeerControls();
     bindThemeToggle();
     bindThemePresetSelector();
     bindSignalHeatDevApi();

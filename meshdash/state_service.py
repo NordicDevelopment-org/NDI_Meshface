@@ -6,6 +6,7 @@ from .helpers import (
     redact_secrets as _redact_secrets,
     to_jsonable as _to_jsonable,
 )
+from .nodes_identity import get_local_node_id as _get_local_node_id_helper
 from .nodes import (
     utc_now as _utc_now,
 )
@@ -118,6 +119,18 @@ def build_dashboard_state_typed(
     include_debug: bool = True,
     include_nodes_full: bool = True,
 ) -> DashboardStatePayload:
+    local_node_id = "local"
+    try:
+        local_node_id = str(
+            _get_local_node_id_helper(
+                iface,
+                broadcast_num=None,
+                to_jsonable_fn=to_jsonable_fn,
+            )
+        )
+    except Exception:
+        local_node_id = "local"
+
     nodes_error: Optional[str] = None
     try:
         nodes = coerce_collected_nodes(collect_nodes_fn(iface))
@@ -256,6 +269,7 @@ def build_dashboard_state_typed(
         history_caps=node_capabilities,
         nodes_full=nodes.full,
         traffic=traffic_payload,
+        local_node_id=local_node_id,
     )
     return state_payload
 

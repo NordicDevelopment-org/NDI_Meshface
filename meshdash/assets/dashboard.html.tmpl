@@ -70,7 +70,25 @@
         <div id="chat-channel-list" class="chat-channel-list"></div>
       </div>
       <div class="chat-left-section chat-users-section">
-        <div id="chat-users-title" class="chat-left-label">Users</div>
+        <div class="chat-users-head">
+          <div id="chat-users-title" class="chat-left-label">Users</div>
+          <button id="chat-peer-add-toggle-btn" class="chat-peer-add-toggle-btn" type="button" title="Add a peer-to-peer user" hidden>Add</button>
+        </div>
+        <div id="chat-peer-add-panel" class="chat-peer-add-panel" hidden>
+          <div class="chat-peer-add-row">
+            <select id="chat-peer-detected-select" class="chat-peer-input" aria-label="Detected node"></select>
+            <button id="chat-peer-add-detected-btn" class="chat-peer-add-btn" type="button">Add detected</button>
+          </div>
+          <div class="chat-peer-add-row">
+            <input id="chat-peer-manual-input" class="chat-peer-input" type="text" placeholder="Node ID (e.g. !49b54790)" autocomplete="off" spellcheck="false" />
+            <button id="chat-peer-add-manual-btn" class="chat-peer-add-btn" type="button">Add ID</button>
+          </div>
+          <div class="chat-peer-add-help">Add peers from detected nodes or manually by Node ID.</div>
+          <div class="chat-peer-saved-wrap">
+            <div class="chat-peer-saved-title">Saved peers</div>
+            <div id="chat-peer-saved-list" class="chat-peer-saved-list"></div>
+          </div>
+        </div>
         <div id="chat-room-list" class="chat-member-list"></div>
         <div class="chat-left-bottom-bar">
           <div class="chat-user-search-wrap">

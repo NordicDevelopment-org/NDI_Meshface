@@ -55,6 +55,7 @@ def test_handle_state_get_accepts_typed_state_payload():
     assert calls["no_store"] is True
     assert calls["payload_obj"]["summary"]["ok"] is True
     assert calls["payload_obj"]["traffic"]["recent_chat"][0]["text"] == "hello"
+    assert calls["payload_obj"]["local_node_id"] == "local"
 
 
 def test_handle_state_get_prefers_lite_builder_when_available():
