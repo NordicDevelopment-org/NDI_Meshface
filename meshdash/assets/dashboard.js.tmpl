@@ -572,6 +572,7 @@
     let savedNodeMainPct = 56;
     let consoleAutoscroll = true;
     let fitDone = false;
+    let mapBootstrapFocusDone = false;
     let pendingMapHistoryFocus = false;
     let programmaticMapMoveDepth = 0;
     let mapResizeObserver = null;
@@ -4706,10 +4707,10 @@
         // This prevents "blank" panes when the server legitimately returns 304s.
         renderSummary(latestState);
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
-        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
         if (next === "network" || next === "all") {{
           renderNodes(latestState.nodes || []);
         }}
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
         if (next === "chat" || next === "all") {{
           renderChat(latestState);
         }}
@@ -5612,6 +5613,54 @@ async function applyLoraSettings() {{
         }}
       }}
       return null;
+    }}
+
+    function nextAnimationFrame() {{
+      return new Promise((resolve) => {{
+        window.requestAnimationFrame(() => resolve());
+      }});
+    }}
+
+    function mapBootstrapInterestNode(nodes, state = latestState) {{
+      const allNodes = Array.isArray(nodes) ? nodes : [];
+      if (allNodes.length === 0) return {{ node: null, source: "none" }};
+
+      const selected = selectedNodeFrom(allNodes);
+      if (selected && isValidMapCoord(Number(selected.lat), Number(selected.lon))) {{
+        return {{ node: selected, source: "selected" }};
+      }}
+
+      const localId = resolveLocalNodeId(state);
+      if (isCanonicalNodeId(localId)) {{
+        for (const node of allNodes) {{
+          if (normalizeNodeId(node && node.id) !== localId) continue;
+          if (isValidMapCoord(Number(node && node.lat), Number(node && node.lon))) {{
+            return {{ node, source: "local" }};
+          }}
+          break;
+        }}
+      }}
+
+      for (const node of allNodes) {{
+        if (isValidMapCoord(Number(node && node.lat), Number(node && node.lon))) {{
+          return {{ node, source: "first-positioned" }};
+        }}
+      }}
+      return {{ node: null, source: "none" }};
+    }}
+
+    function applyMapBootstrapFocus(nodes, state = latestState) {{
+      const interest = mapBootstrapInterestNode(nodes, state);
+      const node = interest.node;
+      if (!node) return {{ didFocus: false, source: interest.source }};
+      const lat = Number(node.lat);
+      const lon = Number(node.lon);
+      const baseZoom = interest.source === "first-positioned" ? 9 : 11;
+      withProgrammaticMapMove(() => {{
+        map.setView([lat, lon], Math.max(map.getZoom(), baseZoom), {{ animate: false }});
+      }});
+      requestMapResize();
+      return {{ didFocus: true, source: interest.source }};
     }}
 
     function updateKnownNodesMetricState() {{
@@ -6853,57 +6902,54 @@ async function applyLoraSettings() {{
       return hash >>> 0;
     }}
 
-    function hashNodeRow(node) {{
-      let h = 2166136261;
-      const nodeId = normalizeNodeId(node && node.id);
-      h = hashMixStr(h, nodeId);
-      h = hashMixInt(h, node && (node.last_heard_unix ?? node.last_heard_epoch ?? 0));
-      h = hashMixStr(h, node && (node.long_name || ""));
-      h = hashMixStr(h, node && (node.short_name || ""));
-      h = hashMixStr(h, node && (node.hardware_model || ""));
-      const snr = Number(node && node.snr);
-      // Preserve decimal movement so small SNR changes still trigger rerender in the
-      // hash-skip path.
-      h = hashMixInt(h, Number.isFinite(snr) ? Math.round(snr * 100) : 0);
-      h = hashMixInt(h, node && (node.hops_away ?? 0));
-      h = hashMixInt(h, node && (node.battery_level ?? 0));
-      h = hashMixInt(h, node && (node.saved_packets ?? 0));
-      const lat = Number(node && node.lat);
-      const lon = Number(node && node.lon);
-      h = hashMixInt(h, Number.isFinite(lat) ? Math.round(lat * 1e5) : 0);
-      h = hashMixInt(h, Number.isFinite(lon) ? Math.round(lon * 1e5) : 0);
-      return h >>> 0;
-    }}
+    function buildNodesTableModel(nodes, query) {{
+      const entries = [];
+      const state = tableSortState["nodes-table"] || {{ index: 0, dir: "desc" }};
+      const sortIndex = Number.isFinite(Number(state.index)) ? Math.trunc(Number(state.index)) : 0;
+      const sortDir = state.dir === "asc" ? "asc" : "desc";
 
-    function computeNodesTableHash(nodes, query) {{
       let h = 2166136261;
       h = hashMixStr(h, query || "");
-      let count = 0;
-      let xor = 0;
+      h = hashMixInt(h, sortIndex);
+      h = hashMixStr(h, sortDir);
+
       for (const node of (nodes || [])) {{
         const nodeId = normalizeNodeId(node && node.id);
         const name = nodeLabel(node);
         if (!matchesIdOrNameQuery(nodeId, name, query)) continue;
-        const nh = hashNodeRow(node);
-        xor ^= nh;
-        h = hashMixInt(h, nh);
-        count += 1;
+
+        entries.push({{ node, nodeId, name }});
+
+        h = hashMixStr(h, nodeId);
+        h = hashMixStr(h, name);
+        h = hashMixStr(h, node && (node.hardware_model || ""));
+        h = hashMixInt(h, node && (node.last_heard_unix ?? node.last_heard_epoch ?? 0));
+        const snr = Number(node && node.snr);
+        h = hashMixInt(h, Number.isFinite(snr) ? Math.round(snr * 10) : 0);
+        h = hashMixInt(h, node && (node.hops_away ?? 0));
+        h = hashMixInt(h, node && (node.battery_level ?? 0));
+        h = hashMixInt(h, node && (node.saved_packets ?? 0));
+        const lat = Number(node && node.lat);
+        const lon = Number(node && node.lon);
+        h = hashMixInt(h, Number.isFinite(lat) ? Math.round(lat * 1e4) : 0);
+        h = hashMixInt(h, Number.isFinite(lon) ? Math.round(lon * 1e4) : 0);
       }}
-      h = hashMixInt(h, count);
-      h = hashMixInt(h, xor);
-      return h >>> 0;
+      h = hashMixInt(h, entries.length);
+      return {{ entries, hash: h >>> 0 }};
     }}
 
-    function nodesTableSortRaw(node, colIndex) {{
+    function nodesTableSortRaw(entry, colIndex) {{
+      const node = (entry && typeof entry === "object" && entry.node) ? entry.node : entry;
       if (!node) return "";
-      const nodeId = normalizeNodeId(node.id || "");
+      const nodeId = normalizeNodeId((entry && entry.nodeId) || node.id || "");
+      const name = (entry && typeof entry.name === "string") ? entry.name : nodeLabel(node);
       switch (colIndex) {{
         case 0:
           return Number(node.last_heard_unix ?? node.last_heard_epoch ?? 0) || 0;
         case 1:
           return nodeId;
         case 2:
-          return nodeLabel(node);
+          return name;
         case 3:
           return String(node.hardware_model || "");
         case 4:
@@ -6937,11 +6983,13 @@ async function applyLoraSettings() {{
         const bValue = normalizeSortValue(nodesTableSortRaw(b, col));
         const cmp = compareSortValues(aValue, bValue);
         if (cmp !== 0) return dir === "asc" ? cmp : -cmp;
-        const aHeard = Number(a && (a.last_heard_unix ?? a.last_heard_epoch ?? 0)) || 0;
-        const bHeard = Number(b && (b.last_heard_unix ?? b.last_heard_epoch ?? 0)) || 0;
+        const aNode = (a && typeof a === "object" && a.node) ? a.node : a;
+        const bNode = (b && typeof b === "object" && b.node) ? b.node : b;
+        const aHeard = Number(aNode && (aNode.last_heard_unix ?? aNode.last_heard_epoch ?? 0)) || 0;
+        const bHeard = Number(bNode && (bNode.last_heard_unix ?? bNode.last_heard_epoch ?? 0)) || 0;
         if (aHeard !== bHeard) return bHeard - aHeard;
-        const aId = normalizeNodeId(a && a.id);
-        const bId = normalizeNodeId(b && b.id);
+        const aId = normalizeNodeId((a && a.nodeId) || (aNode && aNode.id));
+        const bId = normalizeNodeId((b && b.nodeId) || (bNode && bNode.id));
         return String(aId).localeCompare(String(bId));
       }});
       return nodes;
@@ -6949,25 +6997,25 @@ async function applyLoraSettings() {{
 
     function renderNodes(nodes) {{
       const query = normalizeSearchQuery(nodesSearchQuery);
-      const computedHash = computeNodesTableHash(nodes || [], query);
+      const model = buildNodesTableModel(nodes || [], query);
+      const computedHash = model.hash;
       if (computedHash === nodesTableLastHash && query === nodesTableLastQuery) {{
         return;
       }}
       nodesTableLastHash = computedHash;
       nodesTableLastQuery = query;
 
-      const filteredNodes = (nodes || []).filter((node) => {{
-        const nodeId = normalizeNodeId(node.id || "");
-        const name = nodeLabel(node);
-        return matchesIdOrNameQuery(nodeId, name, query);
-      }});
+      const filteredNodes = model.entries;
 
       sortNodesForTable(filteredNodes);
 
       const nowUnix = Math.floor(Date.now() / 1000);
 
-      const rows = filteredNodes.map((node) => {{
-          const nodeId = normalizeNodeId(node.id || "");
+      const rows = [];
+      for (const entry of filteredNodes) {{
+          const node = entry.node;
+          const nodeId = entry.nodeId;
+          const name = entry.name;
           const selectable = isSelectableNodeId(nodeId);
           const selectedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
           const lastUnix = nodeLastHeardUnix(node);
@@ -6976,7 +7024,6 @@ async function applyLoraSettings() {{
           const pos = (typeof node.lat === "number" && typeof node.lon === "number")
             ? `${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}`
             : "n/a";
-          const name = nodeLabel(node);
           const savedPackets = Number.isFinite(Number(node.saved_packets))
             ? Number(node.saved_packets)
             : 0;
@@ -6990,7 +7037,7 @@ async function applyLoraSettings() {{
           const lastSort = Number.isFinite(Number(node.last_heard_unix))
             ? Number(node.last_heard_unix)
             : (Number.isFinite(Number(lastUnix)) ? Number(lastUnix) : 0);
-          return `<tr data-node-id="${{escAttr(nodeId)}}" class="${{selectable ? "node-selectable" : ""}}${{selectedClass}}${{statusClass}}">
+          rows.push(`<tr data-node-id="${{escAttr(nodeId)}}" class="${{selectable ? "node-selectable" : ""}}${{selectedClass}}${{statusClass}}">
           <td data-sort="${{escAttr(lastSort)}}" title="${{escAttr(lastHeardText)}}"><span class="node-status-dot status-${{escAttr(status || "unknown")}}">●</span>${{lastHeardText}}</td>
           <td class="mono" data-sort="${{escAttr(nodeId)}}" title="${{escAttr(String(node.id || nodeId || ""))}}">${{nodeId || "n/a"}}</td>
           <td data-sort="${{escAttr(name)}}">
@@ -7005,8 +7052,8 @@ async function applyLoraSettings() {{
           <td data-sort="${{escAttr(savedPackets)}}" title="${{escAttr(savedTitle)}}">${{savedPackets}}</td>
           <td data-sort="${{escAttr(pos)}}">${{pos}}</td>
           <td data-sort="${{escAttr(isFavoriteNode(nodeId) ? 1 : 0)}}">${{favoriteToggleButtonHtml(nodeId, "node-favorite-btn")}}</td>
-        </tr>`;
-      }});
+        </tr>`);
+      }}
       if (rows.length === 0) {{
         rows.push('<tr><td colspan="10">No nodes match this search.</td></tr>');
       }}
@@ -9569,6 +9616,19 @@ async function applyLoraSettings() {{
           && isSelectableNodeId(selectedNodeId);
         const cachedHistory = historyRelevant ? cachedNodeHistory(selectedNodeId) : null;
 
+        if (mapVisible && !mapBootstrapFocusDone) {{
+          const bootstrap = applyMapBootstrapFocus(state.nodes || [], state);
+          if (bootstrap.didFocus) {{
+            mapBootstrapFocusDone = true;
+            if (activeLayoutView === "network" && (bootstrap.source === "selected" || bootstrap.source === "local")) {{
+              // Keep focus anchored on explicit interest targets instead of immediately re-fitting.
+              fitDone = true;
+            }}
+            // Let the map paint at the location-of-interest before heavier render work.
+            await nextAnimationFrame();
+          }}
+        }}
+
         let onlineActivity = null;
         if (mapVisible && mapDataFocus === "activity") {{
           try {{
@@ -9589,11 +9649,14 @@ async function applyLoraSettings() {{
 
         if (mapVisible) {{
           renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], cachedHistory);
-          renderTraffic(state.traffic || {{}}, state.nodes || [], cachedHistory, onlineActivity);
         }}
 
         if (activeLayoutView === "network" || activeLayoutView === "all") {{
           renderNodes(state.nodes || []);
+        }}
+
+        if (mapVisible) {{
+          renderTraffic(state.traffic || {{}}, state.nodes || [], cachedHistory, onlineActivity);
         }}
 
         if (activeLayoutView === "chat" || activeLayoutView === "all") {{
