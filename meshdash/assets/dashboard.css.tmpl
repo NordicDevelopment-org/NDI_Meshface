@@ -512,6 +512,35 @@
     .map-reset-view-btn:hover {{
       background: #e7f3eb;
     }}
+    .map-position-badge {{
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid #bfd4c3;
+      border-radius: 999px;
+      background: #f7fcf7;
+      color: #274935;
+      padding: 0 6px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+      line-height: 1.4;
+      vertical-align: middle;
+    }}
+    .map-position-badge.live {{
+      border-color: #8ec9a0;
+      background: #eaf8ef;
+      color: #1f6b42;
+    }}
+    .map-position-badge.history {{
+      border-color: #e2c989;
+      background: #fff8e6;
+      color: #7a5b1b;
+    }}
+    .map-position-badge.unknown {{
+      border-color: #c7d6cc;
+      background: #f2f6f3;
+      color: #5e7266;
+    }}
 
     #nodes-table thead th {{
       padding-right: 12px;
@@ -2505,6 +2534,9 @@
       gap: 6px;
       min-width: 0;
     }}
+    .chat-emoji-search-row {{
+      align-items: stretch;
+    }}
     .chat-emoji-filter {{
       flex: 1 1 auto;
       min-width: 0;
@@ -2516,11 +2548,35 @@
       font-size: 12px;
       line-height: 1.2;
     }}
+    .chat-emoji-search {{
+      width: 100%;
+    }}
     .chat-emoji-meta {{
       flex: 0 0 auto;
       font-size: 10px;
       color: #4f6e5a;
       white-space: nowrap;
+    }}
+    .chat-emoji-top-grid {{
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 4px;
+      min-height: 32px;
+    }}
+    .chat-emoji-top-item {{
+      padding: 4px;
+      font-size: 15px;
+    }}
+    .chat-emoji-top-empty {{
+      grid-column: 1 / -1;
+      border: 1px dashed #d1e0d4;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #4f6e5a;
+      font-size: 10px;
+      line-height: 1.3;
+      padding: 6px 8px;
+      text-align: center;
     }}
     .chat-emoji-grid {{
       display: grid;
@@ -2529,6 +2585,17 @@
       max-height: min(56vh, 320px);
       overflow: auto;
       padding-right: 2px;
+    }}
+    .chat-emoji-empty {{
+      grid-column: 1 / -1;
+      border: 1px dashed #d1e0d4;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #4f6e5a;
+      font-size: 11px;
+      line-height: 1.3;
+      padding: 8px;
+      text-align: center;
     }}
     .chat-emoji-item {{
       border: 1px solid #d9e7da;
@@ -3058,6 +3125,12 @@
     [data-theme="dark"] .chat-emoji-meta {{
       color: #aac8ba;
     }}
+    [data-theme="dark"] .chat-emoji-top-empty,
+    [data-theme="dark"] .chat-emoji-empty {{
+      background: #22352b;
+      border-color: #3b5949;
+      color: #aac8ba;
+    }}
     [data-theme="dark"] #chat-send-btn:hover,
     [data-theme="dark"] #chat-emoji-btn:hover,
     [data-theme="dark"] .chat-emoji-item:hover {{
@@ -3164,7 +3237,10 @@
     [data-theme="dark"] .chat-left-bottom-bar,
     [data-theme="dark"] .chat-reply-context,
     [data-theme="dark"] .chat-emoji-panel,
+    [data-theme="dark"] .chat-emoji-filter,
     [data-theme="dark"] .chat-emoji-item,
+    [data-theme="dark"] .chat-emoji-top-empty,
+    [data-theme="dark"] .chat-emoji-empty,
     [data-theme="dark"] details {{
       background: #050905;
       border-color: #246f47;
@@ -3415,7 +3491,10 @@
     [data-theme="dark"] #chat-send-btn,
     [data-theme="dark"] #chat-emoji-btn,
     [data-theme="dark"] .chat-emoji-panel,
+    [data-theme="dark"] .chat-emoji-filter,
     [data-theme="dark"] .chat-emoji-item,
+    [data-theme="dark"] .chat-emoji-top-empty,
+    [data-theme="dark"] .chat-emoji-empty,
     [data-theme="dark"] .console-controls button {{
       background: var(--ui-panel-alt);
       border-color: var(--ui-border) !important;
@@ -3856,6 +3935,26 @@
       background: #101914;
       border-color: #355343;
       color: #cbe8d7;
+    }}
+    [data-theme="dark"] .map-position-badge {{
+      background: #16231d;
+      border-color: #355343;
+      color: #cbe8d7;
+    }}
+    [data-theme="dark"] .map-position-badge.live {{
+      background: #173126;
+      border-color: #3f8f68;
+      color: #8ce7b4;
+    }}
+    [data-theme="dark"] .map-position-badge.history {{
+      background: #2a2416;
+      border-color: #8a7444;
+      color: #f2cf7a;
+    }}
+    [data-theme="dark"] .map-position-badge.unknown {{
+      background: #202a25;
+      border-color: #4b5e54;
+      color: #afc3b7;
     }}
 
     [data-theme="dark"] .map-reset-view-btn {{

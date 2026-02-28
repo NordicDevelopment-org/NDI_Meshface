@@ -467,10 +467,59 @@
     ];
     const chatEmojiGroupsById = new Map(chatEmojiGroups.map((group) => [group.id, group]));
     const chatEmojiAllChoices = chatEmojiGroups.flatMap((group) => group.emojis);
-    const chatEmojiTotalChoices = 3944;
+    const chatEmojiTotalChoices = chatEmojiAllChoices.length;
+    const chatEmojiChoiceSet = new Set(chatEmojiAllChoices);
     const chatEmojiDefaultGroup = chatEmojiGroupsById.has("smileys-emotion") ? "smileys-emotion" : "all";
     const chatEmojiPickerStateStorageKey = "meshDashboardEmojiPickerStateV2";
+    const chatEmojiUsageStorageKey = "meshDashboardEmojiUsageV1";
+    const chatEmojiTopUsageCount = 8;
+    const chatEmojiUsagePersistMax = 128;
+    const chatEmojiPopularDefaults = ["😂", "❤️", "🤣", "👍", "😭", "🙏", "😍", "😊"];
     const chatEmojiNodesByGroup = new Map();
+    const chatEmojiSearchCache = new Map();
+    const chatEmojiSearchMetaByEmoji = new Map();
+    const chatEmojiSearchAliases = {{
+      "👍": "thumb thumbs up thumbsup thumbs-up like approve yes ok",
+      "👎": "thumbs down thumbsdown thumbs-down dislike no reject",
+      "❤️": "heart love like favorite fav",
+      "😂": "laugh lol lmao tears joy funny",
+      "🤣": "rolling laugh rofl funny",
+      "😭": "cry crying tears sad upset",
+      "🙏": "pray prayer thanks thank you please",
+      "🔥": "fire lit hot",
+      "💯": "100 hundred perfect",
+      "✅": "check checked done correct yes",
+      "❌": "x cross wrong no stop",
+      "🎉": "party celebrate celebration congrats congratulations",
+      "👏": "clap clapping applause",
+      "😀": "smile happy grinning",
+      "😃": "smile happy grin",
+      "😄": "smile happy",
+      "😁": "grin happy",
+      "😊": "smile blush happy",
+      "😍": "heart eyes love",
+      "😢": "cry sad tear",
+      "😎": "cool sunglasses",
+      "🤔": "think thinking unsure",
+      "🤝": "handshake agreement deal",
+      "👌": "ok okay good",
+      "👀": "eyes look watch",
+      "⚠️": "warning alert caution",
+      "⭐": "star favorite fav",
+      "💪": "muscle strong strength",
+      "✌️": "peace victory",
+    }};
+    for (const group of chatEmojiGroups) {{
+      const groupTokens = `${{String(group.id || "").trim().toLowerCase()}} ${{String(group.label || "").trim().toLowerCase()}}`;
+      for (const emoji of (group.emojis || [])) {{
+        const prev = String(chatEmojiSearchMetaByEmoji.get(emoji) || "");
+        const aliases = String(chatEmojiSearchAliases[emoji] || "").trim().toLowerCase();
+        chatEmojiSearchMetaByEmoji.set(
+          emoji,
+          (prev ? `${{prev}} ` : "") + groupTokens + (aliases ? ` ${{aliases}}` : "")
+        );
+      }}
+    }}
     const consoleMaxLines = 1200;
     const tableSortState = {{
       "nodes-table": {{ index: 0, dir: "desc" }},
@@ -533,6 +582,8 @@
     let activeChatChannel = "all";
     let chatEmojiMode = "compose";
     let chatEmojiPickerGroup = chatEmojiDefaultGroup;
+    let chatEmojiSearchQuery = "";
+    let chatEmojiUsageCounts = new Map();
     let chatReactionTargetId = null;
     let chatReplyTargetId = null;
     let chatReplyTargetName = "";
@@ -2532,6 +2583,17 @@
       return chatEmojiGroupsById.has(clean) ? clean : "all";
     }}
 
+    function normalizeChatEmojiSearchQuery(raw) {{
+      return String(raw || "").trim().toLowerCase();
+    }}
+
+    function tokenizeChatEmojiSearchQuery(rawQuery) {{
+      return normalizeChatEmojiSearchQuery(rawQuery)
+        .split(/[^a-z0-9+_-]+/g)
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+    }}
+
     function chatEmojiChoicesForGroup(groupId) {{
       const key = normalizeChatEmojiGroup(groupId);
       if (key === "all") return chatEmojiAllChoices;
@@ -2542,6 +2604,41 @@
       return chatEmojiAllChoices;
     }}
 
+    function chatEmojiChoicesForSearch(rawQuery) {{
+      const query = normalizeChatEmojiSearchQuery(rawQuery);
+      if (!query) return [];
+      const cached = chatEmojiSearchCache.get(query);
+      if (Array.isArray(cached)) {{
+        return cached;
+      }}
+
+      const parts = tokenizeChatEmojiSearchQuery(query);
+      if (!parts.length) return [];
+      const matches = [];
+      const seen = new Set();
+      for (const emoji of chatEmojiAllChoices) {{
+        if (seen.has(emoji)) continue;
+        seen.add(emoji);
+        const haystack = `${{emoji}} ${{String(chatEmojiSearchMetaByEmoji.get(emoji) || "")}}`;
+        const allPartsMatch = parts.every((part) => haystack.includes(part));
+        if (allPartsMatch || haystack.includes(query)) {{
+          matches.push(emoji);
+        }}
+      }}
+      chatEmojiSearchCache.set(query, matches);
+      return matches;
+    }}
+
+    function buildChatEmojiNode(emoji, extraClass = "") {{
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = extraClass ? `chat-emoji-item ${{extraClass}}` : "chat-emoji-item";
+      btn.setAttribute("data-emoji", emoji);
+      btn.setAttribute("title", emoji);
+      btn.textContent = emoji;
+      return btn;
+    }}
+
     function chatEmojiNodesForGroup(groupId) {{
       const key = normalizeChatEmojiGroup(groupId);
       const cached = chatEmojiNodesByGroup.get(key);
@@ -2550,16 +2647,80 @@
       }}
       const nodes = [];
       for (const emoji of chatEmojiChoicesForGroup(key)) {{
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "chat-emoji-item";
-        btn.setAttribute("data-emoji", emoji);
-        btn.setAttribute("title", emoji);
-        btn.textContent = emoji;
-        nodes.push(btn);
+        nodes.push(buildChatEmojiNode(emoji));
       }}
       chatEmojiNodesByGroup.set(key, nodes);
       return nodes;
+    }}
+
+    function chatEmojiUsageEntries() {{
+      return Array.from(chatEmojiUsageCounts.entries())
+        .filter(([emoji, count]) => chatEmojiChoiceSet.has(emoji) && Number.isFinite(count) && count > 0)
+        .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])));
+    }}
+
+    function chatEmojiTopChoices() {{
+      const picked = [];
+      const used = new Set();
+      for (const [emoji] of chatEmojiUsageEntries()) {{
+        if (used.has(emoji)) continue;
+        used.add(emoji);
+        picked.push(emoji);
+        if (picked.length >= chatEmojiTopUsageCount) {{
+          return picked;
+        }}
+      }}
+      for (const emoji of chatEmojiPopularDefaults) {{
+        if (!chatEmojiChoiceSet.has(emoji) || used.has(emoji)) continue;
+        used.add(emoji);
+        picked.push(emoji);
+        if (picked.length >= chatEmojiTopUsageCount) {{
+          break;
+        }}
+      }}
+      return picked;
+    }}
+
+    function persistChatEmojiUsage() {{
+      try {{
+        const entries = chatEmojiUsageEntries().slice(0, chatEmojiUsagePersistMax);
+        const payload = {{}};
+        for (const [emoji, count] of entries) {{
+          payload[emoji] = count;
+        }}
+        window.localStorage.setItem(chatEmojiUsageStorageKey, JSON.stringify(payload));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadChatEmojiUsage() {{
+      const next = new Map();
+      try {{
+        const raw = window.localStorage.getItem(chatEmojiUsageStorageKey);
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {{
+            for (const [emojiRaw, countRaw] of Object.entries(parsed)) {{
+              const emoji = String(emojiRaw || "").trim();
+              const count = Math.floor(Number(countRaw));
+              if (!emoji || !chatEmojiChoiceSet.has(emoji) || !Number.isFinite(count) || count <= 0) {{
+                continue;
+              }}
+              next.set(emoji, count);
+            }}
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      chatEmojiUsageCounts = next;
+    }}
+
+    function noteChatEmojiUsage(rawEmoji) {{
+      const emoji = String(rawEmoji || "").trim();
+      if (!emoji || !chatEmojiChoiceSet.has(emoji)) return;
+      const nextCount = (chatEmojiUsageCounts.get(emoji) || 0) + 1;
+      chatEmojiUsageCounts.set(emoji, nextCount);
+      persistChatEmojiUsage();
     }}
 
     function persistChatEmojiPickerState() {{
@@ -2779,11 +2940,44 @@
       }}
     }}
 
+    function renderChatEmojiTopRow() {{
+      const topGrid = document.getElementById("chat-emoji-top-grid");
+      if (!(topGrid instanceof HTMLElement)) return;
+
+      const choices = chatEmojiTopChoices();
+      const signature = choices.join("\u0000");
+      if ((topGrid.dataset.signature || "") === signature) {{
+        return;
+      }}
+      if (!choices.length) {{
+        const empty = document.createElement("div");
+        empty.className = "chat-emoji-top-empty";
+        empty.textContent = "Use emojis and your top 8 will appear here.";
+        topGrid.replaceChildren(empty);
+        topGrid.dataset.signature = signature;
+        return;
+      }}
+      const nodes = choices.map((emoji) => buildChatEmojiNode(emoji, "chat-emoji-top-item"));
+      topGrid.replaceChildren(...nodes);
+      topGrid.dataset.signature = signature;
+    }}
+
     function renderChatEmojiPickerPanel() {{
       const groupSelect = document.getElementById("chat-emoji-group-select");
+      const searchInput = document.getElementById("chat-emoji-search");
       const grid = document.getElementById("chat-emoji-grid");
       const meta = document.getElementById("chat-emoji-meta");
       if (!(grid instanceof HTMLElement)) return;
+
+      const selectedSearch = normalizeChatEmojiSearchQuery(
+        (searchInput instanceof HTMLInputElement)
+          ? searchInput.value
+          : chatEmojiSearchQuery
+      );
+      chatEmojiSearchQuery = selectedSearch;
+      if (searchInput instanceof HTMLInputElement && searchInput.value !== selectedSearch) {{
+        searchInput.value = selectedSearch;
+      }}
 
       const selectedGroup = normalizeChatEmojiGroup(
         (groupSelect instanceof HTMLSelectElement)
@@ -2796,24 +2990,41 @@
         groupSelect.value = selectedGroup;
       }}
 
-      const choices = chatEmojiChoicesForGroup(selectedGroup);
-      const groupLabel = selectedGroup === "all"
-        ? "All groups"
-        : ((chatEmojiGroupsById.get(selectedGroup) || {{}}).label || "All groups");
+      const searchActive = !!selectedSearch;
+      const choices = searchActive
+        ? chatEmojiChoicesForSearch(selectedSearch)
+        : chatEmojiChoicesForGroup(selectedGroup);
+      const groupLabel = searchActive
+        ? `Search all: "${{selectedSearch}}"`
+        : (selectedGroup === "all"
+          ? "All groups"
+          : ((chatEmojiGroupsById.get(selectedGroup) || {{}}).label || "All groups"));
       if (meta instanceof HTMLElement) {{
         meta.textContent = `${{groupLabel}} · ${{choices.length}} / ${{chatEmojiTotalChoices}}`;
         meta.title = `Unicode Emoji ${{chatEmojiDataVersion}} (${{
           chatEmojiDataDate
         }})`;
       }}
-      if ((grid.dataset.group || "") !== selectedGroup) {{
-        grid.replaceChildren(...chatEmojiNodesForGroup(selectedGroup));
-        grid.dataset.group = selectedGroup;
+      const renderKey = searchActive ? `search:${{selectedSearch}}` : `group:${{selectedGroup}}`;
+      if ((grid.dataset.key || "") !== renderKey) {{
+        if (choices.length) {{
+          const nodes = searchActive
+            ? choices.map((emoji) => buildChatEmojiNode(emoji))
+            : chatEmojiNodesForGroup(selectedGroup);
+          grid.replaceChildren(...nodes);
+        }} else {{
+          const empty = document.createElement("div");
+          empty.className = "chat-emoji-empty";
+          empty.textContent = "No emojis matched your search.";
+          grid.replaceChildren(empty);
+        }}
+        grid.dataset.key = renderKey;
         grid.scrollTop = 0;
       }}
       if (previousGroup !== selectedGroup) {{
         persistChatEmojiPickerState();
       }}
+      renderChatEmojiTopRow();
     }}
 
     function openChatEmojiPanel(mode = "compose", reactionTargetId = null) {{
@@ -2840,8 +3051,13 @@
       const btn = document.getElementById("chat-emoji-btn");
       chatEmojiMode = "compose";
       chatReactionTargetId = null;
+      chatEmojiSearchQuery = "";
       if (panel instanceof HTMLElement) {{
         panel.hidden = true;
+      }}
+      const searchInput = document.getElementById("chat-emoji-search");
+      if (searchInput instanceof HTMLInputElement) {{
+        searchInput.value = "";
       }}
       if (btn instanceof HTMLButtonElement) {{
         btn.setAttribute("aria-expanded", "false");
@@ -2872,7 +3088,19 @@
             `<option value="${{escAttr(group.id)}}">${{escAttr(group.label)}} (${{group.emojis.length}})</option>`
           )),
         ].join("");
-        panel.innerHTML = `<div class="chat-emoji-toolbar">
+        panel.innerHTML = `<div id="chat-emoji-top-grid" class="chat-emoji-top-grid" aria-label="Top used emojis"></div>
+        <div class="chat-emoji-toolbar chat-emoji-search-row">
+          <input
+            id="chat-emoji-search"
+            class="chat-emoji-filter chat-emoji-search"
+            type="search"
+            placeholder="Search all categories..."
+            aria-label="Search emojis across all categories"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="chat-emoji-toolbar">
           <select id="chat-emoji-group-select" class="chat-emoji-filter" aria-label="Emoji group">
             ${{groupOptions}}
           </select>
@@ -2886,6 +3114,15 @@
           groupSelect.dataset.bound = "1";
           groupSelect.value = normalizeChatEmojiGroup(chatEmojiPickerGroup);
           groupSelect.addEventListener("change", () => {{
+            renderChatEmojiPickerPanel();
+          }});
+        }}
+        const searchInput = document.getElementById("chat-emoji-search");
+        if (searchInput instanceof HTMLInputElement && searchInput.dataset.bound !== "1") {{
+          searchInput.dataset.bound = "1";
+          searchInput.value = chatEmojiSearchQuery;
+          searchInput.addEventListener("input", () => {{
+            chatEmojiSearchQuery = normalizeChatEmojiSearchQuery(searchInput.value);
             renderChatEmojiPickerPanel();
           }});
         }}
@@ -2913,6 +3150,7 @@
           if (!(emojiBtn instanceof HTMLButtonElement)) return;
           const emoji = String(emojiBtn.getAttribute("data-emoji") || emojiBtn.textContent || "").trim();
           if (!emoji) return;
+          noteChatEmojiUsage(emoji);
           if (chatEmojiMode === "react" && Number.isInteger(chatReactionTargetId) && chatReactionTargetId > 0) {{
             sendChatReaction(chatReactionTargetId, emoji);
           }} else {{
@@ -5552,6 +5790,51 @@ async function applyLoraSettings() {{
       }});
     }}
 
+    function resolveMapPositionBadge(node, caps = null, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const lat = Number(node && node.lat);
+      const lon = Number(node && node.lon);
+      if (!isValidMapCoord(lat, lon)) {{
+        return {{
+          label: "No Position",
+          className: "unknown",
+          title: "No usable position is available for this node.",
+        }};
+      }}
+
+      const heardRaw = Number(node && node.last_heard_unix);
+      const heardUnix = Number.isFinite(heardRaw) && heardRaw > 0
+        ? Math.trunc(heardRaw)
+        : null;
+      const capsPosRaw = Number(caps && caps.last_position_unix);
+      const capsPosUnix = Number.isFinite(capsPosRaw) && capsPosRaw > 0
+        ? Math.trunc(capsPosRaw)
+        : null;
+
+      const heardAgeSeconds = Number.isFinite(heardUnix)
+        ? Math.max(0, nowUnix - heardUnix)
+        : null;
+      const recentlyHeard = Number.isFinite(heardAgeSeconds) && heardAgeSeconds <= chatWarnWindowSeconds;
+      const positionNearLastHeard = Number.isFinite(heardUnix)
+        && Number.isFinite(capsPosUnix)
+        && Math.abs(heardUnix - capsPosUnix) <= 120;
+      const positionRecentlyUpdated = Number.isFinite(capsPosUnix)
+        && (nowUnix - capsPosUnix) <= chatWarnWindowSeconds;
+
+      if (positionNearLastHeard || (recentlyHeard && (positionRecentlyUpdated || !Number.isFinite(capsPosUnix)))) {{
+        return {{
+          label: "Live GPS",
+          className: "live",
+          title: "Position appears to be from a recent live GPS update.",
+        }};
+      }}
+
+      return {{
+        label: "History/Fixed",
+        className: "history",
+        title: "Position appears to be fixed or from an older saved location.",
+      }};
+    }}
+
     function renderMap(nodes, edges, nodeHistory = null) {{
       const hideHeatmap = activeLayoutView === "saved";
       const signature = buildMapSignature(nodes, edges, nodeHistory);
@@ -5577,6 +5860,12 @@ async function applyLoraSettings() {{
       nodeMarkers.clear();
       const features = [];
       const byId = Object.fromEntries(nodes.map((n) => [normalizeNodeId(n.id), n]));
+      const historyCapsById = new Map(
+        Object.entries((latestState && latestState.history_caps && typeof latestState.history_caps === "object") ? latestState.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
+      const nowUnix = Math.floor(Date.now() / 1000);
       const selectionMode = isSelectableNodeId(selectedNodeId);
       const savedSelectionMode = selectionMode && activeLayoutView === "saved";
       const networkSelectionMode = selectionMode && activeLayoutView === "network";
@@ -5668,6 +5957,8 @@ async function applyLoraSettings() {{
           const trailLast = trailPointsCount > 0
             ? (trailPoints[trailPointsCount - 1].time || "n/a")
             : "n/a";
+          const selectedCaps = historyCapsById.get(selectionId) || null;
+          const posBadge = resolveMapPositionBadge(selectedNode, selectedCaps, nowUnix);
           const marker = L.circleMarker(
             [selectedNode.lat, selectedNode.lon],
             markerStyle(true)
@@ -5678,6 +5969,7 @@ async function applyLoraSettings() {{
             Num: ${{selectedNode.num ?? "n/a"}}<br/>
             SNR: ${{selectedNode.snr ?? "n/a"}}<br/>
             RSSI: ${{selectedNode.rssi ?? "n/a"}}<br/>
+            Position: <span class="map-position-badge ${{posBadge.className}}" title="${{escAttr(posBadge.title)}}">${{escAttr(posBadge.label)}}</span><br/>
             Last: ${{selectedNode.last_heard || "n/a"}}<br/>
             Trail points: ${{trailPointsCount}}<br/>
             Trail latest: ${{trailLast}}
@@ -5714,6 +6006,8 @@ async function applyLoraSettings() {{
         if (typeof node.lat !== "number" || typeof node.lon !== "number") continue;
         const normalizedId = normalizeNodeId(node.id || "");
         const isSelected = !!selectedNodeId && normalizedId === selectedNodeId;
+        const nodeCaps = historyCapsById.get(normalizedId) || null;
+        const posBadge = resolveMapPositionBadge(node, nodeCaps, nowUnix);
         const marker = L.circleMarker([node.lat, node.lon], markerStyle(isSelected));
         marker.bindPopup(`
           <b>${{nodeLabel(node)}}</b><br/>
@@ -5721,6 +6015,7 @@ async function applyLoraSettings() {{
           Num: ${{node.num ?? "n/a"}}<br/>
           SNR: ${{node.snr ?? "n/a"}}<br/>
           RSSI: ${{node.rssi ?? "n/a"}}<br/>
+          Position: <span class="map-position-badge ${{posBadge.className}}" title="${{escAttr(posBadge.title)}}">${{escAttr(posBadge.label)}}</span><br/>
           Last: ${{node.last_heard || "n/a"}}
         `);
         marker.on("click", () => {{
@@ -8359,6 +8654,7 @@ async function applyLoraSettings() {{
     loadLayoutView();
     loadChatChannel();
     loadChatEmojiPickerState();
+    loadChatEmojiUsage();
     loadThemePreference();
     bindLayoutNav();
     renderSavedRailStatus();
