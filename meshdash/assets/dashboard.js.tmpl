@@ -100,13 +100,11 @@
     // The strongest buckets therefore *trade a little peak intensity for spread*
     // (intensityMul < 1), which reads more like "coverage" than "explosion".
     const signalHeatBucketDefs = [
-      // Blur scaling is intentionally closer to radius scaling so large coverage blobs
-      // don't render as sharp ring/arcs near the viewport edges when zooming.
-      {{ id: "vweak",  min: 0.0,  max: 0.22, radiusMul: 0.72, blurMul: 0.90, intensityMul: 1.00 }},
-      {{ id: "weak",   min: 0.22, max: 0.44, radiusMul: 0.92, blurMul: 1.08, intensityMul: 1.00 }},
-      {{ id: "mid",    min: 0.44, max: 0.66, radiusMul: 1.18, blurMul: 1.28, intensityMul: 1.00 }},
-      {{ id: "strong", min: 0.66, max: 0.84, radiusMul: 1.62, blurMul: 1.72, intensityMul: 0.96 }},
-      {{ id: "vstrong",min: 0.84, max: 1.01, radiusMul: 2.20, blurMul: 2.25, intensityMul: 0.90 }},
+      { id: "vweak",  min: 0.0,  max: 0.22, radiusMul: 0.72, blurMul: 0.86, intensityMul: 1.00 },
+      { id: "weak",   min: 0.22, max: 0.44, radiusMul: 0.92, blurMul: 0.95, intensityMul: 1.00 },
+      { id: "mid",    min: 0.44, max: 0.66, radiusMul: 1.18, blurMul: 1.06, intensityMul: 1.00 },
+      { id: "strong", min: 0.66, max: 0.84, radiusMul: 1.62, blurMul: 1.18, intensityMul: 0.96 },
+      { id: "vstrong",min: 0.84, max: 1.01, radiusMul: 2.20, blurMul: 1.34, intensityMul: 0.90 },
     ];
     const signalHeatFreshFullSeconds = 8 * 60;
     const signalHeatFreshDropSeconds = 40 * 60;
@@ -116,14 +114,12 @@
       rssiMin: -125,
       rssiMax: -88,
     }};
-    const signalHeatDevKnobsStorageKey = "meshDashboardSignalHeatDevKnobsV1";
+    const signalHeatDevKnobsStorageKey = "meshDashboardSignalHeatDevKnobsV2";
     const signalHeatDevKnobDefaults = {{
       radius: 26,
       blur: 20,
       radiusSignalGain: 1,
-      // Lower default opacity reads more like "coverage" (soft) instead of hard circles,
-      // especially when geo-radius-lock makes pixels grow at higher zoom.
-      minOpacity: 0.32,
+      minOpacity: 0.46,
       intensityFloor: 0.015,
       intensityGamma: 1.22,
       freshnessFloor: 0.84,
@@ -131,8 +127,7 @@
       greenBias: 0.62,
       geoRadiusLock: 1,
       coverageKm: 2.8,
-      // Keep the edge soft as radius grows.
-      blurRatio: 0.92,
+      blurRatio: 0.78,
     }};
     const signalHeatDevKnobBounds = {{
       radius: [14, 46],
@@ -632,44 +627,20 @@
         points.push([lat, lon, Math.max(intensityFloor, adjusted)]);
       }}
       return buckets;
-    }}
-
-    function resolveSignalHeatVisualOptions(pointsCount) {{
+    }}    function resolveSignalHeatVisualOptions(pointsCount) {{
       const geoLocked = signalHeatDevKnobs.geoRadiusLock >= 0.5;
       const zoom = Number(map.getZoom());
       const safeCount = Number.isFinite(pointsCount) ? Math.max(0, Math.round(pointsCount)) : 0;
       let radius = signalHeatDevKnobs.radius;
       let blur = signalHeatDevKnobs.blur;
 
-      // Geo-locked radii (km->px) can become visually overwhelming at higher zooms.
-      // Keep a dynamic upper bound based on the current viewport size so the heat layer
-      // reads as "coverage" instead of giant clipped blocks/quarters.
-      const mapSize = (map && typeof map.getSize === "function") ? map.getSize() : null;
-      const minDim = mapSize && Number.isFinite(mapSize.x) && Number.isFinite(mapSize.y)
-        ? Math.max(0, Math.min(mapSize.x, mapSize.y))
-        : 0;
-      // 0.16*minDim keeps the overlay readable in split layouts; hard-capped so
-      // very large monitors don't turn the heat layer into a blanket.
-      const dynamicMaxRadius = clampNumber(Math.round(minDim * 0.16), 48, 120, 96);
-      const dynamicMaxBlur = clampNumber(Math.round(dynamicMaxRadius * 0.95), 36, 160, 120);
-
       if (geoLocked) {{
         const center = map.getCenter();
         const centerLat = center && Number.isFinite(center.lat) ? center.lat : 0;
         const metersPerPixel = metersPerPixelAtLatitude(centerLat, zoom);
         const targetMeters = Math.max(100, signalHeatDevKnobs.coverageKm * 1000);
-        radius = clampNumber(
-          Math.round(targetMeters / Math.max(1, metersPerPixel)),
-          10,
-          dynamicMaxRadius,
-          signalHeatDevKnobs.radius
-        );
-        blur = clampNumber(
-          Math.round(radius * signalHeatDevKnobs.blurRatio),
-          8,
-          dynamicMaxBlur,
-          signalHeatDevKnobs.blur
-        );
+        radius = clampNumber(Math.round(targetMeters / Math.max(1, metersPerPixel)), 10, 96, signalHeatDevKnobs.radius);
+        blur = clampNumber(Math.round(radius * signalHeatDevKnobs.blurRatio), 8, 80, signalHeatDevKnobs.blur);
       }} else {{
         if (safeCount >= 36 || (safeCount >= 24 && zoom >= 11)) {{
           radius = Math.max(16, radius - 2);
@@ -688,8 +659,6 @@
         radius,
         blur,
         minOpacity: signalHeatDevKnobs.minOpacity,
-        maxRadiusPx: dynamicMaxRadius,
-        maxBlurPx: dynamicMaxBlur,
       }};
     }}
 
@@ -742,9 +711,6 @@
         && signalHeatmapEnabled
         && pointsCount > 0;
 
-      const maxBaseRadius = Number.isFinite(baseVisual.maxRadiusPx) ? baseVisual.maxRadiusPx : 140;
-      const maxBaseBlur = Number.isFinite(baseVisual.maxBlurPx) ? baseVisual.maxBlurPx : 180;
-
       for (let i = 0; i < layers.length; i++) {{
         const layer = layers[i];
         const bucket = signalHeatBucketDefs[i] || {{}};
@@ -753,19 +719,17 @@
         const baseBlurMul = Number(bucket.blurMul);
         const radiusMul = 1 + ((Number.isFinite(baseRadiusMul) ? baseRadiusMul : 1) - 1) * signalGain;
         const blurMul = 1 + ((Number.isFinite(baseBlurMul) ? baseBlurMul : 1) - 1) * signalGain;
-        const maxRadius = Math.round(maxBaseRadius * (1 + (0.20 * signalGain)));
-        const maxBlur = Math.round(maxBaseBlur * (1 + (0.25 * signalGain)));
         const visual = {{
           radius: clampNumber(
             Math.round(baseVisual.radius * radiusMul),
             10,
-            maxRadius,
+            160,
             baseVisual.radius
           ),
           blur: clampNumber(
             Math.round(baseVisual.blur * blurMul),
             8,
-            maxBlur,
+            140,
             baseVisual.blur
           ),
           minOpacity: baseVisual.minOpacity,
