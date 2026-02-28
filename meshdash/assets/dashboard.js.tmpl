@@ -157,6 +157,7 @@
     const themeStorageKey = "meshDashboardThemePreference";
     const signalHeatmapStorageKey = "meshDashboardSignalHeatmapEnabledV1";
     const themeSettingsEndpoint = "/api/settings/theme";
+    const radioSettingsEndpoint = "/api/settings/radio";
     const themeAcceptedModes = new Set(["auto", "dark", "light"]);
     const chatBottomStickThresholdPx = 28;
     const chatWarnWindowSeconds = 10 * 60;
@@ -175,7 +176,7 @@
       "packets-table": {{ index: 0, dir: "desc" }},
     }};
     const wheelActivationLeaseMs = 1400;
-    const knownLayoutViews = new Set(["chat", "network", "saved", "packets", "data", "all"]);
+    const knownLayoutViews = new Set(["chat", "network", "saved", "packets", "data", "settings", "all"]);
     const knownChatChannels = new Set(["all", "direct"]);
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
@@ -219,6 +220,11 @@
     let mapWheelJustArmed = false;
     let mapWheelLease = null;
     let chatSendInFlight = false;
+    let settingsApplyInFlight = false;
+    let settingsFetchInFlight = false;
+    let settingsAutoFetchAttempted = false;
+    let settingsLocalStateCache = null;
+    let settingsLocalStateFetchedAt = 0;
     let chatStickToBottom = true;
     let activeLayoutView = "chat";
     let activeChatChannel = "all";
@@ -233,6 +239,8 @@
     let chatUserSearchQuery = "";
     let themePreference = "auto";
     let themePresetSelected = "default";
+    let settingsDirty = false;
+    let settingsDirtyAt = 0;
     let themePresetCatalog = {{
       default: {{ light: {{}}, dark: {{}} }},
     }};
@@ -3206,10 +3214,13 @@
         }} else {{
           renderSavedNodeDetails(latestState, cachedNodeHistory);
         }}
+        if (next === "settings") {{
+          renderSettings(latestState);
+        }}
         if (next === "packets" || next === "all") {{
           renderPackets(latestState.traffic || {{}});
         }}
-        if (next === "packets" || next === "data" || next === "all") {{
+        if (next === "packets" || next === "data" || next === "settings" || next === "all") {{
           renderConsole(latestState.traffic || {{}});
         }}
       }}
@@ -3632,6 +3643,288 @@
       pre.textContent = consoleLines.join("\\n");
       if (consoleAutoscroll) {{
         pre.scrollTop = pre.scrollHeight;
+      }}
+    }}
+
+    function loraConfigFromState(state) {{
+      const localState = state && typeof state === "object" ? state.local_state : null;
+      const localConfig = localState && typeof localState === "object" ? localState.local_config : null;
+      const lora = localConfig && typeof localConfig === "object" ? localConfig.lora : null;
+      if (lora && typeof lora === "object") return lora;
+
+      const cachedState = settingsLocalStateCache && typeof settingsLocalStateCache === "object"
+        ? settingsLocalStateCache
+        : null;
+      const cachedConfig = cachedState && typeof cachedState === "object" ? cachedState.local_config : null;
+      const cachedLora = cachedConfig && typeof cachedConfig === "object" ? cachedConfig.lora : null;
+      return cachedLora && typeof cachedLora === "object" ? cachedLora : null;
+    }}
+
+
+    function setFormValue(el, value) {{
+      if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLSelectElement) && !(el instanceof HTMLTextAreaElement)) return;
+      const next = value == null ? "" : String(value);
+      if (el.value !== next) {{
+        el.value = next;
+      }}
+    }}
+
+    function setFormChecked(el, checked) {{
+      if (!(el instanceof HTMLInputElement) || el.type !== "checkbox") return;
+      const next = !!checked;
+      if (el.checked !== next) {{
+        el.checked = next;
+      }}
+    }}
+
+    function syncLoraManualFieldsDisabled() {{
+      const usePreset = document.getElementById("settings-lora-use-preset");
+      const enabled = !(usePreset instanceof HTMLInputElement) || !usePreset.checked;
+      for (const id of [
+        "settings-lora-bandwidth",
+        "settings-lora-spread-factor",
+        "settings-lora-coding-rate",
+        "settings-lora-frequency-offset",
+        "settings-lora-override-frequency",
+      ]) {{
+        const input = document.getElementById(id);
+        if (input instanceof HTMLInputElement) {{
+          input.disabled = !enabled;
+        }}
+      }}
+    }}
+
+    function renderSettings(state, force = false) {{
+      if (!force && settingsDirty) return;
+      const lora = loraConfigFromState(state);
+      if (!lora) {{
+        if (!settingsDirty && !settingsFetchInFlight && !settingsAutoFetchAttempted) {{
+          settingsAutoFetchAttempted = true;
+          setText("settings-apply-status", "Fetching current radio settings…");
+          void fetchSettingsFromRadio();
+          return;
+        }}
+        setText("settings-apply-status", "No local LoRa config available. Click Fetch settings.");
+        return;
+      }}
+
+      const region = document.getElementById("settings-lora-region");
+      const preset = document.getElementById("settings-lora-modem-preset");
+      const usePreset = document.getElementById("settings-lora-use-preset");
+      const hop = document.getElementById("settings-lora-hop-limit");
+      const txPower = document.getElementById("settings-lora-tx-power");
+      const chanNum = document.getElementById("settings-lora-channel-num");
+      const txEnabled = document.getElementById("settings-lora-tx-enabled");
+      const bw = document.getElementById("settings-lora-bandwidth");
+      const sf = document.getElementById("settings-lora-spread-factor");
+      const cr = document.getElementById("settings-lora-coding-rate");
+      const freqOff = document.getElementById("settings-lora-frequency-offset");
+      const overrideFreq = document.getElementById("settings-lora-override-frequency");
+      const ignoreMqtt = document.getElementById("settings-lora-ignore-mqtt");
+      const okMqtt = document.getElementById("settings-lora-config-ok-to-mqtt");
+      const overrideDuty = document.getElementById("settings-lora-override-duty-cycle");
+      const boosted = document.getElementById("settings-lora-sx126x-rx-boosted-gain");
+      const paFan = document.getElementById("settings-lora-pa-fan-disabled");
+
+      setFormValue(region, lora.region);
+      setFormValue(preset, lora.modem_preset);
+      setFormChecked(usePreset, lora.use_preset);
+      setFormValue(hop, lora.hop_limit);
+      setFormValue(txPower, lora.tx_power);
+      setFormValue(chanNum, lora.channel_num);
+      setFormChecked(txEnabled, lora.tx_enabled);
+      setFormValue(bw, lora.bandwidth);
+      setFormValue(sf, lora.spread_factor);
+      setFormValue(cr, lora.coding_rate);
+      setFormValue(freqOff, lora.frequency_offset);
+      setFormValue(overrideFreq, lora.override_frequency);
+      setFormChecked(ignoreMqtt, lora.ignore_mqtt);
+      setFormChecked(okMqtt, lora.config_ok_to_mqtt);
+      setFormChecked(overrideDuty, lora.override_duty_cycle);
+      setFormChecked(boosted, lora.sx126x_rx_boosted_gain);
+      setFormChecked(paFan, lora.pa_fan_disabled);
+
+      syncLoraManualFieldsDisabled();
+    }}
+
+    function markSettingsDirty(message = "Unsaved settings changes") {{
+      settingsDirty = true;
+      settingsDirtyAt = Date.now();
+      setText("settings-apply-status", message);
+    }}
+
+    function clearSettingsDirty() {{
+      settingsDirty = false;
+      settingsDirtyAt = 0;
+    }}
+
+    function readSelectValue(id) {{
+      const el = document.getElementById(id);
+      if (!(el instanceof HTMLSelectElement)) return null;
+      const value = String(el.value || "").trim();
+      return value.length ? value : null;
+    }}
+
+    function readCheckboxValue(id) {{
+      const el = document.getElementById(id);
+      if (!(el instanceof HTMLInputElement) || el.type !== "checkbox") return null;
+      return !!el.checked;
+    }}
+
+    function readNumberValue(id, allowFloat = false) {{
+      const el = document.getElementById(id);
+      if (!(el instanceof HTMLInputElement)) return null;
+      const raw = String(el.value || "").trim();
+      if (!raw) return null;
+      const num = Number(raw);
+      if (!Number.isFinite(num)) return null;
+      return allowFloat ? num : Math.trunc(num);
+    }}
+
+        async function fetchSettingsFromRadio() {{
+      if (settingsFetchInFlight) return;
+      settingsFetchInFlight = true;
+      const fetchBtn = document.getElementById("settings-reset");
+      if (fetchBtn instanceof HTMLButtonElement) {{
+        fetchBtn.disabled = true;
+      }}
+      setText("settings-apply-status", "Fetching settings…");
+      try {{
+        const resp = await fetch("/api/raw/local_state", {{ cache: "no-store" }});
+        if (!resp.ok) throw new Error(`HTTP ${{resp.status}}`);
+        const data = await resp.json();
+        const obj = (data && typeof data === "object") ? data : {{}};
+        settingsLocalStateCache = obj;
+        settingsLocalStateFetchedAt = Date.now();
+        clearSettingsDirty();
+        renderSettings({{ local_state: obj }}, true);
+        setText("settings-apply-status", "Loaded current radio settings.");
+        appendConsoleLine(`settings|${{Date.now()}}|fetch`, "[settings] loaded current radio settings.");
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        setText("settings-apply-status", `Fetch failed: ${{msg}}`);
+        appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] fetch failed: ${{msg}}`);
+      }} finally {{
+        if (fetchBtn instanceof HTMLButtonElement) {{
+          fetchBtn.disabled = false;
+        }}
+        settingsFetchInFlight = false;
+      }}
+    }}
+
+async function applyLoraSettings() {{
+      if (settingsApplyInFlight) return;
+
+      const payload = {{
+        lora: {{
+          region: readSelectValue("settings-lora-region"),
+          modem_preset: readSelectValue("settings-lora-modem-preset"),
+          use_preset: readCheckboxValue("settings-lora-use-preset"),
+          hop_limit: readNumberValue("settings-lora-hop-limit"),
+          tx_power: readNumberValue("settings-lora-tx-power"),
+          channel_num: readNumberValue("settings-lora-channel-num"),
+          tx_enabled: readCheckboxValue("settings-lora-tx-enabled"),
+          bandwidth: readNumberValue("settings-lora-bandwidth"),
+          spread_factor: readNumberValue("settings-lora-spread-factor"),
+          coding_rate: readNumberValue("settings-lora-coding-rate"),
+          frequency_offset: readNumberValue("settings-lora-frequency-offset"),
+          override_frequency: readNumberValue("settings-lora-override-frequency", true),
+          ignore_mqtt: readCheckboxValue("settings-lora-ignore-mqtt"),
+          config_ok_to_mqtt: readCheckboxValue("settings-lora-config-ok-to-mqtt"),
+          override_duty_cycle: readCheckboxValue("settings-lora-override-duty-cycle"),
+          sx126x_rx_boosted_gain: readCheckboxValue("settings-lora-sx126x-rx-boosted-gain"),
+          pa_fan_disabled: readCheckboxValue("settings-lora-pa-fan-disabled"),
+        }},
+      }};
+
+      // Strip nulls so we don't accidentally clobber fields we don't show.
+      for (const [key, value] of Object.entries(payload.lora)) {{
+        if (value == null) delete payload.lora[key];
+      }}
+
+      if (!payload.lora.region || !payload.lora.modem_preset) {{
+        setText("settings-apply-status", "Region + modem preset are required.");
+        return;
+      }}
+
+      settingsApplyInFlight = true;
+
+      const applyBtn = document.getElementById("settings-apply-lora");
+      if (applyBtn instanceof HTMLButtonElement) {{
+        applyBtn.disabled = true;
+      }}
+      setText("settings-apply-status", "Applying settings… (radio may reboot)");
+      try {{
+        const resp = await fetch(radioSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(payload),
+        }});
+
+        const text = await resp.text();
+        let parsed = null;
+        try {{
+          parsed = text ? JSON.parse(text) : null;
+        }} catch (_err) {{
+        }}
+
+        if (!resp.ok) {{
+          const errMsg = parsed && parsed.error ? String(parsed.error) : (text || `HTTP ${{resp.status}}`);
+          setText("settings-apply-status", `Apply failed: ${{errMsg}}`);
+          appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply failed: ${{errMsg}}`);
+          return;
+        }}
+
+        const rebootHint = parsed && parsed.reboot_expected ? " Radio reboot expected." : "";
+        setText("settings-apply-status", `Applied.${{rebootHint}}`);
+        appendConsoleLine(`settings|${{Date.now()}}|ok`, `[settings] applied LoRa settings.${{rebootHint}}`);
+        clearSettingsDirty();
+      }} catch (err) {{
+        setText("settings-apply-status", `Apply error: ${{err.message}}`);
+        appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply error: ${{err.message}}`);
+      }} finally {{
+        if (applyBtn instanceof HTMLButtonElement) {{
+          applyBtn.disabled = false;
+        }}
+        settingsApplyInFlight = false;
+      }}
+    }}
+
+    function bindSettingsPanel() {{
+      const settingsCard = document.querySelector(".card.settings");
+      if (!(settingsCard instanceof HTMLElement) || settingsCard.dataset.bound === "1") return;
+      settingsCard.dataset.bound = "1";
+
+      settingsCard.addEventListener("input", (ev) => {{
+        const target = ev.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {{
+          markSettingsDirty();
+        }}
+      }});
+      settingsCard.addEventListener("change", (ev) => {{
+        const target = ev.target;
+        if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {{
+          markSettingsDirty();
+        }}
+        if (target instanceof HTMLInputElement && target.id === "settings-lora-use-preset") {{
+          syncLoraManualFieldsDisabled();
+        }}
+      }});
+
+      const applyBtn = document.getElementById("settings-apply-lora");
+      if (applyBtn instanceof HTMLButtonElement) {{
+        applyBtn.addEventListener("click", () => {{
+          void applyLoraSettings();
+        }});
+      }}
+
+      const resetBtn = document.getElementById("settings-reset");
+      if (resetBtn instanceof HTMLButtonElement) {{
+        resetBtn.addEventListener("click", () => {{
+          clearSettingsDirty();
+          settingsAutoFetchAttempted = true;
+          void fetchSettingsFromRadio();
+        }});
       }}
     }}
 
@@ -7277,7 +7570,11 @@
           renderPackets(state.traffic || {{}});
         }}
 
-        if (activeLayoutView === "packets" || activeLayoutView === "data" || activeLayoutView === "all") {{
+        if (activeLayoutView === "settings") {{
+          renderSettings(state);
+        }}
+
+        if (activeLayoutView === "packets" || activeLayoutView === "data" || activeLayoutView === "settings" || activeLayoutView === "all") {{
           renderConsole(state.traffic || {{}});
         }}
 
@@ -7335,6 +7632,7 @@
     bindKnownNodesMetricControl();
     bindChatAutoScroll();
     bindRawDataFetch();
+    bindSettingsPanel();
     bindHistoryTabs();
     bindWheelPassthrough();
     renderSelectionStatus();
