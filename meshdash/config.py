@@ -1,5 +1,6 @@
 DEFAULT_MESH_PORT = "/dev/ttyACM0"
-DEFAULT_GATEWAY_HOST = "192.168.1.241"
+# Default gateway fallback is intentionally disabled unless explicitly configured.
+DEFAULT_GATEWAY_HOST = ""
 DEFAULT_GATEWAY_PORT = 4403
 DEFAULT_HTTP_HOST = "0.0.0.0"
 DEFAULT_HTTP_PORT = 8877

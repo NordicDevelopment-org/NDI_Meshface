@@ -107,6 +107,7 @@ Open:
 Notes:
 
 - Replace `COM5` with your actual radio port.
+- Add `--no-default-gateway` to force USB-only mode if you have `MESH_GATEWAY_HOST` set in your environment.
 - If PowerShell blocks activation, run:
   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
   then reopen PowerShell.
