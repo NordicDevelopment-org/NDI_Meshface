@@ -251,6 +251,7 @@
     let signalHeatmapEnabled = true;
     let signalHeatmapLayers = null;
     let signalHeatDevKnobs = Object.assign({{}}, signalHeatDevKnobDefaults);
+    const baseDocumentTitle = String(document.title || "").trim() || "Mesh dashboard";
     let chatUnreadCount = 0;
     let chatRosterModel = [];
     const chatUnreadByChannel = {{ all: 0, direct: 0 }};
@@ -3080,6 +3081,114 @@
       return `sig:${{from}}|${{to}}|${{rx}}|${{channel}}|${{text}}`;
     }}
 
+    function isLikelyReactionPayloadText(rawValue) {{
+      const text = String(rawValue == null ? "" : rawValue).trim();
+      if (!text) return false;
+      if (text.length > 8 || /\s/.test(text)) return false;
+      if (/^[0-9A-Za-z.,;:!?'"`~_\-]+$/.test(text)) return false;
+      return true;
+    }}
+
+    function isReactionLikeChatMessage(msg) {{
+      if (!msg || typeof msg !== "object") return false;
+      if (msg.is_reaction === true) return true;
+      const replyId = Number(msg.reply_id ?? msg.replyId);
+      if (!Number.isFinite(replyId) || replyId <= 0) return false;
+      if (msg.emoji != null || msg.emoji_codepoint != null || msg.emojiCodepoint != null) {{
+        return true;
+      }}
+      return isLikelyReactionPayloadText(msg.text ?? msg.decoded_text ?? msg.payload_text);
+    }}
+
+    function chatSenderLabelFromMessage(msg, nodesById) {{
+      if (!msg || typeof msg !== "object") return "Unknown node";
+      const senderId = normalizeNodeId(msg.from || "");
+      if (senderId === "^all") return "All";
+      if (senderId === "local") return "Local";
+      const explicitName = String(msg.from_name ?? msg.fromName ?? "").trim();
+      if (explicitName) return explicitName;
+      const node = nodesById.get(senderId);
+      const preferred = preferredNodeName(node);
+      if (preferred) return preferred;
+      return senderId || "Unknown node";
+    }}
+
+    function collectChatMessageEntries(state) {{
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const traffic = safeState.traffic && typeof safeState.traffic === "object"
+        ? safeState.traffic
+        : {{}};
+      const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const nodesById = new Map(
+        nodes.map((node) => [normalizeNodeId(node && node.id ? node.id : ""), node])
+      );
+      const entries = [];
+      for (const msg of recentChat) {{
+        if (isReactionLikeChatMessage(msg)) continue;
+        const key = chatMessageKey(msg);
+        if (!key) continue;
+        entries.push({{
+          key,
+          channel: classifyMessageChannel(msg),
+          sender: chatSenderLabelFromMessage(msg, nodesById),
+        }});
+      }}
+      return entries;
+    }}
+
+    function syncChatUnreadFromEntries(entries, options = {{}}) {{
+      const clearActiveWhenInChat = options.clearActiveWhenInChat !== false;
+      const keyedMessages = Array.isArray(entries) ? entries : [];
+      if (!chatUnreadInitialized) {{
+        for (const entry of keyedMessages) {{
+          rememberSeenChatMessage(entry.key);
+        }}
+        chatUnreadInitialized = true;
+        syncChatRailUnread();
+        return;
+      }}
+
+      const freshByChannel = {{ all: 0, direct: 0 }};
+      const latestSenderByChannel = {{ all: "", direct: "" }};
+      for (const entry of keyedMessages) {{
+        if (!rememberSeenChatMessage(entry.key)) continue;
+        const key = entry.channel === "direct" ? "direct" : "all";
+        freshByChannel[key] += 1;
+        latestSenderByChannel[key] = String(entry.sender || "").trim();
+      }}
+
+      if (activeLayoutView === "chat" && clearActiveWhenInChat) {{
+        const otherKey = activeChatChannel === "direct" ? "all" : "direct";
+        if (freshByChannel[otherKey] > 0) {{
+          setChatChannelUnread(
+            otherKey,
+            Number(chatUnreadByChannel[otherKey] || 0) + freshByChannel[otherKey]
+          );
+          setChatChannelUnreadLatest(
+            otherKey,
+            latestSenderByChannel[otherKey] || chatUnreadLatestByChannel[otherKey] || ""
+          );
+        }}
+        setChatChannelUnread(activeChatChannel, 0);
+        setChatChannelUnreadLatest(activeChatChannel, "");
+      }} else {{
+        if (freshByChannel.all > 0) {{
+          setChatChannelUnread("all", Number(chatUnreadByChannel.all || 0) + freshByChannel.all);
+          setChatChannelUnreadLatest("all", latestSenderByChannel.all || chatUnreadLatestByChannel.all || "");
+        }}
+        if (freshByChannel.direct > 0) {{
+          setChatChannelUnread("direct", Number(chatUnreadByChannel.direct || 0) + freshByChannel.direct);
+          setChatChannelUnreadLatest("direct", latestSenderByChannel.direct || chatUnreadLatestByChannel.direct || "");
+        }}
+      }}
+      syncChatRailUnread();
+    }}
+
+    function syncChatUnreadFromState(state, options = {{}}) {{
+      syncChatUnreadFromEntries(collectChatMessageEntries(state), options);
+    }}
+
     function rememberSeenChatMessage(key) {{
       if (!key || chatSeenMessageKeys.has(key)) return false;
       chatSeenMessageKeys.add(key);
@@ -3115,13 +3224,25 @@
       setChatRailUnread(chatUnreadCount);
     }}
 
+    function syncDocumentUnreadTitle(count) {{
+      const safeCount = Math.max(0, Math.trunc(Number(count) || 0));
+      const badge = safeCount > 99 ? "99+" : String(safeCount);
+      const nextTitle = safeCount > 0
+        ? `(${{badge}}) ${{baseDocumentTitle}}`
+        : baseDocumentTitle;
+      if (document.title !== nextTitle) {{
+        document.title = nextTitle;
+      }}
+    }}
+
     function setChatRailUnread(count) {{
+      const safeCount = Math.max(0, Math.trunc(Number(count) || 0));
+      syncDocumentUnreadTitle(safeCount);
       const btn = document.querySelector('.teams-rail .rail-btn[data-view="chat"]');
       if (!(btn instanceof HTMLButtonElement)) return;
       if (!btn.dataset.baseTitle) {{
         btn.dataset.baseTitle = btn.getAttribute("title") || "Teams-style chat workspace";
       }}
-      const safeCount = Math.max(0, Math.trunc(Number(count) || 0));
       const labelCount = safeCount > 99 ? "99+" : String(safeCount);
       btn.textContent = safeCount > 0 ? `Chat (${{labelCount}})` : "Chat";
       btn.classList.toggle("has-unread", safeCount > 0);
@@ -7169,41 +7290,7 @@ async function applyLoraSettings() {{
           sender: chatEndpointParts(normalizeNodeId(msg.from || "")).label || "Unknown node",
         }}))
         .filter((entry) => !!entry.key);
-      if (!chatUnreadInitialized) {{
-        for (const entry of keyedMessages) {{
-          rememberSeenChatMessage(entry.key);
-        }}
-        chatUnreadInitialized = true;
-      }} else {{
-        const freshByChannel = {{ all: 0, direct: 0 }};
-        const latestSenderByChannel = {{ all: "", direct: "" }};
-        for (const entry of keyedMessages) {{
-          if (rememberSeenChatMessage(entry.key)) {{
-            const key = entry.channel === "direct" ? "direct" : "all";
-            freshByChannel[key] += 1;
-            latestSenderByChannel[key] = String(entry.sender || "").trim();
-          }}
-        }}
-        if (activeLayoutView === "chat") {{
-          const otherKey = activeChatChannel === "direct" ? "all" : "direct";
-          if (freshByChannel[otherKey] > 0) {{
-            setChatChannelUnread(otherKey, Number(chatUnreadByChannel[otherKey] || 0) + freshByChannel[otherKey]);
-            setChatChannelUnreadLatest(otherKey, latestSenderByChannel[otherKey] || chatUnreadLatestByChannel[otherKey] || "");
-          }}
-          setChatChannelUnread(activeChatChannel, 0);
-          setChatChannelUnreadLatest(activeChatChannel, "");
-        }} else {{
-          if (freshByChannel.all > 0) {{
-            setChatChannelUnread("all", Number(chatUnreadByChannel.all || 0) + freshByChannel.all);
-            setChatChannelUnreadLatest("all", latestSenderByChannel.all || chatUnreadLatestByChannel.all || "");
-          }}
-          if (freshByChannel.direct > 0) {{
-            setChatChannelUnread("direct", Number(chatUnreadByChannel.direct || 0) + freshByChannel.direct);
-            setChatChannelUnreadLatest("direct", latestSenderByChannel.direct || chatUnreadLatestByChannel.direct || "");
-          }}
-        }}
-      }}
-      syncChatRailUnread();
+      syncChatUnreadFromEntries(keyedMessages, {{ clearActiveWhenInChat: true }});
 
       const messageIndex = new Map();
       for (const msg of baseMessages) {{
@@ -7631,6 +7718,8 @@ async function applyLoraSettings() {{
 
         if (activeLayoutView === "chat" || activeLayoutView === "all") {{
           renderChat(state);
+        }} else {{
+          syncChatUnreadFromState(state, {{ clearActiveWhenInChat: false }});
         }}
 
         if (activeLayoutView === "saved" || activeLayoutView === "all") {{
