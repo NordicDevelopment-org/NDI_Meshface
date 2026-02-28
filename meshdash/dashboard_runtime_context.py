@@ -161,6 +161,20 @@ def build_dashboard_runtime_context(
             dependencies=loader_dependencies
         )
 
+    # Optional: attach radio settings application hook.
+    # We hang this off state_fn to avoid threading new dependencies through the
+    # entire server wiring. (Same trick as state_fn.lite.)
+    try:
+        from .services_radio_settings import apply_radio_settings as _apply_radio_settings
+    except Exception:
+        _apply_radio_settings = None
+
+    if _apply_radio_settings is not None:
+        def _apply_radio_settings_fn(request):  # type: ignore[no-redef]
+            return _apply_radio_settings(request, iface=iface, send_lock=send_lock)
+
+        setattr(loaders.state_fn, "apply_radio_settings_fn", _apply_radio_settings_fn)
+
     return DashboardRuntimeContext(
         target=target,
         iface=iface,
