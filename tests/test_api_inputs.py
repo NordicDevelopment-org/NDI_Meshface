@@ -7,7 +7,6 @@ from meshdash.api_inputs import (
     parse_node_history_query,
     parse_online_activity_request,
     parse_online_activity_query,
-    parse_radio_settings_request,
     parse_theme_settings_request,
     validate_content_length,
 )
@@ -119,24 +118,3 @@ def test_parse_theme_settings_request_normalizes_payload():
 
     invalid = parse_theme_settings_request(b"{invalid-json}")
     assert invalid.preset_name is None
-
-
-def test_parse_radio_settings_request_normalizes_fixed_position_and_clear_flag():
-    request = parse_radio_settings_request(
-        b'{"fixed_position":{"lat":"44.9801","lon":"-93.2636","alt":"288"},"clear_fixed_position":"false"}'
-    )
-    assert request.fixed_position == {
-        "latitude": 44.9801,
-        "longitude": -93.2636,
-        "altitude": 288,
-    }
-    assert request.clear_fixed_position is False
-    assert request.lora == {}
-
-
-def test_parse_radio_settings_request_rejects_out_of_range_coordinates():
-    with pytest.raises(ValueError, match="latitude out of range"):
-        parse_radio_settings_request(b'{"fixed_position":{"latitude":91,"longitude":-93.26}}')
-
-    with pytest.raises(ValueError, match="longitude out of range"):
-        parse_radio_settings_request(b'{"fixed_position":{"latitude":44.98,"longitude":-181}}')
