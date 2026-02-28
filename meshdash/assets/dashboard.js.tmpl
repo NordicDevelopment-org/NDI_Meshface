@@ -7,8 +7,55 @@
       fadeAnimation: false,
       markerZoomAnimation: false,
       inertia: false,
-      scrollWheelZoom: false,
+      // Wheel zoom should work out of the box. (We previously guarded this to avoid
+      // hijacking page scroll, but that can feel broken and isn't worth the friction.)
+      scrollWheelZoom: true,
     }}).setView([39.5, -98.35], 4);
+
+    // Leaflet.heat (via simpleheat) uses a fixed shadow offset of 200px when
+    // generating its blurred circle stamp.
+    //
+    // When radius+blur grows past ~200px that offset isn't enough to keep the
+    // *solid* fill portion off-canvas, so you can get the infamous "quarter pizza
+    // slice" artifacts (hard 90° wedges) during zoom/pan.
+    //
+    // We patch simpleheat.radius() to use a dynamic offset that always pushes the
+    // solid fill off-canvas while keeping the blurred shadow centered.
+    function patchSimpleHeatForLargeRadii() {{
+      if (!window.simpleheat || !window.simpleheat.prototype) return false;
+      const proto = window.simpleheat.prototype;
+      if (proto.__meshPatchedRadiusV2) return true;
+      proto.__meshPatchedRadiusV2 = true;
+
+      proto.radius = function (radius, blur) {{
+        const r = Number(radius);
+        const b = Number.isFinite(Number(blur)) ? Number(blur) : 15;
+        const safeRadius = Number.isFinite(r) ? Math.max(0, r) : this.defaultRadius;
+        const safeBlur = Number.isFinite(b) ? Math.max(0, b) : 15;
+        const e = (safeRadius + safeBlur);
+
+        const circle = this._circle = document.createElement("canvas");
+        const ctx = circle.getContext("2d");
+        this._r = e;
+        circle.width = circle.height = 2 * e;
+
+        // Match upstream behavior for small circles; scale up when e is large.
+        // Offset must be > e so the filled arc is fully off-canvas.
+        const offset = Math.max(200, Math.ceil(e * 2));
+        ctx.shadowOffsetX = ctx.shadowOffsetY = offset;
+        ctx.shadowBlur = safeBlur;
+        ctx.shadowColor = "black";
+
+        ctx.beginPath();
+        ctx.arc(e - offset, e - offset, safeRadius, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fill();
+        return this;
+      }};
+
+      return true;
+    }}
+    patchSimpleHeatForLargeRadii();
     const mapTileConfigs = {{
       light: {{
         url: "https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png",
@@ -48,13 +95,18 @@
     // Leaflet.heat applies a single radius/blur per layer (not per point).
     // To make stronger signals "reach farther" we bucket points by signal score
     // and render multiple heat layers with different radii.
+    //
+    // If we only increase radius for strong signals they can look like a bright "bomb".
+    // The strongest buckets therefore *trade a little peak intensity for spread*
+    // (intensityMul < 1), which reads more like "coverage" than "explosion".
     const signalHeatBucketDefs = [
-      // Weak signal: smaller footprint
-      {{ id: "weak", min: 0.0, max: 0.34, radiusMul: 0.78, blurMul: 0.82 }},
-      // Medium signal: baseline footprint
-      {{ id: "mid", min: 0.34, max: 0.68, radiusMul: 1.0, blurMul: 1.0 }},
-      // Strong signal: larger footprint
-      {{ id: "strong", min: 0.68, max: 1.01, radiusMul: 1.34, blurMul: 1.12 }},
+      // Blur scaling is intentionally closer to radius scaling so large coverage blobs
+      // don't render as sharp ring/arcs near the viewport edges when zooming.
+      {{ id: "vweak",  min: 0.0,  max: 0.22, radiusMul: 0.72, blurMul: 0.90, intensityMul: 1.00 }},
+      {{ id: "weak",   min: 0.22, max: 0.44, radiusMul: 0.92, blurMul: 1.08, intensityMul: 1.00 }},
+      {{ id: "mid",    min: 0.44, max: 0.66, radiusMul: 1.18, blurMul: 1.28, intensityMul: 1.00 }},
+      {{ id: "strong", min: 0.66, max: 0.84, radiusMul: 1.62, blurMul: 1.72, intensityMul: 0.96 }},
+      {{ id: "vstrong",min: 0.84, max: 1.01, radiusMul: 2.20, blurMul: 2.25, intensityMul: 0.90 }},
     ];
     const signalHeatFreshFullSeconds = 8 * 60;
     const signalHeatFreshDropSeconds = 40 * 60;
@@ -69,7 +121,9 @@
       radius: 26,
       blur: 20,
       radiusSignalGain: 1,
-      minOpacity: 0.46,
+      // Lower default opacity reads more like "coverage" (soft) instead of hard circles,
+      // especially when geo-radius-lock makes pixels grow at higher zoom.
+      minOpacity: 0.32,
       intensityFloor: 0.015,
       intensityGamma: 1.22,
       freshnessFloor: 0.84,
@@ -77,7 +131,8 @@
       greenBias: 0.62,
       geoRadiusLock: 1,
       coverageKm: 2.8,
-      blurRatio: 0.78,
+      // Keep the edge soft as radius grows.
+      blurRatio: 0.92,
     }};
     const signalHeatDevKnobBounds = {{
       radius: [14, 46],
@@ -193,6 +248,7 @@
     let signalHeatmapLayers = null;
     let signalHeatDevKnobs = Object.assign({{}}, signalHeatDevKnobDefaults);
     let chatUnreadCount = 0;
+    let chatRosterModel = [];
     const chatUnreadByChannel = {{ all: 0, direct: 0 }};
     const chatUnreadLatestByChannel = {{ all: "", direct: "" }};
     let chatUnreadInitialized = false;
@@ -411,13 +467,13 @@
         const radius = clampNumber(
           Math.round(baseRadius * radiusMul),
           10,
-          96,
+          160,
           baseRadius
         );
         const blur = clampNumber(
           Math.round(baseBlur * blurMul),
           8,
-          86,
+          140,
           baseBlur
         );
         return L.heatLayer(
@@ -567,8 +623,13 @@
         const eased = Math.pow(clampUnitInterval(weight), signalHeatDevKnobs.intensityGamma);
         const intensity = intensityFloor + (eased * (1 - intensityFloor));
         const idx = resolveSignalHeatBucketIndex(signalScore);
+        const bucket = signalHeatBucketDefs[idx] || {};
+        const signalGain = clampUnitInterval(signalHeatDevKnobs.radiusSignalGain);
+        const baseMul = Number(bucket && bucket.intensityMul);
+        const intensityMul = 1 + (((Number.isFinite(baseMul) ? baseMul : 1) - 1) * signalGain);
+        const adjusted = clampUnitInterval(intensity * intensityMul);
         const points = buckets[idx] || buckets[0];
-        points.push([lat, lon, Math.max(intensityFloor, Math.min(1, intensity))]);
+        points.push([lat, lon, Math.max(intensityFloor, adjusted)]);
       }}
       return buckets;
     }}
@@ -580,13 +641,35 @@
       let radius = signalHeatDevKnobs.radius;
       let blur = signalHeatDevKnobs.blur;
 
+      // Geo-locked radii (km->px) can become visually overwhelming at higher zooms.
+      // Keep a dynamic upper bound based on the current viewport size so the heat layer
+      // reads as "coverage" instead of giant clipped blocks/quarters.
+      const mapSize = (map && typeof map.getSize === "function") ? map.getSize() : null;
+      const minDim = mapSize && Number.isFinite(mapSize.x) && Number.isFinite(mapSize.y)
+        ? Math.max(0, Math.min(mapSize.x, mapSize.y))
+        : 0;
+      // 0.16*minDim keeps the overlay readable in split layouts; hard-capped so
+      // very large monitors don't turn the heat layer into a blanket.
+      const dynamicMaxRadius = clampNumber(Math.round(minDim * 0.16), 48, 120, 96);
+      const dynamicMaxBlur = clampNumber(Math.round(dynamicMaxRadius * 0.95), 36, 160, 120);
+
       if (geoLocked) {{
         const center = map.getCenter();
         const centerLat = center && Number.isFinite(center.lat) ? center.lat : 0;
         const metersPerPixel = metersPerPixelAtLatitude(centerLat, zoom);
         const targetMeters = Math.max(100, signalHeatDevKnobs.coverageKm * 1000);
-        radius = clampNumber(Math.round(targetMeters / Math.max(1, metersPerPixel)), 10, 64, signalHeatDevKnobs.radius);
-        blur = clampNumber(Math.round(radius * signalHeatDevKnobs.blurRatio), 8, 54, signalHeatDevKnobs.blur);
+        radius = clampNumber(
+          Math.round(targetMeters / Math.max(1, metersPerPixel)),
+          10,
+          dynamicMaxRadius,
+          signalHeatDevKnobs.radius
+        );
+        blur = clampNumber(
+          Math.round(radius * signalHeatDevKnobs.blurRatio),
+          8,
+          dynamicMaxBlur,
+          signalHeatDevKnobs.blur
+        );
       }} else {{
         if (safeCount >= 36 || (safeCount >= 24 && zoom >= 11)) {{
           radius = Math.max(16, radius - 2);
@@ -605,6 +688,8 @@
         radius,
         blur,
         minOpacity: signalHeatDevKnobs.minOpacity,
+        maxRadiusPx: dynamicMaxRadius,
+        maxBlurPx: dynamicMaxBlur,
       }};
     }}
 
@@ -657,6 +742,9 @@
         && signalHeatmapEnabled
         && pointsCount > 0;
 
+      const maxBaseRadius = Number.isFinite(baseVisual.maxRadiusPx) ? baseVisual.maxRadiusPx : 140;
+      const maxBaseBlur = Number.isFinite(baseVisual.maxBlurPx) ? baseVisual.maxBlurPx : 180;
+
       for (let i = 0; i < layers.length; i++) {{
         const layer = layers[i];
         const bucket = signalHeatBucketDefs[i] || {{}};
@@ -665,17 +753,19 @@
         const baseBlurMul = Number(bucket.blurMul);
         const radiusMul = 1 + ((Number.isFinite(baseRadiusMul) ? baseRadiusMul : 1) - 1) * signalGain;
         const blurMul = 1 + ((Number.isFinite(baseBlurMul) ? baseBlurMul : 1) - 1) * signalGain;
+        const maxRadius = Math.round(maxBaseRadius * (1 + (0.20 * signalGain)));
+        const maxBlur = Math.round(maxBaseBlur * (1 + (0.25 * signalGain)));
         const visual = {{
           radius: clampNumber(
             Math.round(baseVisual.radius * radiusMul),
             10,
-            96,
+            maxRadius,
             baseVisual.radius
           ),
           blur: clampNumber(
             Math.round(baseVisual.blur * blurMul),
             8,
-            86,
+            maxBlur,
             baseVisual.blur
           ),
           minOpacity: baseVisual.minOpacity,
@@ -695,7 +785,9 @@
     }}
 
     function isMapWheelGuardEnabled() {{
-      return activeLayoutView !== "network" && activeLayoutView !== "saved";
+      // Wheel-zoom gating was causing confusion (and can feel like "zoom is broken").
+      // Keep scroll wheel zoom enabled everywhere for reliability.
+      return false;
     }}
 
     function setMapWheelZoomActive(active) {{
@@ -973,6 +1065,9 @@
       map.on("zoomstart", () => {{
         if ((Number.isFinite(Number(programmaticMapMoveDepth)) ? programmaticMapMoveDepth : 0) > 0) return;
         pendingMapHistoryFocus = false;
+        // Avoid odd canvas artifacts while zooming (leaflet.heat can look glitchy mid-zoom).
+        const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+        syncSignalHeatmapLayer(nodes, true);
       }});
       map.on("zoomend", () => {{
         const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
@@ -1407,25 +1502,6 @@
       return "stale";
     }}
 
-    function applyNodesTableRowFreshness(row, nowUnix = Math.floor(Date.now() / 1000)) {{
-      if (!(row instanceof HTMLElement)) return;
-      const lastUnix = Number(row.dataset.lastHeardUnix);
-      const status = freshnessStatus(lastUnix, nowUnix) || "unknown";
-      row.classList.remove("status-online", "status-warn", "status-stale", "status-unknown");
-      row.classList.add(`status-${{status}}`);
-      const dot = row.querySelector(".node-status-dot");
-      if (dot instanceof HTMLElement) {{
-        dot.classList.remove("status-online", "status-warn", "status-stale", "status-unknown");
-        dot.classList.add(`status-${{status}}`);
-      }}
-    }}
-
-    function refreshNodesTableFreshness(nowUnix = Math.floor(Date.now() / 1000)) {{
-      for (const row of document.querySelectorAll("#nodes-table tbody tr[data-last-heard-unix]")) {{
-        applyNodesTableRowFreshness(row, nowUnix);
-      }}
-    }}
-
     function statusRank(status) {{
       const key = String(status || "unknown");
       if (key === "online") return 0;
@@ -1433,6 +1509,187 @@
       if (key === "stale") return 2;
       return 3;
     }}
+
+    function normalizeFreshnessKey(status) {{
+      const key = String(status || "").trim().toLowerCase();
+      if (key === "online" || key === "warn" || key === "stale") return key;
+      return "unknown";
+    }}
+
+    function applyFreshnessClass(el, status) {{
+      if (!(el instanceof HTMLElement)) return;
+      const key = normalizeFreshnessKey(status);
+      if (el.dataset.freshness === key) return;
+      el.dataset.freshness = key;
+      el.classList.remove("status-online", "status-warn", "status-stale", "status-unknown");
+      el.classList.add(`status-${{key}}`);
+    }}
+
+    function computeNodeFreshnessUnix(node, caps = null) {{
+      const live = nodeLastHeardUnix(node);
+      if (Number.isFinite(live) && live > 0) return Math.trunc(live);
+      const capsUnix = Number(caps && caps.last_seen_unix);
+      if (Number.isFinite(capsUnix) && capsUnix > 0) return Math.trunc(capsUnix);
+      return null;
+    }}
+
+    function tickFreshnessUI(state = latestState) {{
+      if (!state || typeof state !== "object") return;
+      const nodes = Array.isArray(state.nodes) ? state.nodes : [];
+      const nodesById = new Map(
+        nodes.map((node) => [normalizeNodeId(node && node.id), node])
+      );
+      const capsById = new Map(
+        Object.entries((state.history_caps && typeof state.history_caps === "object") ? state.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
+
+      const nowUnix = Math.floor(Date.now() / 1000);
+
+      // Network explorer table freshness dots.
+      const table = document.getElementById("nodes-table");
+      if (table) {{
+        for (const row of table.querySelectorAll("tbody tr[data-node-id]")) {{
+          if (!(row instanceof HTMLElement)) continue;
+          const nodeId = normalizeNodeId(row.dataset.nodeId || "");
+          if (!isSelectableNodeId(nodeId)) continue;
+          const node = nodesById.get(nodeId);
+          const caps = capsById.get(nodeId);
+          const lastSeenUnix = computeNodeFreshnessUnix(node, caps);
+          const status = freshnessStatus(lastSeenUnix, nowUnix);
+          applyFreshnessClass(row, status);
+          const dot = row.querySelector(".node-status-dot");
+          if (dot instanceof HTMLElement) {{
+            applyFreshnessClass(dot, status);
+          }}
+        }}
+      }}
+
+      // Chat roster freshness + counts.
+      const rosterList = document.getElementById("chat-room-list");
+      let chatOnlineCount = 0;
+      let chatWarnCount = 0;
+      let chatStaleCount = 0;
+      const rosterModel = Array.isArray(chatRosterModel) ? chatRosterModel : [];
+      if (rosterModel.length > 0) {{
+        for (const entry of rosterModel) {{
+          const nodeId = normalizeNodeId(entry && entry.id);
+          if (!isSelectableNodeId(nodeId)) continue;
+          const node = nodesById.get(nodeId);
+          const caps = capsById.get(nodeId);
+          const lastSeenUnix = computeNodeFreshnessUnix(node, caps);
+          const status = freshnessStatus(lastSeenUnix, nowUnix);
+          const key = normalizeFreshnessKey(status);
+          if (key === "online") chatOnlineCount += 1;
+          else if (key === "warn") chatWarnCount += 1;
+          else if (key === "stale") chatStaleCount += 1;
+        }}
+      }}
+
+      if (rosterList) {{
+        // Refresh the visible DOM list's status chips, but compute the counts from the
+        // canonical roster model (so search filters don't skew the totals).
+        let fallbackOnline = 0;
+        let fallbackWarn = 0;
+        let fallbackStale = 0;
+        const useFallbackCounts = rosterModel.length === 0;
+        for (const item of rosterList.querySelectorAll(".chat-member-item[data-node-id]")) {{
+          if (!(item instanceof HTMLElement)) continue;
+          const nodeId = normalizeNodeId(item.dataset.nodeId || "");
+          if (!isSelectableNodeId(nodeId)) continue;
+          const node = nodesById.get(nodeId);
+          const caps = capsById.get(nodeId);
+          const lastSeenUnix = computeNodeFreshnessUnix(node, caps);
+          const status = freshnessStatus(lastSeenUnix, nowUnix);
+          const key = normalizeFreshnessKey(status);
+          if (useFallbackCounts) {{
+            if (key === "online") fallbackOnline += 1;
+            else if (key === "warn") fallbackWarn += 1;
+            else if (key === "stale") fallbackStale += 1;
+          }}
+
+          applyFreshnessClass(item, key);
+          const statusEl = item.querySelector(".chat-member-status");
+          if (statusEl instanceof HTMLElement) applyFreshnessClass(statusEl, key);
+          const nameEl = item.querySelector(".chat-member-name");
+          if (nameEl instanceof HTMLElement) applyFreshnessClass(nameEl, key);
+        }}
+        if (useFallbackCounts) {{
+          chatOnlineCount = fallbackOnline;
+          chatWarnCount = fallbackWarn;
+          chatStaleCount = fallbackStale;
+        }}
+      }}
+
+      const leftSub = document.getElementById("chat-left-sub");
+      if (leftSub) {{
+        leftSub.textContent = `${{channelLabel(activeChatChannel)}}: ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale`;
+      }}
+      const caption = document.getElementById("chat-caption");
+      if (caption) {{
+        const preset = (state.summary && state.summary.modem_preset) ? state.summary.modem_preset : "unknown";
+        caption.textContent = `LoRa preset: ${{preset}}. Channel: ${{channelLabel(activeChatChannel)}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale.`;
+      }}
+
+      // Saved nodes list freshness.
+      const favList = document.getElementById("favorites-list");
+      if (favList) {{
+        for (const item of favList.querySelectorAll(".favorite-node-item[data-node-id]")) {{
+          if (!(item instanceof HTMLElement)) continue;
+          const nodeId = normalizeNodeId(item.dataset.nodeId || "");
+          if (!isSelectableNodeId(nodeId)) continue;
+          const node = nodesById.get(nodeId);
+          const caps = capsById.get(nodeId);
+          const lastSeenUnix = computeNodeFreshnessUnix(node, caps);
+          const status = freshnessStatus(lastSeenUnix, nowUnix);
+          applyFreshnessClass(item, status);
+        }}
+
+        const caption = document.getElementById("favorites-caption");
+        if (caption) {{
+          let onlineCount = 0;
+          let warnCount = 0;
+          let staleCount = 0;
+          for (const nodeId of favoriteNodeIds) {{
+            if (!isSelectableNodeId(nodeId)) continue;
+            const node = nodesById.get(nodeId);
+            const caps = capsById.get(nodeId);
+            const lastSeenUnix = computeNodeFreshnessUnix(node, caps);
+            const status = freshnessStatus(lastSeenUnix, nowUnix);
+            const key = normalizeFreshnessKey(status);
+            if (key === "online") onlineCount += 1;
+            else if (key === "warn") warnCount += 1;
+            else if (key === "stale") staleCount += 1;
+          }}
+          caption.textContent = `Saved subsection: ${{favoriteNodeIds.size}} total (${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale)`;
+        }}
+      }}
+
+      // Saved view summary freshness chip should age even if state is cached.
+      // Also: when the user clears selection, we must hide/reset it (304 responses would
+      // otherwise skip renderSummary() and the chip can get "stuck" stale).
+      const savedChip = document.getElementById("updated-freshness");
+      if (savedChip instanceof HTMLElement) {{
+        if (activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId)) {{
+          const node = nodesById.get(selectedNodeId);
+          const caps = capsById.get(selectedNodeId);
+          const lastSeenUnix = computeNodeFreshnessUnix(node, caps);
+          const status = freshnessStatus(lastSeenUnix, nowUnix);
+          const key = normalizeFreshnessKey(status);
+          savedChip.textContent = key === "online"
+            ? "Fresh"
+            : (key === "warn" ? "Aging" : (key === "stale" ? "Stale" : "Unknown"));
+          applyFreshnessClass(savedChip, key);
+          savedChip.hidden = false;
+        }} else {{
+          savedChip.textContent = "";
+          savedChip.hidden = true;
+          applyFreshnessClass(savedChip, "unknown");
+        }}
+      }}
+    }}
+
 
     function normalizeChatChannel(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
@@ -2893,9 +3150,29 @@
             cachedNodeHistory = cached.data;
           }}
         }}
+        // Render visible UI from cached state immediately on view switches.
+        // This prevents "blank" panes when the server legitimately returns 304s.
+        renderSummary(latestState);
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
-        renderSavedNodeDetails(latestState, cachedNodeHistory);
+        if (next === "network" || next === "all") {{
+          renderNodes(latestState.nodes || []);
+        }}
+        if (next === "chat" || next === "all") {{
+          renderChat(latestState);
+        }}
+        if (next === "saved" || next === "all") {{
+          renderFavorites(latestState);
+          renderSavedNodeDetails(latestState, cachedNodeHistory);
+        }} else {{
+          renderSavedNodeDetails(latestState, cachedNodeHistory);
+        }}
+        if (next === "packets" || next === "all") {{
+          renderPackets(latestState.traffic || {{}});
+        }}
+        if (next === "packets" || next === "data" || next === "all") {{
+          renderConsole(latestState.traffic || {{}});
+        }}
       }}
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
@@ -3678,6 +3955,14 @@
       persistSelection();
       renderSelectionStatus();
       highlightNodeSelection();
+      // If the saved-view freshness chip was showing for a selected node, hide it
+      // immediately. (The poll loop might see 304s and skip renderSummary.)
+      const chip = document.getElementById("updated-freshness");
+      if (chip instanceof HTMLElement) {{
+        chip.textContent = "";
+        chip.hidden = true;
+        applyFreshnessClass(chip, "unknown");
+      }}
       updateMapSelection(false);
       map.closePopup();
       setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
@@ -4506,6 +4791,8 @@
       h = hashMixStr(h, node && (node.short_name || ""));
       h = hashMixStr(h, node && (node.hardware_model || ""));
       const snr = Number(node && node.snr);
+      // Preserve decimal movement so small SNR changes still trigger rerender in the
+      // hash-skip path.
       h = hashMixInt(h, Number.isFinite(snr) ? Math.round(snr * 100) : 0);
       h = hashMixInt(h, node && (node.hops_away ?? 0));
       h = hashMixInt(h, node && (node.battery_level ?? 0));
@@ -4632,7 +4919,7 @@
           const lastSort = Number.isFinite(Number(node.last_heard_unix))
             ? Number(node.last_heard_unix)
             : (Number.isFinite(Number(lastUnix)) ? Number(lastUnix) : 0);
-          return `<tr data-node-id="${{escAttr(nodeId)}}" data-last-heard-unix="${{escAttr(lastSort)}}" class="${{selectable ? "node-selectable" : ""}}${{selectedClass}}${{statusClass}}">
+          return `<tr data-node-id="${{escAttr(nodeId)}}" class="${{selectable ? "node-selectable" : ""}}${{selectedClass}}${{statusClass}}">
           <td data-sort="${{escAttr(lastSort)}}" title="${{escAttr(lastHeardText)}}"><span class="node-status-dot status-${{escAttr(status || "unknown")}}">●</span>${{lastHeardText}}</td>
           <td class="mono" data-sort="${{escAttr(nodeId)}}" title="${{escAttr(String(node.id || nodeId || ""))}}">${{nodeId || "n/a"}}</td>
           <td data-sort="${{escAttr(name)}}">
@@ -4660,7 +4947,6 @@
       if (scrollTop != null && scroller) {{
         scroller.scrollTop = scrollTop;
       }}
-      refreshNodesTableFreshness(nowUnix);
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
       }}
@@ -6696,6 +6982,9 @@
           return String(a.name || a.id).localeCompare(String(b.name || b.id));
         }})
         .slice(0, chatRosterMaxEntries);
+      // Preserve the full (unfiltered) roster so tickFreshnessUI() can compute canonical
+      // online/aging/stale counts even when the user is search-filtering the roster DOM.
+      chatRosterModel = roster;
       const rosterQuery = normalizeSearchQuery(chatUserSearchQuery);
       const rosterFiltered = roster.filter((item) => (
         matchesIdOrNameQuery(item.id, item.name, rosterQuery)
@@ -6885,6 +7174,7 @@
               void refreshSelectedNodeHistory(false);
             }}
           }}
+          tickFreshnessUI(latestState);
           return;
         }}
         if (!resp.ok) throw new Error(`API ${{resp.status}}`);
@@ -6958,6 +7248,8 @@
           }}
         }}
 
+
+        tickFreshnessUI(state);
       }} catch (err) {{
         setText("updated-at", `error: ${{err.message}}`);
         appendConsoleLine(`error|${{Date.now()}}|${{err.message}}`, `[poll error] ${{err.message}}`);
@@ -7032,10 +7324,7 @@
     setInterval(pollOnce, refreshMs);
     // Keep the uptime label moving even when the server returns cached/304 state.
     setInterval(() => {{
-      if (!document.hidden) {{
-        updateUptimeDisplay();
-        refreshNodesTableFreshness();
-      }}
+      if (!document.hidden) updateUptimeDisplay();
     }}, 1000);
     setInterval(() => {{
       void loadThemeSettingsFromServer(false);
