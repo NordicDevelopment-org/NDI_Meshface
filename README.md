@@ -106,7 +106,7 @@ Open:
 
 Notes:
 
-- Replace `COM5` with your actual radio port.
+- Replace `COM5` with your actual radio port. On Windows, default serial is now `COM3` if `--mesh-port` is omitted.
 - Add `--no-default-gateway` to force USB-only mode if you have `MESH_GATEWAY_HOST` set in your environment.
 - If PowerShell blocks activation, run:
   `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`

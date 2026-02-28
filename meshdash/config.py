@@ -1,4 +1,10 @@
-DEFAULT_MESH_PORT = "/dev/ttyACM0"
+import os
+
+
+DEFAULT_MESH_PORT = os.environ.get(
+    "MESH_DASH_MESH_PORT",
+    "COM3" if os.name == "nt" else "/dev/ttyACM0",
+)
 # Default gateway fallback is intentionally disabled unless explicitly configured.
 DEFAULT_GATEWAY_HOST = ""
 DEFAULT_GATEWAY_PORT = 4403
