@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from contextlib import contextmanager
 from typing import Any
 
 from .api_input_radio import RadioSettingsRequest
@@ -160,76 +161,142 @@ def _get_local_node(iface: object) -> Any:
     raise RuntimeError("Interface has no local node")
 
 
+@contextmanager
+def _send_lock_guard(send_lock: object):
+    lock = send_lock
+    acquire = getattr(lock, "acquire", None)
+    release = getattr(lock, "release", None)
+    locked = False
+    if callable(acquire) and callable(release):
+        acquire()
+        locked = True
+    try:
+        yield
+    finally:
+        if locked:
+            release()
+
+
+def _apply_fixed_position(
+    node: object,
+    fixed_position: Mapping[str, object],
+) -> dict[str, object]:
+    setter = getattr(node, "setFixedPosition", None)
+    if not callable(setter):
+        raise RuntimeError("Meshtastic node does not support setFixedPosition()")
+
+    lat = _coerce_float(fixed_position.get("latitude"))
+    lon = _coerce_float(fixed_position.get("longitude"))
+    altitude_raw = fixed_position.get("altitude")
+    altitude = _coerce_int(altitude_raw) if altitude_raw is not None else 0
+
+    setter(lat, lon, altitude)
+    return {
+        "latitude": lat,
+        "longitude": lon,
+        "altitude": altitude,
+    }
+
+
+def _clear_fixed_position(node: object) -> None:
+    clearer = getattr(node, "removeFixedPosition", None)
+    if not callable(clearer):
+        raise RuntimeError("Meshtastic node does not support removeFixedPosition()")
+    clearer()
+
+
 def apply_radio_settings(
     request: RadioSettingsRequest,
     *,
     iface: object,
     send_lock: object,
 ) -> dict[str, object]:
-    """Apply radio settings (currently: LoRa config) to the connected local node."""
+    """Apply radio settings to the connected local node."""
 
     lora_updates = request.lora or {}
-    if not lora_updates:
+    fixed_position = request.fixed_position or {}
+    clear_fixed_position = bool(request.clear_fixed_position)
+
+    if fixed_position and clear_fixed_position:
+        return {
+            "ok": False,
+            "error": "Cannot set and clear fixed position in the same request",
+        }
+
+    if not lora_updates and not fixed_position and not clear_fixed_position:
         return {"ok": False, "error": "No settings provided"}
 
     node = _get_local_node(iface)
-    local_config = getattr(node, "localConfig", None)
-    if local_config is None:
-        return {"ok": False, "error": "Local config is not available"}
+    ignored_fields: list[str] = []
+    applied_lora_fields: list[str] = []
+    applied: dict[str, object] = {}
+    reboot_expected = False
 
-    lora_cfg = getattr(local_config, "lora", None)
-    if lora_cfg is None:
-        return {"ok": False, "error": "LoRa config is not available"}
+    try:
+        with _send_lock_guard(send_lock):
+            if lora_updates:
+                local_config = getattr(node, "localConfig", None)
+                if local_config is None:
+                    return {"ok": False, "error": "Local config is not available"}
 
-    applied_fields, ignored_fields = _apply_updates_to_message(lora_cfg, lora_updates)
-    if not applied_fields:
+                lora_cfg = getattr(local_config, "lora", None)
+                if lora_cfg is None:
+                    return {"ok": False, "error": "LoRa config is not available"}
+
+                lora_applied, lora_ignored = _apply_updates_to_message(lora_cfg, lora_updates)
+                ignored_fields.extend(lora_ignored)
+                if not lora_applied and not (fixed_position or clear_fixed_position):
+                    return {
+                        "ok": False,
+                        "error": "No valid fields to apply",
+                        "ignored_fields": ignored_fields,
+                    }
+                if lora_applied:
+                    begin_tx = getattr(node, "beginSettingsTransaction", None)
+                    if callable(begin_tx):
+                        try:
+                            begin_tx()
+                        except Exception:
+                            pass
+
+                    write_cfg = getattr(node, "writeConfig", None)
+                    if not callable(write_cfg):
+                        return {"ok": False, "error": "Meshtastic node does not support writeConfig()"}
+                    write_cfg("lora")
+
+                    commit_tx = getattr(node, "commitSettingsTransaction", None)
+                    if callable(commit_tx):
+                        try:
+                            commit_tx()
+                        except Exception:
+                            pass
+                    applied_lora_fields = lora_applied
+                    applied["lora"] = {k: lora_updates.get(k) for k in lora_applied}
+                    reboot_expected = True
+
+            if fixed_position:
+                applied["fixed_position"] = _apply_fixed_position(node, fixed_position)
+
+            if clear_fixed_position:
+                _clear_fixed_position(node)
+                applied["clear_fixed_position"] = True
+    except Exception as exc:
+        payload: dict[str, object] = {"ok": False, "error": f"Write failed: {exc}"}
+        if applied_lora_fields:
+            payload["applied_fields"] = applied_lora_fields
+        return payload
+
+    if not applied and ignored_fields:
         return {
             "ok": False,
             "error": "No valid fields to apply",
             "ignored_fields": ignored_fields,
         }
 
-    # Apply on radio. LoRa config changes typically trigger a reboot.
-    try:
-        lock = send_lock
-        # Best-effort support for threading.Lock-like objects.
-        acquire = getattr(lock, "acquire", None)
-        release = getattr(lock, "release", None)
-        if callable(acquire) and callable(release):
-            acquire()
-            locked = True
-        else:
-            locked = False
-
-        try:
-            begin_tx = getattr(node, "beginSettingsTransaction", None)
-            if callable(begin_tx):
-                try:
-                    begin_tx()
-                except Exception:
-                    pass
-
-            write_cfg = getattr(node, "writeConfig", None)
-            if not callable(write_cfg):
-                return {"ok": False, "error": "Meshtastic node does not support writeConfig()"}
-            write_cfg("lora")
-
-            commit_tx = getattr(node, "commitSettingsTransaction", None)
-            if callable(commit_tx):
-                try:
-                    commit_tx()
-                except Exception:
-                    pass
-        finally:
-            if locked:
-                release()
-    except Exception as exc:
-        return {"ok": False, "error": f"Write failed: {exc}", "applied_fields": applied_fields}
-
     return {
         "ok": True,
-        "applied": {"lora": {k: lora_updates.get(k) for k in applied_fields}},
-        "applied_fields": applied_fields,
+        "applied": applied,
+        "applied_fields": applied_lora_fields,
         "ignored_fields": ignored_fields,
-        "reboot_expected": True,
+        "reboot_expected": reboot_expected,
     }

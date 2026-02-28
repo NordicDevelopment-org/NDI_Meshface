@@ -4268,6 +4268,50 @@
       return cachedLora && typeof cachedLora === "object" ? cachedLora : null;
     }}
 
+    function localNodeRowFromState(state) {{
+      const safeState = state && typeof state === "object" ? state : null;
+      if (!safeState) return null;
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      if (!nodes.length) return null;
+      const myInfo = safeState.my_info && typeof safeState.my_info === "object"
+        ? safeState.my_info
+        : null;
+      if (!myInfo) return null;
+
+      const explicitId = normalizeNodeId(myInfo.id || myInfo.node_id || "");
+      if (explicitId) {{
+        const byId = nodes.find((node) => normalizeNodeId(node && node.id) === explicitId);
+        if (byId) return byId;
+      }}
+
+      const nodeNumRaw = Number(
+        myInfo.my_node_num ?? myInfo.myNodeNum ?? myInfo.node_num ?? myInfo.nodeNum ?? myInfo.num
+      );
+      if (Number.isInteger(nodeNumRaw)) {{
+        const byNum = nodes.find((node) => Number(node && node.num) === nodeNumRaw);
+        if (byNum) return byNum;
+      }}
+      return null;
+    }}
+
+    function fixedPositionFromState(state) {{
+      const sources = [state, latestState];
+      for (const candidate of sources) {{
+        const row = localNodeRowFromState(candidate);
+        if (!row) continue;
+        const lat = Number(row.lat);
+        const lon = Number(row.lon);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {{
+          return {{
+            latitude: lat,
+            longitude: lon,
+            altitude: null,
+          }};
+        }}
+      }}
+      return null;
+    }}
+
 
     function setFormValue(el, value) {{
       if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLSelectElement) && !(el instanceof HTMLTextAreaElement)) return;
@@ -4305,6 +4349,7 @@
     function renderSettings(state, force = false) {{
       if (!force && settingsDirty) return;
       const lora = loraConfigFromState(state);
+      const fixedPosition = fixedPositionFromState(state);
       if (!lora) {{
         if (!settingsDirty && !settingsFetchInFlight && !settingsAutoFetchAttempted) {{
           settingsAutoFetchAttempted = true;
@@ -4333,6 +4378,9 @@
       const overrideDuty = document.getElementById("settings-lora-override-duty-cycle");
       const boosted = document.getElementById("settings-lora-sx126x-rx-boosted-gain");
       const paFan = document.getElementById("settings-lora-pa-fan-disabled");
+      const fixedLat = document.getElementById("settings-fixed-latitude");
+      const fixedLon = document.getElementById("settings-fixed-longitude");
+      const fixedAlt = document.getElementById("settings-fixed-altitude");
 
       setFormValue(region, lora.region);
       setFormValue(preset, lora.modem_preset);
@@ -4351,6 +4399,9 @@
       setFormChecked(overrideDuty, lora.override_duty_cycle);
       setFormChecked(boosted, lora.sx126x_rx_boosted_gain);
       setFormChecked(paFan, lora.pa_fan_disabled);
+      setFormValue(fixedLat, fixedPosition ? fixedPosition.latitude : "");
+      setFormValue(fixedLon, fixedPosition ? fixedPosition.longitude : "");
+      setFormValue(fixedAlt, fixedPosition ? fixedPosition.altitude : "");
 
       syncLoraManualFieldsDisabled();
     }}
@@ -4389,7 +4440,20 @@
       return allowFloat ? num : Math.trunc(num);
     }}
 
-        async function fetchSettingsFromRadio() {{
+    function setSettingsActionButtonsDisabled(disabled) {{
+      for (const id of [
+        "settings-apply-lora",
+        "settings-apply-fixed-position",
+        "settings-clear-fixed-position",
+      ]) {{
+        const btn = document.getElementById(id);
+        if (btn instanceof HTMLButtonElement) {{
+          btn.disabled = !!disabled;
+        }}
+      }}
+    }}
+
+    async function fetchSettingsFromRadio() {{
       if (settingsFetchInFlight) return;
       settingsFetchInFlight = true;
       const fetchBtn = document.getElementById("settings-reset");
@@ -4420,7 +4484,7 @@
       }}
     }}
 
-async function applyLoraSettings() {{
+    async function applyLoraSettings() {{
       if (settingsApplyInFlight) return;
 
       const payload = {{
@@ -4456,11 +4520,7 @@ async function applyLoraSettings() {{
       }}
 
       settingsApplyInFlight = true;
-
-      const applyBtn = document.getElementById("settings-apply-lora");
-      if (applyBtn instanceof HTMLButtonElement) {{
-        applyBtn.disabled = true;
-      }}
+      setSettingsActionButtonsDisabled(true);
       setText("settings-apply-status", "Applying settings… (radio may reboot)");
       try {{
         const resp = await fetch(radioSettingsEndpoint, {{
@@ -4491,9 +4551,88 @@ async function applyLoraSettings() {{
         setText("settings-apply-status", `Apply error: ${{err.message}}`);
         appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply error: ${{err.message}}`);
       }} finally {{
-        if (applyBtn instanceof HTMLButtonElement) {{
-          applyBtn.disabled = false;
+        setSettingsActionButtonsDisabled(false);
+        settingsApplyInFlight = false;
+      }}
+    }}
+
+    async function applyFixedPositionSettings(clearOnly = false) {{
+      if (settingsApplyInFlight) return;
+
+      let payload = {{}};
+      let statusPending = "";
+      let statusSuccess = "";
+      let consoleSuccess = "";
+
+      if (clearOnly) {{
+        payload = {{ clear_fixed_position: true }};
+        statusPending = "Clearing fixed location…";
+        statusSuccess = "Cleared fixed location.";
+        consoleSuccess = "[settings] cleared fixed location.";
+      }} else {{
+        const latRaw = readNumberValue("settings-fixed-latitude", true);
+        const lonRaw = readNumberValue("settings-fixed-longitude", true);
+        const altRaw = readNumberValue("settings-fixed-altitude", false);
+        if (!Number.isFinite(latRaw) || !Number.isFinite(lonRaw)) {{
+          setText("settings-apply-status", "Latitude and longitude are required.");
+          return;
         }}
+        const lat = Number(latRaw);
+        const lon = Number(lonRaw);
+        if (lat < -90 || lat > 90) {{
+          setText("settings-apply-status", "Latitude must be between -90 and 90.");
+          return;
+        }}
+        if (lon < -180 || lon > 180) {{
+          setText("settings-apply-status", "Longitude must be between -180 and 180.");
+          return;
+        }}
+
+        const fixed = {{
+          latitude: lat,
+          longitude: lon,
+        }};
+        if (Number.isFinite(altRaw)) {{
+          fixed.altitude = Number(altRaw);
+        }}
+        payload = {{ fixed_position: fixed }};
+        statusPending = "Applying fixed location…";
+        statusSuccess = "Fixed location applied.";
+        consoleSuccess = `[settings] applied fixed location (${{lat.toFixed(6)}}, ${{lon.toFixed(6)}}).`;
+      }}
+
+      settingsApplyInFlight = true;
+      setSettingsActionButtonsDisabled(true);
+      setText("settings-apply-status", statusPending);
+      try {{
+        const resp = await fetch(radioSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(payload),
+        }});
+
+        const text = await resp.text();
+        let parsed = null;
+        try {{
+          parsed = text ? JSON.parse(text) : null;
+        }} catch (_err) {{
+        }}
+
+        if (!resp.ok || !(parsed && parsed.ok)) {{
+          const errMsg = parsed && parsed.error ? String(parsed.error) : (text || `HTTP ${{resp.status}}`);
+          setText("settings-apply-status", `Apply failed: ${{errMsg}}`);
+          appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] fixed location apply failed: ${{errMsg}}`);
+          return;
+        }}
+
+        setText("settings-apply-status", statusSuccess);
+        appendConsoleLine(`settings|${{Date.now()}}|ok`, consoleSuccess);
+        clearSettingsDirty();
+      }} catch (err) {{
+        setText("settings-apply-status", `Apply error: ${{err.message}}`);
+        appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] fixed location apply error: ${{err.message}}`);
+      }} finally {{
+        setSettingsActionButtonsDisabled(false);
         settingsApplyInFlight = false;
       }}
     }}
@@ -4523,6 +4662,20 @@ async function applyLoraSettings() {{
       if (applyBtn instanceof HTMLButtonElement) {{
         applyBtn.addEventListener("click", () => {{
           void applyLoraSettings();
+        }});
+      }}
+
+      const applyFixedBtn = document.getElementById("settings-apply-fixed-position");
+      if (applyFixedBtn instanceof HTMLButtonElement) {{
+        applyFixedBtn.addEventListener("click", () => {{
+          void applyFixedPositionSettings(false);
+        }});
+      }}
+
+      const clearFixedBtn = document.getElementById("settings-clear-fixed-position");
+      if (clearFixedBtn instanceof HTMLButtonElement) {{
+        clearFixedBtn.addEventListener("click", () => {{
+          void applyFixedPositionSettings(true);
         }});
       }}
 
