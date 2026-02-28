@@ -8295,8 +8295,12 @@ async function applyLoraSettings() {{
         const replyButton = canReply
           ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message">Reply</button>`
           : "";
+        const hasReactions = !!reactionChips;
         const reactButton = messageId
-          ? `<button type="button" class="chat-react-btn" data-reply-id="${{escAttr(messageId)}}" title="React to this message">😊+</button>`
+          ? `<button type="button" class="chat-react-btn${{hasReactions ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
+          : "";
+        const hopBadge = hasHop
+          ? `<span class="chat-feed-hops" title="${{escAttr(hopTitle)}}">${{escAttr(hopLabel)}}</span>`
           : "";
         const retryButton = (
           isLocalEcho
@@ -8305,25 +8309,26 @@ async function applyLoraSettings() {{
         )
           ? `<button type="button" class="chat-retry-btn" data-retry-text="${{escAttr(String(msg.text || ""))}}" data-retry-destination="${{escAttr(String(msg.to || "^all"))}}" data-retry-channel="${{escAttr(msg.channel ?? 0)}}" data-retry-reply-id="${{escAttr(retryReplyId)}}" data-retry-of="${{escAttr(messageId || "")}}" title="Retry this message">Retry</button>`
           : "";
-        const reactionRow = reactionChips
-          ? `<div class="chat-reaction-row">${{reactionChips}}</div>`
+        const reactionRowParts = [];
+        if (reactButton) reactionRowParts.push(reactButton);
+        if (reactionChips) reactionRowParts.push(`<span class="chat-reaction-stack">${{reactionChips}}</span>`);
+        if (replyButton) reactionRowParts.push(`<span class="chat-reply-tail">${{replyButton}}</span>`);
+        const reactionRow = reactionRowParts.length > 0
+          ? `<div class="chat-reaction-row">${{reactionRowParts.join("")}}</div>`
           : "";
         const selectedFeedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
         return `<div data-node-id="${{escAttr(nodeId)}}" data-message-id="${{escAttr(messageId || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}">
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
-              ${{fromMeta.metaHtml ? `<span class="chat-name-meta">${{fromMeta.metaHtml}}</span>` : ""}}
               ${{fromMeta.idTag ? `<span class="chat-id-bg status-${{fromMeta.status}}">${{escAttr(fromMeta.idTag)}}</span>` : ""}}
             </span>
             <span class="chat-feed-arrow">&rarr;</span>
             <span class="chat-endpoint" title="${{escAttr(toMeta.title)}}">
               <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
-              ${{toMeta.metaHtml ? `<span class="chat-name-meta">${{toMeta.metaHtml}}</span>` : ""}}
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
-            ${{hasHop ? `<span class="chat-feed-hops" title="${{escAttr(hopTitle)}}">${{escAttr(hopLabel)}}</span>` : ""}}
-            <span class="chat-feed-actions">${{replyButton}}${{reactButton}}${{retryButton}}</span>
+            <span class="chat-feed-actions">${{hopBadge}}${{retryButton}}</span>
             ${{deliveryChip}}
             <span class="chat-feed-time">${{escAttr(timeText)}}</span>
           </div>
