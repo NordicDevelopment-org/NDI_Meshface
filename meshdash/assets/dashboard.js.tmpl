@@ -6148,62 +6148,104 @@ async function applyLoraSettings() {{
       }}
     }}
 
+    function hashTrailSignature(nodeHistory, selection) {{
+      let hash = 2166136261;
+      let pointCount = 0;
+      const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
+      hash = hashMixStr(hash, historyNodeId);
+      if (!(historyNodeId && historyNodeId === selection)) {{
+        hash = hashMixInt(hash, -1);
+        return {{ hash: hash >>> 0, count: 0 }};
+      }}
+
+      const rawTrail = Array.isArray(nodeHistory && nodeHistory.positions)
+        ? nodeHistory.positions
+        : [];
+      for (const point of rawTrail) {{
+        const lat = Number(point && point.lat);
+        const lon = Number(point && point.lon);
+        if (!isValidMapCoord(lat, lon)) continue;
+        pointCount += 1;
+        hash = hashMixInt(hash, Math.round(lat * 100000));
+        hash = hashMixInt(hash, Math.round(lon * 100000));
+        const when = Number(point && point.time_unix);
+        hash = hashMixInt(hash, Number.isFinite(when) ? Math.round(when) : 0);
+      }}
+      hash = hashMixInt(hash, pointCount);
+      return {{ hash: hash >>> 0, count: pointCount }};
+    }}
+
     function buildMapSignature(nodes, edges, nodeHistory) {{
       const selection = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
       const savedSelectionMode = activeLayoutView === "saved" && !!selection;
       const networkSelectionMode = activeLayoutView === "network" && !!selection;
+      let hash = 2166136261;
+      hash = hashMixStr(hash, savedSelectionMode ? "saved" : (networkSelectionMode ? "network" : "all"));
+      hash = hashMixStr(hash, selection);
+
       if (savedSelectionMode) {{
-        let trailSig = "no-trail";
-        const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
-        if (historyNodeId && historyNodeId === selection) {{
-          const rawTrail = Array.isArray(nodeHistory.positions) ? nodeHistory.positions : [];
-          const compact = [];
-          for (const point of rawTrail) {{
-            const lat = Number(point && point.lat);
-            const lon = Number(point && point.lon);
-            if (!isValidMapCoord(lat, lon)) continue;
-            const when = Number(point && point.time_unix);
-            const ts = Number.isFinite(when) ? String(Math.round(when)) : "";
-            compact.push(`${{lat.toFixed(5)}},${{lon.toFixed(5)}}@${{ts}}`);
-          }}
-          trailSig = compact.join("|");
-        }}
         const selectedNode = selectedNodeFrom(nodes);
         if (
           selectedNode &&
           typeof selectedNode.lat === "number" &&
           typeof selectedNode.lon === "number"
         ) {{
-          return `sel:${{selection}}:${{selectedNode.lat.toFixed(5)}},${{selectedNode.lon.toFixed(5)}}:trail:${{trailSig}}`;
+          hash = hashMixInt(hash, Math.round(selectedNode.lat * 100000));
+          hash = hashMixInt(hash, Math.round(selectedNode.lon * 100000));
+        }} else {{
+          hash = hashMixInt(hash, -2147483648);
         }}
-        return `sel:${{selection}}:no-position:trail:${{trailSig}}`;
+        const trailSig = hashTrailSignature(nodeHistory, selection);
+        hash = hashMixInt(hash, trailSig.hash);
+        hash = hashMixInt(hash, trailSig.count);
+        return `saved:${{(hash >>> 0).toString(16)}}:${{trailSig.hash.toString(16)}}:${{trailSig.count}}`;
       }}
-      const nodeSig = (nodes || [])
-        .filter((node) => typeof node.lat === "number" && typeof node.lon === "number")
-        .map((node) => `${{normalizeNodeId(node.id)}}:${{node.lat.toFixed(5)}},${{node.lon.toFixed(5)}}`)
-        .join("|");
-      const edgeSig = (edges || [])
-        .map((edge) => `${{normalizeNodeId(edge.from)}}>${{normalizeNodeId(edge.to)}}:${{edge.lifetime_count ?? edge.count ?? 0}}:${{edge.last_rx_time || ""}}:${{edge.last_hops ?? ""}}`)
-        .join("|");
+
+      let nodeCount = 0;
+      let nodeXor = 0;
+      let nodeSum = 0;
+      for (const node of (nodes || [])) {{
+        if (typeof node.lat !== "number" || typeof node.lon !== "number") continue;
+        let itemHash = 2166136261;
+        itemHash = hashMixStr(itemHash, normalizeNodeId(node.id));
+        itemHash = hashMixInt(itemHash, Math.round(node.lat * 100000));
+        itemHash = hashMixInt(itemHash, Math.round(node.lon * 100000));
+        nodeXor ^= itemHash;
+        nodeSum = (nodeSum + itemHash) >>> 0;
+        nodeCount += 1;
+      }}
+      hash = hashMixInt(hash, nodeCount);
+      hash = hashMixInt(hash, nodeXor);
+      hash = hashMixInt(hash, nodeSum);
+
+      let edgeCount = 0;
+      let edgeXor = 0;
+      let edgeSum = 0;
+      for (const edge of (edges || [])) {{
+        const lifetimeCount = Number(edge && (edge.lifetime_count ?? edge.count ?? 0));
+        const lastHops = Number(edge && edge.last_hops);
+        let itemHash = 2166136261;
+        itemHash = hashMixStr(itemHash, normalizeNodeId(edge && edge.from));
+        itemHash = hashMixStr(itemHash, normalizeNodeId(edge && edge.to));
+        itemHash = hashMixInt(itemHash, Number.isFinite(lifetimeCount) ? Math.trunc(lifetimeCount) : 0);
+        itemHash = hashMixStr(itemHash, edge && edge.last_rx_time);
+        itemHash = hashMixInt(itemHash, Number.isFinite(lastHops) ? Math.trunc(lastHops) : -1);
+        itemHash = hashMixInt(itemHash, edge && edge.is_real ? 1 : 0);
+        edgeXor ^= itemHash;
+        edgeSum = (edgeSum + itemHash) >>> 0;
+        edgeCount += 1;
+      }}
+      hash = hashMixInt(hash, edgeCount);
+      hash = hashMixInt(hash, edgeXor);
+      hash = hashMixInt(hash, edgeSum);
+
       if (networkSelectionMode) {{
-        let trailSig = "no-trail";
-        const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
-        if (historyNodeId && historyNodeId === selection) {{
-          const rawTrail = Array.isArray(nodeHistory.positions) ? nodeHistory.positions : [];
-          const compact = [];
-          for (const point of rawTrail) {{
-            const lat = Number(point && point.lat);
-            const lon = Number(point && point.lon);
-            if (!isValidMapCoord(lat, lon)) continue;
-            const when = Number(point && point.time_unix);
-            const ts = Number.isFinite(when) ? String(Math.round(when)) : "";
-            compact.push(`${{lat.toFixed(5)}},${{lon.toFixed(5)}}@${{ts}}`);
-          }}
-          trailSig = compact.join("|");
-        }}
-        return `all#${{nodeSig}}#${{edgeSig}}#sel:${{selection}}#trail:${{trailSig}}`;
+        const trailSig = hashTrailSignature(nodeHistory, selection);
+        hash = hashMixInt(hash, trailSig.hash);
+        hash = hashMixInt(hash, trailSig.count);
+        return `network:${{(hash >>> 0).toString(16)}}:${{trailSig.hash.toString(16)}}:${{trailSig.count}}`;
       }}
-      return `all#${{nodeSig}}#${{edgeSig}}`;
+      return `all:${{(hash >>> 0).toString(16)}}:${{nodeCount}}:${{edgeCount}}`;
     }}
 
 
@@ -6214,6 +6256,30 @@ async function applyLoraSettings() {{
       // Many devices report (0,0) before GPS lock. Treat that as "unknown" for overview fitting.
       if (Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9) return false;
       return true;
+    }}
+
+    function collectTrailPoints(nodeHistory, selectionId) {{
+      const selection = normalizeNodeId(selectionId || "");
+      if (!selection) return [];
+      const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
+      if (!historyNodeId || historyNodeId !== selection) return [];
+      const rawTrail = Array.isArray(nodeHistory && nodeHistory.positions)
+        ? nodeHistory.positions
+        : [];
+      const points = [];
+      for (const point of rawTrail) {{
+        const lat = Number(point && point.lat);
+        const lon = Number(point && point.lon);
+        if (!isValidMapCoord(lat, lon)) continue;
+        const timeUnix = Number(point && point.time_unix);
+        points.push({{
+          lat,
+          lon,
+          time_unix: Number.isFinite(timeUnix) ? Math.round(timeUnix) : null,
+          time: point && point.time ? String(point.time) : null,
+        }});
+      }}
+      return points;
     }}
 
     function collectNodeLatLngs(nodes) {{
@@ -6353,8 +6419,10 @@ async function applyLoraSettings() {{
       edgeLayer.clearLayers();
       trailLayer.clearLayers();
       nodeMarkers.clear();
-      const features = [];
-      const byId = Object.fromEntries(nodes.map((n) => [normalizeNodeId(n.id), n]));
+      const byId = Object.create(null);
+      for (const node of (nodes || [])) {{
+        byId[normalizeNodeId(node && node.id)] = node;
+      }}
       const historyCapsById = new Map(
         Object.entries((latestState && latestState.history_caps && typeof latestState.history_caps === "object") ? latestState.history_caps : {{}})
           .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
@@ -6374,25 +6442,7 @@ async function applyLoraSettings() {{
         const hasSelectedPosition = !!selectedNode
           && typeof selectedNode.lat === "number"
           && typeof selectedNode.lon === "number";
-        const canUseHistory = !!nodeHistory
-          && normalizeNodeId((nodeHistory && nodeHistory.node_id) || "") === selectionId;
-        const rawTrail = canUseHistory && Array.isArray(nodeHistory.positions)
-          ? nodeHistory.positions
-          : [];
-        const trailPoints = rawTrail
-          .map((point) => {{
-            const lat = Number(point && point.lat);
-            const lon = Number(point && point.lon);
-            const timeUnix = Number(point && point.time_unix);
-            if (!isValidMapCoord(lat, lon)) return null;
-            return {{
-              lat,
-              lon,
-              time_unix: Number.isFinite(timeUnix) ? Math.round(timeUnix) : null,
-              time: point && point.time ? String(point.time) : null,
-            }};
-          }})
-          .filter((point) => point !== null);
+        const trailPoints = collectTrailPoints(nodeHistory, selectionId);
 
         if (trailPoints.length >= 2) {{
           const line = L.polyline(
@@ -6407,7 +6457,6 @@ async function applyLoraSettings() {{
           );
           line.bindTooltip(`Location trail (${{trailPoints.length}} points)`, {{ sticky: true, opacity: 0.9 }});
           line.addTo(trailLayer);
-          features.push(line);
         }}
         if (trailPoints.length > 0) {{
           const endPoint = trailPoints[trailPoints.length - 1];
@@ -6431,7 +6480,6 @@ async function applyLoraSettings() {{
               {{ sticky: true, opacity: 0.88 }}
             );
             marker.addTo(trailLayer);
-            features.push(marker);
           }}
 
           const latestHalo = L.circleMarker([endPoint.lat, endPoint.lon], {{
@@ -6444,7 +6492,6 @@ async function applyLoraSettings() {{
           }});
           latestHalo.bindTooltip(`Newest trail point: ${{endPoint.time || "n/a"}}`, {{ sticky: true, opacity: 0.9 }});
           latestHalo.addTo(trailLayer);
-          features.push(latestHalo);
         }}
 
         if (hasSelectedPosition) {{
@@ -6474,7 +6521,6 @@ async function applyLoraSettings() {{
           }});
           marker.addTo(nodeLayer);
           nodeMarkers.set(normalizeNodeId(selectedNode.id || ""), marker);
-          features.push(marker);
           if (trailPoints.length > 1) {{
             const trailBounds = L.latLngBounds(trailPoints.map((point) => [point.lat, point.lon]));
             trailBounds.extend([selectedNode.lat, selectedNode.lon]);
@@ -6518,7 +6564,6 @@ async function applyLoraSettings() {{
         }});
         marker.addTo(nodeLayer);
         nodeMarkers.set(normalizedId, marker);
-        features.push(marker);
       }}
 
       for (const edge of edges) {{
@@ -6557,30 +6602,11 @@ async function applyLoraSettings() {{
           Ports: ${{(edge.portnums || []).join(", ") || "n/a"}}
         `);
         line.addTo(edgeLayer);
-        features.push(line);
       }}
 
       if (networkSelectionMode) {{
         const selectionId = normalizeNodeId(selectedNodeId || "");
-        const canUseHistory = !!nodeHistory
-          && normalizeNodeId((nodeHistory && nodeHistory.node_id) || "") === selectionId;
-        const rawTrail = canUseHistory && Array.isArray(nodeHistory.positions)
-          ? nodeHistory.positions
-          : [];
-        const trailPoints = rawTrail
-          .map((point) => {{
-            const lat = Number(point && point.lat);
-            const lon = Number(point && point.lon);
-            const timeUnix = Number(point && point.time_unix);
-            if (!isValidMapCoord(lat, lon)) return null;
-            return {{
-              lat,
-              lon,
-              time_unix: Number.isFinite(timeUnix) ? Math.round(timeUnix) : null,
-              time: point && point.time ? String(point.time) : null,
-            }};
-          }})
-          .filter((point) => point !== null);
+        const trailPoints = collectTrailPoints(nodeHistory, selectionId);
 
         if (trailPoints.length >= 2) {{
           const line = L.polyline(
