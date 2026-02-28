@@ -8671,15 +8671,24 @@ async function applyLoraSettings() {{
         }}
       }}
 
-      const messages = baseMessages.filter((msg) => classifyMessageChannel(msg) === activeChatChannel);
-      const feedItems = messages.map((msg) => {{
-        const sourceNode = normalizeNodeId(msg.from);
-        const fallbackNode = normalizeNodeId(msg.to);
-        const primarySelectable = isSelectableNodeId(sourceNode) ? sourceNode : "";
-        const fallbackSelectable = isSelectableNodeId(fallbackNode) ? fallbackNode : "";
-        const nodeId = primarySelectable || fallbackSelectable;
-        const selectableClass = nodeId ? "chat-selectable" : "";
-        const msgTimeUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
+      const directSelectedId = (
+        activeChatChannel === "direct" && isCanonicalNodeId(selectedNodeId)
+      ) ? normalizeNodeId(selectedNodeId) : "";
+      const messages = baseMessages.filter((msg) => {{
+        if (classifyMessageChannel(msg) !== activeChatChannel) return false;
+        if (activeChatChannel !== "direct") return true;
+        if (!isCanonicalNodeId(directSelectedId)) return false;
+        const fromId = normalizeNodeId(msg && msg.from);
+        const toId = normalizeNodeId((msg && msg.to) || (msg && msg.destination));
+        return fromId === directSelectedId || toId === directSelectedId;
+      }});
+      const participantSourceMessages = (activeChatChannel === "direct")
+        ? baseMessages.filter((msg) => classifyMessageChannel(msg) === "direct")
+        : messages;
+      for (const msg of participantSourceMessages) {{
+        const sourceNode = normalizeNodeId(msg && msg.from);
+        const fallbackNode = normalizeNodeId((msg && msg.to) || (msg && msg.destination));
+        const msgTimeUnix = latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at);
         const fromMeta = chatEndpointParts(sourceNode, msgTimeUnix);
         const toMeta = chatEndpointParts(fallbackNode, msgTimeUnix);
         touchParticipant(fromMeta, msgTimeUnix);
@@ -8688,6 +8697,17 @@ async function applyLoraSettings() {{
           touchNodeById(sourceNode, msgTimeUnix);
           touchNodeById(fallbackNode, msgTimeUnix);
         }}
+      }}
+      const feedItems = messages.map((msg) => {{
+        const sourceNode = normalizeNodeId(msg.from);
+        const fallbackNode = normalizeNodeId(msg.to || msg.destination);
+        const primarySelectable = isSelectableNodeId(sourceNode) ? sourceNode : "";
+        const fallbackSelectable = isSelectableNodeId(fallbackNode) ? fallbackNode : "";
+        const nodeId = primarySelectable || fallbackSelectable;
+        const selectableClass = nodeId ? "chat-selectable" : "";
+        const msgTimeUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
+        const fromMeta = chatEndpointParts(sourceNode, msgTimeUnix);
+        const toMeta = chatEndpointParts(fallbackNode, msgTimeUnix);
         const timeText = msg.rx_time || msg.captured_at || "n/a";
         const textHtml = escapeChatText(msg.text || "");
         const textCompact = compactInlineMessage(msg.text || "", 140);
@@ -8827,10 +8847,13 @@ async function applyLoraSettings() {{
       }}
       const feed = document.getElementById("chat-feed");
       if (feed) {{
+        const emptyText = (activeChatChannel === "direct" && !isCanonicalNodeId(directSelectedId))
+          ? "Select a user to view peer-to-peer messages."
+          : `No ${{channelLabel(activeChatChannel).toLowerCase()}} messages yet.`;
         closeReactionPopover(true);
         feed.innerHTML = feedItems.length > 0
           ? feedItems.join("")
-          : `<div class="chat-feed-empty">No ${{channelLabel(activeChatChannel).toLowerCase()}} messages yet.</div>`;
+          : `<div class="chat-feed-empty">${{emptyText}}</div>`;
       }}
 
       const roomList = document.getElementById("chat-room-list");
@@ -8933,7 +8956,14 @@ async function applyLoraSettings() {{
       const caption = document.getElementById("chat-caption");
       if (caption) {{
         const preset = s.modem_preset || "unknown";
-        caption.textContent = `LoRa preset: ${{preset}}. Channel: ${{channelLabel(activeChatChannel)}}. ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.`;
+        const directTargetText = (() => {{
+          if (activeChatChannel !== "direct") return "";
+          if (!isCanonicalNodeId(directSelectedId)) return " Target: none selected.";
+          const node = nodesById.get(directSelectedId);
+          const targetName = preferredNodeName(node) || nodeNameCache.get(directSelectedId) || directSelectedId;
+          return ` Target: ${{targetName}} (${{directSelectedId}}).`;
+        }})();
+        caption.textContent = `LoRa preset: ${{preset}}. Channel: ${{channelLabel(activeChatChannel)}}.${{directTargetText}} ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.`;
       }}
     }}
 
