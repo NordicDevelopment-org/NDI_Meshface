@@ -4170,16 +4170,7 @@
       const pill = document.getElementById("selected-node-pill");
       if (pill) {{
         if (selectedNodeId) {{
-          let nodeName = "";
-          if (latestState && Array.isArray(latestState.nodes)) {{
-            const selectedNode = latestState.nodes.find((node) => (
-              normalizeNodeId(node && node.id) === selectedNodeId
-            ));
-            nodeName = preferredNodeName(selectedNode);
-          }}
-          if (!nodeName) {{
-            nodeName = nodeNameCache.get(selectedNodeId) || "";
-          }}
+          const nodeName = resolveSelectedNodeName();
           pill.textContent = nodeName
             ? `Selected: ${{nodeName}} (${{selectedNodeId}})`
             : `Selected: ${{selectedNodeId}}`;
@@ -4201,6 +4192,33 @@
         btn.disabled = !selectedNodeId;
       }}
       refreshMapCardTitle();
+    }}
+
+    function resolveSelectedNodeName() {{
+      if (!isSelectableNodeId(selectedNodeId)) {{
+        return "";
+      }}
+      if (latestState && Array.isArray(latestState.nodes)) {{
+        const selectedNode = latestState.nodes.find((node) => (
+          normalizeNodeId(node && node.id) === selectedNodeId
+        ));
+        const name = preferredNodeName(selectedNode);
+        if (name) {{
+          return name;
+        }}
+      }}
+      return nodeNameCache.get(selectedNodeId) || "";
+    }}
+
+    function formatSavedViewMapTitle() {{
+      if (!isSelectableNodeId(selectedNodeId)) {{
+        return "Select a node";
+      }}
+      const nodeName = resolveSelectedNodeName();
+      if (nodeName) {{
+        return `${{nodeName}} (${{selectedNodeId}})`;
+      }}
+      return selectedNodeId;
     }}
 
     function setMapCardTitle(text) {{
@@ -4250,7 +4268,7 @@
 
     function refreshMapCardTitle() {{
       if (activeLayoutView === "saved") {{
-        setMapCardTitle("Node Details");
+        setMapCardTitle(formatSavedViewMapTitle());
       }} else if (activeLayoutView === "network") {{
         setMapCardTitle("");
       }} else {{
