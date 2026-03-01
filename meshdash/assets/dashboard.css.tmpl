@@ -1083,6 +1083,29 @@
     .saved-map-splitter.active::before {{
       background: #2f855a;
     }}
+    .saved-map-splitter-head {{
+      display: none;
+      position: relative;
+      cursor: col-resize;
+      pointer-events: auto;
+      touch-action: none;
+      user-select: none;
+    }}
+    .saved-map-splitter-head::before {{
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      transform: translateX(-50%);
+      background: #b8cab9;
+      border-radius: 1px;
+    }}
+    .saved-map-splitter-head:hover::before,
+    .saved-map-splitter-head.active::before {{
+      background: #2f855a;
+    }}
     .saved-node-details-empty {{
       border: 1px dashed #c6d8cc;
       border-radius: 8px;
@@ -2024,6 +2047,10 @@
       grid-column: 1 / span 3;
       grid-row: 2;
       min-height: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      overflow: visible;
     }}
     .layout.view-saved .map-card-head {{
       position: relative;
@@ -2033,19 +2060,39 @@
       gap: 8px;
       border-bottom: 0;
       background: transparent;
-      padding: 8px 10px 0 10px;
+      padding: 0 10px 0 10px;
     }}
     .layout.view-saved .map-card-head::before {{
-      content: "";
+      content: none;
+    }}
+    .layout.view-saved .saved-map-splitter-head {{
       display: block;
       grid-column: 2;
       grid-row: 1;
-      align-self: stretch;
-      border-radius: 8px 8px 0 0;
+      min-height: 0;
       border: 1px solid var(--saved-pane-divider-border);
       border-bottom: 0;
+      border-radius: 8px 8px 0 0;
       background: var(--saved-pane-divider-bg);
-      pointer-events: none;
+      z-index: 2;
+    }}
+    .layout.view-saved .saved-map-splitter-head::before {{
+      top: 0;
+      bottom: 0;
+      background: var(--saved-pane-divider-line);
+    }}
+    .layout.view-saved .saved-map-splitter-head:hover::before,
+    .layout.view-saved .saved-map-splitter-head.active::before {{
+      background: var(--saved-pane-divider-line-active);
+    }}
+    .layout.view-saved .map-card-head .pane-head-title,
+    .layout.view-saved .map-card-head .pane-head-actions {{
+      min-height: 32px;
+      margin: 0;
+      border: 1px solid var(--saved-pane-head-border);
+      border-bottom: 1px solid var(--saved-pane-head-border);
+      border-radius: 8px 8px 0 0;
+      background: var(--saved-pane-head-bg);
     }}
     .layout.view-saved .map-card-head .pane-head-title {{
       grid-column: 1;
@@ -2053,12 +2100,6 @@
       align-items: center;
       justify-content: flex-start;
       gap: 8px;
-      min-height: 32px;
-      margin: 0;
-      border: 0;
-      border-bottom: 1px solid var(--saved-pane-head-border);
-      border-radius: 0;
-      background: transparent;
       padding: 8px 10px 7px 10px;
     }}
     .layout.view-saved .map-card-head #map-card-title-text {{
@@ -2079,12 +2120,6 @@
       justify-content: flex-end;
       gap: 8px;
       flex-wrap: wrap;
-      min-height: 32px;
-      margin: 0;
-      border: 1px solid var(--saved-pane-head-border);
-      border-radius: 8px 8px 0 0;
-      border-bottom: 0;
-      background: var(--saved-pane-head-bg);
       padding: 6px 8px;
     }}
     .layout.view-saved .map .body {{
@@ -4306,6 +4341,17 @@
     [data-theme="dark"] .saved-map-splitter.active::before {{
       background: #79c0ff;
     }}
+    [data-theme="dark"] .saved-map-splitter-head {{
+      border-color: var(--ui-border);
+      background: linear-gradient(180deg, #1a2430, #16202c);
+    }}
+    [data-theme="dark"] .saved-map-splitter-head::before {{
+      background: #44566a;
+    }}
+    [data-theme="dark"] .saved-map-splitter-head:hover::before,
+    [data-theme="dark"] .saved-map-splitter-head.active::before {{
+      background: #79c0ff;
+    }}
     [data-theme="dark"] .network-node-splitter::before {{
       background: #44566a;
     }}
@@ -4549,10 +4595,10 @@
     }}
     [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-title {{
       color: var(--ui-text-soft) !important;
-      border: 0;
+      border: 1px solid var(--saved-pane-head-border);
       border-bottom: 1px solid var(--saved-pane-head-border);
-      border-radius: 0;
-      background: transparent;
+      border-radius: 8px 8px 0 0;
+      background: var(--saved-pane-head-bg);
       padding: 8px 10px 7px 10px;
     }}
     [data-theme="dark"] .map-heatmap-wrap {{
@@ -4715,7 +4761,8 @@
       [data-theme="dark"] .layout.view-saved .saved-node-details {{
         border-top-color: var(--ui-border);
       }}
-      .saved-map-splitter {{
+      .saved-map-splitter,
+      .saved-map-splitter-head {{
         display: none !important;
       }}
       .saved-node-history-splitter {{

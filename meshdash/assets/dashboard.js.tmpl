@@ -5063,50 +5063,63 @@
     }}
 
     function bindSavedNodeSplitter() {{
-      const splitter = document.getElementById("saved-map-splitter");
-      if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;
-      const pane = splitter.parentElement;
+      const handles = [
+        document.getElementById("saved-map-splitter"),
+        document.getElementById("saved-map-splitter-head"),
+      ].filter((el) => el instanceof HTMLElement);
+      if (!handles.length) return;
+      const pane = document.querySelector(".card.map .body");
       if (!(pane instanceof HTMLElement)) return;
-      splitter.dataset.bound = "1";
 
-      splitter.addEventListener("pointerdown", (ev) => {{
-        if (activeLayoutView !== "saved") return;
-        if (window.matchMedia("(max-width: 1100px)").matches) return;
-        ev.preventDefault();
-        splitter.classList.add("active");
-        document.body.classList.add("resizing-panels-x");
-        splitter.setPointerCapture(ev.pointerId);
+      const setActive = (active) => {{
+        for (const handle of handles) {{
+          handle.classList.toggle("active", !!active);
+        }}
+      }};
 
-        const updateFromClientX = (clientX) => {{
-          const rect = pane.getBoundingClientRect();
-          if (rect.width < 120) return;
-          const relativeX = clientX - rect.left;
-          const pct = clampSavedNodePanePct((relativeX / rect.width) * 100);
-          savedNodePanePct = pct;
-          applySavedNodeSplitState();
-          requestMapResize();
-        }};
+      for (const splitter of handles) {{
+        if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") continue;
+        splitter.dataset.bound = "1";
 
-        updateFromClientX(ev.clientX);
+        splitter.addEventListener("pointerdown", (ev) => {{
+          if (activeLayoutView !== "saved") return;
+          if (window.matchMedia("(max-width: 1100px)").matches) return;
+          ev.preventDefault();
+          setActive(true);
+          document.body.classList.add("resizing-panels-x");
+          splitter.setPointerCapture(ev.pointerId);
 
-        const onMove = (moveEv) => {{
-          updateFromClientX(moveEv.clientX);
-        }};
+          const updateFromClientX = (clientX) => {{
+            const rect = pane.getBoundingClientRect();
+            if (rect.width < 120) return;
+            const relativeX = clientX - rect.left;
+            const pct = clampSavedNodePanePct((relativeX / rect.width) * 100);
+            savedNodePanePct = pct;
+            applySavedNodeSplitState();
+            requestMapResize();
+          }};
 
-        const onUp = () => {{
-          splitter.classList.remove("active");
-          document.body.classList.remove("resizing-panels-x");
-          persistSavedNodeSplitState();
-          requestMapResize();
-          splitter.removeEventListener("pointermove", onMove);
-          splitter.removeEventListener("pointerup", onUp);
-          splitter.removeEventListener("pointercancel", onUp);
-        }};
+          updateFromClientX(ev.clientX);
 
-        splitter.addEventListener("pointermove", onMove);
-        splitter.addEventListener("pointerup", onUp);
-        splitter.addEventListener("pointercancel", onUp);
-      }});
+          const onMove = (moveEv) => {{
+            updateFromClientX(moveEv.clientX);
+          }};
+
+          const onUp = () => {{
+            setActive(false);
+            document.body.classList.remove("resizing-panels-x");
+            persistSavedNodeSplitState();
+            requestMapResize();
+            splitter.removeEventListener("pointermove", onMove);
+            splitter.removeEventListener("pointerup", onUp);
+            splitter.removeEventListener("pointercancel", onUp);
+          }};
+
+          splitter.addEventListener("pointermove", onMove);
+          splitter.addEventListener("pointerup", onUp);
+          splitter.addEventListener("pointercancel", onUp);
+        }});
+      }}
     }}
 
     function bindSavedNodeHistorySplitter() {{
