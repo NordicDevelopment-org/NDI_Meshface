@@ -8,6 +8,7 @@ def test_parse_radio_settings_request_defaults_to_empty_objects():
     assert request.lora == {}
     assert request.local == {}
     assert request.module == {}
+    assert request.fixed_position == {}
     assert request.actions == {}
 
 
@@ -41,7 +42,15 @@ def test_parse_radio_settings_request_filters_to_supported_value_shapes():
             "reset_nodedb": "yes",
             "reset_dashboard_db": 1,
             "set_time": "on",
+            "set_fixed_position": 1,
+            "clear_fixed_position": "false",
             "unknown": true
+          },
+          "fixed_position": {
+            "latitude": "44.98",
+            "longitude": -93.26,
+            "altitude": 260,
+            "extra": {"bad": true}
           }
         }
         """
@@ -57,12 +66,27 @@ def test_parse_radio_settings_request_filters_to_supported_value_shapes():
     }
     assert request.local == {"device": {"role": "ROUTER", "is_router": "true"}}
     assert request.module == {"mqtt": {"enabled": True, "address": "mqtt.example.net"}}
-    assert request.actions == {"reset_nodedb": True, "reset_dashboard_db": True, "set_time": True}
+    assert request.fixed_position == {"lat": "44.98", "lon": -93.26, "alt": 260}
+    assert request.actions == {
+        "reset_nodedb": True,
+        "reset_dashboard_db": True,
+        "set_time": True,
+        "set_fixed_position": True,
+        "clear_fixed_position": False,
+    }
 
 
 def test_parse_radio_settings_request_supports_top_level_reset_alias():
-    request = parse_radio_settings_request(b'{"reset_nodedb": "1", "reset_dashboard_db": "true", "set_time": "yes"}')
-    assert request.actions == {"reset_nodedb": True, "reset_dashboard_db": True, "set_time": True}
+    request = parse_radio_settings_request(
+        b'{"reset_nodedb":"1","reset_dashboard_db":"true","set_time":"yes","set_fixed_position":"on","clear_fixed_position":"0"}'
+    )
+    assert request.actions == {
+        "reset_nodedb": True,
+        "reset_dashboard_db": True,
+        "set_time": True,
+        "set_fixed_position": True,
+        "clear_fixed_position": False,
+    }
 
 
 def test_parse_radio_settings_request_rejects_invalid_json():
@@ -89,3 +113,8 @@ def test_parse_radio_settings_request_rejects_non_object_local_module_and_action
 
     with pytest.raises(ValueError, match="Expected 'actions' to be an object"):
         parse_radio_settings_request(b'{"actions": ["not", "an", "object"]}')
+
+
+def test_parse_radio_settings_request_rejects_non_object_fixed_position():
+    with pytest.raises(ValueError, match="Expected 'fixed_position' to be an object"):
+        parse_radio_settings_request(b'{"fixed_position": ["not", "an", "object"]}')

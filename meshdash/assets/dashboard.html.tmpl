@@ -234,6 +234,41 @@
                 <input id="settings-lora-tx-enabled" type="checkbox" />
                 <span>Transmit enabled</span>
               </label>
+
+              <label class="settings-field">
+                <span class="settings-label">Fixed GPS position (lat, lon, alt m)</span>
+                <div class="settings-row">
+                  <input
+                    id="settings-fixed-latitude"
+                    class="settings-input"
+                    type="number"
+                    min="-90"
+                    max="90"
+                    step="0.000001"
+                    placeholder="Latitude"
+                  />
+                  <input
+                    id="settings-fixed-longitude"
+                    class="settings-input"
+                    type="number"
+                    min="-180"
+                    max="180"
+                    step="0.000001"
+                    placeholder="Longitude"
+                  />
+                  <input
+                    id="settings-fixed-altitude"
+                    class="settings-input"
+                    type="number"
+                    step="1"
+                    placeholder="Altitude (m)"
+                  />
+                </div>
+              </label>
+              <div class="settings-row">
+                <button id="settings-set-fixed-position" class="btn btn-secondary" type="button">Set Fixed Position</button>
+                <button id="settings-clear-fixed-position" class="btn btn-secondary" type="button">Clear Fixed Position</button>
+              </div>
             </div>
           </div>
 
@@ -294,7 +329,7 @@
             </div>
           </div>
 
-          <div class="settings-panel">
+          <div class="settings-panel settings-panel-wide">
             <h3>Advanced Config</h3>
             <div class="settings-fields">
               <label class="settings-field">

@@ -14,6 +14,8 @@
         radial-gradient(circle at 80% 0%, #d0e6d4 0, transparent 40%),
         var(--bg);
       min-height: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
     }}
     .topbar {{
       padding: 8px 12px;
@@ -344,7 +346,10 @@
       grid-template-columns: var(--rail-width) minmax(0, 1fr);
       gap: 8px;
       padding: 8px;
-      align-items: start;
+      min-height: calc(100vh - var(--workspace-viewport-offset, 84px));
+      min-height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      background: var(--panel);
+      align-items: stretch;
     }}
     .workspace-shell.chat-panel-open {{
       grid-template-columns: var(--rail-width) minmax(190px, var(--chat-panel-width)) minmax(0, 1fr);
@@ -352,12 +357,18 @@
     .workspace-main {{
       min-width: 0;
       width: 100%;
+      min-height: calc(100vh - var(--workspace-viewport-offset, 84px));
+      min-height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      height: calc(100vh - var(--workspace-viewport-offset, 84px));
+      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
     }}
     .teams-rail {{
       position: sticky;
       top: var(--topbar-sticky-offset, 72px);
+      align-self: stretch;
       height: calc(100vh - var(--workspace-viewport-offset, 84px));
-      min-height: 420px;
+      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      min-height: 0;
       border: 1px solid #c6d6c0;
       border-radius: 10px;
       background: #eef6ee;
@@ -1487,6 +1498,9 @@
       gap: 10px;
       min-height: 0;
     }}
+    .settings-panel.settings-panel-wide {{
+      grid-column: 1 / -1;
+    }}
     .settings-panel h3 {{
       margin: 0;
       font-size: 12px;
@@ -1548,6 +1562,12 @@
       gap: 10px;
       align-items: center;
       margin-top: 12px;
+    }}
+    .layout.view-settings .settings-actions {{
+      margin-top: 10px;
+      padding: 10px 0 2px;
+      border-top: 1px solid var(--line);
+      background: var(--panel);
     }}
     .btn {{
       font-size: 12px;
@@ -2228,12 +2248,18 @@
     .layout.view-data .hsplitter[data-target="low"] {{ grid-row: 3; }}
 
     .layout.view-settings {{
-      height: calc(100vh - var(--workspace-viewport-offset, 84px));
-      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
-      min-height: 560px;
+      height: 100%;
+      min-height: 0;
     }}
     .layout.view-settings .settings {{
       display: flex;
+      min-height: 0;
+    }}
+    .layout.view-settings .settings .body {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow-y: auto;
     }}
     .layout.view-settings .chat,
     .layout.view-settings .nodes,
@@ -2249,9 +2275,7 @@
       display: none !important;
     }}
     .layout.view-settings .console {{
-      display: flex;
-      grid-column: 1 / span 3;
-      grid-row: 10;
+      display: none !important;
     }}
 
     .layout.view-saved {{
@@ -3826,6 +3850,7 @@
     [data-theme="dark"] .workspace-shell,
     [data-theme="dark"] .workspace-main {{
       color: #dbece3;
+      background: var(--ui-bg, #0d1117);
     }}
     [data-theme="dark"] .rail-btn,
     [data-theme="dark"] .chat-channel-item,
@@ -4230,6 +4255,10 @@
     }}
     [data-theme="dark"] a {{
       color: #86ffd2;
+    }}
+    html[data-theme="dark"],
+    html[data-theme="dark"] body {{
+      background: var(--ui-bg) !important;
     }}
     [data-theme="dark"] body {{
       background: linear-gradient(180deg, #0a1016 0%, #0d1117 42%, #0f141b 100%);
@@ -4991,6 +5020,10 @@
         grid-template-rows: auto auto auto;
         gap: 6px;
         padding: 6px;
+      }}
+      .workspace-main {{
+        min-height: 0;
+        height: auto;
       }}
       .teams-rail {{
         position: static;

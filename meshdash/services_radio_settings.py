@@ -44,6 +44,44 @@ def _coerce_float(value: object) -> float:
     return float(value)  # type: ignore[arg-type]
 
 
+def _normalize_fixed_position_payload(payload: Mapping[str, object] | None) -> dict[str, object]:
+    if not payload:
+        return {}
+    out: dict[str, object] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            continue
+        normalized = key.strip().lower()
+        if normalized in {"lat", "latitude"}:
+            out["lat"] = value
+        elif normalized in {"lon", "lng", "longitude"}:
+            out["lon"] = value
+        elif normalized in {"alt", "altitude"}:
+            out["alt"] = value
+    return out
+
+
+def _parse_fixed_position(payload: Mapping[str, object]) -> tuple[float, float, int]:
+    if "lat" not in payload or "lon" not in payload:
+        raise ValueError("Fixed position requires latitude and longitude")
+
+    lat_raw = payload.get("lat")
+    lon_raw = payload.get("lon")
+    alt_raw = payload.get("alt", 0)
+    if isinstance(lat_raw, bool) or isinstance(lon_raw, bool) or isinstance(alt_raw, bool):
+        raise ValueError("Latitude/longitude/altitude must be numeric values")
+
+    lat = _coerce_float(lat_raw)
+    lon = _coerce_float(lon_raw)
+    alt = _coerce_int(alt_raw if alt_raw is not None else 0)
+
+    if lat < -90.0 or lat > 90.0:
+        raise ValueError("Latitude must be between -90 and 90")
+    if lon < -180.0 or lon > 180.0:
+        raise ValueError("Longitude must be between -180 and 180")
+    return lat, lon, alt
+
+
 def _apply_field_update(msg: Any, field_name: str, value: object) -> None:
     """Best-effort apply a field update on a protobuf message.
 
@@ -293,6 +331,7 @@ def apply_radio_settings(
     lora_updates = dict(request.lora or {})
     local_updates = _normalize_section_updates(request.local)
     module_updates = _normalize_section_updates(request.module)
+    fixed_position_updates = _normalize_fixed_position_payload(request.fixed_position)
     actions = dict(request.actions or {})
 
     # Allow clients to submit LoRa updates either in top-level "lora" (legacy)
@@ -306,6 +345,18 @@ def apply_radio_settings(
     reset_nodedb = bool(actions.get("reset_nodedb"))
     reset_dashboard_db = bool(actions.get("reset_dashboard_db"))
     set_time = bool(actions.get("set_time"))
+    set_fixed_position = bool(actions.get("set_fixed_position")) or bool(fixed_position_updates)
+    clear_fixed_position = bool(actions.get("clear_fixed_position"))
+
+    if set_fixed_position and clear_fixed_position:
+        return {"ok": False, "error": "Cannot set and clear fixed position in one request"}
+
+    fixed_position_coords: tuple[float, float, int] | None = None
+    if set_fixed_position:
+        try:
+            fixed_position_coords = _parse_fixed_position(fixed_position_updates)
+        except Exception as exc:
+            return {"ok": False, "error": f"Invalid fixed position: {exc}"}
 
     if (
         not lora_updates
@@ -314,6 +365,8 @@ def apply_radio_settings(
         and not reset_nodedb
         and not reset_dashboard_db
         and not set_time
+        and not set_fixed_position
+        and not clear_fixed_position
     ):
         return {"ok": False, "error": "No settings/actions provided"}
 
@@ -373,6 +426,10 @@ def apply_radio_settings(
         actions_applied.append("reset_dashboard_db")
     if set_time:
         actions_applied.append("set_time")
+    if set_fixed_position:
+        actions_applied.append("set_fixed_position")
+    if clear_fixed_position:
+        actions_applied.append("clear_fixed_position")
 
     if not write_sections and not actions_applied:
         return {
@@ -421,6 +478,21 @@ def apply_radio_settings(
                 if not callable(set_time_fn):
                     return {"ok": False, "error": "Meshtastic node does not support setTime()"}
                 set_time_fn(0)
+
+            if set_fixed_position:
+                set_fixed_position_fn = getattr(node, "setFixedPosition", None)
+                if not callable(set_fixed_position_fn):
+                    return {"ok": False, "error": "Meshtastic node does not support setFixedPosition()"}
+                if fixed_position_coords is None:
+                    return {"ok": False, "error": "Invalid fixed position payload"}
+                lat, lon, alt = fixed_position_coords
+                set_fixed_position_fn(lat, lon, alt)
+
+            if clear_fixed_position:
+                clear_fixed_position_fn = getattr(node, "removeFixedPosition", None)
+                if not callable(clear_fixed_position_fn):
+                    return {"ok": False, "error": "Meshtastic node does not support removeFixedPosition()"}
+                clear_fixed_position_fn()
 
             if reset_nodedb:
                 reset_db = getattr(node, "resetNodeDb", None)

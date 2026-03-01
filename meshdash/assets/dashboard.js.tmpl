@@ -759,7 +759,7 @@
         }}
       }}
       const nextStickyOffset = Math.max(72, Math.ceil(measuredHeight || 0));
-      const nextViewportOffset = nextStickyOffset + 10;
+      const nextViewportOffset = nextStickyOffset;
       if (nextStickyOffset !== topbarStickyOffsetPx) {{
         topbarStickyOffsetPx = nextStickyOffset;
         rootStyle.setProperty("--topbar-sticky-offset", `${{nextStickyOffset}}px`);
@@ -5942,6 +5942,8 @@
       for (const id of [
         "settings-apply-lora",
         "settings-set-time",
+        "settings-set-fixed-position",
+        "settings-clear-fixed-position",
         "settings-reset",
         "settings-apply-local",
         "settings-apply-module",
@@ -6185,6 +6187,68 @@
       }}
     }}
 
+    async function setFixedPosition() {{
+      if (settingsApplyInFlight) return;
+
+      const lat = readNumberValue("settings-fixed-latitude", true);
+      const lon = readNumberValue("settings-fixed-longitude", true);
+      const alt = readNumberValue("settings-fixed-altitude");
+      if (lat == null || lon == null) {{
+        setText("settings-apply-status", "Fixed position requires latitude and longitude.");
+        return;
+      }}
+      if (lat < -90 || lat > 90) {{
+        setText("settings-apply-status", "Latitude must be between -90 and 90.");
+        return;
+      }}
+      if (lon < -180 || lon > 180) {{
+        setText("settings-apply-status", "Longitude must be between -180 and 180.");
+        return;
+      }}
+
+      const payload = {{
+        actions: {{ set_fixed_position: true }},
+        fixed_position: {{
+          lat,
+          lon,
+        }},
+      }};
+      if (alt != null) {{
+        payload.fixed_position.alt = alt;
+      }}
+
+      const ok = await postRadioSettingsPayload(
+        payload,
+        "Setting fixed GPS position on radio…",
+        "fixed GPS position saved"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
+    async function clearFixedPosition() {{
+      if (settingsApplyInFlight) return;
+
+      const confirmed = window.confirm(
+        "Clear fixed GPS position on the radio? The node will stop using a pinned location."
+      );
+      if (!confirmed) return;
+
+      const ok = await postRadioSettingsPayload(
+        {{ actions: {{ clear_fixed_position: true }} }},
+        "Clearing fixed GPS position…",
+        "fixed GPS position cleared"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
     function bindSettingsPanel() {{
       const settingsCard = document.querySelector(".card.settings");
       if (!(settingsCard instanceof HTMLElement) || settingsCard.dataset.bound === "1") return;
@@ -6226,6 +6290,20 @@
       if (setTimeBtn instanceof HTMLButtonElement) {{
         setTimeBtn.addEventListener("click", () => {{
           void setRadioTime();
+        }});
+      }}
+
+      const setFixedPositionBtn = document.getElementById("settings-set-fixed-position");
+      if (setFixedPositionBtn instanceof HTMLButtonElement) {{
+        setFixedPositionBtn.addEventListener("click", () => {{
+          void setFixedPosition();
+        }});
+      }}
+
+      const clearFixedPositionBtn = document.getElementById("settings-clear-fixed-position");
+      if (clearFixedPositionBtn instanceof HTMLButtonElement) {{
+        clearFixedPositionBtn.addEventListener("click", () => {{
+          void clearFixedPosition();
         }});
       }}
 
