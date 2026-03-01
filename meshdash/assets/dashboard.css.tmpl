@@ -830,6 +830,47 @@
     }}
     .metric .label {{ font-size: 10px; color: var(--muted); }}
     .metric .value {{ font-size: 15px; font-weight: 700; margin-top: 2px; line-height: 1.1; }}
+    .metric-ticker {{
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 14px;
+    }}
+    .metric-ticker-delta {{
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      color: #4f6556;
+      white-space: nowrap;
+    }}
+    .metric-ticker-chart {{
+      width: 72px;
+      height: 14px;
+      display: block;
+      flex: 0 0 auto;
+      opacity: 0.95;
+    }}
+    .metric-ticker-chart path {{
+      fill: none;
+      stroke: #8ba79a;
+      stroke-width: 1.7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }}
+    .metric-ticker.trend-up .metric-ticker-delta {{ color: #1f7a4d; }}
+    .metric-ticker.trend-up .metric-ticker-chart path {{ stroke: #2f855a; }}
+    .metric-ticker.trend-down .metric-ticker-delta {{ color: #8b3a3a; }}
+    .metric-ticker.trend-down .metric-ticker-chart path {{ stroke: #b54a4a; }}
+    .metric-ticker.trend-flat .metric-ticker-delta {{ color: #52685a; }}
+    .metric-ticker.trend-flat .metric-ticker-chart path {{ stroke: #90a89a; }}
+    #m-target {{
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
     .summary-updated-row {{
       margin-top: 10px;
       font-size: 12px;
@@ -3324,6 +3365,18 @@
       border-color: #3f9868;
       color: #ebfff3;
     }}
+    [data-theme="dark"] .metric-ticker-delta {{
+      color: #9cb7a8;
+    }}
+    [data-theme="dark"] .metric-ticker-chart path {{
+      stroke: #6e8f7d;
+    }}
+    [data-theme="dark"] .metric-ticker.trend-up .metric-ticker-delta {{ color: #8ee0ad; }}
+    [data-theme="dark"] .metric-ticker.trend-up .metric-ticker-chart path {{ stroke: #6bcf94; }}
+    [data-theme="dark"] .metric-ticker.trend-down .metric-ticker-delta {{ color: #e5a5a5; }}
+    [data-theme="dark"] .metric-ticker.trend-down .metric-ticker-chart path {{ stroke: #d57a7a; }}
+    [data-theme="dark"] .metric-ticker.trend-flat .metric-ticker-delta {{ color: #9cb7a8; }}
+    [data-theme="dark"] .metric-ticker.trend-flat .metric-ticker-chart path {{ stroke: #7b9a89; }}
     [data-theme="dark"] .chat-left-head,
     [data-theme="dark"] .chat-left-section {{
       background: #1b2b22;

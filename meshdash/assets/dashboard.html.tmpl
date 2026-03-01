@@ -104,10 +104,38 @@
       <div class="body">
         <div class="metrics">
           <div class="metric"><div class="label">Target</div><div class="value" id="m-target">n/a</div></div>
-          <div class="metric metric-action" id="metric-known-nodes" role="button" tabindex="0" aria-pressed="false" title="Show online node activity by hour"><div class="label">Known Nodes</div><div class="value" id="m-nodes">0</div></div>
-          <div class="metric"><div class="label">Nodes With Position</div><div class="value" id="m-pos-nodes">0</div></div>
-          <div class="metric"><div class="label">Live Packets</div><div class="value" id="m-live-packets">0</div></div>
-          <div class="metric"><div class="label">Directed Links</div><div class="value" id="m-links">0</div></div>
+          <div class="metric metric-action" id="metric-known-nodes" role="button" tabindex="0" aria-pressed="false" title="Show online node activity by hour">
+            <div class="label">Known Nodes</div>
+            <div class="value" id="m-nodes">0</div>
+            <div class="metric-ticker" id="ticker-nodes" hidden>
+              <span class="metric-ticker-delta" id="ticker-delta-nodes">n/a</span>
+              <svg class="metric-ticker-chart" id="ticker-chart-nodes" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
+            </div>
+          </div>
+          <div class="metric">
+            <div class="label">Nodes With Position</div>
+            <div class="value" id="m-pos-nodes">0</div>
+            <div class="metric-ticker" id="ticker-pos-nodes" hidden>
+              <span class="metric-ticker-delta" id="ticker-delta-pos-nodes">n/a</span>
+              <svg class="metric-ticker-chart" id="ticker-chart-pos-nodes" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
+            </div>
+          </div>
+          <div class="metric">
+            <div class="label">Live Packets</div>
+            <div class="value" id="m-live-packets">0</div>
+            <div class="metric-ticker" id="ticker-live-packets" hidden>
+              <span class="metric-ticker-delta" id="ticker-delta-live-packets">n/a</span>
+              <svg class="metric-ticker-chart" id="ticker-chart-live-packets" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
+            </div>
+          </div>
+          <div class="metric">
+            <div class="label">Directed Links</div>
+            <div class="value" id="m-links">0</div>
+            <div class="metric-ticker" id="ticker-links" hidden>
+              <span class="metric-ticker-delta" id="ticker-delta-links">n/a</span>
+              <svg class="metric-ticker-chart" id="ticker-chart-links" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
+            </div>
+          </div>
           <div class="metric"><div class="label">LoRa Preset</div><div class="value" id="m-modem-preset">n/a</div></div>
           <div class="metric"><div class="label">Uptime (s)</div><div class="value" id="m-uptime">0</div></div>
         </div>

@@ -188,6 +188,9 @@
     const chatRosterMaxEntries = 180;
     const chatFeedMaxEntries = 320;
     const chatPerfEmaAlpha = 0.2;
+    const metricTickerWindowMs = 60 * 60 * 1000;
+    const metricTickerMaxPoints = 180;
+    const metricTickerSeries = new Map();
     // Generated from Unicode emoji-test.txt
     // Source: https://unicode.org/Public/emoji/latest/emoji-test.txt
     // Unicode Emoji Version: 17.0 (2025-08-04, 20:55:31 GMT)
@@ -1699,6 +1702,140 @@
       const el = document.getElementById(id);
       if (!el) return;
       el.textContent = value == null ? "n/a" : String(value);
+    }}
+
+    function formatTickerNumber(value, digits = 0) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "n/a";
+      const fixedDigits = Math.max(0, Math.min(2, Math.floor(Number(digits) || 0)));
+      return fixedDigits > 0 ? numeric.toFixed(fixedDigits) : `${{Math.round(numeric)}}`;
+    }}
+
+    function trimMetricTickerPoints(points, cutoffMs) {{
+      while (points.length > 0) {{
+        const firstMs = Number(points[0] && points[0].ms);
+        if (Number.isFinite(firstMs) && firstMs >= cutoffMs) {{
+          break;
+        }}
+        points.shift();
+      }}
+      while (points.length > metricTickerMaxPoints) {{
+        points.shift();
+      }}
+    }}
+
+    function appendMetricTickerPoint(metricKey, rawValue, nowMs = Date.now()) {{
+      const cleanKey = String(metricKey || "").trim();
+      const value = Number(rawValue);
+      if (!cleanKey || !Number.isFinite(value)) return [];
+      const points = metricTickerSeries.get(cleanKey) || [];
+      points.push({{ ms: nowMs, value }});
+      trimMetricTickerPoints(points, nowMs - metricTickerWindowMs);
+      metricTickerSeries.set(cleanKey, points);
+      return points;
+    }}
+
+    function buildMetricTickerPath(points, width = 72, height = 16, pad = 1.5) {{
+      if (!Array.isArray(points) || points.length === 0) return "";
+      const values = points
+        .map((point) => Number(point && point.value))
+        .filter((value) => Number.isFinite(value));
+      if (values.length === 0) return "";
+      const widthPx = Math.max(4, Number(width) || 72);
+      const heightPx = Math.max(4, Number(height) || 16);
+      const padPx = Math.max(0, Number(pad) || 0);
+      const top = padPx;
+      const bottom = Math.max(top + 1, heightPx - padPx);
+      const usableHeight = Math.max(1, bottom - top);
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const xSpan = Math.max(1, values.length - 1);
+      let d = "";
+      for (let idx = 0; idx < values.length; idx += 1) {{
+        const x = values.length === 1 ? (widthPx / 2) : ((idx / xSpan) * widthPx);
+        const normalized = maxValue === minValue
+          ? 0.5
+          : ((values[idx] - minValue) / (maxValue - minValue));
+        const y = bottom - (normalized * usableHeight);
+        d += `${{idx === 0 ? "M" : "L"}}${{x.toFixed(2)}} ${{y.toFixed(2)}} `;
+      }}
+      if (values.length === 1) {{
+        const x = widthPx / 2;
+        const y = (top + bottom) / 2;
+        d += `L${{x.toFixed(2)}} ${{y.toFixed(2)}}`;
+      }}
+      return d.trim();
+    }}
+
+    function updateMetricTicker(metricKey, rawValue, config = {{}}) {{
+      const container = document.getElementById(config.containerId || "");
+      const deltaEl = document.getElementById(config.deltaId || "");
+      const chart = document.getElementById(config.chartId || "");
+      if (!(container instanceof HTMLElement) || !(deltaEl instanceof HTMLElement) || !(chart instanceof SVGElement)) {{
+        return;
+      }}
+      const value = Number(rawValue);
+      if (!Number.isFinite(value)) {{
+        container.hidden = true;
+        return;
+      }}
+      const points = appendMetricTickerPoint(metricKey, value);
+      if (!Array.isArray(points) || points.length === 0) {{
+        container.hidden = true;
+        return;
+      }}
+
+      const latest = Number(points[points.length - 1] && points[points.length - 1].value);
+      const baseline = Number(points[0] && points[0].value);
+      const delta = latest - baseline;
+      const flatThreshold = Number(config.flatThreshold);
+      const epsilon = Number.isFinite(flatThreshold) ? Math.max(0, flatThreshold) : 0;
+      let trend = "flat";
+      if (delta > epsilon) trend = "up";
+      else if (delta < -epsilon) trend = "down";
+
+      const deltaAbsText = formatTickerNumber(Math.abs(delta), config.digits);
+      const pct = baseline !== 0 ? ((delta / Math.abs(baseline)) * 100) : null;
+      const pctText = Number.isFinite(pct)
+        ? ` (${{pct > 0 ? "+" : ""}}${{Number(pct).toFixed(1)}}%)`
+        : "";
+      if (trend === "flat") {{
+        deltaEl.textContent = `0${{pctText}}`;
+      }} else {{
+        const sign = trend === "up" ? "+" : "-";
+        deltaEl.textContent = `${{sign}}${{deltaAbsText}}${{pctText}}`;
+      }}
+
+      container.classList.remove("trend-up", "trend-down", "trend-flat");
+      container.classList.add(`trend-${{trend}}`);
+      container.hidden = false;
+
+      chart.innerHTML = "";
+      const pathData = buildMetricTickerPath(points, 72, 16, 1.5);
+      if (pathData) {{
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", pathData);
+        chart.appendChild(path);
+      }}
+
+      const firstMs = Number(points[0] && points[0].ms);
+      const rangeMinutes = Number.isFinite(firstMs)
+        ? Math.max(1, Math.round((Date.now() - firstMs) / 60000))
+        : Math.max(1, Math.round(metricTickerWindowMs / 60000));
+      const fromText = formatTickerNumber(baseline, config.digits);
+      const toText = formatTickerNumber(latest, config.digits);
+      container.title = `Trend (${{rangeMinutes}}m): ${{fromText}} -> ${{toText}}`;
+    }}
+
+    function compactTargetMetric(value, maxLen = 44) {{
+      const text = String(value == null ? "n/a" : value).replace(/\\s+/g, " ").trim();
+      if (!text) return "n/a";
+      const serialPrefix = "/dev/serial/by-id/";
+      const compactBase = text.startsWith(serialPrefix) ? text.slice(serialPrefix.length) : text;
+      if (compactBase.length <= maxLen) return compactBase;
+      const suffixLen = Math.max(12, Math.floor(maxLen * 0.45));
+      const prefixLen = Math.max(8, maxLen - suffixLen - 3);
+      return `${{compactBase.slice(0, prefixLen)}}...${{compactBase.slice(-suffixLen)}}`;
     }}
 
     function syncUptimeBase(uptimeSeconds) {{
@@ -6384,12 +6521,42 @@
           targetValue = "Select a node";
         }}
       }}
-      setText("m-target", targetValue);
+      const targetDisplay = compactTargetMetric(targetValue);
+      setText("m-target", targetDisplay);
+      const targetMetric = document.getElementById("m-target");
+      if (targetMetric instanceof HTMLElement) {{
+        const fullTarget = String(targetValue == null ? "" : targetValue).trim();
+        targetMetric.title = fullTarget || "n/a";
+      }}
       setText("m-nodes", s.node_count ?? 0);
       setText("m-pos-nodes", s.nodes_with_position ?? 0);
       setText("m-live-packets", s.live_packet_count ?? 0);
       const realLinks = s.real_edge_count ?? s.edge_count ?? 0;
       setText("m-links", realLinks);
+      updateMetricTicker("nodes", s.node_count ?? 0, {{
+        containerId: "ticker-nodes",
+        deltaId: "ticker-delta-nodes",
+        chartId: "ticker-chart-nodes",
+        digits: 0,
+      }});
+      updateMetricTicker("pos_nodes", s.nodes_with_position ?? 0, {{
+        containerId: "ticker-pos-nodes",
+        deltaId: "ticker-delta-pos-nodes",
+        chartId: "ticker-chart-pos-nodes",
+        digits: 0,
+      }});
+      updateMetricTicker("live_packets", s.live_packet_count ?? 0, {{
+        containerId: "ticker-live-packets",
+        deltaId: "ticker-delta-live-packets",
+        chartId: "ticker-chart-live-packets",
+        digits: 0,
+      }});
+      updateMetricTicker("real_links", realLinks, {{
+        containerId: "ticker-links",
+        deltaId: "ticker-delta-links",
+        chartId: "ticker-chart-links",
+        digits: 0,
+      }});
       setText("m-modem-preset", s.modem_preset || "n/a");
       syncUptimeBase(s.uptime_seconds);
       updateUptimeDisplay();
