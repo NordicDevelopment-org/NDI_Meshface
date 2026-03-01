@@ -2133,6 +2133,7 @@
     }}
     .layout.view-saved .map {{
       --saved-pane-head-bg: #edf6ec;
+      --saved-pane-body-bg: #f6fbf5;
       --saved-pane-head-border: #d2e1d0;
       --saved-pane-divider-bg: linear-gradient(90deg, #f4faf3, #edf5ea);
       --saved-pane-divider-border: #d1e0cb;
@@ -2245,17 +2246,25 @@
       order: 0;
       flex: 0 0 auto;
       min-height: 0;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--saved-pane-head-border);
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
+      background: var(--saved-pane-body-bg);
     }}
     .layout.view-saved .saved-node-search-wrap {{
       display: block;
+      padding: 0;
     }}
     .layout.view-saved .saved-node-details {{
       display: flex;
       flex: 1 1 auto;
       min-height: 0;
-      border-color: var(--saved-pane-head-border);
-      border-top: 0;
-      border-radius: 0 0 8px 8px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
     }}
     .layout.view-saved .saved-map-splitter {{
       display: block;
@@ -4731,6 +4740,7 @@
     }}
     [data-theme="dark"] .layout.view-saved .map {{
       --saved-pane-head-bg: #070d07;
+      --saved-pane-body-bg: #16273a;
       --saved-pane-head-border: #236744;
       --saved-pane-divider-bg: linear-gradient(90deg, #1a2430, #16202c);
       --saved-pane-divider-border: var(--ui-border);
