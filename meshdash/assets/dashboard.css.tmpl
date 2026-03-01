@@ -713,7 +713,7 @@
       border-bottom: 1px solid #d2e1d0;
       background: #edf6ec;
     }}
-    .map-card-head h2 {{
+    .map-card-head .pane-head-title {{
       margin: 0;
       font-size: 11px;
       font-weight: 700;
@@ -789,7 +789,7 @@
       cursor: pointer;
     }}
 
-    .map-card-actions {{
+    .map-card-head .pane-head-actions {{
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -1881,7 +1881,7 @@
     .layout.view-network .map-card-head {{
       justify-content: flex-end;
     }}
-    .layout.view-network .map-card-head h2 {{
+    .layout.view-network .map-card-head .pane-head-title {{
       display: none;
     }}
     .layout.view-network .map-frame {{
@@ -2019,7 +2019,65 @@
       grid-row: 2;
       min-height: 0;
     }}
+    .layout.view-saved .map-card-head {{
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(320px, var(--saved-node-pane-pct)) var(--splitter-size) minmax(320px, 1fr);
+      align-items: stretch;
+      gap: 8px;
+      border-bottom: 0;
+      background: transparent;
+      padding: 8px 10px 0 10px;
+    }}
+    .layout.view-saved .map-card-head::before {{
+      content: "";
+      display: block;
+      grid-column: 2;
+      grid-row: 1;
+      align-self: stretch;
+      border-radius: 8px 8px 0 0;
+      border: 1px solid #d1e0cb;
+      border-bottom: 0;
+      background: linear-gradient(180deg, #f4faf3, #edf5ea);
+      pointer-events: none;
+    }}
+    .layout.view-saved .map-card-head .pane-head-title,
+    .layout.view-saved .map-card-head .pane-head-actions {{
+      border: 1px solid #d2e1d0;
+      border-radius: 8px 8px 0 0;
+      background: #edf6ec;
+      min-height: 32px;
+      border-bottom: 0;
+      margin: 0;
+    }}
+    .layout.view-saved .map-card-head .pane-head-title {{
+      grid-column: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px 7px 10px;
+    }}
+    .layout.view-saved .map-card-head #map-card-title-text {{
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .layout.view-saved .map-card-head .map-title-favorite-btn {{
+      margin-left: auto;
+      transform: none;
+    }}
+    .layout.view-saved .map-card-head .pane-head-actions {{
+      grid-column: 3;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 6px 8px;
+    }}
     .layout.view-saved .map .body {{
+      padding: 0 10px 8px 10px;
       min-height: 0;
       display: grid;
       grid-template-columns: minmax(320px, var(--saved-node-pane-pct)) var(--splitter-size) minmax(320px, 1fr);
@@ -2032,6 +2090,8 @@
       order: 0;
       flex: 0 0 auto;
       min-height: 260px;
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
     }}
     .layout.view-saved .saved-node-details {{
       display: flex;
@@ -2040,12 +2100,20 @@
       order: 0;
       flex: 0 0 auto;
       min-height: 0;
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
     }}
     .layout.view-saved .saved-map-splitter {{
       display: block;
       grid-column: 2;
       grid-row: 1;
       min-height: 0;
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
+    }}
+    .layout.view-saved .saved-map-splitter::before {{
+      top: 0;
+      bottom: 0;
     }}
     .layout.view-saved .saved-node-stack {{
       display: flex;
@@ -4439,11 +4507,29 @@
       background: #121c16;
       border-bottom-color: #2b4336;
     }}
-    [data-theme="dark"] .map-card-head h2 {{
+    [data-theme="dark"] .map-card-head .pane-head-title {{
       color: #d8efe0;
       border: 0;
       background: transparent;
       padding: 0;
+    }}
+    [data-theme="dark"] .layout.view-saved .map-card-head {{
+      background: transparent;
+      border-bottom-color: transparent;
+    }}
+    [data-theme="dark"] .layout.view-saved .map-card-head::before {{
+      border-color: #2b4336;
+      background: linear-gradient(180deg, #1b2b23, #121c16);
+    }}
+    [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-title,
+    [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-actions {{
+      border-color: #2b4336;
+      background: #121c16;
+    }}
+    [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-title {{
+      color: #d8efe0;
+      border-width: 1px;
+      padding: 8px 10px 7px 10px;
     }}
     [data-theme="dark"] .map-heatmap-wrap {{
       background: #16231d;
@@ -4568,9 +4654,42 @@
         height: auto;
         min-height: 0;
       }}
+      .layout.view-saved .map-card-head {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border-bottom: 1px solid #d2e1d0;
+        background: #edf6ec;
+        padding: 8px 10px 7px 10px;
+      }}
+      .layout.view-saved .map-card-head::before {{
+        content: none;
+      }}
+      .layout.view-saved .map-card-head .pane-head-title,
+      .layout.view-saved .map-card-head .pane-head-actions {{
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        min-height: 0;
+        padding: 0;
+      }}
+      [data-theme="dark"] .layout.view-saved .map-card-head {{
+        background: #121c16;
+        border-bottom-color: #2b4336;
+      }}
       .layout.view-saved .map .body {{
         display: flex;
         flex-direction: column;
+      }}
+      .layout.view-saved .map-frame,
+      .layout.view-saved .saved-node-details {{
+        border-top: 1px solid #d7e5d2;
+        border-radius: 8px;
+      }}
+      [data-theme="dark"] .layout.view-saved .map-frame,
+      [data-theme="dark"] .layout.view-saved .saved-node-details {{
+        border-top-color: var(--ui-border);
       }}
       .saved-map-splitter {{
         display: none !important;
