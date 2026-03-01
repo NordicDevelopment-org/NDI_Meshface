@@ -1,185 +1,341 @@
-# Multi-Radio Ingest Plan
+# Multi-Radio Federated Backend Plan (V2, Greenfield)
 
-## Problem
+## Decision
 
-Support more than one radio (serial and/or remote TCP) feeding one dashboard and one history database, without inflating counts or duplicating chat/messages.
+Build a new V2 backend architecture that is allowed to break old assumptions.
 
-## Goals
+1. No backward-compatibility requirement.
+2. No legacy patch constraints.
+3. Prioritize correctness, dedupe integrity, and sync reliability.
 
-1. Ingest from multiple radios in one running dashboard process.
-2. Deduplicate packets across radios before they affect tracker state, chat feed, links, and history rollups.
-3. Preserve source attribution so we can answer "which radio(s) heard this packet?"
-4. Keep backward compatibility with current single-radio CLI and APIs.
+## What We Are Building
 
-## Non-Goals (Initial)
+A backend can run in dual role:
 
-1. Distributed cluster consensus across multiple dashboard hosts.
-2. Perfect dedupe for malformed packets missing sender/id fields.
-3. Rewriting all history tables in one migration.
+1. Local collector:
+   - ingest one or more radios
+   - write to local DB
+2. Uplink contributor:
+   - forward canonical events to another backend
+   - retry until acknowledged
 
-## Current State (Repo)
+And optionally:
 
-1. One interface is opened in `mesh_connection.py` and passed through runtime context.
-2. Runtime subscribes a single tracker receive callback in `meshdash/dashboard_runtime_context.py`.
-3. Packet/chat history writes are append-only:
-   - packets: `meshdash/history_raw_writes.py`
-   - chat: `meshdash/history_raw_writes.py`
-   - packet events + rollups: `meshdash/history_writes.py`
-4. There is no packet identity uniqueness constraint in current schema:
-   - `meshdash/history_schema_tables.py`
+1. Aggregator backend:
+   - accept events from many collectors
+   - dedupe and aggregate globally
+   - serve frontend queries
 
-## Architecture Overview
+Frontend deployment options:
 
-### Phase 1: Multi-Source Input (No Schema Breakage)
+1. Casual mode: connect to a local collector backend.
+2. Aggregated mode: connect to a central aggregator backend.
 
-1. Add a new optional config input for sources:
-   - `--mesh-sources-file /path/to/sources.json`
-2. Keep existing `--mesh-port` and `--mesh-host` behavior:
-   - if no sources file, runtime behaves exactly as today.
-3. Introduce `open_mesh_interfaces(args)`:
-   - returns a source registry and multiple interface objects.
-   - each source has a stable `source_id`.
-4. Runtime callback maps incoming `(packet, interface)` to `source_id`.
+## Core Requirements
 
-Example `sources.json`:
+1. Duplicate receptions from different radios must not inflate canonical counts.
+2. Per-radio and per-backend observations must be preserved for RF insight.
+3. Backend-to-backend sync must be idempotent.
+4. Sync loops must be prevented by design.
+5. Local ingest must continue when upstream is offline.
 
-```json
-{
-  "sources": [
-    { "id": "local-usb", "mode": "serial", "port": "/dev/ttyACM0" },
-    { "id": "garage-tcp", "mode": "tcp", "host": "192.168.1.109", "port": 4403 }
-  ]
-}
-```
+## Consistency Model
 
-### Phase 2: Runtime Dedupe Gate (Primary MVP)
+Eventual consistency with idempotent replay.
 
-1. Compute a canonical identity before tracker storage updates.
-2. Suppress duplicates so duplicate packets do not:
-   - increment live packet counters
-   - duplicate chat entries
-   - inflate link counts and rollups
-3. Keep a bounded in-memory dedupe registry (LRU + TTL window).
+1. Local ingest commits first.
+2. Upstream sync is asynchronous.
+3. Duplicate deliveries are safe.
+4. Ordering is best-effort, not globally strict.
 
-Proposed identity strategy:
+## Event Identity and Dedupe
 
-1. Primary key when available: `from_id + packet_id`.
-2. Duplicate decision: same primary key within a short time window (for example 120-300s) is duplicate.
-3. Fallback key when packet id is missing: hash of stable fields (`from`, `to`, `portnum`, decoded text/payload signature, channel, hop_start, hop_limit).
+Define one canonical event key used everywhere.
 
-Reasoning:
+## Canonical Key (`event_key`)
 
-1. `from + packet_id` is source-independent and catches same mesh packet heard by multiple radios.
-2. Time window avoids false duplicate suppression from very old packet-id reuse.
+Preferred:
 
-### Phase 3: Source Attribution Persistence
+1. `from_id + packet_id + portnum`
 
-Add additive tables (no destructive migration):
+With replay guard:
 
-1. `ingest_sources`
-   - `source_id` primary key
-   - source mode/endpoint metadata
-   - last seen timestamps and status
-2. `packet_sightings`
-   - one row per source observation
-   - includes canonical packet identity key + source id + per-source RSSI/SNR/hops
-   - indexed by packet identity and source id
+1. dedupe window per sender/packet id scope
+2. configurable window duration
 
-Canonical packet/history rows remain one-per-message. Sightings preserve "heard by N radios" detail.
+Fallback when packet id missing:
 
-### Phase 4: Optional Remote Push Mode
+1. stable hash over normalized fields:
+   - `from_id`
+   - `to_id`
+   - `portnum`
+   - `channel`
+   - normalized payload signature
+   - hop metadata
+   - coarse time bucket
 
-If central host cannot directly reach all radios, add optional ingest endpoint:
+Rules:
 
-1. `POST /api/ingest/packet` (token-authenticated)
-2. payload includes packet + `source_id`
-3. central runtime runs same dedupe gate and storage path
+1. Canonical insert is unique on `event_key`.
+2. Observation insert is unique on `(event_key, backend_id, source_id, seen_unix_bucket)`.
 
-This allows remote edge collectors to push into one central DB.
+## Data Model (V2)
 
-## Data Model Changes (Additive)
+Use additive, purpose-built tables for canonical-vs-observation separation.
 
-### New Tables
+## Tables
 
-1. `ingest_sources`
-2. `packet_sightings`
+### `backends`
 
-### Optional Additive Columns (if needed for quick joins)
+1. `backend_id` primary key
+2. `role` (`collector`, `aggregator`, `hybrid`)
+3. `created_unix`
+4. `last_seen_unix`
 
-1. `packets.first_source_id`
-2. `chat.first_source_id`
-3. `packet_events.first_source_id`
+### `sources`
 
-These should be additive only, nullable, and backfilled lazily if needed.
+1. `source_id` primary key
+2. `backend_id` foreign key
+3. `source_mode` (`serial`, `tcp`, `remote`)
+4. `endpoint`
+5. `enabled`
+6. `last_seen_unix`
 
-## Duplicate Handling Details
+### `events_canonical`
 
-1. Dedupe happens before `apply_tracker_storage_updates(...)` in `meshdash/tracker_storage.py` path.
-2. Canonical packet flow:
-   - normal tracker update
-   - normal packet/chat/history writes
-   - optional sighting write
-3. Duplicate packet flow:
-   - skip canonical tracker/history writes
-   - write sighting only (optional by phase)
+1. `event_key` primary key
+2. `origin_backend_id`
+3. canonical packet fields (from/to/port/channel/payload/meta)
+4. `first_seen_unix`
+5. `first_source_id`
 
-Collision/risk handling:
+### `event_observations`
 
-1. Packet-id reuse by a node over long periods is handled by time-windowed dedupe decisions.
-2. Missing packet id uses a weaker fallback key and can still produce occasional duplicates.
-3. Keep dedupe window configurable for tuning.
+1. `id` primary key
+2. `event_key` foreign key
+3. `backend_id`
+4. `source_id`
+5. `seen_unix`
+6. `rx_rssi`
+7. `rx_snr`
+8. `hops`
+9. unique observation guard index
+
+### `sync_peers`
+
+1. `peer_id` primary key
+2. endpoint/auth metadata
+3. enabled flag
+4. last success/failure timestamps
+
+### `sync_outbox`
+
+1. `id` primary key
+2. `peer_id`
+3. `event_key`
+4. serialized envelope
+5. `attempt_count`
+6. `next_attempt_unix`
+7. `last_error`
+8. `acked_unix`
+9. unique index on `(peer_id, event_key)` for idempotent queueing
+
+### `sync_inbox_seen`
+
+1. `peer_id`
+2. `event_key`
+3. `seen_unix`
+4. primary key `(peer_id, event_key)`
+
+Purpose:
+
+1. guarantees idempotent accept on remote ingest endpoint.
+
+## Ingest Pipeline (Collector)
+
+For each received packet:
+
+1. Normalize packet fields.
+2. Compute `event_key`.
+3. Upsert canonical event:
+   - insert if missing
+   - no-op if exists
+4. Insert observation row for this source.
+5. Update rollups only if canonical insert happened now.
+6. Enqueue outbox record(s) for configured peers.
+
+Critical property:
+
+1. Canonical metrics depend on canonical rows, not raw observations.
+
+## Sync Protocol (Backend to Backend)
+
+## Endpoint
+
+1. `POST /sync/v1/events/batch`
+
+Request:
+
+1. list of envelopes with:
+   - `event_key`
+   - `origin_backend_id`
+   - `sender_backend_id`
+   - canonical payload
+   - observation payload subset
+   - `sent_unix`
+
+Response:
+
+1. per-item status:
+   - `acked`
+   - `duplicate`
+   - `rejected`
+2. optional retry hints
+
+## Idempotency Rules
+
+1. Receiver checks `(sender_backend_id, event_key)` in `sync_inbox_seen`.
+2. If seen, return `duplicate` and no mutation.
+3. If unseen, record inbox marker and apply canonical/observation upserts.
+
+## Loop Prevention
+
+1. Envelope includes `origin_backend_id`.
+2. Backend must never forward event back to origin.
+3. Backend must never enqueue same `(peer_id, event_key)` twice.
+4. Optional max relay depth guard.
+
+## Sync Worker
+
+1. Pull due outbox rows by `next_attempt_unix`.
+2. Send batches with size caps.
+3. Mark ACKed rows complete.
+4. Retry failures with exponential backoff and jitter.
+5. Emit queue depth and error metrics.
+
+## Security
+
+V2 minimum:
+
+1. static token auth per peer
+2. TLS required for remote transport
+
+Recommended next:
+
+1. mTLS between backends
+2. per-peer key rotation
+3. signed envelope payload hash
+
+## Observability and Ops
+
+Expose:
+
+1. `GET /api/sync/status`
+2. `GET /api/sources/status`
+3. queue depth, retry rate, last ACK time, per-peer error counters
+4. dedupe hit ratio (canonical skipped vs inserted)
+
+Alerting:
+
+1. outbox age high watermark
+2. sustained peer failures
+3. abnormal dedupe collision/fallback-key rates
 
 ## Implementation Plan
 
-1. Add source config parser and validation.
-2. Add multi-interface open/close manager.
-3. Thread `source_id` through receive pipeline and packet summary builders.
-4. Add runtime dedupe registry and gate before storage updates.
-5. Add tests for dedupe correctness and counter integrity.
-6. Add `ingest_sources` and `packet_sightings` tables plus writes.
-7. Add API payload fields for source status and optional sighting counts.
-8. Add optional remote push ingest endpoint later.
+## Phase 1: V2 Local Canonical Core
 
-## Testing Matrix
+1. Implement canonical key generation.
+2. Create V2 schema tables (`events_canonical`, `event_observations`, `sources`).
+3. Route ingest through canonical-first pipeline.
 
-1. Unit tests:
-   - key generation (primary/fallback)
-   - dedupe window behavior
-   - source id routing from interface to packet handling
-2. Runtime behavior tests:
-   - two sources emit same packet, only one canonical chat/packet entry appears
-   - live counters and link metrics increment once
-3. Persistence tests:
-   - canonical packet stored once
-   - sightings stored per source
-4. Regression tests:
-   - single-source mode unchanged
-   - existing API/state payload still valid when source metadata absent
+Done when:
 
-## Rollout and Rollback
+1. two local radios hearing same packet produce one canonical row and multiple observations.
 
-1. Ship behind feature flag/config:
-   - default single-source behavior
-   - multi-source enabled only when `--mesh-sources-file` is provided
-2. Start with Phase 1+2 in staging.
-3. Verify:
-   - no duplicate chat rows
-   - stable packet/link counters
-   - expected CPU/memory with dedupe cache
-4. Enable source attribution tables and optional UI fields.
-5. Rollback path:
-   - disable multi-source config/flag
-   - keep additive schema; old runtime ignores new tables.
+## Phase 2: Multi-Source Runtime
 
-## Effort Estimate
+1. Add multi-interface source manager.
+2. Attach stable `source_id` to receive path.
+3. Track per-source health.
 
-1. Phase 1+2 MVP: medium, about 2-4 focused development sessions.
-2. Phase 3 source attribution persistence: medium, about 1-3 additional sessions.
-3. Phase 4 remote push ingest mode: medium-high, about 2-4 sessions including auth/hardening.
+Done when:
 
-## Open Questions
+1. mixed serial/tcp local source ingest is stable under load.
 
-1. Should dedupe window be global or per-source/per-port?
-2. Do we want to show "heard by X radios" in UI immediately or later?
-3. Is remote push mode required now, or is direct TCP reachability enough for first delivery?
-4. Should we persist dedupe registry to DB for restart continuity, or keep runtime-only in MVP?
+## Phase 3: Outbox Uplink
+
+1. Add `sync_peers`, `sync_outbox`.
+2. Add retry worker with backoff+jitter.
+3. Add sync status endpoints.
+
+Done when:
+
+1. upstream outages do not impact local ingest and backlog drains on recovery.
+
+## Phase 4: Remote Ingest Endpoint
+
+1. Implement `/sync/v1/events/batch`.
+2. Add inbox idempotency table.
+3. Enforce loop rules.
+
+Done when:
+
+1. replaying same batch is no-op and returns duplicate ACKs.
+
+## Phase 5: Frontend Mode Clarity
+
+1. Add explicit backend mode metadata in API.
+2. Frontend surfaces mode:
+   - local collector
+   - aggregator
+   - hybrid
+
+Done when:
+
+1. operators can clearly see where data is sourced and whether sync is healthy.
+
+## Test Plan
+
+## Unit Tests
+
+1. canonical key generation and fallback behavior
+2. dedupe window semantics
+3. outbox retry scheduling logic
+4. loop-prevention rule checks
+
+## Integration Tests
+
+1. two radios same packet -> one canonical, two observations
+2. collector to aggregator sync -> idempotent insert on repeated deliveries
+3. upstream down -> outbox grows, local queries still correct
+4. recovery -> backlog drains without duplicates
+
+## Fault Injection
+
+1. delayed ACKs
+2. partial batch failures
+3. clock skew across nodes
+4. repeated replay attempts
+
+## Deployment Strategy
+
+No compatibility bridge required. Treat as V2 cutover.
+
+1. deploy V2 backend schema and runtime as a new release line
+2. validate in staging with synthetic multi-radio traffic
+3. promote collector first, then aggregator
+4. monitor queue depth/dedupe metrics before full rollout
+
+Rollback:
+
+1. stop sync workers
+2. run collector-only mode
+3. preserve V2 data for postmortem and retry later
+
+## Open Decisions
+
+1. Final canonical key formula details and time-bucket choice.
+2. Whether aggregator should relay onward or be terminal in V2.
+3. Envelope size limits and compression defaults.
+4. Minimum security baseline accepted for first production rollout.
