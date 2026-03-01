@@ -56,32 +56,21 @@ Eventual consistency with idempotent replay.
 
 Define one canonical event key used everywhere.
 
-## Canonical Key (`event_key`)
+**V2.1 frozen spec:** `docs/MULTI_RADIO_V2_1_FROZEN_SPEC.md`
 
-Preferred:
+## Canonical Key (`event_key`) (V2.1)
 
-1. `from_id + packet_id + portnum`
+Canonical identity is defined by the frozen spec:
 
-With replay guard:
+* primary: `from_num_u32 + packet_id_u32` (sender-assigned, wire-stable)
+* fallback: `from_num_u32 + wire_payload_bytes` hash (only if `packet_id` missing)
+* **no decode-only fields** (e.g. `portnum`) and **no observer-local fields** (e.g. RSSI/SNR/hops/time buckets)
 
-1. dedupe window per sender/packet id scope
-2. configurable window duration
-
-Fallback when packet id missing:
-
-1. stable hash over normalized fields:
-   - `from_id`
-   - `to_id`
-   - `portnum`
-   - `channel`
-   - normalized payload signature
-   - hop metadata
-   - coarse time bucket
-
-Rules:
+Rules (V2.1):
 
 1. Canonical insert is unique on `event_key`.
-2. Observation insert is unique on `(event_key, backend_id, source_id, seen_unix_bucket)`.
+2. Observations are **aggregated** and upserted uniquely on `(event_key, backend_id, source_id)`.
+3. Canonical dedupe horizon is bounded by canonical retention policy (see frozen spec §4).
 
 ## Data Model (V2)
 
@@ -98,7 +87,7 @@ Use additive, purpose-built tables for canonical-vs-observation separation.
 
 ### `sources`
 
-1. `source_id` primary key
+1. composite primary key `(backend_id, source_id)`
 2. `backend_id` foreign key
 3. `source_mode` (`serial`, `tcp`, `remote`)
 4. `endpoint`
@@ -115,19 +104,15 @@ Use additive, purpose-built tables for canonical-vs-observation separation.
 
 ### `event_observations`
 
-1. `id` primary key
-2. `event_key` foreign key
-3. `backend_id`
-4. `source_id`
-5. `seen_unix`
-6. `rx_rssi`
-7. `rx_snr`
-8. `hops`
-9. unique observation guard index
+1. aggregated observation row keyed by `(event_key, backend_id, source_id)`
+2. fields include:
+   - `first_seen_unix`, `last_seen_unix`, `seen_count`
+   - min/max RSSI/SNR (optional)
+   - min/max hops (optional)
 
 ### `sync_peers`
 
-1. `peer_id` primary key
+1. `peer_backend_id` primary key
 2. endpoint/auth metadata
 3. enabled flag
 4. last success/failure timestamps
@@ -135,21 +120,25 @@ Use additive, purpose-built tables for canonical-vs-observation separation.
 ### `sync_outbox`
 
 1. `id` primary key
-2. `peer_id`
-3. `event_key`
-4. serialized envelope
-5. `attempt_count`
-6. `next_attempt_unix`
-7. `last_error`
-8. `acked_unix`
-9. unique index on `(peer_id, event_key)` for idempotent queueing
+2. `peer_backend_id`
+3. `item_type` (V2.1 MVP uses `event` only)
+4. `item_key` (V2.1: `event_key`)
+5. `item_hash` (hash of canonical sync payload)
+6. serialized envelope
+7. `attempt_count`
+8. `next_attempt_unix`
+9. `last_error`
+10. `acked_unix`
+11. unique index on `(peer_backend_id, item_type, item_key)` for **coalescing**
 
 ### `sync_inbox_seen`
 
-1. `peer_id`
-2. `event_key`
-3. `seen_unix`
-4. primary key `(peer_id, event_key)`
+1. `sender_backend_id`
+2. `item_type`
+3. `item_key`
+4. `item_hash`
+5. `seen_unix`
+6. primary key `(sender_backend_id, item_type, item_key, item_hash)`
 
 Purpose:
 
@@ -163,10 +152,9 @@ For each received packet:
 2. Compute `event_key`.
 3. Upsert canonical event:
    - insert if missing
-   - no-op if exists
-4. Insert observation row for this source.
-5. Update rollups only if canonical insert happened now.
-6. Enqueue outbox record(s) for configured peers.
+   - merge/enrich if exists (fill-NULL-only; see frozen spec)
+4. Upsert aggregated observation row for this source.
+5. Enqueue outbox record(s) for configured peers **only when sync-worthy canonical fields change**.
 
 Critical property:
 
@@ -181,11 +169,12 @@ Critical property:
 Request:
 
 1. list of envelopes with:
-   - `event_key`
+   - `item_type` (V2.1 MVP uses `event` only)
+   - `item_key` (V2.1: `event_key`)
+   - `item_hash` (hash of canonical sync payload)
    - `origin_backend_id`
    - `sender_backend_id`
    - canonical payload
-   - observation payload subset
    - `sent_unix`
 
 Response:
@@ -193,21 +182,22 @@ Response:
 1. per-item status:
    - `acked`
    - `duplicate`
+   - `conflict`
    - `rejected`
+   - `retry`
 2. optional retry hints
 
 ## Idempotency Rules
 
-1. Receiver checks `(sender_backend_id, event_key)` in `sync_inbox_seen`.
+1. Receiver checks `(sender_backend_id, item_type, item_key, item_hash)` in `sync_inbox_seen`.
 2. If seen, return `duplicate` and no mutation.
-3. If unseen, record inbox marker and apply canonical/observation upserts.
+3. If unseen, record inbox marker and apply canonical upsert.
 
 ## Loop Prevention
 
 1. Envelope includes `origin_backend_id`.
-2. Backend must never forward event back to origin.
-3. Backend must never enqueue same `(peer_id, event_key)` twice.
-4. Optional max relay depth guard.
+2. In MVP, aggregators are terminal and do not forward any items.
+3. Sender outbox coalesces on `(peer_backend_id, item_type, item_key)`.
 
 ## Sync Worker
 
@@ -339,7 +329,6 @@ Rollback:
 
 ## Open Decisions
 
-1. Final canonical key formula details and time-bucket choice.
-2. Whether aggregator should relay onward or be terminal in V2.
-3. Envelope size limits and compression defaults.
-4. Minimum security baseline accepted for first production rollout.
+1. Envelope size limits and compression defaults.
+2. Minimum security baseline accepted for first production rollout.
+3. Post-MVP: whether to add typed observation sync.

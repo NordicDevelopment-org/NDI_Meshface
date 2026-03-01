@@ -18,7 +18,7 @@ High-confidence findings:
 2. Most useful artifact: `docs/MULTI_RADIO_V2_CODEX_HANDOFF.md` in ZIP.
 3. Key corrections we must enforce in implementation:
    - Canonical key must not depend on decode-only fields.
-   - Sync queue must support typed items (`event`, `observation`).
+   - Sync queue must support typed items (MVP uses `event`; `observation` is post-MVP).
    - Receiver idempotency must key by `sender_backend_id`.
    - ACK must only happen after durable transaction commit.
    - Backpressure must be bounded by policy and metrics.
@@ -61,11 +61,10 @@ MVP deployment:
 Canonical key rules:
 
 1. Primary identity uses stable wire fields:
-   - `from_id`
+   - `from`/`from_id` (sender)
    - `packet_id` (when `> 0`)
-   - channel discriminator (hash/index)
 2. Fallback key (for no packet id) excludes observer-local fields:
-   - include stable sender, destination, channel, payload signature
+   - include stable sender + wire payload signature (encrypted payload bytes)
    - exclude RSSI/SNR/hops/time-bucket from identity
 3. Persist collision anomalies when same key conflicts on payload hash.
 
@@ -76,7 +75,7 @@ Core tables:
 3. `events_canonical`
 4. `event_observations`
 5. `sync_peers`
-6. `sync_outbox` (typed items, per-item idempotency key)
+6. `sync_outbox` (typed items; MVP uses `event`)
 7. `sync_inbox_seen`
 8. `dedupe_collisions` (anomaly log)
 
@@ -138,11 +137,11 @@ Done when:
 
 Deliver:
 
-1. Typed outbox entries (`event`, `observation`) with unique item keys.
+1. Outbox entries for `event` items only (MVP). Observation sync is post-MVP.
 2. Retry worker with backoff + jitter.
 3. Queue bounds:
    - canonical items never dropped
-   - observation degradation policy under pressure
+   - (post-MVP) observation degradation policy under pressure
 
 Done when:
 
@@ -154,7 +153,7 @@ Done when:
 Deliver:
 
 1. `POST /sync/v1/events/batch`.
-2. Idempotency guard on `(sender_backend_id, item_type, item_key)`.
+2. Idempotency guard on `(sender_backend_id, item_type, item_key, item_hash)`.
 3. Single transaction for apply + inbox mark + ACK response state.
 
 Done when:
