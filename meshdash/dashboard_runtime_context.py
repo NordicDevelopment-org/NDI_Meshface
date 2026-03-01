@@ -123,6 +123,18 @@ def build_dashboard_runtime_context(
     tracker = dashboard_tracker_cls(packet_limit=args.packet_limit, history_store=history_store)
     send_lock = lock_factory()
     subscribe_fn(tracker.on_receive, "meshtastic.receive")
+    on_connection_established = getattr(tracker, "on_connection_established", None)
+    if callable(on_connection_established):
+        subscribe_fn(on_connection_established, "meshtastic.connection.established")
+    on_connection_lost = getattr(tracker, "on_connection_lost", None)
+    if callable(on_connection_lost):
+        subscribe_fn(on_connection_lost, "meshtastic.connection.lost")
+    bootstrap_connection_state = getattr(tracker, "bootstrap_connection_state", None)
+    if callable(bootstrap_connection_state):
+        try:
+            bootstrap_connection_state(iface)
+        except Exception:
+            pass
     if bool(getattr(args, "seed_from_node_db", False)):
         seed_tracker_if_empty_fn(tracker, iface, seed_tracker_fn=seed_tracker_fn)
     started_at = now_unix_fn()

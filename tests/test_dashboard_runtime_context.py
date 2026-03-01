@@ -51,12 +51,22 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
         def __init__(self, packet_limit, history_store):
             self.packet_limit = packet_limit
             self.history_store = history_store
+            self.bootstrap_iface = None
 
         def on_receive(self, _packet, _interface):
             return None
 
+        def on_connection_established(self, interface, **_kwargs):
+            return interface
+
+        def on_connection_lost(self, interface, **_kwargs):
+            return interface
+
+        def bootstrap_connection_state(self, iface_obj):
+            self.bootstrap_iface = iface_obj
+
     def _subscribe(callback, topic):
-        calls["subscribe"] = (callback, topic)
+        calls.setdefault("subscribe", []).append((callback, topic))
 
     def _seed_tracker_if_empty(tracker, iface_obj, **kwargs):
         calls["seed_tracker_if_empty"] = (tracker, iface_obj, kwargs)
@@ -132,10 +142,21 @@ def test_build_dashboard_runtime_context_wires_runtime_dependencies():
         "history_db_path": "/abs/state/history.sqlite3",
     }
 
-    subscribe_callback, subscribe_topic = calls["subscribe"]
-    assert subscribe_topic == "meshtastic.receive"
-    assert subscribe_callback.__self__ is context.tracker
-    assert subscribe_callback.__func__.__name__ == "on_receive"
+    subscribe_topics = [topic for _callback, topic in calls["subscribe"]]
+    assert subscribe_topics == [
+        "meshtastic.receive",
+        "meshtastic.connection.established",
+        "meshtastic.connection.lost",
+    ]
+    subscribe_methods = [callback.__func__.__name__ for callback, _topic in calls["subscribe"]]
+    assert subscribe_methods == [
+        "on_receive",
+        "on_connection_established",
+        "on_connection_lost",
+    ]
+    for callback, _topic in calls["subscribe"]:
+        assert callback.__self__ is context.tracker
+    assert context.tracker.bootstrap_iface is iface
 
     seeded_tracker, seeded_iface, seed_kwargs = calls["seed_tracker_if_empty"]
     assert seeded_tracker is context.tracker

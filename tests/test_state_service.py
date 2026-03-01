@@ -734,3 +734,70 @@ def test_build_dashboard_state_coerces_non_mapping_nested_capabilities_to_empty_
 
     assert payload["history_caps"]["!a"] == {}
     assert payload["tracker_capabilities_error"] is None
+
+
+def test_build_dashboard_state_surfaces_tracker_radio_link_loss():
+    tracker = _DummyTracker()
+    tracker.radio_link_connected = False
+    tracker.radio_link_changed_unix = 10
+    tracker.radio_link_error = "connection lost"
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert "radio link lost" in str(payload["tracker_error"])
+
+
+def test_build_dashboard_state_combines_snapshot_and_radio_link_errors():
+    tracker = _FailingTracker()
+    tracker.radio_link_connected = False
+    tracker.radio_link_changed_unix = 10
+    tracker.radio_link_error = "stream disconnected"
+    payload = build_dashboard_state(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert "snapshot boom" in str(payload["tracker_error"])
+    assert "radio link lost" in str(payload["tracker_error"])

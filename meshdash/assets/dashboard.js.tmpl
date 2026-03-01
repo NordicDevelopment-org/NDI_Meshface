@@ -562,6 +562,9 @@
     let latestState = null;
     let stateEtag = "";
     let forceStateReloadOnce = false;
+    let lastPollError = "";
+    let lastPollErrorUnix = 0;
+    let lastPollSuccessUnix = 0;
     let uptimeBaseSeconds = null;
     let uptimeBaseMs = 0;
     let lastMapSignature = "";
@@ -1917,12 +1920,20 @@
       uptimeBaseMs = Date.now();
     }}
 
+    function formatUptimeHms(totalSeconds) {{
+      const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+      const hours = Math.floor(safe / 3600);
+      const minutes = Math.floor((safe % 3600) / 60);
+      const seconds = safe % 60;
+      return `${{String(hours).padStart(2, "0")}}:${{String(minutes).padStart(2, "0")}}:${{String(seconds).padStart(2, "0")}}`;
+    }}
+
     function updateUptimeDisplay() {{
       if (typeof uptimeBaseSeconds !== "number" || !Number.isFinite(uptimeBaseSeconds)) {{
         return;
       }}
       const delta = Math.max(0, (Date.now() - (uptimeBaseMs || 0)) / 1000);
-      setText("m-uptime", Math.floor(uptimeBaseSeconds + delta));
+      setText("m-uptime", formatUptimeHms(uptimeBaseSeconds + delta));
     }}
 
     function normalizeThemeMode(raw) {{
@@ -2143,25 +2154,12 @@
       return clean === "expanded" ? "expanded" : "compact";
     }}
 
-    function updateTickerDensityLabel() {{
-      const btn = document.getElementById("ticker-density-btn");
-      if (!(btn instanceof HTMLButtonElement)) return;
-      const expanded = tickerDensity === "expanded";
-      btn.textContent = expanded ? "Tickers: Expanded" : "Tickers: Compact";
-      btn.title = expanded
-        ? "Collapse summary tickers to save space."
-        : "Expand summary tickers to see larger trend plots.";
-      btn.setAttribute("aria-pressed", expanded ? "true" : "false");
-      btn.setAttribute("aria-label", btn.title);
-    }}
-
     function applyTickerDensity(mode, persist = true) {{
       const normalized = normalizeTickerDensityMode(mode);
       tickerDensity = normalized;
       if (topbarElement instanceof HTMLElement) {{
         topbarElement.classList.toggle("ticker-expanded", normalized === "expanded");
       }}
-      updateTickerDensityLabel();
       requestTopbarLayoutMetricsSync();
       window.setTimeout(() => {{
         requestTopbarLayoutMetricsSync();
@@ -2242,17 +2240,6 @@
           themeMediaQuery.addListener(onThemeChange);
         }}
       }}
-    }}
-
-    function bindTickerDensityToggle() {{
-      const btn = document.getElementById("ticker-density-btn");
-      if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") return;
-      btn.dataset.bound = "1";
-      btn.addEventListener("click", () => {{
-        const next = tickerDensity === "expanded" ? "compact" : "expanded";
-        applyTickerDensity(next, true);
-      }});
-      updateTickerDensityLabel();
     }}
 
     function bindSummaryTickerExpandControl() {{
@@ -2444,6 +2431,166 @@
       el.dataset.freshness = key;
       el.classList.remove("status-online", "status-warn", "status-stale", "status-unknown");
       el.classList.add(`status-${{key}}`);
+    }}
+
+    function trimInlineError(value, maxLen = 120) {{
+      const text = String(value == null ? "" : value).replace(/\\s+/g, " ").trim();
+      if (!text) return "";
+      const limit = Math.max(24, Math.floor(Number(maxLen) || 120));
+      if (text.length <= limit) return text;
+      return `${{text.slice(0, limit - 1)}}…`;
+    }}
+
+    function buildRadioTrafficSnapshot(traffic, localNodeId, nowUnix = Math.floor(Date.now() / 1000), windowSec = 120) {{
+      const packets = Array.isArray(traffic && traffic.recent_packets) ? traffic.recent_packets : [];
+      let rxRecent = 0;
+      let txRecent = 0;
+      let lastPacketUnix = null;
+      const windowSeconds = Math.max(30, Math.floor(Number(windowSec) || 120));
+      for (const packet of packets) {{
+        const summary = (packet && typeof packet.summary === "object") ? packet.summary : packet;
+        const packetUnix = latestUnixTimestamp(
+          summary && summary.captured_at,
+          summary && summary.rx_time,
+          summary && summary.time,
+          packet && packet.captured_at,
+          packet && packet.rx_time,
+          packet && packet.time,
+        );
+        if (Number.isFinite(packetUnix) && packetUnix > 0) {{
+          if (!Number.isFinite(lastPacketUnix) || packetUnix > lastPacketUnix) {{
+            lastPacketUnix = packetUnix;
+          }}
+        }}
+        if (!Number.isFinite(packetUnix) || packetUnix <= 0) continue;
+        if ((nowUnix - packetUnix) > windowSeconds) continue;
+
+        const fromId = normalizeNodeId(
+          summary && (summary.from_id ?? summary.fromId ?? summary.from)
+        );
+        const toId = normalizeNodeId(
+          summary && (summary.to_id ?? summary.toId ?? summary.to)
+        );
+        const isLocalTx = isCanonicalNodeId(localNodeId) && fromId === localNodeId;
+        const isDirectToLocal = isCanonicalNodeId(localNodeId) && toId === localNodeId;
+        const heardFromPeer = isCanonicalNodeId(fromId) && (!isCanonicalNodeId(localNodeId) || fromId !== localNodeId);
+        if (isLocalTx) {{
+          txRecent += 1;
+        }} else if (isDirectToLocal || heardFromPeer) {{
+          rxRecent += 1;
+        }}
+      }}
+      return {{
+        rxRecent,
+        txRecent,
+        lastPacketUnix,
+        windowSeconds,
+      }};
+    }}
+
+    function buildTargetRadioStatus(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const localStateError = trimInlineError(safeState.local_state_error || "");
+      const trackerError = trimInlineError(safeState.tracker_error || "");
+      const pollError = trimInlineError(lastPollError || "");
+      const pollErrorActive = !!pollError
+        && Number.isFinite(lastPollErrorUnix)
+        && lastPollErrorUnix > 0
+        && (nowUnix - lastPollErrorUnix) <= Math.max(120, Math.round((refreshMs / 1000) * 6));
+      const pollSuccessAge = Number.isFinite(lastPollSuccessUnix) && lastPollSuccessUnix > 0
+        ? Math.max(0, nowUnix - lastPollSuccessUnix)
+        : null;
+      const pollLikelyLost = pollErrorActive
+        && (!Number.isFinite(pollSuccessAge) || pollSuccessAge > Math.max(20, Math.round((refreshMs / 1000) * 4)));
+
+      const localId = resolveLocalNodeId(safeState);
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
+      const trafficSnap = buildRadioTrafficSnapshot(traffic, localId, nowUnix, 120);
+      const trafficText = `RX ${{trafficSnap.rxRecent}} / TX ${{trafficSnap.txRecent}} (2m)`;
+      const quietText = Number.isFinite(trafficSnap.lastPacketUnix)
+        ? `quiet, last packet ${{savedDetailAge(trafficSnap.lastPacketUnix, nowUnix)}}`
+        : "quiet, no packets yet";
+
+      const errors = [];
+      if (localStateError) errors.push(`local state: ${{localStateError}}`);
+      if (trackerError) errors.push(`tracker: ${{trackerError}}`);
+      if (pollErrorActive) errors.push(`poll: ${{pollError}}`);
+      const errorSummary = errors.join(" | ");
+      const trackerReportsLost = /radio link lost/i.test(trackerError);
+
+      if (!isCanonicalNodeId(localId)) {{
+        const detail = errorSummary || "local radio id unavailable";
+        return {{
+          key: "lost",
+          text: `Radio: Lost - ${{detail}}`,
+          title: `Local radio unavailable. ${{detail}}`,
+        }};
+      }}
+
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const selfNode = nodes.find((node) => normalizeNodeId(node && node.id) === localId) || null;
+      const historyCapsById = new Map(
+        Object.entries((safeState.history_caps && typeof safeState.history_caps === "object") ? safeState.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
+      const caps = historyCapsById.get(localId) || null;
+      const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
+      const freshness = resolveNodeFreshness(selfNode, caps, null, latestChatTouchByNode.get(localId) || null);
+      const freshnessKey = normalizeFreshnessKey(freshnessStatus(freshness.unix, nowUnix));
+      if (pollLikelyLost) {{
+        const detail = errorSummary || "state polling failed";
+        return {{
+          key: "lost",
+          text: `Radio: Lost - ${{detail}}`,
+          title: `Dashboard polling is stale (${{
+            Number.isFinite(pollSuccessAge) ? `${{pollSuccessAge}}s since last success` : "no successful poll yet"
+          }}). ${{detail}}`,
+        }};
+      }}
+      if (trackerReportsLost) {{
+        const detail = errorSummary || trackerError;
+        return {{
+          key: "lost",
+          text: `Radio: Lost - ${{detail || "radio link lost"}}`,
+          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}}`,
+        }};
+      }}
+
+      let key = freshnessKey;
+      let label = "Unknown";
+      if (freshnessKey === "online") label = "Active";
+      else if (freshnessKey === "warn") label = "Aging";
+      else if (freshnessKey === "stale") label = "Stale";
+
+      const hasTraffic = (trafficSnap.rxRecent + trafficSnap.txRecent) > 0;
+      let text = `Radio: ${{label}} - ${{hasTraffic ? trafficText : quietText}}`;
+      if (errorSummary) {{
+        text += ` - ERR: ${{errorSummary}}`;
+      }}
+      const lastSeenTitle = Number.isFinite(freshness.unix)
+        ? `last seen ${{savedDetailAge(freshness.unix, nowUnix)}}`
+        : "last seen n/a";
+      return {{
+        key,
+        text,
+        title: `${{localId}} | ${{label}} | ${{trafficText}} | ${{lastSeenTitle}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}`,
+      }};
+    }}
+
+    function renderTargetRadioStatus(state = latestState) {{
+      const el = document.getElementById("m-target-radio-status");
+      if (!(el instanceof HTMLElement)) return;
+      const status = buildTargetRadioStatus(state);
+      const cleanKey = String(status && status.key ? status.key : "unknown").toLowerCase();
+      const allowed = new Set(["online", "warn", "stale", "lost", "unknown"]);
+      const key = allowed.has(cleanKey) ? cleanKey : "unknown";
+      el.classList.remove("status-online", "status-warn", "status-stale", "status-lost", "status-unknown");
+      el.classList.add(`status-${{key}}`);
+      el.textContent = status && status.text ? String(status.text) : "Radio: n/a";
+      el.title = status && status.title ? String(status.title) : "Radio status unavailable";
     }}
 
     function computeNodeFreshnessUnix(node, caps = null, chatTouch = null) {{
@@ -6783,6 +6930,7 @@
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
         targetMetric.title = fullTarget || "n/a";
       }}
+      renderTargetRadioStatus(state);
       setText("m-nodes", s.node_count ?? 0);
       setText("m-pos-nodes", s.nodes_with_position ?? 0);
       setText("m-live-packets", s.live_packet_count ?? 0);
@@ -6834,7 +6982,14 @@
       }}
       const err = document.getElementById("local-state-error");
       if (err) {{
-        err.textContent = state.local_state_error ? `  Local state error: ${{state.local_state_error}}` : "";
+        const parts = [];
+        if (state.local_state_error) {{
+          parts.push(`Local state error: ${{trimInlineError(state.local_state_error)}}`);
+        }}
+        if (state.tracker_error) {{
+          parts.push(`Tracker error: ${{trimInlineError(state.tracker_error)}}`);
+        }}
+        err.textContent = parts.length > 0 ? `  ${{parts.join(" | ")}}` : "";
       }}
 
       const revision = s.revision || {{}};
@@ -10358,6 +10513,9 @@
           }}
           // Nothing changed; keep the existing state and skip expensive DOM work.
           // Still allow an on-demand node-history fetch if the user just changed selection.
+          lastPollSuccessUnix = Math.floor(Date.now() / 1000);
+          lastPollError = "";
+          lastPollErrorUnix = 0;
           renderSelfRadioPill(latestState);
           const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
           const historyRelevant304 = (activeLayoutView === "saved" || activeLayoutView === "network")
@@ -10405,6 +10563,9 @@
         }}
         const state = await resp.json();
         latestState = state;
+        lastPollSuccessUnix = Math.floor(Date.now() / 1000);
+        lastPollError = "";
+        lastPollErrorUnix = 0;
         const nextLocalNodeId = resolveLocalNodeId(state);
         if (isCanonicalNodeId(nextLocalNodeId)) {{
           resolvedLocalNodeId = nextLocalNodeId;
@@ -10503,8 +10664,12 @@
 
         tickFreshnessUI(state);
       }} catch (err) {{
-        setText("updated-at", `error: ${{err.message}}`);
-        appendConsoleLine(`error|${{Date.now()}}|${{err.message}}`, `[poll error] ${{err.message}}`);
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        lastPollError = msg;
+        lastPollErrorUnix = Math.floor(Date.now() / 1000);
+        setText("updated-at", `error: ${{msg}}`);
+        renderTargetRadioStatus(latestState || {{}});
+        appendConsoleLine(`error|${{Date.now()}}|${{msg}}`, `[poll error] ${{msg}}`);
       }}
     }}
 
@@ -10548,7 +10713,6 @@
     bindChatComposer();
     bindChatPeerControls();
     bindThemeToggle();
-    bindTickerDensityToggle();
     bindSummaryTickerExpandControl();
     bindThemePresetSelector();
     bindSignalHeatDevApi();

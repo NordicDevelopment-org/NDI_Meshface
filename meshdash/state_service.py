@@ -1,3 +1,4 @@
+import time
 from collections.abc import Mapping
 from typing import Dict, Optional
 
@@ -97,6 +98,30 @@ def _coerce_nested_mapping_rows(
     return out
 
 
+def _tracker_radio_link_error(tracker: object) -> Optional[str]:
+    # Tracker implementations may expose radio link state when available.
+    connected = getattr(tracker, "radio_link_connected", None)
+    if connected is not False:
+        return None
+    changed_raw = getattr(tracker, "radio_link_changed_unix", None)
+    try:
+        changed_unix = int(changed_raw) if changed_raw is not None else None
+    except Exception:
+        changed_unix = None
+    age_text = ""
+    if changed_unix is not None and changed_unix > 0:
+        try:
+            age_seconds = max(0, int(time.time()) - changed_unix)
+            age_text = f" ({age_seconds}s)"
+        except Exception:
+            age_text = ""
+    reason_raw = getattr(tracker, "radio_link_error", None)
+    reason = str(reason_raw).strip() if reason_raw else ""
+    if reason:
+        return f"radio link lost{age_text}: {reason}"
+    return f"radio link lost{age_text}"
+
+
 def build_dashboard_state_typed(
     *,
     iface: object,
@@ -152,6 +177,9 @@ def build_dashboard_state_typed(
         tracker_data = empty_tracker_snapshot()
         if tracker_error is None:
             tracker_error = str(exc)
+    radio_link_error = _tracker_radio_link_error(tracker)
+    if radio_link_error:
+        tracker_error = f"{tracker_error} | {radio_link_error}" if tracker_error else radio_link_error
 
     node_saved_counts_raw, node_saved_counts_error = load_tracker_node_saved_counts_safe_fn(tracker)
     try:
