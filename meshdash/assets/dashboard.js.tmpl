@@ -178,6 +178,7 @@
     const chatDirectPeersStorageKey = "meshDashboardDirectPeersV1";
     const chatPerfStorageKey = "meshDashboardChatPerfMetricsV1";
     const themeStorageKey = "meshDashboardThemePreference";
+    const tickerDensityStorageKey = "meshDashboardTickerDensityV1";
     const signalHeatmapStorageKey = "meshDashboardSignalHeatmapEnabledV1";
     const signalHeatmapModeStorageKey = "meshDashboardSignalHeatmapModeV1";
     const themeSettingsEndpoint = "/api/settings/theme";
@@ -616,6 +617,7 @@
     let chatUserSearchQuery = "";
     let chatPeerAddPanelOpen = false;
     let themePreference = "auto";
+    let tickerDensity = "compact";
     let themePresetSelected = "default";
     let settingsDirty = false;
     let settingsDirtyAt = 0;
@@ -1824,6 +1826,7 @@
       const container = document.getElementById(config.containerId || "");
       const deltaEl = document.getElementById(config.deltaId || "");
       const chart = document.getElementById(config.chartId || "");
+      const rateEl = document.getElementById(config.rateId || "");
       if (!(container instanceof HTMLElement) || !(deltaEl instanceof HTMLElement) || !(chart instanceof SVGElement)) {{
         return;
       }}
@@ -1852,19 +1855,26 @@
       const pctText = Number.isFinite(pct)
         ? ` (${{pct > 0 ? "+" : ""}}${{Number(pct).toFixed(1)}}%)`
         : "";
+      let deltaText = "";
       if (trend === "flat") {{
-        deltaEl.textContent = `0${{pctText}}`;
+        deltaText = `0${{pctText}}`;
       }} else {{
         const sign = trend === "up" ? "+" : "-";
-        deltaEl.textContent = `${{sign}}${{deltaAbsText}}${{pctText}}`;
+        deltaText = `${{sign}}${{deltaAbsText}}${{pctText}}`;
       }}
+      deltaEl.textContent = deltaText;
 
       container.classList.remove("trend-up", "trend-down", "trend-flat");
       container.classList.add(`trend-${{trend}}`);
       container.hidden = false;
 
       chart.innerHTML = "";
-      const pathData = buildMetricTickerPath(points, 72, 16, 1.5);
+      const expandedTickerView = topbarElement instanceof HTMLElement && topbarElement.classList.contains("ticker-expanded");
+      const chartWidth = expandedTickerView ? 184 : 72;
+      const chartHeight = expandedTickerView ? 44 : 16;
+      const chartPad = expandedTickerView ? 3 : 1.5;
+      chart.setAttribute("viewBox", `0 0 ${{chartWidth}} ${{chartHeight}}`);
+      const pathData = buildMetricTickerPath(points, chartWidth, chartHeight, chartPad);
       if (pathData) {{
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
         path.setAttribute("d", pathData);
@@ -1875,9 +1885,18 @@
       const rangeMinutes = Number.isFinite(firstMs)
         ? Math.max(1, Math.round((Date.now() - firstMs) / 60000))
         : Math.max(1, Math.round(metricTickerWindowMs / 60000));
+      const rangeHours = Math.max(1 / 60, rangeMinutes / 60);
+      const ratePerHour = delta / rangeHours;
+      const rateAbsText = formatTickerNumber(Math.abs(ratePerHour), Number.isFinite(Number(config.rateDigits)) ? Number(config.rateDigits) : 1);
+      const rateSign = ratePerHour > 0 ? "+" : (ratePerHour < 0 ? "-" : "");
+      const rateText = `${{rateSign}}${{rateAbsText}}/h`;
+      if (rateEl instanceof HTMLElement) {{
+        rateEl.textContent = rateText;
+        rateEl.title = `Rate of change per hour across a ${{rangeMinutes}}m window`;
+      }}
       const fromText = formatTickerNumber(baseline, config.digits);
       const toText = formatTickerNumber(latest, config.digits);
-      container.title = `Trend (${{rangeMinutes}}m): ${{fromText}} -> ${{toText}}`;
+      container.title = `Trend (${{rangeMinutes}}m): ${{fromText}} -> ${{toText}}; delta ${{deltaText}}; rate ${{rateText}}`;
     }}
 
     function compactTargetMetric(value, maxLen = 44) {{
@@ -2119,6 +2138,44 @@
       return "light";
     }}
 
+    function normalizeTickerDensityMode(mode) {{
+      const clean = String(mode || "").trim().toLowerCase();
+      return clean === "expanded" ? "expanded" : "compact";
+    }}
+
+    function updateTickerDensityLabel() {{
+      const btn = document.getElementById("ticker-density-btn");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const expanded = tickerDensity === "expanded";
+      btn.textContent = expanded ? "Tickers: Expanded" : "Tickers: Compact";
+      btn.title = expanded
+        ? "Collapse summary tickers to save space."
+        : "Expand summary tickers to see larger trend plots.";
+      btn.setAttribute("aria-pressed", expanded ? "true" : "false");
+      btn.setAttribute("aria-label", btn.title);
+    }}
+
+    function applyTickerDensity(mode, persist = true) {{
+      const normalized = normalizeTickerDensityMode(mode);
+      tickerDensity = normalized;
+      if (topbarElement instanceof HTMLElement) {{
+        topbarElement.classList.toggle("ticker-expanded", normalized === "expanded");
+      }}
+      updateTickerDensityLabel();
+      requestTopbarLayoutMetricsSync();
+      window.setTimeout(() => {{
+        requestTopbarLayoutMetricsSync();
+      }}, 170);
+      if (latestState) {{
+        renderSummary(latestState);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(tickerDensityStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
     function updateThemeToggleLabel(resolvedTheme) {{
       const btn = document.getElementById("theme-toggle-btn");
       if (!(btn instanceof HTMLButtonElement)) return;
@@ -2187,6 +2244,31 @@
       }}
     }}
 
+    function bindTickerDensityToggle() {{
+      const btn = document.getElementById("ticker-density-btn");
+      if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {{
+        const next = tickerDensity === "expanded" ? "compact" : "expanded";
+        applyTickerDensity(next, true);
+      }});
+      updateTickerDensityLabel();
+    }}
+
+    function bindSummaryTickerExpandControl() {{
+      const row = document.querySelector(".summary-ticker-row");
+      if (!(row instanceof HTMLElement) || row.dataset.expandBound === "1") return;
+      row.dataset.expandBound = "1";
+      row.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest(".summary-ticker-item");
+        if (!(item instanceof HTMLElement) || !row.contains(item)) return;
+        const next = tickerDensity === "expanded" ? "compact" : "expanded";
+        applyTickerDensity(next, true);
+      }});
+    }}
+
     function loadThemePreference() {{
       let stored = "auto";
       try {{
@@ -2194,6 +2276,15 @@
       }} catch (_err) {{
       }}
       applyThemePreference(stored, false);
+    }}
+
+    function loadTickerDensityPreference() {{
+      let stored = "compact";
+      try {{
+        stored = window.localStorage.getItem(tickerDensityStorageKey) || "compact";
+      }} catch (_err) {{
+      }}
+      applyTickerDensity(stored, false);
     }}
 
     function persistSignalHeatmapPreference() {{
@@ -6700,24 +6791,28 @@
       updateMetricTicker("nodes", s.node_count ?? 0, {{
         containerId: "ticker-nodes",
         deltaId: "ticker-delta-nodes",
+        rateId: "ticker-rate-nodes",
         chartId: "ticker-chart-nodes",
         digits: 0,
       }});
       updateMetricTicker("pos_nodes", s.nodes_with_position ?? 0, {{
         containerId: "ticker-pos-nodes",
         deltaId: "ticker-delta-pos-nodes",
+        rateId: "ticker-rate-pos-nodes",
         chartId: "ticker-chart-pos-nodes",
         digits: 0,
       }});
       updateMetricTicker("live_packets", s.live_packet_count ?? 0, {{
         containerId: "ticker-live-packets",
         deltaId: "ticker-delta-live-packets",
+        rateId: "ticker-rate-live-packets",
         chartId: "ticker-chart-live-packets",
         digits: 0,
       }});
       updateMetricTicker("real_links", realLinks, {{
         containerId: "ticker-links",
         deltaId: "ticker-delta-links",
+        rateId: "ticker-rate-links",
         chartId: "ticker-chart-links",
         digits: 0,
       }});
@@ -10433,6 +10528,7 @@
     loadChatEmojiPickerState();
     loadChatEmojiUsage();
     loadThemePreference();
+    loadTickerDensityPreference();
     bindLayoutNav();
     renderSavedRailStatus();
     bindSplitters();
@@ -10452,6 +10548,8 @@
     bindChatComposer();
     bindChatPeerControls();
     bindThemeToggle();
+    bindTickerDensityToggle();
+    bindSummaryTickerExpandControl();
     bindThemePresetSelector();
     bindSignalHeatDevApi();
     bindSignalHeatmapControl();
