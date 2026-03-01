@@ -3980,7 +3980,7 @@
       }}
     }}
 
-    function buildSavedNodeSearchResults(state, query) {{
+    function buildNodeSearchResults(state, query, limit = 250) {{
       const safeState = state && typeof state === "object" ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       const results = [];
@@ -3993,7 +3993,7 @@
           nodeId,
           name: String(name || nodeId),
         }});
-        if (results.length >= 250) break;
+        if (results.length >= Math.max(1, Number(limit) || 250)) break;
       }}
       return results;
     }}
@@ -4015,9 +4015,9 @@
       }}
 
       const query = normalizeSearchQuery(savedNodeSearchQuery);
-      const rows = buildSavedNodeSearchResults(state, query);
+      const rows = buildNodeSearchResults(state, query, 250);
       if (!rows.length) {{
-        dropdown.innerHTML = '<div class="saved-node-search-empty">No nodes match this search.</div>';
+        dropdown.innerHTML = '<div class="node-search-empty">No nodes match this search.</div>';
         dropdown.hidden = false;
         return;
       }}
@@ -4025,7 +4025,7 @@
       const selectedId = normalizeNodeId(selectedNodeId || "");
       dropdown.innerHTML = rows.map((row) => {{
         const selectedClass = row.nodeId === selectedId ? " selected-node" : "";
-        return `<button type="button" class="saved-node-search-item${{selectedClass}}" data-node-id="${{escAttr(row.nodeId)}}" role="option" aria-selected="${{row.nodeId === selectedId ? "true" : "false"}}"><span class="saved-node-search-name">${{escAttr(row.name)}}</span><span class="saved-node-search-id">${{escAttr(row.nodeId)}}</span></button>`;
+        return `<button type="button" class="node-search-item${{selectedClass}}" data-node-id="${{escAttr(row.nodeId)}}" role="option" aria-selected="${{row.nodeId === selectedId ? "true" : "false"}}"><span class="node-search-name">${{escAttr(row.name)}}</span><span class="node-search-id">${{escAttr(row.nodeId)}}</span></button>`;
       }}).join("");
       dropdown.hidden = false;
     }}
@@ -6648,7 +6648,7 @@
         dropdown.addEventListener("click", (ev) => {{
           const target = ev.target;
           if (!(target instanceof Element)) return;
-          const item = target.closest(".saved-node-search-item");
+          const item = target.closest(".node-search-item");
           if (!(item instanceof HTMLButtonElement)) return;
           const nodeId = normalizeNodeId(item.dataset.nodeId || "");
           if (!isSelectableNodeId(nodeId)) return;
