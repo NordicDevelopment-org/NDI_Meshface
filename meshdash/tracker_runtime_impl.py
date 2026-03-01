@@ -50,6 +50,7 @@ MIN_REAL_LINK_COUNT = 2
 class DashboardTracker:
     def __init__(self, packet_limit: int, history_store: Optional[HistoryStore] = None) -> None:
         self._lock = threading.Lock()
+        self._accept_packets = True
         _initialize_dashboard_tracker_runtime_helper(
             self,
             packet_limit=packet_limit,
@@ -71,8 +72,14 @@ class DashboardTracker:
 
     def on_receive(self, packet: dict[str, object], interface: object) -> None:
         with self._lock:
+            if not self._accept_packets:
+                return
             self.live_packet_count += 1
             self._record_packet_unlocked(packet, interface, include_live_count=True)
+
+    def stop_receiving(self) -> None:
+        with self._lock:
+            self._accept_packets = False
 
     def has_recent_packets(self) -> bool:
         with self._lock:
