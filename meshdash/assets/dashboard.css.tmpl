@@ -1941,6 +1941,13 @@
     }}
 
     .layout.view-network {{
+      --network-pane-head-bg: #edf6ec;
+      --network-pane-body-bg: #f6fbf5;
+      --network-pane-head-border: #d2e1d0;
+      --network-pane-divider-bg: linear-gradient(90deg, #f4faf3, #edf5ea);
+      --network-pane-divider-border: #d1e0cb;
+      --network-pane-divider-line: #b8cab9;
+      --network-pane-divider-line-active: #2f855a;
       height: calc(100vh - var(--workspace-viewport-offset, 84px));
       height: calc(100dvh - var(--workspace-viewport-offset, 84px));
       min-height: 560px;
@@ -1956,15 +1963,22 @@
       grid-column: 1;
       grid-row: 2;
       min-height: 0;
+      border-color: var(--network-pane-head-border);
+    }}
+    .layout.view-network .nodes h2 {{
+      border-bottom-color: var(--network-pane-head-border);
+      background: var(--network-pane-head-bg);
     }}
     .layout.view-network .map {{
       grid-column: 3;
       grid-row: 2;
       min-height: 0;
+      border-color: var(--network-pane-head-border);
     }}
     .layout.view-network .nodes .body {{
       min-height: 0;
       overflow: hidden;
+      background: var(--network-pane-body-bg);
     }}
     .layout.view-network .network-node-stack {{
       flex: 1 1 auto;
@@ -1995,15 +2009,22 @@
     }}
     .layout.view-network .map .body {{
       min-height: 0;
+      background: var(--network-pane-body-bg);
+      padding-top: 0;
     }}
     .layout.view-network .map-card-head {{
       justify-content: flex-end;
+      border-bottom-color: var(--network-pane-head-border);
+      background: var(--network-pane-head-bg);
     }}
     .layout.view-network .map-card-head .pane-head-title {{
       display: none;
     }}
     .layout.view-network .map-frame {{
       min-height: 0;
+      border-color: var(--network-pane-head-border);
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
     }}
     .layout.view-network .map-data,
     .layout.view-network .chat,
@@ -2018,15 +2039,15 @@
     .layout.view-network .splitter {{
       display: block;
       grid-row: 2;
-      border-color: #d1e0cb;
-      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+      border-color: var(--network-pane-divider-border);
+      background: var(--network-pane-divider-bg);
     }}
     .layout.view-network .splitter::before {{
-      background: #b8cab9;
+      background: var(--network-pane-divider-line);
     }}
     .layout.view-network .splitter:hover::before,
     .layout.view-network .splitter.active::before {{
-      background: #2f855a;
+      background: var(--network-pane-divider-line-active);
     }}
 
     .layout.view-packets {{
@@ -4746,6 +4767,15 @@
       --saved-pane-divider-border: var(--ui-border);
       --saved-pane-divider-line: #44566a;
       --saved-pane-divider-line-active: #79c0ff;
+    }}
+    [data-theme="dark"] .layout.view-network {{
+      --network-pane-head-bg: #070d07;
+      --network-pane-body-bg: #16273a;
+      --network-pane-head-border: #236744;
+      --network-pane-divider-bg: linear-gradient(90deg, #1a2430, #16202c);
+      --network-pane-divider-border: var(--ui-border);
+      --network-pane-divider-line: #44566a;
+      --network-pane-divider-line-active: #79c0ff;
     }}
     [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-actions {{
       border-color: var(--saved-pane-head-border);
