@@ -45,6 +45,22 @@ from .state_summary import (
 )
 from .tracker_snapshot_contracts import coerce_tracker_snapshot, empty_tracker_snapshot
 
+_MODEM_PRESET_ENUM_BY_NUMBER: dict[int, str] = {
+    0: "LONG_FAST",
+    1: "LONG_SLOW",
+    2: "VERY_LONG_SLOW",
+    3: "MEDIUM_SLOW",
+    4: "MEDIUM_FAST",
+    5: "SHORT_SLOW",
+    6: "SHORT_FAST",
+    7: "LONG_MODERATE",
+    8: "SHORT_TURBO",
+    9: "LONG_TURBO",
+}
+_MODEM_PRESET_NORMALIZED_KEYS: dict[str, str] = {
+    str(name).replace("_", "").upper(): name for name in _MODEM_PRESET_ENUM_BY_NUMBER.values()
+}
+
 
 def _to_jsonable_safe(
     value: object,
@@ -120,6 +136,89 @@ def _tracker_radio_link_error(tracker: object) -> Optional[str]:
     if reason:
         return f"radio link lost{age_text}: {reason}"
     return f"radio link lost{age_text}"
+
+
+def _normalize_modem_preset(value: object) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            number = int(value)
+        except Exception:
+            number = None
+        if number is not None:
+            mapped = _MODEM_PRESET_ENUM_BY_NUMBER.get(number)
+            if mapped:
+                return mapped
+            return str(number)
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+    numeric_text = text
+    if numeric_text.startswith("+"):
+        numeric_text = numeric_text[1:]
+    if numeric_text.isdigit():
+        mapped = _MODEM_PRESET_ENUM_BY_NUMBER.get(int(numeric_text))
+        if mapped:
+            return mapped
+        return numeric_text
+    upper = text.upper()
+    upper = upper.split(".")[-1]
+    upper = upper.replace("MODEMPRESET_", "")
+    upper = upper.replace("CONFIG_LORACONFIG_MODEMPRESET_", "")
+    upper = upper.replace("-", "_").replace(" ", "_")
+    if upper in _MODEM_PRESET_ENUM_BY_NUMBER.values():
+        return upper
+    collapsed = upper.replace("_", "")
+    mapped = _MODEM_PRESET_NORMALIZED_KEYS.get(collapsed)
+    if mapped:
+        return mapped
+    return text
+
+
+def _modem_preset_from_local_config(local_config: object) -> Optional[str]:
+    if not isinstance(local_config, Mapping):
+        return None
+    lora = local_config.get("lora")
+    if isinstance(lora, Mapping):
+        return _normalize_modem_preset(lora.get("modem_preset"))
+    return None
+
+
+def _modem_preset_quick_from_iface(iface: object) -> Optional[str]:
+    """Best-effort lightweight modem preset lookup for lite polling."""
+    local = getattr(iface, "localNode", None)
+    if local is None:
+        get_node = getattr(iface, "getNode", None)
+        if callable(get_node):
+            try:
+                local = get_node("^local")
+            except Exception:
+                local = None
+    if local is None:
+        return None
+
+    local_config = getattr(local, "localConfig", None)
+    from_mapping = _modem_preset_from_local_config(local_config)
+    if from_mapping:
+        return from_mapping
+
+    lora = getattr(local_config, "lora", None)
+    if isinstance(lora, Mapping):
+        preset = _normalize_modem_preset(lora.get("modem_preset"))
+        if preset:
+            return preset
+    elif lora is not None:
+        preset = _normalize_modem_preset(getattr(lora, "modem_preset", None))
+        if preset:
+            return preset
+
+    if isinstance(local, Mapping):
+        return _modem_preset_from_local_config(local.get("local_config"))
+    return None
 
 
 def build_dashboard_state_typed(
@@ -245,7 +344,7 @@ def build_dashboard_state_typed(
         my_info, my_info_error = None, None
         metadata, metadata_error = None, None
         local_state, local_error = {}, None
-        modem_preset = None
+        modem_preset = _modem_preset_quick_from_iface(iface)
     summary_error: Optional[str] = None
     try:
         summary = build_summary_payload_fn(

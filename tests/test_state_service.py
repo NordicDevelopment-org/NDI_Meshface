@@ -2,7 +2,11 @@ from types import MappingProxyType
 
 from meshdash.state_payload_contracts import DashboardStatePayload
 from meshdash.revision import RevisionInfo
-from meshdash.state_service import build_dashboard_state, build_dashboard_state_typed
+from meshdash.state_service import (
+    build_dashboard_state,
+    build_dashboard_state_lite,
+    build_dashboard_state_typed,
+)
 
 
 class _DummyTracker:
@@ -801,3 +805,69 @@ def test_build_dashboard_state_combines_snapshot_and_radio_link_errors():
 
     assert "snapshot boom" in str(payload["tracker_error"])
     assert "radio link lost" in str(payload["tracker_error"])
+
+
+def test_build_dashboard_state_lite_reports_modem_preset_from_iface():
+    tracker = _DummyTracker()
+    local_node = type("_LocalNode", (), {"localConfig": {"lora": {"modem_preset": "MEDIUM_FAST"}}})()
+    iface = type("_Iface", (), {"myInfo": {}, "metadata": {}, "localNode": local_node})()
+
+    payload = build_dashboard_state_lite(
+        iface=iface,
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"modem_preset": kwargs["modem_preset"]},
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["summary"]["modem_preset"] == "MEDIUM_FAST"
+
+
+def test_build_dashboard_state_lite_maps_numeric_modem_preset_enum_to_name():
+    tracker = _DummyTracker()
+    local_node = type("_LocalNode", (), {"localConfig": {"lora": {"modem_preset": 4}}})()
+    iface = type("_Iface", (), {"myInfo": {}, "metadata": {}, "localNode": local_node})()
+
+    payload = build_dashboard_state_lite(
+        iface=iface,
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=True,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"modem_preset": kwargs["modem_preset"]},
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: state,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["summary"]["modem_preset"] == "MEDIUM_FAST"

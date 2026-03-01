@@ -2369,6 +2369,29 @@
       return num / (1024 ** 3);
     }}
 
+    function formatModemPresetLabel(value, fallback = "unknown") {{
+      const raw = String(value == null ? "" : value).trim();
+      if (!raw) return fallback;
+      const enumMap = new Map([
+        ["0", "LONG_FAST"],
+        ["1", "LONG_SLOW"],
+        ["2", "VERY_LONG_SLOW"],
+        ["3", "MEDIUM_SLOW"],
+        ["4", "MEDIUM_FAST"],
+        ["5", "SHORT_SLOW"],
+        ["6", "SHORT_FAST"],
+        ["7", "LONG_MODERATE"],
+        ["8", "SHORT_TURBO"],
+        ["9", "LONG_TURBO"],
+      ]);
+      const canonicalRaw = enumMap.get(raw) || raw;
+      return canonicalRaw
+        .split(/[_\\s]+/)
+        .filter((token) => !!token)
+        .map((token) => `${{token.slice(0, 1).toUpperCase()}}${{token.slice(1).toLowerCase()}}`)
+        .join(" ");
+    }}
+
     function parseDashboardTimeToUnix(value) {{
       const numericRaw = Number(value);
       if (Number.isFinite(numericRaw) && numericRaw > 0) {{
@@ -2712,7 +2735,10 @@
       }}
       const caption = document.getElementById("chat-caption");
       if (caption) {{
-        const preset = (state.summary && state.summary.modem_preset) ? state.summary.modem_preset : "unknown";
+        const preset = formatModemPresetLabel(
+          (state.summary && state.summary.modem_preset) ? state.summary.modem_preset : "",
+          "unknown"
+        );
         caption.textContent = `LoRa preset: ${{preset}}. Channel: ${{channelLabel(activeChatChannel)}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale.`;
       }}
 
@@ -6964,7 +6990,7 @@
         chartId: "ticker-chart-links",
         digits: 0,
       }});
-      setText("m-modem-preset", s.modem_preset || "n/a");
+      setText("m-modem-preset", formatModemPresetLabel(s.modem_preset, "n/a"));
       syncUptimeBase(s.uptime_seconds);
       updateUptimeDisplay();
       setText("updated-at", updatedValue);
@@ -10364,7 +10390,7 @@
 
       const caption = document.getElementById("chat-caption");
       if (caption) {{
-        const preset = s.modem_preset || "unknown";
+        const preset = formatModemPresetLabel(s.modem_preset, "unknown");
         const directTargetText = (() => {{
           if (activeChatChannel !== "direct") return "";
           if (!isCanonicalNodeId(directSelectedId)) return " Target: none selected.";
@@ -10381,6 +10407,11 @@
         }} else {{
           caption.removeAttribute("title");
         }}
+      }}
+      const chatTitle = document.getElementById("chat-title");
+      if (chatTitle instanceof HTMLElement) {{
+        const titlePreset = formatModemPresetLabel(s.modem_preset, "Mesh");
+        chatTitle.textContent = `${{titlePreset}} Chat`;
       }}
     }}
 
