@@ -1079,6 +1079,76 @@
       padding: 8px;
       overflow: hidden;
     }}
+    .saved-node-pane {{
+      display: none;
+      flex: 1 1 auto;
+      min-height: 0;
+      flex-direction: column;
+      gap: 8px;
+    }}
+    .saved-node-search-wrap {{
+      display: none;
+      position: relative;
+      flex: 0 0 auto;
+      padding: 0 0 2px 0;
+    }}
+    .saved-node-search-dropdown {{
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 8;
+      border: 1px solid #c7dac5;
+      border-radius: 8px;
+      background: #ecf7ef;
+      box-shadow: 0 8px 24px rgba(15, 32, 24, 0.2);
+      max-height: 260px;
+      overflow: auto;
+      padding: 4px;
+    }}
+    .saved-node-search-item {{
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: #204233;
+      padding: 6px 7px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      line-height: 1.25;
+    }}
+    .saved-node-search-item:hover,
+    .saved-node-search-item.active {{
+      border-color: #99c5aa;
+      background: #d8efe1;
+      color: #16402c;
+    }}
+    .saved-node-search-item.selected-node {{
+      border-color: #99c5aa;
+      background: #d8efe1;
+      color: #16402c;
+      box-shadow: inset 2px 0 0 #2f855a;
+    }}
+    .saved-node-search-name {{
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+      font-weight: 600;
+    }}
+    .saved-node-search-id {{
+      color: #5d7566;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }}
+    .saved-node-search-empty {{
+      padding: 7px 8px;
+      color: #5d7566;
+      font-size: 11px;
+      line-height: 1.25;
+    }}
     .saved-map-splitter {{
       display: none;
       position: relative;
@@ -2165,12 +2235,20 @@
       border-top: 0;
       border-radius: 0 0 8px 8px;
     }}
-    .layout.view-saved .saved-node-details {{
+    .layout.view-saved .saved-node-pane {{
       display: flex;
       grid-column: 1;
       grid-row: 1;
       order: 0;
       flex: 0 0 auto;
+      min-height: 0;
+    }}
+    .layout.view-saved .saved-node-search-wrap {{
+      display: block;
+    }}
+    .layout.view-saved .saved-node-details {{
+      display: flex;
+      flex: 1 1 auto;
       min-height: 0;
       border-color: var(--saved-pane-head-border);
       border-top: 0;
