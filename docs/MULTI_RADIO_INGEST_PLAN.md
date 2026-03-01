@@ -31,6 +31,10 @@ Frontend deployment options:
 1. Casual mode: connect to a local collector backend.
 2. Aggregated mode: connect to a central aggregator backend.
 
+Primary platform outcome:
+
+1. Any radio on the network can contribute observations/events into the shared database path (directly or via collector-to-aggregator sync).
+
 ## Core Requirements
 
 1. Duplicate receptions from different radios must not inflate canonical counts.

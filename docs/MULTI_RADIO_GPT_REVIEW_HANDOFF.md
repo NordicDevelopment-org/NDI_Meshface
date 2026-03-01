@@ -31,6 +31,7 @@ This is a greenfield V2 plan.
 4. Outbox + ACK sync with replay-safe idempotency.
 5. Loop prevention by `origin_backend_id` and per-peer delivery guards.
 6. Eventual consistency (not strict global ordering).
+7. Network-wide contribution model: any reachable radio can feed the shared database path.
 
 ## Critical Questions Reviewer Must Answer
 
@@ -70,6 +71,7 @@ System intent:
    - upstream contribution to another backend via outbox sync
 4) Optional aggregator backend fan-in
 5) Eventual consistency with idempotent replay and loop prevention
+6) Network-wide contribution where any reachable radio can contribute via collector/aggregator paths
 
 Your output must include:
 1) Top risks ordered by severity, with concrete failure examples
