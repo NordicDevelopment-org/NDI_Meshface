@@ -6207,14 +6207,6 @@
       return {{ didFocus: true, source: interest.source }};
     }}
 
-    function updateKnownNodesMetricState() {{
-      const metric = document.getElementById("metric-known-nodes");
-      if (!(metric instanceof HTMLElement)) return;
-      const active = activeMapDataMode === "activity";
-      metric.classList.toggle("active", active);
-      metric.setAttribute("aria-pressed", active ? "true" : "false");
-    }}
-
     function setMapDataMode(mode) {{
       const normalized = mode === "node" || mode === "activity" ? mode : "live";
       activeMapDataMode = normalized;
@@ -6234,56 +6226,6 @@
           ? "Node History"
           : (normalized === "activity" ? "Online Activity" : "Map Data");
       }}
-      updateKnownNodesMetricState();
-    }}
-
-    function toggleKnownNodesActivityMode() {{
-      if (mapDataFocus === "activity") {{
-        mapDataFocus = "auto";
-        if (latestState) {{
-          let cachedNodeHistory = null;
-          if (isSelectableNodeId(selectedNodeId)) {{
-            const cached = nodeHistoryCache.get(selectedNodeId);
-            if (cached && cached.data) {{
-              cachedNodeHistory = cached.data;
-            }}
-          }}
-          renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
-          // Kick a refresh so we don't wait for the next poll to show node history.
-          void refreshSelectedNodeHistory(false);
-        }} else {{
-          setMapDataMode("live");
-        }}
-        return;
-      }}
-
-      mapDataFocus = "activity";
-      abortNodeHistoryFetch();
-      renderOnlineActivityLoading();
-      fetchOnlineActivity(nodeHistoryHours)
-        .then((data) => {{
-          if (mapDataFocus !== "activity") return;
-          renderOnlineActivity(data);
-        }})
-        .catch((err) => {{
-          if (mapDataFocus !== "activity") return;
-          renderOnlineActivityError(err instanceof Error ? err.message : String(err || "unknown error"));
-        }});
-    }}
-
-    function bindKnownNodesMetricControl() {{
-      const metric = document.getElementById("metric-known-nodes");
-      if (!(metric instanceof HTMLElement) || metric.dataset.bound === "1") return;
-      metric.dataset.bound = "1";
-      metric.addEventListener("click", () => {{
-        toggleKnownNodesActivityMode();
-      }});
-      metric.addEventListener("keydown", (ev) => {{
-        if (ev.key !== "Enter" && ev.key !== " ") return;
-        ev.preventDefault();
-        toggleKnownNodesActivityMode();
-      }});
-      updateKnownNodesMetricState();
     }}
 
     function setHistoryTab(tabName) {{
@@ -10513,7 +10455,6 @@
     bindThemePresetSelector();
     bindSignalHeatDevApi();
     bindSignalHeatmapControl();
-    bindKnownNodesMetricControl();
     bindChatAutoScroll();
     bindRawDataFetch();
     bindSettingsPanel();
