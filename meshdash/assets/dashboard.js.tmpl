@@ -556,6 +556,7 @@
     let nodesTableLastQuery = "";
     let latestState = null;
     let stateEtag = "";
+    let forceStateReloadOnce = false;
     let uptimeBaseSeconds = null;
     let uptimeBaseMs = 0;
     let lastMapSignature = "";
@@ -4728,10 +4729,12 @@
         if (next === "packets" || next === "data" || next === "settings" || next === "all") {{
           renderConsole(latestState.traffic || {{}});
         }}
+      }} else if (next === "network" || next === "all") {{
+        renderNodesPlaceholder("Syncing nodes...");
       }}
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
-      if (next === "chat" || next === "all") {{
+      if (next === "chat" || next === "network" || next === "saved" || next === "all") {{
         requestImmediatePoll(0);
       }}
       if (isMapVisibleLayoutView(next)) {{
@@ -6903,6 +6906,7 @@ async function applyLoraSettings() {{
     }}
 
     function buildNodesTableModel(nodes, query) {{
+      const sourceNodes = Array.isArray(nodes) ? nodes : [];
       const entries = [];
       const state = tableSortState["nodes-table"] || {{ index: 0, dir: "desc" }};
       const sortIndex = Number.isFinite(Number(state.index)) ? Math.trunc(Number(state.index)) : 0;
@@ -6913,7 +6917,7 @@ async function applyLoraSettings() {{
       h = hashMixInt(h, sortIndex);
       h = hashMixStr(h, sortDir);
 
-      for (const node of (nodes || [])) {{
+      for (const node of sourceNodes) {{
         const nodeId = normalizeNodeId(node && node.id);
         const name = nodeLabel(node);
         if (!matchesIdOrNameQuery(nodeId, name, query)) continue;
@@ -6936,6 +6940,11 @@ async function applyLoraSettings() {{
       }}
       h = hashMixInt(h, entries.length);
       return {{ entries, hash: h >>> 0 }};
+    }}
+
+    function renderNodesPlaceholder(message = "Waiting for first state snapshot...") {{
+      const text = String(message == null ? "" : message).trim() || "Waiting for first state snapshot...";
+      fillTable("nodes-table", [`<tr><td colspan="10">${{escAttr(text)}}</td></tr>`]);
     }}
 
     function nodesTableSortRaw(entry, colIndex) {{
@@ -9572,16 +9581,58 @@ async function applyLoraSettings() {{
 
     async function poll() {{
       try {{
-        const stateUrl = "/api/state?lite=1";
+        const stateUrlBase = "/api/state?lite=1";
+        const stateUrl = forceStateReloadOnce
+          ? `${{stateUrlBase}}&_=${{Date.now()}}`
+          : stateUrlBase;
+        forceStateReloadOnce = false;
         const headers = {{}};
-        if (stateEtag) {{
+        if (stateEtag && stateUrl === stateUrlBase) {{
           headers["If-None-Match"] = stateEtag;
         }}
         const resp = await fetch(stateUrl, {{ cache: "no-store", headers }});
         if (resp.status === 304) {{
+          if (!latestState || typeof latestState !== "object") {{
+            // Rare startup edge: conditional/cached response before we have any local snapshot.
+            // Force one cache-busted retry so sidebar panels can hydrate immediately.
+            if (activeLayoutView === "network" || activeLayoutView === "all") {{
+              renderNodesPlaceholder("Syncing nodes...");
+            }}
+            stateEtag = "";
+            forceStateReloadOnce = true;
+            requestImmediatePoll(20);
+            return;
+          }}
           // Nothing changed; keep the existing state and skip expensive DOM work.
           // Still allow an on-demand node-history fetch if the user just changed selection.
           renderSelfRadioPill(latestState);
+          const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
+          const historyRelevant304 = (activeLayoutView === "saved" || activeLayoutView === "network")
+            && mapDataFocus !== "activity"
+            && isSelectableNodeId(selectedNodeId);
+          const cachedHistory304 = historyRelevant304 ? cachedNodeHistory(selectedNodeId) : null;
+          const nodes304 = Array.isArray(latestState.nodes) ? latestState.nodes : [];
+          const traffic304 = (latestState.traffic && typeof latestState.traffic === "object")
+            ? latestState.traffic
+            : {{}};
+          if (activeLayoutView !== "chat") {{
+            renderSummary(latestState);
+          }}
+          if (mapVisible304) {{
+            renderMap(nodes304, traffic304.edges || [], cachedHistory304);
+          }}
+          if (activeLayoutView === "network" || activeLayoutView === "all") {{
+            renderNodes(nodes304);
+          }}
+          if (mapVisible304) {{
+            renderTraffic(traffic304, nodes304, cachedHistory304, null);
+          }}
+          if (activeLayoutView === "saved" || activeLayoutView === "all") {{
+            const loadingId304 = (activeLayoutView === "saved" && historyRelevant304 && !cachedHistory304)
+              ? selectedNodeId
+              : null;
+            renderFavorites(latestState, cachedHistory304, loadingId304);
+          }}
           if ((activeLayoutView === "saved" || activeLayoutView === "network")
             && mapDataFocus !== "activity"
             && isSelectableNodeId(selectedNodeId)) {{
