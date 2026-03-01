@@ -7,6 +7,7 @@ from .history_store_runtime_maintenance import (
     close_history_store as _close_history_store_helper,
     maybe_prune_history_store_unlocked as _maybe_prune_history_store_unlocked_helper,
     prune_history_store_unlocked as _prune_history_store_unlocked_helper,
+    reset_history_store as _reset_history_store_helper,
 )
 from .history_store_chat import (
     load_recent_chat as _load_recent_chat_helper,
@@ -61,6 +62,9 @@ class HistoryStore:
             self,
             prune_unlocked_fn=self._prune_unlocked,
         )
+
+    def reset(self) -> int:
+        return _reset_history_store_helper(self)
 
     def load_recent_packets(self, limit: int) -> list[dict[str, object]]:
         return _load_recent_packets_helper(self, limit)

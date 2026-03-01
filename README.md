@@ -64,14 +64,14 @@ Archived (not active project surface):
   - `pypubsub`
   - `protobuf`
 
-## Quick Start (Run Locally)
+## Linux Quick Start (venv + run)
 
 ```bash
 cd ~/mesh_py
 python3 -m venv .venv
-. .venv/bin/activate
-pip install --upgrade pip
-pip install meshtastic pypubsub protobuf
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install meshtastic pypubsub protobuf
 python mesh_dashboard.py --mesh-host 192.168.1.109 --mesh-tcp-port 4403 --http-host 0.0.0.0 --http-port 8877
 ```
 
@@ -80,7 +80,7 @@ Open:
 - Local machine: `http://127.0.0.1:8877`
 - LAN devices: `http://<your-ip>:8877`
 
-## Windows Quick Start (Local Laptop + USB Radio)
+## Windows Quick Start (PowerShell, venv + run)
 
 This is the simple local mode: plug the Meshtastic radio into your Windows laptop,
 run the backend in a terminal, and open the dashboard in a browser.
@@ -91,12 +91,26 @@ run the backend in a terminal, and open the dashboard in a browser.
 4. Run the dashboard with your radio COM port.
 
 ```powershell
-cd C:\path\to\mesh_py
+cd C:\meshyface\mesh_py-main
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install meshtastic pypubsub protobuf
-python mesh_dashboard.py --mesh-port COM5 --http-host 0.0.0.0 --http-port 8877
+python -m pip install meshtastic pypubsub protobuf
+python .\mesh_dashboard.py --mesh-port COM3 --http-host 0.0.0.0 --http-port 8877
+```
+
+Windows TCP mode (instead of USB serial):
+
+```powershell
+python .\mesh_dashboard.py --mesh-host 192.168.1.109 --mesh-tcp-port 4403 --http-host 0.0.0.0 --http-port 8877
+```
+
+No-activation option (always uses venv Python directly):
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install meshtastic pypubsub protobuf
+.\.venv\Scripts\python.exe .\mesh_dashboard.py --mesh-port COM3 --http-host 0.0.0.0 --http-port 8877
 ```
 
 Open:
@@ -106,11 +120,22 @@ Open:
 
 Notes:
 
-- Replace `COM5` with your actual radio port.
-- If PowerShell blocks activation, run:
-  `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
-  then reopen PowerShell.
+- Replace `COM3` with your actual radio port. On Windows, default serial is now `COM3` if `--mesh-port` is omitted.
+- Add `--no-default-gateway` to force USB-only mode if you have `MESH_GATEWAY_HOST` set in your environment.
 - This mode is intentionally terminal-run only (no Windows service/installer).
+
+### Windows PowerShell gotchas
+
+- `.\.venv\Scripts\Activate.ps1` is the Windows activate path.
+  Linux/macOS uses `.venv/bin/activate` and will fail in PowerShell.
+- If you see `pip is not recognized`, your venv is not active (or pip is not bootstrapped).
+  Use `python -m pip ...` instead of plain `pip`.
+- If activation is blocked, run one of:
+  - `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (persistent for your user)
+  - `Set-ExecutionPolicy -Scope Process Bypass` (current shell only)
+- If pip is missing in the venv:
+  - `python -m ensurepip --upgrade`
+  - `python -m pip install --upgrade pip`
 
 ## Recommended Production Setup (Debian VM + systemd)
 

@@ -7,12 +7,13 @@ def add_default_gateway_args(
     resolved_gateway_host: str,
     resolved_gateway_port: int,
 ) -> None:
+    display_default_host = resolved_gateway_host if str(resolved_gateway_host or "").strip() else "disabled"
     parser.add_argument(
         "--default-gateway-host",
         default=resolved_gateway_host,
         help=(
             "Fallback TCP host for dashboard mode when --mesh-host is not provided "
-            f"(default: {resolved_gateway_host})."
+            f"(default: {display_default_host})."
         ),
     )
     parser.add_argument(

@@ -42,6 +42,7 @@ class DashboardStatePayload:
     history_caps: StateHistoryCaps
     nodes_full: list[StateRow]
     traffic: StateTrafficPayload
+    local_node_id: str = "local"
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -62,6 +63,7 @@ class DashboardStatePayload:
             "history_caps": self.history_caps,
             "nodes_full": self.nodes_full,
             "traffic": self.traffic.as_dict(),
+            "local_node_id": self.local_node_id,
         }
 
 
@@ -121,6 +123,7 @@ def coerce_dashboard_state_payload(
         history_caps=(value.get("history_caps") if isinstance(value.get("history_caps"), dict) else {}),
         nodes_full=(value.get("nodes_full") if isinstance(value.get("nodes_full"), list) else []),
         traffic=coerce_state_traffic_payload(value.get("traffic") or {}),
+        local_node_id=str(value.get("local_node_id") or "local"),
     )
 
 

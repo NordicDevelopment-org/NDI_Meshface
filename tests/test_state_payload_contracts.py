@@ -54,6 +54,7 @@ def test_dashboard_state_payload_as_dict():
     assert out["summary_error"] is None
     assert out["nodes"][0]["id"] == "!a"
     assert out["traffic"]["edges"][0]["from"] == "!a"
+    assert out["local_node_id"] == "local"
 
 
 def test_coerce_state_traffic_payload_accepts_legacy_mapping():
@@ -93,6 +94,19 @@ def test_coerce_dashboard_state_payload_accepts_legacy_mapping():
     assert out.summary["ok"] is True
     assert out.summary_error is None
     assert out.traffic.recent_chat[0]["text"] == "hello"
+    assert out.local_node_id == "local"
+
+
+def test_coerce_dashboard_state_payload_accepts_explicit_local_node_id():
+    out = coerce_dashboard_state_payload(
+        {
+            "generated_at": "2026-02-25T00:00:00Z",
+            "summary": {"ok": True},
+            "traffic": {"edges": [], "port_counts": [], "recent_packets": [], "recent_chat": []},
+            "local_node_id": "!49b54790",
+        }
+    )
+    assert out.local_node_id == "!49b54790"
 
 
 def test_normalize_state_payload_for_api_passthrough_for_non_dashboard_mapping():

@@ -77,7 +77,8 @@ def apply_default_gateway(args: DefaultGatewayArgs, *, default_mesh_port: str) -
         return
     if args.mesh_port != default_mesh_port:
         return
-    if not args.default_gateway_host:
+    gateway_host = str(args.default_gateway_host or "").strip()
+    if not gateway_host:
         return
-    args.mesh_host = args.default_gateway_host
+    args.mesh_host = gateway_host
     args.mesh_tcp_port = args.default_gateway_port

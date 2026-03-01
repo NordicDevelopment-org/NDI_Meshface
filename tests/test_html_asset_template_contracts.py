@@ -15,6 +15,8 @@ _EXPECTED_TEMPLATE_TOKENS = {
         "node_history_max_points",
     },
     "dashboard.html.tmpl": {
+        "app_title",
+        "app_heading",
         "style_css",
         "app_js",
         "revision_title",
@@ -48,6 +50,8 @@ def test_rendered_asset_templates_leave_no_single_token_placeholders():
             "node_history_max_points": 1440,
         },
         "dashboard.html.tmpl": {
+            "app_title": "Meshyface",
+            "app_heading": "Meshyface",
             "style_css": "/* css */",
             "app_js": "// js",
             "revision_title": "Rev title",

@@ -119,7 +119,8 @@ def build_dashboard_runtime_context(
     tracker = dashboard_tracker_cls(packet_limit=args.packet_limit, history_store=history_store)
     send_lock = lock_factory()
     subscribe_fn(tracker.on_receive, "meshtastic.receive")
-    seed_tracker_if_empty_fn(tracker, iface, seed_tracker_fn=seed_tracker_fn)
+    if bool(getattr(args, "seed_from_node_db", False)):
+        seed_tracker_if_empty_fn(tracker, iface, seed_tracker_fn=seed_tracker_fn)
     started_at = now_unix_fn()
     revision_info = revision_info_fn()
 
@@ -160,6 +161,26 @@ def build_dashboard_runtime_context(
         loaders = build_dashboard_runtime_loaders_with_dependencies_fn(
             dependencies=loader_dependencies
         )
+
+    # Optional: attach radio settings application hook.
+    # We hang this off state_fn to avoid threading new dependencies through the
+    # entire server wiring. (Same trick as state_fn.lite.)
+    try:
+        from .services_radio_settings import apply_radio_settings as _apply_radio_settings
+    except Exception:
+        _apply_radio_settings = None
+
+    if _apply_radio_settings is not None:
+        def _apply_radio_settings_fn(request):  # type: ignore[no-redef]
+            return _apply_radio_settings(
+                request,
+                iface=iface,
+                send_lock=send_lock,
+                history_store=history_store,
+                tracker=tracker,
+            )
+
+        setattr(loaders.state_fn, "apply_radio_settings_fn", _apply_radio_settings_fn)
 
     return DashboardRuntimeContext(
         target=target,

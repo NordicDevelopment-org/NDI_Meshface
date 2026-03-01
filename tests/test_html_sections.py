@@ -3,6 +3,8 @@ from meshdash.html_sections import build_html_shell
 
 def test_build_html_shell_injects_style_js_and_header_tokens():
     html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
         style_css="/* style-css */",
         app_js="// app-js",
         revision_title="rev-title",
@@ -14,6 +16,10 @@ def test_build_html_shell_injects_style_js_and_header_tokens():
     )
     assert "<style>\n/* style-css */\n  </style>" in html
     assert "<script>\n// app-js\n  </script>" in html
+    assert "<title>Meshyface</title>" in html
+    assert '<h1 class="topbar-heading">Meshyface' in html
+    assert 'id="self-radio-pill"' in html
+    assert ">n/a<" in html
     assert 'title="rev-title">Rev: test<' in html
     assert "Packet buffer: 250" in html
     assert "Refresh: 3000 ms" in html

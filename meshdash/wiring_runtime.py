@@ -83,6 +83,7 @@ def build_dashboard_runtime_dependencies(
     seed_tracker_fn: SeedTrackerFn,
     revision_info_fn: RevisionInfoFn,
     build_state_fn: BuildStateWithSensitiveFn,
+    build_state_lite_fn: BuildStateWithSensitiveFn | None = None,
     sensitive_field_names: set[str],
     build_node_history_loader_fn: BuildNodeHistoryLoaderFn,
     build_online_activity_loader_fn: BuildOnlineActivityLoaderFn,
@@ -105,6 +106,17 @@ def build_dashboard_runtime_dependencies(
         build_state_fn=build_state_fn,
         sensitive_field_names=sensitive_field_names,
     )
+    if build_state_lite_fn is not None:
+        build_state_lite_with_sensitive_fields = _build_state_builder_helper(
+            build_state_fn=build_state_lite_fn,
+            sensitive_field_names=sensitive_field_names,
+        )
+        # Attach the lite builder so downstream components can opt into it
+        # without expanding every Protocol/dataclass.
+        try:
+            setattr(build_state_with_sensitive_fields, "lite", build_state_lite_with_sensitive_fields)
+        except Exception:
+            pass
     send_reaction_packet = _build_reaction_sender_helper(
         send_emoji_reaction_packet_fn=send_emoji_reaction_packet_fn,
         mesh_pb2_module=mesh_pb2_module,

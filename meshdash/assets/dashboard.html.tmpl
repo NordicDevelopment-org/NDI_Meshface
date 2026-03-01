@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Meshtastic Dashboard</title>
+  <title>{app_title}</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -16,7 +16,7 @@
 </head>
 <body>
   <div class="topbar">
-    <h1>Meshtastic Deep Dashboard</h1>
+    <h1 class="topbar-heading">{app_heading}<span id="self-radio-pill" class="pill self-radio-pill" title="Connected local radio">n/a</span></h1>
     <div class="sub">
       <div class="sub-main">
         <span id="revision-text" class="sub-text revision-text" title="{revision_title}">{revision_label}</span>
@@ -57,6 +57,7 @@
       <button class="rail-btn" data-view="saved" type="button" title="Node details and saved nodes">Node</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
       <button class="rail-btn" data-view="data" type="button" title="Raw node/config views">Data</button>
+      <button class="rail-btn" data-view="settings" type="button" title="Radio + dashboard settings">Settings</button>
       <button class="rail-btn" data-view="all" type="button" title="Show every panel">All</button>
     </aside>
     <aside id="chat-left-panel" class="chat-left-panel" hidden aria-label="Chat roster">
@@ -69,7 +70,25 @@
         <div id="chat-channel-list" class="chat-channel-list"></div>
       </div>
       <div class="chat-left-section chat-users-section">
-        <div id="chat-users-title" class="chat-left-label">Users</div>
+        <div class="chat-users-head">
+          <div id="chat-users-title" class="chat-left-label">Users</div>
+          <button id="chat-peer-add-toggle-btn" class="chat-peer-add-toggle-btn" type="button" title="Add a peer-to-peer user" hidden>Add</button>
+        </div>
+        <div id="chat-peer-add-panel" class="chat-peer-add-panel" hidden>
+          <div class="chat-peer-add-row">
+            <select id="chat-peer-detected-select" class="chat-peer-input" aria-label="Detected node"></select>
+            <button id="chat-peer-add-detected-btn" class="chat-peer-add-btn" type="button">Add detected</button>
+          </div>
+          <div class="chat-peer-add-row">
+            <input id="chat-peer-manual-input" class="chat-peer-input" type="text" placeholder="Node ID (e.g. !49b54790)" autocomplete="off" spellcheck="false" />
+            <button id="chat-peer-add-manual-btn" class="chat-peer-add-btn" type="button">Add ID</button>
+          </div>
+          <div class="chat-peer-add-help">Add peers from detected nodes or manually by Node ID.</div>
+          <div class="chat-peer-saved-wrap">
+            <div class="chat-peer-saved-title">Saved peers</div>
+            <div id="chat-peer-saved-list" class="chat-peer-saved-list"></div>
+          </div>
+        </div>
         <div id="chat-room-list" class="chat-member-list"></div>
         <div class="chat-left-bottom-bar">
           <div class="chat-user-search-wrap">
@@ -96,6 +115,210 @@
           Updated: <span id="updated-at">n/a</span>
           <span id="updated-freshness" class="summary-freshness" hidden>Unknown</span>
           <span id="local-state-error" class="warn"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card settings" aria-label="Settings">
+      <div class="settings-card-head">
+        <h2>Settings</h2>
+        <div class="settings-caption" id="settings-caption">
+          Configure the connected radio. Some changes (especially LoRa) may reboot the device.
+        </div>
+      </div>
+      <div class="body">
+        <div class="settings-grid">
+          <div class="settings-panel">
+            <h3>LoRa / Radio</h3>
+            <div class="settings-fields">
+              <label class="settings-field">
+                <span class="settings-label">Region</span>
+                <select id="settings-lora-region" class="settings-select" autocomplete="off">
+                  <option value="UNSET">UNSET</option>
+                  <option value="US">US</option>
+                  <option value="EU_433">EU_433</option>
+                  <option value="EU_868">EU_868</option>
+                  <option value="CN">CN</option>
+                  <option value="JP">JP</option>
+                  <option value="ANZ">ANZ</option>
+                  <option value="ANZ_433">ANZ_433</option>
+                  <option value="KR">KR</option>
+                  <option value="TW">TW</option>
+                  <option value="RU">RU</option>
+                  <option value="IN">IN</option>
+                  <option value="NZ_865">NZ_865</option>
+                  <option value="TH">TH</option>
+                  <option value="UA_433">UA_433</option>
+                  <option value="UA_868">UA_868</option>
+                  <option value="MY_433">MY_433</option>
+                  <option value="MY_919">MY_919</option>
+                  <option value="SG_923">SG_923</option>
+                  <option value="KZ_433">KZ_433</option>
+                  <option value="KZ_863">KZ_863</option>
+                  <option value="BR_902">BR_902</option>
+                  <option value="PH_433">PH_433</option>
+                  <option value="PH_868">PH_868</option>
+                  <option value="PH_915">PH_915</option>
+                  <option value="NP_865">NP_865</option>
+                  <option value="LORA_24">LORA_24</option>
+                </select>
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-label">Modem preset</span>
+                <select id="settings-lora-modem-preset" class="settings-select" autocomplete="off">
+                  <option value="LONG_FAST">LONG_FAST</option>
+                  <option value="LONG_MODERATE">LONG_MODERATE</option>
+                  <option value="LONG_SLOW">LONG_SLOW</option>
+                  <option value="VERY_LONG_SLOW">VERY_LONG_SLOW</option>
+                  <option value="MEDIUM_FAST">MEDIUM_FAST</option>
+                  <option value="MEDIUM_SLOW">MEDIUM_SLOW</option>
+                  <option value="SHORT_FAST">SHORT_FAST</option>
+                  <option value="SHORT_SLOW">SHORT_SLOW</option>
+                  <option value="SHORT_TURBO">SHORT_TURBO</option>
+                </select>
+              </label>
+
+              <label class="settings-field settings-inline">
+                <input id="settings-lora-use-preset" type="checkbox" />
+                <span>Use preset (ignore manual modem fields)</span>
+              </label>
+
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Max hops</span>
+                  <input id="settings-lora-hop-limit" class="settings-input" type="number" min="1" max="7" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">TX power (dBm)</span>
+                  <input id="settings-lora-tx-power" class="settings-input" type="number" min="0" max="30" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Frequency slot</span>
+                  <input id="settings-lora-channel-num" class="settings-input" type="number" min="0" step="1" />
+                </label>
+              </div>
+
+              <label class="settings-field settings-inline">
+                <input id="settings-lora-tx-enabled" type="checkbox" />
+                <span>Transmit enabled</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-panel">
+            <h3>Advanced LoRa</h3>
+            <div class="settings-fields">
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Bandwidth (kHz)</span>
+                  <input id="settings-lora-bandwidth" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Spread factor</span>
+                  <input id="settings-lora-spread-factor" class="settings-input" type="number" min="7" max="12" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Coding rate (denom)</span>
+                  <input id="settings-lora-coding-rate" class="settings-input" type="number" min="5" max="8" step="1" />
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Frequency offset (Hz)</span>
+                  <input id="settings-lora-frequency-offset" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Override frequency (MHz)</span>
+                  <input id="settings-lora-override-frequency" class="settings-input" type="number" min="0" step="0.001" />
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-ignore-mqtt" type="checkbox" />
+                  <span>Ignore MQTT</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-config-ok-to-mqtt" type="checkbox" />
+                  <span>OK to MQTT</span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-override-duty-cycle" type="checkbox" />
+                  <span>Override duty cycle limit</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-sx126x-rx-boosted-gain" type="checkbox" />
+                  <span>SX126x RX boosted gain</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-pa-fan-disabled" type="checkbox" />
+                  <span>PA fan disabled</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel">
+            <h3>Advanced Config</h3>
+            <div class="settings-fields">
+              <label class="settings-field">
+                <span class="settings-label">Local config section</span>
+                <div class="settings-row">
+                  <select id="settings-local-section" class="settings-select" autocomplete="off">
+                    <option value="">Select local section</option>
+                  </select>
+                  <button id="settings-apply-local" class="btn btn-secondary" type="button">Apply local section</button>
+                </div>
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Local section JSON</span>
+                <textarea
+                  id="settings-local-json"
+                  class="settings-input settings-textarea"
+                  rows="6"
+                  spellcheck="false"
+                  placeholder='{"field_name": "value"}'
+                ></textarea>
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-label">Module config section</span>
+                <div class="settings-row">
+                  <select id="settings-module-section" class="settings-select" autocomplete="off">
+                    <option value="">Select module section</option>
+                  </select>
+                  <button id="settings-apply-module" class="btn btn-secondary" type="button">Apply module section</button>
+                </div>
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Module section JSON</span>
+                <textarea
+                  id="settings-module-json"
+                  class="settings-input settings-textarea"
+                  rows="6"
+                  spellcheck="false"
+                  placeholder='{"field_name": "value"}'
+                ></textarea>
+              </label>
+
+              <div class="settings-row settings-row-danger">
+                <button id="settings-reset-nodedb" class="btn btn-danger" type="button">Reset Radio NodeDB</button>
+                <button id="settings-reset-dashboard-db" class="btn btn-danger" type="button">Reset Dashboard DB</button>
+                <span class="settings-danger-note">Danger zone: resets radio discovery or clears dashboard history.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button id="settings-apply-lora" class="btn" type="button">Apply LoRa settings</button>
+          <button id="settings-reset" class="btn btn-secondary" type="button">Fetch settings</button>
+          <span id="settings-apply-status" class="settings-status"></span>
         </div>
       </div>
     </section>
@@ -145,11 +368,32 @@
 
     <section class="card map">
       <div class="map-card-head">
-        <h2 id="map-card-title">Network Map</h2>
-        <label id="map-heatmap-wrap" class="map-heatmap-wrap" title="Overlay realtime signal heatmap">
-          <input id="map-heatmap-toggle" type="checkbox" checked />
-          <span>Signal Heatmap</span>
-        </label>
+        <h2 id="map-card-title">
+          <button
+            id="map-card-title-favorite-btn"
+            class="favorite-toggle-btn map-title-favorite-btn"
+            type="button"
+            title="Save node"
+            aria-label="Save node"
+            aria-pressed="false"
+            hidden
+          ><span class="favorite-toggle-icon">☆</span></button>
+          <span id="map-card-title-text">Network Map</span>
+        </h2>
+        <div class="map-card-actions">
+          <button id="map-reset-view-btn" class="map-reset-view-btn" type="button" title="Reset map view">Reset view</button>
+          <label id="map-heatmap-wrap" class="map-heatmap-wrap" title="Overlay realtime signal heatmap">
+            <input id="map-heatmap-toggle" type="checkbox" checked />
+            <span>Signal Heatmap</span>
+          </label>
+          <label id="map-heatmap-mode-wrap" class="map-heatmap-mode-wrap" title="Choose heatmap recency behavior">
+            <span>Mode</span>
+            <select id="map-heatmap-mode" class="map-heatmap-mode">
+              <option value="live">Live only</option>
+              <option value="coverage">Coverage</option>
+            </select>
+          </label>
+        </div>
       </div>
       <div class="body">
         <div id="saved-node-details" class="saved-node-details" aria-live="polite"></div>
@@ -171,11 +415,32 @@
         <div class="network-node-stack">
           <div class="scroll nodes-table-scroll">
             <table id="nodes-table">
-                <thead>
-                  <tr>
-                  <th>Last Heard</th><th>ID</th><th>Name</th><th>HW</th><th>SNR</th><th>Hops</th><th>Battery</th><th>Saved</th><th>Pos</th><th>★</th>
-                  </tr>
-                </thead>
+              <colgroup id="nodes-table-cols">
+                <col style="width:13%" />
+                <col style="width:12%" />
+                <col style="width:20%" />
+                <col style="width:14%" />
+                <col style="width:6%" />
+                <col style="width:6%" />
+                <col style="width:7%" />
+                <col style="width:9%" />
+                <col style="width:10%" />
+                <col style="width:3%" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Last Heard<div class="col-resizer" data-col="0" aria-hidden="true"></div></th>
+                  <th>ID<div class="col-resizer" data-col="1" aria-hidden="true"></div></th>
+                  <th>Name<div class="col-resizer" data-col="2" aria-hidden="true"></div></th>
+                  <th>HW<div class="col-resizer" data-col="3" aria-hidden="true"></div></th>
+                  <th>SNR<div class="col-resizer" data-col="4" aria-hidden="true"></div></th>
+                  <th>Hops<div class="col-resizer" data-col="5" aria-hidden="true"></div></th>
+                  <th>Battery<div class="col-resizer" data-col="6" aria-hidden="true"></div></th>
+                  <th>Saved<div class="col-resizer" data-col="7" aria-hidden="true"></div></th>
+                  <th>Pos<div class="col-resizer" data-col="8" aria-hidden="true"></div></th>
+                  <th>★<div class="col-resizer" data-col="9" aria-hidden="true"></div></th>
+                </tr>
+              </thead>
               <tbody></tbody>
             </table>
           </div>

@@ -21,7 +21,7 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "const refreshMs = 3000;" in js
     assert "const nodeHistoryHours = 72;" in js
     assert "const nodeHistoryMaxPoints = 1440;" in js
-    assert "setInterval(poll, refreshMs);" in js
+    assert "setInterval(pollOnce, refreshMs);" in js
     assert "/^[0-9a-f]{8}$/i.test(hex)" in js
     assert "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" in js
     assert "{{" not in js

@@ -5,6 +5,7 @@ from .api_inputs import (
     ChatSendRequest,
     NodeHistoryQuery,
     OnlineActivityQuery,
+    RadioSettingsRequest,
     ThemeSettingsRequest,
 )
 from .http_handler_contracts import DashboardHttpHandler
@@ -117,8 +118,24 @@ class ParseThemeSettingsRequestFn(Protocol):
         ...
 
 
+class ParseRadioSettingsRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> RadioSettingsRequest:
+        ...
+
+
+class ApplyRadioSettingsFn(Protocol):
+    def __call__(self, request: RadioSettingsRequest) -> dict[str, object]:
+        ...
+
+
 class WriteHtmlResponseFn(Protocol):
-    def __call__(self, handler: DashboardHttpHandler, *, html_text: str) -> None:
+    def __call__(
+        self,
+        handler: DashboardHttpHandler,
+        *,
+        html_text: str,
+        extra_headers: Optional[Mapping[str, str]] = None,
+    ) -> None:
         ...
 
 
@@ -130,12 +147,20 @@ class WriteJsonResponseFn(Protocol):
         status_code: int,
         payload_obj: object,
         no_store: bool = False,
+        extra_headers: Optional[Mapping[str, str]] = None,
     ) -> None:
         ...
 
 
 class WriteTextResponseFn(Protocol):
-    def __call__(self, handler: DashboardHttpHandler, *, status_code: int, text: str) -> None:
+    def __call__(
+        self,
+        handler: DashboardHttpHandler,
+        *,
+        status_code: int,
+        text: str,
+        extra_headers: Optional[Mapping[str, str]] = None,
+    ) -> None:
         ...
 
 
@@ -166,3 +191,5 @@ class DashboardPostRouteDependencies:
     write_json_response_fn: WriteJsonResponseFn
     set_theme_preset_fn: Optional[SetThemePresetFn] = None
     parse_theme_settings_request_fn: Optional[ParseThemeSettingsRequestFn] = None
+    apply_radio_settings_fn: Optional[ApplyRadioSettingsFn] = None
+    parse_radio_settings_request_fn: Optional[ParseRadioSettingsRequestFn] = None

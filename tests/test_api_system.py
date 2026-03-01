@@ -55,3 +55,31 @@ def test_handle_state_get_accepts_typed_state_payload():
     assert calls["no_store"] is True
     assert calls["payload_obj"]["summary"]["ok"] is True
     assert calls["payload_obj"]["traffic"]["recent_chat"][0]["text"] == "hello"
+    assert calls["payload_obj"]["local_node_id"] == "local"
+
+
+def test_handle_state_get_prefers_lite_builder_when_available():
+    calls = {}
+    observed = {"full": 0, "lite": 0}
+
+    def _state_fn():
+        observed["full"] += 1
+        return {"ok": True, "nodes_full": ["x"]}
+
+    def _state_fn_lite():
+        observed["lite"] += 1
+        return {"ok": True}
+
+    setattr(_state_fn, "lite", _state_fn_lite)
+
+    handle_state_get(
+        object(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda handler, **kwargs: calls.update(kwargs),
+        query="lite=1",
+    )
+
+    assert observed["lite"] == 1
+    assert observed["full"] == 0
+    assert calls["status_code"] == 200
+    assert calls["payload_obj"] == {"ok": True}

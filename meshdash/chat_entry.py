@@ -1,5 +1,6 @@
 from typing import Callable, Optional
 
+from .chat_scope import chat_scope_for_destination
 from .helpers import emoji_from_codepoint, to_int
 from .runtime_types import EmojiFromCodepointFn, ToIntFn
 
@@ -49,6 +50,7 @@ def build_local_chat_entry(
         "captured_at": now_text,
         "from": str(from_id or "local"),
         "to": str(to_id or "^all"),
+        "scope": chat_scope_for_destination(to_id),
         "portnum": "TEXT_MESSAGE_APP",
         "channel": int(channel_index) if isinstance(channel_index, int) else 0,
         "rx_time": now_text,

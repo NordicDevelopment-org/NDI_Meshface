@@ -112,6 +112,7 @@ def test_build_dashboard_state_builds_payload_and_redacts():
     assert observed["redact_state"]["nodes_error"] is None
     assert observed["redact_state"]["tracker_saved_counts_error"] is None
     assert observed["redact_state"]["tracker_capabilities_error"] is None
+    assert observed["redact_state"]["local_node_id"] == "local"
     assert observed["sensitive_names"] == {"password"}
 
 
@@ -531,8 +532,17 @@ def test_build_dashboard_state_handles_invalid_capabilities_shape_without_crashi
 
 def test_build_dashboard_state_typed_returns_contract_payload():
     tracker = _DummyTracker()
+    iface = type(
+        "_Iface",
+        (),
+        {
+            "myInfo": {"my_node_num": 1234},
+            "metadata": {"board": "x1"},
+            "nodesByNum": {1234: {"user": {"id": "!49b54790"}}},
+        },
+    )()
     payload = build_dashboard_state_typed(
-        iface=type("_Iface", (), {"myInfo": {"id": "!a"}, "metadata": {"board": "x1"}})(),
+        iface=iface,
         tracker=tracker,
         target="target",
         started_at=0.0,
@@ -558,6 +568,7 @@ def test_build_dashboard_state_typed_returns_contract_payload():
     assert payload.summary["summary_ok"] is True
     assert payload.summary_error is None
     assert payload.traffic.recent_chat[0]["text"] == "hello"
+    assert payload.local_node_id == "!49b54790"
 
 
 def test_build_dashboard_state_handles_summary_builder_failure_without_crashing():

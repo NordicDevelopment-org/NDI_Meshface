@@ -90,3 +90,17 @@ def test_apply_default_gateway_skips_when_user_already_set_mesh_host():
     apply_default_gateway(args, default_mesh_port="/dev/ttyACM0")
     assert args.mesh_host == "192.168.1.50"
     assert args.mesh_tcp_port == 1234
+
+
+def test_apply_default_gateway_skips_when_fallback_host_missing():
+    args = argparse.Namespace(
+        no_default_gateway=False,
+        mesh_host=None,
+        mesh_port="/dev/ttyACM0",
+        default_gateway_host="   ",
+        default_gateway_port=4403,
+        mesh_tcp_port=1234,
+    )
+    apply_default_gateway(args, default_mesh_port="/dev/ttyACM0")
+    assert args.mesh_host is None
+    assert args.mesh_tcp_port == 1234

@@ -93,3 +93,88 @@ def backfill_node_capabilities(
                 None,
             ),
         )
+
+
+def backfill_node_saved_counts(conn: SqlConnection) -> None:
+    """Populate node_saved_counts from node_metrics_1m if it's empty.
+
+    The node_saved_counts table is maintained incrementally via triggers going
+    forward, but existing databases need an initial fill so /api/state does not
+    fall back to expensive GROUP BY scans.
+    """
+    try:
+        existing = conn.execute("SELECT COUNT(*) FROM node_saved_counts").fetchone()
+    except Exception:
+        # Old schema without node_saved_counts (should be created by
+        # initialize_history_schema, but be defensive).
+        existing = None
+
+    if existing and int(existing[0] or 0) > 0:
+        return
+
+    rows = conn.execute(
+        """
+        SELECT node_id,
+               SUM(packet_count) AS saved_packets,
+               COUNT(*) AS saved_points,
+               MAX(last_seen_unix) AS saved_last_seen_unix
+        FROM node_metrics_1m
+        GROUP BY node_id
+        """
+    ).fetchall()
+    for node_id, saved_packets, saved_points, saved_last_seen_unix in rows:
+        clean_node_id = str(node_id or "").strip()
+        if not clean_node_id:
+            continue
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO node_saved_counts(
+              node_id, saved_packets, saved_points, saved_last_seen_unix
+            ) VALUES(?, ?, ?, ?)
+            """,
+            (
+                clean_node_id,
+                int(saved_packets or 0),
+                int(saved_points or 0),
+                int(saved_last_seen_unix or 0),
+            ),
+        )
+
+
+def backfill_node_hour_seen(conn: SqlConnection) -> None:
+    """Populate node_hour_seen from node_metrics_1m if it's empty.
+
+    node_hour_seen is maintained incrementally via triggers going forward, but
+    existing databases need an initial fill so /api/history/online can render
+    quickly without scanning the 1-minute rollup.
+    """
+    try:
+        existing = conn.execute("SELECT COUNT(*) FROM node_hour_seen").fetchone()
+    except Exception:
+        existing = None
+
+    if existing and int(existing[0] or 0) > 0:
+        return
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT (bucket_unix - (bucket_unix % 3600)) AS hour_bucket,
+                            node_id
+            FROM node_metrics_1m
+            """
+        ).fetchall()
+    except Exception:
+        rows = []
+
+    for hour_bucket, node_id in rows:
+        clean_node_id = str(node_id or "").strip()
+        if not clean_node_id:
+            continue
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO node_hour_seen(hour_bucket, node_id) VALUES(?, ?)",
+                (int(hour_bucket or 0), clean_node_id),
+            )
+        except Exception:
+            continue

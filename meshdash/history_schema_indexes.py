@@ -9,6 +9,9 @@ INDEX_SCHEMA_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_node_positions_created_unix ON node_positions(created_unix)",
     "CREATE INDEX IF NOT EXISTS idx_node_positions_node_id_created_unix ON node_positions(node_id, created_unix)",
     "CREATE INDEX IF NOT EXISTS idx_node_capabilities_last_seen_unix ON node_capabilities(last_seen_unix)",
+    # Optimize node history lookups (/api/history/node), which filter by node_id
+    # and bucket range then order by bucket_unix.
+    "CREATE INDEX IF NOT EXISTS idx_node_metrics_1m_node_id_bucket_unix ON node_metrics_1m(node_id, bucket_unix)",
     "CREATE INDEX IF NOT EXISTS idx_node_metrics_1m_last_seen_unix ON node_metrics_1m(last_seen_unix)",
     "CREATE INDEX IF NOT EXISTS idx_link_metrics_1m_last_seen_unix ON link_metrics_1m(last_seen_unix)",
 ]

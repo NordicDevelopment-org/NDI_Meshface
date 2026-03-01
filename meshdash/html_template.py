@@ -2,6 +2,8 @@ from .html_context import build_html_render_context as _build_html_render_contex
 from .html_css import build_dashboard_css as _build_dashboard_css_helper
 from .html_js import build_dashboard_js as _build_dashboard_js_helper
 from .html_sections import build_html_shell as _build_html_shell_helper
+from .app_brand import APP_HEADING as _APP_HEADING
+from .app_brand import APP_TITLE as _APP_TITLE
 
 
 def render_html(
@@ -33,6 +35,8 @@ def render_html(
         node_history_max_points=node_history_max_points,
     )
     return _build_html_shell_helper(
+        app_title=_APP_TITLE,
+        app_heading=_APP_HEADING,
         style_css=style_css,
         app_js=app_js,
         revision_title=revision_title,

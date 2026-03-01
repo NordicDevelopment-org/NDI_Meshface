@@ -24,6 +24,7 @@ def make_http_handler(
     default_node_history_hours: int = 72,
     to_int_fn: ToIntFn = to_int,
 ):
+    apply_radio_settings_fn = getattr(state_fn, "apply_radio_settings_fn", None)
     get_deps = build_get_route_dependencies(
         html_text=html_text,
         state_fn=state_fn,
@@ -36,6 +37,7 @@ def make_http_handler(
     post_deps = build_post_route_dependencies(
         send_chat_fn=send_chat_fn,
         set_theme_preset_fn=set_theme_preset_fn,
+        apply_radio_settings_fn=apply_radio_settings_fn,
         to_int_fn=to_int_fn,
     )
 

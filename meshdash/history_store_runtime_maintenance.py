@@ -4,6 +4,7 @@ from .history_maintenance import (
 from .history.db import (
     prune_history_connection as _prune_history_connection_helper,
     prune_history_connection_with_policy as _prune_history_connection_with_policy_helper,
+    reset_history_connection as _reset_history_connection_helper,
 )
 from .history_store_runtime_contracts import (
     HistoryStoreRuntimeState,
@@ -20,6 +21,18 @@ from .history_store_policy import (
 def close_history_store(store: HistoryStoreRuntimeState) -> None:
     with store._lock:
         store._conn.close()
+    read_conn = getattr(store, "_read_conn", None)
+    if read_conn is None:
+        return
+    if read_conn is getattr(store, "_conn", None):
+        return
+    read_lock = getattr(store, "_read_lock", None) or getattr(store, "_lock", None)
+    if read_lock is None:
+        # Last resort.
+        read_conn.close()
+        return
+    with read_lock:
+        read_conn.close()
 
 
 def prune_history_store_unlocked(
@@ -61,3 +74,23 @@ def maybe_prune_history_store_unlocked(
     if not should_prune:
         return
     prune_unlocked_fn()
+
+
+def reset_history_store(store: HistoryStoreRuntimeState) -> int:
+    with store._lock:
+        deleted = _reset_history_connection_helper(store._conn)
+
+    # Refresh read connection snapshots to avoid stale WAL readers.
+    read_conn = getattr(store, "_read_conn", None)
+    if read_conn is None or read_conn is getattr(store, "_conn", None):
+        return int(deleted)
+
+    read_lock = getattr(store, "_read_lock", None) or getattr(store, "_lock", None)
+    if read_lock is None:
+        return int(deleted)
+    with read_lock:
+        try:
+            read_conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except Exception:
+            pass
+    return int(deleted)
