@@ -172,7 +172,13 @@ def build_dashboard_runtime_context(
 
     if _apply_radio_settings is not None:
         def _apply_radio_settings_fn(request):  # type: ignore[no-redef]
-            return _apply_radio_settings(request, iface=iface, send_lock=send_lock)
+            return _apply_radio_settings(
+                request,
+                iface=iface,
+                send_lock=send_lock,
+                history_store=history_store,
+                tracker=tracker,
+            )
 
         setattr(loaders.state_fn, "apply_radio_settings_fn", _apply_radio_settings_fn)
 

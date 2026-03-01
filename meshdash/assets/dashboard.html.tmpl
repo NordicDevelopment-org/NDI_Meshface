@@ -262,6 +262,57 @@
               </div>
             </div>
           </div>
+
+          <div class="settings-panel">
+            <h3>Advanced Config</h3>
+            <div class="settings-fields">
+              <label class="settings-field">
+                <span class="settings-label">Local config section</span>
+                <div class="settings-row">
+                  <select id="settings-local-section" class="settings-select" autocomplete="off">
+                    <option value="">Select local section</option>
+                  </select>
+                  <button id="settings-apply-local" class="btn btn-secondary" type="button">Apply local section</button>
+                </div>
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Local section JSON</span>
+                <textarea
+                  id="settings-local-json"
+                  class="settings-input settings-textarea"
+                  rows="6"
+                  spellcheck="false"
+                  placeholder='{"field_name": "value"}'
+                ></textarea>
+              </label>
+
+              <label class="settings-field">
+                <span class="settings-label">Module config section</span>
+                <div class="settings-row">
+                  <select id="settings-module-section" class="settings-select" autocomplete="off">
+                    <option value="">Select module section</option>
+                  </select>
+                  <button id="settings-apply-module" class="btn btn-secondary" type="button">Apply module section</button>
+                </div>
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Module section JSON</span>
+                <textarea
+                  id="settings-module-json"
+                  class="settings-input settings-textarea"
+                  rows="6"
+                  spellcheck="false"
+                  placeholder='{"field_name": "value"}'
+                ></textarea>
+              </label>
+
+              <div class="settings-row settings-row-danger">
+                <button id="settings-reset-nodedb" class="btn btn-danger" type="button">Reset Radio NodeDB</button>
+                <button id="settings-reset-dashboard-db" class="btn btn-danger" type="button">Reset Dashboard DB</button>
+                <span class="settings-danger-note">Danger zone: resets radio discovery or clears dashboard history.</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="settings-actions">

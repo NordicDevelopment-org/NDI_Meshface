@@ -1,16 +1,103 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
 class RadioSettingsRequest:
     """A request to apply radio settings to the connected node.
 
-    This is intentionally narrow for now: we accept a single optional "lora" object
-    with snake_case protobuf field names (matching the dashboard's state JSON).
+    Supports:
+      - `lora`: legacy LoRa-only field updates.
+      - `local`: local config section updates, keyed by section name.
+      - `module`: module config section updates, keyed by section name.
+      - `actions`: control actions, e.g. {"reset_nodedb": true, "reset_dashboard_db": true}
     """
 
-    lora: dict[str, object]
+    lora: dict[str, object] = field(default_factory=dict)
+    local: dict[str, dict[str, object]] = field(default_factory=dict)
+    module: dict[str, dict[str, object]] = field(default_factory=dict)
+    actions: dict[str, bool] = field(default_factory=dict)
+
+
+def _coerce_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in {"1", "true", "yes", "y", "on"}:
+            return True
+        if v in {"0", "false", "no", "n", "off"}:
+            return False
+    return bool(value)
+
+
+def _clean_update_value(value: object) -> object | None:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        if all(item is None or isinstance(item, (str, int, float, bool)) for item in value):
+            return list(value)
+        return None
+    if isinstance(value, dict):
+        clean_obj: dict[str, object] = {}
+        for k, v in value.items():
+            if not isinstance(k, str):
+                continue
+            clean_v = _clean_update_value(v)
+            if clean_v is not None:
+                clean_obj[k] = clean_v
+            elif v is None:
+                clean_obj[k] = None
+        return clean_obj
+    return None
+
+
+def _clean_update_object(payload: object, *, field_name: str) -> dict[str, object]:
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected '{field_name}' to be an object")
+    clean_obj: dict[str, object] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            continue
+        clean_value = _clean_update_value(value)
+        if clean_value is not None:
+            clean_obj[key] = clean_value
+        elif value is None:
+            clean_obj[key] = None
+    return clean_obj
+
+
+def _clean_section_map(payload: object, *, field_name: str) -> dict[str, dict[str, object]]:
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected '{field_name}' to be an object")
+
+    clean_sections: dict[str, dict[str, object]] = {}
+    for section, updates in payload.items():
+        if not isinstance(section, str):
+            continue
+        if not isinstance(updates, dict):
+            continue
+        clean_sections[section] = _clean_update_object(updates, field_name=f"{field_name}.{section}")
+    return clean_sections
+
+
+def _clean_actions(payload: object) -> dict[str, bool]:
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError("Expected 'actions' to be an object")
+
+    actions: dict[str, bool] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            continue
+        if key in {"reset_nodedb", "reset_dashboard_db"}:
+            actions[key] = _coerce_bool(value)
+    return actions
 
 
 def parse_radio_settings_request(raw_body: bytes) -> RadioSettingsRequest:
@@ -22,29 +109,19 @@ def parse_radio_settings_request(raw_body: bytes) -> RadioSettingsRequest:
     if not isinstance(payload, dict):
         raise ValueError("Expected a JSON object")
 
-    lora = payload.get("lora")
-    if lora is None:
-        lora = {}
+    clean_lora = _clean_update_object(payload.get("lora"), field_name="lora")
+    clean_local = _clean_section_map(payload.get("local"), field_name="local")
+    clean_module = _clean_section_map(payload.get("module"), field_name="module")
+    clean_actions = _clean_actions(payload.get("actions"))
 
-    if not isinstance(lora, dict):
-        raise ValueError("Expected 'lora' to be an object")
+    if "reset_nodedb" not in clean_actions and "reset_nodedb" in payload:
+        clean_actions["reset_nodedb"] = _coerce_bool(payload.get("reset_nodedb"))
+    if "reset_dashboard_db" not in clean_actions and "reset_dashboard_db" in payload:
+        clean_actions["reset_dashboard_db"] = _coerce_bool(payload.get("reset_dashboard_db"))
 
-    # Keep only JSON-compatible scalar values or simple lists.
-    # (We do this as a guardrail — protobuf messages can have complex fields.)
-    clean_lora: dict[str, object] = {}
-    for key, value in lora.items():
-        if not isinstance(key, str):
-            continue
-        # Allow null/None; caller may strip nulls.
-        if value is None:
-            clean_lora[key] = None
-            continue
-        if isinstance(value, (str, int, float, bool)):
-            clean_lora[key] = value
-            continue
-        if isinstance(value, list) and all(
-            (v is None) or isinstance(v, (str, int, float, bool)) for v in value
-        ):
-            clean_lora[key] = value
-
-    return RadioSettingsRequest(lora=clean_lora)
+    return RadioSettingsRequest(
+        lora=clean_lora,
+        local=clean_local,
+        module=clean_module,
+        actions=clean_actions,
+    )

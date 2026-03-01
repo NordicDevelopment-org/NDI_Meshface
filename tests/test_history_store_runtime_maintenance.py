@@ -1,7 +1,10 @@
+import sqlite3
+
 from meshdash.history_store_runtime_maintenance import (
     close_history_store,
     maybe_prune_history_store_unlocked,
     prune_history_store_unlocked,
+    reset_history_store,
 )
 
 
@@ -166,3 +169,23 @@ def test_maybe_prune_history_store_unlocked_only_prunes_on_threshold():
     )
     assert store._writes_since_prune == 7
     assert observed["prunes"] == 1
+
+
+def test_reset_history_store_clears_rows_under_lock():
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE packets (id INTEGER PRIMARY KEY AUTOINCREMENT, v TEXT)")
+    conn.execute("CREATE TABLE chat (id INTEGER PRIMARY KEY AUTOINCREMENT, v TEXT)")
+    conn.executemany("INSERT INTO packets(v) VALUES(?)", [("a",), ("b",)])
+    conn.executemany("INSERT INTO chat(v) VALUES(?)", [("c",)])
+    conn.commit()
+
+    store = type("_Store", (), {"_lock": _FakeLock(), "_conn": conn, "_read_conn": None})()
+    deleted = reset_history_store(store)
+
+    packets = conn.execute("SELECT COUNT(*) FROM packets").fetchone()[0]
+    chat = conn.execute("SELECT COUNT(*) FROM chat").fetchone()[0]
+    assert deleted == 3
+    assert packets == 0
+    assert chat == 0
+    assert store._lock.entered == 1
+    assert store._lock.exited == 1

@@ -5157,20 +5157,87 @@
       }}
     }}
 
-    function loraConfigFromState(state) {{
+    function settingsLocalStateFrom(state) {{
       const localState = state && typeof state === "object" ? state.local_state : null;
-      const localConfig = localState && typeof localState === "object" ? localState.local_config : null;
-      const lora = localConfig && typeof localConfig === "object" ? localConfig.lora : null;
-      if (lora && typeof lora === "object") return lora;
-
+      if (localState && typeof localState === "object") return localState;
       const cachedState = settingsLocalStateCache && typeof settingsLocalStateCache === "object"
         ? settingsLocalStateCache
         : null;
-      const cachedConfig = cachedState && typeof cachedState === "object" ? cachedState.local_config : null;
-      const cachedLora = cachedConfig && typeof cachedConfig === "object" ? cachedConfig.lora : null;
-      return cachedLora && typeof cachedLora === "object" ? cachedLora : null;
+      return cachedState && typeof cachedState === "object" ? cachedState : null;
     }}
 
+    function loraConfigFromState(state) {{
+      const localState = settingsLocalStateFrom(state);
+      const localConfig = localState && typeof localState === "object" ? localState.local_config : null;
+      const lora = localConfig && typeof localConfig === "object" ? localConfig.lora : null;
+      return lora && typeof lora === "object" ? lora : null;
+    }}
+
+    function configSectionMapFromState(state, scopeKey) {{
+      const localState = settingsLocalStateFrom(state);
+      const scope = localState && typeof localState === "object" ? localState[scopeKey] : null;
+      return scope && typeof scope === "object" ? scope : null;
+    }}
+
+    function sortedConfigSectionNames(scopeObj, excludedNames = []) {{
+      if (!scopeObj || typeof scopeObj !== "object") return [];
+      const excluded = new Set(excludedNames.map((name) => String(name || "").trim().toLowerCase()));
+      const names = [];
+      for (const [name, value] of Object.entries(scopeObj)) {{
+        if (!name || excluded.has(String(name).toLowerCase())) continue;
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        names.push(name);
+      }}
+      names.sort((a, b) => a.localeCompare(b));
+      return names;
+    }}
+
+    function syncSectionSelectOptions(selectId, names, placeholderText) {{
+      const select = document.getElementById(selectId);
+      if (!(select instanceof HTMLSelectElement)) return;
+      const previous = String(select.value || "");
+      select.innerHTML = "";
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = placeholderText;
+      select.appendChild(placeholder);
+      for (const name of names) {{
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      }}
+
+      if (previous && names.includes(previous)) {{
+        select.value = previous;
+        return;
+      }}
+      select.value = names.length ? names[0] : "";
+    }}
+
+    function syncSectionEditorFromState(state, scopeKey, selectId, textareaId, placeholderText, excludedNames = []) {{
+      const scopeObj = configSectionMapFromState(state, scopeKey);
+      const sectionNames = sortedConfigSectionNames(scopeObj, excludedNames);
+      syncSectionSelectOptions(selectId, sectionNames, placeholderText);
+
+      const select = document.getElementById(selectId);
+      const textarea = document.getElementById(textareaId);
+      if (!(select instanceof HTMLSelectElement) || !(textarea instanceof HTMLTextAreaElement)) return;
+
+      const sectionName = String(select.value || "");
+      const sectionData =
+        sectionName && scopeObj && typeof scopeObj === "object" && scopeObj[sectionName] && typeof scopeObj[sectionName] === "object"
+          ? scopeObj[sectionName]
+          : {{}};
+      let text = "{{}}";
+      try {{
+        text = JSON.stringify(sectionData, null, 2);
+      }} catch (_err) {{
+        text = "{{}}";
+      }}
+      setFormValue(textarea, text);
+    }}
 
     function setFormValue(el, value) {{
       if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLSelectElement) && !(el instanceof HTMLTextAreaElement)) return;
@@ -5205,8 +5272,36 @@
       }}
     }}
 
+    function refreshLocalSettingsSectionEditor(state) {{
+      syncSectionEditorFromState(
+        state,
+        "local_config",
+        "settings-local-section",
+        "settings-local-json",
+        "Select local section",
+        ["lora"]
+      );
+    }}
+
+    function refreshModuleSettingsSectionEditor(state) {{
+      syncSectionEditorFromState(
+        state,
+        "module_config",
+        "settings-module-section",
+        "settings-module-json",
+        "Select module section"
+      );
+    }}
+
+    function refreshSettingsSectionEditors(state) {{
+      refreshLocalSettingsSectionEditor(state);
+      refreshModuleSettingsSectionEditor(state);
+    }}
+
     function renderSettings(state, force = false) {{
       if (!force && settingsDirty) return;
+      refreshSettingsSectionEditors(state);
+
       const lora = loraConfigFromState(state);
       if (!lora) {{
         if (!settingsDirty && !settingsFetchInFlight && !settingsAutoFetchAttempted) {{
@@ -5215,7 +5310,7 @@
           void fetchSettingsFromRadio();
           return;
         }}
-        setText("settings-apply-status", "No local LoRa config available. Click Fetch settings.");
+        setText("settings-apply-status", "LoRa config is unavailable. Advanced section editors may still work.");
         return;
       }}
 
@@ -5292,13 +5387,100 @@
       return allowFloat ? num : Math.trunc(num);
     }}
 
-        async function fetchSettingsFromRadio() {{
+    function setSettingsButtonsDisabled(disabled) {{
+      for (const id of [
+        "settings-apply-lora",
+        "settings-reset",
+        "settings-apply-local",
+        "settings-apply-module",
+        "settings-reset-nodedb",
+        "settings-reset-dashboard-db",
+      ]) {{
+        const el = document.getElementById(id);
+        if (el instanceof HTMLButtonElement) {{
+          el.disabled = !!disabled;
+        }}
+      }}
+    }}
+
+    function parseSectionJsonTextarea(textareaId) {{
+      const textarea = document.getElementById(textareaId);
+      if (!(textarea instanceof HTMLTextAreaElement)) {{
+        return {{ ok: false, error: "Editor is unavailable", value: null }};
+      }}
+      const raw = String(textarea.value || "").trim();
+      if (!raw) {{
+        return {{ ok: false, error: "Enter a JSON object before applying", value: null }};
+      }}
+      try {{
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {{
+          return {{ ok: false, error: "JSON must be an object (field/value pairs)", value: null }};
+        }}
+        return {{ ok: true, error: "", value: parsed }};
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "invalid JSON");
+        return {{ ok: false, error: `Invalid JSON: ${{msg}}`, value: null }};
+      }}
+    }}
+
+    async function postRadioSettingsPayload(payload, pendingLabel, successLabel) {{
+      if (settingsApplyInFlight) return false;
+      settingsApplyInFlight = true;
+      setSettingsButtonsDisabled(true);
+      setText("settings-apply-status", pendingLabel);
+      try {{
+        const resp = await fetch(radioSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(payload),
+        }});
+
+        const text = await resp.text();
+        let parsed = null;
+        try {{
+          parsed = text ? JSON.parse(text) : null;
+        }} catch (_err) {{
+        }}
+
+        if (!resp.ok) {{
+          const errMsg = parsed && parsed.error ? String(parsed.error) : (text || `HTTP ${{resp.status}}`);
+          setText("settings-apply-status", `Apply failed: ${{errMsg}}`);
+          appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply failed: ${{errMsg}}`);
+          return false;
+        }}
+
+        const rebootHint = parsed && parsed.reboot_expected ? " Radio may reconnect." : "";
+        const actionHint =
+          parsed && Array.isArray(parsed.actions_applied) && parsed.actions_applied.length
+            ? ` Actions: ${{parsed.actions_applied.join(", ")}}.`
+            : "";
+        const deletedHint =
+          parsed && Number.isFinite(Number(parsed.deleted_history_rows))
+            ? ` Cleared rows: ${{Number(parsed.deleted_history_rows)}}.`
+            : "";
+        setText("settings-apply-status", `Applied. ${{successLabel}}.${{rebootHint}}${{actionHint}}${{deletedHint}}`);
+        appendConsoleLine(
+          `settings|${{Date.now()}}|ok`,
+          `[settings] ${{successLabel}}.${{rebootHint}}${{actionHint}}${{deletedHint}}`
+        );
+        clearSettingsDirty();
+        return true;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        setText("settings-apply-status", `Apply error: ${{msg}}`);
+        appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply error: ${{msg}}`);
+        return false;
+      }} finally {{
+        settingsApplyInFlight = false;
+        setSettingsButtonsDisabled(false);
+      }}
+    }}
+
+    async function fetchSettingsFromRadio() {{
       if (settingsFetchInFlight) return;
       settingsFetchInFlight = true;
-      const fetchBtn = document.getElementById("settings-reset");
-      if (fetchBtn instanceof HTMLButtonElement) {{
-        fetchBtn.disabled = true;
-      }}
+      setSettingsButtonsDisabled(true);
       setText("settings-apply-status", "Fetching settings…");
       try {{
         const resp = await fetch("/api/raw/local_state", {{ cache: "no-store" }});
@@ -5316,14 +5498,12 @@
         setText("settings-apply-status", `Fetch failed: ${{msg}}`);
         appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] fetch failed: ${{msg}}`);
       }} finally {{
-        if (fetchBtn instanceof HTMLButtonElement) {{
-          fetchBtn.disabled = false;
-        }}
+        setSettingsButtonsDisabled(false);
         settingsFetchInFlight = false;
       }}
     }}
 
-async function applyLoraSettings() {{
+    async function applyLoraSettings() {{
       if (settingsApplyInFlight) return;
 
       const payload = {{
@@ -5348,7 +5528,6 @@ async function applyLoraSettings() {{
         }},
       }};
 
-      // Strip nulls so we don't accidentally clobber fields we don't show.
       for (const [key, value] of Object.entries(payload.lora)) {{
         if (value == null) delete payload.lora[key];
       }}
@@ -5358,46 +5537,84 @@ async function applyLoraSettings() {{
         return;
       }}
 
-      settingsApplyInFlight = true;
-
-      const applyBtn = document.getElementById("settings-apply-lora");
-      if (applyBtn instanceof HTMLButtonElement) {{
-        applyBtn.disabled = true;
+      const ok = await postRadioSettingsPayload(
+        payload,
+        "Applying LoRa settings… (radio may reboot)",
+        "LoRa settings saved"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
       }}
-      setText("settings-apply-status", "Applying settings… (radio may reboot)");
-      try {{
-        const resp = await fetch(radioSettingsEndpoint, {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify(payload),
-        }});
+    }}
 
-        const text = await resp.text();
-        let parsed = null;
-        try {{
-          parsed = text ? JSON.parse(text) : null;
-        }} catch (_err) {{
-        }}
+    async function applySectionSettings(scope) {{
+      const isLocal = scope === "local";
+      const sectionId = isLocal ? "settings-local-section" : "settings-module-section";
+      const editorId = isLocal ? "settings-local-json" : "settings-module-json";
+      const section = readSelectValue(sectionId);
+      if (!section) {{
+        setText("settings-apply-status", `Select a ${{scope}} section first.`);
+        return;
+      }}
+      const parsed = parseSectionJsonTextarea(editorId);
+      if (!parsed.ok) {{
+        setText("settings-apply-status", parsed.error || "Invalid JSON");
+        return;
+      }}
 
-        if (!resp.ok) {{
-          const errMsg = parsed && parsed.error ? String(parsed.error) : (text || `HTTP ${{resp.status}}`);
-          setText("settings-apply-status", `Apply failed: ${{errMsg}}`);
-          appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply failed: ${{errMsg}}`);
-          return;
-        }}
+      const payload = isLocal
+        ? {{ local: {{ [section]: parsed.value }} }}
+        : {{ module: {{ [section]: parsed.value }} }};
 
-        const rebootHint = parsed && parsed.reboot_expected ? " Radio reboot expected." : "";
-        setText("settings-apply-status", `Applied.${{rebootHint}}`);
-        appendConsoleLine(`settings|${{Date.now()}}|ok`, `[settings] applied LoRa settings.${{rebootHint}}`);
-        clearSettingsDirty();
-      }} catch (err) {{
-        setText("settings-apply-status", `Apply error: ${{err.message}}`);
-        appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply error: ${{err.message}}`);
-      }} finally {{
-        if (applyBtn instanceof HTMLButtonElement) {{
-          applyBtn.disabled = false;
-        }}
-        settingsApplyInFlight = false;
+      const ok = await postRadioSettingsPayload(
+        payload,
+        `Applying ${{scope}}.${{section}} settings…`,
+        `${{scope}}.${{section}} saved`
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
+    async function resetRadioNodeDb() {{
+      if (settingsApplyInFlight) return;
+      const confirmed = window.confirm(
+        "Reset the radio node database? This removes discovered nodes until they are heard again."
+      );
+      if (!confirmed) return;
+
+      const ok = await postRadioSettingsPayload(
+        {{ actions: {{ reset_nodedb: true }} }},
+        "Resetting radio NodeDB…",
+        "radio NodeDB reset requested"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 1200);
+      }}
+    }}
+
+    async function resetDashboardDb() {{
+      if (settingsApplyInFlight) return;
+      const confirmed = window.confirm(
+        "Clear the dashboard history database? This removes saved packets, chat, links, and analytics."
+      );
+      if (!confirmed) return;
+
+      const ok = await postRadioSettingsPayload(
+        {{ actions: {{ reset_dashboard_db: true }} }},
+        "Resetting dashboard history database…",
+        "dashboard history reset"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
       }}
     }}
 
@@ -5409,16 +5626,25 @@ async function applyLoraSettings() {{
       settingsCard.addEventListener("input", (ev) => {{
         const target = ev.target;
         if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {{
+          if (target.id === "settings-local-section" || target.id === "settings-module-section") return;
           markSettingsDirty();
         }}
       }});
       settingsCard.addEventListener("change", (ev) => {{
         const target = ev.target;
         if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) {{
-          markSettingsDirty();
+          if (target.id !== "settings-local-section" && target.id !== "settings-module-section") {{
+            markSettingsDirty();
+          }}
         }}
         if (target instanceof HTMLInputElement && target.id === "settings-lora-use-preset") {{
           syncLoraManualFieldsDisabled();
+        }}
+        if (target instanceof HTMLSelectElement && target.id === "settings-local-section") {{
+          refreshLocalSettingsSectionEditor({{ local_state: settingsLocalStateFrom(latestState) || settingsLocalStateCache || {{}} }});
+        }}
+        if (target instanceof HTMLSelectElement && target.id === "settings-module-section") {{
+          refreshModuleSettingsSectionEditor({{ local_state: settingsLocalStateFrom(latestState) || settingsLocalStateCache || {{}} }});
         }}
       }});
 
@@ -5426,6 +5652,34 @@ async function applyLoraSettings() {{
       if (applyBtn instanceof HTMLButtonElement) {{
         applyBtn.addEventListener("click", () => {{
           void applyLoraSettings();
+        }});
+      }}
+
+      const applyLocalBtn = document.getElementById("settings-apply-local");
+      if (applyLocalBtn instanceof HTMLButtonElement) {{
+        applyLocalBtn.addEventListener("click", () => {{
+          void applySectionSettings("local");
+        }});
+      }}
+
+      const applyModuleBtn = document.getElementById("settings-apply-module");
+      if (applyModuleBtn instanceof HTMLButtonElement) {{
+        applyModuleBtn.addEventListener("click", () => {{
+          void applySectionSettings("module");
+        }});
+      }}
+
+      const resetNodeDbBtn = document.getElementById("settings-reset-nodedb");
+      if (resetNodeDbBtn instanceof HTMLButtonElement) {{
+        resetNodeDbBtn.addEventListener("click", () => {{
+          void resetRadioNodeDb();
+        }});
+      }}
+
+      const resetDashboardDbBtn = document.getElementById("settings-reset-dashboard-db");
+      if (resetDashboardDbBtn instanceof HTMLButtonElement) {{
+        resetDashboardDbBtn.addEventListener("click", () => {{
+          void resetDashboardDb();
         }});
       }}
 

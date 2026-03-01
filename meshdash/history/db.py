@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import time
+from collections.abc import Iterable
 
 from ..helpers import to_int as _to_int
 from ..history_backfill import (
@@ -145,6 +146,52 @@ def prune_history_connection_with_policy(
         event_max_rows=policy.event_max_rows,
     )
 
+
+def _iter_history_table_names(conn: SqlConnection) -> Iterable[str]:
+    rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    ).fetchall()
+    for row in rows:
+        if not row:
+            continue
+        name = row[0]
+        if isinstance(name, str) and name:
+            yield name
+
+
+def reset_history_connection(conn: SqlConnection) -> int:
+    """Delete all rows from all non-system history tables.
+
+    Returns the total number of rows deleted across all tables.
+    """
+
+    deleted_total = 0
+    table_names = list(_iter_history_table_names(conn))
+    for table_name in table_names:
+        safe_name = table_name.replace('"', '""')
+        try:
+            before = conn.execute(f'SELECT COUNT(*) FROM "{safe_name}"').fetchone()
+            if before and isinstance(before[0], int):
+                deleted_total += int(before[0])
+        except Exception:
+            pass
+        conn.execute(f'DELETE FROM "{safe_name}"')
+
+    # Reset AUTOINCREMENT counters if present.
+    try:
+        conn.execute("DELETE FROM sqlite_sequence")
+    except Exception:
+        pass
+
+    # Best-effort WAL cleanup after large deletes.
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+
+    conn.commit()
+    return int(deleted_total)
+
 __all__ = [
     "initialize_history_schema",
     "open_and_initialize_history_connection",
@@ -152,4 +199,5 @@ __all__ = [
     "open_history_read_connection",
     "prune_history_connection",
     "prune_history_connection_with_policy",
+    "reset_history_connection",
 ]

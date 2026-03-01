@@ -99,9 +99,41 @@ class _LoraMessage:
         self.passthrough = None
 
 
+class _DeviceMessage:
+    DESCRIPTOR = _Descriptor(
+        {
+            "role": _FieldDesc(type_=_FieldDesc.TYPE_STRING),
+            "is_router": _FieldDesc(type_=_FieldDesc.TYPE_BOOL),
+        }
+    )
+
+    def __init__(self):
+        self.role = "CLIENT"
+        self.is_router = False
+
+
+class _MqttMessage:
+    DESCRIPTOR = _Descriptor(
+        {
+            "enabled": _FieldDesc(type_=_FieldDesc.TYPE_BOOL),
+            "address": _FieldDesc(type_=_FieldDesc.TYPE_STRING),
+        }
+    )
+
+    def __init__(self):
+        self.enabled = False
+        self.address = ""
+
+
 class _LocalConfig:
-    def __init__(self, lora: _LoraMessage | None):
+    def __init__(self, lora: _LoraMessage | None, device: _DeviceMessage | None):
         self.lora = lora
+        self.device = device
+
+
+class _ModuleConfig:
+    def __init__(self, mqtt: _MqttMessage | None):
+        self.mqtt = mqtt
 
 
 class _FakeNode:
@@ -110,20 +142,39 @@ class _FakeNode:
         *,
         has_local_config: bool = True,
         has_lora: bool = True,
+        has_device: bool = True,
+        has_module_config: bool = True,
+        has_mqtt: bool = True,
+        has_reset: bool = True,
         has_write: bool = True,
         write_error: Exception | None = None,
+        reset_error: Exception | None = None,
         begin_error: bool = False,
         commit_error: bool = False,
     ):
-        self.localConfig = _LocalConfig(_LoraMessage() if has_lora else None) if has_local_config else None
+        self.localConfig = (
+            _LocalConfig(
+                _LoraMessage() if has_lora else None,
+                _DeviceMessage() if has_device else None,
+            )
+            if has_local_config
+            else None
+        )
+        self.moduleConfig = (
+            _ModuleConfig(_MqttMessage() if has_mqtt else None) if has_module_config else None
+        )
         self.begin_calls = 0
         self.write_calls: list[str] = []
         self.commit_calls = 0
+        self.reset_calls = 0
         self._write_error = write_error
+        self._reset_error = reset_error
         self._begin_error = begin_error
         self._commit_error = commit_error
         if not has_write:
             self.writeConfig = None
+        if not has_reset:
+            self.resetNodeDb = None
 
     def beginSettingsTransaction(self):
         self.begin_calls += 1
@@ -140,6 +191,11 @@ class _FakeNode:
         if self._commit_error:
             raise RuntimeError("commit failed")
 
+    def resetNodeDb(self):
+        self.reset_calls += 1
+        if self._reset_error is not None:
+            raise self._reset_error
+
 
 class _FakeLock:
     def __init__(self):
@@ -153,12 +209,52 @@ class _FakeLock:
         self.release_calls += 1
 
 
+class _CtxLock:
+    def __init__(self):
+        self.entered = 0
+        self.exited = 0
+
+    def __enter__(self):
+        self.entered += 1
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.exited += 1
+        return False
+
+
+class _FakeHistoryStore:
+    def __init__(self, *, deleted_rows: int = 0, error: Exception | None = None):
+        self.deleted_rows = deleted_rows
+        self.error = error
+        self.reset_calls = 0
+
+    def reset(self):
+        self.reset_calls += 1
+        if self.error is not None:
+            raise self.error
+        return self.deleted_rows
+
+
+class _FakeTracker:
+    def __init__(self):
+        self._lock = _CtxLock()
+        self.edges = {"a": 1}
+        self._historical_edges = {"b": 2}
+        self.port_counts = {"text": 5}
+        self.recent_packets = [1, 2, 3]
+        self.recent_chat = [4, 5]
+        self.live_packet_count = 42
+
+
 def _iface_with_local_node(node: object):
     class _Iface:
         pass
 
     iface = _Iface()
     iface.localNode = node
+    iface.nodesByNum = {}
+    iface.nodes = {}
     return iface
 
 
@@ -259,6 +355,8 @@ def test_apply_radio_settings_success_converts_types_and_writes():
         "passthrough",
     }
     assert set(response["ignored_fields"]) == {"unknown_field", "none_field"}
+    assert response["actions_applied"] == []
+    assert response["write_sections"] == ["lora"]
     assert response["reboot_expected"] is True
     assert lora.hop_limit == 3
     assert lora.tx_power == 14.5
@@ -282,7 +380,7 @@ def test_apply_radio_settings_handles_missing_input_or_config():
         send_lock=_FakeLock(),
     )
     assert empty["ok"] is False
-    assert "No settings provided" in str(empty["error"])
+    assert "No settings/actions provided" in str(empty["error"])
 
     missing_local_config = apply_radio_settings(
         RadioSettingsRequest(lora={"hop_limit": 3}),
@@ -309,7 +407,7 @@ def test_apply_radio_settings_rejects_when_no_valid_fields():
     )
 
     assert response["ok"] is False
-    assert "No valid fields to apply" in str(response["error"])
+    assert "No valid fields/actions to apply" in str(response["error"])
     assert set(response["ignored_fields"]) == {"unknown_field", "none_field"}
 
 
@@ -353,3 +451,134 @@ def test_apply_radio_settings_allows_getnode_and_non_lock_object():
     assert node.begin_calls == 1
     assert node.commit_calls == 1
     assert node.write_calls == ["lora"]
+
+
+def test_apply_radio_settings_supports_local_and_module_section_updates():
+    node = _FakeNode()
+    response = apply_radio_settings(
+        RadioSettingsRequest(
+            local={"device": {"role": "ROUTER", "is_router": "yes"}},
+            module={"mqtt": {"enabled": "true", "address": "mqtt.local"}},
+        ),
+        iface=_iface_with_local_node(node),
+        send_lock=_FakeLock(),
+    )
+
+    assert response["ok"] is True
+    assert response["applied"] == {
+        "local": {"device": {"role": "ROUTER", "is_router": "yes"}},
+        "module": {"mqtt": {"enabled": "true", "address": "mqtt.local"}},
+    }
+    assert set(response["applied_fields"]) == {
+        "local.device.role",
+        "local.device.is_router",
+        "module.mqtt.enabled",
+        "module.mqtt.address",
+    }
+    assert response["write_sections"] == ["device", "mqtt"]
+    assert node.localConfig.device.role == "ROUTER"
+    assert node.localConfig.device.is_router is True
+    assert node.moduleConfig.mqtt.enabled is True
+    assert node.moduleConfig.mqtt.address == "mqtt.local"
+    assert node.write_calls == ["device", "mqtt"]
+
+
+def test_apply_radio_settings_supports_reset_nodedb_action():
+    node = _FakeNode()
+    response = apply_radio_settings(
+        RadioSettingsRequest(actions={"reset_nodedb": True}),
+        iface=_iface_with_local_node(node),
+        send_lock=_FakeLock(),
+    )
+
+    assert response["ok"] is True
+    assert response["actions_applied"] == ["reset_nodedb"]
+    assert response["write_sections"] == []
+    assert node.reset_calls == 1
+    assert response["reboot_expected"] is True
+
+
+def test_apply_radio_settings_reset_nodedb_clears_iface_and_tracker_caches():
+    node = _FakeNode()
+    tracker = _FakeTracker()
+    iface = _iface_with_local_node(node)
+    iface.nodesByNum = {1: {"user": {"id": "!aaaa0001"}}}
+    iface.nodes = {"!aaaa0001": {"user": {"id": "!aaaa0001"}}}
+
+    response = apply_radio_settings(
+        RadioSettingsRequest(actions={"reset_nodedb": True}),
+        iface=iface,
+        send_lock=_FakeLock(),
+        tracker=tracker,
+    )
+
+    assert response["ok"] is True
+    assert response["actions_applied"] == ["reset_nodedb"]
+    assert iface.nodesByNum == {}
+    assert iface.nodes == {}
+    assert tracker.edges == {}
+    assert tracker._historical_edges == {}
+    assert tracker.port_counts == {}
+    assert tracker.recent_packets == []
+    assert tracker.recent_chat == []
+    assert tracker.live_packet_count == 0
+
+
+def test_apply_radio_settings_reset_nodedb_requires_supported_node_method():
+    response = apply_radio_settings(
+        RadioSettingsRequest(actions={"reset_nodedb": True}),
+        iface=_iface_with_local_node(_FakeNode(has_reset=False)),
+        send_lock=_FakeLock(),
+    )
+    assert response["ok"] is False
+    assert "does not support resetNodeDb" in str(response["error"])
+
+
+def test_apply_radio_settings_uses_local_lora_payload_too():
+    node = _FakeNode()
+    response = apply_radio_settings(
+        RadioSettingsRequest(local={"lora": {"hop_limit": 4}}),
+        iface=_iface_with_local_node(node),
+        send_lock=_FakeLock(),
+    )
+    assert response["ok"] is True
+    assert response["applied_fields"] == ["hop_limit"]
+    assert node.localConfig.lora.hop_limit == 4
+    assert node.write_calls == ["lora"]
+
+
+def test_apply_radio_settings_supports_reset_dashboard_db_action():
+    history_store = _FakeHistoryStore(deleted_rows=123)
+    tracker = _FakeTracker()
+    response = apply_radio_settings(
+        RadioSettingsRequest(actions={"reset_dashboard_db": True}),
+        iface=_iface_with_local_node(_FakeNode()),
+        send_lock=_FakeLock(),
+        history_store=history_store,
+        tracker=tracker,
+    )
+
+    assert response["ok"] is True
+    assert response["actions_applied"] == ["reset_dashboard_db"]
+    assert response["deleted_history_rows"] == 123
+    assert response["reboot_expected"] is False
+    assert history_store.reset_calls == 1
+    assert tracker.edges == {}
+    assert tracker._historical_edges == {}
+    assert tracker.port_counts == {}
+    assert tracker.recent_packets == []
+    assert tracker.recent_chat == []
+    assert tracker.live_packet_count == 0
+    assert tracker._lock.entered == 1
+    assert tracker._lock.exited == 1
+
+
+def test_apply_radio_settings_reset_dashboard_db_requires_history_store():
+    response = apply_radio_settings(
+        RadioSettingsRequest(actions={"reset_dashboard_db": True}),
+        iface=_iface_with_local_node(_FakeNode()),
+        send_lock=_FakeLock(),
+        history_store=None,
+    )
+    assert response["ok"] is False
+    assert "Dashboard history reset failed" in str(response["error"])
