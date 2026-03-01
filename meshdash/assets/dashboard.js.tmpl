@@ -76,6 +76,7 @@
 
     const mapElement = document.getElementById("map");
     const mapFrameElement = mapElement ? mapElement.closest(".map-frame") : null;
+    const topbarElement = document.querySelector(".topbar");
     const nodeLayer = L.layerGroup().addTo(map);
     const edgeLayer = L.layerGroup().addTo(map);
     const trailLayer = L.layerGroup().addTo(map);
@@ -567,6 +568,9 @@
     let lastMapRenderMode = "";
     let mapResizeRaf = null;
     let mapResizeStabilizeTimers = [];
+    let topbarLayoutSyncRaf = null;
+    let topbarStickyOffsetPx = 72;
+    let workspaceViewportOffsetPx = 84;
     let splitPct = 64;
     let splitTopPx = 430;
     let splitMidPx = 250;
@@ -733,6 +737,39 @@
       splitLowPx = clampLowSplitPx(splitLowPx);
       applySplitState();
       requestMapResize();
+    }}
+
+    function syncTopbarLayoutMetrics() {{
+      const rootStyle = document.documentElement && document.documentElement.style;
+      if (!rootStyle) return;
+      let measuredHeight = 0;
+      if (topbarElement instanceof HTMLElement) {{
+        const rect = topbarElement.getBoundingClientRect();
+        const rawHeight = Number(rect && rect.height);
+        if (Number.isFinite(rawHeight) && rawHeight > 0) {{
+          measuredHeight = rawHeight;
+        }}
+      }}
+      const nextStickyOffset = Math.max(72, Math.ceil(measuredHeight || 0));
+      const nextViewportOffset = nextStickyOffset + 10;
+      if (nextStickyOffset !== topbarStickyOffsetPx) {{
+        topbarStickyOffsetPx = nextStickyOffset;
+        rootStyle.setProperty("--topbar-sticky-offset", `${{nextStickyOffset}}px`);
+      }}
+      if (nextViewportOffset !== workspaceViewportOffsetPx) {{
+        workspaceViewportOffsetPx = nextViewportOffset;
+        rootStyle.setProperty("--workspace-viewport-offset", `${{nextViewportOffset}}px`);
+      }}
+    }}
+
+    function requestTopbarLayoutMetricsSync() {{
+      if (topbarLayoutSyncRaf != null) {{
+        cancelAnimationFrame(topbarLayoutSyncRaf);
+      }}
+      topbarLayoutSyncRaf = requestAnimationFrame(() => {{
+        topbarLayoutSyncRaf = null;
+        syncTopbarLayoutMetrics();
+      }});
     }}
 
     function bindMapContainerObserver() {{
@@ -1698,7 +1735,11 @@
       }});
     }});
     window.addEventListener("resize", () => {{
-      setTimeout(syncMapSize, 120);
+      requestTopbarLayoutMetricsSync();
+      setTimeout(() => {{
+        syncMapSize();
+        requestTopbarLayoutMetricsSync();
+      }}, 120);
     }});
 
     function setText(id, value) {{
@@ -6623,6 +6664,7 @@
           const detail = disk.error ? ` (${{disk.error}})` : "";
           diskMeter.title = `Disk free on dashboard host${{detail}}`;
         }}
+        requestTopbarLayoutMetricsSync();
         return;
       }}
 
@@ -6646,6 +6688,7 @@
         const totalText = totalGiB == null ? "n/a" : totalGiB.toFixed(1);
         diskMeter.title = `Disk free on dashboard host (${{freeText}} GiB / ${{totalText}} GiB, path: ${{disk.path || "n/a"}})`;
       }}
+      requestTopbarLayoutMetricsSync();
     }}
 
     function hashTrailSignature(nodeHistory, selection) {{
@@ -9092,7 +9135,7 @@
         const data = await fetchSummaryMetrics(hoursOverride);
         hydrateTickerSeriesFromSummaryMetrics(data);
         summaryMetricsHydrated = true;
-        if (latestState && activeLayoutView !== "chat") {{
+        if (latestState) {{
           renderSummary(latestState);
         }}
       }} catch (_err) {{
@@ -10115,9 +10158,7 @@
           const traffic304 = (latestState.traffic && typeof latestState.traffic === "object")
             ? latestState.traffic
             : {{}};
-          if (activeLayoutView !== "chat") {{
-            renderSummary(latestState);
-          }}
+          renderSummary(latestState);
           if (mapVisible304) {{
             renderMap(nodes304, traffic304.edges || [], cachedHistory304);
           }}
@@ -10198,11 +10239,9 @@
             }};
           }}
         }}
-        // UI rendering is view-specific; updating hidden panes is wasted work and can
-        // cause jank on slower devices.
-        if (activeLayoutView !== "chat") {{
-          renderSummary(state);
-        }}
+        // Summary metrics now live in the global header ticker row, so keep them
+        // refreshed for every active view.
+        renderSummary(state);
 
         if (mapVisible) {{
           renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], cachedHistory);
@@ -10261,6 +10300,7 @@
 
     loadStoredSelection();
     loadNodeNameCache();
+    requestTopbarLayoutMetricsSync();
     renderSelfRadioPill();
     loadFavoriteNodes();
     loadSplitState();
