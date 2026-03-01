@@ -2047,30 +2047,29 @@
       background: var(--saved-pane-divider-bg);
       pointer-events: none;
     }}
-    .layout.view-saved .map-card-head .pane-head-title,
-    .layout.view-saved .map-card-head .pane-head-actions {{
-      border: 1px solid var(--saved-pane-head-border);
-      border-radius: 8px 8px 0 0;
-      background: var(--saved-pane-head-bg);
-      min-height: 32px;
-      border-bottom: 0;
-      margin: 0;
-    }}
     .layout.view-saved .map-card-head .pane-head-title {{
       grid-column: 1;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 8px;
+      min-height: 32px;
+      margin: 0;
+      border: 0;
+      border-bottom: 1px solid var(--saved-pane-head-border);
+      border-radius: 0;
+      background: transparent;
       padding: 8px 10px 7px 10px;
     }}
     .layout.view-saved .map-card-head #map-card-title-text {{
+      order: 1;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }}
     .layout.view-saved .map-card-head .map-title-favorite-btn {{
-      margin-left: auto;
+      order: 2;
+      margin-left: 6px;
       transform: none;
     }}
     .layout.view-saved .map-card-head .pane-head-actions {{
@@ -2080,6 +2079,12 @@
       justify-content: flex-end;
       gap: 8px;
       flex-wrap: wrap;
+      min-height: 32px;
+      margin: 0;
+      border: 1px solid var(--saved-pane-head-border);
+      border-radius: 8px 8px 0 0;
+      border-bottom: 0;
+      background: var(--saved-pane-head-bg);
       padding: 6px 8px;
     }}
     .layout.view-saved .map .body {{
@@ -4538,14 +4543,16 @@
       --saved-pane-divider-line: #44566a;
       --saved-pane-divider-line-active: #79c0ff;
     }}
-    [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-title,
     [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-actions {{
       border-color: var(--saved-pane-head-border);
       background: var(--saved-pane-head-bg);
     }}
     [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-title {{
       color: var(--ui-text-soft) !important;
-      border-width: 1px;
+      border: 0;
+      border-bottom: 1px solid var(--saved-pane-head-border);
+      border-radius: 0;
+      background: transparent;
       padding: 8px 10px 7px 10px;
     }}
     [data-theme="dark"] .map-heatmap-wrap {{
