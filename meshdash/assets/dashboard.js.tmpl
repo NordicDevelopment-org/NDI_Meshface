@@ -183,6 +183,7 @@
     const signalHeatmapModeStorageKey = "meshDashboardSignalHeatmapModeV1";
     const themeSettingsEndpoint = "/api/settings/theme";
     const radioSettingsEndpoint = "/api/settings/radio";
+    const channelSettingsEndpoint = "/api/settings/channels";
     const themeAcceptedModes = new Set(["auto", "dark", "light"]);
     const chatBottomStickThresholdPx = 28;
     const chatWarnWindowSeconds = 10 * 60;
@@ -5847,6 +5848,9 @@
     function refreshSettingsSectionEditors(state) {{
       refreshLocalSettingsSectionEditor(state);
       refreshModuleSettingsSectionEditor(state);
+      try {{
+        renderChannelsTable(settingsLocalStateFrom(state) || {{}});
+      }} catch (_err) {{}}
     }}
 
     function renderSettings(state, force = false) {{
@@ -5949,6 +5953,7 @@
         "settings-apply-module",
         "settings-reset-nodedb",
         "settings-reset-dashboard-db",
+        "settings-export-channel-url",
       ]) {{
         const el = document.getElementById(id);
         if (el instanceof HTMLButtonElement) {{
@@ -5956,6 +5961,285 @@
         }}
       }}
     }}
+
+    async function copyTextToClipboard(text) {{
+      const value = String(text || "");
+      if (!value) return false;
+
+      try {{
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {{
+          await navigator.clipboard.writeText(value);
+          return true;
+        }}
+      }} catch (_err) {{
+        // Fallback below.
+      }}
+
+      try {{
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.setAttribute("readonly", "true");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        return !!ok;
+      }} catch (_err) {{
+        return false;
+      }}
+    }}
+
+    function renderChannelsTable(localState) {{
+      const tbody = document.getElementById("settings-channels-tbody");
+      if (!(tbody instanceof HTMLElement)) return;
+
+      const channels = localState && Array.isArray(localState.channels) ? localState.channels : null;
+      tbody.innerHTML = "";
+
+      if (!channels || !channels.length) {{
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 7;
+        td.className = "settings-channels-empty";
+        td.textContent = "No channel data. Click “Fetch settings” to load channels from the radio.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }}
+
+      const sorted = [...channels].sort((a, b) => {{
+        const ai = Number(a && a.index != null ? a.index : 0);
+        const bi = Number(b && b.index != null ? b.index : 0);
+        return ai - bi;
+      }});
+
+      for (const ch of sorted) {{
+        const idx = Number(ch && ch.index != null ? ch.index : 0);
+        const role = String(ch && ch.role != null ? ch.role : "");
+        const settings = ch && typeof ch.settings === "object" && ch.settings ? ch.settings : {{}};
+
+        const nameValue = String(settings.name || "");
+        const uplinkEnabled = !!settings.uplink_enabled;
+        const downlinkEnabled = !!settings.downlink_enabled;
+
+        const tr = document.createElement("tr");
+        tr.dataset.channelIndex = String(idx);
+        tr.dataset.channelRole = role;
+
+        const tdIndex = document.createElement("td");
+        tdIndex.textContent = String(idx);
+        tr.appendChild(tdIndex);
+
+        const tdRole = document.createElement("td");
+        tdRole.textContent = role || "";
+        tr.appendChild(tdRole);
+
+        const tdName = document.createElement("td");
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "settings-input";
+        nameInput.value = nameValue;
+        nameInput.placeholder = role === "DISABLED" ? "New channel name" : "";
+        nameInput.dataset.field = "name";
+        tdName.appendChild(nameInput);
+        tr.appendChild(tdName);
+
+        const tdUplink = document.createElement("td");
+        const uplink = document.createElement("input");
+        uplink.type = "checkbox";
+        uplink.checked = uplinkEnabled;
+        uplink.dataset.field = "uplink_enabled";
+        tdUplink.appendChild(uplink);
+        tr.appendChild(tdUplink);
+
+        const tdDownlink = document.createElement("td");
+        const downlink = document.createElement("input");
+        downlink.type = "checkbox";
+        downlink.checked = downlinkEnabled;
+        downlink.dataset.field = "downlink_enabled";
+        tdDownlink.appendChild(downlink);
+        tr.appendChild(tdDownlink);
+
+        const tdPsk = document.createElement("td");
+        const psk = document.createElement("input");
+        psk.type = "text";
+        psk.className = "settings-input";
+        psk.value = "";
+        const pskHint = (settings.psk && String(settings.psk) === "<redacted>") ? "<redacted>" : "leave blank to keep";
+        psk.placeholder = pskHint;
+        psk.dataset.field = "psk";
+        tdPsk.appendChild(psk);
+        tr.appendChild(tdPsk);
+
+        const tdActions = document.createElement("td");
+        const actions = document.createElement("div");
+        actions.className = "settings-channels-actions";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "btn btn-secondary";
+        saveBtn.dataset.channelAction = "save";
+        saveBtn.dataset.channelIndex = String(idx);
+        saveBtn.textContent = role === "DISABLED" ? "Add" : "Save";
+        actions.appendChild(saveBtn);
+
+        if (idx > 0 && role !== "DISABLED") {{
+          const disableBtn = document.createElement("button");
+          disableBtn.type = "button";
+          disableBtn.className = "btn btn-danger";
+          disableBtn.dataset.channelAction = "disable";
+          disableBtn.dataset.channelIndex = String(idx);
+          disableBtn.textContent = "Disable";
+          actions.appendChild(disableBtn);
+        }}
+
+        tdActions.appendChild(actions);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      }}
+    }}
+
+    async function postChannelSettingsPayload(payload, pendingLabel, successLabel) {{
+      if (settingsApplyInFlight) return {{ ok: false, data: null }};
+      settingsApplyInFlight = true;
+      setSettingsButtonsDisabled(true);
+      setText("settings-apply-status", pendingLabel);
+      try {{
+        const resp = await fetch(channelSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(payload),
+        }});
+
+        const text = await resp.text();
+        let parsed = null;
+        try {{
+          parsed = text ? JSON.parse(text) : null;
+        }} catch (_err) {{
+        }}
+
+        if (!resp.ok) {{
+          const errMsg = parsed && parsed.error ? String(parsed.error) : (text || `HTTP ${{resp.status}}`);
+          setText("settings-apply-status", `Channel update failed: ${{errMsg}}`);
+          appendConsoleLine(`channels|${{Date.now()}}|error`, `[channels] update failed: ${{errMsg}}`);
+          return {{ ok: false, data: parsed }};
+        }}
+
+        const rebootHint = parsed && parsed.reboot_expected ? " Radio may reconnect." : "";
+        const fieldsHint =
+          parsed && Array.isArray(parsed.applied_fields) && parsed.applied_fields.length
+            ? ` Applied: ${{parsed.applied_fields.join(", ")}}.`
+            : "";
+        setText("settings-apply-status", `Applied. ${{successLabel}}.${{rebootHint}}${{fieldsHint}}`);
+        appendConsoleLine(
+          `channels|${{Date.now()}}|ok`,
+          `[channels] ${{successLabel}}.${{rebootHint}}${{fieldsHint}}`
+        );
+        clearSettingsDirty();
+        return {{ ok: true, data: parsed }};
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        setText("settings-apply-status", `Channel update error: ${{msg}}`);
+        appendConsoleLine(`channels|${{Date.now()}}|error`, `[channels] update error: ${{msg}}`);
+        return {{ ok: false, data: null }};
+      }} finally {{
+        settingsApplyInFlight = false;
+        setSettingsButtonsDisabled(false);
+      }}
+    }}
+
+    function readChannelRowSettings(row) {{
+      if (!(row instanceof HTMLElement)) return null;
+      const getInput = (field) => row.querySelector(`[data-field=\"${{field}}\"]`);
+      const nameEl = getInput("name");
+      const uplinkEl = getInput("uplink_enabled");
+      const downlinkEl = getInput("downlink_enabled");
+      const pskEl = getInput("psk");
+
+      const settings = {{}};
+      if (nameEl instanceof HTMLInputElement) {{
+        settings.name = String(nameEl.value || "").trim();
+      }}
+      if (uplinkEl instanceof HTMLInputElement && uplinkEl.type === "checkbox") {{
+        settings.uplink_enabled = !!uplinkEl.checked;
+      }}
+      if (downlinkEl instanceof HTMLInputElement && downlinkEl.type === "checkbox") {{
+        settings.downlink_enabled = !!downlinkEl.checked;
+      }}
+      if (pskEl instanceof HTMLInputElement) {{
+        const pskValue = String(pskEl.value || "").trim();
+        if (pskValue) settings.psk = pskValue;
+      }}
+      return settings;
+    }}
+
+    async function handleChannelSave(index) {{
+      const idx = Number(index);
+      const row = document.querySelector(`#settings-channels-tbody tr[data-channel-index=\"${{idx}}\"]`);
+      if (!(row instanceof HTMLElement)) return;
+
+      const role = String(row.dataset.channelRole || "");
+      const settings = readChannelRowSettings(row) || {{}};
+
+      if (role === "DISABLED" && !settings.name) {{
+        setText("settings-apply-status", "Channel name is required to add a channel.");
+        return;
+      }}
+
+      const payload = {{
+        action: "upsert",
+        channel_index: idx,
+        settings,
+      }};
+
+      if (role === "DISABLED") {{
+        payload.role = "SECONDARY";
+      }}
+
+      const label = role === "DISABLED" ? `Adding channel ${{idx}}…` : `Saving channel ${{idx}}…`;
+      const res = await postChannelSettingsPayload(payload, label, `Channel ${{idx}} updated`);
+      if (res.ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 700);
+      }}
+    }}
+
+    async function handleChannelDisable(index) {{
+      const idx = Number(index);
+      if (!Number.isFinite(idx) || idx <= 0) return;
+
+      const payload = {{
+        action: "disable",
+        channel_index: idx,
+      }};
+      const res = await postChannelSettingsPayload(payload, `Disabling channel ${{idx}}…`, `Channel ${{idx}} disabled`);
+      if (res.ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 700);
+      }}
+    }}
+
+    async function handleChannelExportUrl() {{
+      const payload = {{
+        action: "export_url",
+        include_all: true,
+      }};
+      const res = await postChannelSettingsPayload(payload, "Exporting channel URL…", "Channel URL exported");
+      if (res.ok && res.data && typeof res.data.url === "string") {{
+        const ok = await copyTextToClipboard(res.data.url);
+        setText(
+          "settings-apply-status",
+          ok ? "Channel URL copied to clipboard." : "Channel URL generated. (Clipboard copy blocked by browser.)"
+        );
+      }}
+    }}
+
 
     function parseSectionJsonTextarea(textareaId) {{
       const textarea = document.getElementById(textareaId);
@@ -6341,6 +6625,31 @@
           clearSettingsDirty();
           settingsAutoFetchAttempted = true;
           void fetchSettingsFromRadio();
+        }});
+      }}
+
+      const exportUrlBtn = document.getElementById("settings-export-channel-url");
+      if (exportUrlBtn instanceof HTMLButtonElement) {{
+        exportUrlBtn.addEventListener("click", () => {{
+          void handleChannelExportUrl();
+        }});
+      }}
+
+      const channelsTbody = document.getElementById("settings-channels-tbody");
+      if (channelsTbody instanceof HTMLElement) {{
+        channelsTbody.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof HTMLElement)) return;
+          if (target instanceof HTMLButtonElement) {{
+            const action = String(target.dataset.channelAction || "");
+            const index = String(target.dataset.channelIndex || "");
+            if (!action || !index) return;
+            if (action === "save") {{
+              void handleChannelSave(index);
+            }} else if (action === "disable") {{
+              void handleChannelDisable(index);
+            }}
+          }}
         }});
       }}
     }}

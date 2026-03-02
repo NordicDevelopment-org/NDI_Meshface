@@ -6,6 +6,7 @@ from .api_inputs import (
     NodeHistoryQuery,
     OnlineActivityQuery,
     RadioSettingsRequest,
+    ChannelSettingsRequest,
     ThemeSettingsRequest,
 )
 from .http_handler_contracts import DashboardHttpHandler
@@ -133,8 +134,18 @@ class ParseRadioSettingsRequestFn(Protocol):
         ...
 
 
+class ParseChannelSettingsRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> ChannelSettingsRequest:
+        ...
+
+
 class ApplyRadioSettingsFn(Protocol):
     def __call__(self, request: RadioSettingsRequest) -> dict[str, object]:
+        ...
+
+
+class ApplyChannelSettingsFn(Protocol):
+    def __call__(self, request: ChannelSettingsRequest) -> dict[str, object]:
         ...
 
 
@@ -205,3 +216,5 @@ class DashboardPostRouteDependencies:
     parse_theme_settings_request_fn: Optional[ParseThemeSettingsRequestFn] = None
     apply_radio_settings_fn: Optional[ApplyRadioSettingsFn] = None
     parse_radio_settings_request_fn: Optional[ParseRadioSettingsRequestFn] = None
+    apply_channel_settings_fn: Optional[ApplyChannelSettingsFn] = None
+    parse_channel_settings_request_fn: Optional[ParseChannelSettingsRequestFn] = None

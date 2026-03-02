@@ -330,6 +330,52 @@
           </div>
 
           <div class="settings-panel settings-panel-wide">
+            <h3>Channels</h3>
+            <div class="settings-fields">
+              <div class="settings-caption">
+                Manage Meshtastic channels on the <strong>local</strong> radio. Changes are applied via admin messages and may reboot the device.
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-field settings-inline" style="flex: 1;">
+                  <label class="settings-label" for="settings-channels-help">Tips</label>
+                  <div id="settings-channels-help" class="settings-danger-note" style="margin: 0;">
+                    <div><strong>PSK:</strong> leave blank to keep existing. You can enter <code>default</code>, <code>random</code>, <code>none</code>, <code>simple15</code>, or <code>base64:&lt;key&gt;</code>.</div>
+                    <div><strong>Gaps:</strong> channels must be consecutive (0..N). Disable from the end; add the next available slot.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-field" style="flex: 1; overflow-x: auto;">
+                  <table class="settings-channels-table" id="settings-channels-table">
+                    <thead>
+                      <tr>
+                        <th>Index</th>
+                        <th>Role</th>
+                        <th>Name</th>
+                        <th>Uplink</th>
+                        <th>Downlink</th>
+                        <th>PSK (new)</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="settings-channels-tbody">
+                      <tr><td colspan="7" class="settings-channels-empty">Fetch settings to load channels.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="settings-row settings-actions">
+                <button id="settings-export-channel-url" class="btn btn-secondary" type="button">
+                  Copy Channel URL (all)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel settings-panel-wide">
             <h3>Advanced Config</h3>
             <div class="settings-fields">
               <label class="settings-field">

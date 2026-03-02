@@ -199,6 +199,23 @@ def build_dashboard_runtime_context(
 
         setattr(loaders.state_fn, "apply_radio_settings_fn", _apply_radio_settings_fn)
 
+    # Optional: attach channel settings application hook.
+    try:
+        from .services_channels import apply_channel_settings as _apply_channel_settings
+    except Exception:
+        _apply_channel_settings = None
+
+    if _apply_channel_settings is not None:
+        def _apply_channel_settings_fn(request):  # type: ignore[no-redef]
+            return _apply_channel_settings(
+                request,
+                iface=iface,
+                send_lock=send_lock,
+                show_secrets=args.show_secrets,
+            )
+
+        setattr(loaders.state_fn, "apply_channel_settings_fn", _apply_channel_settings_fn)
+
     return DashboardRuntimeContext(
         target=target,
         iface=iface,
