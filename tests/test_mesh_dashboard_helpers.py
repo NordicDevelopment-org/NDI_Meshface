@@ -46,6 +46,8 @@ def test_extract_reply_id_accepts_both_key_styles():
 def test_extract_emoji_codepoint_accepts_int_string_and_glyph():
     assert extract_emoji_codepoint({"emoji": 128077}) == 128077
     assert extract_emoji_codepoint({"emoji": "128077"}) == 128077
+    assert extract_emoji_codepoint({"emoji": "U+1F44D"}) == 0x1F44D
+    assert extract_emoji_codepoint({"emoji": "1F44D"}) == 0x1F44D
     assert extract_emoji_codepoint({"emoji": "👍"}) == ord("👍")
     assert extract_emoji_codepoint({"emoji": ""}) is None
     assert extract_emoji_codepoint({"emoji": 0}) is None
@@ -62,6 +64,16 @@ def test_normalize_single_emoji_accepts_codepoint_string():
     glyph, codepoint = normalize_single_emoji(str(ord("😀")))
     assert glyph == "😀"
     assert codepoint == ord("😀")
+
+
+def test_normalize_single_emoji_accepts_hex_and_variation_selector():
+    glyph, codepoint = normalize_single_emoji("U+1F955")
+    assert glyph == "🥕"
+    assert codepoint == 0x1F955
+
+    glyph, codepoint = normalize_single_emoji("🥕\ufe0f")
+    assert glyph == "🥕"
+    assert codepoint == 0x1F955
 
 
 def test_disk_space_info_has_expected_shape_for_current_dir():

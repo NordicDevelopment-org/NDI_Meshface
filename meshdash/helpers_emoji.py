@@ -1,6 +1,10 @@
+import re
 from typing import Optional
 
 from .helpers_types import to_int as _to_int
+
+_HEX_CODEPOINT_RE = re.compile(r"^(?:U\+)?([0-9A-Fa-f]{4,8})$")
+_SKIP_LEADING_CODEPOINTS = {0xFE0E, 0xFE0F}
 
 
 def emoji_from_codepoint(codepoint: Optional[int]) -> Optional[str]:
@@ -13,21 +17,39 @@ def emoji_from_codepoint(codepoint: Optional[int]) -> Optional[str]:
         return None
 
 
-def normalize_single_emoji(value: object) -> tuple[Optional[str], Optional[int]]:
+def emoji_codepoint_from_any(value: object) -> Optional[int]:
     if value is None:
-        return None, None
-    text = str(value).strip()
-    if not text:
-        return None, None
+        return None
+    if isinstance(value, str):
+        clean = value.strip()
+        if not clean:
+            return None
+        as_int = _to_int(clean)
+        if as_int is not None:
+            return as_int if as_int > 0 else None
+        match = _HEX_CODEPOINT_RE.fullmatch(clean)
+        if match:
+            try:
+                parsed = int(match.group(1), 16)
+            except ValueError:
+                parsed = None
+            return parsed if parsed is not None and parsed > 0 else None
+        for ch in clean:
+            codepoint = ord(ch)
+            if codepoint in _SKIP_LEADING_CODEPOINTS:
+                continue
+            return codepoint if codepoint > 0 else None
+        return None
+    as_int = _to_int(value)
+    if as_int is None or as_int <= 0:
+        return None
+    return as_int
 
-    as_int = _to_int(text)
-    if as_int is not None and as_int > 0:
-        emoji = emoji_from_codepoint(as_int)
-        if emoji:
-            return emoji, as_int
-        return None, None
 
-    codepoint = ord(text[0])
+def normalize_single_emoji(value: object) -> tuple[Optional[str], Optional[int]]:
+    codepoint = emoji_codepoint_from_any(value)
+    if codepoint is None:
+        return None, None
     emoji = emoji_from_codepoint(codepoint)
     if emoji:
         return emoji, codepoint
