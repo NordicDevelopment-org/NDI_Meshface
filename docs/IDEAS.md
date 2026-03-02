@@ -2,13 +2,7 @@
 
 
 
-- settings
-- add set time
-- look for other easy wins
-
 - split the UPDATE ticker into two rows, RADIO TIME and UPTIME and just call the ticker time
-
-- update network to match node style
 
 - style chat to match closer to node / network.
 - Render html links in chat as a link
