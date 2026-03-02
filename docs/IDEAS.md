@@ -1,6 +1,7 @@
 # Ideas Backlog
 
 
+- add UI for channels
 
 - split the UPDATE ticker into two rows, RADIO TIME and UPTIME and just call the ticker time
 
