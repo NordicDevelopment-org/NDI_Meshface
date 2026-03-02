@@ -9959,6 +9959,8 @@
         }}
       }};
 
+      const reactionVariationSelectors = new Set([0xFE0E, 0xFE0F]);
+
       const emojiFromAny = (rawValue) => {{
         if (rawValue == null) return "";
         if (typeof rawValue === "number") {{
@@ -9988,13 +9990,25 @@
         return raw;
       }};
 
+      const canonicalReactionEmoji = (rawValue) => {{
+        const glyph = emojiFromAny(rawValue);
+        if (!glyph) return "";
+        for (const ch of glyph) {{
+          const cp = ch.codePointAt(0);
+          if (!Number.isInteger(cp)) continue;
+          if (reactionVariationSelectors.has(cp)) continue;
+          return emojiFromCodepointValue(cp);
+        }}
+        return "";
+      }};
+
       const emojiFromTextPayload = (rawValue) => {{
         const text = String(rawValue == null ? "" : rawValue).trim();
         if (!text) return "";
         // Do not treat regular chat text as emoji fallback.
         if (text.length > 8 || /\\s/.test(text)) return "";
         if (/^[0-9A-Za-z.,;:!?'"`~_\\-]+$/.test(text)) return "";
-        const glyph = emojiFromAny(text);
+        const glyph = canonicalReactionEmoji(text);
         if (!glyph) return "";
         // Keep fallback conservative: one emoji (optionally with variation/joiners).
         const clusters = Array.from(glyph);
@@ -10004,10 +10018,12 @@
 
       const emojiOf = (msg) => {{
         if (!msg || typeof msg !== "object") return "";
-        const direct = emojiFromAny(msg.emoji);
-        if (direct) return direct;
-        const fromCodepoint = emojiFromAny(msg.emoji_codepoint ?? msg.emojiCodepoint);
+        // Prefer explicit numeric codepoint when present, matching Meshtastic's
+        // Data.emoji reaction field semantics.
+        const fromCodepoint = canonicalReactionEmoji(msg.emoji_codepoint ?? msg.emojiCodepoint);
         if (fromCodepoint) return fromCodepoint;
+        const direct = canonicalReactionEmoji(msg.emoji);
+        if (direct) return direct;
         return emojiFromTextPayload(msg.text ?? msg.decoded_text ?? msg.payload_text);
       }};
 
