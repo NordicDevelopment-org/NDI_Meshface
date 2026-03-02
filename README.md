@@ -93,11 +93,17 @@ run the backend in a terminal, and open the dashboard in a browser.
 ```powershell
 cd C:\meshyface\mesh_py-main
 py -3 -m venv .venv
+# If Activate.ps1 is blocked in this shell:
+Set-ExecutionPolicy -Scope Process Bypass
 .\.venv\Scripts\Activate.ps1
+python -c "import sys; print(sys.executable)"
 python -m pip install --upgrade pip
 python -m pip install meshtastic pypubsub protobuf
 python .\mesh_dashboard.py --mesh-port COM3 --http-host 0.0.0.0 --http-port 8877
 ```
+
+The `python -c "import sys; print(sys.executable)"` line should print a path inside
+`.venv\Scripts\python.exe`. If it does not, stop and activate the venv before installing.
 
 Windows TCP mode (instead of USB serial):
 
