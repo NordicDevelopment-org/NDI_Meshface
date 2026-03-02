@@ -3603,12 +3603,12 @@
 
     function classifyMessageChannel(msg) {{
       if (!msg || typeof msg !== "object") return "all";
-      if (typeof msg.scope === "string" && msg.scope.trim()) {{
-        return normalizeChatChannel(msg.scope);
-      }}
       const toId = normalizeNodeId(msg.to || msg.destination || "");
       if (!toId || toId === "^all" || toId === "all" || toId === "broadcast") {{
         return "all";
+      }}
+      if (typeof msg.scope === "string" && msg.scope.trim()) {{
+        return normalizeChatChannel(msg.scope);
       }}
       return "direct";
     }}
@@ -4100,7 +4100,15 @@
       const raw = String(nodeId == null ? "" : nodeId).trim();
       if (!raw) return "";
       const lower = raw.toLowerCase();
-      if (lower === "^all" || lower === "all" || lower === "broadcast") return "^all";
+      if (
+        lower === "^all"
+        || lower === "all"
+        || lower === "broadcast"
+        || lower === "!ffffffff"
+        || lower === "ffffffff"
+        || lower === "0xffffffff"
+        || lower === "4294967295"
+      ) return "^all";
       if (lower === "unknown") return "Unknown";
       if (lower === "n/a" || lower === "na") return "n/a";
       if (lower === "local") return "local";
