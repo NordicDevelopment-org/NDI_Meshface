@@ -190,6 +190,8 @@
     const chatStaleWindowSeconds = 30 * 60;
     const chatRosterMaxEntries = 180;
     const chatFeedMaxEntries = 320;
+    const chatChangeNoticeMaxEntries = 120;
+    const chatChangeSummaryMaxRows = 8;
     const chatPerfEmaAlpha = 0.2;
     const metricTickerWindowMs = 60 * 60 * 1000;
     const metricTickerMaxPoints = 240;
@@ -644,6 +646,9 @@
     let chatUnreadInitialized = false;
     const chatSeenMessageKeys = new Set();
     const chatSeenMessageOrder = [];
+    const chatChangeNoticesByChannel = {{ all: [], direct: [] }};
+    const chatChangeNoticeKeysByChannel = {{ all: new Set(), direct: new Set() }};
+    let chatChangeFocusTimer = null;
     let chatPerfEnabled = false;
     const chatPerfStats = {{
       samples: 0,
@@ -4954,6 +4959,226 @@
       return isLikelyReactionPayloadText(msg.text ?? msg.decoded_text ?? msg.payload_text);
     }}
 
+    function compactChatChangePreview(rawValue, maxLen = 72) {{
+      const text = String(rawValue == null ? "" : rawValue).replace(/\\s+/g, " ").trim();
+      if (!text) return "";
+      return compactInlineMessage(text, maxLen);
+    }}
+
+    function reactionEmojiPreviewFromMessage(msg) {{
+      if (!msg || typeof msg !== "object") return "";
+      const cpRaw = msg.emoji_codepoint ?? msg.emojiCodepoint;
+      const cp = Number(cpRaw);
+      if (Number.isInteger(cp) && cp > 0 && cp <= 0x10ffff) {{
+        try {{
+          return String.fromCodePoint(cp);
+        }} catch (_err) {{
+        }}
+      }}
+      const direct = String(msg.emoji == null ? "" : msg.emoji).trim();
+      if (isLikelyReactionPayloadText(direct)) return direct;
+      const textPayload = String(msg.text ?? msg.decoded_text ?? msg.payload_text ?? "").trim();
+      if (isLikelyReactionPayloadText(textPayload)) return textPayload;
+      return "";
+    }}
+
+    function chatChangePreviewFromMessage(msg, isReaction) {{
+      const textPayload = compactChatChangePreview(msg && (msg.text ?? msg.decoded_text ?? msg.payload_text), 78);
+      if (!isReaction) {{
+        return textPayload || "(no text)";
+      }}
+      const emoji = reactionEmojiPreviewFromMessage(msg);
+      if (emoji) return `reacted ${{emoji}}`;
+      const replyId = Number(msg && (msg.reply_id ?? msg.replyId));
+      if (Number.isInteger(replyId) && replyId > 0) {{
+        return `reaction on #${{replyId}}`;
+      }}
+      return textPayload || "reaction update";
+    }}
+
+    function chatChangeFocusKeyFromMessage(msg, fallbackKey = "") {{
+      const cleanFallback = String(fallbackKey || "").trim();
+      const replyId = Number(msg && (msg.reply_id ?? msg.replyId));
+      if (Number.isInteger(replyId) && replyId > 0) {{
+        return `id:${{replyId}}`;
+      }}
+      return cleanFallback;
+    }}
+
+    function trackChatChangeNotice(entry) {{
+      if (!entry || typeof entry !== "object") return;
+      const channel = normalizeChatChannel(entry.channel);
+      const key = String(entry.key || "").trim();
+      if (!key) return;
+      const keySet = chatChangeNoticeKeysByChannel[channel];
+      const list = chatChangeNoticesByChannel[channel];
+      if (!(keySet instanceof Set) || !Array.isArray(list)) return;
+      if (keySet.has(key)) return;
+      const sender = String(entry.sender || "Unknown node").replace(/\\s+/g, " ").trim() || "Unknown node";
+      const previewRaw = compactChatChangePreview(entry.preview, 96);
+      const kind = entry.kind === "reaction" ? "reaction" : "message";
+      const preview = previewRaw || (kind === "reaction" ? "reaction update" : "(no text)");
+      const focusKey = String(entry.focusKey || key).trim() || key;
+      const unixRaw = Number(entry.unix);
+      const unix = Number.isFinite(unixRaw) && unixRaw > 0 ? Math.trunc(unixRaw) : null;
+      list.push({{
+        key,
+        focusKey,
+        sender,
+        preview,
+        kind,
+        unix,
+      }});
+      keySet.add(key);
+      while (list.length > chatChangeNoticeMaxEntries) {{
+        const dropped = list.shift();
+        if (dropped && dropped.key) {{
+          keySet.delete(String(dropped.key));
+        }}
+      }}
+    }}
+
+    function clearChatChangeNotices(channelKey = null) {{
+      const clearOne = (key) => {{
+        const normalized = normalizeChatChannel(key);
+        const list = chatChangeNoticesByChannel[normalized];
+        const keySet = chatChangeNoticeKeysByChannel[normalized];
+        if (Array.isArray(list)) {{
+          list.length = 0;
+        }}
+        if (keySet instanceof Set) {{
+          keySet.clear();
+        }}
+      }};
+      if (channelKey == null) {{
+        clearOne("all");
+        clearOne("direct");
+        return;
+      }}
+      clearOne(channelKey);
+    }}
+
+    function chatChangeNoticesForChannel(channelKey) {{
+      const key = normalizeChatChannel(channelKey);
+      const list = chatChangeNoticesByChannel[key];
+      return Array.isArray(list) ? list : [];
+    }}
+
+    function chatChangeFocusKeysForChannel(channelKey) {{
+      const keys = new Set();
+      for (const notice of chatChangeNoticesForChannel(channelKey)) {{
+        const focusKey = String((notice && (notice.focusKey || notice.key)) || "").trim();
+        if (focusKey) {{
+          keys.add(focusKey);
+        }}
+      }}
+      return keys;
+    }}
+
+    function renderChatChangeSummary(nowUnix = Math.floor(Date.now() / 1000)) {{
+      const panel = document.getElementById("chat-change-summary");
+      if (!(panel instanceof HTMLElement)) return;
+      const notices = chatChangeNoticesForChannel(activeChatChannel);
+      if (!notices.length) {{
+        panel.innerHTML = "";
+        panel.hidden = true;
+        return;
+      }}
+      const count = notices.length;
+      const recent = notices.slice(-chatChangeSummaryMaxRows).reverse();
+      const rows = recent.map((notice) => {{
+        const sender = escAttr(String(notice && notice.sender ? notice.sender : "Unknown node"));
+        const preview = escAttr(String(notice && notice.preview ? notice.preview : "update"));
+        const kind = notice && notice.kind === "reaction" ? "reaction" : "message";
+        const kindLabel = kind === "reaction" ? "Reaction" : "Message";
+        const kindClass = kind === "reaction" ? "reaction" : "message";
+        const focusKey = escAttr(String((notice && (notice.focusKey || notice.key)) || ""));
+        const when = notice && Number.isFinite(Number(notice.unix))
+          ? savedDetailAge(Number(notice.unix), nowUnix)
+          : "just now";
+        return `<button type="button" class="chat-change-item" data-change-focus-key="${{focusKey}}" title="Jump to this changed message">
+          <span class="chat-change-item-main">
+            <span class="chat-change-kind ${{kindClass}}">${{kindLabel}}</span>
+            <span class="chat-change-item-text"><strong>${{sender}}</strong>: ${{preview}}</span>
+          </span>
+          <span class="chat-change-item-age">${{escAttr(when)}}</span>
+        </button>`;
+      }}).join("");
+      const headline = `${{count}} update${{count === 1 ? "" : "s"}} while you were away`;
+      panel.innerHTML = `<div class="chat-change-head">
+        <div class="chat-change-title">${{escAttr(headline)}}</div>
+        <button type="button" id="chat-change-clear-btn" class="chat-change-clear-btn">Mark seen</button>
+      </div>
+      <div class="chat-change-list">${{rows}}</div>`;
+      panel.hidden = false;
+    }}
+
+    function findChatFeedItemByMessageKey(messageKey) {{
+      const key = String(messageKey || "").trim();
+      if (!key) return null;
+      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item")) {{
+        if (!(item instanceof HTMLElement)) continue;
+        if (String(item.dataset.messageKey || "") === key) {{
+          return item;
+        }}
+      }}
+      return null;
+    }}
+
+    function clearChatFeedChangeFocus() {{
+      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item.change-focus")) {{
+        if (!(item instanceof HTMLElement)) continue;
+        item.classList.remove("change-focus");
+      }}
+      if (chatChangeFocusTimer !== null) {{
+        clearTimeout(chatChangeFocusTimer);
+        chatChangeFocusTimer = null;
+      }}
+    }}
+
+    function focusChatFeedItem(item) {{
+      if (!(item instanceof HTMLElement)) return;
+      clearChatFeedChangeFocus();
+      item.classList.add("change-focus");
+      chatChangeFocusTimer = window.setTimeout(() => {{
+        item.classList.remove("change-focus");
+        chatChangeFocusTimer = null;
+      }}, 1600);
+    }}
+
+    function bindChatChangeSummaryControls() {{
+      const panel = document.getElementById("chat-change-summary");
+      if (!(panel instanceof HTMLElement) || panel.hidden) return;
+      const clearBtn = panel.querySelector("#chat-change-clear-btn");
+      if (clearBtn instanceof HTMLButtonElement) {{
+        clearBtn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          clearChatChangeNotices(activeChatChannel);
+          clearChatFeedChangeFocus();
+          if (latestState) {{
+            renderChat(latestState);
+          }} else {{
+            renderChatChangeSummary();
+          }}
+        }});
+      }}
+      for (const btn of panel.querySelectorAll(".chat-change-item")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          const focusKey = String(btn.dataset.changeFocusKey || "").trim();
+          if (!focusKey) return;
+          const target = findChatFeedItemByMessageKey(focusKey);
+          if (!(target instanceof HTMLElement)) {{
+            setChatSendStatus("Change is older than the visible chat window.", true);
+            return;
+          }}
+          target.scrollIntoView({{ behavior: "smooth", block: "center" }});
+          focusChatFeedItem(target);
+        }});
+      }}
+    }}
+
     function chatSenderLabelFromMessage(msg, nodesById) {{
       if (!msg || typeof msg !== "object") return "Unknown node";
       const senderId = normalizeNodeId(msg.from || "");
@@ -4979,13 +5204,18 @@
       );
       const entries = [];
       for (const msg of recentChat) {{
-        if (isReactionLikeChatMessage(msg)) continue;
         const key = chatMessageKey(msg);
         if (!key) continue;
+        const isReaction = isReactionLikeChatMessage(msg);
         entries.push({{
           key,
+          focusKey: isReaction ? chatChangeFocusKeyFromMessage(msg, key) : key,
           channel: classifyMessageChannel(msg),
           sender: chatSenderLabelFromMessage(msg, nodesById),
+          preview: chatChangePreviewFromMessage(msg, isReaction),
+          kind: isReaction ? "reaction" : "message",
+          countsUnread: !isReaction,
+          unix: latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at),
         }});
       }}
       return entries;
@@ -5008,6 +5238,22 @@
       for (const entry of keyedMessages) {{
         if (!rememberSeenChatMessage(entry.key)) continue;
         const key = entry.channel === "direct" ? "direct" : "all";
+        const shouldTrackChange = (
+          activeLayoutView !== "chat"
+          || normalizeChatChannel(activeChatChannel) !== key
+        );
+        if (shouldTrackChange) {{
+          trackChatChangeNotice({{
+            key: entry.key,
+            focusKey: entry.focusKey || entry.key,
+            channel: key,
+            sender: entry.sender,
+            preview: entry.preview,
+            kind: entry.kind,
+            unix: entry.unix,
+          }});
+        }}
+        if (entry.countsUnread === false) continue;
         freshByChannel[key] += 1;
         latestSenderByChannel[key] = String(entry.sender || "").trim();
       }}
@@ -10483,16 +10729,24 @@
         messageEndpoints.set(msg, resolved);
         return resolved;
       }};
-      const keyedMessages = baseMessages
+      const keyedMessages = rawMessages
         .map((msg) => {{
+          const key = chatMessageKey(msg);
+          if (!key) return null;
+          const isReaction = isReactionMessage(msg);
           const endpoints = endpointsForMessage(msg);
           return {{
-            key: chatMessageKey(msg),
+            key,
+            focusKey: isReaction ? chatChangeFocusKeyFromMessage(msg, key) : key,
             channel: classifyMessageChannel(msg),
             sender: chatEndpointParts(endpoints.fromId).label || "Unknown node",
+            preview: chatChangePreviewFromMessage(msg, isReaction),
+            kind: isReaction ? "reaction" : "message",
+            countsUnread: !isReaction,
+            unix: latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at),
           }};
         }})
-        .filter((entry) => !!entry.key);
+        .filter((entry) => !!entry && !!entry.key);
       syncChatUnreadFromEntries(keyedMessages, {{ clearActiveWhenInChat: true }});
 
       const channelList = document.getElementById("chat-channel-list");
@@ -10545,6 +10799,7 @@
       const visibleMessages = messages.length > chatFeedMaxEntries
         ? messages.slice(-chatFeedMaxEntries)
         : messages;
+      const activeChangeFocusKeys = chatChangeFocusKeysForChannel(activeChatChannel);
       const participantSourceMessages = (activeChatChannel === "direct")
         ? channelMessages.direct
         : messages;
@@ -10654,7 +10909,13 @@
           ? `<div class="chat-reaction-row">${{reactionRowParts.join("")}}</div>`
           : "";
         const selectedFeedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-message-id="${{escAttr(messageId || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}">
+        const messageKey = chatMessageKey(msg);
+        const hasChangeMarker = !!messageKey && activeChangeFocusKeys.has(messageKey);
+        const changeClass = hasChangeMarker ? " has-change-marker" : "";
+        const changeBadge = hasChangeMarker
+          ? '<span class="chat-feed-new-pill" title="Changed while you were away">NEW</span>'
+          : "";
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}">
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
@@ -10665,7 +10926,7 @@
               <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
-            <span class="chat-feed-actions">${{hopBadge}}${{retryButton}}</span>
+            <span class="chat-feed-actions">${{changeBadge}}${{hopBadge}}${{retryButton}}</span>
             ${{deliveryChip}}
             <span class="chat-feed-time">${{escAttr(timeText)}}</span>
           </div>
@@ -10720,6 +10981,7 @@
           ? feedItems.join("")
           : `<div class="chat-feed-empty">${{emptyText}}</div>`;
       }}
+      renderChatChangeSummary(nowUnix);
 
       const roomList = document.getElementById("chat-room-list");
       const roster = Array.from(participants.values())
@@ -10807,6 +11069,7 @@
       bindChatFeedClicks();
       bindChatReactionControls();
       bindChatRetryControls();
+      bindChatChangeSummaryControls();
       renderChatPeerAddPanel(state);
       highlightNodeSelection();
       if (pendingSelectionScroll) {{
