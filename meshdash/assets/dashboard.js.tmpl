@@ -206,7 +206,7 @@
     const weeklySummaryHours = 24 * 7;
     const weeklySummaryMetricStorageKey = "meshDashboardWeeklySummaryMetricV1";
     const weeklySummaryMetricCatalog = new Map([
-      ["live_packet_count", { label: "Live Packets", decimals: 0 }],
+      ["live_packet_count", { label: "Packets / min", decimals: 1 }],
       ["node_count", { label: "Known Nodes", decimals: 0 }],
       ["nodes_with_position", { label: "Nodes With Position", decimals: 0 }],
       ["real_edge_count", { label: "Directed Links", decimals: 0 }],
@@ -2503,6 +2503,26 @@
       if (!Number.isFinite(numeric)) return "n/a";
       const fixedDigits = Math.max(0, Math.min(2, Math.floor(Number(digits) || 0)));
       return fixedDigits > 0 ? numeric.toFixed(fixedDigits) : `${{Math.round(numeric)}}`;
+    }}
+
+    function derivePacketsPerMinuteFromTotals(points) {{
+      const series = Array.isArray(points) ? points : [];
+      if (series.length < 2) return 0;
+      const latestPoint = series[series.length - 1] || null;
+      const previousPoint = series[series.length - 2] || null;
+      const latestTotal = Number(latestPoint && latestPoint.value);
+      const previousTotal = Number(previousPoint && previousPoint.value);
+      if (!Number.isFinite(latestTotal) || !Number.isFinite(previousTotal)) {{
+        return 0;
+      }}
+      const latestMs = Number(latestPoint && latestPoint.ms);
+      const previousMs = Number(previousPoint && previousPoint.ms);
+      const spanMinutes = (Number.isFinite(latestMs) && Number.isFinite(previousMs) && latestMs > previousMs)
+        ? Math.max(1 / 60, (latestMs - previousMs) / 60000)
+        : 1;
+      const delta = latestTotal - previousTotal;
+      if (!Number.isFinite(delta) || delta <= 0) return 0;
+      return delta / spanMinutes;
     }}
 
     function trimMetricTickerPoints(points, cutoffMs) {{
@@ -8645,7 +8665,8 @@
       renderTargetRadioStatus(state);
       setText("m-nodes", s.node_count ?? 0);
       setText("m-pos-nodes", s.nodes_with_position ?? 0);
-      setText("m-live-packets", s.live_packet_count ?? 0);
+      const rawLivePacketTotal = Number(s.live_packet_count);
+      const livePacketTotal = Number.isFinite(rawLivePacketTotal) ? rawLivePacketTotal : 0;
       const realLinks = s.real_edge_count ?? s.edge_count ?? 0;
       setText("m-links", realLinks);
       updateMetricTicker("nodes", s.node_count ?? 0, {{
@@ -8662,13 +8683,20 @@
         chartId: "ticker-chart-pos-nodes",
         digits: 0,
       }});
-      updateMetricTicker("live_packets", s.live_packet_count ?? 0, {{
+      updateMetricTicker("live_packets", livePacketTotal, {{
         containerId: "ticker-live-packets",
         deltaId: "ticker-delta-live-packets",
         rateId: "ticker-rate-live-packets",
         chartId: "ticker-chart-live-packets",
         digits: 0,
       }});
+      const livePacketSeries = metricTickerSeries.get("live_packets") || [];
+      const packetsPerMinute = derivePacketsPerMinuteFromTotals(livePacketSeries);
+      setText("m-live-packets", formatTickerNumber(packetsPerMinute, 1));
+      const livePacketsMetric = document.getElementById("m-live-packets");
+      if (livePacketsMetric instanceof HTMLElement) {{
+        livePacketsMetric.title = `Packets per minute (derived). Total packets in background: ${{formatTickerNumber(livePacketTotal, 0)}}`;
+      }}
       updateMetricTicker("real_links", realLinks, {{
         containerId: "ticker-links",
         deltaId: "ticker-delta-links",
@@ -10997,13 +11025,34 @@
       const payload = (summaryHistory && typeof summaryHistory === "object") ? summaryHistory : {{}};
       const points = Array.isArray(payload.points) ? payload.points : [];
       const rows = [];
+      const packetRateMetric = metricKey === "live_packet_count";
+      let prevPacketBucketUnix = null;
+      let prevPacketTotal = null;
       for (const point of points) {{
         if (!point || typeof point !== "object") continue;
+        const bucketText = String(point.bucket_time || "").trim();
+        if (packetRateMetric) {{
+          const bucketUnix = Number(point.bucket_unix);
+          const packetTotal = Number(point.live_packet_count);
+          if (!Number.isFinite(bucketUnix) || !Number.isFinite(packetTotal) || bucketUnix <= 0) continue;
+          if (Number.isFinite(prevPacketBucketUnix) && Number.isFinite(prevPacketTotal) && bucketUnix > prevPacketBucketUnix) {{
+            const spanMinutes = Math.max(1 / 60, (bucketUnix - prevPacketBucketUnix) / 60);
+            const packetRate = Math.max(0, (packetTotal - prevPacketTotal) / spanMinutes);
+            rows.push({{
+              value: packetRate,
+              totalValue: packetTotal,
+              bucketText,
+            }});
+          }}
+          prevPacketBucketUnix = bucketUnix;
+          prevPacketTotal = packetTotal;
+          continue;
+        }}
         const value = Number(point[metricKey]);
         if (!Number.isFinite(value)) continue;
         rows.push({{
           value,
-          bucketText: String(point.bucket_time || "").trim(),
+          bucketText,
         }});
       }}
 
@@ -11015,12 +11064,15 @@
       if (!(overview instanceof HTMLElement)) return;
 
       if (rows.length === 0) {{
+        const emptyMessage = packetRateMetric
+          ? "Need at least two saved samples to estimate packets/min."
+          : "No weekly summary history yet.";
         svg.innerHTML = "";
         overview.innerHTML = "";
         empty.hidden = false;
-        empty.textContent = "No weekly summary history yet.";
+        empty.textContent = emptyMessage;
         if (caption) {{
-          caption.textContent = `Weekly trend for ${{metricMeta.label}}. No saved samples yet.`;
+          caption.textContent = `Weekly trend for ${{metricMeta.label}}. ${{emptyMessage}}`;
         }}
         return;
       }}
@@ -11051,12 +11103,15 @@
         pointsXY.push({{ x, y }});
       }}
       if (!pointsXY.length) {{
+        const emptyMessage = packetRateMetric
+          ? "Need at least two saved samples to estimate packets/min."
+          : "No weekly summary history yet.";
         svg.innerHTML = "";
         overview.innerHTML = "";
         empty.hidden = false;
-        empty.textContent = "No weekly summary history yet.";
+        empty.textContent = emptyMessage;
         if (caption) {{
-          caption.textContent = `Weekly trend for ${{metricMeta.label}}. No saved samples yet.`;
+          caption.textContent = `Weekly trend for ${{metricMeta.label}}. ${{emptyMessage}}`;
         }}
         return;
       }}
@@ -11110,6 +11165,12 @@
         ["Peak", formatMetricValue(Math.max(...values), metricMeta.decimals)],
         ["Range", `${{startLabel || "n/a"}} to ${{endLabel || "n/a"}}`],
       ];
+      if (packetRateMetric) {{
+        const latestTotal = Number(rows[rows.length - 1] && rows[rows.length - 1].totalValue);
+        if (Number.isFinite(latestTotal)) {{
+          items.push(["Total Packets", formatMetricValue(latestTotal, 0)]);
+        }}
+      }}
       overview.innerHTML = items.map(([k, v]) => (
         `<div class="overview-item"><div class="k">${{k}}</div><div class="v">${{v}}</div></div>`
       )).join("");
