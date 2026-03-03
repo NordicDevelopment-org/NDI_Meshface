@@ -5710,6 +5710,82 @@
         .replace(/>/g, "&gt;");
     }}
 
+    function splitTrailingUrlPunctuation(urlText) {{
+      let url = String(urlText || "");
+      let trailing = "";
+      const trimSimple = new Set([".", ",", "!", "?", ";", ":"]);
+      const maybeUnbalancedPairs = [
+        [")", "("],
+        ["]", "["],
+        ["}", "{"],
+      ];
+      while (url) {{
+        const last = url.slice(-1);
+        if (trimSimple.has(last)) {{
+          trailing = `${{last}}${{trailing}}`;
+          url = url.slice(0, -1);
+          continue;
+        }}
+        let trimmed = false;
+        for (const [closeChar, openChar] of maybeUnbalancedPairs) {{
+          if (last !== closeChar) continue;
+          const opens = url.split(openChar).length - 1;
+          const closes = url.split(closeChar).length - 1;
+          if (closes > opens) {{
+            trailing = `${{last}}${{trailing}}`;
+            url = url.slice(0, -1);
+            trimmed = true;
+          }}
+          break;
+        }}
+        if (trimmed) continue;
+        break;
+      }}
+      return {{ url, trailing }};
+    }}
+
+    function chatPlainTextToHtml(value, linkify = false) {{
+      const raw = String(value == null ? "" : value);
+      if (!raw) return "";
+
+      const escapeWithBreaks = (textValue) => {{
+        const escaped = escAttr(textValue);
+        return escaped.split("\\n").join("<br/>").split("\n").join("<br/>");
+      }};
+
+      if (!linkify) {{
+        return escapeWithBreaks(raw);
+      }}
+
+      const parts = [];
+      const urlRe = /https?:\/\/[^\x00-\x20<>"'`]+/gi;
+      let start = 0;
+      for (const match of raw.matchAll(urlRe)) {{
+        const index = Number(match.index);
+        if (!Number.isFinite(index) || index < start) continue;
+        const token = String(match[0] || "");
+        if (!token) continue;
+        if (index > start) {{
+          parts.push(escapeWithBreaks(raw.slice(start, index)));
+        }}
+        const split = splitTrailingUrlPunctuation(token);
+        const href = String(split.url || "");
+        const suffix = String(split.trailing || "");
+        const hrefLower = href.toLowerCase();
+        if (href && (hrefLower.startsWith("http://") || hrefLower.startsWith("https://"))) {{
+          parts.push(`<a class="chat-link" href="${{escAttr(href)}}" target="_blank" rel="noopener noreferrer">${{escAttr(href)}}</a>`);
+          if (suffix) parts.push(escapeWithBreaks(suffix));
+        }} else {{
+          parts.push(escapeWithBreaks(token));
+        }}
+        start = index + token.length;
+      }}
+      if (start < raw.length) {{
+        parts.push(escapeWithBreaks(raw.slice(start)));
+      }}
+      return parts.join("");
+    }}
+
     function clampSplitPct(value) {{
       return Math.max(42, Math.min(78, value));
     }}
@@ -8506,7 +8582,10 @@
         if (!(item instanceof HTMLElement)) continue;
         item.addEventListener("click", (ev) => {{
           const target = ev.target;
-          if (target instanceof Element && target.closest(".chat-reply-trigger, .chat-reply-btn")) {{
+          if (!(target instanceof Element)) return;
+
+          const replyBtn = target.closest(".chat-reply-btn");
+          if (replyBtn) {{
             ev.preventDefault();
             ev.stopPropagation();
             const replyId = Number(item.dataset.messageId || "");
@@ -8518,6 +8597,16 @@
             setChatReplyTarget(replyId, replyName, replyText);
             return;
           }}
+
+          if (target.closest("a.chat-link")) {{
+            // Let browser open the link (target=_blank) without selecting/replying.
+            return;
+          }}
+
+          if (target.closest("button")) {{
+            return;
+          }}
+
           if (item.classList.contains("chat-selectable")) {{
             selectNode(item.dataset.nodeId || "", true);
           }}
@@ -11355,11 +11444,12 @@
         const renderedText = text
           ? text
           : (isReaction ? `Reaction ${{emoji || ""}}`.trim() : (emoji || "n/a"));
+        const renderedTextHtml = chatPlainTextToHtml(renderedText, true);
         return `<tr>
           <td data-sort="${{escAttr(capturedAt)}}">${{escAttr(capturedAt)}}</td>
           <td data-sort="${{escAttr(fromId)}}">${{escAttr(fromId)}}</td>
           <td data-sort="${{escAttr(toId)}}">${{escAttr(toId)}}</td>
-          <td data-sort="${{escAttr(renderedText)}}">${{escAttr(renderedText)}}</td>
+          <td data-sort="${{escAttr(renderedText)}}">${{renderedTextHtml || "&nbsp;"}}</td>
         </tr>`;
       }});
       if (!rows.length) {{
@@ -11982,12 +12072,6 @@
         }}
       }};
 
-      const escapeChatText = (value) => {{
-        const clean = String(value == null ? "" : value);
-        const escaped = escAttr(clean);
-        return escaped.replace(/\\n/g, "<br/>");
-      }};
-
       const parseMessageId = (value) => {{
         const num = Number(value);
         if (!Number.isFinite(num) || num <= 0) return null;
@@ -12328,7 +12412,7 @@
         const fromMeta = chatEndpointParts(sourceNode, msgTimeUnix);
         const toMeta = chatEndpointParts(fallbackNode, msgTimeUnix);
         const timeText = msg.rx_time || msg.captured_at || "n/a";
-        const textHtml = escapeChatText(msg.text || "");
+        const textHtml = chatPlainTextToHtml(msg.text || "", true);
         const textCompact = compactInlineMessage(msg.text || "", 140);
         const hopNum = Number(msg.hops);
         const hasHop = Number.isFinite(hopNum) && hopNum >= 0;
@@ -12430,7 +12514,7 @@
             <span class="chat-feed-time">${{escAttr(timeText)}}</span>
           </div>
           ${{replyPreview}}
-          <div class="chat-feed-text${{canReply ? " chat-reply-trigger" : ""}}"${{canReply ? ` title="Click to reply to this message"` : ""}}>${{textHtml || "&nbsp;"}}</div>
+          <div class="chat-feed-text">${{textHtml || "&nbsp;"}}</div>
           ${{reactionRow}}
         </div>`;
       }});
