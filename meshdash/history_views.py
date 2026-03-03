@@ -100,11 +100,14 @@ def build_node_history_loader(
             if isinstance(points_override, int) and points_override > 0
             else int(default_points)
         )
-        return history_store.load_node_history(
-            node_id=clean_node_id,
-            window_hours=hours,
-            max_points=points,
-        )
+        try:
+            return history_store.load_node_history(
+                node_id=clean_node_id,
+                window_hours=hours,
+                max_points=points,
+            )
+        except Exception:
+            return empty_node_history(clean_node_id)
 
     return node_history_loader
 
@@ -122,7 +125,10 @@ def build_online_activity_loader(
         )
         if history_store is None:
             return empty_online_activity(hours)
-        return history_store.load_online_activity(window_hours=hours)
+        try:
+            return history_store.load_online_activity(window_hours=hours)
+        except Exception:
+            return empty_online_activity(hours)
 
     return online_activity_loader
 
@@ -143,6 +149,9 @@ def build_summary_metrics_loader(
         load_summary_metrics_fn = getattr(history_store, "load_summary_metrics", None)
         if not callable(load_summary_metrics_fn):
             return empty_summary_metrics(hours)
-        return load_summary_metrics_fn(window_hours=hours)
+        try:
+            return load_summary_metrics_fn(window_hours=hours)
+        except Exception:
+            return empty_summary_metrics(hours)
 
     return summary_metrics_loader

@@ -98,3 +98,33 @@ def test_history_loaders_without_store_return_empty_payloads():
     summary_payload = summary_loader(None)
     assert summary_payload["window_hours"] == 72
     assert summary_payload["points"] == []
+
+
+class _FailingHistoryStore:
+    def load_node_history(self, *, node_id, window_hours, max_points):
+        raise RuntimeError("history closed")
+
+    def load_online_activity(self, *, window_hours):
+        raise RuntimeError("history closed")
+
+    def load_summary_metrics(self, *, window_hours):
+        raise RuntimeError("history closed")
+
+
+def test_history_loaders_fallback_to_empty_payloads_when_store_raises():
+    store = _FailingHistoryStore()
+    node_loader = build_node_history_loader(store, default_hours=72, default_points=1440)
+    online_loader = build_online_activity_loader(store, default_hours=72)
+    summary_loader = build_summary_metrics_loader(store, default_hours=72)
+
+    node_payload = node_loader("!xyz", 24, 100)
+    assert node_payload["node_id"] == "!xyz"
+    assert node_payload["points"] == []
+
+    online_payload = online_loader(24)
+    assert online_payload["window_hours"] == 24
+    assert online_payload["points"] == []
+
+    summary_payload = summary_loader(24)
+    assert summary_payload["window_hours"] == 24
+    assert summary_payload["points"] == []
