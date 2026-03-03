@@ -339,6 +339,47 @@
       cursor: default;
       opacity: 0.7;
     }}
+
+    .mesh-channel-wrap {{
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid rgba(214, 238, 223, 0.55);
+      background: rgba(248, 255, 251, 0.12);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      line-height: 1.2;
+      color: #f2fff7;
+      white-space: nowrap;
+    }}
+    .mesh-channel-label {{
+      opacity: 0.92;
+    }}
+    .mesh-channel-select {{
+      border: none;
+      border-radius: 999px;
+      background: rgba(248, 255, 251, 0.16);
+      color: #f2fff7;
+      font-size: 10px;
+      line-height: 1.2;
+      padding: 2px 8px 2px 6px;
+      min-width: 84px;
+      cursor: pointer;
+      appearance: none;
+      outline: none;
+    }}
+    .mesh-channel-select:disabled {{
+      cursor: default;
+      opacity: 0.7;
+    }}
+    .mesh-channel-select option {{
+      color: #13241a;
+      background: #f8fcfa;
+    }}
+    .mesh-channel-select option:disabled {{
+      color: #6a7f73;
+    }}
     .workspace-shell {{
       --rail-width: 72px;
       --chat-panel-width: 250px;
@@ -2232,61 +2273,107 @@
       height: calc(100vh - var(--workspace-viewport-offset, 84px));
       height: calc(100dvh - var(--workspace-viewport-offset, 84px));
       min-height: 560px;
-      grid-template-rows:
-        auto
-        minmax(240px, var(--split-top-px))
-        var(--splitter-size)
-        minmax(170px, 1fr);
+      grid-template-rows: minmax(0, 1fr);
     }}
     .layout.view-packets .packets {{
       grid-column: 1 / span 3;
-      grid-row: 2;
+      grid-row: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }}
-    .layout.view-packets .console {{
-      grid-column: 1 / span 3;
-      grid-row: 4;
+    .layout.view-packets .packets .body {{
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .layout.view-packets .packets .body.scroll {{
+      max-height: none;
+      height: 100%;
     }}
     .layout.view-packets .chat,
     .layout.view-packets .nodes,
     .layout.view-packets .map,
     .layout.view-packets .map-data,
+    .layout.view-packets .summary,
     .layout.view-packets .raw,
+    .layout.view-packets .console,
     .layout.view-packets .splitter,
     .layout.view-packets .hsplitter[data-target="top"],
-    .layout.view-packets .hsplitter[data-target="mid"] {{
+    .layout.view-packets .hsplitter[data-target="mid"],
+    .layout.view-packets .hsplitter[data-target="low"] {{
       display: none !important;
     }}
-    .layout.view-packets .hsplitter[data-target="low"] {{ grid-row: 3; }}
 
     .layout.view-data {{
       height: calc(100vh - var(--workspace-viewport-offset, 84px));
       height: calc(100dvh - var(--workspace-viewport-offset, 84px));
       min-height: 560px;
-      grid-template-rows:
-        auto
-        minmax(240px, var(--split-top-px))
-        var(--splitter-size)
-        minmax(170px, 1fr);
+      grid-template-rows: minmax(0, 1fr);
     }}
     .layout.view-data .raw {{
       grid-column: 1 / span 3;
-      grid-row: 2;
+      grid-row: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }}
-    .layout.view-data .console {{
+    .layout.view-data .raw .body {{
+      display: block;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+    }}
+    .layout.view-console {{
+      height: calc(100vh - var(--workspace-viewport-offset, 84px));
+      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      min-height: 560px;
+      grid-template-rows: auto minmax(240px, 1fr);
+    }}
+    .layout.view-console .console {{
       grid-column: 1 / span 3;
-      grid-row: 4;
+      grid-row: 2;
+      display: flex;
+      min-height: 0;
+    }}
+    .layout.view-console .console .body {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1 1 auto;
+    }}
+    .layout.view-console #live-console {{
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
     }}
     .layout.view-data .chat,
     .layout.view-data .nodes,
     .layout.view-data .map,
     .layout.view-data .map-data,
+    .layout.view-data .summary,
     .layout.view-data .packets,
+    .layout.view-data .console,
     .layout.view-data .splitter,
     .layout.view-data .hsplitter[data-target="top"],
-    .layout.view-data .hsplitter[data-target="mid"] {{
+    .layout.view-data .hsplitter[data-target="mid"],
+    .layout.view-data .hsplitter[data-target="low"] {{
       display: none !important;
     }}
-    .layout.view-data .hsplitter[data-target="low"] {{ grid-row: 3; }}
+
+    .layout.view-console .chat,
+    .layout.view-console .nodes,
+    .layout.view-console .map,
+    .layout.view-console .map-data,
+    .layout.view-console .packets,
+    .layout.view-console .raw,
+    .layout.view-console .splitter,
+    .layout.view-console .hsplitter[data-target="top"],
+    .layout.view-console .hsplitter[data-target="mid"],
+    .layout.view-console .hsplitter[data-target="low"] {{
+      display: none !important;
+    }}
 
     .layout.view-settings {{
       height: 100%;
@@ -5336,6 +5423,10 @@
         min-height: 0;
       }}
       .layout.view-data {{
+        height: auto;
+        min-height: 0;
+      }}
+      .layout.view-console {{
         height: auto;
         min-height: 0;
       }}

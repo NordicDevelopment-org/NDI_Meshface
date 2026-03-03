@@ -175,6 +175,7 @@
     const savedNodeHistorySplitStorageKey = "meshDashboardSavedNodeMainPct";
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
+    const meshChannelIndexStorageKey = "meshDashboardMeshChannelIndexV1";
     const chatDirectPeersStorageKey = "meshDashboardDirectPeersV1";
     const chatPerfStorageKey = "meshDashboardChatPerfMetricsV1";
     const themeStorageKey = "meshDashboardThemePreference";
@@ -543,7 +544,7 @@
       "packets-table": {{ index: 0, dir: "desc" }},
     }};
     const wheelActivationLeaseMs = 1400;
-    const knownLayoutViews = new Set(["chat", "network", "saved", "packets", "data", "settings", "all"]);
+    const knownLayoutViews = new Set(["chat", "network", "saved", "packets", "data", "console", "settings"]);
     const knownChatChannels = new Set(["all", "direct"]);
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
@@ -605,6 +606,10 @@
     let chatStickToBottom = true;
     let activeLayoutView = "chat";
     let activeChatChannel = "all";
+    let activeMeshChannelIndex = 0;
+    let meshChannelOptions = [];
+    let meshChannelOptionsSignature = "";
+    let meshChannelOptionsFetchedAt = 0;
     let chatEmojiMode = "compose";
     let chatEmojiPickerGroup = chatEmojiDefaultGroup;
     let chatEmojiSearchQuery = "";
@@ -1327,7 +1332,6 @@
       const inMapHeatContext = (
         activeLayoutView === "network"
         || activeLayoutView === "saved"
-        || activeLayoutView === "all"
       );
       if (wrap instanceof HTMLElement) {{
         wrap.hidden = !inMapHeatContext;
@@ -2737,7 +2741,7 @@
 
       const leftSub = document.getElementById("chat-left-sub");
       if (leftSub) {{
-        leftSub.textContent = `${{channelLabel(activeChatChannel)}}: ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale`;
+        leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • Mesh: ${{meshChannelLabelForIndex(activeMeshChannelIndex)}} • ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale`;
       }}
       const caption = document.getElementById("chat-caption");
       if (caption) {{
@@ -2745,7 +2749,7 @@
           (state.summary && state.summary.modem_preset) ? state.summary.modem_preset : "",
           "unknown"
         );
-        caption.textContent = `LoRa preset: ${{preset}}. Channel: ${{channelLabel(activeChatChannel)}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale.`;
+        caption.textContent = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}. Mesh: ${{meshChannelLabelForIndex(activeMeshChannelIndex, {{ verbose: true }})}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale.`;
       }}
 
       // Saved nodes list freshness.
@@ -3136,6 +3140,208 @@
       }}
       applyChatChannel(preferred, false);
     }}
+
+    // Meshtastic has its own notion of "channels" (0..N) which are distinct from this UI's
+    // chat scopes (Everyone vs Peer-to-peer).
+    //
+    // We expose a lightweight selector so outgoing chat packets can be sent on a user-chosen
+    // channel index. Default is channel 0.
+
+    function normalizeMeshChannelIndex(value) {{
+      const num = Number(value);
+      if (!Number.isFinite(num)) return 0;
+      const idx = Math.trunc(num);
+      if (!Number.isInteger(idx) || idx < 0) return 0;
+      return idx;
+    }}
+
+    function meshChannelOptionLabel(opt) {{
+      if (!opt || typeof opt !== "object") return "";
+      const idx = Number(opt.index);
+      if (!Number.isInteger(idx) || idx < 0) return "";
+      const name = typeof opt.name === "string" ? opt.name.trim() : "";
+      const role = typeof opt.role === "string" ? opt.role.trim() : "";
+      if (name) return `Ch ${{idx}}: ${{name}}`;
+      if (role) return `Ch ${{idx}} (${{role}})`;
+      return `Ch ${{idx}}`;
+    }}
+
+    function meshChannelLabelForIndex(rawIndex, {{ verbose = false }} = {{}}) {{
+      const idx = normalizeMeshChannelIndex(rawIndex);
+      const match = Array.isArray(meshChannelOptions)
+        ? meshChannelOptions.find((opt) => Number(opt && opt.index) === idx)
+        : null;
+      const name = match && typeof match.name === "string" ? match.name.trim() : "";
+      if (verbose && name) return `Ch ${{idx}} (${{name}})`;
+      return `Ch ${{idx}}`;
+    }}
+
+    function buildMeshChannelOptionsFromLocalState(localState) {{
+      const root = (localState && typeof localState === "object") ? localState : {{}};
+      const rawChannels = Array.isArray(root.channels) ? root.channels : [];
+      const byIndex = new Map();
+
+      for (let i = 0; i < rawChannels.length; i++) {{
+        const ch = rawChannels[i];
+        if (!ch || typeof ch !== "object") continue;
+
+        const idxRaw = ch.index ?? ch.channel_index ?? ch.channelIndex ?? i;
+        const idxNum = Math.trunc(Number(idxRaw));
+        const index = Number.isInteger(idxNum) && idxNum >= 0 ? idxNum : i;
+
+        const roleRaw = ch.role ?? ch.channel_role ?? ch.channelRole;
+        const role = typeof roleRaw === "string" ? roleRaw.trim() : (roleRaw != null ? String(roleRaw) : "");
+        const roleUpper = role.toUpperCase();
+        const disabled = roleUpper === "DISABLED" || roleUpper === "CHANNEL_ROLE_DISABLED";
+
+        const settings = (ch.settings && typeof ch.settings === "object") ? ch.settings
+          : (ch.channel_settings && typeof ch.channel_settings === "object") ? ch.channel_settings
+          : (ch.channelSettings && typeof ch.channelSettings === "object") ? ch.channelSettings
+          : null;
+        const nameRaw = (
+          settings && typeof settings.name === "string" ? settings.name
+          : settings && typeof settings.channel_name === "string" ? settings.channel_name
+          : settings && typeof settings.short_name === "string" ? settings.short_name
+          : typeof ch.name === "string" ? ch.name
+          : typeof ch.channel_name === "string" ? ch.channel_name
+          : ""
+        );
+        const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
+
+        const opt = {{ index, name, role, disabled }};
+        if (!byIndex.has(index)) {{
+          byIndex.set(index, opt);
+        }} else {{
+          const prev = byIndex.get(index);
+          if (prev && typeof prev === "object") {{
+            if (!prev.name && name) prev.name = name;
+            if (!prev.role && role) prev.role = role;
+            prev.disabled = prev.disabled && disabled;
+          }}
+        }}
+      }}
+
+      const fallbackCount = Math.max(8, rawChannels.length || 0);
+      for (let i = 0; i < fallbackCount; i++) {{
+        if (!byIndex.has(i)) {{
+          byIndex.set(i, {{ index: i, name: "", role: "", disabled: false }});
+        }}
+      }}
+
+      const options = Array.from(byIndex.values())
+        .filter((opt) => opt && Number.isInteger(Number(opt.index)) && Number(opt.index) >= 0)
+        .sort((a, b) => Number(a.index) - Number(b.index));
+
+      return options.length ? options : [{{ index: 0, name: "", role: "", disabled: false }}];
+    }}
+
+    function renderMeshChannelSelect(options) {{
+      const select = document.getElementById("mesh-channel-select");
+      if (!(select instanceof HTMLSelectElement)) return;
+
+      const normalized = Array.isArray(options) ? options : [];
+      select.innerHTML = "";
+      for (const opt of normalized) {{
+        const idx = normalizeMeshChannelIndex(opt && opt.index);
+        const optionEl = document.createElement("option");
+        optionEl.value = String(idx);
+        optionEl.textContent = meshChannelOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
+        optionEl.disabled = !!(opt && opt.disabled);
+        if (opt && opt.role) {{
+          optionEl.title = String(opt.role);
+        }}
+        select.appendChild(optionEl);
+      }}
+
+      // Pick an enabled value.
+      const desired = String(activeMeshChannelIndex);
+      const desiredOpt = Array.from(select.options).find((o) => o.value === desired && !o.disabled);
+      if (desiredOpt) {{
+        select.value = desired;
+        return;
+      }}
+      const firstEnabled = Array.from(select.options).find((o) => !o.disabled);
+      const nextValue = firstEnabled ? firstEnabled.value : "0";
+      select.value = nextValue;
+      activeMeshChannelIndex = normalizeMeshChannelIndex(nextValue);
+      try {{
+        window.localStorage.setItem(meshChannelIndexStorageKey, String(activeMeshChannelIndex));
+      }} catch (_err) {{}}
+    }}
+
+    async function hydrateMeshChannelOptions(force = false) {{
+      const nowMs = Date.now();
+      const ttlMs = 60000;
+
+      let localState = (settingsLocalStateCache && typeof settingsLocalStateCache === "object")
+        ? settingsLocalStateCache
+        : null;
+      const stale = !settingsLocalStateFetchedAt || (nowMs - settingsLocalStateFetchedAt) > ttlMs;
+      if (force || !localState || stale || !Array.isArray(localState.channels)) {{
+        try {{
+          const data = await fetchRawJson("/api/raw/local_state", rawDataCache.localState, ttlMs);
+          const obj = (data && typeof data === "object") ? data : null;
+          if (obj) {{
+            settingsLocalStateCache = obj;
+            settingsLocalStateFetchedAt = nowMs;
+            localState = obj;
+          }}
+        }} catch (_err) {{}}
+      }}
+
+      const options = buildMeshChannelOptionsFromLocalState(localState);
+      meshChannelOptions = options;
+      renderMeshChannelSelect(options);
+      return options;
+    }}
+
+    function applyMeshChannelIndex(rawIndex, persist = true) {{
+      const idx = normalizeMeshChannelIndex(rawIndex);
+      const changed = idx !== activeMeshChannelIndex;
+      activeMeshChannelIndex = idx;
+
+      const select = document.getElementById("mesh-channel-select");
+      if (select instanceof HTMLSelectElement) {{
+        select.value = String(activeMeshChannelIndex);
+      }}
+
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(meshChannelIndexStorageKey, String(activeMeshChannelIndex));
+        }} catch (_err) {{}}
+      }}
+
+      if (changed && latestState && activeLayoutView === "chat") {{
+        renderChat(latestState);
+      }}
+    }}
+
+    function loadMeshChannelIndex() {{
+      let preferred = 0;
+      try {{
+        preferred = normalizeMeshChannelIndex(window.localStorage.getItem(meshChannelIndexStorageKey) || "0");
+      }} catch (_err) {{}}
+      activeMeshChannelIndex = preferred;
+    }}
+
+    function bindMeshChannelControl() {{
+      const select = document.getElementById("mesh-channel-select");
+      if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+
+      select.addEventListener("change", () => {{
+        applyMeshChannelIndex(select.value, true);
+      }});
+
+      // Seed fast fallback so the control is usable before the radio query returns.
+      const fallback = buildMeshChannelOptionsFromLocalState({{ channels: [] }});
+      meshChannelOptions = fallback;
+      renderMeshChannelSelect(fallback);
+      select.value = String(activeMeshChannelIndex);
+
+      void hydrateMeshChannelOptions(false);
+    }}
+
 
     function requestImmediatePoll(delayMs = 0) {{
       const waitMs = Math.max(0, Math.trunc(Number(delayMs) || 0));
@@ -3700,7 +3906,7 @@
       const requestBody = {{
         text,
         destination,
-        channel_index: 0,
+        channel_index: activeMeshChannelIndex,
       }};
       if (Number.isInteger(replyId) && replyId > 0) {{
         requestBody.reply_id = replyId;
@@ -3748,7 +3954,7 @@
       const payload = await sendChatPayload(
         {{
           destination,
-          channel_index: 0,
+          channel_index: activeMeshChannelIndex,
           reply_id: replyNum,
           emoji: cleanEmoji,
         }},
@@ -5388,7 +5594,7 @@
 
     function isMapVisibleLayoutView(viewName) {{
       const view = normalizeLayoutView(viewName);
-      return view === "network" || view === "saved" || view === "all";
+      return view === "network" || view === "saved";
     }}
 
     function syncNodeHistoryDock() {{
@@ -5425,6 +5631,15 @@
         layout.classList.remove(`view-${{name}}`);
       }}
       layout.classList.add(`view-${{next}}`);
+
+      // Keep rail selection in sync even if any later view-specific setup throws.
+      for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const isActive = normalizeLayoutView(btn.dataset.view || "") === next;
+        btn.classList.toggle("active", isActive);
+        btn.setAttribute("aria-current", isActive ? "page" : "false");
+      }}
+
       const chatPanelOpen = next === "chat";
       if (shell instanceof HTMLElement) {{
         shell.classList.toggle("chat-panel-open", chatPanelOpen);
@@ -5439,8 +5654,14 @@
       }}
 
       const mapNodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
-      syncSignalHeatmapLayer(mapNodes, next === "saved");
-      setMapWheelZoomActive(next === "network" || next === "saved");
+      try {{
+        syncSignalHeatmapLayer(mapNodes, next === "saved");
+      }} catch (_err) {{
+      }}
+      try {{
+        setMapWheelZoomActive(next === "network" || next === "saved");
+      }} catch (_err) {{
+      }}
       if (chatPanelOpen) {{
         if (activeWheelPane instanceof HTMLElement) {{
           activeWheelPane.classList.remove("wheel-scroll-active");
@@ -5456,14 +5677,10 @@
       }}
       syncChatRailUnread();
       if (typeof window.meshRefreshWheelHints === "function") {{
-        window.meshRefreshWheelHints();
-      }}
-
-      for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
-        if (!(btn instanceof HTMLButtonElement)) continue;
-        const isActive = normalizeLayoutView(btn.dataset.view || "") === next;
-        btn.classList.toggle("active", isActive);
-        btn.setAttribute("aria-current", isActive ? "page" : "false");
+        try {{
+          window.meshRefreshWheelHints();
+        }} catch (_err) {{
+        }}
       }}
 
       if (persist) {{
@@ -5499,14 +5716,14 @@
         // This prevents "blank" panes when the server legitimately returns 304s.
         renderSummary(latestState);
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
-        if (next === "network" || next === "all") {{
+        if (next === "network") {{
           renderNodes(latestState.nodes || []);
         }}
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
-        if (next === "chat" || next === "all") {{
+        if (next === "chat") {{
           renderChat(latestState);
         }}
-        if (next === "saved" || next === "all") {{
+        if (next === "saved") {{
           renderFavorites(latestState, cachedNodeHistory);
         }} else {{
           renderSavedNodeDetails(latestState, cachedNodeHistory);
@@ -5514,13 +5731,13 @@
         if (next === "settings") {{
           renderSettings(latestState);
         }}
-        if (next === "packets" || next === "all") {{
+        if (next === "packets") {{
           renderPackets(latestState.traffic || {{}});
         }}
-        if (next === "packets" || next === "data" || next === "settings" || next === "all") {{
+        if (next === "console") {{
           renderConsole(latestState.traffic || {{}});
         }}
-      }} else if (next === "network" || next === "all") {{
+      }} else if (next === "network") {{
         renderNodesPlaceholder("Syncing nodes...");
       }}
       if (next !== "saved") {{
@@ -5529,7 +5746,7 @@
       renderSavedNodeSearchDropdown(latestState);
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
-      if (next === "chat" || next === "network" || next === "saved" || next === "all") {{
+      if (next === "chat" || next === "network" || next === "saved") {{
         requestImmediatePoll(0);
       }}
       if (isMapVisibleLayoutView(next)) {{
@@ -6585,6 +6802,7 @@
         settingsLocalStateFetchedAt = Date.now();
         clearSettingsDirty();
         renderSettings({{ local_state: obj }}, true);
+        void hydrateMeshChannelOptions(false);
         setText("settings-apply-status", "Loaded current radio settings.");
         appendConsoleLine(`settings|${{Date.now()}}|fetch`, "[settings] loaded current radio settings.");
       }} catch (err) {{
@@ -7241,7 +7459,7 @@
         }} else {{
           renderNodeHistoryLoading(selectedNodeId);
         }}
-      }} else if (activeLayoutView === "network" || activeLayoutView === "all") {{
+      }} else if (activeLayoutView === "network") {{
         // Map-data panel is visible in these views.
         renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory, null);
         setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
@@ -10034,7 +10252,7 @@
       }}
 
       // The signal plot lives in the map-data panel, rendered by renderTraffic.
-      if (activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all") {{
+      if (activeLayoutView === "saved" || activeLayoutView === "network") {{
         renderTraffic(traffic, nodes, nodeHistory, null);
       }}
 
@@ -11061,7 +11279,7 @@
       }}
       const leftSub = document.getElementById("chat-left-sub");
       if (leftSub) {{
-        leftSub.textContent = `${{channelLabel(activeChatChannel)}}: ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale`;
+        leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • Mesh: ${{meshChannelLabelForIndex(activeMeshChannelIndex)}} • ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale`;
       }}
 
       renderChatReplyContext();
@@ -11100,7 +11318,7 @@
         const perfSuffix = chatPerfEnabled
           ? ` Render: ${{chatPerfStats.lastMs.toFixed(1)}}ms (ema ${{chatPerfStats.emaMs.toFixed(1)}}ms, rows ${{chatPerfStats.lastFeedCount}}/${{chatPerfStats.lastRosterCount}}).`
           : "";
-        caption.textContent = `LoRa preset: ${{preset}}. Channel: ${{channelLabel(activeChatChannel)}}.${{directTargetText}} ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.${{perfSuffix}}`;
+        caption.textContent = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}.${{directTargetText}} Mesh: ${{meshChannelLabelForIndex(activeMeshChannelIndex, {{ verbose: true }})}}. ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.${{perfSuffix}}`;
         if (chatPerfEnabled) {{
           caption.title = `Chat render avg ${{chatPerfStats.avgMs.toFixed(1)}}ms, max ${{chatPerfStats.maxMs.toFixed(1)}}ms, samples ${{chatPerfStats.samples}}`;
         }} else {{
@@ -11233,7 +11451,7 @@
           if (!latestState || typeof latestState !== "object") {{
             // Rare startup edge: conditional/cached response before we have any local snapshot.
             // Force one cache-busted retry so sidebar panels can hydrate immediately.
-            if (activeLayoutView === "network" || activeLayoutView === "all") {{
+            if (activeLayoutView === "network") {{
               renderNodesPlaceholder("Syncing nodes...");
             }}
             stateEtag = "";
@@ -11247,7 +11465,7 @@
           lastPollError = "";
           lastPollErrorUnix = 0;
           renderSelfRadioPill(latestState);
-          const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
+          const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network";
           const historyRelevant304 = (activeLayoutView === "saved" || activeLayoutView === "network")
             && mapDataFocus !== "activity"
             && isSelectableNodeId(selectedNodeId);
@@ -11260,13 +11478,13 @@
           if (mapVisible304) {{
             renderMap(nodes304, traffic304.edges || [], cachedHistory304);
           }}
-          if (activeLayoutView === "network" || activeLayoutView === "all") {{
+          if (activeLayoutView === "network") {{
             renderNodes(nodes304);
           }}
           if (mapVisible304) {{
             renderTraffic(traffic304, nodes304, cachedHistory304, null);
           }}
-          if (activeLayoutView === "saved" || activeLayoutView === "all") {{
+          if (activeLayoutView === "saved") {{
             const loadingId304 = (activeLayoutView === "saved" && historyRelevant304 && !cachedHistory304)
               ? selectedNodeId
               : null;
@@ -11309,7 +11527,7 @@
             }});
         }}
 
-        const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network" || activeLayoutView === "all";
+        const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network";
         const historyRelevant = (activeLayoutView === "saved" || activeLayoutView === "network")
           && mapDataFocus !== "activity"
           && isSelectableNodeId(selectedNodeId);
@@ -11348,7 +11566,7 @@
           renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], cachedHistory);
         }}
 
-        if (activeLayoutView === "network" || activeLayoutView === "all") {{
+        if (activeLayoutView === "network") {{
           renderNodes(state.nodes || []);
         }}
 
@@ -11356,20 +11574,20 @@
           renderTraffic(state.traffic || {{}}, state.nodes || [], cachedHistory, onlineActivity);
         }}
 
-        if (activeLayoutView === "chat" || activeLayoutView === "all") {{
+        if (activeLayoutView === "chat") {{
           renderChat(state);
         }} else {{
           syncChatUnreadFromState(state, {{ clearActiveWhenInChat: false }});
         }}
 
-        if (activeLayoutView === "saved" || activeLayoutView === "all") {{
+        if (activeLayoutView === "saved") {{
           const loadingId = (activeLayoutView === "saved" && historyRelevant && !cachedHistory)
             ? selectedNodeId
             : null;
           renderFavorites(state, cachedHistory, loadingId);
         }}
 
-        if (activeLayoutView === "packets" || activeLayoutView === "all") {{
+        if (activeLayoutView === "packets") {{
           renderPackets(state.traffic || {{}});
         }}
 
@@ -11377,7 +11595,7 @@
           renderSettings(state);
         }}
 
-        if (activeLayoutView === "packets" || activeLayoutView === "data" || activeLayoutView === "settings" || activeLayoutView === "all") {{
+        if (activeLayoutView === "console") {{
           renderConsole(state.traffic || {{}});
         }}
 
@@ -11420,6 +11638,7 @@
     loadLayoutView();
     loadManualDirectPeers();
     loadChatChannel();
+    loadMeshChannelIndex();
     loadChatEmojiPickerState();
     loadChatEmojiUsage();
     loadThemePreference();
@@ -11445,6 +11664,7 @@
     bindThemeToggle();
     bindSummaryTickerExpandControl();
     bindThemePresetSelector();
+    bindMeshChannelControl();
     bindSignalHeatDevApi();
     bindSignalHeatmapControl();
     bindChatAutoScroll();
