@@ -1114,7 +1114,12 @@
       mapOfflineCityMarkers = [];
     }}
 
+    function shouldShowOfflineAtlas() {{
+      return mapBasemapMode === "offline" || mapOfflineFallbackActive;
+    }}
+
     async function ensureOfflineAtlasLayers() {{
+      const shouldAttach = shouldShowOfflineAtlas();
       if (
         mapOfflineCountriesLayer
         && mapOfflineCoastlineLayer
@@ -1125,7 +1130,9 @@
         && mapOfflineLakesLayer
         && mapOfflineCitiesLayer
       ) {{
-        addOfflineAtlasLayersToMap();
+        if (shouldAttach) {{
+          addOfflineAtlasLayersToMap();
+        }}
         return true;
       }}
       const payload = await fetchOfflineAtlasPayload();
@@ -1133,7 +1140,10 @@
         return false;
       }}
       buildOfflineAtlasLayers(payload);
-      addOfflineAtlasLayersToMap();
+      // Guard against race conditions: atlas fetch may finish after mode switched back online.
+      if (shouldShowOfflineAtlas()) {{
+        addOfflineAtlasLayersToMap();
+      }}
       return true;
     }}
 
@@ -1224,6 +1234,8 @@
         return;
       }}
 
+      // In online mode we never want offline vectors lingering underneath tiles.
+      setMapOfflineFallbackState(false, "Online mode enabled.");
       setMapBasemapStatus("loading", reason || "Online mode enabled. Loading map tiles...");
       applyMapTiles(activeMapTileTheme());
     }}
