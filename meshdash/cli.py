@@ -39,6 +39,7 @@ def build_dashboard_parser(
     default_http_port: int,
     default_refresh_ms: int,
     default_packet_limit: int,
+    default_reset_ticker_scale_on_restart: bool,
     default_history_db: str,
     env_history_db: Optional[str],
     default_history_max_rows: int,
@@ -74,6 +75,7 @@ def build_dashboard_parser(
         default_http_port=default_http_port,
         default_refresh_ms=default_refresh_ms,
         default_packet_limit=default_packet_limit,
+        default_reset_ticker_scale_on_restart=default_reset_ticker_scale_on_restart,
     )
     _add_history_args_helper(
         parser,

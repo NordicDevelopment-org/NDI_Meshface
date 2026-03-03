@@ -1,6 +1,7 @@
     const refreshMs = {refresh_ms};
     const nodeHistoryHours = {node_history_hours};
     const nodeHistoryMaxPoints = {node_history_max_points};
+    const resetTickerScaleOnRestart = Number({reset_ticker_scale_on_restart}) === 1;
     const map = L.map("map", {{
       preferCanvas: true,
       zoomAnimation: false,
@@ -2538,6 +2539,50 @@
       }}
     }}
 
+    function metricTickerLatestValue(metricKey) {{
+      const cleanKey = String(metricKey || "").trim();
+      if (!cleanKey) return null;
+      const points = metricTickerSeries.get(cleanKey);
+      if (!Array.isArray(points) || points.length === 0) return null;
+      const latest = Number(points[points.length - 1] && points[points.length - 1].value);
+      return Number.isFinite(latest) ? latest : null;
+    }}
+
+    function maybeResetMetricTickerSeries(livePacketTotal) {{
+      const latestLiveTotal = metricTickerLatestValue("live_packets");
+      const nextLiveTotal = Number(livePacketTotal);
+      if (!Number.isFinite(latestLiveTotal) || !Number.isFinite(nextLiveTotal)) {{
+        return false;
+      }}
+      // live_packet_count is monotonic within a runtime session. If it moves
+      // backward, assume a tracker/runtime reset and restart ticker history so
+      // scales don't stay anchored to the previous session.
+      if (nextLiveTotal + 1 < latestLiveTotal) {{
+        metricTickerSeries.clear();
+        return true;
+      }}
+      return false;
+    }}
+
+    function sliceSummaryPointsAfterLiveCounterReset(points) {{
+      const rows = Array.isArray(points) ? points : [];
+      if (!resetTickerScaleOnRestart || rows.length < 2) {{
+        return rows;
+      }}
+      let previousTotal = null;
+      let resetStartIndex = 0;
+      for (let i = 0; i < rows.length; i += 1) {{
+        const currentTotal = Number(rows[i] && rows[i].live_packet_count);
+        if (!Number.isFinite(currentTotal)) continue;
+        if (Number.isFinite(previousTotal) && (currentTotal + 1 < previousTotal)) {{
+          // Keep the newest segment when the monotonic live counter rolls over.
+          resetStartIndex = i;
+        }}
+        previousTotal = currentTotal;
+      }}
+      return resetStartIndex > 0 ? rows.slice(resetStartIndex) : rows;
+    }}
+
     function appendMetricTickerPoint(metricKey, rawValue, nowMs = Date.now()) {{
       const cleanKey = String(metricKey || "").trim();
       const value = Number(rawValue);
@@ -3343,9 +3388,12 @@
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
       const trafficSnap = buildRadioTrafficSnapshot(traffic, localId, nowUnix, 120);
       const trafficText = `RX ${{trafficSnap.rxRecent}} / TX ${{trafficSnap.txRecent}} (2m)`;
-      const quietText = Number.isFinite(trafficSnap.lastPacketUnix)
-        ? `quiet, last packet ${{savedDetailAge(trafficSnap.lastPacketUnix, nowUnix)}}`
-        : "quiet, no packets yet";
+      const trafficCompactText = `RX ${{trafficSnap.rxRecent}} TX ${{trafficSnap.txRecent}}`;
+      const lastActivityText = Number.isFinite(trafficSnap.lastPacketUnix)
+        ? savedDetailAge(trafficSnap.lastPacketUnix, nowUnix)
+        : "n/a";
+      const lastActivityCompact = String(lastActivityText).replace(/\s+ago$/, "");
+      const activityText = `last activity ${{lastActivityText}}`;
 
       const errors = [];
       if (localStateError) errors.push(`local state: ${{localStateError}}`);
@@ -3358,7 +3406,7 @@
         const detail = errorSummary || "local radio id unavailable";
         return {{
           key: "lost",
-          text: `Radio: Lost - ${{detail}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
           title: `Local radio unavailable. ${{detail}}`,
         }};
       }}
@@ -3379,18 +3427,18 @@
         const detail = errorSummary || "state polling failed";
         return {{
           key: "lost",
-          text: `Radio: Lost - ${{detail}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
           title: `Dashboard polling is stale (${{
             Number.isFinite(pollSuccessAge) ? `${{pollSuccessAge}}s since last success` : "no successful poll yet"
-          }}). ${{detail}}`,
+          }}). ${{detail}} | ${{trafficText}} | ${{activityText}}`,
         }};
       }}
       if (trackerReportsLost) {{
         const detail = errorSummary || trackerError;
         return {{
           key: "lost",
-          text: `Radio: Lost - ${{detail || "radio link lost"}}`,
-          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
+          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}} | ${{trafficText}} | ${{activityText}}`,
         }};
       }}
 
@@ -3400,18 +3448,14 @@
       else if (freshnessKey === "warn") label = "Aging";
       else if (freshnessKey === "stale") label = "Stale";
 
-      const hasTraffic = (trafficSnap.rxRecent + trafficSnap.txRecent) > 0;
-      let text = `Radio: ${{label}} - ${{hasTraffic ? trafficText : quietText}}`;
-      if (errorSummary) {{
-        text += ` - ERR: ${{errorSummary}}`;
-      }}
+      const text = `${{label}} · ${{lastActivityCompact}} · ${{trafficCompactText}}`;
       const lastSeenTitle = Number.isFinite(freshness.unix)
         ? `last seen ${{savedDetailAge(freshness.unix, nowUnix)}}`
         : "last seen n/a";
       return {{
         key,
         text,
-        title: `${{localId}} | ${{label}} | ${{trafficText}} | ${{lastSeenTitle}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}`,
+        title: `${{localId}} | ${{label}} | ${{activityText}} | ${{trafficText}} | ${{lastSeenTitle}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}`,
       }};
     }}
 
@@ -3422,9 +3466,12 @@
       const cleanKey = String(status && status.key ? status.key : "unknown").toLowerCase();
       const allowed = new Set(["online", "warn", "stale", "lost", "unknown"]);
       const key = allowed.has(cleanKey) ? cleanKey : "unknown";
+      let toneKey = "warn";
+      if (key === "online") toneKey = "online";
+      else if (key === "lost") toneKey = "lost";
       el.classList.remove("status-online", "status-warn", "status-stale", "status-lost", "status-unknown");
-      el.classList.add(`status-${{key}}`);
-      el.textContent = status && status.text ? String(status.text) : "Radio: n/a";
+      el.classList.add(`status-${{toneKey}}`);
+      el.textContent = status && status.text ? String(status.text) : "n/a";
       el.title = status && status.title ? String(status.title) : "Radio status unavailable";
     }}
 
@@ -8667,6 +8714,9 @@
       setText("m-pos-nodes", s.nodes_with_position ?? 0);
       const rawLivePacketTotal = Number(s.live_packet_count);
       const livePacketTotal = Number.isFinite(rawLivePacketTotal) ? rawLivePacketTotal : 0;
+      if (resetTickerScaleOnRestart) {{
+        maybeResetMetricTickerSeries(livePacketTotal);
+      }}
       const realLinks = s.real_edge_count ?? s.edge_count ?? 0;
       setText("m-links", realLinks);
       updateMetricTicker("nodes", s.node_count ?? 0, {{
@@ -11430,7 +11480,7 @@
 
     function hydrateTickerSeriesFromSummaryMetrics(historyPayload) {{
       const payload = (historyPayload && typeof historyPayload === "object") ? historyPayload : {{}};
-      const points = Array.isArray(payload.points) ? payload.points : [];
+      const points = sliceSummaryPointsAfterLiveCounterReset(payload.points);
       const byKey = new Map([
         ["nodes", []],
         ["pos_nodes", []],

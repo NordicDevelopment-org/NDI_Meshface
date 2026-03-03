@@ -17,10 +17,12 @@ def test_build_dashboard_js_injects_runtime_values():
         refresh_ms=3000,
         node_history_hours=72,
         node_history_max_points=1440,
+        reset_ticker_scale_on_restart=True,
     )
     assert "const refreshMs = 3000;" in js
     assert "const nodeHistoryHours = 72;" in js
     assert "const nodeHistoryMaxPoints = 1440;" in js
+    assert "const resetTickerScaleOnRestart = Number(1) === 1;" in js
     assert "setInterval(pollOnce, refreshMs);" in js
     assert "/^[0-9a-f]{8}$/i.test(hex)" in js
     assert "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" in js

@@ -29,6 +29,7 @@ from meshdash.config import (
     DEFAULT_NODE_HISTORY_MAX_POINTS,
     DEFAULT_PACKET_LIMIT,
     DEFAULT_REFRESH_MS,
+    DEFAULT_RESET_TICKER_SCALE_ON_RESTART,
     SENSITIVE_FIELD_NAMES,
     UNKNOWN_GIT_COMMIT,
 )
@@ -237,6 +238,7 @@ def main() -> None:
         default_http_port=DEFAULT_HTTP_PORT,
         default_refresh_ms=DEFAULT_REFRESH_MS,
         default_packet_limit=DEFAULT_PACKET_LIMIT,
+        default_reset_ticker_scale_on_restart=DEFAULT_RESET_TICKER_SCALE_ON_RESTART,
         default_history_db=DEFAULT_HISTORY_DB,
         env_history_db=os.environ.get("MESH_DASH_HISTORY_DB"),
         default_history_max_rows=DEFAULT_HISTORY_MAX_ROWS,

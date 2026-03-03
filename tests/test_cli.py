@@ -25,6 +25,7 @@ def _build_parser(
         default_http_port=8877,
         default_refresh_ms=3000,
         default_packet_limit=250,
+        default_reset_ticker_scale_on_restart=True,
         default_history_db="mesh_dashboard_history.sqlite3",
         env_history_db=env_history_db,
         default_history_max_rows=5000,
@@ -65,6 +66,7 @@ def test_build_dashboard_parser_uses_env_defaults():
     assert args.theme_preset == "forest"
     assert args.theme_settings_file == "/tmp/theme_settings.json"
     assert args.seed_from_node_db is False
+    assert args.reset_ticker_scale_on_restart is True
 
 
 def test_build_dashboard_parser_falls_back_on_invalid_gateway_port():
@@ -76,9 +78,16 @@ def test_build_dashboard_parser_falls_back_on_invalid_gateway_port():
     assert args.theme_preset == "default"
     assert args.theme_settings_file == "mesh_dashboard_theme_settings.json"
     assert args.seed_from_node_db is False
+    assert args.reset_ticker_scale_on_restart is True
 
 
 def test_build_dashboard_parser_enables_seed_from_node_db_flag():
     parser = _build_parser()
     args = parser.parse_args(["--seed-from-node-db"])
     assert args.seed_from_node_db is True
+
+
+def test_build_dashboard_parser_allows_disabling_ticker_scale_reset():
+    parser = _build_parser()
+    args = parser.parse_args(["--no-reset-ticker-scale-on-restart"])
+    assert args.reset_ticker_scale_on_restart is False

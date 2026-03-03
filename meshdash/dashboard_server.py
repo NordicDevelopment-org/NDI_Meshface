@@ -70,6 +70,9 @@ def build_dashboard_server_with_dependencies(
         history_retention_days=dependencies.args.history_retention_days,
         node_history_hours=dependencies.args.node_history_hours,
         node_history_max_points=dependencies.args.node_history_max_points,
+        reset_ticker_scale_on_restart=bool(
+            getattr(dependencies.args, "reset_ticker_scale_on_restart", True)
+        ),
         revision_label=dependencies.revision_info.label,
         revision_title=dependencies.revision_info.title,
     )

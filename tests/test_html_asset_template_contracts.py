@@ -13,6 +13,7 @@ _EXPECTED_TEMPLATE_TOKENS = {
         "refresh_ms",
         "node_history_hours",
         "node_history_max_points",
+        "reset_ticker_scale_on_restart",
     },
     "dashboard.html.tmpl": {
         "app_title",
@@ -48,6 +49,7 @@ def test_rendered_asset_templates_leave_no_single_token_placeholders():
             "refresh_ms": 3000,
             "node_history_hours": 72,
             "node_history_max_points": 1440,
+            "reset_ticker_scale_on_restart": 1,
         },
         "dashboard.html.tmpl": {
             "app_title": "Meshyface",

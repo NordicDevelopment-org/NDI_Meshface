@@ -46,6 +46,7 @@ class RenderHtmlFn(Protocol):
         node_history_max_points: int,
         revision_label: str,
         revision_title: str,
+        reset_ticker_scale_on_restart: bool = True,
         light_theme_vars: dict | None = None,
         dark_theme_vars: dict | None = None,
     ) -> str:
