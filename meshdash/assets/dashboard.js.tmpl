@@ -179,6 +179,7 @@
     const networkNodesSplitStorageKey = "meshDashboardNetworkNodesSplitPct";
     const savedNodeSplitStorageKey = "meshDashboardSavedNodePanePct";
     const savedNodeHistorySplitStorageKey = "meshDashboardSavedNodeMainPct";
+    const historyActivitySplitStorageKey = "meshDashboardHistoryActivityTopPct";
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const meshChannelIndexStorageKey = "meshDashboardMeshChannelIndexV1";
@@ -601,6 +602,7 @@
     let networkNodesListPct = 52;
     let savedNodePanePct = 50;
     let savedNodeMainPct = 56;
+    let historyActivityTopPct = 50;
     let consoleAutoscroll = true;
     let fitDone = false;
     let mapBootstrapFocusDone = false;
@@ -2524,6 +2526,31 @@
       const delta = latestTotal - previousTotal;
       if (!Number.isFinite(delta) || delta <= 0) return 0;
       return delta / spanMinutes;
+    }}
+
+    function derivePacketsPerMinuteSeriesFromTotals(points) {{
+      const series = Array.isArray(points) ? points : [];
+      if (series.length < 2) return [];
+      const output = [];
+      for (let i = 1; i < series.length; i += 1) {{
+        const previousPoint = series[i - 1] || null;
+        const currentPoint = series[i] || null;
+        const previousTotal = Number(previousPoint && previousPoint.value);
+        const currentTotal = Number(currentPoint && currentPoint.value);
+        if (!Number.isFinite(previousTotal) || !Number.isFinite(currentTotal)) continue;
+        const previousMs = Number(previousPoint && previousPoint.ms);
+        const currentMs = Number(currentPoint && currentPoint.ms);
+        const spanMinutes = (Number.isFinite(previousMs) && Number.isFinite(currentMs) && currentMs > previousMs)
+          ? Math.max(1 / 60, (currentMs - previousMs) / 60000)
+          : 1;
+        const delta = currentTotal - previousTotal;
+        const rate = Number.isFinite(delta) && delta > 0 ? (delta / spanMinutes) : 0;
+        output.push({{
+          ms: Number.isFinite(currentMs) ? currentMs : Date.now(),
+          value: rate,
+        }});
+      }}
+      return output;
     }}
 
     function trimMetricTickerPoints(points, cutoffMs) {{
@@ -5714,6 +5741,10 @@
       return Math.max(28, Math.min(78, value));
     }}
 
+    function clampHistoryActivityTopPct(value) {{
+      return Math.max(30, Math.min(76, value));
+    }}
+
     function applySplitState() {{
       const layout = document.querySelector(".layout");
       if (!(layout instanceof HTMLElement)) return;
@@ -5739,6 +5770,12 @@
       const layout = document.getElementById("dashboard-layout");
       if (!(layout instanceof HTMLElement)) return;
       layout.style.setProperty("--saved-node-main-pct", `${{savedNodeMainPct}}%`);
+    }}
+
+    function applyHistoryActivitySplitState() {{
+      const layout = document.getElementById("dashboard-layout");
+      if (!(layout instanceof HTMLElement)) return;
+      layout.style.setProperty("--history-activity-top-pct", `${{historyActivityTopPct}}%`);
     }}
 
     function loadSplitState() {{
@@ -5808,6 +5845,20 @@
       }} catch (_err) {{
       }}
       applySavedNodeHistorySplitState();
+    }}
+
+    function loadHistoryActivitySplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(historyActivitySplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            historyActivityTopPct = clampHistoryActivityTopPct(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applyHistoryActivitySplitState();
     }}
 
 
@@ -5974,6 +6025,13 @@
     function persistSavedNodeHistorySplitState() {{
       try {{
         window.localStorage.setItem(savedNodeHistorySplitStorageKey, String(savedNodeMainPct));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistHistoryActivitySplitState() {{
+      try {{
+        window.localStorage.setItem(historyActivitySplitStorageKey, String(historyActivityTopPct));
       }} catch (_err) {{
       }}
     }}
@@ -6852,6 +6910,58 @@
           splitter.classList.remove("active");
           document.body.classList.remove("resizing-panels-y");
           persistSavedNodeHistorySplitState();
+          splitter.removeEventListener("pointermove", onMove);
+          splitter.removeEventListener("pointerup", onUp);
+          splitter.removeEventListener("pointercancel", onUp);
+        }};
+
+        splitter.addEventListener("pointermove", onMove);
+        splitter.addEventListener("pointerup", onUp);
+        splitter.addEventListener("pointercancel", onUp);
+      }});
+    }}
+
+    function bindHistoryActivitySplitter() {{
+      const splitter = document.getElementById("history-activity-splitter");
+      if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;
+      const stack = splitter.closest(".history-activity-stack");
+      if (!(stack instanceof HTMLElement)) return;
+      splitter.dataset.bound = "1";
+
+      splitter.addEventListener("pointerdown", (ev) => {{
+        if (activeLayoutView !== "history") return;
+        if (window.matchMedia("(max-width: 1100px)").matches) return;
+        ev.preventDefault();
+        splitter.classList.add("active");
+        document.body.classList.add("resizing-panels-y");
+        splitter.setPointerCapture(ev.pointerId);
+
+        const topPane = stack.querySelector(".history-activity-main-scroll");
+        if (!(topPane instanceof HTMLElement)) {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-y");
+          return;
+        }}
+
+        const updateFromClientY = (clientY) => {{
+          const rect = stack.getBoundingClientRect();
+          if (rect.height < 80) return;
+          const relativeY = clientY - rect.top;
+          const pct = clampHistoryActivityTopPct((relativeY / rect.height) * 100);
+          historyActivityTopPct = pct;
+          applyHistoryActivitySplitState();
+        }};
+
+        updateFromClientY(ev.clientY);
+
+        const onMove = (moveEv) => {{
+          updateFromClientY(moveEv.clientY);
+        }};
+
+        const onUp = () => {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-y");
+          persistHistoryActivitySplitState();
           splitter.removeEventListener("pointermove", onMove);
           splitter.removeEventListener("pointerup", onUp);
           splitter.removeEventListener("pointercancel", onUp);
@@ -8733,14 +8843,19 @@
         chartId: "ticker-chart-pos-nodes",
         digits: 0,
       }});
-      updateMetricTicker("live_packets", livePacketTotal, {{
+      appendMetricTickerPoint("live_packets", livePacketTotal);
+      const livePacketSeries = metricTickerSeries.get("live_packets") || [];
+      const packetsPerMinuteSeries = derivePacketsPerMinuteSeriesFromTotals(livePacketSeries);
+      const latestPacketsPerMinute = packetsPerMinuteSeries.length
+        ? Number(packetsPerMinuteSeries[packetsPerMinuteSeries.length - 1].value)
+        : 0;
+      updateMetricTicker("live_packets_per_min", latestPacketsPerMinute, {{
         containerId: "ticker-live-packets",
         deltaId: "ticker-delta-live-packets",
         rateId: "ticker-rate-live-packets",
         chartId: "ticker-chart-live-packets",
-        digits: 0,
+        digits: 1,
       }});
-      const livePacketSeries = metricTickerSeries.get("live_packets") || [];
       const packetsPerMinute = derivePacketsPerMinuteFromTotals(livePacketSeries);
       setText("m-live-packets", formatTickerNumber(packetsPerMinute, 1));
       const livePacketsMetric = document.getElementById("m-live-packets");
@@ -11485,6 +11600,7 @@
         ["nodes", []],
         ["pos_nodes", []],
         ["live_packets", []],
+        ["live_packets_per_min", []],
         ["real_links", []],
       ]);
       for (const point of points) {{
@@ -11508,6 +11624,12 @@
         if (Number.isFinite(realLinks)) {{
           byKey.get("real_links").push({{ ms: bucketMs, value: realLinks }});
         }}
+      }}
+
+      const livePacketTotals = byKey.get("live_packets") || [];
+      const livePacketRates = derivePacketsPerMinuteSeriesFromTotals(livePacketTotals);
+      if (livePacketRates.length > 0) {{
+        byKey.set("live_packets_per_min", livePacketRates);
       }}
 
       const cutoffMs = Date.now() - metricTickerWindowMs;
@@ -12817,6 +12939,7 @@
     loadNetworkNodesSplitState();
     loadSavedNodeSplitState();
     loadSavedNodeHistorySplitState();
+    loadHistoryActivitySplitState();
     loadNodesTableColPcts();
     loadSignalHeatDevKnobs();
     loadSignalHeatmapModePreference();
@@ -12839,6 +12962,7 @@
     bindNetworkNodeSplitter();
     bindSavedNodeSplitter();
     bindSavedNodeHistorySplitter();
+    bindHistoryActivitySplitter();
     bindSelectionControls();
     bindStarredNodeControl();
     bindFavoriteToggleControls();

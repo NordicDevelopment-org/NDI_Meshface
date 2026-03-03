@@ -860,6 +860,7 @@
       --network-nodes-list-pct: 52%;
       --saved-node-pane-pct: 50%;
       --saved-node-main-pct: 56%;
+      --history-activity-top-pct: 50%;
       display: grid;
       gap: 8px;
       padding: 0;
@@ -1814,6 +1815,59 @@
       gap: 8px;
       flex: 1 1 auto;
     }}
+    .history-activity-stack {{
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 0;
+    }}
+    .history-activity-main-scroll {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 2px;
+    }}
+    .history-activity-splitter {{
+      display: none;
+      position: relative;
+      border-radius: 8px;
+      border: 1px solid #d1e0cb;
+      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+      cursor: row-resize;
+      touch-action: none;
+      user-select: none;
+      min-height: 6px;
+      flex: 0 0 var(--splitter-size);
+      margin: 8px 0;
+    }}
+    .history-activity-splitter::before {{
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      background: #b8cab9;
+      border-radius: 1px;
+    }}
+    .history-activity-splitter:hover::before,
+    .history-activity-splitter.active::before {{
+      background: #2f855a;
+    }}
+    .history-activity-weekly-panel {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 2px;
+    }}
     .map-data-live[hidden], .map-data-node[hidden], .map-data-activity[hidden] {{
       display: none !important;
     }}
@@ -2449,6 +2503,12 @@
     .layout.view-history .map-data .body {{
       min-height: 0;
       background: var(--history-pane-body-bg);
+    }}
+    .layout.view-history .history-activity-splitter {{
+      display: block;
+    }}
+    .layout.view-history .history-activity-main-scroll {{
+      flex: 0 0 var(--history-activity-top-pct);
     }}
     .layout.view-history .history-chat {{
       display: flex;
@@ -5129,11 +5189,22 @@
       border-color: var(--ui-border);
       background: linear-gradient(90deg, #1a2430, #16202c);
     }}
+    [data-theme="dark"] .history-activity-splitter {{
+      border-color: var(--ui-border);
+      background: linear-gradient(90deg, #1a2430, #16202c);
+    }}
     [data-theme="dark"] .saved-node-history-splitter::before {{
+      background: #44566a;
+    }}
+    [data-theme="dark"] .history-activity-splitter::before {{
       background: #44566a;
     }}
     [data-theme="dark"] .saved-node-history-splitter:hover::before,
     [data-theme="dark"] .saved-node-history-splitter.active::before {{
+      background: #79c0ff;
+    }}
+    [data-theme="dark"] .history-activity-splitter:hover::before,
+    [data-theme="dark"] .history-activity-splitter.active::before {{
       background: #79c0ff;
     }}
     [data-theme="dark"] .saved-map-splitter {{
@@ -5701,6 +5772,12 @@
       }}
       .saved-node-history-splitter {{
         display: none !important;
+      }}
+      .history-activity-splitter {{
+        display: none !important;
+      }}
+      .layout.view-history .history-activity-main-scroll {{
+        flex: 1 1 auto;
       }}
       .layout.view-saved .saved-node-main-scroll {{
         flex: 1 1 auto;
