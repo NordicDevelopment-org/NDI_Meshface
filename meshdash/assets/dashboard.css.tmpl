@@ -980,6 +980,45 @@
     .map-reset-view-btn:hover {{
       background: #e7f3eb;
     }}
+    .map-basemap-status {{
+      display: inline-flex;
+      align-items: center;
+      appearance: none;
+      border: 1px solid #bfd4c3;
+      border-radius: 999px;
+      background: #f7fcf7;
+      color: #274935;
+      padding: 3px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+      line-height: 1.2;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }}
+    .map-basemap-status:hover {{
+      background: #e7f3eb;
+    }}
+    .map-basemap-status:focus-visible {{
+      outline: 2px solid rgba(76, 143, 103, 0.55);
+      outline-offset: 1px;
+    }}
+    .map-basemap-status.status-online {{
+      border-color: #8ec9a0;
+      background: #eaf8ef;
+      color: #1f6b42;
+    }}
+    .map-basemap-status.status-loading {{
+      border-color: #d1be8b;
+      background: #fff8e5;
+      color: #705116;
+    }}
+    .map-basemap-status.status-offline {{
+      border-color: #c5ccd6;
+      background: #f2f4f8;
+      color: #34445f;
+    }}
     .map-position-badge {{
       display: inline-flex;
       align-items: center;
@@ -1487,6 +1526,42 @@
       width: 100%;
       height: 100%;
       min-height: 0;
+    }}
+    .map-frame.map-basemap-offline {{
+      border-style: dashed;
+      border-color: #8ca1be;
+    }}
+    .offline-landmark-icon {{
+      width: 0 !important;
+      height: 0 !important;
+      pointer-events: none;
+    }}
+    .offline-landmark-icon span {{
+      position: relative;
+      display: inline-block;
+      transform: translate(4px, -4px);
+      border: 1px solid rgba(84, 104, 133, 0.58);
+      border-radius: 999px;
+      background: rgba(239, 246, 255, 0.85);
+      color: #2a3f5f;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12px;
+      line-height: 1.15;
+      padding: 1px 6px 1px 12px;
+      white-space: nowrap;
+      box-shadow: 0 1px 2px rgba(19, 36, 64, 0.2);
+    }}
+    .offline-landmark-icon span::before {{
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 50%;
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: #3f648f;
+      transform: translateY(-50%);
     }}
     .chat {{
       grid-column: 1 / span 3;
@@ -5243,6 +5318,44 @@
     }}
     [data-theme="dark"] .map-reset-view-btn:hover {{
       background: #1b2b23;
+    }}
+    [data-theme="dark"] .map-basemap-status {{
+      background: #151f2b;
+      border-color: #3c506c;
+      color: #c9ddfb;
+    }}
+    [data-theme="dark"] .map-basemap-status:hover {{
+      background: #1b293a;
+    }}
+    [data-theme="dark"] .map-basemap-status:focus-visible {{
+      outline-color: rgba(137, 176, 230, 0.65);
+    }}
+    [data-theme="dark"] .map-basemap-status.status-online {{
+      background: #173126;
+      border-color: #3f8f68;
+      color: #8ce7b4;
+    }}
+    [data-theme="dark"] .map-basemap-status.status-loading {{
+      background: #2a2416;
+      border-color: #8a7444;
+      color: #f2cf7a;
+    }}
+    [data-theme="dark"] .map-basemap-status.status-offline {{
+      background: #1a2433;
+      border-color: #4e6282;
+      color: #bdd3f6;
+    }}
+    [data-theme="dark"] .map-frame.map-basemap-offline {{
+      border-color: #5f7ea7;
+    }}
+    [data-theme="dark"] .offline-landmark-icon span {{
+      border-color: rgba(116, 147, 191, 0.62);
+      background: rgba(14, 22, 34, 0.84);
+      color: #d4e5ff;
+      box-shadow: 0 1px 2px rgba(3, 8, 15, 0.55);
+    }}
+    [data-theme="dark"] .offline-landmark-icon span::before {{
+      background: #8fb1e2;
     }}
     [data-theme="dark"] .col-resizer::after {{
       background: rgba(120, 176, 151, 0.32);

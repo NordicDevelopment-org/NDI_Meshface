@@ -76,6 +76,16 @@ def test_handle_dashboard_get_returns_state_and_404():
 
     handle_dashboard_get(
         handler,
+        path="/api/offline/atlas",
+        query="",
+        deps=deps,
+    )
+    assert calls["json"][3]["status_code"] == 200
+    assert isinstance(calls["json"][3]["payload_obj"], dict)
+    assert "layers" in calls["json"][3]["payload_obj"]
+
+    handle_dashboard_get(
+        handler,
         path="/not-found",
         query="",
         deps=deps,

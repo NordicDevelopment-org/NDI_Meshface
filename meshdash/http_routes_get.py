@@ -11,6 +11,7 @@ from .api_theme import (
 )
 from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardGetRouteDependencies
+from .offline_atlas import load_offline_atlas_payload as _load_offline_atlas_payload_helper
 
 
 def handle_dashboard_get(
@@ -116,6 +117,15 @@ def handle_dashboard_get(
             empty_summary_metrics_fn=deps.empty_summary_metrics_fn,
         )
         deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
+        return
+
+    if path == "/api/offline/atlas":
+        deps.write_json_response_fn(
+            handler,
+            status_code=200,
+            payload_obj=_load_offline_atlas_payload_helper(),
+            no_store=False,
+        )
         return
 
     deps.write_text_response_fn(handler, status_code=404, text="Not Found")
