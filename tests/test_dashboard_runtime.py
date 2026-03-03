@@ -1,8 +1,10 @@
 import argparse
 import threading
 import time
+from types import SimpleNamespace
 
 from meshdash.dashboard_runtime import run_dashboard_runtime
+from meshdash.dashboard_runner_impl import _start_summary_sampler
 from meshdash.revision import RevisionInfo
 
 
@@ -356,3 +358,45 @@ def test_run_dashboard_runtime_starts_offline_mode_when_serial_radio_missing():
     assert payload.get("summary", {}).get("node_count") == 0
     assert payload.get("local_node_id") == "local"
     assert "no serial device" in str(payload.get("tracker_error", ""))
+
+
+def test_start_summary_sampler_primes_with_lite_state_fn():
+    calls = []
+
+    def _state_fn():
+        calls.append("full")
+        return {}
+
+    def _state_fn_lite():
+        calls.append("lite")
+        return {}
+
+    _state_fn.lite = _state_fn_lite
+    context = SimpleNamespace(
+        history_enabled=True,
+        history_store=SimpleNamespace(save_summary_metrics=lambda *_a, **_k: None),
+        state_fn=_state_fn,
+    )
+
+    stop_event, thread = _start_summary_sampler(context)
+
+    assert calls == ["lite"]
+    assert stop_event is not None
+    assert thread is not None
+
+    stop_event.set()
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+
+
+def test_start_summary_sampler_skips_when_history_store_has_no_summary_saver():
+    context = SimpleNamespace(
+        history_enabled=True,
+        history_store=SimpleNamespace(),
+        state_fn=lambda: {},
+    )
+
+    stop_event, thread = _start_summary_sampler(context)
+
+    assert stop_event is None
+    assert thread is None

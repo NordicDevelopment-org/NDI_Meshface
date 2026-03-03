@@ -203,6 +203,14 @@
     const metricTickerWindowMs = 60 * 60 * 1000;
     const metricTickerMaxPoints = 240;
     const metricTickerSeries = new Map();
+    const weeklySummaryHours = 24 * 7;
+    const weeklySummaryMetricStorageKey = "meshDashboardWeeklySummaryMetricV1";
+    const weeklySummaryMetricCatalog = new Map([
+      ["live_packet_count", { label: "Live Packets", decimals: 0 }],
+      ["node_count", { label: "Known Nodes", decimals: 0 }],
+      ["nodes_with_position", { label: "Nodes With Position", decimals: 0 }],
+      ["real_edge_count", { label: "Directed Links", decimals: 0 }],
+    ]);
     // Generated from Unicode emoji-test.txt
     // Source: https://unicode.org/Public/emoji/latest/emoji-test.txt
     // Unicode Emoji Version: 17.0 (2025-08-04, 20:55:31 GMT)
@@ -550,7 +558,7 @@
       "packets-table": {{ index: 0, dir: "desc" }},
     }};
     const wheelActivationLeaseMs = 1400;
-    const knownLayoutViews = new Set(["chat", "network", "saved", "packets", "data", "console", "settings"]);
+    const knownLayoutViews = new Set(["chat", "history", "network", "saved", "packets", "data", "console", "settings"]);
     const knownChatChannels = new Set(["all", "direct"]);
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
@@ -636,6 +644,7 @@
     let themePreference = "auto";
     let tickerDensity = "compact";
     let themePresetSelected = "default";
+    let weeklySummaryMetric = "live_packet_count";
     let settingsDirty = false;
     let settingsDirtyAt = 0;
     let themePresetCatalog = {{
@@ -2887,6 +2896,29 @@
       return clean === "expanded" ? "expanded" : "compact";
     }}
 
+    function normalizeWeeklySummaryMetric(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return weeklySummaryMetricCatalog.has(clean) ? clean : "live_packet_count";
+    }}
+
+    function applyWeeklySummaryMetric(metricKey, persist = true) {{
+      const normalized = normalizeWeeklySummaryMetric(metricKey);
+      weeklySummaryMetric = normalized;
+      const select = document.getElementById("weekly-summary-metric");
+      if (select instanceof HTMLSelectElement && select.value !== normalized) {{
+        select.value = normalized;
+      }}
+      const cached = summaryMetricsCache.get(String(weeklySummaryHours));
+      if (cached && cached.data) {{
+        renderWeeklySummary(cached.data);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(weeklySummaryMetricStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
     function applyTickerDensity(mode, persist = true) {{
       const normalized = normalizeTickerDensityMode(mode);
       tickerDensity = normalized;
@@ -2940,6 +2972,10 @@
         if (cachedActivity && cachedActivity.data && Array.isArray(cachedActivity.data.points)) {{
           renderOnlineActivityChart(cachedActivity.data.points);
         }}
+        const cachedWeekly = summaryMetricsCache.get(String(weeklySummaryHours));
+        if (cachedWeekly && cachedWeekly.data && Array.isArray(cachedWeekly.data.points)) {{
+          renderWeeklySummary(cachedWeekly.data);
+        }}
       }}
 
       if (!persist) return;
@@ -2989,6 +3025,20 @@
       }});
     }}
 
+    function bindWeeklySummaryMetricControl() {{
+      const select = document.getElementById("weekly-summary-metric");
+      if (!(select instanceof HTMLSelectElement)) return;
+      if (select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+      select.value = normalizeWeeklySummaryMetric(weeklySummaryMetric);
+      select.addEventListener("change", () => {{
+        applyWeeklySummaryMetric(select.value || "live_packet_count", true);
+        if (activeLayoutView === "history") {{
+          void refreshHistoryPanels(false);
+        }}
+      }});
+    }}
+
     function loadThemePreference() {{
       let stored = "auto";
       try {{
@@ -3005,6 +3055,15 @@
       }} catch (_err) {{
       }}
       applyTickerDensity(stored, false);
+    }}
+
+    function loadWeeklySummaryMetricPreference() {{
+      let stored = "live_packet_count";
+      try {{
+        stored = window.localStorage.getItem(weeklySummaryMetricStorageKey) || "live_packet_count";
+      }} catch (_err) {{
+      }}
+      applyWeeklySummaryMetric(stored, false);
     }}
 
     function persistSignalHeatmapPreference() {{
@@ -6373,7 +6432,7 @@
       refreshMapCardTitle();
       const mapResetBtn = document.getElementById("map-reset-view-btn");
       if (mapResetBtn instanceof HTMLButtonElement) {{
-        mapResetBtn.hidden = next === "saved";
+        mapResetBtn.hidden = next === "saved" || next === "history";
       }}
 
       const mapNodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
@@ -6413,6 +6472,9 @@
         }}
       }}
 
+      if (next === "history") {{
+        mapDataFocus = "activity";
+      }}
       if (next === "network" && mapDataFocus === "activity") {{
         mapDataFocus = "auto";
       }}
@@ -6438,13 +6500,20 @@
         // Render visible UI from cached state immediately on view switches.
         // This prevents "blank" panes when the server legitimately returns 304s.
         renderSummary(latestState);
-        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
+        if (next === "saved" || next === "network") {{
+          renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
+        }}
         if (next === "network") {{
           renderNodes(latestState.nodes || []);
         }}
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
         if (next === "chat") {{
           renderChat(latestState);
+        }}
+        if (next === "history") {{
+          renderHistoryChat(latestState.traffic || {{}});
+          setMapDataMode("activity");
+          void refreshHistoryPanels(false);
         }}
         if (next === "saved") {{
           renderFavorites(latestState, cachedNodeHistory);
@@ -6462,6 +6531,11 @@
         }}
       }} else if (next === "network") {{
         renderNodesPlaceholder("Syncing nodes...");
+      }} else if (next === "history") {{
+        setMapDataMode("activity");
+        renderOnlineActivityLoading();
+        renderWeeklySummaryLoading();
+        renderHistoryChat({{}});
       }}
       if (next !== "saved") {{
         closeSavedNodeSearchDropdown();
@@ -6469,7 +6543,7 @@
       renderSavedNodeSearchDropdown(latestState);
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
-      if (next === "chat" || next === "network" || next === "saved") {{
+      if (next === "chat" || next === "history" || next === "network" || next === "saved") {{
         requestImmediatePoll(0);
       }}
       if (isMapVisibleLayoutView(next)) {{
@@ -10874,6 +10948,207 @@
       renderOnlineActivityOverview(activity);
     }}
 
+    function renderWeeklySummaryLoading() {{
+      const caption = document.getElementById("weekly-summary-caption");
+      if (caption) {{
+        caption.textContent = "Loading weekly summary metrics...";
+      }}
+      const overview = document.getElementById("weekly-summary-overview");
+      if (overview) {{
+        overview.innerHTML = "";
+      }}
+      const svg = document.getElementById("weekly-summary-chart");
+      if (svg) {{
+        svg.innerHTML = "";
+      }}
+      const empty = document.getElementById("weekly-summary-empty");
+      if (empty) {{
+        empty.hidden = false;
+        empty.textContent = "Loading weekly summary metrics...";
+      }}
+    }}
+
+    function renderWeeklySummaryError(message) {{
+      const caption = document.getElementById("weekly-summary-caption");
+      if (caption) {{
+        caption.textContent = `Weekly summary error: ${{message || "unknown error"}}`;
+      }}
+      const overview = document.getElementById("weekly-summary-overview");
+      if (overview) {{
+        overview.innerHTML = "";
+      }}
+      const svg = document.getElementById("weekly-summary-chart");
+      if (svg) {{
+        svg.innerHTML = "";
+      }}
+      const empty = document.getElementById("weekly-summary-empty");
+      if (empty) {{
+        empty.hidden = false;
+        empty.textContent = "Unable to load weekly summary metrics.";
+      }}
+    }}
+
+    function renderWeeklySummary(summaryHistory) {{
+      const metricKey = normalizeWeeklySummaryMetric(weeklySummaryMetric);
+      const metricMeta = weeklySummaryMetricCatalog.get(metricKey) || {{
+        label: "Metric",
+        decimals: 0,
+      }};
+      const payload = (summaryHistory && typeof summaryHistory === "object") ? summaryHistory : {{}};
+      const points = Array.isArray(payload.points) ? payload.points : [];
+      const rows = [];
+      for (const point of points) {{
+        if (!point || typeof point !== "object") continue;
+        const value = Number(point[metricKey]);
+        if (!Number.isFinite(value)) continue;
+        rows.push({{
+          value,
+          bucketText: String(point.bucket_time || "").trim(),
+        }});
+      }}
+
+      const caption = document.getElementById("weekly-summary-caption");
+      const overview = document.getElementById("weekly-summary-overview");
+      const svg = document.getElementById("weekly-summary-chart");
+      const empty = document.getElementById("weekly-summary-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+      if (!(overview instanceof HTMLElement)) return;
+
+      if (rows.length === 0) {{
+        svg.innerHTML = "";
+        overview.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = "No weekly summary history yet.";
+        if (caption) {{
+          caption.textContent = `Weekly trend for ${{metricMeta.label}}. No saved samples yet.`;
+        }}
+        return;
+      }}
+
+      empty.hidden = true;
+      const values = rows.map((row) => Number(row.value)).filter((value) => Number.isFinite(value));
+      let minVal = Math.min(...values);
+      let maxVal = Math.max(...values);
+      if ((maxVal - minVal) < 1e-6) {{
+        maxVal = minVal + 1;
+      }}
+
+      const width = 900;
+      const height = 220;
+      const padLeft = 46;
+      const padRight = 10;
+      const padTop = 12;
+      const padBottom = 24;
+      const plotW = width - padLeft - padRight;
+      const plotH = height - padTop - padBottom;
+      const n = rows.length;
+      const pointsXY = [];
+      for (let i = 0; i < n; i += 1) {{
+        const value = Number(rows[i].value);
+        if (!Number.isFinite(value)) continue;
+        const x = padLeft + ((Math.max(0, i) / Math.max(1, n - 1)) * plotW);
+        const y = padTop + ((maxVal - value) / (maxVal - minVal)) * plotH;
+        pointsXY.push({{ x, y }});
+      }}
+      if (!pointsXY.length) {{
+        svg.innerHTML = "";
+        overview.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = "No weekly summary history yet.";
+        if (caption) {{
+          caption.textContent = `Weekly trend for ${{metricMeta.label}}. No saved samples yet.`;
+        }}
+        return;
+      }}
+
+      const path = pointsXY.map((pt, idx) => (
+        `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
+      )).join(" ");
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const chartPalette = darkTheme
+        ? {{
+            grid: "#324152",
+            line: "#58c878",
+            label: "#9ce7b8",
+          }}
+        : {{
+            grid: "#dce8df",
+            line: "#1f6f53",
+            label: "#1f6f53",
+          }};
+      const startLabel = rows[0].bucketText || "";
+      const endLabel = rows[rows.length - 1].bucketText || "";
+      const midY = padTop + (plotH / 2);
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.innerHTML = `
+        <rect x="0" y="0" width="${{width}}" height="${{height}}" fill="none"></rect>
+        <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{midY.toFixed(2)}}" x2="${{width - padRight}}" y2="${{midY.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{height - padBottom}}" x2="${{width - padRight}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
+        <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(maxVal, metricMeta.decimals)}}</text>
+        <text x="${{padLeft - 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(minVal, metricMeta.decimals)}}</text>
+        <text x="${{padLeft}}" y="${{height - 6}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">${{escAttr(startLabel)}}</text>
+        <text x="${{width - padRight}}" y="${{height - 6}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{escAttr(endLabel)}}</text>
+      `;
+
+      const firstValue = Number(rows[0].value);
+      const lastValue = Number(rows[rows.length - 1].value);
+      const delta = lastValue - firstValue;
+      const avg = values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
+      const windowHours = Number(payload.window_hours);
+      if (caption) {{
+        caption.textContent = `Weekly trend for ${{metricMeta.label}}. Window: ${{Number.isFinite(windowHours) ? windowHours : weeklySummaryHours}}h, samples: ${{rows.length}}.`;
+      }}
+      const items = [
+        ["Metric", metricMeta.label],
+        ["Window", `${{Number.isFinite(windowHours) ? Math.round(windowHours) : weeklySummaryHours}}h`],
+        ["Samples", String(rows.length)],
+        ["Latest", formatMetricValue(lastValue, metricMeta.decimals)],
+        ["Delta", formatMetricValue(delta, metricMeta.decimals)],
+        ["Average", formatMetricValue(avg, metricMeta.decimals)],
+        ["Peak", formatMetricValue(Math.max(...values), metricMeta.decimals)],
+        ["Range", `${{startLabel || "n/a"}} to ${{endLabel || "n/a"}}`],
+      ];
+      overview.innerHTML = items.map(([k, v]) => (
+        `<div class="overview-item"><div class="k">${{k}}</div><div class="v">${{v}}</div></div>`
+      )).join("");
+    }}
+
+    function renderHistoryChat(traffic) {{
+      const tbody = document.querySelector("#history-chat-table tbody");
+      if (!(tbody instanceof HTMLElement)) return;
+      const messages = Array.isArray(traffic && traffic.recent_chat) ? traffic.recent_chat : [];
+      const rows = messages.slice(0, 240).map((entry) => {{
+        const capturedAt = String((entry && (entry.captured_at || entry.rx_time)) || "n/a");
+        const fromId = String((entry && entry.from) || "n/a");
+        const toId = String((entry && entry.to) || "n/a");
+        const text = String((entry && entry.text) || "").trim();
+        const emoji = String((entry && entry.emoji) || "").trim();
+        const isReaction = entry && entry.is_reaction === true;
+        const renderedText = text
+          ? text
+          : (isReaction ? `Reaction ${{emoji || ""}}`.trim() : (emoji || "n/a"));
+        return `<tr>
+          <td data-sort="${{escAttr(capturedAt)}}">${{escAttr(capturedAt)}}</td>
+          <td data-sort="${{escAttr(fromId)}}">${{escAttr(fromId)}}</td>
+          <td data-sort="${{escAttr(toId)}}">${{escAttr(toId)}}</td>
+          <td data-sort="${{escAttr(renderedText)}}">${{escAttr(renderedText)}}</td>
+        </tr>`;
+      }});
+      if (!rows.length) {{
+        tbody.innerHTML = '<tr><td colspan="4">No saved chat history yet.</td></tr>';
+      }} else {{
+        tbody.innerHTML = rows.join("");
+      }}
+      const caption = document.getElementById("history-chat-caption");
+      if (caption) {{
+        caption.textContent = rows.length
+          ? `Showing ${{rows.length}} most recent saved chat messages.`
+          : "No saved chat history yet.";
+      }}
+    }}
+
     function renderNodeHistoryOverview(history, node) {{
       const summary = history.summary || {{}};
       const target = document.getElementById("node-history-overview");
@@ -11143,6 +11418,51 @@
         }}
       }} catch (_err) {{
         summaryMetricsHydrated = false;
+      }}
+    }}
+
+    async function refreshHistoryPanels(force = false) {{
+      if (activeLayoutView !== "history") return;
+      setMapDataMode("activity");
+      const onlineKey = String(Math.max(1, Math.round(Number(nodeHistoryHours) || nodeHistoryHours)));
+      const weeklyKey = String(weeklySummaryHours);
+      if (force) {{
+        onlineActivityCache.delete(onlineKey);
+        summaryMetricsCache.delete(weeklyKey);
+      }}
+      const cachedOnline = onlineActivityCache.get(onlineKey);
+      if (cachedOnline && cachedOnline.data) {{
+        renderOnlineActivity(cachedOnline.data);
+      }} else {{
+        renderOnlineActivityLoading();
+      }}
+      const cachedWeekly = summaryMetricsCache.get(weeklyKey);
+      if (cachedWeekly && cachedWeekly.data) {{
+        renderWeeklySummary(cachedWeekly.data);
+      }} else {{
+        renderWeeklySummaryLoading();
+      }}
+
+      const [onlineResult, weeklyResult] = await Promise.allSettled([
+        fetchOnlineActivity(nodeHistoryHours),
+        fetchSummaryMetrics(weeklySummaryHours),
+      ]);
+      if (activeLayoutView !== "history") return;
+
+      if (onlineResult.status === "fulfilled") {{
+        renderOnlineActivity(onlineResult.value);
+      }} else {{
+        const reason = onlineResult.reason;
+        const message = reason instanceof Error ? reason.message : String(reason || "unknown error");
+        renderOnlineActivityError(message);
+      }}
+
+      if (weeklyResult.status === "fulfilled") {{
+        renderWeeklySummary(weeklyResult.value);
+      }} else {{
+        const reason = weeklyResult.reason;
+        const message = reason instanceof Error ? reason.message : String(reason || "unknown error");
+        renderWeeklySummaryError(message);
       }}
     }}
 
@@ -12194,6 +12514,7 @@
           lastPollErrorUnix = 0;
           renderSelfRadioPill(latestState);
           const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network";
+          const trafficVisible304 = mapVisible304 || activeLayoutView === "history";
           const historyRelevant304 = (activeLayoutView === "saved" || activeLayoutView === "network")
             && mapDataFocus !== "activity"
             && isSelectableNodeId(selectedNodeId);
@@ -12209,8 +12530,12 @@
           if (activeLayoutView === "network") {{
             renderNodes(nodes304);
           }}
-          if (mapVisible304) {{
+          if (trafficVisible304) {{
             renderTraffic(traffic304, nodes304, cachedHistory304, null);
+          }}
+          if (activeLayoutView === "history") {{
+            renderHistoryChat(traffic304);
+            void refreshHistoryPanels(false);
           }}
           if (activeLayoutView === "saved") {{
             const loadingId304 = (activeLayoutView === "saved" && historyRelevant304 && !cachedHistory304)
@@ -12256,6 +12581,7 @@
         }}
 
         const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network";
+        const trafficVisible = mapVisible || activeLayoutView === "history";
         const historyRelevant = (activeLayoutView === "saved" || activeLayoutView === "network")
           && mapDataFocus !== "activity"
           && isSelectableNodeId(selectedNodeId);
@@ -12275,7 +12601,7 @@
         }}
 
         let onlineActivity = null;
-        if (mapVisible && mapDataFocus === "activity") {{
+        if (activeLayoutView === "history" || (mapVisible && mapDataFocus === "activity")) {{
           try {{
             onlineActivity = await fetchOnlineActivity(nodeHistoryHours);
           }} catch (activityErr) {{
@@ -12283,6 +12609,18 @@
               error: activityErr instanceof Error
                 ? activityErr.message
                 : String(activityErr || "unknown error"),
+            }};
+          }}
+        }}
+        let weeklySummary = null;
+        if (activeLayoutView === "history") {{
+          try {{
+            weeklySummary = await fetchSummaryMetrics(weeklySummaryHours);
+          }} catch (summaryErr) {{
+            weeklySummary = {{
+              error: summaryErr instanceof Error
+                ? summaryErr.message
+                : String(summaryErr || "unknown error"),
             }};
           }}
         }}
@@ -12298,8 +12636,18 @@
           renderNodes(state.nodes || []);
         }}
 
-        if (mapVisible) {{
+        if (trafficVisible) {{
           renderTraffic(state.traffic || {{}}, state.nodes || [], cachedHistory, onlineActivity);
+        }}
+        if (activeLayoutView === "history") {{
+          renderHistoryChat(state.traffic || {{}});
+          if (weeklySummary && !weeklySummary.error) {{
+            renderWeeklySummary(weeklySummary);
+          }} else if (weeklySummary && weeklySummary.error) {{
+            renderWeeklySummaryError(weeklySummary.error);
+          }} else {{
+            renderWeeklySummaryLoading();
+          }}
         }}
 
         if (activeLayoutView === "chat") {{
@@ -12373,6 +12721,7 @@
     bindMapBasemapConnectivityHandlers();
     loadThemePreference();
     loadTickerDensityPreference();
+    loadWeeklySummaryMetricPreference();
     bindLayoutNav();
     renderSavedRailStatus();
     bindSplitters();
@@ -12394,6 +12743,7 @@
     bindChatPeerControls();
     bindThemeToggle();
     bindSummaryTickerExpandControl();
+    bindWeeklySummaryMetricControl();
     bindThemePresetSelector();
     bindMeshChannelControl();
     bindSignalHeatDevApi();

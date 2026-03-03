@@ -55,6 +55,62 @@ class _OfflineTracker:
         return
 
 
+_SUMMARY_SAMPLE_INTERVAL_SECONDS = 30.0
+_SUMMARY_SAMPLE_STARTUP_DELAY_SECONDS = 5.0
+
+
+def _summary_sampling_supported(context: DashboardRuntimeContext) -> bool:
+    if not context.history_enabled:
+        return False
+    store = context.history_store
+    if store is None:
+        return False
+    save_summary_fn = getattr(store, "save_summary_metrics", None)
+    return callable(save_summary_fn)
+
+
+def _resolve_summary_sampler_state_fn(state_fn: object):
+    lite_fn = getattr(state_fn, "lite", None)
+    if callable(lite_fn):
+        return lite_fn
+    return state_fn if callable(state_fn) else None
+
+
+def _start_summary_sampler(context: DashboardRuntimeContext) -> tuple[threading.Event | None, threading.Thread | None]:
+    if not _summary_sampling_supported(context):
+        return None, None
+    sample_state_fn = _resolve_summary_sampler_state_fn(context.state_fn)
+    if sample_state_fn is None:
+        return None, None
+
+    # Prime the latest bucket at startup so charts are populated even before
+    # the first background interval elapses.
+    try:
+        sample_state_fn()
+    except Exception:
+        pass
+
+    stop_event = threading.Event()
+
+    def _sample_loop() -> None:
+        if stop_event.wait(_SUMMARY_SAMPLE_STARTUP_DELAY_SECONDS):
+            return
+        while not stop_event.wait(_SUMMARY_SAMPLE_INTERVAL_SECONDS):
+            try:
+                sample_state_fn()
+            except Exception:
+                # Sampling is best-effort; never take down runtime on metrics write.
+                pass
+
+    thread = threading.Thread(
+        target=_sample_loop,
+        name="dashboard-summary-sampler",
+        daemon=True,
+    )
+    thread.start()
+    return stop_event, thread
+
+
 def _enable_serial_auto_reconnect(args: DashboardArgs) -> bool:
     # Meshtastic TCPInterface has its own reconnect path. Serial links do not,
     # so recover by rebuilding a fresh runtime session.
@@ -412,6 +468,9 @@ def run_dashboard_runtime(
         restart_requested = threading.Event()
         stop_watcher = threading.Event()
         watcher_thread: threading.Thread | None = None
+        stop_summary_sampler: threading.Event | None = None
+        summary_sampler_thread: threading.Thread | None = None
+        stop_summary_sampler, summary_sampler_thread = _start_summary_sampler(context)
 
         if auto_reconnect and not startup_offline and hasattr(context.tracker, "radio_link_connected"):
 
@@ -449,6 +508,10 @@ def run_dashboard_runtime(
             stop_watcher.set()
             if watcher_thread is not None:
                 watcher_thread.join(timeout=1.0)
+            if stop_summary_sampler is not None:
+                stop_summary_sampler.set()
+            if summary_sampler_thread is not None:
+                summary_sampler_thread.join(timeout=1.0)
             stop_receiving = getattr(context.tracker, "stop_receiving", None)
             if callable(stop_receiving):
                 try:

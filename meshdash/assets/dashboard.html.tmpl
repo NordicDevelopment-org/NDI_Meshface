@@ -108,13 +108,13 @@
 
   <div class="workspace-shell">
     <aside class="teams-rail" aria-label="Dashboard views">
-      <div class="teams-rail-title">Views</div>
       <button class="rail-btn active" data-view="chat" type="button" title="Teams-style chat workspace">Chat</button>
       <button class="rail-btn" data-view="network" type="button" title="Topology, nodes, and links">Network</button>
       <button class="rail-btn" data-view="saved" type="button" title="Node details and saved nodes">Node</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
       <button class="rail-btn" data-view="data" type="button" title="Raw node/config views">Data</button>
       <button class="rail-btn" data-view="console" type="button" title="Realtime dashboard console">Console</button>
+      <button class="rail-btn" data-view="history" type="button" title="Network and chat history">History</button>
       <button class="rail-btn" data-view="settings" type="button" title="Radio + dashboard settings">Settings</button>
     </aside>
     <aside id="chat-left-panel" class="chat-left-panel" hidden aria-label="Chat roster">
@@ -656,6 +656,38 @@
             <span class="legend-chip activity-legend-nodes">Online nodes / hour</span>
           </div>
           <div id="online-activity-overview" class="overview-grid"></div>
+          <div id="weekly-summary-caption" class="history-caption">Weekly trend by minute-bucket snapshots.</div>
+          <div class="history-metric-wrap">
+            <label for="weekly-summary-metric" class="history-metric-label">Metric</label>
+            <select id="weekly-summary-metric" class="history-metric-select" aria-label="Weekly summary metric">
+              <option value="live_packet_count">Live Packets</option>
+              <option value="node_count">Known Nodes</option>
+              <option value="nodes_with_position">Nodes With Position</option>
+              <option value="real_edge_count">Directed Links</option>
+            </select>
+          </div>
+          <div id="weekly-summary-chart-wrap">
+            <svg id="weekly-summary-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Weekly metric trend"></svg>
+            <div id="weekly-summary-empty" class="signal-empty" hidden>No weekly summary history yet.</div>
+          </div>
+          <div id="weekly-summary-overview" class="overview-grid"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card history-chat">
+      <h2>Chat History</h2>
+      <div class="body">
+        <div id="history-chat-caption" class="history-caption">Recent saved chat messages.</div>
+        <div class="scroll">
+          <table id="history-chat-table">
+            <thead>
+              <tr>
+                <th>Captured</th><th>From</th><th>To</th><th>Message</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
       </div>
     </section>
