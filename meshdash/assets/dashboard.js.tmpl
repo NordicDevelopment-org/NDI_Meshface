@@ -7699,10 +7699,19 @@
 
       if (input.dataset.bound !== "1") {{
         input.dataset.bound = "1";
-        input.addEventListener("focus", () => {{
+        const openSavedNodeSearch = () => {{
+          if (savedNodeSearchBlurTimer !== null) {{
+            clearTimeout(savedNodeSearchBlurTimer);
+            savedNodeSearchBlurTimer = null;
+          }}
+          savedNodeSearchQuery = normalizeSearchQuery(input.value);
           savedNodeSearchOpen = true;
           renderSavedNodeSearchDropdown(latestState);
-        }});
+        }};
+        input.addEventListener("focus", openSavedNodeSearch);
+        // Clicking an already-focused input does not fire "focus" again.
+        // Reopen on click so the list pops every time the user clicks it.
+        input.addEventListener("click", openSavedNodeSearch);
         input.addEventListener("input", () => {{
           savedNodeSearchQuery = normalizeSearchQuery(input.value);
           savedNodeSearchOpen = true;
@@ -7822,15 +7831,11 @@
           const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
           const freshness = resolveNodeFreshness(node, caps, null, latestChatTouchByNode.get(selectedId) || null);
           const status = freshnessStatus(freshness.unix, Math.floor(Date.now() / 1000));
-          const nodeName = preferredNodeName(node) || nodeNameCache.get(selectedId) || `Node ${{selectedId}}`;
-          targetValue = `${{nodeName}} (${{selectedId}})`;
           updatedValue = savedDetailText(freshness.text, state.generated_at || "n/a");
           updatedFreshnessStatus = status;
           updatedFreshnessLabel = status === "online"
             ? "Fresh"
             : (status === "warn" ? "Aging" : (status === "stale" ? "Stale" : "Unknown"));
-        }} else {{
-          targetValue = "Select a node";
         }}
       }}
       const targetDisplay = compactTargetMetric(targetValue);
