@@ -553,6 +553,7 @@
       }}
     }}
     const consoleMaxLines = 1200;
+    const consolePacketPreviewMaxChars = 140;
     const tableSortState = {{
       "nodes-table": {{ index: 0, dir: "desc" }},
       "links-table": {{ index: 2, dir: "desc" }},
@@ -7164,24 +7165,102 @@
 
     function formatConsoleLine(entry) {{
       const s = entry.summary || {{}};
+      const packet = entry && entry.packet && typeof entry.packet === "object"
+        ? entry.packet
+        : {{}};
       const hops = (s.hop_start != null && s.hop_limit != null)
         ? Number(s.hop_start) - Number(s.hop_limit)
         : "n/a";
-      const packetJson = (() => {{
+      const packetId = packet.id ?? packet.packet_id ?? packet.message_id ?? s.packet_id ?? "";
+      const channel = packet.channel ?? s.channel ?? "";
+      const textSnippetRaw = String(
+        s.text ?? s.decoded_text ?? s.payload_text ?? packet.text ?? ""
+      ).trim();
+      const textSnippet = textSnippetRaw ? compactInlineMessage(textSnippetRaw, 88) : "";
+      const sanitizeConsolePreviewValue = (value, depth = 0) => {{
+        if (depth > 4) return "[depth-limit]";
+        if (Array.isArray(value)) {{
+          const limited = value.slice(0, 6).map((item) => sanitizeConsolePreviewValue(item, depth + 1));
+          if (value.length > limited.length) {{
+            limited.push(`... +${{value.length - limited.length}} items`);
+          }}
+          return limited;
+        }}
+        if (value && typeof value === "object") {{
+          const out = {{}};
+          for (const [key, rawVal] of Object.entries(value)) {{
+            const keyLower = String(key || "").toLowerCase();
+            if (keyLower === "raw") continue;
+            out[key] = sanitizeConsolePreviewValue(rawVal, depth + 1);
+          }}
+          return out;
+        }}
+        if (typeof value === "string") {{
+          const squashed = value
+            .replace(/\r\n/g, "\n")
+            .replace(/\r/g, "\n")
+            .replace(/\\r\\n|\\n|\\r/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          return squashed.length > 96
+            ? `${{squashed.slice(0, 96)}}... (+${{squashed.length - 96}} chars)`
+            : squashed;
+        }}
+        return value;
+      }};
+      const compactConsoleFragment = (value, maxChars = consolePacketPreviewMaxChars) => {{
+        const text = String(value == null ? "" : value)
+          .replace(/\\r\\n|\\n|\\r/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (text.length <= maxChars) return text;
+        const keep = Math.max(72, maxChars - 1);
+        const hidden = Math.max(0, text.length - keep);
+        return `${{text.slice(0, keep).trimEnd()}}… (+${{hidden}} chars)`;
+      }};
+      const packetPreview = (() => {{
         try {{
-          return JSON.stringify(entry.packet || {{}});
+          const cleaned = sanitizeConsolePreviewValue(packet);
+          const json = JSON.stringify(cleaned || {{}});
+          return compactConsoleFragment(json);
         }} catch (_err) {{
-          return "{{}}";
+          return "";
         }}
       }})();
-      return `[${{s.captured_at || s.rx_time || "n/a"}}] ${{s.from || "n/a"}} -> ${{s.to || "n/a"}} port=${{s.portnum || "n/a"}} snr=${{s.rx_snr ?? "n/a"}} rssi=${{s.rx_rssi ?? "n/a"}} hops=${{hops}} ${{packetJson}}`;
+      const parts = [
+        `${{s.from || "n/a"}} -> ${{s.to || "n/a"}}`,
+        `port=${{s.portnum || "n/a"}}`,
+        `snr=${{s.rx_snr ?? "n/a"}}`,
+        `rssi=${{s.rx_rssi ?? "n/a"}}`,
+        `hops=${{hops}}`,
+      ];
+      if (channel !== "") parts.push(`ch=${{channel}}`);
+      if (packetId !== "") parts.push(`id=${{packetId}}`);
+      if (textSnippet) parts.push(`text=\"${{textSnippet.replace(/\"/g, "'")}}\"`);
+      if (packetPreview) parts.push(`pkt=${{packetPreview}}`);
+      return parts.join(" ");
     }}
 
-    function appendConsoleLine(key, line) {{
+    function formatConsoleTimestamp(msValue) {{
+      const ms = Number(msValue);
+      const dt = Number.isFinite(ms) ? new Date(ms) : new Date();
+      if (!Number.isFinite(dt.getTime())) {{
+        return "n/a";
+      }}
+      const pad2 = (value) => String(Math.trunc(Math.max(0, Number(value) || 0))).padStart(2, "0");
+      const hour = pad2(dt.getHours());
+      const minute = pad2(dt.getMinutes());
+      const second = pad2(dt.getSeconds());
+      return `${{hour}}:${{minute}}:${{second}}`;
+    }}
+
+    function appendConsoleLine(key, line, loggedAtMs = Date.now()) {{
       if (!key || consoleSeen.has(key)) return;
       consoleSeen.add(key);
       consoleKeyQueue.push(key);
-      consoleLines.push(line);
+      const timestamp = formatConsoleTimestamp(loggedAtMs);
+      const body = String(line == null ? "" : line);
+      consoleLines.push(`[${{timestamp}}] > ${{body}}`);
 
       while (consoleLines.length > consoleMaxLines) {{
         consoleLines.shift();
@@ -7213,6 +7292,13 @@
         consoleAutoscroll = auto.checked;
         auto.addEventListener("change", () => {{
           consoleAutoscroll = auto.checked;
+          if (consoleAutoscroll) {{
+            const pre = document.getElementById("live-console");
+            if (pre instanceof HTMLElement) {{
+              pre.scrollLeft = 0;
+              pre.scrollTop = pre.scrollHeight;
+            }}
+          }}
         }});
       }}
     }}
@@ -7221,13 +7307,19 @@
       const packets = traffic.recent_packets || [];
       for (const entry of packets) {{
         const key = packetConsoleKey(entry);
-        appendConsoleLine(key, formatConsoleLine(entry));
+        const summary = entry && entry.summary && typeof entry.summary === "object" ? entry.summary : {{}};
+        const packetUnix = latestUnixTimestamp(summary.captured_at, summary.rx_time);
+        const packetMs = Number.isFinite(packetUnix) && packetUnix > 0
+          ? packetUnix * 1000
+          : Date.now();
+        appendConsoleLine(key, formatConsoleLine(entry), packetMs);
       }}
 
       const pre = document.getElementById("live-console");
       if (!pre) return;
-      pre.textContent = consoleLines.join("\\n");
+      pre.textContent = consoleLines.join("\n");
       if (consoleAutoscroll) {{
+        pre.scrollLeft = 0;
         pre.scrollTop = pre.scrollHeight;
       }}
     }}
