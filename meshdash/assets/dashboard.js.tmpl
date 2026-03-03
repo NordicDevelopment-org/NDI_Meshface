@@ -572,7 +572,7 @@
     const consoleLines = [];
     const consoleKeyQueue = [];
     const consoleSeen = new Set();
-    const wheelPaneSelector = ".scroll, #live-console, details pre";
+    const wheelPaneSelector = ".scroll, details pre";
     let selectedNodeId = null;
     let mapDataFocus = "auto";
     let activeMapDataMode = "live";
@@ -7829,6 +7829,22 @@
           consoleAutoscroll = auto.checked;
           if (consoleAutoscroll) {{
             renderConsoleBuffer(true);
+          }}
+        }});
+      }}
+      const pre = document.getElementById("live-console");
+      if (pre instanceof HTMLElement && pre.dataset.scrollBound !== "1") {{
+        pre.dataset.scrollBound = "1";
+        pre.addEventListener("scroll", () => {{
+          const maxTop = Math.max(0, pre.scrollHeight - pre.clientHeight);
+          const remaining = Math.max(0, maxTop - pre.scrollTop);
+          const atBottom = remaining <= 3;
+          if (consoleAutoscroll !== atBottom) {{
+            consoleAutoscroll = atBottom;
+          }}
+          const autoBox = document.getElementById("console-autoscroll");
+          if (autoBox instanceof HTMLInputElement && autoBox.checked !== consoleAutoscroll) {{
+            autoBox.checked = consoleAutoscroll;
           }}
         }});
       }}
