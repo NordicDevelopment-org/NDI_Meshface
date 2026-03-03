@@ -775,13 +775,6 @@
       return text || fallback;
     }}
 
-    function estimateOfflineCityLabelWidthPx(name) {{
-      const text = sanitizeOfflineLabel(name, "City");
-      // Approximate 10px badge text width + horizontal badge padding.
-      const estimate = 22 + (text.length * 5.2);
-      return clampNumber(estimate, 46, 220, 92);
-    }}
-
     function parseOfflineCityRank(value, fallback = 9) {{
       const numeric = Number(value);
       if (!Number.isFinite(numeric)) {{
@@ -800,9 +793,9 @@
 
     function offlineCityMinZoom(rank) {{
       if (rank <= 0) return 0;
-      if (rank <= 1) return 1;
-      if (rank <= 2) return 3;
-      return 4;
+      if (rank <= 1) return 2;
+      if (rank <= 2) return 4;
+      return 6;
     }}
 
     function offlineCityVisibilityBudget(zoom) {{
@@ -810,19 +803,20 @@
       if (zoom < 4) return 42;
       if (zoom < 5) return 72;
       if (zoom < 6) return 120;
-      if (zoom < 7) return 210;
-      if (zoom < 8) return 320;
-      if (zoom < 9) return 460;
-      return 700;
+      if (zoom < 7) return 160;
+      if (zoom < 8) return 240;
+      if (zoom < 9) return 360;
+      return 820;
     }}
 
     function offlineCitySpacingByZoom(zoom) {{
       if (zoom < 4) return 86;
       if (zoom < 5) return 76;
       if (zoom < 6) return 66;
-      if (zoom < 7) return 56;
-      if (zoom < 8) return 48;
-      return 40;
+      if (zoom < 7) return 66;
+      if (zoom < 8) return 58;
+      if (zoom < 9) return 40;
+      return 34;
     }}
 
     function offlineCityRangeSpacingPx(zoom) {{
@@ -883,13 +877,7 @@
         }}
         const point = map.latLngToContainerPoint(markerLatLng);
         const weight = parseOfflineCityWeight(entry.weight, 0);
-        const labelWidth = clampNumber(
-          Number(entry.labelWidth),
-          24,
-          260,
-          estimateOfflineCityLabelWidthPx(entry.label || "City")
-        );
-        candidates.push({{ marker, rank, weight, point, labelWidth }});
+        candidates.push({{ marker, rank, weight, point }});
       }}
 
       candidates.sort((a, b) => {{
@@ -938,16 +926,14 @@
         }}
       }}
 
-      function hasLabelOverlap(point, labelWidth) {{
-        const w = clampNumber(labelWidth, 24, 260, 92);
+      function hasLabelOverlap(point) {{
+        const xBand = Math.max(34, minSpacingPx * 1.08);
+        const yBand = Math.max(14, minSpacingPx * 0.34);
         for (const box of selectedLabelBoxes) {{
           if (!box) continue;
-          const otherW = clampNumber(Number(box.w), 24, 260, 92);
           const dx = Math.abs(point.x - box.x);
           const dy = Math.abs(point.y - box.y);
-          const allowedX = ((w + otherW) * 0.5) + 8;
-          const allowedY = 16;
-          if (dx < allowedX && dy < allowedY) {{
+          if (dx < xBand && dy < yBand) {{
             return true;
           }}
         }}
@@ -964,18 +950,14 @@
           candidate.marker.setOpacity(0);
           continue;
         }}
-        if (!forceInclude && hasLabelOverlap(candidate.point, candidate.labelWidth)) {{
+        if (!forceInclude && hasLabelOverlap(candidate.point)) {{
           candidate.marker.setOpacity(0);
           continue;
         }}
         candidate.marker.setOpacity(1);
         selected.push(candidate);
         rememberPoint(candidate.point);
-        selectedLabelBoxes.push({{
-          x: candidate.point.x,
-          y: candidate.point.y,
-          w: candidate.labelWidth,
-        }});
+        selectedLabelBoxes.push({{ x: candidate.point.x, y: candidate.point.y }});
       }}
     }}
 
@@ -1073,7 +1055,6 @@
           const name = sanitizeOfflineLabel(props.name, "City");
           const rank = parseOfflineCityRank(props.scalerank, 9);
           const weight = parseOfflineCityWeight(props.population, 0);
-          const labelWidth = estimateOfflineCityLabelWidthPx(name);
           const marker = L.marker(latlng, {{
             interactive: false,
             keyboard: false,
@@ -1091,7 +1072,6 @@
             weight,
             latlng,
             label: name,
-            labelWidth,
           }});
           return marker;
         }},
