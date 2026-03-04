@@ -108,6 +108,56 @@ def apply_channel_settings(
 
     node = _get_local_node(iface)
 
+    if action == "import_url":
+        set_url = getattr(node, "setURL", None)
+        if not callable(set_url):
+            return {"ok": False, "error": "Meshtastic node does not support setURL()"}
+
+        url = (request.url or "").strip()
+        if not url:
+            return {"ok": False, "error": "Missing url"}
+
+        add_only = bool(request.add_only)
+
+        # Meshtastic expects a special URL shape when addOnly=True: .../?add=true#...
+        # Be forgiving and rewrite common share URLs into the expected form.
+        normalized = url
+        if add_only:
+            if "/?add=true#" not in normalized and "/#" in normalized:
+                normalized = normalized.replace("/#", "/?add=true#", 1)
+        else:
+            if "/?add=true#" in normalized:
+                normalized = normalized.replace("/?add=true#", "/#", 1)
+
+        # Ensure we have channels loaded before invoking setURL (it expects node.channels not None).
+        try:
+            _ensure_channels_loaded(node)
+        except Exception:
+            # Best-effort; setURL will emit a nicer error if it truly can't proceed.
+            pass
+
+        locked, release = _acquire_lock(send_lock)
+        try:
+            try:
+                set_url(normalized, addOnly=add_only)
+            except TypeError:
+                # Older versions might use positional args.
+                set_url(normalized, add_only)
+        except SystemExit as exc:
+            return {"ok": False, "error": f"Import failed: {exc}"}
+        except Exception as exc:
+            return {"ok": False, "error": f"Import failed: {exc}"}
+        finally:
+            if locked and release:
+                release()
+
+        return {
+            "ok": True,
+            "action": "import_url",
+            "add_only": add_only,
+            "reboot_expected": True,
+        }
+
     if action == "export_url":
         if not show_secrets:
             return {

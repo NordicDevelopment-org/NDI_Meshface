@@ -1754,6 +1754,16 @@
       color: #2b4a37;
       line-height: 1.35;
     }}
+
+    .settings-help-note {{
+      font-size: 12px;
+      color: #2b4a37;
+      line-height: 1.35;
+      background: #f4faf3;
+      border: 1px solid #d7e5d2;
+      border-radius: 10px;
+      padding: 8px 10px;
+    }}
     .settings-grid {{
       display: grid;
       grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
@@ -1908,6 +1918,21 @@
     .settings-channels-table td .settings-input {{
       width: 100%;
       box-sizing: border-box;
+    }}
+
+    /* Beginner-friendly default: hide MQTT bridge toggles unless Advanced is enabled. */
+    body:not(.channels-advanced-ui) .settings-channel-mqtt {{
+      display: none;
+    }}
+
+    .settings-channels-simple-actions {{
+      border: 1px dashed #d7e5d2;
+      border-radius: 12px;
+      padding: 10px;
+      background: #f8fcf7;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }}
     .settings-channels-actions {{
       display: flex;
@@ -4569,10 +4594,20 @@
     [data-theme="dark"] .settings-caption {{
       color: #98b7a7;
     }}
+    [data-theme="dark"] .settings-help-note {{
+      color: #98b7a7;
+      background: rgba(12, 21, 17, 0.45);
+      border-color: #31473b;
+    }}
     [data-theme="dark"] .settings-panel {{
       background: #1a2a21;
       border-color: #31473b;
       color: #dbece3;
+    }}
+
+    [data-theme="dark"] .settings-channels-simple-actions {{
+      border-color: #31473b;
+      background: rgba(12, 21, 17, 0.35);
     }}
     [data-theme="dark"] .settings-panel h3 {{
       color: #9fbead;

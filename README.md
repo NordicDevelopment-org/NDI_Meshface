@@ -235,11 +235,18 @@ Important knobs:
 ## Chat Send Notes
 
 - Chat send box posts to `/api/chat/send`.
-- Current UI sends to broadcast room (`^all`) on channel `0`.
+- Outgoing sends use the **Msg Ch** selector in the chat header (Meshtastic channel index).
+  - Selecting **All channels (view)** only affects what you *see* in chat; outgoing sends use channel `0` in that mode.
 - Message byte limit is enforced (`220` UTF-8 bytes).
 - Sent messages are also echoed into dashboard chat history immediately.
 - Direct peer-to-peer text messages request mesh ACK and now show delivery state (`Pending`, `Delivered`, `Failed`, `Timed out`) in chat.
 - Failed direct sends can be retried from the message row using `Retry`.
+
+## Channels (beginner-friendly docs)
+
+Meshtastic uses the word “channel” in *multiple* ways (frequency slot vs message channel index). This dashboard exposes both.
+
+- See: `docs/CHANNELS.md`
 
 ## Troubleshooting
 

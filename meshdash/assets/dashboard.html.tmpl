@@ -31,12 +31,6 @@
             <option value="default">default</option>
           </select>
         </label>
-        <label for="mesh-channel-select" class="mesh-channel-wrap" title="Mesh channel selector for chat view and outgoing sends. Selecting 'All channels' shows all traffic; outgoing sends use Ch 0.">
-          <span class="mesh-channel-label">Mesh Ch</span>
-          <select id="mesh-channel-select" class="mesh-channel-select" aria-label="Meshtastic channel">
-            <option value="0">Ch 0</option>
-          </select>
-        </label>
         <span id="disk-meter" class="disk-meter" title="Disk free on dashboard host">
           <span id="disk-label" class="disk-label">Disk free: n/a</span>
           <span class="disk-track"><span id="disk-fill" class="disk-fill"></span></span>
@@ -168,6 +162,9 @@
           <div class="settings-panel">
             <h3>LoRa / Radio</h3>
             <div class="settings-fields">
+              <div class="settings-help-note">
+                <strong>Frequency slot</strong> tunes the physical RF frequency. <strong>Message channels</strong> (Chat “Msg Ch” + Settings → Channels) are encryption groups.
+              </div>
               <label class="settings-field">
                 <span class="settings-label">Region</span>
                 <select id="settings-lora-region" class="settings-select" autocomplete="off">
@@ -343,10 +340,59 @@
               </div>
 
               <div class="settings-row">
+                <label class="settings-field settings-inline" title="Beginner-friendly view hides MQTT bridge toggles and shows quick actions. Advanced shows everything.">
+                  <input id="settings-channels-advanced-toggle" type="checkbox" />
+                  <span>Advanced channel options</span>
+                </label>
+              </div>
+
+              <div id="settings-channels-simple-actions" class="settings-channels-simple-actions">
+                <div class="settings-row">
+                  <label class="settings-field" style="flex: 1;">
+                    <span class="settings-label">Join from Channel URL (QR)</span>
+                    <div class="settings-row">
+                      <input
+                        id="settings-channels-import-url"
+                        class="settings-input"
+                        type="text"
+                        placeholder="https://meshtastic.org/e/#..."
+                        autocomplete="off"
+                        spellcheck="false"
+                      />
+                      <button id="settings-channels-import-url-join-btn" class="btn btn-secondary" type="button">Join</button>
+                      <button id="settings-channels-import-url-add-btn" class="btn btn-secondary" type="button" title="Add channels without overwriting existing names" hidden>Add only</button>
+                    </div>
+                    <div class="settings-help-note" style="margin-top: 6px;">
+                      Channel URLs include <strong>LoRa</strong> + <strong>channel</strong> settings. Only paste URLs from people you trust.
+                    </div>
+                  </label>
+                </div>
+
+                <div class="settings-row">
+                  <label class="settings-field" style="flex: 1;">
+                    <span class="settings-label">Create private channel (random key)</span>
+                    <div class="settings-row">
+                      <input
+                        id="settings-channels-private-name"
+                        class="settings-input"
+                        type="text"
+                        placeholder="Channel name (e.g. HikingCrew)"
+                        autocomplete="off"
+                        spellcheck="false"
+                      />
+                      <button id="settings-channels-create-private-btn" class="btn btn-secondary" type="button">Create</button>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-row">
                 <div class="settings-field settings-inline" style="flex: 1;">
                   <label class="settings-label" for="settings-channels-help">Tips</label>
                   <div id="settings-channels-help" class="settings-danger-note" style="margin: 0;">
                     <div><strong>PSK:</strong> leave blank to keep existing. You can enter <code>default</code>, <code>random</code>, <code>none</code>, <code>simple15</code>, or <code>base64:&lt;key&gt;</code>.</div>
+                    <div><strong>Uplink/Downlink:</strong> MQTT bridge toggles (internet), not LoRa TX/RX (shown in Advanced mode).</div>
+                    <div><strong>Frequency:</strong> all messaging channels share the LoRa modem settings above (region/preset/frequency slot).</div>
                     <div><strong>Gaps:</strong> channels must be consecutive (0..N). Disable from the end; add the next available slot.</div>
                   </div>
                 </div>
@@ -360,8 +406,8 @@
                         <th>Index</th>
                         <th>Role</th>
                         <th>Name</th>
-                        <th>Uplink</th>
-                        <th>Downlink</th>
+                        <th class="settings-channel-mqtt">MQTT Up</th>
+                        <th class="settings-channel-mqtt">MQTT Down</th>
                         <th>PSK (new)</th>
                         <th>Actions</th>
                       </tr>
@@ -447,6 +493,16 @@
         <div class="chat-card-head-row">
           <h2 id="chat-title">Mesh Chat</h2>
           <div class="chat-card-head-actions">
+            <label
+              for="mesh-channel-select"
+              class="mesh-channel-wrap chat-mesh-channel-wrap"
+              title="Message channel index (0..7) controls the encryption group used for outgoing messages + which decoded messages you view. This does NOT change your LoRa frequency slot."
+            >
+              <span class="mesh-channel-label">Msg Ch</span>
+              <select id="mesh-channel-select" class="mesh-channel-select" aria-label="Message channel">
+                <option value="0">Ch 0</option>
+              </select>
+            </label>
             <label class="chat-change-scope-wrap" for="chat-change-scope" title="Notification scope">
               <span class="chat-change-scope-label">Notify</span>
               <select id="chat-change-scope" class="chat-change-scope-select" aria-label="Notification scope">

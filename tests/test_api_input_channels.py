@@ -68,3 +68,30 @@ def test_parse_channel_settings_request_rejects_invalid_payload_shapes():
     with pytest.raises(ValueError, match="Expected 'settings' to be an object"):
         parse_channel_settings_request(b'{"settings":["bad"]}')
 
+
+def test_parse_channel_settings_request_parses_import_url():
+    request = parse_channel_settings_request(
+        b'{"action":"import_url","url":"https://meshtastic.org/e/#AAAA","add_only":"true"}'
+    )
+    assert request.action == "import_url"
+    assert request.url == "https://meshtastic.org/e/#AAAA"
+    assert request.add_only is True
+
+    with pytest.raises(ValueError, match="Missing url"):
+        parse_channel_settings_request(b'{"action":"import_url","add_only":false}')
+
+
+def test_parse_channel_settings_request_accepts_seturl_aliases():
+    request = parse_channel_settings_request(
+        b'{"action":"setURL","setURL":"https://meshtastic.org/e/#BBBB"}'
+    )
+    assert request.action == "import_url"
+    assert request.url == "https://meshtastic.org/e/#BBBB"
+    assert request.add_only is False
+
+    request = parse_channel_settings_request(
+        b'{"action":"set_url","set_url":"https://meshtastic.org/e/#CCCC","addOnly":1}'
+    )
+    assert request.action == "import_url"
+    assert request.url == "https://meshtastic.org/e/#CCCC"
+    assert request.add_only is True

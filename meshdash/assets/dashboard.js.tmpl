@@ -184,6 +184,7 @@
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const chatNotificationScopeStorageKey = "meshDashboardChatNotificationScopeV1";
     const meshChannelIndexStorageKey = "meshDashboardMeshChannelIndexV1";
+    const channelsUiModeStorageKey = "meshDashboardChannelsUiModeV1";
     const chatDirectPeersStorageKey = "meshDashboardDirectPeersV1";
     const chatPerfStorageKey = "meshDashboardChatPerfMetricsV1";
     const themeStorageKey = "meshDashboardThemePreference";
@@ -631,6 +632,7 @@
     let settingsApplyInFlight = false;
     let settingsFetchInFlight = false;
     let settingsAutoFetchAttempted = false;
+    let channelsUiAdvanced = false;
     let settingsLocalStateCache = null;
     let settingsLocalStateFetchedAt = 0;
     let chatStickToBottom = true;
@@ -3663,7 +3665,7 @@
 
       const leftSub = document.getElementById("chat-left-sub");
       if (leftSub) {{
-        leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • Mesh: ${{meshChannelLabelForIndex(activeMeshChannelIndex)}} • ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale`;
+        leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • Msg Ch: ${{meshChannelLabelForIndex(activeMeshChannelIndex, {{ verbose: true }})}} • ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale`;
       }}
       const caption = document.getElementById("chat-caption");
       if (caption) {{
@@ -3671,7 +3673,7 @@
           (state.summary && state.summary.modem_preset) ? state.summary.modem_preset : "",
           "unknown"
         );
-        caption.textContent = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}. Mesh: ${{meshChannelLabelForIndex(activeMeshChannelIndex, {{ verbose: true }})}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale.`;
+        caption.textContent = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}. Msg Ch: ${{meshChannelLabelForIndex(activeMeshChannelIndex, {{ verbose: true }})}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale. Msg Ch = encryption group (not frequency slot).`;
       }}
 
       // Saved nodes list freshness.
@@ -4156,7 +4158,7 @@
       if (!Number.isInteger(idx) || idx < 0) return "";
       const name = typeof opt.name === "string" ? opt.name.trim() : "";
       const role = typeof opt.role === "string" ? opt.role.trim() : "";
-      if (name) return `Ch ${{idx}}: ${{name}}`;
+      if (name) return `Ch ${{idx}} (${{name}})`;
       if (role) return `Ch ${{idx}} (${{role}})`;
       return `Ch ${{idx}}`;
     }}
@@ -4204,7 +4206,12 @@
         const roleRaw = ch.role ?? ch.channel_role ?? ch.channelRole;
         const role = typeof roleRaw === "string" ? roleRaw.trim() : (roleRaw != null ? String(roleRaw) : "");
         const roleUpper = role.toUpperCase();
-        const disabled = roleUpper === "DISABLED" || roleUpper === "CHANNEL_ROLE_DISABLED";
+        const roleNum = Number(role);
+        const disabled = (
+          roleUpper === "DISABLED"
+          || roleUpper === "CHANNEL_ROLE_DISABLED"
+          || (Number.isInteger(roleNum) && roleNum === 0)
+        );
 
         const settings = (ch.settings && typeof ch.settings === "object") ? ch.settings
           : (ch.channel_settings && typeof ch.channel_settings === "object") ? ch.channel_settings
@@ -4360,6 +4367,45 @@
       select.value = String(activeMeshChannelIndex);
 
       void hydrateMeshChannelOptions(false);
+    }}
+
+
+    function normalizeChannelsUiMode(raw) {{
+      const text = String(raw == null ? "" : raw).trim().toLowerCase();
+      if (text === "advanced" || text === "1" || text === "true" || text === "on") return "advanced";
+      return "simple";
+    }}
+
+    function applyChannelsUiMode() {{
+      const root = document.body;
+      if (root) {{
+        root.classList.toggle("channels-advanced-ui", !!channelsUiAdvanced);
+      }}
+      const addOnlyBtn = document.getElementById("settings-channels-import-url-add-btn");
+      if (addOnlyBtn instanceof HTMLButtonElement) {{
+        addOnlyBtn.hidden = !channelsUiAdvanced;
+      }}
+    }}
+
+    function setChannelsUiAdvanced(enabled, persist = true) {{
+      channelsUiAdvanced = !!enabled;
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(
+            channelsUiModeStorageKey,
+            channelsUiAdvanced ? "advanced" : "simple"
+          );
+        }} catch (_err) {{}}
+      }}
+      applyChannelsUiMode();
+    }}
+
+    function loadChannelsUiMode() {{
+      let stored = "simple";
+      try {{
+        stored = normalizeChannelsUiMode(window.localStorage.getItem(channelsUiModeStorageKey) || "simple");
+      }} catch (_err) {{}}
+      channelsUiAdvanced = stored === "advanced";
     }}
 
 
@@ -8608,9 +8654,15 @@
         "settings-reset-nodedb",
         "settings-reset-dashboard-db",
         "settings-export-channel-url",
+        "settings-channels-import-url-join-btn",
+        "settings-channels-import-url-add-btn",
+        "settings-channels-create-private-btn",
+        "settings-channels-advanced-toggle",
       ]) {{
         const el = document.getElementById(id);
         if (el instanceof HTMLButtonElement) {{
+          el.disabled = !!disabled;
+        }} else if (el instanceof HTMLInputElement && el.type === "checkbox") {{
           el.disabled = !!disabled;
         }}
       }}
@@ -8650,6 +8702,16 @@
       const tbody = document.getElementById("settings-channels-tbody");
       if (!(tbody instanceof HTMLElement)) return;
 
+      // Meshtastic channel roles are usually strings (PRIMARY/SECONDARY/DISABLED),
+      // but some protobuf -> JSON conversions may yield numeric enums.
+      const channelRoleIsDisabled = (roleRaw) => {{
+        const roleText = String(roleRaw == null ? "" : roleRaw).trim();
+        const upper = roleText.toUpperCase();
+        if (upper === "DISABLED" || upper === "CHANNEL_ROLE_DISABLED") return true;
+        const num = Number(roleText);
+        return Number.isInteger(num) && num === 0;
+      }};
+
       const channels = localState && Array.isArray(localState.channels) ? localState.channels : null;
       tbody.innerHTML = "";
 
@@ -8670,9 +8732,23 @@
         return ai - bi;
       }});
 
+      // Reflect common Meshtastic expectations:
+      // - channels are consecutive 0..N
+      // - disable happens from the end (highest active index)
+      let lastActiveIndex = 0;
+      for (const ch of sorted) {{
+        const idx = Number(ch && ch.index != null ? ch.index : 0);
+        const role = ch && ch.role != null ? ch.role : "";
+        if (!channelRoleIsDisabled(role) && Number.isFinite(idx) && idx > lastActiveIndex) {{
+          lastActiveIndex = idx;
+        }}
+      }}
+      const nextAvailableIndex = lastActiveIndex + 1;
+
       for (const ch of sorted) {{
         const idx = Number(ch && ch.index != null ? ch.index : 0);
         const role = String(ch && ch.role != null ? ch.role : "");
+        const isDisabledRole = channelRoleIsDisabled(role);
         const settings = ch && typeof ch.settings === "object" && ch.settings ? ch.settings : {{}};
 
         const nameValue = String(settings.name || "");
@@ -8696,24 +8772,28 @@
         nameInput.type = "text";
         nameInput.className = "settings-input";
         nameInput.value = nameValue;
-        nameInput.placeholder = role === "DISABLED" ? "New channel name" : "";
+        nameInput.placeholder = isDisabledRole ? "New channel name" : "";
         nameInput.dataset.field = "name";
         tdName.appendChild(nameInput);
         tr.appendChild(tdName);
 
         const tdUplink = document.createElement("td");
+        tdUplink.className = "settings-channel-mqtt";
         const uplink = document.createElement("input");
         uplink.type = "checkbox";
         uplink.checked = uplinkEnabled;
         uplink.dataset.field = "uplink_enabled";
+        uplink.title = "MQTT uplink (internet bridge). Not LoRa TX/RX.";
         tdUplink.appendChild(uplink);
         tr.appendChild(tdUplink);
 
         const tdDownlink = document.createElement("td");
+        tdDownlink.className = "settings-channel-mqtt";
         const downlink = document.createElement("input");
         downlink.type = "checkbox";
         downlink.checked = downlinkEnabled;
         downlink.dataset.field = "downlink_enabled";
+        downlink.title = "MQTT downlink (internet bridge). Not LoRa TX/RX.";
         tdDownlink.appendChild(downlink);
         tr.appendChild(tdDownlink);
 
@@ -8737,10 +8817,14 @@
         saveBtn.className = "btn btn-secondary";
         saveBtn.dataset.channelAction = "save";
         saveBtn.dataset.channelIndex = String(idx);
-        saveBtn.textContent = role === "DISABLED" ? "Add" : "Save";
+        saveBtn.textContent = isDisabledRole ? "Add" : "Save";
+        if (isDisabledRole && idx !== nextAvailableIndex) {{
+          saveBtn.disabled = true;
+          saveBtn.title = `Add channels in order. Next available slot is ${{nextAvailableIndex}}.`;
+        }}
         actions.appendChild(saveBtn);
 
-        if (idx > 0 && role !== "DISABLED") {{
+        if (idx > 0 && !isDisabledRole && idx === lastActiveIndex) {{
           const disableBtn = document.createElement("button");
           disableBtn.type = "button";
           disableBtn.className = "btn btn-danger";
@@ -8837,9 +8921,16 @@
       if (!(row instanceof HTMLElement)) return;
 
       const role = String(row.dataset.channelRole || "");
+      const roleText = String(role || "").trim();
+      const roleUpper = roleText.toUpperCase();
+      const isDisabledRole = (
+        roleUpper === "DISABLED"
+        || roleUpper === "CHANNEL_ROLE_DISABLED"
+        || (Number.isInteger(Number(roleText)) && Number(roleText) === 0)
+      );
       const settings = readChannelRowSettings(row) || {{}};
 
-      if (role === "DISABLED" && !settings.name) {{
+      if (isDisabledRole && !settings.name) {{
         setText("settings-apply-status", "Channel name is required to add a channel.");
         return;
       }}
@@ -8850,11 +8941,11 @@
         settings,
       }};
 
-      if (role === "DISABLED") {{
+      if (isDisabledRole) {{
         payload.role = "SECONDARY";
       }}
 
-      const label = role === "DISABLED" ? `Adding channel ${{idx}}…` : `Saving channel ${{idx}}…`;
+      const label = isDisabledRole ? `Adding channel ${{idx}}…` : `Saving channel ${{idx}}…`;
       const res = await postChannelSettingsPayload(payload, label, `Channel ${{idx}} updated`);
       if (res.ok) {{
         setTimeout(() => {{
@@ -8891,6 +8982,80 @@
           "settings-apply-status",
           ok ? "Channel URL copied to clipboard." : "Channel URL generated. (Clipboard copy blocked by browser.)"
         );
+      }}
+    }}
+
+    function looksLikeMeshtasticChannelUrl(rawValue) {{
+      const text = String(rawValue == null ? "" : rawValue).trim();
+      if (!text) return false;
+      if (!text.includes("#")) return false;
+      return /^https?:\/\//i.test(text) || /^meshtastic:\/\//i.test(text);
+    }}
+
+    async function handleChannelImportUrl(addOnly) {{
+      const input = document.getElementById("settings-channels-import-url");
+      if (!(input instanceof HTMLInputElement)) return;
+      const url = String(input.value || "").trim();
+      if (!url) {{
+        setText("settings-apply-status", "Paste a Meshtastic channel URL first.");
+        return;
+      }}
+      if (!looksLikeMeshtasticChannelUrl(url)) {{
+        setText("settings-apply-status", "That does not look like a Meshtastic channel URL (expected ...#...).");
+        return;
+      }}
+
+      const add = !!addOnly;
+      const warning = add
+        ? "Add channels from this URL?\n\nThis STILL applies LoRa settings from the URL (region/preset/frequency slot) and may reboot the radio.\n\nOnly proceed if you trust the source."
+        : "Join from this URL?\n\nThis replaces your channel settings and applies LoRa settings from the URL (region/preset/frequency slot). The radio may reboot.\n\nOnly proceed if you trust the source.";
+      if (!window.confirm(warning)) return;
+
+      const payload = {{
+        action: "import_url",
+        url,
+        add_only: add,
+      }};
+      const pending = add ? "Adding channels from URL…" : "Joining from URL…";
+      const success = add ? "Channel URL applied (add-only)" : "Channel URL applied";
+      const res = await postChannelSettingsPayload(payload, pending, success);
+      if (res.ok) {{
+        input.value = "";
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 900);
+      }}
+    }}
+
+    async function handleCreatePrivateChannel() {{
+      const input = document.getElementById("settings-channels-private-name");
+      if (!(input instanceof HTMLInputElement)) return;
+      const name = String(input.value || "").trim();
+      if (!name) {{
+        setText("settings-apply-status", "Enter a private channel name first.");
+        return;
+      }}
+
+      const payload = {{
+        action: "upsert",
+        role: "SECONDARY",
+        settings: {{
+          name,
+          psk: "random",
+          uplink_enabled: false,
+          downlink_enabled: false,
+        }},
+      }};
+      const res = await postChannelSettingsPayload(
+        payload,
+        "Creating private channel…",
+        "Private channel created"
+      );
+      if (res.ok) {{
+        input.value = "";
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 700);
       }}
     }}
 
@@ -9287,6 +9452,35 @@
       if (exportUrlBtn instanceof HTMLButtonElement) {{
         exportUrlBtn.addEventListener("click", () => {{
           void handleChannelExportUrl();
+        }});
+      }}
+
+      const channelsAdvToggle = document.getElementById("settings-channels-advanced-toggle");
+      if (channelsAdvToggle instanceof HTMLInputElement) {{
+        channelsAdvToggle.checked = !!channelsUiAdvanced;
+        channelsAdvToggle.addEventListener("change", () => {{
+          setChannelsUiAdvanced(!!channelsAdvToggle.checked, true);
+        }});
+      }}
+
+      const importUrlJoinBtn = document.getElementById("settings-channels-import-url-join-btn");
+      if (importUrlJoinBtn instanceof HTMLButtonElement) {{
+        importUrlJoinBtn.addEventListener("click", () => {{
+          void handleChannelImportUrl(false);
+        }});
+      }}
+
+      const importUrlAddBtn = document.getElementById("settings-channels-import-url-add-btn");
+      if (importUrlAddBtn instanceof HTMLButtonElement) {{
+        importUrlAddBtn.addEventListener("click", () => {{
+          void handleChannelImportUrl(true);
+        }});
+      }}
+
+      const createPrivateBtn = document.getElementById("settings-channels-create-private-btn");
+      if (createPrivateBtn instanceof HTMLButtonElement) {{
+        createPrivateBtn.addEventListener("click", () => {{
+          void handleCreatePrivateChannel();
         }});
       }}
 
@@ -14143,7 +14337,7 @@
       }}
       const leftSub = document.getElementById("chat-left-sub");
       if (leftSub) {{
-        leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • Mesh: ${{meshChannelLabelForIndex(activeMeshChannelIndex)}} • ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale`;
+        leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • Msg Ch: ${{meshChannelLabelForIndex(activeMeshChannelIndex, {{ verbose: true }})}} • ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale`;
       }}
 
       renderChatReplyContext();
@@ -14182,7 +14376,7 @@
         const perfSuffix = chatPerfEnabled
           ? ` Render: ${{chatPerfStats.lastMs.toFixed(1)}}ms (ema ${{chatPerfStats.emaMs.toFixed(1)}}ms, rows ${{chatPerfStats.lastFeedCount}}/${{chatPerfStats.lastRosterCount}}).`
           : "";
-        caption.textContent = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}.${{directTargetText}} Mesh: ${{meshChannelLabelForIndex(activeMeshChannelIndex, {{ verbose: true }})}}. ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.${{perfSuffix}}`;
+        caption.textContent = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}.${{directTargetText}} Msg Ch: ${{meshChannelLabelForIndex(activeMeshChannelIndex, {{ verbose: true }})}}. ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.${{perfSuffix}} Msg Ch = encryption group (not frequency slot).`;
         if (chatPerfEnabled) {{
           caption.title = `Chat render avg ${{chatPerfStats.avgMs.toFixed(1)}}ms, max ${{chatPerfStats.maxMs.toFixed(1)}}ms, samples ${{chatPerfStats.samples}}`;
         }} else {{
@@ -14533,6 +14727,8 @@
     loadChatChannel();
     loadChatNotificationScope();
     loadMeshChannelIndex();
+    loadChannelsUiMode();
+    applyChannelsUiMode();
     loadChatEmojiPickerState();
     loadChatEmojiUsage();
     loadMapBasemapModePreference();

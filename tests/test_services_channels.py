@@ -66,19 +66,25 @@ class _FakeNode:
         *,
         channels,
         has_write_channel: bool = True,
+        has_set_url: bool = True,
         write_error: Exception | None = None,
         export_url: str = "https://mesh.example/ch",
         export_error: Exception | None = None,
+        set_url_error: Exception | None = None,
     ):
         self.channels = channels
         self.request_calls = []
         self.wait_calls = []
         self.write_calls = []
+        self.set_url_calls = []
         self._write_error = write_error
         self._export_url = export_url
         self._export_error = export_error
+        self._set_url_error = set_url_error
         if has_write_channel:
             self.writeChannel = self._write_channel
+        if has_set_url:
+            self.setURL = self._set_url
 
     def requestChannels(self, idx=0):
         self.request_calls.append(idx)
@@ -92,6 +98,11 @@ class _FakeNode:
         self.write_calls.append(int(idx))
         if self._write_error is not None:
             raise self._write_error
+
+    def _set_url(self, url, addOnly=False):
+        self.set_url_calls.append((str(url), bool(addOnly)))
+        if self._set_url_error is not None:
+            raise self._set_url_error
 
     def getURL(self, includeAll=True):
         if self._export_error is not None:
@@ -202,6 +213,78 @@ def test_apply_channel_settings_export_url_paths(monkeypatch):
     assert ok["ok"] is True
     assert ok["action"] == "export_url"
     assert ok["url"].endswith("all=0")
+
+
+def test_apply_channel_settings_import_url_paths(monkeypatch):
+    node = _FakeNode(channels=[_FakeChannel(0, _FakeRole.PRIMARY)])
+
+    missing_support = apply_channel_settings(
+        ChannelSettingsRequest(action="import_url", url="https://meshtastic.org/e/#A"),
+        iface=SimpleNamespace(localNode=SimpleNamespace(channels=node.channels)),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert missing_support["ok"] is False
+    assert "setURL" in str(missing_support["error"])
+
+    missing_url = apply_channel_settings(
+        ChannelSettingsRequest(action="import_url", url=None),
+        iface=_iface_with_local(node),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert missing_url["ok"] is False
+    assert "Missing url" in str(missing_url["error"])
+
+    lock = _FakeLock()
+    add_only_ok = apply_channel_settings(
+        ChannelSettingsRequest(action="import_url", url="https://meshtastic.org/e/#AAAA", add_only=True),
+        iface=_iface_with_local(node),
+        send_lock=lock,
+        show_secrets=True,
+    )
+    assert add_only_ok["ok"] is True
+    assert node.set_url_calls[-1] == ("https://meshtastic.org/e/?add=true#AAAA", True)
+    assert lock.acquire_calls == 1
+    assert lock.release_calls == 1
+
+    join_ok = apply_channel_settings(
+        ChannelSettingsRequest(action="import_url", url="https://meshtastic.org/e/?add=true#BBBB", add_only=False),
+        iface=_iface_with_local(node),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert join_ok["ok"] is True
+    assert node.set_url_calls[-1] == ("https://meshtastic.org/e/#BBBB", False)
+
+    fail = apply_channel_settings(
+        ChannelSettingsRequest(action="import_url", url="https://meshtastic.org/e/#CCCC"),
+        iface=_iface_with_local(_FakeNode(channels=node.channels, set_url_error=RuntimeError("boom"))),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert fail["ok"] is False
+    assert "Import failed" in str(fail["error"])
+
+
+def test_apply_channel_settings_import_url_supports_legacy_seturl_signature():
+    class _LegacySetUrlNode:
+        def __init__(self):
+            self.channels = [_FakeChannel(0, _FakeRole.PRIMARY)]
+            self.calls = []
+
+        def setURL(self, url, add_only):  # positional-only style used by some versions
+            self.calls.append((str(url), bool(add_only)))
+
+    node = _LegacySetUrlNode()
+    result = apply_channel_settings(
+        ChannelSettingsRequest(action="import_url", url="https://meshtastic.org/e/#DDDD", add_only=True),
+        iface=SimpleNamespace(localNode=node),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert result["ok"] is True
+    assert node.calls == [("https://meshtastic.org/e/?add=true#DDDD", True)]
 
 
 def test_apply_channel_settings_disable_paths(monkeypatch):

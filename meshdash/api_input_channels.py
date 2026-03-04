@@ -11,6 +11,7 @@ class ChannelSettingsRequest:
       - "upsert": create/update a channel slot (PRIMARY/SECONDARY).
       - "disable": disable a SECONDARY channel slot (must be last active).
       - "export_url": return the sharable channel URL from the device.
+      - "import_url": apply a Meshtastic channel URL (QR/share URL) to the device.
 
     Notes:
       - If channel_index is omitted for "upsert", the next available slot
@@ -25,6 +26,8 @@ class ChannelSettingsRequest:
     role: Optional[str] = None
     settings: dict[str, object] = field(default_factory=dict)
     include_all: bool = True
+    url: Optional[str] = None
+    add_only: bool = False
 
 
 def _coerce_bool(value: object) -> bool:
@@ -97,8 +100,15 @@ def parse_channel_settings_request(raw_body: bytes) -> ChannelSettingsRequest:
     if not isinstance(payload, dict):
         raise ValueError("Expected a JSON object")
 
-    action = str(payload.get("action") or payload.get("op") or "upsert").strip().lower()
-    if action not in {"upsert", "disable", "export_url"}:
+    action_raw = str(payload.get("action") or payload.get("op") or "upsert").strip().lower()
+    action = {
+        "seturl": "import_url",
+        "set_url": "import_url",
+        "importurl": "import_url",
+        "import_url": "import_url",
+    }.get(action_raw, action_raw)
+
+    if action not in {"upsert", "disable", "export_url", "import_url"}:
         raise ValueError("Unsupported action")
 
     channel_index = _coerce_int(payload.get("channel_index"))
@@ -124,10 +134,28 @@ def parse_channel_settings_request(raw_body: bytes) -> ChannelSettingsRequest:
             elif val is not None:
                 settings[flat_key] = str(val)
 
+    url: Optional[str] = None
+    add_only = False
+    if action == "import_url":
+        url_raw = (
+            payload.get("url")
+            or payload.get("channel_url")
+            or payload.get("seturl")
+            or payload.get("set_url")
+            or payload.get("setURL")
+            or payload.get("setUrl")
+        )
+        url = str(url_raw).strip() if url_raw is not None else None
+        if not url:
+            raise ValueError("Missing url")
+        add_only = _coerce_bool(payload.get("add_only", payload.get("addOnly", False)))
+
     return ChannelSettingsRequest(
         action=action,
         channel_index=channel_index,
         role=role_s,
         settings=settings,
         include_all=include_all,
+        url=url,
+        add_only=add_only,
     )
