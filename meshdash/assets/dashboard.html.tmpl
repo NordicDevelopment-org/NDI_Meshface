@@ -16,6 +16,49 @@
 </head>
 <body>
   <div class="topbar">
+    <div class="topbar-notify-corner">
+      <div class="chat-change-menu-wrap topbar-chat-change-menu-wrap">
+        <button
+          id="chat-change-toggle-btn"
+          class="chat-change-toggle-btn"
+          type="button"
+          title="No missed updates"
+          aria-label="Missed updates"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <svg class="chat-change-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 22c1.32 0 2.4-1.08 2.4-2.4h-4.8c0 1.32 1.08 2.4 2.4 2.4Zm7.2-7.2v-5.4c0-3.31-2.05-6.09-4.95-7.08v-.72a2.25 2.25 0 0 0-4.5 0v.72C6.85 3.31 4.8 6.09 4.8 9.4v5.4l-2.1 2.1v1.2h18.6v-1.2l-2.1-2.1Z"/>
+          </svg>
+          <span id="chat-change-badge" class="chat-change-badge" hidden>0</span>
+        </button>
+        <div id="chat-change-summary" class="chat-change-menu" hidden></div>
+      </div>
+      <div class="chat-settings-menu-wrap topbar-chat-settings-menu-wrap">
+        <button
+          id="chat-settings-toggle-btn"
+          class="chat-settings-toggle-btn"
+          type="button"
+          title="Chat settings"
+          aria-label="Chat settings"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <svg class="chat-settings-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19.14 12.94a7.92 7.92 0 0 0 .06-.94 7.92 7.92 0 0 0-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.63l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.38 7.38 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.43h-3.84a.5.5 0 0 0-.5.43l-.36 2.54a7.38 7.38 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.85a.5.5 0 0 0 .12.63l2.03 1.58a7.92 7.92 0 0 0-.06.94 7.92 7.92 0 0 0 .06.94l-2.03 1.58a.5.5 0 0 0-.12.63l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.71 1.63.94l.36 2.54a.5.5 0 0 0 .5.43h3.84a.5.5 0 0 0 .5-.43l.36-2.54c.58-.23 1.13-.55 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.63l-2.03-1.58ZM12 15.2A3.2 3.2 0 1 1 12 8.8a3.2 3.2 0 0 1 0 6.4Z"/>
+          </svg>
+        </button>
+        <div id="chat-settings-menu" class="chat-settings-menu" hidden>
+          <label class="chat-change-scope-wrap" for="chat-change-scope" title="Notification scope">
+            <span class="chat-change-scope-label">Notification scope</span>
+            <select id="chat-change-scope" class="chat-change-scope-select" aria-label="Notification scope">
+              <option value="all">All</option>
+              <option value="self">Self</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
     <h1 class="topbar-heading">{app_heading}<span id="self-radio-pill" class="pill self-radio-pill" title="Connected local radio">n/a</span></h1>
     <div class="sub">
       <div class="sub-main">
@@ -503,30 +546,6 @@
                 <option value="0">Ch 0</option>
               </select>
             </label>
-            <label class="chat-change-scope-wrap" for="chat-change-scope" title="Notification scope">
-              <span class="chat-change-scope-label">Notify</span>
-              <select id="chat-change-scope" class="chat-change-scope-select" aria-label="Notification scope">
-                <option value="all">All</option>
-                <option value="self">Self</option>
-              </select>
-            </label>
-            <div class="chat-change-menu-wrap">
-              <button
-                id="chat-change-toggle-btn"
-                class="chat-change-toggle-btn"
-                type="button"
-                title="No missed updates"
-                aria-label="Missed updates"
-                aria-haspopup="menu"
-                aria-expanded="false"
-              >
-                <svg class="chat-change-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M12 22c1.32 0 2.4-1.08 2.4-2.4h-4.8c0 1.32 1.08 2.4 2.4 2.4Zm7.2-7.2v-5.4c0-3.31-2.05-6.09-4.95-7.08v-.72a2.25 2.25 0 0 0-4.5 0v.72C6.85 3.31 4.8 6.09 4.8 9.4v5.4l-2.1 2.1v1.2h18.6v-1.2l-2.1-2.1Z"/>
-                </svg>
-                <span id="chat-change-badge" class="chat-change-badge" hidden>0</span>
-              </button>
-              <div id="chat-change-summary" class="chat-change-menu" hidden></div>
-            </div>
           </div>
         </div>
         <div id="chat-caption">

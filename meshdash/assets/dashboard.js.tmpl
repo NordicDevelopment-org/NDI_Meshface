@@ -638,6 +638,7 @@
     let chatStickToBottom = true;
     let chatChangeCatchupArmed = false;
     let chatChangeMenuOpen = false;
+    let chatSettingsMenuOpen = false;
     let activeLayoutView = "chat";
     let activeChatChannel = "all";
     let chatNotificationScope = "all";
@@ -6605,6 +6606,18 @@
       }}
     }}
 
+    function setChatSettingsMenuOpen(open) {{
+      chatSettingsMenuOpen = !!open;
+      const panel = document.getElementById("chat-settings-menu");
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = !chatSettingsMenuOpen;
+      }}
+      const btn = document.getElementById("chat-settings-toggle-btn");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", chatSettingsMenuOpen ? "true" : "false");
+      }}
+    }}
+
     function updateChatChangeBadge(count) {{
       const safeCount = Math.max(0, Math.floor(Number(count) || 0));
       const scopeLabel = chatNotificationScopeLabel();
@@ -6717,6 +6730,7 @@
           ev.stopPropagation();
           setChatChangeMenuOpen(!chatChangeMenuOpen);
           if (chatChangeMenuOpen) {{
+            setChatSettingsMenuOpen(false);
             // Opening the bell acknowledges current alerts without clearing history.
             markChatChangeAlertsAcknowledged();
             renderChatChangeSummary();
@@ -6774,6 +6788,42 @@
           setChatChangeMenuOpen(false);
           target.scrollIntoView({{ behavior: "smooth", block: "center" }});
           focusChatFeedItem(target);
+        }});
+      }}
+    }}
+
+    function bindChatSettingsMenuControls() {{
+      const btn = document.getElementById("chat-settings-toggle-btn");
+      if (btn instanceof HTMLButtonElement && btn.dataset.bound !== "1") {{
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const nextOpen = !chatSettingsMenuOpen;
+          setChatSettingsMenuOpen(nextOpen);
+          if (nextOpen) {{
+            setChatChangeMenuOpen(false);
+          }}
+        }});
+      }}
+
+      if (document.body.dataset.chatSettingsMenuDocBound !== "1") {{
+        document.body.dataset.chatSettingsMenuDocBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          if (!chatSettingsMenuOpen) return;
+          const target = ev.target;
+          if (!(target instanceof Element)) {{
+            setChatSettingsMenuOpen(false);
+            return;
+          }}
+          if (target.closest("#chat-settings-toggle-btn") || target.closest("#chat-settings-menu")) {{
+            return;
+          }}
+          setChatSettingsMenuOpen(false);
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key !== "Escape" || !chatSettingsMenuOpen) return;
+          setChatSettingsMenuOpen(false);
         }});
       }}
     }}
@@ -14758,6 +14808,7 @@
     bindChatPeerControls();
     bindChatNotificationScopeControl();
     bindChatChangeSummaryControls();
+    bindChatSettingsMenuControls();
     bindThemeToggle();
     bindSummaryTickerExpandControl();
     bindWeeklySummaryMetricControl();

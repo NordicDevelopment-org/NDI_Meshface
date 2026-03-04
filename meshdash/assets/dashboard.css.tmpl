@@ -25,6 +25,51 @@
       position: sticky;
       top: 0;
       z-index: 100;
+      padding-right: max(12px, calc(78px + env(safe-area-inset-right)));
+    }}
+    .topbar-notify-corner {{
+      position: absolute;
+      top: 8px;
+      right: max(10px, env(safe-area-inset-right));
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }}
+    .topbar-chat-change-menu-wrap .chat-change-toggle-btn,
+    .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn {{
+      width: 30px;
+      height: 30px;
+      border-color: rgba(214, 238, 223, 0.55);
+      background: rgba(248, 255, 251, 0.12);
+      color: #f1fff6;
+    }}
+    .topbar-chat-change-menu-wrap .chat-change-toggle-btn:hover,
+    .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn:hover {{
+      border-color: rgba(214, 238, 223, 0.82);
+      background: rgba(248, 255, 251, 0.22);
+      color: #ffffff;
+    }}
+    .topbar-chat-change-menu-wrap .chat-change-toggle-btn[aria-expanded="true"],
+    .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn[aria-expanded="true"] {{
+      border-color: rgba(214, 238, 223, 0.82);
+      background: rgba(248, 255, 251, 0.24);
+      color: #ffffff;
+    }}
+    .topbar-chat-change-menu-wrap .chat-change-toggle-btn.has-unread {{
+      border-color: #8be0af;
+      color: #dbffe9;
+      box-shadow: 0 0 0 1px rgba(83, 185, 124, 0.4);
+    }}
+    .topbar-chat-change-menu-wrap .chat-change-badge {{
+      border-color: #173d2d;
+    }}
+    .topbar-chat-change-menu-wrap .chat-change-menu {{
+      top: calc(100% + 10px);
+    }}
+    .topbar-chat-settings-menu-wrap .chat-settings-menu {{
+      top: calc(100% + 10px);
     }}
     .topbar h1 {{
       margin: 0;
@@ -1224,7 +1269,27 @@
       align-items: center;
       justify-content: center;
     }}
+    .chat-settings-menu-wrap {{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }}
     .chat-change-toggle-btn {{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid #bfd4c3;
+      background: #ffffff;
+      color: #2b513d;
+      cursor: pointer;
+      transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+    }}
+    .chat-settings-toggle-btn {{
       position: relative;
       display: inline-flex;
       align-items: center;
@@ -1243,7 +1308,16 @@
       background: #f3faf4;
       color: #1f4231;
     }}
+    .chat-settings-toggle-btn:hover {{
+      border-color: #95b6a2;
+      background: #f3faf4;
+      color: #1f4231;
+    }}
     .chat-change-toggle-btn:focus-visible {{
+      outline: 2px solid #3ea269;
+      outline-offset: 2px;
+    }}
+    .chat-settings-toggle-btn:focus-visible {{
       outline: 2px solid #3ea269;
       outline-offset: 2px;
     }}
@@ -1257,7 +1331,18 @@
       border-color: #7da78f;
       color: #214c37;
     }}
+    .chat-settings-toggle-btn[aria-expanded="true"] {{
+      background: #ebf6ee;
+      border-color: #7da78f;
+      color: #214c37;
+    }}
     .chat-change-toggle-icon {{
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+      display: block;
+    }}
+    .chat-settings-toggle-icon {{
       width: 15px;
       height: 15px;
       fill: currentColor;
@@ -3458,6 +3543,38 @@
     }}
     .chat-change-menu[hidden] {{
       display: none !important;
+    }}
+    .chat-settings-menu {{
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: min(260px, 82vw);
+      border: 1px solid #ccddcf;
+      border-radius: 10px;
+      background: #f4fbf5;
+      padding: 8px 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      box-shadow: 0 10px 28px rgba(21, 47, 33, 0.24);
+      z-index: 45;
+    }}
+    .chat-settings-menu[hidden] {{
+      display: none !important;
+    }}
+    .chat-settings-menu .chat-change-scope-wrap {{
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+      color: #4f6758;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+    }}
+    .chat-settings-menu .chat-change-scope-select {{
+      width: 100%;
     }}
     .chat-change-head {{
       display: flex;
@@ -5961,10 +6078,37 @@
       border-color: #58a37a !important;
       color: #c8ffe0 !important;
     }}
-    [data-theme="dark"] .chat-change-toggle-btn {{
+    [data-theme="dark"] .chat-change-toggle-btn,
+    [data-theme="dark"] .chat-settings-toggle-btn {{
       background: #152633;
       border-color: #35556d;
       color: #dbeeff;
+    }}
+    [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn,
+    [data-theme="dark"] .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn {{
+      background: rgba(13, 24, 34, 0.82);
+      border-color: rgba(125, 164, 191, 0.62);
+      color: #d7ecff;
+    }}
+    [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn:hover,
+    [data-theme="dark"] .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn:hover {{
+      background: rgba(25, 46, 64, 0.94);
+      border-color: rgba(157, 194, 220, 0.78);
+      color: #f0f8ff;
+    }}
+    [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn[aria-expanded="true"],
+    [data-theme="dark"] .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn[aria-expanded="true"] {{
+      background: rgba(31, 58, 79, 0.96);
+      border-color: rgba(157, 194, 220, 0.82);
+      color: #f0f8ff;
+    }}
+    [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn.has-unread {{
+      border-color: #59b883;
+      color: #baf8d4;
+      box-shadow: 0 0 0 1px rgba(89, 184, 131, 0.45);
+    }}
+    [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-badge {{
+      border-color: #0d1a24;
     }}
     [data-theme="dark"] .chat-change-scope-wrap {{
       color: #93b8a6;
@@ -5987,6 +6131,11 @@
       border-color: #476b87;
       color: #f0f8ff;
     }}
+    [data-theme="dark"] .chat-settings-toggle-btn:hover {{
+      background: #1b2f3e;
+      border-color: #476b87;
+      color: #f0f8ff;
+    }}
     [data-theme="dark"] .chat-change-toggle-btn.has-unread {{
       border-color: #3f8f68;
       color: #9ce7b8;
@@ -5997,12 +6146,22 @@
       border-color: #58839f;
       color: #dbeeff;
     }}
+    [data-theme="dark"] .chat-settings-toggle-btn[aria-expanded="true"] {{
+      background: #1b3140;
+      border-color: #58839f;
+      color: #dbeeff;
+    }}
     [data-theme="dark"] .chat-change-badge {{
       background: #2f8f61;
       border-color: #0f1a24;
       color: #ecfff4;
     }}
     [data-theme="dark"] .chat-change-menu {{
+      background: #0f1f17;
+      border-color: #2f4d3d;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.56);
+    }}
+    [data-theme="dark"] .chat-settings-menu {{
       background: #0f1f17;
       border-color: #2f4d3d;
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.56);
@@ -6197,6 +6356,12 @@
       }}
     }}
     @media (max-width: 760px) {{
+      .topbar {{
+        padding-right: max(10px, calc(74px + env(safe-area-inset-right)));
+      }}
+      .topbar-notify-corner {{
+        top: 6px;
+      }}
       .chat-left-panel {{
         max-height: 180px;
       }}
