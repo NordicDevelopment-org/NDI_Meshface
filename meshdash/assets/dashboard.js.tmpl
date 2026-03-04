@@ -4179,10 +4179,13 @@
       return normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }});
     }}
 
-    function meshChannelIndexForSend() {{
+    function meshChannelSendContext() {{
       const activeIdx = activeMeshChannelFilterIndex();
-      if (activeIdx >= 0) return activeIdx;
-      return 0;
+      const sendIndex = activeIdx >= 0 ? activeIdx : 0;
+      return {{
+        sendIndex,
+        allSelected: activeIdx === meshChannelAllIndex,
+      }};
     }}
 
     function buildMeshChannelOptionsFromLocalState(localState) {{
@@ -4252,8 +4255,8 @@
       select.innerHTML = "";
       const allOption = document.createElement("option");
       allOption.value = String(meshChannelAllIndex);
-      allOption.textContent = "All channels";
-      allOption.title = "Show chat from all mesh channels";
+      allOption.textContent = "All channels (view)";
+      allOption.title = "Show chat from all mesh channels. Outgoing sends use Ch 0 while this is selected.";
       select.appendChild(allOption);
       for (const opt of normalized) {{
         const idx = normalizeMeshChannelIndex(opt && opt.index);
@@ -4969,10 +4972,11 @@
         }}
       }}
       const replyId = Number(chatReplyTargetId);
+      const sendCtx = meshChannelSendContext();
       const requestBody = {{
         text,
         destination,
-        channel_index: meshChannelIndexForSend(),
+        channel_index: sendCtx.sendIndex,
       }};
       if (Number.isInteger(replyId) && replyId > 0) {{
         requestBody.reply_id = replyId;
@@ -4986,13 +4990,15 @@
         const replied = Number.isInteger(replyId) && replyId > 0;
         clearChatReplyTarget();
         if (destination === "^all") {{
-          setChatSendStatus(`${{replied ? "Reply sent" : "Sent"}} to Everyone at ${{payload.sent_at || "now"}}`);
+          const allNote = sendCtx.allSelected ? " (All channels view selected)" : "";
+          setChatSendStatus(`${{replied ? "Reply sent" : "Sent"}} to Everyone on Ch ${{sendCtx.sendIndex}} at ${{payload.sent_at || "now"}}${{allNote}}`);
         }} else {{
           const awaitingAck = payload.ack_requested === true && normalizeDeliveryState(payload.delivery_state) === "pending";
+          const allNote = sendCtx.allSelected ? " (All channels view selected)" : "";
           if (awaitingAck) {{
-            setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} at ${{payload.sent_at || "now"}} (awaiting ACK)`);
+            setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} on Ch ${{sendCtx.sendIndex}} at ${{payload.sent_at || "now"}} (awaiting ACK)${{allNote}}`);
           }} else {{
-            setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} at ${{payload.sent_at || "now"}}`);
+            setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} on Ch ${{sendCtx.sendIndex}} at ${{payload.sent_at || "now"}}${{allNote}}`);
           }}
         }}
       }}
@@ -5014,6 +5020,7 @@
         return;
       }}
       let destination = "^all";
+      const sendCtx = meshChannelSendContext();
       if (activeChatChannel === "direct" && isSelectableNodeId(selectedNodeId)) {{
         destination = selectedNodeId;
         if (isSelfNodeId(destination)) {{
@@ -5024,14 +5031,15 @@
       const payload = await sendChatPayload(
         {{
           destination,
-          channel_index: meshChannelIndexForSend(),
+          channel_index: sendCtx.sendIndex,
           reply_id: replyNum,
           emoji: cleanEmoji,
         }},
         null
       );
       if (payload && payload.ok) {{
-        setChatSendStatus(`Reacted ${{cleanEmoji}} at ${{payload.sent_at || "now"}}`);
+        const allNote = sendCtx.allSelected ? " (All channels view selected)" : "";
+        setChatSendStatus(`Reacted ${{cleanEmoji}} on Ch ${{sendCtx.sendIndex}} at ${{payload.sent_at || "now"}}${{allNote}}`);
       }}
     }}
 
@@ -6357,9 +6365,7 @@
       if (msg.is_reaction === true) return true;
       const replyId = Number(msg.reply_id ?? msg.replyId);
       if (!Number.isFinite(replyId) || replyId <= 0) return false;
-      if (msg.emoji != null || msg.emoji_codepoint != null || msg.emojiCodepoint != null) {{
-        return true;
-      }}
+      if (reactionEmojiPreviewFromMessage(msg)) return true;
       return isLikelyReactionPayloadText(msg.text ?? msg.decoded_text ?? msg.payload_text);
     }}
 
@@ -6373,7 +6379,7 @@
       if (!msg || typeof msg !== "object") return "";
       const cpRaw = msg.emoji_codepoint ?? msg.emojiCodepoint;
       const cp = Number(cpRaw);
-      if (Number.isInteger(cp) && cp > 0 && cp <= 0x10ffff) {{
+      if (Number.isInteger(cp) && cp > 0x7f && cp <= 0x10ffff) {{
         try {{
           return String.fromCodePoint(cp);
         }} catch (_err) {{
@@ -13566,6 +13572,8 @@
       const emojiFromCodepointValue = (value) => {{
         const codepoint = Number(value);
         if (!Number.isInteger(codepoint) || codepoint <= 0) return "";
+        // Ignore plain ASCII so reply text can't be interpreted as reactions.
+        if (codepoint <= 0x7F) return "";
         try {{
           const glyph = String.fromCodePoint(codepoint);
           // Filter non-printable control chars (often bad legacy payload values).
