@@ -1,4 +1,6 @@
 from types import SimpleNamespace
+import sys
+import types
 
 import pytest
 
@@ -387,3 +389,309 @@ def test_apply_channel_settings_handles_missing_protobuf_and_write_support(monke
     )
     assert no_write["ok"] is False
     assert "writeChannel" in str(no_write["error"])
+
+
+def test_channel_helpers_cover_request_typeerror_and_wait_errors():
+    class _Node:
+        def __init__(self):
+            self.channels = None
+
+        def requestChannels(self):
+            self.channels = [_FakeChannel(0, _FakeRole.PRIMARY)]
+
+        def waitForConfig(self, _name):
+            raise RuntimeError("wait failed")
+
+    loaded = _ensure_channels_loaded(_Node())
+    assert isinstance(loaded, list)
+
+    with pytest.raises(ValueError, match="empty"):
+        _role_value(_FakeChannelPb2, "")
+
+    class _Bad:
+        index = object()
+        role = _FakeRole.SECONDARY
+
+    assert _compute_last_active_index(_FakeChannelPb2, [_FakeChannel(0, _FakeRole.PRIMARY), _Bad()]) == 0
+
+
+def test_apply_channel_settings_disable_additional_error_paths(monkeypatch):
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+
+    unavailable = apply_channel_settings(
+        ChannelSettingsRequest(action="disable", channel_index=1),
+        iface=_iface_with_local(SimpleNamespace(channels=None, requestChannels=None, waitForConfig=None, writeChannel=lambda _idx: None)),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert unavailable["ok"] is False
+    assert "Channels unavailable" in str(unavailable["error"])
+
+    out_of_range_channels = [_FakeChannel(0, _FakeRole.PRIMARY), _FakeChannel(5, _FakeRole.SECONDARY)]
+    out_of_range = apply_channel_settings(
+        ChannelSettingsRequest(action="disable", channel_index=5),
+        iface=_iface_with_local(_FakeNode(channels=out_of_range_channels)),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert out_of_range["ok"] is False
+    assert "out of range" in str(out_of_range["error"])
+
+    class _FlakyRoleChannel:
+        def __init__(self):
+            self.index = 1
+            self._reads = 0
+            self.settings = _BadSettings()
+            self.module_settings = _BadModuleSettings()
+
+        @property
+        def role(self):
+            self._reads += 1
+            if self._reads == 1:
+                return _FakeRole.SECONDARY
+            return object()
+
+        @role.setter
+        def role(self, _value):
+            raise RuntimeError("role locked")
+
+    class _BadSettings:
+        uplink_enabled = False
+        downlink_enabled = False
+        psk = b"existing"
+
+        @property
+        def name(self):
+            return ""
+
+        @name.setter
+        def name(self, _value):
+            raise RuntimeError("name blocked")
+
+    class _BadModuleSettings:
+        @property
+        def is_muted(self):
+            return False
+
+        @is_muted.setter
+        def is_muted(self, _value):
+            raise RuntimeError("mute blocked")
+
+        @property
+        def position_precision(self):
+            return 0
+
+        @position_precision.setter
+        def position_precision(self, _value):
+            raise RuntimeError("precision blocked")
+
+    disable_fail = apply_channel_settings(
+        ChannelSettingsRequest(action="disable", channel_index=1),
+        iface=_iface_with_local(_FakeNode(channels=[_FakeChannel(0, _FakeRole.PRIMARY), _FlakyRoleChannel()], write_error=RuntimeError("write fail"))),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert disable_fail["ok"] is False
+    assert "Write failed" in str(disable_fail["error"])
+
+
+def test_apply_channel_settings_disable_sets_default_psk_when_util_available(monkeypatch):
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+    fake_util = types.SimpleNamespace(fromPSK=lambda value: b"default-bytes")
+    monkeypatch.setitem(sys.modules, "meshtastic.util", fake_util)
+
+    channels = [_FakeChannel(0, _FakeRole.PRIMARY), _FakeChannel(1, _FakeRole.SECONDARY)]
+    result = apply_channel_settings(
+        ChannelSettingsRequest(action="disable", channel_index=1),
+        iface=_iface_with_local(_FakeNode(channels=channels)),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert result["ok"] is True
+    assert channels[1].settings.psk == b"default-bytes"
+
+
+def test_apply_channel_settings_upsert_additional_branches(monkeypatch):
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+
+    channels = [
+        _FakeChannel(0, _FakeRole.PRIMARY),
+        _FakeChannel(1, _FakeRole.SECONDARY),
+        _FakeChannel(2, _FakeRole.DISABLED),
+    ]
+    node = _FakeNode(channels=channels)
+
+    default_idx = apply_channel_settings(
+        ChannelSettingsRequest(action="upsert", settings={"name": "Auto"}),
+        iface=_iface_with_local(node),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert default_idx["ok"] is True
+    assert default_idx["channel_index"] == 2
+
+    primary_ok = apply_channel_settings(
+        ChannelSettingsRequest(action="upsert", channel_index=0, settings={"name": "Primary"}),
+        iface=_iface_with_local(node),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert primary_ok["ok"] is True
+
+    primary_reject = apply_channel_settings(
+        ChannelSettingsRequest(action="upsert", channel_index=1, role="PRIMARY", settings={"name": "Bad"}),
+        iface=_iface_with_local(node),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert primary_reject["ok"] is False
+
+    class _RoleSetFailChannel(_FakeChannel):
+        def __init__(self, index: int):
+            self.index = index
+            self.settings = _FakeSettings()
+            self.module_settings = _FakeModuleSettings()
+
+        @property
+        def role(self):
+            return _FakeRole.SECONDARY
+
+        @role.setter
+        def role(self, _value):
+            raise RuntimeError("role set fail")
+
+    role_set_fail = apply_channel_settings(
+        ChannelSettingsRequest(action="upsert", channel_index=1, role="SECONDARY", settings={"name": "Ops"}),
+        iface=_iface_with_local(_FakeNode(channels=[_FakeChannel(0, _FakeRole.PRIMARY), _RoleSetFailChannel(1)])),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert role_set_fail["ok"] is True
+
+    class _RoleReadFailChannel(_FakeChannel):
+        @property
+        def role(self):
+            return object()
+
+        @role.setter
+        def role(self, _value):
+            pass
+
+    with pytest.raises(TypeError):
+        apply_channel_settings(
+            ChannelSettingsRequest(action="upsert", channel_index=1, settings={"name": "Ops"}),
+            iface=_iface_with_local(_FakeNode(channels=[_FakeChannel(0, _FakeRole.PRIMARY), _RoleReadFailChannel(1, _FakeRole.SECONDARY)])),
+            send_lock=_FakeLock(),
+            show_secrets=True,
+        )
+
+    no_settings = apply_channel_settings(
+        ChannelSettingsRequest(action="upsert", channel_index=1, settings={"name": "Ops"}),
+        iface=_iface_with_local(_FakeNode(channels=[_FakeChannel(0, _FakeRole.PRIMARY), SimpleNamespace(index=1, role=_FakeRole.SECONDARY, settings=None)])),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert no_settings["ok"] is False
+    assert "settings are unavailable" in str(no_settings["error"])
+
+
+def test_apply_channel_settings_upsert_field_error_and_module_settings_paths(monkeypatch):
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+
+    class _BadSettings:
+        psk = b"existing"
+
+        @property
+        def name(self):
+            return ""
+
+        @name.setter
+        def name(self, _value):
+            raise RuntimeError("name fail")
+
+        @property
+        def uplink_enabled(self):
+            return False
+
+        @uplink_enabled.setter
+        def uplink_enabled(self, _value):
+            raise RuntimeError("uplink fail")
+
+        @property
+        def downlink_enabled(self):
+            return False
+
+        @downlink_enabled.setter
+        def downlink_enabled(self, _value):
+            raise RuntimeError("downlink fail")
+
+    class _BadModuleSettings:
+        @property
+        def is_muted(self):
+            return False
+
+        @is_muted.setter
+        def is_muted(self, _value):
+            raise RuntimeError("mute fail")
+
+        @property
+        def position_precision(self):
+            return 0
+
+        @position_precision.setter
+        def position_precision(self, _value):
+            raise RuntimeError("precision fail")
+
+    bad_channel = SimpleNamespace(
+        index=1,
+        role=_FakeRole.SECONDARY,
+        settings=_BadSettings(),
+        module_settings=_BadModuleSettings(),
+    )
+
+    fake_util = types.SimpleNamespace(fromPSK=lambda value: (_ for _ in ()).throw(RuntimeError("psk fail")))
+    monkeypatch.setitem(sys.modules, "meshtastic.util", fake_util)
+
+    result = apply_channel_settings(
+        ChannelSettingsRequest(
+            action="upsert",
+            channel_index=1,
+            settings={
+                "name": "Ops",
+                "uplink_enabled": True,
+                "downlink_enabled": True,
+                "psk": "custom",
+                "module_settings": {"is_muted": True, "position_precision": 7},
+            },
+        ),
+        iface=_iface_with_local(_FakeNode(channels=[_FakeChannel(0, _FakeRole.PRIMARY), bad_channel])),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert result["ok"] is False
+    assert "No valid fields" in str(result["error"])
+    assert "settings.name" in result["ignored_fields"]
+    assert "settings.uplink_enabled" in result["ignored_fields"]
+    assert "settings.downlink_enabled" in result["ignored_fields"]
+    assert "settings.psk" in result["ignored_fields"]
+    assert "module_settings.is_muted" in result["ignored_fields"]
+    assert "module_settings.position_precision" in result["ignored_fields"]
+
+    module_none_channel = SimpleNamespace(
+        index=1,
+        role=_FakeRole.SECONDARY,
+        settings=_FakeSettings(),
+        module_settings=None,
+    )
+    module_none = apply_channel_settings(
+        ChannelSettingsRequest(
+            action="upsert",
+            channel_index=1,
+            settings={"name": "Ops", "module_settings": {"is_muted": True}},
+        ),
+        iface=_iface_with_local(_FakeNode(channels=[_FakeChannel(0, _FakeRole.PRIMARY), module_none_channel])),
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert module_none["ok"] is True
+    assert "module_settings" in module_none["ignored_fields"]

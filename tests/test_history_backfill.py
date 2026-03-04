@@ -1,6 +1,10 @@
 import sqlite3
 
-from meshdash.history_backfill import backfill_node_capabilities
+from meshdash.history_backfill import (
+    backfill_node_capabilities,
+    backfill_node_hour_seen,
+    backfill_node_saved_counts,
+)
 from meshdash.history.db import initialize_history_schema
 
 
@@ -102,3 +106,158 @@ def test_backfill_node_capabilities_is_noop_when_capabilities_exist():
         assert rows == [("!existing", 50)]
     finally:
         conn.close()
+
+
+def test_backfill_node_saved_counts_populates_and_skips_empty_node_ids():
+    conn = sqlite3.connect(":memory:")
+    try:
+        initialize_history_schema(conn)
+        conn.execute(
+            """
+            INSERT INTO node_metrics_1m(
+              bucket_unix, node_id, packet_count,
+              snr_sum, snr_count, snr_min, snr_max,
+              rssi_sum, rssi_count, rssi_min, rssi_max,
+              hops_sum, hops_count, hops_min, hops_max,
+              last_seen_unix
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (60, "!n2", 3, 0.0, 0, None, None, 0.0, 0, None, None, 0, 0, None, None, 120),
+        )
+        conn.execute(
+            """
+            INSERT INTO node_metrics_1m(
+              bucket_unix, node_id, packet_count,
+              snr_sum, snr_count, snr_min, snr_max,
+              rssi_sum, rssi_count, rssi_min, rssi_max,
+              hops_sum, hops_count, hops_min, hops_max,
+              last_seen_unix
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (120, "!n2", 2, 0.0, 0, None, None, 0.0, 0, None, None, 0, 0, None, None, 180),
+        )
+        conn.execute(
+            """
+            INSERT INTO node_metrics_1m(
+              bucket_unix, node_id, packet_count,
+              snr_sum, snr_count, snr_min, snr_max,
+              rssi_sum, rssi_count, rssi_min, rssi_max,
+              hops_sum, hops_count, hops_min, hops_max,
+              last_seen_unix
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (180, "   ", 9, 0.0, 0, None, None, 0.0, 0, None, None, 0, 0, None, None, 200),
+        )
+
+        backfill_node_saved_counts(conn)
+
+        row = conn.execute(
+            "SELECT saved_packets, saved_points, saved_last_seen_unix FROM node_saved_counts WHERE node_id = ?",
+            ("!n2",),
+        ).fetchone()
+        assert row == (5, 2, 180)
+        assert conn.execute(
+            "SELECT COUNT(*) FROM node_saved_counts WHERE node_id = ?",
+            ("!n2",),
+        ).fetchone()[0] == 1
+    finally:
+        conn.close()
+
+
+def test_backfill_node_saved_counts_is_noop_when_table_already_has_rows():
+    conn = sqlite3.connect(":memory:")
+    try:
+        initialize_history_schema(conn)
+        conn.execute(
+            "INSERT INTO node_saved_counts(node_id, saved_packets, saved_points, saved_last_seen_unix) VALUES(?, ?, ?, ?)",
+            ("!existing", 1, 1, 1),
+        )
+        backfill_node_saved_counts(conn)
+        rows = conn.execute("SELECT node_id FROM node_saved_counts ORDER BY node_id").fetchall()
+        assert rows == [("!existing",)]
+    finally:
+        conn.close()
+
+
+def test_backfill_node_saved_counts_handles_missing_table_gracefully():
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.execute("CREATE TABLE node_metrics_1m(node_id TEXT, packet_count INTEGER, last_seen_unix INTEGER, bucket_unix INTEGER)")
+        backfill_node_saved_counts(conn)
+    finally:
+        conn.close()
+
+
+def test_backfill_node_hour_seen_populates_and_handles_failures():
+    conn = sqlite3.connect(":memory:")
+    try:
+        initialize_history_schema(conn)
+        conn.execute(
+            """
+            INSERT INTO node_metrics_1m(
+              bucket_unix, node_id, packet_count,
+              snr_sum, snr_count, snr_min, snr_max,
+              rssi_sum, rssi_count, rssi_min, rssi_max,
+              hops_sum, hops_count, hops_min, hops_max,
+              last_seen_unix
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (3661, "!n3", 1, 0.0, 0, None, None, 0.0, 0, None, None, 0, 0, None, None, 10),
+        )
+        conn.execute(
+            """
+            INSERT INTO node_metrics_1m(
+              bucket_unix, node_id, packet_count,
+              snr_sum, snr_count, snr_min, snr_max,
+              rssi_sum, rssi_count, rssi_min, rssi_max,
+              hops_sum, hops_count, hops_min, hops_max,
+              last_seen_unix
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (7201, "", 1, 0.0, 0, None, None, 0.0, 0, None, None, 0, 0, None, None, 20),
+        )
+
+        backfill_node_hour_seen(conn)
+        rows = conn.execute("SELECT hour_bucket, node_id FROM node_hour_seen ORDER BY node_id").fetchall()
+        assert (3600, "!n3") in rows
+    finally:
+        conn.close()
+
+    class _FailingConn:
+        def __init__(self):
+            self._calls = 0
+
+        def execute(self, _sql, _params=None):
+            self._calls += 1
+            if self._calls == 1:
+                raise RuntimeError("missing table")
+            if self._calls == 2:
+                raise RuntimeError("select failed")
+            raise RuntimeError("insert failed")
+
+    backfill_node_hour_seen(_FailingConn())
+
+    class _Cursor:
+        def __init__(self, *, one=None, many=None):
+            self._one = one
+            self._many = many or []
+
+        def fetchone(self):
+            return self._one
+
+        def fetchall(self):
+            return list(self._many)
+
+    class _InsertFailConn:
+        def __init__(self):
+            self.calls = 0
+
+        def execute(self, _sql, _params=None):
+            self.calls += 1
+            if self.calls == 1:
+                return _Cursor(one=(0,))
+            if self.calls == 2:
+                return _Cursor(many=[(3600, "!n"), (7200, "")])
+            raise RuntimeError("insert fail")
+
+    backfill_node_hour_seen(_InsertFailConn())

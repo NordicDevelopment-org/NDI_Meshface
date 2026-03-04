@@ -2,6 +2,7 @@ from types import MappingProxyType
 
 from meshdash.state_payload_contracts import DashboardStatePayload
 from meshdash.revision import RevisionInfo
+from meshdash import state_service as state_service_mod
 from meshdash.state_service import (
     build_dashboard_state,
     build_dashboard_state_lite,
@@ -871,3 +872,122 @@ def test_build_dashboard_state_lite_maps_numeric_modem_preset_enum_to_name():
     )
 
     assert payload["summary"]["modem_preset"] == "MEDIUM_FAST"
+
+
+def test_state_service_private_helpers_cover_modem_normalization_and_radio_errors(monkeypatch):
+    assert state_service_mod._normalize_modem_preset(None) is None
+    assert state_service_mod._normalize_modem_preset(True) is None
+    assert state_service_mod._normalize_modem_preset(4) == "MEDIUM_FAST"
+    assert state_service_mod._normalize_modem_preset(999.0) == "999"
+    assert state_service_mod._normalize_modem_preset(float("nan")) == "nan"
+    assert state_service_mod._normalize_modem_preset("+8") == "SHORT_TURBO"
+    assert state_service_mod._normalize_modem_preset("   ") is None
+    assert state_service_mod._normalize_modem_preset("42") == "42"
+    assert state_service_mod._normalize_modem_preset("longfast") == "LONG_FAST"
+    assert state_service_mod._normalize_modem_preset("MODEMPRESET_LONG_FAST") == "LONG_FAST"
+    assert (
+        state_service_mod._normalize_modem_preset("CONFIG_LORACONFIG_MODEMPRESET_LONG_FAST")
+        == "CONFIG_LORACONFIG_MODEMPRESET_LONG_FAST"
+    )
+    assert state_service_mod._normalize_modem_preset("unknown preset") == "unknown preset"
+
+    assert state_service_mod._modem_preset_from_local_config({"lora": {"modem_preset": 5}}) == "SHORT_SLOW"
+    assert state_service_mod._modem_preset_from_local_config({"lora": "bad"}) is None
+    assert state_service_mod._modem_preset_from_local_config("bad") is None
+
+    class _IfaceFallback:
+        localNode = None
+
+        @staticmethod
+        def getNode(_id):
+            raise RuntimeError("boom")
+
+    assert state_service_mod._modem_preset_quick_from_iface(_IfaceFallback()) is None
+
+    class _LocalMapIface:
+        localNode = {"local_config": {"lora": {"modem_preset": "2"}}}
+
+    assert state_service_mod._modem_preset_quick_from_iface(_LocalMapIface()) == "VERY_LONG_SLOW"
+
+    class _LocalConfigWithLoraMap:
+        lora = {"modem_preset": 5}
+
+    class _IfaceLoraMap:
+        localNode = type("_Node", (), {"localConfig": _LocalConfigWithLoraMap()})()
+
+    assert state_service_mod._modem_preset_quick_from_iface(_IfaceLoraMap()) == "SHORT_SLOW"
+
+    class _LoraObj:
+        modem_preset = 6
+
+    class _LocalConfigWithLoraObj:
+        lora = _LoraObj()
+
+    class _IfaceLoraObj:
+        localNode = type("_Node", (), {"localConfig": _LocalConfigWithLoraObj()})()
+
+    assert state_service_mod._modem_preset_quick_from_iface(_IfaceLoraObj()) == "SHORT_FAST"
+
+    class _LoraObjNoPreset:
+        modem_preset = None
+
+    class _LocalConfigNoPreset:
+        lora = _LoraObjNoPreset()
+
+    class _IfaceNoPreset:
+        localNode = type("_Node", (), {"localConfig": _LocalConfigNoPreset()})()
+
+    assert state_service_mod._modem_preset_quick_from_iface(_IfaceNoPreset()) is None
+
+    class _TrackerConnected:
+        radio_link_connected = True
+
+    assert state_service_mod._tracker_radio_link_error(_TrackerConnected()) is None
+
+    class _TrackerBadChanged:
+        radio_link_connected = False
+        radio_link_changed_unix = object()
+        radio_link_error = "serial disconnected"
+
+    assert "serial disconnected" in state_service_mod._tracker_radio_link_error(_TrackerBadChanged())
+
+    class _TrackerTimeError:
+        radio_link_connected = False
+        radio_link_changed_unix = 42
+        radio_link_error = ""
+
+    monkeypatch.setattr(state_service_mod.time, "time", lambda: (_ for _ in ()).throw(RuntimeError("clock")))
+    assert state_service_mod._tracker_radio_link_error(_TrackerTimeError()) == "radio link lost"
+
+
+def test_build_dashboard_state_lite_redacts_when_show_secrets_false():
+    tracker = _DummyTracker()
+    captured = {}
+    payload = build_dashboard_state_lite(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}, "localNode": None})(),
+        tracker=tracker,
+        started_at=0.0,
+        target="target",
+        show_secrets=False,
+        storage_probe_path=".",
+        revision_info={"version": "0.1.0"},
+        sensitive_field_names={"password"},
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!a"}],
+            "full": [{"id": "!a", "info": {}}],
+            "by_id": {"!a": {"id": "!a"}},
+            "with_position_count": 1,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"ok": True},
+        to_jsonable_fn=lambda value: value,
+        redact_secrets_fn=lambda state, names: (captured.update({"state": state}), {"redacted": True})[1],
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert payload["redacted"] is True
+    assert captured["state"]["my_info"] is None
+    assert captured["state"]["nodes_full"] == []
