@@ -444,7 +444,28 @@
 
     <section class="card chat">
       <div class="chat-card-head">
-        <h2 id="chat-title">Mesh Chat</h2>
+        <div class="chat-card-head-row">
+          <h2 id="chat-title">Mesh Chat</h2>
+          <div class="chat-card-head-actions">
+            <div class="chat-change-menu-wrap">
+              <button
+                id="chat-change-toggle-btn"
+                class="chat-change-toggle-btn"
+                type="button"
+                title="No missed updates"
+                aria-label="Missed updates"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <svg class="chat-change-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 22c1.32 0 2.4-1.08 2.4-2.4h-4.8c0 1.32 1.08 2.4 2.4 2.4Zm7.2-7.2v-5.4c0-3.31-2.05-6.09-4.95-7.08v-.72a2.25 2.25 0 0 0-4.5 0v.72C6.85 3.31 4.8 6.09 4.8 9.4v5.4l-2.1 2.1v1.2h18.6v-1.2l-2.1-2.1Z"/>
+                </svg>
+                <span id="chat-change-badge" class="chat-change-badge" hidden>0</span>
+              </button>
+              <div id="chat-change-summary" class="chat-change-menu" hidden></div>
+            </div>
+          </div>
+        </div>
         <div id="chat-caption">
           Showing decoded text messages from recent packets.
         </div>
@@ -452,7 +473,6 @@
       <div class="body">
         <div class="chat-shell">
           <div class="chat-main-pane">
-            <div id="chat-change-summary" class="chat-change-summary" hidden></div>
             <div class="scroll chat-log-scroll">
               <div id="chat-feed" class="chat-feed"></div>
             </div>

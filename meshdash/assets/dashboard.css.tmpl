@@ -1145,6 +1145,14 @@
       border-bottom: 1px solid #d2e1d0;
       background: #edf6ec;
       padding: 8px 10px 7px 10px;
+      position: relative;
+      overflow: visible;
+    }}
+    .chat-card-head-row {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
     }}
     .chat-card-head h2 {{
       margin: 0;
@@ -1156,6 +1164,80 @@
       border: 0;
       background: transparent;
       padding: 0;
+    }}
+    .chat-card-head-actions {{
+      display: inline-flex;
+      align-items: center;
+      margin-left: auto;
+      position: relative;
+    }}
+    .chat-change-menu-wrap {{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }}
+    .chat-change-toggle-btn {{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid #bfd4c3;
+      background: #ffffff;
+      color: #2b513d;
+      cursor: pointer;
+      transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+    }}
+    .chat-change-toggle-btn:hover {{
+      border-color: #95b6a2;
+      background: #f3faf4;
+      color: #1f4231;
+    }}
+    .chat-change-toggle-btn:focus-visible {{
+      outline: 2px solid #3ea269;
+      outline-offset: 2px;
+    }}
+    .chat-change-toggle-btn.has-unread {{
+      border-color: #4b9a6d;
+      color: #1e583c;
+      box-shadow: 0 0 0 1px rgba(41, 131, 85, 0.2);
+    }}
+    .chat-change-toggle-btn[aria-expanded="true"] {{
+      background: #ebf6ee;
+      border-color: #7da78f;
+      color: #214c37;
+    }}
+    .chat-change-toggle-icon {{
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+      display: block;
+    }}
+    .chat-change-badge {{
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      min-width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: #2f7f58;
+      border: 1px solid #f6fbf5;
+      color: #ecfff4;
+      font-size: 9px;
+      line-height: 1;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }}
+    .chat-change-badge[hidden] {{
+      display: none !important;
     }}
     .card .body {{
       padding: 8px 10px;
@@ -3287,7 +3369,11 @@
       min-height: 0;
       overflow: hidden;
     }}
-    .chat-change-summary {{
+    .chat-change-menu {{
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: min(380px, 82vw);
       border: 1px solid #ccddcf;
       border-radius: 10px;
       background: #f4fbf5;
@@ -3295,8 +3381,10 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+      box-shadow: 0 10px 28px rgba(21, 47, 33, 0.24);
+      z-index: 45;
     }}
-    .chat-change-summary[hidden] {{
+    .chat-change-menu[hidden] {{
       display: none !important;
     }}
     .chat-change-head {{
@@ -3330,9 +3418,19 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      max-height: 148px;
+      max-height: min(44vh, 320px);
       overflow: auto;
       padding-right: 2px;
+    }}
+    .chat-change-empty {{
+      border: 1px dashed #c5d7ca;
+      border-radius: 8px;
+      padding: 10px 9px;
+      color: #4f6a5b;
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: center;
+      background: #fbfefb;
     }}
     .chat-change-item {{
       border: 1px solid #d3e3d6;
@@ -5763,9 +5861,35 @@
       border-color: #58a37a !important;
       color: #c8ffe0 !important;
     }}
-    [data-theme="dark"] .chat-change-summary {{
+    [data-theme="dark"] .chat-change-toggle-btn {{
+      background: #152633;
+      border-color: #35556d;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .chat-change-toggle-btn:hover {{
+      background: #1b2f3e;
+      border-color: #476b87;
+      color: #f0f8ff;
+    }}
+    [data-theme="dark"] .chat-change-toggle-btn.has-unread {{
+      border-color: #3f8f68;
+      color: #9ce7b8;
+      box-shadow: 0 0 0 1px rgba(63, 143, 104, 0.34);
+    }}
+    [data-theme="dark"] .chat-change-toggle-btn[aria-expanded="true"] {{
+      background: #1b3140;
+      border-color: #58839f;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .chat-change-badge {{
+      background: #2f8f61;
+      border-color: #0f1a24;
+      color: #ecfff4;
+    }}
+    [data-theme="dark"] .chat-change-menu {{
       background: #0f1f17;
       border-color: #2f4d3d;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.56);
     }}
     [data-theme="dark"] .chat-change-title {{
       color: #c7e8d6;
@@ -5800,6 +5924,11 @@
     }}
     [data-theme="dark"] .chat-change-item-age {{
       color: #9ab7a7;
+    }}
+    [data-theme="dark"] .chat-change-empty {{
+      background: #13241b;
+      border-color: #2a4638;
+      color: #b8d9c8;
     }}
     [data-theme="dark"] .chat-feed-item.has-change-marker {{
       background: rgba(201, 150, 44, 0.08);

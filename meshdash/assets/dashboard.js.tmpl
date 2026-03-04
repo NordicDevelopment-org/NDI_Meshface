@@ -630,6 +630,7 @@
     let settingsLocalStateCache = null;
     let settingsLocalStateFetchedAt = 0;
     let chatStickToBottom = true;
+    let chatChangeMenuOpen = false;
     let activeLayoutView = "chat";
     let activeChatChannel = "all";
     let activeMeshChannelIndex = 0;
@@ -6302,16 +6303,57 @@
       return keys;
     }}
 
+    function setChatChangeMenuOpen(open) {{
+      chatChangeMenuOpen = !!open;
+      const panel = document.getElementById("chat-change-summary");
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = !chatChangeMenuOpen;
+      }}
+      const btn = document.getElementById("chat-change-toggle-btn");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", chatChangeMenuOpen ? "true" : "false");
+      }}
+    }}
+
+    function updateChatChangeBadge(count) {{
+      const safeCount = Math.max(0, Math.floor(Number(count) || 0));
+      const btn = document.getElementById("chat-change-toggle-btn");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.classList.toggle("has-unread", safeCount > 0);
+        const countLabel = safeCount > 99 ? "99+" : String(safeCount);
+        btn.title = safeCount > 0
+          ? `${{countLabel}} missed update${{safeCount === 1 ? "" : "s"}}`
+          : "No missed updates";
+        btn.setAttribute(
+          "aria-label",
+          safeCount > 0
+            ? `Missed updates (${{countLabel}})`
+            : "Missed updates"
+        );
+      }}
+      const badge = document.getElementById("chat-change-badge");
+      if (badge instanceof HTMLElement) {{
+        if (safeCount > 0) {{
+          badge.hidden = false;
+          badge.textContent = safeCount > 99 ? "99+" : String(safeCount);
+        }} else {{
+          badge.hidden = true;
+          badge.textContent = "0";
+        }}
+      }}
+    }}
+
     function renderChatChangeSummary(nowUnix = Math.floor(Date.now() / 1000)) {{
       const panel = document.getElementById("chat-change-summary");
       if (!(panel instanceof HTMLElement)) return;
       const notices = chatChangeNoticesForChannel(activeChatChannel);
+      const count = notices.length;
+      updateChatChangeBadge(count);
       if (!notices.length) {{
-        panel.innerHTML = "";
-        panel.hidden = true;
+        panel.innerHTML = '<div class="chat-change-empty">No missed updates while you were away.</div>';
+        panel.hidden = !chatChangeMenuOpen;
         return;
       }}
-      const count = notices.length;
       const recent = notices.slice(-chatChangeSummaryMaxRows).reverse();
       const rows = recent.map((notice) => {{
         const sender = escAttr(String(notice && notice.sender ? notice.sender : "Unknown node"));
@@ -6337,7 +6379,7 @@
         <button type="button" id="chat-change-clear-btn" class="chat-change-clear-btn">Mark seen</button>
       </div>
       <div class="chat-change-list">${{rows}}</div>`;
-      panel.hidden = false;
+      panel.hidden = !chatChangeMenuOpen;
     }}
 
     function findChatFeedItemByMessageKey(messageKey) {{
@@ -6374,6 +6416,40 @@
     }}
 
     function bindChatChangeSummaryControls() {{
+      const btn = document.getElementById("chat-change-toggle-btn");
+      if (btn instanceof HTMLButtonElement && btn.dataset.bound !== "1") {{
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          setChatChangeMenuOpen(!chatChangeMenuOpen);
+          if (chatChangeMenuOpen) {{
+            renderChatChangeSummary();
+            bindChatChangeSummaryControls();
+          }}
+        }});
+      }}
+
+      if (document.body.dataset.chatChangeMenuDocBound !== "1") {{
+        document.body.dataset.chatChangeMenuDocBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          if (!chatChangeMenuOpen) return;
+          const target = ev.target;
+          if (!(target instanceof Element)) {{
+            setChatChangeMenuOpen(false);
+            return;
+          }}
+          if (target.closest("#chat-change-toggle-btn") || target.closest("#chat-change-summary")) {{
+            return;
+          }}
+          setChatChangeMenuOpen(false);
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key !== "Escape" || !chatChangeMenuOpen) return;
+          setChatChangeMenuOpen(false);
+        }});
+      }}
+
       const panel = document.getElementById("chat-change-summary");
       if (!(panel instanceof HTMLElement) || panel.hidden) return;
       const clearBtn = panel.querySelector("#chat-change-clear-btn");
@@ -6389,17 +6465,18 @@
           }}
         }});
       }}
-      for (const btn of panel.querySelectorAll(".chat-change-item")) {{
-        if (!(btn instanceof HTMLButtonElement)) continue;
-        btn.addEventListener("click", (ev) => {{
+      for (const itemBtn of panel.querySelectorAll(".chat-change-item")) {{
+        if (!(itemBtn instanceof HTMLButtonElement)) continue;
+        itemBtn.addEventListener("click", (ev) => {{
           ev.preventDefault();
-          const focusKey = String(btn.dataset.changeFocusKey || "").trim();
+          const focusKey = String(itemBtn.dataset.changeFocusKey || "").trim();
           if (!focusKey) return;
           const target = findChatFeedItemByMessageKey(focusKey);
           if (!(target instanceof HTMLElement)) {{
             setChatSendStatus("Change is older than the visible chat window.", true);
             return;
           }}
+          setChatChangeMenuOpen(false);
           target.scrollIntoView({{ behavior: "smooth", block: "center" }});
           focusChatFeedItem(target);
         }});
@@ -14165,6 +14242,7 @@
     bindConsoleControls();
     bindChatComposer();
     bindChatPeerControls();
+    bindChatChangeSummaryControls();
     bindThemeToggle();
     bindSummaryTickerExpandControl();
     bindWeeklySummaryMetricControl();
