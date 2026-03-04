@@ -737,6 +737,35 @@
     let signalChartZoomStart = 0;
     let signalChartZoomEnd = 1;
     let signalChartPointerDrag = null;
+    const historyTrendChartLayout = {{
+      width: 900,
+      height: 220,
+      padLeft: 46,
+      padRight: 10,
+      padTop: 12,
+      padBottom: 24,
+    }};
+    const historyTrendZoomMinPoints = 10;
+    const historyTrendCharts = {{
+      online: {{
+        key: "online",
+        svgId: "online-activity-chart",
+        timelineId: "online-activity-timeline",
+        points: [],
+        zoomStart: 0,
+        zoomEnd: 1,
+        pointerDrag: null,
+      }},
+      weekly: {{
+        key: "weekly",
+        svgId: "weekly-summary-chart",
+        timelineId: "weekly-summary-timeline",
+        points: [],
+        zoomStart: 0,
+        zoomEnd: 1,
+        pointerDrag: null,
+      }},
+    }};
 
     function ensureMapOfflineGridPane() {{
       let pane = map.getPane(mapOfflineGridPaneName);
@@ -11547,26 +11576,222 @@
       }});
     }}
 
-    function setSignalTimelineMessage(message) {{
-      const timeline = document.getElementById("signal-timeline");
-      if (!(timeline instanceof HTMLElement)) return;
-      timeline.innerHTML = "";
-      const text = String(message || "").trim();
-      if (!text) return;
-      const note = document.createElement("div");
-      note.className = "signal-timeline-empty";
-      note.textContent = text;
-      timeline.appendChild(note);
+    function historyTrendZoomMinSpan(totalPoints) {{
+      const total = Math.max(0, Math.floor(Number(totalPoints) || 0));
+      if (total <= 2) return 1;
+      const minPoints = Math.max(2, Math.min(total, historyTrendZoomMinPoints));
+      return Math.max(1 / Math.max(1, total - 1), (minPoints - 1) / Math.max(1, total - 1));
     }}
 
-    function signalPointUnix(point) {{
-      const direct = Number(point && point.bucket_unix);
+    function normalizeHistoryTrendZoomWindow(chartState, totalPoints) {{
+      if (!chartState || typeof chartState !== "object") return;
+      const minSpan = historyTrendZoomMinSpan(totalPoints);
+      let start = clampUnit(chartState.zoomStart);
+      let end = clampUnit(chartState.zoomEnd);
+      if (end <= start) {{
+        end = Math.min(1, start + minSpan);
+      }}
+      let span = end - start;
+      if (span < minSpan) {{
+        const center = start + (span / 2);
+        span = minSpan;
+        start = center - (span / 2);
+        end = center + (span / 2);
+      }}
+      if (start < 0) {{
+        end = Math.min(1, end - start);
+        start = 0;
+      }}
+      if (end > 1) {{
+        start = Math.max(0, start - (end - 1));
+        end = 1;
+      }}
+      span = end - start;
+      if (span < minSpan) {{
+        start = Math.max(0, end - minSpan);
+        end = Math.min(1, start + minSpan);
+      }}
+      chartState.zoomStart = clampUnit(start);
+      chartState.zoomEnd = clampUnit(end);
+    }}
+
+    function setHistoryTrendZoomWindow(chartState, start, end, totalPoints) {{
+      if (!chartState || typeof chartState !== "object") return false;
+      const prevStart = chartState.zoomStart;
+      const prevEnd = chartState.zoomEnd;
+      chartState.zoomStart = start;
+      chartState.zoomEnd = end;
+      normalizeHistoryTrendZoomWindow(chartState, totalPoints);
+      return Math.abs(chartState.zoomStart - prevStart) > 1e-6
+        || Math.abs(chartState.zoomEnd - prevEnd) > 1e-6;
+    }}
+
+    function resetHistoryTrendZoom(chartState) {{
+      if (!chartState || typeof chartState !== "object") return;
+      chartState.zoomStart = 0;
+      chartState.zoomEnd = 1;
+      chartState.pointerDrag = null;
+    }}
+
+    function getHistoryTrendAxisBounds(svg) {{
+      const rect = svg.getBoundingClientRect();
+      const axisStartPx = rect.left + ((historyTrendChartLayout.padLeft / historyTrendChartLayout.width) * rect.width);
+      const axisEndPx = rect.left + (((historyTrendChartLayout.width - historyTrendChartLayout.padRight) / historyTrendChartLayout.width) * rect.width);
+      const axisWidthPx = Math.max(1, axisEndPx - axisStartPx);
+      return {{ axisStartPx, axisEndPx, axisWidthPx }};
+    }}
+
+    function getVisibleHistoryTrendRows(chartState, rows) {{
+      const allRows = Array.isArray(rows) ? rows : [];
+      const total = allRows.length;
+      if (total <= 1) {{
+        return {{
+          rows: allRows,
+          startIndex: 0,
+          endIndex: Math.max(0, total - 1),
+          zoomed: false,
+        }};
+      }}
+      normalizeHistoryTrendZoomWindow(chartState, total);
+      const span = total - 1;
+      let startIndex = Math.max(0, Math.min(span, Math.floor(chartState.zoomStart * span)));
+      let endIndex = Math.max(startIndex + 1, Math.min(span, Math.ceil(chartState.zoomEnd * span)));
+      const minPoints = Math.max(2, Math.min(total, historyTrendZoomMinPoints));
+      if ((endIndex - startIndex + 1) < minPoints) {{
+        endIndex = Math.min(span, startIndex + minPoints - 1);
+        if ((endIndex - startIndex + 1) < minPoints) {{
+          startIndex = Math.max(0, endIndex - minPoints + 1);
+        }}
+      }}
+      return {{
+        rows: allRows.slice(startIndex, endIndex + 1),
+        startIndex,
+        endIndex,
+        zoomed: startIndex > 0 || endIndex < span,
+      }};
+    }}
+
+    function bindHistoryTrendChartZoom(chartState, rerenderFn, chartLabel = "Trend chart") {{
+      if (!chartState || typeof chartState !== "object") return;
+      const svg = document.getElementById(chartState.svgId);
+      if (!(svg instanceof SVGElement) || svg.dataset.zoomBound === "1") return;
+      svg.dataset.zoomBound = "1";
+      svg.setAttribute("tabindex", "0");
+
+      svg.addEventListener("wheel", (ev) => {{
+        const total = Array.isArray(chartState.points) ? chartState.points.length : 0;
+        if (total < 3) return;
+        const {{ axisStartPx, axisEndPx, axisWidthPx }} = getHistoryTrendAxisBounds(svg);
+        if (ev.clientX < axisStartPx || ev.clientX > axisEndPx) return;
+        ev.preventDefault();
+        const anchorRatio = clampUnit((ev.clientX - axisStartPx) / axisWidthPx);
+        const currentSpan = Math.max(1e-6, chartState.zoomEnd - chartState.zoomStart);
+        const zoomFactor = ev.deltaY < 0 ? 0.84 : 1.19;
+        const minSpan = historyTrendZoomMinSpan(total);
+        const nextSpan = Math.max(minSpan, Math.min(1, currentSpan * zoomFactor));
+        const anchor = chartState.zoomStart + (anchorRatio * currentSpan);
+        const nextStart = anchor - (anchorRatio * nextSpan);
+        const nextEnd = nextStart + nextSpan;
+        if (setHistoryTrendZoomWindow(chartState, nextStart, nextEnd, total)) {{
+          rerenderFn();
+        }}
+      }}, {{ passive: false }});
+
+      svg.addEventListener("dblclick", (ev) => {{
+        ev.preventDefault();
+        if (setHistoryTrendZoomWindow(chartState, 0, 1, (chartState.points || []).length || 2)) {{
+          rerenderFn();
+        }}
+      }});
+
+      svg.addEventListener("pointerdown", (ev) => {{
+        if (ev.button !== 0 || (chartState.points || []).length < 3) return;
+        const {{ axisStartPx, axisEndPx }} = getHistoryTrendAxisBounds(svg);
+        if (ev.clientX < axisStartPx || ev.clientX > axisEndPx) return;
+        chartState.pointerDrag = {{
+          pointerId: ev.pointerId,
+          startClientX: ev.clientX,
+          startZoomStart: chartState.zoomStart,
+          startZoomEnd: chartState.zoomEnd,
+        }};
+        svg.classList.add("chart-dragging");
+        try {{
+          svg.setPointerCapture(ev.pointerId);
+        }} catch (_err) {{
+        }}
+        ev.preventDefault();
+      }});
+
+      svg.addEventListener("pointermove", (ev) => {{
+        if (!chartState.pointerDrag || chartState.pointerDrag.pointerId !== ev.pointerId) return;
+        const total = (chartState.points || []).length;
+        if (total < 3) return;
+        const {{ axisWidthPx }} = getHistoryTrendAxisBounds(svg);
+        const deltaRatio = (ev.clientX - chartState.pointerDrag.startClientX) / axisWidthPx;
+        const dragSpan = chartState.pointerDrag.startZoomEnd - chartState.pointerDrag.startZoomStart;
+        const nextStart = chartState.pointerDrag.startZoomStart - (deltaRatio * dragSpan);
+        const nextEnd = chartState.pointerDrag.startZoomEnd - (deltaRatio * dragSpan);
+        if (setHistoryTrendZoomWindow(chartState, nextStart, nextEnd, total)) {{
+          rerenderFn();
+        }}
+      }});
+
+      const clearDrag = (ev) => {{
+        if (!chartState.pointerDrag) return;
+        if (ev && chartState.pointerDrag.pointerId !== ev.pointerId) return;
+        chartState.pointerDrag = null;
+        svg.classList.remove("chart-dragging");
+        if (ev) {{
+          try {{
+            svg.releasePointerCapture(ev.pointerId);
+          }} catch (_err) {{
+          }}
+        }}
+      }};
+      svg.addEventListener("pointerup", clearDrag);
+      svg.addEventListener("pointercancel", clearDrag);
+      svg.addEventListener("lostpointercapture", clearDrag);
+      svg.addEventListener("keydown", (ev) => {{
+        if (ev.key !== "Escape") return;
+        if (setHistoryTrendZoomWindow(chartState, 0, 1, (chartState.points || []).length || 2)) {{
+          rerenderFn();
+        }}
+      }});
+
+      svg.setAttribute(
+        "title",
+        `${{chartLabel}}. Wheel to zoom, drag to pan, double-click or Esc to reset.`
+      );
+    }}
+
+    function setHistoryTrendChartTitle(svg, chartLabel, zoomed) {{
+      if (!(svg instanceof SVGElement)) return;
+      svg.classList.toggle("zoomed", !!zoomed);
+      svg.setAttribute(
+        "title",
+        zoomed
+          ? `${{chartLabel}} zoomed. Wheel to zoom, drag to pan, double-click or Esc to reset.`
+          : `${{chartLabel}}. Wheel to zoom, drag to pan, double-click or Esc to reset.`
+      );
+    }}
+
+    function timelinePointUnix(
+      point,
+      bucketUnixKey = "bucket_unix",
+      bucketTextKeys = ["bucket_time", "bucket_local"]
+    ) {{
+      const direct = Number(point && point[bucketUnixKey]);
       if (Number.isFinite(direct) && direct > 0) {{
         return Math.trunc(direct);
       }}
-      const stamp = String(
-        (point && (point.bucket_time || point.bucket_local)) || ""
-      ).trim();
+      let stamp = "";
+      for (const key of bucketTextKeys) {{
+        const value = String((point && point[key]) || "").trim();
+        if (value) {{
+          stamp = value;
+          break;
+        }}
+      }}
       if (!stamp) return null;
       const normalized = stamp.includes("T")
         ? stamp
@@ -11578,7 +11803,7 @@
       return null;
     }}
 
-    function formatSignalTimelineLabel(unixTs, includeDate) {{
+    function formatTimelineLabel(unixTs, includeDate) {{
       if (!Number.isFinite(unixTs)) return "";
       const dt = new Date(unixTs * 1000);
       if (Number.isNaN(dt.getTime())) return "";
@@ -11591,20 +11816,35 @@
       return `${{mon}}/${{day}} ${{timeLabel}}`;
     }}
 
-    function renderSignalTimeline(rows, padLeft, padRight, width) {{
-      const timeline = document.getElementById("signal-timeline");
+    function setTimelineMessage(timelineId, message) {{
+      const timeline = document.getElementById(String(timelineId || "").trim());
+      if (!(timeline instanceof HTMLElement)) return;
+      timeline.innerHTML = "";
+      const text = String(message || "").trim();
+      if (!text) return;
+      const note = document.createElement("div");
+      note.className = "signal-timeline-empty";
+      note.textContent = text;
+      timeline.appendChild(note);
+    }}
+
+    function renderTimeline(timelineId, rows, padLeft, padRight, width, resolveUnix) {{
+      const timeline = document.getElementById(String(timelineId || "").trim());
       if (!(timeline instanceof HTMLElement)) return;
 
       const total = Array.isArray(rows) ? rows.length : 0;
       if (!total) {{
-        setSignalTimelineMessage("Timeline available when history points are present.");
+        setTimelineMessage(timelineId, "Timeline available when history points are present.");
         return;
       }}
 
-      const timestamps = rows.map((row) => signalPointUnix(row));
+      const pointUnixResolver = typeof resolveUnix === "function"
+        ? resolveUnix
+        : ((row) => timelinePointUnix(row));
+      const timestamps = rows.map((row) => pointUnixResolver(row));
       const valid = timestamps.filter((ts) => Number.isFinite(ts));
       if (!valid.length) {{
-        setSignalTimelineMessage("Timeline unavailable (missing timestamps).");
+        setTimelineMessage(timelineId, "Timeline unavailable (missing timestamps).");
         return;
       }}
 
@@ -11651,13 +11891,25 @@
         const label = document.createElement("div");
         label.className = "signal-timeline-label";
         const includeDate = spanCrossesDay && (i === 0 || i === indices.length - 1);
-        label.textContent = formatSignalTimelineLabel(pointUnix, includeDate);
+        label.textContent = formatTimelineLabel(pointUnix, includeDate);
         if (Number.isFinite(pointUnix)) {{
           label.title = new Date(pointUnix * 1000).toLocaleString();
         }}
         mark.appendChild(label);
         timeline.appendChild(mark);
       }}
+    }}
+
+    function setSignalTimelineMessage(message) {{
+      setTimelineMessage("signal-timeline", message);
+    }}
+
+    function signalPointUnix(point) {{
+      return timelinePointUnix(point, "bucket_unix", ["bucket_time", "bucket_local"]);
+    }}
+
+    function renderSignalTimeline(rows, padLeft, padRight, width) {{
+      renderTimeline("signal-timeline", rows, padLeft, padRight, width, (row) => signalPointUnix(row));
     }}
 
     function renderSignalChart(points) {{
@@ -11775,8 +12027,30 @@
       renderSignalTimeline(plotRows, padLeft, padRight, width);
     }}
 
+    function rerenderOnlineActivityChartFromCache() {{
+      const chartState = historyTrendCharts.online;
+      const points = chartState && Array.isArray(chartState.points) ? chartState.points : [];
+      renderOnlineActivityChart(points);
+    }}
+
+    function rerenderWeeklySummaryChartFromCache() {{
+      const chartState = historyTrendCharts.weekly;
+      const rows = chartState && Array.isArray(chartState.points) ? chartState.points : [];
+      const metricKey = normalizeWeeklySummaryMetric(weeklySummaryMetric);
+      const metricMeta = weeklySummaryMetricCatalog.get(metricKey) || {{
+        label: "Metric",
+        decimals: 0,
+      }};
+      const emptyMessage = metricKey === "live_packet_count"
+        ? "Need at least two saved samples to estimate packets/min."
+        : "No weekly summary history yet.";
+      renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage);
+    }}
+
     function renderOnlineActivityLoading() {{
       setMapDataMode("activity");
+      historyTrendCharts.online.points = [];
+      historyTrendCharts.online.pointerDrag = null;
       const caption = document.getElementById("online-activity-caption");
       if (caption) {{
         caption.textContent = "Loading online-node activity history...";
@@ -11786,18 +12060,22 @@
         overview.innerHTML = "";
       }}
       const svg = document.getElementById("online-activity-chart");
-      if (svg) {{
+      if (svg instanceof SVGElement) {{
         svg.innerHTML = "";
+        svg.classList.remove("zoomed", "chart-dragging");
       }}
       const empty = document.getElementById("online-activity-empty");
       if (empty) {{
         empty.hidden = false;
         empty.textContent = "Loading historical online activity...";
       }}
+      setTimelineMessage("online-activity-timeline", "Loading timeline...");
     }}
 
     function renderOnlineActivityError(message) {{
       setMapDataMode("activity");
+      historyTrendCharts.online.points = [];
+      resetHistoryTrendZoom(historyTrendCharts.online);
       const caption = document.getElementById("online-activity-caption");
       if (caption) {{
         caption.textContent = `Online activity error: ${{message || "unknown error"}}`;
@@ -11807,14 +12085,16 @@
         overview.innerHTML = "";
       }}
       const svg = document.getElementById("online-activity-chart");
-      if (svg) {{
+      if (svg instanceof SVGElement) {{
         svg.innerHTML = "";
+        svg.classList.remove("zoomed", "chart-dragging");
       }}
       const empty = document.getElementById("online-activity-empty");
       if (empty) {{
         empty.hidden = false;
         empty.textContent = "Unable to load online-activity history.";
       }}
+      setTimelineMessage("online-activity-timeline", "Timeline unavailable due to online-activity error.");
     }}
 
     function renderOnlineActivityChart(points) {{
@@ -11822,22 +12102,42 @@
       const empty = document.getElementById("online-activity-empty");
       if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
 
+      const chartState = historyTrendCharts.online;
+      bindHistoryTrendChartZoom(
+        chartState,
+        () => rerenderOnlineActivityChartFromCache(),
+        "Online activity chart"
+      );
+
       const rows = Array.isArray(points) ? points : [];
-      const values = rows.map((p) => Number(p.online_nodes)).filter((v) => Number.isFinite(v));
+      chartState.points = rows;
+      const visible = getVisibleHistoryTrendRows(chartState, rows);
+      const plotRows = visible.rows;
+      setHistoryTrendChartTitle(svg, "Online activity chart", visible.zoomed);
+
+      const values = plotRows.map((p) => Number(p.online_nodes)).filter((v) => Number.isFinite(v));
       if (values.length === 0) {{
         svg.innerHTML = "";
         empty.hidden = false;
         empty.textContent = "No historical online-activity points yet.";
+        renderTimeline(
+          chartState.timelineId,
+          plotRows,
+          historyTrendChartLayout.padLeft,
+          historyTrendChartLayout.padRight,
+          historyTrendChartLayout.width,
+          (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
+        );
         return;
       }}
       empty.hidden = true;
 
-      const width = 900;
-      const height = 220;
-      const padLeft = 46;
-      const padRight = 10;
-      const padTop = 12;
-      const padBottom = 24;
+      const width = historyTrendChartLayout.width;
+      const height = historyTrendChartLayout.height;
+      const padLeft = historyTrendChartLayout.padLeft;
+      const padRight = historyTrendChartLayout.padRight;
+      const padTop = historyTrendChartLayout.padTop;
+      const padBottom = historyTrendChartLayout.padBottom;
       const plotW = width - padLeft - padRight;
       const plotH = height - padTop - padBottom;
 
@@ -11854,10 +12154,10 @@
         padTop + ((maxValue - value) / (maxValue - minValue)) * plotH
       );
 
-      const n = rows.length;
+      const n = plotRows.length;
       const pointsXY = [];
       for (let i = 0; i < n; i += 1) {{
-        const raw = Number(rows[i].online_nodes);
+        const raw = Number(plotRows[i].online_nodes);
         if (!Number.isFinite(raw)) continue;
         pointsXY.push({{
           x: xAt(i, n),
@@ -11868,6 +12168,14 @@
         svg.innerHTML = "";
         empty.hidden = false;
         empty.textContent = "No historical online-activity points yet.";
+        renderTimeline(
+          chartState.timelineId,
+          plotRows,
+          padLeft,
+          padRight,
+          width,
+          (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
+        );
         return;
       }}
 
@@ -11888,8 +12196,6 @@
             label: "#1f6f53",
           }};
 
-      const startLabel = rows[0] && (rows[0].bucket_local || rows[0].bucket_time || "");
-      const endLabel = rows[rows.length - 1] && (rows[rows.length - 1].bucket_local || rows[rows.length - 1].bucket_time || "");
       const midY = padTop + (plotH / 2);
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
@@ -11901,9 +12207,15 @@
         <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
         <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(maxVal, 0)}}</text>
         <text x="${{padLeft - 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(minVal, 0)}}</text>
-        <text x="${{padLeft}}" y="${{height - 6}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">${{escAttr(startLabel || "")}}</text>
-        <text x="${{width - padRight}}" y="${{height - 6}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{escAttr(endLabel || "")}}</text>
       `;
+      renderTimeline(
+        chartState.timelineId,
+        plotRows,
+        padLeft,
+        padRight,
+        width,
+        (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
+      );
     }}
 
     function renderOnlineActivityOverview(activity) {{
@@ -11957,6 +12269,8 @@
     }}
 
     function renderWeeklySummaryLoading() {{
+      historyTrendCharts.weekly.points = [];
+      historyTrendCharts.weekly.pointerDrag = null;
       const caption = document.getElementById("weekly-summary-caption");
       if (caption) {{
         caption.textContent = "Loading weekly summary metrics...";
@@ -11966,17 +12280,21 @@
         overview.innerHTML = "";
       }}
       const svg = document.getElementById("weekly-summary-chart");
-      if (svg) {{
+      if (svg instanceof SVGElement) {{
         svg.innerHTML = "";
+        svg.classList.remove("zoomed", "chart-dragging");
       }}
       const empty = document.getElementById("weekly-summary-empty");
       if (empty) {{
         empty.hidden = false;
         empty.textContent = "Loading weekly summary metrics...";
       }}
+      setTimelineMessage("weekly-summary-timeline", "Loading timeline...");
     }}
 
     function renderWeeklySummaryError(message) {{
+      historyTrendCharts.weekly.points = [];
+      resetHistoryTrendZoom(historyTrendCharts.weekly);
       const caption = document.getElementById("weekly-summary-caption");
       if (caption) {{
         caption.textContent = `Weekly summary error: ${{message || "unknown error"}}`;
@@ -11986,114 +12304,95 @@
         overview.innerHTML = "";
       }}
       const svg = document.getElementById("weekly-summary-chart");
-      if (svg) {{
+      if (svg instanceof SVGElement) {{
         svg.innerHTML = "";
+        svg.classList.remove("zoomed", "chart-dragging");
       }}
       const empty = document.getElementById("weekly-summary-empty");
       if (empty) {{
         empty.hidden = false;
         empty.textContent = "Unable to load weekly summary metrics.";
       }}
+      setTimelineMessage("weekly-summary-timeline", "Timeline unavailable due to weekly summary error.");
     }}
 
-    function renderWeeklySummary(summaryHistory) {{
-      const metricKey = normalizeWeeklySummaryMetric(weeklySummaryMetric);
-      const metricMeta = weeklySummaryMetricCatalog.get(metricKey) || {{
-        label: "Metric",
-        decimals: 0,
-      }};
-      const payload = (summaryHistory && typeof summaryHistory === "object") ? summaryHistory : {{}};
-      const points = Array.isArray(payload.points) ? payload.points : [];
-      const rows = [];
-      const packetRateMetric = metricKey === "live_packet_count";
-      let prevPacketBucketUnix = null;
-      let prevPacketTotal = null;
-      for (const point of points) {{
-        if (!point || typeof point !== "object") continue;
-        const bucketText = String(point.bucket_time || "").trim();
-        if (packetRateMetric) {{
-          const bucketUnix = Number(point.bucket_unix);
-          const packetTotal = Number(point.live_packet_count);
-          if (!Number.isFinite(bucketUnix) || !Number.isFinite(packetTotal) || bucketUnix <= 0) continue;
-          if (Number.isFinite(prevPacketBucketUnix) && Number.isFinite(prevPacketTotal) && bucketUnix > prevPacketBucketUnix) {{
-            const spanMinutes = Math.max(1 / 60, (bucketUnix - prevPacketBucketUnix) / 60);
-            const packetRate = Math.max(0, (packetTotal - prevPacketTotal) / spanMinutes);
-            rows.push({{
-              value: packetRate,
-              totalValue: packetTotal,
-              bucketText,
-            }});
-          }}
-          prevPacketBucketUnix = bucketUnix;
-          prevPacketTotal = packetTotal;
-          continue;
-        }}
-        const value = Number(point[metricKey]);
-        if (!Number.isFinite(value)) continue;
-        rows.push({{
-          value,
-          bucketText,
-        }});
-      }}
-
-      const caption = document.getElementById("weekly-summary-caption");
-      const overview = document.getElementById("weekly-summary-overview");
+    function renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage) {{
       const svg = document.getElementById("weekly-summary-chart");
       const empty = document.getElementById("weekly-summary-empty");
-      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
-      if (!(overview instanceof HTMLElement)) return;
-
-      if (rows.length === 0) {{
-        const emptyMessage = packetRateMetric
-          ? "Need at least two saved samples to estimate packets/min."
-          : "No weekly summary history yet.";
-        svg.innerHTML = "";
-        overview.innerHTML = "";
-        empty.hidden = false;
-        empty.textContent = emptyMessage;
-        if (caption) {{
-          caption.textContent = `Weekly trend for ${{metricMeta.label}}. ${{emptyMessage}}`;
-        }}
-        return;
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) {{
+        return false;
       }}
 
+      const chartState = historyTrendCharts.weekly;
+      bindHistoryTrendChartZoom(
+        chartState,
+        () => rerenderWeeklySummaryChartFromCache(),
+        "Weekly trend chart"
+      );
+
+      const sourceRows = Array.isArray(rows) ? rows : [];
+      chartState.points = sourceRows;
+      const visible = getVisibleHistoryTrendRows(chartState, sourceRows);
+      const plotRows = visible.rows;
+      const chartLabel = `${{metricMeta.label}} trend chart`;
+      setHistoryTrendChartTitle(svg, chartLabel, visible.zoomed);
+
+      const values = plotRows
+        .map((row) => Number(row && row.value))
+        .filter((value) => Number.isFinite(value));
+      const fallbackMessage = String(emptyMessage || "No weekly summary history yet.").trim();
+      if (!values.length) {{
+        svg.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = fallbackMessage;
+        renderTimeline(
+          chartState.timelineId,
+          plotRows,
+          historyTrendChartLayout.padLeft,
+          historyTrendChartLayout.padRight,
+          historyTrendChartLayout.width,
+          (row) => timelinePointUnix(row, "bucketUnix", ["bucketText"])
+        );
+        return false;
+      }}
       empty.hidden = true;
-      const values = rows.map((row) => Number(row.value)).filter((value) => Number.isFinite(value));
+
       let minVal = Math.min(...values);
       let maxVal = Math.max(...values);
       if ((maxVal - minVal) < 1e-6) {{
         maxVal = minVal + 1;
       }}
 
-      const width = 900;
-      const height = 220;
-      const padLeft = 46;
-      const padRight = 10;
-      const padTop = 12;
-      const padBottom = 24;
+      const width = historyTrendChartLayout.width;
+      const height = historyTrendChartLayout.height;
+      const padLeft = historyTrendChartLayout.padLeft;
+      const padRight = historyTrendChartLayout.padRight;
+      const padTop = historyTrendChartLayout.padTop;
+      const padBottom = historyTrendChartLayout.padBottom;
       const plotW = width - padLeft - padRight;
       const plotH = height - padTop - padBottom;
-      const n = rows.length;
+      const n = plotRows.length;
       const pointsXY = [];
       for (let i = 0; i < n; i += 1) {{
-        const value = Number(rows[i].value);
+        const value = Number(plotRows[i].value);
         if (!Number.isFinite(value)) continue;
         const x = padLeft + ((Math.max(0, i) / Math.max(1, n - 1)) * plotW);
         const y = padTop + ((maxVal - value) / (maxVal - minVal)) * plotH;
         pointsXY.push({{ x, y }});
       }}
       if (!pointsXY.length) {{
-        const emptyMessage = packetRateMetric
-          ? "Need at least two saved samples to estimate packets/min."
-          : "No weekly summary history yet.";
         svg.innerHTML = "";
-        overview.innerHTML = "";
         empty.hidden = false;
-        empty.textContent = emptyMessage;
-        if (caption) {{
-          caption.textContent = `Weekly trend for ${{metricMeta.label}}. ${{emptyMessage}}`;
-        }}
-        return;
+        empty.textContent = fallbackMessage;
+        renderTimeline(
+          chartState.timelineId,
+          plotRows,
+          padLeft,
+          padRight,
+          width,
+          (row) => timelinePointUnix(row, "bucketUnix", ["bucketText"])
+        );
+        return false;
       }}
 
       const path = pointsXY.map((pt, idx) => (
@@ -12111,8 +12410,6 @@
             line: "#1f6f53",
             label: "#1f6f53",
           }};
-      const startLabel = rows[0].bucketText || "";
-      const endLabel = rows[rows.length - 1].bucketText || "";
       const midY = padTop + (plotH / 2);
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `
@@ -12123,15 +12420,97 @@
         <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
         <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(maxVal, metricMeta.decimals)}}</text>
         <text x="${{padLeft - 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(minVal, metricMeta.decimals)}}</text>
-        <text x="${{padLeft}}" y="${{height - 6}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">${{escAttr(startLabel)}}</text>
-        <text x="${{width - padRight}}" y="${{height - 6}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{escAttr(endLabel)}}</text>
       `;
+      renderTimeline(
+        chartState.timelineId,
+        plotRows,
+        padLeft,
+        padRight,
+        width,
+        (row) => timelinePointUnix(row, "bucketUnix", ["bucketText"])
+      );
+      return true;
+    }}
+
+    function renderWeeklySummary(summaryHistory) {{
+      const metricKey = normalizeWeeklySummaryMetric(weeklySummaryMetric);
+      const metricMeta = weeklySummaryMetricCatalog.get(metricKey) || {{
+        label: "Metric",
+        decimals: 0,
+      }};
+      const payload = (summaryHistory && typeof summaryHistory === "object") ? summaryHistory : {{}};
+      const points = Array.isArray(payload.points) ? payload.points : [];
+      const rows = [];
+      const packetRateMetric = metricKey === "live_packet_count";
+      let prevPacketBucketUnix = null;
+      let prevPacketTotal = null;
+      for (const point of points) {{
+        if (!point || typeof point !== "object") continue;
+        const bucketUnix = Number(point.bucket_unix);
+        const bucketText = String(point.bucket_time || "").trim();
+        if (packetRateMetric) {{
+          const packetTotal = Number(point.live_packet_count);
+          if (!Number.isFinite(bucketUnix) || !Number.isFinite(packetTotal) || bucketUnix <= 0) continue;
+          if (Number.isFinite(prevPacketBucketUnix) && Number.isFinite(prevPacketTotal) && bucketUnix > prevPacketBucketUnix) {{
+            const spanMinutes = Math.max(1 / 60, (bucketUnix - prevPacketBucketUnix) / 60);
+            const packetRate = Math.max(0, (packetTotal - prevPacketTotal) / spanMinutes);
+            rows.push({{
+              value: packetRate,
+              totalValue: packetTotal,
+              bucketText,
+              bucketUnix,
+            }});
+          }}
+          prevPacketBucketUnix = bucketUnix;
+          prevPacketTotal = packetTotal;
+          continue;
+        }}
+        const value = Number(point[metricKey]);
+        if (!Number.isFinite(value)) continue;
+        rows.push({{
+          value,
+          bucketText,
+          bucketUnix: Number.isFinite(bucketUnix) && bucketUnix > 0 ? bucketUnix : null,
+        }});
+      }}
+
+      const caption = document.getElementById("weekly-summary-caption");
+      const overview = document.getElementById("weekly-summary-overview");
+      const svg = document.getElementById("weekly-summary-chart");
+      const empty = document.getElementById("weekly-summary-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+      if (!(overview instanceof HTMLElement)) return;
+
+      const emptyMessage = packetRateMetric
+        ? "Need at least two saved samples to estimate packets/min."
+        : "No weekly summary history yet.";
+
+      if (rows.length === 0) {{
+        overview.innerHTML = "";
+        renderWeeklySummaryChartRows([], metricMeta, emptyMessage);
+        if (caption) {{
+          caption.textContent = `Weekly trend for ${{metricMeta.label}}. ${{emptyMessage}}`;
+        }}
+        return;
+      }}
+
+      const rendered = renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage);
+      if (!rendered) {{
+        overview.innerHTML = "";
+        if (caption) {{
+          caption.textContent = `Weekly trend for ${{metricMeta.label}}. ${{emptyMessage}}`;
+        }}
+        return;
+      }}
 
       const firstValue = Number(rows[0].value);
       const lastValue = Number(rows[rows.length - 1].value);
       const delta = lastValue - firstValue;
+      const values = rows.map((row) => Number(row.value)).filter((value) => Number.isFinite(value));
       const avg = values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
       const windowHours = Number(payload.window_hours);
+      const startLabel = rows[0].bucketText || "";
+      const endLabel = rows[rows.length - 1].bucketText || "";
       if (caption) {{
         caption.textContent = `Weekly trend for ${{metricMeta.label}}. Window: ${{Number.isFinite(windowHours) ? windowHours : weeklySummaryHours}}h, samples: ${{rows.length}}.`;
       }}
