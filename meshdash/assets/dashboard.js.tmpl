@@ -708,6 +708,8 @@
     const chatChangeNoticesByChannel = {{ all: [], direct: [] }};
     const chatChangeNoticeKeysByChannel = {{ all: new Set(), direct: new Set() }};
     const chatChangeAcknowledgedKeysByChannel = {{ all: new Set(), direct: new Set() }};
+    const favoriteFreshnessByNodeId = new Map();
+    let favoriteFreshnessHydrated = false;
     let chatChangeFocusTimer = null;
     let chatPerfEnabled = false;
     const chatPerfStats = {{
@@ -3569,6 +3571,78 @@
       return Math.max(...candidates);
     }}
 
+    function syncFavoriteOnlineNotices(
+      state = latestState,
+      nodesById = null,
+      capsById = null,
+      latestChatTouchByNode = null,
+      nowUnix = Math.floor(Date.now() / 1000)
+    ) {{
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const nodeMap = nodesById instanceof Map
+        ? nodesById
+        : new Map(
+            (Array.isArray(safeState.nodes) ? safeState.nodes : [])
+              .map((node) => [normalizeNodeId(node && node.id), node])
+          );
+      const capsMap = capsById instanceof Map
+        ? capsById
+        : new Map(
+            Object.entries((safeState.history_caps && typeof safeState.history_caps === "object") ? safeState.history_caps : {{}})
+              .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+              .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+          );
+      const chatTouchMap = latestChatTouchByNode instanceof Map
+        ? latestChatTouchByNode
+        : mapLatestChatTouchInfo(
+            Array.isArray(safeState.traffic && safeState.traffic.recent_chat)
+              ? safeState.traffic.recent_chat
+              : []
+          );
+
+      for (const nodeId of Array.from(favoriteFreshnessByNodeId.keys())) {{
+        if (!favoriteNodeIds.has(nodeId)) {{
+          favoriteFreshnessByNodeId.delete(nodeId);
+        }}
+      }}
+
+      const bootstrap = !favoriteFreshnessHydrated;
+      for (const favoriteId of favoriteNodeIds) {{
+        const nodeId = normalizeNodeId(favoriteId);
+        if (!isSelectableNodeId(nodeId)) continue;
+        const node = nodeMap.get(nodeId);
+        const caps = capsMap.get(nodeId);
+        const chatTouch = chatTouchMap.get(nodeId) || null;
+        const lastSeenUnix = computeNodeFreshnessUnix(node, caps, chatTouch);
+        const status = normalizeFreshnessKey(freshnessStatus(lastSeenUnix, nowUnix));
+        const previousStatus = favoriteFreshnessByNodeId.has(nodeId)
+          ? String(favoriteFreshnessByNodeId.get(nodeId) || "")
+          : "";
+        favoriteFreshnessByNodeId.set(nodeId, status);
+        if (bootstrap || !previousStatus || previousStatus === "online" || status !== "online") {{
+          continue;
+        }}
+        const displayName = preferredNodeName(node) || nodeNameCache.get(nodeId) || nodeId;
+        const whenText = Number.isFinite(lastSeenUnix)
+          ? savedDetailAge(lastSeenUnix, nowUnix)
+          : "just now";
+        const noticeKeyUnix = Number.isFinite(lastSeenUnix) ? Math.trunc(lastSeenUnix) : Math.trunc(nowUnix);
+        trackChatChangeNotice({{
+          key: `favorite-online:${{nodeId}}:${{noticeKeyUnix}}`,
+          focusKey: nodeId,
+          channel: "all",
+          targetView: "saved",
+          sender: displayName,
+          preview: `starred node is online (${{nodeId}}, seen ${{whenText}})`,
+          kind: "status",
+          // Keep these visible even in "Self" notification scope.
+          selfRelevant: true,
+          unix: noticeKeyUnix,
+        }});
+      }}
+      favoriteFreshnessHydrated = true;
+    }}
+
     function tickFreshnessUI(state = latestState) {{
       if (!state || typeof state !== "object") return;
       const nodes = Array.isArray(state.nodes) ? state.nodes : [];
@@ -3585,6 +3659,7 @@
       const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
 
       const nowUnix = Math.floor(Date.now() / 1000);
+      syncFavoriteOnlineNotices(state, nodesById, capsById, latestChatTouchByNode, nowUnix);
 
       // Network explorer table freshness dots.
       const table = document.getElementById("nodes-table");
@@ -6692,9 +6767,15 @@
       const rows = recent.map((notice) => {{
         const sender = escAttr(String(notice && notice.sender ? notice.sender : "Unknown node"));
         const preview = escAttr(String(notice && notice.preview ? notice.preview : "update"));
-        const kind = notice && notice.kind === "reaction" ? "reaction" : "message";
-        const kindLabel = kind === "reaction" ? "Reaction" : "Message";
+        const kindRaw = String(notice && notice.kind ? notice.kind : "").trim().toLowerCase();
+        const kind = kindRaw === "reaction"
+          ? "reaction"
+          : (kindRaw === "status" ? "status" : "message");
+        const kindLabel = kind === "reaction"
+          ? "Reaction"
+          : (kind === "status" ? "Status" : "Message");
         const kindClass = kind === "reaction" ? "reaction" : "message";
+        const resolvedKindClass = kind === "status" ? "status" : kindClass;
         const focusKey = escAttr(String((notice && (notice.focusKey || notice.key)) || ""));
         const targetView = escAttr(normalizeLayoutView(notice && notice.targetView ? notice.targetView : "chat"));
         const when = notice && Number.isFinite(Number(notice.unix))
@@ -6702,7 +6783,7 @@
           : "just now";
         return `<button type="button" class="chat-change-item" data-change-focus-key="${{focusKey}}" data-change-target-view="${{targetView}}" title="Open this update">
           <span class="chat-change-item-main">
-            <span class="chat-change-kind ${{kindClass}}">${{kindLabel}}</span>
+            <span class="chat-change-kind ${{resolvedKindClass}}">${{kindLabel}}</span>
             <span class="chat-change-item-text"><strong>${{sender}}</strong>: ${{preview}}</span>
           </span>
           <span class="chat-change-item-age">${{escAttr(when)}}</span>
@@ -6760,7 +6841,7 @@
       return true;
     }}
 
-    function openChatChangeNoticeTarget(targetViewRaw, focusKeyRaw) {{
+    function openNoticeTarget(targetViewRaw, focusKeyRaw) {{
       const targetView = normalizeLayoutView(targetViewRaw || "chat");
       const focusKey = String(focusKeyRaw || "").trim();
       const switchedView = activeLayoutView !== targetView;
@@ -6772,6 +6853,10 @@
           if (!focusChatNoticeByMessageKey(focusKey)) {{
             setChatSendStatus("Change is older than the visible chat window.", true);
           }}
+          return;
+        }}
+        if ((targetView === "saved" || targetView === "network") && isSelectableNodeId(focusKey)) {{
+          selectNode(focusKey, true, false);
         }}
       }};
       if (switchedView) {{
@@ -6841,7 +6926,7 @@
           setChatChangeMenuOpen(false);
           const targetView = normalizeLayoutView(itemBtn.dataset.changeTargetView || "chat");
           const focusKey = String(itemBtn.dataset.changeFocusKey || "").trim();
-          openChatChangeNoticeTarget(targetView, focusKey);
+          openNoticeTarget(targetView, focusKey);
         }});
       }}
     }}
