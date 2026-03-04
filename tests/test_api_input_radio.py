@@ -1,5 +1,6 @@
 import pytest
 
+from meshdash import api_input_radio as radio_input
 from meshdash.api_input_radio import parse_radio_settings_request
 
 
@@ -118,3 +119,56 @@ def test_parse_radio_settings_request_rejects_non_object_local_module_and_action
 def test_parse_radio_settings_request_rejects_non_object_fixed_position():
     with pytest.raises(ValueError, match="Expected 'fixed_position' to be an object"):
         parse_radio_settings_request(b'{"fixed_position": ["not", "an", "object"]}')
+
+
+def test_radio_input_helper_branches_for_private_cleaners():
+    class _Unsupported:
+        pass
+
+    assert radio_input._coerce_bool(True) is True
+    assert radio_input._coerce_bool(False) is False
+    assert radio_input._coerce_bool("off") is False
+
+    clean_nested = radio_input._clean_update_value(
+        {
+            "ok": 1,
+            1: "skip",
+            "keep_none": None,
+            "drop": _Unsupported(),
+        }
+    )
+    assert clean_nested == {"ok": 1, "keep_none": None}
+    assert radio_input._clean_update_value(_Unsupported()) is None
+
+    clean_obj = radio_input._clean_update_object(
+        {
+            "good": 2,
+            99: "skip",
+            "none_field": None,
+            "drop": _Unsupported(),
+        },
+        field_name="lora",
+    )
+    assert clean_obj == {"good": 2, "none_field": None}
+
+    clean_sections = radio_input._clean_section_map(
+        {
+            "device": {"role": "ROUTER"},
+            7: {"bad": True},
+            "bad_shape": "skip",
+        },
+        field_name="local",
+    )
+    assert clean_sections == {"device": {"role": "ROUTER"}}
+
+    clean_actions = radio_input._clean_actions({"set_time": "yes", 7: True})
+    assert clean_actions == {"set_time": True}
+
+    clean_fixed_position = radio_input._clean_fixed_position(
+        {
+            "lat": 44.98,
+            8: "skip",
+            "longitude": _Unsupported(),
+        }
+    )
+    assert clean_fixed_position == {"lat": 44.98}

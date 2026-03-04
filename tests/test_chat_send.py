@@ -49,6 +49,81 @@ def test_prepare_chat_send_input_reaction_requires_reply_id():
         )
 
 
+def test_prepare_chat_send_input_rejects_non_positive_reply_id():
+    with pytest.raises(ValueError, match="positive packet id"):
+        prepare_chat_send_input(
+            text="hello",
+            destination="^all",
+            channel_index=0,
+            reply_id=0,
+            retry_of=None,
+            emoji=None,
+            chat_max_bytes=220,
+            normalize_single_emoji_fn=lambda value: (None, None),
+            to_int_fn=_to_int,
+        )
+
+
+def test_prepare_chat_send_input_rejects_reaction_with_text():
+    with pytest.raises(ValueError, match="must not include text"):
+        prepare_chat_send_input(
+            text="hello",
+            destination="!abcd1234",
+            channel_index=0,
+            reply_id=123,
+            retry_of=None,
+            emoji="😀",
+            chat_max_bytes=220,
+            normalize_single_emoji_fn=lambda value: ("😀", ord("😀")),
+            to_int_fn=_to_int,
+        )
+
+
+def test_prepare_chat_send_input_rejects_empty_message():
+    with pytest.raises(ValueError, match="cannot be empty"):
+        prepare_chat_send_input(
+            text="   ",
+            destination="^all",
+            channel_index=0,
+            reply_id=None,
+            retry_of=None,
+            emoji=None,
+            chat_max_bytes=220,
+            normalize_single_emoji_fn=lambda value: (None, None),
+            to_int_fn=_to_int,
+        )
+
+
+def test_prepare_chat_send_input_rejects_too_long_message():
+    with pytest.raises(ValueError, match="too long"):
+        prepare_chat_send_input(
+            text="abcd",
+            destination="^all",
+            channel_index=0,
+            reply_id=None,
+            retry_of=None,
+            emoji=None,
+            chat_max_bytes=3,
+            normalize_single_emoji_fn=lambda value: (None, None),
+            to_int_fn=_to_int,
+        )
+
+
+def test_prepare_chat_send_input_rejects_invalid_destination():
+    with pytest.raises(ValueError, match=r"Destination must be '\^all'"):
+        prepare_chat_send_input(
+            text="hello",
+            destination="peer",
+            channel_index=0,
+            reply_id=None,
+            retry_of=None,
+            emoji=None,
+            chat_max_bytes=220,
+            normalize_single_emoji_fn=lambda value: (None, None),
+            to_int_fn=_to_int,
+        )
+
+
 def test_delivery_state_for_send_matches_ack_behavior():
     assert delivery_state_for_send(ack_requested=False, sent_packet_id=None) == "sent"
     assert delivery_state_for_send(ack_requested=True, sent_packet_id=123) == "pending"
