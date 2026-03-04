@@ -5563,15 +5563,33 @@
       return true;
     }}
 
+    function selfRadioProfileShortLabel(nodeId) {{
+      const cleanId = String(nodeId || "").replace(/[^A-Za-z0-9]/g, "");
+      if (cleanId) return cleanId.slice(-4).toLowerCase();
+      return "na";
+    }}
+
     function renderSelfRadioPill(state = latestState) {{
       const pill = document.getElementById("self-radio-pill");
       if (!(pill instanceof HTMLElement)) return;
+      const profile = document.getElementById("self-radio-profile");
+      const profileShort = document.getElementById("self-radio-profile-short");
+      const setProfile = (shortText, titleText) => {{
+        if (profileShort instanceof HTMLElement) {{
+          profileShort.textContent = String(shortText || "na");
+        }}
+        if (profile instanceof HTMLElement) {{
+          profile.title = String(titleText || "Connected local radio: unavailable");
+          profile.setAttribute("aria-label", profile.title);
+        }}
+      }};
 
       const safeState = (state && typeof state === "object") ? state : {{}};
       const selfId = resolveLocalNodeId(safeState);
       if (!isCanonicalNodeId(selfId)) {{
         pill.textContent = "n/a";
         pill.title = "Connected local radio: unavailable";
+        setProfile("na", "Connected local radio: unavailable");
         return;
       }}
 
@@ -5581,9 +5599,17 @@
       if (selfName) {{
         pill.textContent = `${{selfName}} (${{selfId}})`;
         pill.title = `Connected local radio: ${{selfName}} (${{selfId}})`;
+        setProfile(
+          selfRadioProfileShortLabel(selfId),
+          `Connected local radio: ${{selfName}} (${{selfId}})`
+        );
       }} else {{
         pill.textContent = `${{selfId}}`;
         pill.title = `Connected local radio: ${{selfId}}`;
+        setProfile(
+          selfRadioProfileShortLabel(selfId),
+          `Connected local radio: ${{selfId}}`
+        );
       }}
     }}
 
@@ -14714,6 +14740,8 @@
           renderChat(state);
         }} else {{
           syncChatUnreadFromState(state, {{ clearActiveWhenInChat: false }});
+          renderChatChangeSummary();
+          bindChatChangeSummaryControls();
         }}
 
         if (activeLayoutView === "saved") {{

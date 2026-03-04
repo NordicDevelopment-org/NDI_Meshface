@@ -30,12 +30,37 @@
     .topbar-notify-corner {{
       position: absolute;
       top: 8px;
-      right: max(10px, env(safe-area-inset-right));
+      right: max(12px, calc(78px + env(safe-area-inset-right)));
       z-index: 2;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-end;
+      flex-direction: row-reverse;
       gap: 6px;
+    }}
+    .topbar-self-profile {{
+      min-width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(214, 238, 223, 0.55);
+      background: rgba(248, 255, 251, 0.12);
+      color: #f1fff6;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+      line-height: 1;
+      white-space: nowrap;
+      user-select: none;
+    }}
+    .topbar-self-profile-short {{
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.35px;
+      text-transform: none;
+      max-width: 5ch;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }}
     .topbar-chat-change-menu-wrap .chat-change-toggle-btn,
     .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn {{
@@ -107,6 +132,19 @@
       flex-wrap: wrap;
       gap: 6px;
       min-width: 0;
+    }}
+    .topbar .sub .sub-main::after {{
+      content: "";
+      order: 98;
+      flex-basis: 100%;
+      width: 0;
+      height: 0;
+    }}
+    .topbar .sub .sub-main .disk-meter {{
+      order: 99;
+      flex: 0 0 auto;
+      width: auto;
+      margin-left: auto;
     }}
     .topbar .sub .selection-row {{
       display: flex;
@@ -6090,6 +6128,11 @@
       border-color: rgba(125, 164, 191, 0.62);
       color: #d7ecff;
     }}
+    [data-theme="dark"] .topbar-self-profile {{
+      background: rgba(13, 24, 34, 0.82);
+      border-color: rgba(125, 164, 191, 0.62);
+      color: #d7ecff;
+    }}
     [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn:hover,
     [data-theme="dark"] .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn:hover {{
       background: rgba(25, 46, 64, 0.94);
@@ -6361,6 +6404,15 @@
       }}
       .topbar-notify-corner {{
         top: 6px;
+        right: max(10px, calc(74px + env(safe-area-inset-right)));
+      }}
+      .topbar-self-profile {{
+        min-width: 28px;
+        height: 28px;
+        padding: 0 7px;
+      }}
+      .topbar-self-profile-short {{
+        font-size: 10px;
       }}
       .chat-left-panel {{
         max-height: 180px;
