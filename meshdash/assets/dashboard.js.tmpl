@@ -175,6 +175,12 @@
     const favoritesStorageKey = "meshDashboardFavoriteNodeIdsV1";
     const nodeNameCacheStorageKey = "meshDashboardNodeNameCacheV1";
     const nodesTableColWidthsStorageKey = "meshDashboardNodesTableColWidthsV1";
+    const portsTableColWidthsStorageKey = "meshDashboardPortsTableColWidthsV1";
+    const linksTableColWidthsStorageKey = "meshDashboardLinksTableColWidthsV1";
+    const historyChatTableColWidthsStorageKey = "meshDashboardHistoryChatTableColWidthsV1";
+    const packetsTableColWidthsStorageKey = "meshDashboardPacketsTableColWidthsV1";
+    const encriptionPacketsTableColWidthsStorageKey = "meshDashboardEncriptionPacketsTableColWidthsV1";
+    const encriptionTrafficTableColWidthsStorageKey = "meshDashboardEncriptionTrafficTableColWidthsV1";
     const splitStorageKey = "meshDashboardLayoutSplitState";
     const networkNodesSplitStorageKey = "meshDashboardNetworkNodesSplitPct";
     const savedNodeSplitStorageKey = "meshDashboardSavedNodePanePct";
@@ -562,6 +568,7 @@
       "nodes-table": {{ index: 0, dir: "desc" }},
       "links-table": {{ index: 2, dir: "desc" }},
       "ports-table": {{ index: 1, dir: "desc" }},
+      "history-chat-table": {{ index: 0, dir: "desc" }},
       "packets-table": {{ index: 0, dir: "desc" }},
       "encription-packets-table": {{ index: 0, dir: "desc" }},
       "encription-traffic-table": {{ index: 2, dir: "desc" }},
@@ -6339,6 +6346,100 @@
       return [0.13, 0.12, 0.20, 0.14, 0.06, 0.06, 0.07, 0.09, 0.10, 0.03];
     }}
 
+    function defaultTableColPcts(colCount) {{
+      const count = Math.max(1, Math.trunc(Number(colCount) || 0));
+      const pct = 1 / count;
+      return Array.from({{ length: count }}, () => pct);
+    }}
+
+    const resizableTableConfigs = {{
+      "nodes-table": {{
+        colgroupId: "nodes-table-cols",
+        storageKey: nodesTableColWidthsStorageKey,
+        defaultColPcts: defaultNodesTableColPcts(),
+        minWidthPxByIndex: {{
+          0: 92,
+          1: 78,
+          2: 120,
+          3: 80,
+          4: 54,
+          5: 54,
+          6: 64,
+          7: 72,
+          8: 110,
+          9: 34,
+        }},
+      }},
+      "ports-table": {{
+        storageKey: portsTableColWidthsStorageKey,
+        defaultColPcts: [0.65, 0.35],
+        minWidthPxByIndex: {{
+          0: 90,
+          1: 70,
+        }},
+      }},
+      "links-table": {{
+        storageKey: linksTableColWidthsStorageKey,
+        defaultColPcts: [0.15, 0.15, 0.1, 0.1, 0.16, 0.34],
+        minWidthPxByIndex: {{
+          0: 90,
+          1: 90,
+          2: 66,
+          3: 66,
+          4: 88,
+          5: 130,
+        }},
+      }},
+      "history-chat-table": {{
+        storageKey: historyChatTableColWidthsStorageKey,
+        defaultColPcts: [0.22, 0.16, 0.16, 0.46],
+        minWidthPxByIndex: {{
+          0: 120,
+          1: 90,
+          2: 90,
+          3: 180,
+        }},
+      }},
+      "packets-table": {{
+        storageKey: packetsTableColWidthsStorageKey,
+        defaultColPcts: [0.16, 0.14, 0.14, 0.12, 0.08, 0.08, 0.28],
+        minWidthPxByIndex: {{
+          0: 120,
+          1: 90,
+          2: 90,
+          3: 86,
+          4: 62,
+          5: 62,
+          6: 160,
+        }},
+      }},
+      "encription-packets-table": {{
+        storageKey: encriptionPacketsTableColWidthsStorageKey,
+        defaultColPcts: [0.16, 0.12, 0.12, 0.08, 0.08, 0.08, 0.24, 0.12],
+        minWidthPxByIndex: {{
+          0: 120,
+          1: 86,
+          2: 86,
+          3: 62,
+          4: 62,
+          5: 62,
+          6: 150,
+          7: 110,
+        }},
+      }},
+      "encription-traffic-table": {{
+        storageKey: encriptionTrafficTableColWidthsStorageKey,
+        defaultColPcts: [0.18, 0.18, 0.14, 0.14, 0.36],
+        minWidthPxByIndex: {{
+          0: 90,
+          1: 90,
+          2: 80,
+          3: 86,
+          4: 130,
+        }},
+      }},
+    }};
+
     function normalizeColPcts(pcts) {{
       if (!Array.isArray(pcts) || pcts.length === 0) return null;
       const nums = pcts.map((v) => Number(v));
@@ -6348,29 +6449,86 @@
       return nums.map((v) => v / total);
     }}
 
-    function applyNodesTableColPcts(pcts) {{
-      const cols = document.querySelectorAll("#nodes-table-cols col");
-      if (!cols || cols.length === 0) return;
+    function tableHeaderRow(table) {{
+      if (!(table instanceof HTMLTableElement)) return null;
+      return (table.tHead && table.tHead.rows && table.tHead.rows[0])
+        ? table.tHead.rows[0]
+        : null;
+    }}
+
+    function ensureTableColgroup(tableId, config = null) {{
+      const table = document.getElementById(tableId);
+      if (!(table instanceof HTMLTableElement)) return null;
+      const headerRow = tableHeaderRow(table);
+      if (!(headerRow instanceof HTMLTableRowElement)) return null;
+      const colCount = headerRow.cells ? headerRow.cells.length : 0;
+      if (!Number.isFinite(colCount) || colCount <= 0) return null;
+
+      let colgroup = null;
+      const expectedId = String(config && config.colgroupId ? config.colgroupId : "").trim();
+      if (expectedId) {{
+        const candidate = document.getElementById(expectedId);
+        if (
+          candidate instanceof HTMLElement
+          && candidate.tagName === "COLGROUP"
+          && candidate.parentElement === table
+        ) {{
+          colgroup = candidate;
+        }}
+      }}
+      if (!(colgroup instanceof HTMLElement)) {{
+        const firstColgroup = table.querySelector("colgroup");
+        if (firstColgroup instanceof HTMLElement && firstColgroup.tagName === "COLGROUP") {{
+          colgroup = firstColgroup;
+        }}
+      }}
+      if (!(colgroup instanceof HTMLElement)) {{
+        colgroup = document.createElement("colgroup");
+        colgroup.dataset.resizableColgroup = "1";
+        if (expectedId) {{
+          colgroup.id = expectedId;
+        }}
+        if (table.tHead) {{
+          table.insertBefore(colgroup, table.tHead);
+        }} else {{
+          table.insertBefore(colgroup, table.firstChild);
+        }}
+      }}
+
+      while (colgroup.children.length < colCount) {{
+        colgroup.appendChild(document.createElement("col"));
+      }}
+      while (colgroup.children.length > colCount) {{
+        colgroup.removeChild(colgroup.lastElementChild);
+      }}
+
+      const cols = Array.from(colgroup.querySelectorAll("col"));
+      if (cols.length !== colCount) return null;
+      return {{ table, headerRow, cols }};
+    }}
+
+    function applyTableColPcts(tableId, pcts) {{
+      const config = resizableTableConfigs[tableId] || null;
+      const tableInfo = ensureTableColgroup(tableId, config);
+      if (!tableInfo) return;
       const normalized = normalizeColPcts(pcts);
-      if (!normalized || normalized.length !== cols.length) return;
+      if (!normalized || normalized.length !== tableInfo.cols.length) return;
       normalized.forEach((pct, idx) => {{
-        const col = cols[idx];
+        const col = tableInfo.cols[idx];
         if (col instanceof HTMLElement) {{
           col.style.width = `${{(pct * 100).toFixed(3)}}%`;
         }}
       }});
     }}
 
-    function readNodesTableColPctsFromDom() {{
-      const table = document.getElementById("nodes-table");
-      const cols = document.querySelectorAll("#nodes-table-cols col");
-      if (!(table instanceof HTMLTableElement) || !cols || cols.length === 0) return null;
-      const headerRow = table.tHead && table.tHead.rows && table.tHead.rows[0] ? table.tHead.rows[0] : null;
-      if (!headerRow || !headerRow.cells || headerRow.cells.length !== cols.length) return null;
-      const tableWidth = table.getBoundingClientRect().width;
+    function readTableColPctsFromDom(tableId) {{
+      const config = resizableTableConfigs[tableId] || null;
+      const tableInfo = ensureTableColgroup(tableId, config);
+      if (!tableInfo) return null;
+      const tableWidth = tableInfo.table.getBoundingClientRect().width;
       if (!Number.isFinite(tableWidth) || tableWidth <= 2) return null;
 
-      const widths = Array.from(headerRow.cells).map((cell) => {{
+      const widths = Array.from(tableInfo.headerRow.cells).map((cell) => {{
         const rect = cell.getBoundingClientRect();
         return rect && Number.isFinite(rect.width) ? rect.width : null;
       }});
@@ -6379,75 +6537,101 @@
       return normalizeColPcts(pcts);
     }}
 
-    function persistNodesTableColPcts() {{
-      const pcts = readNodesTableColPctsFromDom();
+    function persistTableColPcts(tableId, config, pctsOverride = null) {{
+      const pcts = pctsOverride || readTableColPctsFromDom(tableId);
       if (!pcts) return;
       try {{
-        window.localStorage.setItem(nodesTableColWidthsStorageKey, JSON.stringify(pcts));
+        window.localStorage.setItem(String(config.storageKey || ""), JSON.stringify(pcts));
       }} catch (_err) {{
       }}
     }}
 
     function loadNodesTableColPcts() {{
-      try {{
-        const raw = window.localStorage.getItem(nodesTableColWidthsStorageKey);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return;
-        if (parsed.length !== 10) return;
-        applyNodesTableColPcts(parsed);
-      }} catch (_err) {{
+      for (const [tableId, config] of Object.entries(resizableTableConfigs)) {{
+        const tableInfo = ensureTableColgroup(tableId, config);
+        if (!tableInfo) continue;
+
+        let applied = false;
+        try {{
+          const raw = window.localStorage.getItem(String(config.storageKey || ""));
+          if (raw) {{
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length === tableInfo.cols.length) {{
+              applyTableColPcts(tableId, parsed);
+              applied = true;
+            }}
+          }}
+        }} catch (_err) {{
+        }}
+
+        if (!applied) {{
+          const defaults = normalizeColPcts(config.defaultColPcts);
+          if (defaults && defaults.length === tableInfo.cols.length) {{
+            applyTableColPcts(tableId, defaults);
+          }} else {{
+            applyTableColPcts(tableId, defaultTableColPcts(tableInfo.cols.length));
+          }}
+        }}
       }}
     }}
 
-    function bindNodesTableColResizers() {{
-      const table = document.getElementById("nodes-table");
-      if (!(table instanceof HTMLTableElement) || table.dataset.colResizeBound === "1") return;
+    function bindTableColResizers(tableId, config) {{
+      const tableInfo = ensureTableColgroup(tableId, config);
+      if (!tableInfo) return;
+      const table = tableInfo.table;
+      if (table.dataset.colResizeBound === "1") return;
       table.dataset.colResizeBound = "1";
+      table.classList.add("table-col-resizable");
 
-      const cols = Array.from(document.querySelectorAll("#nodes-table-cols col"));
-      const handles = Array.from(table.querySelectorAll("thead .col-resizer"));
-      if (!cols.length || !handles.length) return;
+      const headerCells = Array.from(tableInfo.headerRow.cells);
+      if (headerCells.length < 2) return;
+      const minWidthPxByIndex = (config && typeof config.minWidthPxByIndex === "object")
+        ? config.minWidthPxByIndex
+        : {{}};
 
-      const minWidthPxByIndex = {{
-        0: 92,  // Last Heard
-        1: 78,  // ID
-        2: 120, // Name
-        3: 80,  // HW
-        4: 54,  // SNR
-        5: 54,  // Hops
-        6: 64,  // Battery
-        7: 72,  // Saved
-        8: 110, // Pos
-        9: 34,  // Star
-      }};
+      const handles = headerCells.map((cell, idx) => {{
+        if (!(cell instanceof HTMLElement)) return null;
+        let handle = cell.querySelector(".col-resizer");
+        if (!(handle instanceof HTMLElement)) {{
+          handle = document.createElement("div");
+          handle.className = "col-resizer";
+          cell.appendChild(handle);
+        }}
+        handle.dataset.col = String(idx);
+        handle.setAttribute("aria-hidden", "true");
+        return handle;
+      }}).filter((handle) => handle instanceof HTMLElement);
+
+      if (handles.length < 2) return;
 
       handles.forEach((handle) => {{
         if (!(handle instanceof HTMLElement)) return;
         handle.addEventListener("mousedown", (ev) => {{
           ev.preventDefault();
           ev.stopPropagation();
+
           const colIndexRaw = Number(handle.dataset.col);
           const colIndex = Number.isFinite(colIndexRaw) ? Math.trunc(colIndexRaw) : -1;
-          if (colIndex < 0 || colIndex >= cols.length) return;
+          const state = ensureTableColgroup(tableId, config);
+          if (!state || colIndex < 0 || colIndex >= state.cols.length) return;
 
-          // Resize this column + its right neighbor (or left neighbor for the last column).
-          const leftIndex = colIndex === cols.length - 1 ? colIndex - 1 : colIndex;
-          const rightIndex = colIndex === cols.length - 1 ? colIndex : colIndex + 1;
-          if (leftIndex < 0 || rightIndex >= cols.length) return;
+          const leftIndex = colIndex === state.cols.length - 1 ? colIndex - 1 : colIndex;
+          const rightIndex = colIndex === state.cols.length - 1 ? colIndex : colIndex + 1;
+          if (leftIndex < 0 || rightIndex >= state.cols.length) return;
 
-          const leftCol = cols[leftIndex];
-          const rightCol = cols[rightIndex];
-          const headerRow = table.tHead && table.tHead.rows && table.tHead.rows[0] ? table.tHead.rows[0] : null;
-          if (!headerRow || !headerRow.cells || headerRow.cells.length <= rightIndex) return;
-          const startLeft = headerRow.cells[leftIndex].getBoundingClientRect().width;
-          const startRight = headerRow.cells[rightIndex].getBoundingClientRect().width;
+          const leftCol = state.cols[leftIndex];
+          const rightCol = state.cols[rightIndex];
+          const activeHeader = tableHeaderRow(state.table);
+          if (!activeHeader || !activeHeader.cells || activeHeader.cells.length <= rightIndex) return;
+
+          const startLeft = activeHeader.cells[leftIndex].getBoundingClientRect().width;
+          const startRight = activeHeader.cells[rightIndex].getBoundingClientRect().width;
           const total = startLeft + startRight;
           if (!Number.isFinite(total) || total <= 10) return;
 
           const startX = ev.clientX;
-          const minLeft = minWidthPxByIndex[leftIndex] || 48;
-          const minRight = minWidthPxByIndex[rightIndex] || 48;
+          const minLeft = Number(minWidthPxByIndex[leftIndex]) || 48;
+          const minRight = Number(minWidthPxByIndex[rightIndex]) || 48;
 
           const onMove = (moveEv) => {{
             moveEv.preventDefault();
@@ -6462,12 +6646,10 @@
           const onUp = () => {{
             document.removeEventListener("mousemove", onMove);
             document.removeEventListener("mouseup", onUp);
-            // Convert to percentages so it survives window resizes nicely.
-            const pcts = readNodesTableColPctsFromDom();
-            if (pcts) {{
-              applyNodesTableColPcts(pcts);
-              persistNodesTableColPcts();
-            }}
+            const pcts = readTableColPctsFromDom(tableId);
+            if (!pcts) return;
+            applyTableColPcts(tableId, pcts);
+            persistTableColPcts(tableId, config, pcts);
           }};
 
           document.addEventListener("mousemove", onMove);
@@ -6475,10 +6657,15 @@
         }});
 
         handle.addEventListener("click", (ev) => {{
-          // Prevent triggering sort on header click.
           ev.stopPropagation();
         }});
       }});
+    }}
+
+    function bindNodesTableColResizers() {{
+      for (const [tableId, config] of Object.entries(resizableTableConfigs)) {{
+        bindTableColResizers(tableId, config);
+      }}
     }}
 
     function persistNetworkNodesSplitState() {{
@@ -13379,8 +13566,6 @@
     }}
 
     function renderHistoryChat(traffic) {{
-      const tbody = document.querySelector("#history-chat-table tbody");
-      if (!(tbody instanceof HTMLElement)) return;
       const messages = Array.isArray(traffic && traffic.recent_chat) ? traffic.recent_chat : [];
       const rows = messages.slice(0, 240).map((entry) => {{
         const capturedAt = String((entry && (entry.captured_at || entry.rx_time)) || "n/a");
@@ -13392,19 +13577,19 @@
         const renderedText = text
           ? text
           : (isReaction ? `Reaction ${{emoji || ""}}`.trim() : (emoji || "n/a"));
-        const renderedTextHtml = chatPlainTextToHtml(renderedText, true);
-        return `<tr>
-          <td data-sort="${{escAttr(capturedAt)}}">${{escAttr(capturedAt)}}</td>
-          <td data-sort="${{escAttr(fromId)}}">${{escAttr(fromId)}}</td>
-          <td data-sort="${{escAttr(toId)}}">${{escAttr(toId)}}</td>
-          <td data-sort="${{escAttr(renderedText)}}">${{renderedTextHtml || "&nbsp;"}}</td>
-        </tr>`;
+        return {{
+          cells: [
+            {{ sort: capturedAt, text: capturedAt }},
+            {{ sort: fromId, text: fromId }},
+            {{ sort: toId, text: toId }},
+            {{ sort: renderedText, html: chatPlainTextToHtml(renderedText, true) || "&nbsp;" }},
+          ],
+        }};
       }});
-      if (!rows.length) {{
-        tbody.innerHTML = '<tr><td colspan="4">No saved chat history yet.</td></tr>';
-      }} else {{
-        tbody.innerHTML = rows.join("");
-      }}
+      renderSortableListboxTable("history-chat-table", rows, {{
+        emptyText: "No saved chat history yet.",
+        emptyColspan: 4,
+      }});
       const caption = document.getElementById("history-chat-caption");
       if (caption) {{
         caption.textContent = rows.length
@@ -14784,6 +14969,60 @@
       }};
     }}
 
+    function renderSortableListboxTable(tableId, rowModels, options = {{}}) {{
+      const rows = Array.isArray(rowModels) ? rowModels : [];
+      const emptyTextRaw = options && options.emptyText != null
+        ? String(options.emptyText)
+        : "No rows.";
+      const emptyText = emptyTextRaw.trim() || "No rows.";
+      const emptyColspan = Math.max(1, Math.trunc(Number(options && options.emptyColspan) || 1));
+      if (!rows.length) {{
+        fillTable(tableId, [`<tr><td colspan="${{emptyColspan}}">${{escAttr(emptyText)}}</td></tr>`]);
+        return;
+      }}
+
+      const renderedRows = rows.map((row) => {{
+        const rowModel = (row && typeof row === "object") ? row : {{}};
+        const cells = Array.isArray(rowModel.cells) ? rowModel.cells : [];
+        const className = String(rowModel.className || "").trim();
+        const dataset = (rowModel.dataset && typeof rowModel.dataset === "object")
+          ? rowModel.dataset
+          : {{}};
+
+        const attrs = [];
+        if (className) {{
+          attrs.push(`class="${{escAttr(className)}}"`);
+        }}
+        for (const [rawKey, rawValue] of Object.entries(dataset)) {{
+          const key = String(rawKey || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
+          if (!key) continue;
+          attrs.push(`data-${{key}}="${{escAttr(String(rawValue == null ? "" : rawValue))}}"`);
+        }}
+
+        const renderedCells = cells.map((cell) => {{
+          const cellModel = (cell && typeof cell === "object") ? cell : {{}};
+          const sortValue = String(cellModel.sort == null ? "" : cellModel.sort);
+          const titleValue = String(cellModel.title == null ? "" : cellModel.title);
+          const cellClass = String(cellModel.className || "").trim();
+          const content = cellModel.html != null
+            ? String(cellModel.html)
+            : escAttr(String(cellModel.text == null ? "" : cellModel.text));
+          const tdAttrs = [`data-sort="${{escAttr(sortValue)}}"`];
+          if (titleValue) {{
+            tdAttrs.push(`title="${{escAttr(titleValue)}}"`);
+          }}
+          if (cellClass) {{
+            tdAttrs.push(`class="${{escAttr(cellClass)}}"`);
+          }}
+          return `<td ${{tdAttrs.join(" ")}}>${{content}}</td>`;
+        }});
+
+        return `<tr ${{attrs.join(" ")}}>${{renderedCells.join("")}}</tr>`;
+      }});
+
+      fillTable(tableId, renderedRows);
+    }}
+
     function renderEncription(traffic) {{
       const allPackets = Array.isArray(traffic && traffic.recent_packets)
         ? traffic.recent_packets
@@ -14807,21 +15046,28 @@
           || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
         );
         const payload = encryptedPacketPayloadPreview(entry);
-        return `<tr data-from-node-id="${{escAttr(fromNodeId)}}" data-to-node-id="${{escAttr(toNodeId)}}" class="${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}">
-          <td data-sort="${{escAttr(s.captured_at || "")}}">${{s.captured_at || "n/a"}}</td>
-          <td data-sort="${{escAttr(s.from || "")}}">${{s.from || "n/a"}}</td>
-          <td data-sort="${{escAttr(s.to || "")}}">${{s.to || "n/a"}}</td>
-          <td data-sort="${{escAttr(s.hops ?? "")}}">${{s.hops ?? "n/a"}}</td>
-          <td data-sort="${{escAttr(s.rx_rssi ?? "")}}">${{s.rx_rssi ?? "n/a"}}</td>
-          <td data-sort="${{escAttr(s.rx_snr ?? "")}}">${{s.rx_snr ?? "n/a"}}</td>
-          <td data-sort="${{escAttr(payload.sort)}}" title="${{escAttr(payload.title)}}">${{escAttr(payload.display)}}</td>
-          <td data-sort="${{escAttr(reason)}}">${{reason}}</td>
-        </tr>`;
+        return {{
+          className: `${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}`,
+          dataset: {{
+            "from-node-id": fromNodeId,
+            "to-node-id": toNodeId,
+          }},
+          cells: [
+            {{ sort: s.captured_at || "", text: s.captured_at || "n/a" }},
+            {{ sort: s.from || "", text: s.from || "n/a" }},
+            {{ sort: s.to || "", text: s.to || "n/a" }},
+            {{ sort: s.hops ?? "", text: s.hops ?? "n/a" }},
+            {{ sort: s.rx_rssi ?? "", text: s.rx_rssi ?? "n/a" }},
+            {{ sort: s.rx_snr ?? "", text: s.rx_snr ?? "n/a" }},
+            {{ sort: payload.sort, text: payload.display, title: payload.title }},
+            {{ sort: reason, text: reason }},
+          ],
+        }};
       }});
-      if (!packetRows.length) {{
-        packetRows.push('<tr><td colspan="8">No encrypted packets detected in recent buffer.</td></tr>');
-      }}
-      fillTable("encription-packets-table", packetRows);
+      renderSortableListboxTable("encription-packets-table", packetRows, {{
+        emptyText: "No encrypted packets detected in recent buffer.",
+        emptyColspan: 8,
+      }});
 
       const routes = new Map();
       for (const entry of encrypted) {{
@@ -14869,18 +15115,25 @@
           );
           const avgHops = item.hopsCount > 0 ? item.hopsTotal / item.hopsCount : null;
           const avgHopsLabel = avgHops == null ? "n/a" : avgHops.toFixed(1);
-          return `<tr data-from-node-id="${{escAttr(fromNodeId)}}" data-to-node-id="${{escAttr(toNodeId)}}" class="${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}">
-            <td data-sort="${{escAttr(item.fromId)}}">${{item.fromId}}</td>
-            <td data-sort="${{escAttr(item.toId)}}">${{item.toId}}</td>
-            <td data-sort="${{escAttr(item.count)}}">${{item.count}}</td>
-            <td data-sort="${{escAttr(avgHops == null ? "" : avgHops.toFixed(4))}}">${{avgHopsLabel}}</td>
-            <td data-sort="${{escAttr(item.lastSeen)}}">${{item.lastSeen || "n/a"}}</td>
-          </tr>`;
+          return {{
+            className: `${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}`,
+            dataset: {{
+              "from-node-id": fromNodeId,
+              "to-node-id": toNodeId,
+            }},
+            cells: [
+              {{ sort: item.fromId, text: item.fromId }},
+              {{ sort: item.toId, text: item.toId }},
+              {{ sort: item.count, text: item.count }},
+              {{ sort: avgHops == null ? "" : avgHops.toFixed(4), text: avgHopsLabel }},
+              {{ sort: item.lastSeen, text: item.lastSeen || "n/a" }},
+            ],
+          }};
         }});
-      if (!trafficRows.length) {{
-        trafficRows.push('<tr><td colspan="5">No encrypted traffic routes yet.</td></tr>');
-      }}
-      fillTable("encription-traffic-table", trafficRows);
+      renderSortableListboxTable("encription-traffic-table", trafficRows, {{
+        emptyText: "No encrypted traffic routes yet.",
+        emptyColspan: 5,
+      }});
 
       const caption = document.getElementById("encription-caption");
       if (caption instanceof HTMLElement) {{
