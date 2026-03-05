@@ -563,9 +563,11 @@
       "links-table": {{ index: 2, dir: "desc" }},
       "ports-table": {{ index: 1, dir: "desc" }},
       "packets-table": {{ index: 0, dir: "desc" }},
+      "encription-packets-table": {{ index: 0, dir: "desc" }},
+      "encription-traffic-table": {{ index: 2, dir: "desc" }},
     }};
     const wheelActivationLeaseMs = 1400;
-    const knownLayoutViews = new Set(["chat", "history", "network", "saved", "packets", "data", "console", "settings"]);
+    const knownLayoutViews = new Set(["chat", "history", "network", "saved", "packets", "encription", "data", "console", "settings"]);
     const knownChatChannels = new Set(["all", "direct"]);
     const meshChannelAllIndex = -1;
     const knownChatNotificationScopes = new Set(["all", "self"]);
@@ -7376,6 +7378,9 @@
         if (next === "packets") {{
           renderPackets(latestState.traffic || {{}});
         }}
+        if (next === "encription") {{
+          renderEncription(latestState.traffic || {{}});
+        }}
         if (next === "console") {{
           renderConsole(latestState.traffic || {{}});
         }}
@@ -7386,6 +7391,8 @@
         renderOnlineActivityLoading();
         renderWeeklySummaryLoading();
         renderHistoryChat({{}});
+      }} else if (next === "encription") {{
+        renderEncription({{}});
       }}
       if (next === "console") {{
         window.requestAnimationFrame(() => {{
@@ -9709,6 +9716,15 @@
         const nodeId = normalizeNodeId(item.dataset.nodeId || "");
         item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
       }}
+      for (const row of document.querySelectorAll("#encription-packets-table tbody tr, #encription-traffic-table tbody tr")) {{
+        const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
+        const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
+        const isSelected = !!selectedNodeId && (
+          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
+          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
+        );
+        row.classList.toggle("selected-node", isSelected);
+      }}
     }}
 
     function isVisibleForSelectionScroll(el) {{
@@ -10089,6 +10105,50 @@
         if (!(row instanceof HTMLElement)) return;
         selectNode(row.dataset.nodeId || "", true);
       }});
+    }}
+
+    function selectNodeFromEncriptionRow(row, targetCell, fromColIndex, toColIndex) {{
+      if (!(row instanceof HTMLTableRowElement)) return "";
+      const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
+      const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
+      const fromSelectable = isSelectableNodeId(fromNodeId);
+      const toSelectable = isSelectableNodeId(toNodeId);
+      if (!(fromSelectable || toSelectable)) return "";
+
+      if (targetCell instanceof HTMLTableCellElement && targetCell.parentElement === row) {{
+        const colIndex = Array.from(row.cells).indexOf(targetCell);
+        if (colIndex === fromColIndex && fromSelectable) return fromNodeId;
+        if (colIndex === toColIndex && toSelectable) return toNodeId;
+      }}
+
+      if (fromSelectable) return fromNodeId;
+      if (toSelectable) return toNodeId;
+      return "";
+    }}
+
+    function bindEncriptionRowClicks() {{
+      const bindTable = (tableId, fromColIndex, toColIndex) => {{
+        const tbody = document.querySelector(`#${{tableId}} tbody`);
+        if (!(tbody instanceof HTMLElement) || tbody.dataset.bound === "1") return;
+        tbody.dataset.bound = "1";
+        tbody.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const row = target.closest("tr");
+          if (!(row instanceof HTMLTableRowElement)) return;
+          const cell = target.closest("td");
+          const nodeId = selectNodeFromEncriptionRow(
+            row,
+            cell instanceof HTMLTableCellElement ? cell : null,
+            fromColIndex,
+            toColIndex
+          );
+          if (!isSelectableNodeId(nodeId)) return;
+          selectNode(nodeId, true, false);
+        }});
+      }};
+      bindTable("encription-packets-table", 1, 2);
+      bindTable("encription-traffic-table", 0, 1);
     }}
 
     function bindChatFeedClicks() {{
@@ -14597,6 +14657,217 @@
       fillTable("packets-table", rows);
     }}
 
+    function isLikelyEncryptedPacketEntry(entry) {{
+      const s = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      const decodedText = s.decoded_text == null ? "" : String(s.decoded_text).trim();
+      if (decodedText) return false;
+      const portnum = s.portnum == null ? "" : String(s.portnum).trim();
+      if (portnum) return false;
+
+      const decoded = packet.decoded;
+      if (decoded && typeof decoded === "object" && !Array.isArray(decoded) && Object.keys(decoded).length > 0) {{
+        return false;
+      }}
+
+      if (Object.prototype.hasOwnProperty.call(packet, "encrypted")) {{
+        return true;
+      }}
+      return true;
+    }}
+
+    function encryptedPacketReason(entry) {{
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      if (Object.prototype.hasOwnProperty.call(packet, "encrypted")) {{
+        return "encrypted payload";
+      }}
+      const payload = packet.payload;
+      if (typeof payload === "string" && payload.trim()) {{
+        return "payload only";
+      }}
+      return "no decoded payload";
+    }}
+
+    function compactEncryptedPayloadText(rawValue, maxChars = 84) {{
+      let text = "";
+      if (rawValue == null) {{
+        text = "";
+      }} else if (typeof rawValue === "string") {{
+        text = rawValue;
+      }} else if (typeof rawValue === "number" || typeof rawValue === "boolean") {{
+        text = String(rawValue);
+      }} else {{
+        try {{
+          text = JSON.stringify(rawValue);
+        }} catch (_err) {{
+          text = String(rawValue);
+        }}
+      }}
+      const compact = String(text || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!compact) return "";
+      if (compact.length <= maxChars) return compact;
+      const keep = Math.max(52, maxChars - 1);
+      const hidden = Math.max(0, compact.length - keep);
+      return `${{compact.slice(0, keep).trimEnd()}}... (+${{hidden}} chars)`;
+    }}
+
+    function encryptedPacketPayloadPreview(entry) {{
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      const decoded = (packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : null;
+      const candidates = [
+        packet.encrypted,
+        packet.payload,
+        packet.payload_text,
+        packet.raw_payload,
+        packet.rawPayload,
+        decoded && decoded.payload,
+      ];
+      let full = "";
+      for (const candidate of candidates) {{
+        const candidateText = compactEncryptedPayloadText(candidate, 2400);
+        if (!candidateText) continue;
+        full = candidateText;
+        break;
+      }}
+      if (!full) {{
+        return {{
+          display: "n/a",
+          sort: "",
+          title: "",
+        }};
+      }}
+      const title = full.length > 480
+        ? `${{full.slice(0, 480)}}... (+${{full.length - 480}} chars)`
+        : full;
+      return {{
+        display: compactEncryptedPayloadText(full, 84),
+        sort: full,
+        title,
+      }};
+    }}
+
+    function renderEncription(traffic) {{
+      const allPackets = Array.isArray(traffic && traffic.recent_packets)
+        ? traffic.recent_packets
+        : [];
+      const encrypted = allPackets
+        .slice()
+        .reverse()
+        .filter((entry) => isLikelyEncryptedPacketEntry(entry))
+        .slice(0, 200);
+
+      const packetRows = encrypted.map((entry) => {{
+        const s = (entry && entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const reason = encryptedPacketReason(entry);
+        const fromNodeId = normalizeNodeId(s.from || "");
+        const toNodeId = normalizeNodeId(s.to || "");
+        const rowSelectable = isSelectableNodeId(fromNodeId) || isSelectableNodeId(toNodeId);
+        const rowSelected = !!selectedNodeId && (
+          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
+          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
+        );
+        const payload = encryptedPacketPayloadPreview(entry);
+        return `<tr data-from-node-id="${{escAttr(fromNodeId)}}" data-to-node-id="${{escAttr(toNodeId)}}" class="${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}">
+          <td data-sort="${{escAttr(s.captured_at || "")}}">${{s.captured_at || "n/a"}}</td>
+          <td data-sort="${{escAttr(s.from || "")}}">${{s.from || "n/a"}}</td>
+          <td data-sort="${{escAttr(s.to || "")}}">${{s.to || "n/a"}}</td>
+          <td data-sort="${{escAttr(s.hops ?? "")}}">${{s.hops ?? "n/a"}}</td>
+          <td data-sort="${{escAttr(s.rx_rssi ?? "")}}">${{s.rx_rssi ?? "n/a"}}</td>
+          <td data-sort="${{escAttr(s.rx_snr ?? "")}}">${{s.rx_snr ?? "n/a"}}</td>
+          <td data-sort="${{escAttr(payload.sort)}}" title="${{escAttr(payload.title)}}">${{escAttr(payload.display)}}</td>
+          <td data-sort="${{escAttr(reason)}}">${{reason}}</td>
+        </tr>`;
+      }});
+      if (!packetRows.length) {{
+        packetRows.push('<tr><td colspan="8">No encrypted packets detected in recent buffer.</td></tr>');
+      }}
+      fillTable("encription-packets-table", packetRows);
+
+      const routes = new Map();
+      for (const entry of encrypted) {{
+        const s = (entry && entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const fromId = String(s.from || "n/a");
+        const toId = String(s.to || "n/a");
+        const key = `${{fromId}}->${{toId}}`;
+        const existing = routes.get(key) || {{
+          fromId,
+          toId,
+          count: 0,
+          lastSeen: "",
+          hopsTotal: 0,
+          hopsCount: 0,
+        }};
+        existing.count += 1;
+        const capturedAt = String(s.captured_at || "");
+        if (capturedAt && (!existing.lastSeen || capturedAt > existing.lastSeen)) {{
+          existing.lastSeen = capturedAt;
+        }}
+        const hops = Number(s.hops);
+        if (Number.isFinite(hops)) {{
+          existing.hopsTotal += hops;
+          existing.hopsCount += 1;
+        }}
+        routes.set(key, existing);
+      }}
+
+      const trafficRows = Array.from(routes.values())
+        .sort((a, b) => (
+          (b.count - a.count)
+          || String(b.lastSeen || "").localeCompare(String(a.lastSeen || ""))
+          || String(a.fromId || "").localeCompare(String(b.fromId || ""))
+          || String(a.toId || "").localeCompare(String(b.toId || ""))
+        ))
+        .map((item) => {{
+          const fromNodeId = normalizeNodeId(item.fromId || "");
+          const toNodeId = normalizeNodeId(item.toId || "");
+          const rowSelectable = isSelectableNodeId(fromNodeId) || isSelectableNodeId(toNodeId);
+          const rowSelected = !!selectedNodeId && (
+            (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
+            || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
+          );
+          const avgHops = item.hopsCount > 0 ? item.hopsTotal / item.hopsCount : null;
+          const avgHopsLabel = avgHops == null ? "n/a" : avgHops.toFixed(1);
+          return `<tr data-from-node-id="${{escAttr(fromNodeId)}}" data-to-node-id="${{escAttr(toNodeId)}}" class="${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}">
+            <td data-sort="${{escAttr(item.fromId)}}">${{item.fromId}}</td>
+            <td data-sort="${{escAttr(item.toId)}}">${{item.toId}}</td>
+            <td data-sort="${{escAttr(item.count)}}">${{item.count}}</td>
+            <td data-sort="${{escAttr(avgHops == null ? "" : avgHops.toFixed(4))}}">${{avgHopsLabel}}</td>
+            <td data-sort="${{escAttr(item.lastSeen)}}">${{item.lastSeen || "n/a"}}</td>
+          </tr>`;
+        }});
+      if (!trafficRows.length) {{
+        trafficRows.push('<tr><td colspan="5">No encrypted traffic routes yet.</td></tr>');
+      }}
+      fillTable("encription-traffic-table", trafficRows);
+
+      const caption = document.getElementById("encription-caption");
+      if (caption instanceof HTMLElement) {{
+        const packetCount = encrypted.length;
+        const routeCount = routes.size;
+        caption.textContent = packetCount > 0
+          ? `${{packetCount}} encrypted packet${{packetCount === 1 ? "" : "s"}} across ${{routeCount}} route${{routeCount === 1 ? "" : "s"}} in recent buffer.`
+          : "No encrypted packets detected in recent buffer.";
+      }}
+    }}
+
     function setRaw(id, value) {{
       const el = document.getElementById(id);
       if (!el) return;
@@ -14736,6 +15007,9 @@
             renderHistoryChat(traffic304);
             void refreshHistoryPanels(false);
           }}
+          if (activeLayoutView === "encription") {{
+            renderEncription(traffic304);
+          }}
           if (activeLayoutView === "saved") {{
             const loadingId304 = (activeLayoutView === "saved" && historyRelevant304 && !cachedHistory304)
               ? selectedNodeId
@@ -14868,6 +15142,10 @@
           renderPackets(state.traffic || {{}});
         }}
 
+        if (activeLayoutView === "encription") {{
+          renderEncription(state.traffic || {{}});
+        }}
+
         if (activeLayoutView === "settings") {{
           renderSettings(state);
         }}
@@ -14941,6 +15219,7 @@
     bindSavedNodeSearchControls();
     bindNodeListSearchControls();
     bindNodeRowClicks();
+    bindEncriptionRowClicks();
     bindNodesTableColResizers();
     bindMapResetControl();
     bindMapBasemapToggleControl();

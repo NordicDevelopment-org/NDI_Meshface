@@ -2565,6 +2565,43 @@
       padding: 8px 10px;
     }}
     .packets {{ grid-column: 1; grid-row: 8; }}
+    .encription {{
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .encription .body {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      overflow: hidden;
+    }}
+    .encription-panels {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .encription-panel {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .encription-panel h3 {{
+      margin: 0 0 6px 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      opacity: 0.82;
+    }}
+    .encription-panel .scroll {{
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
+    }}
     .raw {{ grid-column: 3; grid-row: 8; }}
     .console {{ grid-column: 1 / span 3; grid-row: 10; }}
     .splitter {{
@@ -2876,6 +2913,33 @@
     .layout.view-packets .hsplitter[data-target="top"],
     .layout.view-packets .hsplitter[data-target="mid"],
     .layout.view-packets .hsplitter[data-target="low"] {{
+      display: none !important;
+    }}
+
+    .layout.view-encription {{
+      height: calc(100vh - var(--workspace-viewport-offset, 84px));
+      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      min-height: 560px;
+      grid-template-rows: minmax(0, 1fr);
+    }}
+    .layout.view-encription .encription {{
+      grid-column: 1 / span 3;
+      grid-row: 1;
+      display: flex;
+      min-height: 0;
+    }}
+    .layout.view-encription .chat,
+    .layout.view-encription .nodes,
+    .layout.view-encription .map,
+    .layout.view-encription .map-data,
+    .layout.view-encription .summary,
+    .layout.view-encription .packets,
+    .layout.view-encription .raw,
+    .layout.view-encription .console,
+    .layout.view-encription .splitter,
+    .layout.view-encription .hsplitter[data-target="top"],
+    .layout.view-encription .hsplitter[data-target="mid"],
+    .layout.view-encription .hsplitter[data-target="low"] {{
       display: none !important;
     }}
 
@@ -3253,6 +3317,14 @@
     #nodes-table tbody tr.node-selectable:hover {{
       background: #edf8f1;
     }}
+    #encription-packets-table tbody tr.node-selectable,
+    #encription-traffic-table tbody tr.node-selectable {{
+      cursor: pointer;
+    }}
+    #encription-packets-table tbody tr.node-selectable:hover,
+    #encription-traffic-table tbody tr.node-selectable:hover {{
+      background: #edf8f1;
+    }}
     .node-status-dot {{
       display: inline-block;
       width: 10px;
@@ -3276,6 +3348,15 @@
     #nodes-table tbody tr.selected-node td:first-child {{
       box-shadow: inset 3px 0 0 #2f855a;
     }}
+    #encription-packets-table tbody tr.selected-node td,
+    #encription-traffic-table tbody tr.selected-node td {{
+      background: #d8efe1;
+      color: #123222;
+    }}
+    #encription-packets-table tbody tr.selected-node td:first-child,
+    #encription-traffic-table tbody tr.selected-node td:first-child {{
+      box-shadow: inset 3px 0 0 #2f855a;
+    }}
     .mono {{ font-family: "IBM Plex Mono", "Consolas", "Menlo", monospace; }}
     #nodes-table th:nth-child(10), #nodes-table td:nth-child(10) {{
       text-align: right;
@@ -3284,6 +3365,10 @@
       padding-right: 4px;
       overflow: visible;
       text-overflow: clip;
+    }}
+    #encription-packets-table td:nth-child(7) {{
+      font-family: "IBM Plex Mono", "Consolas", "Menlo", monospace;
+      letter-spacing: 0.01em;
     }}
     #nodes-table th:nth-child(10) {{
       color: #6a856f;
@@ -5808,6 +5893,20 @@
     [data-theme="dark"] #nodes-table tbody tr.selected-node td:first-child {{
       box-shadow: inset 3px 0 0 #79c0ff;
     }}
+    [data-theme="dark"] #encription-packets-table tbody tr.node-selectable:hover,
+    [data-theme="dark"] #encription-traffic-table tbody tr.node-selectable:hover {{
+      background: #122031;
+    }}
+    [data-theme="dark"] #encription-packets-table tbody tr.selected-node td,
+    [data-theme="dark"] #encription-traffic-table tbody tr.selected-node td {{
+      background: #243646 !important;
+      border-color: #4a617a !important;
+      color: #ecf5ff !important;
+    }}
+    [data-theme="dark"] #encription-packets-table tbody tr.selected-node td:first-child,
+    [data-theme="dark"] #encription-traffic-table tbody tr.selected-node td:first-child {{
+      box-shadow: inset 3px 0 0 #79c0ff;
+    }}
     [data-theme="dark"] .chat-feed-item,
     [data-theme="dark"] .chat-channel-item,
     [data-theme="dark"] .chat-member-item,
@@ -6387,6 +6486,10 @@
         height: auto;
         min-height: 0;
       }}
+      .layout.view-encription {{
+        height: auto;
+        min-height: 0;
+      }}
       .layout.view-data {{
         height: auto;
         min-height: 0;
@@ -6395,11 +6498,14 @@
         height: auto;
         min-height: 0;
       }}
+      .encription-panels {{
+        grid-template-columns: 1fr;
+      }}
       .network-node-splitter {{
         display: none !important;
       }}
       .splitter, .hsplitter {{ display: none; }}
-      .summary, .map, .map-data, .nodes, .favorites, .chat, .history-chat, .packets, .raw, .console {{ grid-column: 1; grid-row: auto; }}
+      .summary, .map, .map-data, .nodes, .favorites, .chat, .history-chat, .packets, .encription, .raw, .console {{ grid-column: 1; grid-row: auto; }}
       .map-frame {{ max-width: none; }}
       .nodes .scroll {{ max-height: 360px; }}
     }}

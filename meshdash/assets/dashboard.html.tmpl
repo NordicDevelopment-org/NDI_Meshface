@@ -152,6 +152,7 @@
       <button class="rail-btn" data-view="network" type="button" title="Topology, nodes, and links">Network</button>
       <button class="rail-btn" data-view="saved" type="button" title="Node details and saved nodes">Node</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
+      <button class="rail-btn" data-view="encription" type="button" title="Encrypted packets and route activity">Encription</button>
       <button class="rail-btn" data-view="data" type="button" title="Raw node/config views">Data</button>
       <button class="rail-btn" data-view="history" type="button" title="Network and chat history">History</button>
       <button class="rail-btn" data-view="console" type="button" title="Realtime dashboard console">Console</button>
@@ -819,6 +820,41 @@
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+    </section>
+
+    <section class="card encription">
+      <h2>Encrypted Traffic</h2>
+      <div class="body">
+        <div id="encription-caption" class="history-caption">Packets that could not be decoded by this node.</div>
+        <div class="encription-panels">
+          <section class="encription-panel">
+            <h3>Recent encrypted packets</h3>
+            <div class="scroll">
+              <table id="encription-packets-table">
+                <thead>
+                  <tr>
+                    <th>Captured</th><th>From</th><th>To</th><th>Hops</th><th>RSSI</th><th>SNR</th><th>Payload</th><th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="encription-panel">
+            <h3>Encrypted route activity</h3>
+            <div class="scroll">
+              <table id="encription-traffic-table">
+                <thead>
+                  <tr>
+                    <th>From</th><th>To</th><th>Packets</th><th>Avg hops</th><th>Latest</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </div>
     </section>
 
