@@ -77,6 +77,8 @@ def test_render_html_includes_saved_view_structure_tokens():
     )
     assert 'data-view="saved"' in html
     assert 'id="favorites-search-input"' in html
-    assert 'id="favorites-clear-btn"' in html
+    assert 'id="favorite-menu-toggle-btn"' in html
+    assert 'id="favorite-menu"' in html
+    assert 'id="favorite-menu-saved-list"' in html
     assert 'id="favorites-list"' in html
     assert 'id="saved-node-details"' in html

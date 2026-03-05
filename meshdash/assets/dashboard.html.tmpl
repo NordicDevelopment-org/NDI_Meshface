@@ -87,21 +87,53 @@
           </section>
         </div>
       </div>
+      <div class="favorite-menu-wrap topbar-favorite-menu-wrap">
+        <button
+          id="favorite-menu-toggle-btn"
+          class="favorite-menu-toggle-btn"
+          type="button"
+          title="Node menu"
+          aria-label="Node menu"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <svg id="favorite-menu-toggle-icon" class="favorite-menu-toggle-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <rect x="2.5" y="4.5" width="9.5" height="6.5" rx="1.4"></rect>
+            <path d="M5.8 13h2.9m-1.45 0v2m-2.4 0h4.8"></path>
+            <circle class="node-signal-dot" cx="14.7" cy="6.2" r="0.9"></circle>
+            <path d="M16.8 7.2a3.4 3.4 0 0 0-2.1-3.15"></path>
+            <path d="M18.4 8.7a5.4 5.4 0 0 0-3.35-5.05"></path>
+          </svg>
+        </button>
+        <div id="favorite-menu" class="favorite-menu" hidden>
+          <section class="favorite-menu-section" aria-label="Selected node">
+            <h3 class="favorite-menu-title">Selected</h3>
+            <div id="favorite-menu-selected-list" class="favorite-menu-saved-list favorite-menu-selected-list" role="list" aria-label="Selected node">
+              <div class="favorite-menu-node-search-wrap">
+                <input
+                  id="favorite-menu-node-search-input"
+                  class="list-search-input"
+                  type="search"
+                  placeholder="Search by ID or name"
+                  autocomplete="off"
+                />
+                <div id="favorite-menu-node-search-dropdown" class="node-search-dropdown favorite-menu-node-search-dropdown" hidden></div>
+              </div>
+            </div>
+          </section>
+          <section class="favorite-menu-section" aria-label="Saved nodes">
+            <h3 class="favorite-menu-title">Saved nodes</h3>
+            <div id="favorite-menu-saved-list" class="favorite-menu-saved-list" role="list" aria-label="Saved nodes">
+              <div class="favorite-menu-saved-empty">No saved nodes yet.</div>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
-    <h1 class="topbar-heading">{app_heading}<span id="self-radio-pill" class="pill self-radio-pill" title="Connected local radio">n/a</span></h1>
+    <h1 class="topbar-heading">{app_heading}</h1>
     <div class="sub">
       <div class="sub-main">
         <span id="revision-text" class="sub-text revision-text" title="{revision_title}">{revision_label}</span>
-      </div>
-      <div class="selection-row">
-        <label for="starred-node-select" class="starred-node-wrap" title="Jump to a starred node">
-          <span class="starred-node-label">Starred</span>
-          <select id="starred-node-select" class="starred-node-select" aria-label="Starred nodes">
-            <option value="">Starred nodes</option>
-          </select>
-        </label>
-        <span class="pill selection-pill" id="selected-node-pill">Selected: none</span>
-        <button id="clear-selection-btn" class="selection-btn" type="button" disabled>Clear</button>
       </div>
       <div class="summary-ticker-row" aria-label="Summary tickers">
         <div class="summary-ticker-item summary-ticker-item-target">
@@ -715,7 +747,6 @@
           <div class="favorites-search-wrap">
             <input id="favorites-search-input" class="list-search-input" type="search" placeholder="Search saved by ID or name" autocomplete="off" />
           </div>
-          <button id="favorites-clear-btn" class="favorites-clear-btn" type="button" title="Remove all saved nodes">Clear Saved</button>
         </div>
         <div id="favorites-caption" class="favorites-caption">No saved nodes yet.</div>
         <div id="favorites-list" class="scroll favorites-list"></div>
