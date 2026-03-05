@@ -16,6 +16,8 @@
       min-height: 100%;
       min-height: 100vh;
       min-height: 100dvh;
+      height: 100%;
+      overflow: hidden;
     }}
     .topbar {{
       padding: 8px 12px;
@@ -495,10 +497,12 @@
       grid-template-columns: var(--rail-width) minmax(0, 1fr);
       gap: 8px;
       padding: 8px;
-      min-height: calc(100vh - var(--workspace-viewport-offset, 84px));
-      min-height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      min-height: 0;
+      height: calc(100vh - var(--workspace-viewport-offset, 84px));
+      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
       background: var(--panel);
       align-items: stretch;
+      overflow: hidden;
     }}
     .workspace-shell.chat-panel-open {{
       grid-template-columns: var(--rail-width) minmax(190px, var(--chat-panel-width)) minmax(0, 1fr);
@@ -506,17 +510,15 @@
     .workspace-main {{
       min-width: 0;
       width: 100%;
-      min-height: calc(100vh - var(--workspace-viewport-offset, 84px));
-      min-height: calc(100dvh - var(--workspace-viewport-offset, 84px));
-      height: calc(100vh - var(--workspace-viewport-offset, 84px));
-      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
     }}
     .teams-rail {{
       position: sticky;
       top: var(--topbar-sticky-offset, 72px);
       align-self: stretch;
-      height: calc(100vh - var(--workspace-viewport-offset, 84px));
-      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      height: 100%;
       min-height: 0;
       border: 1px solid #c6d6c0;
       border-radius: 10px;
@@ -565,8 +567,8 @@
     .chat-left-panel {{
       position: sticky;
       top: var(--topbar-sticky-offset, 72px);
-      height: calc(100vh - var(--workspace-viewport-offset, 84px));
-      min-height: 420px;
+      height: 100%;
+      min-height: 0;
       border: 1px solid #c6d6c0;
       border-radius: 10px;
       background: #f6fbf5;
@@ -6382,15 +6384,23 @@
       color: var(--ui-link);
     }}
     @media (max-width: 1100px) {{
+      html, body {{
+        height: auto;
+        overflow: auto;
+      }}
       .workspace-shell {{
         grid-template-columns: 1fr;
         grid-template-rows: auto auto auto;
         gap: 6px;
         padding: 6px;
+        height: auto;
+        min-height: 0;
+        overflow: visible;
       }}
       .workspace-main {{
         min-height: 0;
         height: auto;
+        overflow: visible;
       }}
       .teams-rail {{
         position: static;
