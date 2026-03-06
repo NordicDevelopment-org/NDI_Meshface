@@ -6352,11 +6352,11 @@
       return out;
     }}
 
-    function tokenizeChatEmojiSearchQueryWithAliases(rawQuery) {{
-      const base = tokenizeChatEmojiSearchQuery(rawQuery);
+    function tokenizeChatEmojiSearchAliasParts(queryParts) {{
+      const base = Array.isArray(queryParts) ? queryParts : [];
       if (!base.length) return [];
       const seen = new Set(base);
-      const out = base.slice(0);
+      const out = [];
       for (const token of base) {{
         const aliasText = String(chatEmojiQueryKeywordAliases[token] || "").trim();
         if (!aliasText) continue;
@@ -6516,6 +6516,46 @@
       return ranked.map((entry) => entry.emoji);
     }}
 
+    function rankChatEmojiSearchMatchesAnyPart(rawQuery, queryParts, allowFuzzy = false) {{
+      const queryText = normalizeChatEmojiSearchQuery(rawQuery);
+      const ranked = [];
+      const seen = new Set();
+      for (const emoji of chatEmojiAllChoices) {{
+        if (seen.has(emoji)) continue;
+        seen.add(emoji);
+        const tokens = chatEmojiSearchTokensByEmoji.get(emoji) || [];
+        if (!tokens.length) continue;
+        const searchText = String(chatEmojiSearchMetaByEmoji.get(emoji) || "");
+        let matchedParts = 0;
+        let score = 0;
+        for (const part of queryParts) {{
+          const partScore = scoreChatEmojiPartMatch(part, tokens, searchText, allowFuzzy);
+          if (partScore <= 0) continue;
+          matchedParts += 1;
+          score += partScore;
+        }}
+        if (matchedParts <= 0) {{
+          continue;
+        }}
+        if (queryText && searchText.includes(queryText)) {{
+          score += 28;
+        }}
+        score += matchedParts * 24;
+        ranked.push({{
+          emoji,
+          score,
+          matchedParts,
+          order: Number(chatEmojiChoiceOrder.get(emoji) || 0),
+        }});
+      }}
+      ranked.sort((a, b) => (
+        (b.score - a.score)
+        || (b.matchedParts - a.matchedParts)
+        || (a.order - b.order)
+      ));
+      return ranked.map((entry) => entry.emoji);
+    }}
+
     const reactionEmojiIgnoredCodepoints = new Set([0xFE0E, 0xFE0F]);
 
     function reactionEmojiCodepoint(rawEmoji) {{
@@ -6574,11 +6614,20 @@
         return cached;
       }}
 
-      const parts = tokenizeChatEmojiSearchQueryWithAliases(query);
+      const parts = tokenizeChatEmojiSearchQuery(query);
       if (!parts.length) return [];
+      const aliasParts = tokenizeChatEmojiSearchAliasParts(parts);
       let matches = rankChatEmojiSearchMatches(query, parts, false);
       if (!matches.length) {{
         matches = rankChatEmojiSearchMatches(query, parts, true);
+      }}
+      if (!matches.length) {{
+        const fallbackParts = aliasParts.length ? parts.concat(aliasParts) : parts;
+        matches = rankChatEmojiSearchMatchesAnyPart(query, fallbackParts, false);
+      }}
+      if (!matches.length) {{
+        const fallbackParts = aliasParts.length ? parts.concat(aliasParts) : parts;
+        matches = rankChatEmojiSearchMatchesAnyPart(query, fallbackParts, true);
       }}
       chatEmojiSearchCache.set(query, matches);
       return matches;
