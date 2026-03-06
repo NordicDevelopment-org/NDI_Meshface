@@ -26,5 +26,10 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "setInterval(pollOnce, refreshMs);" in js
     assert "/^[0-9a-f]{8}$/i.test(hex)" in js
     assert "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" in js
+    assert "const chatEmojiQueryKeywordAliases = {" in js
+    assert "function tokenizeChatEmojiSearchQueryWithAliases(rawQuery)" in js
+    assert "function focusChatEmojiSearchInput()" in js
+    assert "if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && key === \"e\") {" in js
+    assert "Top matches" in js
     assert "{{" not in js
     assert "}}" not in js

@@ -538,6 +538,26 @@
       "symbols": "symbol symbols sign signs icon icons math arrows warning warnings status",
       "flags": "flag flags country countries nation nations state states regional region",
     }};
+    const chatEmojiQueryKeywordAliases = {{
+      "emotion": "smile smiley face mood feelings happy sad love",
+      "emotions": "emotion smile smiley face mood feelings",
+      "feeling": "emotion feelings mood smile face",
+      "feelings": "emotion feeling mood smile face",
+      "mood": "emotion feelings happy sad angry love laugh cry",
+      "happy": "smile joy laugh grin celebration",
+      "sad": "cry crying tears upset gloomy",
+      "angry": "mad rage annoyed upset",
+      "love": "heart hearts kiss affection",
+      "animal": "animals nature pet pets wildlife bird cat dog chicken",
+      "animals": "animal nature pet pets wildlife bird cat dog chicken",
+      "pet": "pets animal animals cat dog",
+      "pets": "pet animal animals cat dog",
+      "food": "foods meal meals eat hungry snack drink",
+      "foods": "food meal meals eat hungry snack drink",
+      "party": "celebrate celebration confetti birthday",
+      "celebrate": "party celebration confetti",
+      "celebration": "party celebrate confetti",
+    }};
     const chatEmojiCodepointKeywordMap = {{
       "23": "number",
       "2a": "asterisk",
@@ -6332,6 +6352,23 @@
       return out;
     }}
 
+    function tokenizeChatEmojiSearchQueryWithAliases(rawQuery) {{
+      const base = tokenizeChatEmojiSearchQuery(rawQuery);
+      if (!base.length) return [];
+      const seen = new Set(base);
+      const out = base.slice(0);
+      for (const token of base) {{
+        const aliasText = String(chatEmojiQueryKeywordAliases[token] || "").trim();
+        if (!aliasText) continue;
+        for (const aliasToken of tokenizeChatEmojiSearchQuery(aliasText)) {{
+          if (!aliasToken || seen.has(aliasToken)) continue;
+          seen.add(aliasToken);
+          out.push(aliasToken);
+        }}
+      }}
+      return out;
+    }}
+
     function collectChatEmojiCodepointAliasParts(rawEmoji) {{
       const text = String(rawEmoji || "").trim();
       if (!text) return [];
@@ -6537,7 +6574,7 @@
         return cached;
       }}
 
-      const parts = tokenizeChatEmojiSearchQuery(query);
+      const parts = tokenizeChatEmojiSearchQueryWithAliases(query);
       if (!parts.length) return [];
       let matches = rankChatEmojiSearchMatches(query, parts, false);
       if (!matches.length) {{
@@ -6888,24 +6925,59 @@
       }}
     }}
 
-    function renderChatEmojiTopRow() {{
+    function normalizeChatEmojiPinnedChoices(rawChoices, maxCount = chatEmojiTopUsageCount) {{
+      const list = Array.isArray(rawChoices) ? rawChoices : [];
+      const out = [];
+      const seen = new Set();
+      for (const rawEmoji of list) {{
+        const emoji = String(rawEmoji || "").trim();
+        if (!emoji || seen.has(emoji) || !chatEmojiChoiceSet.has(emoji)) continue;
+        seen.add(emoji);
+        out.push(emoji);
+        if (out.length >= maxCount) {{
+          break;
+        }}
+      }}
+      return out;
+    }}
+
+    function renderChatEmojiTopRow(options = null) {{
+      const topLabel = document.getElementById("chat-emoji-top-label");
       const topGrid = document.getElementById("chat-emoji-top-grid");
       if (!(topGrid instanceof HTMLElement)) return;
 
-      const sourceChoices = chatEmojiTopChoices();
+      const preferredChoices = normalizeChatEmojiPinnedChoices(
+        options && Array.isArray(options.choices) ? options.choices : [],
+        chatEmojiTopUsageCount,
+      );
+      const usePreferredChoices = preferredChoices.length > 0;
+      const sourceChoices = usePreferredChoices ? preferredChoices : chatEmojiTopChoices();
+      const labelText = usePreferredChoices
+        ? String((options && options.label) || "Top matches").trim() || "Top matches"
+        : "Top used";
       const choices = chatEmojiMode === "react"
         ? reactionCompatibleEmojiChoices(sourceChoices)
         : sourceChoices;
-      const signature = `${{chatEmojiMode}}:${{choices.join("\u0000")}}`;
+      const signature = `${{chatEmojiMode}}:${{labelText}}:${{choices.join("\u0000")}}`;
       if ((topGrid.dataset.signature || "") === signature) {{
         return;
       }}
+
+      if (topLabel instanceof HTMLElement) {{
+        topLabel.textContent = labelText;
+      }}
+      topGrid.setAttribute("aria-label", labelText);
+
       if (!choices.length) {{
         const empty = document.createElement("div");
         empty.className = "chat-emoji-top-empty";
-        empty.textContent = chatEmojiMode === "react"
-          ? "No compatible reaction emojis in your top list yet."
-          : "Use emojis and your top 8 will appear here.";
+        empty.textContent = usePreferredChoices
+          ? (chatEmojiMode === "react"
+            ? "No compatible matches found."
+            : "No quick matches found.")
+          : (chatEmojiMode === "react"
+            ? "No compatible reaction emojis in your top list yet."
+            : "Use emojis and your top 8 will appear here.");
         topGrid.replaceChildren(empty);
         topGrid.dataset.signature = signature;
         return;
@@ -6989,7 +7061,31 @@
       if (previousGroup !== selectedGroup) {{
         persistChatEmojiPickerState();
       }}
-      renderChatEmojiTopRow();
+      const topRowOptions = searchActive && choices.length
+        ? {{
+          choices: choices.slice(0, chatEmojiTopUsageCount),
+          label: chatEmojiMode === "react" ? "Top reaction matches" : "Top matches",
+        }}
+        : null;
+      renderChatEmojiTopRow(topRowOptions);
+    }}
+
+    function focusChatEmojiSearchInput() {{
+      const panel = document.getElementById("chat-emoji-panel");
+      const searchInput = document.getElementById("chat-emoji-search");
+      if (!(panel instanceof HTMLElement) || panel.hidden) {{
+        return false;
+      }}
+      if (!(searchInput instanceof HTMLInputElement)) {{
+        return false;
+      }}
+      requestAnimationFrame(() => {{
+        if (panel.hidden) return;
+        searchInput.focus({{ preventScroll: true }});
+        const end = searchInput.value.length;
+        searchInput.setSelectionRange(end, end);
+      }});
+      return true;
     }}
 
     function openChatEmojiPanel(mode = "compose", reactionTargetId = null) {{
@@ -7003,15 +7099,7 @@
       ) ? parsedTarget : null;
       renderChatEmojiPickerPanel();
       panel.hidden = false;
-      const searchInput = document.getElementById("chat-emoji-search");
-      if (searchInput instanceof HTMLInputElement) {{
-        requestAnimationFrame(() => {{
-          if (panel.hidden) return;
-          searchInput.focus({{ preventScroll: true }});
-          const end = searchInput.value.length;
-          searchInput.setSelectionRange(end, end);
-        }});
-      }}
+      focusChatEmojiSearchInput();
       if (btn instanceof HTMLButtonElement) {{
         btn.setAttribute("aria-expanded", "true");
       }}
@@ -7062,7 +7150,8 @@
             `<option value="${{escAttr(group.id)}}">${{escAttr(group.label)}} (${{group.emojis.length}})</option>`
           )),
         ].join("");
-        panel.innerHTML = `<div id="chat-emoji-top-grid" class="chat-emoji-top-grid" aria-label="Top used emojis"></div>
+        panel.innerHTML = `<div id="chat-emoji-top-label" class="chat-emoji-top-label">Top used</div>
+        <div id="chat-emoji-top-grid" class="chat-emoji-top-grid" aria-label="Top used"></div>
         <div class="chat-emoji-toolbar chat-emoji-search-row">
           <input
             id="chat-emoji-search"
@@ -7072,6 +7161,7 @@
             aria-label="Search emojis across all categories"
             autocomplete="off"
             spellcheck="false"
+            title="Shortcut: Ctrl/Cmd+E"
           />
         </div>
         <div class="chat-emoji-toolbar">
@@ -7150,6 +7240,17 @@
         document.addEventListener("keydown", (ev) => {{
           if (ev.key === "Escape") {{
             closeChatEmojiPanel();
+            return;
+          }}
+          const key = String(ev.key || "").toLowerCase();
+          if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && key === "e") {{
+            ev.preventDefault();
+            if (panel.hidden) {{
+              if (chatSendInFlight) return;
+              openChatEmojiPanel("compose", null);
+              return;
+            }}
+            focusChatEmojiSearchInput();
           }}
         }});
       }}
