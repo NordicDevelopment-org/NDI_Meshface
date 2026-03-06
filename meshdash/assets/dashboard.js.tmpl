@@ -7003,6 +7003,15 @@
       ) ? parsedTarget : null;
       renderChatEmojiPickerPanel();
       panel.hidden = false;
+      const searchInput = document.getElementById("chat-emoji-search");
+      if (searchInput instanceof HTMLInputElement) {{
+        requestAnimationFrame(() => {{
+          if (panel.hidden) return;
+          searchInput.focus({{ preventScroll: true }});
+          const end = searchInput.value.length;
+          searchInput.setSelectionRange(end, end);
+        }});
+      }}
       if (btn instanceof HTMLButtonElement) {{
         btn.setAttribute("aria-expanded", "true");
       }}
