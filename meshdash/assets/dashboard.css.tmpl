@@ -2660,6 +2660,9 @@
       flex-direction: column;
       min-height: 0;
     }}
+    .encription-panel.encription-panel-wide {{
+      grid-column: 1 / -1;
+    }}
     .encription-panel h3 {{
       margin: 0 0 6px 0;
       font-size: 11px;
@@ -2672,6 +2675,21 @@
       flex: 1 1 auto;
       min-height: 0;
       max-height: none;
+    }}
+    #encription-trend-chart-wrap {{
+      position: relative;
+      width: 100%;
+      min-height: 220px;
+      height: 220px;
+      border: 1px solid #d7e5d2;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fbfffc 0%, #eef8f1 100%);
+      overflow: hidden;
+    }}
+    #encription-trend-chart {{
+      width: 100%;
+      height: 100%;
+      display: block;
     }}
     .raw {{ grid-column: 3; grid-row: 8; }}
     .console {{ grid-column: 1 / span 3; grid-row: 10; }}
@@ -6026,7 +6044,8 @@
     }}
     [data-theme="dark"] #signal-chart-wrap,
     [data-theme="dark"] #online-activity-chart-wrap,
-    [data-theme="dark"] #weekly-summary-chart-wrap {{
+    [data-theme="dark"] #weekly-summary-chart-wrap,
+    [data-theme="dark"] #encription-trend-chart-wrap {{
       background: linear-gradient(180deg, #141c27 0%, #111823 100%);
       border-color: var(--ui-border);
     }}
