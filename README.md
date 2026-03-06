@@ -285,6 +285,58 @@ ls -lh /home/j/mesh/mesh_dashboard_history*.sqlite3
 
 If UI seems stale after deploy, hard-refresh browser (`Ctrl+Shift+R`).
 
+### Diagnostics Runbook: "Server crashed" vs "Radio disconnected"
+
+When the dashboard appears down, run this sequence on the host (for example `192.168.1.241`) before unplugging hardware:
+
+```bash
+# 1) Current/last service health
+sudo systemctl status meshtastic-dashboard --no-pager -l
+sudo systemctl show meshtastic-dashboard \
+  -p ActiveState -p SubState -p NRestarts -p ExecMainCode -p ExecMainStatus \
+  -p ExecMainStartTimestamp -p ExecMainExitTimestamp
+
+# 2) Logs in the exact incident window
+sudo journalctl -u meshtastic-dashboard \
+  --since "YYYY-MM-DD HH:MM:SS" --until "YYYY-MM-DD HH:MM:SS" \
+  -o short-iso --no-pager
+
+# 3) Host reboot/kernel-level checks
+sudo journalctl --list-boots
+sudo journalctl -u meshtastic-dashboard -b -1 -o short-iso --no-pager | tail -n 200
+sudo journalctl -k -b -1 -p warning --no-pager | egrep -i "oom|killed process|segfault|panic|watchdog"
+last -x | head -n 20
+
+# 4) Verify radio path exists
+ls -l /dev/serial/by-id
+```
+
+Interpretation:
+
+- If you see `Meshtastic serial port disconnected` followed by repeated `No such file or directory` for `/dev/serial/by-id/...`, the issue is radio/USB path loss (unplug, power reset, cable/hub issue, or port contention), not a Python crash.
+- If `ActiveState=active`, `SubState=running`, and `NRestarts` is not increasing, the service itself is healthy.
+- If kernel logs show OOM/panic/segfault, investigate host stability and memory pressure.
+
+Quick recovery after radio reconnect:
+
+```bash
+sudo systemctl restart meshtastic-dashboard
+sudo systemctl status meshtastic-dashboard --no-pager -l
+sudo journalctl -u meshtastic-dashboard -f
+```
+
+Optional: check for other software holding the serial port:
+
+```bash
+sudo lsof /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+```
+
+Incident reference (March 6, 2026):
+
+- Service remained healthy after restart (`ActiveState=active`, `SubState=running`, `NRestarts=0`).
+- Logs showed serial disconnect at `2026-03-06T14:52:10-06:00` and repeated missing device path errors until reconnect.
+- Device path returned as `/dev/serial/by-id/... -> ../../ttyACM0`, and the dashboard resumed normally.
+
 ## Development and Tests
 
 Install dev dependency:
