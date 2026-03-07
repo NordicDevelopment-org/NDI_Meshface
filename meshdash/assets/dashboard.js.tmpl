@@ -20521,16 +20521,14 @@
         const messageId = messageIdOf(msg);
         const canReply = Number.isInteger(messageId) && messageId > 0;
         const replyToId = replyIdOf(msg);
-        let replyPreview = "";
+        let replyTooltipSummary = "";
+        let replyTooltipPreview = "";
         if (Number.isInteger(replyToId) && replyToId > 0) {{
           const parentMsg = messageIndex.get(String(replyToId));
           if (parentMsg) {{
             const parentFromMeta = chatEndpointParts(endpointsForMessage(parentMsg).fromId);
-            const parentText = compactInlineMessage(parentMsg.text || "", 110);
-            replyPreview = `<div class="chat-reply-inline" title="Reply to packet #${{replyToId}}">
-              <span class="chat-reply-inline-label">Replying to ${{escAttr(parentFromMeta.label || "Unknown node")}}</span>
-              <span class="chat-reply-inline-text">${{escAttr(parentText)}}</span>
-            </div>`;
+            replyTooltipSummary = `Replying to ${{parentFromMeta.label || "Unknown node"}}`;
+            replyTooltipPreview = compactInlineMessage(parentMsg.text || "", 110);
           }} else {{
             const parentPacketEntry = packetSummaryById.get(String(replyToId));
             if (parentPacketEntry && typeof parentPacketEntry === "object") {{
@@ -20551,7 +20549,7 @@
                 parentPacketEntry && (parentPacketEntry.captured_at || parentPacketEntry.rx_time),
               );
               const parentFromMeta = chatEndpointParts(parentEndpoints.fromId, parentUnix);
-              const parentSenderLabel = parentFromMeta.label || `packet #${{replyToId}}`;
+              replyTooltipSummary = `Replying to ${{parentFromMeta.label || `packet #${{replyToId}}`}}`;
               const parentText = compactInlineMessage(
                 parentSummary.decoded_text ?? parentDecoded.text ?? "",
                 110
@@ -20565,22 +20563,10 @@
               if (parentTimeRaw) {{
                 metaParts.push(formatLocalChatTime(parentUnix, parentTimeRaw, nowUnix));
               }}
-              if (!parentText) {{
-                metaParts.push("original text not retained");
-              }}
-              const parentTextMarkup = parentText
-                ? `<span class="chat-reply-inline-text">${{escAttr(parentText)}}</span>`
-                : "";
-              replyPreview = `<div class="chat-reply-inline missing" title="Reply to packet #${{replyToId}}">
-                <span class="chat-reply-inline-label">Replying to ${{escAttr(parentSenderLabel)}}</span>
-                ${{parentTextMarkup}}
-                <span class="chat-reply-inline-meta">${{escAttr(metaParts.join(" • "))}}</span>
-              </div>`;
+              replyTooltipPreview = parentText || metaParts.join(" • ") || "Original packet retained without decoded text.";
             }} else {{
-              replyPreview = `<div class="chat-reply-inline missing" title="Reply to packet #${{replyToId}}">
-                <span class="chat-reply-inline-label">Replying to packet #${{replyToId}}</span>
-                <span class="chat-reply-inline-meta">Original packet not retained locally.</span>
-              </div>`;
+              replyTooltipSummary = `Reply to #${{replyToId}}`;
+              replyTooltipPreview = "Original packet not retained locally.";
             }}
           }}
         }}
@@ -20681,6 +20667,12 @@
         }}
         if (Number.isInteger(replyToId) && replyToId > 0) {{
           messageTooltipParts.push(`Reply to: #${{replyToId}}`);
+          if (replyTooltipSummary) {{
+            messageTooltipParts.push(replyTooltipSummary);
+          }}
+          if (replyTooltipPreview) {{
+            messageTooltipParts.push(`Reply context: ${{replyTooltipPreview}}`);
+          }}
         }}
         if (timeText) {{
           messageTooltipParts.push(`Time: ${{timeText}}`);
@@ -20705,22 +20697,22 @@
         }}
         const messageTooltip = messageTooltipParts.join("\n");
         return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
-          <div class="chat-feed-meta">
-            <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
-              <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
-              ${{fromMeta.idTag ? `<span class="chat-id-bg status-${{fromMeta.status}}">${{escAttr(fromMeta.idTag)}}</span>` : ""}}
+          <div class="chat-feed-line">
+            <div class="chat-feed-summary">
+              ${{changeBadge}}
+              ${{statusBadge}}
+              <span class="chat-endpoint chat-feed-author" title="${{escAttr(fromMeta.title)}}">
+                <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
+              </span>
+              <span class="chat-feed-colon">:</span>
+              <span class="chat-feed-text chat-feed-text-inline">${{textHtml || "&nbsp;"}}</span>
+            </div>
+            <span class="chat-feed-side">
+              ${{retryButton}}
+              ${{deliveryChip}}
+              <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
             </span>
-            <span class="chat-feed-arrow">&rarr;</span>
-            <span class="chat-endpoint" title="${{escAttr(toMeta.title)}}">
-              <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
-              ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
-            </span>
-            <span class="chat-feed-actions">${{changeBadge}}${{statusBadge}}${{retryButton}}</span>
-            ${{deliveryChip}}
-            <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
           </div>
-          ${{replyPreview}}
-          <div class="chat-feed-text">${{textHtml || "&nbsp;"}}</div>
           ${{reactionSummaryRow}}
           ${{reactionRow}}
         </div>`;

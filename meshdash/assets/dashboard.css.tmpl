@@ -5397,25 +5397,44 @@
         background: transparent;
       }}
     }}
-    .chat-feed-meta {{
+    .chat-feed-line {{
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      width: 100%;
+    }}
+    .chat-feed-summary {{
+      min-width: 0;
+      flex: 1 1 auto;
       display: flex;
       align-items: baseline;
       flex-wrap: wrap;
-      gap: 6px;
-      font-size: 10px;
-      color: #5a7462;
-      line-height: 1.2;
-      margin-bottom: 3px;
+      gap: 4px;
+      line-height: 1.35;
     }}
-    .chat-feed-arrow {{
-      color: #6e8c78;
-      opacity: 0.75;
+    .chat-feed-author {{
+      flex: 0 0 auto;
+      min-width: 0;
+      max-width: 100%;
+    }}
+    .chat-feed-colon {{
+      color: #6a8572;
+      font-weight: 600;
+      flex: 0 0 auto;
+    }}
+    .chat-feed-side {{
+      flex: 0 0 auto;
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
     }}
     .chat-feed-time {{
-      margin-left: auto;
       font-size: 10px;
       color: #6a8572;
       white-space: nowrap;
+      flex: 0 0 auto;
     }}
     .mesh-channel-badge,
     .chat-feed-mesh {{
@@ -5587,6 +5606,25 @@
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: break-word;
+    }}
+    .chat-feed-text-inline {{
+      display: inline;
+      min-width: 0;
+      margin: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .chat-feed-text-inline > :first-child {{
+      margin-top: 0;
+    }}
+    .chat-feed-text-inline > :last-child {{
+      margin-bottom: 0;
+    }}
+    .chat-feed-text-inline p,
+    .chat-feed-text-inline div {{
+      display: inline;
+      margin: 0;
     }}
     .chat-feed-text .chat-link,
     #history-chat-table .chat-link {{
