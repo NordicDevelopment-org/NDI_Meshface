@@ -194,6 +194,9 @@
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const chatNotificationScopeStorageKey = "meshDashboardChatNotificationScopeV1";
+    const chatWhoisQuickActionEnabledStorageKey = "meshDashboardWhoisQuickActionEnabledV1";
+    const chatWhoisQuickActionPrefixStorageKey = "meshDashboardWhoisQuickActionPrefixV1";
+    const chatWhoisQuickActionThreadReplyStorageKey = "meshDashboardWhoisQuickActionThreadReplyV1";
     const chatChangeLogStorageKey = "meshDashboardChatChangeLogV1";
     const meshChannelIndexStorageKey = "meshDashboardMeshChannelIndexV1";
     const channelsUiModeStorageKey = "meshDashboardChannelsUiModeV1";
@@ -2071,6 +2074,7 @@
     const knownChatChannels = new Set(["all", "direct"]);
     const meshChannelAllIndex = -1;
     const knownChatNotificationScopes = new Set(["all", "self"]);
+    const knownWhoisCommandPrefixes = new Set(["whois", "!whois", "#whois"]);
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const reactionPopoverMaxNames = 12;
@@ -2150,6 +2154,9 @@
     let activeLayoutView = "chat";
     let activeChatChannel = "all";
     let chatNotificationScope = "all";
+    let chatWhoisQuickActionEnabled = true;
+    let chatWhoisQuickActionPrefix = "whois";
+    let chatWhoisQuickActionThreadReply = true;
     let activeMeshChannelIndex = 0;
     let meshChannelOptions = [];
     let meshChannelOptionsSignature = "";
@@ -5996,6 +6003,125 @@
       }} catch (_err) {{
       }}
       applyChatNotificationScope(preferred, false);
+    }}
+
+    function normalizeWhoisCommandPrefix(value) {{
+      const clean = String(value || "").trim().toLowerCase();
+      return knownWhoisCommandPrefixes.has(clean) ? clean : "whois";
+    }}
+
+    function nodeIdSuffixForWhois(nodeId) {{
+      const clean = String(nodeId || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (!clean) return "";
+      return clean.slice(-4);
+    }}
+
+    function buildWhoisCommandForNode(nodeId, prefixValue = chatWhoisQuickActionPrefix) {{
+      const prefix = normalizeWhoisCommandPrefix(prefixValue);
+      const suffix = nodeIdSuffixForWhois(nodeId);
+      if (!suffix) return prefix;
+      return `${{prefix}} ${{suffix}}`;
+    }}
+
+    function syncChatWhoisQuickActionControls() {{
+      const enabledInput = document.getElementById("chat-bot-whois-enabled");
+      const prefixSelect = document.getElementById("chat-bot-whois-prefix");
+      const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
+      const enabled = !!chatWhoisQuickActionEnabled;
+      const prefix = normalizeWhoisCommandPrefix(chatWhoisQuickActionPrefix);
+      if (enabledInput instanceof HTMLInputElement) {{
+        enabledInput.checked = enabled;
+      }}
+      if (prefixSelect instanceof HTMLSelectElement) {{
+        prefixSelect.value = prefix;
+        prefixSelect.disabled = !enabled;
+      }}
+      if (threadReplyInput instanceof HTMLInputElement) {{
+        threadReplyInput.checked = !!chatWhoisQuickActionThreadReply;
+        threadReplyInput.disabled = !enabled;
+      }}
+    }}
+
+    function applyChatWhoisQuickActionConfig(config = {{}}, persist = true) {{
+      const nextEnabled = Object.prototype.hasOwnProperty.call(config, "enabled")
+        ? !!config.enabled
+        : !!chatWhoisQuickActionEnabled;
+      const nextPrefix = Object.prototype.hasOwnProperty.call(config, "prefix")
+        ? normalizeWhoisCommandPrefix(config.prefix)
+        : normalizeWhoisCommandPrefix(chatWhoisQuickActionPrefix);
+      const nextThreadReply = Object.prototype.hasOwnProperty.call(config, "threadReply")
+        ? !!config.threadReply
+        : !!chatWhoisQuickActionThreadReply;
+      const changed = (
+        chatWhoisQuickActionEnabled !== nextEnabled
+        || chatWhoisQuickActionPrefix !== nextPrefix
+        || chatWhoisQuickActionThreadReply !== nextThreadReply
+      );
+      chatWhoisQuickActionEnabled = nextEnabled;
+      chatWhoisQuickActionPrefix = nextPrefix;
+      chatWhoisQuickActionThreadReply = nextThreadReply;
+      syncChatWhoisQuickActionControls();
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(chatWhoisQuickActionEnabledStorageKey, nextEnabled ? "1" : "0");
+          window.localStorage.setItem(chatWhoisQuickActionPrefixStorageKey, nextPrefix);
+          window.localStorage.setItem(chatWhoisQuickActionThreadReplyStorageKey, nextThreadReply ? "1" : "0");
+        }} catch (_err) {{
+        }}
+      }}
+      if (changed && latestState && activeLayoutView === "chat") {{
+        renderChat(latestState);
+      }}
+    }}
+
+    function loadChatWhoisQuickActionConfig() {{
+      const config = {{}};
+      try {{
+        config.enabled = parseBoolToken(window.localStorage.getItem(chatWhoisQuickActionEnabledStorageKey), true);
+      }} catch (_err) {{
+        config.enabled = true;
+      }}
+      try {{
+        config.prefix = normalizeWhoisCommandPrefix(
+          window.localStorage.getItem(chatWhoisQuickActionPrefixStorageKey) || "whois"
+        );
+      }} catch (_err) {{
+        config.prefix = "whois";
+      }}
+      try {{
+        config.threadReply = parseBoolToken(
+          window.localStorage.getItem(chatWhoisQuickActionThreadReplyStorageKey),
+          true
+        );
+      }} catch (_err) {{
+        config.threadReply = true;
+      }}
+      applyChatWhoisQuickActionConfig(config, false);
+    }}
+
+    function bindChatWhoisQuickActionControls() {{
+      const enabledInput = document.getElementById("chat-bot-whois-enabled");
+      if (enabledInput instanceof HTMLInputElement && enabledInput.dataset.bound !== "1") {{
+        enabledInput.dataset.bound = "1";
+        enabledInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ enabled: enabledInput.checked }}, true);
+        }});
+      }}
+      const prefixSelect = document.getElementById("chat-bot-whois-prefix");
+      if (prefixSelect instanceof HTMLSelectElement && prefixSelect.dataset.bound !== "1") {{
+        prefixSelect.dataset.bound = "1";
+        prefixSelect.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ prefix: prefixSelect.value }}, true);
+        }});
+      }}
+      const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
+      if (threadReplyInput instanceof HTMLInputElement && threadReplyInput.dataset.bound !== "1") {{
+        threadReplyInput.dataset.bound = "1";
+        threadReplyInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ threadReply: threadReplyInput.checked }}, true);
+        }});
+      }}
+      syncChatWhoisQuickActionControls();
     }}
 
     function bindChatNotificationScopeControl() {{
@@ -13643,6 +13769,48 @@
           const target = ev.target;
           if (!(target instanceof Element)) return;
 
+          const whoisBtn = target.closest(".chat-whois-btn");
+          if (whoisBtn) {{
+            ev.preventDefault();
+            ev.stopPropagation();
+            const whoisTargetId = normalizeNodeId(
+              whoisBtn instanceof HTMLElement
+                ? (whoisBtn.dataset.whoisTargetId || item.dataset.fromNodeId || "")
+                : (item.dataset.fromNodeId || "")
+            );
+            const whoisSuffix = nodeIdSuffixForWhois(whoisTargetId);
+            if (!isCanonicalNodeId(whoisTargetId) || !whoisSuffix) {{
+              setChatSendStatus("Cannot build Whois command: sender ID is unavailable.", true);
+              return;
+            }}
+            const command = buildWhoisCommandForNode(whoisTargetId);
+            const input = document.getElementById("chat-input");
+            if (!(input instanceof HTMLInputElement)) {{
+              setChatSendStatus("Cannot prepare Whois command: chat input is unavailable.", true);
+              return;
+            }}
+            if (chatWhoisQuickActionThreadReply) {{
+              const replyId = Number(item.dataset.messageId || "");
+              if (Number.isInteger(replyId) && replyId > 0) {{
+                const replyName = item.dataset.replyName || "Unknown node";
+                const replyText = item.dataset.replyText || "";
+                setChatReplyTarget(replyId, replyName, replyText);
+              }} else {{
+                clearChatReplyTarget();
+              }}
+            }} else {{
+              clearChatReplyTarget();
+            }}
+            input.value = command;
+            input.focus();
+            input.setSelectionRange(command.length, command.length);
+            input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+            setChatSendStatus(
+              `Prepared ${{command}} for ${{whoisTargetId}}${{chatWhoisQuickActionThreadReply ? " (reply attached)" : ""}}.`
+            );
+            return;
+          }}
+
           const replyBtn = target.closest(".chat-reply-btn");
           if (replyBtn) {{
             ev.preventDefault();
@@ -18154,6 +18322,15 @@
         const replyButton = canReply
           ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message">Reply</button>`
           : "";
+        const whoisTargetId = normalizeNodeId(sourceNode);
+        const whoisSuffix = nodeIdSuffixForWhois(whoisTargetId);
+        const whoisCommand = buildWhoisCommandForNode(whoisTargetId);
+        const showWhoisButton = chatWhoisQuickActionEnabled
+          && isCanonicalNodeId(whoisTargetId)
+          && !!whoisSuffix;
+        const whoisButton = showWhoisButton
+          ? `<button type="button" class="chat-whois-btn" data-whois-target-id="${{escAttr(whoisTargetId)}}" title="Prepare ${{escAttr(whoisCommand)}} for ${{escAttr(whoisTargetId)}}">Whois</button>`
+          : "";
         const hasReactions = !!reactionChips;
         const reactButton = messageId
           ? `<button type="button" class="chat-react-btn${{hasReactions ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
@@ -18171,7 +18348,12 @@
         const reactionRowParts = [];
         if (reactButton) reactionRowParts.push(reactButton);
         if (reactionChips) reactionRowParts.push(`<span class="chat-reaction-stack">${{reactionChips}}</span>`);
-        if (replyButton) reactionRowParts.push(`<span class="chat-reply-tail">${{replyButton}}</span>`);
+        const tailButtons = [];
+        if (whoisButton) tailButtons.push(whoisButton);
+        if (replyButton) tailButtons.push(replyButton);
+        if (tailButtons.length > 0) {{
+          reactionRowParts.push(`<span class="chat-reply-tail">${{tailButtons.join("")}}</span>`);
+        }}
         const reactionRow = reactionRowParts.length > 0
           ? `<div class="chat-reaction-row">${{reactionRowParts.join("")}}</div>`
           : "";
@@ -18182,7 +18364,7 @@
         const changeBadge = hasChangeMarker
           ? '<span class="chat-feed-new-pill" title="Changed while you were away">NEW</span>'
           : "";
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}">
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
@@ -19231,6 +19413,7 @@
     loadManualDirectPeers();
     loadChatChannel();
     loadChatNotificationScope();
+    loadChatWhoisQuickActionConfig();
     loadChatChangeNotices();
     loadMeshChannelIndex();
     loadChannelsUiMode();
@@ -19267,6 +19450,7 @@
     bindChatComposer();
     bindChatPeerControls();
     bindChatNotificationScopeControl();
+    bindChatWhoisQuickActionControls();
     bindChatChangeSummaryControls();
     bindHistoryNotificationControls();
     renderChatChangeSummary();

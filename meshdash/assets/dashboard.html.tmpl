@@ -85,6 +85,34 @@
               </select>
             </label>
           </section>
+          <section class="chat-settings-section" aria-label="Mesh Bots">
+            <h3 class="chat-settings-section-title">Mesh Bots</h3>
+            <label class="chat-bot-toggle-wrap" for="chat-bot-whois-enabled" title="Show Whois helper action in chat rows">
+              <input id="chat-bot-whois-enabled" type="checkbox" />
+              <span>Enable Whois quick action</span>
+            </label>
+            <label class="chat-change-scope-wrap" for="chat-bot-whois-prefix" title="Whois command prefix used when drafting">
+              <span class="chat-change-scope-label">Whois command</span>
+              <select id="chat-bot-whois-prefix" class="chat-change-scope-select" aria-label="Whois command prefix">
+                <option value="whois">whois (recommended)</option>
+                <option value="!whois">!whois</option>
+                <option value="#whois">#whois</option>
+              </select>
+            </label>
+            <label class="chat-bot-toggle-wrap" for="chat-bot-whois-thread-reply" title="When enabled, Whois drafts reply to the selected chat packet">
+              <input id="chat-bot-whois-thread-reply" type="checkbox" />
+              <span>Attach Whois as reply</span>
+            </label>
+            <div class="chat-bot-cheatsheet" aria-label="Common mesh bot commands">
+              <div class="chat-bot-cheatsheet-title">Common bot commands (network dependent)</div>
+              <div class="chat-bot-cheatsheet-row"><code>cmd</code><span>show available bot commands</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>help</code><span>basic usage/help menu</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>whoami</code><span>show your local node identity</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>whois a39c</code><span>lookup node by ID suffix</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>wx 55112</code><span>weather (if supported)</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>lheard</code><span>recently heard node list</span></div>
+            </div>
+          </section>
         </div>
       </div>
       <div class="favorite-menu-wrap topbar-favorite-menu-wrap">
