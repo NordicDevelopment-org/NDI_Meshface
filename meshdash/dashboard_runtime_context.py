@@ -248,14 +248,36 @@ def build_dashboard_runtime_context(
             setattr(loaders.state_fn, "bot_responder", response_bot)
         except Exception:
             pass
+        def _bot_settings_fn():
+            settings = response_bot.bot_settings()
+            settings["ok"] = True
+            return settings
+        def _apply_bot_settings_fn(request):
+            return response_bot.configure(
+                enabled=getattr(request, "enabled", None),
+                log_enabled=getattr(request, "log_enabled", None),
+                game_enabled=getattr(request, "game_enabled", None),
+            )
         try:
             setattr(loaders.state_fn, "bot_request_history_fn", response_bot.recent_requests)
+        except Exception:
+            pass
+        try:
+            setattr(loaders.state_fn, "bot_settings_fn", _bot_settings_fn)
+        except Exception:
+            pass
+        try:
+            setattr(loaders.state_fn, "apply_bot_settings_fn", _apply_bot_settings_fn)
         except Exception:
             pass
         state_lite_fn = getattr(loaders.state_fn, "lite", None)
         if callable(state_lite_fn):
             try:
                 setattr(state_lite_fn, "bot_request_history_fn", response_bot.recent_requests)
+            except Exception:
+                pass
+            try:
+                setattr(state_lite_fn, "bot_settings_fn", _bot_settings_fn)
             except Exception:
                 pass
 

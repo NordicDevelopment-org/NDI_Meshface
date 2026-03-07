@@ -259,6 +259,37 @@ def test_handle_state_get_injects_backend_bot_requests_when_available():
     assert calls["payload_obj"]["bot_requests"][0]["id"] == "mesh-1"
 
 
+def test_handle_state_get_injects_backend_bot_settings_when_available():
+    calls = {}
+
+    def _state_fn():
+        return {"ok": True}
+
+    setattr(
+        _state_fn,
+        "bot_settings_fn",
+        lambda: {
+            "ok": True,
+            "enabled": True,
+            "log_enabled": True,
+            "game_enabled": False,
+            "active_game_sessions": 0,
+        },
+    )
+
+    handle_state_get(
+        object(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 200
+    settings = calls["payload_obj"]["bot_settings"]
+    assert settings["enabled"] is True
+    assert settings["game_enabled"] is False
+    assert settings["active_game_sessions"] == 0
+
+
 def test_handle_state_get_etag_includes_bot_request_marker():
     calls = {}
 

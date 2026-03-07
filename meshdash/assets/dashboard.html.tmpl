@@ -695,12 +695,19 @@
         <div class="bots-grid">
           <div class="bots-panel">
             <h3>Whois Quick Action</h3>
-            <label class="chat-bot-toggle-wrap bots-master-toggle" for="chat-bot-commands-enabled" title="Master switch for dashboard bot actions. Turn off to hard-disable bot-triggering commands and new bot request logging.">
+            <label class="chat-bot-toggle-wrap bots-master-toggle" for="chat-bot-commands-enabled" title="Master switch for browser quick actions. Turn off to disable Whois helper controls and local bot-history matching in this browser.">
               <input id="chat-bot-commands-enabled" type="checkbox" />
-              <span>Master: Bot Actions Enabled</span>
+              <span>Master: Quick Actions Enabled</span>
             </label>
             <div class="bots-master-note">
-              Turn off to block bot-triggering commands from this dashboard and pause new bot-request logging.
+              Turn off to disable quick-action helpers in this browser. Manual chat commands still send normally.
+            </div>
+            <label class="chat-bot-toggle-wrap" for="chat-bot-game-enabled" title="Enable text-adventure game replies for direct peer-to-peer messages. Send 'zork' in a direct chat to start.">
+              <input id="chat-bot-game-enabled" type="checkbox" />
+              <span>Enable Zork game bot (peer-to-peer)</span>
+            </label>
+            <div class="settings-help-note">
+              Direct message <code>zork</code> to this node to start. Commands: <code>look</code>, <code>n/s/e/w</code>, <code>take</code>, <code>inventory</code>, <code>quit</code>.
             </div>
             <div class="settings-help-note">
               Keep quick bot actions and result tracking in one place.
@@ -731,8 +738,10 @@
               <div class="chat-bot-cheatsheet-row"><code>help</code><span>basic usage/help menu</span></div>
               <div class="chat-bot-cheatsheet-row"><code>whoami</code><span>show your local node identity</span></div>
               <div class="chat-bot-cheatsheet-row"><code>whois a39c</code><span>lookup node by ID suffix</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>ping a39c</code><span>measure reply latency + hop path</span></div>
               <div class="chat-bot-cheatsheet-row"><code>wx 55112</code><span>weather (if supported)</span></div>
               <div class="chat-bot-cheatsheet-row"><code>lheard</code><span>recently heard node list</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>zork</code><span>start peer-to-peer text adventure</span></div>
             </div>
           </div>
           <div class="bots-panel bots-history-panel">

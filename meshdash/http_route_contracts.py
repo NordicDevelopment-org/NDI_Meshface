@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Mapping, Optional, Protocol
 
 from .api_inputs import (
+    BotSettingsRequest,
     ChatSendRequest,
     NodeHistoryQuery,
     OnlineActivityQuery,
@@ -139,6 +140,11 @@ class ParseChannelSettingsRequestFn(Protocol):
         ...
 
 
+class ParseBotSettingsRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> BotSettingsRequest:
+        ...
+
+
 class ApplyRadioSettingsFn(Protocol):
     def __call__(self, request: RadioSettingsRequest) -> dict[str, object]:
         ...
@@ -146,6 +152,11 @@ class ApplyRadioSettingsFn(Protocol):
 
 class ApplyChannelSettingsFn(Protocol):
     def __call__(self, request: ChannelSettingsRequest) -> dict[str, object]:
+        ...
+
+
+class ApplyBotSettingsFn(Protocol):
+    def __call__(self, request: BotSettingsRequest) -> dict[str, object]:
         ...
 
 
@@ -218,3 +229,5 @@ class DashboardPostRouteDependencies:
     parse_radio_settings_request_fn: Optional[ParseRadioSettingsRequestFn] = None
     apply_channel_settings_fn: Optional[ApplyChannelSettingsFn] = None
     parse_channel_settings_request_fn: Optional[ParseChannelSettingsRequestFn] = None
+    apply_bot_settings_fn: Optional[ApplyBotSettingsFn] = None
+    parse_bot_settings_request_fn: Optional[ParseBotSettingsRequestFn] = None

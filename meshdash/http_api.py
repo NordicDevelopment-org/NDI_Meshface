@@ -28,6 +28,7 @@ def make_http_handler(
 ):
     apply_radio_settings_fn = getattr(state_fn, "apply_radio_settings_fn", None)
     apply_channel_settings_fn = getattr(state_fn, "apply_channel_settings_fn", None)
+    apply_bot_settings_fn = getattr(state_fn, "apply_bot_settings_fn", None)
     get_deps = build_get_route_dependencies(
         html_text=html_text,
         state_fn=state_fn,
@@ -43,6 +44,7 @@ def make_http_handler(
         set_theme_preset_fn=set_theme_preset_fn,
         apply_radio_settings_fn=apply_radio_settings_fn,
         apply_channel_settings_fn=apply_channel_settings_fn,
+        apply_bot_settings_fn=apply_bot_settings_fn,
         to_int_fn=to_int_fn,
     )
 

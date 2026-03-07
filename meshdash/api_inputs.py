@@ -24,6 +24,10 @@ from .api_input_channels import (
     ChannelSettingsRequest,
     parse_channel_settings_request,
 )
+from .api_input_bot import (
+    BotSettingsRequest,
+    parse_bot_settings_request,
+)
 
 __all__ = [
     "ChatSendRequest",
@@ -41,5 +45,7 @@ __all__ = [
     "parse_radio_settings_request",
     "ChannelSettingsRequest",
     "parse_channel_settings_request",
+    "BotSettingsRequest",
+    "parse_bot_settings_request",
     "validate_content_length",
 ]

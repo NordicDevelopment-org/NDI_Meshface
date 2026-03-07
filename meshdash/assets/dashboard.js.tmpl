@@ -216,6 +216,7 @@
     const themeSettingsEndpoint = "/api/settings/theme";
     const radioSettingsEndpoint = "/api/settings/radio";
     const channelSettingsEndpoint = "/api/settings/channels";
+    const botSettingsEndpoint = "/api/settings/bot";
     const themeAcceptedModes = new Set(["auto", "dark", "light"]);
     const chatBottomStickThresholdPx = 28;
     const chatWarnWindowSeconds = 10 * 60;
@@ -2085,6 +2086,7 @@
       "help", "!help", "#help",
       "whoami", "!whoami", "#whoami",
       "lheard", "!lheard", "#lheard",
+      "zork", "!zork", "#zork",
     ]);
     const knownBotArgumentCommands = new Set([
       "whois", "!whois", "#whois",
@@ -2178,6 +2180,16 @@
     let chatBotHistoryEnabled = true;
     let botRequestHistory = [];
     let backendBotRequestHistory = [];
+    let serverBotSettings = {{
+      available: false,
+      enabled: true,
+      log_enabled: true,
+      game_enabled: false,
+      active_game_sessions: 0,
+    }};
+    let botGameToggleSaveInFlight = false;
+    let queuedComposerSend = false;
+    let queuedComposerFocus = false;
     let activeMeshChannelIndex = 0;
     let meshChannelOptions = [];
     let meshChannelOptionsSignature = "";
@@ -6090,12 +6102,83 @@
       return `${{prefix}} ${{suffix}}`;
     }}
 
+    function normalizeServerBotSettings(raw) {{
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {{
+        return {{
+          available: false,
+          enabled: true,
+          log_enabled: true,
+          game_enabled: false,
+          active_game_sessions: 0,
+        }};
+      }}
+      const sessionsRaw = Number(raw.active_game_sessions ?? raw.activeGameSessions ?? 0);
+      return {{
+        available: true,
+        enabled: parseBoolToken(raw.enabled, true),
+        log_enabled: parseBoolToken(raw.log_enabled ?? raw.logEnabled, true),
+        game_enabled: parseBoolToken(raw.game_enabled ?? raw.gameEnabled, false),
+        active_game_sessions: Number.isFinite(sessionsRaw) && sessionsRaw >= 0 ? Math.trunc(sessionsRaw) : 0,
+      }};
+    }}
+
+    function applyServerBotSettingsFromState(state = latestState) {{
+      const normalized = normalizeServerBotSettings(state && state.bot_settings);
+      serverBotSettings = normalized;
+      return normalized.available;
+    }}
+
+    async function saveServerBotSettingsPatch(patch = {{}}, { quiet = false } = {{}}) {{
+      if (!patch || typeof patch !== "object") {{
+        return false;
+      }}
+      botGameToggleSaveInFlight = true;
+      syncChatWhoisQuickActionControls();
+      try {{
+        const resp = await fetch(botSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(patch),
+        }});
+        const payload = await resp.json().catch(() => ({{ ok: false, error: `API ${{resp.status}}` }}));
+        if (!resp.ok || !payload || payload.ok === false) {{
+          const message = payload && payload.error ? payload.error : `API ${{resp.status}}`;
+          throw new Error(String(message));
+        }}
+        serverBotSettings = normalizeServerBotSettings(payload);
+        if (!quiet) {{
+          setChatSendStatus(
+            `Bot settings updated: game bot ${{serverBotSettings.game_enabled ? "enabled" : "disabled"}}.`,
+            false
+          );
+        }}
+        if (latestState && typeof latestState === "object") {{
+          latestState.bot_settings = {{ ...payload }};
+        }}
+        if (activeLayoutView === "bots") {{
+          renderBotsView(latestState);
+        }}
+        return true;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        if (!quiet) {{
+          setChatSendStatus(`Failed to update bot settings: ${{msg}}`, true);
+        }}
+        appendConsoleLine(`bot-settings-save|${{Date.now()}}|${{msg}}`, `[bot settings] save failed: ${{msg}}`);
+      }} finally {{
+        botGameToggleSaveInFlight = false;
+        syncChatWhoisQuickActionControls();
+      }}
+      return false;
+    }}
+
     function syncChatWhoisQuickActionControls() {{
       const enabledInput = document.getElementById("chat-bot-whois-enabled");
       const prefixSelect = document.getElementById("chat-bot-whois-prefix");
       const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
       const commandsInput = document.getElementById("chat-bot-commands-enabled");
       const historyInput = document.getElementById("chat-bot-history-enabled");
+      const gameInput = document.getElementById("chat-bot-game-enabled");
       const commandsEnabled = !!chatBotCommandsEnabled;
       const enabled = commandsEnabled && !!chatWhoisQuickActionEnabled;
       const prefix = normalizeWhoisCommandPrefix(chatWhoisQuickActionPrefix);
@@ -6117,6 +6200,18 @@
       if (historyInput instanceof HTMLInputElement) {{
         historyInput.checked = !!chatBotHistoryEnabled;
         historyInput.disabled = !commandsEnabled;
+      }}
+      if (gameInput instanceof HTMLInputElement) {{
+        const available = !!serverBotSettings.available;
+        gameInput.checked = !!serverBotSettings.game_enabled;
+        gameInput.disabled = !available || botGameToggleSaveInFlight;
+        if (!available) {{
+          gameInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (botGameToggleSaveInFlight) {{
+          gameInput.title = "Saving game bot setting...";
+        }} else {{
+          gameInput.title = "Enable text-adventure game replies for direct peer-to-peer messages.";
+        }}
       }}
     }}
 
@@ -6244,6 +6339,18 @@
         historyInput.dataset.bound = "1";
         historyInput.addEventListener("change", () => {{
           applyChatWhoisQuickActionConfig({{ historyEnabled: historyInput.checked }}, true);
+        }});
+      }}
+      const gameInput = document.getElementById("chat-bot-game-enabled");
+      if (gameInput instanceof HTMLInputElement && gameInput.dataset.bound !== "1") {{
+        gameInput.dataset.bound = "1";
+        gameInput.addEventListener("change", async () => {{
+          const nextValue = !!gameInput.checked;
+          const ok = await saveServerBotSettingsPatch({{ game_enabled: nextValue }});
+          if (!ok) {{
+            gameInput.checked = !!serverBotSettings.game_enabled;
+          }}
+          syncChatWhoisQuickActionControls();
         }});
       }}
       syncChatWhoisQuickActionControls();
@@ -6541,6 +6648,7 @@
     }}
 
     function renderBotsView(state = latestState) {{
+      applyServerBotSettingsFromState(state);
       syncChatWhoisQuickActionControls();
       const listEl = document.getElementById("bots-history-list");
       const totalEl = document.getElementById("bots-history-total");
@@ -6566,7 +6674,7 @@
         return;
       }}
       const commandsDisabledNotice = !chatBotCommandsEnabled
-        ? '<div class="bots-history-empty">Dashboard bot commands / responses are disabled. Backend-observed mesh requests still appear here when available.</div>'
+        ? '<div class="bots-history-empty">Quick actions are disabled for this browser. You can still type commands manually in chat; backend-observed mesh requests still appear here when available.</div>'
         : "";
       const disabledNotice = !chatBotHistoryEnabled
         ? '<div class="bots-history-empty">Tracking is disabled. Existing history is shown read-only; new requests and matches will not be recorded.</div>'
@@ -7788,34 +7896,72 @@
         return null;
       }} finally {{
         setChatSendBusy(false);
+        flushQueuedComposerSend();
       }}
     }}
 
-    async function sendChatMessage() {{
+    function restoreChatInputFocus(input) {{
+      if (!(input instanceof HTMLInputElement)) return;
+      window.requestAnimationFrame(() => {{
+        if (input.disabled) return;
+        input.focus({{ preventScroll: true }});
+        const tail = input.value.length;
+        input.setSelectionRange(tail, tail);
+      }});
+    }}
+
+    function flushQueuedComposerSend() {{
+      if (!queuedComposerSend || chatSendInFlight) return;
+      const input = document.getElementById("chat-input");
+      const hasText = input instanceof HTMLInputElement && String(input.value || "").trim().length > 0;
+      const preserveFocus = !!queuedComposerFocus;
+      queuedComposerSend = false;
+      queuedComposerFocus = false;
+      if (!hasText) return;
+      window.setTimeout(() => {{
+        void sendChatMessage({{ preserveFocus }});
+      }}, 0);
+    }}
+
+    async function sendChatMessage(options = null) {{
       const input = document.getElementById("chat-input");
       if (!(input instanceof HTMLInputElement)) return;
+      const preserveFocus = !!(options && options.preserveFocus);
+      const hadFocus = preserveFocus && document.activeElement === input;
+      if (chatSendInFlight) {{
+        const queuedText = String(input.value || "").trim();
+        if (queuedText) {{
+          queuedComposerSend = true;
+          if (preserveFocus || document.activeElement === input) {{
+            queuedComposerFocus = true;
+          }}
+          setChatSendStatus("Send in progress. Queued your message...");
+        }}
+        return;
+      }}
       const text = input.value.trim();
       if (!text) {{
         setChatSendStatus("Enter a message before sending.", true);
-        return;
-      }}
-      const botCommand = parseTrackedBotCommandFromText(text);
-      if (!chatBotCommandsEnabled && botCommand) {{
-        setChatSendStatus(
-          `Bot command ${{botCommand.head}} blocked. Enable "bot commands / responses" in Bots view to send.`,
-          true
-        );
+        if (hadFocus) {{
+          restoreChatInputFocus(input);
+        }}
         return;
       }}
       let destination = "^all";
       if (activeChatChannel === "direct") {{
         if (!isSelectableNodeId(selectedNodeId)) {{
           setChatSendStatus("Select a user before sending a peer-to-peer message.", true);
+          if (hadFocus) {{
+            restoreChatInputFocus(input);
+          }}
           return;
         }}
         destination = selectedNodeId;
         if (isSelfNodeId(destination)) {{
           setChatSendStatus("Cannot send peer-to-peer message to your own radio.", true);
+          if (hadFocus) {{
+            restoreChatInputFocus(input);
+          }}
           return;
         }}
       }}
@@ -7850,6 +7996,9 @@
             setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} on Ch ${{sendCtx.sendIndex}} at ${{payload.sent_at || "now"}}${{allNote}}`);
           }}
         }}
+      }}
+      if (hadFocus) {{
+        restoreChatInputFocus(input);
       }}
     }}
 
@@ -8278,7 +8427,7 @@
         input.addEventListener("keydown", (ev) => {{
           if (ev.key === "Enter" && !ev.shiftKey) {{
             ev.preventDefault();
-            sendChatMessage();
+            sendChatMessage({{ preserveFocus: true }});
           }}
         }});
       }}
@@ -14326,7 +14475,7 @@
             ev.preventDefault();
             ev.stopPropagation();
             if (!chatBotCommandsEnabled) {{
-              setChatSendStatus("Whois quick action is disabled. Enable bot commands / responses in Bots view.", true);
+              setChatSendStatus("Whois quick action is disabled. Enable quick actions in Bots view.", true);
               return;
             }}
             const whoisTargetId = normalizeNodeId(
@@ -19753,6 +19902,7 @@
           const traffic304 = (latestState.traffic && typeof latestState.traffic === "object")
             ? latestState.traffic
             : {{}};
+          applyServerBotSettingsFromState(latestState);
           syncBackendBotRequestHistory(latestState);
           syncBotRequestHistoryWithMessages(traffic304.recent_chat || [], latestState);
           renderSummary(latestState);
@@ -19805,6 +19955,7 @@
         lastPollSuccessUnix = Math.floor(Date.now() / 1000);
         lastPollError = "";
         lastPollErrorUnix = 0;
+        applyServerBotSettingsFromState(state);
         syncBackendBotRequestHistory(state);
         const nextLocalNodeId = resolveLocalNodeId(state);
         if (isCanonicalNodeId(nextLocalNodeId)) {{

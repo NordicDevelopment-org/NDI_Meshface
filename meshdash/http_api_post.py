@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from .api_input_chat import parse_chat_send_request, validate_content_length
 from .api_input_radio import parse_radio_settings_request
 from .api_input_channels import parse_channel_settings_request
+from .api_input_bot import parse_bot_settings_request
 from .api_input_theme import parse_theme_settings_request
 from .helpers import to_int
 from .http_handler_contracts import DashboardHttpHandler
@@ -11,6 +12,7 @@ from .http_responses import write_json_response
 from .http_route_contracts import (
     ApplyRadioSettingsFn,
     ApplyChannelSettingsFn,
+    ApplyBotSettingsFn,
     DashboardPostRouteDependencies,
     SendChatFn,
     SetThemePresetFn,
@@ -29,6 +31,7 @@ def build_post_route_dependencies(
     set_theme_preset_fn: SetThemePresetFn | None = None,
     apply_radio_settings_fn: ApplyRadioSettingsFn | None = None,
     apply_channel_settings_fn: ApplyChannelSettingsFn | None = None,
+    apply_bot_settings_fn: ApplyBotSettingsFn | None = None,
     to_int_fn: ToIntFn = to_int,
 ) -> DashboardPostRouteDependencies:
     return DashboardPostRouteDependencies(
@@ -43,6 +46,8 @@ def build_post_route_dependencies(
         parse_radio_settings_request_fn=parse_radio_settings_request,
         apply_channel_settings_fn=apply_channel_settings_fn,
         parse_channel_settings_request_fn=parse_channel_settings_request,
+        apply_bot_settings_fn=apply_bot_settings_fn,
+        parse_bot_settings_request_fn=parse_bot_settings_request,
     )
 
 

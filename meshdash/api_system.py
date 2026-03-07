@@ -42,6 +42,16 @@ def _resolve_bot_request_history_fn(*, state_fn: object, selected_fn: object) ->
     return None
 
 
+def _resolve_bot_settings_fn(*, state_fn: object, selected_fn: object) -> object:
+    settings_fn = getattr(selected_fn, "bot_settings_fn", None)
+    if callable(settings_fn):
+        return settings_fn
+    settings_fn = getattr(state_fn, "bot_settings_fn", None)
+    if callable(settings_fn):
+        return settings_fn
+    return None
+
+
 def _read_bot_request_rows(*, history_fn: object) -> object:
     if not callable(history_fn):
         return None
@@ -52,6 +62,18 @@ def _read_bot_request_rows(*, history_fn: object) -> object:
     if not isinstance(rows, list):
         return None
     return rows
+
+
+def _read_bot_settings(*, settings_fn: object) -> object:
+    if not callable(settings_fn):
+        return None
+    try:
+        payload = settings_fn()
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
 
 
 def _bot_request_etag_marker(rows: object) -> str:
@@ -74,6 +96,19 @@ def _bot_request_etag_marker(rows: object) -> str:
     return ";".join(marker_parts)
 
 
+def _bot_settings_etag_marker(settings: object) -> str:
+    if not isinstance(settings, dict):
+        return "none"
+    return "|".join(
+        [
+            "1" if bool(settings.get("enabled")) else "0",
+            "1" if bool(settings.get("log_enabled")) else "0",
+            "1" if bool(settings.get("game_enabled")) else "0",
+            str(settings.get("active_game_sessions") or 0),
+        ]
+    )
+
+
 def _inject_bot_requests(
     payload: object,
     *,
@@ -90,6 +125,25 @@ def _inject_bot_requests(
         return payload
     out = dict(payload)
     out["bot_requests"] = rows
+    return out
+
+
+def _inject_bot_settings(
+    payload: object,
+    *,
+    state_fn: object,
+    selected_fn: object,
+    settings: object = None,
+) -> object:
+    if not isinstance(payload, dict):
+        return payload
+    if settings is None:
+        settings_fn = _resolve_bot_settings_fn(state_fn=state_fn, selected_fn=selected_fn)
+        settings = _read_bot_settings(settings_fn=settings_fn)
+    if not isinstance(settings, dict):
+        return payload
+    out = dict(payload)
+    out["bot_settings"] = settings
     return out
 
 
@@ -119,8 +173,12 @@ def handle_state_get(
             etag = None
     history_fn = _resolve_bot_request_history_fn(state_fn=state_fn, selected_fn=selected_fn)
     bot_rows = _read_bot_request_rows(history_fn=history_fn)
+    settings_fn = _resolve_bot_settings_fn(state_fn=state_fn, selected_fn=selected_fn)
+    bot_settings = _read_bot_settings(settings_fn=settings_fn)
     if etag and isinstance(bot_rows, list):
         etag = f"{etag}|bot:{_bot_request_etag_marker(bot_rows)}"
+    if etag and isinstance(bot_settings, dict):
+        etag = f"{etag}|botcfg:{_bot_settings_etag_marker(bot_settings)}"
 
     if etag:
         # BaseHTTPRequestHandler's headers mapping is case-insensitive, but our
@@ -153,6 +211,12 @@ def handle_state_get(
         state_fn=state_fn,
         selected_fn=selected_fn,
         rows=bot_rows,
+    )
+    payload = _inject_bot_settings(
+        payload,
+        state_fn=state_fn,
+        selected_fn=selected_fn,
+        settings=bot_settings,
     )
     if lite:
         payload = _lite_state_payload(payload)

@@ -192,3 +192,86 @@ def test_bot_logs_requests_when_responses_disabled():
     assert row["to_id"] == "^all"
     assert row["respond_enabled"] is False
     assert row["responded"] is False
+
+
+def test_zork_game_starts_only_for_direct_messages():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("zork", packet_id=2001, to_id="^all"), iface)
+    bot.on_receive(_base_packet("zork", packet_id=2002, to_id="!02ed9b7c"), iface)
+
+    assert len(sent) == 1
+    assert sent[0]["destination"] == "!49b5dff0"
+    assert "zork" in str(sent[0]["text"]).lower()
+
+
+def test_zork_game_session_replies_to_followup_commands():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("zork", packet_id=2101, to_id="!02ed9b7c"), iface)
+    bot.on_receive(_base_packet("look", packet_id=2102, to_id="!02ed9b7c"), iface)
+
+    assert len(sent) == 2
+    assert sent[1]["destination"] == "!49b5dff0"
+    assert "trailhead" in str(sent[1]["text"]).lower()
+    history = bot.recent_requests()
+    assert len(history) == 2
+    assert all(str(row.get("command_head") or "") == "zork" for row in history)
+
+
+def test_zork_game_disabled_still_logs_direct_start_requests():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=False,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("zork", packet_id=2201, to_id="!02ed9b7c"), iface)
+
+    assert sent == []
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["command"] == "zork"
+    assert history[0]["command_head"] == "zork"
+
+
+def test_build_bot_from_env_can_enable_game_mode():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_GAME_ENABLED": "1"},
+    )
+    assert bot is not None
+    assert bot.game_enabled is True
