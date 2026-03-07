@@ -1,6 +1,7 @@
 Mini-games for `MeshResponseBot` live here.
 
 The current bot app example lives in `meshdash/games/zork/`.
+That folder now also includes `upstream_1977/zork-master/`, which is the archived MIT Zork source used as the reference for a future fuller port.
 
 If you want to make your own game:
 

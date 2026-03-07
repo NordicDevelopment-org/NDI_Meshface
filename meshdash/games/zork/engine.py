@@ -1,4 +1,4 @@
-from ...bot_apps import BotAppResult
+from ...bot_apps.base import BotAppResult
 from ...bot_commands import BotCommandSpec
 
 from .world import ROOMS, START_ROOM

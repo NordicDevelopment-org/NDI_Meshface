@@ -1,5 +1,5 @@
 from .base import BotApp
-from ..games.zork import ZorkGame
+from ..games.zork.engine import ZorkGame
 
 
 def build_builtin_bot_apps() -> list[BotApp]:

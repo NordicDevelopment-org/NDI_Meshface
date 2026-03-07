@@ -11,7 +11,8 @@ from .bot_commands import (
     build_custom_bot_command_spec,
     normalize_bot_command_name,
 )
-from .bot_apps import BotApp, build_builtin_bot_apps
+from .bot_apps.base import BotApp
+from .bot_apps.registry import build_builtin_bot_apps
 from .helpers import to_int as _to_int
 
 STANDARD_BOT_COMMANDS = _STANDARD_BOT_COMMANDS
