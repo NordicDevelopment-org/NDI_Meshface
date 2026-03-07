@@ -2557,9 +2557,46 @@
       justify-content: space-between;
       gap: 8px;
     }}
+    .bots-review-head-copy {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }}
+    .bots-review-tabs {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }}
+    .bots-review-tab {{
+      border: 1px solid #c8d9cc;
+      border-radius: 999px;
+      background: #edf6ef;
+      color: #365846;
+      font-size: 11px;
+      line-height: 1;
+      padding: 6px 10px;
+      cursor: pointer;
+    }}
+    .bots-review-tab.is-active {{
+      background: #2f855a;
+      border-color: #2f855a;
+      color: #ffffff;
+    }}
     .bots-history-clear-btn {{
       padding: 4px 10px;
       font-size: 11px;
+    }}
+    .bots-tab-panel {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      flex: 1 1 auto;
+    }}
+    .bots-tab-panel[hidden] {{
+      display: none !important;
     }}
     .bots-history-stats {{
       display: flex;
@@ -2581,8 +2618,45 @@
       flex-direction: column;
       gap: 6px;
     }}
-    .bots-history-reference-card {{
+    .bots-sniffer-controls {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: end;
+    }}
+    .bots-sniffer-filter-wrap {{
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1 1 260px;
+      min-width: 220px;
+    }}
+    .bots-sniffer-filter-label {{
+      font-size: 10px;
+      color: #4f6758;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }}
+    .bots-sniffer-command-input {{
+      width: 100%;
+      min-width: 0;
+      border-radius: 8px;
+      border: 1px solid #c8d9cc;
+      background: #ffffff;
+      color: #204231;
+      font-size: 12px;
+      padding: 8px 10px;
+    }}
+    .bots-sniffer-actions {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       flex: 0 0 auto;
+    }}
+    .bots-sniffer-btn {{
+      padding: 6px 10px;
+      font-size: 11px;
     }}
     .bots-history-empty {{
       border: 1px dashed #cfe0d2;
@@ -8336,6 +8410,16 @@
       border-color: #355343;
       color: #c7e8d6;
     }}
+    [data-theme="dark"] .bots-review-tab {{
+      border-color: #3f5a4c;
+      background: #173122;
+      color: #bdd6c5;
+    }}
+    [data-theme="dark"] .bots-review-tab.is-active {{
+      border-color: #2f855a;
+      background: #2f855a;
+      color: #f4fff8;
+    }}
     [data-theme="dark"] .bots-history-stats {{
       color: #9ec8b3;
     }}
@@ -8379,6 +8463,14 @@
     }}
     [data-theme="dark"] .bots-history-response strong {{
       color: #dbeeff;
+    }}
+    [data-theme="dark"] .bots-sniffer-filter-label {{
+      color: #afc8ba;
+    }}
+    [data-theme="dark"] .bots-sniffer-command-input {{
+      border-color: #2a4638;
+      background: #0f1d16;
+      color: #e9f5ee;
     }}
     [data-theme="dark"] .chat-change-title {{
       color: #c7e8d6;

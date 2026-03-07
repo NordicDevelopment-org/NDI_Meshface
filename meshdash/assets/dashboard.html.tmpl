@@ -754,25 +754,40 @@
           </div>
           <div class="bots-panel bots-history-panel">
             <div class="bots-history-head">
-              <h3>Request History</h3>
+              <div class="bots-review-head-copy">
+                <h3>Bot Review</h3>
+                <div class="bots-review-tabs" role="tablist" aria-label="Bot review views">
+                  <button id="bots-tab-history-btn" class="bots-review-tab is-active" type="button" role="tab" aria-selected="true">Request History</button>
+                  <button id="bots-tab-sniffer-btn" class="bots-review-tab" type="button" role="tab" aria-selected="false">Traffic Sniffer</button>
+                </div>
+              </div>
               <button id="bots-history-clear-btn" class="btn btn-secondary bots-history-clear-btn" type="button">Clear History</button>
             </div>
-            <div class="bots-history-stats">
-              <span>Total <strong id="bots-history-total">0</strong></span>
-              <span>Pending <strong id="bots-history-pending">0</strong></span>
-              <span>Responded <strong id="bots-history-responded">0</strong></span>
+            <div id="bots-history-tab-panel" class="bots-tab-panel" role="tabpanel" aria-labelledby="bots-tab-history-btn">
+              <div class="bots-history-stats">
+                <span>Total <strong id="bots-history-total">0</strong></span>
+                <span>Pending <strong id="bots-history-pending">0</strong></span>
+                <span>Responded <strong id="bots-history-responded">0</strong></span>
+              </div>
+              <div id="bots-history-list" class="scroll bots-history-list" aria-live="polite"></div>
             </div>
-            <div id="bots-history-list" class="scroll bots-history-list" aria-live="polite"></div>
-            <div class="chat-bot-cheatsheet bots-history-reference-card" aria-label="Common mesh bot commands">
-              <div class="chat-bot-cheatsheet-title">Common bot commands (network dependent)</div>
-              <div class="chat-bot-cheatsheet-row"><code>cmd</code><span>show available bot commands</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>help</code><span>basic usage/help menu</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>whoami</code><span>show your local node identity</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>whois a39c</code><span>lookup node by ID suffix</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>ping a39c</code><span>measure reply latency + hop path</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>wx 55112</code><span>weather (if supported)</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>lheard</code><span>recently heard node list</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>zork</code><span>start peer-to-peer text adventure</span></div>
+            <div id="bots-sniffer-tab-panel" class="bots-tab-panel" role="tabpanel" aria-labelledby="bots-tab-sniffer-btn" hidden>
+              <div class="bots-sniffer-controls">
+                <label class="bots-sniffer-filter-wrap" for="bots-sniffer-command-input">
+                  <span class="bots-sniffer-filter-label">Tracked Commands</span>
+                  <input id="bots-sniffer-command-input" class="bots-sniffer-command-input" type="text" placeholder="cmd, whois, ping, wx, zork" autocomplete="off" />
+                </label>
+                <div class="bots-sniffer-actions">
+                  <button id="bots-sniffer-apply-btn" class="btn btn-secondary bots-sniffer-btn" type="button">Apply</button>
+                  <button id="bots-sniffer-reset-btn" class="btn btn-secondary bots-sniffer-btn" type="button">Defaults</button>
+                </div>
+              </div>
+              <div class="bots-history-stats">
+                <span>Total <strong id="bots-sniffer-total">0</strong></span>
+                <span>Senders <strong id="bots-sniffer-senders">0</strong></span>
+                <span>Commands <strong id="bots-sniffer-commands">0</strong></span>
+              </div>
+              <div id="bots-sniffer-list" class="scroll bots-history-list" aria-live="polite"></div>
             </div>
           </div>
         </div>
