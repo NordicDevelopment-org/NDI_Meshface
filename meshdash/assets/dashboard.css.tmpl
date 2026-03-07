@@ -5272,15 +5272,35 @@
       line-height: 1.3;
       white-space: nowrap;
     }}
+    .mesh-channel-badge,
     .chat-feed-mesh {{
+      --mesh-channel-badge-fill: #0072b2;
+      --mesh-channel-badge-rgb: 0, 114, 178;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       font-size: 10px;
-      color: #345f7f;
-      background: #ebf2f8;
-      border: 1px solid #c7d8e6;
+      color: #2f5369;
+      background: rgba(var(--mesh-channel-badge-rgb), 0.12);
+      border: 1px solid rgba(var(--mesh-channel-badge-rgb), 0.32);
       border-radius: 999px;
-      padding: 1px 7px;
+      padding: 1px 7px 1px 6px;
       line-height: 1.3;
       white-space: nowrap;
+    }}
+    .mesh-channel-badge::before,
+    .chat-feed-mesh::before {{
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      background: var(--mesh-channel-badge-fill);
+      border: 1px solid rgba(19, 36, 26, 0.28);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    }}
+    .bots-history-channel {{
+      margin-right: 1px;
     }}
     .chat-feed-actions {{
       display: inline-flex;
@@ -6469,10 +6489,16 @@
       border-color: #416253;
       color: #c9e2d4;
     }}
+    [data-theme="dark"] .mesh-channel-badge,
     [data-theme="dark"] .chat-feed-mesh {{
-      background: #1d2f3d;
-      border-color: #3f627a;
-      color: #c6e2f6;
+      background: rgba(var(--mesh-channel-badge-rgb), 0.18);
+      border-color: rgba(var(--mesh-channel-badge-rgb), 0.46);
+      color: #deedf7;
+    }}
+    [data-theme="dark"] .mesh-channel-badge::before,
+    [data-theme="dark"] .chat-feed-mesh::before {{
+      border-color: rgba(7, 20, 13, 0.36);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
     }}
     [data-theme="dark"] .chat-reaction-chip,
     [data-theme="dark"] .chat-reply-btn,
@@ -6802,7 +6828,6 @@
     }}
     [data-theme="dark"] .chat-endpoint .chat-id-bg,
     [data-theme="dark"] .chat-feed-hops,
-    [data-theme="dark"] .chat-feed-mesh,
     [data-theme="dark"] .chat-reaction-chip,
     [data-theme="dark"] .chat-reply-btn,
     [data-theme="dark"] .chat-react-btn,
@@ -7001,7 +7026,6 @@
     [data-theme="dark"] .chat-feed-item,
     [data-theme="dark"] .chat-endpoint .chat-id-bg,
     [data-theme="dark"] .chat-feed-hops,
-    [data-theme="dark"] .chat-feed-mesh,
     [data-theme="dark"] .chat-reaction-chip,
     [data-theme="dark"] .chat-reply-btn,
     [data-theme="dark"] .chat-react-btn,
@@ -7101,7 +7125,6 @@
       border-color: #2f3b4b;
     }}
     [data-theme="dark"] .card.chat .chat-feed-hops,
-    [data-theme="dark"] .card.chat .chat-feed-mesh,
     [data-theme="dark"] .card.chat .chat-endpoint .chat-id-bg,
     [data-theme="dark"] .card.chat .chat-reaction-chip,
     [data-theme="dark"] .card.chat .chat-reply-btn,

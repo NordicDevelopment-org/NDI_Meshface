@@ -6843,7 +6843,15 @@
         const sentLabel = formatLocalChatTime(entry.sent_unix, entry.sent_at || "n/a");
         const destLabel = entry.destination === "^all" ? "All" : nodeLabel(entry.destination);
         const fromLabel = nodeLabel(entry.from_id || "");
-        const channelLabel = Number.isInteger(entry.channel_index) ? `Ch ${{entry.channel_index}}` : "Ch ?";
+        const hasChannelIndex = Number.isInteger(entry.channel_index) && Number(entry.channel_index) >= 0;
+        const channelLabel = hasChannelIndex ? `Ch ${{entry.channel_index}}` : "Ch ?";
+        const channelBadge = hasChannelIndex
+          ? meshChannelBadgeHtml(entry.channel_index, channelLabel, {{
+              allowAll: false,
+              extraClass: "bots-history-channel",
+              title: meshChannelLabelForIndex(entry.channel_index, {{ verbose: true, allowAll: false }}),
+            }})
+          : `<span>${{escAttr(channelLabel)}}</span>`;
         const replyHint = entry.reply_attached ? "reply attached" : "new request";
         const commandHead = String(entry.command_head || botCommandHeadFromText(entry.command)).trim().toLowerCase();
         const isPingCommand = commandHead === "ping" || commandHead === "!ping" || commandHead === "#ping";
@@ -6881,7 +6889,7 @@
           <div class="bots-history-meta">
             <span>${{escAttr(sentLabel)}}</span>
             <span>from ${{escAttr(fromLabel || "n/a")}}</span>
-            <span>${{escAttr(channelLabel)}}</span>
+            ${{channelBadge}}
             <span>to ${{escAttr(destLabel)}}</span>
             <span>${{escAttr(replyHint)}}</span>
           </div>
@@ -6974,6 +6982,32 @@
         fill,
         title: colorTitle,
       }};
+    }}
+
+    function hexColorRgbTriplet(fill) {{
+      const text = String(fill || "").trim();
+      const match = /^#?([0-9a-f]{6})$/i.exec(text);
+      if (!match) return "141, 163, 177";
+      const hex = match[1];
+      const r = Number.parseInt(hex.slice(0, 2), 16);
+      const g = Number.parseInt(hex.slice(2, 4), 16);
+      const b = Number.parseInt(hex.slice(4, 6), 16);
+      return `${{r}}, ${{g}}, ${{b}}`;
+    }}
+
+    function meshChannelBadgeStyle(rawIndex, {{ allowAll = false }} = {{}}) {{
+      const meta = meshChannelColorMeta(rawIndex, {{ allowAll }});
+      return `--mesh-channel-badge-fill: ${{meta.fill}}; --mesh-channel-badge-rgb: ${{hexColorRgbTriplet(meta.fill)}};`;
+    }}
+
+    function meshChannelBadgeHtml(rawIndex, label, {{ allowAll = false, extraClass = "", title = "" }} = {{}}) {{
+      const classNames = ["mesh-channel-badge"];
+      if (extraClass) classNames.push(String(extraClass).trim());
+      const text = String(label || "").trim() || meshChannelLabelForIndex(rawIndex, {{ compact: true, allowAll }});
+      const titleText = String(title || "").trim();
+      const styleAttr = escAttr(meshChannelBadgeStyle(rawIndex, {{ allowAll }}));
+      const titleAttr = titleText ? ` title="${{escAttr(titleText)}}"` : "";
+      return `<span class="${{escAttr(classNames.join(" "))}}" style="${{styleAttr}}"${{titleAttr}}>${{escAttr(text)}}</span>`;
     }}
 
     function meshChannelViewMenuLabel(rawIndex) {{
@@ -19247,14 +19281,16 @@
         return snapshot;
       }}
 
-      const nodeIdentityMeta = (nodeId) => {{
+      const nodeIdentityMeta = (nodeId, options = {{}}) => {{
+        const showHops = !(options && options.showHops === false);
         const snapshot = resolveChatNodeFreshness(nodeId);
         const clean = snapshot.id;
         if (!clean) {{
           return {{ html: "", title: "" }};
         }}
-        if (nodeIdentityCache.has(clean)) {{
-          return nodeIdentityCache.get(clean);
+        const cacheKey = `${{clean}}|hops:${{showHops ? "1" : "0"}}`;
+        if (nodeIdentityCache.has(cacheKey)) {{
+          return nodeIdentityCache.get(cacheKey);
         }}
         const node = snapshot.node;
         const historyCaps = snapshot.historyCaps;
@@ -19291,26 +19327,28 @@
           );
         }}
 
-        const hopsRaw = Number(
-          (node && node.hops_away != null)
-            ? node.hops_away
-          : (historyCaps && historyCaps.last_hops)
-        );
-        if (Number.isFinite(hopsRaw) && hopsRaw >= 0) {{
-          const hops = Math.trunc(hopsRaw);
-          chips.push(`<span class="chat-name-chip hops ${{chipStateClass}}" title="Hops away">${{hops}}h</span>`);
-          titleParts.push(
+        if (showHops) {{
+          const hopsRaw = Number(
             (node && node.hops_away != null)
-              ? `${{hops}} hop${{hops === 1 ? "" : "s"}} away`
-              : `${{hops}} hop${{hops === 1 ? "" : "s"}} last known`
+              ? node.hops_away
+            : (historyCaps && historyCaps.last_hops)
           );
+          if (Number.isFinite(hopsRaw) && hopsRaw >= 0) {{
+            const hops = Math.trunc(hopsRaw);
+            chips.push(`<span class="chat-name-chip hops ${{chipStateClass}}" title="Hops away">${{hops}}h</span>`);
+            titleParts.push(
+              (node && node.hops_away != null)
+                ? `${{hops}} hop${{hops === 1 ? "" : "s"}} away`
+                : `${{hops}} hop${{hops === 1 ? "" : "s"}} last known`
+            );
+          }}
         }}
 
         const identity = {{
           html: chips.join(""),
           title: titleParts.join(", "),
         }};
-        nodeIdentityCache.set(clean, identity);
+        nodeIdentityCache.set(cacheKey, identity);
         return identity;
       }};
 
@@ -19758,7 +19796,15 @@
         const hasHop = Number.isFinite(hopNum) && hopNum >= 0;
         const meshIdx = messageMeshChannelIndex(msg);
         const meshBadge = showMeshBadge
-          ? `<span class="chat-feed-mesh" title="${{escAttr(meshChannelLabelForIndex(meshIdx, {{ verbose: true, allowAll: false }}))}}">${{escAttr(meshChannelLabelForIndex(meshIdx, {{ compact: true, allowAll: false }}))}}</span>`
+          ? meshChannelBadgeHtml(
+              meshIdx,
+              meshChannelLabelForIndex(meshIdx, {{ compact: true, allowAll: false }}),
+              {{
+                allowAll: false,
+                extraClass: "chat-feed-mesh",
+                title: meshChannelLabelForIndex(meshIdx, {{ verbose: true, allowAll: false }}),
+              }},
+            )
           : "";
         const hopStart = Number(msg.hop_start ?? msg.hopStart);
         const hopLimit = Number(msg.hop_limit ?? msg.hopLimit);
@@ -19840,10 +19886,10 @@
           : "";
         const reactionRowParts = [];
         if (reactButton) reactionRowParts.push(reactButton);
+        if (replyButton) reactionRowParts.push(replyButton);
         if (reactionChips) reactionRowParts.push(`<span class="chat-reaction-stack">${{reactionChips}}</span>`);
         const tailButtons = [];
         if (whoisButton) tailButtons.push(whoisButton);
-        if (replyButton) tailButtons.push(replyButton);
         if (tailButtons.length > 0) {{
           reactionRowParts.push(`<span class="chat-reply-tail">${{tailButtons.join("")}}</span>`);
         }}
@@ -19956,7 +20002,7 @@
         roomList.innerHTML = rosterFiltered.length > 0
           ? rosterFiltered.map((item) => (
               (() => {{
-                const meta = nodeIdentityMeta(item.id);
+                const meta = nodeIdentityMeta(item.id, {{ showHops: false }});
                 const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}}`;
                 const peerBadge = item.p2pPinned
                   ? '<span class="chat-member-peer-badge" title="Saved peer-to-peer target">saved</span>'
