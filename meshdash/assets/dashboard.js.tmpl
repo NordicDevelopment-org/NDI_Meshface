@@ -20633,9 +20633,6 @@
         const reactButton = messageId
           ? `<button type="button" class="chat-react-btn${{hasReactions ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
           : "";
-        const hopBadge = hasHop
-          ? `<span class="chat-feed-hops" title="${{escAttr(hopTitle)}}">${{escAttr(hopLabel)}}</span>`
-          : "";
         const retryButton = (
           isLocalEcho
           && isRetryableDeliveryState(deliveryState)
@@ -20668,7 +20665,46 @@
         const statusBadge = isStatusMessage
           ? '<span class="chat-feed-status-pill" title="Status update">Status</span>'
           : "";
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}}>
+        const packetEntry = messageId ? packetSummaryById.get(String(messageId)) : null;
+        const packetSummary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+          ? packetEntry.summary
+          : {};
+        const portnumText = String(msg.portnum ?? packetSummary.portnum ?? "").trim() || "n/a";
+        const messageTooltipParts = [
+          `From: ${{fromMeta.label}}${{fromMeta.idTag ? ` (${{fromMeta.idTag}})` : ""}}`,
+          `To: ${{toMeta.label}}${{toMeta.idTag ? ` (${{toMeta.idTag}})` : ""}}`,
+          `Channel: ${{meshChannelLabelForIndex(meshIdx, {{ verbose: true, allowAll: false }})}}`,
+          `Port: ${{portnumText}}`,
+        ];
+        if (messageId) {{
+          messageTooltipParts.push(`Packet: #${{messageId}}`);
+        }}
+        if (Number.isInteger(replyToId) && replyToId > 0) {{
+          messageTooltipParts.push(`Reply to: #${{replyToId}}`);
+        }}
+        if (timeText) {{
+          messageTooltipParts.push(`Time: ${{timeText}}`);
+        }}
+        if (rawTimeText && rawTimeText !== timeText) {{
+          messageTooltipParts.push(`Raw time: ${{rawTimeText}}`);
+        }}
+        if (hasHop) {{
+          messageTooltipParts.push(`Hops: ${{hopTitle === "Hop count" ? hopLabel : `${{hopLabel}} (${{hopTitle}})`}}`);
+        }}
+        if (deliveryLabel) {{
+          messageTooltipParts.push(`Delivery: ${{deliveryLabel}}`);
+        }}
+        if (deliveryError) {{
+          messageTooltipParts.push(`Delivery error: ${{trimInlineError(deliveryError, 160)}}`);
+        }}
+        if (isStatusMessage) {{
+          messageTooltipParts.push("Kind: status");
+        }}
+        if (textCompact) {{
+          messageTooltipParts.push(`Message: ${{textCompact}}`);
+        }}
+        const messageTooltip = messageTooltipParts.join("\n");
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
@@ -20679,7 +20715,7 @@
               <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
-            <span class="chat-feed-actions">${{changeBadge}}${{statusBadge}}${{hopBadge}}${{retryButton}}</span>
+            <span class="chat-feed-actions">${{changeBadge}}${{statusBadge}}${{retryButton}}</span>
             ${{deliveryChip}}
             <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
           </div>
