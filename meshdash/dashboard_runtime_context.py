@@ -248,6 +248,16 @@ def build_dashboard_runtime_context(
             setattr(loaders.state_fn, "bot_responder", response_bot)
         except Exception:
             pass
+        try:
+            setattr(loaders.state_fn, "bot_request_history_fn", response_bot.recent_requests)
+        except Exception:
+            pass
+        state_lite_fn = getattr(loaders.state_fn, "lite", None)
+        if callable(state_lite_fn):
+            try:
+                setattr(state_lite_fn, "bot_request_history_fn", response_bot.recent_requests)
+            except Exception:
+                pass
 
     return DashboardRuntimeContext(
         target=target,

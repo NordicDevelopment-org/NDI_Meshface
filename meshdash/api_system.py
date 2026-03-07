@@ -32,6 +32,67 @@ def _lite_state_payload(payload: object) -> object:
     return out
 
 
+def _resolve_bot_request_history_fn(*, state_fn: object, selected_fn: object) -> object:
+    history_fn = getattr(selected_fn, "bot_request_history_fn", None)
+    if callable(history_fn):
+        return history_fn
+    history_fn = getattr(state_fn, "bot_request_history_fn", None)
+    if callable(history_fn):
+        return history_fn
+    return None
+
+
+def _read_bot_request_rows(*, history_fn: object) -> object:
+    if not callable(history_fn):
+        return None
+    try:
+        rows = history_fn()
+    except Exception:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return rows
+
+
+def _bot_request_etag_marker(rows: object) -> str:
+    if not isinstance(rows, list):
+        return "0"
+    sample = []
+    for row in rows[:20]:
+        if not isinstance(row, dict):
+            continue
+        sample.append(
+            (
+                str(row.get("id") or ""),
+                str(row.get("received_unix") or row.get("sent_unix") or ""),
+                str(row.get("response_message_id") or ""),
+                "1" if bool(row.get("responded")) else "0",
+            )
+        )
+    marker_parts = [str(len(rows))]
+    marker_parts.extend("|".join(part) for part in sample)
+    return ";".join(marker_parts)
+
+
+def _inject_bot_requests(
+    payload: object,
+    *,
+    state_fn: object,
+    selected_fn: object,
+    rows: object = None,
+) -> object:
+    if not isinstance(payload, dict):
+        return payload
+    if rows is None:
+        history_fn = _resolve_bot_request_history_fn(state_fn=state_fn, selected_fn=selected_fn)
+        rows = _read_bot_request_rows(history_fn=history_fn)
+    if not isinstance(rows, list):
+        return payload
+    out = dict(payload)
+    out["bot_requests"] = rows
+    return out
+
+
 def handle_state_get(
     handler: DashboardHttpHandler,
     *,
@@ -56,6 +117,10 @@ def handle_state_get(
             etag = str(etag_fn())
         except Exception:
             etag = None
+    history_fn = _resolve_bot_request_history_fn(state_fn=state_fn, selected_fn=selected_fn)
+    bot_rows = _read_bot_request_rows(history_fn=history_fn)
+    if etag and isinstance(bot_rows, list):
+        etag = f"{etag}|bot:{_bot_request_etag_marker(bot_rows)}"
 
     if etag:
         # BaseHTTPRequestHandler's headers mapping is case-insensitive, but our
@@ -83,6 +148,12 @@ def handle_state_get(
 
     payload_raw = selected_fn()
     payload = normalize_state_payload_for_api(payload_raw)
+    payload = _inject_bot_requests(
+        payload,
+        state_fn=state_fn,
+        selected_fn=selected_fn,
+        rows=bot_rows,
+    )
     if lite:
         payload = _lite_state_payload(payload)
     kwargs = {

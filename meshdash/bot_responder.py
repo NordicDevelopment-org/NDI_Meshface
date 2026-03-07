@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import time
 from typing import Callable, Optional
 
@@ -255,12 +256,14 @@ class MeshResponseBot:
         get_local_node_id_fn: Callable[[object], str],
         custom_commands: Optional[dict[str, str]] = None,
         enabled: bool = True,
+        log_enabled: bool = True,
         reply_broadcast: bool = False,
         now_unix_fn: Callable[[], float] = time.time,
     ) -> None:
         self._send_chat_fn = send_chat_fn
         self._get_local_node_id_fn = get_local_node_id_fn
         self._enabled = bool(enabled)
+        self._log_enabled = bool(log_enabled)
         self._reply_broadcast = bool(reply_broadcast)
         self._now_unix_fn = now_unix_fn
         self._custom_commands = {
@@ -268,31 +271,80 @@ class MeshResponseBot:
             for name, template in (custom_commands or {}).items()
             if _normalize_command_name(name) and str(template or "").strip()
         }
-        self._recent_packet_ids: dict[int, int] = {}
+        self._recent_packet_ids: dict[str, int] = {}
+        self._request_log: list[dict[str, object]] = []
+        self._request_seq = 0
+        self._lock = threading.Lock()
 
     @property
     def enabled(self) -> bool:
         return self._enabled
 
-    def _remember_packet_id(self, packet_id: Optional[int]) -> bool:
+    @property
+    def log_enabled(self) -> bool:
+        return self._log_enabled
+
+    def _remember_packet_id(self, from_id: str, packet_id: Optional[int]) -> bool:
         if packet_id is None or packet_id <= 0:
             return False
+        key = f"{_normalize_node_id(from_id)}|{packet_id}"
+        if not key.startswith("!"):
+            key = f"unknown|{packet_id}"
         now_unix = int(self._now_unix_fn())
-        seen_at = self._recent_packet_ids.get(packet_id)
+        seen_at = self._recent_packet_ids.get(key)
         if seen_at is not None and (now_unix - seen_at) <= _RECENT_PACKET_TTL_SECONDS:
             return True
-        self._recent_packet_ids[packet_id] = now_unix
+        self._recent_packet_ids[key] = now_unix
         if len(self._recent_packet_ids) > _RECENT_PACKET_MAX:
             oldest = sorted(self._recent_packet_ids.items(), key=lambda item: item[1])[
                 : max(1, len(self._recent_packet_ids) - _RECENT_PACKET_MAX)
             ]
-            for stale_packet_id, _stale_ts in oldest:
-                self._recent_packet_ids.pop(stale_packet_id, None)
+            for stale_key, _stale_ts in oldest:
+                self._recent_packet_ids.pop(stale_key, None)
         stale_before = now_unix - _RECENT_PACKET_TTL_SECONDS
-        for stale_packet_id, seen_unix in list(self._recent_packet_ids.items()):
+        for stale_key, seen_unix in list(self._recent_packet_ids.items()):
             if seen_unix < stale_before:
-                self._recent_packet_ids.pop(stale_packet_id, None)
+                self._recent_packet_ids.pop(stale_key, None)
         return False
+
+    def _record_request(self, entry: dict[str, object]) -> None:
+        if not self._log_enabled:
+            return
+        with self._lock:
+            self._request_seq += 1
+            entry["_seq"] = self._request_seq
+            self._request_log.append(dict(entry))
+            if len(self._request_log) > _RECENT_PACKET_MAX:
+                self._request_log = self._request_log[-_RECENT_PACKET_MAX:]
+
+    def _update_request(self, request_id: str, **updates: object) -> None:
+        if not self._log_enabled:
+            return
+        if not request_id:
+            return
+        with self._lock:
+            for row in reversed(self._request_log):
+                if str(row.get("id") or "") != request_id:
+                    continue
+                row.update(updates)
+                break
+
+    def recent_requests(self, limit: int = 200) -> list[dict[str, object]]:
+        max_rows = max(1, min(1000, int(limit)))
+        with self._lock:
+            rows = list(self._request_log)
+        rows.sort(
+            key=lambda row: (
+                _to_int(row.get("received_unix")) or 0,
+                _to_int(row.get("_seq")) or 0,
+            ),
+            reverse=True,
+        )
+        out: list[dict[str, object]] = []
+        for row in rows[:max_rows]:
+            clean = {k: v for k, v in row.items() if not str(k).startswith("_")}
+            out.append(clean)
+        return out
 
     def _local_node_context(self, interface: object) -> tuple[str, set[str], list[dict[str, object]]]:
         local_node_id = ""
@@ -489,17 +541,13 @@ class MeshResponseBot:
         return None
 
     def on_receive(self, packet: object, interface: object = None, **_kwargs: object) -> None:
-        if not self._enabled:
+        if not self._enabled and not self._log_enabled:
             return
         if not isinstance(packet, dict):
             return
         if not _is_text_message_packet(packet):
             return
         if interface is None:
-            return
-
-        packet_id = _to_int(packet.get("id"))
-        if self._remember_packet_id(packet_id):
             return
 
         decoded = packet.get("decoded")
@@ -517,14 +565,54 @@ class MeshResponseBot:
         from_id = _resolve_packet_node_id(packet.get("fromId"), packet.get("from"), interface)
         if not from_id or from_id == "^all":
             return
+        packet_id = _to_int(packet.get("id"))
+        if self._remember_packet_id(from_id, packet_id):
+            return
         to_id = _resolve_packet_node_id(packet.get("toId"), packet.get("to"), interface) or "^all"
         local_node_id, local_aliases, nodes = self._local_node_context(interface)
-        if local_node_id and from_id.lower() == local_node_id.lower():
+        if local_node_id and _normalize_node_id(from_id).lower() == local_node_id.lower():
             return
+
+        rx_unix = _to_int(packet.get("rxTime"))
+        now_unix = int(self._now_unix_fn())
+        received_unix = rx_unix if rx_unix is not None and rx_unix > 0 else now_unix
+        received_ms = received_unix * 1000
+        channel_index = _to_int(packet.get("channel"))
+        if channel_index is None or channel_index < 0:
+            channel_index = 0
+        request_id = f"mesh-{_normalize_node_id(from_id) or 'unknown'}-{packet_id if packet_id is not None else received_unix}-{command}"
+        request_entry = {
+            "id": request_id,
+            "source": "mesh",
+            "command": text,
+            "command_head": command,
+            "command_args": " ".join(args),
+            "from_id": _normalize_node_id(from_id),
+            "to_id": _normalize_node_id(to_id) or "^all",
+            "channel_index": channel_index,
+            "message_id": packet_id,
+            "reply_id": None,
+            "received_unix": received_unix,
+            "received_at": _safe_strftime(received_unix),
+            "hops": _packet_hops(packet),
+            "respond_enabled": bool(self._enabled),
+            "responded": False,
+            "response_message_id": None,
+            "response_unix": None,
+            "response_hops": None,
+            "response_from": "",
+            "response_to": "",
+            "response_text": "",
+            "response_error": "",
+        }
+        self._record_request(request_entry)
+
+        if not self._enabled:
+            return
+
         if to_id.startswith("!") and local_node_id.startswith("!") and to_id.lower() != local_node_id.lower():
             return
 
-        received_ms = int(self._now_unix_fn() * 1000)
         reply_text = self._build_reply(
             command=command,
             args=args,
@@ -539,19 +627,44 @@ class MeshResponseBot:
         if not reply_text:
             return
 
-        channel_index = _to_int(packet.get("channel"))
-        if channel_index is None or channel_index < 0:
-            channel_index = 0
         reply_id = packet_id if packet_id is not None and packet_id > 0 else None
         destination = "^all" if self._reply_broadcast or to_id == "^all" else from_id
         if destination != "^all" and not destination.startswith("!"):
             return
-        self._send_chat_fn(
-            text=reply_text,
-            destination=destination,
-            channel_index=channel_index,
-            reply_id=reply_id,
-        )
+        try:
+            response_payload = self._send_chat_fn(
+                text=reply_text,
+                destination=destination,
+                channel_index=channel_index,
+                reply_id=reply_id,
+            )
+            response_message_id = _to_int(
+                response_payload.get("message_id") if isinstance(response_payload, dict) else None
+            )
+            response_unix = _to_int(
+                response_payload.get("sent_at")
+                if isinstance(response_payload, dict)
+                else None
+            )
+            response_from = local_node_id or ""
+            response_to = _normalize_node_id(destination) or destination
+            self._update_request(
+                request_id,
+                responded=True,
+                response_message_id=response_message_id,
+                response_unix=response_unix if response_unix and response_unix > 0 else int(self._now_unix_fn()),
+                response_hops=_packet_hops(packet),
+                response_from=response_from,
+                response_to=response_to,
+                response_text=reply_text,
+                response_error="",
+            )
+        except Exception as exc:
+            self._update_request(
+                request_id,
+                responded=False,
+                response_error=str(exc),
+            )
 
 
 def _load_custom_commands_from_env(env: dict[str, str]) -> dict[str, str]:
@@ -584,8 +697,9 @@ def build_mesh_response_bot_from_env(
     now_unix_fn: Callable[[], float] = time.time,
 ) -> Optional[MeshResponseBot]:
     env_map = env if isinstance(env, dict) else dict(os.environ)
-    enabled = _parse_bool_token(env_map.get("MESH_DASH_BOT_ENABLED"), True)
-    if not enabled:
+    respond_enabled = _parse_bool_token(env_map.get("MESH_DASH_BOT_ENABLED"), True)
+    log_enabled = _parse_bool_token(env_map.get("MESH_DASH_BOT_LOG_ENABLED"), True)
+    if not respond_enabled and not log_enabled:
         return None
     reply_broadcast = _parse_bool_token(env_map.get("MESH_DASH_BOT_REPLY_BROADCAST"), False)
     custom_commands = _load_custom_commands_from_env(env_map)
@@ -593,7 +707,8 @@ def build_mesh_response_bot_from_env(
         send_chat_fn=send_chat_fn,
         get_local_node_id_fn=get_local_node_id_fn,
         custom_commands=custom_commands,
-        enabled=True,
+        enabled=respond_enabled,
+        log_enabled=log_enabled,
         reply_broadcast=reply_broadcast,
         now_unix_fn=now_unix_fn,
     )

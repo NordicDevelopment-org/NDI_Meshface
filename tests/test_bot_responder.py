@@ -148,4 +148,47 @@ def test_build_bot_from_env_can_disable_bot():
         get_local_node_id_fn=lambda _iface: "!02ed9b7c",
         env={"MESH_DASH_BOT_ENABLED": "0"},
     )
+    assert bot is not None
+    assert bot.enabled is False
+    assert bot.log_enabled is True
+
+
+def test_build_bot_from_env_can_disable_bot_and_logging():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "0",
+            "MESH_DASH_BOT_LOG_ENABLED": "0",
+        },
+    )
     assert bot is None
+
+
+def test_bot_logs_requests_when_responses_disabled():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        enabled=False,
+        log_enabled=True,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("ping 9b7c"), iface)
+
+    assert sent == []
+    history = bot.recent_requests()
+    assert len(history) == 1
+    row = history[0]
+    assert row["command"] == "ping 9b7c"
+    assert row["from_id"] == "!49b5dff0"
+    assert row["to_id"] == "^all"
+    assert row["respond_enabled"] is False
+    assert row["responded"] is False

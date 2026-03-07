@@ -2089,6 +2089,7 @@
     const knownBotArgumentCommands = new Set([
       "whois", "!whois", "#whois",
       "whohas", "!whohas", "#whohas",
+      "ping", "!ping", "#ping",
       "wx", "!wx", "#wx",
     ]);
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
@@ -2176,6 +2177,7 @@
     let chatBotCommandsEnabled = true;
     let chatBotHistoryEnabled = true;
     let botRequestHistory = [];
+    let backendBotRequestHistory = [];
     let activeMeshChannelIndex = 0;
     let meshChannelOptions = [];
     let meshChannelOptionsSignature = "";
@@ -5111,18 +5113,24 @@
         .join(" ");
     }}
 
-    function parseDashboardTimeToUnix(value) {{
+    function parseDashboardTimeToMs(value) {{
       const numericRaw = Number(value);
       if (Number.isFinite(numericRaw) && numericRaw > 0) {{
         // Accept either Unix seconds or milliseconds.
-        return Math.floor(numericRaw > 1e12 ? (numericRaw / 1000) : numericRaw);
+        return Math.floor(numericRaw > 1e12 ? numericRaw : (numericRaw * 1000));
       }}
       const text = String(value == null ? "" : value).trim();
       if (!text) return null;
       const iso = text.includes("T") ? text : text.replace(" ", "T");
       const parsed = Date.parse(iso);
       if (!Number.isFinite(parsed)) return null;
-      return Math.floor(parsed / 1000);
+      return Math.floor(parsed);
+    }}
+
+    function parseDashboardTimeToUnix(value) {{
+      const parsedMs = parseDashboardTimeToMs(value);
+      if (!parsedMs) return null;
+      return Math.floor(parsedMs / 1000);
     }}
 
     function parsePositiveMessageId(value) {{
@@ -5141,10 +5149,34 @@
       return parsePositiveMessageId(msg.reply_id ?? msg.replyId);
     }}
 
+    function hopCountOfChatPacket(msg) {{
+      if (!msg || typeof msg !== "object") return null;
+      const direct = Number(msg.hops);
+      if (Number.isFinite(direct) && direct >= 0) {{
+        return Math.trunc(direct);
+      }}
+      const hopStart = Number(msg.hop_start ?? msg.hopStart);
+      const hopLimit = Number(msg.hop_limit ?? msg.hopLimit);
+      if (Number.isFinite(hopStart) && Number.isFinite(hopLimit)) {{
+        const derived = Math.trunc(hopStart) - Math.trunc(hopLimit);
+        if (derived >= 0) return derived;
+      }}
+      return null;
+    }}
+
     function latestUnixTimestamp(...values) {{
       let latest = 0;
       for (const value of values) {{
         const ts = parseDashboardTimeToUnix(value);
+        if (ts && ts > latest) latest = ts;
+      }}
+      return latest > 0 ? latest : null;
+    }}
+
+    function latestTimestampMs(...values) {{
+      let latest = 0;
+      for (const value of values) {{
+        const ts = parseDashboardTimeToMs(value);
         if (ts && ts > latest) latest = ts;
       }}
       return latest > 0 ? latest : null;
@@ -6223,38 +6255,79 @@
       return `bot-${{Date.now().toString(36)}}-${{rand}}${{cleanSeed ? `-${{cleanSeed}}` : ""}}`;
     }}
 
+    function botCommandHeadFromText(commandText) {{
+      const raw = String(commandText || "").trim().toLowerCase();
+      if (!raw) return "";
+      const head = raw.split(/\\s+/)[0] || "";
+      return head;
+    }}
+
     function normalizeBotRequestHistoryEntry(raw) {{
       if (!raw || typeof raw !== "object") return null;
       const command = String(raw.command || "").trim();
       if (!command) return null;
-      const prefix = normalizeWhoisCommandPrefix(raw.prefix || command.split(/\\s+/)[0]);
+      const source = String(raw.source || "local").trim().toLowerCase() || "local";
+      const commandHead = String(raw.command_head || raw.commandHead || botCommandHeadFromText(command)).trim().toLowerCase();
+      const prefix = knownWhoisCommandPrefixes.has(commandHead)
+        ? normalizeWhoisCommandPrefix(raw.prefix || commandHead)
+        : String(raw.prefix || commandHead || command.split(/\\s+/)[0] || "").trim().toLowerCase();
       const suffix = nodeIdSuffixForWhois(raw.suffix || command.split(/\\s+/).slice(1).join(" "));
+      const fromId = normalizeNodeId(raw.from_id ?? raw.fromId ?? "");
+      const destination = normalizeNodeId(raw.destination ?? raw.to_id ?? raw.toId ?? "^all") || "^all";
       const messageId = parsePositiveMessageId(raw.message_id ?? raw.messageId);
       const replyId = parsePositiveMessageId(raw.reply_id ?? raw.replyId);
+      const sentAtText = String(raw.sent_at ?? raw.sentAt ?? raw.received_at ?? raw.receivedAt ?? "").trim();
+      const sentMs = (
+        parseDashboardTimeToMs(raw.sent_ms ?? raw.sentMs)
+        || parseDashboardTimeToMs(raw.sent_at ?? raw.sentAt)
+        || parseDashboardTimeToMs(raw.sent_unix ?? raw.sentUnix)
+        || parseDashboardTimeToMs(raw.received_unix ?? raw.receivedUnix)
+        || parseDashboardTimeToMs(raw.received_at ?? raw.receivedAt)
+        || Date.now()
+      );
       const sentUnix = (
         parseDashboardTimeToUnix(raw.sent_unix ?? raw.sentUnix)
         || parseDashboardTimeToUnix(raw.sent_at ?? raw.sentAt)
-        || Math.floor(Date.now() / 1000)
+        || parseDashboardTimeToUnix(raw.received_unix ?? raw.receivedUnix)
+        || parseDashboardTimeToUnix(raw.received_at ?? raw.receivedAt)
+        || Math.floor(sentMs / 1000)
       );
       const responseMessageId = parsePositiveMessageId(raw.response_message_id ?? raw.responseMessageId);
+      const responseMs = parseDashboardTimeToMs(raw.response_ms ?? raw.responseMs ?? raw.response_at ?? raw.responseAt);
       const responseUnix = parseDashboardTimeToUnix(raw.response_unix ?? raw.responseUnix ?? raw.response_at ?? raw.responseAt);
+      const responseHopsRaw = Number(raw.response_hops ?? raw.responseHops);
+      const responseHops = (Number.isFinite(responseHopsRaw) && responseHopsRaw >= 0)
+        ? Math.trunc(responseHopsRaw)
+        : null;
+      const respondEnabled = parseBoolToken(raw.respond_enabled ?? raw.respondEnabled, true);
+      const responded = parseBoolToken(raw.responded, !!responseMessageId);
+      const responseError = String(raw.response_error ?? raw.responseError ?? "").trim();
       return {{
         id: String(raw.id || makeBotRequestHistoryId(suffix)).trim() || makeBotRequestHistoryId(suffix),
+        source,
         command,
+        command_head: commandHead,
         prefix,
         suffix,
-        destination: String(raw.destination || "^all").trim() || "^all",
+        from_id: fromId,
+        destination,
         channel_index: normalizeMeshChannelIndex(raw.channel_index ?? raw.channelIndex ?? 0),
         reply_id: replyId,
         reply_attached: parseBoolToken(raw.reply_attached ?? raw.replyAttached, !!replyId),
         message_id: messageId,
-        sent_at: String(raw.sent_at ?? raw.sentAt ?? "").trim(),
+        sent_at: sentAtText,
+        sent_ms: sentMs,
         sent_unix: sentUnix,
+        respond_enabled: respondEnabled,
+        responded,
         response_message_id: responseMessageId,
+        response_ms: responseMs,
         response_unix: responseUnix,
+        response_hops: responseHops,
         response_from: normalizeNodeId(raw.response_from ?? raw.responseFrom ?? ""),
         response_to: normalizeNodeId(raw.response_to ?? raw.responseTo ?? ""),
         response_text: String(raw.response_text ?? raw.responseText ?? "").trim(),
+        response_error: responseError,
       }};
     }}
 
@@ -6308,6 +6381,18 @@
       }}
     }}
 
+    function syncBackendBotRequestHistory(state = latestState) {{
+      const raw = (state && Array.isArray(state.bot_requests)) ? state.bot_requests : [];
+      backendBotRequestHistory = pruneBotRequestHistoryEntries(raw);
+    }}
+
+    function mergedBotRequestHistoryEntries(state = latestState) {{
+      syncBackendBotRequestHistory(state);
+      const localRows = Array.isArray(botRequestHistory) ? botRequestHistory : [];
+      const backendRows = Array.isArray(backendBotRequestHistory) ? backendBotRequestHistory : [];
+      return pruneBotRequestHistoryEntries([...(backendRows || []), ...(localRows || [])]);
+    }}
+
     function parseTrackedBotCommandFromText(text) {{
       const raw = String(text || "").trim();
       if (!raw) return null;
@@ -6326,7 +6411,9 @@
       }}
       if (!knownBotArgumentCommands.has(prefixRaw)) return null;
       if (parts.length < 2) return null;
-      const suffix = nodeIdSuffixForWhois(parts[1] || "");
+      const targetToken = String(parts[1] || "").trim();
+      const isWeatherCommand = prefixRaw === "wx" || prefixRaw === "!wx" || prefixRaw === "#wx";
+      const suffix = isWeatherCommand ? targetToken : nodeIdSuffixForWhois(targetToken);
       return {{
         command: raw,
         prefix: knownWhoisCommandPrefixes.has(prefixRaw) ? normalizeWhoisCommandPrefix(prefixRaw) : prefixRaw,
@@ -6337,13 +6424,18 @@
     }}
 
     function recordBotRequestHistoryFromSend(requestBody, payload) {{
-      if (!chatBotHistoryEnabled) return;
+      if (!chatBotHistoryEnabled || !chatBotCommandsEnabled) return;
       const parsed = parseTrackedBotCommandFromText(requestBody && requestBody.text);
       if (!parsed) return;
+      const sentMs = (
+        parseDashboardTimeToMs(payload && payload.sent_at)
+        || parseDashboardTimeToMs(payload && payload.rx_time)
+        || Date.now()
+      );
       const sentUnix = (
         parseDashboardTimeToUnix(payload && payload.sent_at)
         || parseDashboardTimeToUnix(payload && payload.rx_time)
-        || Math.floor(Date.now() / 1000)
+        || Math.floor(sentMs / 1000)
       );
       const messageId = messageIdOfChatPacket(payload || {{}});
       const replyId = parsePositiveMessageId(
@@ -6353,6 +6445,7 @@
       const entry = normalizeBotRequestHistoryEntry({{
         id: makeBotRequestHistoryId(parsed.suffix),
         command: parsed.command,
+        command_head: parsed.head,
         prefix: parsed.prefix,
         suffix: parsed.suffix,
         destination: requestBody && requestBody.destination,
@@ -6361,6 +6454,7 @@
         reply_attached: Number.isInteger(replyId) && replyId > 0,
         message_id: messageId,
         sent_at: (payload && payload.sent_at) || "",
+        sent_ms: sentMs,
         sent_unix: sentUnix,
       }});
       if (!entry) return;
@@ -6384,6 +6478,12 @@
         if (messageId === replyId) continue;
         const fromId = normalizeNodeId(msg.from || "");
         if (isSelfNodeId(fromId)) continue;
+        const msgMs = latestTimestampMs(
+          msg.rx_time,
+          msg.captured_at,
+          msg.sent_at,
+          msg.created_at
+        ) || Date.now();
         const unix = latestUnixTimestamp(
           msg.rx_time,
           msg.captured_at,
@@ -6391,10 +6491,12 @@
           msg.created_at
         ) || 0;
         const existing = responseByReplyId.get(replyId);
-        if (existing && Number(existing.unix || 0) > unix) continue;
+        if (existing && Number(existing.ms || 0) > msgMs) continue;
         responseByReplyId.set(replyId, {{
           messageId,
+          ms: msgMs,
           unix,
+          hops: hopCountOfChatPacket(msg),
           fromId,
           toId: normalizeNodeId(msg.to || msg.destination || ""),
           text: String(msg.text ?? msg.decoded_text ?? msg.payload_text ?? "").trim(),
@@ -6410,7 +6512,9 @@
           const match = responseByReplyId.get(normalized.message_id);
           if (match) {{
             normalized.response_message_id = match.messageId;
+            normalized.response_ms = Number(match.ms) > 0 ? Number(match.ms) : null;
             normalized.response_unix = Number(match.unix) > 0 ? Number(match.unix) : normalized.sent_unix;
+            normalized.response_hops = Number.isInteger(match.hops) ? Number(match.hops) : null;
             normalized.response_from = match.fromId;
             normalized.response_to = match.toId;
             normalized.response_text = match.text;
@@ -6444,10 +6548,10 @@
       const respondedEl = document.getElementById("bots-history-responded");
       if (!(listEl instanceof HTMLElement)) return;
 
-      const entries = Array.isArray(botRequestHistory) ? botRequestHistory : [];
+      const entries = mergedBotRequestHistoryEntries(state);
       const total = entries.length;
       const responded = entries.reduce((acc, item) => (
-        acc + ((item && item.response_message_id) ? 1 : 0)
+        acc + ((item && (item.response_message_id || item.responded)) ? 1 : 0)
       ), 0);
       const pending = Math.max(0, total - responded);
 
@@ -6457,12 +6561,12 @@
 
       if (entries.length === 0) {{
         listEl.innerHTML = chatBotHistoryEnabled
-          ? '<div class="bots-history-empty">No tracked bot requests yet. Send a <code>whois</code> command to start logging.</div>'
+          ? '<div class="bots-history-empty">No tracked bot requests yet. Send a <code>whois</code> or <code>ping</code> command, or wait for mesh bot traffic.</div>'
           : '<div class="bots-history-empty">Bot request history tracking is disabled.</div>';
         return;
       }}
       const commandsDisabledNotice = !chatBotCommandsEnabled
-        ? '<div class="bots-history-empty">Bot commands / responses are disabled. New bot-triggering commands are blocked from this dashboard and no new bot-request entries will be logged.</div>'
+        ? '<div class="bots-history-empty">Dashboard bot commands / responses are disabled. Backend-observed mesh requests still appear here when available.</div>'
         : "";
       const disabledNotice = !chatBotHistoryEnabled
         ? '<div class="bots-history-empty">Tracking is disabled. Existing history is shown read-only; new requests and matches will not be recorded.</div>'
@@ -6483,19 +6587,51 @@
       }};
 
       const rows = entries.map((entry) => {{
-        const statusClass = entry.response_message_id ? "responded" : "pending";
-        const statusLabel = entry.response_message_id ? "Responded" : "Pending";
+        let statusClass = "pending";
+        let statusLabel = "Pending";
+        if (entry.response_message_id || entry.responded) {{
+          statusClass = "responded";
+          statusLabel = "Responded";
+        }} else if (entry.response_error) {{
+          statusClass = "pending";
+          statusLabel = "Error";
+        }} else if (entry.respond_enabled === false) {{
+          statusClass = "pending";
+          statusLabel = "Observed";
+        }}
         const sentLabel = formatLocalChatTime(entry.sent_unix, entry.sent_at || "n/a");
         const destLabel = entry.destination === "^all" ? "All" : nodeLabel(entry.destination);
+        const fromLabel = nodeLabel(entry.from_id || "");
         const channelLabel = Number.isInteger(entry.channel_index) ? `Ch ${{entry.channel_index}}` : "Ch ?";
         const replyHint = entry.reply_attached ? "reply attached" : "new request";
+        const commandHead = String(entry.command_head || botCommandHeadFromText(entry.command)).trim().toLowerCase();
+        const isPingCommand = commandHead === "ping" || commandHead === "!ping" || commandHead === "#ping";
+        const sentMs = Number(entry.sent_ms || 0);
+        const responseMs = Number(entry.response_ms || 0);
+        const pingRttMs = (
+          isPingCommand
+          && sentMs > 0
+          && responseMs > 0
+          && responseMs >= sentMs
+        ) ? Math.round(responseMs - sentMs) : null;
+        const pingHopCount = Number(entry.response_hops);
+        const pingHopLabel = Number.isInteger(pingHopCount) && pingHopCount >= 0
+          ? `${{pingHopCount}} hop${{pingHopCount === 1 ? "" : "s"}}`
+          : "hops n/a";
+        const pingMeta = (isPingCommand && entry.response_message_id)
+          ? `<div class="bots-history-meta"><span>RTT ${{pingRttMs == null ? "n/a" : `${{pingRttMs}} ms`}}</span><span>${{escAttr(pingHopLabel)}}</span></div>`
+          : "";
         const responseText = String(entry.response_text || "").trim();
         const responsePreview = responseText
           ? compactInlineMessage(responseText, 200)
           : "(no text)";
         const responseBlock = entry.response_message_id
           ? `<div class="bots-history-response"><strong>${{escAttr(nodeLabel(entry.response_from))}}:</strong> ${{escAttr(responsePreview)}}</div>`
-          : "";
+          : (
+            entry.response_error
+              ? `<div class="bots-history-response"><strong>error:</strong> ${{escAttr(entry.response_error)}}</div>`
+              : ""
+          );
         return `<article class="bots-history-item">
           <div class="bots-history-item-head">
             <span class="bots-history-command">${{escAttr(entry.command)}}</span>
@@ -6503,10 +6639,12 @@
           </div>
           <div class="bots-history-meta">
             <span>${{escAttr(sentLabel)}}</span>
+            <span>from ${{escAttr(fromLabel || "n/a")}}</span>
             <span>${{escAttr(channelLabel)}}</span>
             <span>to ${{escAttr(destLabel)}}</span>
             <span>${{escAttr(replyHint)}}</span>
           </div>
+          ${{pingMeta}}
           ${{responseBlock}}
         </article>`;
       }});
@@ -19615,6 +19753,7 @@
           const traffic304 = (latestState.traffic && typeof latestState.traffic === "object")
             ? latestState.traffic
             : {{}};
+          syncBackendBotRequestHistory(latestState);
           syncBotRequestHistoryWithMessages(traffic304.recent_chat || [], latestState);
           renderSummary(latestState);
           if (mapVisible304) {{
@@ -19666,6 +19805,7 @@
         lastPollSuccessUnix = Math.floor(Date.now() / 1000);
         lastPollError = "";
         lastPollErrorUnix = 0;
+        syncBackendBotRequestHistory(state);
         const nextLocalNodeId = resolveLocalNodeId(state);
         if (isCanonicalNodeId(nextLocalNodeId)) {{
           resolvedLocalNodeId = nextLocalNodeId;

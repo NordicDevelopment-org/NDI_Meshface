@@ -233,3 +233,97 @@ def test_handle_state_get_handles_non_string_query_without_crashing():
 
     assert calls["status_code"] == 200
     assert calls["payload_obj"] == {"ok": True}
+
+
+def test_handle_state_get_injects_backend_bot_requests_when_available():
+    calls = {}
+
+    def _state_fn():
+        return {"ok": True}
+
+    setattr(
+        _state_fn,
+        "bot_request_history_fn",
+        lambda: [{"id": "mesh-1", "command": "ping 9b7c", "from_id": "!49b5dff0"}],
+    )
+
+    handle_state_get(
+        object(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 200
+    assert calls["payload_obj"]["ok"] is True
+    assert isinstance(calls["payload_obj"]["bot_requests"], list)
+    assert calls["payload_obj"]["bot_requests"][0]["id"] == "mesh-1"
+
+
+def test_handle_state_get_etag_includes_bot_request_marker():
+    calls = {}
+
+    def _state_fn():
+        return {"ok": True}
+
+    setattr(_state_fn, "etag", lambda: "v1")
+    setattr(
+        _state_fn,
+        "bot_request_history_fn",
+        lambda: [{"id": "mesh-1", "received_unix": 1710001000, "responded": False}],
+    )
+
+    handle_state_get(
+        object(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 200
+    assert "bot_requests" in calls["payload_obj"]
+    assert calls["extra_headers"]["ETag"].startswith("v1|bot:")
+
+
+def test_handle_state_get_composite_etag_can_return_304():
+    first = {}
+
+    def _state_fn():
+        return {"ok": True}
+
+    setattr(_state_fn, "etag", lambda: "v1")
+    setattr(
+        _state_fn,
+        "bot_request_history_fn",
+        lambda: [{"id": "mesh-1", "received_unix": 1710001000, "responded": False}],
+    )
+
+    handle_state_get(
+        object(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda _handler, **kwargs: first.update(kwargs),
+    )
+    etag = first["extra_headers"]["ETag"]
+
+    calls = {"send_response": [], "send_header": [], "end_headers": 0}
+
+    class _H:
+        headers = {"If-None-Match": etag}
+
+        def send_response(self, code):
+            calls["send_response"].append(code)
+
+        def send_header(self, key, value):
+            calls["send_header"].append((key, value))
+
+        def end_headers(self):
+            calls["end_headers"] += 1
+
+    handle_state_get(
+        _H(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda *_args, **_kwargs: calls.update({"write_called": True}),
+    )
+
+    assert calls["send_response"] == [304]
+    assert ("ETag", etag) in calls["send_header"]
+    assert calls["end_headers"] == 1
+    assert "write_called" not in calls
