@@ -7449,6 +7449,7 @@
         btn.textContent = meshChannelViewMenuLabel(activeMeshChannelIndex);
         btn.title = `${{meta.title}} • ${{btn.textContent}}`;
       }}
+      syncMeshChannelMismatchWarning();
     }}
 
     function setMeshChannelMenuOpen(open) {{
@@ -7540,6 +7541,30 @@
       return meshChannelSendOptionLabel(match ? {{ ...match, index: idx }} : {{ index: idx }});
     }}
 
+    function syncMeshChannelMismatchWarning() {{
+      const wrap = document.querySelector(".chat-send-channel-wrap");
+      const warningEl = document.getElementById("chat-channel-mismatch-warning");
+      if (!(wrap instanceof HTMLElement)) return;
+
+      const viewIdx = activeMeshChannelFilterIndex();
+      const sendIdx = activeMeshChannelSendIndex();
+      const mismatched = viewIdx !== meshChannelAllIndex && sendIdx !== viewIdx;
+      const warningText = mismatched
+        ? `Sending on ${{currentMeshChannelSendLabel()}} while viewing ${{currentMeshChannelViewLabel()}}. You may send something you cannot see here.`
+        : "";
+
+      wrap.classList.toggle("mismatch", mismatched);
+      wrap.title = mismatched
+        ? warningText
+        : "Choose which configured message channel to use for outgoing chat. This sets the encryption group used for sends and does NOT change your LoRa frequency slot.";
+      wrap.setAttribute("aria-label", mismatched ? warningText : "Outgoing chat channel");
+
+      if (warningEl instanceof HTMLElement) {{
+        warningEl.hidden = !mismatched;
+        warningEl.textContent = warningText;
+      }}
+    }}
+
     function meshChannelSendContext() {{
       const sendIndex = activeMeshChannelSendIndex();
       return {{
@@ -7566,6 +7591,7 @@
         btn.disabled = disabled;
         btn.setAttribute("aria-disabled", disabled ? "true" : "false");
       }}
+      syncMeshChannelMismatchWarning();
     }}
 
     function setMeshChannelSendMenuOpen(open) {{
@@ -7839,6 +7865,7 @@
     function applyMeshChannelIndex(rawIndex, persist = true) {{
       const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll: true }});
       const changed = idx !== activeMeshChannelIndex;
+      const shouldFollowForSend = idx !== meshChannelAllIndex;
       activeMeshChannelIndex = idx;
       syncMeshChannelViewControl();
 
@@ -7854,12 +7881,16 @@
         }} catch (_err) {{}}
       }}
 
-      if (changed && latestState && activeLayoutView === "chat") {{
+      if (shouldFollowForSend) {{
+        applyMeshSendChannelIndex(idx, persist, false);
+      }}
+
+      if ((changed || shouldFollowForSend) && latestState && activeLayoutView === "chat") {{
         renderChat(latestState);
       }}
     }}
 
-    function applyMeshSendChannelIndex(rawIndex, persist = true) {{
+    function applyMeshSendChannelIndex(rawIndex, persist = true, rerenderChat = true) {{
       const idx = normalizeMeshChannelIndex(rawIndex);
       const changed = idx !== activeMeshSendChannelIndex;
       activeMeshSendChannelIndex = idx;
@@ -7877,7 +7908,7 @@
         }} catch (_err) {{}}
       }}
 
-      if (changed && latestState && activeLayoutView === "chat") {{
+      if (rerenderChat && changed && latestState && activeLayoutView === "chat") {{
         renderChat(latestState);
       }}
     }}
