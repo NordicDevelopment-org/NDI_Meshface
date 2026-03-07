@@ -154,6 +154,27 @@
       flex-wrap: wrap;
       gap: 4px;
     }}
+    .topbar .topbar-heading-app {{
+      display: inline-flex;
+      align-items: center;
+    }}
+    .topbar .topbar-chat-context {{
+      display: inline-flex;
+      align-items: center;
+      max-width: min(52vw, 420px);
+      padding: 3px 10px;
+      border: 1px solid rgba(214, 238, 223, 0.26);
+      border-radius: 999px;
+      background: rgba(248, 255, 251, 0.08);
+      color: rgba(241, 255, 246, 0.94);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.12px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
     .topbar .sub {{
       margin-top: 2px;
       font-size: 11px;
@@ -7658,6 +7679,11 @@
       border-color: #59b883;
       color: #baf8d4;
       box-shadow: 0 0 0 1px rgba(89, 184, 131, 0.45);
+    }}
+    [data-theme="dark"] .topbar .topbar-chat-context {{
+      border-color: rgba(157, 194, 220, 0.24);
+      background: rgba(31, 58, 79, 0.38);
+      color: #e6f3fb;
     }}
     [data-theme="dark"] .topbar-favorite-menu-wrap .favorite-menu-toggle-btn.has-saved {{
       border-color: #59b883;

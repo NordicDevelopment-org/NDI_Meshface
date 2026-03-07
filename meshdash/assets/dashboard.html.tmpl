@@ -77,13 +77,10 @@
           </section>
           <section class="chat-settings-section" aria-label="Notifications">
             <h3 class="chat-settings-section-title">Notifications</h3>
-            <label class="chat-change-scope-wrap" for="chat-change-scope" title="Notification scope">
-              <span class="chat-change-scope-label">Notification scope</span>
-              <select id="chat-change-scope" class="chat-change-scope-select" aria-label="Notification scope">
-                <option value="all">All</option>
-                <option value="self">Self</option>
-              </select>
-            </label>
+            <div class="chat-settings-meta-list" title="Notification behavior">
+              <div class="chat-settings-meta-item">Chat counter: all inbound chat activity</div>
+              <div class="chat-settings-meta-item">Bell: inbound to you, replies to you, and reactions to you</div>
+            </div>
           </section>
         </div>
       </div>
@@ -130,7 +127,10 @@
         </div>
       </div>
     </div>
-    <h1 class="topbar-heading">{app_heading}</h1>
+    <h1 class="topbar-heading">
+      <span class="topbar-heading-app">{app_heading}</span>
+      <span id="topbar-chat-context" class="topbar-chat-context" title="Connected local radio: unavailable">n/a</span>
+    </h1>
     <div class="sub">
       <div class="sub-main">
         <span id="revision-text" class="sub-text revision-text" title="{revision_title}">{revision_label}</span>
@@ -989,8 +989,8 @@
           <div id="history-chat-splitter" class="history-chat-splitter" title="Drag to resize chat and notification history panels"></div>
           <div class="history-notification-section">
             <div class="history-notification-head">
-              <div id="history-notification-caption" class="history-caption">Recent notification history from this browser.</div>
-              <button id="history-notification-clear-btn" class="history-notification-clear-btn" type="button" title="Clear saved notification history">Clear</button>
+              <div id="history-notification-caption" class="history-caption">Recent inbound system notification history from this browser.</div>
+              <button id="history-notification-clear-btn" class="history-notification-clear-btn" type="button" title="Clear saved system notification history">Clear</button>
             </div>
             <div id="history-notification-list" class="history-notification-list" aria-live="polite"></div>
           </div>

@@ -5985,9 +5985,10 @@
       const nextChannel = normalizeChatChannel(channelKey);
       const changed = activeChatChannel !== nextChannel;
       activeChatChannel = nextChannel;
-      if (activeLayoutView === "chat") {{
+      if (activeLayoutView === "chat" && !document.hidden && tabHasFocus) {{
         clearChatUnread(activeChatChannel);
       }}
+      syncTopbarChatContext(latestState);
       if (persist) {{
         try {{
           window.localStorage.setItem(chatChannelStorageKey, activeChatChannel);
@@ -9235,6 +9236,7 @@
       renderStarredNodeSelect(latestState || {{}});
       renderSavedRailStatus();
       refreshMapCardTitle();
+      syncTopbarChatContext(latestState);
     }}
 
     function resolveSelectedNodeName() {{
@@ -9251,6 +9253,43 @@
         }}
       }}
       return nodeNameCache.get(selectedNodeId) || "";
+    }}
+
+    function syncTopbarChatContext(state = latestState) {{
+      const labelEl = document.getElementById("topbar-chat-context");
+      if (!(labelEl instanceof HTMLElement)) return;
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const selfId = resolveLocalNodeId(safeState);
+      if (!isCanonicalNodeId(selfId)) {{
+        labelEl.textContent = "n/a";
+        labelEl.title = "Connected local radio: unavailable";
+        return;
+      }}
+      const owner = localNodeUserFromState(safeState);
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const selfNode = nodes.find((node) => normalizeNodeId(node && node.id) === selfId) || null;
+      const longName = String(
+        (owner && owner.long_name)
+        || (selfNode && selfNode.long_name)
+        || ""
+      ).trim();
+      const shortName = String(
+        (owner && owner.short_name)
+        || (selfNode && selfNode.short_name)
+        || ""
+      ).trim();
+      let display = "";
+      if (longName && shortName && shortName !== longName) {{
+        display = `${{longName}} (${{shortName}})`;
+      }} else if (longName) {{
+        display = longName;
+      }} else if (shortName) {{
+        display = shortName;
+      }} else {{
+        display = nodeNameCache.get(selfId) || selfId;
+      }}
+      labelEl.textContent = display;
+      labelEl.title = `Connected local radio: ${{display}} (${{selfId}})`;
     }}
 
     function formatSavedViewMapTitle() {{
@@ -10039,6 +10078,8 @@
       if (!key) return null;
       const focusKey = String(source.focusKey || key).trim() || key;
       const targetView = normalizeLayoutView(source.targetView || source.view || "chat");
+      const targetChatChannel = normalizeChatChannel(source.targetChatChannel || source.channel || "all");
+      const peerNodeId = normalizeNodeId(source.peerNodeId || source.nodeId || "");
       const sender = String(source.sender || "Unknown node").replace(/\\s+/g, " ").trim() || "Unknown node";
       const kindRaw = String(source.kind || "").trim().toLowerCase();
       const kind = kindRaw === "reaction"
@@ -10056,10 +10097,13 @@
         key,
         focusKey,
         targetView,
+        targetChatChannel,
+        peerNodeId,
         sender,
         preview,
         kind,
         selfRelevant: source.selfRelevant === true,
+        systemRelevant: source.systemRelevant === true,
         unix,
       }};
     }}
@@ -10187,9 +10231,49 @@
         }}
       }}
       persistChatChangeNotices();
-      // Title badge should include missed reaction updates too.
+      // The chat rail/title count only unread chat messages now, but notification
+      // history still needs an immediate rerender when new missed updates arrive.
       syncDocumentUnreadTitle(chatUnreadCount);
       renderHistoryNotificationLog();
+    }}
+
+    function collectSystemNotificationRows() {{
+      const rows = [];
+      const appendChannel = (channelKey) => {{
+        const normalizedChannel = normalizeChatChannel(channelKey);
+        const notices = Array.isArray(chatChangeNoticesByChannel[normalizedChannel])
+          ? chatChangeNoticesByChannel[normalizedChannel]
+          : [];
+        const ackSet = chatChangeAcknowledgedKeySetForChannel(normalizedChannel);
+        for (const notice of notices) {{
+          const normalized = normalizeChatChangeNotice(notice);
+          if (!normalized || normalized.systemRelevant !== true) continue;
+          rows.push({{
+            ...normalized,
+            channel: normalizedChannel,
+            seen: ackSet instanceof Set ? ackSet.has(normalized.key) : false,
+          }});
+        }}
+      }};
+      appendChannel("all");
+      appendChannel("direct");
+      rows.sort((a, b) => {{
+        const aUnix = Number(a && a.unix);
+        const bUnix = Number(b && b.unix);
+        const safeA = Number.isFinite(aUnix) ? aUnix : 0;
+        const safeB = Number.isFinite(bUnix) ? bUnix : 0;
+        if (safeB !== safeA) return safeB - safeA;
+        const aKey = String(a && a.key ? a.key : "");
+        const bKey = String(b && b.key ? b.key : "");
+        return bKey.localeCompare(aKey);
+      }});
+      return rows.slice(0, historyNotificationMaxRows);
+    }}
+
+    function totalSystemNotificationCount() {{
+      return collectSystemNotificationRows()
+        .filter((row) => row && row.seen !== true)
+        .length;
     }}
 
     function chatChangeAcknowledgedKeySetForChannel(channelKey) {{
@@ -10241,9 +10325,7 @@
     }}
 
     function noticeMatchesNotificationScope(notice) {{
-      const scope = normalizeChatNotificationScope(chatNotificationScope);
-      if (scope === "all") return true;
-      return !!(notice && notice.selfRelevant === true);
+      return !!(notice && notice.systemRelevant === true);
     }}
 
     function chatFeedVisibilityRatio(item, scroller) {{
@@ -10473,19 +10555,18 @@
 
     function updateChatChangeBadge(count) {{
       const safeCount = Math.max(0, Math.floor(Number(count) || 0));
-      const scopeLabel = chatNotificationScopeLabel();
       const btn = document.getElementById("chat-change-toggle-btn");
       if (btn instanceof HTMLButtonElement) {{
         btn.classList.toggle("has-unread", safeCount > 0);
         const countLabel = safeCount > 99 ? "99+" : String(safeCount);
         btn.title = safeCount > 0
-          ? `${{countLabel}} missed update${{safeCount === 1 ? "" : "s"}} (${{scopeLabel}})`
-          : `No missed updates (${{scopeLabel}})`;
+          ? `${{countLabel}} inbound system notification${{safeCount === 1 ? "" : "s"}}`
+          : "No inbound system notifications";
         btn.setAttribute(
           "aria-label",
           safeCount > 0
-            ? `Missed updates (${{countLabel}}, ${{scopeLabel}})`
-            : `Missed updates (${{scopeLabel}})`
+            ? `System notifications (${{countLabel}})`
+            : "System notifications"
         );
       }}
       const badge = document.getElementById("chat-change-badge");
@@ -10503,13 +10584,12 @@
     function renderChatChangeSummary(nowUnix = Math.floor(Date.now() / 1000)) {{
       const panel = document.getElementById("chat-change-summary");
       if (!(panel instanceof HTMLElement)) return;
-      const notices = chatChangeNoticesForChannel(activeChatChannel);
+      const notices = collectSystemNotificationRows();
       const count = notices.length;
-      const alertCount = chatChangeUnacknowledgedCountForChannel(activeChatChannel);
-      const scopeLabel = chatNotificationScopeLabel();
+      const alertCount = notices.filter((notice) => notice && notice.seen !== true).length;
       updateChatChangeBadge(alertCount);
       if (!notices.length) {{
-        panel.innerHTML = `<div class="chat-change-empty">No missed ${{scopeLabel.toLowerCase()}} updates while you were away.</div>`;
+        panel.innerHTML = '<div class="chat-change-empty">No inbound system notifications while you were away.</div>';
         panel.hidden = !chatChangeMenuOpen;
         return;
       }}
@@ -10528,10 +10608,12 @@
         const resolvedKindClass = kind === "status" ? "status" : kindClass;
         const focusKey = escAttr(String((notice && (notice.focusKey || notice.key)) || ""));
         const targetView = escAttr(normalizeLayoutView(notice && notice.targetView ? notice.targetView : "chat"));
+        const targetChatChannel = escAttr(normalizeChatChannel(notice && notice.targetChatChannel ? notice.targetChatChannel : notice && notice.channel ? notice.channel : "all"));
+        const peerNodeId = escAttr(normalizeNodeId(notice && notice.peerNodeId ? notice.peerNodeId : ""));
         const when = notice && Number.isFinite(Number(notice.unix))
           ? savedDetailAge(Number(notice.unix), nowUnix)
           : "just now";
-        return `<button type="button" class="chat-change-item" data-change-focus-key="${{focusKey}}" data-change-target-view="${{targetView}}" title="Open this update">
+        return `<button type="button" class="chat-change-item" data-change-focus-key="${{focusKey}}" data-change-target-view="${{targetView}}" data-change-chat-channel="${{targetChatChannel}}" data-change-peer-node-id="${{peerNodeId}}" title="Open this update">
           <span class="chat-change-item-main">
             <span class="chat-change-kind ${{resolvedKindClass}}">${{kindLabel}}</span>
             <span class="chat-change-item-text"><strong>${{sender}}</strong>: ${{preview}}</span>
@@ -10539,10 +10621,10 @@
           <span class="chat-change-item-age">${{escAttr(when)}}</span>
         </button>`;
       }}).join("");
-      const headline = `${{count}} update${{count === 1 ? "" : "s"}} while you were away (${{scopeLabel}})`;
+      const headline = `${{count}} inbound system notification${{count === 1 ? "" : "s"}}`;
       panel.innerHTML = `<div class="chat-change-head">
         <div class="chat-change-title">${{escAttr(headline)}}</div>
-        <button type="button" id="chat-change-clear-btn" class="chat-change-clear-btn" title="Clear notification history in this view">Clear</button>
+        <button type="button" id="chat-change-clear-btn" class="chat-change-clear-btn" title="Clear inbound system notifications">Clear</button>
       </div>
       <div class="chat-change-list">${{rows}}</div>`;
       panel.hidden = !chatChangeMenuOpen;
@@ -10591,15 +10673,21 @@
       return true;
     }}
 
-    function openNoticeTarget(targetViewRaw, focusKeyRaw) {{
+    function openNoticeTarget(targetViewRaw, focusKeyRaw, chatChannelRaw = "all", peerNodeIdRaw = "") {{
       const targetView = normalizeLayoutView(targetViewRaw || "chat");
       const focusKey = String(focusKeyRaw || "").trim();
+      const targetChatChannel = normalizeChatChannel(chatChannelRaw || "all");
+      const peerNodeId = normalizeNodeId(peerNodeIdRaw || "");
       const switchedView = activeLayoutView !== targetView;
       if (switchedView) {{
         applyLayoutView(targetView, true);
       }}
       const finalize = () => {{
         if (targetView === "chat") {{
+          applyChatChannel(targetChatChannel, true);
+          if (targetChatChannel === "direct" && isSelectableNodeId(peerNodeId)) {{
+            selectNode(peerNodeId, false, false);
+          }}
           if (!focusChatNoticeByMessageKey(focusKey)) {{
             setChatSendStatus("Change is older than the visible chat window.", true);
           }}
@@ -10663,7 +10751,7 @@
       if (clearBtn instanceof HTMLButtonElement) {{
         clearBtn.addEventListener("click", (ev) => {{
           ev.preventDefault();
-          clearChatChangeNotices(activeChatChannel);
+          clearChatChangeNotices();
           clearChatFeedChangeFocus();
           if (latestState) {{
             renderChat(latestState);
@@ -10679,7 +10767,9 @@
           setChatChangeMenuOpen(false);
           const targetView = normalizeLayoutView(itemBtn.dataset.changeTargetView || "chat");
           const focusKey = String(itemBtn.dataset.changeFocusKey || "").trim();
-          openNoticeTarget(targetView, focusKey);
+          const targetChatChannel = normalizeChatChannel(itemBtn.dataset.changeChatChannel || "all");
+          const peerNodeId = normalizeNodeId(itemBtn.dataset.changePeerNodeId || "");
+          openNoticeTarget(targetView, focusKey, targetChatChannel, peerNodeId);
         }});
       }}
     }}
@@ -10737,6 +10827,7 @@
     function collectChatMessageEntries(state) {{
       const safeState = state && typeof state === "object" ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const botRequests = Array.isArray(safeState.bot_requests) ? safeState.bot_requests : [];
       const traffic = safeState.traffic && typeof safeState.traffic === "object"
         ? safeState.traffic
         : {{}};
@@ -10746,6 +10837,23 @@
       const nodesById = new Map(
         nodes.map((node) => [normalizeNodeId(node && node.id ? node.id : ""), node])
       );
+      const meshBotRequestByMessageId = new Map();
+      const meshBotResponseByMessageId = new Map();
+      for (const rawRow of botRequests) {{
+        if (!rawRow || typeof rawRow !== "object") continue;
+        const source = String(rawRow.source || "").trim().toLowerCase();
+        if (source !== "mesh") continue;
+        const requestMessageId = parsePositiveMessageId(rawRow.message_id ?? rawRow.messageId);
+        const responseMessageId = parsePositiveMessageId(
+          rawRow.response_message_id ?? rawRow.responseMessageId
+        );
+        if (requestMessageId) {{
+          meshBotRequestByMessageId.set(String(requestMessageId), rawRow);
+        }}
+        if (responseMessageId) {{
+          meshBotResponseByMessageId.set(String(responseMessageId), rawRow);
+        }}
+      }}
       const messageSenderById = new Map();
       for (const msg of recentChat) {{
         if (!messageMatchesActiveMeshChannel(msg)) continue;
@@ -10764,6 +10872,7 @@
         const channel = classifyMessageChannel(msg);
         const isReaction = isReactionLikeChatMessage(msg);
         const kind = normalizeChatMessageKind(msg, isReaction);
+        const msgId = messageIdOfChatPacket(msg);
         const fromId = normalizeNodeId(msg && msg.from ? msg.from : "");
         const toId = normalizeNodeId(msg && (msg.to || msg.destination) ? (msg.to || msg.destination) : "");
         const replyIdRaw = Number(msg && (msg.reply_id ?? msg.replyId));
@@ -10773,29 +10882,64 @@
         const replyTargetSenderId = replyId != null
           ? normalizeNodeId(messageSenderById.get(String(replyId)) || "")
           : "";
+        const botRequestRow = msgId != null
+          ? meshBotRequestByMessageId.get(String(msgId)) || null
+          : null;
+        const botResponseRow = msgId != null
+          ? meshBotResponseByMessageId.get(String(msgId)) || null
+          : null;
+        const botInteractionRow = botResponseRow || botRequestRow || null;
         const senderIsSelf = hasLocalNodeId && fromId === localNodeId;
         const directToSelf = hasLocalNodeId && channel === "direct" && toId === localNodeId;
         const referencesSelfMessage = hasLocalNodeId && !!replyId && replyTargetSenderId === localNodeId;
-        const selfRelevant = hasLocalNodeId && !senderIsSelf && (directToSelf || referencesSelfMessage);
+        const botPeerNodeId = normalizeNodeId(
+          (botResponseRow && (botResponseRow.from_id ?? botResponseRow.fromId))
+          || (botRequestRow && (botRequestRow.from_id ?? botRequestRow.fromId))
+          || ""
+        );
+        const botInteraction = !!botInteractionRow;
+        const systemRelevant = hasLocalNodeId && (
+          (!senderIsSelf && (directToSelf || referencesSelfMessage))
+          || botInteraction
+        );
+        const peerNodeId = channel === "direct"
+          ? normalizeNodeId(
+            botPeerNodeId || (
+              senderIsSelf
+              ? (toId || fromId || "")
+              : (fromId || toId || "")
+            )
+          )
+          : "";
         entries.push({{
           key,
           focusKey: isReaction ? chatChangeFocusKeyFromMessage(msg, key) : key,
           channel,
+          targetChatChannel: channel,
+          peerNodeId,
           sender: chatSenderLabelFromMessage(msg, nodesById),
           preview: chatChangePreviewFromMessage(msg, isReaction),
           kind,
-          countsUnread: kind === "message",
-          selfRelevant,
+          countsUnread: !senderIsSelf || !!botResponseRow,
+          selfRelevant: systemRelevant,
+          systemRelevant,
           unix: latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at),
         }});
       }}
       return entries;
     }}
 
-    function entryMatchesNotificationScope(entry) {{
-      const scope = normalizeChatNotificationScope(chatNotificationScope);
-      if (scope === "all") return true;
-      return !!(entry && entry.selfRelevant === true);
+    function isChatEntryVisibleInCurrentContext(entry) {{
+      if (!entry || typeof entry !== "object") return false;
+      if (document.hidden || !tabHasFocus) return false;
+      if (activeLayoutView !== "chat") return false;
+      const entryChannel = normalizeChatChannel(entry.channel || entry.targetChatChannel || "all");
+      if (entryChannel !== activeChatChannel) return false;
+      if (entryChannel !== "direct") return true;
+      const selectedPeerId = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
+      const entryPeerId = normalizeNodeId(entry.peerNodeId || "");
+      if (!selectedPeerId || !entryPeerId) return false;
+      return selectedPeerId === entryPeerId;
     }}
 
     function isTabInactiveForNotifications() {{
@@ -10822,26 +10966,36 @@
       for (const entry of keyedMessages) {{
         if (!rememberSeenChatMessage(entry.key)) continue;
         const key = entry.channel === "direct" ? "direct" : "all";
-        const scopeMatch = entryMatchesNotificationScope(entry);
-        const shouldNotify = catchupNoticeArmed || tabInactive;
-        if (shouldNotify && scopeMatch) {{
+        const entryVisible = isChatEntryVisibleInCurrentContext(entry);
+        const shouldNotify = catchupNoticeArmed || tabInactive || !entryVisible;
+        const systemRelevant = !!(entry && entry.systemRelevant === true);
+        if (shouldNotify && systemRelevant) {{
           trackChatChangeNotice({{
             key: entry.key,
             focusKey: entry.focusKey || entry.key,
             channel: key,
+            targetChatChannel: entry.targetChatChannel || key,
+            peerNodeId: entry.peerNodeId || "",
             sender: entry.sender,
             preview: entry.preview,
             kind: entry.kind,
             selfRelevant: entry.selfRelevant === true,
+            systemRelevant,
             unix: entry.unix,
           }});
         }}
-        if (!shouldNotify || entry.countsUnread === false || !scopeMatch) continue;
+        if (!shouldNotify || entry.countsUnread === false) continue;
         freshByChannel[key] += 1;
         latestSenderByChannel[key] = String(entry.sender || "").trim();
       }}
 
-      if (activeLayoutView === "chat" && clearActiveWhenInChat) {{
+      const canClearActiveChat = (
+        activeLayoutView === "chat"
+        && clearActiveWhenInChat
+        && !tabInactive
+        && !catchupNoticeArmed
+      );
+      if (canClearActiveChat) {{
         const otherKey = activeChatChannel === "direct" ? "all" : "direct";
         if (freshByChannel[otherKey] > 0) {{
           setChatChannelUnread(
@@ -10903,9 +11057,7 @@
     }}
 
     function totalChatChangeNotices() {{
-      const allCount = chatChangeUnacknowledgedCountForChannel("all");
-      const directCount = chatChangeUnacknowledgedCountForChannel("direct");
-      return allCount + directCount;
+      return totalSystemNotificationCount();
     }}
 
     function syncChatRailUnread() {{
@@ -10915,10 +11067,8 @@
 
     function syncDocumentUnreadTitle(count) {{
       const unreadCount = Math.max(0, Math.trunc(Number(count) || 0));
-      const missedCount = Math.max(0, Math.trunc(Number(totalChatChangeNotices()) || 0));
-      const safeCount = Math.max(unreadCount, missedCount);
-      const badge = safeCount > 99 ? "99+" : String(safeCount);
-      const nextTitle = safeCount > 0
+      const badge = unreadCount > 99 ? "99+" : String(unreadCount);
+      const nextTitle = unreadCount > 0
         ? `(${{badge}}) ${{baseDocumentTitle}}`
         : baseDocumentTitle;
       if (document.title !== nextTitle) {{
@@ -10929,20 +11079,25 @@
     function setChatRailUnread(count) {{
       const unreadCount = Math.max(0, Math.trunc(Number(count) || 0));
       const missedCount = Math.max(0, Math.trunc(Number(totalChatChangeNotices()) || 0));
-      const safeCount = Math.max(unreadCount, missedCount);
-      syncDocumentUnreadTitle(safeCount);
+      const attentionCount = Math.max(unreadCount, missedCount);
+      syncDocumentUnreadTitle(unreadCount);
       const btn = document.querySelector('.teams-rail .rail-btn[data-view="chat"]');
       if (!(btn instanceof HTMLButtonElement)) return;
       if (!btn.dataset.baseTitle) {{
         btn.dataset.baseTitle = btn.getAttribute("title") || "Teams-style chat workspace";
       }}
-      const labelCount = safeCount > 99 ? "99+" : String(safeCount);
-      btn.textContent = safeCount > 0 ? `Chat (${{labelCount}})` : "Chat";
-      btn.classList.toggle("has-unread", safeCount > 0);
+      const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
+      btn.textContent = unreadCount > 0 ? `Chat (${{unreadLabel}})` : "Chat";
+      btn.classList.toggle("has-unread", attentionCount > 0);
       const baseTitle = btn.dataset.baseTitle || "Teams-style chat workspace";
-      btn.title = safeCount > 0
-        ? `${{baseTitle}}. ${{safeCount}} unread update${{safeCount === 1 ? "" : "s"}}.`
-        : baseTitle;
+      const titleParts = [baseTitle];
+      if (unreadCount > 0) {{
+        titleParts.push(`${{unreadCount}} unread chat message${{unreadCount === 1 ? "" : "s"}}.`);
+      }}
+      if (missedCount > 0) {{
+        titleParts.push(`${{missedCount}} missed update${{missedCount === 1 ? "" : "s"}}.`);
+      }}
+      btn.title = titleParts.join(" ");
       btn.setAttribute("aria-label", btn.title);
     }}
 
@@ -13524,13 +13679,19 @@
         }}
         actions.appendChild(saveBtn);
 
-        if (idx > 0 && !isDisabledRole && idx === lastActiveIndex) {{
+        if (idx > 0 && !isDisabledRole) {{
           const disableBtn = document.createElement("button");
           disableBtn.type = "button";
           disableBtn.className = "btn btn-danger";
           disableBtn.dataset.channelAction = "disable";
           disableBtn.dataset.channelIndex = String(idx);
           disableBtn.textContent = "Disable";
+          if (idx !== lastActiveIndex) {{
+            disableBtn.disabled = true;
+            disableBtn.title = `Disable channels from the end. Last active slot is ${{lastActiveIndex}}.`;
+          }} else {{
+            disableBtn.title = `Disable channel ${{idx}}.`;
+          }}
           actions.appendChild(disableBtn);
         }}
 
@@ -15221,6 +15382,7 @@
     }});
 
     function renderSummary(state) {{
+      syncTopbarChatContext(state);
       const s = state.summary || {{}};
       let targetValue = s.target || "n/a";
       let updatedValue = state.generated_at || "n/a";
@@ -18318,40 +18480,7 @@
     }}
 
     function collectHistoryNotificationRows() {{
-      const rows = [];
-      const appendChannel = (channelKey) => {{
-        const normalizedChannel = normalizeChatChannel(channelKey);
-        const notices = Array.isArray(chatChangeNoticesByChannel[normalizedChannel])
-          ? chatChangeNoticesByChannel[normalizedChannel]
-          : [];
-        const ackSet = chatChangeAcknowledgedKeySetForChannel(normalizedChannel);
-        for (const notice of notices) {{
-          const normalized = normalizeChatChangeNotice(notice);
-          if (!normalized) continue;
-          rows.push({{
-            key: normalized.key,
-            channel: normalizedChannel,
-            sender: normalized.sender,
-            preview: normalized.preview,
-            kind: normalized.kind,
-            unix: normalized.unix,
-            seen: ackSet instanceof Set ? ackSet.has(normalized.key) : false,
-          }});
-        }}
-      }};
-      appendChannel("all");
-      appendChannel("direct");
-      rows.sort((a, b) => {{
-        const aUnix = Number(a && a.unix);
-        const bUnix = Number(b && b.unix);
-        const safeA = Number.isFinite(aUnix) ? aUnix : 0;
-        const safeB = Number.isFinite(bUnix) ? bUnix : 0;
-        if (safeB !== safeA) return safeB - safeA;
-        const aKey = String(a && a.key ? a.key : "");
-        const bKey = String(b && b.key ? b.key : "");
-        return bKey.localeCompare(aKey);
-      }});
-      return rows.slice(0, historyNotificationMaxRows);
+      return collectSystemNotificationRows();
     }}
 
     function renderHistoryNotificationLog(nowUnix = Math.floor(Date.now() / 1000)) {{
@@ -18361,11 +18490,11 @@
       const rows = collectHistoryNotificationRows();
       if (caption instanceof HTMLElement) {{
         caption.textContent = rows.length
-          ? `Showing ${{rows.length}} recent notification events from this browser log.`
-          : "No saved notification history yet in this browser.";
+          ? `Showing ${{rows.length}} recent inbound system notifications from this browser log.`
+          : "No saved system notification history yet in this browser.";
       }}
       if (!rows.length) {{
-        host.innerHTML = '<div class="history-notification-empty">No notification history yet in this browser.</div>';
+        host.innerHTML = '<div class="history-notification-empty">No system notification history yet in this browser.</div>';
         return;
       }}
       host.innerHTML = rows.map((row) => {{
@@ -18781,6 +18910,7 @@
     }}
 
     function renderChat(state) {{
+      syncTopbarChatContext(state);
       const chatRenderStartMs = (
         chatPerfEnabled
         && typeof window.performance !== "undefined"
@@ -19261,26 +19391,7 @@
         messageEndpoints.set(msg, resolved);
         return resolved;
       }};
-      const keyedMessages = rawMessages
-        .map((msg) => {{
-          if (!messageMatchesActiveMeshChannel(msg)) return null;
-          const key = chatMessageKey(msg);
-          if (!key) return null;
-          const isReaction = isReactionMessage(msg);
-          const kind = normalizeChatMessageKind(msg, isReaction);
-          const endpoints = endpointsForMessage(msg);
-          return {{
-            key,
-            focusKey: isReaction ? chatChangeFocusKeyFromMessage(msg, key) : key,
-            channel: classifyMessageChannel(msg),
-            sender: chatEndpointParts(endpoints.fromId).label || "Unknown node",
-            preview: chatChangePreviewFromMessage(msg, isReaction),
-            kind,
-            countsUnread: kind === "message",
-            unix: latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at),
-          }};
-        }})
-        .filter((entry) => !!entry && !!entry.key);
+      const keyedMessages = collectChatMessageEntries(state);
       syncChatUnreadFromEntries(keyedMessages, {{ clearActiveWhenInChat: true }});
 
       const channelList = document.getElementById("chat-channel-list");
