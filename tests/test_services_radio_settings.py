@@ -147,8 +147,11 @@ class _FakeNode:
         has_mqtt: bool = True,
         has_reset: bool = True,
         has_set_time: bool = True,
+        has_factory_reset: bool = True,
         has_set_fixed_position: bool = True,
         has_remove_fixed_position: bool = True,
+        has_set_owner: bool = True,
+        set_owner_requires_positional: bool = False,
         has_write: bool = True,
         write_error: Exception | None = None,
         reset_error: Exception | None = None,
@@ -171,22 +174,31 @@ class _FakeNode:
         self.commit_calls = 0
         self.reset_calls = 0
         self.set_time_calls: list[int] = []
+        self.factory_reset_calls: list[bool] = []
         self.set_fixed_position_calls: list[tuple[float, float, int]] = []
         self.remove_fixed_position_calls = 0
+        self.set_owner_calls: list[dict[str, object]] = []
+        self.user = {"shortName": "OLD1", "longName": "Old Node"}
+        self.nodeNum = 123
         self._write_error = write_error
         self._reset_error = reset_error
         self._begin_error = begin_error
         self._commit_error = commit_error
+        self._set_owner_requires_positional = set_owner_requires_positional
         if not has_write:
             self.writeConfig = None
         if not has_reset:
             self.resetNodeDb = None
         if not has_set_time:
             self.setTime = None
+        if not has_factory_reset:
+            self.factoryReset = None
         if not has_set_fixed_position:
             self.setFixedPosition = None
         if not has_remove_fixed_position:
             self.removeFixedPosition = None
+        if not has_set_owner:
+            self.setOwner = None
 
     def beginSettingsTransaction(self):
         self.begin_calls += 1
@@ -211,11 +223,32 @@ class _FakeNode:
     def setTime(self, time_sec: int = 0):
         self.set_time_calls.append(int(time_sec))
 
+    def factoryReset(self, full: bool = False):
+        self.factory_reset_calls.append(bool(full))
+
     def setFixedPosition(self, lat: float, lon: float, alt: int):
         self.set_fixed_position_calls.append((float(lat), float(lon), int(alt)))
 
     def removeFixedPosition(self):
         self.remove_fixed_position_calls += 1
+
+    def setOwner(self, *args, **kwargs):
+        if kwargs:
+            if self._set_owner_requires_positional:
+                raise TypeError("kwargs not supported")
+            self.set_owner_calls.append(dict(kwargs))
+            return
+
+        if len(args) >= 2:
+            self.set_owner_calls.append(
+                {
+                    "long_name": args[0],
+                    "short_name": args[1],
+                    "is_licensed": bool(args[2]) if len(args) >= 3 else False,
+                }
+            )
+            return
+        raise TypeError("expected owner names")
 
 
 class _FakeLock:
@@ -534,6 +567,53 @@ def test_apply_radio_settings_supports_set_time_action():
     assert node.set_time_calls == [0]
 
 
+def test_apply_radio_settings_supports_regenerate_node_id_action():
+    node = _FakeNode()
+    response = apply_radio_settings(
+        RadioSettingsRequest(actions={"regenerate_node_id": True}),
+        iface=_iface_with_local_node(node),
+        send_lock=_FakeLock(),
+    )
+
+    assert response["ok"] is True
+    assert response["actions_applied"] == ["regenerate_node_id"]
+    assert response["write_sections"] == []
+    assert response["reboot_expected"] is True
+    assert node.factory_reset_calls == [True]
+
+
+def test_apply_radio_settings_supports_owner_updates():
+    node = _FakeNode()
+    response = apply_radio_settings(
+        RadioSettingsRequest(owner={"short_name": "ABCD", "long_name": "Alpha Bravo"}),
+        iface=_iface_with_local_node(node),
+        send_lock=_FakeLock(),
+    )
+
+    assert response["ok"] is True
+    assert response["actions_applied"] == ["set_owner"]
+    assert response["write_sections"] == []
+    assert response["reboot_expected"] is False
+    assert response["applied"]["owner"] == {"short_name": "ABCD", "long_name": "Alpha Bravo"}
+    assert node.set_owner_calls == [{"short_name": "ABCD", "long_name": "Alpha Bravo"}]
+
+
+def test_apply_radio_settings_owner_update_uses_current_name_fallback_and_positional_call():
+    node = _FakeNode(set_owner_requires_positional=True)
+    response = apply_radio_settings(
+        RadioSettingsRequest(owner={"long_name": "Only Long"}),
+        iface=_iface_with_local_node(node),
+        send_lock=_FakeLock(),
+    )
+
+    assert response["ok"] is True
+    assert response["actions_applied"] == ["set_owner"]
+    assert response["applied"]["owner"] == {"short_name": "OLD1", "long_name": "Only Long"}
+    assert node.set_owner_calls == [
+        {"short_name": "OLD1", "long_name": "Only Long", "is_licensed": False}
+    ]
+
+
 def test_apply_radio_settings_supports_set_fixed_position_action():
     node = _FakeNode()
     response = apply_radio_settings(
@@ -656,6 +736,26 @@ def test_apply_radio_settings_set_time_requires_supported_node_method():
     )
     assert response["ok"] is False
     assert "does not support setTime" in str(response["error"])
+
+
+def test_apply_radio_settings_regenerate_node_id_requires_supported_node_method():
+    response = apply_radio_settings(
+        RadioSettingsRequest(actions={"regenerate_node_id": True}),
+        iface=_iface_with_local_node(_FakeNode(has_factory_reset=False)),
+        send_lock=_FakeLock(),
+    )
+    assert response["ok"] is False
+    assert "does not support factoryReset" in str(response["error"])
+
+
+def test_apply_radio_settings_owner_update_requires_supported_node_method():
+    response = apply_radio_settings(
+        RadioSettingsRequest(owner={"short_name": "ABCD"}),
+        iface=_iface_with_local_node(_FakeNode(has_set_owner=False)),
+        send_lock=_FakeLock(),
+    )
+    assert response["ok"] is False
+    assert "does not support setOwner" in str(response["error"])
 
 
 def test_apply_radio_settings_set_fixed_position_requires_supported_node_method():

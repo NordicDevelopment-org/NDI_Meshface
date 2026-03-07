@@ -338,6 +338,31 @@
               </label>
 
               <label class="settings-field">
+                <span class="settings-label">Node Name</span>
+                <div class="settings-row">
+                  <input
+                    id="settings-owner-short-name"
+                    class="settings-input"
+                    type="text"
+                    maxlength="4"
+                    placeholder="Short (max 4)"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <input
+                    id="settings-owner-long-name"
+                    class="settings-input"
+                    type="text"
+                    maxlength="80"
+                    placeholder="Long name"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button id="settings-apply-owner" class="btn btn-secondary" type="button">Apply Name</button>
+                </div>
+              </label>
+
+              <label class="settings-field">
                 <span class="settings-label">Position Source</span>
                 <select id="settings-position-source" class="settings-select" autocomplete="off">
                   <option value="none">None</option>
@@ -590,7 +615,8 @@
               <div class="settings-row settings-row-danger">
                 <button id="settings-reset-nodedb" class="btn btn-danger" type="button">Reset Radio NodeDB</button>
                 <button id="settings-reset-dashboard-db" class="btn btn-danger" type="button">Reset Dashboard DB</button>
-                <span class="settings-danger-note">Danger zone: resets radio discovery or clears dashboard history.</span>
+                <button id="settings-regenerate-node-id" class="btn btn-danger" type="button">Regenerate Node ID</button>
+                <span class="settings-danger-note">Danger zone: resets radio discovery, clears dashboard history, or full-resets the radio to regenerate node ID.</span>
               </div>
             </div>
           </div>

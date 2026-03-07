@@ -11369,6 +11369,21 @@
       return lora && typeof lora === "object" ? lora : null;
     }}
 
+    function localNodeUserFromState(state) {{
+      const localState = settingsLocalStateFrom(state);
+      const localNodeInfo = localState && typeof localState === "object" ? localState.local_node_info : null;
+      const user = localNodeInfo && typeof localNodeInfo === "object" ? localNodeInfo.user : null;
+      if (!user || typeof user !== "object") {{
+        return null;
+      }}
+      const shortName = String(user.shortName ?? user.short_name ?? "").trim();
+      const longName = String(user.longName ?? user.long_name ?? "").trim();
+      return {{
+        short_name: shortName,
+        long_name: longName,
+      }};
+    }}
+
     function configSectionMapFromState(state, scopeKey) {{
       const localState = settingsLocalStateFrom(state);
       const scope = localState && typeof localState === "object" ? localState[scopeKey] : null;
@@ -12008,6 +12023,8 @@
       const overrideDuty = document.getElementById("settings-lora-override-duty-cycle");
       const boosted = document.getElementById("settings-lora-sx126x-rx-boosted-gain");
       const paFan = document.getElementById("settings-lora-pa-fan-disabled");
+      const ownerShortInput = document.getElementById("settings-owner-short-name");
+      const ownerLongInput = document.getElementById("settings-owner-long-name");
       const fixedLatInput = document.getElementById("settings-fixed-latitude");
       const fixedLonInput = document.getElementById("settings-fixed-longitude");
       const fixedAltInput = document.getElementById("settings-fixed-altitude");
@@ -12029,6 +12046,9 @@
       setFormChecked(overrideDuty, lora.override_duty_cycle);
       setFormChecked(boosted, lora.sx126x_rx_boosted_gain);
       setFormChecked(paFan, lora.pa_fan_disabled);
+      const owner = localNodeUserFromState(state);
+      setFormValue(ownerShortInput, owner && owner.short_name ? owner.short_name : "");
+      setFormValue(ownerLongInput, owner && owner.long_name ? owner.long_name : "");
 
       const fixedFromState = fixedPositionFromState(state);
       if (fixedFromState) {{
@@ -12111,6 +12131,7 @@
       for (const id of [
         "settings-apply-lora",
         "settings-set-time",
+        "settings-apply-owner",
         "settings-set-fixed-position",
         "settings-clear-fixed-position",
         "settings-reset",
@@ -12118,6 +12139,7 @@
         "settings-apply-module",
         "settings-reset-nodedb",
         "settings-reset-dashboard-db",
+        "settings-regenerate-node-id",
         "settings-export-channel-url",
         "settings-channels-import-url-join-btn",
         "settings-channels-import-url-add-btn",
@@ -12676,6 +12698,36 @@
       }}
     }}
 
+    async function applyOwnerSettings() {{
+      if (settingsApplyInFlight) return;
+
+      const shortInput = document.getElementById("settings-owner-short-name");
+      const longInput = document.getElementById("settings-owner-long-name");
+      const shortNameRaw = shortInput instanceof HTMLInputElement ? String(shortInput.value || "").trim() : "";
+      const longNameRaw = longInput instanceof HTMLInputElement ? String(longInput.value || "").trim() : "";
+      const shortName = shortNameRaw.slice(0, 4);
+
+      if (!shortName && !longNameRaw) {{
+        setText("settings-apply-status", "Enter a short or long node name.");
+        return;
+      }}
+
+      const payload = {{ owner: {{}} }};
+      if (shortName) payload.owner.short_name = shortName;
+      if (longNameRaw) payload.owner.long_name = longNameRaw;
+
+      const ok = await postRadioSettingsPayload(
+        payload,
+        "Applying node name…",
+        "node name saved"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
     async function applySectionSettings(scope) {{
       const isLocal = scope === "local";
       const sectionId = isLocal ? "settings-local-section" : "settings-module-section";
@@ -12742,6 +12794,34 @@
         setTimeout(() => {{
           void fetchSettingsFromRadio();
         }}, 600);
+      }}
+    }}
+
+    async function regenerateNodeId() {{
+      if (settingsApplyInFlight) return;
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(latestState));
+      const idSuffix = isCanonicalNodeId(localNodeId) ? ` (current: ${{localNodeId}})` : "";
+
+      const confirmed = window.confirm(
+        `Regenerate radio node ID${{idSuffix}}? This sends FULL FACTORY RESET to the radio, erases config/channels/keys, and reboots.`
+      );
+      if (!confirmed) return;
+
+      const typed = window.prompt("Type REGEN to confirm full factory reset and node ID regeneration:");
+      if (String(typed || "").trim().toUpperCase() !== "REGEN") {{
+        setText("settings-apply-status", "Canceled: confirmation token did not match.");
+        return;
+      }}
+
+      const ok = await postRadioSettingsPayload(
+        {{ actions: {{ regenerate_node_id: true }} }},
+        "Regenerating node ID (full factory reset)… radio will reboot.",
+        "node ID regeneration requested"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 3000);
       }}
     }}
 
@@ -12911,6 +12991,13 @@
         }});
       }}
 
+      const applyOwnerBtn = document.getElementById("settings-apply-owner");
+      if (applyOwnerBtn instanceof HTMLButtonElement) {{
+        applyOwnerBtn.addEventListener("click", () => {{
+          void applyOwnerSettings();
+        }});
+      }}
+
       const setFixedPositionBtn = document.getElementById("settings-set-fixed-position");
       if (setFixedPositionBtn instanceof HTMLButtonElement) {{
         setFixedPositionBtn.addEventListener("click", () => {{
@@ -12950,6 +13037,13 @@
       if (resetDashboardDbBtn instanceof HTMLButtonElement) {{
         resetDashboardDbBtn.addEventListener("click", () => {{
           void resetDashboardDb();
+        }});
+      }}
+
+      const regenerateNodeIdBtn = document.getElementById("settings-regenerate-node-id");
+      if (regenerateNodeIdBtn instanceof HTMLButtonElement) {{
+        regenerateNodeIdBtn.addEventListener("click", () => {{
+          void regenerateNodeId();
         }});
       }}
 

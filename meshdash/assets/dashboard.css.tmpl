@@ -19,6 +19,11 @@
       height: 100%;
       overflow: hidden;
     }}
+    body {{
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }}
     .topbar {{
       padding: 8px 12px;
       background: linear-gradient(100deg, #173d2d, #2d6f50);
@@ -28,6 +33,7 @@
       top: 0;
       z-index: 1200;
       padding-right: max(12px, calc(78px + env(safe-area-inset-right)));
+      flex: 0 0 auto;
     }}
     .topbar-notify-corner {{
       position: absolute;
@@ -526,8 +532,8 @@
       gap: 8px;
       padding: 8px;
       min-height: 0;
-      height: calc(100vh - var(--workspace-viewport-offset, 84px));
-      height: calc(100dvh - var(--workspace-viewport-offset, 84px));
+      flex: 1 1 auto;
+      height: auto;
       background: var(--panel);
       align-items: stretch;
       overflow: hidden;
@@ -3372,16 +3378,23 @@
     .layout.view-settings {{
       height: 100%;
       min-height: 0;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
     }}
     .layout.view-settings .settings {{
+      grid-column: 1;
+      grid-row: 1;
       display: flex;
       min-height: 0;
+      max-height: 100%;
     }}
     .layout.view-settings .settings .body {{
       display: flex;
       flex-direction: column;
       min-height: 0;
       overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-gutter: stable;
     }}
     .layout.view-settings .chat,
     .layout.view-settings .nodes,

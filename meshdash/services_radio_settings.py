@@ -212,6 +212,101 @@ def _normalize_section_updates(
     return normalized
 
 
+def _clean_owner_name(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _object_get(value: object, key: str) -> object | None:
+    if isinstance(value, Mapping):
+        return value.get(key)
+    return getattr(value, key, None)
+
+
+def _owner_names_from_object(value: object) -> tuple[str, str]:
+    if value is None:
+        return "", ""
+
+    nested_user = _object_get(value, "user")
+    if nested_user is not None:
+        nested_short, nested_long = _owner_names_from_object(nested_user)
+        if nested_short or nested_long:
+            return nested_short, nested_long
+
+    short_name = _clean_owner_name(
+        _object_get(value, "short_name")
+        or _object_get(value, "shortName")
+    )
+    long_name = _clean_owner_name(
+        _object_get(value, "long_name")
+        or _object_get(value, "longName")
+    )
+    return short_name, long_name
+
+
+def _current_owner_names(node: object, iface: object) -> tuple[str, str]:
+    for candidate in (
+        _object_get(node, "user"),
+        node,
+    ):
+        short_name, long_name = _owner_names_from_object(candidate)
+        if short_name or long_name:
+            return short_name, long_name
+
+    node_num = _object_get(node, "nodeNum")
+    nodes_by_num = getattr(iface, "nodesByNum", None)
+    if isinstance(nodes_by_num, Mapping):
+        info = nodes_by_num.get(node_num)
+        if info is None and node_num is not None:
+            info = nodes_by_num.get(str(node_num))
+        short_name, long_name = _owner_names_from_object(info)
+        if short_name or long_name:
+            return short_name, long_name
+
+    return "", ""
+
+
+def _normalize_owner_updates(owner_updates: Mapping[str, object] | None) -> dict[str, object]:
+    if not owner_updates:
+        return {}
+    out: dict[str, object] = {}
+    if "short_name" in owner_updates:
+        out["short_name"] = _clean_owner_name(owner_updates.get("short_name"))
+    if "long_name" in owner_updates:
+        out["long_name"] = _clean_owner_name(owner_updates.get("long_name"))
+    if "is_licensed" in owner_updates:
+        out["is_licensed"] = _coerce_bool(owner_updates.get("is_licensed"))
+    if "is_unmessagable" in owner_updates:
+        out["is_unmessagable"] = _coerce_bool(owner_updates.get("is_unmessagable"))
+    return out
+
+
+def _set_owner_with_fallback(node: object, owner_kwargs: Mapping[str, object]) -> None:
+    set_owner = getattr(node, "setOwner", None)
+    if not callable(set_owner):
+        raise RuntimeError("Meshtastic node does not support setOwner()")
+
+    kwargs = dict(owner_kwargs)
+    try:
+        set_owner(**kwargs)
+        return
+    except TypeError:
+        pass
+
+    fallback_kwargs = dict(kwargs)
+    fallback_kwargs.pop("is_unmessagable", None)
+    try:
+        set_owner(**fallback_kwargs)
+        return
+    except TypeError:
+        pass
+
+    set_owner(
+        fallback_kwargs.get("long_name"),
+        fallback_kwargs.get("short_name"),
+        bool(fallback_kwargs.get("is_licensed", False)),
+    )
+
+
 def _dedupe_preserve_order(items: Iterable[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -331,6 +426,7 @@ def apply_radio_settings(
     lora_updates = dict(request.lora or {})
     local_updates = _normalize_section_updates(request.local)
     module_updates = _normalize_section_updates(request.module)
+    owner_updates = _normalize_owner_updates(request.owner)
     fixed_position_updates = _normalize_fixed_position_payload(request.fixed_position)
     actions = dict(request.actions or {})
 
@@ -345,6 +441,7 @@ def apply_radio_settings(
     reset_nodedb = bool(actions.get("reset_nodedb"))
     reset_dashboard_db = bool(actions.get("reset_dashboard_db"))
     set_time = bool(actions.get("set_time"))
+    regenerate_node_id = bool(actions.get("regenerate_node_id"))
     set_fixed_position = bool(actions.get("set_fixed_position")) or bool(fixed_position_updates)
     clear_fixed_position = bool(actions.get("clear_fixed_position"))
 
@@ -362,15 +459,46 @@ def apply_radio_settings(
         not lora_updates
         and not local_updates
         and not module_updates
+        and not owner_updates
         and not reset_nodedb
         and not reset_dashboard_db
         and not set_time
+        and not regenerate_node_id
         and not set_fixed_position
         and not clear_fixed_position
     ):
         return {"ok": False, "error": "No settings/actions provided"}
 
     node = _get_local_node(iface)
+    owner_apply_kwargs: dict[str, object] = {}
+    owner_applied: dict[str, object] = {}
+    owner_applied_fields: list[str] = []
+    if owner_updates:
+        current_short_name, current_long_name = _current_owner_names(node, iface)
+        short_name = _clean_owner_name(owner_updates.get("short_name")) or current_short_name
+        long_name = _clean_owner_name(owner_updates.get("long_name")) or current_long_name
+        if not long_name and short_name:
+            long_name = short_name
+        if not short_name and long_name:
+            short_name = long_name[:4]
+        if not short_name and not long_name:
+            return {"ok": False, "error": "Owner update requires a short or long name"}
+
+        owner_apply_kwargs["long_name"] = long_name
+        owner_apply_kwargs["short_name"] = short_name
+        owner_applied["long_name"] = long_name
+        owner_applied["short_name"] = short_name
+        owner_applied_fields.extend(["owner.long_name", "owner.short_name"])
+
+        if "is_licensed" in owner_updates:
+            owner_apply_kwargs["is_licensed"] = _coerce_bool(owner_updates.get("is_licensed"))
+            owner_applied["is_licensed"] = owner_apply_kwargs["is_licensed"]
+            owner_applied_fields.append("owner.is_licensed")
+        if "is_unmessagable" in owner_updates:
+            owner_apply_kwargs["is_unmessagable"] = _coerce_bool(owner_updates.get("is_unmessagable"))
+            owner_applied["is_unmessagable"] = owner_apply_kwargs["is_unmessagable"]
+            owner_applied_fields.append("owner.is_unmessagable")
+
     applied: dict[str, object] = {}
     write_sections: list[str] = []
     applied_fields: list[str] = []
@@ -426,10 +554,17 @@ def apply_radio_settings(
         actions_applied.append("reset_dashboard_db")
     if set_time:
         actions_applied.append("set_time")
+    if regenerate_node_id:
+        actions_applied.append("regenerate_node_id")
     if set_fixed_position:
         actions_applied.append("set_fixed_position")
     if clear_fixed_position:
         actions_applied.append("clear_fixed_position")
+
+    if owner_applied:
+        applied["owner"] = owner_applied
+        applied_fields.extend(owner_applied_fields)
+        actions_applied.append("set_owner")
 
     if not write_sections and not actions_applied:
         return {
@@ -473,11 +608,23 @@ def apply_radio_settings(
                     except Exception:
                         pass
 
+            if owner_apply_kwargs:
+                _set_owner_with_fallback(node, owner_apply_kwargs)
+
             if set_time:
                 set_time_fn = getattr(node, "setTime", None)
                 if not callable(set_time_fn):
                     return {"ok": False, "error": "Meshtastic node does not support setTime()"}
                 set_time_fn(0)
+
+            if regenerate_node_id:
+                factory_reset = getattr(node, "factoryReset", None)
+                if not callable(factory_reset):
+                    return {"ok": False, "error": "Meshtastic node does not support factoryReset()"}
+                try:
+                    factory_reset(full=True)
+                except TypeError:
+                    factory_reset(True)
 
             if set_fixed_position:
                 set_fixed_position_fn = getattr(node, "setFixedPosition", None)
@@ -542,7 +689,7 @@ def apply_radio_settings(
         "ignored_fields": ignored_fields,
         "actions_applied": actions_applied,
         "write_sections": write_sections,
-        "reboot_expected": bool(write_sections or reset_nodedb),
+        "reboot_expected": bool(write_sections or reset_nodedb or regenerate_node_id),
     }
     if deleted_history_rows is not None:
         response["deleted_history_rows"] = deleted_history_rows
