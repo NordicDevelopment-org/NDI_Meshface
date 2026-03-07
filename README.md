@@ -255,22 +255,31 @@ Important knobs:
 
 The dashboard can now run a server-side chat responder bot (radio-wide behavior).
 It listens for incoming text commands and replies on mesh via the same send pipeline.
+By default, bot replies start **off**. When you turn them on, the curated startup set keeps
+only `ping` and `zork` active so the Bots screen can be used as a quick “ping bot / game bot”
+control surface without enabling the full catalog.
 
 Built-in commands:
 
+- `ping [target]`
+- `zork`
 - `cmd` / `help`
 - `whoami`
 - `whois <id|name>`
 - `whohas <id|name>`
-- `ping [target]`
 - `lheard`
 
 Environment controls:
 
-- `MESH_DASH_BOT_ENABLED=0|1` (default: `1`)
+- `MESH_DASH_BOT_ENABLED=0|1` (default: `0`)
+- `MESH_DASH_BOT_GAME_ENABLED=0|1` (default: `1`)
 - `MESH_DASH_BOT_REPLY_BROADCAST=0|1` (default: `0`)
   - `0`: reply direct when request was direct, broadcast when request was broadcast
   - `1`: always broadcast replies
+- `MESH_DASH_BOT_DISABLED_COMMANDS`
+  - default startup profile disables every managed command except `ping` and `zork`
+  - set this var explicitly to override that curated default
+  - example: `MESH_DASH_BOT_DISABLED_COMMANDS=""` starts with the full managed catalog enabled
 - `MESH_DASH_BOT_CUSTOM_COMMANDS` JSON object for custom commands, for example:
 
 ```bash
@@ -279,6 +288,11 @@ export MESH_DASH_BOT_CUSTOM_COMMANDS='{"status":"status local={local_id} from={f
 
 Custom template fields:
 `{command}`, `{args}`, `{from_id}`, `{to_id}`, `{local_id}`, `{hops}`, `{rx_time}`.
+
+Bots panel notes:
+
+- `Bot Commands` are backend radio behavior. Individual command toggles are preserved even when the master bot-response switch is off.
+- `Bot Assistant` is browser-only UI help. Turning it off disables local Whois drafting/history matching in that browser, but manual chat commands still send normally.
 
 ## Channels (beginner-friendly docs)
 

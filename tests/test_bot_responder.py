@@ -163,6 +163,10 @@ def test_build_bot_from_env_defaults_bot_responses_to_disabled():
     assert bot is not None
     assert bot.enabled is False
     assert bot.log_enabled is True
+    assert bot.game_enabled is True
+    settings = bot.bot_settings()
+    enabled_names = [row["name"] for row in settings["commands"] if row["enabled"]]
+    assert enabled_names == ["ping", "zork"]
 
 
 def test_build_bot_from_env_can_disable_bot_and_logging():
@@ -222,6 +226,8 @@ def test_bot_settings_expose_managed_command_catalog():
     assert "ping" in names
     assert "zork" in names
     assert "status" in names
+    assert commands[0]["name"] == "ping"
+    assert commands[1]["name"] == "zork"
     ping = next(row for row in commands if row["name"] == "ping")
     assert ping["enabled"] is True
 
@@ -373,3 +379,18 @@ def test_build_bot_from_env_can_disable_specific_command():
     whois = next(row for row in settings["commands"] if row["name"] == "whois")
     assert ping["enabled"] is False
     assert whois["enabled"] is False
+
+
+def test_build_bot_from_env_empty_disabled_commands_enables_full_catalog():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_DISABLED_COMMANDS": ""},
+    )
+    assert bot is not None
+    settings = bot.bot_settings()
+    rows = {row["name"]: row for row in settings["commands"]}
+    assert rows["ping"]["enabled"] is True
+    assert rows["zork"]["enabled"] is True
+    assert rows["cmd"]["enabled"] is True
+    assert rows["whois"]["enabled"] is True

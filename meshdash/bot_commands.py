@@ -9,6 +9,12 @@ class BotCommandSpec:
     kind: str = "builtin"
 
 
+DEFAULT_ENABLED_MANAGED_BOT_COMMAND_NAMES = (
+    "ping",
+    "zork",
+)
+
+
 def normalize_bot_command_name(value: object) -> str:
     text = str(value or "").strip().lower()
     if not text:
@@ -25,6 +31,17 @@ def normalize_bot_command_name(value: object) -> str:
 
 
 MANAGED_BOT_COMMAND_SPECS = (
+    BotCommandSpec(
+        name="ping",
+        usage="ping [target]",
+        description="measure reply latency and hop path",
+    ),
+    BotCommandSpec(
+        name="zork",
+        usage="zork",
+        description="start the peer-to-peer text adventure",
+        kind="game",
+    ),
     BotCommandSpec(
         name="cmd",
         usage="cmd",
@@ -51,20 +68,9 @@ MANAGED_BOT_COMMAND_SPECS = (
         description="lookup node by name",
     ),
     BotCommandSpec(
-        name="ping",
-        usage="ping [target]",
-        description="measure reply latency and hop path",
-    ),
-    BotCommandSpec(
         name="lheard",
         usage="lheard",
         description="list recently heard nodes",
-    ),
-    BotCommandSpec(
-        name="zork",
-        usage="zork",
-        description="start the peer-to-peer text adventure",
-        kind="game",
     ),
 )
 
@@ -88,6 +94,7 @@ def build_custom_bot_command_spec(name: object) -> BotCommandSpec:
 
 
 __all__ = [
+    "DEFAULT_ENABLED_MANAGED_BOT_COMMAND_NAMES",
     "BotCommandSpec",
     "MANAGED_BOT_COMMAND_SPECS",
     "MANAGED_BOT_COMMAND_SPECS_BY_NAME",

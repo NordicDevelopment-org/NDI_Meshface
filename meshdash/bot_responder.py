@@ -5,6 +5,7 @@ import time
 from typing import Callable, Optional
 
 from .bot_commands import (
+    DEFAULT_ENABLED_MANAGED_BOT_COMMAND_NAMES,
     MANAGED_BOT_COMMAND_SPECS,
     STANDARD_BOT_COMMANDS as _STANDARD_BOT_COMMANDS,
     build_custom_bot_command_spec,
@@ -877,6 +878,20 @@ def _load_disabled_commands_from_env(env: dict[str, str]) -> list[str]:
     ]
 
 
+def _default_disabled_commands() -> list[str]:
+    default_enabled = {
+        _normalize_command_name(name) for name in DEFAULT_ENABLED_MANAGED_BOT_COMMAND_NAMES
+    }
+    return [
+        name
+        for name in (
+            _normalize_command_name(getattr(spec, "name", ""))
+            for spec in MANAGED_BOT_COMMAND_SPECS
+        )
+        if name and name not in default_enabled
+    ]
+
+
 def build_mesh_response_bot_from_env(
     *,
     send_chat_fn: Callable[..., dict[str, object]],
@@ -887,12 +902,15 @@ def build_mesh_response_bot_from_env(
     env_map = env if isinstance(env, dict) else dict(os.environ)
     respond_enabled = _parse_bool_token(env_map.get("MESH_DASH_BOT_ENABLED"), False)
     log_enabled = _parse_bool_token(env_map.get("MESH_DASH_BOT_LOG_ENABLED"), True)
-    game_enabled = _parse_bool_token(env_map.get("MESH_DASH_BOT_GAME_ENABLED"), False)
+    game_enabled = _parse_bool_token(env_map.get("MESH_DASH_BOT_GAME_ENABLED"), True)
     if not respond_enabled and not log_enabled:
         return None
     reply_broadcast = _parse_bool_token(env_map.get("MESH_DASH_BOT_REPLY_BROADCAST"), False)
     custom_commands = _load_custom_commands_from_env(env_map)
-    disabled_commands = _load_disabled_commands_from_env(env_map)
+    if "MESH_DASH_BOT_DISABLED_COMMANDS" in env_map:
+        disabled_commands = _load_disabled_commands_from_env(env_map)
+    else:
+        disabled_commands = _default_disabled_commands()
     return MeshResponseBot(
         send_chat_fn=send_chat_fn,
         get_local_node_id_fn=get_local_node_id_fn,
