@@ -14352,6 +14352,12 @@
     }}
 
     function applyMapBootstrapFocus(nodes, state = latestState) {{
+      if (activeLayoutView === "network") {{
+        const didFit = fitMapToMostNodes(nodes, {{ pad: 0.18, maxZoom: 13 }});
+        if (didFit) {{
+          return {{ didFocus: true, source: "network-overview" }};
+        }}
+      }}
       const interest = mapBootstrapInterestNode(nodes, state);
       const node = interest.node;
       if (!node) return {{ didFocus: false, source: interest.source }};
@@ -20100,11 +20106,12 @@
           const bootstrap = applyMapBootstrapFocus(state.nodes || [], state);
           if (bootstrap.didFocus) {{
             mapBootstrapFocusDone = true;
-            if (activeLayoutView === "network" && (bootstrap.source === "selected" || bootstrap.source === "local")) {{
-              // Keep focus anchored on explicit interest targets instead of immediately re-fitting.
+            if (activeLayoutView === "network") {{
+              // Network view should start from the broadest useful overview and not
+              // immediately fight that bootstrap focus with a second auto-fit.
               fitDone = true;
             }}
-            // Let the map paint at the location-of-interest before heavier render work.
+            // Let the map paint at the initial focus target before heavier render work.
             await nextAnimationFrame();
           }}
         }}
