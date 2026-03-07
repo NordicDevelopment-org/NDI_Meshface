@@ -3647,7 +3647,7 @@
 
     function collectSavedNodeHeatmapBuckets(nodes, profile) {{
       const buckets = signalHeatBucketDefs.map(() => []);
-      const selectedId = normalizeNodeId(selectedNodeId || "");
+      const selectedId = resolveSavedViewNodeId(latestState);
       if (!(activeLayoutView === "saved" && isSelectableNodeId(selectedId))) {{
         return buckets;
       }}
@@ -3781,7 +3781,8 @@
       const layers = ensureSignalHeatmapLayers();
       const profile = resolveSignalHeatProfile();
       const supported = Array.isArray(layers) && layers.length > 0;
-      const savedSingleNodeMode = activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId);
+      const savedSingleNodeMode = activeLayoutView === "saved"
+        && isSelectableNodeId(resolveSavedViewNodeId(latestState));
       const buckets = supported
         ? (
             savedSingleNodeMode
@@ -4859,8 +4860,11 @@
       applyMapTiles(resolvedTheme);
       applySettingsFixedMapTiles(resolvedTheme);
       updateThemeToggleLabel(resolvedTheme);
-      if (isSelectableNodeId(selectedNodeId)) {{
-        const cached = nodeHistoryCache.get(selectedNodeId);
+      const historyNodeId = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : normalizeNodeId(selectedNodeId || "");
+      if (isSelectableNodeId(historyNodeId)) {{
+        const cached = nodeHistoryCache.get(historyNodeId);
         if (cached && cached.data && Array.isArray(cached.data.points)) {{
           renderSignalChart(cached.data.points);
         }}
@@ -5699,10 +5703,13 @@
       // otherwise skip renderSummary() and the chip can get "stuck" stale).
       const savedChip = document.getElementById("updated-freshness");
       if (savedChip instanceof HTMLElement) {{
-        if (activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId)) {{
-          const node = nodesById.get(selectedNodeId);
-          const caps = capsById.get(selectedNodeId);
-          const chatTouch = latestChatTouchByNode.get(selectedNodeId) || null;
+        const savedNodeId = activeLayoutView === "saved"
+          ? resolveSavedViewNodeId(latestState)
+          : "";
+        if (activeLayoutView === "saved" && isSelectableNodeId(savedNodeId)) {{
+          const node = nodesById.get(savedNodeId);
+          const caps = capsById.get(savedNodeId);
+          const chatTouch = latestChatTouchByNode.get(savedNodeId) || null;
           const lastSeenUnix = computeNodeFreshnessUnix(node, caps, chatTouch);
           const status = freshnessStatus(lastSeenUnix, nowUnix);
           const key = normalizeFreshnessKey(status);
@@ -9256,6 +9263,61 @@
       return isCanonicalNodeId(resolvedLocalNodeId) ? resolvedLocalNodeId : "";
     }}
 
+    function resolveSavedViewNodeId(state = latestState) {{
+      const explicitId = normalizeNodeId(selectedNodeId || "");
+      if (isSelectableNodeId(explicitId)) {{
+        return explicitId;
+      }}
+      const localId = normalizeNodeId(resolveLocalNodeId(state) || "");
+      if (isSelectableNodeId(localId)) {{
+        return localId;
+      }}
+      return "";
+    }}
+
+    function resolveSavedViewNodeName(state = latestState, nodeId = resolveSavedViewNodeId(state)) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) {{
+        return "";
+      }}
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const node = nodes.find((entry) => normalizeNodeId(entry && entry.id) === clean) || null;
+      const nodeName = preferredNodeName(node);
+      if (nodeName) {{
+        return nodeName;
+      }}
+      const localId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      if (clean === localId) {{
+        const owner = localNodeUserFromState(safeState);
+        const longName = String((owner && owner.long_name) || "").trim();
+        const shortName = String((owner && owner.short_name) || "").trim();
+        if (longName && shortName && shortName !== longName) {{
+          return `${{longName}} (${{shortName}})`;
+        }}
+        if (longName) {{
+          return longName;
+        }}
+        if (shortName) {{
+          return shortName;
+        }}
+      }}
+      return nodeNameCache.get(clean) || clean;
+    }}
+
+    function savedViewNodeFrom(nodes, state = latestState) {{
+      const nodeId = resolveSavedViewNodeId(state);
+      if (!isSelectableNodeId(nodeId)) {{
+        return null;
+      }}
+      for (const node of (nodes || [])) {{
+        if (normalizeNodeId(node && node.id) === nodeId) {{
+          return node;
+        }}
+      }}
+      return null;
+    }}
+
     function isSelfNodeId(nodeId, state = latestState) {{
       const clean = normalizeNodeId(nodeId);
       if (!isCanonicalNodeId(clean)) return false;
@@ -9535,8 +9597,18 @@
 
     function renderSavedRailStatus() {{
       const count = Math.max(0, favoriteNodeIds.size);
-      const selectedId = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
-      const selectedName = selectedId ? (resolveSelectedNodeName() || selectedId) : "";
+      const explicitSelectedId = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
+      const selectedId = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : explicitSelectedId;
+      const usingLocalFallback = activeLayoutView === "saved" && !explicitSelectedId && !!selectedId;
+      const selectedName = selectedId
+        ? (
+            usingLocalFallback
+              ? (resolveSavedViewNodeName(latestState, selectedId) || selectedId)
+              : (resolveSelectedNodeName() || selectedId)
+          )
+        : "";
       const btn = document.querySelector('.teams-rail .rail-btn[data-view="saved"]');
       if (btn instanceof HTMLButtonElement) {{
         if (!btn.dataset.baseTitle) {{
@@ -9545,7 +9617,9 @@
         btn.textContent = "Node";
         const baseTitle = btn.dataset.baseTitle || "Node details and saved nodes";
         if (selectedId) {{
-          btn.title = `${{baseTitle}}. Selected: ${{selectedName}}.`;
+          btn.title = usingLocalFallback
+            ? `${{baseTitle}}. Showing local node: ${{selectedName}}.`
+            : `${{baseTitle}}. Selected: ${{selectedName}}.`;
         }} else {{
           btn.title = count > 0
             ? `${{baseTitle}}. ${{count}} saved node${{count === 1 ? "" : "s"}}.`
@@ -9559,7 +9633,11 @@
         favMenuBtn.classList.toggle("has-saved", count > 0);
         favMenuBtn.classList.toggle("has-selected", !!selectedId);
         const title = selectedId
-          ? `Selected node: ${{selectedName}}. Open node menu.`
+          ? (
+              usingLocalFallback
+                ? `Showing local node: ${{selectedName}}. Open node menu.`
+                : `Selected node: ${{selectedName}}. Open node menu.`
+            )
           : (count > 0
             ? `${{count}} saved node${{count === 1 ? "" : "s"}}. Open node menu.`
             : "No node selected. Open node menu.");
@@ -9819,15 +9897,16 @@
       labelEl.title = `Connected local radio: ${{display}} (${{selfId}})`;
     }}
 
-    function formatSavedViewMapTitle() {{
-      if (!isSelectableNodeId(selectedNodeId)) {{
+    function formatSavedViewMapTitle(state = latestState) {{
+      const nodeId = resolveSavedViewNodeId(state);
+      if (!isSelectableNodeId(nodeId)) {{
         return "Select a node";
       }}
-      const nodeName = resolveSelectedNodeName();
+      const nodeName = resolveSavedViewNodeName(state, nodeId);
       if (nodeName) {{
-        return `${{nodeName}} (${{selectedNodeId}})`;
+        return `${{nodeName}} (${{nodeId}})`;
       }}
-      return selectedNodeId;
+      return nodeId;
     }}
 
     function setMapCardTitle(text) {{
@@ -9846,7 +9925,10 @@
     function syncMapTitleFavoriteToggle() {{
       const btn = document.getElementById("map-card-title-favorite-btn");
       if (!(btn instanceof HTMLButtonElement)) return;
-      const canToggle = activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId);
+      const nodeId = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : "";
+      const canToggle = activeLayoutView === "saved" && isSelectableNodeId(nodeId);
       btn.hidden = !canToggle;
       if (!canToggle) {{
         btn.dataset.nodeId = "";
@@ -9861,7 +9943,6 @@
         return;
       }}
 
-      const nodeId = normalizeNodeId(selectedNodeId || "");
       const active = isFavoriteNode(nodeId);
       btn.dataset.nodeId = nodeId;
       btn.classList.toggle("active", active);
@@ -11790,8 +11871,11 @@
       syncNodeHistoryDock();
       if (latestState) {{
         let cachedNodeHistory = null;
-        if ((next === "saved" || next === "network") && isSelectableNodeId(selectedNodeId)) {{
-          const cached = nodeHistoryCache.get(selectedNodeId);
+        const viewHistoryNodeId = next === "saved"
+          ? resolveSavedViewNodeId(latestState)
+          : (next === "network" ? normalizeNodeId(selectedNodeId || "") : "");
+        if ((next === "saved" || next === "network") && isSelectableNodeId(viewHistoryNodeId)) {{
+          const cached = nodeHistoryCache.get(viewHistoryNodeId);
           if (cached && cached.data) {{
             cachedNodeHistory = cached.data;
           }}
@@ -16163,7 +16247,9 @@
     }}
 
     function buildMapSignatures(nodes, edges, nodeHistory) {{
-      const selection = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
+      const selection = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : (isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "");
       const savedSelectionMode = activeLayoutView === "saved" && !!selection;
       const networkSelectionMode = activeLayoutView === "network" && !!selection;
 
@@ -16171,7 +16257,7 @@
         let hash = 2166136261;
         hash = hashMixStr(hash, "saved");
         hash = hashMixStr(hash, selection);
-        const selectedNode = selectedNodeFrom(nodes);
+        const selectedNode = savedViewNodeFrom(nodes, latestState);
         if (
           selectedNode &&
           typeof selectedNode.lat === "number" &&
@@ -16451,7 +16537,7 @@
             .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
         );
         const nowUnix = Math.floor(Date.now() / 1000);
-        const selectedNode = selectedNodeFrom(nodes);
+        const selectedNode = savedViewNodeFrom(nodes, latestState);
         const selectedNodeIdNormalized = normalizeNodeId((selectedNode && selectedNode.id) || "");
         const hasSelectedPosition = !!selectedNode
           && typeof selectedNode.lat === "number"
@@ -17290,7 +17376,7 @@
       }}
 
       const safeState = (state && typeof state === "object") ? state : {{}};
-      const nodeId = normalizeNodeId(selectedNodeId || "");
+      const nodeId = resolveSavedViewNodeId(safeState);
       const loadingId = normalizeNodeId(loadingNodeId || "");
 
       if (!isSelectableNodeId(nodeId)) {{
@@ -19080,10 +19166,11 @@
       const target = document.getElementById("node-history-overview");
       if (!target) return;
       const historyNodeId = normalizeNodeId(history.node_id || "");
-      const label = node ? nodeLabel(node) : (historyNodeId || selectedNodeId || "node");
+      const fallbackNodeId = resolveSavedViewNodeId(latestState);
+      const label = node ? nodeLabel(node) : (historyNodeId || fallbackNodeId || "node");
       const items = [
         ["Node", `${{label}}`],
-        ["Node ID", `${{historyNodeId || selectedNodeId || "n/a"}}`],
+        ["Node ID", `${{historyNodeId || fallbackNodeId || "n/a"}}`],
         ["Points", `${{summary.points ?? (history.points || []).length ?? 0}}`],
         ["Trail Points", `${{summary.trail_points ?? (history.positions || []).length ?? 0}}`],
         ["Packets", `${{summary.total_packets ?? 0}}`],
@@ -19100,11 +19187,13 @@
 
     function renderNodeHistory(history, nodes) {{
       setMapDataMode("node");
-      const node = selectedNodeFrom(nodes);
       const historyNodeId = normalizeNodeId(history.node_id || "");
+      const node = (nodes || []).find((entry) => normalizeNodeId(entry && entry.id) === historyNodeId)
+        || savedViewNodeFrom(nodes, latestState);
       const caption = document.getElementById("node-history-caption");
       if (caption) {{
-        const name = node ? nodeLabel(node) : (historyNodeId || selectedNodeId || "node");
+        const fallbackNodeId = resolveSavedViewNodeId(latestState);
+        const name = node ? nodeLabel(node) : (historyNodeId || fallbackNodeId || "node");
         const span = history.summary || {{}};
         const trailPoints = Number.isFinite(Number(span.trail_points))
           ? Number(span.trail_points)
@@ -19112,7 +19201,7 @@
         const loc = (node && typeof node.lat === "number" && typeof node.lon === "number")
           ? `Current location: ${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}.`
           : "No current location available from live node state.";
-        caption.textContent = `${{name}} (${{historyNodeId || selectedNodeId || "n/a"}}). ${{loc}} History window: ${{history.window_hours || nodeHistoryHours}}h, packets: ${{span.total_packets ?? 0}}, trail points: ${{trailPoints}}.`;
+        caption.textContent = `${{name}} (${{historyNodeId || fallbackNodeId || "n/a"}}). ${{loc}} History window: ${{history.window_hours || nodeHistoryHours}}h, packets: ${{span.total_packets ?? 0}}, trail points: ${{trailPoints}}.`;
       }}
       renderSignalChart(history.points || []);
       renderNodeHistoryOverview(history, node);
@@ -19191,7 +19280,9 @@
     }}
 
     async function refreshSelectedNodeHistory(force = false) {{
-      const nodeId = normalizeNodeId(selectedNodeId || "");
+      const nodeId = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : normalizeNodeId(selectedNodeId || "");
       if (!isSelectableNodeId(nodeId)) {{
         abortNodeHistoryFetch();
         return null;
@@ -19238,7 +19329,10 @@
       try {{
         const data = await fetchNodeHistory(nodeId, {{ force: true, signal }});
         if (seq !== nodeHistoryFetchSeq) return null;
-        if (normalizeNodeId(selectedNodeId || "") !== nodeId) return null;
+        const activeNodeId = activeLayoutView === "saved"
+          ? resolveSavedViewNodeId(latestState)
+          : normalizeNodeId(selectedNodeId || "");
+        if (activeNodeId !== nodeId) return null;
         if (!(activeLayoutView === "saved" || activeLayoutView === "network")) return null;
         if (mapDataFocus === "activity") return null;
         applyNodeHistoryToView(data);
@@ -19411,12 +19505,15 @@
         return;
       }}
 
-      const showNodeHistory = activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId);
+      const savedNodeId = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : "";
+      const showNodeHistory = activeLayoutView === "saved" && isSelectableNodeId(savedNodeId);
       if (showNodeHistory) {{
-        if (nodeHistory && normalizeNodeId(nodeHistory.node_id) === selectedNodeId) {{
+        if (nodeHistory && normalizeNodeId(nodeHistory.node_id) === savedNodeId) {{
           renderNodeHistory(nodeHistory, nodes);
         }} else {{
-          renderNodeHistoryLoading(selectedNodeId);
+          renderNodeHistoryLoading(savedNodeId);
         }}
         return;
       }}
@@ -21356,10 +21453,13 @@
           renderSelfRadioPill(latestState);
           const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network";
           const trafficVisible304 = mapVisible304 || activeLayoutView === "history";
+          const historyTargetId304 = activeLayoutView === "saved"
+            ? resolveSavedViewNodeId(latestState)
+            : normalizeNodeId(selectedNodeId || "");
           const historyRelevant304 = (activeLayoutView === "saved" || activeLayoutView === "network")
             && mapDataFocus !== "activity"
-            && isSelectableNodeId(selectedNodeId);
-          const cachedHistory304 = historyRelevant304 ? cachedNodeHistory(selectedNodeId) : null;
+            && isSelectableNodeId(historyTargetId304);
+          const cachedHistory304 = historyRelevant304 ? cachedNodeHistory(historyTargetId304) : null;
           const nodes304 = Array.isArray(latestState.nodes) ? latestState.nodes : [];
           const traffic304 = (latestState.traffic && typeof latestState.traffic === "object")
             ? latestState.traffic
@@ -21392,14 +21492,14 @@
           }}
           if (activeLayoutView === "saved") {{
             const loadingId304 = (activeLayoutView === "saved" && historyRelevant304 && !cachedHistory304)
-              ? selectedNodeId
+              ? historyTargetId304
               : null;
             renderFavorites(latestState, cachedHistory304, loadingId304);
           }}
           if ((activeLayoutView === "saved" || activeLayoutView === "network")
             && mapDataFocus !== "activity"
-            && isSelectableNodeId(selectedNodeId)) {{
-            const cached = nodeHistoryCache.get(selectedNodeId);
+            && isSelectableNodeId(historyTargetId304)) {{
+            const cached = nodeHistoryCache.get(historyTargetId304);
             const nowMs = Date.now();
             const ttlMs = Math.max(refreshMs * 2, 8000);
             const stale = !(cached && cached.data) || (nowMs - (cached.fetchedAt || 0)) >= ttlMs;
@@ -21438,10 +21538,13 @@
 
         const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network";
         const trafficVisible = mapVisible || activeLayoutView === "history";
+        const historyTargetId = activeLayoutView === "saved"
+          ? resolveSavedViewNodeId(state)
+          : normalizeNodeId(selectedNodeId || "");
         const historyRelevant = (activeLayoutView === "saved" || activeLayoutView === "network")
           && mapDataFocus !== "activity"
-          && isSelectableNodeId(selectedNodeId);
-        const cachedHistory = historyRelevant ? cachedNodeHistory(selectedNodeId) : null;
+          && isSelectableNodeId(historyTargetId);
+        const cachedHistory = historyRelevant ? cachedNodeHistory(historyTargetId) : null;
 
         if (mapVisible && !mapBootstrapFocusDone) {{
           const bootstrap = applyMapBootstrapFocus(state.nodes || [], state);
@@ -21519,7 +21622,7 @@
 
         if (activeLayoutView === "saved") {{
           const loadingId = (activeLayoutView === "saved" && historyRelevant && !cachedHistory)
-            ? selectedNodeId
+            ? historyTargetId
             : null;
           renderFavorites(state, cachedHistory, loadingId);
         }}
@@ -21545,7 +21648,7 @@
         }}
 
         if (historyRelevant) {{
-          const cached = nodeHistoryCache.get(selectedNodeId);
+          const cached = nodeHistoryCache.get(historyTargetId);
           const nowMs = Date.now();
           const ttlMs = Math.max(refreshMs * 2, 8000);
           const stale = !(cached && cached.data) || (nowMs - (cached.fetchedAt || 0)) >= ttlMs;
@@ -21649,8 +21752,9 @@
     bindHistoryTabs();
     bindWheelPassthrough();
     renderSelectionStatus();
-    if (activeLayoutView === "saved" && isSelectableNodeId(selectedNodeId)) {{
-      renderNodeHistoryLoading(selectedNodeId);
+    const initialSavedNodeId = resolveSavedViewNodeId(latestState);
+    if (activeLayoutView === "saved" && isSelectableNodeId(initialSavedNodeId)) {{
+      renderNodeHistoryLoading(initialSavedNodeId);
     }} else {{
       setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
     }}
