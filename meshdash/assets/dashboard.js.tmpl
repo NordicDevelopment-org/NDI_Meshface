@@ -2076,7 +2076,7 @@
       "encription-traffic-table": {{ index: 2, dir: "desc" }},
     }};
     const wheelActivationLeaseMs = 1400;
-    const knownLayoutViews = new Set(["chat", "bots", "history", "network", "saved", "packets", "encription", "data", "console", "settings"]);
+    const knownLayoutViews = new Set(["chat", "bots", "history", "network", "saved", "packets", "channels", "encription", "data", "console", "settings"]);
     const knownChatChannels = new Set(["all", "direct"]);
     const meshChannelAllIndex = -1;
     const knownChatNotificationScopes = new Set(["all", "self"]);
@@ -2163,6 +2163,7 @@
     let settingsFetchInFlight = false;
     let settingsAutoFetchAttempted = false;
     let channelsUiAdvanced = false;
+    let channelsViewHydrateInFlight = null;
     let settingsLocalStateCache = null;
     let settingsLocalStateFetchedAt = 0;
     let chatStickToBottom = true;
@@ -6958,10 +6959,12 @@
       }};
     }}
 
-    function buildMeshChannelOptionsFromLocalState(localState) {{
+    function collectMeshChannelOptionsFromLocalState(localState, options = {{}}) {{
       const root = (localState && typeof localState === "object") ? localState : {{}};
       const rawChannels = Array.isArray(root.channels) ? root.channels : [];
       const byIndex = new Map();
+      const includeFallback = options.includeFallback !== false;
+      const fallbackCount = Math.max(1, Math.trunc(Number(options.fallbackCount) || 0));
 
       for (let i = 0; i < rawChannels.length; i++) {{
         const ch = rawChannels[i];
@@ -7008,18 +7011,29 @@
         }}
       }}
 
-      const fallbackCount = Math.max(8, rawChannels.length || 0);
-      for (let i = 0; i < fallbackCount; i++) {{
-        if (!byIndex.has(i)) {{
-          byIndex.set(i, {{ index: i, name: "", role: "", disabled: false }});
+      if (includeFallback) {{
+        const fillCount = Math.max(fallbackCount, rawChannels.length || 0);
+        for (let i = 0; i < fillCount; i++) {{
+          if (!byIndex.has(i)) {{
+            byIndex.set(i, {{ index: i, name: "", role: "", disabled: false }});
+          }}
         }}
       }}
 
-      const options = Array.from(byIndex.values())
+      const collectedOptions = Array.from(byIndex.values())
         .filter((opt) => opt && Number.isInteger(Number(opt.index)) && Number(opt.index) >= 0)
         .sort((a, b) => Number(a.index) - Number(b.index));
 
-      return options.length ? options : [{{ index: 0, name: "", role: "", disabled: false }}];
+      if (collectedOptions.length) return collectedOptions;
+      if (!includeFallback) return [];
+      return [{{ index: 0, name: "", role: "", disabled: false }}];
+    }}
+
+    function buildMeshChannelOptionsFromLocalState(localState) {{
+      return collectMeshChannelOptionsFromLocalState(localState, {{
+        includeFallback: true,
+        fallbackCount: Math.max(8, (localState && Array.isArray(localState.channels)) ? localState.channels.length : 0),
+      }});
     }}
 
     function renderMeshChannelSelect(options) {{
@@ -7085,6 +7099,32 @@
       meshChannelOptions = options;
       renderMeshChannelSelect(options);
       return options;
+    }}
+
+    function ensureChannelsViewLocalStateHydrated(force = false) {{
+      if (channelsViewHydrateInFlight) {{
+        return channelsViewHydrateInFlight;
+      }}
+      const cached = settingsLocalStateCache && typeof settingsLocalStateCache === "object"
+        ? settingsLocalStateCache
+        : null;
+      const stale = !settingsLocalStateFetchedAt || (Date.now() - settingsLocalStateFetchedAt) > 60000;
+      const missingChannels = !(cached && Array.isArray(cached.channels));
+      if (!force && !missingChannels && !stale) {{
+        return Promise.resolve(cached);
+      }}
+      channelsViewHydrateInFlight = hydrateMeshChannelOptions(force)
+        .catch(() => null)
+        .then(() => {{
+          if (activeLayoutView === "channels") {{
+            renderChannelsView(latestState);
+          }}
+          return settingsLocalStateCache;
+        }})
+        .finally(() => {{
+          channelsViewHydrateInFlight = null;
+        }});
+      return channelsViewHydrateInFlight;
     }}
 
     function applyMeshChannelIndex(rawIndex, persist = true) {{
@@ -9935,6 +9975,14 @@
       return isLikelyReactionPayloadText(msg.text ?? msg.decoded_text ?? msg.payload_text);
     }}
 
+    function normalizeChatMessageKind(msg, isReaction = null) {{
+      const source = (msg && typeof msg === "object") ? msg : {{}};
+      const kindRaw = String(source.kind || "").trim().toLowerCase();
+      if (kindRaw === "status") return "status";
+      const reaction = isReaction == null ? isReactionLikeChatMessage(source) : !!isReaction;
+      return reaction ? "reaction" : "message";
+    }}
+
     function compactChatChangePreview(rawValue, maxLen = 72) {{
       const text = String(rawValue == null ? "" : rawValue).replace(/\\s+/g, " ").trim();
       if (!text) return "";
@@ -9960,7 +10008,11 @@
 
     function chatChangePreviewFromMessage(msg, isReaction) {{
       const textPayload = compactChatChangePreview(msg && (msg.text ?? msg.decoded_text ?? msg.payload_text), 78);
-      if (!isReaction) {{
+      const kind = normalizeChatMessageKind(msg, isReaction);
+      if (kind === "status") {{
+        return textPayload || "status update";
+      }}
+      if (kind !== "reaction") {{
         return textPayload || "(no text)";
       }}
       const emoji = reactionEmojiPreviewFromMessage(msg);
@@ -10711,6 +10763,7 @@
         if (!key) continue;
         const channel = classifyMessageChannel(msg);
         const isReaction = isReactionLikeChatMessage(msg);
+        const kind = normalizeChatMessageKind(msg, isReaction);
         const fromId = normalizeNodeId(msg && msg.from ? msg.from : "");
         const toId = normalizeNodeId(msg && (msg.to || msg.destination) ? (msg.to || msg.destination) : "");
         const replyIdRaw = Number(msg && (msg.reply_id ?? msg.replyId));
@@ -10730,8 +10783,8 @@
           channel,
           sender: chatSenderLabelFromMessage(msg, nodesById),
           preview: chatChangePreviewFromMessage(msg, isReaction),
-          kind: isReaction ? "reaction" : "message",
-          countsUnread: !isReaction,
+          kind,
+          countsUnread: kind === "message",
           selfRelevant,
           unix: latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at),
         }});
@@ -11088,6 +11141,10 @@
         if (next === "packets") {{
           renderPackets(latestState.traffic || {{}});
         }}
+        if (next === "channels") {{
+          renderChannelsView(latestState);
+          void ensureChannelsViewLocalStateHydrated(false);
+        }}
         if (next === "encription") {{
           renderEncription(latestState.traffic || {{}});
         }}
@@ -11101,6 +11158,9 @@
         renderOnlineActivityLoading();
         renderWeeklySummaryLoading();
         renderHistoryChat({{}});
+      }} else if (next === "channels") {{
+        renderChannelsView(latestState);
+        void ensureChannelsViewLocalStateHydrated(false);
       }} else if (next === "bots") {{
         renderBotsView(latestState);
       }} else if (next === "encription") {{
@@ -11118,7 +11178,7 @@
       renderFavoriteMenuNodeSearchDropdown(latestState);
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
-      if (next === "chat" || next === "bots" || next === "history" || next === "network" || next === "saved") {{
+      if (next === "chat" || next === "bots" || next === "history" || next === "network" || next === "saved" || next === "channels") {{
         requestImmediatePoll(0);
       }}
       if (isMapVisibleLayoutView(next)) {{
@@ -12371,13 +12431,144 @@
       renderConsoleBuffer();
     }}
 
+    function invalidateStateSnapshotCache(delayMs = 20) {{
+      stateEtag = "";
+      forceStateReloadOnce = true;
+      requestImmediatePoll(delayMs);
+    }}
+
+    function patchOwnerNamesOnRecord(record, shortNameRaw, longNameRaw) {{
+      if (!record || typeof record !== "object") return false;
+      const user = (record.user && typeof record.user === "object") ? record.user : record;
+      const shortName = String(shortNameRaw || "").trim();
+      const longName = String(longNameRaw || "").trim();
+      let changed = false;
+
+      if (shortName) {{
+        if (String(user.shortName ?? "").trim() !== shortName) {{
+          user.shortName = shortName;
+          changed = true;
+        }}
+        if (String(user.short_name ?? "").trim() !== shortName) {{
+          user.short_name = shortName;
+          changed = true;
+        }}
+        if (String(record.short_name ?? "").trim() !== shortName) {{
+          record.short_name = shortName;
+          changed = true;
+        }}
+      }}
+
+      if (longName) {{
+        if (String(user.longName ?? "").trim() !== longName) {{
+          user.longName = longName;
+          changed = true;
+        }}
+        if (String(user.long_name ?? "").trim() !== longName) {{
+          user.long_name = longName;
+          changed = true;
+        }}
+        if (String(record.long_name ?? "").trim() !== longName) {{
+          record.long_name = longName;
+          changed = true;
+        }}
+      }}
+
+      return changed;
+    }}
+
+    function syncOwnerNameLocally(shortNameRaw, longNameRaw) {{
+      const shortName = String(shortNameRaw || "").trim();
+      const longName = String(longNameRaw || "").trim();
+      if (!shortName && !longName) return;
+
+      if (
+        !settingsLocalStateCache
+        && latestState
+        && typeof latestState === "object"
+        && latestState.local_state
+        && typeof latestState.local_state === "object"
+      ) {{
+        settingsLocalStateCache = latestState.local_state;
+      }}
+
+      let changed = false;
+      const patchRecord = (record) => {{
+        if (patchOwnerNamesOnRecord(record, shortName, longName)) {{
+          changed = true;
+        }}
+      }};
+
+      const cachedLocalInfo =
+        settingsLocalStateCache
+        && typeof settingsLocalStateCache === "object"
+        && settingsLocalStateCache.local_node_info
+        && typeof settingsLocalStateCache.local_node_info === "object"
+          ? settingsLocalStateCache.local_node_info
+          : null;
+      patchRecord(cachedLocalInfo);
+
+      const safeState = latestState && typeof latestState === "object" ? latestState : null;
+      const selfId = safeState ? resolveLocalNodeId(safeState) : "";
+      if (safeState) {{
+        const localState = safeState.local_state && typeof safeState.local_state === "object"
+          ? safeState.local_state
+          : null;
+        const localInfo = localState && localState.local_node_info && typeof localState.local_node_info === "object"
+          ? localState.local_node_info
+          : null;
+        patchRecord(localInfo);
+
+        if (isCanonicalNodeId(selfId) && Array.isArray(safeState.nodes)) {{
+          const selfNode = safeState.nodes.find((node) => normalizeNodeId(node && node.id) === selfId) || null;
+          patchRecord(selfNode);
+          const preferredName = longName || shortName;
+          if (preferredName && nodeNameCache.get(selfId) !== preferredName) {{
+            nodeNameCache.set(selfId, preferredName);
+            persistNodeNameCache();
+            changed = true;
+          }}
+        }}
+      }}
+
+      settingsLocalStateFetchedAt = Date.now();
+      if (!changed) return;
+
+      if (safeState) {{
+        renderSelfRadioPill(safeState);
+        if (activeLayoutView === "chat") {{
+          renderChat(safeState);
+        }} else if (activeLayoutView === "history") {{
+          renderHistoryChat((safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}});
+        }} else if (activeLayoutView === "channels") {{
+          renderChannelsView(safeState);
+        }} else if (activeLayoutView === "network") {{
+          renderNodes(Array.isArray(safeState.nodes) ? safeState.nodes : []);
+        }} else if (activeLayoutView === "saved") {{
+          renderFavorites(safeState);
+        }} else if (activeLayoutView === "bots") {{
+          renderBotsView(safeState);
+        }}
+      }}
+
+      if (activeLayoutView === "settings") {{
+        const settingsState =
+          settingsLocalStateCache && typeof settingsLocalStateCache === "object"
+            ? {{ local_state: settingsLocalStateCache }}
+            : safeState;
+        if (settingsState) {{
+          renderSettings(settingsState, true);
+        }}
+      }}
+    }}
+
     function settingsLocalStateFrom(state) {{
-      const localState = state && typeof state === "object" ? state.local_state : null;
-      if (localState && typeof localState === "object") return localState;
       const cachedState = settingsLocalStateCache && typeof settingsLocalStateCache === "object"
         ? settingsLocalStateCache
         : null;
-      return cachedState && typeof cachedState === "object" ? cachedState : null;
+      if (cachedState && typeof cachedState === "object") return cachedState;
+      const localState = state && typeof state === "object" ? state.local_state : null;
+      return localState && typeof localState === "object" ? localState : null;
     }}
 
     function loraConfigFromState(state) {{
@@ -13631,6 +13822,7 @@
           `[settings] ${{successLabel}}.${{rebootHint}}${{actionHint}}${{deletedHint}}`
         );
         clearSettingsDirty();
+        invalidateStateSnapshotCache(parsed && parsed.reboot_expected ? 200 : 20);
         return true;
       }} catch (err) {{
         const msg = err instanceof Error ? err.message : String(err || "unknown error");
@@ -13740,6 +13932,7 @@
         "node name saved"
       );
       if (ok) {{
+        syncOwnerNameLocally(shortName, longNameRaw);
         setTimeout(() => {{
           void fetchSettingsFromRadio();
         }}, 600);
@@ -16243,8 +16436,15 @@
       for (const msg of (messages || [])) {{
         const timeUnix = latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at);
         const timeText = String((msg && (msg.rx_time || msg.captured_at)) || "").trim();
+        const isLocalEcho = !!(msg && (msg.local_echo === true || msg.localEcho === true));
+        const deliveryState = normalizeDeliveryState(msg && (msg.delivery_state ?? msg.deliveryState));
         updateTouch(msg && msg.from, timeUnix, timeText);
-        updateTouch(msg && msg.to, timeUnix, timeText);
+        // Do not treat an outbound local echo as proof that the destination exists.
+        // A manual/fake direct target should stay unknown until we have real evidence,
+        // such as an actual mesh packet touching that node or an ACKed direct send.
+        if (!isLocalEcho || deliveryState === "acked") {{
+          updateTouch(msg && msg.to, timeUnix, timeText);
+        }}
       }}
       return latestByNodeId;
     }}
@@ -17989,12 +18189,106 @@
       )).join("");
     }}
 
-    function renderHistoryChat(traffic) {{
+    function resolveTrafficRenderContext(source, fallbackState = latestState) {{
+      const safeFallback = (fallbackState && typeof fallbackState === "object") ? fallbackState : {{}};
+      const safeSource = (source && typeof source === "object") ? source : {{}};
+      const sourceHasTraffic = !!(safeSource.traffic && typeof safeSource.traffic === "object");
+      const traffic = sourceHasTraffic
+        ? safeSource.traffic
+        : safeSource;
+      const nodes = sourceHasTraffic
+        ? (Array.isArray(safeSource.nodes) ? safeSource.nodes : [])
+        : (Array.isArray(safeFallback.nodes) ? safeFallback.nodes : []);
+      return {{
+        traffic: (traffic && typeof traffic === "object") ? traffic : {{}},
+        nodes,
+      }};
+    }}
+
+    function buildHistoryNodeIdentityResolver(nodes) {{
+      const rows = Array.isArray(nodes) ? nodes : [];
+      const nodesById = new Map(
+        rows
+          .map((node) => [normalizeNodeId(node && node.id ? node.id : ""), node])
+          .filter(([nodeId]) => !!nodeId)
+      );
+      return (rawNodeId) => {{
+        const clean = normalizeNodeId(rawNodeId);
+        if (!clean) {{
+          return {{
+            sort: "n/a",
+            title: "n/a",
+            html: '<div class="history-node-cell"><span class="history-node-primary">n/a</span></div>',
+          }};
+        }}
+        if (clean === "^all") {{
+          return {{
+            sort: "^all",
+            title: "Broadcast / all nodes",
+            html: '<div class="history-node-cell"><span class="history-node-primary">All</span><span class="history-node-secondary">broadcast</span></div>',
+          }};
+        }}
+        if (clean === "local") {{
+          return {{
+            sort: "local",
+            title: "Local node",
+            html: '<div class="history-node-cell"><span class="history-node-primary">Local</span><span class="history-node-secondary">this node</span></div>',
+          }};
+        }}
+
+        const node = nodesById.get(clean);
+        const longName = String(node && node.long_name ? node.long_name : "").trim();
+        const shortName = String(node && node.short_name ? node.short_name : "").trim();
+        const cachedName = String(nodeNameCache.get(clean) || "").trim();
+        const primary = longName || cachedName || shortName || clean;
+        const secondaryParts = [];
+        if (shortName && shortName !== primary) {{
+          secondaryParts.push(shortName);
+        }}
+        if (clean && clean !== primary) {{
+          secondaryParts.push(clean);
+        }} else if (!secondaryParts.length && clean) {{
+          secondaryParts.push(clean);
+        }}
+        const secondary = secondaryParts.join(" • ");
+        const titleParts = [];
+        if (longName) titleParts.push(`Long: ${{longName}}`);
+        if (shortName) titleParts.push(`Short: ${{shortName}}`);
+        if (!longName && !shortName && cachedName && cachedName !== clean) {{
+          titleParts.push(`Name: ${{cachedName}}`);
+        }}
+        titleParts.push(`ID: ${{clean}}`);
+        return {{
+          sort: `${{primary}} ${{shortName}} ${{clean}}`.trim(),
+          title: titleParts.join(" | "),
+          html: `<div class="history-node-cell"><span class="history-node-primary">${{escAttr(primary)}}</span>${{secondary ? `<span class="history-node-secondary">${{escAttr(secondary)}}</span>` : ""}}</div>`,
+        }};
+      }};
+    }}
+
+    function renderHistoryMessageCell(entry, renderedText) {{
+      const kind = normalizeChatMessageKind(entry, entry && entry.is_reaction === true);
+      const textHtml = chatPlainTextToHtml(renderedText, true) || "&nbsp;";
+      if (kind !== "status") {{
+        return textHtml;
+      }}
+      const statusEvent = String(entry && entry.status_event ? entry.status_event : "").trim().toLowerCase();
+      const pillLabel = statusEvent === "name_change" ? "Name change" : "Status";
+      const pillClass = statusEvent === "name_change" ? " history-message-pill-name-change" : "";
+      return `<div class="history-message-cell"><span class="history-message-pill${{pillClass}}">${{escAttr(pillLabel)}}</span><span class="history-message-body">${{textHtml}}</span></div>`;
+    }}
+
+    function renderHistoryChat(source) {{
+      const context = resolveTrafficRenderContext(source);
+      const traffic = context.traffic;
+      const describeNode = buildHistoryNodeIdentityResolver(context.nodes);
       const messages = Array.isArray(traffic && traffic.recent_chat) ? traffic.recent_chat : [];
       const rows = messages.slice(0, 240).map((entry) => {{
         const capturedAt = String((entry && (entry.captured_at || entry.rx_time)) || "n/a");
         const fromId = String((entry && entry.from) || "n/a");
         const toId = String((entry && entry.to) || "n/a");
+        const fromIdentity = describeNode(fromId);
+        const toIdentity = describeNode(toId);
         const text = String((entry && entry.text) || "").trim();
         const emoji = String((entry && entry.emoji) || "").trim();
         const isReaction = entry && entry.is_reaction === true;
@@ -18004,21 +18298,21 @@
         return {{
           cells: [
             {{ sort: capturedAt, text: capturedAt }},
-            {{ sort: fromId, text: fromId }},
-            {{ sort: toId, text: toId }},
-            {{ sort: renderedText, html: chatPlainTextToHtml(renderedText, true) || "&nbsp;" }},
+            {{ sort: fromIdentity.sort, html: fromIdentity.html, title: fromIdentity.title }},
+            {{ sort: toIdentity.sort, html: toIdentity.html, title: toIdentity.title }},
+            {{ sort: renderedText, html: renderHistoryMessageCell(entry, renderedText) }},
           ],
         }};
       }});
       renderSortableListboxTable("history-chat-table", rows, {{
-        emptyText: "No saved chat history yet.",
+        emptyText: "No saved chat or derived status history yet.",
         emptyColspan: 4,
       }});
       const caption = document.getElementById("history-chat-caption");
       if (caption) {{
         caption.textContent = rows.length
-          ? `Showing ${{rows.length}} most recent saved chat messages.`
-          : "No saved chat history yet.";
+          ? `Showing ${{rows.length}} most recent saved chat and derived status entries.`
+          : "No saved chat or derived status history yet.";
       }}
       renderHistoryNotificationLog();
     }}
@@ -18973,6 +19267,7 @@
           const key = chatMessageKey(msg);
           if (!key) return null;
           const isReaction = isReactionMessage(msg);
+          const kind = normalizeChatMessageKind(msg, isReaction);
           const endpoints = endpointsForMessage(msg);
           return {{
             key,
@@ -18980,8 +19275,8 @@
             channel: classifyMessageChannel(msg),
             sender: chatEndpointParts(endpoints.fromId).label || "Unknown node",
             preview: chatChangePreviewFromMessage(msg, isReaction),
-            kind: isReaction ? "reaction" : "message",
-            countsUnread: !isReaction,
+            kind,
+            countsUnread: kind === "message",
             unix: latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at),
           }};
         }})
@@ -19061,6 +19356,8 @@
         const endpoints = endpointsForMessage(msg);
         const sourceNode = endpoints.fromId;
         const fallbackNode = endpoints.toId;
+        const messageKind = normalizeChatMessageKind(msg);
+        const isStatusMessage = messageKind === "status";
         const primarySelectable = isSelectableNodeId(sourceNode) ? sourceNode : "";
         const fallbackSelectable = isSelectableNodeId(fallbackNode) ? fallbackNode : "";
         const nodeId = primarySelectable || fallbackSelectable;
@@ -19178,10 +19475,14 @@
         const messageKey = chatMessageKey(msg);
         const hasChangeMarker = !!messageKey && activeChangeFocusKeys.has(messageKey);
         const changeClass = hasChangeMarker ? " has-change-marker" : "";
+        const statusClass = isStatusMessage ? " kind-status" : "";
         const changeBadge = hasChangeMarker
           ? '<span class="chat-feed-new-pill" title="Changed while you were away">NEW</span>'
           : "";
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}">
+        const statusBadge = isStatusMessage
+          ? '<span class="chat-feed-status-pill" title="Status update">Status</span>'
+          : "";
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}">
           <div class="chat-feed-meta">
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
@@ -19192,7 +19493,7 @@
               <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
-            <span class="chat-feed-actions">${{changeBadge}}${{meshBadge}}${{hopBadge}}${{retryButton}}</span>
+            <span class="chat-feed-actions">${{changeBadge}}${{statusBadge}}${{meshBadge}}${{hopBadge}}${{retryButton}}</span>
             ${{deliveryChip}}
             <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
           </div>
@@ -19398,6 +19699,376 @@
         </tr>`;
       }});
       fillTable("packets-table", rows);
+    }}
+
+    function explicitPacketChannelIndex(entry) {{
+      const summary = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      const decoded = (packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : null;
+      const candidates = [
+        summary.channel_index,
+        summary.channelIndex,
+        summary.channel,
+        packet.channel_index,
+        packet.channelIndex,
+        packet.channel,
+        decoded && decoded.channel_index,
+        decoded && decoded.channelIndex,
+        decoded && decoded.channel,
+      ];
+      for (const candidate of candidates) {{
+        if (candidate == null || candidate === "") continue;
+        const num = Number(candidate);
+        if (Number.isInteger(num) && num >= 0) {{
+          return Math.trunc(num);
+        }}
+      }}
+      return null;
+    }}
+
+    function packetPortnumLabel(entry) {{
+      const summary = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      const decoded = (packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : null;
+      const candidates = [
+        summary.portnum,
+        packet.portnum,
+        decoded && decoded.portnum,
+      ];
+      for (const candidate of candidates) {{
+        const text = String(candidate == null ? "" : candidate).trim();
+        if (text) return text;
+      }}
+      return "encrypted/unknown";
+    }}
+
+    function packetEndpointIds(entry) {{
+      const summary = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      return {{
+        fromId: normalizeNodeId(summary.from ?? packet.from ?? ""),
+        toId: normalizeNodeId(summary.to ?? packet.to ?? packet.destination ?? ""),
+      }};
+    }}
+
+    function isMeshChannelRoleDisabled(roleRaw) {{
+      const roleText = String(roleRaw == null ? "" : roleRaw).trim();
+      const upper = roleText.toUpperCase();
+      if (upper === "DISABLED" || upper === "CHANNEL_ROLE_DISABLED") return true;
+      const num = Number(roleText);
+      return Number.isInteger(num) && num === 0;
+    }}
+
+    function formatMeshChannelRole(roleRaw) {{
+      const roleText = String(roleRaw == null ? "" : roleRaw).trim();
+      if (!roleText) return "";
+      const upper = roleText.toUpperCase();
+      if (upper === "CHANNEL_ROLE_DISABLED" || upper === "DISABLED" || upper === "0") return "Disabled";
+      if (upper === "CHANNEL_ROLE_PRIMARY" || upper === "PRIMARY" || upper === "1") return "Primary";
+      if (upper === "CHANNEL_ROLE_SECONDARY" || upper === "SECONDARY" || upper === "2") return "Secondary";
+      if (upper.startsWith("CHANNEL_ROLE_")) {{
+        return upper.slice("CHANNEL_ROLE_".length)
+          .toLowerCase()
+          .replace(/(^|_)([a-z])/g, (_m, prefix, ch) => `${{prefix === "_" ? " " : ""}}${{ch.toUpperCase()}}`);
+      }}
+      return roleText
+        .toLowerCase()
+        .replace(/(^|_)([a-z])/g, (_m, prefix, ch) => `${{prefix === "_" ? " " : ""}}${{ch.toUpperCase()}}`);
+    }}
+
+    function formatChannelTopPorts(portCounts, maxPorts = 3) {{
+      const rows = Array.from((portCounts instanceof Map) ? portCounts.entries() : [])
+        .map(([port, count]) => {{
+          const label = String(port == null ? "" : port).trim();
+          const num = Math.max(0, Math.trunc(Number(count) || 0));
+          return {{ label: label || "unknown", count: num }};
+        }})
+        .filter((row) => row.label && row.count > 0)
+        .sort((a, b) => (b.count - a.count) || String(a.label).localeCompare(String(b.label)));
+      if (!rows.length) return "n/a";
+      const limit = Math.max(1, Math.trunc(Number(maxPorts) || 3));
+      return rows.slice(0, limit).map((row) => `${{row.label}} x${{row.count}}`).join(", ");
+    }}
+
+    function channelEvidenceMeta(kind) {{
+      switch (String(kind || "")) {{
+        case "observed-local":
+          return {{
+            label: "Observed + local",
+            className: "kind-observed-local",
+            title: "Seen in recent packets and configured on this radio.",
+          }};
+        case "observed-only":
+          return {{
+            label: "Observed only",
+            className: "kind-observed-only",
+            title: "Seen in recent packets, but not present in this radio's local channel config.",
+          }};
+        case "local-only":
+          return {{
+            label: "Local only",
+            className: "kind-local-only",
+            title: "Configured on this radio, but not seen in the recent packet buffer.",
+          }};
+        case "disabled":
+          return {{
+            label: "Disabled local",
+            className: "kind-disabled",
+            title: "Present in local config but disabled. Recent packets may predate that change.",
+          }};
+        default:
+          return {{
+            label: "Unknown",
+            className: "",
+            title: "Insufficient evidence.",
+          }};
+      }}
+    }}
+
+    function renderChannelsView(source) {{
+      const context = resolveTrafficRenderContext(source);
+      const traffic = context.traffic;
+      const safeSource = (source && typeof source === "object") ? source : {{}};
+      const localState = settingsLocalStateFrom(safeSource);
+      const localOptions = collectMeshChannelOptionsFromLocalState(localState, {{ includeFallback: false }});
+      const localByIndex = new Map(
+        localOptions.map((opt) => [Number(opt && opt.index), opt])
+      );
+      const packets = Array.isArray(traffic && traffic.recent_packets)
+        ? traffic.recent_packets
+        : [];
+      const observed = new Map();
+      let packetsWithChannel = 0;
+      let packetsWithoutChannel = 0;
+
+      for (const entry of packets) {{
+        const index = explicitPacketChannelIndex(entry);
+        if (!Number.isInteger(index) || index < 0) {{
+          packetsWithoutChannel += 1;
+          continue;
+        }}
+        packetsWithChannel += 1;
+        let bucket = observed.get(index);
+        if (!(bucket && typeof bucket === "object")) {{
+          bucket = {{
+            packetCount: 0,
+            everyoneCount: 0,
+            directCount: 0,
+            nodeIds: new Set(),
+            portCounts: new Map(),
+            lastSeenUnix: 0,
+            lastSeenText: "",
+          }};
+          observed.set(index, bucket);
+        }}
+        bucket.packetCount += 1;
+        const endpoints = packetEndpointIds(entry);
+        if (endpoints.toId === "^all") {{
+          bucket.everyoneCount += 1;
+        }} else {{
+          bucket.directCount += 1;
+        }}
+        if (isSelectableNodeId(endpoints.fromId)) bucket.nodeIds.add(endpoints.fromId);
+        if (isSelectableNodeId(endpoints.toId)) bucket.nodeIds.add(endpoints.toId);
+        const portLabel = packetPortnumLabel(entry);
+        bucket.portCounts.set(portLabel, (bucket.portCounts.get(portLabel) || 0) + 1);
+
+        const summary = (entry && entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const entryUnix = latestUnixTimestamp(
+          summary.captured_at,
+          summary.rx_time,
+          summary.time,
+          entry && entry.captured_at,
+          entry && entry.rx_time,
+          entry && entry.time,
+        );
+        const entryText = String(
+          summary.captured_at
+          || summary.rx_time
+          || summary.time
+          || (entry && (entry.captured_at || entry.rx_time || entry.time))
+          || ""
+        ).trim();
+        if (Number.isFinite(entryUnix) && entryUnix > bucket.lastSeenUnix) {{
+          bucket.lastSeenUnix = Math.trunc(entryUnix);
+          bucket.lastSeenText = entryText;
+        }} else if (!bucket.lastSeenText && entryText) {{
+          bucket.lastSeenText = entryText;
+        }}
+      }}
+
+      const observedIndexes = Array.from(observed.keys()).sort((a, b) => a - b);
+      const highestSeenIndex = observedIndexes.length ? observedIndexes[observedIndexes.length - 1] : null;
+      const enabledLocalCount = localOptions.filter((opt) => !isMeshChannelRoleDisabled(opt && opt.role) && !opt.disabled).length;
+      const disabledLocalCount = localOptions.filter((opt) => isMeshChannelRoleDisabled(opt && opt.role) || !!opt.disabled).length;
+      const configuredUnseenCount = localOptions.filter((opt) => !isMeshChannelRoleDisabled(opt && opt.role) && !opt.disabled && !observed.has(Number(opt.index))).length;
+      const localConfigReady = !!(localState && Array.isArray(localState.channels));
+
+      const caption = document.getElementById("channels-caption");
+      if (caption instanceof HTMLElement) {{
+        const parts = [
+          `Observed ${{observedIndexes.length}} explicit message channel${{observedIndexes.length === 1 ? "" : "s"}} across ${{packets.length}} recent packet${{packets.length === 1 ? "" : "s"}}.`,
+          packetsWithoutChannel > 0
+            ? `${{packetsWithoutChannel}} packet${{packetsWithoutChannel === 1 ? "" : "s"}} lacked an explicit channel index, so the true count may be higher.`
+            : "All recent packets had an explicit channel index.",
+          localConfigReady
+            ? "Local names and roles come from this radio's channel config."
+            : "Local names and roles are still loading from this radio.",
+          "Message channels are encryption groups, not RF frequency slots.",
+        ];
+        caption.textContent = parts.join(" ");
+      }}
+
+      const overview = document.getElementById("channels-overview");
+      if (overview instanceof HTMLElement) {{
+        const items = [
+          ["Observed", observedIndexes.length],
+          ["Highest Seen", highestSeenIndex == null ? "n/a" : `Ch ${{highestSeenIndex}}`],
+          ["Attributed Packets", packetsWithChannel],
+          ["Unattributed", packetsWithoutChannel],
+          ["Local Active", enabledLocalCount],
+          ["Local Disabled", disabledLocalCount],
+          ["Configured Unseen", configuredUnseenCount],
+        ];
+        overview.innerHTML = items.map(([k, v]) => (
+          `<div class="overview-item"><div class="k">${{escAttr(String(k))}}</div><div class="v">${{escAttr(String(v))}}</div></div>`
+        )).join("");
+      }}
+
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const unionIndexes = Array.from(new Set([
+        ...observed.keys(),
+        ...localByIndex.keys(),
+      ]))
+        .filter((idx) => Number.isInteger(Number(idx)) && Number(idx) >= 0)
+        .sort((a, b) => Number(a) - Number(b));
+
+      const inferenceRows = unionIndexes.map((rawIndex) => {{
+        const index = Number(rawIndex);
+        const bucket = observed.get(index) || null;
+        const localOpt = localByIndex.get(index) || null;
+        const roleLabel = formatMeshChannelRole(localOpt && localOpt.role);
+        const localName = localOpt && typeof localOpt.name === "string" ? localOpt.name.trim() : "";
+        const localPrimary = localName || (localOpt ? `Ch ${{index}}` : "Not in local config");
+        const localDisabled = !!(localOpt && (localOpt.disabled || isMeshChannelRoleDisabled(localOpt.role)));
+        const localSecondary = localOpt
+          ? [roleLabel || "", localDisabled ? "disabled" : "configured locally"]
+              .filter((part, idxParts, arr) => !!part && arr.indexOf(part) === idxParts)
+              .join(" • ")
+          : "observed from packet metadata";
+        let evidenceKind = "observed-only";
+        if (localDisabled) {{
+          evidenceKind = "disabled";
+        }} else if (localOpt && bucket) {{
+          evidenceKind = "observed-local";
+        }} else if (localOpt) {{
+          evidenceKind = "local-only";
+        }}
+        const evidence = channelEvidenceMeta(evidenceKind);
+        const latestLabel = bucket && bucket.lastSeenUnix > 0
+          ? formatLocalChatTime(bucket.lastSeenUnix, bucket.lastSeenText || "n/a", nowUnix)
+          : "n/a";
+        const latestTitle = bucket && bucket.lastSeenUnix > 0
+          ? [
+              bucket.lastSeenText ? `Raw: ${{bucket.lastSeenText}}` : "",
+              new Date(bucket.lastSeenUnix * 1000).toLocaleString(),
+            ].filter((part) => !!part).join(" | ")
+          : "No recent packet timestamps";
+        return {{
+          cells: [
+            {{ sort: index, text: `Ch ${{index}}` }},
+            {{
+              sort: `${{localPrimary}} ${{localSecondary}}`,
+              html: `<div class="channels-local-cell"><span class="channels-local-primary">${{escAttr(localPrimary)}}</span>${{localSecondary ? `<span class="channels-local-secondary">${{escAttr(localSecondary)}}</span>` : ""}}</div>`,
+              title: localOpt ? `${{localName || `Ch ${{index}}`}}${{roleLabel ? ` | ${{roleLabel}}` : ""}}` : "Observed in recent packet buffer only",
+            }},
+            {{
+              sort: evidence.label,
+              html: `<span class="channels-evidence-pill ${{escAttr(evidence.className)}}">${{escAttr(evidence.label)}}</span>`,
+              title: evidence.title,
+            }},
+            {{ sort: bucket ? bucket.packetCount : 0, text: bucket ? bucket.packetCount : 0 }},
+            {{ sort: bucket ? bucket.everyoneCount : 0, text: bucket ? bucket.everyoneCount : 0 }},
+            {{ sort: bucket ? bucket.directCount : 0, text: bucket ? bucket.directCount : 0 }},
+            {{ sort: bucket ? bucket.nodeIds.size : 0, text: bucket ? bucket.nodeIds.size : 0 }},
+            {{
+              sort: bucket ? formatChannelTopPorts(bucket.portCounts, 5) : "",
+              text: bucket ? formatChannelTopPorts(bucket.portCounts, 3) : "n/a",
+              title: bucket ? formatChannelTopPorts(bucket.portCounts, 5) : "No recent packet evidence",
+            }},
+            {{ sort: bucket ? bucket.lastSeenUnix : 0, text: latestLabel, title: latestTitle }},
+          ],
+        }};
+      }});
+      renderSortableListboxTable("channels-inference-table", inferenceRows, {{
+        emptyText: "No explicit channel indexes were found in recent packets yet.",
+        emptyColspan: 9,
+      }});
+
+      const localRows = localOptions
+        .slice()
+        .sort((a, b) => Number(a.index) - Number(b.index))
+        .map((opt) => {{
+          const index = Number(opt && opt.index);
+          const bucket = observed.get(index) || null;
+          const roleLabel = formatMeshChannelRole(opt && opt.role);
+          const name = typeof opt.name === "string" ? opt.name.trim() : "";
+          const stateLabel = (opt.disabled || isMeshChannelRoleDisabled(opt.role))
+            ? "Disabled"
+            : bucket
+              ? "Seen in recent packets"
+              : "Configured";
+          const observedLabel = bucket
+            ? `${{bucket.packetCount}} packets • ${{bucket.nodeIds.size}} nodes`
+            : "No recent packets";
+          const latestLabel = bucket && bucket.lastSeenUnix > 0
+            ? formatLocalChatTime(bucket.lastSeenUnix, bucket.lastSeenText || "n/a", nowUnix)
+            : "n/a";
+          const latestTitle = bucket && bucket.lastSeenUnix > 0
+            ? [
+                bucket.lastSeenText ? `Raw: ${{bucket.lastSeenText}}` : "",
+                new Date(bucket.lastSeenUnix * 1000).toLocaleString(),
+              ].filter((part) => !!part).join(" | ")
+            : "No recent packet evidence";
+          return {{
+            cells: [
+              {{ sort: index, text: `Ch ${{index}}` }},
+              {{
+                sort: `${{name}} ${{roleLabel}} ${{index}}`,
+                html: `<div class="channels-local-cell"><span class="channels-local-primary">${{escAttr(name || `Ch ${{index}}`)}}</span><span class="channels-local-secondary">${{escAttr((name ? `Ch ${{index}}` : "") || (roleLabel || "Unnamed local channel"))}}</span></div>`,
+                title: name ? `Local name: ${{name}}` : "Unnamed local channel",
+              }},
+              {{ sort: roleLabel || "", text: roleLabel || "n/a" }},
+              {{ sort: stateLabel, text: stateLabel }},
+              {{ sort: bucket ? bucket.packetCount : 0, text: observedLabel }},
+              {{ sort: bucket ? bucket.lastSeenUnix : 0, text: latestLabel, title: latestTitle }},
+            ],
+          }};
+        }});
+      renderSortableListboxTable("channels-local-table", localRows, {{
+        emptyText: localConfigReady
+          ? "No local channel config exposed by the radio."
+          : "Loading local channel config from the radio...",
+        emptyColspan: 6,
+      }});
     }}
 
     function isLikelyEncryptedPacketEntry(entry) {{
@@ -19778,7 +20449,10 @@
       fillTable(tableId, renderedRows);
     }}
 
-    function renderEncription(traffic) {{
+    function renderEncription(source) {{
+      const context = resolveTrafficRenderContext(source);
+      const traffic = context.traffic;
+      const describeNode = buildHistoryNodeIdentityResolver(context.nodes);
       const allPackets = Array.isArray(traffic && traffic.recent_packets)
         ? traffic.recent_packets
         : [];
@@ -19800,6 +20474,8 @@
           (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
           || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
         );
+        const fromIdentity = describeNode(fromNodeId || s.from || "");
+        const toIdentity = describeNode(toNodeId || s.to || "");
         const payload = encryptedPacketPayloadPreview(entry);
         return {{
           className: `${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}`,
@@ -19809,8 +20485,8 @@
           }},
           cells: [
             {{ sort: s.captured_at || "", text: s.captured_at || "n/a" }},
-            {{ sort: s.from || "", text: s.from || "n/a" }},
-            {{ sort: s.to || "", text: s.to || "n/a" }},
+            {{ sort: fromIdentity.sort, html: fromIdentity.html, title: fromIdentity.title }},
+            {{ sort: toIdentity.sort, html: toIdentity.html, title: toIdentity.title }},
             {{ sort: s.hops ?? "", text: s.hops ?? "n/a" }},
             {{ sort: s.rx_rssi ?? "", text: s.rx_rssi ?? "n/a" }},
             {{ sort: s.rx_snr ?? "", text: s.rx_snr ?? "n/a" }},
@@ -19868,6 +20544,8 @@
             (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
             || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
           );
+          const fromIdentity = describeNode(fromNodeId || item.fromId || "");
+          const toIdentity = describeNode(toNodeId || item.toId || "");
           const avgHops = item.hopsCount > 0 ? item.hopsTotal / item.hopsCount : null;
           const avgHopsLabel = avgHops == null ? "n/a" : avgHops.toFixed(1);
           return {{
@@ -19877,8 +20555,8 @@
               "to-node-id": toNodeId,
             }},
             cells: [
-              {{ sort: item.fromId, text: item.fromId }},
-              {{ sort: item.toId, text: item.toId }},
+              {{ sort: fromIdentity.sort, html: fromIdentity.html, title: fromIdentity.title }},
+              {{ sort: toIdentity.sort, html: toIdentity.html, title: toIdentity.title }},
               {{ sort: item.count, text: item.count }},
               {{ sort: avgHops == null ? "" : avgHops.toFixed(4), text: avgHopsLabel }},
               {{ sort: item.lastSeen, text: item.lastSeen || "n/a" }},
@@ -20043,6 +20721,9 @@
             renderHistoryChat(traffic304);
             void refreshHistoryPanels(false);
           }}
+          if (activeLayoutView === "channels") {{
+            renderChannelsView(latestState);
+          }}
           if (activeLayoutView === "encription") {{
             renderEncription(traffic304);
           }}
@@ -20185,6 +20866,10 @@
 
         if (activeLayoutView === "packets") {{
           renderPackets(state.traffic || {{}});
+        }}
+
+        if (activeLayoutView === "channels") {{
+          renderChannelsView(state);
         }}
 
         if (activeLayoutView === "encription") {{

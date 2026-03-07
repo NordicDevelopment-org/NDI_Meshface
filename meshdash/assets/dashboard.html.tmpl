@@ -204,6 +204,7 @@
       <button class="rail-btn" data-view="network" type="button" title="Topology, nodes, and links">Network</button>
       <button class="rail-btn" data-view="saved" type="button" title="Node details and saved nodes">Node</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
+      <button class="rail-btn" data-view="channels" type="button" title="Inferred message channel activity">Channels</button>
       <button class="rail-btn" data-view="encription" type="button" title="Encrypted packets and route activity">Encription</button>
       <button class="rail-btn" data-view="data" type="button" title="Raw node/config views">Data</button>
       <button class="rail-btn" data-view="history" type="button" title="Network and chat history">History</button>
@@ -973,7 +974,7 @@
     <section class="card history-chat">
       <h2>Chat History</h2>
       <div class="body">
-        <div id="history-chat-caption" class="history-caption">Recent saved chat messages.</div>
+        <div id="history-chat-caption" class="history-caption">Recent saved chat and derived status activity.</div>
         <div class="history-chat-stack">
           <div class="scroll history-chat-main-scroll">
             <table id="history-chat-table">
@@ -1010,6 +1011,42 @@
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+    </section>
+
+    <section class="card channels-view" aria-label="Inferred message channels">
+      <h2>Channels</h2>
+      <div class="body">
+        <div id="channels-caption" class="history-caption">Observed message channels inferred from recent packets. Message channels are encryption groups, not RF frequency slots.</div>
+        <div id="channels-overview" class="overview-grid"></div>
+        <div class="channels-panels">
+          <section class="channels-panel channels-panel-wide">
+            <h3>Observed and inferred message channels</h3>
+            <div class="scroll">
+              <table id="channels-inference-table">
+                <thead>
+                  <tr>
+                    <th>Channel</th><th>Local label</th><th>Evidence</th><th>Packets</th><th>Everyone</th><th>Direct</th><th>Nodes</th><th>Top ports</th><th>Latest</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="channels-panel">
+            <h3>Local channel hints</h3>
+            <div class="scroll">
+              <table id="channels-local-table">
+                <thead>
+                  <tr>
+                    <th>Channel</th><th>Name</th><th>Role</th><th>State</th><th>Observed</th><th>Latest</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
       </div>
     </section>
 

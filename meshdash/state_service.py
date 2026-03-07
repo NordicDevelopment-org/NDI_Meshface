@@ -5,10 +5,13 @@ from typing import Dict, Optional
 from .revision import RevisionInfo, coerce_revision_info
 from .helpers import (
     redact_secrets as _redact_secrets,
+    to_int as _to_int,
     to_jsonable as _to_jsonable,
 )
+from .history_node_names import build_name_change_chat_entries as _build_name_change_chat_entries_helper
 from .nodes_identity import get_local_node_id as _get_local_node_id_helper
 from .nodes import (
+    parse_utc_text_to_unix as _parse_utc_text_to_unix_helper,
     utc_now as _utc_now,
 )
 from .runtime_types import ToJsonableFn, UtcNowFn
@@ -136,6 +139,52 @@ def _tracker_radio_link_error(tracker: object) -> Optional[str]:
     if reason:
         return f"radio link lost{age_text}: {reason}"
     return f"radio link lost{age_text}"
+
+
+def _chat_entry_sort_unix(entry: object) -> Optional[int]:
+    if not isinstance(entry, Mapping):
+        return None
+    for value in (
+        entry.get("rx_time_unix"),
+        entry.get("time_unix"),
+    ):
+        unix_value = _to_int(value)
+        if unix_value is not None and unix_value > 0:
+            return int(unix_value)
+    for value in (
+        entry.get("rx_time"),
+        entry.get("captured_at"),
+        entry.get("time"),
+    ):
+        unix_value = _parse_utc_text_to_unix_helper(value)
+        if unix_value is not None and unix_value > 0:
+            return int(unix_value)
+    return None
+
+
+def _merge_recent_chat_entries(
+    *,
+    recent_chat: list[dict[str, object]],
+    recent_packets: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    name_change_entries = _build_name_change_chat_entries_helper(recent_packets=recent_packets)
+    if not name_change_entries:
+        return list(recent_chat)
+
+    decorated_entries: list[tuple[tuple[int, int, int], dict[str, object]]] = []
+    for order, entry in enumerate(recent_chat):
+        sort_unix = _chat_entry_sort_unix(entry)
+        sort_key = (1 if sort_unix is None else 0, 0 if sort_unix is None else int(sort_unix), order)
+        decorated_entries.append((sort_key, entry))
+
+    base_order = len(decorated_entries)
+    for offset, entry in enumerate(name_change_entries):
+        sort_unix = _chat_entry_sort_unix(entry)
+        sort_key = (1 if sort_unix is None else 0, 0 if sort_unix is None else int(sort_unix), base_order + offset)
+        decorated_entries.append((sort_key, entry))
+
+    decorated_entries.sort(key=lambda item: item[0])
+    return [entry for _, entry in decorated_entries]
 
 
 def _normalize_modem_preset(value: object) -> Optional[str]:
@@ -372,11 +421,15 @@ def build_dashboard_state_typed(
             modem_preset=modem_preset,
         )
 
+    merged_recent_chat = _merge_recent_chat_entries(
+        recent_chat=tracker_data.recent_chat,
+        recent_packets=tracker_data.recent_packets,
+    )
     traffic_payload = StateTrafficPayload(
         edges=tracker_data.edges,
         port_counts=tracker_data.port_counts,
         recent_packets=tracker_data.recent_packets,
-        recent_chat=tracker_data.recent_chat,
+        recent_chat=merged_recent_chat,
     )
     state_payload = DashboardStatePayload(
         generated_at=utc_now_fn(),

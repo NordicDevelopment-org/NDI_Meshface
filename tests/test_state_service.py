@@ -576,6 +576,97 @@ def test_build_dashboard_state_typed_returns_contract_payload():
     assert payload.local_node_id == "!49b54790"
 
 
+def test_build_dashboard_state_typed_includes_name_change_status_rows_in_recent_chat():
+    class _NameChangeTracker:
+        def snapshot(self, by_id):
+            return {
+                "live_packet_count": 4,
+                "real_edge_count": 2,
+                "edges": [],
+                "port_counts": [],
+                "recent_packets": [
+                    {
+                        "summary": {
+                            "from": "!abcd1234",
+                            "to": "^all",
+                            "rx_time_unix": 250,
+                            "portnum": "NODEINFO_APP",
+                            "channel": 0,
+                        },
+                        "packet": {
+                            "fromId": "!abcd1234",
+                            "rxTime": 250,
+                            "decoded": {
+                                "portnum": "NODEINFO_APP",
+                                "user": {"id": "!abcd1234", "shortName": "A", "longName": "Alpha"},
+                            },
+                        },
+                    },
+                    {
+                        "summary": {
+                            "from": "!abcd1234",
+                            "to": "^all",
+                            "rx_time_unix": 300,
+                            "portnum": "NODEINFO_APP",
+                            "channel": 0,
+                        },
+                        "packet": {
+                            "fromId": "!abcd1234",
+                            "rxTime": 300,
+                            "decoded": {
+                                "portnum": "NODEINFO_APP",
+                                "user": {"id": "!abcd1234", "shortName": "B", "longName": "Beta"},
+                            },
+                        },
+                    },
+                ],
+                "recent_chat": [
+                    {
+                        "from": "!eeff0011",
+                        "to": "^all",
+                        "scope": "all",
+                        "text": "hello",
+                        "rx_time": "1970-01-01 00:04:35Z",
+                    }
+                ],
+            }
+
+        def load_node_saved_counts(self):
+            return {}
+
+        def load_node_capabilities(self):
+            return {}
+
+    payload = build_dashboard_state_typed(
+        iface=type("_Iface", (), {"myInfo": {}, "metadata": {}, "nodesByNum": {}})(),
+        tracker=_NameChangeTracker(),
+        target="target",
+        started_at=0.0,
+        storage_probe_path=".",
+        revision_info=RevisionInfo(version="0.1.0", commit="abc", label="L", title="T"),
+        collect_nodes_fn=lambda iface: {
+            "rows": [{"id": "!abcd1234", "long_name": "Beta"}],
+            "full": [{"id": "!abcd1234", "long_name": "Beta"}],
+            "by_id": {"!abcd1234": {"id": "!abcd1234", "long_name": "Beta"}},
+            "with_position_count": 0,
+        },
+        collect_local_state_fn=lambda iface: {},
+        collect_local_state_safe_fn=lambda iface, *, collect_local_state_fn: ({}, None),
+        modem_preset_from_local_state_fn=lambda state: None,
+        apply_node_saved_counts_fn=lambda node_rows, saved_counts: None,
+        build_summary_payload_fn=lambda **kwargs: {"summary_ok": True},
+        to_jsonable_fn=lambda value: value,
+        utc_now_fn=lambda: "2026-02-24T00:00:00Z",
+    )
+
+    assert [entry["text"] for entry in payload.traffic.recent_chat] == [
+        "hello",
+        "Alpha changed their name to Beta",
+    ]
+    assert payload.traffic.recent_chat[1]["kind"] == "status"
+    assert payload.traffic.recent_chat[1]["status_event"] == "name_change"
+
+
 def test_build_dashboard_state_handles_summary_builder_failure_without_crashing():
     tracker = _DummyTracker()
     payload = build_dashboard_state(

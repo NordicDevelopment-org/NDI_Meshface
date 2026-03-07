@@ -3246,6 +3246,102 @@
       padding: 8px 10px;
     }}
     .packets {{ grid-column: 1; grid-row: 8; }}
+    .channels-view {{
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .channels-view .body {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      overflow: hidden;
+    }}
+    .channels-panels {{
+      display: grid;
+      grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.9fr);
+      gap: 10px;
+      flex: 1 1 auto;
+      min-height: 0;
+      align-items: stretch;
+    }}
+    .channels-panel {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      gap: 6px;
+    }}
+    .channels-panel h3 {{
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      opacity: 0.82;
+    }}
+    .channels-panel .scroll {{
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
+    }}
+    .channels-local-cell {{
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+      line-height: 1.2;
+    }}
+    .channels-local-primary {{
+      color: inherit;
+      font-weight: 600;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .channels-local-secondary {{
+      color: inherit;
+      opacity: 0.74;
+      font-size: 10px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .channels-evidence-pill {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid #bfd4c3;
+      background: #edf6ef;
+      color: #204231;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      line-height: 1.2;
+      padding: 2px 7px;
+      white-space: nowrap;
+    }}
+    .channels-evidence-pill.kind-observed-local {{
+      border-color: #8eb89c;
+      background: #e6f4ea;
+      color: #23583c;
+    }}
+    .channels-evidence-pill.kind-observed-only {{
+      border-color: #8db7d8;
+      background: #e8f1f8;
+      color: #2a5876;
+    }}
+    .channels-evidence-pill.kind-local-only {{
+      border-color: #c8b37a;
+      background: #f8f1df;
+      color: #6d5721;
+    }}
+    .channels-evidence-pill.kind-disabled {{
+      border-color: #d5aaaa;
+      background: #faecec;
+      color: #7a2f2f;
+    }}
     .encription {{
       display: none;
       flex-direction: column;
@@ -3622,6 +3718,35 @@
     .layout.view-packets .hsplitter[data-target="top"],
     .layout.view-packets .hsplitter[data-target="mid"],
     .layout.view-packets .hsplitter[data-target="low"] {{
+      display: none !important;
+    }}
+
+    .layout.view-channels {{
+      height: 100%;
+      min-height: 0;
+      grid-template-rows: minmax(0, 1fr);
+    }}
+    .layout.view-channels .channels-view {{
+      grid-column: 1 / span 3;
+      grid-row: 1;
+      display: flex;
+      min-height: 0;
+    }}
+    .layout.view-channels .chat,
+    .layout.view-channels .bots,
+    .layout.view-channels .nodes,
+    .layout.view-channels .map,
+    .layout.view-channels .map-data,
+    .layout.view-channels .summary,
+    .layout.view-channels .favorites,
+    .layout.view-channels .packets,
+    .layout.view-channels .encription,
+    .layout.view-channels .raw,
+    .layout.view-channels .console,
+    .layout.view-channels .splitter,
+    .layout.view-channels .hsplitter[data-target="top"],
+    .layout.view-channels .hsplitter[data-target="mid"],
+    .layout.view-channels .hsplitter[data-target="low"] {{
       display: none !important;
     }}
 
@@ -4120,6 +4245,58 @@
     #encription-packets-table td:nth-child(7) {{
       font-family: "IBM Plex Mono", "Consolas", "Menlo", monospace;
       letter-spacing: 0.01em;
+    }}
+    .history-node-cell {{
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+      line-height: 1.2;
+    }}
+    .history-node-primary {{
+      color: inherit;
+      font-weight: 600;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .history-node-secondary {{
+      color: inherit;
+      opacity: 0.74;
+      font-size: 10px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .history-message-cell {{
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }}
+    .history-message-pill {{
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      border: 1px solid #bdd0dd;
+      background: #eef5f9;
+      color: #35576f;
+      border-radius: 999px;
+      padding: 1px 7px;
+      font-size: 9px;
+      line-height: 1.35;
+      letter-spacing: 0.22px;
+      font-weight: 700;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }}
+    .history-message-pill.history-message-pill-name-change {{
+      border-color: #b8d5c2;
+      background: #edf7ef;
+      color: #2d6143;
+    }}
+    .history-message-body {{
+      min-width: 0;
     }}
     #nodes-table th:nth-child(10) {{
       color: #6a856f;
@@ -4935,6 +5112,9 @@
       background: transparent;
       box-shadow: inset 2px 0 0 transparent;
     }}
+    .chat-feed-item.kind-status {{
+      background: linear-gradient(90deg, rgba(225, 239, 248, 0.7), rgba(225, 239, 248, 0) 52%);
+    }}
     .chat-feed-item.change-focus {{
       outline: 1px solid #d1a74a;
       outline-offset: -1px;
@@ -5009,6 +5189,19 @@
       opacity: 1;
       transform: translateY(0) scale(1);
       transition: opacity 0.48s ease, transform 0.48s ease, filter 0.48s ease;
+    }}
+    .chat-feed-status-pill {{
+      border: 1px solid #c7d8e6;
+      background: #ebf2f8;
+      color: #315674;
+      border-radius: 999px;
+      padding: 1px 6px;
+      font-size: 9px;
+      line-height: 1.3;
+      letter-spacing: 0.25px;
+      font-weight: 700;
+      white-space: nowrap;
+      text-transform: uppercase;
     }}
     .chat-feed-item.change-marker-fading .chat-feed-new-pill {{
       opacity: 0;
@@ -7054,6 +7247,44 @@
     [data-theme="dark"] #encription-traffic-table tbody tr.selected-node td:first-child {{
       box-shadow: inset 3px 0 0 #79c0ff;
     }}
+    [data-theme="dark"] .history-node-secondary {{
+      opacity: 0.76;
+    }}
+    [data-theme="dark"] .history-message-pill {{
+      border-color: #3d647c;
+      background: #173247;
+      color: #c4dbeb;
+    }}
+    [data-theme="dark"] .history-message-pill.history-message-pill-name-change {{
+      border-color: #3f7255;
+      background: #153223;
+      color: #b5e0c3;
+    }}
+    [data-theme="dark"] .channels-evidence-pill {{
+      border-color: #355145;
+      background: #14241b;
+      color: #c5e2d2;
+    }}
+    [data-theme="dark"] .channels-evidence-pill.kind-observed-local {{
+      border-color: #3f7a60;
+      background: #173228;
+      color: #8cd7b2;
+    }}
+    [data-theme="dark"] .channels-evidence-pill.kind-observed-only {{
+      border-color: #355970;
+      background: #162734;
+      color: #9ac7e6;
+    }}
+    [data-theme="dark"] .channels-evidence-pill.kind-local-only {{
+      border-color: #776033;
+      background: #352c16;
+      color: #e7cf93;
+    }}
+    [data-theme="dark"] .channels-evidence-pill.kind-disabled {{
+      border-color: #7d4a4a;
+      background: #331d1d;
+      color: #e4b8b8;
+    }}
     [data-theme="dark"] .chat-feed-item,
     [data-theme="dark"] .chat-channel-item,
     [data-theme="dark"] .chat-member-item,
@@ -7817,6 +8048,9 @@
       background: rgba(201, 150, 44, 0.08);
       box-shadow: inset 2px 0 0 #c9962c;
     }}
+    [data-theme="dark"] .chat-feed-item.kind-status {{
+      background: linear-gradient(90deg, rgba(38, 66, 88, 0.58), rgba(38, 66, 88, 0) 56%);
+    }}
     [data-theme="dark"] .chat-feed-item.change-focus {{
       outline-color: #cfa756;
       background: rgba(201, 150, 44, 0.18);
@@ -7833,6 +8067,11 @@
       background: #4d3b10;
       border-color: #8d6a1e;
       color: #f4d78e;
+    }}
+    [data-theme="dark"] .chat-feed-status-pill {{
+      border-color: #436a86;
+      background: #173247;
+      color: #c5d9ea;
     }}
     [data-theme="dark"] a {{
       color: var(--ui-link);
@@ -7956,6 +8195,10 @@
         height: auto;
         min-height: 0;
       }}
+      .layout.view-channels {{
+        height: auto;
+        min-height: 0;
+      }}
       .layout.view-encription {{
         height: auto;
         min-height: 0;
@@ -7975,6 +8218,9 @@
       .bots-grid {{
         grid-template-columns: minmax(0, 1fr);
       }}
+      .channels-panels {{
+        grid-template-columns: 1fr;
+      }}
       .encription-panels {{
         grid-template-columns: 1fr;
       }}
@@ -7982,7 +8228,7 @@
         display: none !important;
       }}
       .splitter, .hsplitter {{ display: none; }}
-      .summary, .map, .map-data, .nodes, .favorites, .chat, .bots, .history-chat, .packets, .encription, .raw, .console {{ grid-column: 1; grid-row: auto; }}
+      .summary, .map, .map-data, .nodes, .favorites, .chat, .bots, .history-chat, .packets, .channels-view, .encription, .raw, .console {{ grid-column: 1; grid-row: auto; }}
       .map-frame {{ max-width: none; }}
       .nodes .scroll {{ max-height: 360px; }}
     }}

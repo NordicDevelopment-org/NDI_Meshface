@@ -1,4 +1,7 @@
-from meshdash.history_node_names import build_name_history_points
+from meshdash.history_node_names import (
+    build_name_change_chat_entries,
+    build_name_history_points,
+)
 
 
 def test_build_name_history_points_extracts_changes_in_time_order():
@@ -51,3 +54,96 @@ def test_build_name_history_points_merges_partial_updates_from_sender():
     assert history[0]["long_name"] == ""
     assert history[1]["short_name"] == "AA"
     assert history[1]["long_name"] == "Alpha Alpha"
+
+
+def test_build_name_change_chat_entries_emits_status_rows_for_real_display_changes():
+    recent_packets = [
+        {
+            "summary": {
+                "from": "!abcd1234",
+                "to": "^all",
+                "rx_time_unix": 250,
+                "portnum": "NODEINFO_APP",
+                "channel": 1,
+            },
+            "packet": {
+                "fromId": "!abcd1234",
+                "rxTime": 250,
+                "decoded": {
+                    "portnum": "NODEINFO_APP",
+                    "user": {"id": "!abcd1234", "shortName": "N1", "longName": "Node One"},
+                },
+            },
+        },
+        {
+            "summary": {
+                "from": "!abcd1234",
+                "to": "^all",
+                "rx_time_unix": 300,
+                "portnum": "NODEINFO_APP",
+                "channel": 1,
+            },
+            "packet": {
+                "fromId": "!abcd1234",
+                "rxTime": 300,
+                "decoded": {
+                    "portnum": "NODEINFO_APP",
+                    "user": {"id": "!abcd1234", "shortName": "N2", "longName": "Node Two"},
+                },
+            },
+        },
+    ]
+
+    entries = build_name_change_chat_entries(recent_packets=recent_packets)
+
+    assert len(entries) == 1
+    assert entries[0]["from"] == "!abcd1234"
+    assert entries[0]["to"] == "^all"
+    assert entries[0]["scope"] == "all"
+    assert entries[0]["kind"] == "status"
+    assert entries[0]["status_event"] == "name_change"
+    assert entries[0]["status_old_name"] == "Node One"
+    assert entries[0]["status_new_name"] == "Node Two"
+    assert entries[0]["text"] == "Node One changed their name to Node Two"
+    assert entries[0]["channel"] == 1
+
+
+def test_build_name_change_chat_entries_skips_changes_that_do_not_affect_display_name():
+    recent_packets = [
+        {
+            "summary": {
+                "from": "!abcd1234",
+                "to": "^all",
+                "rx_time_unix": 250,
+                "portnum": "NODEINFO_APP",
+            },
+            "packet": {
+                "fromId": "!abcd1234",
+                "rxTime": 250,
+                "decoded": {
+                    "portnum": "NODEINFO_APP",
+                    "user": {"id": "!abcd1234", "shortName": "N1", "longName": "Node One"},
+                },
+            },
+        },
+        {
+            "summary": {
+                "from": "!abcd1234",
+                "to": "^all",
+                "rx_time_unix": 300,
+                "portnum": "NODEINFO_APP",
+            },
+            "packet": {
+                "fromId": "!abcd1234",
+                "rxTime": 300,
+                "decoded": {
+                    "portnum": "NODEINFO_APP",
+                    "user": {"id": "!abcd1234", "shortName": "N2", "longName": "Node One"},
+                },
+            },
+        },
+    ]
+
+    entries = build_name_change_chat_entries(recent_packets=recent_packets)
+
+    assert entries == []

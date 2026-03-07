@@ -1,5 +1,6 @@
 import pytest
 
+import meshdash.services_radio_settings as radio_settings_service
 from meshdash.api_input_radio import RadioSettingsRequest
 from meshdash.services_radio_settings import (
     _apply_field_update,
@@ -299,6 +300,7 @@ class _FakeTracker:
         self.recent_packets = [1, 2, 3]
         self.recent_chat = [4, 5]
         self.live_packet_count = 42
+        self.radio_link_changed_unix = 0
 
 
 def _iface_with_local_node(node: object):
@@ -612,6 +614,52 @@ def test_apply_radio_settings_owner_update_uses_current_name_fallback_and_positi
     assert node.set_owner_calls == [
         {"short_name": "OLD1", "long_name": "Only Long", "is_licensed": False}
     ]
+
+
+def test_apply_radio_settings_owner_update_refreshes_local_owner_cache_and_state_revision(
+    monkeypatch,
+):
+    monkeypatch.setattr(radio_settings_service.time, "time", lambda: 12345.9)
+
+    node = _FakeNode()
+    tracker = _FakeTracker()
+    iface = _iface_with_local_node(node)
+    iface.nodesByNum = {
+        123: {
+            "num": 123,
+            "user": {
+                "id": "!0000007b",
+                "shortName": "OLD1",
+                "longName": "Meshtastic 9b7c",
+            },
+        }
+    }
+    iface.nodes = {
+        "!0000007b": {
+            "num": 123,
+            "user": {
+                "id": "!0000007b",
+                "shortName": "OLD1",
+                "longName": "Meshtastic 9b7c",
+            },
+        }
+    }
+
+    response = apply_radio_settings(
+        RadioSettingsRequest(owner={"short_name": "ZERO", "long_name": "zero cool"}),
+        iface=iface,
+        send_lock=_FakeLock(),
+        tracker=tracker,
+    )
+
+    assert response["ok"] is True
+    assert tracker.radio_link_changed_unix == 12345
+    assert node.user["shortName"] == "ZERO"
+    assert node.user["longName"] == "zero cool"
+    assert iface.nodesByNum[123]["user"]["shortName"] == "ZERO"
+    assert iface.nodesByNum[123]["user"]["longName"] == "zero cool"
+    assert iface.nodes["!0000007b"]["user"]["shortName"] == "ZERO"
+    assert iface.nodes["!0000007b"]["user"]["longName"] == "zero cool"
 
 
 def test_apply_radio_settings_supports_set_fixed_position_action():
