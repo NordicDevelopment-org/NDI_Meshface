@@ -20459,7 +20459,8 @@
       const visibleMessages = messages.length > chatFeedMaxEntries
         ? messages.slice(-chatFeedMaxEntries)
         : messages;
-      const showMeshBadge = activeMeshChannelFilterIndex() === meshChannelAllIndex;
+      const showAllMeshChannels = activeMeshChannelFilterIndex() === meshChannelAllIndex;
+      const activeSendMeshIdx = activeMeshChannelSendIndex();
       const activeChangeFocusKeys = chatChangeFocusKeysForChannel(activeChatChannel);
       const participantSourceMessages = (activeChatChannel === "direct")
         ? channelMessages.direct
@@ -20504,8 +20505,16 @@
         const hopNum = Number(msg.hops);
         const hasHop = Number.isFinite(hopNum) && hopNum >= 0;
         const meshIdx = messageMeshChannelIndex(msg);
-        const meshTintClass = showMeshBadge ? " channel-tinted" : "";
-        const meshTintStyle = showMeshBadge
+        const hasMeshTint = Number.isInteger(meshIdx) && meshIdx >= 0;
+        const meshTintClass = hasMeshTint ? " channel-tinted" : "";
+        const meshDimClass = (
+          showAllMeshChannels
+          && hasMeshTint
+          && meshIdx !== activeSendMeshIdx
+        )
+          ? " channel-dimmed"
+          : "";
+        const meshTintStyle = hasMeshTint
           ? ` style="${{escAttr(meshChannelTintStyle(meshIdx, {{ allowAll: false }}))}}"`
           : "";
         const hopStart = Number(msg.hop_start ?? msg.hopStart);
@@ -20696,7 +20705,7 @@
           messageTooltipParts.push(`Message: ${{textCompact}}`);
         }}
         const messageTooltip = messageTooltipParts.join("\n");
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}${{meshDimClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
           <div class="chat-feed-line">
             <div class="chat-feed-summary">
               ${{changeBadge}}
