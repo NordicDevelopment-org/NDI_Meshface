@@ -3,6 +3,8 @@
     :root {{
       --topbar-sticky-offset: 72px;
       --workspace-viewport-offset: 84px;
+      --topbar-right-inset: max(12px, env(safe-area-inset-right));
+      --topbar-corner-reserve: 172px;
     }}
     html, body {{
       margin: 0;
@@ -32,13 +34,13 @@
       position: sticky;
       top: 0;
       z-index: 1200;
-      padding-right: max(12px, calc(78px + env(safe-area-inset-right)));
+      padding-right: var(--topbar-corner-reserve, 172px);
       flex: 0 0 auto;
     }}
     .topbar-notify-corner {{
       position: absolute;
       top: 8px;
-      right: max(12px, calc(78px + env(safe-area-inset-right)));
+      right: var(--topbar-right-inset);
       z-index: 2;
       display: inline-flex;
       align-items: center;
@@ -3394,7 +3396,6 @@
       min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
-      scrollbar-gutter: stable;
     }}
     .layout.view-settings .chat,
     .layout.view-settings .nodes,
@@ -7400,14 +7401,14 @@
     }}
     @media (max-width: 760px) {{
       .topbar {{
-        padding-right: max(10px, calc(74px + env(safe-area-inset-right)));
+        padding-right: var(--topbar-corner-reserve, 132px);
       }}
       .topbar h1 {{
         font-size: 20px;
       }}
       .topbar-notify-corner {{
         top: 6px;
-        right: max(10px, calc(74px + env(safe-area-inset-right)));
+        right: var(--topbar-right-inset);
       }}
       .topbar-self-profile {{
         min-width: 28px;

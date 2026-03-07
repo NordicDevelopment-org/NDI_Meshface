@@ -86,6 +86,7 @@
     const settingsFixedMapDefaultZoom = 4;
     const mapFrameElement = mapElement ? mapElement.closest(".map-frame") : null;
     const topbarElement = document.querySelector(".topbar");
+    const topbarNotifyCornerElement = document.querySelector(".topbar-notify-corner");
     const nodeLayer = L.layerGroup().addTo(map);
     const edgeLayer = L.layerGroup().addTo(map);
     const trailLayer = L.layerGroup().addTo(map);
@@ -2106,6 +2107,7 @@
     let topbarLayoutSyncRaf = null;
     let topbarStickyOffsetPx = 72;
     let workspaceViewportOffsetPx = 84;
+    let topbarCornerReservePx = 172;
     let splitPct = 64;
     let splitTopPx = 430;
     let splitMidPx = 250;
@@ -3103,6 +3105,15 @@
       }}
       const nextStickyOffset = Math.max(72, Math.ceil(measuredHeight || 0));
       const nextViewportOffset = nextStickyOffset;
+      let nextTopbarCornerReserve = topbarCornerReservePx;
+      if (topbarElement instanceof HTMLElement && topbarNotifyCornerElement instanceof HTMLElement) {{
+        const topRect = topbarElement.getBoundingClientRect();
+        const cornerRect = topbarNotifyCornerElement.getBoundingClientRect();
+        const overlapWidth = Number(topRect.right) - Number(cornerRect.left);
+        if (Number.isFinite(overlapWidth) && overlapWidth > 0) {{
+          nextTopbarCornerReserve = Math.max(80, Math.ceil(overlapWidth + 12));
+        }}
+      }}
       if (nextStickyOffset !== topbarStickyOffsetPx) {{
         topbarStickyOffsetPx = nextStickyOffset;
         rootStyle.setProperty("--topbar-sticky-offset", `${{nextStickyOffset}}px`);
@@ -3110,6 +3121,10 @@
       if (nextViewportOffset !== workspaceViewportOffsetPx) {{
         workspaceViewportOffsetPx = nextViewportOffset;
         rootStyle.setProperty("--workspace-viewport-offset", `${{nextViewportOffset}}px`);
+      }}
+      if (nextTopbarCornerReserve !== topbarCornerReservePx) {{
+        topbarCornerReservePx = nextTopbarCornerReserve;
+        rootStyle.setProperty("--topbar-corner-reserve", `${{nextTopbarCornerReserve}}px`);
       }}
     }}
 
