@@ -85,34 +85,6 @@
               </select>
             </label>
           </section>
-          <section class="chat-settings-section" aria-label="Mesh Bots">
-            <h3 class="chat-settings-section-title">Mesh Bots</h3>
-            <label class="chat-bot-toggle-wrap" for="chat-bot-whois-enabled" title="Show Whois helper action in chat rows">
-              <input id="chat-bot-whois-enabled" type="checkbox" />
-              <span>Enable Whois quick action</span>
-            </label>
-            <label class="chat-change-scope-wrap" for="chat-bot-whois-prefix" title="Whois command prefix used when drafting">
-              <span class="chat-change-scope-label">Whois command</span>
-              <select id="chat-bot-whois-prefix" class="chat-change-scope-select" aria-label="Whois command prefix">
-                <option value="whois">whois (recommended)</option>
-                <option value="!whois">!whois</option>
-                <option value="#whois">#whois</option>
-              </select>
-            </label>
-            <label class="chat-bot-toggle-wrap" for="chat-bot-whois-thread-reply" title="When enabled, Whois drafts reply to the selected chat packet">
-              <input id="chat-bot-whois-thread-reply" type="checkbox" />
-              <span>Attach Whois as reply</span>
-            </label>
-            <div class="chat-bot-cheatsheet" aria-label="Common mesh bot commands">
-              <div class="chat-bot-cheatsheet-title">Common bot commands (network dependent)</div>
-              <div class="chat-bot-cheatsheet-row"><code>cmd</code><span>show available bot commands</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>help</code><span>basic usage/help menu</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>whoami</code><span>show your local node identity</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>whois a39c</code><span>lookup node by ID suffix</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>wx 55112</code><span>weather (if supported)</span></div>
-              <div class="chat-bot-cheatsheet-row"><code>lheard</code><span>recently heard node list</span></div>
-            </div>
-          </section>
         </div>
       </div>
       <div class="favorite-menu-wrap topbar-favorite-menu-wrap">
@@ -229,6 +201,7 @@
   <div class="workspace-shell">
     <aside class="teams-rail" aria-label="Dashboard views">
       <button class="rail-btn active" data-view="chat" type="button" title="Teams-style chat workspace">Chat</button>
+      <button class="rail-btn" data-view="bots" type="button" title="Mesh bot tools and request history">Bots</button>
       <button class="rail-btn" data-view="network" type="button" title="Topology, nodes, and links">Network</button>
       <button class="rail-btn" data-view="saved" type="button" title="Node details and saved nodes">Node</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
@@ -711,6 +684,68 @@
               <div id="chat-send-status" class="chat-send-status"></div>
             </div>
             <div id="chat-reaction-popover" class="chat-reaction-popover" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card bots" aria-label="Mesh bot tools">
+      <h2>Bots</h2>
+      <div class="body">
+        <div class="bots-grid">
+          <div class="bots-panel">
+            <h3>Whois Quick Action</h3>
+            <label class="chat-bot-toggle-wrap bots-master-toggle" for="chat-bot-commands-enabled" title="Master switch for dashboard bot actions. Turn off to hard-disable bot-triggering commands and new bot request logging.">
+              <input id="chat-bot-commands-enabled" type="checkbox" />
+              <span>Master: Bot Actions Enabled</span>
+            </label>
+            <div class="bots-master-note">
+              Turn off to block bot-triggering commands from this dashboard and pause new bot-request logging.
+            </div>
+            <div class="settings-help-note">
+              Keep quick bot actions and result tracking in one place.
+            </div>
+            <label class="chat-bot-toggle-wrap" for="chat-bot-whois-enabled" title="Show Whois helper action in chat rows">
+              <input id="chat-bot-whois-enabled" type="checkbox" />
+              <span>Enable Whois quick action</span>
+            </label>
+            <label class="chat-change-scope-wrap bots-whois-prefix-wrap" for="chat-bot-whois-prefix" title="Whois command prefix used when drafting">
+              <span class="chat-change-scope-label">Whois command</span>
+              <select id="chat-bot-whois-prefix" class="chat-change-scope-select" aria-label="Whois command prefix">
+                <option value="whois">whois (recommended)</option>
+                <option value="!whois">!whois</option>
+                <option value="#whois">#whois</option>
+              </select>
+            </label>
+            <label class="chat-bot-toggle-wrap" for="chat-bot-whois-thread-reply" title="When enabled, Whois drafts reply to the selected chat packet">
+              <input id="chat-bot-whois-thread-reply" type="checkbox" />
+              <span>Attach Whois as reply</span>
+            </label>
+            <label class="chat-bot-toggle-wrap" for="chat-bot-history-enabled" title="Persist bot command history and match replies to requests">
+              <input id="chat-bot-history-enabled" type="checkbox" />
+              <span>Track bot request history</span>
+            </label>
+            <div class="chat-bot-cheatsheet" aria-label="Common mesh bot commands">
+              <div class="chat-bot-cheatsheet-title">Common bot commands (network dependent)</div>
+              <div class="chat-bot-cheatsheet-row"><code>cmd</code><span>show available bot commands</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>help</code><span>basic usage/help menu</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>whoami</code><span>show your local node identity</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>whois a39c</code><span>lookup node by ID suffix</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>wx 55112</code><span>weather (if supported)</span></div>
+              <div class="chat-bot-cheatsheet-row"><code>lheard</code><span>recently heard node list</span></div>
+            </div>
+          </div>
+          <div class="bots-panel bots-history-panel">
+            <div class="bots-history-head">
+              <h3>Request History</h3>
+              <button id="bots-history-clear-btn" class="btn btn-secondary bots-history-clear-btn" type="button">Clear History</button>
+            </div>
+            <div class="bots-history-stats">
+              <span>Total <strong id="bots-history-total">0</strong></span>
+              <span>Pending <strong id="bots-history-pending">0</strong></span>
+              <span>Responded <strong id="bots-history-responded">0</strong></span>
+            </div>
+            <div id="bots-history-list" class="scroll bots-history-list" aria-live="polite"></div>
           </div>
         </div>
       </div>

@@ -2036,6 +2036,13 @@
       flex-direction: column;
       min-height: 0;
     }}
+    .bots {{
+      grid-column: 1 / span 3;
+      grid-row: 2 / 9;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+    }}
     .settings-card-head {{
       display: flex;
       align-items: baseline;
@@ -2231,6 +2238,228 @@
       color: #204231;
       line-height: 1.35;
       overflow-wrap: anywhere;
+    }}
+    .bots .body {{
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+    }}
+    .bots-grid {{
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 12px;
+      min-height: 0;
+      flex: 1 1 auto;
+    }}
+    .bots-panel {{
+      border: 1px solid #d7e5d2;
+      border-radius: 10px;
+      background: #f8fcf7;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      padding: 10px;
+    }}
+    .bots-panel h3 {{
+      margin: 0;
+      font-size: 12px;
+      color: #204231;
+      letter-spacing: 0.35px;
+      text-transform: uppercase;
+    }}
+    .bots .chat-change-scope-wrap {{
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+      color: #4f6758;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+    }}
+    .bots .chat-change-scope-select {{
+      width: 100%;
+      min-width: 0;
+    }}
+    .bots .chat-bot-toggle-wrap {{
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      line-height: 1.25;
+      color: #274935;
+      cursor: pointer;
+      user-select: none;
+    }}
+    .bots .chat-bot-toggle-wrap.bots-master-toggle {{
+      border: 1px solid #c98d8d;
+      border-radius: 8px;
+      background: #fff3f3;
+      color: #742727;
+      padding: 7px 8px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }}
+    .bots .chat-bot-toggle-wrap input[type="checkbox"] {{
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: #2f855a;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }}
+    .bots-master-note {{
+      font-size: 11px;
+      color: #6b2d2d;
+      line-height: 1.35;
+      margin-top: -4px;
+    }}
+    .bots .chat-bot-cheatsheet {{
+      border: 1px solid #ccddcf;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 6px 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }}
+    .bots .chat-bot-cheatsheet-title {{
+      font-size: 10px;
+      color: #4f6758;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }}
+    .bots .chat-bot-cheatsheet-row {{
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 7px;
+      align-items: baseline;
+      font-size: 10px;
+      line-height: 1.25;
+      color: #2f4f3f;
+    }}
+    .bots .chat-bot-cheatsheet-row code {{
+      font-family: "IBM Plex Mono", "Cascadia Mono", "Consolas", monospace;
+      font-size: 10px;
+      color: #1f4e35;
+      background: #edf6ef;
+      border: 1px solid #c9dece;
+      border-radius: 6px;
+      padding: 1px 5px;
+      white-space: nowrap;
+    }}
+    .bots-history-panel {{
+      min-height: 0;
+    }}
+    .bots-history-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }}
+    .bots-history-clear-btn {{
+      padding: 4px 10px;
+      font-size: 11px;
+    }}
+    .bots-history-stats {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      font-size: 11px;
+      color: #355b44;
+    }}
+    .bots-history-list {{
+      border: 1px solid #ccddcf;
+      border-radius: 8px;
+      background: #ffffff;
+      flex: 1 1 auto;
+      min-height: 180px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }}
+    .bots-history-empty {{
+      border: 1px dashed #cfe0d2;
+      border-radius: 8px;
+      color: #4f6758;
+      background: #f7fbf7;
+      font-size: 12px;
+      line-height: 1.35;
+      padding: 10px;
+      text-align: center;
+    }}
+    .bots-history-item {{
+      border: 1px solid #d7e5d2;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: #f8fcf7;
+    }}
+    .bots-history-item-head {{
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }}
+    .bots-history-command {{
+      font-family: "IBM Plex Mono", "Cascadia Mono", "Consolas", monospace;
+      font-size: 11px;
+      color: #1f4e35;
+      word-break: break-word;
+    }}
+    .bots-history-meta {{
+      font-size: 10px;
+      color: #5b7565;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }}
+    .bots-history-status-pill {{
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid #bfd4c3;
+      background: #edf6ef;
+      color: #204231;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+      line-height: 1.2;
+      padding: 2px 7px;
+    }}
+    .bots-history-status-pill.pending {{
+      border-color: #d3a856;
+      background: #fff8e8;
+      color: #7a5a1f;
+    }}
+    .bots-history-status-pill.responded {{
+      border-color: #2f855a;
+      background: #e9f8ee;
+      color: #1d5a3b;
+    }}
+    .bots-history-response {{
+      border-left: 2px solid #bfd4c3;
+      padding-left: 7px;
+      font-size: 11px;
+      color: #274935;
+      line-height: 1.3;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }}
+    .bots-history-response strong {{
+      color: #1f4e35;
     }}
 
     .settings-channels-table {{
@@ -3065,6 +3294,7 @@
     .layout.view-chat .map-data,
     .layout.view-chat .summary,
     .layout.view-chat .nodes,
+    .layout.view-chat .bots,
     .layout.view-chat .packets,
     .layout.view-chat .raw,
     .layout.view-chat .console,
@@ -3160,6 +3390,7 @@
     }}
     .layout.view-network .map-data,
     .layout.view-network .chat,
+    .layout.view-network .bots,
     .layout.view-network .packets,
     .layout.view-network .raw,
     .layout.view-network .console,
@@ -3259,6 +3490,7 @@
       background: var(--history-pane-divider-line-active);
     }}
     .layout.view-history .chat,
+    .layout.view-history .bots,
     .layout.view-history .settings,
     .layout.view-history .nodes,
     .layout.view-history .map,
@@ -3295,6 +3527,7 @@
       height: 100%;
     }}
     .layout.view-packets .chat,
+    .layout.view-packets .bots,
     .layout.view-packets .nodes,
     .layout.view-packets .map,
     .layout.view-packets .map-data,
@@ -3320,6 +3553,7 @@
       min-height: 0;
     }}
     .layout.view-encription .chat,
+    .layout.view-encription .bots,
     .layout.view-encription .nodes,
     .layout.view-encription .map,
     .layout.view-encription .map-data,
@@ -3375,6 +3609,7 @@
       max-height: none;
     }}
     .layout.view-data .chat,
+    .layout.view-data .bots,
     .layout.view-data .nodes,
     .layout.view-data .map,
     .layout.view-data .map-data,
@@ -3389,6 +3624,7 @@
     }}
 
     .layout.view-console .chat,
+    .layout.view-console .bots,
     .layout.view-console .nodes,
     .layout.view-console .map,
     .layout.view-console .map-data,
@@ -3422,6 +3658,7 @@
       overflow-x: hidden;
     }}
     .layout.view-settings .chat,
+    .layout.view-settings .bots,
     .layout.view-settings .nodes,
     .layout.view-settings .map,
     .layout.view-settings .map-data,
@@ -3435,6 +3672,41 @@
       display: none !important;
     }}
     .layout.view-settings .console {{
+      display: none !important;
+    }}
+
+    .layout.view-bots {{
+      height: 100%;
+      min-height: 0;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+    }}
+    .layout.view-bots .bots {{
+      grid-column: 1;
+      grid-row: 1;
+      display: flex;
+      min-height: 0;
+      max-height: 100%;
+    }}
+    .layout.view-bots .bots .body {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }}
+    .layout.view-bots .chat,
+    .layout.view-bots .settings,
+    .layout.view-bots .nodes,
+    .layout.view-bots .map,
+    .layout.view-bots .map-data,
+    .layout.view-bots .favorites,
+    .layout.view-bots .packets,
+    .layout.view-bots .raw,
+    .layout.view-bots .console,
+    .layout.view-bots .splitter,
+    .layout.view-bots .hsplitter[data-target="top"],
+    .layout.view-bots .hsplitter[data-target="mid"],
+    .layout.view-bots .hsplitter[data-target="low"] {{
       display: none !important;
     }}
 
@@ -3650,6 +3922,7 @@
     }}
     .layout.view-saved .map-data,
     .layout.view-saved .chat,
+    .layout.view-saved .bots,
     .layout.view-saved .nodes,
     .layout.view-saved .packets,
     .layout.view-saved .raw,
@@ -7266,6 +7539,83 @@
       border-color: #35556d;
       color: #dbeeff;
     }}
+    [data-theme="dark"] .bots-panel {{
+      background: #13241b;
+      border-color: #2a4638;
+    }}
+    [data-theme="dark"] .bots-panel h3 {{
+      color: #c6e8d5;
+    }}
+    [data-theme="dark"] .bots .chat-bot-toggle-wrap {{
+      color: #c5e2d2;
+    }}
+    [data-theme="dark"] .bots .chat-bot-toggle-wrap.bots-master-toggle {{
+      border-color: #8f4d4d;
+      background: #2a1616;
+      color: #f2b7b7;
+    }}
+    [data-theme="dark"] .bots-master-note {{
+      color: #d8a7a7;
+    }}
+    [data-theme="dark"] .bots .chat-bot-cheatsheet {{
+      background: #0f1d16;
+      border-color: #2a4638;
+    }}
+    [data-theme="dark"] .bots .chat-bot-cheatsheet-title {{
+      color: #93b8a6;
+    }}
+    [data-theme="dark"] .bots .chat-bot-cheatsheet-row {{
+      color: #c5e2d2;
+    }}
+    [data-theme="dark"] .bots .chat-bot-cheatsheet-row code {{
+      background: #1b2f3e;
+      border-color: #35556d;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .bots-history-stats {{
+      color: #9ec8b3;
+    }}
+    [data-theme="dark"] .bots-history-list {{
+      background: #0f1d16;
+      border-color: #2a4638;
+    }}
+    [data-theme="dark"] .bots-history-empty {{
+      background: #13241b;
+      border-color: #2a4638;
+      color: #9ec8b3;
+    }}
+    [data-theme="dark"] .bots-history-item {{
+      background: #13241b;
+      border-color: #2a4638;
+    }}
+    [data-theme="dark"] .bots-history-command {{
+      color: #cfeee0;
+    }}
+    [data-theme="dark"] .bots-history-meta {{
+      color: #9ec8b3;
+    }}
+    [data-theme="dark"] .bots-history-status-pill {{
+      border-color: #3a5a49;
+      background: #1a3124;
+      color: #c7e8d6;
+    }}
+    [data-theme="dark"] .bots-history-status-pill.pending {{
+      border-color: #8d7232;
+      background: #2d2715;
+      color: #f3dfad;
+    }}
+    [data-theme="dark"] .bots-history-status-pill.responded {{
+      border-color: #2f855a;
+      background: #173526;
+      color: #9ce3ba;
+    }}
+    [data-theme="dark"] .bots-history-response {{
+      border-left-color: #3a5a49;
+      color: #c5e2d2;
+    }}
+    [data-theme="dark"] .bots-history-response strong {{
+      color: #dbeeff;
+    }}
     [data-theme="dark"] .chat-change-title {{
       color: #c7e8d6;
     }}
@@ -7519,6 +7869,13 @@
         height: auto;
         min-height: 0;
       }}
+      .layout.view-bots {{
+        height: auto;
+        min-height: 0;
+      }}
+      .bots-grid {{
+        grid-template-columns: minmax(0, 1fr);
+      }}
       .encription-panels {{
         grid-template-columns: 1fr;
       }}
@@ -7526,7 +7883,7 @@
         display: none !important;
       }}
       .splitter, .hsplitter {{ display: none; }}
-      .summary, .map, .map-data, .nodes, .favorites, .chat, .history-chat, .packets, .encription, .raw, .console {{ grid-column: 1; grid-row: auto; }}
+      .summary, .map, .map-data, .nodes, .favorites, .chat, .bots, .history-chat, .packets, .encription, .raw, .console {{ grid-column: 1; grid-row: auto; }}
       .map-frame {{ max-width: none; }}
       .nodes .scroll {{ max-height: 360px; }}
     }}
