@@ -7083,21 +7083,10 @@
       return `<span class="${{escAttr(classNames.join(" "))}}" style="${{styleAttr}}"${{titleAttr}}>${{escAttr(text)}}</span>`;
     }}
 
-    function meshChannelDotHtml(rawIndex, {{ allowAll = false, extraClass = "", title = "" }} = {{}}) {{
+    function meshChannelTintStyle(rawIndex, {{ allowAll = false }} = {{}}) {{
       const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll }});
       const meta = meshChannelColorMeta(idx, {{ allowAll }});
-      const classNames = ["channel-color-dot"];
-      if (idx === meshChannelAllIndex) {{
-        classNames.push("is-all");
-      }}
-      if (extraClass) classNames.push(String(extraClass).trim());
-      const titleText = String(title || meta.title).trim();
-      const styleText = idx === meshChannelAllIndex ? "" : `--channel-dot-fill: ${{meta.fill}};`;
-      const styleAttr = styleText ? ` style="${{escAttr(styleText)}}"` : "";
-      const titleAttr = titleText
-        ? ` title="${{escAttr(titleText)}}" aria-label="${{escAttr(titleText)}}" role="img"`
-        : ' aria-hidden="true"';
-      return `<span class="${{escAttr(classNames.join(" "))}}"${{styleAttr}}${{titleAttr}}></span>`;
+      return `--chat-feed-channel-fill: ${{meta.fill}}; --chat-feed-channel-rgb: ${{hexColorRgbTriplet(meta.fill)}};`;
     }}
 
     function meshChannelViewMenuLabel(rawIndex) {{
@@ -20035,12 +20024,9 @@
         const hopNum = Number(msg.hops);
         const hasHop = Number.isFinite(hopNum) && hopNum >= 0;
         const meshIdx = messageMeshChannelIndex(msg);
-        const meshBadge = showMeshBadge
-          ? meshChannelDotHtml(meshIdx, {{
-              allowAll: false,
-              extraClass: "chat-feed-channel-dot",
-              title: meshChannelLabelForIndex(meshIdx, {{ verbose: true, allowAll: false }}),
-            }})
+        const meshTintClass = showMeshBadge ? " channel-tinted" : "";
+        const meshTintStyle = showMeshBadge
+          ? ` style="${{escAttr(meshChannelTintStyle(meshIdx, {{ allowAll: false }}))}}"`
           : "";
         const hopStart = Number(msg.hop_start ?? msg.hopStart);
         const hopLimit = Number(msg.hop_limit ?? msg.hopLimit);
@@ -20155,9 +20141,8 @@
         const statusBadge = isStatusMessage
           ? '<span class="chat-feed-status-pill" title="Status update">Status</span>'
           : "";
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}}>
           <div class="chat-feed-meta">
-            ${{meshBadge}}
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
               ${{fromMeta.idTag ? `<span class="chat-id-bg status-${{fromMeta.status}}">${{escAttr(fromMeta.idTag)}}</span>` : ""}}
