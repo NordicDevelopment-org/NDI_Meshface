@@ -1,19 +1,24 @@
 # Ideas Backlog
 
 
+add a ping / pong top the bot
 
-- add a toggle for network connections
+add the game zork, a private message zorkbot mode!
 
-- split the UPDATE ticker into two rows, RADIO TIME and UPTIME and just call the ticker time
+make it work with radios connected to wifi
+
+
+- keep track of node name history?
+- add link to private messge seledcted node from anywhere
 
 - style chat to match closer to node / network.
-- Render html links in chat as a link
+
 - Subtle chat styling for messages from the directly connected radio so users can quickly distinguish local-radio traffic from other mesh messages.
 - add the abiluty to setup and interact with meshtastic channels
 
-- add link to private messge seledcted node from anywhere
 
-- keep track of node name history?
+
+
 
 - move console to it's own view
 - remove/replace data view?
