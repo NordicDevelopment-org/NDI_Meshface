@@ -2080,6 +2080,16 @@
     const knownLayoutViews = new Set(["chat", "bots", "history", "network", "saved", "packets", "channels", "encription", "data", "console", "settings"]);
     const knownChatChannels = new Set(["all", "direct"]);
     const meshChannelAllIndex = -1;
+    const meshChannelColorPalette = [
+      {{ name: "blue", fill: "#0072B2" }},
+      {{ name: "orange", fill: "#E69F00" }},
+      {{ name: "bluish green", fill: "#009E73" }},
+      {{ name: "yellow", fill: "#F0E442" }},
+      {{ name: "sky blue", fill: "#56B4E9" }},
+      {{ name: "vermillion", fill: "#D55E00" }},
+      {{ name: "reddish purple", fill: "#CC79A7" }},
+      {{ name: "gray", fill: "#999999" }},
+    ];
     const knownChatNotificationScopes = new Set(["all", "self"]);
     const knownWhoisCommandPrefixes = new Set(["whois", "!whois", "#whois"]);
     const knownBotSingleWordCommands = new Set([
@@ -2194,6 +2204,7 @@
     let botSettingsSaveInFlight = false;
     let queuedComposerSend = false;
     let queuedComposerFocus = false;
+    let meshChannelMenuOpen = false;
     let activeMeshChannelIndex = 0;
     let activeMeshSendChannelIndex = 0;
     let meshChannelOptions = [];
@@ -6943,6 +6954,103 @@
       return name || `Public ${{idx}}`;
     }}
 
+    function meshChannelColorMeta(rawIndex, {{ allowAll = true }} = {{}}) {{
+      const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll }});
+      if (idx === meshChannelAllIndex) {{
+        return {{
+          key: "all",
+          name: "all",
+          fill: "#FFFFFF",
+          title: "All channels view",
+        }};
+      }}
+      const palette = meshChannelColorPalette[idx % meshChannelColorPalette.length] || meshChannelColorPalette[0];
+      const colorName = String(palette && palette.name || "channel").trim() || "channel";
+      const fill = String(palette && palette.fill || "#8DA3B1").trim() || "#8DA3B1";
+      const colorTitle = `${{colorName.charAt(0).toUpperCase()}}${{colorName.slice(1)}} channel`;
+      return {{
+        key: colorName,
+        name: colorName,
+        fill,
+        title: colorTitle,
+      }};
+    }}
+
+    function meshChannelViewMenuLabel(rawIndex) {{
+      return meshChannelLabelForIndex(rawIndex, {{ verbose: true, allowAll: true }});
+    }}
+
+    function syncMeshChannelViewControl() {{
+      const dot = document.getElementById("mesh-channel-view-dot");
+      const meta = meshChannelColorMeta(activeMeshChannelIndex, {{ allowAll: true }});
+      if (dot instanceof HTMLElement) {{
+        dot.classList.toggle("is-all", meta.key === "all");
+        dot.style.setProperty("--channel-dot-fill", meta.fill);
+        dot.title = meta.title;
+        dot.setAttribute("aria-label", meta.title);
+      }}
+      const btn = document.getElementById("mesh-channel-menu-btn");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.textContent = meshChannelViewMenuLabel(activeMeshChannelIndex);
+        btn.title = `${{meta.title}} • ${{btn.textContent}}`;
+      }}
+    }}
+
+    function setMeshChannelMenuOpen(open) {{
+      meshChannelMenuOpen = !!open;
+      const panel = document.getElementById("mesh-channel-menu");
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = !meshChannelMenuOpen;
+      }}
+      const btn = document.getElementById("mesh-channel-menu-btn");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", meshChannelMenuOpen ? "true" : "false");
+      }}
+    }}
+
+    function renderMeshChannelMenu(options) {{
+      const panel = document.getElementById("mesh-channel-menu");
+      if (!(panel instanceof HTMLElement)) return;
+      const normalized = Array.isArray(options) ? options : [];
+      const rows = [];
+      rows.push({{
+        index: meshChannelAllIndex,
+        label: meshChannelViewMenuLabel(meshChannelAllIndex),
+        meta: meshChannelColorMeta(meshChannelAllIndex, {{ allowAll: true }}),
+        all: true,
+      }});
+      for (const opt of normalized) {{
+        const idx = normalizeMeshChannelIndex(opt && opt.index);
+        rows.push({{
+          index: idx,
+          label: meshChannelOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`,
+          meta: meshChannelColorMeta(idx, {{ allowAll: false }}),
+          all: false,
+        }});
+      }}
+      panel.innerHTML = rows.map((row) => {{
+        const active = normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }}) === row.index;
+        const dotClass = row.all ? "channel-color-dot is-all" : "channel-color-dot";
+        const metaText = "";
+        const rowClass = row.all ? " mesh-channel-menu-item-all" : "";
+        const metaMarkup = metaText ? `<span class="mesh-channel-menu-item-meta">${{escAttr(metaText)}}</span>` : "";
+        return `<button
+          type="button"
+          class="mesh-channel-menu-item${{rowClass}}${{active ? " active" : ""}}"
+          role="option"
+          aria-selected="${{active ? "true" : "false"}}"
+          data-mesh-channel-index="${{escAttr(row.index)}}"
+          title="${{escAttr(`${{row.meta.title}} • ${{row.label}}`)}}"
+        >
+          <span class="${{dotClass}}" style="${{row.all ? "" : `--channel-dot-fill: ${{row.meta.fill}};`}}" aria-hidden="true"></span>
+          <span class="mesh-channel-menu-item-main">
+            <span class="mesh-channel-menu-item-title">${{escAttr(row.label)}}</span>
+            ${{metaMarkup}}
+          </span>
+        </button>`;
+      }}).join("");
+    }}
+
     function meshChannelLabelForIndex(rawIndex, {{ verbose = false, compact = false, allowAll = true }} = {{}}) {{
       const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll }});
       if (idx === meshChannelAllIndex) {{
@@ -7079,13 +7187,14 @@
       const allOption = document.createElement("option");
       allOption.value = String(meshChannelAllIndex);
       allOption.textContent = "All channels (view)";
-      allOption.title = "Show chat from all configured mesh channels.";
+      allOption.title = "All channels view";
       select.appendChild(allOption);
       for (const opt of normalized) {{
         const idx = normalizeMeshChannelIndex(opt && opt.index);
+        const plainLabel = meshChannelOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
         const optionEl = document.createElement("option");
         optionEl.value = String(idx);
-        optionEl.textContent = meshChannelOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
+        optionEl.textContent = plainLabel;
         optionEl.disabled = !!(opt && opt.disabled);
         if (opt && opt.role) {{
           optionEl.title = String(opt.role);
@@ -7104,6 +7213,7 @@
       const nextValue = firstEnabled ? firstEnabled.value : "0";
       select.value = nextValue;
       activeMeshChannelIndex = normalizeMeshChannelIndex(nextValue, {{ allowAll: true }});
+      syncMeshChannelViewControl();
       try {{
         window.localStorage.setItem(meshChannelIndexStorageKey, String(activeMeshChannelIndex));
       }} catch (_err) {{}}
@@ -7168,6 +7278,7 @@
       const options = buildMeshChannelOptionsFromLocalState(localState);
       meshChannelOptions = options;
       renderMeshChannelSelect(options);
+      renderMeshChannelMenu(options);
       renderMeshChannelSendSelect(buildMeshChannelSendOptionsFromLocalState(localState));
       return options;
     }}
@@ -7202,11 +7313,13 @@
       const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll: true }});
       const changed = idx !== activeMeshChannelIndex;
       activeMeshChannelIndex = idx;
+      syncMeshChannelViewControl();
 
       const select = document.getElementById("mesh-channel-select");
       if (select instanceof HTMLSelectElement) {{
         select.value = String(activeMeshChannelIndex);
       }}
+      renderMeshChannelMenu(meshChannelOptions);
 
       if (persist) {{
         try {{
@@ -7272,10 +7385,51 @@
       const fallback = buildMeshChannelOptionsFromLocalState({{ channels: [] }});
       meshChannelOptions = fallback;
       renderMeshChannelSelect(fallback);
+      renderMeshChannelMenu(fallback);
       renderMeshChannelSendSelect(buildMeshChannelSendOptionsFromLocalState(null), {{ preserveCurrent: true }});
       select.value = String(activeMeshChannelIndex);
+      syncMeshChannelViewControl();
 
       void hydrateMeshChannelOptions(false);
+    }}
+
+    function bindMeshChannelMenuControl() {{
+      const btn = document.getElementById("mesh-channel-menu-btn");
+      const panel = document.getElementById("mesh-channel-menu");
+      if (!(btn instanceof HTMLButtonElement) || !(panel instanceof HTMLElement) || btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+
+      btn.addEventListener("click", (ev) => {{
+        ev.preventDefault();
+        setMeshChannelMenuOpen(!meshChannelMenuOpen);
+      }});
+
+      panel.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest(".mesh-channel-menu-item");
+        if (!(item instanceof HTMLButtonElement)) return;
+        applyMeshChannelIndex(item.dataset.meshChannelIndex || meshChannelAllIndex, true);
+        setMeshChannelMenuOpen(false);
+      }});
+
+      if (document.body.dataset.meshChannelMenuBound !== "1") {{
+        document.body.dataset.meshChannelMenuBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          if (target.closest("#mesh-channel-menu-btn") || target.closest("#mesh-channel-menu")) return;
+          setMeshChannelMenuOpen(false);
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key === "Escape") {{
+            setMeshChannelMenuOpen(false);
+          }}
+        }});
+      }}
+
+      syncMeshChannelViewControl();
+      renderMeshChannelMenu(meshChannelOptions);
     }}
 
     function bindMeshChannelSendControl() {{
@@ -21202,6 +21356,7 @@
     bindWeeklySummaryMetricControl();
     bindThemePresetSelector();
     bindMeshChannelControl();
+    bindMeshChannelMenuControl();
     bindMeshChannelSendControl();
     bindSignalHeatDevApi();
     bindMapPacketLinesControl();

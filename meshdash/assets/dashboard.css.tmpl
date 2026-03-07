@@ -532,6 +532,7 @@
     }}
 
     .mesh-channel-wrap {{
+      position: relative;
       display: inline-flex;
       align-items: center;
       gap: 5px;
@@ -544,10 +545,25 @@
       color: #f2fff7;
       white-space: nowrap;
     }}
-    .mesh-channel-label {{
-      opacity: 0.92;
+    .channel-color-dot {{
+      --channel-dot-fill: #8da3b1;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      display: inline-block;
+      background: var(--channel-dot-fill);
+      border: 1px solid rgba(19, 36, 26, 0.38);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
     }}
-    .mesh-channel-select {{
+    .channel-color-dot.is-all {{
+      background: #ffffff;
+    }}
+    .mesh-channel-view-dot {{
+      margin-left: 1px;
+      margin-right: 1px;
+    }}
+    .mesh-channel-menu-btn {{
       border: none;
       border-radius: 999px;
       background: rgba(248, 255, 251, 0.16);
@@ -557,8 +573,14 @@
       padding: 2px 8px 2px 6px;
       min-width: 84px;
       cursor: pointer;
-      appearance: none;
       outline: none;
+      white-space: nowrap;
+    }}
+    .mesh-channel-menu-btn:hover {{
+      background: rgba(248, 255, 251, 0.24);
+    }}
+    .mesh-channel-menu-btn[aria-expanded="true"] {{
+      background: rgba(248, 255, 251, 0.28);
     }}
     .mesh-channel-select:disabled {{
       cursor: default;
@@ -570,6 +592,77 @@
     }}
     .mesh-channel-select option:disabled {{
       color: #6a7f73;
+    }}
+    .mesh-channel-menu {{
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 224px;
+      max-width: min(320px, 86vw);
+      border: 1px solid #ccddcf;
+      border-radius: 10px;
+      background: #f4fbf5;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 10px 28px rgba(21, 47, 33, 0.24);
+      z-index: 45;
+    }}
+    .mesh-channel-menu[hidden] {{
+      display: none !important;
+    }}
+    .mesh-channel-menu-item {{
+      width: 100%;
+      border: 1px solid #c9dccf;
+      border-radius: 8px;
+      background: #edf7ef;
+      color: #1d4130;
+      padding: 6px 7px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+      font-size: 10px;
+      line-height: 1.2;
+      cursor: pointer;
+    }}
+    .mesh-channel-menu-item:hover {{
+      background: #e3f2e7;
+      border-color: #b6d0bf;
+    }}
+    .mesh-channel-menu-item.active {{
+      background: #dcefe2;
+      border-color: #8fb69e;
+      box-shadow: inset 2px 0 0 rgba(21, 70, 46, 0.24);
+    }}
+    .mesh-channel-menu-item-all {{
+      background: #eef4f7;
+      border-color: #ccd7df;
+    }}
+    .mesh-channel-menu-item-all:hover {{
+      background: #e3edf2;
+      border-color: #b8c8d5;
+    }}
+    .mesh-channel-menu-item-main {{
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }}
+    .mesh-channel-menu-item-title,
+    .mesh-channel-menu-item-meta {{
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .mesh-channel-menu-item-title {{
+      font-weight: 700;
+    }}
+    .mesh-channel-menu-item-meta {{
+      color: #5d7668;
+      font-size: 9px;
     }}
     .workspace-shell {{
       --rail-width: 72px;
@@ -6454,6 +6547,48 @@
     }}
     [data-theme="dark"] .chat-emoji-top-label {{
       color: #aac8ba;
+    }}
+    [data-theme="dark"] .channel-color-dot {{
+      border-color: rgba(201, 226, 212, 0.42);
+      box-shadow: inset 0 0 0 1px rgba(7, 20, 13, 0.28);
+    }}
+    [data-theme="dark"] .mesh-channel-menu-btn {{
+      background: rgba(20, 35, 28, 0.34);
+      color: #deeee5;
+    }}
+    [data-theme="dark"] .mesh-channel-menu-btn:hover,
+    [data-theme="dark"] .mesh-channel-menu-btn[aria-expanded="true"] {{
+      background: rgba(34, 53, 43, 0.7);
+    }}
+    [data-theme="dark"] .mesh-channel-menu {{
+      border-color: #345442;
+      background: #0f1b15;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    }}
+    [data-theme="dark"] .mesh-channel-menu-item {{
+      background: #16241d;
+      border-color: #314b3d;
+      color: #d9eee1;
+    }}
+    [data-theme="dark"] .mesh-channel-menu-item:hover {{
+      background: #1c2f25;
+      border-color: #4a6b57;
+    }}
+    [data-theme="dark"] .mesh-channel-menu-item.active {{
+      background: #21372b;
+      border-color: #5a8a6d;
+      box-shadow: inset 2px 0 0 rgba(142, 204, 169, 0.3);
+    }}
+    [data-theme="dark"] .mesh-channel-menu-item-all {{
+      background: #172029;
+      border-color: #334b5e;
+    }}
+    [data-theme="dark"] .mesh-channel-menu-item-all:hover {{
+      background: #1d2b36;
+      border-color: #47657d;
+    }}
+    [data-theme="dark"] .mesh-channel-menu-item-meta {{
+      color: #9fbaac;
     }}
     [data-theme="dark"] .chat-emoji-top-empty,
     [data-theme="dark"] .chat-emoji-empty {{
