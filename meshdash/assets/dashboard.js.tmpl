@@ -7083,6 +7083,23 @@
       return `<span class="${{escAttr(classNames.join(" "))}}" style="${{styleAttr}}"${{titleAttr}}>${{escAttr(text)}}</span>`;
     }}
 
+    function meshChannelDotHtml(rawIndex, {{ allowAll = false, extraClass = "", title = "" }} = {{}}) {{
+      const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll }});
+      const meta = meshChannelColorMeta(idx, {{ allowAll }});
+      const classNames = ["channel-color-dot"];
+      if (idx === meshChannelAllIndex) {{
+        classNames.push("is-all");
+      }}
+      if (extraClass) classNames.push(String(extraClass).trim());
+      const titleText = String(title || meta.title).trim();
+      const styleText = idx === meshChannelAllIndex ? "" : `--channel-dot-fill: ${{meta.fill}};`;
+      const styleAttr = styleText ? ` style="${{escAttr(styleText)}}"` : "";
+      const titleAttr = titleText
+        ? ` title="${{escAttr(titleText)}}" aria-label="${{escAttr(titleText)}}" role="img"`
+        : ' aria-hidden="true"';
+      return `<span class="${{escAttr(classNames.join(" "))}}"${{styleAttr}}${{titleAttr}}></span>`;
+    }}
+
     function meshChannelViewMenuLabel(rawIndex) {{
       const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll: true }});
       if (idx === meshChannelAllIndex) {{
@@ -11588,9 +11605,18 @@
 
     function syncDocumentUnreadTitle(count) {{
       const unreadCount = Math.max(0, Math.trunc(Number(count) || 0));
-      const badge = unreadCount > 99 ? "99+" : String(unreadCount);
-      const nextTitle = unreadCount > 0
-        ? `(${{badge}}) ${{baseDocumentTitle}}`
+      const systemCount = Math.max(0, Math.trunc(Number(totalSystemNotificationCount()) || 0));
+      const unreadBadge = unreadCount > 99 ? "99+" : String(unreadCount);
+      const systemBadge = systemCount > 99 ? "99+" : String(systemCount);
+      const prefixes = [];
+      if (systemCount > 0) {{
+        prefixes.push(`(${{systemBadge}})!`);
+      }}
+      if (unreadCount > 0) {{
+        prefixes.push(`(${{unreadBadge}})`);
+      }}
+      const nextTitle = prefixes.length
+        ? `${{prefixes.join(" ")}} ${{baseDocumentTitle}}`
         : baseDocumentTitle;
       if (document.title !== nextTitle) {{
         document.title = nextTitle;
@@ -20010,15 +20036,11 @@
         const hasHop = Number.isFinite(hopNum) && hopNum >= 0;
         const meshIdx = messageMeshChannelIndex(msg);
         const meshBadge = showMeshBadge
-          ? meshChannelBadgeHtml(
-              meshIdx,
-              meshChannelLabelForIndex(meshIdx, {{ compact: true, allowAll: false }}),
-              {{
-                allowAll: false,
-                extraClass: "chat-feed-mesh",
-                title: meshChannelLabelForIndex(meshIdx, {{ verbose: true, allowAll: false }}),
-              }},
-            )
+          ? meshChannelDotHtml(meshIdx, {{
+              allowAll: false,
+              extraClass: "chat-feed-channel-dot",
+              title: meshChannelLabelForIndex(meshIdx, {{ verbose: true, allowAll: false }}),
+            }})
           : "";
         const hopStart = Number(msg.hop_start ?? msg.hopStart);
         const hopLimit = Number(msg.hop_limit ?? msg.hopLimit);
@@ -20135,6 +20157,7 @@
           : "";
         return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}">
           <div class="chat-feed-meta">
+            ${{meshBadge}}
             <span class="chat-endpoint" title="${{escAttr(fromMeta.title)}}">
               <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
               ${{fromMeta.idTag ? `<span class="chat-id-bg status-${{fromMeta.status}}">${{escAttr(fromMeta.idTag)}}</span>` : ""}}
@@ -20144,7 +20167,7 @@
               <span class="chat-name status-${{toMeta.status}}">${{escAttr(toMeta.label)}}</span>
               ${{toMeta.idTag ? `<span class="chat-id-bg status-${{toMeta.status}}">${{escAttr(toMeta.idTag)}}</span>` : ""}}
             </span>
-            <span class="chat-feed-actions">${{changeBadge}}${{statusBadge}}${{meshBadge}}${{hopBadge}}${{retryButton}}</span>
+            <span class="chat-feed-actions">${{changeBadge}}${{statusBadge}}${{hopBadge}}${{retryButton}}</span>
             ${{deliveryChip}}
             <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
           </div>
