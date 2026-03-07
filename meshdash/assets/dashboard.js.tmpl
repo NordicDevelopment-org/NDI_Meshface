@@ -5818,6 +5818,36 @@
       }}
     }}
 
+    function parseReactionSummaryGroups(button) {{
+      if (!(button instanceof HTMLButtonElement)) return [];
+      const raw = String(button.dataset.reactionSummary || "").trim();
+      if (!raw) return [];
+      try {{
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .map((item) => {{
+            if (!item || typeof item !== "object") return null;
+            const emoji = String(item.emoji || "").trim();
+            const count = Number(item.count || 0);
+            const names = Array.isArray(item.names)
+              ? item.names
+                  .map((name) => normalizeReactionName(name))
+                  .filter((name, idx, arr) => !!name && arr.indexOf(name) === idx)
+              : [];
+            if (!emoji || !Number.isFinite(count) || count <= 0) return null;
+            return {{
+              emoji,
+              count: Math.trunc(count),
+              names,
+            }};
+          }})
+          .filter((item) => !!item);
+      }} catch (_err) {{
+        return [];
+      }}
+    }}
+
     function positionReactionPopover(anchor, popover) {{
       if (!(anchor instanceof HTMLElement) || !(popover instanceof HTMLElement) || popover.hidden) {{
         return;
@@ -5880,6 +5910,39 @@
       positionReactionPopover(chip, popover);
     }}
 
+    function openReactionPopoverForSummary(button) {{
+      if (!(button instanceof HTMLButtonElement)) return;
+      const popover = reactionPopoverElement();
+      if (!(popover instanceof HTMLElement)) return;
+
+      const groups = parseReactionSummaryGroups(button);
+      if (!groups.length) return;
+      const total = groups.reduce((sum, group) => sum + Math.max(0, Number(group.count || 0)), 0);
+      const listRows = groups.map((group) => {{
+        const shownNames = group.names.slice(0, 4);
+        const shownText = shownNames.length ? shownNames.join(", ") : "No named reactors yet";
+        const remaining = Math.max(0, group.count - shownNames.length);
+        const detail = remaining > 0 ? `${{shownText}} +${{remaining}}` : shownText;
+        return `<div class="chat-reaction-popover-row">
+          <span class="chat-reaction-popover-emoji">${{escAttr(group.emoji)}}</span>
+          <span class="chat-reaction-popover-name">${{escAttr(`${{group.count}} • ${{detail}}`)}}</span>
+        </div>`;
+      }}).join("");
+
+      popover.innerHTML = `
+        <div class="chat-reaction-popover-head">
+          <span>Reactions</span>
+          <span class="chat-reaction-popover-count">${{total}}</span>
+        </div>
+        <div class="chat-reaction-popover-list">
+          ${{listRows}}
+        </div>
+      `;
+      popover.hidden = false;
+      chatReactionPopoverAnchor = button;
+      positionReactionPopover(button, popover);
+    }}
+
     function closeReactionPopover(force = false) {{
       const popover = reactionPopoverElement();
       if (!(popover instanceof HTMLElement)) return;
@@ -5908,7 +5971,7 @@
           closeReactionPopover(true);
           return;
         }}
-        if (target.closest(".chat-reaction-chip") || target.closest("#chat-reaction-popover")) {{
+        if (target.closest(".chat-reaction-chip") || target.closest(".chat-reaction-summary") || target.closest("#chat-reaction-popover")) {{
           return;
         }}
         closeReactionPopover(true);
@@ -15343,13 +15406,13 @@
         }});
       }}
 
-      for (const chip of document.querySelectorAll("#chat-feed .chat-reaction-chip")) {{
-        if (!(chip instanceof HTMLButtonElement)) continue;
-        chip.addEventListener("pointerenter", () => {{
+      for (const summary of document.querySelectorAll("#chat-feed .chat-reaction-summary")) {{
+        if (!(summary instanceof HTMLButtonElement)) continue;
+        summary.addEventListener("pointerenter", () => {{
           clearReactionPopoverHideTimer();
-          openReactionPopoverForChip(chip);
+          openReactionPopoverForSummary(summary);
         }});
-        chip.addEventListener("pointerleave", (ev) => {{
+        summary.addEventListener("pointerleave", (ev) => {{
           const related = ev.relatedTarget;
           const popover = reactionPopoverElement();
           if (
@@ -15361,23 +15424,18 @@
           }}
           scheduleReactionPopoverHide(120);
         }});
-        chip.addEventListener("focus", () => {{
+        summary.addEventListener("focus", () => {{
           clearReactionPopoverHideTimer();
-          openReactionPopoverForChip(chip);
+          openReactionPopoverForSummary(summary);
         }});
-        chip.addEventListener("blur", () => {{
+        summary.addEventListener("blur", () => {{
           scheduleReactionPopoverHide(80);
         }});
-        chip.addEventListener("click", (ev) => {{
+        summary.addEventListener("click", (ev) => {{
           ev.preventDefault();
           ev.stopPropagation();
           clearReactionPopoverHideTimer();
-          openReactionPopoverForChip(chip);
-          if (chatSendInFlight) return;
-          const replyId = Number(chip.dataset.replyId || "");
-          const emoji = String(chip.dataset.emoji || "").trim();
-          if (!Number.isInteger(replyId) || replyId <= 0 || !emoji) return;
-          sendChatReaction(replyId, emoji);
+          openReactionPopoverForSummary(summary);
         }});
       }}
     }}
@@ -19836,17 +19894,27 @@
           }}
         }}
         const messageReactions = messageId ? reactionBuckets.get(String(messageId)) : null;
-        const reactionChips = messageReactions
+        const reactionGroups = messageReactions
           ? Array.from(messageReactions.values())
               .sort((a, b) => (b.count - a.count) || String(a.emoji).localeCompare(String(b.emoji)))
-              .map((bucket) => {{
-                const reactorNames = Array.from(new Set(bucket.names)).slice(0, 40);
-                const aria = `${{bucket.emoji}} reaction, ${{bucket.count}} total`;
-                return `<button type="button" class="chat-reaction-chip" data-reply-id="${{escAttr(messageId)}}" data-emoji="${{escAttr(bucket.emoji)}}" data-reactor-count="${{escAttr(bucket.count)}}" data-reactors="${{escAttr(JSON.stringify(reactorNames))}}" aria-label="${{escAttr(aria)}}">
-                  <span class="chat-reaction-emoji">${{escAttr(bucket.emoji)}}</span><span class="chat-reaction-count">${{bucket.count}}</span>
-                </button>`;
-              }})
-              .join("")
+              .map((bucket) => ({{
+                emoji: String(bucket.emoji || "").trim(),
+                count: Math.max(0, Number(bucket.count || 0)),
+                names: Array.from(new Set(bucket.names)).slice(0, 40),
+              }}))
+              .filter((bucket) => !!bucket.emoji && Number.isFinite(bucket.count) && bucket.count > 0)
+          : [];
+        const reactionTotal = reactionGroups.reduce((sum, bucket) => sum + Math.max(0, Number(bucket.count || 0)), 0);
+        const reactionSummaryTitle = reactionGroups.map((bucket) => `${{bucket.emoji}} ${{bucket.count}}`).join(" • ");
+        const reactionSummaryIcons = reactionGroups
+          .slice(0, 4)
+          .map((bucket) => `<span class="chat-reaction-summary-emoji">${{escAttr(bucket.emoji)}}</span>`)
+          .join("");
+        const reactionSummary = reactionGroups.length > 0
+          ? `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}" title="${{escAttr(reactionSummaryTitle)}}">
+              <span class="chat-reaction-summary-icons">${{reactionSummaryIcons}}</span>
+              <span class="chat-reaction-summary-total">${{reactionTotal}}</span>
+            </button>`
           : "";
         const isLocalEcho = msg.local_echo === true || msg.localEcho === true;
         const deliveryState = normalizeDeliveryState(msg.delivery_state ?? msg.deliveryState);
@@ -19870,7 +19938,7 @@
         const whoisButton = showWhoisButton
           ? `<button type="button" class="chat-whois-btn" data-whois-target-id="${{escAttr(whoisTargetId)}}" title="Prepare ${{escAttr(whoisCommand)}} for ${{escAttr(whoisTargetId)}}">Whois</button>`
           : "";
-        const hasReactions = !!reactionChips;
+        const hasReactions = reactionGroups.length > 0;
         const reactButton = messageId
           ? `<button type="button" class="chat-react-btn${{hasReactions ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
           : "";
@@ -19887,12 +19955,14 @@
         const reactionRowParts = [];
         if (reactButton) reactionRowParts.push(reactButton);
         if (replyButton) reactionRowParts.push(replyButton);
-        if (reactionChips) reactionRowParts.push(`<span class="chat-reaction-stack">${{reactionChips}}</span>`);
         const tailButtons = [];
         if (whoisButton) tailButtons.push(whoisButton);
         if (tailButtons.length > 0) {{
           reactionRowParts.push(`<span class="chat-reply-tail">${{tailButtons.join("")}}</span>`);
         }}
+        const reactionSummaryRow = reactionSummary
+          ? `<div class="chat-reaction-summary-row">${{reactionSummary}}</div>`
+          : "";
         const reactionRow = reactionRowParts.length > 0
           ? `<div class="chat-reaction-row">${{reactionRowParts.join("")}}</div>`
           : "";
@@ -19924,6 +19994,7 @@
           </div>
           ${{replyPreview}}
           <div class="chat-feed-text">${{textHtml || "&nbsp;"}}</div>
+          ${{reactionSummaryRow}}
           ${{reactionRow}}
         </div>`;
       }});
