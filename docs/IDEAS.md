@@ -1,9 +1,7 @@
 # Ideas Backlog
 
 
-add a ping / pong top the bot
-
-add the game zork, a private message zorkbot mode!
+put chatname up top
 
 make it work with radios connected to wifi
 
