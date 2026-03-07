@@ -7785,6 +7785,28 @@
           profile.setAttribute("aria-label", profile.title);
         }}
       }};
+      const setProfileFreshness = (status, lastSeenUnix = null) => {{
+        const key = normalizeFreshnessKey(status);
+        if (profile instanceof HTMLElement) {{
+          applyFreshnessClass(profile, key);
+          const lastSeen = Number(lastSeenUnix);
+          if (Number.isFinite(lastSeen) && lastSeen > 0) {{
+            profile.dataset.lastSeenUnix = String(Math.trunc(lastSeen));
+          }} else {{
+            delete profile.dataset.lastSeenUnix;
+          }}
+        }}
+        if (hasPill) {{
+          applyFreshnessClass(pill, key);
+        }}
+      }};
+      const freshnessLabel = (status) => {{
+        const key = normalizeFreshnessKey(status);
+        if (key === "online") return "Online";
+        if (key === "warn") return "Aging";
+        if (key === "stale") return "Stale";
+        return "Unknown";
+      }};
 
       const safeState = (state && typeof state === "object") ? state : {{}};
       const selfId = resolveLocalNodeId(safeState);
@@ -7794,31 +7816,51 @@
           pill.title = "Connected local radio: unavailable";
         }}
         setProfile("na", "Connected local radio: unavailable");
+        setProfileFreshness("unknown");
         return;
       }}
 
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       const selfNode = nodes.find((node) => normalizeNodeId(node && node.id) === selfId) || null;
+      const historyCapsById = new Map(
+        Object.entries((safeState.history_caps && typeof safeState.history_caps === "object") ? safeState.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
+      const caps = historyCapsById.get(selfId) || null;
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
+      const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
+      const chatTouch = latestChatTouchByNode.get(selfId) || null;
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const lastSeenUnix = computeNodeFreshnessUnix(selfNode, caps, chatTouch);
+      const status = normalizeFreshnessKey(freshnessStatus(lastSeenUnix, nowUnix));
+      const statusDetail = Number.isFinite(lastSeenUnix)
+        ? `${{freshnessLabel(status)}} (seen ${{savedDetailAge(lastSeenUnix, nowUnix)}})`
+        : freshnessLabel(status);
       const selfName = preferredNodeName(selfNode) || nodeNameCache.get(selfId) || "";
       if (selfName) {{
+        const profileTitle = `Connected local radio: ${{selfName}} (${{selfId}}) • Status: ${{statusDetail}}`;
         if (hasPill) {{
           pill.textContent = `${{selfName}} (${{selfId}})`;
-          pill.title = `Connected local radio: ${{selfName}} (${{selfId}})`;
+          pill.title = profileTitle;
         }}
         setProfile(
           selfRadioProfileShortLabel(selfId),
-          `Connected local radio: ${{selfName}} (${{selfId}})`
+          profileTitle
         );
       }} else {{
+        const profileTitle = `Connected local radio: ${{selfId}} • Status: ${{statusDetail}}`;
         if (hasPill) {{
           pill.textContent = `${{selfId}}`;
-          pill.title = `Connected local radio: ${{selfId}}`;
+          pill.title = profileTitle;
         }}
         setProfile(
           selfRadioProfileShortLabel(selfId),
-          `Connected local radio: ${{selfId}}`
+          profileTitle
         );
       }}
+      setProfileFreshness(status, lastSeenUnix);
     }}
 
     function normalizeSearchQuery(value) {{
