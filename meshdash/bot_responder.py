@@ -11,7 +11,7 @@ from .bot_commands import (
     build_custom_bot_command_spec,
     normalize_bot_command_name,
 )
-from .games.zork import ZorkGame
+from .bot_apps import BotApp, build_builtin_bot_apps
 from .helpers import to_int as _to_int
 
 STANDARD_BOT_COMMANDS = _STANDARD_BOT_COMMANDS
@@ -277,7 +277,6 @@ class MeshResponseBot:
         self._get_local_node_id_fn = get_local_node_id_fn
         self._enabled = bool(enabled)
         self._log_enabled = bool(log_enabled)
-        self._game_enabled = bool(game_enabled)
         self._reply_broadcast = bool(reply_broadcast)
         self._now_unix_fn = now_unix_fn
         self._custom_commands = {
@@ -285,23 +284,44 @@ class MeshResponseBot:
             for name, template in (custom_commands or {}).items()
             if _normalize_command_name(name) and str(template or "").strip()
         }
-        self._game = ZorkGame()
+        bot_apps = []
+        for app in build_builtin_bot_apps():
+            app_name = _normalize_command_name(getattr(getattr(app, "SPEC", None), "name", ""))
+            if not app_name:
+                continue
+            bot_apps.append((app_name, app))
+        self._bot_apps_by_name: dict[str, BotApp] = {}
+        self._bot_app_order: list[str] = []
+        self._bot_app_enabled: dict[str, bool] = {}
+        for app_name, app in bot_apps:
+            if app_name in self._bot_apps_by_name:
+                continue
+            self._bot_apps_by_name[app_name] = app
+            self._bot_app_order.append(app_name)
+            self._bot_app_enabled[app_name] = True
+        if "zork" in self._bot_app_enabled:
+            self._bot_app_enabled["zork"] = bool(game_enabled)
         raw_disabled_commands = {
             _normalize_command_name(value) for value in (disabled_commands or [])
         }
         known_commands = {
             _normalize_command_name(getattr(spec, "name", ""))
             for spec in list(MANAGED_BOT_COMMAND_SPECS)
+            + [
+                getattr(app, "SPEC", None)
+                for app in self._bot_apps_by_name.values()
+            ]
             + [build_custom_bot_command_spec(name) for name in self._custom_commands.keys()]
             if _normalize_command_name(getattr(spec, "name", ""))
         }
         self._disabled_commands = {
             name
             for name in raw_disabled_commands
-            if name and name != "zork" and name in known_commands
+            if name and name not in self._bot_apps_by_name and name in known_commands
         }
-        if "zork" in raw_disabled_commands:
-            self._game_enabled = False
+        for name in raw_disabled_commands:
+            if name in self._bot_app_enabled:
+                self._set_bot_app_enabled_locked(name, False)
         self._recent_packet_ids: dict[str, int] = {}
         self._request_log: list[dict[str, object]] = []
         self._request_seq = 0
@@ -317,10 +337,59 @@ class MeshResponseBot:
 
     @property
     def game_enabled(self) -> bool:
-        return self._game_enabled
+        return bool(self._bot_app_enabled.get("zork"))
+
+    def _active_game_sessions_locked(self) -> int:
+        total = 0
+        for name in self._bot_app_order:
+            app = self._bot_apps_by_name.get(name)
+            spec = getattr(app, "SPEC", None)
+            kind = str(getattr(spec, "kind", "") or "").strip().lower()
+            if kind != "game":
+                continue
+            try:
+                total += int(app.active_session_count())
+            except Exception:
+                continue
+        return total
+
+    def _set_bot_app_enabled_locked(self, name: str, enabled: bool) -> None:
+        clean = _normalize_command_name(name)
+        if clean not in self._bot_app_enabled:
+            return
+        self._bot_app_enabled[clean] = bool(enabled)
+        if self._bot_app_enabled[clean]:
+            return
+        app = self._bot_apps_by_name.get(clean)
+        if app is None:
+            return
+        try:
+            app.clear_sessions()
+        except Exception:
+            return
+
+    def _bot_app_specs_locked(self) -> list[object]:
+        out: list[object] = []
+        for name in self._bot_app_order:
+            app = self._bot_apps_by_name.get(name)
+            spec = getattr(app, "SPEC", None)
+            if _normalize_command_name(getattr(spec, "name", "")):
+                out.append(spec)
+        return out
 
     def _managed_command_specs_locked(self) -> list[object]:
         specs = list(MANAGED_BOT_COMMAND_SPECS)
+        seen = {
+            _normalize_command_name(getattr(spec, "name", ""))
+            for spec in specs
+            if _normalize_command_name(getattr(spec, "name", ""))
+        }
+        for spec in self._bot_app_specs_locked():
+            name = _normalize_command_name(getattr(spec, "name", ""))
+            if not name or name in seen:
+                continue
+            specs.append(spec)
+            seen.add(name)
         for name in sorted(self._custom_commands.keys()):
             specs.append(build_custom_bot_command_spec(name))
         return specs
@@ -336,8 +405,8 @@ class MeshResponseBot:
         clean = _normalize_command_name(command)
         if not clean:
             return False
-        if clean == "zork":
-            return bool(self._game_enabled)
+        if clean in self._bot_app_enabled:
+            return bool(self._bot_app_enabled.get(clean))
         return clean not in self._disabled_commands
 
     def _managed_command_rows_locked(self) -> list[dict[str, object]]:
@@ -380,10 +449,8 @@ class MeshResponseBot:
             enabled = bool(raw_enabled)
             if not name:
                 continue
-            if name == "zork":
-                self._game_enabled = enabled
-                if not self._game_enabled:
-                    self._game.clear_sessions()
+            if name in self._bot_app_enabled:
+                self._set_bot_app_enabled_locked(name, enabled)
                 continue
             if enabled:
                 self._disabled_commands.discard(name)
@@ -394,8 +461,8 @@ class MeshResponseBot:
         return {
             "enabled": bool(self._enabled),
             "log_enabled": bool(self._log_enabled),
-            "game_enabled": bool(self._game_enabled),
-            "active_game_sessions": self._game.active_session_count(),
+            "game_enabled": bool(self._bot_app_enabled.get("zork")),
+            "active_game_sessions": self._active_game_sessions_locked(),
             "disabled_commands": sorted(self._disabled_commands),
             "commands": self._managed_command_rows_locked(),
         }
@@ -418,9 +485,7 @@ class MeshResponseBot:
             if log_enabled is not None:
                 self._log_enabled = bool(log_enabled)
             if game_enabled is not None:
-                self._game_enabled = bool(game_enabled)
-                if not self._game_enabled:
-                    self._game.clear_sessions()
+                self._set_bot_app_enabled_locked("zork", bool(game_enabled))
             if command_settings:
                 self._apply_command_settings_locked(command_settings)
             out = self._bot_settings_locked()
@@ -685,6 +750,24 @@ class MeshResponseBot:
             return custom_reply[:200]
         return None
 
+    def _prioritized_bot_apps_locked(self, from_id: str) -> list[tuple[str, BotApp]]:
+        clean_from_id = _normalize_node_id(from_id)
+        active: list[tuple[str, BotApp]] = []
+        inactive: list[tuple[str, BotApp]] = []
+        for name in self._bot_app_order:
+            app = self._bot_apps_by_name.get(name)
+            if app is None:
+                continue
+            try:
+                has_session = app.has_active_session(clean_from_id)
+            except Exception:
+                has_session = False
+            if has_session:
+                active.append((name, app))
+            else:
+                inactive.append((name, app))
+        return active + inactive
+
     def on_receive(self, packet: object, interface: object = None, **_kwargs: object) -> None:
         if not self._enabled and not self._log_enabled:
             return
@@ -718,20 +801,31 @@ class MeshResponseBot:
         channel_index = _to_int(packet.get("channel"))
         if channel_index is None or channel_index < 0:
             channel_index = 0
+        app_result = None
         with self._lock:
-            game_handled, game_reply_text, game_command = self._game.try_handle_message(
-                text=text,
-                from_id=from_id,
-                to_id=to_id,
-                local_node_id=local_node_id,
-                now_unix=now_unix,
-                enabled=self._game_enabled,
-            )
-        if game_handled:
-            command = game_command or "zork"
-            args = [part for part in str(text or "").split()[1:] if part]
-            command_enabled = bool(self._game_enabled)
-            reply_text = game_reply_text
+            for app_name, app in self._prioritized_bot_apps_locked(from_id):
+                result = app.try_handle_message(
+                    text=text,
+                    from_id=from_id,
+                    to_id=to_id,
+                    local_node_id=local_node_id,
+                    now_unix=now_unix,
+                    enabled=bool(self._bot_app_enabled.get(app_name)),
+                )
+                if not getattr(result, "handled", False):
+                    continue
+                app_result = (app_name, result)
+                break
+        if app_result is not None:
+            app_name, result = app_result
+            command = _normalize_command_name(result.command_name or app_name) or app_name
+            raw_args = result.command_args if getattr(result, "command_args", None) else None
+            if raw_args is None:
+                args = [part for part in str(text or "").split()[1:] if part]
+            else:
+                args = [str(part) for part in raw_args if str(part)]
+            command_enabled = bool(self._command_enabled_locked(command))
+            reply_text = getattr(result, "reply_text", None)
         else:
             parsed = self._parse_command(text)
             if parsed is None:
@@ -792,7 +886,7 @@ class MeshResponseBot:
             return
 
         reply_id = packet_id if packet_id is not None and packet_id > 0 else None
-        if command == "zork":
+        if command in self._bot_apps_by_name:
             destination = from_id
         else:
             destination = "^all" if self._reply_broadcast or to_id == "^all" else from_id

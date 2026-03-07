@@ -1,4 +1,5 @@
-from typing import Optional
+from ...bot_apps import BotAppResult
+from ...bot_commands import BotCommandSpec
 
 from .world import ROOMS, START_ROOM
 
@@ -38,6 +39,13 @@ class ZorkGame:
     adventure world and rules here so users can rewrite them in one place.
     """
 
+    SPEC = BotCommandSpec(
+        name="zork",
+        usage="zork",
+        description="start the peer-to-peer text adventure",
+        kind="game",
+    )
+
     def __init__(self) -> None:
         self._sessions: dict[str, dict[str, object]] = {}
 
@@ -46,6 +54,12 @@ class ZorkGame:
 
     def clear_sessions(self) -> None:
         self._sessions.clear()
+
+    def has_active_session(self, from_id: str) -> bool:
+        peer_id = str(from_id or "").strip().lower()
+        if not peer_id:
+            return False
+        return peer_id in self._sessions
 
     def _room_summary(self, room_id: str, session: dict[str, object]) -> str:
         room = ROOMS.get(room_id) or ROOMS[START_ROOM]
@@ -104,36 +118,40 @@ class ZorkGame:
         local_node_id: str,
         now_unix: int,
         enabled: bool,
-    ) -> tuple[bool, Optional[str], str]:
+    ) -> BotAppResult:
         raw = str(text or "").strip()
         if not raw:
-            return False, None, ""
+            return BotAppResult(handled=False)
         parts = [part for part in raw.split() if part]
         if not parts:
-            return False, None, ""
+            return BotAppResult(handled=False)
         head_raw = str(parts[0]).strip().lower()
         if head_raw not in GAME_VERB_HEADS:
-            return False, None, ""
+            return BotAppResult(handled=False)
         if not self._is_direct_to_local(to_id, local_node_id):
-            return False, None, ""
+            return BotAppResult(handled=False)
 
         peer_id = str(from_id or "").strip().lower()
         if not peer_id.startswith("!"):
-            return False, None, ""
+            return BotAppResult(handled=False)
 
         self._prune_sessions(now_unix)
         session = self._sessions.get(peer_id)
         if head_raw in ("zork", "!zork", "#zork", "restart"):
             if not enabled:
-                return True, None, "zork"
+                return BotAppResult(handled=True, command_name=self.SPEC.name)
             session = self._start_session(from_id, now_unix)
             summary = self._room_summary(str(session.get("room") or START_ROOM), session)
-            return True, f"zork: session started. {summary}", "zork"
+            return BotAppResult(
+                handled=True,
+                reply_text=f"zork: session started. {summary}",
+                command_name=self.SPEC.name,
+            )
 
         if session is None:
-            return False, None, ""
+            return BotAppResult(handled=False)
         if not enabled:
-            return True, None, "zork"
+            return BotAppResult(handled=True, command_name=self.SPEC.name)
 
         room_id = str(session.get("room") or START_ROOM)
         inventory = {str(value).strip().lower() for value in (session.get("inventory") or [])}
@@ -153,7 +171,11 @@ class ZorkGame:
                 feedback = "inventory: empty"
         elif head_raw in ("quit", "exit"):
             self._sessions.pop(peer_id, None)
-            return True, "zork: session ended. Send 'zork' to start again.", "zork"
+            return BotAppResult(
+                handled=True,
+                reply_text="zork: session ended. Send 'zork' to start again.",
+                command_name=self.SPEC.name,
+            )
         elif head_raw in ("open",):
             target = args[0] if args else ""
             if target in ("gate", "door"):
@@ -219,9 +241,25 @@ class ZorkGame:
         self._sessions[peer_id] = session
 
         if moved:
-            return True, self._room_summary(room_id, session), "zork"
+            return BotAppResult(
+                handled=True,
+                reply_text=self._room_summary(room_id, session),
+                command_name=self.SPEC.name,
+            )
         if feedback:
             if head_raw in ("look", "l", "help", "inventory", "inv", "i"):
-                return True, feedback, "zork"
-            return True, f"{feedback} {self._room_summary(room_id, session)}", "zork"
-        return True, self._room_summary(room_id, session), "zork"
+                return BotAppResult(
+                    handled=True,
+                    reply_text=feedback,
+                    command_name=self.SPEC.name,
+                )
+            return BotAppResult(
+                handled=True,
+                reply_text=f"{feedback} {self._room_summary(room_id, session)}",
+                command_name=self.SPEC.name,
+            )
+        return BotAppResult(
+            handled=True,
+            reply_text=self._room_summary(room_id, session),
+            command_name=self.SPEC.name,
+        )
