@@ -5286,7 +5286,19 @@
       const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
       const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
       const freshness = resolveNodeFreshness(selfNode, caps, null, latestChatTouchByNode.get(localId) || null);
-      const freshnessKey = normalizeFreshnessKey(freshnessStatus(freshness.unix, nowUnix));
+      const liveFreshnessUnix = Number(freshness.unix);
+      const trafficFreshnessUnix = Number(trafficSnap.lastPacketUnix);
+      const statusFreshnessCandidates = [];
+      if (Number.isFinite(liveFreshnessUnix) && liveFreshnessUnix > 0) {{
+        statusFreshnessCandidates.push(Math.trunc(liveFreshnessUnix));
+      }}
+      if (Number.isFinite(trafficFreshnessUnix) && trafficFreshnessUnix > 0) {{
+        statusFreshnessCandidates.push(Math.trunc(trafficFreshnessUnix));
+      }}
+      const statusFreshnessUnix = statusFreshnessCandidates.length > 0
+        ? Math.max(...statusFreshnessCandidates)
+        : null;
+      const freshnessKey = normalizeFreshnessKey(freshnessStatus(statusFreshnessUnix, nowUnix));
       if (pollLikelyLost) {{
         const detail = errorSummary || "state polling failed";
         return {{
@@ -5313,8 +5325,12 @@
       else if (freshnessKey === "stale") label = "Stale";
 
       const text = `${{label}} · ${{lastActivityCompact}} · ${{trafficCompactText}}`;
-      const lastSeenTitle = Number.isFinite(freshness.unix)
-        ? `last seen ${{savedDetailAge(freshness.unix, nowUnix)}}`
+      const statusUsesTraffic = Number.isFinite(statusFreshnessUnix)
+        && Number.isFinite(trafficFreshnessUnix)
+        && Math.trunc(statusFreshnessUnix) === Math.trunc(trafficFreshnessUnix)
+        && (!Number.isFinite(liveFreshnessUnix) || trafficFreshnessUnix >= liveFreshnessUnix);
+      const lastSeenTitle = Number.isFinite(statusFreshnessUnix)
+        ? `last seen ${{savedDetailAge(statusFreshnessUnix, nowUnix)}}${{statusUsesTraffic ? " (packet activity)" : ""}}`
         : "last seen n/a";
       return {{
         key,
