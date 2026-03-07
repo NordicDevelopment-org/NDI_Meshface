@@ -83,6 +83,24 @@ def test_collect_local_state_falls_back_to_getnode_when_needed():
     assert len(state["channels"]) == 1
 
 
+def test_collect_local_state_includes_local_position_from_node_registry():
+    local = types.SimpleNamespace(
+        nodeNum=2,
+        localConfig={"lora": {"modem_preset": "MEDIUM_FAST"}},
+        moduleConfig={"foo": "bar"},
+        channels=[{"name": "primary"}],
+    )
+    iface = _iface_with_local(local_node=local)
+    iface.myInfo = {"my_node_num": 2}
+
+    state = collect_local_state(iface)
+
+    assert state["local_node_num"] == 2
+    assert state["local_node_info"]["num"] == 2
+    assert state["local_position"]["latitude"] == 44.98
+    assert state["local_position"]["longitude"] == -93.26
+
+
 def test_build_state_merges_saved_counts_and_redacts_secrets():
     iface = _iface_with_local()
     tracker = _DummyTracker()

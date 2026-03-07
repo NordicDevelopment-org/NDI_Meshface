@@ -204,6 +204,8 @@
     const signalHeatmapModeStorageKey = "meshDashboardSignalHeatmapModeV1";
     const mapPacketLinesStorageKey = "meshDashboardMapPacketLinesEnabledV1";
     const mapBasemapModeStorageKey = "meshDashboardMapBasemapModeV1";
+    const settingsPositionSourceStorageKey = "meshDashboardSettingsPositionSourceV1";
+    const settingsFixedPositionCacheStorageKey = "meshDashboardSettingsFixedPositionCacheV1";
     const themeSettingsEndpoint = "/api/settings/theme";
     const radioSettingsEndpoint = "/api/settings/radio";
     const channelSettingsEndpoint = "/api/settings/channels";
@@ -2189,6 +2191,10 @@
     let settingsFixedMapTileTheme = "";
     let settingsFixedMapResizeRaf = null;
     let settingsFixedMapResizeTimers = [];
+    let settingsFixedMapAutoCenteredOnce = false;
+    let settingsPositionSourcePref = "gps";
+    let settingsFixedPositionCache = null;
+    let settingsFixedMapPanelVisible = false;
     let mapBasemapMode = "online";
     let mapOfflineCountriesLayer = null;
     let mapOfflineCoastlineLayer = null;
@@ -3888,7 +3894,10 @@
 
     function bindWheelPassthrough() {{
       const isWheelPassthroughEnabled = () => (
-        activeLayoutView !== "chat" && activeLayoutView !== "network" && activeLayoutView !== "saved"
+        activeLayoutView !== "chat"
+        && activeLayoutView !== "network"
+        && activeLayoutView !== "saved"
+        && activeLayoutView !== "settings"
       );
 
       const refreshWheelPaneHints = () => {{
@@ -4020,6 +4029,10 @@
           "wheel",
           (ev) => {{
             if (!isWheelPassthroughEnabled()) {{
+              return;
+            }}
+            if (ev.target instanceof Element && ev.target.closest(".leaflet-container")) {{
+              // Let Leaflet keep full control of wheel interactions.
               return;
             }}
             if (ev.defaultPrevented || ev.ctrlKey || ev.metaKey) {{
@@ -5078,6 +5091,34 @@
         if (ts && ts > latest) latest = ts;
       }}
       return latest > 0 ? latest : null;
+    }}
+
+    function formatLocalChatTime(unixTs, fallback = "n/a", nowUnix = Math.floor(Date.now() / 1000)) {{
+      const ts = Number(unixTs);
+      if (!Number.isFinite(ts) || ts <= 0) {{
+        const fallbackText = String(fallback == null ? "" : fallback).trim();
+        return fallbackText || "n/a";
+      }}
+      const valueDate = new Date(Math.floor(ts) * 1000);
+      if (Number.isNaN(valueDate.getTime())) {{
+        const fallbackText = String(fallback == null ? "" : fallback).trim();
+        return fallbackText || "n/a";
+      }}
+      const nowDate = new Date(Math.floor(Number.isFinite(nowUnix) ? nowUnix : (Date.now() / 1000)) * 1000);
+      const sameLocalDay = (
+        valueDate.getFullYear() === nowDate.getFullYear()
+        && valueDate.getMonth() === nowDate.getMonth()
+        && valueDate.getDate() === nowDate.getDate()
+      );
+      const hh = String(valueDate.getHours()).padStart(2, "0");
+      const mm = String(valueDate.getMinutes()).padStart(2, "0");
+      const ss = String(valueDate.getSeconds()).padStart(2, "0");
+      if (sameLocalDay) {{
+        return `${{hh}}:${{mm}}:${{ss}}`;
+      }}
+      const mon = String(valueDate.getMonth() + 1).padStart(2, "0");
+      const day = String(valueDate.getDate()).padStart(2, "0");
+      return `${{mon}}/${{day}} ${{hh}}:${{mm}}:${{ss}}`;
     }}
 
     function nodeLastHeardUnix(node) {{
@@ -10023,6 +10064,10 @@
         }}
         if (next === "settings") {{
           renderSettings(latestState);
+          syncSettingsPositionSourceUi({{
+            source: settingsPositionSourcePref,
+            recenter: true,
+          }});
         }}
         if (next === "packets") {{
           renderPackets(latestState.traffic || {{}});
@@ -11459,6 +11504,308 @@
       return true;
     }}
 
+    function normalizeSettingsPositionSource(value) {{
+      const key = String(value || "").trim().toLowerCase();
+      if (key === "none" || key === "gps" || key === "fixed") return key;
+      return "gps";
+    }}
+
+    function loadSettingsPositionSourcePreference() {{
+      try {{
+        const raw = window.localStorage.getItem(settingsPositionSourceStorageKey) || "";
+        if (raw) {{
+          settingsPositionSourcePref = normalizeSettingsPositionSource(raw);
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadSettingsFixedPositionCache() {{
+      try {{
+        const raw = window.localStorage.getItem(settingsFixedPositionCacheStorageKey) || "";
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const candidate = fixedPositionCandidateFromObject(parsed);
+        settingsFixedPositionCache = candidate ? {{
+          lat: Number(candidate.lat),
+          lon: Number(candidate.lon),
+          alt: Number.isFinite(candidate.alt) ? Math.trunc(candidate.alt) : null,
+        }} : null;
+      }} catch (_err) {{
+        settingsFixedPositionCache = null;
+      }}
+    }}
+
+    function persistSettingsPositionSourcePreference() {{
+      try {{
+        window.localStorage.setItem(settingsPositionSourceStorageKey, settingsPositionSourcePref);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistSettingsFixedPositionCache(position) {{
+      const candidate = fixedPositionCandidateFromObject(position);
+      if (!candidate) return;
+      settingsFixedPositionCache = {{
+        lat: Number(candidate.lat),
+        lon: Number(candidate.lon),
+        alt: Number.isFinite(candidate.alt) ? Math.trunc(candidate.alt) : null,
+      }};
+      try {{
+        window.localStorage.setItem(
+          settingsFixedPositionCacheStorageKey,
+          JSON.stringify(settingsFixedPositionCache)
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function clearSettingsFixedPositionCache() {{
+      settingsFixedPositionCache = null;
+      try {{
+        window.localStorage.removeItem(settingsFixedPositionCacheStorageKey);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function readSettingsPositionSourceSelection() {{
+      const select = document.getElementById("settings-position-source");
+      if (!(select instanceof HTMLSelectElement)) return "";
+      return normalizeSettingsPositionSource(select.value);
+    }}
+
+    function toFiniteNumberOrNull(value) {{
+      const num = Number(value);
+      return Number.isFinite(num) ? num : null;
+    }}
+
+    function coordinateValueFromSpecs(obj, specs) {{
+      if (!obj || typeof obj !== "object" || !Array.isArray(specs)) return null;
+      for (const spec of specs) {{
+        if (!spec || typeof spec !== "object") continue;
+        const key = String(spec.key || "").trim();
+        if (!key) continue;
+        const raw = obj[key];
+        if (raw == null || raw === "") continue;
+        const num = toFiniteNumberOrNull(raw);
+        if (!Number.isFinite(num)) continue;
+        const scale = Number(spec.scale);
+        if (Number.isFinite(scale) && scale > 0 && scale !== 1) {{
+          return num * scale;
+        }}
+        return num;
+      }}
+      return null;
+    }}
+
+    function fixedPositionCandidateFromObject(value) {{
+      if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+      const obj = value;
+      const lat = coordinateValueFromSpecs(obj, [
+        {{ key: "lat" }},
+        {{ key: "latitude" }},
+        {{ key: "fixed_lat" }},
+        {{ key: "fixed_latitude" }},
+        {{ key: "fixedLatitude" }},
+        {{ key: "latitude_i", scale: 1e-7 }},
+        {{ key: "latitudeI", scale: 1e-7 }},
+        {{ key: "fixed_lat_i", scale: 1e-7 }},
+        {{ key: "fixedLatitudeI", scale: 1e-7 }},
+      ]);
+      const lon = coordinateValueFromSpecs(obj, [
+        {{ key: "lon" }},
+        {{ key: "lng" }},
+        {{ key: "longitude" }},
+        {{ key: "fixed_lon" }},
+        {{ key: "fixed_longitude" }},
+        {{ key: "fixedLongitude" }},
+        {{ key: "longitude_i", scale: 1e-7 }},
+        {{ key: "longitudeI", scale: 1e-7 }},
+        {{ key: "fixed_lon_i", scale: 1e-7 }},
+        {{ key: "fixedLongitudeI", scale: 1e-7 }},
+      ]);
+      if (!isValidLatLonRange(lat, lon)) return null;
+      const altRaw = toFiniteNumberOrNull(
+        obj.alt ?? obj.altitude ?? obj.altitude_m ?? obj.altitudeM ?? obj.fixed_altitude ?? obj.fixedAltitude
+      );
+      const alt = Number.isFinite(altRaw) ? Math.trunc(altRaw) : null;
+      return {{
+        lat: Number(lat),
+        lon: Number(lon),
+        alt,
+      }};
+    }}
+
+    function fixedPositionFromState(state = latestState) {{
+      const localState = settingsLocalStateFrom(state);
+      if (!localState || typeof localState !== "object") return null;
+      const localConfig = localState.local_config && typeof localState.local_config === "object"
+        ? localState.local_config
+        : null;
+      const moduleConfig = localState.module_config && typeof localState.module_config === "object"
+        ? localState.module_config
+        : null;
+      const localNodeInfo = localState.local_node_info && typeof localState.local_node_info === "object"
+        ? localState.local_node_info
+        : null;
+
+      const candidates = [
+        localState.local_position,
+        localState.localPosition,
+        localState.local_node_position,
+        localState.localNodePosition,
+        localState.position,
+        localState.fixed_position,
+        localState.fixedPosition,
+        localConfig && localConfig.fixed_position,
+        localConfig && localConfig.fixedPosition,
+        localConfig && localConfig.position,
+        localConfig && localConfig.position_config,
+        localNodeInfo && localNodeInfo.position,
+        moduleConfig && moduleConfig.position,
+        moduleConfig && moduleConfig.position_config,
+        moduleConfig && moduleConfig.positionConfig,
+      ];
+      for (const candidate of candidates) {{
+        const parsed = fixedPositionCandidateFromObject(candidate);
+        if (parsed) return parsed;
+        if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {{
+          const nested = fixedPositionCandidateFromObject(
+            candidate.fixed_position ?? candidate.fixedPosition
+          );
+          if (nested) return nested;
+        }}
+      }}
+      return null;
+    }}
+
+    function radioPositionSourceFromState(state = latestState) {{
+      const localState = settingsLocalStateFrom(state);
+      if (!localState || typeof localState !== "object") return null;
+      const localConfig = localState.local_config && typeof localState.local_config === "object"
+        ? localState.local_config
+        : null;
+      const positionConfig = localConfig && localConfig.position && typeof localConfig.position === "object"
+        ? localConfig.position
+        : null;
+      if (!positionConfig) return null;
+
+      if (positionConfig.fixed_position === true) return "fixed";
+      if (positionConfig.gps_enabled === false) return "none";
+      if (positionConfig.gps_enabled === true) return "gps";
+      return null;
+    }}
+
+    function localNodePositionCandidate(state = latestState) {{
+      const safeState = state && typeof state === "object" ? state : {};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      if (!nodes.length) return null;
+
+      const localId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      if (!isCanonicalNodeId(localId)) return null;
+      for (const node of nodes) {{
+        if (normalizeNodeId(node && node.id) !== localId) continue;
+        const nodePos = node && node.position && typeof node.position === "object" ? node.position : null;
+        const lat = coordinateValueFromSpecs(node, [
+          {{ key: "lat" }},
+          {{ key: "latitude" }},
+          {{ key: "latitude_i", scale: 1e-7 }},
+          {{ key: "latitudeI", scale: 1e-7 }},
+        ]) ?? coordinateValueFromSpecs(nodePos, [
+          {{ key: "lat" }},
+          {{ key: "latitude" }},
+          {{ key: "latitude_i", scale: 1e-7 }},
+          {{ key: "latitudeI", scale: 1e-7 }},
+        ]);
+        const lon = coordinateValueFromSpecs(node, [
+          {{ key: "lon" }},
+          {{ key: "lng" }},
+          {{ key: "longitude" }},
+          {{ key: "longitude_i", scale: 1e-7 }},
+          {{ key: "longitudeI", scale: 1e-7 }},
+        ]) ?? coordinateValueFromSpecs(nodePos, [
+          {{ key: "lon" }},
+          {{ key: "lng" }},
+          {{ key: "longitude" }},
+          {{ key: "longitude_i", scale: 1e-7 }},
+          {{ key: "longitudeI", scale: 1e-7 }},
+        ]);
+        if (!isValidLatLonRange(lat, lon)) return null;
+        const altRaw = toFiniteNumberOrNull(node && (node.alt ?? node.altitude ?? node.altitudeM));
+        return {{
+          lat: Number(lat),
+          lon: Number(lon),
+          alt: Number.isFinite(altRaw) ? Math.trunc(altRaw) : null,
+        }};
+      }}
+      return null;
+    }}
+
+    function syncSettingsPositionSourceUi(options = {{}}) {{
+      const source = normalizeSettingsPositionSource(
+        options && typeof options === "object" && options.source != null
+          ? options.source
+          : settingsPositionSourcePref
+      );
+      const fixedMode = source === "fixed";
+      const recenter = fixedMode && !!(options && options.recenter);
+      const wasPanelVisible = settingsFixedMapPanelVisible;
+      settingsFixedMapPanelVisible = fixedMode;
+
+      settingsPositionSourcePref = source;
+      persistSettingsPositionSourcePreference();
+
+      const sourceSelect = document.getElementById("settings-position-source");
+      if (sourceSelect instanceof HTMLSelectElement && sourceSelect.value !== source) {{
+        sourceSelect.value = source;
+      }}
+
+      const fixedControls = document.getElementById("settings-fixed-controls");
+      if (fixedControls instanceof HTMLElement) {{
+        fixedControls.hidden = !fixedMode;
+      }}
+      const mapWrap = document.getElementById("settings-fixed-map-wrap");
+      if (mapWrap instanceof HTMLElement) {{
+        mapWrap.hidden = !fixedMode;
+      }}
+      const setFixedPositionBtn = document.getElementById("settings-set-fixed-position");
+      if (setFixedPositionBtn instanceof HTMLButtonElement) {{
+        setFixedPositionBtn.hidden = !fixedMode;
+      }}
+
+      const clearFixedPositionBtn = document.getElementById("settings-clear-fixed-position");
+      if (clearFixedPositionBtn instanceof HTMLButtonElement) {{
+        if (source === "fixed") {{
+          clearFixedPositionBtn.textContent = "Clear Fixed Position";
+          clearFixedPositionBtn.title = "Clear fixed GPS position on the radio";
+        }} else if (source === "none") {{
+          clearFixedPositionBtn.textContent = "Apply None Mode";
+          clearFixedPositionBtn.title = "Clear fixed position override and use None mode";
+        }} else {{
+          clearFixedPositionBtn.textContent = "Apply GPS Mode";
+          clearFixedPositionBtn.title = "Clear fixed position override and use GPS mode";
+        }}
+      }}
+
+      const modeNote = document.getElementById("settings-position-mode-note");
+      if (modeNote instanceof HTMLElement) {{
+        if (source === "fixed") {{
+          modeNote.textContent = "Fixed mode pins radio position to the coordinates below.";
+        }} else if (source === "none") {{
+          modeNote.textContent = "None mode keeps the fixed-position map hidden and clears fixed-position override when applied.";
+        }} else {{
+          modeNote.textContent = "GPS mode uses live GPS reported by the radio. Fixed-position map is hidden.";
+        }}
+      }}
+
+      if (!fixedMode) return;
+      if (!ensureSettingsFixedMap()) return;
+      syncSettingsFixedMapFromInputs({{ recenter }});
+      if (activeLayoutView === "settings" && (!wasPanelVisible || recenter)) {{
+        requestSettingsFixedMapResizeStabilized();
+      }}
+    }}
+
     function settingsMapBootstrapFocus(state = latestState) {{
       const lat = readNumberValue("settings-fixed-latitude", true);
       const lon = readNumberValue("settings-fixed-longitude", true);
@@ -11466,6 +11813,15 @@
         return {{
           lat,
           lon,
+          zoom: 12,
+        }};
+      }}
+
+      const fixedKnown = fixedPositionFromState(state) || settingsFixedPositionCache || localNodePositionCandidate(state);
+      if (fixedKnown && isValidLatLonRange(fixedKnown.lat, fixedKnown.lon)) {{
+        return {{
+          lat: Number(fixedKnown.lat),
+          lon: Number(fixedKnown.lon),
           zoom: 12,
         }};
       }}
@@ -11512,6 +11868,9 @@
       const layerOptions = cfg && cfg.options && typeof cfg.options === "object"
         ? Object.assign({{}}, cfg.options)
         : {{}};
+      layerOptions.updateWhenZooming = false;
+      layerOptions.updateWhenIdle = true;
+      layerOptions.keepBuffer = 3;
       settingsFixedMapTileLayer = L.tileLayer(cfg.url, layerOptions);
       settingsFixedMapTileLayer.addTo(settingsFixedMap);
       settingsFixedMapTileTheme = nextTheme;
@@ -11539,6 +11898,7 @@
         );
         if (recenter) {{
           settingsFixedMap.setView(markerPoint, Math.max(settingsFixedMap.getZoom(), 12), {{ animate: false }});
+          settingsFixedMapAutoCenteredOnce = true;
         }}
         return;
       }}
@@ -11576,6 +11936,10 @@
       }}).setView(settingsFixedMapDefaultCenter, settingsFixedMapDefaultZoom);
       applySettingsFixedMapTiles();
 
+      settingsFixedMap.on("zoomend", () => {{
+        requestSettingsFixedMapResize();
+      }});
+
       settingsFixedMap.on("click", (ev) => {{
         const point = ev && ev.latlng ? ev.latlng : null;
         const latRaw = Number(point && point.lat);
@@ -11589,8 +11953,20 @@
         setFormValue(latInput, latText);
         setFormValue(lonInput, lonText);
         syncSettingsFixedMapFromInputs({{ recenter: false }});
+        persistSettingsFixedPositionCache({{
+          lat: Number(latText),
+          lon: Number(lonText),
+          alt: readNumberValue("settings-fixed-altitude"),
+        }});
         markSettingsDirty(`Unsaved fixed GPS position (${{latText}}, ${{lonText}})`);
       }});
+
+      const settingsMapContainer = settingsFixedMap.getContainer();
+      if (settingsMapContainer instanceof HTMLElement) {{
+        settingsMapContainer.addEventListener("wheel", (ev) => {{
+          ev.stopPropagation();
+        }}, {{ passive: true }});
+      }}
 
       const focus = settingsMapBootstrapFocus(latestState);
       settingsFixedMap.setView([focus.lat, focus.lon], focus.zoom, {{ animate: false }});
@@ -11632,6 +12008,9 @@
       const overrideDuty = document.getElementById("settings-lora-override-duty-cycle");
       const boosted = document.getElementById("settings-lora-sx126x-rx-boosted-gain");
       const paFan = document.getElementById("settings-lora-pa-fan-disabled");
+      const fixedLatInput = document.getElementById("settings-fixed-latitude");
+      const fixedLonInput = document.getElementById("settings-fixed-longitude");
+      const fixedAltInput = document.getElementById("settings-fixed-altitude");
 
       setFormValue(region, lora.region);
       setFormValue(preset, lora.modem_preset);
@@ -11651,13 +12030,34 @@
       setFormChecked(boosted, lora.sx126x_rx_boosted_gain);
       setFormChecked(paFan, lora.pa_fan_disabled);
 
-      syncLoraManualFieldsDisabled();
-      if (ensureSettingsFixedMap()) {{
-        syncSettingsFixedMapFromInputs({{ recenter: false }});
-        if (activeLayoutView === "settings") {{
-          requestSettingsFixedMapResizeStabilized();
+      const fixedFromState = fixedPositionFromState(state);
+      if (fixedFromState) {{
+        persistSettingsFixedPositionCache(fixedFromState);
+      }}
+      const fixedFromLocalNode = localNodePositionCandidate(state);
+      const fixedForForm = fixedFromState || settingsFixedPositionCache || fixedFromLocalNode;
+      if (!fixedFromState && !settingsFixedPositionCache && fixedFromLocalNode) {{
+        persistSettingsFixedPositionCache(fixedFromLocalNode);
+      }}
+      if (fixedForForm) {{
+        setFormValue(fixedLatInput, Number(fixedForForm.lat).toFixed(6));
+        setFormValue(fixedLonInput, Number(fixedForForm.lon).toFixed(6));
+        if (Number.isFinite(Number(fixedForForm.alt))) {{
+          setFormValue(fixedAltInput, String(Math.trunc(Number(fixedForForm.alt))));
         }}
       }}
+      const sourceFromRadio = radioPositionSourceFromState(state);
+      const shouldAutoCenterFixed = (
+        activeLayoutView === "settings"
+        && !!fixedForForm
+        && !settingsFixedMapAutoCenteredOnce
+      );
+
+      syncLoraManualFieldsDisabled();
+      syncSettingsPositionSourceUi({{
+        source: sourceFromRadio || (fixedForForm ? "fixed" : settingsPositionSourcePref),
+        recenter: shouldAutoCenterFixed,
+      }});
     }}
 
     function markSettingsDirty(message = "Unsaved settings changes") {{
@@ -11694,6 +12094,19 @@
       return allowFloat ? num : Math.trunc(num);
     }}
 
+    function cacheSettingsFixedInputsIfValid() {{
+      const lat = readNumberValue("settings-fixed-latitude", true);
+      const lon = readNumberValue("settings-fixed-longitude", true);
+      if (!isValidLatLonRange(lat, lon)) return false;
+      const alt = readNumberValue("settings-fixed-altitude");
+      persistSettingsFixedPositionCache({{
+        lat: Number(lat),
+        lon: Number(lon),
+        alt,
+      }});
+      return true;
+    }}
+
     function setSettingsButtonsDisabled(disabled) {{
       for (const id of [
         "settings-apply-lora",
@@ -11717,6 +12130,10 @@
         }} else if (el instanceof HTMLInputElement && el.type === "checkbox") {{
           el.disabled = !!disabled;
         }}
+      }}
+      const positionSource = document.getElementById("settings-position-source");
+      if (positionSource instanceof HTMLSelectElement) {{
+        positionSource.disabled = !!disabled;
       }}
     }}
 
@@ -12345,6 +12762,10 @@
 
     async function setFixedPosition() {{
       if (settingsApplyInFlight) return;
+      if (normalizeSettingsPositionSource(readSettingsPositionSourceSelection()) !== "fixed") {{
+        setText("settings-apply-status", "Select Fixed position source before setting a fixed location.");
+        return;
+      }}
 
       const lat = readNumberValue("settings-fixed-latitude", true);
       const lon = readNumberValue("settings-fixed-longitude", true);
@@ -12379,26 +12800,35 @@
         "fixed GPS position saved"
       );
       if (ok) {{
+        persistSettingsFixedPositionCache({{ lat, lon, alt }});
         setTimeout(() => {{
           void fetchSettingsFromRadio();
         }}, 600);
       }}
     }}
 
-    async function clearFixedPosition() {{
+    async function clearFixedPosition(positionSource = null) {{
       if (settingsApplyInFlight) return;
 
+      const mode = normalizeSettingsPositionSource(
+        positionSource == null ? readSettingsPositionSourceSelection() : positionSource
+      );
+      const modeLabel = mode === "none" ? "None" : (mode === "gps" ? "GPS" : "Fixed");
+
       const confirmed = window.confirm(
-        "Clear fixed GPS position on the radio? The node will stop using a pinned location."
+        mode === "fixed"
+          ? "Clear fixed GPS position on the radio? The node will stop using a pinned location."
+          : `Apply ${modeLabel} mode by clearing fixed GPS position override on the radio?`
       );
       if (!confirmed) return;
 
       const ok = await postRadioSettingsPayload(
         {{ actions: {{ clear_fixed_position: true }} }},
-        "Clearing fixed GPS position…",
-        "fixed GPS position cleared"
+        mode === "fixed" ? "Clearing fixed GPS position…" : `Applying ${modeLabel} mode…`,
+        mode === "fixed" ? "fixed GPS position cleared" : `${modeLabel} mode applied (fixed override cleared)`
       );
       if (ok) {{
+        clearSettingsFixedPositionCache();
         setTimeout(() => {{
           void fetchSettingsFromRadio();
         }}, 600);
@@ -12418,9 +12848,14 @@
         }}
         if (
           target instanceof HTMLInputElement
-          && (target.id === "settings-fixed-latitude" || target.id === "settings-fixed-longitude")
+          && (
+            target.id === "settings-fixed-latitude"
+            || target.id === "settings-fixed-longitude"
+            || target.id === "settings-fixed-altitude"
+          )
         ) {{
-          if (ensureSettingsFixedMap()) {{
+          cacheSettingsFixedInputsIfValid();
+          if (normalizeSettingsPositionSource(readSettingsPositionSourceSelection()) === "fixed" && ensureSettingsFixedMap()) {{
             syncSettingsFixedMapFromInputs({{ recenter: false }});
           }}
         }}
@@ -12434,11 +12869,22 @@
         }}
         if (
           target instanceof HTMLInputElement
-          && (target.id === "settings-fixed-latitude" || target.id === "settings-fixed-longitude")
+          && (
+            target.id === "settings-fixed-latitude"
+            || target.id === "settings-fixed-longitude"
+            || target.id === "settings-fixed-altitude"
+          )
         ) {{
-          if (ensureSettingsFixedMap()) {{
+          cacheSettingsFixedInputsIfValid();
+          if (normalizeSettingsPositionSource(readSettingsPositionSourceSelection()) === "fixed" && ensureSettingsFixedMap()) {{
             syncSettingsFixedMapFromInputs({{ recenter: true }});
           }}
+        }}
+        if (target instanceof HTMLSelectElement && target.id === "settings-position-source") {{
+          syncSettingsPositionSourceUi({{
+            source: target.value,
+            recenter: activeLayoutView === "settings",
+          }});
         }}
         if (target instanceof HTMLInputElement && target.id === "settings-lora-use-preset") {{
           syncLoraManualFieldsDisabled();
@@ -12475,7 +12921,7 @@
       const clearFixedPositionBtn = document.getElementById("settings-clear-fixed-position");
       if (clearFixedPositionBtn instanceof HTMLButtonElement) {{
         clearFixedPositionBtn.addEventListener("click", () => {{
-          void clearFixedPosition();
+          void clearFixedPosition(readSettingsPositionSourceSelection());
         }});
       }}
 
@@ -17428,7 +17874,14 @@
         const msgTimeUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
         const fromMeta = chatEndpointParts(sourceNode, msgTimeUnix);
         const toMeta = chatEndpointParts(fallbackNode, msgTimeUnix);
-        const timeText = msg.rx_time || msg.captured_at || "n/a";
+        const rawTimeText = String(msg.rx_time || msg.captured_at || "").trim();
+        const timeText = formatLocalChatTime(msgTimeUnix, rawTimeText || "n/a", nowUnix);
+        const localTimeTitle = Number.isFinite(msgTimeUnix)
+          ? new Date(Math.floor(msgTimeUnix) * 1000).toLocaleString()
+          : "";
+        const timeTitle = [localTimeTitle ? `Local: ${{localTimeTitle}}` : "", rawTimeText ? `Raw: ${{rawTimeText}}` : ""]
+          .filter((part) => !!part)
+          .join(" | ");
         const textHtml = chatPlainTextToHtml(msg.text || "", true);
         const textCompact = compactInlineMessage(msg.text || "", 140);
         const hopNum = Number(msg.hops);
@@ -17532,7 +17985,7 @@
             </span>
             <span class="chat-feed-actions">${{changeBadge}}${{meshBadge}}${{hopBadge}}${{retryButton}}</span>
             ${{deliveryChip}}
-            <span class="chat-feed-time">${{escAttr(timeText)}}</span>
+            <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
           </div>
           ${{replyPreview}}
           <div class="chat-feed-text">${{textHtml || "&nbsp;"}}</div>
@@ -18575,6 +19028,8 @@
     loadChatEmojiPickerState();
     loadChatEmojiUsage();
     loadMapBasemapModePreference();
+    loadSettingsPositionSourcePreference();
+    loadSettingsFixedPositionCache();
     bindMapBasemapConnectivityHandlers();
     loadThemePreference();
     loadTickerDensityPreference();

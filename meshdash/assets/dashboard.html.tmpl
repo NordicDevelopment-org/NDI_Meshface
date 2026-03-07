@@ -338,41 +338,52 @@
               </label>
 
               <label class="settings-field">
-                <span class="settings-label">Fixed GPS position (lat, lon, alt m)</span>
-                <div class="settings-row">
-                  <input
-                    id="settings-fixed-latitude"
-                    class="settings-input"
-                    type="number"
-                    min="-90"
-                    max="90"
-                    step="0.000001"
-                    placeholder="Latitude"
-                  />
-                  <input
-                    id="settings-fixed-longitude"
-                    class="settings-input"
-                    type="number"
-                    min="-180"
-                    max="180"
-                    step="0.000001"
-                    placeholder="Longitude"
-                  />
-                  <input
-                    id="settings-fixed-altitude"
-                    class="settings-input"
-                    type="number"
-                    step="1"
-                    placeholder="Altitude (m)"
-                  />
-                </div>
+                <span class="settings-label">Position Source</span>
+                <select id="settings-position-source" class="settings-select" autocomplete="off">
+                  <option value="none">None</option>
+                  <option value="gps" selected>GPS</option>
+                  <option value="fixed">Fixed</option>
+                </select>
               </label>
-              <div class="settings-fixed-map-wrap">
-                <div class="settings-fixed-map-head">
-                  <span class="settings-label">Pick on map</span>
-                  <span class="settings-fixed-map-help">Click map to set latitude + longitude</span>
+              <div id="settings-position-mode-note" class="settings-help-note"></div>
+              <div id="settings-fixed-controls" class="settings-fixed-controls">
+                <label class="settings-field">
+                  <span class="settings-label">Fixed GPS position (lat, lon, alt m)</span>
+                  <div class="settings-row">
+                    <input
+                      id="settings-fixed-latitude"
+                      class="settings-input"
+                      type="number"
+                      min="-90"
+                      max="90"
+                      step="0.000001"
+                      placeholder="Latitude"
+                    />
+                    <input
+                      id="settings-fixed-longitude"
+                      class="settings-input"
+                      type="number"
+                      min="-180"
+                      max="180"
+                      step="0.000001"
+                      placeholder="Longitude"
+                    />
+                    <input
+                      id="settings-fixed-altitude"
+                      class="settings-input"
+                      type="number"
+                      step="1"
+                      placeholder="Altitude (m)"
+                    />
+                  </div>
+                </label>
+                <div id="settings-fixed-map-wrap" class="settings-fixed-map-wrap">
+                  <div class="settings-fixed-map-head">
+                    <span class="settings-label">Pick on map</span>
+                    <span class="settings-fixed-map-help">Map is only used for Fixed mode. Click map to set fixed latitude + longitude.</span>
+                  </div>
+                  <div id="settings-fixed-map" class="settings-fixed-map" role="img" aria-label="Fixed GPS position map picker"></div>
                 </div>
-                <div id="settings-fixed-map" class="settings-fixed-map" role="img" aria-label="Fixed GPS position map picker"></div>
               </div>
               <div class="settings-row">
                 <button id="settings-set-fixed-position" class="btn btn-secondary" type="button">Set Fixed Position</button>
