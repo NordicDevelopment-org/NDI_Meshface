@@ -11845,13 +11845,13 @@
       }}
       const entries = [];
       for (const msg of recentChat) {{
-        if (!messageMatchesActiveMeshChannel(msg)) continue;
         const key = chatMessageKey(msg);
         if (!key) continue;
         const channel = classifyMessageChannel(msg);
         const isReaction = isReactionLikeChatMessage(msg);
         const kind = normalizeChatMessageKind(msg, isReaction);
         const msgId = messageIdOfChatPacket(msg);
+        const meshChannelIndex = messageMeshChannelIndex(msg);
         const fromId = normalizeNodeId(msg && msg.from ? msg.from : "");
         const toId = normalizeNodeId(msg && (msg.to || msg.destination) ? (msg.to || msg.destination) : "");
         const replyIdRaw = Number(msg && (msg.reply_id ?? msg.replyId));
@@ -11894,6 +11894,7 @@
           key,
           focusKey: isReaction ? chatChangeFocusKeyFromMessage(msg, key) : key,
           channel,
+          meshChannelIndex,
           targetChatChannel: channel,
           peerNodeId,
           sender: chatSenderLabelFromMessage(msg, nodesById),
@@ -11912,6 +11913,9 @@
       if (!entry || typeof entry !== "object") return false;
       if (document.hidden || !tabHasFocus) return false;
       if (activeLayoutView !== "chat") return false;
+      const activeMeshIdx = activeMeshChannelFilterIndex();
+      const entryMeshIdx = normalizeMeshChannelIndex(entry.meshChannelIndex);
+      if (activeMeshIdx !== meshChannelAllIndex && entryMeshIdx !== activeMeshIdx) return false;
       const entryChannel = normalizeChatChannel(entry.channel || entry.targetChatChannel || "all");
       if (entryChannel !== activeChatChannel) return false;
       if (entryChannel !== "direct") return true;
