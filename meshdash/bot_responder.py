@@ -27,6 +27,9 @@ _RECENT_PACKET_MAX = 1024
 _BOT_COMMAND_ALIASES = {
     "test": "ping",
 }
+_NATURAL_PING_PREFIXES = (
+    "can you see this",
+)
 
 
 def _parse_bool_token(value: object, default: bool) -> bool:
@@ -76,6 +79,19 @@ def _canonical_command_name(value: object) -> str:
     if not clean:
         return ""
     return _BOT_COMMAND_ALIASES.get(clean, clean)
+
+
+def _parse_natural_ping_command(raw: str) -> tuple[str, list[str]] | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    for prefix in _NATURAL_PING_PREFIXES:
+        if lowered == prefix:
+            return ("ping", [])
+        if lowered == f"{prefix}?":
+            return ("ping", [])
+    return None
 
 
 def _format_node_id_from_num(raw_num: object) -> str:
@@ -205,6 +221,14 @@ def _format_latency_label(latency_ms: int) -> str:
     return " ".join(parts[:3])
 
 
+def _format_hop_count_label(hops: Optional[int]) -> str:
+    if hops is None:
+        return "hop count n/a"
+    if hops == 1:
+        return "1 hop"
+    return f"{hops} hops"
+
+
 def _format_short_node_label(node: dict[str, object], now_unix: int) -> str:
     node_id = str(node.get("id") or "").strip() or "unknown"
     short_name = str(node.get("short_name") or "").strip()
@@ -218,6 +242,13 @@ def _format_short_node_label(node: dict[str, object], now_unix: int) -> str:
     if hops is None:
         return f"{id_tail}:{name_text}/{age}"
     return f"{id_tail}:{name_text}/{hops}h/{age}"
+
+
+def _preferred_node_label(node: dict[str, object]) -> str:
+    node_id = str(node.get("id") or "").strip() or "unknown"
+    short_name = str(node.get("short_name") or "").strip()
+    long_name = str(node.get("long_name") or "").strip()
+    return long_name or short_name or _node_suffix(node_id) or node_id
 
 
 def _find_node_for_query(query: str, nodes: list[dict[str, object]]) -> Optional[dict[str, object]]:
@@ -616,6 +647,9 @@ class MeshResponseBot:
         raw = str(text or "").strip()
         if not raw:
             return None
+        natural_ping = _parse_natural_ping_command(raw)
+        if natural_ping is not None:
+            return natural_ping
         parts = [part for part in raw.split() if part]
         if not parts:
             return None
@@ -629,6 +663,7 @@ class MeshResponseBot:
         *,
         command: str,
         args: list[str],
+        from_id: str,
         local_node_id: str,
         local_aliases: set[str],
         nodes: list[dict[str, object]],
@@ -704,8 +739,10 @@ class MeshResponseBot:
             latency_ms = max(0, tx_ms - int(received_ms))
             latency_text = _format_latency_label(latency_ms)
             hops = _packet_hops(packet)
-            hop_text = f"hop {hops}" if hops is not None else "hop n/a"
-            return f"pong {latency_text} {hop_text}"
+            hop_text = _format_hop_count_label(hops)
+            requester = _find_node_for_query(from_id, nodes)
+            requester_label = _preferred_node_label(requester) if requester else (_node_suffix(from_id) or from_id or "unknown")
+            return f"{requester_label} {latency_text} round trip, {hop_text}."
 
         return None
 
@@ -756,6 +793,7 @@ class MeshResponseBot:
         standard_reply = self._build_standard_reply(
             command=command,
             args=args,
+            from_id=from_id,
             local_node_id=local_node_id,
             local_aliases=local_aliases,
             nodes=nodes,

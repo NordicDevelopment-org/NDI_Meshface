@@ -54,7 +54,7 @@ def _base_packet(text: str, *, packet_id: int = 1001, to_id: str = "^all") -> di
     }
 
 
-def test_ping_targeted_to_local_suffix_replies_with_pong():
+def test_ping_targeted_to_local_suffix_replies_with_human_readable_reply():
     iface = _FakeIface()
     sent = []
 
@@ -74,14 +74,16 @@ def test_ping_targeted_to_local_suffix_replies_with_pong():
     assert sent[0]["destination"] == "^all"
     assert sent[0]["reply_id"] == 1001
     assert sent[0]["channel_index"] == 0
-    assert "pong" in str(sent[0]["text"]).lower()
-    assert "hop " in str(sent[0]["text"]).lower()
-    assert "6.0s" in str(sent[0]["text"]).lower()
-    assert "rx=" not in str(sent[0]["text"]).lower()
-    assert "tx=" not in str(sent[0]["text"]).lower()
+    text = str(sent[0]["text"]).lower()
+    assert "brew hq" in text
+    assert "6.0s round trip" in text
+    assert "3 hops" in text
+    assert "pong" not in text
+    assert "rx=" not in text
+    assert "tx=" not in text
 
 
-def test_test_alias_replies_with_pong_and_logs_as_ping():
+def test_test_alias_replies_with_human_readable_ping_text_and_logs_as_ping():
     iface = _FakeIface()
     sent = []
 
@@ -98,11 +100,86 @@ def test_test_alias_replies_with_pong_and_logs_as_ping():
     bot.on_receive(_base_packet("test"), iface)
 
     assert len(sent) == 1
-    assert "pong" in str(sent[0]["text"]).lower()
+    assert sent[0]["destination"] == "^all"
+    assert sent[0]["reply_id"] == 1001
+    text = str(sent[0]["text"]).lower()
+    assert "brew hq" in text
+    assert "round trip" in text
     history = bot.recent_requests()
     assert len(history) == 1
     assert history[0]["command"] == "test"
     assert history[0]["command_head"] == "ping"
+
+
+def test_natural_ping_phrase_replies_with_human_readable_ping_text():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("can you see this?"), iface)
+
+    assert len(sent) == 1
+    assert sent[0]["destination"] == "^all"
+    assert sent[0]["reply_id"] == 1001
+    text = str(sent[0]["text"]).lower()
+    assert "brew hq" in text
+    assert "round trip" in text
+    assert "hops" in text
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["command"] == "can you see this?"
+    assert history[0]["command_head"] == "ping"
+
+
+def test_natural_ping_phrase_ignores_extra_trailing_words():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("can you see this? 9b7c"), iface)
+
+    assert sent == []
+    assert bot.recent_requests() == []
+
+
+def test_direct_ping_replies_direct_with_reply_id():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("ping 9b7c", to_id="!02ed9b7c"), iface)
+
+    assert len(sent) == 1
+    assert sent[0]["destination"] == "!49b5dff0"
+    assert sent[0]["reply_id"] == 1001
+    assert "round trip" in str(sent[0]["text"]).lower()
 
 
 def test_ping_targeted_to_other_suffix_is_ignored():
@@ -307,8 +384,7 @@ def test_ping_formats_long_round_trip_as_human_readable_duration():
 
     assert len(sent) == 1
     text = str(sent[0]["text"]).lower()
-    assert "pong" in text
-    assert "1h 32m 13s" in text
+    assert "1h 32m 13s round trip" in text
 
 
 def test_zork_game_starts_only_for_direct_messages():
