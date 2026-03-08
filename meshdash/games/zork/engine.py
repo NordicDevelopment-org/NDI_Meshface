@@ -176,6 +176,12 @@ ROOM_DYNAMIC_DESCRIPTIONS = {
     "SAFE": (
         "You are in a dusty old room which is virtually featureless, except for an exit on the north side. {safe_state}"
     ),
+    "CAROU": "You are in a circular room with passages off in eight directions. {bearing_state}",
+    "CMACH": (
+        "You are in a large room full of assorted heavy machinery. The room smells of burned resistors and the whirring of machinery fills the air. "
+        "Along one wall are three buttons: round, triangular, and square. A large sign above them says 'DANGER -- HIGH VOLTAGE'."
+    ),
+    "MAGNE": "You are in a room with a low circular ceiling. There are exits to the east and the southeast.",
 }
 
 NATURALLY_LIT_ROOMS = {
@@ -325,6 +331,28 @@ BALLOON_FUEL_TURNS = {
     "RBTLB": 2,
 }
 DEFAULT_BALLOON_FUEL_TURNS = 3
+
+CAROUSEL_RANDOM_TARGETS = (
+    "CAVE4",
+    "CAVE4",
+    "MGRAI",
+    "PASS1",
+    "CANY1",
+    "PASS5",
+    "PASS4",
+    "MAZE1",
+)
+MAGNET_FIXED_TARGETS = {
+    "NORTH": "CMACH",
+    "SOUTH": "CMACH",
+    "WEST": "CMACH",
+    "NE": "CMACH",
+    "EAST": "CMACH",
+    "NW": "ALICE",
+    "SW": "ALICE",
+    "SE": "ALICE",
+}
+MAGNET_RANDOM_TARGETS = tuple(MAGNET_FIXED_TARGETS[direction] for direction in ("NORTH", "SOUTH", "WEST", "NE", "NW", "SW", "SE", "EAST"))
 
 
 class ZorkGame:
@@ -766,6 +794,79 @@ class ZorkGame:
         counters["bat_drop_index"] = index + 1
         return BAT_DROP_ROOMS[index % len(BAT_DROP_ROOMS)]
 
+    def _carousel_random_target(self, session: dict[str, object]) -> str:
+        counters = self._session_counters(session)
+        index = int(counters.get("carousel_random_index") or 0)
+        counters["carousel_random_index"] = index + 1
+        return CAROUSEL_RANDOM_TARGETS[index % len(CAROUSEL_RANDOM_TARGETS)]
+
+    def _magnet_random_target(self, session: dict[str, object]) -> str:
+        counters = self._session_counters(session)
+        index = int(counters.get("magnet_random_index") or 0)
+        counters["magnet_random_index"] = index + 1
+        return MAGNET_RANDOM_TARGETS[index % len(MAGNET_RANDOM_TARGETS)]
+
+    def _carousel_room_oriented(self, flags: set[str]) -> bool:
+        return "carousel_flip" in flags
+
+    def _magnet_room_disoriented(self, flags: set[str]) -> bool:
+        return "carousel_flip" in flags
+
+    def _special_exit_text(self, session: dict[str, object], room_id: str) -> str | None:
+        room_key = str(room_id or START_ROOM).strip().upper() or START_ROOM
+        flags = self._session_flags(session)
+        if room_key == "CAROU":
+            if self._carousel_room_oriented(flags):
+                return "Exits north, south, east, west, ne, nw, se, sw, exit."
+            return ""
+        if room_key == "MAGNE":
+            if self._magnet_room_disoriented(flags):
+                return ""
+            return "Exits east, southeast."
+        return None
+
+    def _complete_transition_with_prefix(
+        self,
+        session: dict[str, object],
+        *,
+        room_id: str,
+        inventory: list[str],
+        flags: set[str],
+        object_locations: dict[str, str],
+        now_unix: int,
+        prefix: str = "",
+    ) -> BotAppResult:
+        entry_prefix, final_room, inventory, flags, object_locations, ended = self._room_entry_transition(
+            session,
+            room_id,
+            inventory,
+            flags,
+            object_locations,
+        )
+        if ended:
+            self._sessions.pop(str(session.get("peer_id") or "").strip().lower(), None)
+            parts = [prefix, entry_prefix]
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(" ".join(part for part in parts if part)),
+                command_name=self.SPEC.name,
+            )
+        self._write_session_state(
+            session,
+            room_id=final_room,
+            inventory=inventory,
+            flags=flags,
+            object_locations=object_locations,
+            now_unix=now_unix,
+        )
+        summary = self._room_summary(session, final_room)
+        reply = " ".join(part for part in (prefix, entry_prefix, summary) if part)
+        return BotAppResult(
+            handled=True,
+            reply_text=self._compact(reply),
+            command_name=self.SPEC.name,
+        )
+
     def _room_neighbors(
         self,
         session: dict[str, object],
@@ -778,6 +879,13 @@ class ZorkGame:
         if room is None:
             return []
         blocked = {str(value).strip().upper() for value in (forbidden_rooms or set()) if str(value).strip()}
+        if room_key == "MAGNE":
+            return sorted(target for target in {"CMACH", "ALICE"} if target in ROOMS and target not in blocked)
+        if room_key == "CAROU":
+            targets = set(CAROUSEL_RANDOM_TARGETS)
+            if self._carousel_room_oriented(self._session_flags(session)):
+                targets.add("PASS3")
+            return sorted(target for target in targets if target in ROOMS and target not in blocked)
         neighbors: list[str] = []
         for exit_row in room.exits:
             kind = str(exit_row.get("kind") or "")
@@ -1026,6 +1134,27 @@ class ZorkGame:
                 "A deranged giant vampire bat swoops down from his belfry and lifts you away...."
             )
 
+        if room_key == "CAROU" and "carousel_zoom" in flags:
+            return (
+                "According to Prof. TAA of MIT Tech, the rapidly changing magnetic fields in the room are so intense as to cause you to be electrocuted. In any event, something just killed you. zork: session ended. Send 'zork' to start again.",
+                room_key,
+                inventory,
+                flags,
+                object_locations,
+                True,
+            )
+        if room_key == "MAGNE" and self._magnet_room_disoriented(flags):
+            if "carousel_zoom" in flags:
+                return (
+                    "According to Prof. TAA of MIT Tech, the rapidly changing magnetic fields in the room are so intense as to cause you to be electrocuted. In any event, something just killed you. zork: session ended. Send 'zork' to start again.",
+                    room_key,
+                    inventory,
+                    flags,
+                    object_locations,
+                    True,
+                )
+            prefix_parts.append("As you enter, your compass starts spinning wildly.")
+
         if room_key == "TREAS":
             treas_reply, flags, object_locations = self._apply_treasure_room_entry(session, room_key, flags, object_locations)
             if treas_reply:
@@ -1077,34 +1206,13 @@ class ZorkGame:
         object_locations: dict[str, str],
         now_unix: int,
     ) -> BotAppResult:
-        prefix, final_room, inventory, flags, object_locations, ended = self._room_entry_transition(
+        return self._complete_transition_with_prefix(
             session,
-            room_id,
-            inventory,
-            flags,
-            object_locations,
-        )
-        if ended:
-            self._sessions.pop(str(session.get("peer_id") or "").strip().lower(), None)
-            return BotAppResult(
-                handled=True,
-                reply_text=self._compact(prefix),
-                command_name=self.SPEC.name,
-            )
-        self._write_session_state(
-            session,
-            room_id=final_room,
+            room_id=room_id,
             inventory=inventory,
             flags=flags,
             object_locations=object_locations,
             now_unix=now_unix,
-        )
-        summary = self._room_summary(session, final_room)
-        reply = f"{prefix} {summary}" if prefix else summary
-        return BotAppResult(
-            handled=True,
-            reply_text=self._compact(reply),
-            command_name=self.SPEC.name,
         )
 
     def _boat_room(self, session: dict[str, object]) -> str:
@@ -1225,7 +1333,21 @@ class ZorkGame:
             return "BOLT"
         if "bubble" in word_set:
             return "BUBBL"
+        if room_id == "CMACH":
+            if "round" in word_set or "circle" in word_set or "circular" in word_set:
+                return "RNBUT"
+            if "square" in word_set or "squar" in word_set:
+                return "SQBUT"
+            if "triangle" in word_set or "triangular" in word_set or "trian" in word_set:
+                return "TRBUT"
         if "button" in word_set or "buttons" in word_set or "switch" in word_set or "switches" in word_set:
+            if room_id == "CMACH":
+                if "round" in word_set:
+                    return "RNBUT"
+                if "square" in word_set or "squar" in word_set:
+                    return "SQBUT"
+                if "triangle" in word_set or "triangular" in word_set or "trian" in word_set:
+                    return "TRBUT"
             if "yellow" in word_set or "yello" in word_set:
                 return "YBUTT"
             if "brown" in word_set:
@@ -1458,6 +1580,8 @@ class ZorkGame:
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         if code_key == "DAM":
             return ""
+        if code_key in {"SQBUT", "RNBUT", "TRBUT"}:
+            return ""
         if code_key == "ICE":
             return "" if "glacier_melted" in self._session_flags(session) else "A mass of ice fills the western half of the room."
         if code_key in {"REFL1", "REFL2"}:
@@ -1596,6 +1720,17 @@ class ZorkGame:
                 else "There are passages to the north and east. A glacier blocks the way west."
             )
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(west_state=west_state)
+        if room_key == "CAROU":
+            bearing_state = (
+                ""
+                if self._carousel_room_oriented(flags)
+                else "Your compass needle spins wildly, and you can't get your bearings."
+            )
+            return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(bearing_state=bearing_state).strip()
+        if room_key == "CMACH":
+            return ROOM_DYNAMIC_DESCRIPTIONS[room_key]
+        if room_key == "MAGNE":
+            return ROOM_DYNAMIC_DESCRIPTIONS[room_key]
         if room_key in {"MIRR1", "MIRR2"}:
             mirror_state = "Unfortunately, you have managed to destroy it by your reckless actions." if "mirror_broken" in flags else ""
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(mirror_state=mirror_state).strip()
@@ -1730,6 +1865,12 @@ class ZorkGame:
         if sword_glow:
             parts.append(sword_glow)
 
+        special_exits = self._special_exit_text(session, room_key)
+        if special_exits is not None:
+            if special_exits:
+                parts.append(special_exits)
+            return self._compact(" ".join(part for part in parts if part))
+
         exits: list[str] = []
         flags = self._session_flags(session)
         for exit_row in room.exits:
@@ -1851,6 +1992,63 @@ class ZorkGame:
                 object_locations=object_locations,
                 now_unix=now_unix,
             )
+
+        if room_id == "CAROU":
+            if self._carousel_room_oriented(flags):
+                if direction == "EXIT":
+                    return self._complete_transition(
+                        session,
+                        room_id="PASS3",
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                    )
+                oriented_target = None
+                for row in room.exits:
+                    if str(row.get("direction") or "").strip().upper() == direction:
+                        oriented_target = str(row.get("target") or "").strip().upper()
+                        break
+                if oriented_target in ROOMS:
+                    return self._complete_transition(
+                        session,
+                        room_id=oriented_target,
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                    )
+            else:
+                if direction in {"NORTH", "SOUTH", "EAST", "WEST", "NE", "NW", "SE", "SW", "EXIT"}:
+                    return self._complete_transition_with_prefix(
+                        session,
+                        room_id=self._carousel_random_target(session),
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                        prefix="Unfortunately, it is impossible to tell directions in here.",
+                    )
+        if room_id == "MAGNE":
+            if direction in MAGNET_FIXED_TARGETS:
+                if self._magnet_room_disoriented(flags):
+                    return self._complete_transition_with_prefix(
+                        session,
+                        room_id=self._magnet_random_target(session),
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                        prefix="You cannot get your bearings...",
+                    )
+                return self._complete_transition(
+                    session,
+                    room_id=MAGNET_FIXED_TARGETS[direction],
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                    now_unix=now_unix,
+                )
 
         if "aboard_boat" in flags and object_locations.get("RBOAT") != room_id:
             flags.discard("aboard_boat")
@@ -2298,6 +2496,9 @@ class ZorkGame:
             return "A large metal bolt on the control panel. It looks as though a wrench might persuade it."
         if code_key == "BUBBL":
             return "A small green bubble above the bolt. It is glowing." if "gate_enabled" in flags else "A small green bubble above the bolt. It is dark."
+        if code_key in {"SQBUT", "RNBUT", "TRBUT"}:
+            button_names = {"SQBUT": "square", "RNBUT": "round", "TRBUT": "triangular"}
+            return f"A {button_names.get(code_key, 'mysterious')} button mounted on the machine-room panel."
         if code_key in {"BLBUT", "BRBUT", "RBUTT", "YBUTT"}:
             button_names = {"BLBUT": "blue", "BRBUT": "brown", "RBUTT": "red", "YBUTT": "yellow"}
             return f"A {button_names.get(code_key, 'mysterious')} button mounted on the panel."
@@ -2725,6 +2926,24 @@ class ZorkGame:
         flags = self._session_flags(session)
         object_locations = self._object_locations(session)
 
+        if code_key == "SQBUT":
+            if "carousel_zoom" in flags:
+                return ("Nothing seems to happen.", flags, object_locations)
+            flags.add("carousel_zoom")
+            return ("The whirring increases in intensity slightly.", flags, object_locations)
+        if code_key == "RNBUT":
+            if "carousel_zoom" not in flags:
+                return ("Nothing seems to happen.", flags, object_locations)
+            flags.discard("carousel_zoom")
+            return ("The whirring decreases in intensity slightly.", flags, object_locations)
+        if code_key == "TRBUT":
+            if "carousel_flip" in flags:
+                flags.discard("carousel_flip")
+            else:
+                flags.add("carousel_flip")
+            if str(object_locations.get("IRBOX") or "").strip().upper() == "CAROU":
+                return ("A dull thump is heard in the distance.", flags, object_locations)
+            return ("Nothing obvious happens.", flags, object_locations)
         if code_key == "YBUTT":
             flags.add("gate_enabled")
             return ("Click. The small green bubble glows.", flags, object_locations)

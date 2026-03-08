@@ -41,6 +41,7 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - The thief can now stalk treasure carriers through the deeper dungeon, steal carried/loose treasure on room entry, and flee with it instead of remaining a treasure-room-only mannequin.
 - Boarding the inflated boat while carrying the broken sharp stick now punctures it into the damaged boat, and the damaged boat can be repaired back into the inflatable boat with putty.
 - The volcano balloon cluster is now playable: the basket/receptacle/wire/hooks are live, burnable fuel in the receptacle inflates the balloon, wire-to-hook tie/untie works on the ledges, and board/launch/land/disembark balloon travel plus rim/bad-landing failures are wired into the live game.
+- The carousel/low-room magnetic cluster is now playable: the round room can now either randomize or honor directional exits, the low room now routes to the machine room or Alice depending on the magnetic state, and the CMACH round/square/triangular buttons now control the flip/zoom behavior instead of leaving that branch as a dead end.
 
 ## What Is Still Missing
 
@@ -48,8 +49,9 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - River/boat travel now supports the main board/launch/land/disembark flow, but the boat is not yet a fully canonical vehicle container and the wider river puzzle web is still incomplete.
 - Balloon travel is now playable, but it is still simplified compared with the upstream clock-driven automatic ascent/descent logic and broader volcano timing details.
 - The safe path is now playable, but its fuse timing is intentionally simplified compared with full upstream timing.
-- Glacier, mirror, thief, machine, safe, and other later puzzle clusters still need fuller canonical behavior.
+- Glacier, mirror, thief, machine, safe, carousel, and other later puzzle clusters still need fuller canonical behavior.
 - The thief now roams and steals in a deterministic simplified way, but he is still not the full upstream robber demon with canonical randomness, hiding rules, or complete combat behavior.
+- The carousel/CMACH branch is now traversable, but the high-voltage/robot mediation is still simplified compared with the original actor-driven robot puzzle.
 
 ## Regenerating Derived Data
 
