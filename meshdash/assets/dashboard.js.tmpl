@@ -2091,6 +2091,16 @@
       {{ name: "reddish purple", fill: "#CC79A7" }},
       {{ name: "gray", fill: "#999999" }},
     ];
+    const meshChannelNeutralPalette = [
+      {{ name: "light gray", fill: "#D9D9D9" }},
+      {{ name: "silver", fill: "#CACACA" }},
+      {{ name: "soft gray", fill: "#BBBBBB" }},
+      {{ name: "gray", fill: "#ACACAC" }},
+      {{ name: "slate gray", fill: "#9D9D9D" }},
+      {{ name: "charcoal gray", fill: "#8E8E8E" }},
+      {{ name: "graphite", fill: "#7F7F7F" }},
+      {{ name: "dark gray", fill: "#707070" }},
+    ];
     const knownChatNotificationScopes = new Set(["all", "self"]);
     const knownWhoisCommandPrefixes = new Set(["whois", "!whois", "#whois"]);
     const knownBotSingleWordCommands = new Set([
@@ -7121,7 +7131,9 @@
         const fromLabel = nodeLabel(entry.from_id || "");
         const toLabel = nodeLabel(entry.to_id || "");
         const hasChannelIndex = Number.isInteger(entry.channel_index) && Number(entry.channel_index) >= 0;
-        const channelLabel = hasChannelIndex ? `Ch ${{entry.channel_index}}` : "Ch ?";
+        const channelLabel = hasChannelIndex
+          ? meshChannelLabelForIndex(entry.channel_index, {{ allowAll: false }})
+          : "Channel ?";
         const channelBadge = hasChannelIndex
           ? meshChannelBadgeHtml(entry.channel_index, channelLabel, {{
               allowAll: false,
@@ -7203,7 +7215,9 @@
         const destLabel = entry.destination === "^all" ? "All" : nodeLabel(entry.destination);
         const fromLabel = nodeLabel(entry.from_id || "");
         const hasChannelIndex = Number.isInteger(entry.channel_index) && Number(entry.channel_index) >= 0;
-        const channelLabel = hasChannelIndex ? `Ch ${{entry.channel_index}}` : "Ch ?";
+        const channelLabel = hasChannelIndex
+          ? meshChannelLabelForIndex(entry.channel_index, {{ allowAll: false }})
+          : "Channel ?";
         const channelBadge = hasChannelIndex
           ? meshChannelBadgeHtml(entry.channel_index, channelLabel, {{
               allowAll: false,
@@ -7349,10 +7363,29 @@
       const idx = Number(opt.index);
       if (!Number.isInteger(idx) || idx < 0) return "";
       const name = typeof opt.name === "string" ? opt.name.trim() : "";
-      const role = typeof opt.role === "string" ? opt.role.trim() : "";
-      if (name) return `Ch ${{idx}} (${{name}})`;
-      if (role) return `Ch ${{idx}} (${{role}})`;
-      return `Ch ${{idx}}`;
+      return name || `Public ${{idx}}`;
+    }}
+
+    function meshChannelOptionByIndex(rawIndex, sourceOptions = null) {{
+      const idx = normalizeMeshChannelIndex(rawIndex);
+      if (!Number.isInteger(idx) || idx < 0) return null;
+      const candidateLists = [];
+      if (Array.isArray(sourceOptions)) candidateLists.push(sourceOptions);
+      if (Array.isArray(meshChannelOptions) && sourceOptions !== meshChannelOptions) candidateLists.push(meshChannelOptions);
+      if (Array.isArray(meshChannelSendOptions) && sourceOptions !== meshChannelSendOptions) candidateLists.push(meshChannelSendOptions);
+      for (const list of candidateLists) {{
+        const match = list.find((opt) => Number(opt && opt.index) === idx);
+        if (match && typeof match === "object") {{
+          return {{ ...match, index: idx }};
+        }}
+      }}
+      return null;
+    }}
+
+    function meshChannelConfiguredName(rawIndex, sourceOptions = null) {{
+      const match = meshChannelOptionByIndex(rawIndex, sourceOptions);
+      const name = match && typeof match.name === "string" ? match.name.trim() : "";
+      return name || "";
     }}
 
     function meshChannelViewOptionLabel(opt) {{
@@ -7360,7 +7393,7 @@
       const idx = Number(opt.index);
       if (!Number.isInteger(idx) || idx < 0) return "";
       const name = typeof opt.name === "string" ? opt.name.trim() : "";
-      return name || `Ch ${{idx}}`;
+      return name || `Public ${{idx}}`;
     }}
 
     function meshChannelSendOptionLabel(opt) {{
@@ -7368,10 +7401,10 @@
       const idx = Number(opt.index);
       if (!Number.isInteger(idx) || idx < 0) return "";
       const name = typeof opt.name === "string" ? opt.name.trim() : "";
-      return name || `Ch ${{idx}}`;
+      return name || `Public ${{idx}}`;
     }}
 
-    function meshChannelColorMeta(rawIndex, {{ allowAll = true }} = {{}}) {{
+    function meshChannelColorMeta(rawIndex, {{ allowAll = true, sourceOptions = null }} = {{}}) {{
       const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll }});
       if (idx === meshChannelAllIndex) {{
         return {{
@@ -7381,10 +7414,22 @@
           title: "All channels view",
         }};
       }}
+      const configuredName = meshChannelConfiguredName(idx, sourceOptions);
+      if (!configuredName) {{
+        const neutral = meshChannelNeutralPalette[idx % meshChannelNeutralPalette.length] || meshChannelNeutralPalette[0];
+        const neutralName = String(neutral && neutral.name || "gray").trim() || "gray";
+        const fill = String(neutral && neutral.fill || "#BBBBBB").trim() || "#BBBBBB";
+        return {{
+          key: `public-${{idx}}`,
+          name: neutralName,
+          fill,
+          title: `Public ${{idx}}`,
+        }};
+      }}
       const palette = meshChannelColorPalette[idx % meshChannelColorPalette.length] || meshChannelColorPalette[0];
       const colorName = String(palette && palette.name || "channel").trim() || "channel";
       const fill = String(palette && palette.fill || "#8DA3B1").trim() || "#8DA3B1";
-      const colorTitle = `${{colorName.charAt(0).toUpperCase()}}${{colorName.slice(1)}} channel`;
+      const colorTitle = `${{configuredName}} • ${{colorName.charAt(0).toUpperCase()}}${{colorName.slice(1)}} channel`;
       return {{
         key: colorName,
         name: colorName,
@@ -7430,9 +7475,7 @@
       if (idx === meshChannelAllIndex) {{
         return "All channels";
       }}
-      const match = Array.isArray(meshChannelOptions)
-        ? meshChannelOptions.find((opt) => Number(opt && opt.index) === idx)
-        : null;
+      const match = meshChannelOptionByIndex(idx, meshChannelOptions);
       return meshChannelViewOptionLabel(match ? {{ ...match, index: idx }} : {{ index: idx }});
     }}
 
@@ -7448,7 +7491,7 @@
       const btn = document.getElementById("mesh-channel-menu-btn");
       if (btn instanceof HTMLButtonElement) {{
         btn.textContent = meshChannelViewMenuLabel(activeMeshChannelIndex);
-        btn.title = `${{meta.title}} • ${{btn.textContent}}`;
+        btn.title = meta.title === btn.textContent ? meta.title : `${{meta.title}} • ${{btn.textContent}}`;
       }}
       syncMeshChannelMismatchWarning();
     }}
@@ -7497,7 +7540,7 @@
           role="option"
           aria-selected="${{active ? "true" : "false"}}"
           data-mesh-channel-index="${{escAttr(row.index)}}"
-          title="${{escAttr(`${{row.meta.title}} • ${{row.label}}`)}}"
+          title="${{escAttr(row.meta.title === row.label ? row.meta.title : `${{row.meta.title}} • ${{row.label}}`)}}"
         >
           <span class="${{dotClass}}" style="${{row.all ? "" : `--channel-dot-fill: ${{row.meta.fill}};`}}" aria-hidden="true"></span>
           <span class="mesh-channel-menu-item-main">
@@ -7513,13 +7556,9 @@
       if (idx === meshChannelAllIndex) {{
         return compact ? "All" : "All channels";
       }}
-      const match = Array.isArray(meshChannelOptions)
-        ? meshChannelOptions.find((opt) => Number(opt && opt.index) === idx)
-        : null;
-      const name = match && typeof match.name === "string" ? match.name.trim() : "";
-      if (compact) return `Ch ${{idx}}`;
-      if (verbose && name) return `Ch ${{idx}} (${{name}})`;
-      return `Ch ${{idx}}`;
+      const name = meshChannelConfiguredName(idx, meshChannelOptions);
+      if (name) return compact ? name : verbose ? `Ch ${{idx}} (${{name}})` : name;
+      return `Public ${{idx}}`;
     }}
 
     function activeMeshChannelFilterIndex() {{
@@ -7536,9 +7575,7 @@
 
     function currentMeshChannelSendLabel() {{
       const idx = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
-      const match = Array.isArray(meshChannelSendOptions)
-        ? meshChannelSendOptions.find((opt) => Number(opt && opt.index) === idx)
-        : null;
+      const match = meshChannelOptionByIndex(idx, meshChannelSendOptions);
       return meshChannelSendOptionLabel(match ? {{ ...match, index: idx }} : {{ index: idx }});
     }}
 
@@ -7602,7 +7639,7 @@
       const btn = document.getElementById("chat-send-channel-menu-btn");
       if (btn instanceof HTMLButtonElement) {{
         btn.textContent = currentMeshChannelSendLabel();
-        btn.title = `${{meta.title}} • ${{btn.textContent}}`;
+        btn.title = meta.title === btn.textContent ? meta.title : `${{meta.title}} • ${{btn.textContent}}`;
         const select = document.getElementById("chat-send-channel-select");
         const disabled = select instanceof HTMLSelectElement ? !!select.disabled : false;
         btn.disabled = disabled;
@@ -7771,7 +7808,7 @@
         optionEl.value = String(idx);
         optionEl.textContent = label;
         optionEl.disabled = !!(opt && opt.disabled);
-        optionEl.title = `${{label}} • Ch ${{idx}}`;
+        optionEl.title = label === `Public ${{idx}}` ? label : `${{label}} • Ch ${{idx}}`;
         select.appendChild(optionEl);
       }}
 
@@ -7811,7 +7848,7 @@
           role="option"
           aria-selected="${{active ? "true" : "false"}}"
           data-mesh-send-channel-index="${{escAttr(idx)}}"
-          title="${{escAttr(`${{meta.title}} • ${{label}}`)}}"
+          title="${{escAttr(meta.title === label ? meta.title : `${{meta.title}} • ${{label}}`)}}"
         >
           <span class="channel-color-dot" style="--channel-dot-fill: ${{meta.fill}};" aria-hidden="true"></span>
           <span class="mesh-channel-menu-item-main">
@@ -21258,7 +21295,7 @@
       if (overview instanceof HTMLElement) {{
         const items = [
           ["Observed", observedIndexes.length],
-          ["Highest Seen", highestSeenIndex == null ? "n/a" : `Ch ${{highestSeenIndex}}`],
+          ["Highest Seen", highestSeenIndex == null ? "n/a" : `Public ${{highestSeenIndex}}`],
           ["Attributed Packets", packetsWithChannel],
           ["Unattributed", packetsWithoutChannel],
           ["Local Active", enabledLocalCount],
@@ -21284,7 +21321,7 @@
         const localOpt = localByIndex.get(index) || null;
         const roleLabel = formatMeshChannelRole(localOpt && localOpt.role);
         const localName = localOpt && typeof localOpt.name === "string" ? localOpt.name.trim() : "";
-        const localPrimary = localName || (localOpt ? `Ch ${{index}}` : "Not in local config");
+        const localPrimary = localName || (localOpt ? `Public ${{index}}` : "Not in local config");
         const localDisabled = !!(localOpt && (localOpt.disabled || isMeshChannelRoleDisabled(localOpt.role)));
         const localSecondary = localOpt
           ? [roleLabel || "", localDisabled ? "disabled" : "configured locally"]
@@ -21315,7 +21352,7 @@
             {{
               sort: `${{localPrimary}} ${{localSecondary}}`,
               html: `<div class="channels-local-cell"><span class="channels-local-primary">${{escAttr(localPrimary)}}</span>${{localSecondary ? `<span class="channels-local-secondary">${{escAttr(localSecondary)}}</span>` : ""}}</div>`,
-              title: localOpt ? `${{localName || `Ch ${{index}}`}}${{roleLabel ? ` | ${{roleLabel}}` : ""}}` : "Observed in recent packet buffer only",
+              title: localOpt ? `${{localName || `Public ${{index}}`}}${{roleLabel ? ` | ${{roleLabel}}` : ""}}` : "Observed in recent packet buffer only",
             }},
             {{
               sort: evidence.label,
@@ -21370,8 +21407,8 @@
               {{ sort: index, text: `Ch ${{index}}` }},
               {{
                 sort: `${{name}} ${{roleLabel}} ${{index}}`,
-                html: `<div class="channels-local-cell"><span class="channels-local-primary">${{escAttr(name || `Ch ${{index}}`)}}</span><span class="channels-local-secondary">${{escAttr((name ? `Ch ${{index}}` : "") || (roleLabel || "Unnamed local channel"))}}</span></div>`,
-                title: name ? `Local name: ${{name}}` : "Unnamed local channel",
+                html: `<div class="channels-local-cell"><span class="channels-local-primary">${{escAttr(name || `Public ${{index}}`)}}</span><span class="channels-local-secondary">${{escAttr((name ? `Ch ${{index}}` : "") || (roleLabel || "Unnamed local channel"))}}</span></div>`,
+                title: name ? `Local name: ${{name}}` : `Public ${{index}}`,
               }},
               {{ sort: roleLabel || "", text: roleLabel || "n/a" }},
               {{ sort: stateLabel, text: stateLabel }},
