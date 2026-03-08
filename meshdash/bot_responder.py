@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import threading
 import time
 from typing import Callable, Optional
@@ -18,6 +19,7 @@ from .bot_settings_store import (
     load_persisted_bot_settings,
     save_persisted_bot_settings,
 )
+from .config import DEFAULT_CHAT_MAX_BYTES
 from .helpers import to_int as _to_int
 
 STANDARD_BOT_COMMANDS = _STANDARD_BOT_COMMANDS
@@ -30,6 +32,8 @@ _BOT_COMMAND_ALIASES = {
 _NATURAL_PING_PREFIXES = (
     "can you see this",
 )
+_CHAT_TOO_LONG_RE = re.compile(r"Message is too long \((\d+) bytes\)\. Limit is (\d+) bytes\.")
+_REPLY_PACKET_TEXT_RESERVE_BYTES = 20
 
 
 def _parse_bool_token(value: object, default: bool) -> bool:
@@ -306,6 +310,124 @@ def _safe_strftime(unix_seconds: object) -> str:
         return "n/a"
 
 
+def _chat_limit_bytes_from_error(exc: Exception) -> Optional[int]:
+    match = _CHAT_TOO_LONG_RE.search(str(exc or ""))
+    if not match:
+        return None
+    return _to_int(match.group(2))
+
+
+def _truncate_text_to_bytes(text: object, max_bytes: int, *, suffix: str = "") -> str:
+    raw = str(text or "")
+    limit = max(0, int(max_bytes))
+    if limit <= 0:
+        return ""
+    raw_bytes = raw.encode("utf-8")
+    if len(raw_bytes) <= limit and not suffix:
+        return raw
+    suffix_text = str(suffix or "")
+    suffix_bytes = suffix_text.encode("utf-8")
+    if len(suffix_bytes) >= limit:
+        suffix_text = ""
+        suffix_bytes = b""
+    budget = max(0, limit - len(suffix_bytes))
+    out: list[str] = []
+    used = 0
+    for ch in raw:
+        chunk = ch.encode("utf-8")
+        if used + len(chunk) > budget:
+            break
+        out.append(ch)
+        used += len(chunk)
+    trimmed = "".join(out).rstrip()
+    return f"{trimmed}{suffix_text}" if suffix_text else trimmed
+
+
+def _repair_truncated_ellipsis(text: object, max_bytes: int) -> Optional[str]:
+    raw = str(text or "").strip()
+    if not raw.endswith("…"):
+        return None
+    repaired = _truncate_text_to_bytes(raw[:-1].rstrip(), max_bytes, suffix="...")
+    if not repaired:
+        return None
+    if len(repaired.encode("utf-8")) > int(max_bytes):
+        return None
+    return repaired
+
+
+def _take_prefix_by_bytes(text: str, max_bytes: int) -> str:
+    if max_bytes <= 0:
+        return ""
+    out: list[str] = []
+    used = 0
+    for ch in text:
+        chunk = ch.encode("utf-8")
+        if used + len(chunk) > max_bytes:
+            break
+        out.append(ch)
+        used += len(chunk)
+    return "".join(out)
+
+
+def _split_text_by_bytes(text: object, max_bytes: int) -> list[str]:
+    raw = str(text or "").strip()
+    limit = max(1, int(max_bytes))
+    if not raw:
+        return []
+    if len(raw.encode("utf-8")) <= limit:
+        return [raw]
+    parts: list[str] = []
+    remaining = raw
+    while remaining:
+        if len(remaining.encode("utf-8")) <= limit:
+            parts.append(remaining)
+            break
+        prefix = _take_prefix_by_bytes(remaining, limit)
+        if not prefix:
+            break
+        split_at = -1
+        for index in range(len(prefix) - 1, -1, -1):
+            if prefix[index].isspace():
+                split_at = index
+                break
+        if split_at > len(prefix) // 2:
+            chunk = prefix[:split_at].rstrip()
+            remaining = remaining[split_at + 1 :].lstrip()
+        else:
+            chunk = prefix.rstrip()
+            remaining = remaining[len(prefix) :].lstrip()
+        if not chunk:
+            chunk = prefix
+            remaining = remaining[len(prefix) :].lstrip()
+        parts.append(chunk)
+    return [part for part in parts if part]
+
+
+def _segment_reply_text(text: object, max_bytes: int) -> list[str]:
+    raw = str(text or "").strip()
+    limit = max(1, int(max_bytes))
+    if not raw:
+        return []
+    if len(raw.encode("utf-8")) <= limit:
+        return [raw]
+    repaired = _repair_truncated_ellipsis(raw, limit)
+    if repaired is not None:
+        return [repaired]
+    digits = 1
+    while True:
+        prefix_reserve = len(f"{'9' * digits}/{'9' * digits} ".encode("utf-8"))
+        chunk_limit = max(1, limit - prefix_reserve)
+        chunks = _split_text_by_bytes(raw, chunk_limit)
+        total = len(chunks)
+        if total <= 1:
+            break
+        next_digits = len(str(total))
+        if next_digits == digits:
+            return [f"{index}/{total} {chunk}" for index, chunk in enumerate(chunks, start=1)]
+        digits = next_digits
+    return [_truncate_text_to_bytes(raw, limit)]
+
+
 class MeshResponseBot:
     def __init__(
         self,
@@ -319,6 +441,7 @@ class MeshResponseBot:
         game_enabled: bool = False,
         reply_broadcast: bool = False,
         settings_path: Optional[str] = None,
+        chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
         now_unix_fn: Callable[[], float] = time.time,
     ) -> None:
         self._send_chat_fn = send_chat_fn
@@ -327,6 +450,7 @@ class MeshResponseBot:
         self._log_enabled = bool(log_enabled)
         self._reply_broadcast = bool(reply_broadcast)
         self._settings_path = str(settings_path).strip() if settings_path else None
+        self._chat_max_bytes = max(1, int(chat_max_bytes))
         self._now_unix_fn = now_unix_fn
         self._custom_commands = {
             _normalize_command_name(name): str(template or "").strip()
@@ -832,6 +956,58 @@ class MeshResponseBot:
                 inactive.append((name, app))
         return active + inactive
 
+    def _send_reply_text(
+        self,
+        *,
+        text: str,
+        destination: str,
+        channel_index: int,
+        reply_id: Optional[int],
+    ) -> tuple[list[str], list[dict[str, object]]]:
+        clean_text = str(text or "").strip()
+        if not clean_text:
+            return ([], [])
+        effective_limit = self._chat_max_bytes
+        if reply_id is not None and reply_id > 0:
+            effective_limit = max(1, effective_limit - _REPLY_PACKET_TEXT_RESERVE_BYTES)
+        proactive_segments = _segment_reply_text(clean_text, effective_limit)
+        if proactive_segments != [clean_text]:
+            payloads: list[dict[str, object]] = []
+            for index, segment in enumerate(proactive_segments):
+                payload = self._send_chat_fn(
+                    text=segment,
+                    destination=destination,
+                    channel_index=channel_index,
+                    reply_id=reply_id if index == 0 else None,
+                )
+                payloads.append(payload if isinstance(payload, dict) else {})
+            return (proactive_segments, payloads)
+        try:
+            payload = self._send_chat_fn(
+                text=clean_text,
+                destination=destination,
+                channel_index=channel_index,
+                reply_id=reply_id,
+            )
+            return ([clean_text], [payload if isinstance(payload, dict) else {}])
+        except Exception as exc:
+            limit = _chat_limit_bytes_from_error(exc)
+            if limit is None:
+                raise
+        segments = _segment_reply_text(clean_text, limit)
+        if not segments:
+            raise ValueError("Reply could not be segmented into non-empty messages")
+        payloads: list[dict[str, object]] = []
+        for index, segment in enumerate(segments):
+            payload = self._send_chat_fn(
+                text=segment,
+                destination=destination,
+                channel_index=channel_index,
+                reply_id=reply_id if index == 0 else None,
+            )
+            payloads.append(payload if isinstance(payload, dict) else {})
+        return (segments, payloads)
+
     def on_receive(self, packet: object, interface: object = None, **_kwargs: object) -> None:
         if not self._enabled and not self._log_enabled:
             return
@@ -957,12 +1133,13 @@ class MeshResponseBot:
         if destination != "^all" and not destination.startswith("!"):
             return
         try:
-            response_payload = self._send_chat_fn(
+            response_segments, response_payloads = self._send_reply_text(
                 text=reply_text,
                 destination=destination,
                 channel_index=channel_index,
                 reply_id=reply_id,
             )
+            response_payload = response_payloads[-1] if response_payloads else {}
             response_message_id = _to_int(
                 response_payload.get("message_id") if isinstance(response_payload, dict) else None
             )
@@ -981,7 +1158,7 @@ class MeshResponseBot:
                 response_hops=_packet_hops(packet),
                 response_from=response_from,
                 response_to=response_to,
-                response_text=reply_text,
+                response_text="\n".join(response_segments),
                 response_error="",
             )
         except Exception as exc:
@@ -1065,6 +1242,7 @@ def build_mesh_response_bot_from_env(
     send_chat_fn: Callable[..., dict[str, object]],
     get_local_node_id_fn: Callable[[object], str],
     env: Optional[dict[str, str]] = None,
+    chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
     now_unix_fn: Callable[[], float] = time.time,
 ) -> Optional[MeshResponseBot]:
     env_map = env if isinstance(env, dict) else dict(os.environ)
@@ -1109,6 +1287,7 @@ def build_mesh_response_bot_from_env(
         game_enabled=game_enabled,
         reply_broadcast=reply_broadcast,
         settings_path=settings_path,
+        chat_max_bytes=chat_max_bytes,
         now_unix_fn=now_unix_fn,
     )
 

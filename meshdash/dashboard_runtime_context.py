@@ -238,6 +238,7 @@ def build_dashboard_runtime_context(
         response_bot = _build_mesh_response_bot_from_env(
             send_chat_fn=loaders.send_chat_fn,
             get_local_node_id_fn=get_local_node_id_fn,
+            chat_max_bytes=default_chat_max_bytes,
         )
     except Exception:
         response_bot = None

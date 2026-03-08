@@ -436,6 +436,107 @@ def test_zork_game_session_replies_to_followup_commands():
     assert all(str(row.get("command_head") or "") == "zork" for row in history)
 
 
+def test_zork_help_reply_is_split_when_transport_limit_is_exceeded():
+    iface = _FakeIface()
+    sent = []
+    next_message_id = 5000
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        text = str(kwargs.get("text") or "")
+        if len(text.encode("utf-8")) > 220:
+            raise ValueError(
+                f"Message is too long ({len(text.encode('utf-8'))} bytes). Limit is 220 bytes."
+            )
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("zork", packet_id=2301, to_id="!02ed9b7c"), iface)
+    bot.on_receive(_base_packet("help", packet_id=2302, to_id="!02ed9b7c"), iface)
+
+    assert len(sent) == 3
+    assert sent[1]["text"].startswith("1/2 ")
+    assert sent[2]["text"].startswith("2/2 ")
+    assert all(len(str(row["text"]).encode("utf-8")) <= 220 for row in sent)
+    history = bot.recent_requests()
+    assert history[0]["command"] == "help"
+    assert "1/2 " in str(history[0]["response_text"])
+    assert "2/2 " in str(history[0]["response_text"])
+
+
+def test_zork_leaflet_reply_is_repaired_to_fit_transport_limit():
+    iface = _FakeIface()
+    sent = []
+    next_message_id = 6000
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        text = str(kwargs.get("text") or "")
+        if len(text.encode("utf-8")) > 220:
+            raise ValueError(
+                f"Message is too long ({len(text.encode('utf-8'))} bytes). Limit is 220 bytes."
+            )
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("zork", packet_id=2401, to_id="!02ed9b7c"), iface)
+    bot.on_receive(_base_packet("open mailbox", packet_id=2402, to_id="!02ed9b7c"), iface)
+    bot.on_receive(_base_packet("read leaflet", packet_id=2403, to_id="!02ed9b7c"), iface)
+
+    assert len(sent) == 3
+    leaflet_text = str(sent[2]["text"])
+    assert len(leaflet_text.encode("utf-8")) <= 220
+    assert leaflet_text.endswith("...")
+    assert not leaflet_text.startswith("1/")
+
+
+def test_zork_leaflet_reply_reserves_headroom_for_direct_reply_metadata():
+    iface = _FakeIface()
+    sent = []
+    next_message_id = 7000
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        chat_max_bytes=220,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("zork", packet_id=2501, to_id="!02ed9b7c"), iface)
+    bot.on_receive(_base_packet("open mailbox", packet_id=2502, to_id="!02ed9b7c"), iface)
+    bot.on_receive(_base_packet("read leaflet", packet_id=2503, to_id="!02ed9b7c"), iface)
+
+    assert len(sent) == 3
+    leaflet_text = str(sent[2]["text"])
+    assert sent[2]["reply_id"] == 2503
+    assert len(leaflet_text.encode("utf-8")) <= 200
+    assert leaflet_text.endswith("...")
+    assert not leaflet_text.startswith("1/")
+
+
 def test_zork_game_disabled_still_logs_direct_start_requests():
     iface = _FakeIface()
     sent = []
