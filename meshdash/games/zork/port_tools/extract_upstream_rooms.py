@@ -94,6 +94,20 @@ def _read_hash_token(text: str, start_index: int) -> tuple[str, int]:
     return text[start_index:index], index
 
 
+def _extract_setg_string_values(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for match in re.finditer(r"<(?:PSETG|SETG)\s+([A-Z0-9-]+)\s+", text):
+        symbol = str(match.group(1) or "").strip().upper()
+        if not symbol:
+            continue
+        index = _skip_ws(text, match.end())
+        if index >= len(text) or text[index] != '"':
+            continue
+        value, _ = _read_string(text, index)
+        values[symbol] = value
+    return values
+
+
 def _extract_strings(text: str) -> list[str]:
     out: list[str] = []
     index = 0
@@ -180,19 +194,32 @@ def _parse_exit_entries(exit_block: str) -> list[dict[str, object]]:
     return entries
 
 
-def _parse_room_block(room_block: str) -> dict[str, object]:
+def _read_room_text_field(text: str, start_index: int, string_values: dict[str, str]) -> tuple[str, int]:
+    index = _skip_ws(text, start_index)
+    if index >= len(text):
+        return "", index
+    if text[index] == '"':
+        return _read_string(text, index)
+    if text.startswith("%,", index):
+        end_index = index + 2
+        while end_index < len(text) and (text[end_index].isalnum() or text[end_index] in {"-", "_"}):
+            end_index += 1
+        symbol = text[index + 2 : end_index].strip().upper()
+        if not symbol:
+            return "", end_index
+        return str(string_values.get(symbol) or ""), end_index
+    if text.startswith("%<>", index):
+        return "", index + 3
+    return "", index
+
+
+def _parse_room_block(room_block: str, string_values: dict[str, str]) -> dict[str, object]:
     code_index = room_block.find('"')
     if code_index < 0:
         raise ValueError("Room block missing room code string")
     room_code, index = _read_string(room_block, code_index)
-    index = _skip_ws(room_block, index)
-    long_desc = ""
-    short_name = ""
-    if index < len(room_block) and room_block[index] == '"':
-        long_desc, index = _read_string(room_block, index)
-        index = _skip_ws(room_block, index)
-    if index < len(room_block) and room_block[index] == '"':
-        short_name, index = _read_string(room_block, index)
+    long_desc, index = _read_room_text_field(room_block, index, string_values)
+    short_name, index = _read_room_text_field(room_block, index, string_values)
     exits = _parse_exit_entries(_extract_exit_block(room_block))
     visible_objects = sorted(
         {
@@ -210,7 +237,8 @@ def _parse_room_block(room_block: str) -> dict[str, object]:
 
 
 def extract_rooms(text: str) -> list[dict[str, object]]:
-    rooms = [_parse_room_block(block) for block in _find_room_blocks(text)]
+    string_values = _extract_setg_string_values(text)
+    rooms = [_parse_room_block(block, string_values) for block in _find_room_blocks(text)]
     deduped: list[dict[str, object]] = []
     seen_codes: set[str] = set()
     for room in rooms:

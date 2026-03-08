@@ -507,6 +507,25 @@ class ZorkGame:
         ghost["object_locations"] = dict(object_locations)
         return ghost
 
+    def _room_summary_for_state(
+        self,
+        session: dict[str, object],
+        *,
+        room_id: str,
+        inventory: Iterable[str],
+        flags: Iterable[str],
+        object_locations: dict[str, str],
+        explicit_look: bool = False,
+    ) -> str:
+        ghost = self._ephemeral_session(
+            session,
+            room_id=room_id,
+            inventory=inventory,
+            flags=flags,
+            object_locations=object_locations,
+        )
+        return self._room_summary(ghost, room_id, explicit_look=explicit_look)
+
     def _mark_room_seen(self, session: dict[str, object], room_id: str) -> None:
         seen_rooms = {str(value).strip().upper() for value in (session.get("seen_rooms") or []) if str(value).strip()}
         seen_rooms.add(str(room_id or START_ROOM).strip().upper())
@@ -946,6 +965,13 @@ class ZorkGame:
                 reply_text=self._compact(" ".join(part for part in parts if part)),
                 command_name=self.SPEC.name,
             )
+        summary = self._room_summary_for_state(
+            session,
+            room_id=final_room,
+            inventory=inventory,
+            flags=flags,
+            object_locations=object_locations,
+        )
         self._write_session_state(
             session,
             room_id=final_room,
@@ -954,7 +980,6 @@ class ZorkGame:
             object_locations=object_locations,
             now_unix=now_unix,
         )
-        summary = self._room_summary(session, final_room)
         reply = " ".join(part for part in (prefix, entry_prefix, summary) if part)
         return BotAppResult(
             handled=True,
@@ -2889,6 +2914,13 @@ class ZorkGame:
                 if counters["balloon_burn_turns"] <= 0:
                     flags.discard("balloon_inflated")
                     extra = " The fire burns low and the cloth bag begins to sag."
+                summary = self._room_summary_for_state(
+                    session,
+                    room_id=new_room,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                )
                 self._write_session_state(
                     session,
                     room_id=new_room,
@@ -2899,7 +2931,7 @@ class ZorkGame:
                 )
                 return BotAppResult(
                     handled=True,
-                    reply_text=self._compact(f"The balloon ascends.{extra} {self._room_summary(session, new_room)}"),
+                    reply_text=self._compact(f"The balloon ascends.{extra} {summary}"),
                     command_name=self.SPEC.name,
                 )
 
@@ -3003,6 +3035,13 @@ class ZorkGame:
                     self._session_counters(session)["balloon_burn_turns"] = 0
                     object_locations["BALLO"] = "GONE"
                     object_locations["DBALL"] = "VLBOT"
+                    summary = self._room_summary_for_state(
+                        session,
+                        room_id="VLBOT",
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                    )
                     self._write_session_state(
                         session,
                         room_id="VLBOT",
@@ -3013,10 +3052,17 @@ class ZorkGame:
                     )
                     return BotAppResult(
                         handled=True,
-                        reply_text=self._compact(f"You have landed, but the balloon did not survive. {self._room_summary(session, 'VLBOT')}"),
+                        reply_text=self._compact(f"You have landed, but the balloon did not survive. {summary}"),
                         command_name=self.SPEC.name,
                     )
                 object_locations["BALLO"] = new_room
+                summary = self._room_summary_for_state(
+                    session,
+                    room_id=new_room,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                )
                 self._write_session_state(
                     session,
                     room_id=new_room,
@@ -3027,7 +3073,7 @@ class ZorkGame:
                 )
                 return BotAppResult(
                     handled=True,
-                    reply_text=self._compact(f"{move_text} {self._room_summary(session, new_room)}"),
+                    reply_text=self._compact(f"{move_text} {summary}"),
                     command_name=self.SPEC.name,
                 )
 
@@ -3035,6 +3081,13 @@ class ZorkGame:
             if room_id == "VAIR2" and direction == "WEST" and exit_row is not None:
                 new_room = "LEDG2"
                 object_locations["BALLO"] = new_room
+                summary = self._room_summary_for_state(
+                    session,
+                    room_id=new_room,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                )
                 self._write_session_state(
                     session,
                     room_id=new_room,
@@ -3045,7 +3098,7 @@ class ZorkGame:
                 )
                 return BotAppResult(
                     handled=True,
-                    reply_text=self._compact(f"The balloon lands. {self._room_summary(session, new_room)}"),
+                    reply_text=self._compact(f"The balloon lands. {summary}"),
                     command_name=self.SPEC.name,
                 )
             if room_id == "VAIR4" and direction == "EAST" and exit_row is not None:
@@ -3057,6 +3110,13 @@ class ZorkGame:
                     )
                 new_room = "LEDG4"
                 object_locations["BALLO"] = new_room
+                summary = self._room_summary_for_state(
+                    session,
+                    room_id=new_room,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                )
                 self._write_session_state(
                     session,
                     room_id=new_room,
@@ -3067,7 +3127,7 @@ class ZorkGame:
                 )
                 return BotAppResult(
                     handled=True,
-                    reply_text=self._compact(f"The balloon lands. {self._room_summary(session, new_room)}"),
+                    reply_text=self._compact(f"The balloon lands. {summary}"),
                     command_name=self.SPEC.name,
                 )
             return BotAppResult(
@@ -4779,8 +4839,14 @@ class ZorkGame:
             if ended:
                 self._sessions.pop(peer_id, None)
                 return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+            suffix = self._room_summary_for_state(
+                session,
+                room_id=room_after,
+                inventory=inventory,
+                flags=flags,
+                object_locations=object_locations,
+            )
             self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
-            suffix = self._room_summary(session, room_after) if room_after != room_id else self._room_summary(session, room_id)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {suffix}"), command_name=self.SPEC.name)
 
         if head_raw in {"help"}:
@@ -4891,8 +4957,15 @@ class ZorkGame:
                 self._sessions.pop(peer_id, None)
                 return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
             room_after = room_after or room_id
+            suffix = self._room_summary_for_state(
+                session,
+                room_id=room_after,
+                inventory=inventory,
+                flags=flags,
+                object_locations=object_locations,
+            )
             self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
-            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_after)}"), command_name=self.SPEC.name)
+            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {suffix}"), command_name=self.SPEC.name)
 
         if head_raw in {"plug", "repair", "patch"}:
             direct_text = raw_target
@@ -4996,8 +5069,15 @@ class ZorkGame:
                 return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
             reply, new_room, flags, object_locations = self._rub_response(session, target)
             room_after = new_room or room_id
+            suffix = self._room_summary_for_state(
+                session,
+                room_id=room_after,
+                inventory=inventory,
+                flags=flags,
+                object_locations=object_locations,
+            )
             self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
-            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_after)}"), command_name=self.SPEC.name)
+            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {suffix}"), command_name=self.SPEC.name)
 
         if head_raw == "melt":
             target = self._resolve_object(session, raw_target, "melt")
@@ -5027,8 +5107,15 @@ class ZorkGame:
             if ended:
                 self._sessions.pop(peer_id, None)
                 return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+            suffix = self._room_summary_for_state(
+                session,
+                room_id=room_after,
+                inventory=inventory,
+                flags=flags,
+                object_locations=object_locations,
+            )
             self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
-            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_after)}"), command_name=self.SPEC.name)
+            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {suffix}"), command_name=self.SPEC.name)
 
         if head_raw in {"open", "close"}:
             target = self._resolve_object(session, raw_target, head_raw)
@@ -5164,8 +5251,15 @@ class ZorkGame:
                 if ended:
                     self._sessions.pop(peer_id, None)
                     return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+                suffix = self._room_summary_for_state(
+                    session,
+                    room_id=room_after,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                )
                 self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
-                return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_after)}"), command_name=self.SPEC.name)
+                return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {suffix}"), command_name=self.SPEC.name)
             reply, inventory, object_locations, flags = self._take_response(session, target)
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
@@ -5330,8 +5424,14 @@ class ZorkGame:
         if head_raw == "pray":
             reply, new_room, flags, object_locations = self._prayer_response(session, now_unix)
             room_after = new_room or room_id
+            suffix = self._room_summary_for_state(
+                session,
+                room_id=room_after,
+                inventory=inventory,
+                flags=flags,
+                object_locations=object_locations,
+            )
             self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
-            suffix = self._room_summary(session, room_after) if new_room else self._room_summary(session, room_id)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {suffix}"), command_name=self.SPEC.name)
 
         if head_raw == "exorcise":
@@ -5348,10 +5448,17 @@ class ZorkGame:
                 self._sessions.pop(peer_id, None)
                 return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
             room_after = new_room or room_id
+            suffix = self._room_summary_for_state(
+                session,
+                room_id=room_after,
+                inventory=inventory,
+                flags=flags,
+                object_locations=object_locations,
+            )
             self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(
                 handled=True,
-                reply_text=self._compact(f"{reply} {self._room_summary(session, room_after)}"),
+                reply_text=self._compact(f"{reply} {suffix}"),
                 command_name=self.SPEC.name,
             )
 

@@ -37,9 +37,17 @@ def test_extract_upstream_rooms_contains_house_and_kitchen() -> None:
     assert "SBAG" in kitch["visible_object_codes"]
 
 
-def test_extract_upstream_rooms_handles_rooms_without_short_names() -> None:
+def test_extract_upstream_rooms_handles_rooms_without_literal_short_names() -> None:
     room_map = _room_map()
 
     vair1 = room_map["VAIR1"]
-    assert vair1["short_name"] == ""
+    assert vair1["short_name"] == "Volcano Core"
     assert "hundred feet above the bottom of the volcano" in str(vair1["long_desc"]).lower()
+
+
+def test_extract_upstream_rooms_resolves_shared_forest_description() -> None:
+    room_map = _room_map()
+
+    fore1 = room_map["FORE1"]
+    assert fore1["short_name"] == "Forest"
+    assert "you are in a forest, with trees in all directions around you." in str(fore1["long_desc"]).lower()

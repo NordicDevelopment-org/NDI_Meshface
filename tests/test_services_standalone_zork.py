@@ -17,6 +17,17 @@ def test_standalone_zork_service_starts_and_continues_session():
     assert "West of House" in str(followup["reply_text"])
 
 
+def test_first_move_west_shows_full_forest_description() -> None:
+    service = StandaloneZorkService(now_unix_fn=lambda: 1710001240.0)
+
+    started = service.play(text="zork")
+    moved = service.play(text="west", session_id=started["session_id"])
+
+    reply = str(moved["reply_text"]).lower()
+    assert "forest, with trees in all directions around you." in reply
+    assert "exits north, east, south, west." in reply
+
+
 def test_standalone_zork_service_requires_start_before_followup():
     service = StandaloneZorkService(now_unix_fn=lambda: 1710001240.0)
 
