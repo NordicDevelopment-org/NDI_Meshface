@@ -86,6 +86,7 @@ GAME_VERB_HEADS = {
     "walk",
     "take",
     "get",
+    "give",
     "drop",
     "read",
     "eat",
@@ -133,6 +134,7 @@ GAME_VERB_HEADS = {
     "disembark",
     "well",
     "sinbad",
+    "geronimo",
     "quit",
     "exitgame",
     "restart",
@@ -181,6 +183,12 @@ ROOM_DYNAMIC_DESCRIPTIONS = {
     "SAFE": (
         "You are in a dusty old room which is virtually featureless, except for an exit on the north side. {safe_state}"
     ),
+    "LEDG2": (
+        "You are on a narrow ledge overlooking the inside of an old dormant volcano. This ledge appears to be about in the middle between the floor below and the rim above. There is an exit here to the south. {west_state}"
+    ),
+    "LEDG4": (
+        "You are on a wide ledge high into the volcano. The rim of the volcano is about 200 feet above and there is a precipitous drop below to the bottom. {south_state} {west_state}"
+    ),
     "CAROU": "You are in a circular room with passages off in eight directions. {bearing_state}",
     "CMACH": (
         "You are in a large room full of assorted heavy machinery. The room smells of burned resistors and the whirring of machinery fills the air. "
@@ -188,6 +196,11 @@ ROOM_DYNAMIC_DESCRIPTIONS = {
     ),
     "MAGNE": "You are in a room with a low circular ceiling. There are exits to the east and the southeast.",
     "ALITR": "You are in a large room, one half of which is depressed. {pool_state} The only exit to this room is to the west.",
+    "LLD2": (
+        "You have entered the Land of the Living Dead, a large desolate room. Although it is apparently uninhabited, "
+        "you can hear the sounds of thousands of lost souls weeping and moaning. In the east corner are stacked the remains "
+        "of dozens of previous adventurers who were less fortunate than yourself. To the east is an ornate passage, apparently recently constructed."
+    ),
 }
 
 NATURALLY_LIT_ROOMS = {
@@ -204,6 +217,7 @@ NATURALLY_LIT_ROOMS = {
     "BEACH",
     "RCAVE",
     "FALLS",
+    "BARRE",
     "VLBOT",
     "VAIR1",
     "VAIR2",
@@ -241,6 +255,7 @@ INLINE_CONTAINER_SUMMARY_CODES = frozenset({"TCASE"})
 BULK_SCOPE_ALL_WORDS = frozenset({"all", "everything"})
 BULK_SCOPE_TREASURE_WORDS = frozenset({"treasure", "treasures", "valuable", "valuables"})
 BAT_DROP_ROOMS = ("MINE1", "MINE2", "MINE3", "MINE4", "MINE5", "MINE6", "MINE7", "TLADD", "BLADD")
+GNOME_LEDGE_ROOMS = frozenset({"LEDG2", "LEDG4"})
 WEAPON_CODES = frozenset({"SWORD", "KNIFE", "RKNIF", "AXE", "STILL"})
 
 THIEF_FORBIDDEN_ROOMS = frozenset(
@@ -884,6 +899,25 @@ class ZorkGame:
             if self._magnet_room_disoriented(flags):
                 return ""
             return "Exits east, southeast."
+        if room_key == "VAIR4" and self._ledge4_collapsed(flags):
+            return "Exits launch, land."
+        if room_key == "POG":
+            return "Exits up, nw, west, se." if "rainbow_solid" in flags else "Exits se."
+        if room_key == "ALISM":
+            return "Exits east."
+        if room_key == "LEDG2":
+            return "Exits south, launch, west." if "gnome_door_open" in flags else "Exits south, launch."
+        if room_key == "LEDG4":
+            if self._ledge4_collapsed(flags):
+                return ""
+            exits = ["launch"]
+            if not self._safe_room_collapsed(flags):
+                exits.insert(0, "south")
+            if "gnome_door_open" in flags:
+                exits.append("west")
+            return f"Exits {', '.join(exits)}."
+        if room_key == "SAFE" and self._safe_room_collapsed(flags):
+            return ""
         return None
 
     def _complete_transition_with_prefix(
@@ -1216,6 +1250,17 @@ class ZorkGame:
                 )
             prefix_parts.append("As you enter, your compass starts spinning wildly.")
 
+        if room_key in GNOME_LEDGE_ROOMS and "gnome_door_open" not in flags:
+            prior_room = str(object_locations.get("GNOME") or "").strip().upper()
+            if prior_room != room_key:
+                prefix_parts.append(
+                    "A volcano gnome seems to walk straight out of the wall and says: 'I have a very busy appointment schedule and little time to waste on trespassers, but for a small fee, I'll show you the way out.'"
+                )
+            object_locations["GNOME"] = room_key
+            counters = self._session_counters(session)
+            counters["gnome_nervous_turns"] = 1
+            counters["gnome_depart_turns"] = 0
+
         if room_key == "TREAS":
             treas_reply, flags, object_locations = self._apply_treasure_room_entry(session, room_key, flags, object_locations)
             if treas_reply:
@@ -1339,6 +1384,225 @@ class ZorkGame:
 
     def _balloon_inflated(self, session: dict[str, object]) -> bool:
         return "balloon_inflated" in self._session_flags(session) or self._balloon_burn_turns(session) > 0
+
+    def _safe_room_collapsed(self, session: dict[str, object] | set[str]) -> bool:
+        if isinstance(session, set):
+            return "safe_room_collapsed" in session
+        return "safe_room_collapsed" in self._session_flags(session)
+
+    def _ledge4_collapsed(self, session: dict[str, object] | set[str]) -> bool:
+        if isinstance(session, set):
+            return "ledge4_collapsed" in session
+        return "ledge4_collapsed" in self._session_flags(session)
+
+    def _turn_event_result(
+        self,
+        session: dict[str, object],
+        *,
+        room_id: str,
+        inventory: list[str],
+        flags: set[str],
+        object_locations: dict[str, str],
+        now_unix: int,
+        message: str,
+        ended: bool = False,
+    ) -> BotAppResult:
+        peer_id = str(session.get("peer_id") or "").strip().lower()
+        if ended:
+            self._sessions.pop(peer_id, None)
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(message),
+                command_name=self.SPEC.name,
+            )
+        self._write_session_state(
+            session,
+            room_id=room_id,
+            inventory=inventory,
+            flags=flags,
+            object_locations=object_locations,
+            now_unix=now_unix,
+        )
+        return BotAppResult(
+            handled=True,
+            reply_text=self._compact(f"{message} {self._room_summary(session, room_id)}"),
+            command_name=self.SPEC.name,
+        )
+
+    def _handle_pending_turn_events(
+        self,
+        session: dict[str, object],
+        *,
+        now_unix: int,
+    ) -> BotAppResult | None:
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        counters = self._session_counters(session)
+
+        fuse_turns = int(counters.get("fuse_turns") or 0)
+        if fuse_turns > 0:
+            counters["fuse_turns"] = fuse_turns - 1
+            if counters["fuse_turns"] <= 0:
+                flags.discard("fuse_lit")
+                object_locations["BRICK"] = "GONE"
+                object_locations["FUSE"] = "GONE"
+                if room_id == "SAFE":
+                    return self._turn_event_result(
+                        session,
+                        room_id=room_id,
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                        message=(
+                            "Now you've done it. It seems that the brick has other properties than weight, namely the ability to blow you to smithereens. "
+                            "zork: session ended. Send 'zork' to start again."
+                        ),
+                        ended=True,
+                    )
+                flags.add("safe_blown")
+                counters["safe_collapse_turns"] = 5
+                return self._turn_event_result(
+                    session,
+                    room_id=room_id,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                    now_unix=now_unix,
+                    message="There is an explosion nearby.",
+                )
+
+        safe_collapse_turns = int(counters.get("safe_collapse_turns") or 0)
+        if safe_collapse_turns > 0:
+            counters["safe_collapse_turns"] = safe_collapse_turns - 1
+            if counters["safe_collapse_turns"] <= 0:
+                flags.add("safe_room_collapsed")
+                counters["ledge_collapse_turns"] = 8
+                if room_id == "SAFE":
+                    return self._turn_event_result(
+                        session,
+                        room_id=room_id,
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                        message=(
+                            "The room trembles and 50,000 pounds of rock fall on you, turning you into a pancake. "
+                            "zork: session ended. Send 'zork' to start again."
+                        ),
+                        ended=True,
+                    )
+                return self._turn_event_result(
+                    session,
+                    room_id=room_id,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                    now_unix=now_unix,
+                    message=(
+                        "You may recall your recent explosion. Well, probably as a result of that, you hear an ominous rumbling, "
+                        "as if one of the rooms in the dungeon had collapsed."
+                    ),
+                )
+
+        ledge_collapse_turns = int(counters.get("ledge_collapse_turns") or 0)
+        if ledge_collapse_turns > 0:
+            counters["ledge_collapse_turns"] = ledge_collapse_turns - 1
+            if counters["ledge_collapse_turns"] <= 0 and "ledge4_collapsed" not in flags:
+                flags.add("ledge4_collapsed")
+                if room_id == "LEDG4":
+                    if "aboard_balloon" in flags and str(object_locations.get("BALLO") or "").strip().upper() == "LEDG4":
+                        if self._balloon_tied_room(session) == "LEDG4":
+                            flags.discard("balloon_tied_ledg2")
+                            flags.discard("balloon_tied_ledg4")
+                            flags.discard("balloon_inflated")
+                            flags.discard("aboard_balloon")
+                            counters["balloon_burn_turns"] = 0
+                            object_locations["BALLO"] = "GONE"
+                            object_locations["DBALL"] = "VLBOT"
+                            return self._turn_event_result(
+                                session,
+                                room_id=room_id,
+                                inventory=inventory,
+                                flags=flags,
+                                object_locations=object_locations,
+                                now_unix=now_unix,
+                                message=(
+                                    "The ledge collapses, probably as a result of the explosion. A large chunk of it, which is attached to the hook, drags you down "
+                                    "to the ground. Fatally. zork: session ended. Send 'zork' to start again."
+                                ),
+                                ended=True,
+                            )
+                        object_locations["BALLO"] = "VAIR4"
+                        return self._turn_event_result(
+                            session,
+                            room_id="VAIR4",
+                            inventory=inventory,
+                            flags=flags,
+                            object_locations=object_locations,
+                            now_unix=now_unix,
+                            message="The ledge collapses, leaving you with no place to land.",
+                        )
+                    return self._turn_event_result(
+                        session,
+                        room_id=room_id,
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                        message=(
+                            "The force of the explosion has caused the ledge to collapse belatedly. "
+                            "zork: session ended. Send 'zork' to start again."
+                        ),
+                        ended=True,
+                    )
+                return self._turn_event_result(
+                    session,
+                    room_id=room_id,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                    now_unix=now_unix,
+                    message="The ledge collapses, giving you a narrow escape.",
+                )
+
+        gnome_room = str(object_locations.get("GNOME") or "").strip().upper()
+        if gnome_room == room_id and room_id in GNOME_LEDGE_ROOMS and "gnome_door_open" not in flags:
+            nervous_turns = int(counters.get("gnome_nervous_turns") or 0)
+            if nervous_turns > 0:
+                counters["gnome_nervous_turns"] = nervous_turns - 1
+                if counters["gnome_nervous_turns"] <= 0:
+                    counters["gnome_depart_turns"] = 5
+                    return self._turn_event_result(
+                        session,
+                        room_id=room_id,
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                        message="The gnome appears increasingly nervous.",
+                    )
+            depart_turns = int(counters.get("gnome_depart_turns") or 0)
+            if depart_turns > 0:
+                counters["gnome_depart_turns"] = depart_turns - 1
+                if counters["gnome_depart_turns"] <= 0:
+                    object_locations["GNOME"] = "GONE"
+                    return self._turn_event_result(
+                        session,
+                        room_id=room_id,
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                        message=(
+                            "The gnome glances at his watch. 'Oops. I'm late for an appointment!' "
+                            "He disappears, leaving you alone on the ledge."
+                        ),
+                    )
+
+        return None
 
     def _balloon_fuel_duration(self, code: str) -> int:
         return int(BALLOON_FUEL_TURNS.get(str(code or "").strip().upper(), DEFAULT_BALLOON_FUEL_TURNS))
@@ -1688,6 +1952,8 @@ class ZorkGame:
         if code_key == "MSWIT":
             return "A switch protrudes from the machine."
         if code_key == "SAFE":
+            if self._safe_room_collapsed(session):
+                return "The way to the south is blocked by debris from an explosion."
             return (
                 "A rusty old box is set in the wall, its door blown away."
                 if "safe_blown" in self._session_flags(session)
@@ -1704,6 +1970,10 @@ class ZorkGame:
             return f"There is a trophy case here containing {summary}."
         if code_key == "SSLOT":
             return "" if "safe_blown" in self._session_flags(session) else "An oblong hole has been chipped out of the front of the box."
+        if code_key == "FUSE":
+            if "fuse_lit" in self._session_flags(session):
+                return "A fuse burns with an unhealthy enthusiasm."
+            return ""
         if code_key == "GATES":
             return (
                 "A black gateway stands open."
@@ -1843,6 +2113,8 @@ class ZorkGame:
                 else "The depressed area is dry now, and a tin of rare spices lies exposed where the pool used to be."
             )
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(pool_state=pool_state)
+        if room_key == "LLD2":
+            return ROOM_DYNAMIC_DESCRIPTIONS[room_key]
         if room_key in {"MIRR1", "MIRR2"}:
             mirror_state = "Unfortunately, you have managed to destroy it by your reckless actions." if "mirror_broken" in flags else ""
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(mirror_state=mirror_state).strip()
@@ -1850,12 +2122,31 @@ class ZorkGame:
             machine_state = "its lid yawning open beside a chunky switch." if "machine_open" in flags else "its lid shut beside a chunky switch."
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(machine_state=machine_state)
         if room_key == "SAFE":
+            if self._safe_room_collapsed(flags):
+                return "The way is blocked by debris from an explosion."
             safe_state = (
                 "On the far wall is a rusty box, whose door has been blown off."
                 if "safe_blown" in flags
                 else "Imbedded in the far wall is a rusty old box with an oblong hole chipped out of the front."
             )
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(safe_state=safe_state)
+        if room_key == "LEDG2":
+            west_state = (
+                "A narrow chimney slopes down through a small door in the west wall."
+                if "gnome_door_open" in flags
+                else ""
+            )
+            return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(west_state=west_state).strip()
+        if room_key == "LEDG4":
+            if self._ledge4_collapsed(flags):
+                return "The ledge has collapsed and cannot be landed on."
+            south_state = "The way to the south is blocked by rubble." if self._safe_room_collapsed(flags) else "There is a small door to the south."
+            west_state = (
+                "A narrow chimney slopes down through a small door in the west wall."
+                if "gnome_door_open" in flags
+                else ""
+            )
+            return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(south_state=south_state, west_state=west_state).strip()
         if room_key == "LROOM":
             if "trap_door_open" in flags and "rug_moved" in flags:
                 center_state = "and a rug lying beside an open trap door"
@@ -2366,6 +2657,70 @@ class ZorkGame:
                     now_unix=now_unix,
                 )
 
+        if room_id == "LEDG4" and direction == "SOUTH" and self._safe_room_collapsed(flags):
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(f"Behind you, the walls of the safe room collapse into rubble. {self._room_summary(session, room_id)}"),
+                command_name=self.SPEC.name,
+            )
+
+        if room_id == "VAIR4" and direction == "EAST" and self._ledge4_collapsed(flags):
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(f"The ledge has collapsed and cannot be landed on. {self._room_summary(session, room_id)}"),
+                command_name=self.SPEC.name,
+            )
+
+        if room_id in GNOME_LEDGE_ROOMS and direction == "WEST":
+            if "gnome_door_open" not in flags:
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(f"The volcano wall is unbroken there. {self._room_summary(session, room_id)}"),
+                    command_name=self.SPEC.name,
+                )
+            return self._complete_transition_with_prefix(
+                session,
+                room_id="VLBOT",
+                inventory=inventory,
+                flags=flags,
+                object_locations=object_locations,
+                now_unix=now_unix,
+                prefix="You squeeze through the little west door and slide down a narrow chimney.",
+            )
+
+        if room_id == "POG" and direction in {"UP", "NW", "WEST"}:
+            if "rainbow_solid" not in flags:
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(f"The rainbow is not solid enough to support you. {self._room_summary(session, room_id)}"),
+                    command_name=self.SPEC.name,
+                )
+            return self._complete_transition(
+                session,
+                room_id="RAINB",
+                inventory=inventory,
+                flags=flags,
+                object_locations=object_locations,
+                now_unix=now_unix,
+            )
+
+        if room_id == "ALISM" and direction in {"WEST", "NW", "DOWN"}:
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(f"There is a chasm too large to jump across. {self._room_summary(session, room_id)}"),
+                command_name=self.SPEC.name,
+            )
+
+        if room_id == "BARRE" and direction in {"LAUNC", "DOWN"}:
+            self._sessions.pop(str(session.get("peer_id") or "").strip().lower(), None)
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(
+                    "I didn't think you would REALLY try to go over the falls in a barrel. Some 450 feet below, you are met by unfriendly rocks and boulders. zork: session ended. Send 'zork' to start again."
+                ),
+                command_name=self.SPEC.name,
+            )
+
         if "aboard_boat" in flags and object_locations.get("RBOAT") != room_id:
             flags.discard("aboard_boat")
         if "aboard_balloon" in flags and object_locations.get("BALLO") != room_id:
@@ -2626,7 +2981,10 @@ class ZorkGame:
                         reply_text=self._compact(f"The balloon is already on the ground. {self._room_summary(session, room_id)}"),
                         command_name=self.SPEC.name,
                     )
-                if room_id in BALLOON_LANDING_MAP:
+                if room_id == "VAIR4" and self._ledge4_collapsed(flags):
+                    new_room = BALLOON_DESCENT_MAP[room_id]
+                    move_text = "The balloon descends."
+                elif room_id in BALLOON_LANDING_MAP:
                     new_room = BALLOON_LANDING_MAP[room_id]
                     move_text = "The balloon lands."
                 elif room_id in BALLOON_DESCENT_MAP:
@@ -2691,6 +3049,12 @@ class ZorkGame:
                     command_name=self.SPEC.name,
                 )
             if room_id == "VAIR4" and direction == "EAST" and exit_row is not None:
+                if self._ledge4_collapsed(flags):
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"The ledge has collapsed and cannot be landed on. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
                 new_room = "LEDG4"
                 object_locations["BALLO"] = new_room
                 self._write_session_state(
@@ -2829,6 +3193,8 @@ class ZorkGame:
         if code_key == "MSWIT":
             return "A sturdy switch on the side of the machine. A screwdriver might persuade it."
         if code_key == "SAFE":
+            if self._safe_room_collapsed(flags):
+                return "The safe room has collapsed into rubble."
             return (
                 "A rusty safe with its door blown off."
                 if "safe_blown" in flags
@@ -2842,6 +3208,10 @@ class ZorkGame:
             return self._compact(f"A trophy case. It currently holds: {labels}.")
         if code_key == "SSLOT":
             return "The chipped-out slot in the front of the box." if "safe_blown" not in flags else "The blasted opening in the front of the safe."
+        if code_key == "FUSE":
+            if "fuse_lit" in flags:
+                return "A fuse burning down toward very poor life choices."
+            return "A fuse threaded for use with the brick."
         if code_key == "GATES":
             return (
                 "A black gateway stands open, no longer crowded by evil spirits."
@@ -2866,6 +3236,10 @@ class ZorkGame:
             )
         if code_key == "BAT":
             return "A large vampire bat clings to the ceiling, glaring at you with weirdly personal disapproval."
+        if code_key == "GNOME":
+            if "gnome_door_open" in flags:
+                return "A nervous volcano gnome checks his watch and admires the little west door he just arranged for you."
+            return "A nervous volcano gnome glances at his watch and looks as though he expects to be paid promptly."
         if code_key == "THIEF":
             return self._compact(
                 "There is a suspicious-looking individual, holding a bag and a vicious-looking stiletto, leaning against one wall."
@@ -3180,6 +3554,8 @@ class ZorkGame:
             inventory.append(code_key)
             object_locations[code_key] = "INVENTORY"
             return (f"Taken: {object_name(code_key)}.", inventory, object_locations, flags)
+        if code_key == "BODIE":
+            return ("A force keeps you from taking the bodies.", inventory, object_locations, flags)
         if code_key == "GUNK":
             object_locations.pop("GUNK", None)
             return (
@@ -3339,7 +3715,7 @@ class ZorkGame:
         flags.discard("lamp_lit")
         return ("The lantern goes dark.", flags)
 
-    def _attack_response(self, session: dict[str, object], target_code: str | None = None) -> tuple[str, set[str], dict[str, str]]:
+    def _attack_response(self, session: dict[str, object], target_code: str | None = None) -> tuple[str, set[str], dict[str, str], bool]:
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         flags = self._session_flags(session)
         object_locations = self._object_locations(session)
@@ -3347,17 +3723,25 @@ class ZorkGame:
         target_key = str(target_code or "").strip().upper()
         visible = set(self._visible_top_level_objects(session, room_id))
         if not target_key:
-            for candidate in ("THIEF", "TROLL", "CYCLO"):
+            for candidate in ("THIEF", "TROLL", "CYCLO", "GHOST"):
                 if candidate in visible:
                     target_key = candidate
                     break
+        if target_key == "GHOST":
+            if "GHOST" not in visible:
+                return ("There are no spirits here to attack.", flags, object_locations, False)
+            return ("You seem unable to affect these spirits.", flags, object_locations, False)
+        if target_key == "BODIE":
+            if "BODIE" not in visible:
+                return ("There are no bodies here to attack.", flags, object_locations, False)
+            return (self._guardian_of_the_dungeon_death(), flags, object_locations, True)
         if target_key == "THIEF":
             if "THIEF" not in visible:
-                return ("There's no thief here to attack.", flags, object_locations)
+                return ("There's no thief here to attack.", flags, object_locations, False)
             if "thief_defeated" in flags:
-                return ("The thief is already unconscious.", flags, object_locations)
+                return ("The thief is already unconscious.", flags, object_locations, False)
             if not inventory.intersection(WEAPON_CODES):
-                return ("The thief eyes you coldly and keeps one hand on his stiletto.", flags, object_locations)
+                return ("The thief eyes you coldly and keeps one hand on his stiletto.", flags, object_locations, False)
             flags.add("thief_defeated")
             for code, location in list(object_locations.items()):
                 if str(location or "").strip().upper() != "THIEF":
@@ -3368,20 +3752,21 @@ class ZorkGame:
                 "The thief collapses in a heap. As his grip slackens, the contents of his bag spill onto the floor.",
                 flags,
                 object_locations,
+                False,
             )
         if target_key == "CYCLO":
             if room_id != "CYCLO" or "CYCLO" not in visible:
-                return ("There's no cyclops here to attack.", flags, object_locations)
-            return ("The cyclops looks less injured than irritated. This seems unpromising.", flags, object_locations)
+                return ("There's no cyclops here to attack.", flags, object_locations, False)
+            return ("The cyclops looks less injured than irritated. This seems unpromising.", flags, object_locations, False)
         if room_id != "MTROL" or "TROLL" not in visible:
-            return ("There's nothing here looking for a fight.", flags, object_locations)
+            return ("There's nothing here looking for a fight.", flags, object_locations, False)
         if "troll_defeated" in flags:
-            return ("The troll is already down.", flags, object_locations)
+            return ("The troll is already down.", flags, object_locations, False)
         if not inventory.intersection(WEAPON_CODES - {"STILL"}):
-            return ("The troll fends you off with a menacing gesture.", flags, object_locations)
+            return ("The troll fends you off with a menacing gesture.", flags, object_locations, False)
         flags.add("troll_defeated")
         object_locations["AXE"] = room_id
-        return ("The troll collapses in a heap, dropping his bloody axe. The passages are open.", flags, object_locations)
+        return ("The troll collapses in a heap, dropping his bloody axe. The passages are open.", flags, object_locations, False)
 
     def _push_or_press_response(self, session: dict[str, object], code: str) -> tuple[str, set[str], dict[str, str]]:
         code_key = str(code or "").strip().upper()
@@ -3728,6 +4113,16 @@ class ZorkGame:
                     False,
                 )
             return ("Wasn't he a sailor?", None, flags, object_locations, False)
+        if word_key == "geronimo":
+            if room_id == "BARRE":
+                return (
+                    "I didn't think you would REALLY try to go over the falls in a barrel. Some 450 feet below, you are met by unfriendly rocks and boulders. zork: session ended. Send 'zork' to start again.",
+                    None,
+                    flags,
+                    object_locations,
+                    True,
+                )
+            return ("Wasn't he an Apache?", None, flags, object_locations, False)
         return ("Nothing happens.", None, flags, object_locations, False)
 
     def _prayer_response(
@@ -3742,25 +4137,94 @@ class ZorkGame:
             return ("A feeling of holiness steals over you, and then you are elsewhere.", "FORE1", flags, object_locations)
         return ("If you pray enough, your prayers may be answered.", None, flags, object_locations)
 
-    def _exorcise_response(self, session: dict[str, object]) -> tuple[str, set[str], dict[str, str]]:
+    def _guardian_of_the_dungeon_death(self) -> str:
+        return (
+            "The voice of the guardian of the dungeon booms out from the darkness: "
+            "'Your disrespect costs you your life!' and places your head on a pole. "
+            "zork: session ended. Send 'zork' to start again."
+        )
+
+    def _begone_chomper_death(self) -> str:
+        return (
+            "There is a clap of thunder, and a voice echoes through the cavern: 'Begone, chomper!' "
+            "Apparently, the voice thinks you are an evil spirit, and dismisses you from the realm of the living. "
+            "zork: session ended. Send 'zork' to start again."
+        )
+
+    def _exorcise_response(self, session: dict[str, object]) -> tuple[str, set[str], dict[str, str], bool]:
         flags = self._session_flags(session)
         object_locations = self._object_locations(session)
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         inventory = set(self._session_inventory(session))
+        visible = set(self._visible_top_level_objects(session, room_id))
         if room_id != "LLD1":
-            return ("That would be overdramatic here.", flags, object_locations)
-        if "lld_open" in flags:
-            return ("The spirits have already fled.", flags, object_locations)
+            return ("That would be overdramatic here.", flags, object_locations, False)
+        if "GHOST" not in visible:
+            return (self._begone_chomper_death(), flags, object_locations, True)
         required = {"BELL", "BOOK", "CANDL"}
         if not required.issubset(inventory) or not self._object_is_lit(session, "CANDL"):
-            return ("You are not equipped for an exorcism.", flags, object_locations)
+            return ("You are not equipped for an exorcism.", flags, object_locations, False)
         flags.add("lld_open")
         object_locations["GHOST"] = "GONE"
         return (
-            "There is a clap of thunder, and a voice booms through the cavern: 'Begone, fiends!' The spirits flee through the walls.",
+            "There is a clap of thunder, and a voice echoes through the cavern: 'Begone, fiends!' The spirits, sensing the presence of a greater power, flee through the walls.",
+            flags,
+            object_locations,
+            False,
+        )
+
+    def _gnome_exchange_response(
+        self,
+        session: dict[str, object],
+        offered_code: str,
+        *,
+        action: str,
+    ) -> tuple[str, list[str], set[str], dict[str, str]]:
+        code_key = str(offered_code or "").strip().upper()
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+
+        if code_key not in inventory:
+            return (f"You aren't carrying the {object_name(code_key)}.", inventory, flags, object_locations)
+        if room_id not in GNOME_LEDGE_ROOMS or str(object_locations.get("GNOME") or "").strip().upper() != room_id:
+            return ("The volcano gnome is not here.", inventory, flags, object_locations)
+
+        counters = self._session_counters(session)
+        inventory = [value for value in inventory if value != code_key]
+        object_locations[code_key] = "GONE"
+        if self._is_treasure(code_key):
+            flags.add("gnome_door_open")
+            object_locations["GNOME"] = "GONE"
+            counters["gnome_nervous_turns"] = 0
+            counters["gnome_depart_turns"] = 0
+            return (
+                f"'Thank you very much for the {object_name(code_key)}. Follow me,' says the gnome. A small door appears on the west side of the ledge, opening onto a narrow chimney sloping downward.",
+                inventory,
+                flags,
+                object_locations,
+            )
+        return (
+            f"'That wasn't quite what I had in mind,' says the gnome, crunching the {object_name(code_key)} in his rock-hard hands.",
+            inventory,
             flags,
             object_locations,
         )
+
+    def _give_response(
+        self,
+        session: dict[str, object],
+        code: str,
+        target_code: str,
+    ) -> tuple[str, list[str], set[str], dict[str, str]]:
+        target_key = str(target_code or "").strip().upper()
+        if target_key == "GNOME":
+            return self._gnome_exchange_response(session, code, action="give")
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        return (f"The {object_name(target_key)} doesn't seem interested.", inventory, flags, object_locations)
 
     def _put_or_insert_response(
         self,
@@ -3891,6 +4355,22 @@ class ZorkGame:
         if code_key not in inventory:
             return (f"You aren't carrying the {object_name(code_key)}.", None, inventory, flags, object_locations, False)
 
+        if target_key == "GNOME":
+            reply, inventory, flags, object_locations = self._gnome_exchange_response(session, code_key, action="throw")
+            return (reply, None, inventory, flags, object_locations, False)
+
+        if target_key == "GHOST":
+            visible = set(self._visible_top_level_objects(session, room_id))
+            if "GHOST" in visible:
+                return (
+                    "How can you attack a spirit with material objects?",
+                    None,
+                    inventory,
+                    flags,
+                    object_locations,
+                    False,
+                )
+
         if code_key == "FLASK":
             inventory = [value for value in inventory if value != "FLASK"]
             object_locations["FLASK"] = "GONE"
@@ -3965,11 +4445,14 @@ class ZorkGame:
         flags = self._session_flags(session)
         object_locations = self._object_locations(session)
         inventory = set(self._session_inventory(session))
+        counters = self._session_counters(session)
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         if room_id != "SAFE":
             return ("Lighting a loose fuse seems unwise.", flags, object_locations)
         if object_locations.get("BRICK") != "SSLOT" or object_locations.get("FUSE") != "SSLOT":
             return ("The fuse isn't set up for anything useful yet.", flags, object_locations)
+        if int(counters.get("fuse_turns") or 0) > 0 or "fuse_lit" in flags:
+            return ("The wire is already burning merrily away.", flags, object_locations)
         if not (
             "MATCH" in inventory
             or self._object_is_lit(session, "TORCH")
@@ -3977,11 +4460,10 @@ class ZorkGame:
             or self._object_is_lit(session, "CANDL")
         ):
             return ("You need a flame to light the fuse.", flags, object_locations)
-        flags.add("safe_blown")
-        object_locations["BRICK"] = "GONE"
-        object_locations["FUSE"] = "GONE"
+        flags.add("fuse_lit")
+        counters["fuse_turns"] = 2
         return (
-            "There is an explosion nearby. When the smoke clears, the box door has been blown off.",
+            "The wire starts to burn.",
             flags,
             object_locations,
         )
@@ -4199,6 +4681,15 @@ class ZorkGame:
         args = [str(value).strip().lower() for value in parts[1:] if str(value).strip()]
         raw_target = " ".join(args)
 
+        pending_event = self._handle_pending_turn_events(session, now_unix=now_unix)
+        if pending_event is not None:
+            return pending_event
+
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        flags = self._session_flags(session)
+        inventory = self._session_inventory(session)
+        object_locations = self._object_locations(session)
+
         if room_id == "CAGED" and "cage_solved" not in flags:
             robot_raising = False
             if robot_command:
@@ -4296,7 +4787,7 @@ class ZorkGame:
             return BotAppResult(
                 handled=True,
                 reply_text=(
-                    "zork: look, x/read, read <cake> through flask, eat, n/s/e/w/u/d, take/drop, put/insert, throw/rub, open/close, move, push/press, turn, "
+                    "zork: look, x/read, read <cake> through flask, eat, n/s/e/w/u/d, take/drop/give, put/insert, throw/rub, open/close, move, push/press, turn, "
                     "light/burn/extinguish, dig, wave stick, tie/untie rope or balloon wire, raise/lower basket, plug/repair broken boat or leak, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
                     "robot, press <button>; robot, north/east/etc.; robot, take sphere; robot, raise cage; magic words, score, attack, quit."
                 ),
@@ -4418,6 +4909,27 @@ class ZorkGame:
                 reply = f"You don't see any {target_text} here." if raw_target else ("Repair what?" if head_raw == "repair" else "Plug what?")
                 return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
             reply, inventory, flags, object_locations = self._repair_or_plug_response(session, target, tool)
+            self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
+
+        if head_raw == "give":
+            direct_text = raw_target
+            target_text = ""
+            if " to " in f" {raw_target} ":
+                before, after = raw_target.split(" to ", 1)
+                direct_text = before.strip()
+                target_text = after.strip()
+            direct = self._resolve_object(session, direct_text, "give") if direct_text else None
+            target = self._resolve_object(session, target_text, "give") if target_text else ("GNOME" if self._is_accessible(session, "GNOME") else None)
+            if not direct:
+                self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+                reply = f"You aren't carrying {direct_text}." if direct_text else "Give what?"
+                return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            if not target:
+                self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+                reply = "Give it to whom?"
+                return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            reply, inventory, flags, object_locations = self._give_response(session, direct, target)
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
 
@@ -4781,6 +5293,13 @@ class ZorkGame:
                 self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
                 reply = f"You don't see any {target_text} here." if raw_target else ("Burn what?" if head_raw == "burn" else ("Light what?" if action == "on" else "Extinguish what?"))
                 return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            if head_raw == "burn" and target == "BODIE":
+                self._sessions.pop(peer_id, None)
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(self._guardian_of_the_dungeon_death()),
+                    command_name=self.SPEC.name,
+                )
             if target == "FUSE" and action == "on":
                 reply, flags, object_locations = self._light_fuse_response(session)
                 self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
@@ -4816,11 +5335,14 @@ class ZorkGame:
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {suffix}"), command_name=self.SPEC.name)
 
         if head_raw == "exorcise":
-            reply, flags, object_locations = self._exorcise_response(session)
+            reply, flags, object_locations, ended = self._exorcise_response(session)
+            if ended:
+                self._sessions.pop(peer_id, None)
+                return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
 
-        if head_raw in {"well", "sinbad"}:
+        if head_raw in {"well", "sinbad", "geronimo"}:
             reply, new_room, flags, object_locations, ended = self._magic_word_response(session, head_raw)
             if ended:
                 self._sessions.pop(peer_id, None)
@@ -4835,7 +5357,10 @@ class ZorkGame:
 
         if head_raw in {"attack", "fight", "kill"}:
             target = self._resolve_object(session, raw_target, "attack") if raw_target else None
-            reply, flags, object_locations = self._attack_response(session, target)
+            reply, flags, object_locations, ended = self._attack_response(session, target)
+            if ended:
+                self._sessions.pop(peer_id, None)
+                return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
 
