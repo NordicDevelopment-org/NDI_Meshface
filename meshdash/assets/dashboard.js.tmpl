@@ -7365,7 +7365,8 @@
       const idx = Number(opt.index);
       if (!Number.isInteger(idx) || idx < 0) return "";
       const name = typeof opt.name === "string" ? opt.name.trim() : "";
-      return name || `Public ${{idx}}`;
+      if (name) return name;
+      return opt.hasPsk === true ? `Private ${{idx}}` : `Public ${{idx}}`;
     }}
 
     function meshChannelOptionByIndex(rawIndex, sourceOptions = null) {{
@@ -7390,12 +7391,18 @@
       return name || "";
     }}
 
+    function meshChannelHasPsk(rawIndex, sourceOptions = null) {{
+      const match = meshChannelOptionByIndex(rawIndex, sourceOptions);
+      return !!(match && match.hasPsk === true);
+    }}
+
     function meshChannelViewOptionLabel(opt) {{
       if (!opt || typeof opt !== "object") return "";
       const idx = Number(opt.index);
       if (!Number.isInteger(idx) || idx < 0) return "";
       const name = typeof opt.name === "string" ? opt.name.trim() : "";
-      return name || `Public ${{idx}}`;
+      if (name) return name;
+      return opt.hasPsk === true ? `Private ${{idx}}` : `Public ${{idx}}`;
     }}
 
     function meshChannelSendOptionLabel(opt) {{
@@ -7403,7 +7410,8 @@
       const idx = Number(opt.index);
       if (!Number.isInteger(idx) || idx < 0) return "";
       const name = typeof opt.name === "string" ? opt.name.trim() : "";
-      return name || `Public ${{idx}}`;
+      if (name) return name;
+      return opt.hasPsk === true ? `Private ${{idx}}` : `Public ${{idx}}`;
     }}
 
     function meshChannelColorMeta(rawIndex, {{ allowAll = true, sourceOptions = null }} = {{}}) {{
@@ -7417,7 +7425,8 @@
         }};
       }}
       const configuredName = meshChannelConfiguredName(idx, sourceOptions);
-      if (!configuredName) {{
+      const hasPsk = meshChannelHasPsk(idx, sourceOptions);
+      if (!configuredName && !hasPsk) {{
         const neutral = meshChannelNeutralPalette[idx % meshChannelNeutralPalette.length] || meshChannelNeutralPalette[0];
         const neutralName = String(neutral && neutral.name || "gray").trim() || "gray";
         const fill = String(neutral && neutral.fill || "#BBBBBB").trim() || "#BBBBBB";
@@ -7431,7 +7440,8 @@
       const palette = meshChannelColorPalette[idx % meshChannelColorPalette.length] || meshChannelColorPalette[0];
       const colorName = String(palette && palette.name || "channel").trim() || "channel";
       const fill = String(palette && palette.fill || "#8DA3B1").trim() || "#8DA3B1";
-      const colorTitle = `${{configuredName}} • ${{colorName.charAt(0).toUpperCase()}}${{colorName.slice(1)}} channel`;
+      const channelBaseLabel = configuredName || `Private ${{idx}}`;
+      const colorTitle = `${{channelBaseLabel}} • ${{colorName.charAt(0).toUpperCase()}}${{colorName.slice(1)}} channel`;
       return {{
         key: colorName,
         name: colorName,
@@ -7560,7 +7570,7 @@
       }}
       const name = meshChannelConfiguredName(idx, meshChannelOptions);
       if (name) return compact ? name : verbose ? `Ch ${{idx}} (${{name}})` : name;
-      return `Public ${{idx}}`;
+      return meshChannelHasPsk(idx, meshChannelOptions) ? `Private ${{idx}}` : `Public ${{idx}}`;
     }}
 
     function activeMeshChannelFilterIndex() {{
@@ -7700,8 +7710,18 @@
           : ""
         );
         const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
+        const pskRaw = (
+          settings && settings.psk != null ? settings.psk
+          : settings && settings.channel_psk != null ? settings.channel_psk
+          : ch.psk != null ? ch.psk
+          : ch.channel_psk != null ? ch.channel_psk
+          : null
+        );
+        const hasPsk = Array.isArray(pskRaw)
+          ? pskRaw.length > 0
+          : (pskRaw != null && String(pskRaw).trim() !== "");
 
-        const opt = {{ index, name, role, disabled }};
+        const opt = {{ index, name, role, disabled, hasPsk }};
         if (!byIndex.has(index)) {{
           byIndex.set(index, opt);
         }} else {{
@@ -7709,6 +7729,7 @@
           if (prev && typeof prev === "object") {{
             if (!prev.name && name) prev.name = name;
             if (!prev.role && role) prev.role = role;
+            prev.hasPsk = prev.hasPsk === true || hasPsk === true;
             prev.disabled = prev.disabled && disabled;
           }}
         }}
@@ -7718,7 +7739,7 @@
         const fillCount = Math.max(fallbackCount, rawChannels.length || 0);
         for (let i = 0; i < fillCount; i++) {{
           if (!byIndex.has(i)) {{
-            byIndex.set(i, {{ index: i, name: "", role: "", disabled: false }});
+            byIndex.set(i, {{ index: i, name: "", role: "", disabled: false, hasPsk: false }});
           }}
         }}
       }}
@@ -7729,7 +7750,7 @@
 
       if (collectedOptions.length) return collectedOptions;
       if (!includeFallback) return [];
-      return [{{ index: 0, name: "", role: "", disabled: false }}];
+      return [{{ index: 0, name: "", role: "", disabled: false, hasPsk: false }}];
     }}
 
     function buildMeshChannelOptionsFromLocalState(localState) {{
@@ -7739,7 +7760,7 @@
         fallbackCount: Math.max(8, (localState && Array.isArray(localState.channels)) ? localState.channels.length : 0),
       }}).filter((opt) => !(opt && opt.disabled));
       if (collected.length) return collected;
-      return [{{ index: 0, name: "", role: "", disabled: false }}];
+      return [{{ index: 0, name: "", role: "", disabled: false, hasPsk: false }}];
     }}
 
     function buildMeshChannelSendOptionsFromLocalState(localState) {{
@@ -7749,7 +7770,7 @@
         fallbackCount: Math.max(8, (localState && Array.isArray(localState.channels)) ? localState.channels.length : 0),
       }}).filter((opt) => !(opt && opt.disabled));
       if (collected.length) return collected;
-      return [{{ index: 0, name: "", role: "", disabled: false }}];
+      return [{{ index: 0, name: "", role: "", disabled: false, hasPsk: false }}];
     }}
 
     function renderMeshChannelSelect(options) {{
@@ -7800,7 +7821,7 @@
       const normalized = Array.isArray(options) ? options.slice() : [];
       const desiredIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === desiredIndex)) {{
-        normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false }});
+        normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
       }}
       select.innerHTML = "";
       for (const opt of normalized) {{
@@ -7810,7 +7831,7 @@
         optionEl.value = String(idx);
         optionEl.textContent = label;
         optionEl.disabled = !!(opt && opt.disabled);
-        optionEl.title = label === `Public ${{idx}}` ? label : `${{label}} • Ch ${{idx}}`;
+        optionEl.title = `${{label}} • Ch ${{idx}}`;
         select.appendChild(optionEl);
       }}
 
@@ -7836,7 +7857,7 @@
       const normalized = Array.isArray(options) ? options.slice() : [];
       const desiredIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === desiredIndex)) {{
-        normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false }});
+        normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
       }}
 
       panel.innerHTML = normalized.map((opt) => {{
