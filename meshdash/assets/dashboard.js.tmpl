@@ -7577,12 +7577,17 @@
     function syncMeshChannelSendControl() {{
       const dot = document.getElementById("chat-send-channel-dot");
       const wrap = document.querySelector(".chat-send-channel-wrap");
+      const composeShell = document.querySelector(".chat-compose-shell");
       const input = document.getElementById("chat-input");
       const meta = meshChannelColorMeta(activeMeshSendChannelIndex, {{ allowAll: false }});
       const rgb = hexColorRgbTriplet(meta.fill);
       if (wrap instanceof HTMLElement) {{
         wrap.style.setProperty("--chat-send-channel-fill", meta.fill);
         wrap.style.setProperty("--chat-send-channel-rgb", rgb);
+      }}
+      if (composeShell instanceof HTMLElement) {{
+        composeShell.style.setProperty("--chat-send-channel-fill", meta.fill);
+        composeShell.style.setProperty("--chat-send-channel-rgb", rgb);
       }}
       if (input instanceof HTMLElement) {{
         input.style.setProperty("--chat-send-channel-fill", meta.fill);

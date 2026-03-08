@@ -5897,9 +5897,17 @@
       background: #f8fcf8;
     }}
     .chat-compose-shell {{
-      border: 1px solid #c8dacc;
+      --chat-send-channel-fill: #0072b2;
+      --chat-send-channel-rgb: 0, 114, 178;
+      border: 1px solid rgba(var(--chat-send-channel-rgb), 0.34);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--chat-send-channel-rgb), 0.06),
+          rgba(243, 250, 245, 0.98) 28%
+        );
+      box-shadow: inset 0 0 0 1px rgba(var(--chat-send-channel-rgb), 0.06);
       border-radius: 10px;
-      background: #f3faf5;
       padding: 6px;
       display: flex;
       flex-direction: column;
@@ -5960,7 +5968,7 @@
     #chat-input {{
       --chat-send-channel-fill: #0072b2;
       --chat-send-channel-rgb: 0, 114, 178;
-      border-color: #c2d8c7;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.34);
       background:
         linear-gradient(
           90deg,
@@ -5971,7 +5979,7 @@
       box-shadow: none;
     }}
     #chat-input:hover {{
-      border-color: #c2d8c7;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.42);
       background:
         linear-gradient(
           90deg,
@@ -5981,9 +5989,9 @@
         );
     }}
     #chat-input:focus {{
-      outline: 2px solid #9ac5aa;
+      outline: 2px solid rgba(var(--chat-send-channel-rgb), 0.28);
       outline-offset: 0;
-      border-color: #9ac5aa;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.48);
       background:
         linear-gradient(
           90deg,
@@ -7453,8 +7461,13 @@
       background: #1f2d3a;
     }}
     [data-theme="dark"] .card.chat .chat-compose-shell {{
-      background: #101a24;
-      border-color: #2f3b4b;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--chat-send-channel-rgb), 0.1),
+          rgba(16, 26, 36, 0.99) 34%
+        );
+      border-color: rgba(var(--chat-send-channel-rgb), 0.38);
     }}
     [data-theme="dark"] .card.chat .chat-endpoint .chat-id-bg,
     [data-theme="dark"] .card.chat .chat-reaction-chip,
@@ -7918,7 +7931,7 @@
       color: #f1c979;
     }}
     [data-theme="dark"] #chat-input {{
-      border-color: #2b8a59;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.4);
       background:
         linear-gradient(
           90deg,
@@ -7929,7 +7942,7 @@
       box-shadow: none;
     }}
     [data-theme="dark"] #chat-input:hover {{
-      border-color: #2b8a59;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.48);
       background:
         linear-gradient(
           90deg,
@@ -7939,10 +7952,10 @@
         );
     }}
     [data-theme="dark"] #chat-input:focus {{
-      outline: 2px solid var(--ui-accent);
+      outline: 2px solid rgba(var(--chat-send-channel-rgb), 0.32);
       outline-offset: 0;
-      border-color: var(--ui-accent);
-      outline-color: var(--ui-accent);
+      border-color: rgba(var(--chat-send-channel-rgb), 0.54);
+      outline-color: rgba(var(--chat-send-channel-rgb), 0.32);
       background:
         linear-gradient(
           90deg,
@@ -8212,8 +8225,13 @@
 
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .card.chat .chat-compose-shell {{
-      background: var(--ui-panel-alt);
-      border-color: var(--ui-border);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--chat-send-channel-rgb), 0.1),
+          rgba(16, 26, 36, 0.99) 34%
+        );
+      border-color: rgba(var(--chat-send-channel-rgb), 0.38);
     }}
     [data-theme="dark"] .chat-reaction-row .chat-react-btn {{
       background: transparent;
