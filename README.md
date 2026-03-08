@@ -202,17 +202,21 @@ sudo systemctl status meshtastic-dashboard --no-pager
 
 ## Fast Update/Deploy Loop
 
-Use this after editing `mesh_dashboard.py` or `meshdash/*.py`:
+Use this after editing `mesh_dashboard.py`, `mesh_connection.py`, or `meshdash/*.py`:
 
 ```bash
-scp /home/j/mesh_py/mesh_dashboard.py j@192.168.1.241:/home/j/mesh/app/ && \
-tar -C /home/j/mesh_py --exclude='meshdash/__pycache__' --exclude='*.pyc' -cf - meshdash | \
-ssh j@192.168.1.241 'tar -C /home/j/mesh/app -xf -' && \
-ssh -t j@192.168.1.241 '
-python3 -m compileall -q /home/j/mesh/app &&
-sudo systemctl restart meshtastic-dashboard &&
-SYSTEMD_PAGER=cat sudo systemctl --no-pager -l status meshtastic-dashboard
-'
+chmod +x ./scripts/deploy_dashboard.sh
+./scripts/deploy_dashboard.sh
+```
+
+Default target is `j@192.168.1.241`. You can override it without editing the script:
+
+```bash
+MESH_DASH_DEPLOY_TARGET=j@192.168.1.241 \
+MESH_DASH_DEPLOY_APP_DIR=/home/j/mesh/app \
+MESH_DASH_DEPLOY_REMOTE_PYTHON=/home/j/mesh/.venv/bin/python \
+MESH_DASH_DEPLOY_SERVICE=meshtastic-dashboard \
+./scripts/deploy_dashboard.sh
 ```
 
 Then hard refresh browser: `Ctrl+Shift+R`.
