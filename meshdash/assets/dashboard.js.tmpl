@@ -2231,7 +2231,6 @@
     let botSettingsSaveInFlight = false;
     let queuedComposerSend = false;
     let queuedComposerFocus = false;
-    let meshChannelMenuOpen = false;
     let meshChannelSendMenuOpen = false;
     let activeMeshChannelIndex = 0;
     let activeMeshSendChannelIndex = 0;
@@ -7486,36 +7485,12 @@
     }}
 
     function syncMeshChannelViewControl() {{
-      const dot = document.getElementById("mesh-channel-view-dot");
-      const meta = meshChannelColorMeta(activeMeshChannelIndex, {{ allowAll: true }});
-      if (dot instanceof HTMLElement) {{
-        dot.classList.toggle("is-all", meta.key === "all");
-        dot.style.setProperty("--channel-dot-fill", meta.fill);
-        dot.title = meta.title;
-        dot.setAttribute("aria-label", meta.title);
-      }}
-      const btn = document.getElementById("mesh-channel-menu-btn");
-      if (btn instanceof HTMLButtonElement) {{
-        btn.textContent = meshChannelViewMenuLabel(activeMeshChannelIndex);
-        btn.title = meta.title === btn.textContent ? meta.title : `${{meta.title}} • ${{btn.textContent}}`;
-      }}
+      renderMeshChannelPills(meshChannelOptions);
       syncMeshChannelMismatchWarning();
     }}
 
-    function setMeshChannelMenuOpen(open) {{
-      meshChannelMenuOpen = !!open;
-      const panel = document.getElementById("mesh-channel-menu");
-      if (panel instanceof HTMLElement) {{
-        panel.hidden = !meshChannelMenuOpen;
-      }}
-      const btn = document.getElementById("mesh-channel-menu-btn");
-      if (btn instanceof HTMLButtonElement) {{
-        btn.setAttribute("aria-expanded", meshChannelMenuOpen ? "true" : "false");
-      }}
-    }}
-
-    function renderMeshChannelMenu(options) {{
-      const panel = document.getElementById("mesh-channel-menu");
+    function renderMeshChannelPills(options) {{
+      const panel = document.getElementById("mesh-channel-pill-strip");
       if (!(panel instanceof HTMLElement)) return;
       const normalized = Array.isArray(options) ? options : [];
       const rows = [];
@@ -7537,22 +7512,16 @@
       panel.innerHTML = rows.map((row) => {{
         const active = normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }}) === row.index;
         const dotClass = row.all ? "channel-color-dot is-all" : "channel-color-dot";
-        const metaText = "";
-        const rowClass = row.all ? " mesh-channel-menu-item-all" : "";
-        const metaMarkup = metaText ? `<span class="mesh-channel-menu-item-meta">${{escAttr(metaText)}}</span>` : "";
         return `<button
           type="button"
-          class="mesh-channel-menu-item${{rowClass}}${{active ? " active" : ""}}"
-          role="option"
+          class="mesh-channel-pill${{active ? " active" : ""}}"
+          role="tab"
           aria-selected="${{active ? "true" : "false"}}"
           data-mesh-channel-index="${{escAttr(row.index)}}"
           title="${{escAttr(row.meta.title === row.label ? row.meta.title : `${{row.meta.title}} • ${{row.label}}`)}}"
         >
           <span class="${{dotClass}}" style="${{row.all ? "" : `--channel-dot-fill: ${{row.meta.fill}};`}}" aria-hidden="true"></span>
-          <span class="mesh-channel-menu-item-main">
-            <span class="mesh-channel-menu-item-title">${{escAttr(row.label)}}</span>
-            ${{metaMarkup}}
-          </span>
+          <span class="mesh-channel-pill-label">${{escAttr(row.label)}}</span>
         </button>`;
       }}).join("");
     }}
@@ -7900,7 +7869,7 @@
       meshChannelOptions = options;
       meshChannelSendOptions = sendOptions;
       renderMeshChannelSelect(options);
-      renderMeshChannelMenu(options);
+      renderMeshChannelPills(options);
       renderMeshChannelSendSelect(sendOptions);
       renderMeshChannelSendMenu(sendOptions, {{ preserveCurrent: true }});
       syncMeshChannelSendControl();
@@ -7944,7 +7913,7 @@
       if (select instanceof HTMLSelectElement) {{
         select.value = String(activeMeshChannelIndex);
       }}
-      renderMeshChannelMenu(meshChannelOptions);
+      renderMeshChannelPills(meshChannelOptions);
 
       if (persist) {{
         try {{
@@ -8018,7 +7987,7 @@
       meshChannelOptions = fallback;
       meshChannelSendOptions = sendFallback;
       renderMeshChannelSelect(fallback);
-      renderMeshChannelMenu(fallback);
+      renderMeshChannelPills(fallback);
       renderMeshChannelSendSelect(sendFallback, {{ preserveCurrent: true }});
       renderMeshChannelSendMenu(sendFallback, {{ preserveCurrent: true }});
       select.value = String(activeMeshChannelIndex);
@@ -8029,45 +7998,22 @@
     }}
 
     function bindMeshChannelMenuControl() {{
-      const btn = document.getElementById("mesh-channel-menu-btn");
-      const panel = document.getElementById("mesh-channel-menu");
-      if (!(btn instanceof HTMLButtonElement) || !(panel instanceof HTMLElement) || btn.dataset.bound === "1") return;
-      btn.dataset.bound = "1";
-
-      btn.addEventListener("click", (ev) => {{
-        ev.preventDefault();
-        setMeshChannelSendMenuOpen(false);
-        setMeshChannelMenuOpen(!meshChannelMenuOpen);
-      }});
+      const panel = document.getElementById("mesh-channel-pill-strip");
+      if (!(panel instanceof HTMLElement) || panel.dataset.bound === "1") return;
+      panel.dataset.bound = "1";
 
       panel.addEventListener("pointerdown", (ev) => {{
         const target = ev.target;
         if (!(target instanceof Element)) return;
-        const item = target.closest(".mesh-channel-menu-item");
+        const item = target.closest(".mesh-channel-pill");
         if (!(item instanceof HTMLButtonElement)) return;
         ev.preventDefault();
         ev.stopPropagation();
         applyMeshChannelIndex(item.dataset.meshChannelIndex || meshChannelAllIndex, true);
-        setMeshChannelMenuOpen(false);
       }});
 
-      if (document.body.dataset.meshChannelMenuBound !== "1") {{
-        document.body.dataset.meshChannelMenuBound = "1";
-        document.addEventListener("pointerdown", (ev) => {{
-          const target = ev.target;
-          if (!(target instanceof Element)) return;
-          if (target.closest("#mesh-channel-menu-btn") || target.closest("#mesh-channel-menu")) return;
-          setMeshChannelMenuOpen(false);
-        }});
-        document.addEventListener("keydown", (ev) => {{
-          if (ev.key === "Escape") {{
-            setMeshChannelMenuOpen(false);
-          }}
-        }});
-      }}
-
       syncMeshChannelViewControl();
-      renderMeshChannelMenu(meshChannelOptions);
+      renderMeshChannelPills(meshChannelOptions);
     }}
 
     function bindMeshChannelSendMenuControl() {{
@@ -8079,7 +8025,6 @@
       btn.addEventListener("click", (ev) => {{
         ev.preventDefault();
         if (btn.disabled) return;
-        setMeshChannelMenuOpen(false);
         setMeshChannelSendMenuOpen(!meshChannelSendMenuOpen);
       }});
 
