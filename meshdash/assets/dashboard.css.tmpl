@@ -5641,40 +5641,54 @@
       color: #144f93;
     }}
     .chat-reply-inline {{
-      margin-bottom: 5px;
-      border-left: 3px solid #a9cbb3;
-      padding: 2px 0 2px 8px;
-      color: #3f6050;
+      flex: 1 0 100%;
+      min-width: 0;
+      margin-bottom: 1px;
+      padding-left: 8px;
+      border-left: 2px solid rgba(112, 147, 126, 0.55);
+      color: #5d7667;
       font-size: 10px;
-      line-height: 1.25;
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
+      line-height: 1.2;
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      opacity: 0.92;
     }}
     .chat-reply-inline .chat-reply-inline-label {{
-      color: #2a513d;
+      color: #6a8778;
       font-weight: 600;
+      flex: 0 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }}
     .chat-reply-inline .chat-reply-inline-text {{
-      color: #587364;
-      white-space: normal;
-      overflow-wrap: anywhere;
-      word-break: break-word;
+      color: #789084;
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }}
     .chat-reply-inline .chat-reply-inline-meta {{
       color: #6b8578;
       font-size: 10px;
       line-height: 1.2;
-      white-space: normal;
-      overflow-wrap: anywhere;
-      word-break: break-word;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }}
     .chat-reply-inline.missing {{
-      border-left-color: #d6d6d6;
-      color: #6f7c76;
+      border-left-color: rgba(132, 140, 136, 0.6);
+      color: #70807a;
     }}
+    .chat-reply-inline.missing .chat-reply-inline-label {{
+      color: #83908b;
+    }}
+    .chat-reply-inline.missing .chat-reply-inline-text,
     .chat-reply-inline.missing .chat-reply-inline-meta {{
-      color: #7b8a83;
+      color: #75817d;
     }}
     .chat-reaction-row {{
       margin-top: 5px;
@@ -8991,4 +9005,27 @@
       .topbar.ticker-expanded .summary-ticker-item .value {{
         font-size: 18px;
       }}
+    }}
+    [data-theme="dark"] .card.chat .chat-reply-inline {{
+      border-left-color: rgba(132, 150, 141, 0.52) !important;
+      color: #7e948a !important;
+      opacity: 0.9;
+    }}
+    [data-theme="dark"] .card.chat .chat-reply-inline .chat-reply-inline-label {{
+      color: #95ada1 !important;
+    }}
+    [data-theme="dark"] .card.chat .chat-reply-inline .chat-reply-inline-text,
+    [data-theme="dark"] .card.chat .chat-reply-inline .chat-reply-inline-meta {{
+      color: #7f968b !important;
+    }}
+    [data-theme="dark"] .card.chat .chat-reply-inline.missing {{
+      border-left-color: rgba(116, 124, 121, 0.6) !important;
+      color: #7b8782 !important;
+    }}
+    [data-theme="dark"] .card.chat .chat-reply-inline.missing .chat-reply-inline-label {{
+      color: #8a9792 !important;
+    }}
+    [data-theme="dark"] .card.chat .chat-reply-inline.missing .chat-reply-inline-text,
+    [data-theme="dark"] .card.chat .chat-reply-inline.missing .chat-reply-inline-meta {{
+      color: #778480 !important;
     }}
