@@ -54,5 +54,7 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "raw.game_public_start_enabled ?? raw.gamePublicStartEnabled" in js
     assert "const publicStartInput = document.getElementById(\"bots-game-public-start-enabled\");" in js
     assert "game_public_start_enabled: !!publicStartInput.checked" in js
+    assert "const receivedAtMs = Date.now();" in js
+    assert "receivedAtMs,\n            true" in js
     assert "{{" not in js
     assert "}}" not in js

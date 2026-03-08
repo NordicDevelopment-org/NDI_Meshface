@@ -13567,10 +13567,12 @@
         }}
         const replyText = String(payload && payload.reply_text ? payload.reply_text : "").trim();
         if (replyText) {{
+          const receivedAtMs = Date.now();
           appendConsoleLine(
-            `interactive|standalone|${{String(session.sessionId || "session")}}|${{Date.now()}}`,
+            `interactive|standalone|${{String(session.sessionId || "session")}}|${{receivedAtMs}}`,
             `zork: ${{replyText}}`,
-            Date.now()
+            receivedAtMs,
+            true
           );
         }}
         if (payload && payload.active_session === false) {{
