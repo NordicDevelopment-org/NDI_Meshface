@@ -2307,6 +2307,7 @@
     let chatUnreadCount = 0;
     let chatRosterModel = [];
     const chatUnreadByChannel = {{ all: 0, direct: 0 }};
+    const chatUnreadByMeshChannel = {{ all: Object.create(null), direct: Object.create(null) }};
     const chatUnreadLatestByChannel = {{ all: "", direct: "" }};
     let chatUnreadInitialized = false;
     const chatSeenMessageKeys = new Set();
@@ -6097,8 +6098,9 @@
       const changed = activeChatChannel !== nextChannel;
       activeChatChannel = nextChannel;
       if (activeLayoutView === "chat" && !document.hidden && tabHasFocus) {{
-        clearChatUnread(activeChatChannel);
+        clearVisibleChatUnread(activeChatChannel);
       }}
+      syncMeshChannelViewControl();
       syncTopbarChatContext(latestState);
       if (persist) {{
         try {{
@@ -7399,6 +7401,15 @@
       return `Ch ${{idx}}`;
     }}
 
+    function meshChannelIsPrimary(rawIndex) {{
+      return normalizeMeshChannelIndex(rawIndex) === 0;
+    }}
+
+    function meshChannelPrimaryBadgeHtml(rawIndex) {{
+      if (!meshChannelIsPrimary(rawIndex)) return "";
+      return '<span class="mesh-channel-primary-badge" aria-hidden="true">P</span>';
+    }}
+
     function meshChannelSendOptionLabel(opt) {{
       if (!opt || typeof opt !== "object") return "";
       const idx = Number(opt.index);
@@ -7427,7 +7438,7 @@
           key: `public-${{idx}}`,
           name: neutralName,
           fill,
-          title: `Ch ${{idx}}`,
+          title: idx === 0 ? "Ch 0 • Primary channel" : `Ch ${{idx}}`,
         }};
       }}
       const palette = meshChannelColorPalette[idx % meshChannelColorPalette.length] || meshChannelColorPalette[0];
@@ -7493,12 +7504,14 @@
       const panel = document.getElementById("mesh-channel-pill-strip");
       if (!(panel instanceof HTMLElement)) return;
       const normalized = Array.isArray(options) ? options : [];
+      const activeScope = normalizeChatChannel(activeChatChannel);
       const rows = [];
       rows.push({{
         index: meshChannelAllIndex,
         label: meshChannelViewMenuLabel(meshChannelAllIndex),
         meta: meshChannelColorMeta(meshChannelAllIndex, {{ allowAll: true }}),
         all: true,
+        unread: Math.max(0, Number(chatUnreadByChannel[activeScope] || 0)),
       }});
       for (const opt of normalized) {{
         const idx = normalizeMeshChannelIndex(opt && opt.index);
@@ -7507,11 +7520,14 @@
           label: meshChannelViewOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`,
           meta: meshChannelColorMeta(idx, {{ allowAll: false }}),
           all: false,
+          unread: getChatMeshChannelUnread(activeScope, idx),
         }});
       }}
       panel.innerHTML = rows.map((row) => {{
         const active = normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }}) === row.index;
         const dotClass = row.all ? "channel-color-dot is-all" : "channel-color-dot";
+        const unreadLabel = row.unread > 99 ? "99+" : String(row.unread || "");
+        const primaryBadge = row.all ? "" : meshChannelPrimaryBadgeHtml(row.index);
         return `<button
           type="button"
           class="mesh-channel-pill${{active ? " active" : ""}}"
@@ -7522,6 +7538,12 @@
         >
           <span class="${{dotClass}}" style="${{row.all ? "" : `--channel-dot-fill: ${{row.meta.fill}};`}}" aria-hidden="true"></span>
           <span class="mesh-channel-pill-label">${{escAttr(row.label)}}</span>
+          ${{primaryBadge}}
+          ${{
+            row.unread > 0
+              ? `<span class="mesh-channel-pill-unread" aria-label="${{escAttr(`${{row.unread}} unread`)}}">(${{escAttr(unreadLabel)}})</span>`
+              : ""
+          }}
         </button>`;
       }}).join("");
     }}
@@ -7613,8 +7635,9 @@
       }}
       const btn = document.getElementById("chat-send-channel-menu-btn");
       if (btn instanceof HTMLButtonElement) {{
-        btn.textContent = currentMeshChannelSendLabel();
-        btn.title = meta.title === btn.textContent ? meta.title : `${{meta.title}} • ${{btn.textContent}}`;
+        const label = currentMeshChannelSendLabel();
+        btn.innerHTML = `${{meshChannelPrimaryBadgeHtml(activeMeshSendChannelIndex)}}<span class="mesh-channel-menu-btn-label">${{escAttr(label)}}</span>`;
+        btn.title = meta.title === label ? meta.title : `${{meta.title}} • ${{label}}`;
         const select = document.getElementById("chat-send-channel-select");
         const disabled = select instanceof HTMLSelectElement ? !!select.disabled : false;
         btn.disabled = disabled;
@@ -7828,6 +7851,7 @@
         const label = meshChannelSendOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
         const active = desiredIndex === idx;
         const meta = meshChannelColorMeta(idx, {{ allowAll: false }});
+        const primaryBadge = meshChannelPrimaryBadgeHtml(idx);
         return `<button
           type="button"
           class="mesh-channel-menu-item${{active ? " active" : ""}}"
@@ -7838,7 +7862,7 @@
         >
           <span class="channel-color-dot" style="--channel-dot-fill: ${{meta.fill}};" aria-hidden="true"></span>
           <span class="mesh-channel-menu-item-main">
-            <span class="mesh-channel-menu-item-title">${{escAttr(label)}}</span>
+            <span class="mesh-channel-menu-item-title">${{primaryBadge}}<span>${{escAttr(label)}}</span></span>
           </span>
         </button>`;
       }}).join("");
@@ -7923,6 +7947,10 @@
 
       if (shouldFollowForSend) {{
         applyMeshSendChannelIndex(idx, persist, false);
+      }}
+
+      if (activeLayoutView === "chat" && !document.hidden && tabHasFocus) {{
+        clearVisibleChatUnread(activeChatChannel);
       }}
 
       if ((changed || shouldFollowForSend) && latestState && activeLayoutView === "chat") {{
@@ -12002,10 +12030,12 @@
         }}
         chatUnreadInitialized = true;
         syncChatRailUnread();
+        syncMeshChannelViewControl();
         return;
       }}
 
       const freshByChannel = {{ all: 0, direct: 0 }};
+      const freshByMeshChannel = {{ all: Object.create(null), direct: Object.create(null) }};
       const latestSenderByChannel = {{ all: "", direct: "" }};
       for (const entry of keyedMessages) {{
         if (!rememberSeenChatMessage(entry.key)) continue;
@@ -12030,7 +12060,21 @@
         }}
         if (!shouldNotify || entry.countsUnread === false) continue;
         freshByChannel[key] += 1;
+        const meshIdx = normalizeMeshChannelIndex(entry.meshChannelIndex);
+        freshByMeshChannel[key][meshIdx] = Number(freshByMeshChannel[key][meshIdx] || 0) + 1;
         latestSenderByChannel[key] = String(entry.sender || "").trim();
+      }}
+
+      for (const key of ["all", "direct"]) {{
+        for (const [rawIdx, count] of Object.entries(freshByMeshChannel[key])) {{
+          addChatMeshChannelUnread(key, rawIdx, count);
+        }}
+      }}
+      if (freshByChannel.all > 0) {{
+        setChatChannelUnreadLatest("all", latestSenderByChannel.all || chatUnreadLatestByChannel.all || "");
+      }}
+      if (freshByChannel.direct > 0) {{
+        setChatChannelUnreadLatest("direct", latestSenderByChannel.direct || chatUnreadLatestByChannel.direct || "");
       }}
 
       const canClearActiveChat = (
@@ -12040,30 +12084,10 @@
         && !catchupNoticeArmed
       );
       if (canClearActiveChat) {{
-        const otherKey = activeChatChannel === "direct" ? "all" : "direct";
-        if (freshByChannel[otherKey] > 0) {{
-          setChatChannelUnread(
-            otherKey,
-            Number(chatUnreadByChannel[otherKey] || 0) + freshByChannel[otherKey]
-          );
-          setChatChannelUnreadLatest(
-            otherKey,
-            latestSenderByChannel[otherKey] || chatUnreadLatestByChannel[otherKey] || ""
-          );
-        }}
-        setChatChannelUnread(activeChatChannel, 0);
-        setChatChannelUnreadLatest(activeChatChannel, "");
+        clearVisibleChatUnread(activeChatChannel);
       }} else {{
-        if (freshByChannel.all > 0) {{
-          setChatChannelUnread("all", Number(chatUnreadByChannel.all || 0) + freshByChannel.all);
-          setChatChannelUnreadLatest("all", latestSenderByChannel.all || chatUnreadLatestByChannel.all || "");
-        }}
-        if (freshByChannel.direct > 0) {{
-          setChatChannelUnread("direct", Number(chatUnreadByChannel.direct || 0) + freshByChannel.direct);
-          setChatChannelUnreadLatest("direct", latestSenderByChannel.direct || chatUnreadLatestByChannel.direct || "");
-        }}
+        syncChatUnreadAggregates();
       }}
-      syncChatRailUnread();
     }}
 
     function syncChatUnreadFromState(state, options = {{}}) {{
@@ -12087,6 +12111,57 @@
       const key = normalizeChatChannel(channelKey);
       const safe = Math.max(0, Math.min(999, Math.trunc(Number(count) || 0)));
       chatUnreadByChannel[key] = safe;
+    }}
+
+    function unreadMeshBucket(channelKey) {{
+      const key = normalizeChatChannel(channelKey);
+      if (!chatUnreadByMeshChannel[key] || typeof chatUnreadByMeshChannel[key] !== "object") {{
+        chatUnreadByMeshChannel[key] = Object.create(null);
+      }}
+      return chatUnreadByMeshChannel[key];
+    }}
+
+    function getChatMeshChannelUnread(channelKey, rawIndex) {{
+      const idx = normalizeMeshChannelIndex(rawIndex);
+      return Math.max(0, Math.trunc(Number(unreadMeshBucket(channelKey)[idx] || 0)));
+    }}
+
+    function setChatMeshChannelUnread(channelKey, rawIndex, count) {{
+      const idx = normalizeMeshChannelIndex(rawIndex);
+      const bucket = unreadMeshBucket(channelKey);
+      const safe = Math.max(0, Math.min(999, Math.trunc(Number(count) || 0)));
+      if (safe > 0) {{
+        bucket[idx] = safe;
+      }} else {{
+        delete bucket[idx];
+      }}
+    }}
+
+    function addChatMeshChannelUnread(channelKey, rawIndex, delta) {{
+      setChatMeshChannelUnread(
+        channelKey,
+        rawIndex,
+        getChatMeshChannelUnread(channelKey, rawIndex) + Number(delta || 0)
+      );
+    }}
+
+    function recomputeChatUnreadScope(channelKey) {{
+      const key = normalizeChatChannel(channelKey);
+      const total = Object.values(unreadMeshBucket(key)).reduce(
+        (sum, value) => sum + Math.max(0, Math.trunc(Number(value) || 0)),
+        0
+      );
+      setChatChannelUnread(key, total);
+      if (total <= 0) {{
+        setChatChannelUnreadLatest(key, "");
+      }}
+    }}
+
+    function syncChatUnreadAggregates() {{
+      recomputeChatUnreadScope("all");
+      recomputeChatUnreadScope("direct");
+      syncChatRailUnread();
+      syncMeshChannelViewControl();
     }}
 
     function setChatChannelUnreadLatest(channelKey, name) {{
@@ -12149,15 +12224,32 @@
 
     function clearChatUnread(channelKey = null) {{
       if (channelKey == null) {{
+        chatUnreadByMeshChannel.all = Object.create(null);
+        chatUnreadByMeshChannel.direct = Object.create(null);
         setChatChannelUnread("all", 0);
         setChatChannelUnread("direct", 0);
         setChatChannelUnreadLatest("all", "");
         setChatChannelUnreadLatest("direct", "");
       }} else {{
+        chatUnreadByMeshChannel[normalizeChatChannel(channelKey)] = Object.create(null);
         setChatChannelUnread(channelKey, 0);
         setChatChannelUnreadLatest(channelKey, "");
       }}
       syncChatRailUnread();
+      syncMeshChannelViewControl();
+    }}
+
+    function clearVisibleChatUnread(channelKey = activeChatChannel) {{
+      const key = normalizeChatChannel(channelKey);
+      const activeIdx = activeMeshChannelFilterIndex();
+      if (activeIdx === meshChannelAllIndex) {{
+        chatUnreadByMeshChannel[key] = Object.create(null);
+      }} else {{
+        setChatMeshChannelUnread(key, activeIdx, 0);
+      }}
+      recomputeChatUnreadScope(key);
+      syncChatRailUnread();
+      syncMeshChannelViewControl();
     }}
 
     function persistSplitState() {{
@@ -14741,6 +14833,15 @@
 
         const tdIndex = document.createElement("td");
         tdIndex.textContent = String(idx);
+        if (idx === 0) {{
+          const primaryBadge = document.createElement("span");
+          primaryBadge.className = "mesh-channel-primary-badge settings-channel-primary-badge";
+          primaryBadge.textContent = "P";
+          primaryBadge.title = "Primary channel";
+          primaryBadge.setAttribute("aria-label", "Primary channel");
+          tdIndex.appendChild(document.createTextNode(" "));
+          tdIndex.appendChild(primaryBadge);
+        }}
         tr.appendChild(tdIndex);
 
         const tdRole = document.createElement("td");
