@@ -1,7 +1,7 @@
 # Ideas Backlog
 
-
-- who does ch 0 say private?
+- make our chats look differant
+- why does ch 0 say private?
 - move channel config to channels, give setting tabs
 - fix deselected channel notifaction
 - put channels in tabs w/ notifaction totalss (N)
