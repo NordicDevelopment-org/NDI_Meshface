@@ -143,6 +143,7 @@
       rssiMax: -88,
     }};
     const signalHeatDevKnobsStorageKey = "meshDashboardSignalHeatDevKnobsV3";
+    const consoleSessionStorageKey = "meshDashboardConsoleSessionV1";
     const signalHeatDevKnobDefaults = {{
       radius: 26,
       blur: 20,
@@ -12981,6 +12982,7 @@
       consoleLines.length = 0;
       consoleKeyQueue.length = 0;
       consoleSeen.clear();
+      persistConsoleSessionState();
       if (renderNow) {{
         renderConsoleBuffer(true);
       }}
@@ -12990,6 +12992,123 @@
       consoleEventCounter += 1;
       const key = `event|${{Math.floor(Number(loggedAtMs) || Date.now())}}|${{consoleEventCounter}}`;
       appendConsoleLine(key, line, loggedAtMs, renderNow);
+    }}
+
+    function normalizeConsoleInteractiveSession(raw) {{
+      const payload = (raw && typeof raw === "object") ? raw : {{}};
+      const mode = String(payload.mode || "").trim().toLowerCase();
+      if (mode === "standalone") {{
+        const sessionId = String(payload.sessionId ?? payload.session_id ?? "").trim();
+        if (!sessionId) return null;
+        return {{
+          name: "zork",
+          mode: "standalone",
+          sessionId,
+        }};
+      }}
+      if (mode !== "remote") return null;
+      const targetNodeId = normalizeNodeId(payload.targetNodeId ?? payload.target_node_id ?? "");
+      if (!isCanonicalNodeId(targetNodeId)) return null;
+      const channelIndex = normalizeMeshChannelIndex(payload.channelIndex ?? payload.channel_index ?? 0);
+      const channelLabel = String(payload.channelLabel || payload.channel_label || "").trim()
+        || meshChannelLabelForIndex(channelIndex);
+      const seenKeysRaw = Array.isArray(payload.seenKeys) ? payload.seenKeys : [];
+      const seenKeys = new Set(
+        seenKeysRaw
+          .map((value) => String(value == null ? "" : value).trim())
+          .filter((value) => !!value)
+          .slice(-4000)
+      );
+      return {{
+        name: String(payload.name || "zork-remote").trim() || "zork-remote",
+        mode: "remote",
+        targetNodeId,
+        targetLabel: String(payload.targetLabel || payload.target_label || "").trim(),
+        channelIndex,
+        channelLabel,
+        seenKeys,
+      }};
+    }}
+
+    function persistConsoleSessionState() {{
+      try {{
+        const storage = window.sessionStorage;
+        if (!storage) return;
+        let interactiveSession = null;
+        if (consoleInteractiveSession && typeof consoleInteractiveSession === "object") {{
+          const mode = String(consoleInteractiveSession.mode || "").trim().toLowerCase();
+          if (mode === "standalone") {{
+            const sessionId = String(consoleInteractiveSession.sessionId || "").trim();
+            if (sessionId) {{
+              interactiveSession = {{
+                name: "zork",
+                mode: "standalone",
+                sessionId,
+              }};
+            }}
+          }} else if (mode === "remote") {{
+            const targetNodeId = normalizeNodeId(consoleInteractiveSession.targetNodeId || "");
+            if (isCanonicalNodeId(targetNodeId)) {{
+              interactiveSession = {{
+                name: String(consoleInteractiveSession.name || "zork-remote").trim() || "zork-remote",
+                mode: "remote",
+                targetNodeId,
+                targetLabel: String(consoleInteractiveSession.targetLabel || "").trim(),
+                channelIndex: normalizeMeshChannelIndex(consoleInteractiveSession.channelIndex),
+                channelLabel: String(consoleInteractiveSession.channelLabel || "").trim(),
+                seenKeys: Array.from(consoleInteractiveSession.seenKeys || []).slice(-4000),
+              }};
+            }}
+          }}
+        }}
+        const payload = {{
+          lines: consoleLines.slice(-consoleMaxLines),
+          commandHistory: consoleCommandHistory.slice(-consoleCommandHistoryMax),
+          autoscroll: !!consoleAutoscroll,
+          interactiveSession,
+          eventCounter: Math.max(0, Math.trunc(Number(consoleEventCounter) || 0)),
+        }};
+        storage.setItem(consoleSessionStorageKey, JSON.stringify(payload));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadConsoleSessionState() {{
+      try {{
+        const storage = window.sessionStorage;
+        if (!storage) return;
+        const raw = storage.getItem(consoleSessionStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const payload = (parsed && typeof parsed === "object") ? parsed : {{}};
+        const lines = Array.isArray(payload.lines)
+          ? payload.lines
+            .map((value) => String(value == null ? "" : value))
+            .filter((value) => !!value)
+            .slice(-consoleMaxLines)
+          : [];
+        consoleLines.length = 0;
+        consoleLines.push(...lines);
+        consoleKeyQueue.length = 0;
+        consoleSeen.clear();
+        lines.forEach((_line, index) => {{
+          const key = `restored|${{index}}`;
+          consoleKeyQueue.push(key);
+          consoleSeen.add(key);
+        }});
+        consoleCommandHistory = Array.isArray(payload.commandHistory)
+          ? payload.commandHistory
+            .map((value) => String(value == null ? "" : value).trim())
+            .filter((value) => !!value)
+            .slice(-consoleCommandHistoryMax)
+          : [];
+        consoleCommandHistoryCursor = -1;
+        consoleCommandDraft = "";
+        consoleAutoscroll = payload.autoscroll !== false;
+        consoleInteractiveSession = normalizeConsoleInteractiveSession(payload.interactiveSession);
+        consoleEventCounter = Math.max(0, Math.trunc(Number(payload.eventCounter) || 0));
+      }} catch (_err) {{
+      }}
     }}
 
     function wildcardPatternToRegExp(pattern) {{
@@ -13153,6 +13272,7 @@
       }}
       consoleCommandHistoryCursor = -1;
       consoleCommandDraft = "";
+      persistConsoleSessionState();
     }}
 
     function navigateConsoleHistory(direction, inputEl) {{
@@ -13205,6 +13325,7 @@
       if (runBtn instanceof HTMLButtonElement) {{
         runBtn.textContent = runningName ? "Busy" : interactiveName ? "Send" : "Run";
       }}
+      persistConsoleSessionState();
     }}
 
     function focusConsoleCommandInput(select = false) {{
@@ -13363,6 +13484,7 @@
         const nextSessionId = String(payload && payload.session_id ? payload.session_id : session.sessionId || "").trim();
         if (nextSessionId) {{
           session.sessionId = nextSessionId;
+          persistConsoleSessionState();
         }}
         const replyText = String(payload && payload.reply_text ? payload.reply_text : "").trim();
         if (replyText) {{
@@ -13927,6 +14049,7 @@
           consoleSeen.delete(oldKey);
         }}
       }}
+      persistConsoleSessionState();
       if (renderNow) {{
         renderConsoleBuffer();
       }}
@@ -13987,9 +14110,10 @@
       const auto = document.getElementById("console-autoscroll");
       if (auto instanceof HTMLInputElement && auto.dataset.bound !== "1") {{
         auto.dataset.bound = "1";
-        consoleAutoscroll = auto.checked;
+        auto.checked = !!consoleAutoscroll;
         auto.addEventListener("change", () => {{
           consoleAutoscroll = auto.checked;
+          persistConsoleSessionState();
           if (consoleAutoscroll) {{
             renderConsoleBuffer(true);
           }}
@@ -14055,6 +14179,8 @@
       syncConsoleCommandInputState();
       if (!consoleLines.length) {{
         appendConsoleEventLine("[console] type \"help\" for commands. Start standalone Zork with \"zork\". Start live stream with \"live\", \"live -v\", \"live -vv\", \"live -vvv\", or \"live -vvvv\".");
+      }} else {{
+        renderConsoleBuffer(false);
       }}
     }}
 
@@ -22744,6 +22870,7 @@
     loadSignalHeatmapPreference();
     loadMapPacketLinesPreference();
     loadChatPerfPreference();
+    loadConsoleSessionState();
     loadLayoutView();
     loadManualDirectPeers();
     loadChatChannel();

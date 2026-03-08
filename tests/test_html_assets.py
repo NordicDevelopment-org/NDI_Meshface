@@ -32,5 +32,10 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "function focusChatEmojiSearchInput()" in js
     assert "if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && key === \"e\") {" in js
     assert "Top matches" in js
+    assert "const consoleSessionStorageKey = \"meshDashboardConsoleSessionV1\";" in js
+    assert "const storage = window.sessionStorage;" in js
+    assert "storage.getItem(consoleSessionStorageKey)" in js
+    assert "storage.setItem(consoleSessionStorageKey" in js
+    assert "loadConsoleSessionState();" in js
     assert "{{" not in js
     assert "}}" not in js
