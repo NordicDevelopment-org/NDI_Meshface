@@ -1,6 +1,7 @@
 # Ideas Backlog
 
-fix dual title (1) (1)
+- hand off zork
+- make ping reply with name
 - zork in chat kicks off a PM with the firm prompt, do we have or need a timeout?
 - fix deselected channel notifaction
 - put channels in tabs w/ notifaction totalss (N)
