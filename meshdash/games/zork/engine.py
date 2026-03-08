@@ -88,6 +88,7 @@ GAME_VERB_HEADS = {
     "get",
     "drop",
     "read",
+    "eat",
     "put",
     "insert",
     "plug",
@@ -185,6 +186,7 @@ ROOM_DYNAMIC_DESCRIPTIONS = {
         "Along one wall are three buttons: round, triangular, and square. A large sign above them says 'DANGER -- HIGH VOLTAGE'."
     ),
     "MAGNE": "You are in a room with a low circular ceiling. There are exits to the east and the southeast.",
+    "ALITR": "You are in a large room, one half of which is depressed. {pool_state} The only exit to this room is to the west.",
 }
 
 NATURALLY_LIT_ROOMS = {
@@ -558,6 +560,10 @@ class ZorkGame:
             return False
         if code_key == "STATU" and room_key == "BEACH" and "beach_statue_found" not in flags:
             return False
+        if code_key == "POOL" and room_key == "ALITR" and "pool_evaporated" in flags:
+            return False
+        if code_key == "SAFFR" and room_key == "ALITR" and "pool_evaporated" not in flags:
+            return False
         if code_key == "TRUNK" and room_key in {"RESES", "RESEN"} and "low_tide" not in flags:
             return False
         if code_key == "CAGE" and "cage_solved" not in flags:
@@ -827,6 +833,38 @@ class ZorkGame:
         index = int(counters.get("magnet_random_index") or 0)
         counters["magnet_random_index"] = index + 1
         return MAGNET_RANDOM_TARGETS[index % len(MAGNET_RANDOM_TARGETS)]
+
+    def _consume_accessible_object(
+        self,
+        session: dict[str, object],
+        code: str,
+        inventory: list[str],
+        object_locations: dict[str, str],
+    ) -> tuple[list[str], dict[str, str]]:
+        code_key = str(code or "").strip().upper()
+        if code_key in inventory:
+            inventory = [value for value in inventory if value != code_key]
+        object_locations[code_key] = "GONE"
+        return inventory, object_locations
+
+    def _shift_room_contents(
+        self,
+        object_locations: dict[str, str],
+        source_room: str,
+        target_room: str,
+        *,
+        exclude: Iterable[str] = (),
+    ) -> dict[str, str]:
+        source_key = str(source_room or "").strip().upper()
+        target_key = str(target_room or "").strip().upper()
+        blocked = {str(value).strip().upper() for value in exclude if str(value).strip()}
+        for code, location in list(object_locations.items()):
+            if str(location or "").strip().upper() != source_key:
+                continue
+            if code in blocked:
+                continue
+            object_locations[code] = target_key
+        return object_locations
 
     def _carousel_room_oriented(self, flags: set[str]) -> bool:
         return "carousel_flip" in flags
@@ -1382,6 +1420,16 @@ class ZorkGame:
                 return "BLBUT"
             if "red" in word_set:
                 return "RBUTT"
+        if "cake" in word_set or "icing" in word_set or "eatme" in word_set or "eatm" in word_set:
+            if "orange" in word_set or "orang" in word_set:
+                return "ORICE"
+            if "red" in word_set:
+                return "RDICE"
+            if "blue" in word_set or "ecch" in word_set:
+                return "BLICE"
+            if "eatme" in word_set or "eatm" in word_set or action == "eat":
+                if self._is_accessible(session, "ECAKE"):
+                    return "ECAKE"
         if "ghost" in word_set or "spirit" in word_set or "spirits" in word_set or "fiend" in word_set or "fiends" in word_set:
             return "GHOST"
         if "thief" in word_set or "robber" in word_set or "crook" in word_set or "bandit" in word_set or "bagman" in word_set:
@@ -1677,6 +1725,10 @@ class ZorkGame:
             return f"There is a very large wicker basket here with a cloth bag draped over it.{tie_text}"
         if code_key == "DBALL":
             return "There is a balloon here, broken into pieces."
+        if code_key == "POOL":
+            if "pool_evaporated" in self._session_flags(session):
+                return ""
+            return "The leak has submerged the depressed area in a pool of sewage."
         if code_key == "BUOY":
             return "There is a red buoy here, now hanging open." if "buoy_open" in self._session_flags(session) else "There is a red buoy here (probably a warning)."
         if code_key == "LABEL":
@@ -1761,6 +1813,13 @@ class ZorkGame:
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key]
         if room_key == "MAGNE":
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key]
+        if room_key == "ALITR":
+            pool_state = (
+                "The leak has filled the depression with a pool of sewage."
+                if "pool_evaporated" not in flags
+                else "The depressed area is dry now, and a tin of rare spices lies exposed where the pool used to be."
+            )
+            return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(pool_state=pool_state)
         if room_key in {"MIRR1", "MIRR2"}:
             mirror_state = "Unfortunately, you have managed to destroy it by your reckless actions." if "mirror_broken" in flags else ""
             return ROOM_DYNAMIC_DESCRIPTIONS[room_key].format(mirror_state=mirror_state).strip()
@@ -2686,6 +2745,28 @@ class ZorkGame:
             if object_locations.get("ADVER") == "MAILB":
                 return self._compact(f"A small mailbox. It is {state}. A leaflet is inside." if state == "open" else f"A small mailbox. It is {state}.")
             return self._compact(f"A small mailbox. It is {state}.")
+        if code_key == "FLASK":
+            return "A stoppered glass flask marked with a skull and crossbones."
+        if code_key == "POOL":
+            return (
+                "The depression is dry now, with only a nasty stain left where the sewage used to be."
+                if "pool_evaporated" in flags
+                else "A disgusting pool of sewage fed by the leak above."
+            )
+        if code_key == "SAFFR":
+            return "A tin of rare spices."
+        if code_key == "BUCKE":
+            return "A wooden bucket, large enough to ride in if you are feeling imprudent."
+        if code_key == "ECAKE":
+            return "A piece of cake bearing the words 'Eat Me'."
+        if code_key == "ORICE":
+            return "A piece of cake with orange icing. Tiny letters are written on it."
+        if code_key == "RDICE":
+            return "A piece of cake with red icing. Tiny letters are written on it."
+        if code_key == "BLICE":
+            return "A piece of cake with blue icing. Tiny letters are written on it."
+        if code_key == "POSTS":
+            return "Four huge wooden posts support what, at this scale, looks suspiciously like a gigantic table."
         if code_key == "DAM":
             return "Flood Control Dam #3 looms here like a slab of overconfident engineering."
         if code_key == "ICE":
@@ -2859,11 +2940,25 @@ class ZorkGame:
             return self._compact(item.short_desc)
         return self._compact(f"You see {object_name(code_key)}.")
 
-    def _read_object(self, session: dict[str, object], code: str) -> str:
+    def _read_object(self, session: dict[str, object], code: str, viewer_code: str | None = None) -> str:
         code_key = str(code or "").strip().upper()
+        viewer_key = str(viewer_code or "").strip().upper()
         item = OBJECTS.get(code_key)
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         if item is None:
             return "There's nothing readable there."
+        if code_key == "ECAKE":
+            return "The icing spells out 'Eat Me'."
+        if code_key in {"ORICE", "RDICE", "BLICE"}:
+            if viewer_key == "BOTTL":
+                return self._compact("The letters appear larger, but still are too small to be read.")
+            if viewer_key == "FLASK":
+                meanings = {"RDICE": "Evaporate", "ORICE": "Explode", "BLICE": "Enlarge"}
+                return self._compact(f"The icing, now visible, says '{meanings.get(code_key, 'Enlarge')}'.")
+            if viewer_key:
+                return "You can't see through that!"
+            if room_id.startswith("ALI"):
+                return self._compact("The only writing legible is a capital E. The rest is too small to be clearly visible.")
         if item.read_desc:
             return self._compact(item.read_desc)
         if code_key == "LABEL":
@@ -2873,6 +2968,56 @@ class ZorkGame:
         if code_key == "WDOOR":
             return self._compact("The engravings translate to 'This space intentionally left blank'.")
         return f"There's nothing written on the {object_name(code_key)}."
+
+    def _eat_response(
+        self,
+        session: dict[str, object],
+        code: str,
+    ) -> tuple[str, str | None, list[str], set[str], dict[str, str], bool]:
+        code_key = str(code or "").strip().upper()
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        item = OBJECTS.get(code_key)
+        if item is None:
+            return ("That doesn't look edible.", room_id, inventory, flags, object_locations, False)
+        if code_key == "ECAKE" and room_id == "ALICE" and self._is_accessible(session, "ECAKE"):
+            inventory, object_locations = self._consume_accessible_object(session, "ECAKE", inventory, object_locations)
+            object_locations = self._shift_room_contents(object_locations, "ALICE", "ALISM", exclude={"ATABL"})
+            return ("Suddenly, the room appears to have become very large.", "ALISM", inventory, flags, object_locations, False)
+        if code_key == "BLICE" and room_id.startswith("ALI") and self._is_accessible(session, "BLICE"):
+            inventory, object_locations = self._consume_accessible_object(session, "BLICE", inventory, object_locations)
+            if room_id == "ALISM":
+                object_locations = self._shift_room_contents(object_locations, "ALISM", "ALICE", exclude={"POSTS"})
+                return ("The room around you seems to be getting smaller.", "ALICE", inventory, flags, object_locations, False)
+            return (
+                "The room seems to have become too small to hold you. The walls are not as compressible as your body. zork: session ended. Send 'zork' to start again.",
+                room_id,
+                inventory,
+                flags,
+                object_locations,
+                True,
+            )
+        if code_key == "ORICE" and room_id.startswith("ALI") and self._is_accessible(session, "ORICE"):
+            inventory, object_locations = self._consume_accessible_object(session, "ORICE", inventory, object_locations)
+            return (
+                "The cake detonates into sticky orange rubble and you are blasted to smithereens. zork: session ended. Send 'zork' to start again.",
+                room_id,
+                inventory,
+                flags,
+                object_locations,
+                True,
+            )
+        if code_key == "RDICE" and self._is_accessible(session, "RDICE"):
+            inventory, object_locations = self._consume_accessible_object(session, "RDICE", inventory, object_locations)
+            return ("You eat the red cake. Nothing obvious happens.", room_id, inventory, flags, object_locations, False)
+        if "FOODBIT" not in item.flags:
+            return ("That doesn't look edible.", room_id, inventory, flags, object_locations, False)
+        if not self._is_accessible(session, code_key):
+            return (f"You don't have the {object_name(code_key)}.", room_id, inventory, flags, object_locations, False)
+        inventory, object_locations = self._consume_accessible_object(session, code_key, inventory, object_locations)
+        return ("Thank you very much. It really hit the spot.", room_id, inventory, flags, object_locations, False)
 
     def _open_close_response(self, session: dict[str, object], code: str, action: str) -> tuple[str, set[str], dict[str, str]]:
         code_key = str(code or "").strip().upper()
@@ -3608,6 +3753,45 @@ class ZorkGame:
         if code_key not in inventory:
             return (f"You aren't carrying the {object_name(code_key)}.", None, inventory, flags, object_locations, False)
 
+        if code_key == "FLASK":
+            inventory = [value for value in inventory if value != "FLASK"]
+            object_locations["FLASK"] = "GONE"
+            return (
+                "The flask breaks into pieces. Just before you pass out, you notice that the vapors from the flask's contents are fatal. zork: session ended. Send 'zork' to start again.",
+                None,
+                inventory,
+                flags,
+                object_locations,
+                True,
+            )
+
+        if room_id.startswith("ALI") and code_key == "ORICE":
+            inventory = [value for value in inventory if value != "ORICE"]
+            object_locations["ORICE"] = "GONE"
+            return (
+                "The orange cake explodes into sticky rubble and you are blasted to smithereens. zork: session ended. Send 'zork' to start again.",
+                None,
+                inventory,
+                flags,
+                object_locations,
+                True,
+            )
+
+        if room_id == "ALITR" and code_key == "RDICE" and target_key == "POOL":
+            inventory = [value for value in inventory if value != "RDICE"]
+            object_locations["RDICE"] = "GONE"
+            flags.add("pool_evaporated")
+            object_locations["POOL"] = "GONE"
+            object_locations["SAFFR"] = "ALITR"
+            return (
+                "The pool of water evaporates, revealing a tin of rare spices.",
+                None,
+                inventory,
+                flags,
+                object_locations,
+                False,
+            )
+
         if room_id == "ICY" and code_key == "TORCH" and target_key == "ICE":
             inventory = [value for value in inventory if value != "TORCH"]
             flags.add("glacier_melted")
@@ -3937,7 +4121,7 @@ class ZorkGame:
             return BotAppResult(
                 handled=True,
                 reply_text=(
-                    "zork: look, x/read, n/s/e/w/u/d, take/drop, put/insert, throw/rub, open/close, move, push/press, turn, "
+                    "zork: look, x/read, read <cake> through flask, eat, n/s/e/w/u/d, take/drop, put/insert, throw/rub, open/close, move, push/press, turn, "
                     "light/burn/extinguish, dig, wave stick, tie/untie rope or balloon wire, plug/repair broken boat, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
                     "robot, press <button>; robot, north/east/etc.; robot, take sphere; robot, raise cage; magic words, score, attack, quit."
                 ),
@@ -4016,10 +4200,33 @@ class ZorkGame:
             return BotAppResult(handled=True, reply_text=self._inventory_text(session), command_name=self.SPEC.name)
 
         if head_raw == "read":
-            target = self._resolve_object(session, raw_target, "read")
-            reply = self._read_object(session, target) if target else (f"You don't see any {raw_target} here." if raw_target else "Read what?")
+            target_text = raw_target
+            viewer_text = ""
+            for separator in (" through ", " with ", " using "):
+                if separator in f" {raw_target} ":
+                    before, after = raw_target.split(separator, 1)
+                    target_text = before.strip()
+                    viewer_text = after.strip()
+                    break
+            target = self._resolve_object(session, target_text, "read")
+            viewer = self._resolve_object(session, viewer_text, "read") if viewer_text else None
+            reply = self._read_object(session, target, viewer) if target else (f"You don't see any {target_text or raw_target} here." if raw_target else "Read what?")
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+
+        if head_raw == "eat":
+            target = self._resolve_object(session, raw_target, "eat")
+            if not target:
+                self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+                reply = f"You don't see any {raw_target} here." if raw_target else "Eat what?"
+                return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            reply, room_after, inventory, flags, object_locations, ended = self._eat_response(session, target)
+            if ended:
+                self._sessions.pop(peer_id, None)
+                return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+            room_after = room_after or room_id
+            self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_after)}"), command_name=self.SPEC.name)
 
         if head_raw in {"plug", "repair", "patch"}:
             direct_text = raw_target
@@ -4116,7 +4323,7 @@ class ZorkGame:
         if head_raw == "throw":
             direct_text = raw_target
             target_text = ""
-            for separator in (" at ", " to "):
+            for separator in (" at ", " to ", " into ", " in ", " onto ", " on "):
                 if separator in f" {raw_target} ":
                     before, after = raw_target.split(separator, 1)
                     direct_text = before.strip()
@@ -4142,6 +4349,15 @@ class ZorkGame:
                 reply = (f"You don't see any {raw_target} here." if raw_target else ("Open what?" if head_raw == "open" else "Close what?"))
                 self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
                 return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            if head_raw == "open" and target == "FLASK":
+                self._sessions.pop(peer_id, None)
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(
+                        "Noxious vapors prevent your entry. Just before you pass out, you notice that the vapors from the flask's contents are fatal. zork: session ended. Send 'zork' to start again."
+                    ),
+                    command_name=self.SPEC.name,
+                )
             reply, flags, object_locations = self._open_close_response(session, target, head_raw)
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)

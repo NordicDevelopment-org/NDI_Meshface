@@ -28,7 +28,7 @@ Meshyface cannot execute those files directly, so a full port means translation 
 
 - A classic-room live map is wired into gameplay.
 - Upstream object data is parsed into the live game, including visible items, containers, aliases, and readable text.
-- The live parser now supports movement, inventory, take/drop, look/examine/read, targeted light/extinguish actions, open/close/unlock, put/insert, throw/rub, move/lift, dig, wave, tie/untie, push/press, turn, inflate/deflate, prayer/exorcism actions, magic-word actions, and early combat.
+- The live parser now supports movement, inventory, take/drop, look/examine/read, `eat`, targeted light/extinguish actions, open/close/unlock, put/insert, throw/rub, move/lift, dig, wave, tie/untie, push/press, turn, inflate/deflate, prayer/exorcism actions, magic-word actions, and early combat.
 - The house/mailbox/window/trap-door/grating/troll path is playable in the live game.
 - Rope-and-dome traversal, the riddle-room word, cyclops bypass, rainbow toggling, and real board/launch/land/disembark inflatable-boat travel are wired into the live game.
 - Dam control-room button/bolt behavior, low-tide reservoir crossings, and the bell-book-candles exorcism route into Hades are now wired into the live game.
@@ -43,6 +43,7 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - The volcano balloon cluster is now playable: the basket/receptacle/wire/hooks are live, burnable fuel in the receptacle inflates the balloon, wire-to-hook tie/untie works on the ledges, and board/launch/land/disembark balloon travel plus rim/bad-landing failures are wired into the live game.
 - The carousel/low-room magnetic cluster is now playable: the round room can now either randomize or honor directional exits, the low room now routes to the machine room or Alice depending on the magnetic state, and the CMACH round/square/triangular buttons now control the flip/zoom behavior instead of leaving that branch as a dead end.
 - The robot/sphere/high-voltage cluster is now partly canonical: pressing the CMACH buttons by hand now fries the player, actor-style `robot ...`/`tell robot ...` commands can move the robot and make it press the buttons safely, the crystal-sphere cage trap now works, and the robot can now raise the cage or ruin the sphere by trying to grab it himself.
+- The Alice branch is now partly canonical: eating the `Eat Me` cake shifts the tea room into its giant-scale counterpart, the blue/orange/red cakes now have their classic enlarge/explode/evaporate behaviors, `read <cake> through flask` reveals the hidden icing words, the pool trick reveals the spices, and opening or smashing the flask now kills the player with noxious vapors.
 
 ## What Is Still Missing
 
