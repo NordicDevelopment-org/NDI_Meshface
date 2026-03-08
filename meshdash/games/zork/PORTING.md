@@ -38,11 +38,13 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - `score` and `quit` now report live progress from seen room bonuses plus treasure recovery/security, so the port has a reusable progress layer instead of just hard-ending sessions.
 - The engine now has a reusable room-entry hazard path for special rooms, so the bat room can fling you into the mines, the gas room can punish open flames, and late-game room-specific handlers have a cleaner place to live.
 - The beach and guano cave now have shovel-driven digging behavior, the treasure room can now spring the thief hideout encounter, and the sword now warns about nearby villains with the classic blue-glow behavior.
+- The volcano balloon cluster is now playable: the basket/receptacle/wire/hooks are live, burnable fuel in the receptacle inflates the balloon, wire-to-hook tie/untie works on the ledges, and board/launch/land/disembark balloon travel plus rim/bad-landing failures are wired into the live game.
 
 ## What Is Still Missing
 
 - Late-game condition flags, richer object routines, canonical scoring details, deeper death/restart handling, and the full puzzle set are still incomplete.
 - River/boat travel now supports the main board/launch/land/disembark flow, but the boat is not yet a fully canonical vehicle container and the wider river puzzle web is still incomplete.
+- Balloon travel is now playable, but it is still simplified compared with the upstream clock-driven automatic ascent/descent logic and broader volcano timing details.
 - The safe path is now playable, but its fuse timing is intentionally simplified compared with full upstream timing.
 - Glacier, mirror, thief, machine, safe, and other later puzzle clusters still need fuller canonical behavior.
 - The thief is now present as a live treasure-room encounter, but the wider roaming robber logic and full stealing/fleeing behavior are still simplified.

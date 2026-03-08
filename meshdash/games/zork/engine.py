@@ -110,6 +110,7 @@ GAME_VERB_HEADS = {
     "fight",
     "kill",
     "light",
+    "burn",
     "extinguish",
     "inflate",
     "deflate",
@@ -188,6 +189,13 @@ NATURALLY_LIT_ROOMS = {
     "BEACH",
     "RCAVE",
     "FALLS",
+    "VLBOT",
+    "VAIR1",
+    "VAIR2",
+    "VAIR3",
+    "VAIR4",
+    "LEDG2",
+    "LEDG4",
 }
 
 TREASURE_CODES = frozenset(
@@ -219,6 +227,48 @@ BULK_SCOPE_ALL_WORDS = frozenset({"all", "everything"})
 BULK_SCOPE_TREASURE_WORDS = frozenset({"treasure", "treasures", "valuable", "valuables"})
 BAT_DROP_ROOMS = ("MINE1", "MINE2", "MINE3", "MINE4", "MINE5", "MINE6", "MINE7", "TLADD", "BLADD")
 WEAPON_CODES = frozenset({"SWORD", "KNIFE", "RKNIF", "AXE", "STILL"})
+
+BALLOON_LAUNCH_MAP = {
+    "VLBOT": "VAIR1",
+    "LEDG2": "VAIR2",
+    "LEDG4": "VAIR4",
+}
+BALLOON_ASCENT_MAP = {
+    "VAIR1": "VAIR2",
+    "VAIR2": "VAIR3",
+    "VAIR3": "VAIR4",
+}
+BALLOON_DESCENT_MAP = {
+    "VAIR1": "VLBOT",
+    "VAIR2": "VAIR1",
+    "VAIR3": "VAIR2",
+    "VAIR4": "VAIR3",
+}
+BALLOON_LANDING_MAP = {
+    "VAIR1": "VLBOT",
+    "VAIR2": "LEDG2",
+    "VAIR4": "LEDG4",
+}
+BALLOON_HOOK_CODES = {
+    "LEDG2": "HOOK1",
+    "LEDG4": "HOOK2",
+}
+BALLOON_AIR_ROOMS = frozenset({"VAIR1", "VAIR2", "VAIR3", "VAIR4"})
+BALLOON_GROUND_ROOMS = frozenset({"VLBOT", "LEDG2", "LEDG4"})
+BALLOON_FUEL_TURNS = {
+    "COAL": 6,
+    "BOOK": 4,
+    "GUIDE": 4,
+    "LISTS": 4,
+    "LEAVE": 3,
+    "PAPER": 2,
+    "ADVER": 2,
+    "BLABE": 2,
+    "CARD": 2,
+    "STAMP": 2,
+    "RBTLB": 2,
+}
+DEFAULT_BALLOON_FUEL_TURNS = 3
 
 
 class ZorkGame:
@@ -801,6 +851,50 @@ class ZorkGame:
         inventory = set(self._session_inventory(session))
         return self._aboard_boat(session) or boat_room == room_key or "RBOAT" in inventory
 
+    def _balloon_room(self, session: dict[str, object]) -> str:
+        return str(self._object_locations(session).get("BALLO") or "").strip().upper()
+
+    def _aboard_balloon(self, session: dict[str, object]) -> bool:
+        return "aboard_balloon" in self._session_flags(session)
+
+    def _balloon_tied_room(self, session: dict[str, object]) -> str:
+        flags = self._session_flags(session)
+        if "balloon_tied_ledg2" in flags:
+            return "LEDG2"
+        if "balloon_tied_ledg4" in flags:
+            return "LEDG4"
+        return ""
+
+    def _balloon_fuel_code(self, session: dict[str, object]) -> str:
+        for code, location in self._object_locations(session).items():
+            if str(location or "").strip().upper() == "RECEP":
+                return str(code or "").strip().upper()
+        return ""
+
+    def _balloon_burn_turns(self, session: dict[str, object]) -> int:
+        counters = self._session_counters(session)
+        try:
+            return max(0, int(counters.get("balloon_burn_turns") or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    def _balloon_inflated(self, session: dict[str, object]) -> bool:
+        return "balloon_inflated" in self._session_flags(session) or self._balloon_burn_turns(session) > 0
+
+    def _balloon_fuel_duration(self, code: str) -> int:
+        return int(BALLOON_FUEL_TURNS.get(str(code or "").strip().upper(), DEFAULT_BALLOON_FUEL_TURNS))
+
+    def _default_board_target(self, session: dict[str, object]) -> str:
+        if self._is_accessible(session, "RBOAT"):
+            return "boat"
+        if self._is_accessible(session, "IBOAT"):
+            return "boat"
+        if self._is_accessible(session, "BALLO"):
+            return "balloon"
+        if self._is_accessible(session, "DBALL"):
+            return "balloon"
+        return "boat"
+
     def _is_accessible(self, session: dict[str, object], code: str, *, include_room: bool = True, include_inventory: bool = True) -> bool:
         code_key = str(code or "").strip().upper()
         if not code_key:
@@ -818,6 +912,8 @@ class ZorkGame:
         if location and location_container in inventory and self._container_open(location_container, flags):
             return True
         if location and include_room and location_container in self._visible_top_level_objects(session, room_id) and self._container_open(location_container, flags):
+            return True
+        if location == "RECEP" and self._is_accessible(session, "RECEP", include_room=include_room, include_inventory=include_inventory):
             return True
         if location == "TROLL" and room_id == "MTROL" and self._container_open("TROLL", flags):
             return True
@@ -909,9 +1005,30 @@ class ZorkGame:
         if "lamp" in word_set or "lantern" in word_set or "lante" in word_set:
             return "LAMP"
         if "label" in word_set or "finep" in word_set:
+            if "blue" in word_set or "bluel" in word_set:
+                if self._is_accessible(session, "BLABE"):
+                    return "BLABE"
+            if self._is_accessible(session, "LABEL"):
+                return "LABEL"
+            if self._is_accessible(session, "BLABE"):
+                return "BLABE"
             return "LABEL"
         if "buoy" in word_set:
             return "BUOY"
+        if "receptacle" in word_set or "burner" in word_set or "recep" in word_set:
+            return "RECEP"
+        if "wire" in word_set or "braided" in word_set:
+            return "BROPE"
+        if "hook" in word_set:
+            if room_id == "LEDG2":
+                return "HOOK1"
+            if room_id == "LEDG4":
+                return "HOOK2"
+        if "balloon" in word_set or "basket" in word_set or "wicker" in word_set:
+            if self._is_accessible(session, "BALLO"):
+                return "BALLO"
+            if self._is_accessible(session, "DBALL"):
+                return "DBALL"
         if "boat" in word_set:
             if action == "board":
                 if self._is_accessible(session, "RBOAT"):
@@ -993,11 +1110,15 @@ class ZorkGame:
         candidates.extend(self._session_inventory(session))
         flags = self._session_flags(session)
         object_locations = self._object_locations(session)
+        visible_top_level = self._visible_top_level_objects(session, room_id)
+        inventory_set = set(self._session_inventory(session))
         for code, location in object_locations.items():
             location_container = self._location_container_code(location)
-            if location_container in set(self._session_inventory(session)) and self._container_open(location_container, flags):
+            if location_container in inventory_set and self._container_open(location_container, flags):
                 candidates.append(code)
-            if location_container in self._visible_top_level_objects(session, room_id) and self._container_open(location_container, flags):
+            if location_container in visible_top_level and self._container_open(location_container, flags):
+                candidates.append(code)
+            if str(location or "").strip().upper() == "RECEP" and self._is_accessible(session, "RECEP"):
                 candidates.append(code)
         unique_candidates = sorted({code for code in candidates if code in OBJECTS})
         best_score = -1
@@ -1120,6 +1241,15 @@ class ZorkGame:
             return "There is a flaming ivory torch here." if self._object_is_lit(session, "TORCH") else "There is an ivory torch here."
         if code_key == "CANDL":
             return "There are two burning candles here." if self._object_is_lit(session, "CANDL") else "There are two candles here."
+        if code_key == "BALLO":
+            fuel_code = self._balloon_fuel_code(session)
+            fuel_text = f" A {object_name(fuel_code)} burns in its receptacle." if fuel_code and self._balloon_inflated(session) else ""
+            tie_text = " The wire is fastened to a hook in the rock." if self._balloon_tied_room(session) == room_id else ""
+            if self._balloon_inflated(session):
+                return f"There is a wicker basket here supporting a large inflated cloth balloon.{fuel_text}{tie_text}"
+            return f"There is a very large wicker basket here with a cloth bag draped over it.{tie_text}"
+        if code_key == "DBALL":
+            return "There is a balloon here, broken into pieces."
         if code_key == "BUOY":
             return "There is a red buoy here, now hanging open." if "buoy_open" in self._session_flags(session) else "There is a red buoy here (probably a warning)."
         if code_key == "LABEL":
@@ -1447,6 +1577,8 @@ class ZorkGame:
 
         if "aboard_boat" in flags and object_locations.get("RBOAT") != room_id:
             flags.discard("aboard_boat")
+        if "aboard_balloon" in flags and object_locations.get("BALLO") != room_id:
+            flags.discard("aboard_balloon")
 
         exit_row = None
         for row in room.exits:
@@ -1520,6 +1652,93 @@ class ZorkGame:
             )
 
         if direction == "LAUNC":
+            if "aboard_balloon" in flags or object_locations.get("BALLO") == room_id or object_locations.get("DBALL") == room_id:
+                if object_locations.get("DBALL") == room_id and "aboard_balloon" not in flags:
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"The balloon is broken. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                if "aboard_balloon" not in flags:
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"You'll need to board the balloon first. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                if object_locations.get("BALLO") != room_id:
+                    flags.discard("aboard_balloon")
+                    self._write_session_state(
+                        session,
+                        room_id=room_id,
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                    )
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"The balloon is not here anymore. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                if self._balloon_tied_room(session) == room_id:
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"The balloon is fastened to the hook. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                burn_turns = self._balloon_burn_turns(session)
+                if burn_turns <= 0 or "balloon_inflated" not in flags:
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"The balloon is not inflated. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                if room_id == "VAIR4":
+                    flags.discard("aboard_balloon")
+                    flags.discard("balloon_inflated")
+                    self._session_counters(session)["balloon_burn_turns"] = 0
+                    object_locations["BALLO"] = "GONE"
+                    object_locations["DBALL"] = "VLBOT"
+                    self._sessions.pop(str(session.get("peer_id") or "").strip().lower(), None)
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(
+                            "Your balloon has hit the rim of the volcano, ripping the cloth and causing you a 500 foot drop. "
+                            "zork: session ended. Send 'zork' to start again."
+                        ),
+                        command_name=self.SPEC.name,
+                    )
+                if room_id in BALLOON_LAUNCH_MAP:
+                    new_room = BALLOON_LAUNCH_MAP[room_id]
+                elif room_id in BALLOON_ASCENT_MAP:
+                    new_room = BALLOON_ASCENT_MAP[room_id]
+                else:
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"You can't launch from here. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                object_locations["BALLO"] = new_room
+                counters = self._session_counters(session)
+                counters["balloon_burn_turns"] = max(0, burn_turns - 1)
+                extra = ""
+                if counters["balloon_burn_turns"] <= 0:
+                    flags.discard("balloon_inflated")
+                    extra = " The fire burns low and the cloth bag begins to sag."
+                self._write_session_state(
+                    session,
+                    room_id=new_room,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                    now_unix=now_unix,
+                )
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(f"The balloon ascends.{extra} {self._room_summary(session, new_room)}"),
+                    command_name=self.SPEC.name,
+                )
+
             if "aboard_boat" not in flags:
                 if object_locations.get("RBOAT") == room_id or "RBOAT" in inventory:
                     return BotAppResult(
@@ -1582,6 +1801,106 @@ class ZorkGame:
                 flags=flags,
                 object_locations=object_locations,
                 now_unix=now_unix,
+            )
+
+        if direction == "LAND":
+            if "aboard_balloon" in flags or room_id in BALLOON_AIR_ROOMS:
+                if "aboard_balloon" not in flags:
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"You'll need to board the balloon first. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                if room_id in BALLOON_GROUND_ROOMS:
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"The balloon is already on the ground. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                if room_id in BALLOON_LANDING_MAP:
+                    new_room = BALLOON_LANDING_MAP[room_id]
+                    move_text = "The balloon lands."
+                elif room_id in BALLOON_DESCENT_MAP:
+                    new_room = BALLOON_DESCENT_MAP[room_id]
+                    move_text = "The balloon descends."
+                else:
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"You can't land from here. {self._room_summary(session, room_id)}"),
+                        command_name=self.SPEC.name,
+                    )
+                burn_turns = self._balloon_burn_turns(session)
+                if new_room == "VLBOT" and burn_turns <= 0:
+                    flags.discard("aboard_balloon")
+                    flags.discard("balloon_inflated")
+                    self._session_counters(session)["balloon_burn_turns"] = 0
+                    object_locations["BALLO"] = "GONE"
+                    object_locations["DBALL"] = "VLBOT"
+                    self._write_session_state(
+                        session,
+                        room_id="VLBOT",
+                        inventory=inventory,
+                        flags=flags,
+                        object_locations=object_locations,
+                        now_unix=now_unix,
+                    )
+                    return BotAppResult(
+                        handled=True,
+                        reply_text=self._compact(f"You have landed, but the balloon did not survive. {self._room_summary(session, 'VLBOT')}"),
+                        command_name=self.SPEC.name,
+                    )
+                object_locations["BALLO"] = new_room
+                self._write_session_state(
+                    session,
+                    room_id=new_room,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                    now_unix=now_unix,
+                )
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(f"{move_text} {self._room_summary(session, new_room)}"),
+                    command_name=self.SPEC.name,
+                )
+
+        if "aboard_balloon" in flags:
+            if room_id == "VAIR2" and direction == "WEST" and exit_row is not None:
+                new_room = "LEDG2"
+                object_locations["BALLO"] = new_room
+                self._write_session_state(
+                    session,
+                    room_id=new_room,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                    now_unix=now_unix,
+                )
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(f"The balloon lands. {self._room_summary(session, new_room)}"),
+                    command_name=self.SPEC.name,
+                )
+            if room_id == "VAIR4" and direction == "EAST" and exit_row is not None:
+                new_room = "LEDG4"
+                object_locations["BALLO"] = new_room
+                self._write_session_state(
+                    session,
+                    room_id=new_room,
+                    inventory=inventory,
+                    flags=flags,
+                    object_locations=object_locations,
+                    now_unix=now_unix,
+                )
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(f"The balloon lands. {self._room_summary(session, new_room)}"),
+                    command_name=self.SPEC.name,
+                )
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(f"I'm afraid you can't control the balloon in this way. {self._room_summary(session, room_id)}"),
+                command_name=self.SPEC.name,
             )
 
         if "aboard_boat" in flags and self._has_launch_exit(room_id):
@@ -1731,6 +2050,35 @@ class ZorkGame:
             return "An ivory torch, blazing steadily." if self._object_is_lit(session, "TORCH") else "An ivory torch. It is no longer burning."
         if code_key == "CANDL":
             return "A pair of candles. They are burning." if self._object_is_lit(session, "CANDL") else "A pair of candles. They have gone out."
+        if code_key == "BALLO":
+            fuel_code = self._balloon_fuel_code(session)
+            fuel_text = ""
+            if fuel_code:
+                if self._balloon_inflated(session):
+                    fuel_text = f" A {object_name(fuel_code)} burns in the receptacle, keeping the bag full of hot air."
+                else:
+                    fuel_text = f" A {object_name(fuel_code)} rests in the receptacle."
+            tie_text = " The wire is fastened to a hook in the rock." if self._balloon_tied_room(session) == room_id else ""
+            if self._balloon_inflated(session):
+                return self._compact(f"A large balloon with an inflated cloth bag above a wicker basket.{fuel_text}{tie_text}")
+            return self._compact(f"A large balloon basket with its cloth bag draped over the sides.{fuel_text}{tie_text}")
+        if code_key == "DBALL":
+            return "A shattered balloon. It has very much failed at being a balloon."
+        if code_key == "RECEP":
+            fuel_code = self._balloon_fuel_code(session)
+            if fuel_code and self._balloon_inflated(session):
+                return self._compact(f"A metal receptacle inside the basket. A {object_name(fuel_code)} is burning in it.")
+            if fuel_code:
+                return self._compact(f"A metal receptacle inside the basket. It currently holds {object_name(fuel_code)}.")
+            return "A metal receptacle mounted inside the basket. It appears to be the balloon's burner."
+        if code_key == "BROPE":
+            if self._balloon_tied_room(session) == room_id:
+                return "A braided wire running from the basket to the hook in the rock."
+            return "A braided wire attached to the outside of the balloon basket."
+        if code_key in {"HOOK1", "HOOK2"}:
+            if self._balloon_tied_room(session) == room_id:
+                return "A small hook attached to the rock. The balloon's wire is fastened to it."
+            return "A small hook attached to the rock."
         if code_key == "BUOY":
             return "A red buoy. It is open." if "buoy_open" in flags else "A red buoy, probably a warning. It looks like it can be opened."
         if code_key == "LABEL":
@@ -1916,6 +2264,7 @@ class ZorkGame:
         inventory = self._session_inventory(session)
         object_locations = self._object_locations(session)
         flags = self._session_flags(session)
+        counters = self._session_counters(session)
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         if item is None:
             return ("You can't take that.", inventory, object_locations, flags)
@@ -1941,6 +2290,9 @@ class ZorkGame:
             flags.add("leaves_moved")
         if code_key == "WATER":
             return ("The water is already in the bottle.", inventory, object_locations, flags)
+        if str(object_locations.get(code_key) or "").strip().upper() == "RECEP":
+            flags.discard("balloon_inflated")
+            counters["balloon_burn_turns"] = 0
         if code_key == "AXE" and object_locations.get("AXE") == "TROLL" and "troll_defeated" in flags:
             object_locations["AXE"] = room_id
         if "TAKEBIT" not in item.flags and code_key not in {"AXE", "LEAVE"}:
@@ -2175,6 +2527,39 @@ class ZorkGame:
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         object_locations = self._object_locations(session)
         inventory = set(self._session_inventory(session))
+        counters = self._session_counters(session)
+
+        fuel_code = self._balloon_fuel_code(session)
+        fuel_target = ""
+        if code_key == "RECEP":
+            fuel_target = fuel_code
+        elif fuel_code and code_key == fuel_code and str(object_locations.get(code_key) or "").strip().upper() == "RECEP":
+            fuel_target = code_key
+        if fuel_target:
+            if action == "on":
+                item = OBJECTS.get(fuel_target)
+                if item is None or "BURNBIT" not in item.flags:
+                    return (f"The {object_name(fuel_target)} won't burn usefully in the receptacle.", flags)
+                if counters.get("balloon_burn_turns"):
+                    return ("The receptacle is already occupied by a burning fire.", flags)
+                if not (
+                    "MATCH" in inventory
+                    or self._object_is_lit(session, "TORCH")
+                    or self._object_is_lit(session, "LAMP")
+                    or self._object_is_lit(session, "CANDL")
+                ):
+                    return ("You need some kind of flame to light it.", flags)
+                counters["balloon_burn_turns"] = self._balloon_fuel_duration(fuel_target)
+                flags.add("balloon_inflated")
+                return (
+                    f"The {object_name(fuel_target)} burns inside the receptacle. The cloth bag inflates as it fills with hot air.",
+                    flags,
+                )
+            if not counters.get("balloon_burn_turns"):
+                return ("Nothing in the receptacle is burning.", flags)
+            counters["balloon_burn_turns"] = 0
+            flags.discard("balloon_inflated")
+            return ("The fire in the receptacle dies, and the cloth bag starts to sag.", flags)
 
         if code_key == "LAMP":
             return self._lamp_response(session, action)
@@ -2268,6 +2653,30 @@ class ZorkGame:
         flags = self._session_flags(session)
         object_locations = self._object_locations(session)
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+
+        if code_key == "BROPE":
+            tied_room = self._balloon_tied_room(session)
+            expected_hook = BALLOON_HOOK_CODES.get(room_id, "")
+            if action == "untie":
+                if tied_room != room_id:
+                    return ("The wire is not tied to anything.", inventory, flags, object_locations)
+                flags.discard("balloon_tied_ledg2")
+                flags.discard("balloon_tied_ledg4")
+                return ("The wire falls off of the hook.", inventory, flags, object_locations)
+
+            if room_id not in BALLOON_HOOK_CODES or object_locations.get("BALLO") != room_id:
+                return ("There is nothing it can be tied to.", inventory, flags, object_locations)
+            if anchor_key != expected_hook:
+                return ("There is nothing it can be tied to.", inventory, flags, object_locations)
+            if tied_room == room_id:
+                return ("The balloon is fastened to the hook.", inventory, flags, object_locations)
+            flags.discard("balloon_tied_ledg2")
+            flags.discard("balloon_tied_ledg4")
+            if room_id == "LEDG2":
+                flags.add("balloon_tied_ledg2")
+            if room_id == "LEDG4":
+                flags.add("balloon_tied_ledg4")
+            return ("The balloon is fastened to the hook.", inventory, flags, object_locations)
 
         if code_key != "ROPE":
             verb = "tie" if action == "tie" else "untie"
@@ -2370,6 +2779,20 @@ class ZorkGame:
             return (f"You don't see any {object_name(container_key)} here.", inventory, flags, object_locations)
         if code_key == container_key:
             return ("That would be a neat topological trick, but no.", inventory, flags, object_locations)
+
+        if container_key == "RECEP":
+            if room_id not in BALLOON_GROUND_ROOMS | BALLOON_AIR_ROOMS:
+                return ("The receptacle is not here.", inventory, flags, object_locations)
+            if object_locations.get("BALLO") != room_id:
+                return ("The balloon is not here.", inventory, flags, object_locations)
+            if self._balloon_fuel_code(session):
+                return ("The receptacle is already occupied.", inventory, flags, object_locations)
+            item = OBJECTS.get(code_key)
+            if item is None or "BURNBIT" not in item.flags:
+                return ("That wouldn't make useful balloon fuel.", inventory, flags, object_locations)
+            inventory = [value for value in inventory if value != code_key]
+            object_locations[code_key] = "RECEP"
+            return (f"The {object_name(code_key)} is now in the receptacle.", inventory, flags, object_locations)
 
         if container_key == "MACHI":
             if room_id != "MACHI":
@@ -2522,6 +2945,16 @@ class ZorkGame:
         if action == "board":
             if target_key == "IBOAT":
                 return ("It would be more useful if it were inflated.", inventory, flags, object_locations)
+            if target_key == "DBALL":
+                return ("It would be more useful if it were not shattered.", inventory, flags, object_locations)
+            if target_key == "BALLO":
+                if "aboard_balloon" in flags:
+                    return ("You are already in the balloon.", inventory, flags, object_locations)
+                if object_locations.get("BALLO") != room_id:
+                    return ("You don't see any balloon here.", inventory, flags, object_locations)
+                flags.discard("aboard_boat")
+                flags.add("aboard_balloon")
+                return ("You are now in the balloon basket.", inventory, flags, object_locations)
             if target_key != "RBOAT":
                 return (f"You can't board the {object_name(target_key)}.", inventory, flags, object_locations)
             if "aboard_boat" in flags:
@@ -2531,11 +2964,18 @@ class ZorkGame:
                 object_locations["RBOAT"] = room_id
             if object_locations.get("RBOAT") != room_id:
                 return ("You don't see any inflated boat here.", inventory, flags, object_locations)
+            flags.discard("aboard_balloon")
             flags.add("aboard_boat")
             return ("You are now in the magic boat.", inventory, flags, object_locations)
 
+        if "aboard_balloon" in flags:
+            if room_id in BALLOON_AIR_ROOMS:
+                return ("This is no place to be getting out of the balloon.", inventory, flags, object_locations)
+            flags.discard("aboard_balloon")
+            return ("You climb out of the balloon basket.", inventory, flags, object_locations)
+
         if "aboard_boat" not in flags:
-            return ("You aren't in the boat.", inventory, flags, object_locations)
+            return ("You are not in any vehicle.", inventory, flags, object_locations)
         if self._is_river_room(room_id):
             return ("The river is no place to be getting out of the boat.", inventory, flags, object_locations)
         flags.discard("aboard_boat")
@@ -2650,6 +3090,7 @@ class ZorkGame:
             "inv",
             "i",
             "light",
+            "burn",
             "turn",
             "on",
             "off",
@@ -2687,7 +3128,7 @@ class ZorkGame:
                 handled=True,
                 reply_text=(
                     "zork: look, x/read, n/s/e/w/u/d, take/drop, put/insert, throw/rub, open/close, move, push/press, turn, "
-                    "light/extinguish, dig, wave stick, tie/untie rope, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
+                    "light/burn/extinguish, dig, wave stick, tie/untie rope or balloon wire, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
                     "magic words, score, attack, quit."
                 ),
                 command_name=self.SPEC.name,
@@ -2707,7 +3148,7 @@ class ZorkGame:
             )
 
         if head_raw in {"board", "disembark"}:
-            target_text = raw_target or ("boat" if head_raw == "board" else "")
+            target_text = raw_target or (self._default_board_target(session) if head_raw == "board" else "")
             target = self._resolve_object(session, target_text, head_raw) if target_text else None
             reply, inventory, flags, object_locations = self._board_or_disembark_response(session, head_raw, target)
             self._write_session_state(
@@ -3086,13 +3527,13 @@ class ZorkGame:
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
 
-        if head_raw in {"light", "extinguish", "on", "off"}:
+        if head_raw in {"light", "burn", "extinguish", "on", "off"}:
             action = "off" if head_raw in {"extinguish", "off"} else "on"
-            target_text = raw_target or "lamp"
+            target_text = raw_target or ("lamp" if head_raw != "burn" else "")
             target = self._resolve_object(session, target_text, head_raw)
             if not target:
                 self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
-                reply = f"You don't see any {target_text} here." if raw_target else ("Light what?" if action == "on" else "Extinguish what?")
+                reply = f"You don't see any {target_text} here." if raw_target else ("Burn what?" if head_raw == "burn" else ("Light what?" if action == "on" else "Extinguish what?"))
                 return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
             if target == "FUSE" and action == "on":
                 reply, flags, object_locations = self._light_fuse_response(session)
