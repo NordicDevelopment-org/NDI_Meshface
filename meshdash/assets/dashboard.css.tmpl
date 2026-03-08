@@ -5401,11 +5401,32 @@
       );
       box-shadow: inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.72);
     }}
+    .chat-feed-item.self-authored {{
+      background: rgba(47, 133, 90, 0.07);
+      box-shadow: inset 2px 0 0 rgba(47, 133, 90, 0.42);
+    }}
+    .chat-feed-item.self-authored.channel-tinted {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.14),
+          rgba(var(--chat-feed-channel-rgb), 0.07) 28%,
+          rgba(var(--chat-feed-channel-rgb), 0.02) 56%,
+          rgba(var(--chat-feed-channel-rgb), 0) 100%
+        ),
+        rgba(47, 133, 90, 0.07);
+      box-shadow:
+        inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.72),
+        inset 4px 0 0 rgba(47, 133, 90, 0.28);
+    }}
     .chat-feed-item.chat-selectable {{
       cursor: pointer;
     }}
     .chat-feed-item.chat-selectable:hover {{
       background: #eef6f1;
+    }}
+    .chat-feed-item.chat-selectable.self-authored:hover {{
+      background: rgba(47, 133, 90, 0.11);
     }}
     .chat-feed-item.chat-selectable.channel-tinted:hover {{
       background: linear-gradient(
@@ -5415,6 +5436,17 @@
         rgba(var(--chat-feed-channel-rgb), 0.05) 58%,
         rgba(var(--chat-feed-channel-rgb), 0.02) 100%
       );
+    }}
+    .chat-feed-item.chat-selectable.self-authored.channel-tinted:hover {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.2),
+          rgba(var(--chat-feed-channel-rgb), 0.1) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.04) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.01) 100%
+        ),
+        rgba(47, 133, 90, 0.11);
     }}
     .chat-feed-item.selected-node {{
       background: #e7f2eb;
@@ -6902,9 +6934,33 @@
         #1a2a21;
       box-shadow: inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.84);
     }}
+    [data-theme="dark"] .chat-feed-item.self-authored {{
+      background: #20372c;
+      border-color: #385647;
+      box-shadow: inset 2px 0 0 rgba(112, 196, 148, 0.52);
+    }}
+    [data-theme="dark"] .chat-feed-item.self-authored.channel-tinted {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.2),
+          rgba(var(--chat-feed-channel-rgb), 0.11) 28%,
+          rgba(var(--chat-feed-channel-rgb), 0.04) 56%,
+          rgba(var(--chat-feed-channel-rgb), 0.01) 100%
+        ),
+        #20372c;
+      border-color: #385647;
+      box-shadow:
+        inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.84),
+        inset 4px 0 0 rgba(112, 196, 148, 0.34);
+    }}
     [data-theme="dark"] .chat-feed-item.chat-selectable:hover {{
       background: #24392f;
       border-color: #436553;
+    }}
+    [data-theme="dark"] .chat-feed-item.chat-selectable.self-authored:hover {{
+      background: #274133;
+      border-color: #456957;
     }}
     [data-theme="dark"] .chat-feed-item.chat-selectable.channel-tinted:hover {{
       background:
@@ -6917,6 +6973,18 @@
         ),
         #24392f;
       border-color: #436553;
+    }}
+    [data-theme="dark"] .chat-feed-item.chat-selectable.self-authored.channel-tinted:hover {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.26),
+          rgba(var(--chat-feed-channel-rgb), 0.14) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.06) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.02) 100%
+        ),
+        #274133;
+      border-color: #456957;
     }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
       background: #2b4638;
@@ -7631,11 +7699,43 @@
       border-radius: 0;
       color: var(--ui-text);
     }}
+    [data-theme="dark"] .card.chat .chat-feed-item.self-authored {{
+      background: rgba(63, 185, 80, 0.035);
+      box-shadow: inset 2px 0 0 rgba(63, 185, 80, 0.18);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.self-authored.channel-tinted {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.16),
+          rgba(var(--chat-feed-channel-rgb), 0.08) 28%,
+          rgba(var(--chat-feed-channel-rgb), 0.025) 56%,
+          rgba(var(--chat-feed-channel-rgb), 0.01) 100%
+        ),
+        rgba(63, 185, 80, 0.035);
+      box-shadow:
+        inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.84),
+        inset 4px 0 0 rgba(63, 185, 80, 0.12);
+    }}
     [data-theme="dark"] .card.chat .chat-feed-item:last-child {{
       border-bottom: 0;
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable:hover:not(.channel-tinted) {{
       background: #1f2d3a;
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable.self-authored:hover:not(.channel-tinted) {{
+      background: rgba(63, 185, 80, 0.055);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable.self-authored.channel-tinted:hover {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.18),
+          rgba(var(--chat-feed-channel-rgb), 0.09) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.035) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.02) 100%
+        ),
+        rgba(63, 185, 80, 0.055);
     }}
     [data-theme="dark"] .card.chat .chat-compose-shell {{
       background:

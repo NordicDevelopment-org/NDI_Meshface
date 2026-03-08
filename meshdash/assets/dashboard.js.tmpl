@@ -21531,6 +21531,7 @@
           ? `<div class="chat-reaction-row">${{reactionRowParts.join("")}}</div>`
           : "";
         const selectedFeedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
+        const selfAuthoredClass = isSelfNodeId(sourceNode) ? " self-authored" : "";
         const messageKey = chatMessageKey(msg);
         const hasChangeMarker = !!messageKey && activeChangeFocusKeys.has(messageKey);
         const changeClass = hasChangeMarker ? " has-change-marker" : "";
@@ -21595,7 +21596,7 @@
               </span>
               <span class="chat-feed-colon">:</span>
               <span class="chat-feed-text chat-feed-text-inline">${{textHtml || "&nbsp;"}}</span>`;
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{selfAuthoredClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
           <div class="chat-feed-line">
             <div class="chat-feed-summary">
               ${{changeBadge}}
