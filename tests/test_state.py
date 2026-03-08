@@ -101,6 +101,34 @@ def test_collect_local_state_includes_local_position_from_node_registry():
     assert state["local_position"]["longitude"] == -93.26
 
 
+def test_collect_local_state_dedupes_repeated_channel_slots_by_index():
+    repeated_channels = [
+        {"role": "PRIMARY", "settings": {"name": "primary"}},
+        {"index": 1, "role": "DISABLED"},
+        {"index": 2, "role": "DISABLED"},
+        {"index": 3, "role": "DISABLED"},
+        {"index": 4, "role": "DISABLED"},
+        {"index": 5, "role": "DISABLED"},
+        {"index": 6, "role": "DISABLED"},
+        {"index": 7, "role": "DISABLED"},
+    ] * 4
+    local = types.SimpleNamespace(
+        localConfig={"lora": {"modem_preset": "LONG_FAST"}},
+        moduleConfig={"foo": "bar"},
+        channels=repeated_channels,
+    )
+    iface = _iface_with_local(local_node=local)
+
+    state = collect_local_state(iface)
+
+    channels = state["channels"]
+    assert len(channels) == 8
+    assert channels[0]["index"] == 0
+    assert channels[0]["role"] == "PRIMARY"
+    assert channels[0]["settings"]["name"] == "primary"
+    assert [channel["index"] for channel in channels[1:]] == [1, 2, 3, 4, 5, 6, 7]
+
+
 def test_build_state_merges_saved_counts_and_redacts_secrets():
     iface = _iface_with_local()
     tracker = _DummyTracker()

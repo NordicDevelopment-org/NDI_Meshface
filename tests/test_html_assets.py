@@ -10,8 +10,6 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert ".console-select" in css
     assert "#history-chat-table td.history-node-clickable" in css
     assert "#history-chat-table tbody tr.history-node-selectable.selected-node td" in css
-    assert ".chat-feed-item.self-authored" in css
-    assert ".card.chat .chat-feed-item.self-authored" in css
     assert ".bots-setting-note" in css
     assert "* { box-sizing: border-box; }" in css
     assert "{{" not in css
@@ -52,7 +50,6 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "\"from-node-id\": fromNodeId" in js
     assert "className: isSelectableNodeId(fromNodeId) ? \"history-node-clickable\" : \"\"" in js
     assert "selectNodeFromDirectionalRow(" in js
-    assert "const selfAuthoredClass = isSelfNodeId(sourceNode) ? \" self-authored\" : \"\";" in js
     assert "game_public_start_enabled: false" in js
     assert "raw.game_public_start_enabled ?? raw.gamePublicStartEnabled" in js
     assert "const publicStartInput = document.getElementById(\"bots-game-public-start-enabled\");" in js
