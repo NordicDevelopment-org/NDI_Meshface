@@ -439,6 +439,7 @@ class MeshResponseBot:
         enabled: bool = True,
         log_enabled: bool = True,
         game_enabled: bool = False,
+        game_public_start_enabled: bool = False,
         reply_broadcast: bool = False,
         settings_path: Optional[str] = None,
         chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
@@ -452,6 +453,7 @@ class MeshResponseBot:
         self._settings_path = str(settings_path).strip() if settings_path else None
         self._chat_max_bytes = max(1, int(chat_max_bytes))
         self._now_unix_fn = now_unix_fn
+        self._game_public_start_enabled = bool(game_public_start_enabled)
         self._custom_commands = {
             _normalize_command_name(name): str(template or "").strip()
             for name, template in (custom_commands or {}).items()
@@ -511,6 +513,10 @@ class MeshResponseBot:
     @property
     def game_enabled(self) -> bool:
         return bool(self._bot_app_enabled.get("zork"))
+
+    @property
+    def game_public_start_enabled(self) -> bool:
+        return bool(self._game_public_start_enabled)
 
     def _active_game_sessions_locked(self) -> int:
         total = 0
@@ -635,6 +641,7 @@ class MeshResponseBot:
             "enabled": bool(self._enabled),
             "log_enabled": bool(self._log_enabled),
             "game_enabled": bool(self._bot_app_enabled.get("zork")),
+            "game_public_start_enabled": bool(self._game_public_start_enabled),
             "active_game_sessions": self._active_game_sessions_locked(),
             "disabled_commands": sorted(self._disabled_commands),
             "commands": self._managed_command_rows_locked(),
@@ -645,6 +652,7 @@ class MeshResponseBot:
             "enabled": bool(self._enabled),
             "log_enabled": bool(self._log_enabled),
             "game_enabled": bool(self._bot_app_enabled.get("zork")),
+            "game_public_start_enabled": bool(self._game_public_start_enabled),
             "disabled_commands": sorted(self._disabled_commands),
         }
 
@@ -658,6 +666,7 @@ class MeshResponseBot:
         enabled: Optional[bool] = None,
         log_enabled: Optional[bool] = None,
         game_enabled: Optional[bool] = None,
+        game_public_start_enabled: Optional[bool] = None,
         command_settings: Optional[dict[str, bool]] = None,
     ) -> dict[str, object]:
         with self._lock:
@@ -667,6 +676,8 @@ class MeshResponseBot:
                 self._log_enabled = bool(log_enabled)
             if game_enabled is not None:
                 self._set_bot_app_enabled_locked("zork", bool(game_enabled))
+            if game_public_start_enabled is not None:
+                self._game_public_start_enabled = bool(game_public_start_enabled)
             if command_settings:
                 self._apply_command_settings_locked(command_settings)
             out = self._bot_settings_locked()
@@ -781,6 +792,26 @@ class MeshResponseBot:
         if not head:
             return None
         return head, parts[1:]
+
+    def _should_bootstrap_public_game_start(
+        self,
+        *,
+        app_name: str,
+        text: str,
+        to_id: str,
+        local_node_id: str,
+    ) -> bool:
+        if app_name != "zork" or not self._game_public_start_enabled:
+            return False
+        if _normalize_node_id(to_id) != "^all":
+            return False
+        if not _normalize_node_id(local_node_id).startswith("!"):
+            return False
+        parsed = self._parse_command(text)
+        if parsed is None:
+            return False
+        command, _args = parsed
+        return command == "zork"
 
     def _build_standard_reply(
         self,
@@ -1044,20 +1075,29 @@ class MeshResponseBot:
         app_result = None
         with self._lock:
             for app_name, app in self._prioritized_bot_apps_locked(from_id):
+                effective_to_id = to_id
+                bootstrapped_public_start = self._should_bootstrap_public_game_start(
+                    app_name=app_name,
+                    text=text,
+                    to_id=to_id,
+                    local_node_id=local_node_id,
+                )
+                if bootstrapped_public_start:
+                    effective_to_id = local_node_id
                 result = app.try_handle_message(
                     text=text,
                     from_id=from_id,
-                    to_id=to_id,
+                    to_id=effective_to_id,
                     local_node_id=local_node_id,
                     now_unix=now_unix,
                     enabled=bool(self._bot_app_enabled.get(app_name)),
                 )
                 if not getattr(result, "handled", False):
                     continue
-                app_result = (app_name, result)
+                app_result = (app_name, result, bootstrapped_public_start)
                 break
         if app_result is not None:
-            app_name, result = app_result
+            app_name, result, _bootstrapped_public_start = app_result
             command = _normalize_command_name(result.command_name or app_name) or app_name
             raw_args = result.command_args if getattr(result, "command_args", None) else None
             if raw_args is None:
@@ -1263,6 +1303,11 @@ def build_mesh_response_bot_from_env(
         if "MESH_DASH_BOT_GAME_ENABLED" in env_map
         else bool(persisted.get("game_enabled", True))
     )
+    game_public_start_enabled = (
+        _parse_bool_token(env_map.get("MESH_DASH_BOT_GAME_PUBLIC_START_ENABLED"), False)
+        if "MESH_DASH_BOT_GAME_PUBLIC_START_ENABLED" in env_map
+        else bool(persisted.get("game_public_start_enabled", False))
+    )
     if not respond_enabled and not log_enabled:
         return None
     reply_broadcast = _parse_bool_token(env_map.get("MESH_DASH_BOT_REPLY_BROADCAST"), False)
@@ -1285,6 +1330,7 @@ def build_mesh_response_bot_from_env(
         enabled=respond_enabled,
         log_enabled=log_enabled,
         game_enabled=game_enabled,
+        game_public_start_enabled=game_public_start_enabled,
         reply_broadcast=reply_broadcast,
         settings_path=settings_path,
         chat_max_bytes=chat_max_bytes,

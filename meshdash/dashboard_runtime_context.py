@@ -261,6 +261,7 @@ def build_dashboard_runtime_context(
                 enabled=getattr(request, "enabled", None),
                 log_enabled=getattr(request, "log_enabled", None),
                 game_enabled=getattr(request, "game_enabled", None),
+                game_public_start_enabled=getattr(request, "game_public_start_enabled", None),
                 command_settings=getattr(request, "command_settings", None),
             )
         try:

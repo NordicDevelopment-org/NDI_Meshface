@@ -54,6 +54,9 @@ def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, objec
     enabled = _parse_optional_bool_token(payload.get("enabled"))
     log_enabled = _parse_optional_bool_token(payload.get("log_enabled", payload.get("logEnabled")))
     game_enabled = _parse_optional_bool_token(payload.get("game_enabled", payload.get("gameEnabled")))
+    game_public_start_enabled = _parse_optional_bool_token(
+        payload.get("game_public_start_enabled", payload.get("gamePublicStartEnabled"))
+    )
     disabled_commands = _parse_disabled_commands(
         payload.get("disabled_commands", payload.get("disabledCommands"))
     )
@@ -63,6 +66,8 @@ def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, objec
         out["log_enabled"] = log_enabled
     if game_enabled is not None:
         out["game_enabled"] = game_enabled
+    if game_public_start_enabled is not None:
+        out["game_public_start_enabled"] = game_public_start_enabled
     if disabled_commands is not None:
         out["disabled_commands"] = disabled_commands
     return out
@@ -79,6 +84,7 @@ def save_persisted_bot_settings(
         "enabled": bool(settings.get("enabled")),
         "log_enabled": bool(settings.get("log_enabled")),
         "game_enabled": bool(settings.get("game_enabled")),
+        "game_public_start_enabled": bool(settings.get("game_public_start_enabled")),
         "disabled_commands": sorted(
             {
                 clean
@@ -101,4 +107,3 @@ def save_persisted_bot_settings(
     except Exception as exc:
         return str(exc)
     return None
-

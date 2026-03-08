@@ -2229,6 +2229,7 @@
       enabled: true,
       log_enabled: true,
       game_enabled: false,
+      game_public_start_enabled: false,
       active_game_sessions: 0,
       commands: [],
       disabled_commands: [],
@@ -6250,6 +6251,7 @@
           enabled: true,
           log_enabled: true,
           game_enabled: false,
+          game_public_start_enabled: false,
           active_game_sessions: 0,
           commands: [],
           disabled_commands: [],
@@ -6281,6 +6283,10 @@
         enabled: parseBoolToken(raw.enabled, true),
         log_enabled: parseBoolToken(raw.log_enabled ?? raw.logEnabled, true),
         game_enabled: parseBoolToken(raw.game_enabled ?? raw.gameEnabled, false),
+        game_public_start_enabled: parseBoolToken(
+          raw.game_public_start_enabled ?? raw.gamePublicStartEnabled,
+          false
+        ),
         active_game_sessions: Number.isFinite(sessionsRaw) && sessionsRaw >= 0 ? Math.trunc(sessionsRaw) : 0,
         commands,
         disabled_commands: disabledCommands,
@@ -6339,6 +6345,7 @@
 
     function syncChatWhoisQuickActionControls() {{
       const masterInput = document.getElementById("bots-command-master-enabled");
+      const publicStartInput = document.getElementById("bots-game-public-start-enabled");
       const enabledInput = document.getElementById("chat-bot-whois-enabled");
       const prefixSelect = document.getElementById("chat-bot-whois-prefix");
       const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
@@ -6347,6 +6354,10 @@
       const commandsEnabled = !!chatBotCommandsEnabled;
       const enabled = commandsEnabled && !!chatWhoisQuickActionEnabled;
       const prefix = normalizeWhoisCommandPrefix(chatWhoisQuickActionPrefix);
+      const zorkCommand = Array.isArray(serverBotSettings.commands)
+        ? serverBotSettings.commands.find((row) => String(row && row.name || "").trim().toLowerCase() === "zork")
+        : null;
+      const zorkEnabled = !!(zorkCommand && zorkCommand.enabled);
       if (enabledInput instanceof HTMLInputElement) {{
         enabledInput.checked = !!chatWhoisQuickActionEnabled;
         enabledInput.disabled = !commandsEnabled;
@@ -6376,6 +6387,22 @@
           masterInput.title = "Saving bot response setting...";
         }} else {{
           masterInput.title = "Enable or disable all backend bot responses on this node.";
+        }}
+      }}
+      if (publicStartInput instanceof HTMLInputElement) {{
+        const available = !!serverBotSettings.available;
+        publicStartInput.checked = !!serverBotSettings.game_public_start_enabled;
+        publicStartInput.disabled = !available || botSettingsSaveInFlight;
+        if (!available) {{
+          publicStartInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (botSettingsSaveInFlight) {{
+          publicStartInput.title = "Saving public Zork handoff setting...";
+        }} else if (!serverBotSettings.enabled) {{
+          publicStartInput.title = "Bot responses are globally disabled. This setting will apply when responses are enabled.";
+        }} else if (!zorkEnabled) {{
+          publicStartInput.title = "Zork is disabled. This setting is saved and will apply when the game command is enabled.";
+        }} else {{
+          publicStartInput.title = "When enabled, a public 'zork' message starts the game with a direct peer-to-peer reply. Follow-up commands still need to continue in direct chat.";
         }}
       }}
       for (const commandToggle of document.querySelectorAll(".bots-command-toggle")) {{
@@ -6532,6 +6559,20 @@
           const ok = await saveServerBotSettingsPatch({{ enabled: nextValue }});
           if (!ok) {{
             masterInput.checked = !!serverBotSettings.enabled;
+          }}
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const publicStartInput = document.getElementById("bots-game-public-start-enabled");
+      if (publicStartInput instanceof HTMLInputElement && publicStartInput.dataset.bound !== "1") {{
+        publicStartInput.dataset.bound = "1";
+        publicStartInput.addEventListener("change", async () => {{
+          const ok = await saveServerBotSettingsPatch({{
+            game_public_start_enabled: !!publicStartInput.checked,
+          }});
+          if (!ok) {{
+            renderBotsView(latestState);
+            return;
           }}
           syncChatWhoisQuickActionControls();
         }});

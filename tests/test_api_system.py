@@ -273,6 +273,7 @@ def test_handle_state_get_injects_backend_bot_settings_when_available():
             "enabled": True,
             "log_enabled": True,
             "game_enabled": False,
+            "game_public_start_enabled": True,
             "active_game_sessions": 0,
             "commands": [
                 {"name": "ping", "usage": "ping [target]", "description": "measure reply latency", "kind": "builtin", "enabled": True}
@@ -290,6 +291,7 @@ def test_handle_state_get_injects_backend_bot_settings_when_available():
     settings = calls["payload_obj"]["bot_settings"]
     assert settings["enabled"] is True
     assert settings["game_enabled"] is False
+    assert settings["game_public_start_enabled"] is True
     assert settings["active_game_sessions"] == 0
     assert settings["commands"][0]["name"] == "ping"
 

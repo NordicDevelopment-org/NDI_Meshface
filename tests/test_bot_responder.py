@@ -410,6 +410,34 @@ def test_zork_game_starts_only_for_direct_messages():
     assert "zork" in str(sent[0]["text"]).lower()
 
 
+def test_zork_game_can_start_from_public_chat_when_public_handoff_is_enabled():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        game_public_start_enabled=True,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("zork", packet_id=2051, to_id="^all"), iface)
+
+    assert len(sent) == 1
+    assert sent[0]["destination"] == "!49b5dff0"
+    assert sent[0]["reply_id"] == 2051
+    assert "zork: session started." in str(sent[0]["text"]).lower()
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["to_id"] == "^all"
+    assert history[0]["response_to"] == "!49b5dff0"
+
+
 def test_zork_game_session_replies_to_followup_commands():
     iface = _FakeIface()
     sent = []
@@ -430,7 +458,7 @@ def test_zork_game_session_replies_to_followup_commands():
 
     assert len(sent) == 2
     assert sent[1]["destination"] == "!49b5dff0"
-    assert "trailhead" in str(sent[1]["text"]).lower()
+    assert "west of house" in str(sent[1]["text"]).lower()
     history = bot.recent_requests()
     assert len(history) == 2
     assert all(str(row.get("command_head") or "") == "zork" for row in history)
@@ -572,6 +600,17 @@ def test_build_bot_from_env_can_enable_game_mode():
     assert bot.game_enabled is True
 
 
+def test_build_bot_from_env_can_enable_public_game_start_handoff():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_GAME_PUBLIC_START_ENABLED": "1"},
+    )
+    assert bot is not None
+    assert bot.enabled is False
+    assert bot.game_public_start_enabled is True
+
+
 def test_build_bot_from_env_can_disable_specific_command():
     bot = build_mesh_response_bot_from_env(
         send_chat_fn=lambda **_kwargs: {"ok": True},
@@ -622,6 +661,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     payload = json.loads(settings_path.read_text(encoding="utf-8"))
     assert payload["enabled"] is True
     assert payload["game_enabled"] is False
+    assert payload["game_public_start_enabled"] is False
     assert "whois" not in payload["disabled_commands"]
     assert "cmd" in payload["disabled_commands"]
 
@@ -639,6 +679,38 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert rows["zork"]["enabled"] is False
     assert rows["whois"]["enabled"] is True
     assert rows["cmd"]["enabled"] is False
+
+
+def test_public_game_start_setting_is_persisted_and_loaded_from_file(tmp_path):
+    settings_path = tmp_path / "bot_settings.json"
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_SETTINGS_FILE": str(settings_path)},
+    )
+    assert bot is not None
+
+    saved = bot.configure(
+        enabled=True,
+        game_enabled=True,
+        game_public_start_enabled=True,
+    )
+    assert saved["ok"] is True
+    assert settings_path.exists()
+
+    payload = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert payload["game_enabled"] is True
+    assert payload["game_public_start_enabled"] is True
+
+    loaded = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_SETTINGS_FILE": str(settings_path)},
+    )
+    assert loaded is not None
+    assert loaded.game_enabled is True
+    assert loaded.game_public_start_enabled is True
 
 
 def test_explicit_env_bot_settings_override_persisted_file(tmp_path):

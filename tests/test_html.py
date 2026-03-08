@@ -58,6 +58,22 @@ def test_render_html_includes_console_text_size_control():
     assert 'id="console-font-size-select"' in html
 
 
+def test_render_html_includes_public_zork_handoff_toggle():
+    html = render_html(
+        refresh_ms=3000,
+        packet_limit=250,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=5000,
+        history_retention_days=7,
+        node_history_hours=72,
+        node_history_max_points=1440,
+        revision_label="Rev: v0.1.0 (abc123)",
+        revision_title="v0.1.0 / abc123",
+    )
+    assert 'id="bots-game-public-start-enabled"' in html
+
+
 def test_render_html_includes_network_view_structure_tokens():
     html = render_html(
         refresh_ms=3000,

@@ -43,6 +43,7 @@ class BotSettingsRequest:
     enabled: Optional[bool] = None
     log_enabled: Optional[bool] = None
     game_enabled: Optional[bool] = None
+    game_public_start_enabled: Optional[bool] = None
     command_settings: Optional[dict[str, bool]] = None
 
 
@@ -59,6 +60,9 @@ def parse_bot_settings_request(raw_body: bytes) -> BotSettingsRequest:
         ),
         game_enabled=_parse_optional_bool_token(
             payload.get("game_enabled", payload.get("gameEnabled"))
+        ),
+        game_public_start_enabled=_parse_optional_bool_token(
+            payload.get("game_public_start_enabled", payload.get("gamePublicStartEnabled"))
         ),
         command_settings=_parse_command_settings_payload(
             payload.get("command_settings", payload.get("commandSettings"))

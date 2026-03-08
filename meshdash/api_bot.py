@@ -44,6 +44,7 @@ def handle_bot_settings_post(
         request.enabled is None
         and request.log_enabled is None
         and request.game_enabled is None
+        and request.game_public_start_enabled is None
         and request.command_settings is None
     ):
         write_json_response_fn(
