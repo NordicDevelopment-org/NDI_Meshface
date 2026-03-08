@@ -7576,7 +7576,18 @@
 
     function syncMeshChannelSendControl() {{
       const dot = document.getElementById("chat-send-channel-dot");
+      const wrap = document.querySelector(".chat-send-channel-wrap");
+      const input = document.getElementById("chat-input");
       const meta = meshChannelColorMeta(activeMeshSendChannelIndex, {{ allowAll: false }});
+      const rgb = hexColorRgbTriplet(meta.fill);
+      if (wrap instanceof HTMLElement) {{
+        wrap.style.setProperty("--chat-send-channel-fill", meta.fill);
+        wrap.style.setProperty("--chat-send-channel-rgb", rgb);
+      }}
+      if (input instanceof HTMLElement) {{
+        input.style.setProperty("--chat-send-channel-fill", meta.fill);
+        input.style.setProperty("--chat-send-channel-rgb", rgb);
+      }}
       if (dot instanceof HTMLElement) {{
         dot.classList.remove("is-all");
         dot.style.setProperty("--channel-dot-fill", meta.fill);
@@ -20584,13 +20595,6 @@
         const meshIdx = messageMeshChannelIndex(msg);
         const hasMeshTint = Number.isInteger(meshIdx) && meshIdx >= 0;
         const meshTintClass = hasMeshTint ? " channel-tinted" : "";
-        const meshDimClass = (
-          showAllMeshChannels
-          && hasMeshTint
-          && meshIdx !== activeSendMeshIdx
-        )
-          ? " channel-dimmed"
-          : "";
         const meshTintStyle = hasMeshTint
           ? ` style="${{escAttr(meshChannelTintStyle(meshIdx, {{ allowAll: false }}))}}"`
           : "";
@@ -20782,16 +20786,19 @@
           messageTooltipParts.push(`Message: ${{textCompact}}`);
         }}
         const messageTooltip = messageTooltipParts.join("\n");
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}${{meshDimClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
-          <div class="chat-feed-line">
-            <div class="chat-feed-summary">
-              ${{changeBadge}}
-              ${{statusBadge}}
+        const summaryBody = isStatusMessage
+          ? `${{statusBadge}}<span class="chat-feed-text chat-feed-text-inline">${{textHtml || "&nbsp;"}}</span>`
+          : `${{statusBadge}}
               <span class="chat-endpoint chat-feed-author" title="${{escAttr(fromMeta.title)}}">
                 <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
               </span>
               <span class="chat-feed-colon">:</span>
-              <span class="chat-feed-text chat-feed-text-inline">${{textHtml || "&nbsp;"}}</span>
+              <span class="chat-feed-text chat-feed-text-inline">${{textHtml || "&nbsp;"}}</span>`;
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
+          <div class="chat-feed-line">
+            <div class="chat-feed-summary">
+              ${{changeBadge}}
+              ${{summaryBody}}
             </div>
             <span class="chat-feed-side">
               ${{retryButton}}
