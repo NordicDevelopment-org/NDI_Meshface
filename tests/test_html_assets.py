@@ -8,6 +8,8 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert ".topbar" in css
     assert ".workspace-shell" in css
     assert ".console-select" in css
+    assert "#history-chat-table td.history-node-clickable" in css
+    assert "#history-chat-table tbody tr.history-node-selectable.selected-node td" in css
     assert "* { box-sizing: border-box; }" in css
     assert "{{" not in css
     assert "}}" not in css
@@ -43,5 +45,9 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "const consoleFontSizeStorageKey = \"meshDashboardConsoleFontSizeV1\";" in js
     assert "loadConsoleFontSizePreference();" in js
     assert "window.localStorage.setItem(consoleFontSizeStorageKey" in js
+    assert "function bindHistoryChatRowClicks()" in js
+    assert "\"from-node-id\": fromNodeId" in js
+    assert "className: isSelectableNodeId(fromNodeId) ? \"history-node-clickable\" : \"\"" in js
+    assert "selectNodeFromDirectionalRow(" in js
     assert "{{" not in js
     assert "}}" not in js

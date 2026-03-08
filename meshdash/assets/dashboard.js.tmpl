@@ -16216,6 +16216,15 @@
         );
         row.classList.toggle("selected-node", isSelected);
       }}
+      for (const row of document.querySelectorAll("#history-chat-table tbody tr")) {{
+        const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
+        const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
+        const isSelected = !!selectedNodeId && (
+          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
+          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
+        );
+        row.classList.toggle("selected-node", isSelected);
+      }}
     }}
 
     function isVisibleForSelectionScroll(el) {{
@@ -16604,7 +16613,7 @@
       }});
     }}
 
-    function selectNodeFromEncriptionRow(row, targetCell, fromColIndex, toColIndex) {{
+    function selectNodeFromDirectionalRow(row, targetCell, fromColIndex, toColIndex) {{
       if (!(row instanceof HTMLTableRowElement)) return "";
       const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
       const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
@@ -16634,7 +16643,7 @@
           const row = target.closest("tr");
           if (!(row instanceof HTMLTableRowElement)) return;
           const cell = target.closest("td");
-          const nodeId = selectNodeFromEncriptionRow(
+          const nodeId = selectNodeFromDirectionalRow(
             row,
             cell instanceof HTMLTableCellElement ? cell : null,
             fromColIndex,
@@ -16646,6 +16655,30 @@
       }};
       bindTable("encription-packets-table", 1, 2);
       bindTable("encription-traffic-table", 0, 1);
+    }}
+
+    function bindHistoryChatRowClicks() {{
+      const tbody = document.querySelector("#history-chat-table tbody");
+      if (!(tbody instanceof HTMLElement) || tbody.dataset.bound === "1") return;
+      tbody.dataset.bound = "1";
+      tbody.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest("a.chat-link")) {{
+          return;
+        }}
+        const row = target.closest("tr");
+        if (!(row instanceof HTMLTableRowElement)) return;
+        const cell = target.closest("td");
+        const nodeId = selectNodeFromDirectionalRow(
+          row,
+          cell instanceof HTMLTableCellElement ? cell : null,
+          1,
+          2
+        );
+        if (!isSelectableNodeId(nodeId)) return;
+        selectNode(nodeId, true, false);
+      }});
     }}
 
     function bindChatFeedClicks() {{
@@ -20169,6 +20202,8 @@
         const capturedAt = String((entry && (entry.captured_at || entry.rx_time)) || "n/a");
         const fromId = String((entry && entry.from) || "n/a");
         const toId = String((entry && entry.to) || "n/a");
+        const fromNodeId = normalizeNodeId(fromId);
+        const toNodeId = normalizeNodeId(toId);
         const fromIdentity = describeNode(fromId);
         const toIdentity = describeNode(toId);
         const text = String((entry && entry.text) || "").trim();
@@ -20177,11 +20212,31 @@
         const renderedText = text
           ? text
           : (isReaction ? `Reaction ${{emoji || ""}}`.trim() : (emoji || "n/a"));
+        const rowSelectable = isSelectableNodeId(fromNodeId) || isSelectableNodeId(toNodeId);
+        const rowSelected = !!selectedNodeId && (
+          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
+          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
+        );
         return {{
+          className: `${{rowSelectable ? "history-node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}`,
+          dataset: {{
+            "from-node-id": fromNodeId,
+            "to-node-id": toNodeId,
+          }},
           cells: [
             {{ sort: capturedAt, text: capturedAt }},
-            {{ sort: fromIdentity.sort, html: fromIdentity.html, title: fromIdentity.title }},
-            {{ sort: toIdentity.sort, html: toIdentity.html, title: toIdentity.title }},
+            {{
+              sort: fromIdentity.sort,
+              html: fromIdentity.html,
+              title: fromIdentity.title,
+              className: isSelectableNodeId(fromNodeId) ? "history-node-clickable" : "",
+            }},
+            {{
+              sort: toIdentity.sort,
+              html: toIdentity.html,
+              title: toIdentity.title,
+              className: isSelectableNodeId(toNodeId) ? "history-node-clickable" : "",
+            }},
             {{ sort: renderedText, html: renderHistoryMessageCell(entry, renderedText) }},
           ],
         }};
@@ -22979,6 +23034,7 @@
     bindNodeListSearchControls();
     bindNodeRowClicks();
     bindEncriptionRowClicks();
+    bindHistoryChatRowClicks();
     bindNodesTableColResizers();
     bindMapResetControl();
     bindMapBasemapToggleControl();
