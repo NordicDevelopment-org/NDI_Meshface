@@ -205,6 +205,7 @@
     const meshChannelIndexStorageKey = "meshDashboardMeshChannelIndexV1";
     const meshChannelSendIndexStorageKey = "meshDashboardMeshChannelSendIndexV1";
     const channelsUiModeStorageKey = "meshDashboardChannelsUiModeV1";
+    const channelsExperimentalStorageKey = "meshDashboardChannelsExperimentalV1";
     const chatDirectPeersStorageKey = "meshDashboardDirectPeersV1";
     const chatPerfStorageKey = "meshDashboardChatPerfMetricsV1";
     const themeStorageKey = "meshDashboardThemePreference";
@@ -2092,14 +2093,14 @@
       {{ name: "gray", fill: "#999999" }},
     ];
     const meshChannelNeutralPalette = [
-      {{ name: "light gray", fill: "#D9D9D9" }},
-      {{ name: "silver", fill: "#CACACA" }},
-      {{ name: "soft gray", fill: "#BBBBBB" }},
-      {{ name: "gray", fill: "#ACACAC" }},
-      {{ name: "slate gray", fill: "#9D9D9D" }},
-      {{ name: "charcoal gray", fill: "#8E8E8E" }},
-      {{ name: "graphite", fill: "#7F7F7F" }},
-      {{ name: "dark gray", fill: "#707070" }},
+      {{ name: "light gray", fill: "#BEBEBE" }},
+      {{ name: "silver", fill: "#AEAEAE" }},
+      {{ name: "soft gray", fill: "#9E9E9E" }},
+      {{ name: "gray", fill: "#8F8F8F" }},
+      {{ name: "slate gray", fill: "#808080" }},
+      {{ name: "charcoal gray", fill: "#717171" }},
+      {{ name: "graphite", fill: "#626262" }},
+      {{ name: "dark gray", fill: "#545454" }},
     ];
     const knownChatNotificationScopes = new Set(["all", "self"]);
     const knownWhoisCommandPrefixes = new Set(["whois", "!whois", "#whois"]);
@@ -2197,6 +2198,7 @@
     let settingsFetchInFlight = false;
     let settingsAutoFetchAttempted = false;
     let channelsUiAdvanced = false;
+    let channelsExperimentalEnabled = false;
     let channelsViewHydrateInFlight = null;
     let settingsLocalStateCache = null;
     let settingsLocalStateFetchedAt = 0;
@@ -8148,12 +8150,32 @@
       applyChannelsUiMode();
     }}
 
+    function setChannelsExperimentalEnabled(enabled, persist = true) {{
+      channelsExperimentalEnabled = !!enabled;
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(
+            channelsExperimentalStorageKey,
+            channelsExperimentalEnabled ? "1" : "0"
+          );
+        }} catch (_err) {{}}
+      }}
+    }}
+
     function loadChannelsUiMode() {{
       let stored = "simple";
       try {{
         stored = normalizeChannelsUiMode(window.localStorage.getItem(channelsUiModeStorageKey) || "simple");
       }} catch (_err) {{}}
       channelsUiAdvanced = stored === "advanced";
+    }}
+
+    function loadChannelsExperimentalPreference() {{
+      let stored = false;
+      try {{
+        stored = parseBoolToken(window.localStorage.getItem(channelsExperimentalStorageKey), false);
+      }} catch (_err) {{}}
+      channelsExperimentalEnabled = !!stored;
     }}
 
 
@@ -14904,8 +14926,8 @@
       );
       const settings = readChannelRowSettings(row) || {{}};
 
-      if (isDisabledRole && !settings.name) {{
-        setText("settings-apply-status", "Channel name is required to add a channel.");
+      if (isDisabledRole && !settings.name && !channelsExperimentalEnabled) {{
+        setText("settings-apply-status", "Channel name is required to add a channel unless experimental channel configs are enabled.");
         return;
       }}
 
@@ -14913,6 +14935,7 @@
         action: "upsert",
         channel_index: idx,
         settings,
+        allow_experimental: !!channelsExperimentalEnabled,
       }};
 
       if (isDisabledRole) {{
@@ -15553,6 +15576,14 @@
         channelsAdvToggle.checked = !!channelsUiAdvanced;
         channelsAdvToggle.addEventListener("change", () => {{
           setChannelsUiAdvanced(!!channelsAdvToggle.checked, true);
+        }});
+      }}
+
+      const channelsExperimentalToggle = document.getElementById("settings-channels-experimental-toggle");
+      if (channelsExperimentalToggle instanceof HTMLInputElement) {{
+        channelsExperimentalToggle.checked = !!channelsExperimentalEnabled;
+        channelsExperimentalToggle.addEventListener("change", () => {{
+          setChannelsExperimentalEnabled(!!channelsExperimentalToggle.checked, true);
         }});
       }}
 
@@ -22294,6 +22325,7 @@
     loadMeshChannelIndex();
     loadChannelsUiMode();
     applyChannelsUiMode();
+    loadChannelsExperimentalPreference();
     loadChatEmojiPickerState();
     loadChatEmojiUsage();
     loadMapBasemapModePreference();

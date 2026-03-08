@@ -28,6 +28,7 @@ class ChannelSettingsRequest:
     include_all: bool = True
     url: Optional[str] = None
     add_only: bool = False
+    allow_experimental: bool = False
 
 
 def _coerce_bool(value: object) -> bool:
@@ -158,4 +159,5 @@ def parse_channel_settings_request(raw_body: bytes) -> ChannelSettingsRequest:
         include_all=include_all,
         url=url,
         add_only=add_only,
+        allow_experimental=_coerce_bool(payload.get("allow_experimental", payload.get("experimental", False))),
     )

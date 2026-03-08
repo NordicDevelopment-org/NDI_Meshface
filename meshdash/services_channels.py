@@ -343,7 +343,7 @@ def apply_channel_settings(
     if "name" in settings:
         try:
             name = str(settings.get("name") or "").strip()
-            if idx != 0 and existing_role == disabled_role and not name:
+            if idx != 0 and existing_role == disabled_role and not name and not bool(request.allow_experimental):
                 return {"ok": False, "error": "Channel name is required when adding a channel"}
             ch.settings.name = name
             applied_fields.append("settings.name")

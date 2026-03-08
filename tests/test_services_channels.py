@@ -408,6 +408,19 @@ def test_apply_channel_settings_upsert_validation_and_success(monkeypatch):
     assert need_name["ok"] is False
     assert "name is required" in str(need_name["error"])
 
+    allow_unnamed = apply_channel_settings(
+        ChannelSettingsRequest(
+            action="upsert",
+            channel_index=2,
+            settings={"name": ""},
+            allow_experimental=True,
+        ),
+        iface=iface,
+        send_lock=_FakeLock(),
+        show_secrets=True,
+    )
+    assert allow_unnamed["ok"] is True
+
     write_fail_node = _FakeNode(channels=channels, write_error=RuntimeError("write fail"))
     write_fail = apply_channel_settings(
         ChannelSettingsRequest(

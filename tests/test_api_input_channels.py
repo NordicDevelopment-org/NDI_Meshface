@@ -56,6 +56,15 @@ def test_parse_channel_settings_request_supports_flat_payload_fields():
     }
 
 
+def test_parse_channel_settings_request_parses_allow_experimental_flag():
+    request = parse_channel_settings_request(
+        b'{"action":"upsert","channel_index":2,"settings":{"name":""},"allow_experimental":"true"}'
+    )
+    assert request.action == "upsert"
+    assert request.channel_index == 2
+    assert request.allow_experimental is True
+
+
 def test_parse_channel_settings_request_rejects_invalid_payload_shapes():
     with pytest.raises(ValueError, match="Invalid JSON"):
         parse_channel_settings_request(b"{bad-json}")
