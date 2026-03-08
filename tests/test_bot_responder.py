@@ -81,6 +81,30 @@ def test_ping_targeted_to_local_suffix_replies_with_pong():
     assert "tx=" not in str(sent[0]["text"]).lower()
 
 
+def test_test_alias_replies_with_pong_and_logs_as_ping():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("test"), iface)
+
+    assert len(sent) == 1
+    assert "pong" in str(sent[0]["text"]).lower()
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["command"] == "test"
+    assert history[0]["command_head"] == "ping"
+
+
 def test_ping_targeted_to_other_suffix_is_ignored():
     iface = _FakeIface()
     sent = []

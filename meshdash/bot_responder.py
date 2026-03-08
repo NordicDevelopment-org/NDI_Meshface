@@ -24,6 +24,9 @@ STANDARD_BOT_COMMANDS = _STANDARD_BOT_COMMANDS
 
 _RECENT_PACKET_TTL_SECONDS = 180
 _RECENT_PACKET_MAX = 1024
+_BOT_COMMAND_ALIASES = {
+    "test": "ping",
+}
 
 
 def _parse_bool_token(value: object, default: bool) -> bool:
@@ -66,6 +69,13 @@ def _node_suffix(node_id: object) -> str:
 
 def _normalize_command_name(value: object) -> str:
     return normalize_bot_command_name(value)
+
+
+def _canonical_command_name(value: object) -> str:
+    clean = _normalize_command_name(value)
+    if not clean:
+        return ""
+    return _BOT_COMMAND_ALIASES.get(clean, clean)
 
 
 def _format_node_id_from_num(raw_num: object) -> str:
@@ -609,7 +619,7 @@ class MeshResponseBot:
         parts = [part for part in raw.split() if part]
         if not parts:
             return None
-        head = _normalize_command_name(parts[0])
+        head = _canonical_command_name(parts[0])
         if not head:
             return None
         return head, parts[1:]
