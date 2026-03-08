@@ -8186,10 +8186,13 @@
     }}
 
     function setChannelsExperimentalEnabled(enabled, persist = true) {{
-      channelsExperimentalEnabled = false;
+      channelsExperimentalEnabled = !!enabled;
       if (persist) {{
         try {{
-          window.localStorage.removeItem(channelsExperimentalStorageKey);
+          window.localStorage.setItem(
+            channelsExperimentalStorageKey,
+            channelsExperimentalEnabled ? "1" : "0"
+          );
         }} catch (_err) {{}}
       }}
     }}
@@ -8203,10 +8206,11 @@
     }}
 
     function loadChannelsExperimentalPreference() {{
+      let stored = false;
       try {{
-        window.localStorage.removeItem(channelsExperimentalStorageKey);
+        stored = parseBoolToken(window.localStorage.getItem(channelsExperimentalStorageKey), false);
       }} catch (_err) {{}}
-      channelsExperimentalEnabled = false;
+      channelsExperimentalEnabled = !!stored;
     }}
 
 
@@ -15800,8 +15804,8 @@
       );
       const settings = readChannelRowSettings(row) || {{}};
 
-      if (isDisabledRole && !settings.name) {{
-        setChannelsStatusText("Channel name is required to add a channel.");
+      if (isDisabledRole && !settings.name && !channelsExperimentalEnabled) {{
+        setChannelsStatusText("Channel name is required to add a channel unless Experimental is enabled.");
         return;
       }}
 
@@ -15809,7 +15813,7 @@
         action: "upsert",
         channel_index: idx,
         settings,
-        allow_experimental: false,
+        allow_experimental: !!channelsExperimentalEnabled,
       }};
 
       if (isDisabledRole) {{
@@ -16446,6 +16450,14 @@
           clearSettingsDirty();
           settingsAutoFetchAttempted = true;
           void fetchSettingsFromRadio();
+        }});
+      }}
+
+      const channelsExperimentalToggle = document.getElementById("settings-channels-experimental-toggle");
+      if (channelsExperimentalToggle instanceof HTMLInputElement) {{
+        channelsExperimentalToggle.checked = !!channelsExperimentalEnabled;
+        channelsExperimentalToggle.addEventListener("change", () => {{
+          setChannelsExperimentalEnabled(!!channelsExperimentalToggle.checked, true);
         }});
       }}
 

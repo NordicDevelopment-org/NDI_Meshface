@@ -92,6 +92,7 @@ def test_render_html_includes_channel_control_center_structure():
     assert 'id="channels-fetch-settings-btn"' in html
     assert 'id="channels-apply-status"' in html
     assert 'id="settings-channels-table"' in html
+    assert 'id="settings-channels-experimental-toggle"' in html
     assert 'id="channels-overview"' in html
     assert "Observed" in html
     assert "Channel Activity" in html

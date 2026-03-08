@@ -67,6 +67,8 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "receivedAtMs,\n            true" in js
     assert "function setChannelsStatusText(message)" in js
     assert "const channelsFetchBtn = document.getElementById(\"channels-fetch-settings-btn\");" in js
+    assert "const channelsExperimentalToggle = document.getElementById(\"settings-channels-experimental-toggle\");" in js
+    assert "allow_experimental: !!channelsExperimentalEnabled" in js
     assert "fallbackCount: 8" in js
     assert 'idx === 0 ? "PRIMARY" : "DISABLED"' in js
     assert "{{" not in js
