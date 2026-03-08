@@ -13,7 +13,8 @@ Important:
 - The current Python bot app is still a simplified playable example.
 - The files under `upstream_1977/zork-master/` are reference source, not directly executable by Meshyface.
 - A true "full game" port means translating the MDL game logic into this Python bot-app structure.
-- The extracted room data currently covers `144` rooms, but that data is not wired into the live game yet.
+- The live game now starts in the classic `West of House` opening and uses the extracted upstream room graph plus parsed upstream object data.
+- The current live port supports classic navigation, inventory, reading/examining, mailbox/window/trap-door/grating interactions, lamp/torch/candle lighting, the early troll-room combat path, rope-and-dome traversal, the riddle-room door word, cyclops bypass via the classic magic word, rainbow toggling with the stick, real board/launch/land/disembark river travel with the inflatable boat, the buoy/emerald pickup, dam control-room button/bolt logic with low-tide reservoir crossings, the bell-book-candles exorcism path into Hades, glacier melting with the torch, mirror rubbing/breaking, the machine-room coal-to-diamond path, the safe/brick/fuse treasure path, generic container stashing (including the trophy case and mailbox), bulk `take/drop/put` handling for `all` and `valuables`, bat-room garlic behavior with live bat drops, gas-room open-flame deaths, shovel-driven digging at the beach and guano cave, a live treasure-room thief encounter, sword glow warnings near villains, and a live `score`/`quit` progress summary.
 
 If you need to regenerate the extracted room data:
 
@@ -35,6 +36,6 @@ For the built-in Zork example specifically, the porting path is:
 
 1. Use `upstream_1977/zork-master/` as the authoritative game reference.
 2. Start from `upstream_1977/extracted_rooms.json` for the room graph.
-3. Expand `world.py` into a much larger data set of rooms, objects, and state.
-4. Grow `engine.py` from a tiny demo parser into a more complete adventure engine.
-5. Port puzzles and verbs incrementally, testing them in the bot shell as you go.
+3. Extend the remaining late-game conditionals, object routines, fuller thief/scoring logic, and deeper death handling.
+4. Keep adding puzzle-specific behavior while preserving the data-driven room/object loader and condition/action registries.
+5. Grow regression tests with every new mechanic so the port does not drift.
