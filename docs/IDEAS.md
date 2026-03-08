@@ -1,10 +1,13 @@
 # Ideas Backlog
 
-
-
-- anything else we can do to show morew about this? Replying to packet #3952896697
+fix dual title (1) (1)
+- zork in chat kicks off a PM with the firm prompt, do we have or need a timeout?
+- fix deselected channel notifaction
+- put channels in tabs w/ notifaction totalss (N)
+- quick reply popups, with hops, top 5 emojie, etc?
 - give setting tabs
-- move private chats up ny bell
+
+
 - Ability to send a direct message by manually entering a Node ID (when only the Node ID is known).
 - Ability to add a favorite by manually entering a Node ID.
 
