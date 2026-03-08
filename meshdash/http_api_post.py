@@ -6,6 +6,7 @@ from .api_input_radio import parse_radio_settings_request
 from .api_input_channels import parse_channel_settings_request
 from .api_input_bot import parse_bot_settings_request
 from .api_input_theme import parse_theme_settings_request
+from .api_input_zork import parse_standalone_zork_request
 from .helpers import to_int
 from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_json_response
@@ -14,6 +15,7 @@ from .http_route_contracts import (
     ApplyChannelSettingsFn,
     ApplyBotSettingsFn,
     DashboardPostRouteDependencies,
+    PlayStandaloneZorkFn,
     SendChatFn,
     SetThemePresetFn,
     ToIntFn,
@@ -32,6 +34,7 @@ def build_post_route_dependencies(
     apply_radio_settings_fn: ApplyRadioSettingsFn | None = None,
     apply_channel_settings_fn: ApplyChannelSettingsFn | None = None,
     apply_bot_settings_fn: ApplyBotSettingsFn | None = None,
+    play_standalone_zork_fn: PlayStandaloneZorkFn | None = None,
     to_int_fn: ToIntFn = to_int,
 ) -> DashboardPostRouteDependencies:
     return DashboardPostRouteDependencies(
@@ -48,6 +51,8 @@ def build_post_route_dependencies(
         parse_channel_settings_request_fn=parse_channel_settings_request,
         apply_bot_settings_fn=apply_bot_settings_fn,
         parse_bot_settings_request_fn=parse_bot_settings_request,
+        play_standalone_zork_fn=play_standalone_zork_fn,
+        parse_standalone_zork_request_fn=parse_standalone_zork_request,
     )
 
 

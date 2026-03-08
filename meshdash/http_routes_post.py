@@ -13,6 +13,9 @@ from .api_channels import (
 from .api_bot import (
     handle_bot_settings_post as _handle_bot_settings_post_helper,
 )
+from .api_zork import (
+    handle_standalone_zork_post as _handle_standalone_zork_post_helper,
+)
 from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardPostRouteDependencies
 
@@ -30,6 +33,17 @@ def handle_dashboard_post(
             to_int_fn=deps.to_int_fn,
             validate_content_length_fn=deps.validate_content_length_fn,
             parse_chat_send_request_fn=deps.parse_chat_send_request_fn,
+            write_json_response_fn=deps.write_json_response_fn,
+        )
+        return
+
+    if path == "/api/games/zork":
+        _handle_standalone_zork_post_helper(
+            handler,
+            play_standalone_zork_fn=deps.play_standalone_zork_fn,
+            to_int_fn=deps.to_int_fn,
+            validate_content_length_fn=deps.validate_content_length_fn,
+            parse_standalone_zork_request_fn=deps.parse_standalone_zork_request_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )
         return

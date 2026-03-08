@@ -22,7 +22,7 @@ def handle_dashboard_get(
     deps: DashboardGetRouteDependencies,
 ) -> None:
     if path in ("/", "/index.html"):
-        deps.write_html_response_fn(handler, html_text=deps.html_text)
+        deps.write_html_response_fn(handler, html_text=deps.html_text, no_store=True)
         return
 
     if path == "/api/state":

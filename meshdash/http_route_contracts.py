@@ -9,6 +9,7 @@ from .api_inputs import (
     RadioSettingsRequest,
     ChannelSettingsRequest,
     ThemeSettingsRequest,
+    StandaloneZorkRequest,
 )
 from .http_handler_contracts import DashboardHttpHandler
 from .state_payload_contracts import DashboardStatePayload
@@ -160,12 +161,28 @@ class ApplyBotSettingsFn(Protocol):
         ...
 
 
+class ParseStandaloneZorkRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> StandaloneZorkRequest:
+        ...
+
+
+class PlayStandaloneZorkFn(Protocol):
+    def __call__(
+        self,
+        *,
+        text: object,
+        session_id: object = None,
+    ) -> dict[str, object]:
+        ...
+
+
 class WriteHtmlResponseFn(Protocol):
     def __call__(
         self,
         handler: DashboardHttpHandler,
         *,
         html_text: str,
+        no_store: bool = False,
         extra_headers: Optional[Mapping[str, str]] = None,
     ) -> None:
         ...
@@ -231,3 +248,5 @@ class DashboardPostRouteDependencies:
     parse_channel_settings_request_fn: Optional[ParseChannelSettingsRequestFn] = None
     apply_bot_settings_fn: Optional[ApplyBotSettingsFn] = None
     parse_bot_settings_request_fn: Optional[ParseBotSettingsRequestFn] = None
+    play_standalone_zork_fn: Optional[PlayStandaloneZorkFn] = None
+    parse_standalone_zork_request_fn: Optional[ParseStandaloneZorkRequestFn] = None

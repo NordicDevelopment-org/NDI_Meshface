@@ -61,6 +61,9 @@ from .history_profile import (
 from .bot_responder import (
     build_mesh_response_bot_from_env as _build_mesh_response_bot_from_env,
 )
+from .services_standalone_zork import (
+    build_standalone_zork_service as _build_standalone_zork_service,
+)
 
 
 @dataclass(frozen=True)
@@ -280,6 +283,23 @@ def build_dashboard_runtime_context(
                 pass
             try:
                 setattr(state_lite_fn, "bot_settings_fn", _bot_settings_fn)
+            except Exception:
+                pass
+
+    try:
+        standalone_zork = _build_standalone_zork_service()
+    except Exception:
+        standalone_zork = None
+
+    if standalone_zork is not None:
+        try:
+            setattr(loaders.state_fn, "play_standalone_zork_fn", standalone_zork.play)
+        except Exception:
+            pass
+        state_lite_fn = getattr(loaders.state_fn, "lite", None)
+        if callable(state_lite_fn):
+            try:
+                setattr(state_lite_fn, "play_standalone_zork_fn", standalone_zork.play)
             except Exception:
                 pass
 

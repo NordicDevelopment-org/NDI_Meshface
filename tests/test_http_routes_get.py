@@ -58,6 +58,7 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
     routes_get.handle_dashboard_get(handler, path="/missing", query="", deps=deps)
 
     assert html_calls[0]["html_text"] == "<html></html>"
+    assert html_calls[0]["no_store"] is True
     assert state_seen["query"] == "lite=1"
     assert state_seen["state_fn"] is deps.state_fn
     assert state_seen["write_json_response_fn"] is deps.write_json_response_fn

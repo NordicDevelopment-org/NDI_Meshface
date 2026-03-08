@@ -2179,6 +2179,7 @@
     let consoleCommandHistoryCursor = -1;
     let consoleCommandDraft = "";
     let consoleRunningCommand = null;
+    let consoleInteractiveSession = null;
     let consoleLiveModeActive = false;
     let consoleLiveVerbosity = 0;
     let consoleEventCounter = 0;
@@ -9019,6 +9020,27 @@
       }}
     }}
 
+    async function postStandaloneZorkCommand(text, sessionId = "") {{
+      const body = {{
+        text: String(text == null ? "" : text),
+      }};
+      const cleanSessionId = String(sessionId == null ? "" : sessionId).trim();
+      if (cleanSessionId) {{
+        body.session_id = cleanSessionId;
+      }}
+      const resp = await fetch("/api/games/zork", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify(body),
+      }});
+      const payload = await resp.json().catch(() => ({{}}));
+      if (!resp.ok || !payload.ok) {{
+        const msg = payload && payload.error ? payload.error : `standalone zork failed (${{resp.status}})`;
+        throw new Error(msg);
+      }}
+      return payload;
+    }}
+
     function restoreChatInputFocus(input) {{
       if (!(input instanceof HTMLInputElement)) return;
       window.requestAnimationFrame(() => {{
@@ -13168,15 +13190,20 @@
       const runningName = consoleRunningCommand && consoleRunningCommand.name
         ? String(consoleRunningCommand.name)
         : "";
+      const interactiveName = consoleInteractiveSession && consoleInteractiveSession.name
+        ? String(consoleInteractiveSession.name)
+        : "";
       const placeholder = runningName
         ? `${{runningName}} running - Ctrl+C to stop`
-        : "Type \"live\" or \"help\"";
+        : interactiveName
+          ? `${{interactiveName}} session - type commands, Ctrl+C to stop, /help for console`
+          : "Type \"live\" or \"help\"";
       if (input instanceof HTMLInputElement) {{
         input.placeholder = placeholder;
-        input.classList.toggle("is-running", !!runningName);
+        input.classList.toggle("is-running", !!runningName || !!interactiveName);
       }}
       if (runBtn instanceof HTMLButtonElement) {{
-        runBtn.textContent = runningName ? "Busy" : "Run";
+        runBtn.textContent = runningName ? "Busy" : interactiveName ? "Send" : "Run";
       }}
     }}
 
@@ -13217,6 +13244,201 @@
         }}
       }}
       return true;
+    }}
+
+    function stopConsoleInteractiveSession(reason = "stopped", emitStatus = true) {{
+      if (!consoleInteractiveSession) return false;
+      const active = consoleInteractiveSession;
+      consoleInteractiveSession = null;
+      syncConsoleCommandInputState();
+      if (emitStatus) {{
+        const targetLabel = String(active.targetLabel || active.targetNodeId || "session");
+        appendConsoleEventLine(`[${{String(active.name || "session")}}] stopped (${{String(reason || "done")}}) with ${{targetLabel}}.`);
+      }}
+      return true;
+    }}
+
+    function preferredConsoleTargetLabel(nodeId, state = latestState) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) return "";
+      const nodes = Array.isArray(state && state.nodes) ? state.nodes : [];
+      const node = nodes.find((entry) => normalizeNodeId(entry && entry.id) === clean) || null;
+      return preferredNodeName(node) || nodeNameCache.get(clean) || clean;
+    }}
+
+    function resolveConsoleGameTarget(ctx = null) {{
+      const state = (ctx && ctx.state && typeof ctx.state === "object") ? ctx.state : latestState;
+      const options = (ctx && ctx.options && typeof ctx.options === "object") ? ctx.options : {{}};
+      const args = Array.isArray(ctx && ctx.args) ? ctx.args : [];
+      const rawTarget = String(options.node ?? options.id ?? options.peer ?? args[0] ?? "").trim();
+      let nodeId = normalizeNodeId(rawTarget || selectedNodeId || "");
+      if (!isSelectableNodeId(nodeId)) {{
+        return {{ ok: false, error: "Select a peer-to-peer user first or pass node=!xxxxxxxx." }};
+      }}
+      if (!isCanonicalNodeId(nodeId)) {{
+        return {{ ok: false, error: `Invalid peer target: ${{nodeId}}` }};
+      }}
+      if (isSelfNodeId(nodeId, state)) {{
+        return {{ ok: false, error: "Cannot start a console game session against your own radio." }};
+      }}
+      let channelIndex = activeMeshChannelSendIndex();
+      if (Object.prototype.hasOwnProperty.call(options, "channel")) {{
+        const parsedChannel = normalizeMeshChannelIndex(options.channel);
+        channelIndex = parsedChannel;
+      }}
+      const channelLabel = meshChannelLabelForIndex(channelIndex);
+      return {{
+        ok: true,
+        nodeId,
+        targetLabel: preferredConsoleTargetLabel(nodeId, state),
+        channelIndex,
+        channelLabel,
+      }};
+    }}
+
+    function consoleInteractiveChatKey(msg) {{
+      const base = chatMessageKey(msg);
+      if (base) return base;
+      return "";
+    }}
+
+    function consoleInteractiveChatTimestampMs(msg) {{
+      const unix = latestUnixTimestamp(
+        msg && (msg.rx_time ?? msg.rxTime),
+        msg && (msg.captured_at ?? msg.capturedAt),
+        msg && (msg.sent_at ?? msg.sentAt)
+      );
+      return Number.isFinite(unix) && unix > 0 ? unix * 1000 : Date.now();
+    }}
+
+    function consoleInteractiveChatText(msg) {{
+      return String(
+        (msg && (msg.text ?? msg.decoded_text ?? msg.payload_text)) || ""
+      ).replace(/\s+/g, " ").trim();
+    }}
+
+    function syncConsoleInteractiveSessionMessages(state = latestState) {{
+      const session = consoleInteractiveSession;
+      if (!session || !state || typeof state !== "object") return;
+      if (String(session.mode || "") !== "remote") return;
+      const traffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
+      const messages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const localNodeId = resolveLocalNodeId(state);
+      const targetNodeId = normalizeNodeId(session.targetNodeId || "");
+      if (!isCanonicalNodeId(localNodeId) || !isCanonicalNodeId(targetNodeId)) return;
+      for (const msg of messages) {{
+        if (!msg || typeof msg !== "object") continue;
+        const text = consoleInteractiveChatText(msg);
+        if (!text) continue;
+        const fromId = normalizeNodeId(msg.from || "");
+        const toId = normalizeNodeId((msg.to || msg.destination || ""));
+        const isTranscriptMessage = (
+          (fromId === targetNodeId && toId === localNodeId)
+          || (fromId === localNodeId && toId === targetNodeId)
+        );
+        if (!isTranscriptMessage) continue;
+        const key = consoleInteractiveChatKey(msg);
+        if (!key || session.seenKeys.has(key)) continue;
+        session.seenKeys.add(key);
+        const fromLabel = fromId === localNodeId
+          ? "you"
+          : (preferredConsoleTargetLabel(fromId, state) || fromId || "peer");
+        appendConsoleLine(
+          `interactive|${{String(session.name || "session")}}|${{key}}`,
+          `${{fromLabel}}: ${{text}}`,
+          consoleInteractiveChatTimestampMs(msg)
+        );
+      }}
+    }}
+
+    async function sendConsoleInteractiveSessionLine(rawLine) {{
+      const session = consoleInteractiveSession;
+      if (!session) {{
+        return "[console] no interactive session is active.";
+      }}
+      const text = String(rawLine == null ? "" : rawLine).trim();
+      if (!text) return "";
+      if (String(session.mode || "") === "standalone") {{
+        const payload = await postStandaloneZorkCommand(text, session.sessionId || "");
+        const nextSessionId = String(payload && payload.session_id ? payload.session_id : session.sessionId || "").trim();
+        if (nextSessionId) {{
+          session.sessionId = nextSessionId;
+        }}
+        const replyText = String(payload && payload.reply_text ? payload.reply_text : "").trim();
+        if (replyText) {{
+          appendConsoleLine(
+            `interactive|standalone|${{String(session.sessionId || "session")}}|${{Date.now()}}`,
+            `zork: ${{replyText}}`,
+            Date.now()
+          );
+        }}
+        if (payload && payload.active_session === false) {{
+          stopConsoleInteractiveSession("game ended", false);
+        }}
+        return "";
+      }}
+      const body = {{
+        text,
+        destination: session.targetNodeId,
+        channel_index: session.channelIndex,
+      }};
+      const payload = await sendChatPayload(body, null);
+      if (!(payload && payload.ok)) {{
+        throw new Error("send failed");
+      }}
+      const messageId = messageIdOfChatPacket(payload || {{}});
+      if (messageId) {{
+        session.seenKeys.add(`id:${{messageId}}`);
+      }}
+      requestImmediatePoll(80);
+      return "";
+    }}
+
+    async function executeConsoleCommand(parsed, line) {{
+      ensureConsoleCommandsRegistered();
+      const commandDef = consoleCommandRegistry.get(parsed.command);
+      if (!commandDef) {{
+        appendConsoleEventLine(`[console] unknown command: ${{parsed.command}} (try "help")`);
+        return;
+      }}
+      try {{
+        const result = await commandDef.run({{
+          line,
+          command: parsed.command,
+          args: parsed.args,
+          options: parsed.options,
+          comparisons: parsed.comparisons,
+          state: latestState,
+          wildcardMatches,
+          append: (msg) => appendConsoleEventLine(msg),
+        }});
+        if (Array.isArray(result)) {{
+          for (const lineOut of result) {{
+            const text = String(lineOut == null ? "" : lineOut).trimEnd();
+            if (text) appendConsoleEventLine(text);
+          }}
+          return;
+        }}
+        if (result && typeof result === "object") {{
+          if (typeof result.message === "string" && result.message.trim()) {{
+            appendConsoleEventLine(result.message.trim());
+            return;
+          }}
+          try {{
+            appendConsoleEventLine(JSON.stringify(result));
+            return;
+          }} catch (_err) {{
+            return;
+          }}
+        }}
+        const text = String(result == null ? "" : result).trim();
+        if (text) {{
+          appendConsoleEventLine(text);
+        }}
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        appendConsoleEventLine(`[${{parsed.command}}] error: ${{msg}}`);
+      }}
     }}
 
     function registerConsoleCommand(commandDef) {{
@@ -13467,6 +13689,77 @@
           return lines;
         }},
       }});
+      registerConsoleCommand({{
+        name: "zork",
+        usage: "zork",
+        description: "Start a standalone local Zork session in Console.",
+        run: async (ctx) => {{
+          if (consoleInteractiveSession) {{
+            return "[zork] already running. Press Ctrl+C to stop.";
+          }}
+          const payload = await postStandaloneZorkCommand("zork");
+          consoleInteractiveSession = {{
+            name: "zork",
+            mode: "standalone",
+            sessionId: String(payload && payload.session_id ? payload.session_id : "").trim(),
+          }};
+          syncConsoleCommandInputState();
+          const lines = [
+            "[zork] standalone session started. Type game commands directly here. Use /help for console commands. Press Ctrl+C to stop this console session.",
+          ];
+          const replyText = String(payload && payload.reply_text ? payload.reply_text : "").trim();
+          if (replyText) {{
+            lines.push(`zork: ${{replyText}}`);
+          }}
+          if (payload && payload.active_session === false) {{
+            stopConsoleInteractiveSession("game ended", false);
+          }}
+          return lines;
+        }},
+      }});
+      registerConsoleCommand({{
+        name: "zork-remote",
+        usage: "zork-remote [node=!xxxxxxxx] [channel=<n>]",
+        description: "Start an interactive Zork session against a selected direct peer over the mesh.",
+        run: async (ctx) => {{
+          if (consoleInteractiveSession) {{
+            return "[zork-remote] another interactive session is already running. Press Ctrl+C to stop.";
+          }}
+          const target = resolveConsoleGameTarget(ctx);
+          if (!target.ok) {{
+            return `[zork-remote] ${{target.error}}`;
+          }}
+          const body = {{
+            text: "zork",
+            destination: target.nodeId,
+            channel_index: target.channelIndex,
+          }};
+          const payload = await sendChatPayload(body, null);
+          if (!(payload && payload.ok)) {{
+            throw new Error("failed to start remote session");
+          }}
+          const seenKeys = new Set();
+          const messageId = messageIdOfChatPacket(payload || {{}});
+          if (messageId) {{
+            seenKeys.add(`id:${{messageId}}`);
+          }}
+          consoleInteractiveSession = {{
+            name: "zork-remote",
+            mode: "remote",
+            targetNodeId: target.nodeId,
+            targetLabel: target.targetLabel || target.nodeId,
+            channelIndex: target.channelIndex,
+            channelLabel: target.channelLabel,
+            seenKeys,
+          }};
+          syncConsoleCommandInputState();
+          requestImmediatePoll(80);
+          return [
+            `[zork-remote] started with ${{target.targetLabel || target.nodeId}} on ${{target.channelLabel}}.`,
+            "[zork-remote] type game commands directly here. Use /help for console commands. Press Ctrl+C to stop this console session.",
+          ];
+        }},
+      }});
     }}
 
     function formatConsoleLine(entry, verbosity = 0) {{
@@ -13650,55 +13943,35 @@
         );
         return;
       }}
+      if (consoleInteractiveSession) {{
+        const consoleEscape = line.startsWith("/") ? String(line.slice(1) || "").trim() : "";
+        if (consoleEscape) {{
+          const parsedEscape = parseConsoleCommandLine(consoleEscape);
+          if (parsedEscape.error) {{
+            appendConsoleEventLine(`[console] parse error: ${{parsedEscape.error}}`);
+            return;
+          }}
+          await executeConsoleCommand(parsedEscape, consoleEscape);
+          return;
+        }}
+        try {{
+          const result = await sendConsoleInteractiveSessionLine(line);
+          const text = String(result == null ? "" : result).trim();
+          if (text) {{
+            appendConsoleEventLine(text);
+          }}
+        }} catch (err) {{
+          const msg = err instanceof Error ? err.message : String(err || "unknown error");
+          appendConsoleEventLine(`[${{String(consoleInteractiveSession.name || "session")}}] error: ${{msg}}`);
+        }}
+        return;
+      }}
       const parsed = parseConsoleCommandLine(line);
       if (parsed.error) {{
         appendConsoleEventLine(`[console] parse error: ${{parsed.error}}`);
         return;
       }}
-      ensureConsoleCommandsRegistered();
-      const commandDef = consoleCommandRegistry.get(parsed.command);
-      if (!commandDef) {{
-        appendConsoleEventLine(`[console] unknown command: ${{parsed.command}} (try "help")`);
-        return;
-      }}
-      try {{
-        const result = await commandDef.run({{
-          line,
-          command: parsed.command,
-          args: parsed.args,
-          options: parsed.options,
-          comparisons: parsed.comparisons,
-          state: latestState,
-          wildcardMatches,
-          append: (msg) => appendConsoleEventLine(msg),
-        }});
-        if (Array.isArray(result)) {{
-          for (const lineOut of result) {{
-            const text = String(lineOut == null ? "" : lineOut).trimEnd();
-            if (text) appendConsoleEventLine(text);
-          }}
-          return;
-        }}
-        if (result && typeof result === "object") {{
-          if (typeof result.message === "string" && result.message.trim()) {{
-            appendConsoleEventLine(result.message.trim());
-            return;
-          }}
-          try {{
-            appendConsoleEventLine(JSON.stringify(result));
-            return;
-          }} catch (_err) {{
-            return;
-          }}
-        }}
-        const text = String(result == null ? "" : result).trim();
-        if (text) {{
-          appendConsoleEventLine(text);
-        }}
-      }} catch (err) {{
-        const msg = err instanceof Error ? err.message : String(err || "unknown error");
-        appendConsoleEventLine(`[${{parsed.command}}] error: ${{msg}}`);
-      }}
+      await executeConsoleCommand(parsed, line);
     }}
 
     function bindConsoleControls() {{
@@ -13756,10 +14029,12 @@
         input.dataset.bound = "1";
         input.addEventListener("keydown", (ev) => {{
           if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && String(ev.key || "").toLowerCase() === "c") {{
-            if (consoleRunningCommand) {{
+            if (consoleRunningCommand || consoleInteractiveSession) {{
               ev.preventDefault();
               appendConsoleEventLine("^C");
-              stopConsoleRunningCommand("interrupted", true);
+              if (!stopConsoleRunningCommand("interrupted", true)) {{
+                stopConsoleInteractiveSession("interrupted", true);
+              }}
               input.value = "";
               consoleCommandHistoryCursor = -1;
               consoleCommandDraft = "";
@@ -13779,7 +14054,7 @@
       }}
       syncConsoleCommandInputState();
       if (!consoleLines.length) {{
-        appendConsoleEventLine("[console] type \"help\" for commands. Start live stream with \"live\", \"live -v\", \"live -vv\", \"live -vvv\", or \"live -vvvv\".");
+        appendConsoleEventLine("[console] type \"help\" for commands. Start standalone Zork with \"zork\". Start live stream with \"live\", \"live -v\", \"live -vv\", \"live -vvv\", or \"live -vvvv\".");
       }}
     }}
 
@@ -13800,6 +14075,7 @@
           }});
         }}
       }}
+      syncConsoleInteractiveSessionMessages(latestState);
       renderConsoleBuffer();
     }}
 

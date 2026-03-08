@@ -102,6 +102,41 @@ def test_http_api_chat_send_success_and_disabled():
     assert "not enabled" in json.loads(data.decode("utf-8"))["error"].lower()
 
 
+def test_http_api_standalone_zork_success_and_disabled():
+    def _state():
+        return {"ok": True}
+
+    setattr(
+        _state,
+        "play_standalone_zork_fn",
+        lambda **_kwargs: {
+            "ok": True,
+            "session_id": "abc123",
+            "reply_text": "West of House.",
+            "active_session": True,
+        },
+    )
+    enabled_handler = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=_state,
+        send_chat_fn=None,
+    )
+    sent, data = _run_post(enabled_handler, "/api/games/zork", {"text": "zork"})
+    assert sent["status"] == 200
+    enabled_body = json.loads(data.decode("utf-8"))
+    assert enabled_body["session_id"] == "abc123"
+    assert "West of House" in enabled_body["reply_text"]
+
+    disabled_handler = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=lambda: {"ok": True},
+        send_chat_fn=None,
+    )
+    sent, data = _run_post(disabled_handler, "/api/games/zork", {"text": "zork"})
+    assert sent["status"] == 503
+    assert "standalone zork is not enabled" in json.loads(data.decode("utf-8"))["error"].lower()
+
+
 def test_http_api_theme_settings_get_and_post():
     selected = {"name": "default"}
     presets = {

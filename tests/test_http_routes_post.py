@@ -6,6 +6,7 @@ from meshdash.api_inputs import (
     ChannelSettingsRequest,
     ChatSendRequest,
     RadioSettingsRequest,
+    StandaloneZorkRequest,
     ThemeSettingsRequest,
 )
 from meshdash.http_route_contracts import DashboardPostRouteDependencies
@@ -42,12 +43,14 @@ def _build_post_deps(*, json_calls):
         parse_channel_settings_request_fn=lambda _raw: ChannelSettingsRequest(action="list"),
         apply_bot_settings_fn=lambda _req: {"ok": True, "bot_applied": True},
         parse_bot_settings_request_fn=lambda _raw: BotSettingsRequest(game_enabled=True),
+        play_standalone_zork_fn=lambda **_kwargs: {"ok": True, "route": "zork"},
+        parse_standalone_zork_request_fn=lambda _raw: StandaloneZorkRequest(text="zork", session_id="abc"),
     )
 
 
 def test_handle_dashboard_post_enabled_routes_delegate_to_helpers(monkeypatch):
     json_calls = []
-    helper_calls = {"chat": 0, "radio": 0, "channels": 0, "theme": 0, "bot": 0}
+    helper_calls = {"chat": 0, "zork": 0, "radio": 0, "channels": 0, "theme": 0, "bot": 0}
 
     monkeypatch.setattr(
         routes_post,
@@ -55,6 +58,14 @@ def test_handle_dashboard_post_enabled_routes_delegate_to_helpers(monkeypatch):
         lambda handler, **kwargs: (
             helper_calls.__setitem__("chat", helper_calls["chat"] + 1),
             json_calls.append({"status_code": 200, "payload_obj": {"route": "chat"}}),
+        ),
+    )
+    monkeypatch.setattr(
+        routes_post,
+        "_handle_standalone_zork_post_helper",
+        lambda handler, **kwargs: (
+            helper_calls.__setitem__("zork", helper_calls["zork"] + 1),
+            json_calls.append({"status_code": 200, "payload_obj": {"route": "zork"}}),
         ),
     )
     monkeypatch.setattr(
@@ -94,19 +105,21 @@ def test_handle_dashboard_post_enabled_routes_delegate_to_helpers(monkeypatch):
     handler = _fake_handler()
 
     routes_post.handle_dashboard_post(handler, path="/api/chat/send", deps=deps)
+    routes_post.handle_dashboard_post(handler, path="/api/games/zork", deps=deps)
     routes_post.handle_dashboard_post(handler, path="/api/settings/radio", deps=deps)
     routes_post.handle_dashboard_post(handler, path="/api/settings/channels", deps=deps)
     routes_post.handle_dashboard_post(handler, path="/api/settings/theme", deps=deps)
     routes_post.handle_dashboard_post(handler, path="/api/settings/bot", deps=deps)
     routes_post.handle_dashboard_post(handler, path="/missing", deps=deps)
 
-    assert helper_calls == {"chat": 1, "radio": 1, "channels": 1, "theme": 1, "bot": 1}
+    assert helper_calls == {"chat": 1, "zork": 1, "radio": 1, "channels": 1, "theme": 1, "bot": 1}
     assert json_calls[0]["payload_obj"]["route"] == "chat"
-    assert json_calls[1]["payload_obj"]["route"] == "radio"
-    assert json_calls[2]["payload_obj"]["route"] == "channels"
-    assert json_calls[3]["payload_obj"]["route"] == "theme"
-    assert json_calls[4]["payload_obj"]["route"] == "bot"
-    assert json_calls[5]["status_code"] == 404
+    assert json_calls[1]["payload_obj"]["route"] == "zork"
+    assert json_calls[2]["payload_obj"]["route"] == "radio"
+    assert json_calls[3]["payload_obj"]["route"] == "channels"
+    assert json_calls[4]["payload_obj"]["route"] == "theme"
+    assert json_calls[5]["payload_obj"]["route"] == "bot"
+    assert json_calls[6]["status_code"] == 404
 
 
 def test_handle_dashboard_post_disabled_feature_paths_return_503():
@@ -128,6 +141,8 @@ def test_handle_dashboard_post_disabled_feature_paths_return_503():
         parse_channel_settings_request_fn=deps.parse_channel_settings_request_fn,
         apply_bot_settings_fn=deps.apply_bot_settings_fn,
         parse_bot_settings_request_fn=deps.parse_bot_settings_request_fn,
+        play_standalone_zork_fn=deps.play_standalone_zork_fn,
+        parse_standalone_zork_request_fn=deps.parse_standalone_zork_request_fn,
     )
     routes_post.handle_dashboard_post(handler, path="/api/settings/radio", deps=deps_disabled_radio)
     assert json_calls[0]["status_code"] == 503
@@ -147,6 +162,8 @@ def test_handle_dashboard_post_disabled_feature_paths_return_503():
         parse_channel_settings_request_fn=None,
         apply_bot_settings_fn=deps.apply_bot_settings_fn,
         parse_bot_settings_request_fn=deps.parse_bot_settings_request_fn,
+        play_standalone_zork_fn=deps.play_standalone_zork_fn,
+        parse_standalone_zork_request_fn=deps.parse_standalone_zork_request_fn,
     )
     routes_post.handle_dashboard_post(handler, path="/api/settings/channels", deps=deps_disabled_channels)
     assert json_calls[1]["status_code"] == 503
@@ -166,6 +183,8 @@ def test_handle_dashboard_post_disabled_feature_paths_return_503():
         parse_channel_settings_request_fn=deps.parse_channel_settings_request_fn,
         apply_bot_settings_fn=deps.apply_bot_settings_fn,
         parse_bot_settings_request_fn=deps.parse_bot_settings_request_fn,
+        play_standalone_zork_fn=deps.play_standalone_zork_fn,
+        parse_standalone_zork_request_fn=deps.parse_standalone_zork_request_fn,
     )
     routes_post.handle_dashboard_post(handler, path="/api/settings/theme", deps=deps_disabled_theme)
     assert json_calls[2]["status_code"] == 503
@@ -185,7 +204,30 @@ def test_handle_dashboard_post_disabled_feature_paths_return_503():
         parse_channel_settings_request_fn=deps.parse_channel_settings_request_fn,
         apply_bot_settings_fn=deps.apply_bot_settings_fn,
         parse_bot_settings_request_fn=None,
+        play_standalone_zork_fn=deps.play_standalone_zork_fn,
+        parse_standalone_zork_request_fn=deps.parse_standalone_zork_request_fn,
     )
     routes_post.handle_dashboard_post(handler, path="/api/settings/bot", deps=deps_disabled_bot)
     assert json_calls[3]["status_code"] == 503
     assert "Bot settings are not enabled" in json_calls[3]["payload_obj"]["error"]
+
+    deps_disabled_zork = DashboardPostRouteDependencies(
+        send_chat_fn=deps.send_chat_fn,
+        to_int_fn=deps.to_int_fn,
+        validate_content_length_fn=deps.validate_content_length_fn,
+        parse_chat_send_request_fn=deps.parse_chat_send_request_fn,
+        write_json_response_fn=deps.write_json_response_fn,
+        set_theme_preset_fn=deps.set_theme_preset_fn,
+        parse_theme_settings_request_fn=deps.parse_theme_settings_request_fn,
+        apply_radio_settings_fn=deps.apply_radio_settings_fn,
+        parse_radio_settings_request_fn=deps.parse_radio_settings_request_fn,
+        apply_channel_settings_fn=deps.apply_channel_settings_fn,
+        parse_channel_settings_request_fn=deps.parse_channel_settings_request_fn,
+        apply_bot_settings_fn=deps.apply_bot_settings_fn,
+        parse_bot_settings_request_fn=deps.parse_bot_settings_request_fn,
+        play_standalone_zork_fn=None,
+        parse_standalone_zork_request_fn=None,
+    )
+    routes_post.handle_dashboard_post(handler, path="/api/games/zork", deps=deps_disabled_zork)
+    assert json_calls[4]["status_code"] == 503
+    assert "Standalone Zork is not enabled" in json_calls[4]["payload_obj"]["error"]

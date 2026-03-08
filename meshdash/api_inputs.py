@@ -28,6 +28,10 @@ from .api_input_bot import (
     BotSettingsRequest,
     parse_bot_settings_request,
 )
+from .api_input_zork import (
+    StandaloneZorkRequest,
+    parse_standalone_zork_request,
+)
 
 __all__ = [
     "ChatSendRequest",
@@ -47,5 +51,7 @@ __all__ = [
     "parse_channel_settings_request",
     "BotSettingsRequest",
     "parse_bot_settings_request",
+    "StandaloneZorkRequest",
+    "parse_standalone_zork_request",
     "validate_content_length",
 ]

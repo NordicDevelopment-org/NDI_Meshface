@@ -43,10 +43,11 @@ def test_write_json_response_sets_headers_and_payload():
 
 def test_write_html_response_sets_headers_and_payload():
     handler = _FakeHandler()
-    write_html_response(handler, html_text="<html>ok</html>")
+    write_html_response(handler, html_text="<html>ok</html>", no_store=True)
 
     assert handler.status == 200
     assert ("Content-Type", "text/html; charset=utf-8") in handler.headers
+    assert ("Cache-Control", "no-store") in handler.headers
     assert handler.wfile.getvalue() == b"<html>ok</html>"
 
 
