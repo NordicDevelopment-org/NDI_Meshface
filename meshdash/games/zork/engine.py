@@ -107,6 +107,9 @@ GAME_VERB_HEADS = {
     "untie",
     "push",
     "press",
+    "tell",
+    "raise",
+    "robot",
     "pray",
     "exorcise",
     "attack",
@@ -498,6 +501,23 @@ class ZorkGame:
     def _clean_words(self, raw: str) -> list[str]:
         return [part for part in re.findall(r"[a-z0-9]+", str(raw or "").lower()) if part]
 
+    def _extract_robot_command(self, raw: str) -> str | None:
+        text = str(raw or "").strip()
+        lower = text.lower()
+        prefixes = (
+            "tell robot to ",
+            "tell robot ",
+            "robot, ",
+            "robot,",
+            "robot ",
+        )
+        for prefix in prefixes:
+            if lower.startswith(prefix):
+                return text[len(prefix):].strip()
+        if lower in {"robot", "tell robot", "tell robot to"}:
+            return ""
+        return None
+
     def _bulk_scope(self, raw_target: str) -> str | None:
         words = set(self._clean_words(raw_target))
         if not words:
@@ -539,6 +559,8 @@ class ZorkGame:
         if code_key == "STATU" and room_key == "BEACH" and "beach_statue_found" not in flags:
             return False
         if code_key == "TRUNK" and room_key in {"RESES", "RESEN"} and "low_tide" not in flags:
+            return False
+        if code_key == "CAGE" and "cage_solved" not in flags:
             return False
         if code_key == "CYCLO" and "cyclops_gone" in flags:
             return False
@@ -1323,6 +1345,10 @@ class ZorkGame:
             return "SSLOT"
         if room_id == "SAFE" and ("safe" in word_set or "box" in word_set):
             return "SAFE"
+        if room_id == "CAGED" and ("cage" in word_set or "bars" in word_set or "iron" in word_set):
+            return "CAGE"
+        if "robot" in word_set or "robby" in word_set:
+            return "ROBOT"
         if room_id == "ICY" and ("glacier" in word_set or "ice" in word_set or "icicle" in word_set):
             return "ICE"
         if room_id in {"MIRR1", "MIRR2"} and ("mirror" in word_set or "glass" in word_set):
@@ -1713,6 +1739,10 @@ class ZorkGame:
                     "In the corner of the room on the ceiling is a large vampire bat who is obviously deranged and holding his nose."
                 )
             return "You are in a small room which has only one door, to the east."
+        if room_key == "CAGED":
+            return (
+                "You are trapped inside a steel cage, while poisonous gas trickles into the room."
+            )
         if room_key == "ICY":
             west_state = (
                 "There are passages to the north, east, and west."
@@ -1939,6 +1969,9 @@ class ZorkGame:
             return message or "You can't go that way."
         if kind == "unknown":
             return "That route is not fully ported yet."
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        if room_id == "CAGED":
+            return "You are stopped by the cage and a cloud of poisonous gas."
         condition = str(exit_row.get("condition") or "").strip().upper()
         if condition == "KITCHEN-WINDOW":
             return "The kitchen window is only slightly ajar. Try 'open window'."
@@ -1974,6 +2007,205 @@ class ZorkGame:
         if head_raw in {"go", "walk"} and args:
             return DIRECTION_ALIASES.get(args[0])
         return None
+
+    def _robot_room(self, session: dict[str, object]) -> str:
+        return str(self._object_locations(session).get("ROBOT") or "").strip().upper()
+
+    def _robot_here(self, session: dict[str, object], room_id: str | None = None) -> bool:
+        room_key = str(room_id or session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        return self._robot_room(session) == room_key
+
+    def _robot_move_response(
+        self,
+        session: dict[str, object],
+        direction: str,
+    ) -> tuple[str, set[str], dict[str, str]]:
+        room_id = self._robot_room(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        if room_id not in ROOMS:
+            return ('"I am only a stupid robot and cannot perform that command."', flags, object_locations)
+
+        target = ""
+        room = ROOMS.get(room_id)
+        if room_id == "CAROU":
+            if self._carousel_room_oriented(flags):
+                if direction == "EXIT":
+                    target = "PASS3"
+                else:
+                    for row in room.exits:
+                        if str(row.get("direction") or "").strip().upper() == direction:
+                            target = str(row.get("target") or "").strip().upper()
+                            break
+            elif direction in {"NORTH", "SOUTH", "EAST", "WEST", "NE", "NW", "SE", "SW", "EXIT"}:
+                target = self._carousel_random_target(session)
+        elif room_id == "MAGNE" and direction in MAGNET_FIXED_TARGETS:
+            if self._magnet_room_disoriented(flags):
+                target = self._magnet_random_target(session)
+            else:
+                target = MAGNET_FIXED_TARGETS[direction]
+        else:
+            for row in room.exits:
+                if str(row.get("direction") or "").strip().upper() != direction:
+                    continue
+                kind = str(row.get("kind") or "")
+                if kind == "room":
+                    target = str(row.get("target") or "").strip().upper()
+                    break
+                if kind == "cexit" and self._condition_passes(session, str(row.get("condition") or ""), row):
+                    target = str(row.get("target") or "").strip().upper()
+                    break
+                return ("The robot bumps into something invisible and gives up.", flags, object_locations)
+
+        if target not in ROOMS:
+            return ('"I am only a stupid robot and cannot perform that command."', flags, object_locations)
+
+        object_locations["ROBOT"] = target
+        return (f"The robot clanks off toward {room_name(target)}.", flags, object_locations)
+
+    def _robot_take_sphere_response(
+        self,
+        session: dict[str, object],
+    ) -> tuple[str, str, list[str], set[str], dict[str, str], bool]:
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        if not self._robot_here(session, room_id):
+            return ("The robot is not here.", room_id, inventory, flags, object_locations, False)
+        if object_locations.get("SPHER") != room_id:
+            return ("There is no sphere here for the robot to reach.", room_id, inventory, flags, object_locations, False)
+        if "cage_solved" in flags:
+            return ('"I am only a stupid robot and cannot perform that command."', room_id, inventory, flags, object_locations, False)
+        object_locations["SPHER"] = "GONE"
+        object_locations["ROBOT"] = "GONE"
+        object_locations["RCAGE"] = room_id
+        return (
+            "As the robot reaches for the sphere, an iron cage falls from the ceiling. "
+            "The robot attempts to fend it off, but is trapped below it. Alas, the robot short-circuits in his vain attempt to escape, "
+            "and crushes the sphere beneath him as he falls to the floor.",
+            room_id,
+            inventory,
+            flags,
+            object_locations,
+            False,
+        )
+
+    def _robot_raise_cage_response(
+        self,
+        session: dict[str, object],
+    ) -> tuple[str, str, list[str], set[str], dict[str, str], bool]:
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        if room_id != "CAGED" or not self._robot_here(session, "CAGED"):
+            return ('"I am only a stupid robot and cannot perform that command."', room_id, inventory, flags, object_locations, False)
+        flags.add("cage_solved")
+        flags.discard("caged_trap")
+        self._session_counters(session)["cage_gas_turns"] = 0
+        object_locations["CAGE"] = "CAGER"
+        object_locations["ROBOT"] = "CAGER"
+        return (
+            "The cage shakes and is hurled across the room.",
+            "CAGER",
+            inventory,
+            flags,
+            object_locations,
+            False,
+        )
+
+    def _robot_command_response(
+        self,
+        session: dict[str, object],
+        raw_command: str,
+    ) -> tuple[str, str, list[str], set[str], dict[str, str], bool]:
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        if not self._robot_here(session, room_id):
+            return ("The robot is not here.", room_id, inventory, flags, object_locations, False)
+
+        words = [part for part in self._clean_words(raw_command) if part]
+        if not words:
+            return ("Tell the robot to do what?", room_id, inventory, flags, object_locations, False)
+
+        head = words[0]
+        if head in DIRECTION_ALIASES or head in {"go", "walk"}:
+            direction = self._movement_direction(head, words[1:])
+            if direction is None:
+                return ('"I am only a stupid robot and cannot perform that command."', room_id, inventory, flags, object_locations, False)
+            reply, flags, object_locations = self._robot_move_response(session, direction)
+            return (reply, room_id, inventory, flags, object_locations, False)
+
+        if head in {"push", "press"}:
+            target_text = " ".join(words[1:])
+            target = self._resolve_object(session, target_text, head)
+            if not target:
+                return ('"I am only a stupid robot and cannot perform that command."', room_id, inventory, flags, object_locations, False)
+            reply, flags, object_locations = self._push_or_press_response(session, target)
+            button_names = {"SQBUT": "square button", "RNBUT": "round button", "TRBUT": "triangular button"}
+            label = button_names.get(target, object_name(target))
+            return (f"The robot obediently presses the {label}. {reply}", room_id, inventory, flags, object_locations, False)
+
+        if head in {"take", "get"}:
+            target_text = " ".join(words[1:])
+            target = self._resolve_object(session, target_text, head)
+            if target == "SPHER":
+                return self._robot_take_sphere_response(session)
+            return ('"I am only a stupid robot and cannot perform that command."', room_id, inventory, flags, object_locations, False)
+
+        if head == "raise":
+            target_text = " ".join(words[1:]).strip()
+            if target_text and "cage" not in target_text and "bars" not in target_text:
+                return ('"I am only a stupid robot and cannot perform that command."', room_id, inventory, flags, object_locations, False)
+            return self._robot_raise_cage_response(session)
+
+        return ('"I am only a stupid robot and cannot perform that command."', room_id, inventory, flags, object_locations, False)
+
+    def _sphere_take_response(
+        self,
+        session: dict[str, object],
+    ) -> tuple[str, str, list[str], set[str], dict[str, str], bool]:
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        if object_locations.get("SPHER") != room_id:
+            return ("You don't see any crystal sphere here.", room_id, inventory, flags, object_locations, False)
+        if "cage_solved" in flags:
+            inventory.append("SPHER")
+            object_locations["SPHER"] = "INVENTORY"
+            return (f"Taken: {object_name('SPHER')}.", room_id, inventory, flags, object_locations, False)
+        if room_id != "CAGER":
+            return ("You can't take the crystal sphere.", room_id, inventory, flags, object_locations, False)
+
+        if not self._robot_here(session, room_id):
+            object_locations["SPHER"] = "GONE"
+            return (
+                "As you reach for the sphere, an iron cage falls from the ceiling to entrap you. "
+                "To make matters worse, poisonous gas starts coming into the room. "
+                "You are stopped by a cloud of poisonous gas. zork: session ended. Send 'zork' to start again.",
+                room_id,
+                inventory,
+                flags,
+                object_locations,
+                True,
+            )
+
+        flags.add("caged_trap")
+        self._session_counters(session)["cage_gas_turns"] = 10
+        object_locations["ROBOT"] = "CAGED"
+        return (
+            "As you reach for the sphere, an iron cage falls from the ceiling to entrap you. "
+            "To make matters worse, poisonous gas starts coming into the room.",
+            "CAGED",
+            inventory,
+            flags,
+            object_locations,
+            False,
+        )
 
     def _move(self, session: dict[str, object], direction: str, now_unix: int) -> BotAppResult:
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
@@ -2754,6 +2986,12 @@ class ZorkGame:
             return ("The rope is tied to the railing.", inventory, object_locations, flags)
         if code_key == "RBOAT" and "aboard_boat" in flags and object_locations.get("RBOAT") == room_id:
             return ("You are already in the boat.", inventory, object_locations, flags)
+        if code_key == "SPHER":
+            if "cage_solved" not in flags:
+                return ("As you reach for the sphere, something very unfortunate happens. Perhaps the robot should be here first.", inventory, object_locations, flags)
+            inventory.append(code_key)
+            object_locations[code_key] = "INVENTORY"
+            return (f"Taken: {object_name(code_key)}.", inventory, object_locations, flags)
         if code_key == "GUNK":
             object_locations.pop("GUNK", None)
             return (
@@ -3562,10 +3800,15 @@ class ZorkGame:
         raw = str(text or "").strip()
         if not raw:
             return BotAppResult(handled=False)
-        parts = [part for part in raw.split() if part]
-        if not parts:
-            return BotAppResult(handled=False)
-        head_raw = str(parts[0]).strip().lower()
+        robot_command = self._extract_robot_command(raw)
+        if robot_command is not None:
+            parts = ["robot", *[part for part in robot_command.split() if part]]
+            head_raw = "robot"
+        else:
+            parts = [part for part in raw.split() if part]
+            if not parts:
+                return BotAppResult(handled=False)
+            head_raw = str(parts[0]).strip().lower()
         if head_raw not in GAME_VERB_HEADS:
             return BotAppResult(handled=False)
         if not self._is_direct_to_local(to_id, local_node_id):
@@ -3600,6 +3843,23 @@ class ZorkGame:
         object_locations = self._object_locations(session)
         args = [str(value).strip().lower() for value in parts[1:] if str(value).strip()]
         raw_target = " ".join(args)
+
+        if room_id == "CAGED" and "cage_solved" not in flags:
+            robot_raising = False
+            if robot_command:
+                robot_words = self._clean_words(robot_command)
+                robot_raising = bool(robot_words and robot_words[0] == "raise")
+            if not robot_raising:
+                counters = self._session_counters(session)
+                remaining = int(counters.get("cage_gas_turns") or 10) - 1
+                counters["cage_gas_turns"] = remaining
+                if remaining <= 0:
+                    self._sessions.pop(peer_id, None)
+                    return BotAppResult(
+                        handled=True,
+                        reply_text="Time passes...and you die from some obscure poisoning. zork: session ended. Send 'zork' to start again.",
+                        command_name=self.SPEC.name,
+                    )
 
         if self._room_is_dark(session, room_id) and head_raw not in {
             "north",
@@ -3664,13 +3924,22 @@ class ZorkGame:
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text="It is pitch black. You are likely to be eaten by a grue.", command_name=self.SPEC.name)
 
+        if head_raw == "robot":
+            reply, room_after, inventory, flags, object_locations, ended = self._robot_command_response(session, robot_command or "")
+            if ended:
+                self._sessions.pop(peer_id, None)
+                return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+            self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+            suffix = self._room_summary(session, room_after) if room_after != room_id else self._room_summary(session, room_id)
+            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {suffix}"), command_name=self.SPEC.name)
+
         if head_raw in {"help"}:
             return BotAppResult(
                 handled=True,
                 reply_text=(
                     "zork: look, x/read, n/s/e/w/u/d, take/drop, put/insert, throw/rub, open/close, move, push/press, turn, "
                     "light/burn/extinguish, dig, wave stick, tie/untie rope or balloon wire, plug/repair broken boat, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
-                    "magic words, score, attack, quit."
+                    "robot, press <button>; robot, north/east/etc.; robot, take sphere; robot, raise cage; magic words, score, attack, quit."
                 ),
                 command_name=self.SPEC.name,
             )
@@ -3974,6 +4243,13 @@ class ZorkGame:
                 self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
                 reply = f"You don't see any {raw_target} here." if raw_target else "Take what?"
                 return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            if target == "SPHER":
+                reply, room_after, inventory, flags, object_locations, ended = self._sphere_take_response(session)
+                if ended:
+                    self._sessions.pop(peer_id, None)
+                    return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+                self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+                return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_after)}"), command_name=self.SPEC.name)
             reply, inventory, object_locations, flags = self._take_response(session, target)
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
@@ -4035,6 +4311,13 @@ class ZorkGame:
                 self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
                 reply = f"You don't see any {raw_target} here." if raw_target else f"{head_raw.title()} what?"
                 return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            if room_id == "CMACH" and target in {"SQBUT", "RNBUT", "TRBUT"}:
+                self._sessions.pop(peer_id, None)
+                return BotAppResult(
+                    handled=True,
+                    reply_text="There is a giant spark and you are fried to a crisp. zork: session ended. Send 'zork' to start again.",
+                    command_name=self.SPEC.name,
+                )
             reply, flags, object_locations = self._push_or_press_response(session, target)
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)

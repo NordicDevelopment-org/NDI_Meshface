@@ -42,6 +42,7 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - Boarding the inflated boat while carrying the broken sharp stick now punctures it into the damaged boat, and the damaged boat can be repaired back into the inflatable boat with putty.
 - The volcano balloon cluster is now playable: the basket/receptacle/wire/hooks are live, burnable fuel in the receptacle inflates the balloon, wire-to-hook tie/untie works on the ledges, and board/launch/land/disembark balloon travel plus rim/bad-landing failures are wired into the live game.
 - The carousel/low-room magnetic cluster is now playable: the round room can now either randomize or honor directional exits, the low room now routes to the machine room or Alice depending on the magnetic state, and the CMACH round/square/triangular buttons now control the flip/zoom behavior instead of leaving that branch as a dead end.
+- The robot/sphere/high-voltage cluster is now partly canonical: pressing the CMACH buttons by hand now fries the player, actor-style `robot ...`/`tell robot ...` commands can move the robot and make it press the buttons safely, the crystal-sphere cage trap now works, and the robot can now raise the cage or ruin the sphere by trying to grab it himself.
 
 ## What Is Still Missing
 
@@ -51,7 +52,8 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - The safe path is now playable, but its fuse timing is intentionally simplified compared with full upstream timing.
 - Glacier, mirror, thief, machine, safe, carousel, and other later puzzle clusters still need fuller canonical behavior.
 - The thief now roams and steals in a deterministic simplified way, but he is still not the full upstream robber demon with canonical randomness, hiding rules, or complete combat behavior.
-- The carousel/CMACH branch is now traversable, but the high-voltage/robot mediation is still simplified compared with the original actor-driven robot puzzle.
+- The carousel/CMACH branch is now traversable, and the high-voltage/robot mediation is now live at a basic actor-command level, but broader robot behavior is still simplified compared with the original actor system.
+- The sphere/cage gas clock is now playable, but its timing and actor behavior are still simplified compared with the upstream event clock.
 
 ## Regenerating Derived Data
 
