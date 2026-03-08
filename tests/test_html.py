@@ -55,6 +55,8 @@ def test_render_html_includes_console_text_size_control():
         revision_title="v0.1.0 / abc123",
     )
     assert 'id="live-console"' in html
+    assert 'id="console-terminal-screen"' in html
+    assert 'id="console-prompt-label"' in html
     assert 'id="console-font-size-select"' in html
 
 

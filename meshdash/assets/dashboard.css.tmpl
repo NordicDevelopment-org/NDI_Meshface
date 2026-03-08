@@ -4100,6 +4100,10 @@
       min-height: 0;
       flex: 1 1 auto;
     }}
+    .layout.view-console .console-terminal-screen {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
     .layout.view-console #live-console {{
       flex: 1 1 auto;
       min-height: 0;
@@ -6651,58 +6655,112 @@
     .console-command-form {{
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-top: 8px;
+      gap: 10px;
+      margin-top: 0;
+      padding: 10px 12px 12px;
+      border-top: 1px solid rgba(25, 83, 53, 0.34);
+      background:
+        linear-gradient(180deg, rgba(214, 242, 223, 0.12), rgba(214, 242, 223, 0.02));
+      position: relative;
+      z-index: 1;
     }}
-    .console-command-label {{
-      font-size: 11px;
-      color: #294735;
-      letter-spacing: 0.08px;
-      white-space: nowrap;
+    .console-terminal-screen {{
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      border: 1px solid #0f5a3a;
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at top, rgba(64, 140, 95, 0.1), transparent 42%),
+        linear-gradient(180deg, #03150d 0%, #041a11 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(116, 214, 152, 0.1),
+        inset 0 0 24px rgba(11, 84, 46, 0.22);
+      overflow: hidden;
+    }}
+    .console-terminal-screen::before {{
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(140, 255, 191, 0.025) 0,
+          rgba(140, 255, 191, 0.025) 1px,
+          transparent 1px,
+          transparent 4px
+        );
+      opacity: 0.55;
+      pointer-events: none;
+    }}
+    .console-prompt-label {{
+      flex: 0 0 auto;
+      color: #8ff5b5;
+      font-size: 12px;
+      line-height: 1.3;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(143, 245, 181, 0.25);
+      user-select: none;
+    }}
+    .console-prompt-label.is-running {{
+      color: #ffe8a3;
+      text-shadow: 0 0 10px rgba(255, 232, 163, 0.18);
     }}
     .console-command-input {{
       flex: 1 1 auto;
       min-width: 0;
-      border: 1px solid #c2d8c7;
-      border-radius: 6px;
-      background: #f0f8f2;
-      color: #1e5e40;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: #c6ffdb;
       font-size: 12px;
       line-height: 1.3;
-      padding: 5px 8px;
+      padding: 0;
       font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      text-shadow: 0 0 10px rgba(143, 245, 181, 0.18);
     }}
     .console-command-input::placeholder {{
-      color: #4f6f5d;
+      color: rgba(143, 245, 181, 0.56);
       opacity: 1;
     }}
+    .console-command-input:focus {{
+      outline: none;
+    }}
     .console-command-input.is-running {{
-      border-color: #c6a642;
-      background: #fff9e5;
-      color: #5d4a12;
+      color: #ffe8a3;
+      text-shadow: 0 0 10px rgba(255, 232, 163, 0.16);
     }}
     #console-command-run-btn {{
-      border: 1px solid #c2d8c7;
-      background: #f0f8f2;
-      color: #1e5e40;
+      border: 1px solid rgba(82, 188, 123, 0.46);
+      background: rgba(6, 29, 18, 0.94);
+      color: #bff9d4;
       border-radius: 6px;
       font-size: 11px;
-      padding: 5px 10px;
+      padding: 4px 10px;
       cursor: pointer;
       white-space: nowrap;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      box-shadow: inset 0 0 0 1px rgba(148, 255, 193, 0.08);
     }}
     #console-command-run-btn:hover {{
-      background: #e1f2e7;
+      background: rgba(12, 47, 30, 0.96);
     }}
     #live-console {{
       margin: 0;
-      background: #f0f8f2;
-      border: 1px solid #c2d8c7;
-      color: #1e5e40;
-      border-radius: 6px;
-      padding: 8px;
-      min-height: 180px;
-      max-height: 280px;
+      background: transparent;
+      border: none;
+      color: #c6ffdb;
+      border-radius: 0;
+      padding: 12px 12px 8px;
+      min-height: 0;
+      max-height: none;
+      flex: 1 1 auto;
       overflow-y: auto;
       overflow-x: auto;
       font-size: 10px;
@@ -6710,6 +6768,7 @@
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       word-break: break-all;
+      text-shadow: 0 0 10px rgba(143, 245, 181, 0.14);
     }}
     details {{
       border: 1px solid #d7e5d2;
@@ -7468,21 +7527,44 @@
       background: #010503;
       color: #bfffd4;
     }}
-    [data-theme="dark"] .console-command-input {{
-      background: #07140d;
+    [data-theme="dark"] .console-terminal-screen {{
       border-color: #2d8f5d;
+      background:
+        radial-gradient(circle at top, rgba(83, 170, 112, 0.09), transparent 42%),
+        linear-gradient(180deg, #031109 0%, #04150d 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(127, 255, 177, 0.08),
+        inset 0 0 28px rgba(10, 71, 40, 0.28);
+    }}
+    [data-theme="dark"] .console-terminal-screen::before {{
+      opacity: 0.45;
+    }}
+    [data-theme="dark"] .console-command-form {{
+      border-top-color: rgba(45, 143, 93, 0.52);
+      background:
+        linear-gradient(180deg, rgba(18, 56, 35, 0.2), rgba(18, 56, 35, 0.03));
+    }}
+    [data-theme="dark"] .console-prompt-label {{
+      color: #9ff7c1;
+      text-shadow: 0 0 12px rgba(159, 247, 193, 0.24);
+    }}
+    [data-theme="dark"] .console-prompt-label.is-running {{
+      color: #ffe8a3;
+      text-shadow: 0 0 12px rgba(255, 232, 163, 0.2);
+    }}
+    [data-theme="dark"] .console-command-input {{
+      background: transparent;
+      border-color: transparent;
       color: #c6ffdb;
     }}
     [data-theme="dark"] .console-command-input::placeholder {{
       color: #90d9ac;
     }}
     [data-theme="dark"] .console-command-input.is-running {{
-      background: #201907;
-      border-color: #b68e1e;
       color: #ffe8a3;
     }}
     [data-theme="dark"] #console-command-run-btn {{
-      background: #07140d;
+      background: rgba(7, 20, 13, 0.94);
       border-color: #2d8f5d;
       color: #c6ffda;
     }}
@@ -7582,8 +7664,8 @@
       box-shadow: none;
     }}
     [data-theme="dark"] #live-console {{
-      background: #07140d;
-      border-color: #2d8f5d !important;
+      background: transparent;
+      border-color: transparent !important;
       color: #c6ffdb;
     }}
     [data-theme="dark"] th {{

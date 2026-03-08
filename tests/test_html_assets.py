@@ -8,6 +8,8 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert ".topbar" in css
     assert ".workspace-shell" in css
     assert ".console-select" in css
+    assert ".console-terminal-screen" in css
+    assert ".console-prompt-label" in css
     assert "#history-chat-table td.history-node-clickable" in css
     assert "#history-chat-table tbody tr.history-node-selectable.selected-node td" in css
     assert ".bots-setting-note" in css
@@ -46,6 +48,13 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "const consoleFontSizeStorageKey = \"meshDashboardConsoleFontSizeV1\";" in js
     assert "loadConsoleFontSizePreference();" in js
     assert "window.localStorage.setItem(consoleFontSizeStorageKey" in js
+    assert "const prompt = document.getElementById(\"console-prompt-label\");" in js
+    assert "const promptLabel = runningName" in js
+    assert "const terminalScreen = document.getElementById(\"console-terminal-screen\");" in js
+    assert "async function copyConsoleSelectionToClipboard()" in js
+    assert "navigator.clipboard.writeText(text);" in js
+    assert "selection.removeAllRanges();" in js
+    assert "pre.addEventListener(\"mouseup\", () => {" in js
     assert "function bindHistoryChatRowClicks()" in js
     assert "\"from-node-id\": fromNodeId" in js
     assert "className: isSelectableNodeId(fromNodeId) ? \"history-node-clickable\" : \"\"" in js

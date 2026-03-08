@@ -13060,10 +13060,23 @@
 
     function applyConsoleFontSizePreference() {{
       const pre = document.getElementById("live-console");
-      if (!(pre instanceof HTMLElement)) return;
       const key = normalizeConsoleFontSize(consoleFontSize);
       const px = Number(consoleFontSizePxByKey[key]) || 12;
-      pre.style.fontSize = `${{px}}px`;
+      if (pre instanceof HTMLElement) {{
+        pre.style.fontSize = `${{px}}px`;
+      }}
+      const input = document.getElementById("console-command-input");
+      if (input instanceof HTMLInputElement) {{
+        input.style.fontSize = `${{px}}px`;
+      }}
+      const prompt = document.getElementById("console-prompt-label");
+      if (prompt instanceof HTMLElement) {{
+        prompt.style.fontSize = `${{px}}px`;
+      }}
+      const runBtn = document.getElementById("console-command-run-btn");
+      if (runBtn instanceof HTMLButtonElement) {{
+        runBtn.style.fontSize = `${{Math.max(10, px - 1)}}px`;
+      }}
       consoleFontSize = key;
     }}
 
@@ -13386,17 +13399,27 @@
     function syncConsoleCommandInputState() {{
       const input = document.getElementById("console-command-input");
       const runBtn = document.getElementById("console-command-run-btn");
+      const prompt = document.getElementById("console-prompt-label");
       const runningName = consoleRunningCommand && consoleRunningCommand.name
         ? String(consoleRunningCommand.name)
         : "";
       const interactiveName = consoleInteractiveSession && consoleInteractiveSession.name
         ? String(consoleInteractiveSession.name)
         : "";
-      const placeholder = runningName
-        ? `${{runningName}} running - Ctrl+C to stop`
+      const promptLabel = runningName
+        ? `${{runningName.replace(/[^a-z0-9_-]+/gi, "").slice(0, 10) || "busy"}}>`
         : interactiveName
-          ? `${{interactiveName}} session - type commands, Ctrl+C to stop, /help for console`
-          : "Type \"live\" or \"help\"";
+          ? `${{interactiveName.replace(/[^a-z0-9_-]+/gi, "").slice(0, 10) || "session"}}>`
+          : ">";
+      const placeholder = runningName
+        ? `ctrl+c to stop ${{runningName}}`
+        : interactiveName
+          ? `enter ${{interactiveName}} command  /help for console`
+          : "enter command or type help";
+      if (prompt instanceof HTMLElement) {{
+        prompt.textContent = promptLabel;
+        prompt.classList.toggle("is-running", !!runningName);
+      }}
       if (input instanceof HTMLInputElement) {{
         input.placeholder = placeholder;
         input.classList.toggle("is-running", !!runningName || !!interactiveName);
@@ -13420,6 +13443,41 @@
       }} else {{
         const len = input.value.length;
         input.setSelectionRange(len, len);
+      }}
+    }}
+
+    function selectionIntersectsElement(selection, element) {{
+      if (!(element instanceof HTMLElement)) return false;
+      if (!selection || typeof selection.rangeCount !== "number" || selection.rangeCount < 1) {{
+        return false;
+      }}
+      try {{
+        const range = selection.getRangeAt(0);
+        const container = range.commonAncestorContainer;
+        if (container instanceof Node) {{
+          return element.contains(container);
+        }}
+      }} catch (_err) {{
+      }}
+      return false;
+    }}
+
+    async function copyConsoleSelectionToClipboard() {{
+      const pre = document.getElementById("live-console");
+      if (!(pre instanceof HTMLElement)) return false;
+      const selection = window.getSelection ? window.getSelection() : null;
+      if (!selectionIntersectsElement(selection, pre)) return false;
+      const text = String(selection ? selection.toString() : "").trim();
+      if (!text) return false;
+      try {{
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {{
+          return false;
+        }}
+        await navigator.clipboard.writeText(text);
+        selection.removeAllRanges();
+        return true;
+      }} catch (_err) {{
+        return false;
       }}
     }}
 
@@ -14245,6 +14303,19 @@
           if (autoBox instanceof HTMLInputElement && autoBox.checked !== consoleAutoscroll) {{
             autoBox.checked = consoleAutoscroll;
           }}
+        }});
+        pre.addEventListener("mouseup", () => {{
+          void copyConsoleSelectionToClipboard();
+        }});
+      }}
+      const terminalScreen = document.getElementById("console-terminal-screen");
+      if (terminalScreen instanceof HTMLElement && terminalScreen.dataset.bound !== "1") {{
+        terminalScreen.dataset.bound = "1";
+        terminalScreen.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (target instanceof HTMLElement && target.closest("#live-console")) return;
+          if (target instanceof HTMLInputElement || target instanceof HTMLButtonElement) return;
+          focusConsoleCommandInput(false);
         }});
       }}
       applyConsoleFontSizePreference();
