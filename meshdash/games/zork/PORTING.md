@@ -38,6 +38,8 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - `score` and `quit` now report live progress from seen room bonuses plus treasure recovery/security, so the port has a reusable progress layer instead of just hard-ending sessions.
 - The engine now has a reusable room-entry hazard path for special rooms, so the bat room can fling you into the mines, the gas room can punish open flames, and late-game room-specific handlers have a cleaner place to live.
 - The beach and guano cave now have shovel-driven digging behavior, the treasure room can now spring the thief hideout encounter, and the sword now warns about nearby villains with the classic blue-glow behavior.
+- The thief can now stalk treasure carriers through the deeper dungeon, steal carried/loose treasure on room entry, and flee with it instead of remaining a treasure-room-only mannequin.
+- Boarding the inflated boat while carrying the broken sharp stick now punctures it into the damaged boat, and the damaged boat can be repaired back into the inflatable boat with putty.
 - The volcano balloon cluster is now playable: the basket/receptacle/wire/hooks are live, burnable fuel in the receptacle inflates the balloon, wire-to-hook tie/untie works on the ledges, and board/launch/land/disembark balloon travel plus rim/bad-landing failures are wired into the live game.
 
 ## What Is Still Missing
@@ -47,7 +49,7 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - Balloon travel is now playable, but it is still simplified compared with the upstream clock-driven automatic ascent/descent logic and broader volcano timing details.
 - The safe path is now playable, but its fuse timing is intentionally simplified compared with full upstream timing.
 - Glacier, mirror, thief, machine, safe, and other later puzzle clusters still need fuller canonical behavior.
-- The thief is now present as a live treasure-room encounter, but the wider roaming robber logic and full stealing/fleeing behavior are still simplified.
+- The thief now roams and steals in a deterministic simplified way, but he is still not the full upstream robber demon with canonical randomness, hiding rules, or complete combat behavior.
 
 ## Regenerating Derived Data
 

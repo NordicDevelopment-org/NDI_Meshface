@@ -90,6 +90,9 @@ GAME_VERB_HEADS = {
     "read",
     "put",
     "insert",
+    "plug",
+    "repair",
+    "patch",
     "throw",
     "rub",
     "melt",
@@ -227,6 +230,59 @@ BULK_SCOPE_ALL_WORDS = frozenset({"all", "everything"})
 BULK_SCOPE_TREASURE_WORDS = frozenset({"treasure", "treasures", "valuable", "valuables"})
 BAT_DROP_ROOMS = ("MINE1", "MINE2", "MINE3", "MINE4", "MINE5", "MINE6", "MINE7", "TLADD", "BLADD")
 WEAPON_CODES = frozenset({"SWORD", "KNIFE", "RKNIF", "AXE", "STILL"})
+
+THIEF_FORBIDDEN_ROOMS = frozenset(
+    {
+        "ATTIC",
+        "BEACH",
+        "CLEAR",
+        "DAM",
+        "DOCK",
+        "EHOUS",
+        "FALLS",
+        "FANTE",
+        "FORE1",
+        "FORE2",
+        "FORE3",
+        "FORE4",
+        "FORE5",
+        "KITCH",
+        "LEDG2",
+        "LEDG3",
+        "LEDG4",
+        "LLD1",
+        "LLD2",
+        "LOBBY",
+        "LROOM",
+        "MAINT",
+        "NHOUS",
+        "POG",
+        "RAINB",
+        "RCAVE",
+        "RESEN",
+        "RESES",
+        "RIVR1",
+        "RIVR2",
+        "RIVR3",
+        "RIVR4",
+        "RIVR5",
+        "SHOUS",
+        "STREA",
+        "STUDI",
+        "TEMP1",
+        "TEMP2",
+        "TOMB",
+        "VAIR1",
+        "VAIR2",
+        "VAIR3",
+        "VAIR4",
+        "VLBOT",
+        "WCLF1",
+        "WCLF2",
+        "WHOUS",
+    }
+)
+THIEF_HOME_ROOM = "TREAS"
 
 BALLOON_LAUNCH_MAP = {
     "VLBOT": "VAIR1",
@@ -710,6 +766,217 @@ class ZorkGame:
         counters["bat_drop_index"] = index + 1
         return BAT_DROP_ROOMS[index % len(BAT_DROP_ROOMS)]
 
+    def _room_neighbors(
+        self,
+        session: dict[str, object],
+        room_id: str,
+        *,
+        forbidden_rooms: frozenset[str] | set[str] | None = None,
+    ) -> list[str]:
+        room_key = str(room_id or START_ROOM).strip().upper() or START_ROOM
+        room = ROOMS.get(room_key)
+        if room is None:
+            return []
+        blocked = {str(value).strip().upper() for value in (forbidden_rooms or set()) if str(value).strip()}
+        neighbors: list[str] = []
+        for exit_row in room.exits:
+            kind = str(exit_row.get("kind") or "")
+            if kind == "room":
+                target = str(exit_row.get("target") or "").strip().upper()
+            elif kind == "cexit" and self._condition_passes(session, str(exit_row.get("condition") or ""), exit_row):
+                target = str(exit_row.get("target") or "").strip().upper()
+            else:
+                continue
+            if target not in ROOMS or target in blocked:
+                continue
+            neighbors.append(target)
+        return sorted(dict.fromkeys(neighbors))
+
+    def _shortest_room_path(
+        self,
+        session: dict[str, object],
+        start_room: str,
+        goal_room: str,
+        *,
+        forbidden_rooms: frozenset[str] | set[str] | None = None,
+    ) -> list[str]:
+        start_key = str(start_room or START_ROOM).strip().upper() or START_ROOM
+        goal_key = str(goal_room or START_ROOM).strip().upper() or START_ROOM
+        if start_key not in ROOMS or goal_key not in ROOMS:
+            return []
+        blocked = {str(value).strip().upper() for value in (forbidden_rooms or set()) if str(value).strip()}
+        if start_key in blocked or goal_key in blocked:
+            return []
+        if start_key == goal_key:
+            return [start_key]
+        queue: list[list[str]] = [[start_key]]
+        seen = {start_key}
+        while queue:
+            path = queue.pop(0)
+            tail = path[-1]
+            for neighbor in self._room_neighbors(session, tail, forbidden_rooms=blocked):
+                if neighbor in seen:
+                    continue
+                next_path = [*path, neighbor]
+                if neighbor == goal_key:
+                    return next_path
+                seen.add(neighbor)
+                queue.append(next_path)
+        return []
+
+    def _format_object_list(self, codes: Iterable[str]) -> str:
+        labels = [object_name(code) for code in codes if str(code or "").strip()]
+        if not labels:
+            return ""
+        if len(labels) == 1:
+            return labels[0]
+        if len(labels) == 2:
+            return f"{labels[0]} and {labels[1]}"
+        return f"{', '.join(labels[:-1])}, and {labels[-1]}"
+
+    def _visible_room_treasures(
+        self,
+        session: dict[str, object],
+        room_id: str,
+        inventory: Iterable[str],
+        flags: set[str],
+        object_locations: dict[str, str],
+    ) -> list[str]:
+        ghost = self._ephemeral_session(
+            session,
+            room_id=room_id,
+            inventory=inventory,
+            flags=flags,
+            object_locations=object_locations,
+        )
+        visible = self._visible_top_level_objects(ghost, room_id)
+        return [code for code in visible if code not in {"THIEF", "STILL"} and self._is_treasure(code)]
+
+    def _thief_flee_room(
+        self,
+        session: dict[str, object],
+        room_id: str,
+        flags: set[str],
+        object_locations: dict[str, str],
+    ) -> str:
+        room_key = str(room_id or START_ROOM).strip().upper() or START_ROOM
+        path_home = self._shortest_room_path(
+            session,
+            room_key,
+            THIEF_HOME_ROOM,
+            forbidden_rooms=THIEF_FORBIDDEN_ROOMS,
+        )
+        if len(path_home) > 1:
+            return path_home[1]
+        neighbors = self._room_neighbors(session, room_key, forbidden_rooms=THIEF_FORBIDDEN_ROOMS)
+        if not neighbors:
+            return room_key
+        longest = ""
+        longest_distance = -1
+        for candidate in neighbors:
+            path = self._shortest_room_path(
+                session,
+                candidate,
+                room_key,
+                forbidden_rooms=THIEF_FORBIDDEN_ROOMS,
+            )
+            distance = len(path)
+            if distance > longest_distance:
+                longest = candidate
+                longest_distance = distance
+        return longest or neighbors[0]
+
+    def _thief_entry_event(
+        self,
+        session: dict[str, object],
+        room_id: str,
+        inventory: list[str],
+        flags: set[str],
+        object_locations: dict[str, str],
+    ) -> tuple[str, list[str], set[str], dict[str, str]]:
+        room_key = str(room_id or START_ROOM).strip().upper() or START_ROOM
+        if "thief_defeated" in flags:
+            return "", inventory, flags, object_locations
+
+        thief_room = str(object_locations.get("THIEF") or "").strip().upper()
+        if thief_room not in ROOMS:
+            return "", inventory, flags, object_locations
+
+        moved_in = False
+        if room_key != THIEF_HOME_ROOM and room_key not in THIEF_FORBIDDEN_ROOMS and thief_room not in THIEF_FORBIDDEN_ROOMS:
+            carry_treasure = any(self._is_treasure(code) for code in inventory)
+            loose_treasure = self._visible_room_treasures(session, room_key, inventory, flags, object_locations)
+            if thief_room != room_key and (carry_treasure or loose_treasure):
+                path_to_player = self._shortest_room_path(
+                    session,
+                    thief_room,
+                    room_key,
+                    forbidden_rooms=THIEF_FORBIDDEN_ROOMS,
+                )
+                if len(path_to_player) > 1:
+                    thief_room = path_to_player[1]
+                    object_locations["THIEF"] = thief_room
+                    object_locations["STILL"] = "THIEF"
+                    moved_in = thief_room == room_key
+            elif thief_room != room_key:
+                counters = self._session_counters(session)
+                neighbors = self._room_neighbors(session, thief_room, forbidden_rooms=THIEF_FORBIDDEN_ROOMS)
+                if neighbors:
+                    patrol_index = int(counters.get("thief_patrol_index") or 0)
+                    thief_room = neighbors[patrol_index % len(neighbors)]
+                    counters["thief_patrol_index"] = patrol_index + 1
+                    object_locations["THIEF"] = thief_room
+                    object_locations["STILL"] = "THIEF"
+                    moved_in = thief_room == room_key
+
+        if str(object_locations.get("THIEF") or "").strip().upper() != room_key:
+            return "", inventory, flags, object_locations
+
+        carried_loot = [code for code in inventory if self._is_treasure(code)]
+        floor_loot = self._visible_room_treasures(session, room_key, inventory, flags, object_locations)
+        if carried_loot or floor_loot:
+            inventory = [code for code in inventory if code not in set(carried_loot)]
+            for code in carried_loot:
+                object_locations[code] = "THIEF"
+            for code in floor_loot:
+                object_locations[code] = "THIEF"
+            object_locations["STILL"] = "THIEF"
+            flee_room = self._thief_flee_room(session, room_key, flags, object_locations)
+            if flee_room in ROOMS and flee_room != room_key:
+                object_locations["THIEF"] = flee_room
+            carried_text = self._format_object_list(carried_loot)
+            floor_text = self._format_object_list(floor_loot)
+            if carried_text and floor_text:
+                return (
+                    f"The thief slips out of the shadows, relieves you of {carried_text}, scoops up {floor_text}, and vanishes into the side passages.",
+                    inventory,
+                    flags,
+                    object_locations,
+                )
+            if carried_text:
+                return (
+                    f"The thief slips out of the shadows, relieves you of {carried_text}, and vanishes into the side passages.",
+                    inventory,
+                    flags,
+                    object_locations,
+                )
+            return (
+                f"The thief scoops up {floor_text} and vanishes into the side passages.",
+                inventory,
+                flags,
+                object_locations,
+            )
+
+        if moved_in:
+            return (
+                "A suspicious-looking thief slips into the room and watches you warily.",
+                inventory,
+                flags,
+                object_locations,
+            )
+
+        return "", inventory, flags, object_locations
+
     def _apply_treasure_room_entry(
         self,
         session: dict[str, object],
@@ -763,6 +1030,16 @@ class ZorkGame:
             treas_reply, flags, object_locations = self._apply_treasure_room_entry(session, room_key, flags, object_locations)
             if treas_reply:
                 prefix_parts.append(treas_reply)
+
+        thief_reply, inventory, flags, object_locations = self._thief_entry_event(
+            session,
+            room_key,
+            inventory,
+            flags,
+            object_locations,
+        )
+        if thief_reply:
+            prefix_parts.append(thief_reply)
 
         if room_key == "RIVR4" and "BUOY" in set(inventory) and "buoy_feel_noticed" not in flags:
             flags.add("buoy_feel_noticed")
@@ -2930,6 +3207,43 @@ class ZorkGame:
             object_locations,
         )
 
+    def _repair_or_plug_response(
+        self,
+        session: dict[str, object],
+        code: str,
+        tool_code: str | None,
+    ) -> tuple[str, list[str], set[str], dict[str, str]]:
+        code_key = str(code or "").strip().upper()
+        tool_key = str(tool_code or "").strip().upper()
+        inventory = self._session_inventory(session)
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+
+        if code_key == "RBOAT":
+            return ("The boat is already inflated and in one piece.", inventory, flags, object_locations)
+        if code_key == "IBOAT":
+            return ("The boat isn't damaged.", inventory, flags, object_locations)
+        if code_key != "DBOAT":
+            return (f"You can't repair the {object_name(code_key)} that way.", inventory, flags, object_locations)
+        if "DBOAT" not in inventory and object_locations.get("DBOAT") != room_id:
+            return ("The damaged boat is not here.", inventory, flags, object_locations)
+        if tool_key and tool_key != "PUTTY":
+            return (f"The {object_name(tool_key)} will not make the boat airtight.", inventory, flags, object_locations)
+        if tool_key != "PUTTY":
+            return ("You'll need something like putty to repair the hole.", inventory, flags, object_locations)
+        if "PUTTY" not in set(inventory):
+            return ("You need some putty for that.", inventory, flags, object_locations)
+        if "DBOAT" in inventory:
+            inventory = [value for value in inventory if value != "DBOAT"]
+            inventory.append("IBOAT")
+            object_locations["DBOAT"] = "GONE"
+            object_locations["IBOAT"] = "INVENTORY"
+            return ("Well done. The boat is repaired.", inventory, flags, object_locations)
+        object_locations["DBOAT"] = "GONE"
+        object_locations["IBOAT"] = room_id
+        return ("Well done. The boat is repaired.", inventory, flags, object_locations)
+
     def _board_or_disembark_response(
         self,
         session: dict[str, object],
@@ -2964,6 +3278,11 @@ class ZorkGame:
                 object_locations["RBOAT"] = room_id
             if object_locations.get("RBOAT") != room_id:
                 return ("You don't see any inflated boat here.", inventory, flags, object_locations)
+            if "STICK" in inventory:
+                object_locations["RBOAT"] = "GONE"
+                object_locations["DBOAT"] = room_id
+                flags.discard("aboard_boat")
+                return ("There is a hissing sound and the boat deflates.", inventory, flags, object_locations)
             flags.discard("aboard_balloon")
             flags.add("aboard_boat")
             return ("You are now in the magic boat.", inventory, flags, object_locations)
@@ -3104,6 +3423,9 @@ class ZorkGame:
             "disembark",
             "put",
             "insert",
+            "plug",
+            "repair",
+            "patch",
             "throw",
             "rub",
             "melt",
@@ -3128,7 +3450,7 @@ class ZorkGame:
                 handled=True,
                 reply_text=(
                     "zork: look, x/read, n/s/e/w/u/d, take/drop, put/insert, throw/rub, open/close, move, push/press, turn, "
-                    "light/burn/extinguish, dig, wave stick, tie/untie rope or balloon wire, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
+                    "light/burn/extinguish, dig, wave stick, tie/untie rope or balloon wire, plug/repair broken boat, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
                     "magic words, score, attack, quit."
                 ),
                 command_name=self.SPEC.name,
@@ -3210,6 +3532,24 @@ class ZorkGame:
             reply = self._read_object(session, target) if target else (f"You don't see any {raw_target} here." if raw_target else "Read what?")
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+
+        if head_raw in {"plug", "repair", "patch"}:
+            direct_text = raw_target
+            tool_text = ""
+            if " with " in f" {raw_target} ":
+                before, after = raw_target.split(" with ", 1)
+                direct_text = before.strip()
+                tool_text = after.strip()
+            target_text = direct_text or "boat"
+            target = self._resolve_object(session, target_text, head_raw)
+            tool = self._resolve_object(session, tool_text, head_raw) if tool_text else ("PUTTY" if "PUTTY" in inventory else None)
+            if not target:
+                self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+                reply = f"You don't see any {target_text} here." if raw_target else ("Repair what?" if head_raw == "repair" else "Plug what?")
+                return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            reply, inventory, flags, object_locations = self._repair_or_plug_response(session, target, tool)
+            self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
 
         if head_raw in {"put", "insert"}:
             direct_text = raw_target
