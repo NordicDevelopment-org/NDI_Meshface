@@ -76,6 +76,28 @@ def test_render_html_includes_public_zork_handoff_toggle():
     assert 'id="bots-game-public-start-enabled"' in html
 
 
+def test_render_html_includes_channel_control_center_structure():
+    html = render_html(
+        refresh_ms=3000,
+        packet_limit=250,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=5000,
+        history_retention_days=7,
+        node_history_hours=72,
+        node_history_max_points=1440,
+        revision_label="Rev: v0.1.0 (abc123)",
+        revision_title="v0.1.0 / abc123",
+    )
+    assert 'id="channels-fetch-settings-btn"' in html
+    assert 'id="channels-apply-status"' in html
+    assert 'id="settings-channels-table"' in html
+    assert 'id="channels-overview"' in html
+    assert "Observed" in html
+    assert "Channel Activity" in html
+    assert "Advanced" in html
+
+
 def test_render_html_includes_network_view_structure_tokens():
     html = render_html(
         refresh_ms=3000,

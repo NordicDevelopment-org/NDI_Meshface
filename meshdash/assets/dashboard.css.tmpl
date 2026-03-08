@@ -3546,21 +3546,51 @@
       min-height: 0;
       overflow: hidden;
     }}
-    .channels-panels {{
+    .channels-dashboard-grid {{
       display: grid;
-      grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.9fr);
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
       gap: 10px;
       flex: 1 1 auto;
       min-height: 0;
       align-items: stretch;
     }}
-    .channels-panel {{
+    .channels-dashboard-panel {{
       display: flex;
       flex-direction: column;
       min-height: 0;
-      gap: 6px;
+      gap: 10px;
     }}
-    .channels-panel h3 {{
+    .channels-dashboard-panel.settings-panel {{
+      background: #f7fcf8;
+      border: 1px solid #d7e5d2;
+      border-radius: 14px;
+      padding: 12px;
+    }}
+    .channels-dashboard-panel-summary {{
+      grid-column: 1;
+      grid-row: 1;
+      gap: 8px;
+    }}
+    .channels-dashboard-panel-activity {{
+      grid-row: 2;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      row-gap: 8px;
+      align-items: stretch;
+      min-height: 0;
+    }}
+    .channels-dashboard-panel-activity.settings-panel {{
+      background: #fcfffc;
+    }}
+    .channels-section-head {{
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }}
+    .channels-section-head h3 {{
       margin: 0;
       font-size: 11px;
       font-weight: 700;
@@ -3568,10 +3598,124 @@
       text-transform: uppercase;
       opacity: 0.82;
     }}
-    .channels-panel .scroll {{
+    .channels-section-actions {{
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }}
+    .channels-summary-actions {{
+      align-items: center;
+      justify-content: flex-end;
+    }}
+    .channels-summary-toggle {{
+      margin: 0;
+      white-space: nowrap;
+    }}
+    .channels-panel-copy {{
+      color: #466656;
+      font-size: 12px;
+      line-height: 1.45;
+      margin-top: 3px;
+    }}
+    .channels-current-note {{
+      margin: 0;
+    }}
+    .channels-local-fields {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       flex: 1 1 auto;
       min-height: 0;
+    }}
+    .channels-local-table-row {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .channels-local-table-wrap {{
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+    }}
+    .channels-status-row {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-height: 22px;
+    }}
+    .channels-status {{
+      flex: 1 1 auto;
+      min-width: 0;
+    }}
+    .channels-activity-table-wrap {{
+      flex: 1 1 auto;
+      align-self: stretch;
+      min-height: 0;
       max-height: none;
+      --channels-fill-row-height: 46px;
+      --channels-fill-row-odd: #f8fbf8;
+      --channels-fill-row-even: #eef5ef;
+      --channels-fill-row-border: #e1ece0;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          var(--channels-fill-row-odd) 0,
+          var(--channels-fill-row-odd) calc(var(--channels-fill-row-height) - 1px),
+          var(--channels-fill-row-border) calc(var(--channels-fill-row-height) - 1px),
+          var(--channels-fill-row-border) var(--channels-fill-row-height),
+          var(--channels-fill-row-even) var(--channels-fill-row-height),
+          var(--channels-fill-row-even) calc((var(--channels-fill-row-height) * 2) - 1px),
+          var(--channels-fill-row-border) calc((var(--channels-fill-row-height) * 2) - 1px),
+          var(--channels-fill-row-border) calc(var(--channels-fill-row-height) * 2)
+        );
+    }}
+    .settings-channels-filler-row td {{
+      color: transparent;
+      user-select: none;
+      height: 46px;
+      padding-top: 0;
+      padding-bottom: 0;
+      line-height: 0;
+    }}
+    .channels-activity-summary {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }}
+    .channels-summary-footer {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }}
+    .channels-settings-compact {{
+      gap: 8px;
+    }}
+    .channels-settings-compact .settings-row {{
+      margin-bottom: 0;
+    }}
+    .channels-settings-compact .settings-field {{
+      min-width: 0;
+    }}
+    .channels-dashboard-panel-summary .channels-panel-copy {{
+      margin-top: 0;
+    }}
+    .channels-dashboard-panel-summary .overview-grid {{
+      gap: 8px;
+    }}
+    .channels-dashboard-panel-summary .overview-item {{
+      min-height: 0;
+    }}
+    .channels-view #settings-channels-table {{
+      min-width: 1320px;
+    }}
+    .channels-action-placeholder {{
+      color: #597767;
+      font-size: 11px;
+      white-space: nowrap;
     }}
     .channels-local-cell {{
       display: flex;
@@ -4018,6 +4162,27 @@
       grid-column: 1 / span 3;
       grid-row: 1;
       display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+    }}
+    .layout.view-channels .channels-view .body {{
+      flex: 1 1 auto;
+      height: 100%;
+      min-height: 0;
+    }}
+    .layout.view-channels .channels-dashboard-grid {{
+      flex: 1 1 auto;
+      height: 100%;
+      min-height: 0;
+    }}
+    .layout.view-channels .channels-dashboard-panel-activity {{
+      height: 100%;
+      min-height: 0;
+    }}
+    .layout.view-channels .channels-activity-table-wrap {{
+      flex: 1 1 auto;
+      height: 100%;
       min-height: 0;
     }}
     .layout.view-channels .chat,
@@ -6186,6 +6351,11 @@
     }}
     .chat-mesh-channel-wrap {{
       width: 100%;
+      border: 0;
+      background: transparent;
+      border-radius: 0;
+      padding: 0;
+      gap: 0;
     }}
     .chat-mesh-channel-wrap .mesh-channel-pill-strip {{
       width: 100%;
@@ -6484,6 +6654,11 @@
     }}
     .scroll {{
       max-height: 300px;
+      overflow: auto;
+    }}
+    .channels-activity-table-wrap.scroll {{
+      max-height: none;
+      height: 100%;
       overflow: auto;
     }}
     .chat-log-scroll.scroll {{
@@ -6874,6 +7049,25 @@
       background: #1a2a21;
       border-color: #31473b;
       color: #dbece3;
+    }}
+    [data-theme="dark"] .channels-dashboard-panel.settings-panel {{
+      background: #1a2a21;
+      border-color: #31473b;
+      color: #dbece3;
+    }}
+    [data-theme="dark"] .channels-dashboard-panel-activity.settings-panel {{
+      background: #18261f;
+    }}
+    [data-theme="dark"] .channels-activity-table-wrap {{
+      --channels-fill-row-odd: #16212b;
+      --channels-fill-row-even: #1a2631;
+      --channels-fill-row-border: #31473b;
+    }}
+    [data-theme="dark"] .channels-panel-copy {{
+      color: #98b7a7;
+    }}
+    [data-theme="dark"] .channels-action-placeholder {{
+      color: #8ea99b;
     }}
 
     [data-theme="dark"] .settings-channels-simple-actions {{
@@ -9314,9 +9508,6 @@
       }}
       .bots-grid {{
         grid-template-columns: minmax(0, 1fr);
-      }}
-      .channels-panels {{
-        grid-template-columns: 1fr;
       }}
       .encription-panels {{
         grid-template-columns: 1fr;

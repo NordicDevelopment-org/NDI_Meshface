@@ -302,6 +302,12 @@ Bots panel notes:
 
 Meshtastic uses the word “channel” in *multiple* ways (frequency slot vs message channel index). This dashboard exposes both.
 
+- The `Channels` view focuses on local channel slots and observed channel activity.
+- `Ch 0` can be the active primary even when its channel name is blank.
+- Leaving `PSK` blank in the editor keeps the current key.
+- `MQTT Up` / `MQTT Down` are bridge toggles, not LoRa TX/RX controls.
+- Message channels are encryption groups. They are not RF frequency slots.
+- Local slots should stay consecutive (`0..N`). Add the next free slot; disable from the end.
 - See: `docs/CHANNELS.md`
 
 ## Troubleshooting

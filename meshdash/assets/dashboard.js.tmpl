@@ -4235,6 +4235,7 @@
         syncMapSize();
         requestSettingsFixedMapResize();
         requestTopbarLayoutMetricsSync();
+        scheduleChannelsTableFillRows();
       }}, 120);
     }});
 
@@ -8185,13 +8186,10 @@
     }}
 
     function setChannelsExperimentalEnabled(enabled, persist = true) {{
-      channelsExperimentalEnabled = !!enabled;
+      channelsExperimentalEnabled = false;
       if (persist) {{
         try {{
-          window.localStorage.setItem(
-            channelsExperimentalStorageKey,
-            channelsExperimentalEnabled ? "1" : "0"
-          );
+          window.localStorage.removeItem(channelsExperimentalStorageKey);
         }} catch (_err) {{}}
       }}
     }}
@@ -8205,11 +8203,10 @@
     }}
 
     function loadChannelsExperimentalPreference() {{
-      let stored = false;
       try {{
-        stored = parseBoolToken(window.localStorage.getItem(channelsExperimentalStorageKey), false);
+        window.localStorage.removeItem(channelsExperimentalStorageKey);
       }} catch (_err) {{}}
-      channelsExperimentalEnabled = !!stored;
+      channelsExperimentalEnabled = false;
     }}
 
 
@@ -15250,12 +15247,25 @@
     function markSettingsDirty(message = "Unsaved settings changes") {{
       settingsDirty = true;
       settingsDirtyAt = Date.now();
-      setText("settings-apply-status", message);
+      setSettingsStatusText(message);
     }}
 
     function clearSettingsDirty() {{
       settingsDirty = false;
       settingsDirtyAt = 0;
+    }}
+
+    function setSettingsStatusText(message) {{
+      setText("settings-apply-status", message);
+    }}
+
+    function setChannelsStatusText(message) {{
+      setText("channels-apply-status", message);
+    }}
+
+    function setSettingsAndChannelsStatusText(message) {{
+      setSettingsStatusText(message);
+      setChannelsStatusText(message);
     }}
 
     function readSelectValue(id) {{
@@ -15308,6 +15318,7 @@
         "settings-reset-dashboard-db",
         "settings-regenerate-node-id",
         "settings-export-channel-url",
+        "channels-fetch-settings-btn",
         "settings-channels-import-url-join-btn",
         "settings-channels-import-url-add-btn",
         "settings-channels-create-private-btn",
@@ -15356,7 +15367,7 @@
       }}
     }}
 
-    function renderChannelsTable(localState) {{
+    function renderChannelsTable(localState, observedByIndex = null, nowUnix = Math.floor(Date.now() / 1000)) {{
       const tbody = document.getElementById("settings-channels-tbody");
       if (!(tbody instanceof HTMLElement)) return;
 
@@ -15370,13 +15381,14 @@
         return Number.isInteger(num) && num === 0;
       }};
 
+      const observed = observedByIndex instanceof Map ? observedByIndex : new Map();
       const channels = localState && Array.isArray(localState.channels) ? localState.channels : null;
       tbody.innerHTML = "";
 
-      if (!channels || !channels.length) {{
+      if ((!channels || !channels.length) && !observed.size) {{
         const tr = document.createElement("tr");
         const td = document.createElement("td");
-        td.colSpan = 7;
+        td.colSpan = 14;
         td.className = "settings-channels-empty";
         td.textContent = "No channel data. Click “Fetch settings” to load channels from the radio.";
         tr.appendChild(td);
@@ -15384,17 +15396,64 @@
         return;
       }}
 
-      const sorted = [...channels].sort((a, b) => {{
+      const sorted = channels ? [...channels].sort((a, b) => {{
         const ai = Number(a && a.index != null ? a.index : 0);
         const bi = Number(b && b.index != null ? b.index : 0);
         return ai - bi;
+      }}) : [];
+
+      const localByIndex = new Map();
+      for (const ch of sorted) {{
+        const idx = Number(ch && ch.index != null ? ch.index : NaN);
+        if (!Number.isInteger(idx) || idx < 0 || localByIndex.has(idx)) continue;
+        localByIndex.set(idx, ch);
+      }}
+
+      const normalizedLocalOptions = collectMeshChannelOptionsFromLocalState(localState, {{
+        includeFallback: true,
+        fallbackCount: 8,
       }});
+      for (const opt of normalizedLocalOptions) {{
+        const idx = Number(opt && opt.index);
+        if (!Number.isInteger(idx) || idx < 0) continue;
+        const fallbackRole = opt && typeof opt.role === "string" && opt.role
+          ? opt.role
+          : (idx === 0 ? "PRIMARY" : "DISABLED");
+        const fallbackSettings = {{
+          name: opt && typeof opt.name === "string" ? opt.name : "",
+        }};
+        if (opt && opt.hasPsk) {{
+          fallbackSettings.psk = "<redacted>";
+        }}
+        if (!localByIndex.has(idx)) {{
+          localByIndex.set(idx, {{
+            index: idx,
+            role: fallbackRole,
+            settings: fallbackSettings,
+          }});
+          continue;
+        }}
+        const existing = localByIndex.get(idx);
+        if (!(existing && typeof existing === "object")) continue;
+        if (!existing.role && fallbackRole) {{
+          existing.role = fallbackRole;
+        }}
+        const existingSettings = (existing.settings && typeof existing.settings === "object")
+          ? existing.settings
+          : (existing.settings = {{}});
+        if (!existingSettings.name && fallbackSettings.name) {{
+          existingSettings.name = fallbackSettings.name;
+        }}
+        if (!existingSettings.psk && fallbackSettings.psk) {{
+          existingSettings.psk = fallbackSettings.psk;
+        }}
+      }}
 
       // Reflect common Meshtastic expectations:
       // - channels are consecutive 0..N
       // - disable happens from the end (highest active index)
       let lastActiveIndex = 0;
-      for (const ch of sorted) {{
+      for (const ch of localByIndex.values()) {{
         const idx = Number(ch && ch.index != null ? ch.index : 0);
         const role = ch && ch.role != null ? ch.role : "";
         if (!channelRoleIsDisabled(role) && Number.isFinite(idx) && idx > lastActiveIndex) {{
@@ -15403,11 +15462,46 @@
       }}
       const nextAvailableIndex = lastActiveIndex + 1;
 
-      for (const ch of sorted) {{
-        const idx = Number(ch && ch.index != null ? ch.index : 0);
+      if (localByIndex.size > 0 && !localByIndex.has(nextAvailableIndex)) {{
+        localByIndex.set(nextAvailableIndex, {{
+          index: nextAvailableIndex,
+          role: "DISABLED",
+          settings: {{}},
+        }});
+      }}
+
+      const unionIndexes = Array.from(new Set([
+        ...localByIndex.keys(),
+        ...observed.keys(),
+      ]))
+        .filter((idx) => Number.isInteger(Number(idx)) && Number(idx) >= 0)
+        .sort((a, b) => Number(a) - Number(b));
+
+      for (const rawIndex of unionIndexes) {{
+        const idx = Number(rawIndex);
+        const ch = localByIndex.get(idx) || null;
+        const bucket = observed.get(idx) || null;
+        const hasLocalConfig = !!ch;
         const role = String(ch && ch.role != null ? ch.role : "");
-        const isDisabledRole = channelRoleIsDisabled(role);
+        const isDisabledRole = hasLocalConfig && channelRoleIsDisabled(role);
         const settings = ch && typeof ch.settings === "object" && ch.settings ? ch.settings : {{}};
+        const evidenceKind = isDisabledRole
+          ? "disabled"
+          : (hasLocalConfig && bucket)
+            ? "observed-local"
+            : hasLocalConfig
+              ? "local-only"
+              : "observed-only";
+        const evidence = channelEvidenceMeta(evidenceKind);
+        const latestLabel = bucket && bucket.lastSeenUnix > 0
+          ? formatLocalChatTime(bucket.lastSeenUnix, bucket.lastSeenText || "n/a", nowUnix)
+          : "n/a";
+        const latestTitle = bucket && bucket.lastSeenUnix > 0
+          ? [
+              bucket.lastSeenText ? `Raw: ${{bucket.lastSeenText}}` : "",
+              new Date(bucket.lastSeenUnix * 1000).toLocaleString(),
+            ].filter((part) => !!part).join(" | ")
+          : "No recent packet timestamps";
 
         const nameValue = String(settings.name || "");
         const uplinkEnabled = !!settings.uplink_enabled;
@@ -15431,7 +15525,7 @@
         tr.appendChild(tdIndex);
 
         const tdRole = document.createElement("td");
-        tdRole.textContent = role || "";
+        tdRole.textContent = hasLocalConfig ? (role || "") : "Observed";
         tr.appendChild(tdRole);
 
         const tdName = document.createElement("td");
@@ -15439,7 +15533,12 @@
         nameInput.type = "text";
         nameInput.className = "settings-input";
         nameInput.value = nameValue;
-        nameInput.placeholder = isDisabledRole ? "New channel name" : "";
+        nameInput.placeholder = !hasLocalConfig
+          ? "Observed only"
+          : isDisabledRole
+            ? "New channel name"
+            : "";
+        nameInput.disabled = !hasLocalConfig;
         nameInput.dataset.field = "name";
         tdName.appendChild(nameInput);
         tr.appendChild(tdName);
@@ -15449,6 +15548,7 @@
         const uplink = document.createElement("input");
         uplink.type = "checkbox";
         uplink.checked = uplinkEnabled;
+        uplink.disabled = !hasLocalConfig;
         uplink.dataset.field = "uplink_enabled";
         uplink.title = "MQTT uplink (internet bridge). Not LoRa TX/RX.";
         tdUplink.appendChild(uplink);
@@ -15459,6 +15559,7 @@
         const downlink = document.createElement("input");
         downlink.type = "checkbox";
         downlink.checked = downlinkEnabled;
+        downlink.disabled = !hasLocalConfig;
         downlink.dataset.field = "downlink_enabled";
         downlink.title = "MQTT downlink (internet bridge). Not LoRa TX/RX.";
         tdDownlink.appendChild(downlink);
@@ -15469,7 +15570,12 @@
         psk.type = "text";
         psk.className = "settings-input";
         psk.value = "";
-        const pskHint = (settings.psk && String(settings.psk) === "<redacted>") ? "<redacted>" : "leave blank to keep";
+        psk.disabled = !hasLocalConfig;
+        const pskHint = !hasLocalConfig
+          ? "n/a"
+          : (settings.psk && String(settings.psk) === "<redacted>")
+            ? "<redacted>"
+            : "leave blank to keep";
         psk.placeholder = pskHint;
         psk.dataset.field = "psk";
         tdPsk.appendChild(psk);
@@ -15479,46 +15585,137 @@
         const actions = document.createElement("div");
         actions.className = "settings-channels-actions";
 
-        const saveBtn = document.createElement("button");
-        saveBtn.type = "button";
-        saveBtn.className = "btn btn-secondary";
-        saveBtn.dataset.channelAction = "save";
-        saveBtn.dataset.channelIndex = String(idx);
-        saveBtn.textContent = isDisabledRole ? "Add" : "Save";
-        if (isDisabledRole && idx !== nextAvailableIndex) {{
-          saveBtn.disabled = true;
-          saveBtn.title = `Add channels in order. Next available slot is ${{nextAvailableIndex}}.`;
-        }}
-        actions.appendChild(saveBtn);
-
-        if (idx > 0 && !isDisabledRole) {{
-          const disableBtn = document.createElement("button");
-          disableBtn.type = "button";
-          disableBtn.className = "btn btn-danger";
-          disableBtn.dataset.channelAction = "disable";
-          disableBtn.dataset.channelIndex = String(idx);
-          disableBtn.textContent = "Disable";
-          if (idx !== lastActiveIndex) {{
-            disableBtn.disabled = true;
-            disableBtn.title = `Disable channels from the end. Last active slot is ${{lastActiveIndex}}.`;
-          }} else {{
-            disableBtn.title = `Disable channel ${{idx}}.`;
+        if (hasLocalConfig) {{
+          const saveBtn = document.createElement("button");
+          saveBtn.type = "button";
+          saveBtn.className = "btn btn-secondary";
+          saveBtn.dataset.channelAction = "save";
+          saveBtn.dataset.channelIndex = String(idx);
+          saveBtn.textContent = isDisabledRole ? "Add" : "Save";
+          if (isDisabledRole && idx !== nextAvailableIndex) {{
+            saveBtn.disabled = true;
+            saveBtn.title = `Add channels in order. Next available slot is ${{nextAvailableIndex}}.`;
           }}
-          actions.appendChild(disableBtn);
+          actions.appendChild(saveBtn);
+
+          if (idx > 0 && !isDisabledRole) {{
+            const disableBtn = document.createElement("button");
+            disableBtn.type = "button";
+            disableBtn.className = "btn btn-danger";
+            disableBtn.dataset.channelAction = "disable";
+            disableBtn.dataset.channelIndex = String(idx);
+            disableBtn.textContent = "Disable";
+            if (idx !== lastActiveIndex) {{
+              disableBtn.disabled = true;
+              disableBtn.title = `Disable channels from the end. Last active slot is ${{lastActiveIndex}}.`;
+            }} else {{
+              disableBtn.title = `Disable channel ${{idx}}.`;
+            }}
+            actions.appendChild(disableBtn);
+          }}
+        }} else {{
+          const placeholder = document.createElement("span");
+          placeholder.className = "channels-action-placeholder";
+          placeholder.textContent = "Observed only";
+          actions.appendChild(placeholder);
         }}
 
         tdActions.appendChild(actions);
         tr.appendChild(tdActions);
 
+        const tdEvidence = document.createElement("td");
+        const evidencePill = document.createElement("span");
+        evidencePill.className = `channels-evidence-pill ${{evidence.className}}`.trim();
+        evidencePill.textContent = evidence.label;
+        evidencePill.title = evidence.title;
+        tdEvidence.appendChild(evidencePill);
+        tr.appendChild(tdEvidence);
+
+        const tdPackets = document.createElement("td");
+        tdPackets.textContent = String(bucket ? bucket.packetCount : 0);
+        tr.appendChild(tdPackets);
+
+        const tdEveryone = document.createElement("td");
+        tdEveryone.textContent = String(bucket ? bucket.everyoneCount : 0);
+        tr.appendChild(tdEveryone);
+
+        const tdDirect = document.createElement("td");
+        tdDirect.textContent = String(bucket ? bucket.directCount : 0);
+        tr.appendChild(tdDirect);
+
+        const tdNodes = document.createElement("td");
+        tdNodes.textContent = String(bucket ? bucket.nodeIds.size : 0);
+        tr.appendChild(tdNodes);
+
+        const tdPorts = document.createElement("td");
+        tdPorts.textContent = bucket ? formatChannelTopPorts(bucket.portCounts, 3) : "n/a";
+        tdPorts.title = bucket ? formatChannelTopPorts(bucket.portCounts, 5) : "No recent packet evidence";
+        tr.appendChild(tdPorts);
+
+        const tdLatest = document.createElement("td");
+        tdLatest.textContent = latestLabel;
+        tdLatest.title = latestTitle;
+        tr.appendChild(tdLatest);
+
         tbody.appendChild(tr);
       }}
+
+      scheduleChannelsTableFillRows();
+    }}
+
+    let channelsTableFillRaf = 0;
+
+    function syncChannelsTableFillRows() {{
+      const tbody = document.getElementById("settings-channels-tbody");
+      const table = document.getElementById("settings-channels-table");
+      if (!(tbody instanceof HTMLElement) || !(table instanceof HTMLTableElement)) return;
+      const wrapper = table.closest(".channels-activity-table-wrap");
+      if (!(wrapper instanceof HTMLElement)) return;
+
+      Array.from(tbody.querySelectorAll("tr.settings-channels-filler-row")).forEach((row) => row.remove());
+
+      const realRows = Array.from(tbody.querySelectorAll("tr")).filter((row) => !row.classList.contains("settings-channels-filler-row"));
+      if (!realRows.length) return;
+      if (realRows.length === 1 && realRows[0].querySelector(".settings-channels-empty")) return;
+
+      const sampleRow = realRows.find((row) => row instanceof HTMLElement && row.offsetHeight > 0);
+      const rowHeight = sampleRow instanceof HTMLElement
+        ? Math.max(32, Math.round(sampleRow.getBoundingClientRect().height))
+        : 46;
+      const columnCount = Math.max(1, table.tHead && table.tHead.rows[0] ? table.tHead.rows[0].cells.length : 14);
+      const wrapperHeight = Math.max(0, Math.floor(wrapper.clientHeight));
+      const tableHeight = Math.max(0, Math.ceil(table.getBoundingClientRect().height));
+      const missingPx = Math.max(0, wrapperHeight - tableHeight);
+      const fillerRows = Math.max(0, Math.ceil(missingPx / rowHeight));
+
+      for (let i = 0; i < fillerRows; i += 1) {{
+        const tr = document.createElement("tr");
+        tr.className = "settings-channels-filler-row";
+        tr.setAttribute("aria-hidden", "true");
+        for (let col = 0; col < columnCount; col += 1) {{
+          const td = document.createElement("td");
+          td.innerHTML = "&nbsp;";
+          tr.appendChild(td);
+        }}
+        tbody.appendChild(tr);
+      }}
+    }}
+
+    function scheduleChannelsTableFillRows() {{
+      if (channelsTableFillRaf) {{
+        cancelAnimationFrame(channelsTableFillRaf);
+      }}
+      channelsTableFillRaf = requestAnimationFrame(() => {{
+        channelsTableFillRaf = 0;
+        syncChannelsTableFillRows();
+      }});
     }}
 
     async function postChannelSettingsPayload(payload, pendingLabel, successLabel) {{
       if (settingsApplyInFlight) return {{ ok: false, data: null }};
       settingsApplyInFlight = true;
       setSettingsButtonsDisabled(true);
-      setText("settings-apply-status", pendingLabel);
+      setChannelsStatusText(pendingLabel);
       try {{
         const resp = await fetch(channelSettingsEndpoint, {{
           method: "POST",
@@ -15535,7 +15732,7 @@
 
         if (!resp.ok) {{
           const errMsg = parsed && parsed.error ? String(parsed.error) : (text || `HTTP ${{resp.status}}`);
-          setText("settings-apply-status", `Channel update failed: ${{errMsg}}`);
+          setChannelsStatusText(`Channel update failed: ${{errMsg}}`);
           appendConsoleLine(`channels|${{Date.now()}}|error`, `[channels] update failed: ${{errMsg}}`);
           return {{ ok: false, data: parsed }};
         }}
@@ -15545,7 +15742,7 @@
           parsed && Array.isArray(parsed.applied_fields) && parsed.applied_fields.length
             ? ` Applied: ${{parsed.applied_fields.join(", ")}}.`
             : "";
-        setText("settings-apply-status", `Applied. ${{successLabel}}.${{rebootHint}}${{fieldsHint}}`);
+        setChannelsStatusText(`Applied. ${{successLabel}}.${{rebootHint}}${{fieldsHint}}`);
         appendConsoleLine(
           `channels|${{Date.now()}}|ok`,
           `[channels] ${{successLabel}}.${{rebootHint}}${{fieldsHint}}`
@@ -15554,7 +15751,7 @@
         return {{ ok: true, data: parsed }};
       }} catch (err) {{
         const msg = err instanceof Error ? err.message : String(err || "unknown error");
-        setText("settings-apply-status", `Channel update error: ${{msg}}`);
+        setChannelsStatusText(`Channel update error: ${{msg}}`);
         appendConsoleLine(`channels|${{Date.now()}}|error`, `[channels] update error: ${{msg}}`);
         return {{ ok: false, data: null }};
       }} finally {{
@@ -15603,8 +15800,8 @@
       );
       const settings = readChannelRowSettings(row) || {{}};
 
-      if (isDisabledRole && !settings.name && !channelsExperimentalEnabled) {{
-        setText("settings-apply-status", "Channel name is required to add a channel unless experimental channel configs are enabled.");
+      if (isDisabledRole && !settings.name) {{
+        setChannelsStatusText("Channel name is required to add a channel.");
         return;
       }}
 
@@ -15612,7 +15809,7 @@
         action: "upsert",
         channel_index: idx,
         settings,
-        allow_experimental: !!channelsExperimentalEnabled,
+        allow_experimental: false,
       }};
 
       if (isDisabledRole) {{
@@ -15652,8 +15849,7 @@
       const res = await postChannelSettingsPayload(payload, "Exporting channel URL…", "Channel URL exported");
       if (res.ok && res.data && typeof res.data.url === "string") {{
         const ok = await copyTextToClipboard(res.data.url);
-        setText(
-          "settings-apply-status",
+        setChannelsStatusText(
           ok ? "Channel URL copied to clipboard." : "Channel URL generated. (Clipboard copy blocked by browser.)"
         );
       }}
@@ -15671,11 +15867,11 @@
       if (!(input instanceof HTMLInputElement)) return;
       const url = String(input.value || "").trim();
       if (!url) {{
-        setText("settings-apply-status", "Paste a Meshtastic channel URL first.");
+        setChannelsStatusText("Paste a Meshtastic channel URL first.");
         return;
       }}
       if (!looksLikeMeshtasticChannelUrl(url)) {{
-        setText("settings-apply-status", "That does not look like a Meshtastic channel URL (expected ...#...).");
+        setChannelsStatusText("That does not look like a Meshtastic channel URL (expected ...#...).");
         return;
       }}
 
@@ -15706,7 +15902,7 @@
       if (!(input instanceof HTMLInputElement)) return;
       const name = String(input.value || "").trim();
       if (!name) {{
-        setText("settings-apply-status", "Enter a private channel name first.");
+        setChannelsStatusText("Enter a private channel name first.");
         return;
       }}
 
@@ -15759,7 +15955,7 @@
       if (settingsApplyInFlight) return false;
       settingsApplyInFlight = true;
       setSettingsButtonsDisabled(true);
-      setText("settings-apply-status", pendingLabel);
+      setSettingsStatusText(pendingLabel);
       try {{
         const resp = await fetch(radioSettingsEndpoint, {{
           method: "POST",
@@ -15776,7 +15972,7 @@
 
         if (!resp.ok) {{
           const errMsg = parsed && parsed.error ? String(parsed.error) : (text || `HTTP ${{resp.status}}`);
-          setText("settings-apply-status", `Apply failed: ${{errMsg}}`);
+          setSettingsStatusText(`Apply failed: ${{errMsg}}`);
           appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply failed: ${{errMsg}}`);
           return false;
         }}
@@ -15790,7 +15986,7 @@
           parsed && Number.isFinite(Number(parsed.deleted_history_rows))
             ? ` Cleared rows: ${{Number(parsed.deleted_history_rows)}}.`
             : "";
-        setText("settings-apply-status", `Applied. ${{successLabel}}.${{rebootHint}}${{actionHint}}${{deletedHint}}`);
+        setSettingsStatusText(`Applied. ${{successLabel}}.${{rebootHint}}${{actionHint}}${{deletedHint}}`);
         appendConsoleLine(
           `settings|${{Date.now()}}|ok`,
           `[settings] ${{successLabel}}.${{rebootHint}}${{actionHint}}${{deletedHint}}`
@@ -15800,7 +15996,7 @@
         return true;
       }} catch (err) {{
         const msg = err instanceof Error ? err.message : String(err || "unknown error");
-        setText("settings-apply-status", `Apply error: ${{msg}}`);
+        setSettingsStatusText(`Apply error: ${{msg}}`);
         appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] apply error: ${{msg}}`);
         return false;
       }} finally {{
@@ -15813,7 +16009,7 @@
       if (settingsFetchInFlight) return;
       settingsFetchInFlight = true;
       setSettingsButtonsDisabled(true);
-      setText("settings-apply-status", "Fetching settings…");
+      setSettingsAndChannelsStatusText("Fetching settings…");
       try {{
         const resp = await fetch("/api/raw/local_state", {{ cache: "no-store" }});
         if (!resp.ok) throw new Error(`HTTP ${{resp.status}}`);
@@ -15823,12 +16019,15 @@
         settingsLocalStateFetchedAt = Date.now();
         clearSettingsDirty();
         renderSettings({{ local_state: obj }}, true);
+        try {{
+          renderChannelsView({{ ...(latestState && typeof latestState === "object" ? latestState : {{}}), local_state: obj }});
+        }} catch (_err) {{}}
         void hydrateMeshChannelOptions(false);
-        setText("settings-apply-status", "Loaded current radio settings.");
+        setSettingsAndChannelsStatusText("Loaded current radio settings.");
         appendConsoleLine(`settings|${{Date.now()}}|fetch`, "[settings] loaded current radio settings.");
       }} catch (err) {{
         const msg = err instanceof Error ? err.message : String(err || "unknown error");
-        setText("settings-apply-status", `Fetch failed: ${{msg}}`);
+        setSettingsAndChannelsStatusText(`Fetch failed: ${{msg}}`);
         appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] fetch failed: ${{msg}}`);
       }} finally {{
         setSettingsButtonsDisabled(false);
@@ -16241,6 +16440,15 @@
         }});
       }}
 
+      const channelsFetchBtn = document.getElementById("channels-fetch-settings-btn");
+      if (channelsFetchBtn instanceof HTMLButtonElement) {{
+        channelsFetchBtn.addEventListener("click", () => {{
+          clearSettingsDirty();
+          settingsAutoFetchAttempted = true;
+          void fetchSettingsFromRadio();
+        }});
+      }}
+
       const exportUrlBtn = document.getElementById("settings-export-channel-url");
       if (exportUrlBtn instanceof HTMLButtonElement) {{
         exportUrlBtn.addEventListener("click", () => {{
@@ -16253,14 +16461,6 @@
         channelsAdvToggle.checked = !!channelsUiAdvanced;
         channelsAdvToggle.addEventListener("change", () => {{
           setChannelsUiAdvanced(!!channelsAdvToggle.checked, true);
-        }});
-      }}
-
-      const channelsExperimentalToggle = document.getElementById("settings-channels-experimental-toggle");
-      if (channelsExperimentalToggle instanceof HTMLInputElement) {{
-        channelsExperimentalToggle.checked = !!channelsExperimentalEnabled;
-        channelsExperimentalToggle.addEventListener("change", () => {{
-          setChannelsExperimentalEnabled(!!channelsExperimentalToggle.checked, true);
         }});
       }}
 
@@ -22101,6 +22301,11 @@
       const disabledLocalCount = localOptions.filter((opt) => isMeshChannelRoleDisabled(opt && opt.role) || !!opt.disabled).length;
       const configuredUnseenCount = localOptions.filter((opt) => !isMeshChannelRoleDisabled(opt && opt.role) && !opt.disabled && !observed.has(Number(opt.index))).length;
       const localConfigReady = !!(localState && Array.isArray(localState.channels));
+      const nowUnix = Math.floor(Date.now() / 1000);
+
+      try {{
+        renderChannelsTable(localState || {{}}, observed, nowUnix);
+      }} catch (_err) {{}}
 
       const caption = document.getElementById("channels-caption");
       if (caption instanceof HTMLElement) {{
@@ -22132,123 +22337,6 @@
           `<div class="overview-item"><div class="k">${{escAttr(String(k))}}</div><div class="v">${{escAttr(String(v))}}</div></div>`
         )).join("");
       }}
-
-      const nowUnix = Math.floor(Date.now() / 1000);
-      const unionIndexes = Array.from(new Set([
-        ...observed.keys(),
-        ...localByIndex.keys(),
-      ]))
-        .filter((idx) => Number.isInteger(Number(idx)) && Number(idx) >= 0)
-        .sort((a, b) => Number(a) - Number(b));
-
-      const inferenceRows = unionIndexes.map((rawIndex) => {{
-        const index = Number(rawIndex);
-        const bucket = observed.get(index) || null;
-        const localOpt = localByIndex.get(index) || null;
-        const roleLabel = formatMeshChannelRole(localOpt && localOpt.role);
-        const localName = localOpt && typeof localOpt.name === "string" ? localOpt.name.trim() : "";
-        const localPrimary = localName || (localOpt ? `Ch ${{index}}` : "Not in local config");
-        const localDisabled = !!(localOpt && (localOpt.disabled || isMeshChannelRoleDisabled(localOpt.role)));
-        const localSecondary = localOpt
-          ? [roleLabel || "", localDisabled ? "disabled" : "configured locally"]
-              .filter((part, idxParts, arr) => !!part && arr.indexOf(part) === idxParts)
-              .join(" • ")
-          : "observed from packet metadata";
-        let evidenceKind = "observed-only";
-        if (localDisabled) {{
-          evidenceKind = "disabled";
-        }} else if (localOpt && bucket) {{
-          evidenceKind = "observed-local";
-        }} else if (localOpt) {{
-          evidenceKind = "local-only";
-        }}
-        const evidence = channelEvidenceMeta(evidenceKind);
-        const latestLabel = bucket && bucket.lastSeenUnix > 0
-          ? formatLocalChatTime(bucket.lastSeenUnix, bucket.lastSeenText || "n/a", nowUnix)
-          : "n/a";
-        const latestTitle = bucket && bucket.lastSeenUnix > 0
-          ? [
-              bucket.lastSeenText ? `Raw: ${{bucket.lastSeenText}}` : "",
-              new Date(bucket.lastSeenUnix * 1000).toLocaleString(),
-            ].filter((part) => !!part).join(" | ")
-          : "No recent packet timestamps";
-        return {{
-          cells: [
-            {{ sort: index, text: `Ch ${{index}}` }},
-            {{
-              sort: `${{localPrimary}} ${{localSecondary}}`,
-              html: `<div class="channels-local-cell"><span class="channels-local-primary">${{escAttr(localPrimary)}}</span>${{localSecondary ? `<span class="channels-local-secondary">${{escAttr(localSecondary)}}</span>` : ""}}</div>`,
-              title: localOpt ? `${{localName || `Ch ${{index}}`}}${{roleLabel ? ` | ${{roleLabel}}` : ""}}` : "Observed in recent packet buffer only",
-            }},
-            {{
-              sort: evidence.label,
-              html: `<span class="channels-evidence-pill ${{escAttr(evidence.className)}}">${{escAttr(evidence.label)}}</span>`,
-              title: evidence.title,
-            }},
-            {{ sort: bucket ? bucket.packetCount : 0, text: bucket ? bucket.packetCount : 0 }},
-            {{ sort: bucket ? bucket.everyoneCount : 0, text: bucket ? bucket.everyoneCount : 0 }},
-            {{ sort: bucket ? bucket.directCount : 0, text: bucket ? bucket.directCount : 0 }},
-            {{ sort: bucket ? bucket.nodeIds.size : 0, text: bucket ? bucket.nodeIds.size : 0 }},
-            {{
-              sort: bucket ? formatChannelTopPorts(bucket.portCounts, 5) : "",
-              text: bucket ? formatChannelTopPorts(bucket.portCounts, 3) : "n/a",
-              title: bucket ? formatChannelTopPorts(bucket.portCounts, 5) : "No recent packet evidence",
-            }},
-            {{ sort: bucket ? bucket.lastSeenUnix : 0, text: latestLabel, title: latestTitle }},
-          ],
-        }};
-      }});
-      renderSortableListboxTable("channels-inference-table", inferenceRows, {{
-        emptyText: "No explicit channel indexes were found in recent packets yet.",
-        emptyColspan: 9,
-      }});
-
-      const localRows = localOptions
-        .slice()
-        .sort((a, b) => Number(a.index) - Number(b.index))
-        .map((opt) => {{
-          const index = Number(opt && opt.index);
-          const bucket = observed.get(index) || null;
-          const roleLabel = formatMeshChannelRole(opt && opt.role);
-          const name = typeof opt.name === "string" ? opt.name.trim() : "";
-          const stateLabel = (opt.disabled || isMeshChannelRoleDisabled(opt.role))
-            ? "Disabled"
-            : bucket
-              ? "Seen in recent packets"
-              : "Configured";
-          const observedLabel = bucket
-            ? `${{bucket.packetCount}} packets • ${{bucket.nodeIds.size}} nodes`
-            : "No recent packets";
-          const latestLabel = bucket && bucket.lastSeenUnix > 0
-            ? formatLocalChatTime(bucket.lastSeenUnix, bucket.lastSeenText || "n/a", nowUnix)
-            : "n/a";
-          const latestTitle = bucket && bucket.lastSeenUnix > 0
-            ? [
-                bucket.lastSeenText ? `Raw: ${{bucket.lastSeenText}}` : "",
-                new Date(bucket.lastSeenUnix * 1000).toLocaleString(),
-              ].filter((part) => !!part).join(" | ")
-            : "No recent packet evidence";
-          return {{
-            cells: [
-              {{ sort: index, text: `Ch ${{index}}` }},
-              {{
-                sort: `${{name}} ${{roleLabel}} ${{index}}`,
-                html: `<div class="channels-local-cell"><span class="channels-local-primary">${{escAttr(name || `Ch ${{index}}`)}}</span><span class="channels-local-secondary">${{escAttr((name ? `Ch ${{index}}` : "") || (roleLabel || "Unnamed local channel"))}}</span></div>`,
-                title: name ? `Local name: ${{name}}` : `Ch ${{index}}`,
-              }},
-              {{ sort: roleLabel || "", text: roleLabel || "n/a" }},
-              {{ sort: stateLabel, text: stateLabel }},
-              {{ sort: bucket ? bucket.packetCount : 0, text: observedLabel }},
-              {{ sort: bucket ? bucket.lastSeenUnix : 0, text: latestLabel, title: latestTitle }},
-            ],
-          }};
-        }});
-      renderSortableListboxTable("channels-local-table", localRows, {{
-        emptyText: localConfigReady
-          ? "No local channel config exposed by the radio."
-          : "Loading local channel config from the radio...",
-        emptyColspan: 6,
-      }});
     }}
 
     function isLikelyEncryptedPacketEntry(entry) {{

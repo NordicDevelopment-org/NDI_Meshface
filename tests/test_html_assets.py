@@ -65,5 +65,9 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "game_public_start_enabled: !!publicStartInput.checked" in js
     assert "const receivedAtMs = Date.now();" in js
     assert "receivedAtMs,\n            true" in js
+    assert "function setChannelsStatusText(message)" in js
+    assert "const channelsFetchBtn = document.getElementById(\"channels-fetch-settings-btn\");" in js
+    assert "fallbackCount: 8" in js
+    assert 'idx === 0 ? "PRIMARY" : "DISABLED"' in js
     assert "{{" not in js
     assert "}}" not in js

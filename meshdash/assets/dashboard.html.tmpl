@@ -262,7 +262,7 @@
         <div class="settings-grid">
           <div class="settings-panel">
             <h3>LoRa / Radio</h3>
-            <div class="settings-fields">
+            <div class="settings-fields channels-local-fields">
               <div class="settings-help-note">
                 <strong>Frequency slot</strong> tunes the physical RF frequency. <strong>Message channels</strong> (Chat “View Ch” / “Send Ch” + Settings → Channels) are encryption groups.
               </div>
@@ -477,111 +477,11 @@
           </div>
 
           <div class="settings-panel settings-panel-wide">
-            <h3>Channels</h3>
-            <div class="settings-fields">
-              <div class="settings-caption">
-                Manage Meshtastic channels on the <strong>local</strong> radio. Changes are applied via admin messages and may reboot the device.
-              </div>
-
-              <div class="settings-row">
-                <label class="settings-field settings-inline" title="Beginner-friendly view hides MQTT bridge toggles and shows quick actions. Advanced shows everything.">
-                  <input id="settings-channels-advanced-toggle" type="checkbox" />
-                  <span>Advanced channel options</span>
-                </label>
-              </div>
-
-              <div class="settings-row settings-channels-experimental-toggle-row">
-                <label class="settings-field settings-inline" title="Permits non-standard channel setups such as unnamed secondary channels. These may behave differently across Meshtastic clients and firmware versions.">
-                  <input id="settings-channels-experimental-toggle" type="checkbox" />
-                  <span>Allow experimental channel configs</span>
-                </label>
-              </div>
-
-              <div id="settings-channels-simple-actions" class="settings-channels-simple-actions">
-                <div class="settings-row">
-                  <label class="settings-field" style="flex: 1;">
-                    <span class="settings-label">Join from Channel URL (QR)</span>
-                    <div class="settings-row">
-                      <input
-                        id="settings-channels-import-url"
-                        class="settings-input"
-                        type="text"
-                        placeholder="https://meshtastic.org/e/#..."
-                        autocomplete="off"
-                        spellcheck="false"
-                      />
-                      <button id="settings-channels-import-url-join-btn" class="btn btn-secondary" type="button">Join</button>
-                      <button id="settings-channels-import-url-add-btn" class="btn btn-secondary" type="button" title="Add channels without overwriting existing names" hidden>Add only</button>
-                    </div>
-                    <div class="settings-help-note" style="margin-top: 6px;">
-                      Channel URLs include <strong>LoRa</strong> + <strong>channel</strong> settings. Only paste URLs from people you trust.
-                    </div>
-                  </label>
-                </div>
-
-                <div class="settings-row">
-                  <label class="settings-field" style="flex: 1;">
-                    <span class="settings-label">Create private channel (random key)</span>
-                    <div class="settings-row">
-                      <input
-                        id="settings-channels-private-name"
-                        class="settings-input"
-                        type="text"
-                        placeholder="Channel name (e.g. HikingCrew)"
-                        autocomplete="off"
-                        spellcheck="false"
-                      />
-                      <button id="settings-channels-create-private-btn" class="btn btn-secondary" type="button">Create</button>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <div class="settings-row">
-                <div class="settings-field settings-inline" style="flex: 1;">
-                  <label class="settings-label" for="settings-channels-help">Tips</label>
-                  <div id="settings-channels-help" class="settings-danger-note" style="margin: 0;">
-                    <div><strong>PSK:</strong> leave blank to keep existing. You can enter <code>default</code>, <code>random</code>, <code>none</code>, <code>simple15</code>, or <code>base64:&lt;key&gt;</code>.</div>
-                    <div><strong>Uplink/Downlink:</strong> MQTT bridge toggles (internet), not LoRa TX/RX (shown in Advanced mode).</div>
-                    <div><strong>Frequency:</strong> all messaging channels share the LoRa modem settings above (region/preset/frequency slot).</div>
-                    <div><strong>Gaps:</strong> channels must be consecutive (0..N). Disable from the end; add the next available slot.</div>
-                    <div><strong>Experimental:</strong> Advanced mode can allow non-standard channel setups such as unnamed secondary channels. These may behave differently across Meshtastic clients and firmware versions.</div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="settings-row">
-                <div class="settings-field" style="flex: 1; overflow-x: auto;">
-                  <table class="settings-channels-table" id="settings-channels-table">
-                    <thead>
-                      <tr>
-                        <th>Index</th>
-                        <th>Role</th>
-                        <th>Name</th>
-                        <th class="settings-channel-mqtt">MQTT Up</th>
-                        <th class="settings-channel-mqtt">MQTT Down</th>
-                        <th>PSK (new)</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody id="settings-channels-tbody">
-                      <tr><td colspan="7" class="settings-channels-empty">Fetch settings to load channels.</td></tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="settings-row settings-actions">
-                <button id="settings-export-channel-url" class="btn btn-secondary" type="button">
-                  Copy Channel URL (all)
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-panel settings-panel-wide">
             <h3>Advanced Config</h3>
             <div class="settings-fields">
+              <div class="settings-help-note">
+                Channel configuration has moved to <strong>Channels</strong> so local channel controls, activity, and tools live in one place.
+              </div>
               <label class="settings-field">
                 <span class="settings-label">Local config section</span>
                 <div class="settings-row">
@@ -1051,32 +951,61 @@
     <section class="card channels-view" aria-label="Inferred message channels">
       <h2>Channels</h2>
       <div class="body">
-        <div id="channels-caption" class="history-caption">Observed message channels inferred from recent packets. Message channels are encryption groups, not RF frequency slots.</div>
-        <div id="channels-overview" class="overview-grid"></div>
-        <div class="channels-panels">
-          <section class="channels-panel channels-panel-wide">
-            <h3>Observed and inferred message channels</h3>
-            <div class="scroll">
-              <table id="channels-inference-table">
-                <thead>
-                  <tr>
-                    <th>Channel</th><th>Local label</th><th>Evidence</th><th>Packets</th><th>Everyone</th><th>Direct</th><th>Nodes</th><th>Top ports</th><th>Latest</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
+        <div class="channels-dashboard-grid">
+          <section class="channels-dashboard-panel settings-panel channels-dashboard-panel-summary" aria-label="Observed channel summary">
+            <div class="channels-section-head">
+              <div>
+                <h3>Observed</h3>
+                <div id="channels-caption" class="history-caption channels-panel-copy">Recent packet evidence for local and observed message channels.</div>
+              </div>
+              <div class="channels-section-actions channels-summary-actions">
+                <label class="settings-field settings-inline channels-summary-toggle" title="Beginner-friendly view hides MQTT bridge toggles and shows quick actions. Advanced shows everything.">
+                  <input id="settings-channels-advanced-toggle" type="checkbox" />
+                  <span>Advanced</span>
+                </label>
+                <button id="channels-fetch-settings-btn" class="btn btn-secondary" type="button">Fetch radio config</button>
+              </div>
+            </div>
+            <div id="channels-overview" class="overview-grid"></div>
+            <div class="channels-summary-footer">
+              <div class="settings-help-note channels-current-note">
+                Blank <strong>PSK</strong> keeps the current key. <strong>Ch 0</strong> may be active with no name.
+              </div>
+              <div class="channels-status-row">
+                <span id="channels-apply-status" class="settings-status channels-status"></span>
+              </div>
             </div>
           </section>
-          <section class="channels-panel">
-            <h3>Local channel hints</h3>
-            <div class="scroll">
-              <table id="channels-local-table">
+
+          <section class="channels-dashboard-panel settings-panel channels-dashboard-panel-activity" aria-label="Channel activity">
+            <div class="channels-section-head">
+              <div>
+                <h3>Channel Activity</h3>
+              </div>
+            </div>
+            <div class="channels-activity-table-wrap scroll">
+              <table class="settings-channels-table" id="settings-channels-table">
                 <thead>
                   <tr>
-                    <th>Channel</th><th>Name</th><th>Role</th><th>State</th><th>Observed</th><th>Latest</th>
+                    <th>Index</th>
+                    <th>Role</th>
+                    <th>Name</th>
+                    <th class="settings-channel-mqtt">MQTT Up</th>
+                    <th class="settings-channel-mqtt">MQTT Down</th>
+                    <th>PSK (new)</th>
+                    <th>Actions</th>
+                    <th>Evidence</th>
+                    <th>Packets</th>
+                    <th>Everyone</th>
+                    <th>Direct</th>
+                    <th>Nodes</th>
+                    <th>Top ports</th>
+                    <th>Latest</th>
                   </tr>
                 </thead>
-                <tbody></tbody>
+                <tbody id="settings-channels-tbody">
+                  <tr><td colspan="14" class="settings-channels-empty">Fetch settings to load channels.</td></tr>
+                </tbody>
               </table>
             </div>
           </section>
