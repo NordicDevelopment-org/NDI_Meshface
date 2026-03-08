@@ -7,6 +7,7 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert ":root { --test-color: #123456; }" in css
     assert ".topbar" in css
     assert ".workspace-shell" in css
+    assert ".console-select" in css
     assert "* { box-sizing: border-box; }" in css
     assert "{{" not in css
     assert "}}" not in css
@@ -37,5 +38,10 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "storage.getItem(consoleSessionStorageKey)" in js
     assert "storage.setItem(consoleSessionStorageKey" in js
     assert "loadConsoleSessionState();" in js
+    assert "function isStandaloneConsoleSessionExpiredMessage(value)" in js
+    assert "Console mode restored. Type \\\"zork\\\" to start again." in js
+    assert "const consoleFontSizeStorageKey = \"meshDashboardConsoleFontSizeV1\";" in js
+    assert "loadConsoleFontSizePreference();" in js
+    assert "window.localStorage.setItem(consoleFontSizeStorageKey" in js
     assert "{{" not in js
     assert "}}" not in js

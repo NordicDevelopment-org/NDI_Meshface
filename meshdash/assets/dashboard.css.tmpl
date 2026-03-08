@@ -6573,6 +6573,20 @@
     .console-controls button:hover {{
       background: #e1f2e7;
     }}
+    .console-select-label {{
+      color: #294735;
+      white-space: nowrap;
+    }}
+    .console-select {{
+      border: 1px solid #c2d8c7;
+      background: #f0f8f2;
+      color: #1e5e40;
+      border-radius: 6px;
+      font-size: 11px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-family: inherit;
+    }}
     .console-command-form {{
       display: flex;
       align-items: center;
@@ -6621,8 +6635,9 @@
     }}
     #live-console {{
       margin: 0;
-      background: #0e1f16;
-      color: #cbffde;
+      background: #f0f8f2;
+      border: 1px solid #c2d8c7;
+      color: #1e5e40;
       border-radius: 6px;
       padding: 8px;
       min-height: 180px;
@@ -7135,6 +7150,14 @@
       border-color: #3e5e4d;
       color: #d9ece2;
     }}
+    [data-theme="dark"] .console-select-label {{
+      color: #a8c6b6;
+    }}
+    [data-theme="dark"] .console-select {{
+      background: #22352b;
+      border-color: #3e5e4d;
+      color: #d9ece2;
+    }}
     [data-theme="dark"] .console-controls button:hover {{
       background: #2b4337;
     }}
@@ -7460,6 +7483,11 @@
       border-color: var(--ui-border) !important;
       color: var(--ui-text);
       box-shadow: none;
+    }}
+    [data-theme="dark"] #live-console {{
+      background: #07140d;
+      border-color: #2d8f5d !important;
+      color: #c6ffdb;
     }}
     [data-theme="dark"] th {{
       background: #1d2733;

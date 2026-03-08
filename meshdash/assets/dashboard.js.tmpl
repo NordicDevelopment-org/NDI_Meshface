@@ -144,6 +144,7 @@
     }};
     const signalHeatDevKnobsStorageKey = "meshDashboardSignalHeatDevKnobsV3";
     const consoleSessionStorageKey = "meshDashboardConsoleSessionV1";
+    const consoleFontSizeStorageKey = "meshDashboardConsoleFontSizeV1";
     const signalHeatDevKnobDefaults = {{
       radius: 26,
       blur: 20,
@@ -2069,6 +2070,7 @@
     const consoleMaxLines = 1200;
     const consolePacketPreviewMaxChars = 140;
     const consoleCommandHistoryMax = 120;
+    const consoleFontSizePxByKey = Object.freeze({{ sm: 10, md: 12, lg: 14, xl: 16 }});
     const consoleCommandRegistry = new Map();
     const tableSortState = {{
       "nodes-table": {{ index: 0, dir: "desc" }},
@@ -2176,6 +2178,7 @@
     let historyActivityTopPct = 50;
     let historyChatMainPct = 72;
     let consoleAutoscroll = true;
+    let consoleFontSize = "md";
     let consoleCommandHistory = [];
     let consoleCommandHistoryCursor = -1;
     let consoleCommandDraft = "";
@@ -12994,6 +12997,35 @@
       appendConsoleLine(key, line, loggedAtMs, renderNow);
     }}
 
+    function normalizeConsoleFontSize(value) {{
+      const clean = String(value == null ? "" : value).trim().toLowerCase();
+      return Object.prototype.hasOwnProperty.call(consoleFontSizePxByKey, clean) ? clean : "md";
+    }}
+
+    function persistConsoleFontSizePreference() {{
+      try {{
+        window.localStorage.setItem(consoleFontSizeStorageKey, normalizeConsoleFontSize(consoleFontSize));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadConsoleFontSizePreference() {{
+      try {{
+        consoleFontSize = normalizeConsoleFontSize(window.localStorage.getItem(consoleFontSizeStorageKey) || "md");
+      }} catch (_err) {{
+        consoleFontSize = "md";
+      }}
+    }}
+
+    function applyConsoleFontSizePreference() {{
+      const pre = document.getElementById("live-console");
+      if (!(pre instanceof HTMLElement)) return;
+      const key = normalizeConsoleFontSize(consoleFontSize);
+      const px = Number(consoleFontSizePxByKey[key]) || 12;
+      pre.style.fontSize = `${{px}}px`;
+      consoleFontSize = key;
+    }}
+
     function normalizeConsoleInteractiveSession(raw) {{
       const payload = (raw && typeof raw === "object") ? raw : {{}};
       const mode = String(payload.mode || "").trim().toLowerCase();
@@ -13109,6 +13141,12 @@
         consoleEventCounter = Math.max(0, Math.trunc(Number(payload.eventCounter) || 0));
       }} catch (_err) {{
       }}
+    }}
+
+    function isStandaloneConsoleSessionExpiredMessage(value) {{
+      const text = String(value == null ? "" : value).trim();
+      if (!text) return false;
+      return /no active standalone zork session/i.test(text);
     }}
 
     function wildcardPatternToRegExp(pattern) {{
@@ -14085,7 +14123,24 @@
           }}
         }} catch (err) {{
           const msg = err instanceof Error ? err.message : String(err || "unknown error");
-          appendConsoleEventLine(`[${{String(consoleInteractiveSession.name || "session")}}] error: ${{msg}}`);
+          const activeSession = consoleInteractiveSession;
+          if (
+            activeSession
+            && String(activeSession.mode || "") === "standalone"
+            && isStandaloneConsoleSessionExpiredMessage(msg)
+          ) {{
+            stopConsoleInteractiveSession("server session expired", false);
+            appendConsoleEventLine("[zork] session expired on server. Console mode restored. Type \"zork\" to start again.");
+            const retryParsed = parseConsoleCommandLine(line);
+            if (!retryParsed.error) {{
+              ensureConsoleCommandsRegistered();
+              if (consoleCommandRegistry.has(retryParsed.command)) {{
+                await executeConsoleCommand(retryParsed, line);
+              }}
+            }}
+            return;
+          }}
+          appendConsoleEventLine(`[${{String((activeSession && activeSession.name) || "session")}}] error: ${{msg}}`);
         }}
         return;
       }}
@@ -14119,6 +14174,20 @@
           }}
         }});
       }}
+      const fontSizeSelect = document.getElementById("console-font-size-select");
+      if (fontSizeSelect instanceof HTMLSelectElement) {{
+        fontSizeSelect.value = normalizeConsoleFontSize(consoleFontSize);
+        if (fontSizeSelect.dataset.bound !== "1") {{
+          fontSizeSelect.dataset.bound = "1";
+          fontSizeSelect.addEventListener("change", () => {{
+            consoleFontSize = normalizeConsoleFontSize(fontSizeSelect.value);
+            fontSizeSelect.value = consoleFontSize;
+            persistConsoleFontSizePreference();
+            applyConsoleFontSizePreference();
+            renderConsoleBuffer(false);
+          }});
+        }}
+      }}
       const pre = document.getElementById("live-console");
       if (pre instanceof HTMLElement && pre.dataset.scrollBound !== "1") {{
         pre.dataset.scrollBound = "1";
@@ -14135,6 +14204,7 @@
           }}
         }});
       }}
+      applyConsoleFontSizePreference();
       const form = document.getElementById("console-command-form");
       const input = document.getElementById("console-command-input");
       if (form instanceof HTMLFormElement && input instanceof HTMLInputElement && form.dataset.bound !== "1") {{
@@ -22870,6 +22940,7 @@
     loadSignalHeatmapPreference();
     loadMapPacketLinesPreference();
     loadChatPerfPreference();
+    loadConsoleFontSizePreference();
     loadConsoleSessionState();
     loadLayoutView();
     loadManualDirectPeers();
