@@ -44,6 +44,9 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - The carousel/low-room magnetic cluster is now playable: the round room can now either randomize or honor directional exits, the low room now routes to the machine room or Alice depending on the magnetic state, and the CMACH round/square/triangular buttons now control the flip/zoom behavior instead of leaving that branch as a dead end.
 - The robot/sphere/high-voltage cluster is now partly canonical: pressing the CMACH buttons by hand now fries the player, actor-style `robot ...`/`tell robot ...` commands can move the robot and make it press the buttons safely, the crystal-sphere cage trap now works, and the robot can now raise the cage or ruin the sphere by trying to grab it himself.
 - The Alice branch is now partly canonical: eating the `Eat Me` cake shifts the tea room into its giant-scale counterpart, the blue/orange/red cakes now have their classic enlarge/explode/evaporate behaviors, `read <cake> through flask` reveals the hidden icing words, the pool trick reveals the spices, and opening or smashing the flask now kills the player with noxious vapors.
+- The magic well route is now playable: saying `well` at the top or bottom of the shaft summons the wooden bucket, `board bucket` lets you ride it, and the bucket can now carry you between `TWELL` and `BWELL` instead of leaving the Pearl branch half-stranded.
+- The mine dumbwaiter is now live: the shaft basket can be raised/lowered from either end of the chain, it stays a real open container while moving, and cargo in the basket can now cross the `EMPTY-HANDED` lower-shaft choke point for the coal/machine route.
+- The maintenance-room leak path is now live: the blue button can spring the leak, and both `plug leak with putty` and `put putty in leak` now stop it again instead of leaving the dam with decorative plumbing.
 
 ## What Is Still Missing
 
@@ -55,6 +58,8 @@ Meshyface cannot execute those files directly, so a full port means translation 
 - The thief now roams and steals in a deterministic simplified way, but he is still not the full upstream robber demon with canonical randomness, hiding rules, or complete combat behavior.
 - The carousel/CMACH branch is now traversable, and the high-voltage/robot mediation is now live at a basic actor-command level, but broader robot behavior is still simplified compared with the original actor system.
 - The sphere/cage gas clock is now playable, but its timing and actor behavior are still simplified compared with the upstream event clock.
+- The magic well bucket is now live as a lightweight vehicle/magic-word transport, but it is still simplified compared with the original bucket clock/event handling.
+- The dumbwaiter works for cargo transfer, but it is still a lightweight single-basket port rather than the full original pair-object chain machinery.
 
 ## Regenerating Derived Data
 

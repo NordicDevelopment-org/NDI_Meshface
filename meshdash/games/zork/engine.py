@@ -110,6 +110,7 @@ GAME_VERB_HEADS = {
     "press",
     "tell",
     "raise",
+    "lower",
     "robot",
     "pray",
     "exorcise",
@@ -1296,6 +1297,19 @@ class ZorkGame:
         inventory = set(self._session_inventory(session))
         return self._aboard_boat(session) or boat_room == room_key or "RBOAT" in inventory
 
+    def _bucket_room(self, session: dict[str, object]) -> str:
+        return str(self._object_locations(session).get("BUCKE") or "").strip().upper()
+
+    def _aboard_bucket(self, session: dict[str, object]) -> bool:
+        return "aboard_bucket" in self._session_flags(session)
+
+    def _shaft_basket_room(self, session: dict[str, object]) -> str:
+        return str(self._object_locations(session).get("TBASK") or "").strip().upper()
+
+    def _shaft_basket_here(self, session: dict[str, object], room_id: str | None = None) -> bool:
+        room_key = str(room_id or session.get("room") or START_ROOM).strip().upper() or START_ROOM
+        return self._shaft_basket_room(session) == room_key
+
     def _balloon_room(self, session: dict[str, object]) -> str:
         return str(self._object_locations(session).get("BALLO") or "").strip().upper()
 
@@ -1338,11 +1352,15 @@ class ZorkGame:
             return "balloon"
         if self._is_accessible(session, "DBALL"):
             return "balloon"
+        if self._is_accessible(session, "BUCKE"):
+            return "bucket"
         return "boat"
 
     def _is_accessible(self, session: dict[str, object], code: str, *, include_room: bool = True, include_inventory: bool = True) -> bool:
         code_key = str(code or "").strip().upper()
         if not code_key:
+            return False
+        if code_key == "FBASK":
             return False
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         flags = self._session_flags(session)
@@ -1454,6 +1472,9 @@ class ZorkGame:
             return "BELL"
         if room_id == "MAINT" and ("leak" in word_set or "drip" in word_set or "hole" in word_set):
             return "LEAK"
+        if room_id in {"TSHAF", "BSHAF"} and ("chain" in word_set or "basket" in word_set or "dumbwaiter" in word_set or "dumbw" in word_set):
+            if action in {"raise", "lower"} or self._shaft_basket_here(session, room_id):
+                return "TBASK"
         if "putty" in word_set or "gunk" in word_set or "glue" in word_set or "material" in word_set:
             return "PUTTY"
         if "window" in word_set or "windo" in word_set:
@@ -1561,6 +1582,8 @@ class ZorkGame:
         if code_key == "FDOOR" and room_id == "WHOUS":
             return True
         if code_key == "MAILB" and room_id == "WHOUS":
+            return True
+        if code_key == "TBASK" and room_id in {"TSHAF", "BSHAF"} and action in {"raise", "lower"}:
             return True
         if code_key == "WIND1" and room_id == "EHOUS":
             return True
@@ -1949,6 +1972,8 @@ class ZorkGame:
 
         if self._aboard_boat(session) and self._boat_room(session) == room_key:
             parts.append("You are in the magic boat.")
+        if self._aboard_bucket(session) and self._bucket_room(session) == room_key:
+            parts.append("You are in the wooden bucket.")
 
         sword_glow = self._sword_glow_text(session, room_key)
         if sword_glow:
@@ -2345,6 +2370,24 @@ class ZorkGame:
             flags.discard("aboard_boat")
         if "aboard_balloon" in flags and object_locations.get("BALLO") != room_id:
             flags.discard("aboard_balloon")
+        if "aboard_bucket" in flags and object_locations.get("BUCKE") != room_id:
+            flags.discard("aboard_bucket")
+        if "aboard_bucket" in flags:
+            if room_id in {"TWELL", "BWELL"} and direction in {"UP", "DOWN"}:
+                return BotAppResult(
+                    handled=True,
+                    reply_text=self._compact(
+                        f"The bucket seems to respond only to the word 'well'. {self._room_summary(session, room_id)}"
+                    ),
+                    command_name=self.SPEC.name,
+                )
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(
+                    f"You'll have to climb out of the bucket first. {self._room_summary(session, room_id)}"
+                ),
+                command_name=self.SPEC.name,
+            )
 
         exit_row = None
         for row in room.exits:
@@ -3201,6 +3244,42 @@ class ZorkGame:
             return ("A grating appears on the ground beneath the leaves.", flags, object_locations)
         return (f"Moving the {object_name(code_key)} accomplishes nothing.", flags, object_locations)
 
+    def _raise_lower_response(
+        self,
+        session: dict[str, object],
+        action: str,
+        code: str,
+    ) -> tuple[str, set[str], dict[str, str]]:
+        code_key = str(code or "").strip().upper()
+        action_key = str(action or "").strip().lower()
+        flags = self._session_flags(session)
+        object_locations = self._object_locations(session)
+        room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+
+        if code_key == "CAGE":
+            if room_id != "CAGED":
+                return ("There is no cage here to raise.", flags, object_locations)
+            return ("The iron cage is not exactly built for your leverage.", flags, object_locations)
+
+        if code_key != "TBASK":
+            return (f"You can't {action_key} the {object_name(code_key)}.", flags, object_locations)
+        if room_id not in {"TSHAF", "BSHAF"}:
+            return (f"There is no basket here to {action_key}.", flags, object_locations)
+
+        basket_room = str(object_locations.get("TBASK") or room_id).strip().upper() or room_id
+        if action_key == "raise":
+            if basket_room == "TSHAF":
+                return ("The basket is already at the top of the shaft.", flags, object_locations)
+            object_locations["TBASK"] = "TSHAF"
+            object_locations["FBASK"] = "GONE"
+            return ("The basket is raised to the top of the shaft.", flags, object_locations)
+
+        if basket_room == "BSHAF":
+            return ("The basket is already at the bottom of the shaft.", flags, object_locations)
+        object_locations["TBASK"] = "BSHAF"
+        object_locations["FBASK"] = "GONE"
+        return ("The basket is lowered to the bottom of the shaft.", flags, object_locations)
+
     def _dig_response(self, session: dict[str, object], tool_code: str | None) -> tuple[str, set[str], dict[str, str], bool]:
         tool_key = str(tool_code or "SHOVE").strip().upper() or "SHOVE"
         flags = self._session_flags(session)
@@ -3582,18 +3661,60 @@ class ZorkGame:
             object_locations,
         )
 
-    def _magic_word_response(self, session: dict[str, object], word: str) -> tuple[str, set[str], dict[str, str]]:
+    def _magic_word_response(
+        self,
+        session: dict[str, object],
+        word: str,
+    ) -> tuple[str, str | None, set[str], dict[str, str], bool]:
         word_key = str(word or "").strip().lower()
         flags = self._session_flags(session)
         object_locations = self._object_locations(session)
         room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
         if word_key == "well":
+            if room_id in {"TWELL", "BWELL"}:
+                other_room = "BWELL" if room_id == "TWELL" else "TWELL"
+                bucket_room = str(object_locations.get("BUCKE") or "").strip().upper()
+                if bucket_room == room_id and "aboard_bucket" in flags:
+                    object_locations["BUCKE"] = other_room
+                    if other_room == "BWELL":
+                        return (
+                            "The bucket creaks and descends into the darkness.",
+                            other_room,
+                            flags,
+                            object_locations,
+                            False,
+                        )
+                    return (
+                        "The bucket rises slowly and comes to rest at the top of the well.",
+                        other_room,
+                        flags,
+                        object_locations,
+                        False,
+                    )
+                if bucket_room == room_id:
+                    return ("The bucket is already here.", None, flags, object_locations, False)
+                object_locations["BUCKE"] = room_id
+                if room_id == "TWELL":
+                    return (
+                        "A wooden bucket rises out of the darkness and comes to rest beside the well.",
+                        None,
+                        flags,
+                        object_locations,
+                        False,
+                    )
+                return (
+                    "A wooden bucket descends from above and comes to rest beside you.",
+                    None,
+                    flags,
+                    object_locations,
+                    False,
+                )
             if room_id != "RIDDL":
-                return ("Well what?", flags, object_locations)
+                return ("Well what?", None, flags, object_locations, False)
             if "riddle_solved" in flags:
-                return ("The stone door is already open.", flags, object_locations)
+                return ("The stone door is already open.", None, flags, object_locations, False)
             flags.add("riddle_solved")
-            return ("There is a clap of thunder and the east door opens.", flags, object_locations)
+            return ("There is a clap of thunder and the east door opens.", None, flags, object_locations, False)
         if word_key == "sinbad":
             if room_id == "CYCLO" and "cyclops_gone" not in flags:
                 flags.add("cyclops_gone")
@@ -3601,11 +3722,13 @@ class ZorkGame:
                 object_locations["CYCLO"] = "GONE"
                 return (
                     "The cyclops, hearing the name of his deadly nemesis, flees by smashing down the north wall.",
+                    None,
                     flags,
                     object_locations,
+                    False,
                 )
-            return ("Wasn't he a sailor?", flags, object_locations)
-        return ("Nothing happens.", flags, object_locations)
+            return ("Wasn't he a sailor?", None, flags, object_locations, False)
+        return ("Nothing happens.", None, flags, object_locations, False)
 
     def _prayer_response(
         self,
@@ -3699,6 +3822,21 @@ class ZorkGame:
             if object_locations.get("FUSE") == "BRICK":
                 object_locations["FUSE"] = "SSLOT"
             return ("The brick slides neatly into the slot.", inventory, flags, object_locations)
+
+        if container_key == "LEAK":
+            if code_key != "PUTTY":
+                return ("Only putty seems likely to stop that leak.", inventory, flags, object_locations)
+            if room_id != "MAINT":
+                return ("There is no leak here.", inventory, flags, object_locations)
+            if "maintenance_leak_active" not in flags:
+                return ("There is no active leak to plug.", inventory, flags, object_locations)
+            flags.discard("maintenance_leak_active")
+            return (
+                "By some miracle of elven technology, you have managed to stop the leak in the dam.",
+                inventory,
+                flags,
+                object_locations,
+            )
 
         container_item = OBJECTS.get(container_key)
         if container_item is None or "CONTBIT" not in container_item.flags:
@@ -3865,6 +4003,24 @@ class ZorkGame:
             return ("The boat is already inflated and in one piece.", inventory, flags, object_locations)
         if code_key == "IBOAT":
             return ("The boat isn't damaged.", inventory, flags, object_locations)
+        if code_key == "LEAK":
+            if room_id != "MAINT":
+                return ("There is no leak here.", inventory, flags, object_locations)
+            if "maintenance_leak_active" not in flags:
+                return ("There is no leak to plug.", inventory, flags, object_locations)
+            if tool_key and tool_key != "PUTTY":
+                return (f"With a {object_name(tool_key)}?", inventory, flags, object_locations)
+            if tool_key != "PUTTY":
+                return ("You'll need something like putty to plug the leak.", inventory, flags, object_locations)
+            if "PUTTY" not in set(inventory):
+                return ("You need some putty for that.", inventory, flags, object_locations)
+            flags.discard("maintenance_leak_active")
+            return (
+                "By some miracle of elven technology, you have managed to stop the leak in the dam.",
+                inventory,
+                flags,
+                object_locations,
+            )
         if code_key != "DBOAT":
             return (f"You can't repair the {object_name(code_key)} that way.", inventory, flags, object_locations)
         if "DBOAT" not in inventory and object_locations.get("DBOAT") != room_id:
@@ -3902,12 +4058,22 @@ class ZorkGame:
                 return ("It would be more useful if it were inflated.", inventory, flags, object_locations)
             if target_key == "DBALL":
                 return ("It would be more useful if it were not shattered.", inventory, flags, object_locations)
+            if target_key == "BUCKE":
+                if "aboard_bucket" in flags:
+                    return ("You are already in the bucket.", inventory, flags, object_locations)
+                if object_locations.get("BUCKE") != room_id:
+                    return ("You don't see any bucket here.", inventory, flags, object_locations)
+                flags.discard("aboard_boat")
+                flags.discard("aboard_balloon")
+                flags.add("aboard_bucket")
+                return ("You are now in the bucket.", inventory, flags, object_locations)
             if target_key == "BALLO":
                 if "aboard_balloon" in flags:
                     return ("You are already in the balloon.", inventory, flags, object_locations)
                 if object_locations.get("BALLO") != room_id:
                     return ("You don't see any balloon here.", inventory, flags, object_locations)
                 flags.discard("aboard_boat")
+                flags.discard("aboard_bucket")
                 flags.add("aboard_balloon")
                 return ("You are now in the balloon basket.", inventory, flags, object_locations)
             if target_key != "RBOAT":
@@ -3925,6 +4091,7 @@ class ZorkGame:
                 flags.discard("aboard_boat")
                 return ("There is a hissing sound and the boat deflates.", inventory, flags, object_locations)
             flags.discard("aboard_balloon")
+            flags.discard("aboard_bucket")
             flags.add("aboard_boat")
             return ("You are now in the magic boat.", inventory, flags, object_locations)
 
@@ -3933,6 +4100,10 @@ class ZorkGame:
                 return ("This is no place to be getting out of the balloon.", inventory, flags, object_locations)
             flags.discard("aboard_balloon")
             return ("You climb out of the balloon basket.", inventory, flags, object_locations)
+
+        if "aboard_bucket" in flags:
+            flags.discard("aboard_bucket")
+            return ("You climb out of the bucket.", inventory, flags, object_locations)
 
         if "aboard_boat" not in flags:
             return ("You are not in any vehicle.", inventory, flags, object_locations)
@@ -4082,6 +4253,8 @@ class ZorkGame:
             "untie",
             "inflate",
             "deflate",
+            "push",
+            "press",
             "board",
             "disembark",
             "put",
@@ -4089,6 +4262,8 @@ class ZorkGame:
             "plug",
             "repair",
             "patch",
+            "raise",
+            "lower",
             "throw",
             "rub",
             "melt",
@@ -4122,7 +4297,7 @@ class ZorkGame:
                 handled=True,
                 reply_text=(
                     "zork: look, x/read, read <cake> through flask, eat, n/s/e/w/u/d, take/drop, put/insert, throw/rub, open/close, move, push/press, turn, "
-                    "light/burn/extinguish, dig, wave stick, tie/untie rope or balloon wire, plug/repair broken boat, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
+                    "light/burn/extinguish, dig, wave stick, tie/untie rope or balloon wire, raise/lower basket, plug/repair broken boat or leak, inflate/deflate boat, board/disembark, launch/land, pray/exorcise, "
                     "robot, press <button>; robot, north/east/etc.; robot, take sphere; robot, raise cage; magic words, score, attack, quit."
                 ),
                 command_name=self.SPEC.name,
@@ -4382,6 +4557,19 @@ class ZorkGame:
             self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
 
+        if head_raw in {"raise", "lower"}:
+            target_text = raw_target.strip()
+            if not target_text and room_id in {"TSHAF", "BSHAF"} and self._shaft_basket_here(session, room_id):
+                target_text = "basket"
+            target = self._resolve_object(session, target_text, head_raw) if target_text else None
+            if not target:
+                self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+                reply = f"You don't see any {target_text} here." if target_text else ("Raise what?" if head_raw == "raise" else "Lower what?")
+                return BotAppResult(handled=True, reply_text=reply, command_name=self.SPEC.name)
+            reply, flags, object_locations = self._raise_lower_response(session, head_raw, target)
+            self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
+
         if head_raw == "dig":
             tool_text = raw_target
             if " with " in f" {raw_target} ":
@@ -4633,9 +4821,17 @@ class ZorkGame:
             return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
 
         if head_raw in {"well", "sinbad"}:
-            reply, flags, object_locations = self._magic_word_response(session, head_raw)
-            self._write_session_state(session, room_id=room_id, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
-            return BotAppResult(handled=True, reply_text=self._compact(f"{reply} {self._room_summary(session, room_id)}"), command_name=self.SPEC.name)
+            reply, new_room, flags, object_locations, ended = self._magic_word_response(session, head_raw)
+            if ended:
+                self._sessions.pop(peer_id, None)
+                return BotAppResult(handled=True, reply_text=self._compact(reply), command_name=self.SPEC.name)
+            room_after = new_room or room_id
+            self._write_session_state(session, room_id=room_after, inventory=inventory, flags=flags, object_locations=object_locations, now_unix=now_unix)
+            return BotAppResult(
+                handled=True,
+                reply_text=self._compact(f"{reply} {self._room_summary(session, room_after)}"),
+                command_name=self.SPEC.name,
+            )
 
         if head_raw in {"attack", "fight", "kill"}:
             target = self._resolve_object(session, raw_target, "attack") if raw_target else None
