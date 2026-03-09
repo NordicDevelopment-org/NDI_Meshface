@@ -13034,10 +13034,23 @@
       const prompt = String(promptLabel == null ? "" : promptLabel).trim() || "$";
       const draft = String(draftValue == null ? "" : draftValue);
       const separator = /[$>]$/.test(prompt) ? "" : " ";
+      const promptWithSeparator = `${{prompt}}${{separator}}`;
       const input = consoleCommandInputElement();
       const focused = input instanceof HTMLInputElement && document.activeElement === input;
-      const caret = (activeLayoutView === "console" && focused && consoleCursorVisible) ? "_" : "";
-      return `${{prompt}}${{separator}}${{draft}}${{caret}}`;
+      if (!(activeLayoutView === "console" && focused && consoleCursorVisible)) {{
+        return escAttr(`${{promptWithSeparator}}${{draft}}`);
+      }}
+      const rawCaretIndex = input instanceof HTMLInputElement ? input.selectionStart : draft.length;
+      const caretIndex = Math.max(
+        0,
+        Math.min(
+          draft.length,
+          Math.trunc(Number.isFinite(rawCaretIndex) ? rawCaretIndex : draft.length)
+        )
+      );
+      const beforeCaret = draft.slice(0, caretIndex);
+      const afterCaret = draft.slice(caretIndex);
+      return `${{escAttr(`${{promptWithSeparator}}${{beforeCaret}}`)}}<span class="console-caret" aria-hidden="true"></span>${{escAttr(afterCaret)}}`;
     }}
 
     function formatConsolePromptEchoLine(promptLabel, commandText) {{
@@ -13061,9 +13074,9 @@
     function renderConsoleBuffer(forceScroll = false) {{
       const pre = document.getElementById("live-console");
       if (!(pre instanceof HTMLElement)) return;
-      const rendered = consoleLines.slice();
+      const rendered = consoleLines.map((line) => escAttr(String(line == null ? "" : line)));
       rendered.push(formatConsolePromptInputLine(consolePromptLabel, consoleCommandInputValue()));
-      pre.textContent = rendered.join("\n");
+      pre.innerHTML = rendered.join("\n");
       if (consoleAutoscroll || forceScroll) {{
         pre.scrollLeft = 0;
         pre.scrollTop = pre.scrollHeight;
@@ -14473,6 +14486,15 @@
         input.addEventListener("input", () => {{
           renderConsoleBuffer(false);
         }});
+        const rerenderForCaretMove = () => {{
+          if (document.activeElement === input) {{
+            renderConsoleBuffer(false);
+          }}
+        }};
+        input.addEventListener("select", rerenderForCaretMove);
+        input.addEventListener("keyup", rerenderForCaretMove);
+        input.addEventListener("click", rerenderForCaretMove);
+        input.addEventListener("mouseup", rerenderForCaretMove);
         input.addEventListener("keydown", (ev) => {{
           if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && String(ev.key || "").toLowerCase() === "c") {{
             if (consoleRunningCommand || consoleInteractiveSession) {{
