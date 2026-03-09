@@ -29,6 +29,8 @@ from .runtime_types import (
 )
 from .send_chat_contracts import SendLock
 
+_SUMMARY_PERSIST_STARTUP_GRACE_SECONDS = 90
+
 
 @dataclass(frozen=True)
 class DashboardRuntimeLoaders:
@@ -45,6 +47,22 @@ def _extract_state_summary(payload: object) -> Mapping[str, object] | None:
         return summary if isinstance(summary, Mapping) else None
     summary = getattr(payload, "summary", None)
     return summary if isinstance(summary, Mapping) else None
+
+
+def _to_int_or_none(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _should_skip_summary_persistence(summary: Mapping[str, object]) -> bool:
+    uptime_seconds = _to_int_or_none(summary.get("uptime_seconds"))
+    if uptime_seconds is None:
+        return False
+    return uptime_seconds < _SUMMARY_PERSIST_STARTUP_GRACE_SECONDS
 
 
 def _copy_state_fn_attrs(target_fn: object, source_fn: object) -> None:
@@ -77,6 +95,8 @@ def _with_summary_persistence(
     def _persist_summary(payload: object) -> None:
         summary = _extract_state_summary(payload)
         if summary is None:
+            return
+        if _should_skip_summary_persistence(summary):
             return
         try:
             save_summary_fn(summary)

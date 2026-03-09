@@ -181,6 +181,34 @@ def test_build_dashboard_runtime_loaders_persists_summary_metrics_when_store_sup
     assert saved and saved[0]["node_count"] == 5
 
 
+def test_with_summary_persistence_skips_startup_grace_samples():
+    saved = []
+
+    class _Store:
+        def save_summary_metrics(self, summary):
+            saved.append(dict(summary))
+
+    payloads = iter(
+        [
+            {"summary": {"node_count": 2, "uptime_seconds": 30}},
+            {"summary": {"node_count": 8, "uptime_seconds": 120}},
+        ]
+    )
+
+    def _base_state_fn():
+        return next(payloads)
+
+    wrapped = runtime_loaders_mod._with_summary_persistence(
+        base_state_fn=_base_state_fn,
+        history_store=_Store(),
+    )
+
+    assert wrapped()["summary"]["node_count"] == 2
+    assert wrapped()["summary"]["node_count"] == 8
+    assert len(saved) == 1
+    assert saved[0]["node_count"] == 8
+
+
 def test_extract_and_copy_state_helpers_cover_mapping_and_attr_paths(monkeypatch):
     assert runtime_loaders_mod._extract_state_summary({"summary": {"ok": True}}) == {"ok": True}
     assert runtime_loaders_mod._extract_state_summary({"summary": "bad"}) is None
