@@ -1,6 +1,7 @@
 # Ideas Backlog
 
-
+- poker game, blackjack
+- bot activity show as (1)
 - move channel config to channels, give setting tabs
 - fix deselected channel notifaction
 - put channels in tabs w/ notifaction totalss (N)
