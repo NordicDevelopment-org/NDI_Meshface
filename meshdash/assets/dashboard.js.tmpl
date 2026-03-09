@@ -2178,10 +2178,12 @@
     let historyActivityTopPct = 50;
     let historyChatMainPct = 72;
     let consoleAutoscroll = true;
+    let consoleShowTimestamps = false;
     let consoleFontSize = "md";
     let consoleCommandHistory = [];
     let consoleCommandHistoryCursor = -1;
     let consoleCommandDraft = "";
+    let consolePromptLabel = "$";
     let consoleRunningCommand = null;
     let consoleInteractiveSession = null;
     let consoleLiveModeActive = false;
@@ -13016,10 +13018,29 @@
       ].join("|");
     }}
 
+    function consoleCommandInputElement() {{
+      const input = document.getElementById("console-command-input");
+      return input instanceof HTMLInputElement ? input : null;
+    }}
+
+    function consoleCommandInputValue() {{
+      const input = consoleCommandInputElement();
+      return input ? String(input.value || "") : "";
+    }}
+
+    function formatConsolePromptInputLine(promptLabel, draftValue) {{
+      const prompt = String(promptLabel == null ? "" : promptLabel).trim() || "$";
+      const draft = String(draftValue == null ? "" : draftValue);
+      const separator = prompt === ">" ? "" : " ";
+      return `${{prompt}}${{separator}}${{draft}}`;
+    }}
+
     function renderConsoleBuffer(forceScroll = false) {{
       const pre = document.getElementById("live-console");
       if (!(pre instanceof HTMLElement)) return;
-      pre.textContent = consoleLines.join("\n");
+      const rendered = consoleLines.slice();
+      rendered.push(formatConsolePromptInputLine(consolePromptLabel, consoleCommandInputValue()));
+      pre.textContent = rendered.join("\n");
       if (consoleAutoscroll || forceScroll) {{
         pre.scrollLeft = 0;
         pre.scrollTop = pre.scrollHeight;
@@ -13069,17 +13090,9 @@
       if (pre instanceof HTMLElement) {{
         pre.style.fontSize = `${{px}}px`;
       }}
-      const input = document.getElementById("console-command-input");
+      const input = consoleCommandInputElement();
       if (input instanceof HTMLInputElement) {{
-        input.style.fontSize = `${{px}}px`;
-      }}
-      const prompt = document.getElementById("console-prompt-label");
-      if (prompt instanceof HTMLElement) {{
-        prompt.style.fontSize = `${{px}}px`;
-      }}
-      const runBtn = document.getElementById("console-command-run-btn");
-      if (runBtn instanceof HTMLButtonElement) {{
-        runBtn.style.fontSize = `${{Math.max(10, px - 1)}}px`;
+        input.style.fontSize = `${{Math.max(8, px)}}px`;
       }}
       consoleFontSize = key;
     }}
@@ -13155,6 +13168,7 @@
           lines: consoleLines.slice(-consoleMaxLines),
           commandHistory: consoleCommandHistory.slice(-consoleCommandHistoryMax),
           autoscroll: !!consoleAutoscroll,
+          timestamps: !!consoleShowTimestamps,
           interactiveSession,
           eventCounter: Math.max(0, Math.trunc(Number(consoleEventCounter) || 0)),
         }};
@@ -13195,6 +13209,7 @@
         consoleCommandHistoryCursor = -1;
         consoleCommandDraft = "";
         consoleAutoscroll = payload.autoscroll !== false;
+        consoleShowTimestamps = payload.timestamps === true;
         consoleInteractiveSession = normalizeConsoleInteractiveSession(payload.interactiveSession);
         consoleEventCounter = Math.max(0, Math.trunc(Number(payload.eventCounter) || 0));
       }} catch (_err) {{
@@ -13205,6 +13220,12 @@
       const text = String(value == null ? "" : value).trim();
       if (!text) return false;
       return /no active standalone zork session/i.test(text);
+    }}
+
+    function normalizeStandaloneZorkReplyText(value) {{
+      const text = String(value == null ? "" : value).trim();
+      if (!text) return "";
+      return text.replace(/^zork:\s*session started\.\s*/i, "").trim();
     }}
 
     function wildcardPatternToRegExp(pattern) {{
@@ -13391,6 +13412,7 @@
           consoleCommandHistoryCursor = -1;
           inputEl.value = consoleCommandDraft;
           inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+          renderConsoleBuffer(false);
           return;
         }}
       }}
@@ -13398,6 +13420,7 @@
       const nextValue = String(consoleCommandHistory[consoleCommandHistoryCursor] || "");
       inputEl.value = nextValue;
       inputEl.setSelectionRange(nextValue.length, nextValue.length);
+      renderConsoleBuffer(false);
     }}
 
     function isZorkConsoleInteractiveSession(session = consoleInteractiveSession) {{
@@ -13410,9 +13433,7 @@
     }}
 
     function syncConsoleCommandInputState() {{
-      const input = document.getElementById("console-command-input");
-      const runBtn = document.getElementById("console-command-run-btn");
-      const prompt = document.getElementById("console-prompt-label");
+      const input = consoleCommandInputElement();
       const runningName = consoleRunningCommand && consoleRunningCommand.name
         ? String(consoleRunningCommand.name)
         : "";
@@ -13432,23 +13453,17 @@
           : interactiveName
             ? `enter ${{interactiveName}} command  /help for console`
           : "enter command or type help";
-      if (prompt instanceof HTMLElement) {{
-        prompt.textContent = promptLabel;
-        prompt.classList.toggle("is-running", !!runningName);
-        prompt.classList.toggle("is-zork", !runningName && interactiveIsZork);
-      }}
+      consolePromptLabel = promptLabel;
       if (input instanceof HTMLInputElement) {{
         input.placeholder = placeholder;
-        input.classList.toggle("is-running", !!runningName || !!interactiveName);
+        input.setAttribute("title", placeholder);
       }}
-      if (runBtn instanceof HTMLButtonElement) {{
-        runBtn.textContent = runningName ? "Busy" : interactiveName ? "Send" : "Run";
-      }}
+      renderConsoleBuffer(false);
       persistConsoleSessionState();
     }}
 
     function focusConsoleCommandInput(select = false) {{
-      const input = document.getElementById("console-command-input");
+      const input = consoleCommandInputElement();
       if (!(input instanceof HTMLInputElement)) return;
       try {{
         input.focus({{ preventScroll: true }});
@@ -13649,11 +13664,12 @@
           session.sessionId = nextSessionId;
           persistConsoleSessionState();
         }}
-        const replyText = String(
+        const replyTextRaw = String(
           payload && Object.prototype.hasOwnProperty.call(payload, "reply_text")
             ? (payload.reply_text ?? "")
             : ""
         );
+        const replyText = normalizeStandaloneZorkReplyText(replyTextRaw);
         if (replyText.trim()) {{
           const receivedAtMs = Date.now();
           appendConsoleLine(
@@ -13997,11 +14013,12 @@
           }};
           syncConsoleCommandInputState();
           const lines = [];
-          const replyText = String(
+          const replyTextRaw = String(
             payload && Object.prototype.hasOwnProperty.call(payload, "reply_text")
               ? (payload.reply_text ?? "")
               : ""
           );
+          const replyText = normalizeStandaloneZorkReplyText(replyTextRaw);
           if (replyText.trim()) {{
             lines.push(replyText);
           }}
@@ -14212,6 +14229,9 @@
       if (isZorkConsoleInteractiveSession(consoleInteractiveSession)) {{
         return body;
       }}
+      if (!consoleShowTimestamps) {{
+        return `> ${{body}}`;
+      }}
       const timestamp = formatConsoleTimestamp(loggedAtMs);
       return `[${{timestamp}}] > ${{body}}`;
     }}
@@ -14237,10 +14257,15 @@
 
     async function runConsoleCommandLine(rawLine) {{
       const line = String(rawLine == null ? "" : rawLine).trim();
-      if (!line) return;
       const zorkPromptInput = isZorkConsoleInteractiveSession(consoleInteractiveSession) && !line.startsWith("/");
-      const renderedInput = zorkPromptInput ? `>${{line}}` : `$ ${{line}}`;
+      let renderedInput = "";
+      if (zorkPromptInput) {{
+        renderedInput = line ? `>${{line}}` : ">";
+      }} else {{
+        renderedInput = line ? `$ ${{line}}` : "$";
+      }}
       appendConsoleEventLine(renderedInput);
+      if (!line) return;
       pushConsoleHistoryEntry(line);
       if (consoleRunningCommand) {{
         appendConsoleEventLine(
@@ -14318,6 +14343,18 @@
           }}
         }});
       }}
+      const timestamps = document.getElementById("console-timestamps");
+      if (timestamps instanceof HTMLInputElement) {{
+        timestamps.checked = !!consoleShowTimestamps;
+        if (timestamps.dataset.bound !== "1") {{
+          timestamps.dataset.bound = "1";
+          timestamps.addEventListener("change", () => {{
+            consoleShowTimestamps = !!timestamps.checked;
+            persistConsoleSessionState();
+            renderConsoleBuffer(false);
+          }});
+        }}
+      }}
       const fontSizeSelect = document.getElementById("console-font-size-select");
       if (fontSizeSelect instanceof HTMLSelectElement) {{
         fontSizeSelect.value = normalizeConsoleFontSize(consoleFontSize);
@@ -14356,28 +14393,24 @@
         terminalScreen.dataset.bound = "1";
         terminalScreen.addEventListener("click", (ev) => {{
           const target = ev.target;
-          if (target instanceof HTMLElement && target.closest("#live-console")) return;
-          if (target instanceof HTMLInputElement || target instanceof HTMLButtonElement) return;
+          if (target instanceof HTMLButtonElement) return;
+          const pre = document.getElementById("live-console");
+          const selection = window.getSelection ? window.getSelection() : null;
+          const hasConsoleSelection = selectionIntersectsElement(
+            selection,
+            pre instanceof HTMLElement ? pre : null
+          ) && String(selection ? selection.toString() : "").trim();
+          if (hasConsoleSelection) return;
           focusConsoleCommandInput(false);
         }});
       }}
       applyConsoleFontSizePreference();
-      const form = document.getElementById("console-command-form");
-      const input = document.getElementById("console-command-input");
-      if (form instanceof HTMLFormElement && input instanceof HTMLInputElement && form.dataset.bound !== "1") {{
-        form.dataset.bound = "1";
-        form.addEventListener("submit", (ev) => {{
-          ev.preventDefault();
-          const cmdLine = input.value;
-          input.value = "";
-          consoleCommandHistoryCursor = -1;
-          consoleCommandDraft = "";
-          void runConsoleCommandLine(cmdLine);
-          focusConsoleCommandInput(false);
-        }});
-      }}
+      const input = consoleCommandInputElement();
       if (input instanceof HTMLInputElement && input.dataset.bound !== "1") {{
         input.dataset.bound = "1";
+        input.addEventListener("input", () => {{
+          renderConsoleBuffer(false);
+        }});
         input.addEventListener("keydown", (ev) => {{
           if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && String(ev.key || "").toLowerCase() === "c") {{
             if (consoleRunningCommand || consoleInteractiveSession) {{
@@ -14389,7 +14422,19 @@
               input.value = "";
               consoleCommandHistoryCursor = -1;
               consoleCommandDraft = "";
+              renderConsoleBuffer(false);
             }}
+            return;
+          }}
+          if (ev.key === "Enter" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
+            ev.preventDefault();
+            const cmdLine = input.value;
+            input.value = "";
+            consoleCommandHistoryCursor = -1;
+            consoleCommandDraft = "";
+            renderConsoleBuffer(false);
+            void runConsoleCommandLine(cmdLine);
+            focusConsoleCommandInput(false);
             return;
           }}
           if (ev.key === "ArrowUp" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
@@ -14404,11 +14449,7 @@
         }});
       }}
       syncConsoleCommandInputState();
-      if (!consoleLines.length) {{
-        appendConsoleEventLine("[console] type \"help\" for commands. Start standalone Zork with \"zork\". Start live stream with \"live\", \"live -v\", \"live -vv\", \"live -vvv\", or \"live -vvvv\".");
-      }} else {{
-        renderConsoleBuffer(false);
-      }}
+      renderConsoleBuffer(false);
     }}
 
     function renderConsole(traffic) {{

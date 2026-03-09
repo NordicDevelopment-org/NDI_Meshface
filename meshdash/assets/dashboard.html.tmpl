@@ -1080,6 +1080,7 @@
         <div class="console-controls">
           <button id="console-clear-btn" type="button">Clear</button>
           <label><input id="console-autoscroll" type="checkbox" checked /> Auto-scroll</label>
+          <label><input id="console-timestamps" type="checkbox" /> Timestamps</label>
           <label class="console-select-label" for="console-font-size-select">Text size</label>
           <select id="console-font-size-select" class="console-select" aria-label="Console text size">
             <option value="sm">Small</option>
@@ -1090,18 +1091,17 @@
         </div>
         <div id="console-terminal-screen" class="console-terminal-screen">
           <pre id="live-console"></pre>
-          <form id="console-command-form" class="console-command-form" autocomplete="off">
-            <span id="console-prompt-label" class="console-prompt-label" aria-hidden="true">$</span>
-            <input
-              id="console-command-input"
-              class="console-command-input"
-              type="text"
-              placeholder='Type "live -v" or "help"'
-              spellcheck="false"
-              autocomplete="off"
-            />
-            <button id="console-command-run-btn" type="submit">Run</button>
-          </form>
+          <input
+            id="console-command-input"
+            class="console-command-input-proxy"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            tabindex="-1"
+            aria-label="Console command input"
+          />
         </div>
       </div>
     </section>

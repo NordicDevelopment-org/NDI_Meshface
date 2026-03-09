@@ -9,7 +9,7 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert ".workspace-shell" in css
     assert ".console-select" in css
     assert ".console-terminal-screen" in css
-    assert ".console-prompt-label" in css
+    assert ".console-command-input-proxy" in css
     assert "#history-chat-table td.history-node-clickable" in css
     assert "#history-chat-table tbody tr.history-node-selectable.selected-node td" in css
     assert ".bots-setting-note" in css
@@ -48,8 +48,9 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "const consoleFontSizeStorageKey = \"meshDashboardConsoleFontSizeV1\";" in js
     assert "loadConsoleFontSizePreference();" in js
     assert "window.localStorage.setItem(consoleFontSizeStorageKey" in js
-    assert "const prompt = document.getElementById(\"console-prompt-label\");" in js
-    assert "const promptLabel = runningName" in js
+    assert "let consolePromptLabel = \"$\";" in js
+    assert "let consoleShowTimestamps = false;" in js
+    assert "function formatConsolePromptInputLine(promptLabel, draftValue)" in js
     assert "const terminalScreen = document.getElementById(\"console-terminal-screen\");" in js
     assert "async function copyConsoleSelectionToClipboard()" in js
     assert "async function copyChatSelectionToClipboard()" in js
