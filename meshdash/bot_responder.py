@@ -35,6 +35,9 @@ _NATURAL_PING_PREFIXES = (
 _CHAT_TOO_LONG_RE = re.compile(r"Message is too long \((\d+) bytes\)\. Limit is (\d+) bytes\.")
 _REPLY_PACKET_TEXT_RESERVE_BYTES = 20
 _DEFAULT_SEGMENT_DELAY_SECONDS = 1.5
+_DEFAULT_SEGMENT_RETRY_COUNT = 2
+_DEFAULT_SEGMENT_ACK_WAIT_SECONDS = 2.5
+_SEGMENT_ACK_POLL_SECONDS = 0.2
 
 
 def _parse_bool_token(value: object, default: bool) -> bool:
@@ -64,6 +67,29 @@ def _parse_nonnegative_float_token(value: object, default: float) -> float:
     if parsed < 0:
         return fallback
     return parsed
+
+
+def _parse_nonnegative_int_token(value: object, default: int) -> int:
+    fallback = max(0, int(default))
+    if value is None:
+        return fallback
+    text = str(value).strip()
+    if not text:
+        return fallback
+    try:
+        parsed = int(text)
+    except Exception:
+        return fallback
+    if parsed < 0:
+        return fallback
+    return parsed
+
+
+def _normalize_delivery_state(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in ("sent", "pending", "acked", "nak", "timeout", "error"):
+        return text
+    return ""
 
 
 def _is_hex_text(value: str) -> bool:
@@ -461,6 +487,9 @@ class MeshResponseBot:
         settings_path: Optional[str] = None,
         chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
         segment_delay_seconds: float = 0.0,
+        segment_retry_count: int = 0,
+        segment_ack_wait_seconds: float = 0.0,
+        delivery_state_lookup_fn: Optional[Callable[[int], Optional[str]]] = None,
         sleep_fn: Callable[[float], None] = time.sleep,
         now_unix_fn: Callable[[], float] = time.time,
     ) -> None:
@@ -472,6 +501,9 @@ class MeshResponseBot:
         self._settings_path = str(settings_path).strip() if settings_path else None
         self._chat_max_bytes = max(1, int(chat_max_bytes))
         self._segment_delay_seconds = _parse_nonnegative_float_token(segment_delay_seconds, 0.0)
+        self._segment_retry_count = _parse_nonnegative_int_token(segment_retry_count, 0)
+        self._segment_ack_wait_seconds = _parse_nonnegative_float_token(segment_ack_wait_seconds, 0.0)
+        self._delivery_state_lookup_fn = delivery_state_lookup_fn
         self._sleep_fn = sleep_fn
         self._now_unix_fn = now_unix_fn
         self._game_public_start_enabled = bool(game_public_start_enabled)
@@ -1028,22 +1060,22 @@ class MeshResponseBot:
             for index, segment in enumerate(proactive_segments):
                 if index > 0 and self._segment_delay_seconds > 0:
                     self._sleep_fn(self._segment_delay_seconds)
-                payload = self._send_chat_fn(
+                payload = self._send_segment_with_retry(
                     text=segment,
                     destination=destination,
                     channel_index=channel_index,
                     reply_id=reply_id if index == 0 else None,
                 )
-                payloads.append(payload if isinstance(payload, dict) else {})
+                payloads.append(payload)
             return (proactive_segments, payloads)
         try:
-            payload = self._send_chat_fn(
+            payload = self._send_segment_with_retry(
                 text=clean_text,
                 destination=destination,
                 channel_index=channel_index,
                 reply_id=reply_id,
             )
-            return ([clean_text], [payload if isinstance(payload, dict) else {}])
+            return ([clean_text], [payload])
         except Exception as exc:
             limit = _chat_limit_bytes_from_error(exc)
             if limit is None:
@@ -1055,14 +1087,82 @@ class MeshResponseBot:
         for index, segment in enumerate(segments):
             if index > 0 and self._segment_delay_seconds > 0:
                 self._sleep_fn(self._segment_delay_seconds)
-            payload = self._send_chat_fn(
+            payload = self._send_segment_with_retry(
                 text=segment,
                 destination=destination,
                 channel_index=channel_index,
                 reply_id=reply_id if index == 0 else None,
             )
-            payloads.append(payload if isinstance(payload, dict) else {})
+            payloads.append(payload)
         return (segments, payloads)
+
+    def _lookup_delivery_state(self, message_id: int) -> str:
+        if message_id <= 0 or self._delivery_state_lookup_fn is None:
+            return ""
+        try:
+            return _normalize_delivery_state(self._delivery_state_lookup_fn(message_id))
+        except Exception:
+            return ""
+
+    def _wait_for_delivery_state(self, message_id: int) -> str:
+        state = self._lookup_delivery_state(message_id)
+        if state in ("acked", "sent", "nak", "timeout", "error"):
+            return state
+        timeout_seconds = max(0.0, float(self._segment_ack_wait_seconds))
+        if timeout_seconds <= 0:
+            return state
+        remaining = timeout_seconds
+        while remaining > 0:
+            sleep_for = min(_SEGMENT_ACK_POLL_SECONDS, remaining)
+            self._sleep_fn(sleep_for)
+            remaining = max(0.0, remaining - sleep_for)
+            current = self._lookup_delivery_state(message_id)
+            if current:
+                state = current
+            if current in ("acked", "sent", "nak", "timeout", "error"):
+                return current
+        return state
+
+    def _send_segment_with_retry(
+        self,
+        *,
+        text: str,
+        destination: str,
+        channel_index: int,
+        reply_id: Optional[int],
+    ) -> dict[str, object]:
+        should_track_delivery = bool(
+            destination.startswith("!")
+            and self._delivery_state_lookup_fn is not None
+        )
+        max_attempts = 1 + (self._segment_retry_count if should_track_delivery else 0)
+        previous_message_id: Optional[int] = None
+        payload: dict[str, object] = {}
+        for attempt in range(max_attempts):
+            send_kwargs: dict[str, object] = {
+                "text": text,
+                "destination": destination,
+                "channel_index": channel_index,
+                "reply_id": reply_id,
+            }
+            if attempt > 0 and previous_message_id is not None and previous_message_id > 0:
+                send_kwargs["retry_of"] = previous_message_id
+            payload_raw = self._send_chat_fn(**send_kwargs)
+            payload = payload_raw if isinstance(payload_raw, dict) else {}
+            if not should_track_delivery:
+                return payload
+            message_id = _to_int(payload.get("message_id"))
+            if message_id is None or message_id <= 0:
+                return payload
+            previous_message_id = message_id
+            state = self._wait_for_delivery_state(message_id)
+            if state in ("acked", "sent"):
+                return payload
+            if attempt + 1 >= max_attempts:
+                return payload
+            if self._segment_delay_seconds > 0:
+                self._sleep_fn(self._segment_delay_seconds)
+        return payload
 
     def on_receive(self, packet: object, interface: object = None, **_kwargs: object) -> None:
         if not self._enabled and not self._log_enabled:
@@ -1308,6 +1408,7 @@ def build_mesh_response_bot_from_env(
     get_local_node_id_fn: Callable[[object], str],
     env: Optional[dict[str, str]] = None,
     chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
+    delivery_state_lookup_fn: Optional[Callable[[int], Optional[str]]] = None,
     sleep_fn: Callable[[float], None] = time.sleep,
     now_unix_fn: Callable[[], float] = time.time,
 ) -> Optional[MeshResponseBot]:
@@ -1341,6 +1442,14 @@ def build_mesh_response_bot_from_env(
         env_map.get("MESH_DASH_BOT_SEGMENT_DELAY_MS"),
         _DEFAULT_SEGMENT_DELAY_SECONDS * 1000.0,
     )
+    segment_retries = _parse_nonnegative_int_token(
+        env_map.get("MESH_DASH_BOT_SEGMENT_RETRIES"),
+        _DEFAULT_SEGMENT_RETRY_COUNT,
+    )
+    segment_ack_wait_ms = _parse_nonnegative_float_token(
+        env_map.get("MESH_DASH_BOT_SEGMENT_ACK_WAIT_MS"),
+        _DEFAULT_SEGMENT_ACK_WAIT_SECONDS * 1000.0,
+    )
     custom_commands = _load_custom_commands_from_env(env_map)
     if "MESH_DASH_BOT_DISABLED_COMMANDS" in env_map:
         disabled_commands = _load_disabled_commands_from_env(env_map)
@@ -1365,6 +1474,9 @@ def build_mesh_response_bot_from_env(
         settings_path=settings_path,
         chat_max_bytes=chat_max_bytes,
         segment_delay_seconds=segment_delay_ms / 1000.0,
+        segment_retry_count=segment_retries,
+        segment_ack_wait_seconds=segment_ack_wait_ms / 1000.0,
+        delivery_state_lookup_fn=delivery_state_lookup_fn,
         sleep_fn=sleep_fn,
         now_unix_fn=now_unix_fn,
     )

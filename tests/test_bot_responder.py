@@ -633,6 +633,53 @@ def test_zork_leaflet_reply_segments_are_paced_with_configured_delay():
     assert sleep_calls == [0.25] * (len(leaflet_segments) - 1)
 
 
+def test_segmented_direct_reply_retries_unacked_parts():
+    sent = []
+    next_message_id = 8000
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    def _delivery_state_lookup(message_id: int) -> str:
+        if message_id == 8002:
+            return "pending"
+        return "acked"
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        chat_max_bytes=220,
+        segment_delay_seconds=0.0,
+        segment_retry_count=2,
+        segment_ack_wait_seconds=0.0,
+        delivery_state_lookup_fn=_delivery_state_lookup,
+        sleep_fn=lambda _seconds: None,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+
+    segments, _payloads = bot._send_reply_text(
+        text="welcome " * 120,
+        destination="!49b5dff0",
+        channel_index=0,
+        reply_id=2701,
+    )
+
+    assert len(segments) >= 2
+    assert len(sent) == len(segments) + 1
+    segment_text_counts: dict[str, int] = {}
+    for row in sent:
+        clean = str(row.get("text") or "")
+        segment_text_counts[clean] = int(segment_text_counts.get(clean) or 0) + 1
+    duplicated_segments = [text for text, count in segment_text_counts.items() if count >= 2]
+    assert duplicated_segments
+    assert sent[0].get("reply_id") == 2701
+
+
 def test_zork_game_disabled_still_logs_direct_start_requests():
     iface = _FakeIface()
     sent = []
@@ -690,6 +737,21 @@ def test_build_bot_from_env_can_override_segment_delay():
     )
     assert bot is not None
     assert bot._segment_delay_seconds == 0.9
+
+
+def test_build_bot_from_env_can_override_segment_retry_controls():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_SEGMENT_RETRIES": "7",
+            "MESH_DASH_BOT_SEGMENT_ACK_WAIT_MS": "1250",
+        },
+    )
+    assert bot is not None
+    assert bot._segment_retry_count == 7
+    assert bot._segment_ack_wait_seconds == 1.25
 
 
 def test_build_bot_from_env_can_disable_specific_command():

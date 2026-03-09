@@ -238,10 +238,53 @@ def build_dashboard_runtime_context(
 
     # Optional: attach chat response bot hook (server-side, radio-wide behavior).
     try:
+        def _bot_delivery_state_lookup(message_id: int) -> Optional[str]:
+            clean_message_id = to_int_fn(message_id)
+            if clean_message_id is None or clean_message_id <= 0:
+                return None
+            recent_chat = getattr(tracker, "recent_chat", None)
+            if recent_chat is None:
+                return None
+
+            def _scan_recent_chat() -> Optional[str]:
+                try:
+                    iterator = reversed(recent_chat)
+                except Exception:
+                    try:
+                        iterator = reversed(list(recent_chat))
+                    except Exception:
+                        return None
+                for entry in iterator:
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("local_echo") is not True:
+                        continue
+                    row_message_id = to_int_fn(
+                        entry.get("message_id")
+                        or entry.get("messageId")
+                        or entry.get("packet_id")
+                        or entry.get("packetId")
+                    )
+                    if row_message_id != clean_message_id:
+                        continue
+                    state = str(entry.get("delivery_state") or "").strip().lower()
+                    return state or None
+                return None
+
+            tracker_lock = getattr(tracker, "_lock", None)
+            if tracker_lock is not None and hasattr(tracker_lock, "__enter__") and hasattr(tracker_lock, "__exit__"):
+                try:
+                    with tracker_lock:
+                        return _scan_recent_chat()
+                except Exception:
+                    return _scan_recent_chat()
+            return _scan_recent_chat()
+
         response_bot = _build_mesh_response_bot_from_env(
             send_chat_fn=loaders.send_chat_fn,
             get_local_node_id_fn=get_local_node_id_fn,
             chat_max_bytes=default_chat_max_bytes,
+            delivery_state_lookup_fn=_bot_delivery_state_lookup,
         )
     except Exception:
         response_bot = None
