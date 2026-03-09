@@ -2184,6 +2184,8 @@
     let consoleCommandHistoryCursor = -1;
     let consoleCommandDraft = "";
     let consolePromptLabel = "$";
+    let consoleCursorVisible = true;
+    let consoleCursorBlinkTimer = null;
     let consoleRunningCommand = null;
     let consoleInteractiveSession = null;
     let consoleLiveModeActive = false;
@@ -13031,8 +13033,29 @@
     function formatConsolePromptInputLine(promptLabel, draftValue) {{
       const prompt = String(promptLabel == null ? "" : promptLabel).trim() || "$";
       const draft = String(draftValue == null ? "" : draftValue);
-      const separator = prompt === ">" ? "" : " ";
-      return `${{prompt}}${{separator}}${{draft}}`;
+      const separator = /[$>]$/.test(prompt) ? "" : " ";
+      const input = consoleCommandInputElement();
+      const focused = input instanceof HTMLInputElement && document.activeElement === input;
+      const caret = (activeLayoutView === "console" && focused && consoleCursorVisible) ? "_" : "";
+      return `${{prompt}}${{separator}}${{draft}}${{caret}}`;
+    }}
+
+    function formatConsolePromptEchoLine(promptLabel, commandText) {{
+      const prompt = String(promptLabel == null ? "" : promptLabel).trim() || "$";
+      const body = String(commandText == null ? "" : commandText).trim();
+      if (!body) return prompt;
+      const separator = /[$>]$/.test(prompt) ? "" : " ";
+      return `${{prompt}}${{separator}}${{body}}`;
+    }}
+
+    function startConsoleCursorBlink() {{
+      if (consoleCursorBlinkTimer !== null) return;
+      consoleCursorBlinkTimer = window.setInterval(() => {{
+        consoleCursorVisible = !consoleCursorVisible;
+        if (activeLayoutView === "console") {{
+          renderConsoleBuffer(false);
+        }}
+      }}, 530);
     }}
 
     function renderConsoleBuffer(forceScroll = false) {{
@@ -13432,6 +13455,39 @@
       return name === "zork" || name === "zork-remote";
     }}
 
+    function normalizeConsolePromptHostLabel(value) {{
+      const clean = String(value == null ? "" : value).trim().toLowerCase();
+      if (!clean) return "radio";
+      const compact = clean
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 24);
+      return compact || "radio";
+    }}
+
+    function resolveConsolePromptHostLabel(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const selfId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      if (isCanonicalNodeId(selfId)) {{
+        return normalizeConsolePromptHostLabel(selfRadioProfileShortLabel(selfId));
+      }}
+      const profileShortEl = document.getElementById("self-radio-profile-short");
+      if (profileShortEl instanceof HTMLElement) {{
+        const shortText = String(profileShortEl.textContent || "").trim();
+        if (shortText && shortText.toLowerCase() !== "na") {{
+          return normalizeConsolePromptHostLabel(shortText);
+        }}
+      }}
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const selfNode = nodes.find((node) => normalizeNodeId(node && node.id) === selfId) || null;
+      const owner = localNodeUserFromState(safeState);
+      const longName = String((owner && owner.long_name) || "").trim();
+      const shortName = String((owner && owner.short_name) || "").trim();
+      const cachedName = selfId ? String(nodeNameCache.get(selfId) || "").trim() : "";
+      const baseName = preferredNodeName(selfNode) || longName || shortName || cachedName || selfId || "radio";
+      return normalizeConsolePromptHostLabel(baseName.replace(/^!+/, ""));
+    }}
+
     function syncConsoleCommandInputState() {{
       const input = consoleCommandInputElement();
       const runningName = consoleRunningCommand && consoleRunningCommand.name
@@ -13445,7 +13501,7 @@
         ? `${{runningName.replace(/[^a-z0-9_-]+/gi, "").slice(0, 10) || "busy"}}>`
         : interactiveIsZork
           ? ">"
-          : "$";
+          : `[${{resolveConsolePromptHostLabel(latestState)}}]$`;
       const placeholder = runningName
         ? `ctrl+c to stop ${{runningName}}`
         : interactiveIsZork
@@ -13476,6 +13532,8 @@
         const len = input.value.length;
         input.setSelectionRange(len, len);
       }}
+      consoleCursorVisible = true;
+      renderConsoleBuffer(false);
     }}
 
     function selectionIntersectsElement(selection, element) {{
@@ -14230,10 +14288,10 @@
         return body;
       }}
       if (!consoleShowTimestamps) {{
-        return `> ${{body}}`;
+        return body;
       }}
       const timestamp = formatConsoleTimestamp(loggedAtMs);
-      return `[${{timestamp}}] > ${{body}}`;
+      return `[${{timestamp}}] ${{body}}`;
     }}
 
     function appendConsoleLine(key, line, loggedAtMs = Date.now(), renderNow = false) {{
@@ -14258,12 +14316,8 @@
     async function runConsoleCommandLine(rawLine) {{
       const line = String(rawLine == null ? "" : rawLine).trim();
       const zorkPromptInput = isZorkConsoleInteractiveSession(consoleInteractiveSession) && !line.startsWith("/");
-      let renderedInput = "";
-      if (zorkPromptInput) {{
-        renderedInput = line ? `>${{line}}` : ">";
-      }} else {{
-        renderedInput = line ? `$ ${{line}}` : "$";
-      }}
+      const promptLabel = zorkPromptInput ? ">" : consolePromptLabel;
+      const renderedInput = formatConsolePromptEchoLine(promptLabel, line);
       appendConsoleEventLine(renderedInput);
       if (!line) return;
       pushConsoleHistoryEntry(line);
@@ -14408,6 +14462,14 @@
       const input = consoleCommandInputElement();
       if (input instanceof HTMLInputElement && input.dataset.bound !== "1") {{
         input.dataset.bound = "1";
+        input.addEventListener("focus", () => {{
+          consoleCursorVisible = true;
+          renderConsoleBuffer(false);
+        }});
+        input.addEventListener("blur", () => {{
+          consoleCursorVisible = false;
+          renderConsoleBuffer(false);
+        }});
         input.addEventListener("input", () => {{
           renderConsoleBuffer(false);
         }});
@@ -14448,6 +14510,7 @@
           }}
         }});
       }}
+      startConsoleCursorBlink();
       syncConsoleCommandInputState();
       renderConsoleBuffer(false);
     }}
