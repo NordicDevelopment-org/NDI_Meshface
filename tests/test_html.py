@@ -39,6 +39,9 @@ def test_render_html_includes_chat_view_structure_tokens():
     assert 'id="chat-feed"' in html
     assert 'id="chat-input"' in html
     assert 'id="chat-user-search-input"' in html
+    assert 'id="self-radio-profile"' in html
+    assert 'id="self-radio-menu"' in html
+    assert 'id="self-radio-copy-id-btn"' in html
 
 
 def test_render_html_includes_console_text_size_control():

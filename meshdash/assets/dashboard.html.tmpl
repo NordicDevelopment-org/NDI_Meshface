@@ -17,8 +17,29 @@
 <body>
   <div class="topbar">
     <div class="topbar-notify-corner">
-      <div id="self-radio-profile" class="topbar-self-profile" title="Connected local radio: unavailable" aria-label="Connected local radio">
-        <span id="self-radio-profile-short" class="topbar-self-profile-short">na</span>
+      <div class="self-radio-menu-wrap topbar-self-radio-menu-wrap">
+        <button
+          id="self-radio-profile"
+          class="topbar-self-profile"
+          type="button"
+          title="Connected local radio: unavailable"
+          aria-label="Connected local radio"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <span id="self-radio-profile-short" class="topbar-self-profile-short">na</span>
+        </button>
+        <div id="self-radio-menu" class="self-radio-menu" hidden>
+          <button
+            id="self-radio-copy-id-btn"
+            class="self-radio-menu-item"
+            type="button"
+            title="Full radio ID unavailable"
+            disabled
+          >
+            Copy full radio ID
+          </button>
+        </div>
       </div>
       <div class="chat-change-menu-wrap topbar-chat-change-menu-wrap">
         <button

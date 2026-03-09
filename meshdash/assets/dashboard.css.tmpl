@@ -59,10 +59,17 @@
       align-items: center;
       justify-content: center;
       padding: 0 8px;
+      margin: 0;
+      font: inherit;
       line-height: 1;
       white-space: nowrap;
       user-select: none;
+      cursor: pointer;
       transition: border-color 140ms ease, background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+    }}
+    .topbar-self-profile:focus-visible {{
+      outline: 2px solid rgba(214, 238, 223, 0.92);
+      outline-offset: 2px;
     }}
     .topbar-self-profile.status-online {{
       border-color: rgba(121, 230, 172, 0.78);
@@ -128,6 +135,9 @@
       border-color: #173d2d;
     }}
     .topbar-chat-change-menu-wrap .chat-change-menu {{
+      top: calc(100% + 10px);
+    }}
+    .topbar-self-radio-menu-wrap .self-radio-menu {{
       top: calc(100% + 10px);
     }}
     .topbar-chat-settings-menu-wrap .chat-settings-menu {{
@@ -1573,6 +1583,12 @@
       justify-content: center;
     }}
     .chat-settings-menu-wrap {{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }}
+    .self-radio-menu-wrap {{
       position: relative;
       display: inline-flex;
       align-items: center;
@@ -5047,6 +5063,52 @@
       flex: 1 1 auto;
       min-height: 0;
       overflow: hidden;
+    }}
+    .self-radio-menu {{
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: min(240px, 72vw);
+      border: 1px solid #ccddcf;
+      border-radius: 10px;
+      background: #f4fbf5;
+      padding: 7px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 10px 28px rgba(21, 47, 33, 0.24);
+      z-index: 45;
+    }}
+    .self-radio-menu[hidden] {{
+      display: none !important;
+    }}
+    .self-radio-menu-item {{
+      border: 1px solid #ccddcf;
+      background: #ffffff;
+      color: #274935;
+      border-radius: 8px;
+      padding: 6px 8px;
+      text-align: left;
+      font-size: 11px;
+      line-height: 1.25;
+      cursor: pointer;
+      transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+    }}
+    .self-radio-menu-item:hover {{
+      border-color: #95b6a2;
+      background: #f3faf4;
+      color: #1f4231;
+    }}
+    .self-radio-menu-item:focus-visible {{
+      outline: 2px solid #3ea269;
+      outline-offset: 2px;
+    }}
+    .self-radio-menu-item:disabled {{
+      cursor: not-allowed;
+      opacity: 0.66;
+      border-color: #d8e5d8;
+      color: #648073;
+      background: #f3f8f4;
     }}
     .chat-change-menu {{
       position: absolute;
@@ -9137,6 +9199,29 @@
       background: #13241b;
       border-color: #2a4638;
       color: #b8d9c8;
+    }}
+    [data-theme="dark"] .self-radio-menu {{
+      background: #112017;
+      border-color: #2a4638;
+      box-shadow: 0 12px 30px rgba(2, 10, 6, 0.5);
+    }}
+    [data-theme="dark"] .self-radio-menu-item {{
+      background: #13241b;
+      border-color: #2a4638;
+      color: #c5e2d2;
+    }}
+    [data-theme="dark"] .self-radio-menu-item:hover {{
+      background: #193128;
+      border-color: #406754;
+      color: #d7ece0;
+    }}
+    [data-theme="dark"] .self-radio-menu-item:focus-visible {{
+      outline-color: #5abf8a;
+    }}
+    [data-theme="dark"] .self-radio-menu-item:disabled {{
+      border-color: #253c31;
+      color: #8aa598;
+      background: #122117;
     }}
     [data-theme="dark"] .history-notification-section {{
       border-top-color: #2a4638;

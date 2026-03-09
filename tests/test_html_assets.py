@@ -10,6 +10,7 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert ".console-select" in css
     assert ".console-terminal-screen" in css
     assert ".console-command-input-proxy" in css
+    assert ".self-radio-menu" in css
     assert "#history-chat-table td.history-node-clickable" in css
     assert "#history-chat-table tbody tr.history-node-selectable.selected-node td" in css
     assert ".bots-setting-note" in css
@@ -50,6 +51,9 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "window.localStorage.setItem(consoleFontSizeStorageKey" in js
     assert "let consolePromptLabel = \"$\";" in js
     assert "let consoleShowTimestamps = false;" in js
+    assert "function bindSelfRadioMenuControls()" in js
+    assert "const copyBtn = document.getElementById(\"self-radio-copy-id-btn\");" in js
+    assert "bindSelfRadioMenuControls();" in js
     assert "function formatConsolePromptInputLine(promptLabel, draftValue)" in js
     assert "const terminalScreen = document.getElementById(\"console-terminal-screen\");" in js
     assert "async function copyConsoleSelectionToClipboard()" in js

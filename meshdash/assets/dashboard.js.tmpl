@@ -2216,6 +2216,7 @@
     let chatChangeMenuOpen = false;
     let chatSettingsMenuOpen = false;
     let favoriteMenuOpen = false;
+    let selfRadioMenuOpen = false;
     let activeLayoutView = "chat";
     let activeChatChannel = "all";
     let chatNotificationScope = "all";
@@ -9881,6 +9882,7 @@
       const hasPill = pill instanceof HTMLElement;
       const profile = document.getElementById("self-radio-profile");
       const profileShort = document.getElementById("self-radio-profile-short");
+      const copyBtn = document.getElementById("self-radio-copy-id-btn");
       const setProfile = (shortText, titleText) => {{
         if (profileShort instanceof HTMLElement) {{
           profileShort.textContent = String(shortText || "na");
@@ -9888,6 +9890,23 @@
         if (profile instanceof HTMLElement) {{
           profile.title = String(titleText || "Connected local radio: unavailable");
           profile.setAttribute("aria-label", profile.title);
+        }}
+      }};
+      const setProfileFullId = (nodeId) => {{
+        const cleanId = normalizeNodeId(nodeId || "");
+        const hasFullId = isCanonicalNodeId(cleanId);
+        if (profile instanceof HTMLElement) {{
+          if (hasFullId) {{
+            profile.dataset.fullRadioId = cleanId;
+          }} else {{
+            delete profile.dataset.fullRadioId;
+          }}
+        }}
+        if (copyBtn instanceof HTMLButtonElement) {{
+          copyBtn.disabled = !hasFullId;
+          copyBtn.title = hasFullId
+            ? `Copy ${{cleanId}} to clipboard`
+            : "Full radio ID unavailable";
         }}
       }};
       const setProfileFreshness = (status, lastSeenUnix = null) => {{
@@ -9921,6 +9940,7 @@
           pill.title = "Connected local radio: unavailable";
         }}
         setProfile("na", "Connected local radio: unavailable");
+        setProfileFullId("");
         setProfileFreshness("unknown");
         return;
       }}
@@ -9940,6 +9960,7 @@
       const nowUnix = Math.floor(Date.now() / 1000);
       const lastSeenUnix = computeNodeFreshnessUnix(selfNode, caps, chatTouch);
       const status = normalizeFreshnessKey(freshnessStatus(lastSeenUnix, nowUnix));
+      setProfileFullId(selfId);
       const statusDetail = Number.isFinite(lastSeenUnix)
         ? `${{freshnessLabel(status)}} (seen ${{savedDetailAge(lastSeenUnix, nowUnix)}})`
         : freshnessLabel(status);
@@ -11659,6 +11680,9 @@
 
     function setChatChangeMenuOpen(open) {{
       chatChangeMenuOpen = !!open;
+      if (chatChangeMenuOpen) {{
+        setSelfRadioMenuOpen(false);
+      }}
       const panel = document.getElementById("chat-change-summary");
       if (panel instanceof HTMLElement) {{
         panel.hidden = !chatChangeMenuOpen;
@@ -11671,6 +11695,9 @@
 
     function setChatSettingsMenuOpen(open) {{
       chatSettingsMenuOpen = !!open;
+      if (chatSettingsMenuOpen) {{
+        setSelfRadioMenuOpen(false);
+      }}
       const panel = document.getElementById("chat-settings-menu");
       if (panel instanceof HTMLElement) {{
         panel.hidden = !chatSettingsMenuOpen;
@@ -11683,6 +11710,9 @@
 
     function setFavoriteMenuOpen(open) {{
       favoriteMenuOpen = !!open;
+      if (favoriteMenuOpen) {{
+        setSelfRadioMenuOpen(false);
+      }}
       const panel = document.getElementById("favorite-menu");
       if (panel instanceof HTMLElement) {{
         panel.hidden = !favoriteMenuOpen;
@@ -11693,6 +11723,34 @@
       }}
       if (!favoriteMenuOpen) {{
         closeFavoriteMenuNodeSearchDropdown();
+      }}
+    }}
+
+    function setSelfRadioMenuOpen(open) {{
+      selfRadioMenuOpen = !!open;
+      if (selfRadioMenuOpen) {{
+        setChatChangeMenuOpen(false);
+        setChatSettingsMenuOpen(false);
+        setFavoriteMenuOpen(false);
+      }}
+      const panel = document.getElementById("self-radio-menu");
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = !selfRadioMenuOpen;
+      }}
+      const profile = document.getElementById("self-radio-profile");
+      if (profile instanceof HTMLButtonElement) {{
+        profile.setAttribute("aria-expanded", selfRadioMenuOpen ? "true" : "false");
+      }}
+      const copyBtn = document.getElementById("self-radio-copy-id-btn");
+      if (copyBtn instanceof HTMLButtonElement) {{
+        const fullId = profile instanceof HTMLElement
+          ? normalizeNodeId(profile.dataset.fullRadioId || "")
+          : "";
+        const hasFullId = isCanonicalNodeId(fullId);
+        copyBtn.disabled = !hasFullId;
+        copyBtn.title = hasFullId
+          ? `Copy ${{fullId}} to clipboard`
+          : "Full radio ID unavailable";
       }}
     }}
 
@@ -11950,6 +12008,63 @@
         document.addEventListener("keydown", (ev) => {{
           if (ev.key !== "Escape" || !chatSettingsMenuOpen) return;
           setChatSettingsMenuOpen(false);
+        }});
+      }}
+    }}
+
+    function bindSelfRadioMenuControls() {{
+      const profileBtn = document.getElementById("self-radio-profile");
+      if (profileBtn instanceof HTMLButtonElement && profileBtn.dataset.bound !== "1") {{
+        profileBtn.dataset.bound = "1";
+        profileBtn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          setSelfRadioMenuOpen(!selfRadioMenuOpen);
+        }});
+      }}
+
+      const copyBtn = document.getElementById("self-radio-copy-id-btn");
+      if (copyBtn instanceof HTMLButtonElement && copyBtn.dataset.bound !== "1") {{
+        copyBtn.dataset.bound = "1";
+        copyBtn.addEventListener("click", async (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const profile = document.getElementById("self-radio-profile");
+          const fullId = profile instanceof HTMLElement
+            ? normalizeNodeId(profile.dataset.fullRadioId || "")
+            : "";
+          if (!isCanonicalNodeId(fullId)) {{
+            copyBtn.disabled = true;
+            copyBtn.title = "Full radio ID unavailable";
+            return;
+          }}
+          const ok = await copyTextToClipboard(fullId);
+          copyBtn.title = ok
+            ? `${{fullId}} copied to clipboard`
+            : `Could not copy ${{fullId}}`;
+          if (ok) {{
+            setSelfRadioMenuOpen(false);
+          }}
+        }});
+      }}
+
+      if (document.body.dataset.selfRadioMenuDocBound !== "1") {{
+        document.body.dataset.selfRadioMenuDocBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          if (!selfRadioMenuOpen) return;
+          const target = ev.target;
+          if (!(target instanceof Element)) {{
+            setSelfRadioMenuOpen(false);
+            return;
+          }}
+          if (target.closest("#self-radio-profile") || target.closest("#self-radio-menu")) {{
+            return;
+          }}
+          setSelfRadioMenuOpen(false);
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key !== "Escape" || !selfRadioMenuOpen) return;
+          setSelfRadioMenuOpen(false);
         }});
       }}
     }}
@@ -23409,6 +23524,7 @@
     bindHistoryActivitySplitter();
     bindHistoryChatSplitter();
     bindFavoriteMenuControls();
+    bindSelfRadioMenuControls();
     bindFavoriteToggleControls();
     bindFavoritesControls();
     bindFavoriteMenuNodeSearchControls();
