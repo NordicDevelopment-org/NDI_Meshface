@@ -34,6 +34,7 @@ _NATURAL_PING_PREFIXES = (
 )
 _CHAT_TOO_LONG_RE = re.compile(r"Message is too long \((\d+) bytes\)\. Limit is (\d+) bytes\.")
 _REPLY_PACKET_TEXT_RESERVE_BYTES = 20
+_DEFAULT_SEGMENT_DELAY_SECONDS = 0.35
 
 
 def _parse_bool_token(value: object, default: bool) -> bool:
@@ -47,6 +48,22 @@ def _parse_bool_token(value: object, default: bool) -> bool:
     if text in ("0", "false", "no", "off", "disable", "disabled"):
         return False
     return default
+
+
+def _parse_nonnegative_float_token(value: object, default: float) -> float:
+    fallback = max(0.0, float(default))
+    if value is None:
+        return fallback
+    text = str(value).strip()
+    if not text:
+        return fallback
+    try:
+        parsed = float(text)
+    except Exception:
+        return fallback
+    if parsed < 0:
+        return fallback
+    return parsed
 
 
 def _is_hex_text(value: str) -> bool:
@@ -443,6 +460,8 @@ class MeshResponseBot:
         reply_broadcast: bool = False,
         settings_path: Optional[str] = None,
         chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
+        segment_delay_seconds: float = 0.0,
+        sleep_fn: Callable[[float], None] = time.sleep,
         now_unix_fn: Callable[[], float] = time.time,
     ) -> None:
         self._send_chat_fn = send_chat_fn
@@ -452,6 +471,8 @@ class MeshResponseBot:
         self._reply_broadcast = bool(reply_broadcast)
         self._settings_path = str(settings_path).strip() if settings_path else None
         self._chat_max_bytes = max(1, int(chat_max_bytes))
+        self._segment_delay_seconds = _parse_nonnegative_float_token(segment_delay_seconds, 0.0)
+        self._sleep_fn = sleep_fn
         self._now_unix_fn = now_unix_fn
         self._game_public_start_enabled = bool(game_public_start_enabled)
         self._custom_commands = {
@@ -1005,6 +1026,8 @@ class MeshResponseBot:
         if proactive_segments != [clean_text]:
             payloads: list[dict[str, object]] = []
             for index, segment in enumerate(proactive_segments):
+                if index > 0 and self._segment_delay_seconds > 0:
+                    self._sleep_fn(self._segment_delay_seconds)
                 payload = self._send_chat_fn(
                     text=segment,
                     destination=destination,
@@ -1030,6 +1053,8 @@ class MeshResponseBot:
             raise ValueError("Reply could not be segmented into non-empty messages")
         payloads: list[dict[str, object]] = []
         for index, segment in enumerate(segments):
+            if index > 0 and self._segment_delay_seconds > 0:
+                self._sleep_fn(self._segment_delay_seconds)
             payload = self._send_chat_fn(
                 text=segment,
                 destination=destination,
@@ -1283,6 +1308,7 @@ def build_mesh_response_bot_from_env(
     get_local_node_id_fn: Callable[[object], str],
     env: Optional[dict[str, str]] = None,
     chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
+    sleep_fn: Callable[[float], None] = time.sleep,
     now_unix_fn: Callable[[], float] = time.time,
 ) -> Optional[MeshResponseBot]:
     env_map = env if isinstance(env, dict) else dict(os.environ)
@@ -1311,6 +1337,10 @@ def build_mesh_response_bot_from_env(
     if not respond_enabled and not log_enabled:
         return None
     reply_broadcast = _parse_bool_token(env_map.get("MESH_DASH_BOT_REPLY_BROADCAST"), False)
+    segment_delay_ms = _parse_nonnegative_float_token(
+        env_map.get("MESH_DASH_BOT_SEGMENT_DELAY_MS"),
+        _DEFAULT_SEGMENT_DELAY_SECONDS * 1000.0,
+    )
     custom_commands = _load_custom_commands_from_env(env_map)
     if "MESH_DASH_BOT_DISABLED_COMMANDS" in env_map:
         disabled_commands = _load_disabled_commands_from_env(env_map)
@@ -1334,6 +1364,8 @@ def build_mesh_response_bot_from_env(
         reply_broadcast=reply_broadcast,
         settings_path=settings_path,
         chat_max_bytes=chat_max_bytes,
+        segment_delay_seconds=segment_delay_ms / 1000.0,
+        sleep_fn=sleep_fn,
         now_unix_fn=now_unix_fn,
     )
 

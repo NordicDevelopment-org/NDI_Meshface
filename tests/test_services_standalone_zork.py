@@ -28,6 +28,19 @@ def test_first_move_west_shows_full_forest_description() -> None:
     assert "exits north, east, south, west." in reply
 
 
+def test_standalone_zork_leaflet_reply_is_not_engine_truncated() -> None:
+    service = StandaloneZorkService(now_unix_fn=lambda: 1710001240.0)
+
+    started = service.play(text="zork")
+    session_id = str(started["session_id"])
+    service.play(text="open mailbox", session_id=session_id)
+    leaflet = service.play(text="read leaflet", session_id=session_id)
+
+    reply = str(leaflet["reply_text"] or "")
+    assert len(reply.encode("utf-8")) > 220
+    assert "Direct inquiries by Net mail to DUNGEON@MIT-DMS." in reply
+
+
 def test_standalone_zork_service_requires_start_before_followup():
     service = StandaloneZorkService(now_unix_fn=lambda: 1710001240.0)
 

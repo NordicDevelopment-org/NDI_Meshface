@@ -54,6 +54,17 @@ def _base_packet(text: str, *, packet_id: int = 1001, to_id: str = "^all") -> di
     }
 
 
+def _segment_marker(text: object) -> tuple[int | None, int | None, str]:
+    raw = str(text or "")
+    head, sep, tail = raw.partition(" ")
+    if not sep or "/" not in head:
+        return (None, None, raw)
+    left, right = head.split("/", 1)
+    if left.isdigit() and right.isdigit():
+        return (int(left), int(right), tail)
+    return (None, None, raw)
+
+
 def test_ping_targeted_to_local_suffix_replies_with_human_readable_reply():
     iface = _FakeIface()
     sent = []
@@ -488,19 +499,24 @@ def test_zork_help_reply_is_split_when_transport_limit_is_exceeded():
         now_unix_fn=lambda: 1710001240.0,
     )
     bot.on_receive(_base_packet("zork", packet_id=2301, to_id="!02ed9b7c"), iface)
+    sent_before_help = len(sent)
     bot.on_receive(_base_packet("help", packet_id=2302, to_id="!02ed9b7c"), iface)
 
-    assert len(sent) == 3
-    assert sent[1]["text"].startswith("1/2 ")
-    assert sent[2]["text"].startswith("2/2 ")
+    help_segments = sent[sent_before_help:]
+    assert len(help_segments) >= 2
+    for index, row in enumerate(help_segments, start=1):
+        part, total, body = _segment_marker(row.get("text"))
+        assert part == index
+        assert total == len(help_segments)
+        assert body
     assert all(len(str(row["text"]).encode("utf-8")) <= 220 for row in sent)
     history = bot.recent_requests()
     assert history[0]["command"] == "help"
-    assert "1/2 " in str(history[0]["response_text"])
-    assert "2/2 " in str(history[0]["response_text"])
+    assert f"1/{len(help_segments)} " in str(history[0]["response_text"])
+    assert f"{len(help_segments)}/{len(help_segments)} " in str(history[0]["response_text"])
 
 
-def test_zork_leaflet_reply_is_repaired_to_fit_transport_limit():
+def test_zork_leaflet_reply_is_split_to_fit_transport_limit():
     iface = _FakeIface()
     sent = []
     next_message_id = 6000
@@ -525,13 +541,21 @@ def test_zork_leaflet_reply_is_repaired_to_fit_transport_limit():
     )
     bot.on_receive(_base_packet("zork", packet_id=2401, to_id="!02ed9b7c"), iface)
     bot.on_receive(_base_packet("open mailbox", packet_id=2402, to_id="!02ed9b7c"), iface)
+    sent_before_leaflet = len(sent)
     bot.on_receive(_base_packet("read leaflet", packet_id=2403, to_id="!02ed9b7c"), iface)
 
-    assert len(sent) == 3
-    leaflet_text = str(sent[2]["text"])
-    assert len(leaflet_text.encode("utf-8")) <= 220
-    assert leaflet_text.endswith("...")
-    assert not leaflet_text.startswith("1/")
+    leaflet_segments = sent[sent_before_leaflet:]
+    assert len(leaflet_segments) >= 2
+    leaflet_joined_parts: list[str] = []
+    for index, row in enumerate(leaflet_segments, start=1):
+        part, total, body = _segment_marker(row.get("text"))
+        assert part == index
+        assert total == len(leaflet_segments)
+        assert body
+        leaflet_joined_parts.append(body)
+        assert len(str(row.get("text") or "").encode("utf-8")) <= 220
+    leaflet_joined = " ".join(leaflet_joined_parts).lower()
+    assert "direct inquiries by net mail to dungeon@mit-dms." in leaflet_joined
 
 
 def test_zork_leaflet_reply_reserves_headroom_for_direct_reply_metadata():
@@ -555,14 +579,58 @@ def test_zork_leaflet_reply_reserves_headroom_for_direct_reply_metadata():
     )
     bot.on_receive(_base_packet("zork", packet_id=2501, to_id="!02ed9b7c"), iface)
     bot.on_receive(_base_packet("open mailbox", packet_id=2502, to_id="!02ed9b7c"), iface)
+    sent_before_leaflet = len(sent)
     bot.on_receive(_base_packet("read leaflet", packet_id=2503, to_id="!02ed9b7c"), iface)
 
-    assert len(sent) == 3
-    leaflet_text = str(sent[2]["text"])
-    assert sent[2]["reply_id"] == 2503
-    assert len(leaflet_text.encode("utf-8")) <= 200
-    assert leaflet_text.endswith("...")
-    assert not leaflet_text.startswith("1/")
+    leaflet_segments = sent[sent_before_leaflet:]
+    assert len(leaflet_segments) >= 2
+    for index, row in enumerate(leaflet_segments, start=1):
+        part, total, body = _segment_marker(row.get("text"))
+        assert part == index
+        assert total == len(leaflet_segments)
+        assert body
+        if index == 1:
+            assert row.get("reply_id") == 2503
+        else:
+            assert row.get("reply_id") is None
+        assert len(str(row.get("text") or "").encode("utf-8")) <= 200
+
+
+def test_zork_leaflet_reply_segments_are_paced_with_configured_delay():
+    iface = _FakeIface()
+    sent = []
+    sleep_calls: list[float] = []
+    next_message_id = 7100
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        text = str(kwargs.get("text") or "")
+        if len(text.encode("utf-8")) > 220:
+            raise ValueError(
+                f"Message is too long ({len(text.encode('utf-8'))} bytes). Limit is 220 bytes."
+            )
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        chat_max_bytes=220,
+        segment_delay_seconds=0.25,
+        sleep_fn=lambda seconds: sleep_calls.append(seconds),
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("zork", packet_id=2601, to_id="!02ed9b7c"), iface)
+    bot.on_receive(_base_packet("open mailbox", packet_id=2602, to_id="!02ed9b7c"), iface)
+    sent_before_leaflet = len(sent)
+    bot.on_receive(_base_packet("read leaflet", packet_id=2603, to_id="!02ed9b7c"), iface)
+
+    leaflet_segments = sent[sent_before_leaflet:]
+    assert len(leaflet_segments) >= 2
+    assert sleep_calls == [0.25] * (len(leaflet_segments) - 1)
 
 
 def test_zork_game_disabled_still_logs_direct_start_requests():
@@ -609,6 +677,19 @@ def test_build_bot_from_env_can_enable_public_game_start_handoff():
     assert bot is not None
     assert bot.enabled is False
     assert bot.game_public_start_enabled is True
+
+
+def test_build_bot_from_env_can_override_segment_delay():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_SEGMENT_DELAY_MS": "900",
+        },
+    )
+    assert bot is not None
+    assert bot._segment_delay_seconds == 0.9
 
 
 def test_build_bot_from_env_can_disable_specific_command():

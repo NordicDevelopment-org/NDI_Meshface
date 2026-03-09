@@ -13636,8 +13636,12 @@
           session.sessionId = nextSessionId;
           persistConsoleSessionState();
         }}
-        const replyText = String(payload && payload.reply_text ? payload.reply_text : "").trim();
-        if (replyText) {{
+        const replyText = String(
+          payload && Object.prototype.hasOwnProperty.call(payload, "reply_text")
+            ? (payload.reply_text ?? "")
+            : ""
+        );
+        if (replyText.trim()) {{
           const receivedAtMs = Date.now();
           appendConsoleLine(
             `interactive|standalone|${{String(session.sessionId || "session")}}|${{receivedAtMs}}`,
@@ -13981,8 +13985,12 @@
           const lines = [
             "[zork] standalone session started. Type game commands directly here. Use /help for console commands. Press Ctrl+C to stop this console session.",
           ];
-          const replyText = String(payload && payload.reply_text ? payload.reply_text : "").trim();
-          if (replyText) {{
+          const replyText = String(
+            payload && Object.prototype.hasOwnProperty.call(payload, "reply_text")
+              ? (payload.reply_text ?? "")
+              : ""
+          );
+          if (replyText.trim()) {{
             lines.push(`zork: ${{replyText}}`);
           }}
           if (payload && payload.active_session === false) {{

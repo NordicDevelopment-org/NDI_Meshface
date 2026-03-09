@@ -10,7 +10,8 @@ from .world import INITIAL_OBJECT_LOCATIONS, OBJECTS, ROOMS, START_ROOM, object_
 
 
 GAME_SESSION_TTL_SECONDS = 45 * 60
-MAX_REPLY_CHARS = 220
+# Set to 0 to disable truncation and let transport-layer chunking handle limits.
+MAX_REPLY_CHARS = 0
 
 BASELINE_OBJECT_LOCATIONS = {
     code: ("SAFEBOX" if code in {"CROWN", "CARD"} and location == "SAFE" else location)
@@ -581,6 +582,8 @@ class ZorkGame:
 
     def _compact(self, text: str, *, limit: int = MAX_REPLY_CHARS) -> str:
         cleaned = re.sub(r"\s+", " ", str(text or "").strip())
+        if int(limit) <= 0:
+            return cleaned
         if len(cleaned) <= limit:
             return cleaned
         clipped = cleaned[: max(0, limit - 1)].rstrip(" ,;:-")
