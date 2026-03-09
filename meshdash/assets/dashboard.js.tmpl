@@ -13400,6 +13400,15 @@
       inputEl.setSelectionRange(nextValue.length, nextValue.length);
     }}
 
+    function isZorkConsoleInteractiveSession(session = consoleInteractiveSession) {{
+      if (!session || typeof session !== "object") return false;
+      const mode = String(session.mode || "").trim().toLowerCase();
+      if (mode === "standalone") return true;
+      if (mode !== "remote") return false;
+      const name = String(session.name || "").trim().toLowerCase();
+      return name === "zork" || name === "zork-remote";
+    }}
+
     function syncConsoleCommandInputState() {{
       const input = document.getElementById("console-command-input");
       const runBtn = document.getElementById("console-command-run-btn");
@@ -13410,19 +13419,23 @@
       const interactiveName = consoleInteractiveSession && consoleInteractiveSession.name
         ? String(consoleInteractiveSession.name)
         : "";
+      const interactiveIsZork = isZorkConsoleInteractiveSession(consoleInteractiveSession);
       const promptLabel = runningName
         ? `${{runningName.replace(/[^a-z0-9_-]+/gi, "").slice(0, 10) || "busy"}}>`
-        : interactiveName
-          ? `${{interactiveName.replace(/[^a-z0-9_-]+/gi, "").slice(0, 10) || "session"}}>`
-          : ">";
+        : interactiveIsZork
+          ? ">"
+          : "$";
       const placeholder = runningName
         ? `ctrl+c to stop ${{runningName}}`
-        : interactiveName
-          ? `enter ${{interactiveName}} command  /help for console`
+        : interactiveIsZork
+          ? "enter zork command  /help for console"
+          : interactiveName
+            ? `enter ${{interactiveName}} command  /help for console`
           : "enter command or type help";
       if (prompt instanceof HTMLElement) {{
         prompt.textContent = promptLabel;
         prompt.classList.toggle("is-running", !!runningName);
+        prompt.classList.toggle("is-zork", !runningName && interactiveIsZork);
       }}
       if (input instanceof HTMLInputElement) {{
         input.placeholder = placeholder;
@@ -13645,7 +13658,7 @@
           const receivedAtMs = Date.now();
           appendConsoleLine(
             `interactive|standalone|${{String(session.sessionId || "session")}}|${{receivedAtMs}}`,
-            `zork: ${{replyText}}`,
+            replyText,
             receivedAtMs,
             true
           );
@@ -13975,6 +13988,7 @@
           if (consoleInteractiveSession) {{
             return "[zork] already running. Press Ctrl+C to stop.";
           }}
+          clearConsoleOutput({{ renderNow: false }});
           const payload = await postStandaloneZorkCommand("zork");
           consoleInteractiveSession = {{
             name: "zork",
@@ -13982,16 +13996,14 @@
             sessionId: String(payload && payload.session_id ? payload.session_id : "").trim(),
           }};
           syncConsoleCommandInputState();
-          const lines = [
-            "[zork] standalone session started. Type game commands directly here. Use /help for console commands. Press Ctrl+C to stop this console session.",
-          ];
+          const lines = [];
           const replyText = String(
             payload && Object.prototype.hasOwnProperty.call(payload, "reply_text")
               ? (payload.reply_text ?? "")
               : ""
           );
           if (replyText.trim()) {{
-            lines.push(`zork: ${{replyText}}`);
+            lines.push(replyText);
           }}
           if (payload && payload.active_session === false) {{
             stopConsoleInteractiveSession("game ended", false);
@@ -14007,6 +14019,7 @@
           if (consoleInteractiveSession) {{
             return "[zork-remote] another interactive session is already running. Press Ctrl+C to stop.";
           }}
+          clearConsoleOutput({{ renderNow: false }});
           const target = resolveConsoleGameTarget(ctx);
           if (!target.ok) {{
             return `[zork-remote] ${{target.error}}`;
@@ -14194,13 +14207,20 @@
       return `${{hour}}:${{minute}}:${{second}}`;
     }}
 
+    function formatConsoleRenderedLine(line, loggedAtMs = Date.now()) {{
+      const body = String(line == null ? "" : line);
+      if (isZorkConsoleInteractiveSession(consoleInteractiveSession)) {{
+        return body;
+      }}
+      const timestamp = formatConsoleTimestamp(loggedAtMs);
+      return `[${{timestamp}}] > ${{body}}`;
+    }}
+
     function appendConsoleLine(key, line, loggedAtMs = Date.now(), renderNow = false) {{
       if (!key || consoleSeen.has(key)) return;
       consoleSeen.add(key);
       consoleKeyQueue.push(key);
-      const timestamp = formatConsoleTimestamp(loggedAtMs);
-      const body = String(line == null ? "" : line);
-      consoleLines.push(`[${{timestamp}}] > ${{body}}`);
+      consoleLines.push(formatConsoleRenderedLine(line, loggedAtMs));
 
       while (consoleLines.length > consoleMaxLines) {{
         consoleLines.shift();
@@ -14218,7 +14238,9 @@
     async function runConsoleCommandLine(rawLine) {{
       const line = String(rawLine == null ? "" : rawLine).trim();
       if (!line) return;
-      appendConsoleEventLine(`$ ${{line}}`);
+      const zorkPromptInput = isZorkConsoleInteractiveSession(consoleInteractiveSession) && !line.startsWith("/");
+      const renderedInput = zorkPromptInput ? `>${{line}}` : `$ ${{line}}`;
+      appendConsoleEventLine(renderedInput);
       pushConsoleHistoryEntry(line);
       if (consoleRunningCommand) {{
         appendConsoleEventLine(
