@@ -116,6 +116,8 @@ TABLE_SCHEMA_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS summary_metrics_1m (
       bucket_unix INTEGER PRIMARY KEY,
       node_count INTEGER NOT NULL DEFAULT 0,
+      saved_node_count INTEGER NOT NULL DEFAULT 0,
+      online_node_count INTEGER NOT NULL DEFAULT 0,
       nodes_with_position INTEGER NOT NULL DEFAULT 0,
       live_packet_count INTEGER NOT NULL DEFAULT 0,
       real_edge_count INTEGER NOT NULL DEFAULT 0,

@@ -3026,6 +3026,23 @@
       height: 100%;
       display: block;
     }}
+    .layout.view-history #map-data-activity .history-activity-stack {{
+      min-height: 0;
+      height: 100%;
+    }}
+    .layout.view-history #map-data-activity .history-activity-weekly-panel {{
+      flex: 1 1 auto;
+      overflow: auto;
+    }}
+    .layout.view-history #map-data-activity #weekly-summary-chart-wrap {{
+      flex: 1 1 auto;
+      min-height: 300px;
+      height: auto;
+    }}
+    .layout.view-history #map-data-activity #weekly-summary-overview {{
+      flex: 0 0 auto;
+      margin-top: auto;
+    }}
     .history-metric-wrap {{
       display: inline-flex;
       align-items: center;
@@ -3036,6 +3053,28 @@
       border-radius: 999px;
       background: #f7fcf7;
       padding: 4px 9px;
+    }}
+    .history-metric-wrap-lines {{
+      gap: 10px;
+      padding-right: 10px;
+    }}
+    .history-metric-controls {{
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      width: 100%;
+    }}
+    .history-metric-inline {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: #325744;
+      font-weight: 600;
+      line-height: 1;
+      white-space: nowrap;
+      cursor: pointer;
     }}
     .history-metric-label {{
       font-size: 10px;
@@ -3057,6 +3096,12 @@
       min-height: 24px;
       min-width: 160px;
       max-width: 100%;
+    }}
+    .history-metric-toggle {{
+      width: 14px;
+      height: 14px;
+      accent-color: #1f6f53;
+      cursor: pointer;
     }}
     #signal-chart {{
       cursor: zoom-in;
@@ -8091,10 +8136,16 @@
     [data-theme="dark"] .history-metric-label {{
       color: var(--ui-text-soft);
     }}
+    [data-theme="dark"] .history-metric-inline {{
+      color: #c0d9cf;
+    }}
     [data-theme="dark"] .history-metric-select {{
       background: #1a2835;
       border-color: #35556d;
       color: #dbeeff;
+    }}
+    [data-theme="dark"] .history-metric-toggle {{
+      accent-color: #58c878;
     }}
     [data-theme="dark"] #signal-chart-wrap,
     [data-theme="dark"] #online-activity-chart-wrap,

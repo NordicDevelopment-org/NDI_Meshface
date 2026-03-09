@@ -111,6 +111,8 @@ def fetch_summary_metrics_rows(
         """
         SELECT bucket_unix,
                node_count,
+               saved_node_count,
+               online_node_count,
                nodes_with_position,
                live_packet_count,
                real_edge_count

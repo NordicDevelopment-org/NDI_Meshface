@@ -161,6 +161,8 @@ def test_history_store_domain_summary_metrics_round_trip(tmp_path):
             store,
             {
                 "node_count": 12,
+                "saved_node_count": 7,
+                "online_node_count": 4,
                 "nodes_with_position": 9,
                 "live_packet_count": 77,
                 "real_edge_count": 5,
@@ -171,6 +173,8 @@ def test_history_store_domain_summary_metrics_round_trip(tmp_path):
         assert payload["points"]
         latest = payload["points"][-1]
         assert latest["node_count"] == 12
+        assert latest["saved_node_count"] == 7
+        assert latest["online_node_count"] == 4
         assert latest["nodes_with_position"] == 9
         assert latest["live_packet_count"] == 77
         assert latest["real_edge_count"] == 5

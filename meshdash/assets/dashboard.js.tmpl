@@ -242,11 +242,48 @@
     const metricTickerSeries = new Map();
     const weeklySummaryHours = 24 * 7;
     const weeklySummaryMetricStorageKey = "meshDashboardWeeklySummaryMetricV1";
+    const weeklySummaryNodeSeriesStorageKey = "meshDashboardWeeklySummaryNodeSeriesV1";
+    const weeklySummaryNodesCompareLegacyStorageKey = "meshDashboardWeeklySummaryNodesCompareV1";
+    const weeklySummaryNodeSeriesOrder = [
+      "online_nodes",
+      "known_nodes",
+      "saved_nodes",
+      "position_nodes",
+    ];
+    const weeklySummaryNodeSeriesControlIds = {{
+      online_nodes: "weekly-summary-node-line-online",
+      known_nodes: "weekly-summary-node-line-known",
+      saved_nodes: "weekly-summary-node-line-saved",
+      position_nodes: "weekly-summary-node-line-position",
+    }};
+    const weeklySummaryNodeSeriesLabels = {{
+      online_nodes: "Online Nodes",
+      known_nodes: "Known Nodes (Radio)",
+      saved_nodes: "Saved Nodes (DB)",
+      position_nodes: "Nodes With Position",
+    }};
+    const weeklySummaryNodeSeriesStyles = {{
+      online_nodes: {{ tone: "line", dashed: false, width: 2.4 }},
+      known_nodes: {{ tone: "compare", dashed: true, width: 2.1 }},
+      saved_nodes: {{ tone: "aux1", dashed: false, width: 2.0 }},
+      position_nodes: {{ tone: "aux2", dashed: true, width: 1.9 }},
+    }};
+    const weeklySummaryNodeSeriesPaletteNames = {{
+      online_nodes: "bluish green",
+      known_nodes: "sky blue",
+      saved_nodes: "orange",
+      position_nodes: "reddish purple",
+    }};
+    const weeklySummaryNodeSeriesDefaults = {{
+      online_nodes: true,
+      known_nodes: true,
+      saved_nodes: true,
+      position_nodes: true,
+    }};
     const weeklySummaryMetricCatalog = new Map([
-      ["live_packet_count", { label: "Packets / min", decimals: 1 }],
-      ["node_count", { label: "Known Nodes", decimals: 0 }],
-      ["nodes_with_position", { label: "Nodes With Position", decimals: 0 }],
-      ["real_edge_count", { label: "Directed Links", decimals: 0 }],
+      ["packets", { label: "Packets / min", decimals: 1 }],
+      ["nodes", { label: "Nodes", decimals: 0 }],
+      ["links", { label: "Directed Links", decimals: 0 }],
     ]);
     // Generated from Unicode emoji-test.txt
     // Source: https://unicode.org/Public/emoji/latest/emoji-test.txt
@@ -2272,7 +2309,8 @@
     let themePreference = "auto";
     let tickerDensity = "compact";
     let themePresetSelected = "default";
-    let weeklySummaryMetric = "live_packet_count";
+    let weeklySummaryMetric = "packets";
+    let weeklySummaryNodeSeriesEnabled = {{ ...weeklySummaryNodeSeriesDefaults }};
     let settingsDirty = false;
     let settingsDirtyAt = 0;
     let themePresetCatalog = {{
@@ -4835,7 +4873,108 @@
 
     function normalizeWeeklySummaryMetric(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
-      return weeklySummaryMetricCatalog.has(clean) ? clean : "live_packet_count";
+      if (clean === "packets" || clean === "live_packet_count") return "packets";
+      if (
+        clean === "nodes"
+        || clean === "node_count"
+        || clean === "online_node_count"
+        || clean === "saved_node_count"
+        || clean === "nodes_with_position"
+      ) return "nodes";
+      if (clean === "links" || clean === "real_edge_count") return "links";
+      return "packets";
+    }}
+
+    function normalizeWeeklySummaryNodesCompare(raw) {{
+      if (raw === true || raw === 1) return true;
+      const clean = String(raw || "").trim().toLowerCase();
+      return clean === "1" || clean === "true" || clean === "on" || clean === "yes";
+    }}
+
+    function normalizeWeeklySummaryNodeSeries(raw) {{
+      const normalized = {{}};
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        normalized[key] = weeklySummaryNodeSeriesDefaults[key] === true;
+      }}
+      if (raw && typeof raw === "object") {{
+        for (const key of weeklySummaryNodeSeriesOrder) {{
+          if (Object.prototype.hasOwnProperty.call(raw, key)) {{
+            normalized[key] = !!raw[key];
+          }}
+        }}
+      }}
+      if (!weeklySummaryNodeSeriesOrder.some((key) => normalized[key])) {{
+        normalized.online_nodes = true;
+      }}
+      return normalized;
+    }}
+
+    function weeklySummaryNodeSeriesPaletteColor(seriesKey) {{
+      const paletteName = String(weeklySummaryNodeSeriesPaletteNames[seriesKey] || "").trim().toLowerCase();
+      if (!paletteName) return "";
+      for (const palette of meshChannelColorPalette) {{
+        const name = String(palette && palette.name || "").trim().toLowerCase();
+        if (name !== paletteName) continue;
+        const fill = String(palette && palette.fill || "").trim();
+        if (fill) return fill;
+      }}
+      return "";
+    }}
+
+    function resolveWeeklySummaryMetricMeta(metricKey, nodeSeries = weeklySummaryNodeSeriesEnabled) {{
+      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const base = weeklySummaryMetricCatalog.get(metric) || {{
+        label: "Metric",
+        decimals: 0,
+      }};
+      if (metric !== "nodes") {{
+        return base;
+      }}
+      const normalizedSeries = normalizeWeeklySummaryNodeSeries(nodeSeries);
+      const seriesOrder = weeklySummaryNodeSeriesOrder.filter((key) => normalizedSeries[key]);
+      const resolvedStyles = {{}};
+      for (const seriesKey of weeklySummaryNodeSeriesOrder) {{
+        const baseStyle = (
+          weeklySummaryNodeSeriesStyles[seriesKey]
+          && typeof weeklySummaryNodeSeriesStyles[seriesKey] === "object"
+        ) ? weeklySummaryNodeSeriesStyles[seriesKey] : {{}};
+        const paletteColor = weeklySummaryNodeSeriesPaletteColor(seriesKey);
+        resolvedStyles[seriesKey] = paletteColor
+          ? {{
+              ...baseStyle,
+              color: paletteColor,
+              labelColor: paletteColor,
+            }}
+          : {{ ...baseStyle }};
+      }}
+      return {{
+        ...base,
+        seriesOrder: seriesOrder.length ? seriesOrder : ["online_nodes"],
+        seriesLabels: weeklySummaryNodeSeriesLabels,
+        seriesStyles: resolvedStyles,
+      }};
+    }}
+
+    function updateWeeklySummaryNodeSeriesControls(metricKey = weeklySummaryMetric) {{
+      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const showLines = metric === "nodes";
+      const wrap = document.getElementById("weekly-summary-node-lines-wrap");
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !showLines;
+      }}
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        const toggleId = weeklySummaryNodeSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        const seriesColor = weeklySummaryNodeSeriesPaletteColor(key);
+        if (seriesColor) {{
+          toggle.style.accentColor = seriesColor;
+        }} else {{
+          toggle.style.removeProperty("accent-color");
+        }}
+        toggle.checked = !!weeklySummaryNodeSeriesEnabled[key];
+        toggle.disabled = !showLines;
+      }}
     }}
 
     function applyWeeklySummaryMetric(metricKey, persist = true) {{
@@ -4845,6 +4984,7 @@
       if (select instanceof HTMLSelectElement && select.value !== normalized) {{
         select.value = normalized;
       }}
+      updateWeeklySummaryNodeSeriesControls(normalized);
       const cached = summaryMetricsCache.get(String(weeklySummaryHours));
       if (cached && cached.data) {{
         renderWeeklySummary(cached.data);
@@ -4852,6 +4992,23 @@
       if (!persist) return;
       try {{
         window.localStorage.setItem(weeklySummaryMetricStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function applyWeeklySummaryNodeSeries(nextSeries, persist = true) {{
+      weeklySummaryNodeSeriesEnabled = normalizeWeeklySummaryNodeSeries(nextSeries);
+      updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
+      const cached = summaryMetricsCache.get(String(weeklySummaryHours));
+      if (cached && cached.data) {{
+        renderWeeklySummary(cached.data);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(
+          weeklySummaryNodeSeriesStorageKey,
+          JSON.stringify(weeklySummaryNodeSeriesEnabled)
+        );
       }} catch (_err) {{
       }}
     }}
@@ -4909,10 +5066,6 @@
         }}
       }}
       if (activeMapDataMode === "activity") {{
-        const cachedActivity = onlineActivityCache.get(String(nodeHistoryHours));
-        if (cachedActivity && cachedActivity.data && Array.isArray(cachedActivity.data.points)) {{
-          renderOnlineActivityChart(cachedActivity.data.points);
-        }}
         const cachedWeekly = summaryMetricsCache.get(String(weeklySummaryHours));
         if (cachedWeekly && cachedWeekly.data && Array.isArray(cachedWeekly.data.points)) {{
           renderWeeklySummary(cachedWeekly.data);
@@ -4972,12 +5125,36 @@
       if (select.dataset.bound === "1") return;
       select.dataset.bound = "1";
       select.value = normalizeWeeklySummaryMetric(weeklySummaryMetric);
+      updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
       select.addEventListener("change", () => {{
-        applyWeeklySummaryMetric(select.value || "live_packet_count", true);
+        applyWeeklySummaryMetric(select.value || "packets", true);
         if (activeLayoutView === "history") {{
           void refreshHistoryPanels(false);
         }}
       }});
+    }}
+
+    function bindWeeklySummaryNodeSeriesControls() {{
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        const toggleId = weeklySummaryNodeSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        if (toggle.dataset.bound === "1") continue;
+        toggle.dataset.bound = "1";
+        toggle.checked = !!weeklySummaryNodeSeriesEnabled[key];
+        toggle.addEventListener("change", () => {{
+          const nextSeries = {{}};
+          for (const innerKey of weeklySummaryNodeSeriesOrder) {{
+            const innerToggleId = weeklySummaryNodeSeriesControlIds[innerKey];
+            const innerToggle = document.getElementById(innerToggleId);
+            if (innerToggle instanceof HTMLInputElement) {{
+              nextSeries[innerKey] = innerToggle.checked;
+            }}
+          }}
+          applyWeeklySummaryNodeSeries(nextSeries, true);
+        }});
+      }}
+      updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
     }}
 
     function loadThemePreference() {{
@@ -4999,12 +5176,48 @@
     }}
 
     function loadWeeklySummaryMetricPreference() {{
-      let stored = "live_packet_count";
+      let stored = "packets";
       try {{
-        stored = window.localStorage.getItem(weeklySummaryMetricStorageKey) || "live_packet_count";
+        stored = window.localStorage.getItem(weeklySummaryMetricStorageKey) || "packets";
       }} catch (_err) {{
       }}
       applyWeeklySummaryMetric(stored, false);
+    }}
+
+    function loadWeeklySummaryNodeSeriesPreference() {{
+      let storedJson = "";
+      try {{
+        storedJson = window.localStorage.getItem(weeklySummaryNodeSeriesStorageKey) || "";
+      }} catch (_err) {{
+      }}
+      if (storedJson) {{
+        try {{
+          const parsed = JSON.parse(storedJson);
+          applyWeeklySummaryNodeSeries(parsed, false);
+          return;
+        }} catch (_err) {{
+        }}
+      }}
+      let legacyCompare = "0";
+      try {{
+        legacyCompare = window.localStorage.getItem(weeklySummaryNodesCompareLegacyStorageKey) || "0";
+      }} catch (_err) {{
+      }}
+      if (normalizeWeeklySummaryNodesCompare(legacyCompare)) {{
+        applyWeeklySummaryNodeSeries({{
+          online_nodes: true,
+          known_nodes: true,
+          saved_nodes: true,
+          position_nodes: true,
+        }}, false);
+      }} else {{
+        applyWeeklySummaryNodeSeries({{
+          online_nodes: true,
+          known_nodes: false,
+          saved_nodes: false,
+          position_nodes: false,
+        }}, false);
+      }}
     }}
 
     function updateMapPacketLinesControl() {{
@@ -12600,7 +12813,7 @@
         if (next === "network") {{
           renderNodes(latestState.nodes || []);
         }}
-        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory, null);
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory);
         if (next === "chat") {{
           renderChat(latestState);
         }}
@@ -12641,7 +12854,6 @@
         renderNodesPlaceholder("Syncing nodes...");
       }} else if (next === "history") {{
         setMapDataMode("activity");
-        renderOnlineActivityLoading();
         renderWeeklySummaryLoading();
         renderHistoryChat({{}});
       }} else if (next === "channels") {{
@@ -17067,7 +17279,7 @@
       if (title) {{
         title.textContent = normalized === "node"
           ? "Node History"
-          : (normalized === "activity" ? "Online Activity" : "Map Data");
+          : (normalized === "activity" ? "History Trends" : "Map Data");
       }}
     }}
 
@@ -17149,14 +17361,14 @@
 
       if (activeLayoutView === "saved") {{
         if (cachedHistory) {{
-          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory, null);
+          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
           renderSavedNodeDetails(latestState || {{}}, cachedHistory);
         }} else {{
           renderNodeHistoryLoading(selectedNodeId);
         }}
       }} else if (activeLayoutView === "network") {{
         // Map-data panel is visible in these views.
-        renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory, null);
+        renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
         setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
       }} else {{
         setMapDataMode("live");
@@ -17201,7 +17413,7 @@
       setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
       if (latestState) {{
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], null);
-        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null, null);
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], null);
         renderSavedNodeDetails(latestState, null);
       }} else {{
         renderSavedNodeDetails({{}}, null);
@@ -20215,11 +20427,8 @@
       const chartState = historyTrendCharts.weekly;
       const rows = chartState && Array.isArray(chartState.points) ? chartState.points : [];
       const metricKey = normalizeWeeklySummaryMetric(weeklySummaryMetric);
-      const metricMeta = weeklySummaryMetricCatalog.get(metricKey) || {{
-        label: "Metric",
-        decimals: 0,
-      }};
-      const emptyMessage = metricKey === "live_packet_count"
+      const metricMeta = resolveWeeklySummaryMetricMeta(metricKey, weeklySummaryNodeSeriesEnabled);
+      const emptyMessage = metricKey === "packets"
         ? "Need at least two saved samples to estimate packets/min."
         : "No weekly summary history yet.";
       renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage);
@@ -20515,11 +20724,71 @@
       const chartLabel = `${{metricMeta.label}} trend chart`;
       setHistoryTrendChartTitle(svg, chartLabel, visible.zoomed);
 
-      const values = plotRows
-        .map((row) => Number(row && row.value))
-        .filter((value) => Number.isFinite(value));
       const fallbackMessage = String(emptyMessage || "No weekly summary history yet.").trim();
-      if (!values.length) {{
+      const seriesDefs = [];
+      if (metricMeta && Array.isArray(metricMeta.seriesOrder) && metricMeta.seriesOrder.length > 0) {{
+        const labels = (metricMeta.seriesLabels && typeof metricMeta.seriesLabels === "object")
+          ? metricMeta.seriesLabels
+          : {{}};
+        const styles = (metricMeta.seriesStyles && typeof metricMeta.seriesStyles === "object")
+          ? metricMeta.seriesStyles
+          : {{}};
+        for (const key of metricMeta.seriesOrder) {{
+          if (!key) continue;
+          const style = (styles && typeof styles[key] === "object") ? styles[key] : {{}};
+          seriesDefs.push({{
+            key: String(key),
+            label: String(labels[key] || key),
+            tone: String(style.tone || ""),
+            dashed: style.dashed === true,
+            width: Number(style.width),
+            color: String(style.color || "").trim(),
+            labelColor: String(style.labelColor || "").trim(),
+            readValue: (row) => row && row.series && row.series[key],
+          }});
+        }}
+      }} else {{
+        seriesDefs.push({{
+          key: "primary",
+          label: String(metricMeta && metricMeta.label ? metricMeta.label : "Series"),
+          tone: "line",
+          dashed: false,
+          width: 2.3,
+          readValue: (row) => row && row.value,
+        }});
+        seriesDefs.push({{
+          key: "compare",
+          label: String(metricMeta && metricMeta.compareLabel ? metricMeta.compareLabel : "Comparison"),
+          tone: "compare",
+          dashed: true,
+          width: 2.0,
+          readValue: (row) => row && row.compareValue,
+        }});
+      }}
+
+      const seriesEntries = [];
+      for (let s = 0; s < seriesDefs.length; s += 1) {{
+        const def = seriesDefs[s];
+        const values = [];
+        const points = [];
+        for (let i = 0; i < plotRows.length; i += 1) {{
+          const rawValue = def.readValue(plotRows[i]);
+          if (rawValue === null || rawValue === undefined) continue;
+          const value = Number(rawValue);
+          if (!Number.isFinite(value)) continue;
+          values.push(value);
+          points.push({{ idx: i, value }});
+        }}
+        if (!points.length) continue;
+        seriesEntries.push({{
+          ...def,
+          index: s,
+          values,
+          points,
+        }});
+      }}
+
+      if (!seriesEntries.length) {{
         svg.innerHTML = "";
         empty.hidden = false;
         empty.textContent = fallbackMessage;
@@ -20535,8 +20804,9 @@
       }}
       empty.hidden = true;
 
-      let minVal = Math.min(...values);
-      let maxVal = Math.max(...values);
+      const allValues = seriesEntries.flatMap((entry) => entry.values);
+      let minVal = Math.min(...allValues);
+      let maxVal = Math.max(...allValues);
       if ((maxVal - minVal) < 1e-6) {{
         maxVal = minVal + 1;
       }}
@@ -20550,54 +20820,93 @@
       const plotW = width - padLeft - padRight;
       const plotH = height - padTop - padBottom;
       const n = plotRows.length;
-      const pointsXY = [];
-      for (let i = 0; i < n; i += 1) {{
-        const value = Number(plotRows[i].value);
-        if (!Number.isFinite(value)) continue;
-        const x = padLeft + ((Math.max(0, i) / Math.max(1, n - 1)) * plotW);
-        const y = padTop + ((maxVal - value) / (maxVal - minVal)) * plotH;
-        pointsXY.push({{ x, y }});
-      }}
-      if (!pointsXY.length) {{
-        svg.innerHTML = "";
-        empty.hidden = false;
-        empty.textContent = fallbackMessage;
-        renderTimeline(
-          chartState.timelineId,
-          plotRows,
-          padLeft,
-          padRight,
-          width,
-          (row) => timelinePointUnix(row, "bucketUnix", ["bucketText"])
-        );
-        return false;
-      }}
-
-      const path = pointsXY.map((pt, idx) => (
-        `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
-      )).join(" ");
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const chartPalette = darkTheme
         ? {{
             grid: "#324152",
             line: "#58c878",
+            compare: "#79c0ff",
+            aux1: "#f3b36b",
+            aux2: "#6fcad8",
+            aux3: "#d0e18a",
             label: "#9ce7b8",
+            compareLabel: "#a4d0ff",
+            aux1Label: "#f6c88e",
+            aux2Label: "#8ddde8",
+            aux3Label: "#dde8a8",
           }}
         : {{
             grid: "#dce8df",
             line: "#1f6f53",
+            compare: "#265d7b",
+            aux1: "#a95f27",
+            aux2: "#2f6e78",
+            aux3: "#6d7a2f",
             label: "#1f6f53",
+            compareLabel: "#265d7b",
+            aux1Label: "#a95f27",
+            aux2Label: "#2f6e78",
+            aux3Label: "#6d7a2f",
           }};
+      const toneFallbacks = ["line", "compare", "aux1", "aux2", "aux3"];
+      const toneStroke = (tone, index) => {{
+        const key = tone && chartPalette[tone] ? tone : toneFallbacks[index] || "compare";
+        return chartPalette[key] || chartPalette.compare;
+      }};
+      const toneLabel = (tone, index) => {{
+        const key = tone && chartPalette[`${{tone}}Label`] ? `${{tone}}Label` : `${{toneFallbacks[index] || "compare"}}Label`;
+        return chartPalette[key] || chartPalette.compareLabel;
+      }};
+      const enrichSeries = seriesEntries.map((entry, index) => {{
+        const stroke = toneStroke(entry.tone, index);
+        const labelColor = toneLabel(entry.tone, index);
+        const resolvedStroke = entry.color || stroke;
+        const resolvedLabelColor = entry.labelColor || labelColor;
+        const widthPx = Number.isFinite(Number(entry.width))
+          ? Math.max(1.2, Number(entry.width))
+          : (index === 0 ? 2.3 : 2.0);
+        const dashText = entry.dashed ? "5 3" : "";
+        const dashAttr = dashText ? ` stroke-dasharray="${{dashText}}"` : "";
+        const pointsXY = entry.points.map((point) => {{
+          const x = padLeft + ((Math.max(0, point.idx) / Math.max(1, n - 1)) * plotW);
+          const y = padTop + ((maxVal - point.value) / (maxVal - minVal)) * plotH;
+          return {{ x, y }};
+        }});
+        const path = pointsXY.map((pt, idx) => (
+          `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
+        )).join(" ");
+        return {{
+          ...entry,
+          stroke: resolvedStroke,
+          labelColor: resolvedLabelColor,
+          widthPx,
+          dashAttr,
+          path,
+        }};
+      }});
       const midY = padTop + (plotH / 2);
+      const legendX = Math.max(padLeft + 8, width - padRight - 260);
+      const legendItems = enrichSeries.slice(0, 5).map((entry, index) => {{
+        const y = padTop + 8 + (index * 14);
+        return `
+          <line x1="${{legendX}}" y1="${{y}}" x2="${{legendX + 22}}" y2="${{y}}" stroke="${{entry.stroke}}" stroke-width="${{entry.widthPx.toFixed(1)}}"${{entry.dashAttr}}></line>
+          <text x="${{legendX + 28}}" y="${{y + 3}}" font-size="10" fill="${{entry.labelColor}}">${{entry.label}}</text>
+        `;
+      }}).join("");
+      const paths = enrichSeries.map((entry) => (
+        `<path d="${{entry.path}}" fill="none" stroke="${{entry.stroke}}" stroke-width="${{entry.widthPx.toFixed(1)}}"${{entry.dashAttr}}></path>`
+      )).join("");
+      const axisLabelColor = enrichSeries[0] ? enrichSeries[0].labelColor : chartPalette.label;
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `
         <rect x="0" y="0" width="${{width}}" height="${{height}}" fill="none"></rect>
         <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
         <line x1="${{padLeft}}" y1="${{midY.toFixed(2)}}" x2="${{width - padRight}}" y2="${{midY.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
         <line x1="${{padLeft}}" y1="${{height - padBottom}}" x2="${{width - padRight}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
-        <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
-        <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(maxVal, metricMeta.decimals)}}</text>
-        <text x="${{padLeft - 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(minVal, metricMeta.decimals)}}</text>
+        ${{paths}}
+        <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{axisLabelColor}}">${{formatMetricValue(maxVal, metricMeta.decimals)}}</text>
+        <text x="${{padLeft - 4}}" y="${{height - padBottom}}" font-size="10" text-anchor="end" fill="${{axisLabelColor}}">${{formatMetricValue(minVal, metricMeta.decimals)}}</text>
+        ${{legendItems}}
       `;
       renderTimeline(
         chartState.timelineId,
@@ -20612,14 +20921,13 @@
 
     function renderWeeklySummary(summaryHistory) {{
       const metricKey = normalizeWeeklySummaryMetric(weeklySummaryMetric);
-      const metricMeta = weeklySummaryMetricCatalog.get(metricKey) || {{
-        label: "Metric",
-        decimals: 0,
-      }};
+      const metricMeta = resolveWeeklySummaryMetricMeta(metricKey, weeklySummaryNodeSeriesEnabled);
       const payload = (summaryHistory && typeof summaryHistory === "object") ? summaryHistory : {{}};
       const points = Array.isArray(payload.points) ? payload.points : [];
       const rows = [];
-      const packetRateMetric = metricKey === "live_packet_count";
+      const packetRateMetric = metricKey === "packets";
+      const nodesMetric = metricKey === "nodes";
+      const linksMetric = metricKey === "links";
       let prevPacketBucketUnix = null;
       let prevPacketTotal = null;
       for (const point of points) {{
@@ -20643,13 +20951,46 @@
           prevPacketTotal = packetTotal;
           continue;
         }}
-        const value = Number(point[metricKey]);
-        if (!Number.isFinite(value)) continue;
+        if (linksMetric) {{
+          const value = Number(point.real_edge_count);
+          if (!Number.isFinite(value)) continue;
+          rows.push({{
+            value,
+            bucketText,
+            bucketUnix: Number.isFinite(bucketUnix) && bucketUnix > 0 ? bucketUnix : null,
+          }});
+          continue;
+        }}
+        if (!nodesMetric) {{
+          continue;
+        }}
+        const onlineValue = Number(point.online_node_count);
+        const knownValue = Number(point.node_count);
+        const savedValue = Number(point.saved_node_count);
+        const positionValue = Number(point.nodes_with_position);
+        const primaryValue = Number.isFinite(onlineValue) ? onlineValue : knownValue;
+        if (!Number.isFinite(primaryValue)) continue;
+        const seriesValues = {{}};
+        if (Number.isFinite(onlineValue)) seriesValues.online_nodes = onlineValue;
+        if (Number.isFinite(knownValue)) seriesValues.known_nodes = knownValue;
+        if (Number.isFinite(savedValue)) seriesValues.saved_nodes = savedValue;
+        if (Number.isFinite(positionValue)) seriesValues.position_nodes = positionValue;
         rows.push({{
-          value,
+          value: primaryValue,
+          series: seriesValues,
+          knownNodeCount: Number.isFinite(knownValue) ? knownValue : null,
+          savedNodeCount: Number.isFinite(savedValue) ? savedValue : null,
+          positionNodeCount: Number.isFinite(positionValue) ? positionValue : null,
           bucketText,
           bucketUnix: Number.isFinite(bucketUnix) && bucketUnix > 0 ? bucketUnix : null,
         }});
+      }}
+      let chartRows = rows;
+      if (nodesMetric && rows.length > 0) {{
+        const firstPositiveIndex = rows.findIndex((row) => Number(row && row.value) > 0);
+        if (firstPositiveIndex > 0) {{
+          chartRows = rows.slice(firstPositiveIndex);
+        }}
       }}
 
       const caption = document.getElementById("weekly-summary-caption");
@@ -20663,7 +21004,7 @@
         ? "Need at least two saved samples to estimate packets/min."
         : "No weekly summary history yet.";
 
-      if (rows.length === 0) {{
+      if (chartRows.length === 0) {{
         overview.innerHTML = "";
         renderWeeklySummaryChartRows([], metricMeta, emptyMessage);
         if (caption) {{
@@ -20672,7 +21013,7 @@
         return;
       }}
 
-      const rendered = renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage);
+      const rendered = renderWeeklySummaryChartRows(chartRows, metricMeta, emptyMessage);
       if (!rendered) {{
         overview.innerHTML = "";
         if (caption) {{
@@ -20681,21 +21022,31 @@
         return;
       }}
 
-      const firstValue = Number(rows[0].value);
-      const lastValue = Number(rows[rows.length - 1].value);
+      const firstValue = Number(chartRows[0].value);
+      const lastValue = Number(chartRows[chartRows.length - 1].value);
       const delta = lastValue - firstValue;
-      const values = rows.map((row) => Number(row.value)).filter((value) => Number.isFinite(value));
+      const values = chartRows.map((row) => Number(row.value)).filter((value) => Number.isFinite(value));
       const avg = values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
       const windowHours = Number(payload.window_hours);
-      const startLabel = rows[0].bucketText || "";
-      const endLabel = rows[rows.length - 1].bucketText || "";
+      const startLabel = chartRows[0].bucketText || "";
+      const endLabel = chartRows[chartRows.length - 1].bucketText || "";
       if (caption) {{
-        caption.textContent = `Weekly trend for ${{metricMeta.label}}. Window: ${{Number.isFinite(windowHours) ? windowHours : weeklySummaryHours}}h, samples: ${{rows.length}}.`;
+        const selectedNodeSeriesLabels = Array.isArray(metricMeta && metricMeta.seriesOrder)
+          ? metricMeta.seriesOrder.map((seriesKey) => (
+            String((metricMeta.seriesLabels && metricMeta.seriesLabels[seriesKey]) || seriesKey)
+          ))
+          : [];
+        const compareNote = nodesMetric
+          ? (selectedNodeSeriesLabels.length > 1
+            ? ` Showing lines: ${{selectedNodeSeriesLabels.join(", ")}}.`
+            : ` Showing ${{selectedNodeSeriesLabels[0] || "Online Nodes"}} line.`)
+          : "";
+        caption.textContent = `Weekly trend for ${{metricMeta.label}}. Window: ${{Number.isFinite(windowHours) ? windowHours : weeklySummaryHours}}h, samples: ${{chartRows.length}}.${{compareNote}}`;
       }}
       const items = [
         ["Metric", metricMeta.label],
         ["Window", `${{Number.isFinite(windowHours) ? Math.round(windowHours) : weeklySummaryHours}}h`],
-        ["Samples", String(rows.length)],
+        ["Samples", String(chartRows.length)],
         ["Latest", formatMetricValue(lastValue, metricMeta.decimals)],
         ["Delta", formatMetricValue(delta, metricMeta.decimals)],
         ["Average", formatMetricValue(avg, metricMeta.decimals)],
@@ -20703,9 +21054,31 @@
         ["Range", `${{startLabel || "n/a"}} to ${{endLabel || "n/a"}}`],
       ];
       if (packetRateMetric) {{
-        const latestTotal = Number(rows[rows.length - 1] && rows[rows.length - 1].totalValue);
+        const latestTotal = Number(chartRows[chartRows.length - 1] && chartRows[chartRows.length - 1].totalValue);
         if (Number.isFinite(latestTotal)) {{
           items.push(["Total Packets", formatMetricValue(latestTotal, 0)]);
+        }}
+      }} else if (nodesMetric) {{
+        const latestRow = chartRows[chartRows.length - 1] || null;
+        const latestKnownNodes = Number(latestRow && latestRow.knownNodeCount);
+        const latestSavedNodes = Number(latestRow && latestRow.savedNodeCount);
+        const latestPositionNodes = Number(latestRow && latestRow.positionNodeCount);
+        if (Number.isFinite(latestKnownNodes)) {{
+          items.push(["Known Nodes (Radio)", formatMetricValue(latestKnownNodes, 0)]);
+        }}
+        if (Number.isFinite(latestSavedNodes)) {{
+          items.push(["Saved Nodes (DB)", formatMetricValue(latestSavedNodes, 0)]);
+        }}
+        if (Number.isFinite(latestPositionNodes)) {{
+          items.push(["Nodes With Position", formatMetricValue(latestPositionNodes, 0)]);
+        }}
+        if (Number.isFinite(latestSavedNodes) && Number.isFinite(latestKnownNodes)) {{
+          if (latestKnownNodes > 0) {{
+            const ratioPercent = (latestSavedNodes / latestKnownNodes) * 100;
+            items.push(["Saved / Known", `${{formatMetricValue(ratioPercent, 1)}}%`]);
+          }} else {{
+            items.push(["Saved / Known", "n/a"]);
+          }}
         }}
       }}
       overview.innerHTML = items.map(([k, v]) => (
@@ -21038,7 +21411,7 @@
 
       // The signal plot lives in the map-data panel, rendered by renderTraffic.
       if (activeLayoutView === "saved" || activeLayoutView === "network") {{
-        renderTraffic(traffic, nodes, nodeHistory, null);
+        renderTraffic(traffic, nodes, nodeHistory);
       }}
 
       if (activeLayoutView === "saved") {{
@@ -21218,17 +21591,9 @@
     async function refreshHistoryPanels(force = false) {{
       if (activeLayoutView !== "history") return;
       setMapDataMode("activity");
-      const onlineKey = String(Math.max(1, Math.round(Number(nodeHistoryHours) || nodeHistoryHours)));
       const weeklyKey = String(weeklySummaryHours);
       if (force) {{
-        onlineActivityCache.delete(onlineKey);
         summaryMetricsCache.delete(weeklyKey);
-      }}
-      const cachedOnline = onlineActivityCache.get(onlineKey);
-      if (cachedOnline && cachedOnline.data) {{
-        renderOnlineActivity(cachedOnline.data);
-      }} else {{
-        renderOnlineActivityLoading();
       }}
       const cachedWeekly = summaryMetricsCache.get(weeklyKey);
       if (cachedWeekly && cachedWeekly.data) {{
@@ -21237,38 +21602,20 @@
         renderWeeklySummaryLoading();
       }}
 
-      const [onlineResult, weeklyResult] = await Promise.allSettled([
-        fetchOnlineActivity(nodeHistoryHours),
-        fetchSummaryMetrics(weeklySummaryHours),
-      ]);
-      if (activeLayoutView !== "history") return;
-
-      if (onlineResult.status === "fulfilled") {{
-        renderOnlineActivity(onlineResult.value);
-      }} else {{
-        const reason = onlineResult.reason;
-        const message = reason instanceof Error ? reason.message : String(reason || "unknown error");
-        renderOnlineActivityError(message);
-      }}
-
-      if (weeklyResult.status === "fulfilled") {{
-        renderWeeklySummary(weeklyResult.value);
-      }} else {{
-        const reason = weeklyResult.reason;
+      try {{
+        const weekly = await fetchSummaryMetrics(weeklySummaryHours);
+        if (activeLayoutView !== "history") return;
+        renderWeeklySummary(weekly);
+      }} catch (reason) {{
+        if (activeLayoutView !== "history") return;
         const message = reason instanceof Error ? reason.message : String(reason || "unknown error");
         renderWeeklySummaryError(message);
       }}
     }}
 
-    function renderTraffic(traffic, nodes, nodeHistory, onlineActivity) {{
+    function renderTraffic(traffic, nodes, nodeHistory) {{
       if (mapDataFocus === "activity") {{
-        if (onlineActivity && !onlineActivity.error) {{
-          renderOnlineActivity(onlineActivity);
-        }} else if (onlineActivity && onlineActivity.error) {{
-          renderOnlineActivityError(onlineActivity.error);
-        }} else {{
-          renderOnlineActivityLoading();
-        }}
+        setMapDataMode("activity");
         return;
       }}
 
@@ -23281,7 +23628,7 @@
             renderNodes(nodes304);
           }}
           if (trafficVisible304) {{
-            renderTraffic(traffic304, nodes304, cachedHistory304, null);
+            renderTraffic(traffic304, nodes304, cachedHistory304);
           }}
           if (activeLayoutView === "history") {{
             renderHistoryChat(traffic304);
@@ -23366,18 +23713,6 @@
           }}
         }}
 
-        let onlineActivity = null;
-        if (activeLayoutView === "history" || (mapVisible && mapDataFocus === "activity")) {{
-          try {{
-            onlineActivity = await fetchOnlineActivity(nodeHistoryHours);
-          }} catch (activityErr) {{
-            onlineActivity = {{
-              error: activityErr instanceof Error
-                ? activityErr.message
-                : String(activityErr || "unknown error"),
-            }};
-          }}
-        }}
         let weeklySummary = null;
         if (activeLayoutView === "history") {{
           try {{
@@ -23403,7 +23738,7 @@
         }}
 
         if (trafficVisible) {{
-          renderTraffic(state.traffic || {{}}, state.nodes || [], cachedHistory, onlineActivity);
+          renderTraffic(state.traffic || {{}}, state.nodes || [], cachedHistory);
         }}
         if (activeLayoutView === "history") {{
           renderHistoryChat(state.traffic || {{}});
@@ -23515,6 +23850,7 @@
     loadThemePreference();
     loadTickerDensityPreference();
     loadWeeklySummaryMetricPreference();
+    loadWeeklySummaryNodeSeriesPreference();
     bindLayoutNav();
     renderSavedRailStatus();
     bindSplitters();
@@ -23551,6 +23887,7 @@
     bindThemeToggle();
     bindSummaryTickerExpandControl();
     bindWeeklySummaryMetricControl();
+    bindWeeklySummaryNodeSeriesControls();
     bindThemePresetSelector();
     bindMeshChannelControl();
     bindMeshChannelMenuControl();

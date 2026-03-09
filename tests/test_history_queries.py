@@ -159,23 +159,23 @@ def test_fetch_summary_metrics_rows_filters_and_orders_by_bucket():
         conn.execute(
             """
             INSERT INTO summary_metrics_1m(
-              bucket_unix, node_count, nodes_with_position,
+              bucket_unix, node_count, saved_node_count, online_node_count, nodes_with_position,
               live_packet_count, real_edge_count, last_seen_unix
-            ) VALUES(60, 10, 8, 25, 4, 61)
+            ) VALUES(60, 10, 6, 4, 8, 25, 4, 61)
             """
         )
         conn.execute(
             """
             INSERT INTO summary_metrics_1m(
-              bucket_unix, node_count, nodes_with_position,
+              bucket_unix, node_count, saved_node_count, online_node_count, nodes_with_position,
               live_packet_count, real_edge_count, last_seen_unix
-            ) VALUES(120, 12, 9, 30, 5, 121)
+            ) VALUES(120, 12, 7, 5, 9, 30, 5, 121)
             """
         )
         rows = fetch_summary_metrics_rows(conn, cutoff=90, limit=10)
         assert rows == [
-            (60, 10, 8, 25, 4),
-            (120, 12, 9, 30, 5),
+            (60, 10, 6, 4, 8, 25, 4),
+            (120, 12, 7, 5, 9, 30, 5),
         ]
     finally:
         conn.close()

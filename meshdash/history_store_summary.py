@@ -30,6 +30,8 @@ def save_summary_metrics(
     now_unix = int(time.time())
     bucket_unix = now_unix - (now_unix % 60)
     node_count = _summary_int(summary, "node_count")
+    saved_node_count = _summary_int(summary, "saved_node_count")
+    online_node_count = _summary_int(summary, "online_node_count")
     nodes_with_position = _summary_int(summary, "nodes_with_position")
     live_packet_count = _summary_int(summary, "live_packet_count")
     real_edge_count = _summary_int(summary, "real_edge_count")
@@ -42,13 +44,17 @@ def save_summary_metrics(
             INSERT INTO summary_metrics_1m(
               bucket_unix,
               node_count,
+              saved_node_count,
+              online_node_count,
               nodes_with_position,
               live_packet_count,
               real_edge_count,
               last_seen_unix
-            ) VALUES(?, ?, ?, ?, ?, ?)
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(bucket_unix) DO UPDATE SET
               node_count = excluded.node_count,
+              saved_node_count = excluded.saved_node_count,
+              online_node_count = excluded.online_node_count,
               nodes_with_position = excluded.nodes_with_position,
               live_packet_count = excluded.live_packet_count,
               real_edge_count = excluded.real_edge_count,
@@ -57,6 +63,8 @@ def save_summary_metrics(
             (
                 bucket_unix,
                 node_count,
+                saved_node_count,
+                online_node_count,
                 nodes_with_position,
                 live_packet_count,
                 real_edge_count,

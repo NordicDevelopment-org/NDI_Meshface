@@ -63,6 +63,7 @@ _MODEM_PRESET_ENUM_BY_NUMBER: dict[int, str] = {
 _MODEM_PRESET_NORMALIZED_KEYS: dict[str, str] = {
     str(name).replace("_", "").upper(): name for name in _MODEM_PRESET_ENUM_BY_NUMBER.values()
 }
+_ONLINE_NODE_WINDOW_SECONDS = 10 * 60
 
 
 def _to_jsonable_safe(
@@ -160,6 +161,29 @@ def _chat_entry_sort_unix(entry: object) -> Optional[int]:
         if unix_value is not None and unix_value > 0:
             return int(unix_value)
     return None
+
+
+def _count_online_nodes(
+    node_rows: list[dict[str, object]],
+    *,
+    now_unix: int,
+    freshness_window_seconds: int = _ONLINE_NODE_WINDOW_SECONDS,
+) -> int:
+    count = 0
+    for row in node_rows:
+        if not isinstance(row, Mapping):
+            continue
+        last_seen_unix = _to_int(row.get("last_heard_unix"))
+        if last_seen_unix is None:
+            last_seen_unix = _to_int(row.get("last_heard_epoch"))
+        if last_seen_unix is None:
+            last_seen_unix = _parse_utc_text_to_unix_helper(row.get("last_heard"))
+        if last_seen_unix is None or last_seen_unix <= 0:
+            continue
+        age_seconds = max(0, int(now_unix) - int(last_seen_unix))
+        if age_seconds <= max(30, int(freshness_window_seconds)):
+            count += 1
+    return count
 
 
 def _merge_recent_chat_entries(
@@ -420,6 +444,19 @@ def build_dashboard_state_typed(
             revision_info=revision_info,
             modem_preset=modem_preset,
         )
+
+    # Keep radio and DB-known node counts explicit in the summary payload.
+    summary_saved_node_count = _to_int(summary.get("saved_node_count"))
+    if summary_saved_node_count is None:
+        summary_saved_node_count = len(node_saved_counts)
+    summary["saved_node_count"] = max(0, int(summary_saved_node_count))
+    summary_online_node_count = _to_int(summary.get("online_node_count"))
+    if summary_online_node_count is None:
+        summary_online_node_count = _count_online_nodes(
+            nodes.rows,
+            now_unix=int(time.time()),
+        )
+    summary["online_node_count"] = max(0, int(summary_online_node_count))
 
     merged_recent_chat = _merge_recent_chat_entries(
         recent_chat=tracker_data.recent_chat,

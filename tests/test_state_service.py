@@ -107,6 +107,8 @@ def test_build_dashboard_state_builds_payload_and_redacts():
     assert observed["summary_kwargs"]["target"] == "192.168.1.109:4403 (tcp)"
     assert observed["summary_kwargs"]["modem_preset"] == "LONG_FAST"
     assert observed["summary_kwargs"]["tracker_data"].live_packet_count == 4
+    assert observed["redact_state"]["summary"]["saved_node_count"] == 1
+    assert observed["redact_state"]["summary"]["online_node_count"] == 0
     assert observed["redact_state"]["summary_error"] is None
     assert observed["redact_state"]["nodes"][0]["saved_packets"] == 7
     assert observed["redact_state"]["history_caps"]["!a"]["gps_capable"] is True
