@@ -1,5 +1,7 @@
 # Ideas Backlog
 
+- reversi!!! perfect first GUI game
+- chess
 - poker game, blackjack
 - bot activity show as (1)
 - move channel config to channels, give setting tabs
