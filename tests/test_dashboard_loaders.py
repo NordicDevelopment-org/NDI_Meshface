@@ -139,7 +139,7 @@ def test_build_dashboard_runtime_loaders_with_dependencies_wires_all_loader_fact
     assert captured["send"]["send_lock"] == "lock"
 
 
-def test_build_dashboard_runtime_loaders_persists_summary_metrics_when_store_supports_it():
+def test_build_dashboard_runtime_loaders_does_not_persist_summary_metrics_on_state_reads():
     saved = []
 
     class _HistoryStore:
@@ -178,7 +178,7 @@ def test_build_dashboard_runtime_loaders_persists_summary_metrics_when_store_sup
 
     payload = result.state_fn()
     assert payload["summary"]["node_count"] == 5
-    assert saved and saved[0]["node_count"] == 5
+    assert saved == []
 
 
 def test_with_summary_persistence_skips_startup_grace_samples():

@@ -174,7 +174,6 @@ def test_fetch_summary_metrics_rows_filters_and_orders_by_bucket():
         )
         rows = fetch_summary_metrics_rows(conn, cutoff=90, limit=10)
         assert rows == [
-            (60, 10, 6, 4, 8, 25, 4),
             (120, 12, 7, 5, 9, 30, 5),
         ]
     finally:

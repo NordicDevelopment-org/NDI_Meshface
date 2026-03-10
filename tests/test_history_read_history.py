@@ -3,6 +3,7 @@ from meshdash.history_read_history import (
     load_online_activity_data,
     load_summary_metrics_history_data,
 )
+from meshdash.history_summary_sampling import summary_metrics_query_limit
 
 
 def test_load_node_history_data_returns_empty_payload_for_blank_node_id():
@@ -77,6 +78,6 @@ def test_load_summary_metrics_history_data_fetches_and_builds_payload():
     )
     assert seen["conn"] == "conn"
     assert seen["cutoff"] == 1000 - (12 * 3600)
-    assert seen["limit"] == (12 * 60) + 5
+    assert seen["limit"] == summary_metrics_query_limit(12)
     assert payload["window_hours"] == 12
     assert payload["rows"] == [{"bucket_unix": 60}]

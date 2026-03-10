@@ -11,6 +11,9 @@ from .history_read_contracts import (
     HistoryPayload,
     TimezoneLabelFn,
 )
+from .history_summary_sampling import (
+    summary_metrics_query_limit as _summary_metrics_query_limit,
+)
 from .runtime_types import NowUnixFn
 from .sql_contracts import SqlConnection
 
@@ -86,7 +89,7 @@ def load_summary_metrics_history_data(
 ) -> HistoryPayload:
     hours = max(1, min(24 * 365, int(window_hours)))
     cutoff = int(now_unix_fn()) - (hours * 3600)
-    limit = max(60, min(24 * 365 * 60, (hours * 60) + 5))
+    limit = _summary_metrics_query_limit(hours)
     rows = fetch_summary_metrics_rows_fn(
         conn,
         cutoff=cutoff,

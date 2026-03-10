@@ -196,10 +196,6 @@ def build_dashboard_runtime_loaders_with_dependencies(
         revision_info=dependencies.revision_info,
         build_state_fn=dependencies.build_state_fn,
     )
-    state_fn = _with_summary_persistence(
-        base_state_fn=state_fn,
-        history_store=dependencies.history_store,
-    )
 
     node_history_fn = dependencies.build_node_history_loader_fn(
         history_store=dependencies.history_store,

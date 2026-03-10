@@ -1,5 +1,6 @@
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Optional
 from http.server import ThreadingHTTPServer
@@ -55,8 +56,9 @@ class _OfflineTracker:
         return
 
 
-_SUMMARY_SAMPLE_INTERVAL_SECONDS = 30.0
+_SUMMARY_SAMPLE_INTERVAL_SECONDS = 15.0
 _SUMMARY_SAMPLE_STARTUP_DELAY_SECONDS = 5.0
+_SUMMARY_PERSIST_STARTUP_GRACE_SECONDS = 90
 
 
 def _summary_sampling_supported(context: DashboardRuntimeContext) -> bool:
@@ -69,6 +71,30 @@ def _summary_sampling_supported(context: DashboardRuntimeContext) -> bool:
     return callable(save_summary_fn)
 
 
+def _extract_state_summary(payload: object) -> Mapping[str, object] | None:
+    if isinstance(payload, Mapping):
+        summary = payload.get("summary")
+        return summary if isinstance(summary, Mapping) else None
+    summary = getattr(payload, "summary", None)
+    return summary if isinstance(summary, Mapping) else None
+
+
+def _to_int_or_none(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _should_skip_summary_persistence(summary: Mapping[str, object]) -> bool:
+    uptime_seconds = _to_int_or_none(summary.get("uptime_seconds"))
+    if uptime_seconds is None:
+        return False
+    return uptime_seconds < _SUMMARY_PERSIST_STARTUP_GRACE_SECONDS
+
+
 def _resolve_summary_sampler_state_fn(state_fn: object):
     lite_fn = getattr(state_fn, "lite", None)
     if callable(lite_fn):
@@ -79,16 +105,32 @@ def _resolve_summary_sampler_state_fn(state_fn: object):
 def _start_summary_sampler(context: DashboardRuntimeContext) -> tuple[threading.Event | None, threading.Thread | None]:
     if not _summary_sampling_supported(context):
         return None, None
+    save_summary_fn = getattr(context.history_store, "save_summary_metrics", None)
+    if not callable(save_summary_fn):
+        return None, None
     sample_state_fn = _resolve_summary_sampler_state_fn(context.state_fn)
     if sample_state_fn is None:
         return None, None
 
+    def _sample_once_and_persist() -> None:
+        try:
+            payload = sample_state_fn()
+        except Exception:
+            return
+        summary = _extract_state_summary(payload)
+        if summary is None:
+            return
+        if _should_skip_summary_persistence(summary):
+            return
+        try:
+            save_summary_fn(summary)
+        except Exception:
+            # Sampling persistence is best-effort.
+            pass
+
     # Prime the latest bucket at startup so charts are populated even before
     # the first background interval elapses.
-    try:
-        sample_state_fn()
-    except Exception:
-        pass
+    _sample_once_and_persist()
 
     stop_event = threading.Event()
 
@@ -96,11 +138,7 @@ def _start_summary_sampler(context: DashboardRuntimeContext) -> tuple[threading.
         if stop_event.wait(_SUMMARY_SAMPLE_STARTUP_DELAY_SECONDS):
             return
         while not stop_event.wait(_SUMMARY_SAMPLE_INTERVAL_SECONDS):
-            try:
-                sample_state_fn()
-            except Exception:
-                # Sampling is best-effort; never take down runtime on metrics write.
-                pass
+            _sample_once_and_persist()
 
     thread = threading.Thread(
         target=_sample_loop,

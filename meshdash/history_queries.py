@@ -1,4 +1,7 @@
 from .sql_contracts import SqlConnection, SqlRows
+from .history_summary_sampling import (
+    summary_metrics_bucket_unix as _summary_metrics_bucket_unix,
+)
 
 
 def fetch_recent_packet_rows(conn: SqlConnection, limit: int) -> SqlRows:
@@ -106,7 +109,7 @@ def fetch_summary_metrics_rows(
     cutoff: int,
     limit: int,
 ) -> SqlRows:
-    cutoff_bucket = int(cutoff) - (int(cutoff) % 60)
+    cutoff_bucket = _summary_metrics_bucket_unix(int(cutoff))
     return conn.execute(
         """
         SELECT bucket_unix,

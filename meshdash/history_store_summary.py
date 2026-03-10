@@ -11,6 +11,9 @@ from .history_queries import (
 from .history_read_history import (
     load_summary_metrics_history_data as _load_summary_metrics_history_data_helper,
 )
+from .history_summary_sampling import (
+    summary_metrics_bucket_unix as _summary_metrics_bucket_unix,
+)
 from .history_store_runtime_contracts import (
     HistoryStoreReadState,
     HistoryStoreWriteState,
@@ -28,7 +31,7 @@ def save_summary_metrics(
     if not isinstance(summary, Mapping):
         return
     now_unix = int(time.time())
-    bucket_unix = now_unix - (now_unix % 60)
+    bucket_unix = _summary_metrics_bucket_unix(now_unix)
     node_count = _summary_int(summary, "node_count")
     saved_node_count = _summary_int(summary, "saved_node_count")
     online_node_count = _summary_int(summary, "online_node_count")

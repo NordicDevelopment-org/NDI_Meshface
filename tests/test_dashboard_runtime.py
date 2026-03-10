@@ -400,3 +400,54 @@ def test_start_summary_sampler_skips_when_history_store_has_no_summary_saver():
 
     assert stop_event is None
     assert thread is None
+
+
+def test_start_summary_sampler_persists_prime_sample_summary():
+    saved = []
+
+    def _state_fn():
+        return {"summary": {"node_count": 1, "uptime_seconds": 999}}
+
+    def _state_fn_lite():
+        return {"summary": {"node_count": 9, "uptime_seconds": 999}}
+
+    _state_fn.lite = _state_fn_lite
+    context = SimpleNamespace(
+        history_enabled=True,
+        history_store=SimpleNamespace(save_summary_metrics=lambda summary: saved.append(dict(summary))),
+        state_fn=_state_fn,
+    )
+
+    stop_event, thread = _start_summary_sampler(context)
+
+    assert stop_event is not None
+    assert thread is not None
+    assert saved
+    assert saved[0]["node_count"] == 9
+
+    stop_event.set()
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
+
+
+def test_start_summary_sampler_skips_startup_grace_samples():
+    saved = []
+
+    def _state_fn():
+        return {"summary": {"node_count": 2, "uptime_seconds": 30}}
+
+    context = SimpleNamespace(
+        history_enabled=True,
+        history_store=SimpleNamespace(save_summary_metrics=lambda summary: saved.append(dict(summary))),
+        state_fn=_state_fn,
+    )
+
+    stop_event, thread = _start_summary_sampler(context)
+
+    assert stop_event is not None
+    assert thread is not None
+    assert saved == []
+
+    stop_event.set()
+    thread.join(timeout=1.0)
+    assert not thread.is_alive()
