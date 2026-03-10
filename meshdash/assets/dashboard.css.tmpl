@@ -2551,7 +2551,7 @@
     }}
     .reversi-link-actions {{
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
     }}
     .reversi-link-btn {{
@@ -2604,6 +2604,20 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+    }}
+    .reversi-invite-item.is-selected {{
+      border-color: #2f855a;
+      background: #ecf8f0;
+      box-shadow: 0 0 0 1px rgba(47, 133, 90, 0.18);
+    }}
+    .reversi-invite-item:focus-visible {{
+      outline: 2px solid #3ea269;
+      outline-offset: 1px;
     }}
     .reversi-invite-main {{
       font-size: 11px;
@@ -2767,6 +2781,16 @@
       background: rgba(223, 247, 234, 0.92);
       border: 1px solid rgba(159, 214, 184, 0.92);
       box-shadow: 0 0 0 1px rgba(23, 74, 50, 0.3);
+    }}
+    .reversi-hint.hint-black {{
+      background: radial-gradient(circle at 30% 26%, #4a5d6b 0%, #202d36 58%, #111920 100%);
+      border-color: rgba(164, 191, 206, 0.76);
+      box-shadow: 0 0 0 1px rgba(220, 240, 255, 0.22);
+    }}
+    .reversi-hint.hint-white {{
+      background: radial-gradient(circle at 30% 24%, #ffffff 0%, #edf3f8 52%, #d6e0e9 100%);
+      border-color: rgba(168, 188, 205, 0.9);
+      box-shadow: 0 0 0 1px rgba(23, 74, 50, 0.24);
     }}
     .bots-grid {{
       display: grid;
@@ -9588,6 +9612,14 @@
       border-color: #2a4638;
       background: #13241b;
     }}
+    [data-theme="dark"] .reversi-invite-item.is-selected {{
+      border-color: #3ba06e;
+      background: #1a3a2b;
+      box-shadow: 0 0 0 1px rgba(75, 186, 129, 0.22);
+    }}
+    [data-theme="dark"] .reversi-invite-item:focus-visible {{
+      outline-color: #5abf8a;
+    }}
     [data-theme="dark"] .reversi-invite-main {{
       color: #cfeee0;
     }}
@@ -9637,6 +9669,16 @@
       background: rgba(179, 240, 207, 0.95);
       border-color: rgba(109, 184, 146, 0.92);
       box-shadow: 0 0 0 1px rgba(11, 38, 26, 0.45);
+    }}
+    [data-theme="dark"] .reversi-hint.hint-black {{
+      background: radial-gradient(circle at 30% 26%, #5a6f7e 0%, #273742 56%, #131c23 100%);
+      border-color: rgba(176, 206, 224, 0.82);
+      box-shadow: 0 0 0 1px rgba(223, 241, 255, 0.26);
+    }}
+    [data-theme="dark"] .reversi-hint.hint-white {{
+      background: radial-gradient(circle at 30% 24%, #ffffff 0%, #edf3f8 52%, #d6e0e9 100%);
+      border-color: rgba(168, 188, 205, 0.92);
+      box-shadow: 0 0 0 1px rgba(11, 38, 26, 0.5);
     }}
     [data-theme="dark"] .bots-sniffer-filter-label {{
       color: #afc8ba;

@@ -2272,7 +2272,9 @@
     let reversiLegalMoves = [];
     let reversiLegalMoveMap = new Map();
     let reversiPeerId = "";
+    let reversiHostColorPreference = reversiPiece.black;
     let reversiPendingInvites = [];
+    let reversiSelectedInviteKey = "";
     let reversiSeenNetworkMessageKeys = new Set();
     let reversiSeenNetworkMessageOrder = [];
     let reversiLink = {{
@@ -2280,6 +2282,7 @@
       role: "",
       session_id: "",
       peer_id: "",
+      channel_index: 0,
       local_color: reversiPiece.black,
       remote_color: reversiPiece.white,
       local_move_seq: 0,
@@ -7644,6 +7647,17 @@
       return Number(player) === reversiPiece.white ? "White" : "Black";
     }}
 
+    function reversiColorToken(player) {{
+      return Number(player) === reversiPiece.white ? "white" : "black";
+    }}
+
+    function parseReversiColor(value, fallback = reversiPiece.black) {{
+      const token = String(value == null ? "" : value).trim().toLowerCase();
+      if (token === "white" || token === "w" || token === "-1") return reversiPiece.white;
+      if (token === "black" || token === "b" || token === "1") return reversiPiece.black;
+      return Number(fallback) === reversiPiece.white ? reversiPiece.white : reversiPiece.black;
+    }}
+
     function reversiCellLabel(row, col) {{
       const file = String.fromCharCode(65 + Math.max(0, Math.min(7, Math.trunc(Number(col) || 0))));
       const rank = Math.max(1, Math.min(8, Math.trunc(Number(row) || 0) + 1));
@@ -7654,11 +7668,16 @@
       const mode = String(overrides.mode || "local").trim().toLowerCase();
       const role = String(overrides.role || "").trim().toLowerCase();
       const peerId = normalizeNodeId(overrides.peer_id ?? overrides.peerId ?? "");
+      const channelIndexRaw = Number(overrides.channel_index ?? overrides.channelIndex);
+      const channelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0
+        ? channelIndexRaw
+        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       return {{
         mode: mode === "connected" || mode === "pending_host" ? mode : "local",
         role: role === "host" || role === "guest" ? role : "",
         session_id: String(overrides.session_id ?? overrides.sessionId ?? "").trim().toLowerCase(),
         peer_id: isCanonicalNodeId(peerId) ? peerId : "",
+        channel_index: channelIndex,
         local_color: Number(overrides.local_color) === reversiPiece.white ? reversiPiece.white : reversiPiece.black,
         remote_color: Number(overrides.remote_color) === reversiPiece.black ? reversiPiece.black : reversiPiece.white,
         local_move_seq: Math.max(0, Math.trunc(Number(overrides.local_move_seq) || 0)),
@@ -7754,10 +7773,15 @@
       from_id = "",
       session_id = "",
       received_unix = Math.floor(Date.now() / 1000),
+      host_color = reversiPiece.black,
+      channel_index = 0,
     }} = {{}}) {{
       const fromId = normalizeNodeId(from_id);
       const sessionId = String(session_id || "").trim().toLowerCase();
       if (!isCanonicalNodeId(fromId) || !sessionId) return;
+      const hostColor = Number(host_color) === reversiPiece.white ? reversiPiece.white : reversiPiece.black;
+      const channelIndexRaw = Number(channel_index);
+      const channelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0 ? channelIndexRaw : 0;
       const nextRows = [];
       const targetKey = reversiInviteKey(fromId, sessionId);
       let replaced = false;
@@ -7772,6 +7796,8 @@
             from_id: fromId,
             session_id: sessionId,
             received_unix: Math.max(0, Math.trunc(Number(received_unix) || 0)),
+            host_color: hostColor,
+            channel_index: channelIndex,
           }});
           replaced = true;
           continue;
@@ -7780,6 +7806,10 @@
           from_id: rowFrom,
           session_id: rowSession,
           received_unix: Math.max(0, Math.trunc(Number(row.received_unix ?? row.receivedUnix) || 0)),
+          host_color: Number(row.host_color ?? row.hostColor) === reversiPiece.white ? reversiPiece.white : reversiPiece.black,
+          channel_index: (Number.isInteger(Number(row.channel_index ?? row.channelIndex)) && Number(row.channel_index ?? row.channelIndex) >= 0)
+            ? Number(row.channel_index ?? row.channelIndex)
+            : 0,
         }});
       }}
       if (!replaced) {{
@@ -7787,6 +7817,8 @@
           from_id: fromId,
           session_id: sessionId,
           received_unix: Math.max(0, Math.trunc(Number(received_unix) || 0)),
+          host_color: hostColor,
+          channel_index: channelIndex,
         }});
       }}
       const nowUnix = Math.floor(Date.now() / 1000);
@@ -7796,6 +7828,9 @@
         .slice(0, reversiInviteMaxRows);
       if (!isCanonicalNodeId(reversiPeerId)) {{
         reversiPeerId = fromId;
+      }}
+      if (!reversiSelectedInviteKey) {{
+        reversiSelectedInviteKey = targetKey;
       }}
     }}
 
@@ -7812,11 +7847,25 @@
           if (!cleanSession) return false;
           return rowSession !== cleanSession;
         }});
+      if (reversiSelectedInviteKey && !reversiPendingInvites.some((row) => reversiInviteKey(row && row.from_id, row && row.session_id) === reversiSelectedInviteKey)) {{
+        reversiSelectedInviteKey = "";
+      }}
+    }}
+
+    function removeAllReversiPendingInvitesFromPeer(fromId) {{
+      const cleanFrom = normalizeNodeId(fromId);
+      if (!isCanonicalNodeId(cleanFrom)) return;
+      removeReversiPendingInvite(cleanFrom, "");
     }}
 
     function reversiPendingInviteChoice() {{
       const rows = Array.isArray(reversiPendingInvites) ? reversiPendingInvites : [];
       if (rows.length < 1) return null;
+      const selectedInvite = String(reversiSelectedInviteKey || "").trim().toLowerCase();
+      if (selectedInvite) {{
+        const exact = rows.find((row) => reversiInviteKey(row && row.from_id, row && row.session_id) === selectedInvite);
+        if (exact) return exact;
+      }}
       const selectedPeer = normalizeNodeId(reversiPeerId);
       if (isCanonicalNodeId(selectedPeer)) {{
         const preferred = rows.find((row) => normalizeNodeId(row && row.from_id) === selectedPeer);
@@ -8157,15 +8206,20 @@
 
         if (parsed.type === "invite") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
+          const hostColor = parseReversiColor(parsed.parts[4], reversiPiece.black);
           if (!sessionId) continue;
           registerReversiPendingInvite({{
             from_id: fromId,
             session_id: sessionId,
             received_unix: reversiProtocolMessageUnix(msg),
+            host_color: hostColor,
+            channel_index: messageMeshChannelIndex(msg),
           }});
-          updateReversiLinkStatus(
-            `Invite available from ${{reversiNodeLabel(fromId, safeState)}}. Choose peer and click Accept Invite.`
-          );
+          if (!reversiIsNetworkLinked()) {{
+            updateReversiLinkStatus(
+              `Invite available from ${{reversiNodeLabel(fromId, safeState)}}. Choose peer and click Accept Invite.`
+            );
+          }}
           continue;
         }}
 
@@ -8178,8 +8232,10 @@
             && reversiLink.session_id === sessionId
             && normalizeNodeId(reversiLink.peer_id) === fromId
           ) {{
+            reversiLink.channel_index = messageMeshChannelIndex(msg);
             reversiLink.mode = "connected";
-            reversiLink.status = `Connected to ${{reversiNodeLabel(fromId, safeState)}}. You are Black.`;
+            removeAllReversiPendingInvitesFromPeer(fromId);
+            reversiLink.status = `Connected to ${{reversiNodeLabel(fromId, safeState)}}. You are ${{reversiPlayerLabel(reversiLink.local_color)}}.`;
           }}
           continue;
         }}
@@ -8213,6 +8269,9 @@
       reversiPendingInvites = (Array.isArray(reversiPendingInvites) ? reversiPendingInvites : [])
         .filter((row) => (nowUnix - (Number(row && row.received_unix) || 0)) <= reversiInviteStaleSeconds)
         .slice(0, reversiInviteMaxRows);
+      if (reversiSelectedInviteKey && !reversiPendingInvites.some((row) => reversiInviteKey(row && row.from_id, row && row.session_id) === reversiSelectedInviteKey)) {{
+        reversiSelectedInviteKey = "";
+      }}
     }}
 
     function startNewReversiGame() {{
@@ -8230,10 +8289,14 @@
     async function sendReversiMoveToPeer(row, col) {{
       if (!reversiIsNetworkLinked()) return false;
       const seq = Math.max(0, Math.trunc(Number(reversiLink.local_move_seq) || 0)) + 1;
+      const sessionChannelRaw = Number(reversiLink.channel_index);
+      const sessionChannel = Number.isInteger(sessionChannelRaw) && sessionChannelRaw >= 0
+        ? sessionChannelRaw
+        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       const sent = await sendReversiProtocolMessage(
         "move",
         [reversiLink.session_id, seq, row, col],
-        {{ destination_id: reversiLink.peer_id }}
+        {{ destination_id: reversiLink.peer_id, channel_index: sessionChannel }}
       );
       if (!sent) {{
         updateReversiLinkStatus("Move applied locally, but network send failed.");
@@ -8315,6 +8378,13 @@
       ) ? reversiState.board : createInitialReversiBoard();
       const lastMove = Array.isArray(reversiState && reversiState.last_move) ? reversiState.last_move : null;
       const gameOver = !!(reversiState && reversiState.game_over);
+      const currentPlayer = Number(reversiState && reversiState.current_player) === reversiPiece.white
+        ? reversiPiece.white
+        : reversiPiece.black;
+      const hintClass = currentPlayer === reversiPiece.white
+        ? "reversi-hint hint-white"
+        : "reversi-hint hint-black";
+      const hintHtml = `<span class="${{hintClass}}" aria-hidden="true"></span>`;
       const html = [];
       for (let row = 0; row < reversiBoardSize; row += 1) {{
         for (let col = 0; col < reversiBoardSize; col += 1) {{
@@ -8329,7 +8399,7 @@
             : (
               value === reversiPiece.white
                 ? '<span class="reversi-disc disc-white" aria-hidden="true"></span>'
-                : (isLegal ? '<span class="reversi-hint" aria-hidden="true"></span>' : "")
+                : (isLegal ? hintHtml : "")
             );
           const stateText = value === reversiPiece.black
             ? "black disc"
@@ -8433,14 +8503,32 @@
         listEl.innerHTML = '<div class="reversi-invite-empty">No pending invites.</div>';
         return;
       }}
+      if (!reversiSelectedInviteKey) {{
+        const first = invites[0];
+        reversiSelectedInviteKey = reversiInviteKey(first && first.from_id, first && first.session_id);
+      }}
       const rows = invites.map((invite) => {{
         const fromId = normalizeNodeId(invite && invite.from_id || "");
         const sessionId = String(invite && invite.session_id || "").trim().toLowerCase();
         const whenUnix = Math.max(0, Math.trunc(Number(invite && invite.received_unix) || 0));
-        return `<div class="reversi-invite-item" title="${{escAttr(fromId)}}">
+        const hostColor = Number(invite && invite.host_color) === reversiPiece.white ? reversiPiece.white : reversiPiece.black;
+        const inviteKey = reversiInviteKey(fromId, sessionId);
+        const inviteChannelRaw = Number(invite && invite.channel_index);
+        const inviteChannel = Number.isInteger(inviteChannelRaw) && inviteChannelRaw >= 0 ? inviteChannelRaw : 0;
+        const selectedClass = inviteKey === String(reversiSelectedInviteKey || "").trim().toLowerCase()
+          ? " is-selected"
+          : "";
+        const yourColorLabel = hostColor === reversiPiece.black ? "White" : "Black";
+        return `<button
+          type="button"
+          class="reversi-invite-item${{selectedClass}}"
+          title="${{escAttr(fromId)}}"
+          data-from-id="${{escAttr(fromId)}}"
+          data-session-id="${{escAttr(sessionId)}}"
+        >
           <div class="reversi-invite-main">${{escAttr(reversiNodeLabel(fromId, state))}}</div>
-          <div class="reversi-invite-meta">${{escAttr(fromId)}} • ${{escAttr(formatLocalChatTime(whenUnix, "now"))}} • session ${{escAttr(sessionId)}}</div>
-        </div>`;
+          <div class="reversi-invite-meta">${{escAttr(fromId)}} • ${{escAttr(formatLocalChatTime(whenUnix, "now"))}} • ch ${{escAttr(inviteChannel)}} • host ${{escAttr(reversiPlayerLabel(hostColor))}} • you ${{escAttr(yourColorLabel)}}</div>
+        </button>`;
       }});
       listEl.innerHTML = rows.join("");
     }}
@@ -8448,23 +8536,34 @@
     function renderReversiLinkUi(state = latestState) {{
       renderReversiPeerSelect(state);
       renderReversiInviteList(state);
+      const hostColorSelect = document.getElementById("reversi-host-color-select");
+      if (hostColorSelect instanceof HTMLSelectElement) {{
+        hostColorSelect.value = reversiHostColorPreference === reversiPiece.white ? "white" : "black";
+      }}
       const statusEl = document.getElementById("reversi-link-status");
       if (statusEl instanceof HTMLElement) {{
         statusEl.textContent = String(reversiLink && reversiLink.status || "Local hotseat mode.");
       }}
       const hostBtn = document.getElementById("reversi-host-btn");
       const acceptBtn = document.getElementById("reversi-accept-btn");
+      const declineBtn = document.getElementById("reversi-decline-btn");
       const disconnectBtn = document.getElementById("reversi-disconnect-btn");
       const peerReady = isCanonicalNodeId(reversiPeerId);
       const pendingInvite = reversiPendingInviteChoice();
       if (hostBtn instanceof HTMLButtonElement) {{
-        hostBtn.disabled = !peerReady || (reversiLink.mode === "pending_host" && reversiLink.peer_id === reversiPeerId);
+        hostBtn.disabled = !peerReady || reversiLink.mode === "connected" || reversiLink.mode === "pending_host";
       }}
       if (acceptBtn instanceof HTMLButtonElement) {{
         acceptBtn.disabled = !(pendingInvite && isCanonicalNodeId(pendingInvite.from_id));
       }}
+      if (declineBtn instanceof HTMLButtonElement) {{
+        declineBtn.disabled = !(pendingInvite && isCanonicalNodeId(pendingInvite.from_id));
+      }}
       if (disconnectBtn instanceof HTMLButtonElement) {{
         disconnectBtn.disabled = !(reversiLink.mode === "connected" || reversiLink.mode === "pending_host");
+      }}
+      if (hostColorSelect instanceof HTMLSelectElement) {{
+        hostColorSelect.disabled = reversiLink.mode === "connected" || reversiLink.mode === "pending_host";
       }}
     }}
 
@@ -8475,6 +8574,11 @@
         if (activeLayoutView === "games") renderGamesView(latestState);
         return;
       }}
+      const hostColor = Number(reversiHostColorPreference) === reversiPiece.white
+        ? reversiPiece.white
+        : reversiPiece.black;
+      const guestColor = reversiOpponent(hostColor);
+      const sessionChannel = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       const sessionId = generateReversiSessionId();
       reversiState = createNewReversiState();
       refreshReversiDerivedState({{ autoPass: true }});
@@ -8484,16 +8588,18 @@
         role: "host",
         session_id: sessionId,
         peer_id: peerId,
-        local_color: reversiPiece.black,
-        remote_color: reversiPiece.white,
+        channel_index: sessionChannel,
+        local_color: hostColor,
+        remote_color: guestColor,
         local_move_seq: 0,
         remote_move_seq: 0,
-        status: `Invite sent to ${{reversiNodeLabel(peerId)}}. Waiting for accept...`,
+        status: `Invite sent to ${{reversiNodeLabel(peerId)}}. You are ${{reversiPlayerLabel(hostColor)}}; waiting for accept...`,
       }});
+      removeAllReversiPendingInvitesFromPeer(peerId);
       const sent = await sendReversiProtocolMessage(
         "invite",
-        [sessionId, normalizeNodeId(resolveLocalNodeId(latestState) || "")],
-        {{ destination_id: peerId }}
+        [sessionId, normalizeNodeId(resolveLocalNodeId(latestState) || ""), reversiColorToken(hostColor)],
+        {{ destination_id: peerId, channel_index: sessionChannel }}
       );
       if (!sent) {{
         reversiLink.mode = "local";
@@ -8512,10 +8618,34 @@
       }}
       const peerId = normalizeNodeId(invite.from_id || "");
       const sessionId = String(invite.session_id || "").trim().toLowerCase();
+      const hostColor = Number(invite.host_color) === reversiPiece.white ? reversiPiece.white : reversiPiece.black;
+      const guestColor = reversiOpponent(hostColor);
+      const inviteChannelRaw = Number(invite.channel_index);
+      const inviteChannel = Number.isInteger(inviteChannelRaw) && inviteChannelRaw >= 0
+        ? inviteChannelRaw
+        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       if (!isCanonicalNodeId(peerId) || !sessionId) {{
         updateReversiLinkStatus("Invite details are invalid.");
         if (activeLayoutView === "games") renderGamesView(latestState);
         return;
+      }}
+      if (
+        reversiLink.mode === "pending_host"
+        && isCanonicalNodeId(reversiLink.peer_id)
+        && String(reversiLink.session_id || "").trim()
+        && (
+          normalizeNodeId(reversiLink.peer_id) !== peerId
+          || String(reversiLink.session_id || "").trim().toLowerCase() !== sessionId
+        )
+      ) {{
+        await sendReversiProtocolMessage(
+          "leave",
+          [reversiLink.session_id],
+          {{
+            destination_id: reversiLink.peer_id,
+            channel_index: Number.isInteger(Number(reversiLink.channel_index)) ? Number(reversiLink.channel_index) : normalizeMeshChannelIndex(activeMeshSendChannelIndex),
+          }}
+        );
       }}
       reversiPeerId = peerId;
       reversiState = createNewReversiState();
@@ -8526,18 +8656,34 @@
         role: "guest",
         session_id: sessionId,
         peer_id: peerId,
-        local_color: reversiPiece.white,
-        remote_color: reversiPiece.black,
+        channel_index: inviteChannel,
+        local_color: guestColor,
+        remote_color: hostColor,
         local_move_seq: 0,
         remote_move_seq: 0,
-        status: `Connected to ${{reversiNodeLabel(peerId)}}. You are White.`,
+        status: `Connected to ${{reversiNodeLabel(peerId)}}. You are ${{reversiPlayerLabel(guestColor)}}.`,
       }});
       removeReversiPendingInvite(peerId, sessionId);
+      removeAllReversiPendingInvitesFromPeer(peerId);
       await sendReversiProtocolMessage(
         "accept",
         [sessionId],
-        {{ destination_id: peerId }}
+        {{ destination_id: peerId, channel_index: inviteChannel }}
       );
+      if (activeLayoutView === "games") renderGamesView(latestState);
+    }}
+
+    function declineReversiInvite() {{
+      const invite = reversiPendingInviteChoice();
+      if (!invite) {{
+        updateReversiLinkStatus("No pending invite to decline.");
+        if (activeLayoutView === "games") renderGamesView(latestState);
+        return;
+      }}
+      const peerId = normalizeNodeId(invite.from_id || "");
+      const sessionId = String(invite.session_id || "").trim().toLowerCase();
+      removeReversiPendingInvite(peerId, sessionId);
+      updateReversiLinkStatus(`Declined invite from ${{reversiNodeLabel(peerId)}}.`);
       if (activeLayoutView === "games") renderGamesView(latestState);
     }}
 
@@ -8547,7 +8693,10 @@
         await sendReversiProtocolMessage(
           "leave",
           [reversiLink.session_id],
-          {{ destination_id: reversiLink.peer_id }}
+          {{
+            destination_id: reversiLink.peer_id,
+            channel_index: Number.isInteger(Number(reversiLink.channel_index)) ? Number(reversiLink.channel_index) : normalizeMeshChannelIndex(activeMeshSendChannelIndex),
+          }}
         );
       }}
       resetReversiNetworkLink("Disconnected. Local hotseat mode.", {{ keepPeer: true }});
@@ -8584,6 +8733,14 @@
           if (activeLayoutView === "games") renderGamesView(latestState);
         }});
       }}
+      const hostColorSelect = document.getElementById("reversi-host-color-select");
+      if (hostColorSelect instanceof HTMLSelectElement && hostColorSelect.dataset.bound !== "1") {{
+        hostColorSelect.dataset.bound = "1";
+        hostColorSelect.addEventListener("change", () => {{
+          reversiHostColorPreference = parseReversiColor(hostColorSelect.value, reversiPiece.black);
+          if (activeLayoutView === "games") renderGamesView(latestState);
+        }});
+      }}
       const hostBtn = document.getElementById("reversi-host-btn");
       if (hostBtn instanceof HTMLButtonElement && hostBtn.dataset.bound !== "1") {{
         hostBtn.dataset.bound = "1";
@@ -8596,6 +8753,13 @@
         acceptBtn.dataset.bound = "1";
         acceptBtn.addEventListener("click", () => {{
           void acceptReversiInvite();
+        }});
+      }}
+      const declineBtn = document.getElementById("reversi-decline-btn");
+      if (declineBtn instanceof HTMLButtonElement && declineBtn.dataset.bound !== "1") {{
+        declineBtn.dataset.bound = "1";
+        declineBtn.addEventListener("click", () => {{
+          declineReversiInvite();
         }});
       }}
       const disconnectBtn = document.getElementById("reversi-disconnect-btn");
@@ -8623,6 +8787,24 @@
           const row = Math.trunc(Number(button.dataset.row) || 0);
           const col = Math.trunc(Number(button.dataset.col) || 0);
           applyReversiMove(row, col);
+        }});
+      }}
+      const inviteListEl = document.getElementById("reversi-invite-list");
+      if (inviteListEl instanceof HTMLElement && inviteListEl.dataset.bound !== "1") {{
+        inviteListEl.dataset.bound = "1";
+        inviteListEl.addEventListener("click", (event) => {{
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const row = target.closest("button.reversi-invite-item");
+          if (!(row instanceof HTMLButtonElement)) return;
+          const fromId = normalizeNodeId(row.dataset.fromId || "");
+          const sessionId = String(row.dataset.sessionId || "").trim().toLowerCase();
+          if (!isCanonicalNodeId(fromId) || !sessionId) return;
+          reversiPeerId = fromId;
+          reversiSelectedInviteKey = reversiInviteKey(fromId, sessionId);
+          if (activeLayoutView === "games") {{
+            renderGamesView(latestState);
+          }}
         }});
       }}
     }}
