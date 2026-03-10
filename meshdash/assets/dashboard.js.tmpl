@@ -10155,6 +10155,7 @@
         setProfile("na", "Connected local radio: unavailable");
         setProfileFullId("");
         setProfileFreshness("unknown");
+        syncConsoleCommandInputState(safeState);
         return;
       }}
 
@@ -10200,6 +10201,7 @@
         );
       }}
       setProfileFreshness(status, lastSeenUnix);
+      syncConsoleCommandInputState(safeState);
     }}
 
     function normalizeSearchQuery(value) {{
@@ -13808,6 +13810,16 @@
     function resolveConsolePromptHostLabel(state = latestState) {{
       const safeState = (state && typeof state === "object") ? state : {{}};
       const selfId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const selfNode = nodes.find((node) => normalizeNodeId(node && node.id) === selfId) || null;
+      const owner = localNodeUserFromState(safeState);
+      const longName = String((owner && owner.long_name) || "").trim();
+      const shortName = String((owner && owner.short_name) || "").trim();
+      const cachedName = selfId ? String(nodeNameCache.get(selfId) || "").trim() : "";
+      const namedLabel = preferredNodeName(selfNode) || longName || shortName || cachedName;
+      if (namedLabel) {{
+        return normalizeConsolePromptHostLabel(namedLabel.replace(/^!+/, ""));
+      }}
       if (isCanonicalNodeId(selfId)) {{
         return normalizeConsolePromptHostLabel(selfRadioProfileShortLabel(selfId));
       }}
@@ -13818,17 +13830,10 @@
           return normalizeConsolePromptHostLabel(shortText);
         }}
       }}
-      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
-      const selfNode = nodes.find((node) => normalizeNodeId(node && node.id) === selfId) || null;
-      const owner = localNodeUserFromState(safeState);
-      const longName = String((owner && owner.long_name) || "").trim();
-      const shortName = String((owner && owner.short_name) || "").trim();
-      const cachedName = selfId ? String(nodeNameCache.get(selfId) || "").trim() : "";
-      const baseName = preferredNodeName(selfNode) || longName || shortName || cachedName || selfId || "radio";
-      return normalizeConsolePromptHostLabel(baseName.replace(/^!+/, ""));
+      return normalizeConsolePromptHostLabel(selfId.replace(/^!+/, "") || "radio");
     }}
 
-    function syncConsoleCommandInputState() {{
+    function syncConsoleCommandInputState(state = latestState) {{
       const input = consoleCommandInputElement();
       const runningName = consoleRunningCommand && consoleRunningCommand.name
         ? String(consoleRunningCommand.name)
@@ -13841,7 +13846,7 @@
         ? `${{runningName.replace(/[^a-z0-9_-]+/gi, "").slice(0, 10) || "busy"}}>`
         : interactiveIsZork
           ? ">"
-          : `[${{resolveConsolePromptHostLabel(latestState)}}]$`;
+          : `[${{resolveConsolePromptHostLabel(state)}}]$`;
       const placeholder = runningName
         ? `ctrl+c to stop ${{runningName}}`
         : interactiveIsZork
