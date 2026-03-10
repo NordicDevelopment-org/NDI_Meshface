@@ -8155,6 +8155,36 @@
       return nodeNameCache.get(clean) || clean;
     }}
 
+    function reversiLocalColor() {{
+      return Number(reversiLink && reversiLink.local_color) === reversiPiece.white
+        ? reversiPiece.white
+        : reversiPiece.black;
+    }}
+
+    function reversiRemoteColor() {{
+      return Number(reversiLink && reversiLink.remote_color) === reversiPiece.black
+        ? reversiPiece.black
+        : reversiPiece.white;
+    }}
+
+    function reversiLocalParticipantName(state = latestState) {{
+      const safeState = state && typeof state === "object" ? state : latestState;
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      if (isCanonicalNodeId(localNodeId)) {{
+        return reversiNodeLabel(localNodeId, safeState);
+      }}
+      return "Local Radio";
+    }}
+
+    function reversiRemoteParticipantName(state = latestState) {{
+      const safeState = state && typeof state === "object" ? state : latestState;
+      const peerNodeId = normalizeNodeId((reversiLink && reversiLink.peer_id) || reversiPeerId || "");
+      if (isCanonicalNodeId(peerNodeId)) {{
+        return reversiNodeLabel(peerNodeId, safeState);
+      }}
+      return "Remote Player";
+    }}
+
     function reversiProtocolMessageText(msg) {{
       if (!msg || typeof msg !== "object") return "";
       return String(msg.text ?? msg.decoded_text ?? msg.payload_text ?? "").trim();
@@ -8417,7 +8447,10 @@
 
     function renderReversiStatus() {{
       const statusEl = document.getElementById("reversi-status-text");
-      const turnEl = document.getElementById("reversi-turn-pill");
+      const localPlayerPillEl = document.getElementById("reversi-player-local-pill");
+      const localPlayerNameEl = document.getElementById("reversi-player-local-name");
+      const remotePlayerPillEl = document.getElementById("reversi-player-remote-pill");
+      const remotePlayerNameEl = document.getElementById("reversi-player-remote-name");
       const blackEl = document.getElementById("reversi-black-count");
       const whiteEl = document.getElementById("reversi-white-count");
       const moveEl = document.getElementById("reversi-move-count");
@@ -8425,7 +8458,11 @@
       const state = reversiState && typeof reversiState === "object" ? reversiState : createNewReversiState();
       const counts = countReversiPieces(state.board);
       const isOver = !!state.game_over;
-      const turnLabel = isOver ? "Game Over" : reversiPlayerLabel(state.current_player);
+      const currentPlayer = Number(state.current_player) === reversiPiece.white ? reversiPiece.white : reversiPiece.black;
+      const localPlayerColor = reversiLocalColor();
+      const remotePlayerColor = reversiRemoteColor();
+      const localPlayerName = reversiLocalParticipantName(latestState);
+      const remotePlayerName = reversiRemoteParticipantName(latestState);
       if (statusEl instanceof HTMLElement) {{
         const fallback = isOver
           ? (
@@ -8436,15 +8473,30 @@
           : `${{reversiPlayerLabel(state.current_player)}} to move.`;
         statusEl.textContent = String(state.notice || fallback);
       }}
-      if (turnEl instanceof HTMLElement) {{
-        turnEl.textContent = turnLabel;
-        turnEl.classList.remove("is-black", "is-white", "is-over");
+      if (localPlayerNameEl instanceof HTMLElement) {{
+        localPlayerNameEl.textContent = localPlayerName;
+      }}
+      if (remotePlayerNameEl instanceof HTMLElement) {{
+        remotePlayerNameEl.textContent = remotePlayerName;
+      }}
+      if (localPlayerPillEl instanceof HTMLElement) {{
+        localPlayerPillEl.classList.remove("is-black", "is-white", "is-active", "is-over");
+        localPlayerPillEl.classList.add(localPlayerColor === reversiPiece.white ? "is-white" : "is-black");
+        localPlayerPillEl.title = `${{localPlayerName}} • ${{reversiPlayerLabel(localPlayerColor)}}`;
         if (isOver) {{
-          turnEl.classList.add("is-over");
-        }} else if (Number(state.current_player) === reversiPiece.white) {{
-          turnEl.classList.add("is-white");
-        }} else {{
-          turnEl.classList.add("is-black");
+          localPlayerPillEl.classList.add("is-over");
+        }} else if (currentPlayer === localPlayerColor) {{
+          localPlayerPillEl.classList.add("is-active");
+        }}
+      }}
+      if (remotePlayerPillEl instanceof HTMLElement) {{
+        remotePlayerPillEl.classList.remove("is-black", "is-white", "is-active", "is-over");
+        remotePlayerPillEl.classList.add(remotePlayerColor === reversiPiece.white ? "is-white" : "is-black");
+        remotePlayerPillEl.title = `${{remotePlayerName}} • ${{reversiPlayerLabel(remotePlayerColor)}}`;
+        if (isOver) {{
+          remotePlayerPillEl.classList.add("is-over");
+        }} else if (currentPlayer === remotePlayerColor) {{
+          remotePlayerPillEl.classList.add("is-active");
         }}
       }}
       if (blackEl instanceof HTMLElement) blackEl.textContent = String(counts.black);

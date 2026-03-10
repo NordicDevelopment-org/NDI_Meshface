@@ -2657,38 +2657,63 @@
       padding: 8px;
       min-height: 40px;
     }}
-    .reversi-turn-row {{
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+    .reversi-player-row {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
+      min-width: 0;
     }}
-    .reversi-turn-pill {{
+    .reversi-player-pill {{
       border: 1px solid #bfd4c3;
-      border-radius: 999px;
+      border-radius: 10px;
       background: #ffffff;
       color: #274935;
-      padding: 3px 9px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.2px;
-      white-space: nowrap;
+      padding: 6px 8px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
     }}
-    .reversi-turn-pill.is-black {{
-      border-color: #1f2b33;
-      background: #2b3944;
-      color: #f5f8fb;
+    .reversi-player-pill.is-black {{
+      border-color: #2a3b48;
+      background: linear-gradient(180deg, #324553, #2a3a46);
+      color: #f3f8ff;
     }}
-    .reversi-turn-pill.is-white {{
-      border-color: #c7d5e0;
-      background: #f5f9fd;
-      color: #26404f;
+    .reversi-player-pill.is-white {{
+      border-color: #b7c9d7;
+      background: linear-gradient(180deg, #ffffff, #edf3f8);
+      color: #253f50;
     }}
-    .reversi-turn-pill.is-over {{
+    .reversi-player-pill.is-active {{
+      border-color: #f2da79;
+      box-shadow: 0 0 0 2px rgba(247, 226, 132, 0.54), 0 0 0 3px rgba(20, 44, 32, 0.35);
+      transform: translateY(-1px);
+    }}
+    .reversi-player-pill.is-over {{
       border-color: #4c8e67;
-      background: #e9f7ee;
-      color: #1f5e3f;
+      box-shadow: inset 0 0 0 1px rgba(76, 142, 103, 0.25);
+      transform: none;
+    }}
+    .reversi-player-role {{
+      display: block;
+      font-size: 10px;
+      line-height: 1.1;
+      text-transform: uppercase;
+      letter-spacing: 0.22px;
+      opacity: 0.92;
+      font-weight: 700;
+    }}
+    .reversi-player-name {{
+      display: block;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      line-height: 1.25;
+      font-weight: 700;
     }}
     .reversi-score-grid {{
       display: grid;
@@ -9632,25 +9657,28 @@
     [data-theme="dark"] .reversi-score-card strong {{
       color: #d8f3e4;
     }}
-    [data-theme="dark"] .reversi-turn-pill {{
+    [data-theme="dark"] .reversi-player-pill {{
       border-color: #2a4638;
       background: #13241b;
       color: #c7e8d6;
     }}
-    [data-theme="dark"] .reversi-turn-pill.is-black {{
-      border-color: #506273;
-      background: #334351;
-      color: #f3f8ff;
+    [data-theme="dark"] .reversi-player-pill.is-black {{
+      border-color: #5f7789;
+      background: linear-gradient(180deg, #4b6170, #354856);
+      color: #f1f7ff;
     }}
-    [data-theme="dark"] .reversi-turn-pill.is-white {{
-      border-color: #627484;
-      background: #d9e6f0;
-      color: #243745;
+    [data-theme="dark"] .reversi-player-pill.is-white {{
+      border-color: #7c93a6;
+      background: linear-gradient(180deg, #edf4fa, #cfdce7);
+      color: #1d3343;
     }}
-    [data-theme="dark"] .reversi-turn-pill.is-over {{
+    [data-theme="dark"] .reversi-player-pill.is-active {{
+      border-color: #f4db7d;
+      box-shadow: 0 0 0 2px rgba(250, 230, 139, 0.55), 0 0 0 3px rgba(4, 13, 10, 0.55);
+    }}
+    [data-theme="dark"] .reversi-player-pill.is-over {{
       border-color: #2f855a;
-      background: #173526;
-      color: #9ce3ba;
+      box-shadow: inset 0 0 0 1px rgba(76, 168, 118, 0.36);
     }}
     [data-theme="dark"] .reversi-board {{
       border-color: #2a6a4c;
