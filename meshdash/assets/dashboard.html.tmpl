@@ -732,70 +732,95 @@
         <div class="games-shell">
           <aside class="games-sidebar">
             <div class="games-library-label">Library</div>
-            <button
-              id="games-select-reversi-btn"
-              class="games-library-btn is-active"
-              type="button"
-              title="Reversi (also known as Othello)"
-            >Reversi</button>
-            <div class="games-mode-note">Mode: local hotseat for now. Matchmaking can be layered in next.</div>
-            <label class="games-peer-wrap" for="reversi-peer-select">
-              <span class="games-library-label">Peer</span>
-              <select id="reversi-peer-select" class="games-peer-select" aria-label="Reversi peer">
-                <option value="">Select peer…</option>
-              </select>
-            </label>
-            <label class="games-peer-wrap" for="reversi-host-color-select">
-              <span class="games-library-label">Host Color</span>
-              <select id="reversi-host-color-select" class="games-peer-select" aria-label="Reversi host color">
-                <option value="black">Black (first move)</option>
-                <option value="white">White (second move)</option>
-              </select>
-            </label>
-            <div class="reversi-link-actions">
-              <button id="reversi-host-btn" class="btn btn-secondary reversi-link-btn" type="button">Host Invite</button>
-              <button id="reversi-accept-btn" class="btn btn-secondary reversi-link-btn" type="button">Accept Invite</button>
-              <button id="reversi-decline-btn" class="btn btn-secondary reversi-link-btn" type="button">Decline Invite</button>
-              <button id="reversi-disconnect-btn" class="btn btn-secondary reversi-link-btn" type="button">Disconnect</button>
+            <div class="games-library-list" role="tablist" aria-label="Game library">
+              <button
+                id="games-select-reversi-btn"
+                class="games-library-btn is-active"
+                type="button"
+                title="Reversi (also known as Othello)"
+                data-game-id="reversi"
+              >Reversi</button>
+              <button
+                id="games-select-chess-btn"
+                class="games-library-btn"
+                type="button"
+                title="Chess (coming soon)"
+                data-game-id="chess"
+              >Chess</button>
             </div>
-            <div id="reversi-link-status" class="reversi-link-status">Local hotseat mode.</div>
-            <div class="reversi-invite-wrap">
-              <div class="games-library-label">Pending Invites</div>
-              <div id="reversi-invite-list" class="reversi-invite-list" aria-live="polite"></div>
+            <div id="games-side-reversi" class="games-side-panel is-active" data-game-id="reversi">
+              <div class="games-mode-note">Mode: local hotseat for now. Matchmaking can be layered in next.</div>
+              <label class="games-peer-wrap" for="reversi-peer-select">
+                <span class="games-library-label">Peer</span>
+                <select id="reversi-peer-select" class="games-peer-select" aria-label="Reversi peer">
+                  <option value="">Select peer…</option>
+                </select>
+              </label>
+              <label class="games-peer-wrap" for="reversi-host-color-select">
+                <span class="games-library-label">Host Color</span>
+                <select id="reversi-host-color-select" class="games-peer-select" aria-label="Reversi host color">
+                  <option value="black">Black (first move)</option>
+                  <option value="white">White (second move)</option>
+                </select>
+              </label>
+              <div class="reversi-link-actions">
+                <button id="reversi-host-btn" class="btn btn-secondary reversi-link-btn" type="button">Host Invite</button>
+                <button id="reversi-accept-btn" class="btn btn-secondary reversi-link-btn" type="button">Accept Invite</button>
+                <button id="reversi-decline-btn" class="btn btn-secondary reversi-link-btn" type="button">Decline Invite</button>
+                <button id="reversi-disconnect-btn" class="btn btn-secondary reversi-link-btn" type="button">Disconnect</button>
+              </div>
+              <div id="reversi-link-status" class="reversi-link-status">Local hotseat mode.</div>
+              <div class="reversi-invite-wrap">
+                <div class="games-library-label">Pending Invites</div>
+                <div id="reversi-invite-list" class="reversi-invite-list" aria-live="polite"></div>
+              </div>
+              <button id="reversi-new-game-btn" class="btn" type="button">New game</button>
+              <div id="reversi-status-text" class="reversi-status-text" aria-live="polite">Initializing board...</div>
+              <div class="reversi-player-row" aria-label="Reversi players">
+                <div id="reversi-player-local-pill" class="reversi-player-pill is-black">
+                  <span class="reversi-player-role">Local</span>
+                  <span id="reversi-player-local-name" class="reversi-player-name">Local Radio</span>
+                </div>
+                <div id="reversi-player-remote-pill" class="reversi-player-pill is-white">
+                  <span class="reversi-player-role">Remote</span>
+                  <span id="reversi-player-remote-name" class="reversi-player-name">Remote Player</span>
+                </div>
+              </div>
+              <div class="reversi-score-grid">
+                <div class="reversi-score-card">
+                  <span class="label">Black</span>
+                  <strong id="reversi-black-count">2</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">White</span>
+                  <strong id="reversi-white-count">2</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Moves</span>
+                  <strong id="reversi-move-count">0</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Legal</span>
+                  <strong id="reversi-legal-count">4</strong>
+                </div>
+              </div>
             </div>
-            <button id="reversi-new-game-btn" class="btn" type="button">New game</button>
-            <div id="reversi-status-text" class="reversi-status-text" aria-live="polite">Initializing board...</div>
-            <div class="reversi-player-row" aria-label="Reversi players">
-              <div id="reversi-player-local-pill" class="reversi-player-pill is-black">
-                <span class="reversi-player-role">Local</span>
-                <span id="reversi-player-local-name" class="reversi-player-name">Local Radio</span>
-              </div>
-              <div id="reversi-player-remote-pill" class="reversi-player-pill is-white">
-                <span class="reversi-player-role">Remote</span>
-                <span id="reversi-player-remote-name" class="reversi-player-name">Remote Player</span>
-              </div>
-            </div>
-            <div class="reversi-score-grid">
-              <div class="reversi-score-card">
-                <span class="label">Black</span>
-                <strong id="reversi-black-count">2</strong>
-              </div>
-              <div class="reversi-score-card">
-                <span class="label">White</span>
-                <strong id="reversi-white-count">2</strong>
-              </div>
-              <div class="reversi-score-card">
-                <span class="label">Moves</span>
-                <strong id="reversi-move-count">0</strong>
-              </div>
-              <div class="reversi-score-card">
-                <span class="label">Legal</span>
-                <strong id="reversi-legal-count">4</strong>
-              </div>
+            <div id="games-side-chess" class="games-side-panel" data-game-id="chess" hidden>
+              <div class="games-mode-note">Chess multiplayer scaffold is ready. Invite/match controls land here next.</div>
+              <button id="chess-new-game-btn" class="btn" type="button" disabled>New game (soon)</button>
+              <div id="chess-status-text" class="games-coming-soon" aria-live="polite">Chess menu scaffolded. Gameplay logic comes next.</div>
             </div>
           </aside>
           <div class="games-main">
-            <div id="reversi-board" class="reversi-board" role="grid" aria-label="Reversi board"></div>
+            <div id="games-main-reversi" class="games-main-panel is-active" data-game-id="reversi">
+              <div id="reversi-board" class="reversi-board" role="grid" aria-label="Reversi board"></div>
+            </div>
+            <div id="games-main-chess" class="games-main-panel" data-game-id="chess" hidden>
+              <div class="games-coming-soon-card" role="status" aria-live="polite">
+                <h3 class="games-coming-soon-title">Chess</h3>
+                <p class="games-coming-soon-copy">This panel is reserved for the multiplayer chess board and controls.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
