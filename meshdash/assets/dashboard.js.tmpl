@@ -8867,12 +8867,23 @@
 
     function chessPieceGlyph(piece) {{
       const type = chessPieceType(piece);
-      if (type === "p") return "P";
-      if (type === "n") return "N";
-      if (type === "b") return "B";
-      if (type === "r") return "R";
-      if (type === "q") return "Q";
-      if (type === "k") return "K";
+      const owner = chessPieceOwner(piece);
+      if (!type || !owner) return "";
+      if (owner === "white") {{
+        if (type === "p") return "♟";
+        if (type === "n") return "♞";
+        if (type === "b") return "♝";
+        if (type === "r") return "♜";
+        if (type === "q") return "♛";
+        if (type === "k") return "♚";
+        return "";
+      }}
+      if (type === "p") return "♟";
+      if (type === "n") return "♞";
+      if (type === "b") return "♝";
+      if (type === "r") return "♜";
+      if (type === "q") return "♛";
+      if (type === "k") return "♚";
       return "";
     }}
 
