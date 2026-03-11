@@ -741,10 +741,17 @@
                 data-game-id="reversi"
               >Reversi</button>
               <button
+                id="games-select-checkers-btn"
+                class="games-library-btn"
+                type="button"
+                title="Checkers"
+                data-game-id="checkers"
+              >Checkers</button>
+              <button
                 id="games-select-chess-btn"
                 class="games-library-btn"
                 type="button"
-                title="Chess (coming soon)"
+                title="Chess"
                 data-game-id="chess"
               >Chess</button>
             </div>
@@ -806,20 +813,129 @@
               </div>
             </div>
             <div id="games-side-chess" class="games-side-panel" data-game-id="chess" hidden>
-              <div class="games-mode-note">Chess multiplayer scaffold is ready. Invite/match controls land here next.</div>
-              <button id="chess-new-game-btn" class="btn" type="button" disabled>New game (soon)</button>
-              <div id="chess-status-text" class="games-coming-soon" aria-live="polite">Chess menu scaffolded. Gameplay logic comes next.</div>
+              <div class="games-mode-note">Mode: local hotseat + peer invite. Moves sync over bot chat payloads between peers.</div>
+              <label class="games-peer-wrap" for="chess-peer-select">
+                <span class="games-library-label">Peer</span>
+                <select id="chess-peer-select" class="games-peer-select" aria-label="Chess peer">
+                  <option value="">Select peer…</option>
+                </select>
+              </label>
+              <label class="games-peer-wrap" for="chess-host-color-select">
+                <span class="games-library-label">Host Color</span>
+                <select id="chess-host-color-select" class="games-peer-select" aria-label="Chess host color">
+                  <option value="white">White (first move)</option>
+                  <option value="black">Black (second move)</option>
+                </select>
+              </label>
+              <div class="reversi-link-actions">
+                <button id="chess-host-btn" class="btn btn-secondary reversi-link-btn" type="button">Host Invite</button>
+                <button id="chess-accept-btn" class="btn btn-secondary reversi-link-btn" type="button">Accept Invite</button>
+                <button id="chess-decline-btn" class="btn btn-secondary reversi-link-btn" type="button">Decline Invite</button>
+                <button id="chess-disconnect-btn" class="btn btn-secondary reversi-link-btn" type="button">Disconnect</button>
+              </div>
+              <div id="chess-link-status" class="reversi-link-status">Local hotseat mode.</div>
+              <div class="reversi-invite-wrap">
+                <div class="games-library-label">Pending Invites</div>
+                <div id="chess-invite-list" class="reversi-invite-list" aria-live="polite"></div>
+              </div>
+              <button id="chess-new-game-btn" class="btn" type="button">New game</button>
+              <div id="chess-status-text" class="games-coming-soon" aria-live="polite">Initializing chess board...</div>
+              <div class="reversi-player-row" aria-label="Chess players">
+                <div id="chess-player-white-pill" class="reversi-player-pill is-white">
+                  <span class="reversi-player-role">White</span>
+                  <span id="chess-player-white-name" class="reversi-player-name">White</span>
+                </div>
+                <div id="chess-player-black-pill" class="reversi-player-pill is-black">
+                  <span class="reversi-player-role">Black</span>
+                  <span id="chess-player-black-name" class="reversi-player-name">Black</span>
+                </div>
+              </div>
+              <div class="reversi-score-grid">
+                <div class="reversi-score-card">
+                  <span class="label">White</span>
+                  <strong id="chess-white-count">16</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Black</span>
+                  <strong id="chess-black-count">16</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Moves</span>
+                  <strong id="chess-move-count">0</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Legal</span>
+                  <strong id="chess-legal-count">20</strong>
+                </div>
+              </div>
+            </div>
+            <div id="games-side-checkers" class="games-side-panel" data-game-id="checkers" hidden>
+              <div class="games-mode-note">Mode: local hotseat + peer invite. Captures are forced and multi-jumps are synced.</div>
+              <label class="games-peer-wrap" for="checkers-peer-select">
+                <span class="games-library-label">Peer</span>
+                <select id="checkers-peer-select" class="games-peer-select" aria-label="Checkers peer">
+                  <option value="">Select peer…</option>
+                </select>
+              </label>
+              <label class="games-peer-wrap" for="checkers-host-color-select">
+                <span class="games-library-label">Host Color</span>
+                <select id="checkers-host-color-select" class="games-peer-select" aria-label="Checkers host color">
+                  <option value="black">Black (first move)</option>
+                  <option value="white">White (second move)</option>
+                </select>
+              </label>
+              <div class="reversi-link-actions">
+                <button id="checkers-host-btn" class="btn btn-secondary reversi-link-btn" type="button">Host Invite</button>
+                <button id="checkers-accept-btn" class="btn btn-secondary reversi-link-btn" type="button">Accept Invite</button>
+                <button id="checkers-decline-btn" class="btn btn-secondary reversi-link-btn" type="button">Decline Invite</button>
+                <button id="checkers-disconnect-btn" class="btn btn-secondary reversi-link-btn" type="button">Disconnect</button>
+              </div>
+              <div id="checkers-link-status" class="reversi-link-status">Local hotseat mode.</div>
+              <div class="reversi-invite-wrap">
+                <div class="games-library-label">Pending Invites</div>
+                <div id="checkers-invite-list" class="reversi-invite-list" aria-live="polite"></div>
+              </div>
+              <button id="checkers-new-game-btn" class="btn" type="button">New game</button>
+              <div id="checkers-status-text" class="games-coming-soon" aria-live="polite">Initializing checkers board...</div>
+              <div class="reversi-player-row" aria-label="Checkers players">
+                <div id="checkers-player-black-pill" class="reversi-player-pill is-black">
+                  <span class="reversi-player-role">Black</span>
+                  <span id="checkers-player-black-name" class="reversi-player-name">Black</span>
+                </div>
+                <div id="checkers-player-white-pill" class="reversi-player-pill is-white">
+                  <span class="reversi-player-role">White</span>
+                  <span id="checkers-player-white-name" class="reversi-player-name">White</span>
+                </div>
+              </div>
+              <div class="reversi-score-grid">
+                <div class="reversi-score-card">
+                  <span class="label">Black</span>
+                  <strong id="checkers-black-count">12</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">White</span>
+                  <strong id="checkers-white-count">12</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Moves</span>
+                  <strong id="checkers-move-count">0</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Legal</span>
+                  <strong id="checkers-legal-count">7</strong>
+                </div>
+              </div>
             </div>
           </aside>
           <div class="games-main">
             <div id="games-main-reversi" class="games-main-panel is-active" data-game-id="reversi">
               <div id="reversi-board" class="reversi-board" role="grid" aria-label="Reversi board"></div>
             </div>
+            <div id="games-main-checkers" class="games-main-panel" data-game-id="checkers" hidden>
+              <div id="checkers-board" class="checkers-board" role="grid" aria-label="Checkers board"></div>
+            </div>
             <div id="games-main-chess" class="games-main-panel" data-game-id="chess" hidden>
-              <div class="games-coming-soon-card" role="status" aria-live="polite">
-                <h3 class="games-coming-soon-title">Chess</h3>
-                <p class="games-coming-soon-copy">This panel is reserved for the multiplayer chess board and controls.</p>
-              </div>
+              <div id="chess-board" class="chess-board" role="grid" aria-label="Chess board"></div>
             </div>
           </div>
         </div>

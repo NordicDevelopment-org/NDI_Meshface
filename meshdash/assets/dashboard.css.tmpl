@@ -2871,6 +2871,171 @@
       border-color: rgba(168, 188, 205, 0.9);
       box-shadow: 0 0 0 1px rgba(23, 74, 50, 0.24);
     }}
+    .checkers-board {{
+      --checkers-cell-size: clamp(38px, 5.8vw, 64px);
+      display: grid;
+      grid-template-columns: repeat(8, var(--checkers-cell-size));
+      grid-template-rows: repeat(8, var(--checkers-cell-size));
+      border: 1px solid #5a3d2b;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #5a3d2b;
+      box-shadow: inset 0 0 0 1px rgba(40, 25, 17, 0.34);
+    }}
+    .checkers-cell {{
+      width: var(--checkers-cell-size);
+      height: var(--checkers-cell-size);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      position: relative;
+    }}
+    .checkers-cell.is-light {{
+      background: #e6d9c8;
+    }}
+    button.checkers-cell.is-dark {{
+      background: #6c4630;
+      cursor: pointer;
+    }}
+    button.checkers-cell.is-dark:hover {{
+      background: #7a5138;
+    }}
+    button.checkers-cell:focus-visible {{
+      outline: 2px solid #d9efc1;
+      outline-offset: -2px;
+      z-index: 2;
+    }}
+    button.checkers-cell.is-movable {{
+      box-shadow: inset 0 0 0 1px rgba(227, 218, 168, 0.35);
+    }}
+    button.checkers-cell.is-selected {{
+      box-shadow: inset 0 0 0 3px rgba(246, 233, 148, 0.85);
+      z-index: 1;
+    }}
+    button.checkers-cell.is-target {{
+      box-shadow: inset 0 0 0 2px rgba(152, 214, 160, 0.72);
+    }}
+    button.checkers-cell.is-last-from,
+    button.checkers-cell.is-last-to {{
+      box-shadow: inset 0 0 0 2px rgba(255, 230, 143, 0.7);
+    }}
+    .checkers-disc {{
+      width: calc(var(--checkers-cell-size) * 0.76);
+      height: calc(var(--checkers-cell-size) * 0.76);
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(11px, 1.7vw, 15px);
+      font-weight: 800;
+      line-height: 1;
+      box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.3);
+      user-select: none;
+    }}
+    .checkers-disc.disc-black {{
+      background: radial-gradient(circle at 30% 24%, #52616b 0%, #2d3a43 52%, #202b33 100%);
+      color: #ecf7ff;
+      border: 1px solid #1b242b;
+    }}
+    .checkers-disc.disc-white {{
+      background: radial-gradient(circle at 30% 24%, #ffffff 0%, #eff4f8 52%, #d6e0e8 100%);
+      color: #204054;
+      border: 1px solid #a8bdcc;
+    }}
+    .checkers-disc.is-king {{
+      box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.26), 0 0 0 1px rgba(244, 214, 112, 0.68);
+    }}
+    .checkers-hint {{
+      width: calc(var(--checkers-cell-size) * 0.22);
+      height: calc(var(--checkers-cell-size) * 0.22);
+      border-radius: 999px;
+      background: rgba(196, 236, 202, 0.94);
+      border: 1px solid rgba(127, 183, 141, 0.9);
+      box-shadow: 0 0 0 1px rgba(32, 64, 43, 0.33);
+    }}
+    .chess-board {{
+      --chess-cell-size: clamp(38px, 5.8vw, 64px);
+      display: grid;
+      grid-template-columns: repeat(8, var(--chess-cell-size));
+      grid-template-rows: repeat(8, var(--chess-cell-size));
+      border: 1px solid #3f4f5d;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #3f4f5d;
+      box-shadow: inset 0 0 0 1px rgba(18, 28, 35, 0.35);
+    }}
+    .chess-cell {{
+      width: var(--chess-cell-size);
+      height: var(--chess-cell-size);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+    }}
+    .chess-cell.is-light {{
+      background: #e7ddcb;
+    }}
+    .chess-cell.is-dark {{
+      background: #9a7a5d;
+    }}
+    .chess-cell:hover {{
+      filter: brightness(1.04);
+    }}
+    .chess-cell:focus-visible {{
+      outline: 2px solid #d9efc1;
+      outline-offset: -2px;
+      z-index: 2;
+    }}
+    .chess-cell.is-movable {{
+      box-shadow: inset 0 0 0 1px rgba(236, 223, 172, 0.42);
+    }}
+    .chess-cell.is-selected {{
+      box-shadow: inset 0 0 0 3px rgba(251, 236, 150, 0.85);
+      z-index: 1;
+    }}
+    .chess-cell.is-target {{
+      box-shadow: inset 0 0 0 2px rgba(149, 209, 160, 0.8);
+    }}
+    .chess-cell.is-last-from,
+    .chess-cell.is-last-to {{
+      box-shadow: inset 0 0 0 2px rgba(255, 229, 141, 0.72);
+    }}
+    .chess-cell.is-checked {{
+      box-shadow: inset 0 0 0 3px rgba(227, 85, 85, 0.84);
+    }}
+    .chess-piece {{
+      font-size: clamp(20px, 3.2vw, 34px);
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+    }}
+    .chess-piece.piece-white {{
+      color: #f8fdff;
+      text-shadow: 0 1px 0 rgba(31, 51, 63, 0.55), 0 0 0 1px rgba(31, 51, 63, 0.35);
+    }}
+    .chess-piece.piece-black {{
+      color: #1e2a31;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
+    }}
+    .chess-hint {{
+      width: calc(var(--chess-cell-size) * 0.2);
+      height: calc(var(--chess-cell-size) * 0.2);
+      border-radius: 999px;
+      background: rgba(196, 236, 202, 0.94);
+      border: 1px solid rgba(127, 183, 141, 0.9);
+      box-shadow: 0 0 0 1px rgba(32, 64, 43, 0.33);
+    }}
     .bots-grid {{
       display: grid;
       grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
@@ -9773,6 +9938,58 @@
       border-color: rgba(168, 188, 205, 0.92);
       box-shadow: 0 0 0 1px rgba(11, 38, 26, 0.5);
     }}
+    [data-theme="dark"] .checkers-board {{
+      border-color: #4d3527;
+      background: #4d3527;
+      box-shadow: inset 0 0 0 1px rgba(13, 9, 7, 0.44);
+    }}
+    [data-theme="dark"] .checkers-cell.is-light {{
+      background: #c8baa7;
+    }}
+    [data-theme="dark"] button.checkers-cell.is-dark {{
+      background: #553826;
+    }}
+    [data-theme="dark"] button.checkers-cell.is-dark:hover {{
+      background: #63432f;
+    }}
+    [data-theme="dark"] .checkers-disc.disc-black {{
+      background: radial-gradient(circle at 30% 24%, #6c7b86 0%, #374752 54%, #263039 100%);
+      border-color: #1b242c;
+    }}
+    [data-theme="dark"] .checkers-disc.disc-white {{
+      background: radial-gradient(circle at 30% 24%, #ffffff 0%, #eef3f8 52%, #d5dee7 100%);
+      border-color: #95abbd;
+      color: #173143;
+    }}
+    [data-theme="dark"] .checkers-hint {{
+      background: rgba(170, 231, 184, 0.94);
+      border-color: rgba(99, 168, 118, 0.9);
+      box-shadow: 0 0 0 1px rgba(5, 18, 11, 0.48);
+    }}
+    [data-theme="dark"] .chess-board {{
+      border-color: #2c3a45;
+      background: #2c3a45;
+      box-shadow: inset 0 0 0 1px rgba(5, 10, 14, 0.48);
+    }}
+    [data-theme="dark"] .chess-cell.is-light {{
+      background: #dac9b1;
+    }}
+    [data-theme="dark"] .chess-cell.is-dark {{
+      background: #87684d;
+    }}
+    [data-theme="dark"] .chess-piece.piece-white {{
+      color: #f6fbff;
+      text-shadow: 0 1px 0 rgba(25, 42, 54, 0.65), 0 0 0 1px rgba(25, 42, 54, 0.44);
+    }}
+    [data-theme="dark"] .chess-piece.piece-black {{
+      color: #182228;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+    }}
+    [data-theme="dark"] .chess-hint {{
+      background: rgba(170, 231, 184, 0.94);
+      border-color: rgba(99, 168, 118, 0.9);
+      box-shadow: 0 0 0 1px rgba(5, 18, 11, 0.48);
+    }}
     [data-theme="dark"] .bots-sniffer-filter-label {{
       color: #afc8ba;
     }}
@@ -10167,6 +10384,12 @@
       }}
       .reversi-board {{
         --reversi-cell-size: clamp(34px, 9vw, 52px);
+      }}
+      .checkers-board {{
+        --checkers-cell-size: clamp(34px, 9vw, 52px);
+      }}
+      .chess-board {{
+        --chess-cell-size: clamp(34px, 9vw, 52px);
       }}
       .reversi-link-actions {{
         grid-template-columns: minmax(0, 1fr);
