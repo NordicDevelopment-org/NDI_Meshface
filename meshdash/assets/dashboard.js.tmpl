@@ -223,6 +223,25 @@
     const radioSettingsEndpoint = "/api/settings/radio";
     const channelSettingsEndpoint = "/api/settings/channels";
     const botSettingsEndpoint = "/api/settings/bot";
+    const deviceRoleOptions = [
+      "CLIENT",
+      "CLIENT_MUTE",
+      "ROUTER",
+      "ROUTER_CLIENT",
+      "REPEATER",
+      "TRACKER",
+      "SENSOR",
+      "TAK",
+      "CLIENT_HIDDEN",
+      "LOST_AND_FOUND",
+      "TAK_TRACKER",
+      "ROUTER_LATE",
+      "CLIENT_BASE",
+    ];
+    const deviceRoleByNumber = new Map(deviceRoleOptions.map((name, index) => [index, name]));
+    const recommendedNodeBroadcastSecs = 6 * 60 * 60;
+    const recommendedPositionBroadcastSecs = 12 * 60 * 60;
+    const recommendedGpsUpdateSecs = 60 * 60;
     const themeAcceptedModes = new Set(["auto", "dark", "light"]);
     const chatBottomStickThresholdPx = 28;
     const chatWarnWindowSeconds = 10 * 60;
@@ -18555,6 +18574,53 @@
       return lora && typeof lora === "object" ? lora : null;
     }}
 
+    function deviceConfigFromState(state) {{
+      const localState = settingsLocalStateFrom(state);
+      const localConfig = localState && typeof localState === "object" ? localState.local_config : null;
+      const device = localConfig && typeof localConfig === "object" ? localConfig.device : null;
+      return device && typeof device === "object" ? device : null;
+    }}
+
+    function positionConfigFromState(state) {{
+      const localState = settingsLocalStateFrom(state);
+      const localConfig = localState && typeof localState === "object" ? localState.local_config : null;
+      const position = localConfig && typeof localConfig === "object" ? localConfig.position : null;
+      return position && typeof position === "object" ? position : null;
+    }}
+
+    function telemetryConfigFromState(state) {{
+      const localState = settingsLocalStateFrom(state);
+      const moduleConfig = localState && typeof localState === "object" ? localState.module_config : null;
+      const telemetry = moduleConfig && typeof moduleConfig === "object" ? moduleConfig.telemetry : null;
+      return telemetry && typeof telemetry === "object" ? telemetry : null;
+    }}
+
+    function normalizeConfigBool(value, fallback = false) {{
+      if (typeof value === "boolean") return value;
+      if (typeof value === "number") return value !== 0;
+      const text = String(value == null ? "" : value).trim().toLowerCase();
+      if (!text) return !!fallback;
+      if (text === "1" || text === "true" || text === "yes" || text === "on") return true;
+      if (text === "0" || text === "false" || text === "no" || text === "off") return false;
+      return !!fallback;
+    }}
+
+    function normalizeConfigSeconds(value, fallback = 0, minimum = 0) {{
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return Math.max(minimum, Math.trunc(Number(fallback) || 0));
+      return Math.max(minimum, Math.trunc(parsed));
+    }}
+
+    function normalizeDeviceRole(value) {{
+      const text = String(value == null ? "" : value).trim().toUpperCase();
+      if (deviceRoleOptions.includes(text)) return text;
+      const maybeNum = Number(text);
+      if (Number.isInteger(maybeNum) && deviceRoleByNumber.has(maybeNum)) {{
+        return String(deviceRoleByNumber.get(maybeNum) || "CLIENT");
+      }}
+      return "CLIENT";
+    }}
+
     function localNodeUserFromState(state) {{
       const localState = settingsLocalStateFrom(state);
       const localNodeInfo = localState && typeof localState === "object" ? localState.local_node_info : null;
@@ -19211,6 +19277,26 @@
       const paFan = document.getElementById("settings-lora-pa-fan-disabled");
       const ownerShortInput = document.getElementById("settings-owner-short-name");
       const ownerLongInput = document.getElementById("settings-owner-long-name");
+      const deviceRoleSelect = document.getElementById("settings-device-role");
+      const deviceNodeBroadcastInput = document.getElementById("settings-device-node-broadcast-secs");
+      const positionSmartEnabledInput = document.getElementById("settings-position-smart-enabled");
+      const positionBroadcastInput = document.getElementById("settings-position-broadcast-secs");
+      const positionGpsUpdateInput = document.getElementById("settings-position-gps-update-secs");
+      const telemetryDeviceEnabledInput = document.getElementById("settings-telemetry-device-enabled");
+      const telemetryEnvironmentEnabledInput = document.getElementById("settings-telemetry-environment-enabled");
+      const telemetryAirQualityEnabledInput = document.getElementById("settings-telemetry-air-quality-enabled");
+      const telemetryPowerEnabledInput = document.getElementById("settings-telemetry-power-enabled");
+      const telemetryHealthEnabledInput = document.getElementById("settings-telemetry-health-enabled");
+      const telemetryEnvironmentScreenEnabledInput = document.getElementById("settings-telemetry-environment-screen-enabled");
+      const telemetryEnvironmentFahrenheitInput = document.getElementById("settings-telemetry-environment-fahrenheit");
+      const telemetryPowerScreenEnabledInput = document.getElementById("settings-telemetry-power-screen-enabled");
+      const telemetryHealthScreenEnabledInput = document.getElementById("settings-telemetry-health-screen-enabled");
+      const telemetryAirQualityScreenEnabledInput = document.getElementById("settings-telemetry-air-quality-screen-enabled");
+      const telemetryDeviceIntervalInput = document.getElementById("settings-telemetry-device-interval-secs");
+      const telemetryEnvironmentIntervalInput = document.getElementById("settings-telemetry-environment-interval-secs");
+      const telemetryAirQualityIntervalInput = document.getElementById("settings-telemetry-air-quality-interval-secs");
+      const telemetryPowerIntervalInput = document.getElementById("settings-telemetry-power-interval-secs");
+      const telemetryHealthIntervalInput = document.getElementById("settings-telemetry-health-interval-secs");
       const fixedLatInput = document.getElementById("settings-fixed-latitude");
       const fixedLonInput = document.getElementById("settings-fixed-longitude");
       const fixedAltInput = document.getElementById("settings-fixed-altitude");
@@ -19235,6 +19321,98 @@
       const owner = localNodeUserFromState(state);
       setFormValue(ownerShortInput, owner && owner.short_name ? owner.short_name : "");
       setFormValue(ownerLongInput, owner && owner.long_name ? owner.long_name : "");
+      const device = deviceConfigFromState(state);
+      setFormValue(deviceRoleSelect, normalizeDeviceRole(device && device.role));
+      setFormValue(
+        deviceNodeBroadcastInput,
+        normalizeConfigSeconds(
+          device && device.node_info_broadcast_secs,
+          recommendedNodeBroadcastSecs,
+          60
+        )
+      );
+      const positionCfg = positionConfigFromState(state);
+      setFormChecked(
+        positionSmartEnabledInput,
+        normalizeConfigBool(positionCfg && positionCfg.position_broadcast_smart_enabled, false)
+      );
+      setFormValue(
+        positionBroadcastInput,
+        normalizeConfigSeconds(
+          positionCfg && positionCfg.position_broadcast_secs,
+          recommendedPositionBroadcastSecs,
+          60
+        )
+      );
+      setFormValue(
+        positionGpsUpdateInput,
+        normalizeConfigSeconds(
+          positionCfg && positionCfg.gps_update_interval,
+          recommendedGpsUpdateSecs,
+          60
+        )
+      );
+      const telemetryCfg = telemetryConfigFromState(state);
+      setFormChecked(
+        telemetryDeviceEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.device_telemetry_enabled, false)
+      );
+      setFormChecked(
+        telemetryEnvironmentEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.environment_measurement_enabled, false)
+      );
+      setFormChecked(
+        telemetryAirQualityEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.air_quality_enabled, false)
+      );
+      setFormChecked(
+        telemetryPowerEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.power_measurement_enabled, false)
+      );
+      setFormChecked(
+        telemetryHealthEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.health_measurement_enabled, false)
+      );
+      setFormChecked(
+        telemetryEnvironmentScreenEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.environment_screen_enabled, false)
+      );
+      setFormChecked(
+        telemetryEnvironmentFahrenheitInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.environment_display_fahrenheit, false)
+      );
+      setFormChecked(
+        telemetryPowerScreenEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.power_screen_enabled, false)
+      );
+      setFormChecked(
+        telemetryHealthScreenEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.health_screen_enabled, false)
+      );
+      setFormChecked(
+        telemetryAirQualityScreenEnabledInput,
+        normalizeConfigBool(telemetryCfg && telemetryCfg.air_quality_screen_enabled, false)
+      );
+      setFormValue(
+        telemetryDeviceIntervalInput,
+        normalizeConfigSeconds(telemetryCfg && telemetryCfg.device_update_interval, 0, 0)
+      );
+      setFormValue(
+        telemetryEnvironmentIntervalInput,
+        normalizeConfigSeconds(telemetryCfg && telemetryCfg.environment_update_interval, 0, 0)
+      );
+      setFormValue(
+        telemetryAirQualityIntervalInput,
+        normalizeConfigSeconds(telemetryCfg && telemetryCfg.air_quality_interval, 0, 0)
+      );
+      setFormValue(
+        telemetryPowerIntervalInput,
+        normalizeConfigSeconds(telemetryCfg && telemetryCfg.power_update_interval, 0, 0)
+      );
+      setFormValue(
+        telemetryHealthIntervalInput,
+        normalizeConfigSeconds(telemetryCfg && telemetryCfg.health_update_interval, 0, 0)
+      );
 
       const fixedFromState = fixedPositionFromState(state);
       if (fixedFromState) {{
@@ -19331,6 +19509,10 @@
         "settings-apply-lora",
         "settings-set-time",
         "settings-apply-owner",
+        "settings-apply-device-role",
+        "settings-apply-device-broadcast",
+        "settings-apply-position",
+        "settings-apply-telemetry",
         "settings-set-fixed-position",
         "settings-clear-fixed-position",
         "settings-reset",
@@ -20134,6 +20316,176 @@
       }}
     }}
 
+    async function applyDeviceRoleSettings() {{
+      if (settingsApplyInFlight) return;
+      const role = normalizeDeviceRole(readSelectValue("settings-device-role"));
+      if (!role) {{
+        setText("settings-apply-status", "Select a device role.");
+        return;
+      }}
+
+      const ok = await postRadioSettingsPayload(
+        {{ local: {{ device: {{ role }} }} }},
+        "Applying device role…",
+        `device role set to ${{role}}`
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
+    async function applyDeviceBroadcastSettings() {{
+      if (settingsApplyInFlight) return;
+      const nodeBroadcastSecs = readNumberValue("settings-device-node-broadcast-secs");
+      if (!Number.isFinite(nodeBroadcastSecs) || Number(nodeBroadcastSecs) < 60) {{
+        setText("settings-apply-status", "Node broadcast interval must be at least 60 seconds.");
+        return;
+      }}
+      if (
+        Number(nodeBroadcastSecs) < recommendedNodeBroadcastSecs
+        && !window.confirm("Node broadcast interval below 6 hours increases mesh chatter. Apply anyway?")
+      ) {{
+        return;
+      }}
+
+      const ok = await postRadioSettingsPayload(
+        {{ local: {{ device: {{ node_info_broadcast_secs: Math.trunc(Number(nodeBroadcastSecs)) }} }} }},
+        "Applying node broadcast interval…",
+        "device node broadcast interval saved"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
+    async function applyPositionConfigSettings() {{
+      if (settingsApplyInFlight) return;
+      const smartEnabled = !!readCheckboxValue("settings-position-smart-enabled");
+      const positionBroadcastSecs = readNumberValue("settings-position-broadcast-secs");
+      const gpsUpdateIntervalSecs = readNumberValue("settings-position-gps-update-secs");
+      if (!Number.isFinite(positionBroadcastSecs) || Number(positionBroadcastSecs) < 60) {{
+        setText("settings-apply-status", "Position broadcast interval must be at least 60 seconds.");
+        return;
+      }}
+      if (!Number.isFinite(gpsUpdateIntervalSecs) || Number(gpsUpdateIntervalSecs) < 60) {{
+        setText("settings-apply-status", "GPS update interval must be at least 60 seconds.");
+        return;
+      }}
+
+      const belowRecommended = (
+        Number(positionBroadcastSecs) < recommendedPositionBroadcastSecs
+        || Number(gpsUpdateIntervalSecs) < recommendedGpsUpdateSecs
+      );
+      if (
+        belowRecommended
+        && !window.confirm("Position intervals are below recommended (12h broadcast, 1h GPS update). Apply anyway?")
+      ) {{
+        return;
+      }}
+
+      const ok = await postRadioSettingsPayload(
+        {{
+          local: {{
+            position: {{
+              position_broadcast_smart_enabled: smartEnabled,
+              position_broadcast_secs: Math.trunc(Number(positionBroadcastSecs)),
+              gps_update_interval: Math.trunc(Number(gpsUpdateIntervalSecs)),
+            }},
+          }},
+        }},
+        "Applying position settings…",
+        "position settings saved"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
+    async function applyTelemetrySettings() {{
+      if (settingsApplyInFlight) return;
+      const deviceEnabled = !!readCheckboxValue("settings-telemetry-device-enabled");
+      const environmentEnabled = !!readCheckboxValue("settings-telemetry-environment-enabled");
+      const airQualityEnabled = !!readCheckboxValue("settings-telemetry-air-quality-enabled");
+      const powerEnabled = !!readCheckboxValue("settings-telemetry-power-enabled");
+      const healthEnabled = !!readCheckboxValue("settings-telemetry-health-enabled");
+      const environmentScreenEnabled = !!readCheckboxValue("settings-telemetry-environment-screen-enabled");
+      const environmentFahrenheit = !!readCheckboxValue("settings-telemetry-environment-fahrenheit");
+      const powerScreenEnabled = !!readCheckboxValue("settings-telemetry-power-screen-enabled");
+      const healthScreenEnabled = !!readCheckboxValue("settings-telemetry-health-screen-enabled");
+      const airQualityScreenEnabled = !!readCheckboxValue("settings-telemetry-air-quality-screen-enabled");
+      let deviceInterval = readNumberValue("settings-telemetry-device-interval-secs");
+      let environmentInterval = readNumberValue("settings-telemetry-environment-interval-secs");
+      let airQualityInterval = readNumberValue("settings-telemetry-air-quality-interval-secs");
+      let powerInterval = readNumberValue("settings-telemetry-power-interval-secs");
+      let healthInterval = readNumberValue("settings-telemetry-health-interval-secs");
+      if (!Number.isFinite(deviceInterval) || Number(deviceInterval) < 0) {{
+        setText("settings-apply-status", "Telemetry device interval must be 0 or more.");
+        return;
+      }}
+      if (!Number.isFinite(environmentInterval) || Number(environmentInterval) < 0) {{
+        setText("settings-apply-status", "Telemetry environment interval must be 0 or more.");
+        return;
+      }}
+      if (!Number.isFinite(airQualityInterval) || Number(airQualityInterval) < 0) {{
+        setText("settings-apply-status", "Telemetry air quality interval must be 0 or more.");
+        return;
+      }}
+      if (!Number.isFinite(powerInterval) || Number(powerInterval) < 0) {{
+        setText("settings-apply-status", "Telemetry power interval must be 0 or more.");
+        return;
+      }}
+      if (!Number.isFinite(healthInterval) || Number(healthInterval) < 0) {{
+        setText("settings-apply-status", "Telemetry health interval must be 0 or more.");
+        return;
+      }}
+
+      const telemetryDisabled = !deviceEnabled && !environmentEnabled && !airQualityEnabled && !powerEnabled && !healthEnabled;
+      if (telemetryDisabled) {{
+        deviceInterval = 0;
+        environmentInterval = 0;
+        airQualityInterval = 0;
+        powerInterval = 0;
+        healthInterval = 0;
+      }}
+
+      const ok = await postRadioSettingsPayload(
+        {{
+          module: {{
+            telemetry: {{
+              device_telemetry_enabled: deviceEnabled,
+              environment_measurement_enabled: environmentEnabled,
+              air_quality_enabled: airQualityEnabled,
+              power_measurement_enabled: powerEnabled,
+              health_measurement_enabled: healthEnabled,
+              environment_screen_enabled: telemetryDisabled ? false : environmentScreenEnabled,
+              environment_display_fahrenheit: telemetryDisabled ? false : environmentFahrenheit,
+              power_screen_enabled: telemetryDisabled ? false : powerScreenEnabled,
+              health_screen_enabled: telemetryDisabled ? false : healthScreenEnabled,
+              air_quality_screen_enabled: telemetryDisabled ? false : airQualityScreenEnabled,
+              device_update_interval: Math.trunc(Number(deviceInterval)),
+              environment_update_interval: Math.trunc(Number(environmentInterval)),
+              air_quality_interval: Math.trunc(Number(airQualityInterval)),
+              power_update_interval: Math.trunc(Number(powerInterval)),
+              health_update_interval: Math.trunc(Number(healthInterval)),
+            }},
+          }},
+        }},
+        "Applying telemetry settings…",
+        telemetryDisabled ? "telemetry disabled" : "telemetry settings saved"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
     async function applySectionSettings(scope) {{
       const isLocal = scope === "local";
       const sectionId = isLocal ? "settings-local-section" : "settings-module-section";
@@ -20401,6 +20753,31 @@
       if (applyOwnerBtn instanceof HTMLButtonElement) {{
         applyOwnerBtn.addEventListener("click", () => {{
           void applyOwnerSettings();
+        }});
+      }}
+
+      const applyDeviceRoleBtn = document.getElementById("settings-apply-device-role");
+      if (applyDeviceRoleBtn instanceof HTMLButtonElement) {{
+        applyDeviceRoleBtn.addEventListener("click", () => {{
+          void applyDeviceRoleSettings();
+        }});
+      }}
+      const applyDeviceBroadcastBtn = document.getElementById("settings-apply-device-broadcast");
+      if (applyDeviceBroadcastBtn instanceof HTMLButtonElement) {{
+        applyDeviceBroadcastBtn.addEventListener("click", () => {{
+          void applyDeviceBroadcastSettings();
+        }});
+      }}
+      const applyPositionBtn = document.getElementById("settings-apply-position");
+      if (applyPositionBtn instanceof HTMLButtonElement) {{
+        applyPositionBtn.addEventListener("click", () => {{
+          void applyPositionConfigSettings();
+        }});
+      }}
+      const applyTelemetryBtn = document.getElementById("settings-apply-telemetry");
+      if (applyTelemetryBtn instanceof HTMLButtonElement) {{
+        applyTelemetryBtn.addEventListener("click", () => {{
+          void applyTelemetrySettings();
         }});
       }}
 
@@ -25670,6 +26047,13 @@
           if (!messageMatchesActiveMeshChannel(msg)) {{
             continue;
           }}
+          const msgId = messageIdOf(msg);
+          if (msgId) {{
+            // Keep an index entry for every message id, including reactions.
+            // Replies can target reaction packets; without this, context depends
+            // on recent_packets retention and may appear missing across nodes.
+            messageIndexLocal.set(String(msgId), msg);
+          }}
           if (isReactionMessage(msg)) {{
             const replyId = replyIdOf(msg);
             const emoji = emojiOf(msg);
@@ -25711,10 +26095,6 @@
           }}
 
           baseMessagesLocal.push(msg);
-          const msgId = messageIdOf(msg);
-          if (msgId) {{
-            messageIndexLocal.set(String(msgId), msg);
-          }}
           const endpoints = endpointsForBuild(msg);
           const key = classifyMessageChannel(msg) === "direct" ? "direct" : "all";
           channelCountsLocal[key] += 1;
@@ -25897,7 +26277,10 @@
           if (parentMsg) {{
             const parentFromMeta = chatEndpointParts(endpointsForMessage(parentMsg).fromId);
             const parentLabel = parentFromMeta.label || "Unknown node";
-            const parentPreview = compactInlineMessage(parentMsg.text || "", 110);
+            const parentPreview = (
+              compactInlineMessage(parentMsg.text || "", 110)
+              || emojiOf(parentMsg)
+            );
             replyTooltipSummary = `Replying to ${{parentLabel}}`;
             replyTooltipPreview = parentPreview;
             replyInlineLabel = parentLabel;

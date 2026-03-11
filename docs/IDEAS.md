@@ -1,7 +1,7 @@
 # Ideas Backlog
 
-- reversi!!! perfect first GUI game
-- chess
+
+- chess, checkers, 
 - poker game, blackjack
 - bot activity show as (1)
 - at the base level, report to other users the version of meshyface

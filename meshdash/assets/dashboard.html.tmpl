@@ -385,6 +385,42 @@
                   <button id="settings-apply-owner" class="btn btn-secondary" type="button">Apply Name</button>
                 </div>
               </label>
+              <label class="settings-field">
+                <span class="settings-label">Device Role</span>
+                <div class="settings-row">
+                  <select id="settings-device-role" class="settings-select" autocomplete="off">
+                    <option value="CLIENT">CLIENT</option>
+                    <option value="CLIENT_MUTE">CLIENT_MUTE</option>
+                    <option value="ROUTER">ROUTER</option>
+                    <option value="ROUTER_CLIENT">ROUTER_CLIENT</option>
+                    <option value="REPEATER">REPEATER</option>
+                    <option value="TRACKER">TRACKER</option>
+                    <option value="SENSOR">SENSOR</option>
+                    <option value="TAK">TAK</option>
+                    <option value="CLIENT_HIDDEN">CLIENT_HIDDEN</option>
+                    <option value="LOST_AND_FOUND">LOST_AND_FOUND</option>
+                    <option value="TAK_TRACKER">TAK_TRACKER</option>
+                    <option value="ROUTER_LATE">ROUTER_LATE</option>
+                    <option value="CLIENT_BASE">CLIENT_BASE</option>
+                  </select>
+                  <button id="settings-apply-device-role" class="btn btn-secondary" type="button">Apply Role</button>
+                </div>
+              </label>
+              <label class="settings-field">
+                <span class="settings-label">Node Broadcast Interval (sec)</span>
+                <div class="settings-row">
+                  <input
+                    id="settings-device-node-broadcast-secs"
+                    class="settings-input"
+                    type="number"
+                    min="60"
+                    step="60"
+                    placeholder="21600 (6h)"
+                  />
+                  <button id="settings-apply-device-broadcast" class="btn btn-secondary" type="button">Apply Device</button>
+                </div>
+                <div class="settings-help-note">Recommended: 21600+ seconds (6 hours or more).</div>
+              </label>
 
               <label class="settings-field">
                 <span class="settings-label">Position Source</span>
@@ -395,6 +431,39 @@
                 </select>
               </label>
               <div id="settings-position-mode-note" class="settings-help-note"></div>
+              <label class="settings-field settings-inline">
+                <input id="settings-position-smart-enabled" type="checkbox" />
+                <span>Smart Position enabled (dynamic position broadcasts)</span>
+              </label>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Position Broadcast Interval (sec)</span>
+                  <input
+                    id="settings-position-broadcast-secs"
+                    class="settings-input"
+                    type="number"
+                    min="60"
+                    step="60"
+                    placeholder="43200 (12h)"
+                  />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">GPS Update Interval (sec)</span>
+                  <input
+                    id="settings-position-gps-update-secs"
+                    class="settings-input"
+                    type="number"
+                    min="60"
+                    step="60"
+                    placeholder="3600 (1h)"
+                  />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Position settings</span>
+                  <button id="settings-apply-position" class="btn btn-secondary" type="button">Apply Position</button>
+                </label>
+              </div>
+              <div class="settings-help-note">Recommended: Smart Position OFF, Broadcast 43200+ sec (12h+), GPS update 3600+ sec (1h+).</div>
               <div id="settings-fixed-controls" class="settings-fixed-controls">
                 <label class="settings-field">
                   <span class="settings-label">Fixed GPS position (lat, lon, alt m)</span>
@@ -438,6 +507,114 @@
                 <button id="settings-set-fixed-position" class="btn btn-secondary" type="button">Set Fixed Position</button>
                 <button id="settings-clear-fixed-position" class="btn btn-secondary" type="button">Clear Fixed Position</button>
               </div>
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-device-enabled" type="checkbox" />
+                  <span>Device telemetry enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-environment-enabled" type="checkbox" />
+                  <span>Environment telemetry enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-air-quality-enabled" type="checkbox" />
+                  <span>Air quality telemetry enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-power-enabled" type="checkbox" />
+                  <span>Power telemetry enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-health-enabled" type="checkbox" />
+                  <span>Health telemetry enabled</span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-environment-screen-enabled" type="checkbox" />
+                  <span>Environment screen enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-environment-fahrenheit" type="checkbox" />
+                  <span>Environment display Fahrenheit</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-power-screen-enabled" type="checkbox" />
+                  <span>Power screen enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-health-screen-enabled" type="checkbox" />
+                  <span>Health screen enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-telemetry-air-quality-screen-enabled" type="checkbox" />
+                  <span>Air quality screen enabled</span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Device interval (sec)</span>
+                  <input
+                    id="settings-telemetry-device-interval-secs"
+                    class="settings-input"
+                    type="number"
+                    min="0"
+                    step="60"
+                    placeholder="0 = disabled"
+                  />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Environment interval (sec)</span>
+                  <input
+                    id="settings-telemetry-environment-interval-secs"
+                    class="settings-input"
+                    type="number"
+                    min="0"
+                    step="60"
+                    placeholder="0 = disabled"
+                  />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Air quality interval (sec)</span>
+                  <input
+                    id="settings-telemetry-air-quality-interval-secs"
+                    class="settings-input"
+                    type="number"
+                    min="0"
+                    step="60"
+                    placeholder="0 = disabled"
+                  />
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Power interval (sec)</span>
+                  <input
+                    id="settings-telemetry-power-interval-secs"
+                    class="settings-input"
+                    type="number"
+                    min="0"
+                    step="60"
+                    placeholder="0 = disabled"
+                  />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Health interval (sec)</span>
+                  <input
+                    id="settings-telemetry-health-interval-secs"
+                    class="settings-input"
+                    type="number"
+                    min="0"
+                    step="60"
+                    placeholder="0 = disabled"
+                  />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Telemetry settings</span>
+                  <button id="settings-apply-telemetry" class="btn btn-secondary" type="button">Apply Telemetry</button>
+                </label>
+              </div>
+              <div class="settings-help-note">Set all telemetry toggles OFF and intervals to 0 to fully disable telemetry.</div>
             </div>
           </div>
 
