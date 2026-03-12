@@ -2289,6 +2289,45 @@
       color: #2b4a37;
       line-height: 1.35;
     }}
+    .settings-tabbar {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 10px 0;
+      padding: 4px 0 8px;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: linear-gradient(180deg, rgba(244, 250, 243, 0.98), rgba(244, 250, 243, 0.9));
+    }}
+    .settings-tab-btn {{
+      border: 1px solid #c8d7c4;
+      background: #f3faf4;
+      color: #244634;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      line-height: 1.2;
+      cursor: pointer;
+    }}
+    .settings-tab-btn:hover {{
+      border-color: #8daf99;
+      background: #e8f3eb;
+      color: #1b3d2c;
+    }}
+    .settings-tab-btn.is-active,
+    .settings-tab-btn[aria-selected="true"] {{
+      border-color: #2f855a;
+      background: #e6f5ec;
+      color: #1f5d3d;
+      box-shadow: 0 0 0 1px rgba(47, 133, 90, 0.24);
+    }}
+    .settings-tab-btn:focus-visible {{
+      outline: 2px solid #2f855a;
+      outline-offset: 1px;
+    }}
 
     .settings-help-note {{
       font-size: 12px;
@@ -2300,8 +2339,8 @@
       padding: 8px 10px;
     }}
     .settings-grid {{
-      display: grid;
-      grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+      display: flex;
+      flex-direction: column;
       gap: 12px;
     }}
     .settings-panel {{
@@ -2314,8 +2353,11 @@
       gap: 10px;
       min-height: 0;
     }}
+    .settings-panel[hidden] {{
+      display: none;
+    }}
     .settings-panel.settings-panel-wide {{
-      grid-column: 1 / -1;
+      width: 100%;
     }}
     .settings-panel h3 {{
       margin: 0;
@@ -2402,6 +2444,9 @@
       background: #edf5ea;
       overflow: hidden;
       cursor: crosshair;
+    }}
+    .settings-fixed-map.dark-fallback-tiles .leaflet-tile {{
+      filter: invert(100%) hue-rotate(180deg) brightness(0.72) contrast(0.9) saturate(0.55);
     }}
     .settings-textarea {{
       width: 100%;
@@ -8052,6 +8097,26 @@
     }}
     [data-theme="dark"] .settings-caption {{
       color: #98b7a7;
+    }}
+    [data-theme="dark"] .settings-tab-btn {{
+      background: #21352a;
+      border-color: #3a5346;
+      color: #a9c8b9;
+    }}
+    [data-theme="dark"] .settings-tabbar {{
+      background: linear-gradient(180deg, rgba(27, 43, 34, 0.98), rgba(27, 43, 34, 0.9));
+    }}
+    [data-theme="dark"] .settings-tab-btn:hover {{
+      background: #2a4033;
+      border-color: #4b6a5a;
+      color: #c2dece;
+    }}
+    [data-theme="dark"] .settings-tab-btn.is-active,
+    [data-theme="dark"] .settings-tab-btn[aria-selected="true"] {{
+      background: #2b4a39;
+      border-color: #4f8f6c;
+      color: #d1eadb;
+      box-shadow: 0 0 0 1px rgba(79, 143, 108, 0.3);
     }}
     [data-theme="dark"] .settings-help-note {{
       color: #98b7a7;

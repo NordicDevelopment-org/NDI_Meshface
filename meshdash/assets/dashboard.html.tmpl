@@ -281,8 +281,51 @@
         </div>
       </div>
       <div class="body">
+        <div class="settings-tabbar" role="tablist" aria-label="Settings categories">
+          <button
+            id="settings-tab-core-btn"
+            class="settings-tab-btn is-active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            data-settings-tab="core"
+          >
+            Core
+          </button>
+          <button
+            id="settings-tab-device-btn"
+            class="settings-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-settings-tab="device"
+          >
+            Device
+          </button>
+          <button
+            id="settings-tab-connectivity-btn"
+            class="settings-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-settings-tab="connectivity"
+          >
+            Connectivity
+          </button>
+          <button
+            id="settings-tab-advanced-btn"
+            class="settings-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-settings-tab="advanced"
+          >
+            Advanced
+          </button>
+        </div>
+
         <div class="settings-grid">
-          <div class="settings-panel">
+          <div class="settings-panel" data-settings-tab-panel="core">
             <h3>LoRa / Radio</h3>
             <div class="settings-fields channels-local-fields">
               <div class="settings-help-note">
@@ -333,6 +376,7 @@
                   <option value="SHORT_FAST">SHORT_FAST</option>
                   <option value="SHORT_SLOW">SHORT_SLOW</option>
                   <option value="SHORT_TURBO">SHORT_TURBO</option>
+                  <option value="LONG_TURBO">LONG_TURBO</option>
                 </select>
               </label>
 
@@ -629,7 +673,7 @@
             </div>
           </div>
 
-          <div class="settings-panel">
+          <div class="settings-panel" data-settings-tab-panel="core">
             <h3>Advanced LoRa</h3>
             <div class="settings-fields">
               <div class="settings-row">
@@ -655,6 +699,14 @@
                 <label class="settings-field">
                   <span class="settings-label">Override frequency (MHz)</span>
                   <input id="settings-lora-override-frequency" class="settings-input" type="number" min="0" step="0.001" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">FEM / LNA mode</span>
+                  <select id="settings-lora-fem-lna-mode" class="settings-select" autocomplete="off">
+                    <option value="DISABLED">DISABLED</option>
+                    <option value="ENABLED">ENABLED</option>
+                    <option value="NOT_PRESENT">NOT_PRESENT</option>
+                  </select>
                 </label>
               </div>
 
@@ -686,7 +738,418 @@
             </div>
           </div>
 
-          <div class="settings-panel settings-panel-wide">
+          <div class="settings-panel" data-settings-tab-panel="device" hidden>
+            <h3>Device Behavior</h3>
+            <div class="settings-fields">
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Rebroadcast mode</span>
+                  <select id="settings-device-rebroadcast-mode" class="settings-select" autocomplete="off">
+                    <option value="ALL">ALL</option>
+                    <option value="ALL_SKIP_DECODING">ALL_SKIP_DECODING</option>
+                    <option value="LOCAL_ONLY">LOCAL_ONLY</option>
+                    <option value="KNOWN_ONLY">KNOWN_ONLY</option>
+                    <option value="NONE">NONE</option>
+                    <option value="CORE_PORTNUMS_ONLY">CORE_PORTNUMS_ONLY</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Buzzer mode</span>
+                  <select id="settings-device-buzzer-mode" class="settings-select" autocomplete="off">
+                    <option value="ALL_ENABLED">ALL_ENABLED</option>
+                    <option value="DISABLED">DISABLED</option>
+                    <option value="NOTIFICATIONS_ONLY">NOTIFICATIONS_ONLY</option>
+                    <option value="SYSTEM_ONLY">SYSTEM_ONLY</option>
+                    <option value="DIRECT_MSG_ONLY">DIRECT_MSG_ONLY</option>
+                  </select>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-device-double-tap-button" type="checkbox" />
+                  <span>Double tap as button press</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-device-disable-triple-click" type="checkbox" />
+                  <span>Disable GPS triple-click toggle</span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Timezone (POSIX TZ)</span>
+                  <input id="settings-device-tzdef" class="settings-input" type="text" placeholder="e.g. CST6CDT,M3.2.0/2,M11.1.0/2" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Device behavior</span>
+                  <button id="settings-apply-device-extra" class="btn btn-secondary" type="button">Apply Device Behavior</button>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel" data-settings-tab-panel="device" hidden>
+            <h3>Power + Display</h3>
+            <div class="settings-fields">
+              <div class="settings-help-note">Meshtastic power and display config from current firmware protobuf definitions.</div>
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-power-saving-enabled" type="checkbox" />
+                  <span>Power saving enabled</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Shutdown on battery (sec)</span>
+                  <input id="settings-power-on-battery-shutdown-secs" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Wait Bluetooth (sec)</span>
+                  <input id="settings-power-wait-bluetooth-secs" class="settings-input" type="number" min="0" step="1" />
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Super deep sleep (sec)</span>
+                  <input id="settings-power-sds-secs" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Light sleep (sec)</span>
+                  <input id="settings-power-ls-secs" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Min wake (sec)</span>
+                  <input id="settings-power-min-wake-secs" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Power settings</span>
+                  <button id="settings-apply-power" class="btn btn-secondary" type="button">Apply Power</button>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Screen on (sec)</span>
+                  <input id="settings-display-screen-on-secs" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Auto carousel (sec)</span>
+                  <input id="settings-display-auto-carousel-secs" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Display units</span>
+                  <select id="settings-display-units" class="settings-select" autocomplete="off">
+                    <option value="METRIC">METRIC</option>
+                    <option value="IMPERIAL">IMPERIAL</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Display mode</span>
+                  <select id="settings-display-mode" class="settings-select" autocomplete="off">
+                    <option value="DEFAULT">DEFAULT</option>
+                    <option value="TWOCOLOR">TWOCOLOR</option>
+                    <option value="INVERTED">INVERTED</option>
+                    <option value="COLOR">COLOR</option>
+                  </select>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-display-flip-screen" type="checkbox" />
+                  <span>Flip screen</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-display-heading-bold" type="checkbox" />
+                  <span>Heading bold</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-display-wake-on-tap" type="checkbox" />
+                  <span>Wake on tap / motion</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-display-use-12h-clock" type="checkbox" />
+                  <span>Use 12h clock</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-display-use-long-node-name" type="checkbox" />
+                  <span>Use long node names</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-display-enable-message-bubbles" type="checkbox" />
+                  <span>Message bubbles on screen</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Display settings</span>
+                  <button id="settings-apply-display" class="btn btn-secondary" type="button">Apply Display</button>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel" data-settings-tab-panel="connectivity" hidden>
+            <h3>Network + Bluetooth + Security</h3>
+            <div class="settings-fields">
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-network-wifi-enabled" type="checkbox" />
+                  <span>Wi-Fi enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-network-eth-enabled" type="checkbox" />
+                  <span>Ethernet enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-network-ipv6-enabled" type="checkbox" />
+                  <span>IPv6 enabled</span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Wi-Fi SSID</span>
+                  <input id="settings-network-wifi-ssid" class="settings-input" type="text" autocomplete="off" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Wi-Fi password</span>
+                  <input id="settings-network-wifi-psk" class="settings-input" type="password" autocomplete="off" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">NTP server</span>
+                  <input id="settings-network-ntp-server" class="settings-input" type="text" autocomplete="off" />
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Address mode</span>
+                  <select id="settings-network-address-mode" class="settings-select" autocomplete="off">
+                    <option value="DHCP">DHCP</option>
+                    <option value="STATIC">STATIC</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Rsyslog server</span>
+                  <input id="settings-network-rsyslog-server" class="settings-input" type="text" autocomplete="off" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Network settings</span>
+                  <button id="settings-apply-network" class="btn btn-secondary" type="button">Apply Network</button>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-bluetooth-enabled" type="checkbox" />
+                  <span>Bluetooth enabled</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Pairing mode</span>
+                  <select id="settings-bluetooth-mode" class="settings-select" autocomplete="off">
+                    <option value="RANDOM_PIN">RANDOM_PIN</option>
+                    <option value="FIXED_PIN">FIXED_PIN</option>
+                    <option value="NO_PIN">NO_PIN</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Fixed PIN</span>
+                  <input id="settings-bluetooth-fixed-pin" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Bluetooth settings</span>
+                  <button id="settings-apply-bluetooth" class="btn btn-secondary" type="button">Apply Bluetooth</button>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-security-serial-enabled" type="checkbox" />
+                  <span>Security serial enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-security-debug-log-api-enabled" type="checkbox" />
+                  <span>Debug log API enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-security-admin-channel-enabled" type="checkbox" />
+                  <span>Admin channel enabled</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Security settings</span>
+                  <button id="settings-apply-security" class="btn btn-secondary" type="button">Apply Security</button>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel" data-settings-tab-panel="connectivity" hidden>
+            <h3>MQTT + Serial + Notifications</h3>
+            <div class="settings-fields">
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-mqtt-enabled" type="checkbox" />
+                  <span>MQTT enabled</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">MQTT address</span>
+                  <input id="settings-mqtt-address" class="settings-input" type="text" autocomplete="off" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">MQTT root</span>
+                  <input id="settings-mqtt-root" class="settings-input" type="text" autocomplete="off" />
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">MQTT username</span>
+                  <input id="settings-mqtt-username" class="settings-input" type="text" autocomplete="off" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">MQTT password</span>
+                  <input id="settings-mqtt-password" class="settings-input" type="password" autocomplete="off" />
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-mqtt-encryption-enabled" type="checkbox" />
+                  <span>MQTT encryption enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-mqtt-json-enabled" type="checkbox" />
+                  <span>MQTT JSON enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-mqtt-tls-enabled" type="checkbox" />
+                  <span>MQTT TLS enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-mqtt-proxy-to-client-enabled" type="checkbox" />
+                  <span>Proxy MQTT to client</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-mqtt-map-reporting-enabled" type="checkbox" />
+                  <span>Map reporting enabled</span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Map publish interval (sec)</span>
+                  <input id="settings-mqtt-map-publish-interval-secs" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Map position precision</span>
+                  <input id="settings-mqtt-map-position-precision" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-mqtt-map-report-location" type="checkbox" />
+                  <span>Opt-in map location reporting</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">MQTT settings</span>
+                  <button id="settings-apply-mqtt" class="btn btn-secondary" type="button">Apply MQTT</button>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-serial-enabled" type="checkbox" />
+                  <span>Serial module enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-serial-echo" type="checkbox" />
+                  <span>Serial echo</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-serial-override-console-port" type="checkbox" />
+                  <span>Override console serial port</span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Serial mode</span>
+                  <select id="settings-serial-mode" class="settings-select" autocomplete="off">
+                    <option value="DEFAULT">DEFAULT</option>
+                    <option value="SIMPLE">SIMPLE</option>
+                    <option value="PROTO">PROTO</option>
+                    <option value="TEXTMSG">TEXTMSG</option>
+                    <option value="NMEA">NMEA</option>
+                    <option value="CALTOPO">CALTOPO</option>
+                    <option value="WS85">WS85</option>
+                    <option value="VE_DIRECT">VE_DIRECT</option>
+                    <option value="MS_CONFIG">MS_CONFIG</option>
+                    <option value="LOG">LOG</option>
+                    <option value="LOGTEXT">LOGTEXT</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Serial baud</span>
+                  <select id="settings-serial-baud" class="settings-select" autocomplete="off">
+                    <option value="BAUD_DEFAULT">BAUD_DEFAULT</option>
+                    <option value="BAUD_110">BAUD_110</option>
+                    <option value="BAUD_300">BAUD_300</option>
+                    <option value="BAUD_600">BAUD_600</option>
+                    <option value="BAUD_1200">BAUD_1200</option>
+                    <option value="BAUD_2400">BAUD_2400</option>
+                    <option value="BAUD_4800">BAUD_4800</option>
+                    <option value="BAUD_9600">BAUD_9600</option>
+                    <option value="BAUD_19200">BAUD_19200</option>
+                    <option value="BAUD_38400">BAUD_38400</option>
+                    <option value="BAUD_57600">BAUD_57600</option>
+                    <option value="BAUD_115200">BAUD_115200</option>
+                    <option value="BAUD_230400">BAUD_230400</option>
+                    <option value="BAUD_460800">BAUD_460800</option>
+                    <option value="BAUD_576000">BAUD_576000</option>
+                    <option value="BAUD_921600">BAUD_921600</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Serial timeout</span>
+                  <input id="settings-serial-timeout" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Serial settings</span>
+                  <button id="settings-apply-serial" class="btn btn-secondary" type="button">Apply Serial</button>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-ext-notify-enabled" type="checkbox" />
+                  <span>External notification enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-ext-notify-alert-message" type="checkbox" />
+                  <span>Alert on message</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-ext-notify-alert-bell" type="checkbox" />
+                  <span>Alert on bell</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-ext-notify-active-high" type="checkbox" />
+                  <span>Active high output</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-ext-notify-use-pwm" type="checkbox" />
+                  <span>Use PWM buzzer path</span>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Output duration (ms)</span>
+                  <input id="settings-ext-notify-output-ms" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Output GPIO</span>
+                  <input id="settings-ext-notify-output-pin" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Nag timeout (sec)</span>
+                  <input id="settings-ext-notify-nag-timeout" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Notification settings</span>
+                  <button id="settings-apply-ext-notify" class="btn btn-secondary" type="button">Apply Notifications</button>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel settings-panel-wide" data-settings-tab-panel="advanced" hidden>
             <h3>Advanced Config</h3>
             <div class="settings-fields">
               <div class="settings-help-note">
