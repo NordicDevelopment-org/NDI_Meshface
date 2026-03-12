@@ -301,9 +301,9 @@
       position_nodes: true,
     }};
     const weeklySummaryMetricCatalog = new Map([
-      ["packets", { label: "Packets / min", decimals: 1 }],
-      ["nodes", { label: "Nodes", decimals: 0 }],
-      ["links", { label: "Directed Links", decimals: 0 }],
+      ["packets", { label: "Packets / min", decimals: 1, smoothingWindow: 19 }],
+      ["nodes", { label: "Nodes", decimals: 0, smoothingWindow: 13 }],
+      ["links", { label: "Directed Links", decimals: 0, smoothingWindow: 1 }],
     ]);
     // Generated from Unicode emoji-test.txt
     // Source: https://unicode.org/Public/emoji/latest/emoji-test.txt
@@ -4424,6 +4424,169 @@
       if (!Number.isFinite(numeric)) return "n/a";
       const fixedDigits = Math.max(0, Math.min(2, Math.floor(Number(digits) || 0)));
       return fixedDigits > 0 ? numeric.toFixed(fixedDigits) : `${{Math.round(numeric)}}`;
+    }}
+
+    function normalizeSmoothingWindow(rawWindow, pointCount = Number.MAX_SAFE_INTEGER) {{
+      const points = Math.max(1, Math.trunc(Number(pointCount) || 1));
+      const candidate = Math.trunc(Number(rawWindow) || 1);
+      if (!Number.isFinite(candidate) || candidate <= 1 || points <= 2) return 1;
+      let windowSize = Math.max(1, Math.min(points, candidate));
+      if ((windowSize % 2) === 0) {{
+        windowSize = Math.max(1, windowSize - 1);
+      }}
+      return windowSize <= 1 ? 1 : windowSize;
+    }}
+
+    function centeredMovingAverage(values, rawWindow) {{
+      const source = Array.isArray(values) ? values : [];
+      const windowSize = normalizeSmoothingWindow(rawWindow, source.length);
+      if (windowSize <= 1 || source.length <= 2) return source.slice();
+      const half = Math.floor(windowSize / 2);
+      const smoothed = new Array(source.length);
+      for (let idx = 0; idx < source.length; idx += 1) {{
+        const start = Math.max(0, idx - half);
+        const end = Math.min(source.length - 1, idx + half);
+        let total = 0;
+        let count = 0;
+        for (let sample = start; sample <= end; sample += 1) {{
+          const value = Number(source[sample]);
+          if (!Number.isFinite(value)) continue;
+          total += value;
+          count += 1;
+        }}
+        smoothed[idx] = count > 0 ? (total / count) : Number(source[idx] || 0);
+      }}
+      return smoothed;
+    }}
+
+    function smoothSeriesPointsWithBreaks(points, rawWindow) {{
+      const source = Array.isArray(points) ? points : [];
+      const baseWindow = normalizeSmoothingWindow(rawWindow, source.length);
+      if (baseWindow <= 1 || source.length <= 2) {{
+        return source.map((point) => ({{ ...point }}));
+      }}
+      const output = source.map((point) => ({{ ...point }}));
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        const segmentLength = idx - segmentStart;
+        const segmentWindow = normalizeSmoothingWindow(baseWindow, segmentLength);
+        if (segmentLength >= 3 && segmentWindow > 1) {{
+          const segmentValues = source
+            .slice(segmentStart, idx)
+            .map((point) => Number(point && point.value));
+          const segmentSmoothed = centeredMovingAverage(segmentValues, segmentWindow);
+          for (let segIdx = 0; segIdx < segmentSmoothed.length; segIdx += 1) {{
+            output[segmentStart + segIdx].value = Number(segmentSmoothed[segIdx]);
+          }}
+        }}
+        segmentStart = idx;
+      }}
+      return output;
+    }}
+
+    function buildSmoothSvgPath(points, rawTension = 0.18) {{
+      const source = Array.isArray(points) ? points : [];
+      if (!source.length) return "";
+      const tension = Math.max(0, Math.min(0.5, Number(rawTension) || 0.18));
+      const linearPath = (segment) => segment.map((pt, idx) => (
+        `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
+      )).join(" ");
+      let path = "";
+      const appendSegment = (segmentPoints) => {{
+        const segment = Array.isArray(segmentPoints)
+          ? segmentPoints.filter((pt) => Number.isFinite(Number(pt && pt.x)) && Number.isFinite(Number(pt && pt.y)))
+          : [];
+        if (!segment.length) return;
+        if (segment.length < 3) {{
+          path += `${{path ? " " : ""}}${{linearPath(segment)}}`;
+          return;
+        }}
+        path += `${{path ? " " : ""}}M ${{segment[0].x.toFixed(2)}} ${{segment[0].y.toFixed(2)}}`;
+        for (let i = 0; i < segment.length - 1; i += 1) {{
+          const p0 = i > 0 ? segment[i - 1] : segment[i];
+          const p1 = segment[i];
+          const p2 = segment[i + 1];
+          const p3 = (i + 2 < segment.length) ? segment[i + 2] : p2;
+          const cp1x = p1.x + ((p2.x - p0.x) * tension);
+          const cp1y = p1.y + ((p2.y - p0.y) * tension);
+          const cp2x = p2.x - ((p3.x - p1.x) * tension);
+          const cp2y = p2.y - ((p3.y - p1.y) * tension);
+          path += ` C ${{cp1x.toFixed(2)}} ${{cp1y.toFixed(2)}} ${{cp2x.toFixed(2)}} ${{cp2y.toFixed(2)}} ${{p2.x.toFixed(2)}} ${{p2.y.toFixed(2)}}`;
+        }}
+      }};
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        appendSegment(source.slice(segmentStart, idx));
+        segmentStart = idx;
+      }}
+      return path.trim();
+    }}
+
+    function aggregatePointsByXPixels(points, rawBucketWidthPx = 1.35) {{
+      const source = Array.isArray(points) ? points : [];
+      if (source.length <= 3) {{
+        return source.map((point) => ({{ ...point }}));
+      }}
+      const bucketWidthPx = Math.max(0.75, Number(rawBucketWidthPx) || 1.35);
+      const compressSegment = (segmentPoints) => {{
+        const segment = Array.isArray(segmentPoints)
+          ? segmentPoints.filter((pt) => Number.isFinite(Number(pt && pt.x)) && Number.isFinite(Number(pt && pt.y)))
+          : [];
+        if (segment.length <= 3) {{
+          return segment.map((pt) => ({{ ...pt, breakBefore: false }}));
+        }}
+        const first = segment[0];
+        const last = segment[segment.length - 1];
+        const startX = Number(first.x);
+        const buckets = new Map();
+        for (let i = 1; i < segment.length - 1; i += 1) {{
+          const x = Number(segment[i].x);
+          const y = Number(segment[i].y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+          const key = Math.floor((x - startX) / bucketWidthPx);
+          const existing = buckets.get(key);
+          if (existing) {{
+            existing.sumX += x;
+            existing.sumY += y;
+            existing.count += 1;
+          }} else {{
+            buckets.set(key, {{ sumX: x, sumY: y, count: 1 }});
+          }}
+        }}
+        const mids = Array.from(buckets.entries())
+          .sort((a, b) => Number(a[0]) - Number(b[0]))
+          .map(([, bucket]) => ({{
+            x: bucket.sumX / bucket.count,
+            y: bucket.sumY / bucket.count,
+            breakBefore: false,
+          }}));
+        return [
+          {{ x: Number(first.x), y: Number(first.y), breakBefore: false }},
+          ...mids,
+          {{ x: Number(last.x), y: Number(last.y), breakBefore: false }},
+        ];
+      }};
+
+      const output = [];
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        const segment = compressSegment(source.slice(segmentStart, idx));
+        for (let pointIndex = 0; pointIndex < segment.length; pointIndex += 1) {{
+          const point = segment[pointIndex];
+          output.push({{
+            ...point,
+            breakBefore: pointIndex === 0 && output.length > 0,
+          }});
+        }}
+        segmentStart = idx;
+      }}
+      return output;
     }}
 
     function derivePacketsPerMinuteFromTotals(points) {{
@@ -26196,7 +26359,43 @@
       }}
       empty.hidden = true;
 
-      const allValues = seriesEntries.flatMap((entry) => entry.values);
+      const smoothingWindow = normalizeSmoothingWindow(
+        metricMeta && metricMeta.smoothingWindow,
+        plotRows.length
+      );
+      const trendWindow = normalizeSmoothingWindow(
+        smoothingWindow <= 1
+          ? 1
+          : Math.max(
+              smoothingWindow,
+              Math.round(Math.max(3, smoothingWindow) * 2.2)
+            ),
+        plotRows.length
+      );
+      const rawBucketWidthPx = 1.05;
+      const trendBucketWidthPx = 4.0;
+      const trendTension = 0.28;
+      const plottedSeriesEntries = seriesEntries.map((entry) => {{
+        const rawPoints = entry.points.map((point) => ({{ ...point }}));
+        const plottedPoints = smoothSeriesPointsWithBreaks(entry.points, trendWindow);
+        const rawValues = rawPoints
+          .map((point) => Number(point && point.value))
+          .filter((value) => Number.isFinite(value));
+        const plottedValues = plottedPoints
+          .map((point) => Number(point && point.value))
+          .filter((value) => Number.isFinite(value));
+        return {{
+          ...entry,
+          rawPoints,
+          rawValues,
+          plottedPoints,
+          plottedValues,
+        }};
+      }});
+
+      const allValues = plottedSeriesEntries.flatMap((entry) => (
+        entry.rawValues.concat(entry.plottedValues)
+      ));
       let minVal = Math.min(...allValues);
       let maxVal = Math.max(...allValues);
       if ((maxVal - minVal) < 1e-6) {{
@@ -26249,7 +26448,12 @@
         const key = tone && chartPalette[`${{tone}}Label`] ? `${{tone}}Label` : `${{toneFallbacks[index] || "compare"}}Label`;
         return chartPalette[key] || chartPalette.compareLabel;
       }};
-      const enrichSeries = seriesEntries.map((entry, index) => {{
+      const buildLinearPath = (points) => (
+        points.map((pt, idx) => (
+          `${{idx === 0 || pt.breakBefore ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
+        )).join(" ")
+      );
+      const enrichSeries = plottedSeriesEntries.map((entry, index) => {{
         const stroke = toneStroke(entry.tone, index);
         const labelColor = toneLabel(entry.tone, index);
         const resolvedStroke = entry.color || stroke;
@@ -26259,7 +26463,7 @@
           : (index === 0 ? 2.3 : 2.0);
         const dashText = entry.dashed ? "5 3" : "";
         const dashAttr = dashText ? ` stroke-dasharray="${{dashText}}"` : "";
-        const pointsXY = entry.points.map((point) => {{
+        const toScreenPoint = (point) => {{
           const x = padLeft + ((Math.max(0, point.idx) / Math.max(1, n - 1)) * plotW);
           const y = padTop + ((maxVal - point.value) / (maxVal - minVal)) * plotH;
           return {{
@@ -26267,17 +26471,27 @@
             y,
             breakBefore: !!point.breakBefore,
           }};
-        }});
-        const path = pointsXY.map((pt, idx) => (
-          `${{idx === 0 || pt.breakBefore ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
-        )).join(" ");
+        }};
+        const rawPointsXY = entry.rawPoints.map((point) => toScreenPoint(point));
+        const trendPointsXY = entry.plottedPoints.map((point) => toScreenPoint(point));
+        const rawPlotPoints = aggregatePointsByXPixels(rawPointsXY, rawBucketWidthPx);
+        const trendPlotPoints = aggregatePointsByXPixels(trendPointsXY, trendBucketWidthPx);
+        const rawPath = buildLinearPath(rawPlotPoints);
+        const trendLinearPath = buildLinearPath(trendPlotPoints);
+        const trendPath = buildSmoothSvgPath(trendPlotPoints, trendTension) || trendLinearPath;
+        const rawWidthPx = Math.max(0.8, widthPx * 0.58);
+        const rawOpacity = entry.dashed ? 0.16 : 0.2;
         return {{
           ...entry,
           stroke: resolvedStroke,
           labelColor: resolvedLabelColor,
           widthPx,
+          rawWidthPx,
+          rawOpacity,
+          trendOpacity: 1,
           dashAttr,
-          path,
+          rawPath,
+          trendPath,
         }};
       }});
       const axisTicks = buildLinearAxisTicks(minVal, maxVal, 5);
@@ -26299,7 +26513,10 @@
         `;
       }}).join("");
       const paths = enrichSeries.map((entry) => (
-        `<path d="${{entry.path}}" fill="none" stroke="${{entry.stroke}}" stroke-width="${{entry.widthPx.toFixed(1)}}"${{entry.dashAttr}}></path>`
+        `
+          <path d="${{entry.rawPath}}" fill="none" stroke="${{entry.stroke}}" stroke-width="${{entry.rawWidthPx.toFixed(1)}}" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{entry.rawOpacity.toFixed(2)}}"></path>
+          <path d="${{entry.trendPath}}" fill="none" stroke="${{entry.stroke}}" stroke-width="${{entry.widthPx.toFixed(1)}}" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{entry.trendOpacity.toFixed(2)}}"${{entry.dashAttr}}></path>
+        `
       )).join("");
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `
