@@ -2159,7 +2159,7 @@
     const chessBoardSize = 8;
     const chessFiles = "abcdefgh";
     const pokerMinPlayers = 2;
-    const pokerMaxPlayers = 5;
+    const pokerMaxPlayers = 4;
     const pokerDefaultPlayers = 4;
     const pokerHandSize = 5;
     const pokerDefaultStartingStack = 200;
@@ -10414,11 +10414,47 @@
       return (state.phase === "draw" || state.phase === "betting") && seatIndex === Number(state.current_player);
     }}
 
+    function pokerSeatSlotLayout(playerCountRaw) {{
+      const playerCount = normalizePokerPlayerCount(playerCountRaw, pokerDefaultPlayers);
+      if (playerCount <= 2) return [0, 3];
+      if (playerCount === 3) return [0, 1, 2];
+      return [0, 1, 2, 3];
+    }}
+
+    function pokerPotChipModel(potTotalRaw) {{
+      const total = normalizePokerChipAmount(potTotalRaw, 0, 0, Number.MAX_SAFE_INTEGER);
+      if (total <= 0) {{
+        return [{{ label: "0", tone: "empty" }}];
+      }}
+      let remaining = total;
+      const chips = [];
+      const denoms = [
+        {{ value: 100, tone: "high" }},
+        {{ value: 25, tone: "mid" }},
+        {{ value: 5, tone: "low" }},
+        {{ value: 1, tone: "base" }},
+      ];
+      for (const denom of denoms) {{
+        const count = Math.floor(remaining / denom.value);
+        if (count <= 0) continue;
+        remaining -= count * denom.value;
+        if (count <= 3) {{
+          for (let idx = 0; idx < count; idx += 1) {{
+            chips.push({{ label: String(denom.value), tone: denom.tone }});
+          }}
+        }} else {{
+          chips.push({{ label: `${{denom.value}}x${{count}}`, tone: denom.tone }});
+        }}
+      }}
+      return chips.slice(0, 10);
+    }}
+
     function renderPokerTable() {{
       const tableEl = document.getElementById("poker-table");
       if (!(tableEl instanceof HTMLElement)) return;
       const state = ensurePokerState();
-      const rows = [];
+      const seatSlots = pokerSeatSlotLayout(state.player_count);
+      const seatsBySlot = new Map();
       for (const seat of state.seats) {{
         const seatIndex = Math.trunc(Number(seat.seat) || 0);
         const inHand = !!seat.in_hand && Array.isArray(seat.hand) && seat.hand.length > 0;
@@ -10512,7 +10548,8 @@
         if (String(seat.blind_posted || "").trim()) seatMetaBits.push(String(seat.blind_posted).trim());
         if (payout > 0) seatMetaBits.push(`+${{payout}}`);
         const turnTag = `<span class="poker-seat-meta">${{escAttr(seatMetaBits.join(" | "))}}</span>`;
-        rows.push(
+        const slot = Math.max(0, Math.min(3, Math.trunc(Number(seatSlots[seatIndex] ?? seatIndex) || 0)));
+        seatsBySlot.set(slot,
           `<section class="${{escAttr(seatClasses.join(" "))}}" aria-label="${{escAttr(seat.name)}}">
             <div class="poker-seat-head">
               <strong class="poker-seat-name">${{escAttr(seat.name)}}</strong>
@@ -10524,7 +10561,32 @@
           </section>`
         );
       }}
-      tableEl.innerHTML = rows.join("");
+      const slotHtml = [0, 1, 2, 3].map((slot) => {{
+        const seatHtml = seatsBySlot.get(slot) || `
+          <section class="poker-seat poker-seat-empty" aria-hidden="true">
+            <div class="poker-seat-head">
+              <strong class="poker-seat-name">Open Seat</strong>
+              <span class="poker-seat-meta">Corner</span>
+            </div>
+            <div class="poker-seat-rank">\u00a0</div>
+            <div class="poker-cards"></div>
+            <div class="poker-seat-note">\u00a0</div>
+          </section>
+        `;
+        return `<div class="poker-seat-slot poker-seat-slot-${{slot}}">${{seatHtml}}</div>`;
+      }}).join("");
+      const potTotal = normalizePokerChipAmount(state.pot_total, 0, 0, Number.MAX_SAFE_INTEGER);
+      const potChips = pokerPotChipModel(potTotal)
+        .map((chip, index) => `<span class="poker-pot-chip is-${{escAttr(chip.tone)}}" style="--chip-level:${{index}}">${{escAttr(chip.label)}}</span>`)
+        .join("");
+      tableEl.innerHTML = `
+        ${{slotHtml}}
+        <div class="poker-pot-center" aria-label="Poker pot">
+          <div class="poker-pot-title">Pot</div>
+          <div class="poker-pot-chip-row">${{potChips}}</div>
+          <div class="poker-pot-amount">${{potTotal}}</div>
+        </div>
+      `;
     }}
 
     function renderPokerStatus() {{
