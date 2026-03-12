@@ -1,6 +1,6 @@
 # Ideas Backlog
 
-
+- #hastag creates channels based on trends on meshy
 - chess, checkers, 
 - poker game, blackjack
 - bot activity show as (1)
