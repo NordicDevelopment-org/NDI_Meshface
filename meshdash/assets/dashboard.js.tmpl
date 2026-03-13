@@ -24359,7 +24359,7 @@
       }}
       renderTargetRadioStatus(state);
       setText("m-nodes", s.node_count ?? 0);
-      setText("m-pos-nodes", s.nodes_with_position ?? 0);
+      setText("m-online-nodes", s.online_node_count ?? 0);
       const rawLivePacketTotal = Number(s.live_packet_count);
       const livePacketTotal = Number.isFinite(rawLivePacketTotal) ? rawLivePacketTotal : 0;
       if (resetTickerScaleOnRestart) {{
@@ -24374,11 +24374,11 @@
         chartId: "ticker-chart-nodes",
         digits: 0,
       }});
-      updateMetricTicker("pos_nodes", s.nodes_with_position ?? 0, {{
-        containerId: "ticker-pos-nodes",
-        deltaId: "ticker-delta-pos-nodes",
-        rateId: "ticker-rate-pos-nodes",
-        chartId: "ticker-chart-pos-nodes",
+      updateMetricTicker("online_nodes", s.online_node_count ?? 0, {{
+        containerId: "ticker-online-nodes",
+        deltaId: "ticker-delta-online-nodes",
+        rateId: "ticker-rate-online-nodes",
+        chartId: "ticker-chart-online-nodes",
         digits: 0,
       }});
       appendMetricTickerPoint("live_packets", livePacketTotal);
@@ -28173,7 +28173,7 @@
       const points = sliceSummaryPointsAfterLiveCounterReset(payload.points);
       const byKey = new Map([
         ["nodes", []],
-        ["pos_nodes", []],
+        ["online_nodes", []],
         ["live_packets", []],
         ["live_packets_per_min", []],
         ["real_links", []],
@@ -28184,14 +28184,14 @@
         if (!Number.isFinite(bucketUnix) || bucketUnix <= 0) continue;
         const bucketMs = Math.floor(bucketUnix) * 1000;
         const nodeCount = Number(point.node_count);
-        const posCount = Number(point.nodes_with_position);
+        const onlineCount = Number(point.online_node_count);
         const livePackets = Number(point.live_packet_count);
         const realLinks = Number(point.real_edge_count);
         if (Number.isFinite(nodeCount)) {{
           byKey.get("nodes").push({{ ms: bucketMs, value: nodeCount }});
         }}
-        if (Number.isFinite(posCount)) {{
-          byKey.get("pos_nodes").push({{ ms: bucketMs, value: posCount }});
+        if (Number.isFinite(onlineCount)) {{
+          byKey.get("online_nodes").push({{ ms: bucketMs, value: onlineCount }});
         }}
         if (Number.isFinite(livePackets)) {{
           byKey.get("live_packets").push({{ ms: bucketMs, value: livePackets }});
