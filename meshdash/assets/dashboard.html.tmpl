@@ -222,6 +222,7 @@
   <div class="workspace-shell">
     <aside class="teams-rail" aria-label="Dashboard views">
       <button class="rail-btn active" data-view="chat" type="button" title="Teams-style chat workspace">Chat</button>
+      <button class="rail-btn" data-view="files" type="button" title="Peer-to-peer file transfer">Files</button>
       <button class="rail-btn" data-view="network" type="button" title="Topology, nodes, and links">Network</button>
       <button class="rail-btn" data-view="saved" type="button" title="Node details and saved nodes">Node</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
@@ -1281,6 +1282,51 @@
               <div id="chat-send-status" class="chat-send-status"></div>
             </div>
             <div id="chat-reaction-popover" class="chat-reaction-popover" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card files" aria-label="Peer-to-peer file transfer">
+      <h2>Files</h2>
+      <div class="body">
+        <div class="files-shell">
+          <div class="files-controls">
+            <div id="files-caption" class="files-caption">Send small files as chunked direct messages on the active send channel.</div>
+            <label class="files-field">
+              <span class="files-label">Destination Node ID</span>
+              <div class="files-row">
+                <input
+                  id="files-destination-input"
+                  class="files-input"
+                  type="text"
+                  placeholder="!49b54790"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button id="files-use-selected-btn" class="btn btn-secondary files-use-selected-btn" type="button">Use selected</button>
+              </div>
+            </label>
+            <label class="files-field">
+              <span class="files-label">Choose file</span>
+              <input id="files-input" class="files-input" type="file" />
+            </label>
+            <div class="files-actions">
+              <button id="files-send-btn" class="btn" type="button">Send file</button>
+              <span id="files-send-status" class="files-send-status"></span>
+            </div>
+          </div>
+          <div class="scroll files-transfers-scroll">
+            <table id="files-transfer-table">
+              <thead>
+                <tr>
+                  <th>Time</th><th>Direction</th><th>Peer</th><th>Name</th><th>Progress</th><th>Size</th><th>Channel</th><th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="8">No file transfers yet.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
