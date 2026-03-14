@@ -101,6 +101,45 @@ def test_collect_local_state_includes_local_position_from_node_registry():
     assert state["local_position"]["longitude"] == -93.26
 
 
+def test_collect_local_state_includes_local_stats_from_node_registry():
+    local = types.SimpleNamespace(
+        nodeNum=2,
+        localConfig={"lora": {"modem_preset": "MEDIUM_FAST"}},
+        moduleConfig={"foo": "bar"},
+        channels=[{"name": "primary"}],
+    )
+    iface = _iface_with_local(local_node=local)
+    iface.myInfo = {"my_node_num": 2}
+    iface.nodesByNum[2]["localStats"] = {
+        "heap_total_bytes": 1000,
+        "heap_free_bytes": 625,
+    }
+
+    state = collect_local_state(iface)
+
+    assert state["local_stats"]["heap_total_bytes"] == 1000
+    assert state["local_stats"]["heap_free_bytes"] == 625
+
+
+def test_collect_local_state_includes_local_stats_from_local_node_when_registry_missing():
+    local = types.SimpleNamespace(
+        nodeNum=2,
+        localStats={"heap_total_bytes": 2048, "heap_free_bytes": 1536},
+        localConfig={"lora": {"modem_preset": "MEDIUM_FAST"}},
+        moduleConfig={"foo": "bar"},
+        channels=[{"name": "primary"}],
+    )
+    iface = _iface_with_local(local_node=local)
+    iface.myInfo = {"my_node_num": 2}
+    iface.nodesByNum[2].pop("localStats", None)
+    iface.nodesByNum[2].pop("local_stats", None)
+
+    state = collect_local_state(iface)
+
+    assert state["local_stats"]["heap_total_bytes"] == 2048
+    assert state["local_stats"]["heap_free_bytes"] == 1536
+
+
 def test_collect_local_state_dedupes_repeated_channel_slots_by_index():
     repeated_channels = [
         {"role": "PRIMARY", "settings": {"name": "primary"}},

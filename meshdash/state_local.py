@@ -156,6 +156,15 @@ def collect_local_state(iface: object) -> dict[str, object]:
     local_node_info = _resolve_local_node_info(iface, local_node_num)
     if local_node_info is not None:
         state["local_node_info"] = to_jsonable(local_node_info)
+    local_stats = _mapping_get(local, "localStats")
+    if local_stats is None:
+        local_stats = _mapping_get(local, "local_stats")
+    if local_stats is None and isinstance(local_node_info, Mapping):
+        local_stats = local_node_info.get("localStats")
+        if local_stats is None:
+            local_stats = local_node_info.get("local_stats")
+    if local_stats is not None:
+        state["local_stats"] = to_jsonable(local_stats)
 
     # Capture current local position when available so the settings map can
     # restore its marker after reloads even if fixed-position coords are absent
