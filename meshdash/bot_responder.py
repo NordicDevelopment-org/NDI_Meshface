@@ -20,6 +20,9 @@ from .bot_settings_store import (
     save_persisted_bot_settings,
 )
 from .config import DEFAULT_CHAT_MAX_BYTES
+from .offline_atlas import nearest_city as _nearest_city_for_coords
+from .helpers import extract_position_fields as _extract_position_fields
+from .helpers import to_float as _to_float
 from .helpers import to_int as _to_int
 
 STANDARD_BOT_COMMANDS = _STANDARD_BOT_COMMANDS
@@ -186,6 +189,23 @@ def _packet_hops(packet: dict[str, object]) -> Optional[int]:
     return diff
 
 
+def _node_hops_away(node: Optional[dict[str, object]]) -> Optional[int]:
+    if not isinstance(node, dict):
+        return None
+    hops = _to_int(node.get("hops_away"))
+    if hops is None or hops < 0:
+        return None
+    return hops
+
+
+def _effective_hops(packet: dict[str, object], from_id: str, nodes: list[dict[str, object]]) -> Optional[int]:
+    direct = _packet_hops(packet)
+    if direct is not None:
+        return direct
+    requester = _find_node_for_query(from_id, nodes)
+    return _node_hops_away(requester)
+
+
 def _packet_text(decoded: object) -> str:
     if not isinstance(decoded, dict):
         return ""
@@ -226,6 +246,11 @@ def _iter_known_nodes(interface: object) -> list[dict[str, object]]:
         long_name = str(user.get("longName") or user.get("long_name") or "").strip()
         last_heard = _to_int(info.get("lastHeard") or info.get("last_heard"))
         hops_away = _to_int(info.get("hopsAway") or info.get("hops_away"))
+        lat = None
+        lon = None
+        coords = _extract_position_fields(info.get("position"))
+        if coords is not None:
+            lat, lon = coords
         rows.append(
             {
                 "id": node_id,
@@ -233,6 +258,8 @@ def _iter_known_nodes(interface: object) -> list[dict[str, object]]:
                 "long_name": long_name,
                 "last_heard": last_heard,
                 "hops_away": hops_away,
+                "lat": lat,
+                "lon": lon,
             }
         )
     return rows
@@ -280,6 +307,44 @@ def _format_hop_count_label(hops: Optional[int]) -> str:
     if hops == 1:
         return "1 hop"
     return f"{hops} hops"
+
+
+def _format_distance_km_label(distance_km: object) -> str:
+    value = _to_float(distance_km)
+    if value is None or value < 0:
+        return ""
+    if value < 1.0:
+        return "<1km"
+    if value < 10.0:
+        return f"{value:.1f}km"
+    return f"{int(round(value))}km"
+
+
+def _nearest_city_hint(node: Optional[dict[str, object]]) -> str:
+    if not isinstance(node, dict):
+        return ""
+    lat = _to_float(node.get("lat"))
+    lon = _to_float(node.get("lon"))
+    if lat is None or lon is None:
+        return ""
+    city = _nearest_city_for_coords(lat, lon)
+    if not isinstance(city, dict):
+        return ""
+    city_name = str(city.get("name") or "").strip()
+    state_name = str(city.get("state") or "").strip()
+    country_name = str(city.get("country") or "").strip()
+    if not city_name:
+        return ""
+    place_parts = [city_name]
+    if state_name:
+        place_parts.append(state_name)
+    elif country_name:
+        place_parts.append(country_name)
+    place = ", ".join(place_parts)
+    distance_label = _format_distance_km_label(city.get("distance_km"))
+    if distance_label:
+        return f"{place} ({distance_label})"
+    return place
 
 
 def _format_short_node_label(node: dict[str, object], now_unix: int) -> str:
@@ -953,10 +1018,13 @@ class MeshResponseBot:
             tx_ms = int(self._now_unix_fn() * 1000)
             latency_ms = max(0, tx_ms - int(received_ms))
             latency_text = _format_latency_label(latency_ms)
-            hops = _packet_hops(packet)
+            hops = _effective_hops(packet, from_id, nodes)
             hop_text = _format_hop_count_label(hops)
             requester = _find_node_for_query(from_id, nodes)
             requester_label = _preferred_node_label(requester) if requester else (_node_suffix(from_id) or from_id or "unknown")
+            city_hint = _nearest_city_hint(requester)
+            if city_hint:
+                return f"{requester_label} {latency_text} round trip, {hop_text}, near {city_hint}."
             return f"{requester_label} {latency_text} round trip, {hop_text}."
 
         return None
@@ -1383,7 +1451,7 @@ class MeshResponseBot:
             "reply_id": None,
             "received_unix": received_unix,
             "received_at": _safe_strftime(received_unix),
-            "hops": _packet_hops(packet),
+            "hops": _effective_hops(packet, from_id, nodes),
             "respond_enabled": bool(self._enabled),
             "responded": False,
             "response_message_id": None,
@@ -1456,7 +1524,7 @@ class MeshResponseBot:
                 responded=True,
                 response_message_id=response_message_id,
                 response_unix=response_unix if response_unix and response_unix > 0 else int(self._now_unix_fn()),
-                response_hops=_packet_hops(packet),
+                response_hops=_effective_hops(packet, from_id, nodes),
                 response_from=response_from,
                 response_to=response_to,
                 response_text="\n".join(response_segments),
