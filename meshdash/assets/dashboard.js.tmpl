@@ -15611,10 +15611,22 @@
       for (const ack of ackByTransferKey.values()) {{
         if (!ack || typeof ack !== "object") continue;
         if (String(ack.transferId || "") !== String(session.transferId || "")) continue;
-        if (normalizeNodeId(ack.originalReceiverId || "") !== expectedReceiver) continue;
+        const ackOriginalReceiver = normalizeNodeId(ack.originalReceiverId || "");
+        const ackOriginalSender = normalizeNodeId(ack.originalSenderId || "");
+        if (isCanonicalNodeId(ackOriginalReceiver) && ackOriginalReceiver !== expectedReceiver) continue;
         const ackChannel = fileTransferExplicitChannelIndex(ack.channelIndex);
         if (expectedChannel != null && ackChannel != null && ackChannel !== expectedChannel) continue;
-        if (isCanonicalNodeId(senderId) && normalizeNodeId(ack.originalSenderId || "") !== senderId) continue;
+        if (isCanonicalNodeId(senderId) && isCanonicalNodeId(ackOriginalSender) && ackOriginalSender !== senderId) continue;
+        const endpointConfidence = (
+          (isCanonicalNodeId(ackOriginalReceiver) && ackOriginalReceiver === expectedReceiver)
+          || (isCanonicalNodeId(senderId) && isCanonicalNodeId(ackOriginalSender) && ackOriginalSender === senderId)
+        );
+        if (!endpointConfidence) {{
+          const endpointsUnknown = !isCanonicalNodeId(ackOriginalReceiver) && !isCanonicalNodeId(ackOriginalSender);
+          if (!endpointsUnknown) {{
+            continue;
+          }}
+        }}
         if (!fallback || Number(ack.latestUnix || 0) > Number(fallback.latestUnix || 0)) {{
           fallback = ack;
         }}
