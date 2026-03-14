@@ -38,6 +38,12 @@ _DEFAULT_SEGMENT_DELAY_SECONDS = 1.5
 _DEFAULT_SEGMENT_RETRY_COUNT = 0
 _DEFAULT_SEGMENT_ACK_WAIT_SECONDS = 2.5
 _SEGMENT_ACK_POLL_SECONDS = 0.2
+_PUBLIC_PING_LIMIT = 3
+_PUBLIC_PING_SUPPRESS_SECONDS = 3600
+_PUBLIC_PING_LIMIT_REACTION = "❌"
+_PUBLIC_PING_DIRECT_HANDOFF_TEXT = (
+    "ping: public limit reached (3). Continue testing with direct peer-to-peer messages for 1 hour."
+)
 
 
 def _parse_bool_token(value: object, default: bool) -> bool:
@@ -553,6 +559,7 @@ class MeshResponseBot:
         self._recent_packet_ids: dict[str, int] = {}
         self._request_log: list[dict[str, object]] = []
         self._request_seq = 0
+        self._public_ping_state: dict[str, dict[str, int]] = {}
         self._lock = threading.Lock()
 
     @property
@@ -1164,6 +1171,114 @@ class MeshResponseBot:
                 self._sleep_fn(self._segment_delay_seconds)
         return payload
 
+    def _public_ping_state_locked(self, from_id: str) -> dict[str, int]:
+        key = _normalize_node_id(from_id) or "unknown"
+        state = self._public_ping_state.get(key)
+        if not isinstance(state, dict):
+            state = {"public_count": 0, "suppress_until": 0}
+            self._public_ping_state[key] = state
+        return state
+
+    def _public_ping_action(self, *, from_id: str, now_unix: int) -> str:
+        with self._lock:
+            state = self._public_ping_state_locked(from_id)
+            suppress_until = int(state.get("suppress_until") or 0)
+            if suppress_until > now_unix:
+                return "suppress"
+            if suppress_until and now_unix >= suppress_until:
+                state["public_count"] = 0
+                state["suppress_until"] = 0
+            public_count = int(state.get("public_count") or 0)
+            if public_count >= _PUBLIC_PING_LIMIT:
+                state["public_count"] = 0
+                state["suppress_until"] = now_unix + _PUBLIC_PING_SUPPRESS_SECONDS
+                return "handoff"
+        return "allow"
+
+    def _mark_public_ping_reply_sent(self, *, from_id: str, now_unix: int) -> None:
+        with self._lock:
+            state = self._public_ping_state_locked(from_id)
+            suppress_until = int(state.get("suppress_until") or 0)
+            if suppress_until > now_unix:
+                return
+            if suppress_until and now_unix >= suppress_until:
+                state["public_count"] = 0
+                state["suppress_until"] = 0
+            public_count = max(0, int(state.get("public_count") or 0))
+            state["public_count"] = min(_PUBLIC_PING_LIMIT, public_count + 1)
+
+    def _handle_public_ping_handoff(
+        self,
+        *,
+        from_id: str,
+        local_node_id: str,
+        channel_index: int,
+        reply_id: Optional[int],
+        request_id: str,
+    ) -> None:
+        response_text_parts: list[str] = []
+        response_error_parts: list[str] = []
+        response_payload: dict[str, object] = {}
+
+        direct_attempts: list[tuple[int, Optional[int], str]] = [
+            # Primary path: match zork/game direct style.
+            (channel_index, reply_id, "zork-style"),
+            # Fallback 1: keep channel, drop thread metadata.
+            (channel_index, None, "no-reply-id"),
+            # Fallback 2: primary channel, plain direct.
+            (0, None, "ch0-no-reply-id"),
+        ]
+        for attempt_channel, attempt_reply_id, attempt_label in direct_attempts:
+            try:
+                response_segments, response_payloads = self._send_reply_text(
+                    text=_PUBLIC_PING_DIRECT_HANDOFF_TEXT,
+                    destination=from_id,
+                    channel_index=attempt_channel,
+                    reply_id=attempt_reply_id,
+                )
+                if response_payloads:
+                    response_payload = response_payloads[-1]
+                if response_segments:
+                    response_text_parts.append("\n".join(response_segments))
+                break
+            except Exception as exc:
+                response_error_parts.append(f"direct[{attempt_label}]: {exc}")
+                continue
+
+        if reply_id is not None and reply_id > 0:
+            try:
+                reaction_payload_raw = self._send_chat_fn(
+                    text="",
+                    destination="^all",
+                    channel_index=channel_index,
+                    reply_id=reply_id,
+                    emoji=_PUBLIC_PING_LIMIT_REACTION,
+                )
+                reaction_payload = reaction_payload_raw if isinstance(reaction_payload_raw, dict) else {}
+                if not response_payload:
+                    response_payload = reaction_payload
+                response_text_parts.append(f"[reaction] {_PUBLIC_PING_LIMIT_REACTION}")
+            except Exception as exc:
+                response_error_parts.append(f"reaction: {exc}")
+
+        response_message_id = _to_int(
+            response_payload.get("message_id") if isinstance(response_payload, dict) else None
+        )
+        response_unix = _to_int(
+            response_payload.get("sent_at") if isinstance(response_payload, dict) else None
+        )
+        self._update_request(
+            request_id,
+            responded=bool(response_text_parts),
+            response_message_id=response_message_id,
+            response_unix=response_unix if response_unix and response_unix > 0 else int(self._now_unix_fn()),
+            response_hops=None,
+            response_from=local_node_id or "",
+            response_to=_normalize_node_id(from_id) or from_id,
+            response_text="\n".join(response_text_parts),
+            response_error="; ".join(response_error_parts),
+        )
+
     def on_receive(self, packet: object, interface: object = None, **_kwargs: object) -> None:
         if not self._enabled and not self._log_enabled:
             return
@@ -1295,6 +1410,25 @@ class MeshResponseBot:
             destination = from_id
         else:
             destination = "^all" if self._reply_broadcast or to_id == "^all" else from_id
+        is_public_ping = bool(command == "ping" and destination == "^all")
+        if is_public_ping:
+            ping_action = self._public_ping_action(from_id=from_id, now_unix=int(self._now_unix_fn()))
+            if ping_action == "suppress":
+                self._update_request(
+                    request_id,
+                    responded=False,
+                    response_error="public ping suppressed (1h cooldown active)",
+                )
+                return
+            if ping_action == "handoff":
+                self._handle_public_ping_handoff(
+                    from_id=from_id,
+                    local_node_id=local_node_id,
+                    channel_index=channel_index,
+                    reply_id=reply_id,
+                    request_id=request_id,
+                )
+                return
         if destination != "^all" and not destination.startswith("!"):
             return
         try:
@@ -1315,6 +1449,8 @@ class MeshResponseBot:
             )
             response_from = local_node_id or ""
             response_to = _normalize_node_id(destination) or destination
+            if is_public_ping:
+                self._mark_public_ping_reply_sent(from_id=from_id, now_unix=int(self._now_unix_fn()))
             self._update_request(
                 request_id,
                 responded=True,

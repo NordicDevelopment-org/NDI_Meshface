@@ -193,6 +193,175 @@ def test_direct_ping_replies_direct_with_reply_id():
     assert "round trip" in str(sent[0]["text"]).lower()
 
 
+def test_public_ping_limit_handoff_and_one_hour_public_suppression():
+    iface = _FakeIface()
+    sent = []
+    now_ref = [1710001240.0]
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: now_ref[0],
+    )
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3001), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3002), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3003), iface)
+
+    assert len(sent) == 3
+    assert all(row["destination"] == "^all" for row in sent[:3])
+    assert all("round trip" in str(row["text"]).lower() for row in sent[:3])
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3004), iface)
+
+    assert len(sent) == 5
+    assert sent[3]["destination"] == "!49b5dff0"
+    assert sent[3]["channel_index"] == 0
+    assert sent[3]["reply_id"] == 3004
+    assert "peer-to-peer" in str(sent[3]["text"]).lower()
+    assert "1 hour" in str(sent[3]["text"]).lower()
+    assert sent[4]["destination"] == "^all"
+    assert sent[4]["reply_id"] == 3004
+    assert sent[4]["emoji"] == "❌"
+    assert str(sent[4].get("text") or "") == ""
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3005), iface)
+    assert len(sent) == 5
+
+
+def test_public_ping_suppression_does_not_block_direct_ping():
+    iface = _FakeIface()
+    sent = []
+    now_ref = [1710001240.0]
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: now_ref[0],
+    )
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3101), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3102), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3103), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3104), iface)
+    sent_before_direct_ping = len(sent)
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3105, to_id="!02ed9b7c"), iface)
+
+    assert len(sent) == sent_before_direct_ping + 1
+    assert sent[-1]["destination"] == "!49b5dff0"
+    assert "round trip" in str(sent[-1]["text"]).lower()
+
+
+def test_public_ping_limit_resets_after_one_hour():
+    iface = _FakeIface()
+    sent = []
+    now_ref = [1710001240.0]
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: now_ref[0],
+    )
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3201), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3202), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3203), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3204), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3205), iface)
+    sent_after_suppression = len(sent)
+
+    now_ref[0] += 3601
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3206), iface)
+
+    assert len(sent) == sent_after_suppression + 1
+    assert sent[-1]["destination"] == "^all"
+    assert "round trip" in str(sent[-1]["text"]).lower()
+
+
+def test_public_ping_handoff_direct_message_uses_incoming_channel_index():
+    iface = _FakeIface()
+    sent = []
+    now_ref = [1710001240.0]
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: now_ref[0],
+    )
+
+    for packet_id in (3301, 3302, 3303):
+        pkt = _base_packet("ping 9b7c", packet_id=packet_id)
+        pkt["channel"] = 3
+        bot.on_receive(pkt, iface)
+
+    handoff_pkt = _base_packet("ping 9b7c", packet_id=3304)
+    handoff_pkt["channel"] = 3
+    bot.on_receive(handoff_pkt, iface)
+
+    assert len(sent) == 5
+    assert sent[3]["destination"] == "!49b5dff0"
+    assert sent[3]["channel_index"] == 3
+    assert sent[3]["reply_id"] == 3304
+    assert sent[4]["destination"] == "^all"
+    assert sent[4]["emoji"] == "❌"
+
+
+def test_public_ping_handoff_falls_back_when_zork_style_direct_fails():
+    iface = _FakeIface()
+    sent = []
+    now_ref = [1710001240.0]
+
+    def _send_chat(**kwargs):
+        destination = str(kwargs.get("destination") or "")
+        text = str(kwargs.get("text") or "")
+        reply_id = kwargs.get("reply_id")
+        if destination.startswith("!") and text and reply_id == 3404:
+            raise RuntimeError("simulated direct threaded send failure")
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: now_ref[0],
+    )
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3401), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3402), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3403), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3404), iface)
+
+    # 3 public replies + reaction + fallback direct PM.
+    assert len(sent) == 5
+    assert sent[3]["destination"] == "!49b5dff0"
+    assert sent[3]["reply_id"] is None
+    assert "peer-to-peer" in str(sent[3]["text"]).lower()
+    assert sent[4]["destination"] == "^all"
+    assert sent[4]["emoji"] == "❌"
+
+
 def test_ping_targeted_to_other_suffix_is_ignored():
     iface = _FakeIface()
     sent = []
