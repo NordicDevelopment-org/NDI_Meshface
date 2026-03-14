@@ -44,6 +44,15 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
 
     monkeypatch.setattr(routes_get, "_handle_state_get_helper", _state_get_helper)
     monkeypatch.setattr(routes_get, "_load_offline_atlas_payload_helper", lambda: {"layers": [{"id": "osm"}]})
+    monkeypatch.setattr(
+        routes_get,
+        "_load_chat_emoji_catalog_payload_helper",
+        lambda: {
+            "ok": True,
+            "version": "17.0",
+            "groups": [{"id": "smileys-emotion", "label": "Smileys & Emotion", "emojis": ["😀"]}],
+        },
+    )
 
     class _State:
         def __call__(self):
@@ -75,6 +84,7 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
         deps=deps,
     )
     routes_get.handle_dashboard_get(handler, path="/api/offline/atlas", query="", deps=deps)
+    routes_get.handle_dashboard_get(handler, path="/api/chat/emoji-catalog", query="", deps=deps)
     routes_get.handle_dashboard_get(handler, path="/missing", query="", deps=deps)
 
     assert html_calls[0]["html_text"] == "<html></html>"
@@ -92,6 +102,8 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
     assert json_calls[4]["payload_obj"]["kwargs"]["scope"] == "both"
     assert json_calls[4]["payload_obj"]["kwargs"]["scan_limit"] == 300
     assert json_calls[5]["payload_obj"]["layers"][0]["id"] == "osm"
+    assert json_calls[6]["payload_obj"]["version"] == "17.0"
+    assert json_calls[6]["payload_obj"]["groups"][0]["id"] == "smileys-emotion"
     assert text_calls[0]["status_code"] == 404
 
 

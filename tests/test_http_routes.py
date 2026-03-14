@@ -86,6 +86,16 @@ def test_handle_dashboard_get_returns_state_and_404():
 
     handle_dashboard_get(
         handler,
+        path="/api/chat/emoji-catalog",
+        query="",
+        deps=deps,
+    )
+    assert calls["json"][4]["status_code"] == 200
+    assert isinstance(calls["json"][4]["payload_obj"], dict)
+    assert "groups" in calls["json"][4]["payload_obj"]
+
+    handle_dashboard_get(
+        handler,
         path="/not-found",
         query="",
         deps=deps,

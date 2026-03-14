@@ -1,5 +1,8 @@
 from urllib.parse import parse_qs
 
+from .emoji_catalog import (
+    load_chat_emoji_catalog_payload as _load_chat_emoji_catalog_payload_helper,
+)
 from .api_history import (
     build_node_history_response as _build_node_history_response_helper,
     build_online_activity_response as _build_online_activity_response_helper,
@@ -195,6 +198,15 @@ def handle_dashboard_get(
             handler,
             status_code=200,
             payload_obj=_load_offline_atlas_payload_helper(),
+            no_store=False,
+        )
+        return
+
+    if path == "/api/chat/emoji-catalog":
+        deps.write_json_response_fn(
+            handler,
+            status_code=200,
+            payload_obj=_load_chat_emoji_catalog_payload_helper(),
             no_store=False,
         )
         return
