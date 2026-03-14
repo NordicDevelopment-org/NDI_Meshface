@@ -2,7 +2,9 @@ from .html_assets import render_asset_template as _render_asset_template_helper
 
 _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.bootstrap.tmpl",
-    "dashboard.js.chat.tmpl",
+    "dashboard.js.chat.state.tmpl",
+    "dashboard.js.chat.events.tmpl",
+    "dashboard.js.chat.render.tmpl",
     "dashboard.js.runtime.tmpl",
 )
 

@@ -87,7 +87,7 @@ This is where “what we heard on the mesh” turns into UI‑friendly state.
 ### Frontend templates
 
 - `html_template.py` / `html_sections.py` / `html_css.py` / `html_js.py`: render pipeline.
-- `assets/dashboard.html.tmpl`, `assets/dashboard.css.tmpl`, `assets/dashboard.js.*.tmpl`: UI source of truth (`dashboard.js.tmpl` is a compatibility stub; runtime JS is assembled from `dashboard.js.bootstrap.tmpl` + `dashboard.js.chat.tmpl` + `dashboard.js.runtime.tmpl`).
+- `assets/dashboard.html.tmpl`, `assets/dashboard.css.tmpl`, `assets/dashboard.js.*.tmpl`: UI source of truth (`dashboard.js.tmpl` and `dashboard.js.chat.tmpl` are compatibility stubs; runtime JS is assembled from `dashboard.js.bootstrap.tmpl` + `dashboard.js.chat.state.tmpl` + `dashboard.js.chat.events.tmpl` + `dashboard.js.chat.render.tmpl` + `dashboard.js.runtime.tmpl`).
 - `theme.py`, `theme_presets.py`, `theme_settings.py`: runtime theme switching.
 
 ## Where Rooms plug in
@@ -103,7 +103,7 @@ Rooms are mostly a **classification + filtering** problem:
   - Current send API is `/api/chat/send` (`meshdash/api_chat.py` + `meshdash/services_chat.py`).
   - Reuse the low‑level `_sendPacket` pattern in `meshdash/mesh_ops.py` (currently used for emoji reactions).
 - **UI:** add a Rooms navigator + feed filtering.
-- Current channel switcher (“Everyone”, “Peer‑to‑peer”) lives in `assets/dashboard.js.chat.tmpl`.
+- Current channel switcher (“Everyone”, “Peer‑to‑peer”) lives in `assets/dashboard.js.chat.render.tmpl`.
   - Rooms will likely become additional “channels” in the left rail, discovered from traffic.
 
 The concrete plan and protocol are in:

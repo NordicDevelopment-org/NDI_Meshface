@@ -9,6 +9,9 @@ _TEMPLATE_FILES = (
     "dashboard.js.tmpl",
     "dashboard.js.bootstrap.tmpl",
     "dashboard.js.chat.tmpl",
+    "dashboard.js.chat.state.tmpl",
+    "dashboard.js.chat.events.tmpl",
+    "dashboard.js.chat.render.tmpl",
     "dashboard.js.runtime.tmpl",
 )
 _TRAILING_SPACE_RE = re.compile(r"[ \t]+$", re.MULTILINE)

@@ -22,6 +22,9 @@ _EXPECTED_TEMPLATE_TOKENS = {
         "reset_ticker_scale_on_restart",
     },
     "dashboard.js.chat.tmpl": set(),
+    "dashboard.js.chat.state.tmpl": set(),
+    "dashboard.js.chat.events.tmpl": set(),
+    "dashboard.js.chat.render.tmpl": set(),
     "dashboard.js.runtime.tmpl": set(),
     "dashboard.html.tmpl": {
         "app_title",
@@ -66,6 +69,9 @@ def test_rendered_asset_templates_leave_no_single_token_placeholders():
             "reset_ticker_scale_on_restart": 1,
         },
         "dashboard.js.chat.tmpl": {},
+        "dashboard.js.chat.state.tmpl": {},
+        "dashboard.js.chat.events.tmpl": {},
+        "dashboard.js.chat.render.tmpl": {},
         "dashboard.js.runtime.tmpl": {},
         "dashboard.html.tmpl": {
             "app_title": "Meshyface",
