@@ -193,6 +193,8 @@
     const savedNodeHistorySplitStorageKey = "meshDashboardSavedNodeMainPct";
     const historyActivitySplitStorageKey = "meshDashboardHistoryActivityTopPct";
     const historyChatSplitStorageKey = "meshDashboardHistoryChatMainPct";
+    const botsMainSplitStorageKey = "meshDashboardBotsMainPanePct";
+    const botsCommandSplitStorageKey = "meshDashboardBotsCommandListPct";
     const layoutViewStorageKey = "meshDashboardLayoutView";
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const chatNotificationScopeStorageKey = "meshDashboardChatNotificationScopeV1";
@@ -2396,6 +2398,8 @@
     let savedNodeMainPct = 56;
     let historyActivityTopPct = 50;
     let historyChatMainPct = 72;
+    let botsMainPanePct = 50;
+    let botsCommandListPct = 50;
     let consoleAutoscroll = true;
     let consoleShowTimestamps = false;
     let consoleFilterText = "";
@@ -2532,6 +2536,7 @@
     let botRequestHistory = [];
     let backendBotRequestHistory = [];
     let activeBotsReviewTab = "history";
+    let activeBotCommandSettingsId = "";
     let botTrafficSnifferCommandHeads = [...defaultBotTrafficSnifferCommandHeads];
     let serverBotSettings = {{
       available: false,
@@ -8294,7 +8299,8 @@
 
     function syncChatWhoisQuickActionControls() {{
       const masterInput = document.getElementById("bots-command-master-enabled");
-      const publicStartInput = document.getElementById("bots-game-public-start-enabled");
+      const commandEnabledInput = document.getElementById("bots-command-selected-enabled");
+      const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
       const enabledInput = document.getElementById("chat-bot-whois-enabled");
       const prefixSelect = document.getElementById("chat-bot-whois-prefix");
       const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
@@ -8306,7 +8312,13 @@
       const zorkCommand = Array.isArray(serverBotSettings.commands)
         ? serverBotSettings.commands.find((row) => String(row && row.name || "").trim().toLowerCase() === "zork")
         : null;
+      const selectedCommandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      const selectedCommand = Array.isArray(serverBotSettings.commands)
+        ? serverBotSettings.commands.find((row) => String(row && row.name || "").trim().toLowerCase() === selectedCommandName)
+        : null;
       const zorkEnabled = !!(zorkCommand && zorkCommand.enabled);
+      const selectedIsZork = !!(selectedCommand && selectedCommand.name === "zork");
+      const available = !!serverBotSettings.available;
       if (enabledInput instanceof HTMLInputElement) {{
         enabledInput.checked = !!chatWhoisQuickActionEnabled;
         enabledInput.disabled = !commandsEnabled;
@@ -8327,7 +8339,6 @@
         historyInput.disabled = !commandsEnabled;
       }}
       if (masterInput instanceof HTMLInputElement) {{
-        const available = !!serverBotSettings.available;
         masterInput.checked = !!serverBotSettings.enabled;
         masterInput.disabled = !available || botSettingsSaveInFlight;
         if (!available) {{
@@ -8338,34 +8349,36 @@
           masterInput.title = "Enable or disable all backend bot responses on this node.";
         }}
       }}
+      if (commandEnabledInput instanceof HTMLInputElement) {{
+        commandEnabledInput.checked = !!(selectedCommand && selectedCommand.enabled);
+        commandEnabledInput.disabled = !available || !selectedCommand || botSettingsSaveInFlight;
+        if (!available) {{
+          commandEnabledInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedCommand) {{
+          commandEnabledInput.title = "Select a bot command to edit.";
+        }} else if (botSettingsSaveInFlight) {{
+          commandEnabledInput.title = "Saving bot command settings...";
+        }} else if (!serverBotSettings.enabled) {{
+          commandEnabledInput.title = "Bot responses are globally disabled. Per-command settings are preserved.";
+        }} else {{
+          commandEnabledInput.title = "Enable or disable this backend bot command.";
+        }}
+      }}
       if (publicStartInput instanceof HTMLInputElement) {{
-        const available = !!serverBotSettings.available;
         publicStartInput.checked = !!serverBotSettings.game_public_start_enabled;
-        publicStartInput.disabled = !available || botSettingsSaveInFlight;
+        publicStartInput.disabled = !available || botSettingsSaveInFlight || !selectedIsZork;
         if (!available) {{
           publicStartInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsZork) {{
+          publicStartInput.title = "Select the zork command to edit this setting.";
         }} else if (botSettingsSaveInFlight) {{
-          publicStartInput.title = "Saving public Zork handoff setting...";
+          publicStartInput.title = "Saving zork handoff setting...";
         }} else if (!serverBotSettings.enabled) {{
           publicStartInput.title = "Bot responses are globally disabled. This setting will apply when responses are enabled.";
         }} else if (!zorkEnabled) {{
           publicStartInput.title = "Zork is disabled. This setting is saved and will apply when the game command is enabled.";
         }} else {{
           publicStartInput.title = "When enabled, a public 'zork' message starts the game with a direct peer-to-peer reply. Follow-up commands still need to continue in direct chat.";
-        }}
-      }}
-      for (const commandToggle of document.querySelectorAll(".bots-command-toggle")) {{
-        if (!(commandToggle instanceof HTMLInputElement)) continue;
-        const available = !!serverBotSettings.available;
-        commandToggle.disabled = !available || botSettingsSaveInFlight;
-        if (!available) {{
-          commandToggle.title = "Backend bot settings endpoint unavailable on this node.";
-        }} else if (botSettingsSaveInFlight) {{
-          commandToggle.title = "Saving bot command settings...";
-        }} else if (!serverBotSettings.enabled) {{
-          commandToggle.title = "Bot responses are globally disabled. Per-command settings are preserved.";
-        }} else {{
-          commandToggle.title = "Enable or disable this backend bot command.";
         }}
       }}
     }}
@@ -8512,12 +8525,31 @@
           syncChatWhoisQuickActionControls();
         }});
       }}
-      const publicStartInput = document.getElementById("bots-game-public-start-enabled");
-      if (publicStartInput instanceof HTMLInputElement && publicStartInput.dataset.bound !== "1") {{
-        publicStartInput.dataset.bound = "1";
-        publicStartInput.addEventListener("change", async () => {{
+      const list = document.getElementById("bots-command-list");
+      if (list instanceof HTMLElement && list.dataset.bound !== "1") {{
+        list.dataset.bound = "1";
+        list.addEventListener("click", (event) => {{
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const item = target.closest(".bots-command-item");
+          if (!(item instanceof HTMLButtonElement)) return;
+          const commandName = String(item.dataset.commandName || "").trim().toLowerCase();
+          if (!commandName) return;
+          activeBotCommandSettingsId = commandName;
+          renderManagedBotCommandList();
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const selectedEnabledInput = document.getElementById("bots-command-selected-enabled");
+      if (selectedEnabledInput instanceof HTMLInputElement && selectedEnabledInput.dataset.bound !== "1") {{
+        selectedEnabledInput.dataset.bound = "1";
+        selectedEnabledInput.addEventListener("change", async () => {{
+          const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+          if (!commandName) return;
           const ok = await saveServerBotSettingsPatch({{
-            game_public_start_enabled: !!publicStartInput.checked,
+            command_settings: {{
+              [commandName]: !!selectedEnabledInput.checked,
+            }},
           }});
           if (!ok) {{
             renderBotsView(latestState);
@@ -8526,20 +8558,13 @@
           syncChatWhoisQuickActionControls();
         }});
       }}
-      const list = document.getElementById("bots-command-list");
-      if (list instanceof HTMLElement && list.dataset.bound !== "1") {{
-        list.dataset.bound = "1";
-        list.addEventListener("change", async (event) => {{
-          const target = event.target;
-          if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") return;
-          const commandName = String(target.dataset.commandName || "").trim().toLowerCase();
-          if (!commandName) return;
-          const patch = {{
-            command_settings: {{
-              [commandName]: !!target.checked,
-            }},
-          }};
-          const ok = await saveServerBotSettingsPatch(patch);
+      const selectedPublicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
+      if (selectedPublicStartInput instanceof HTMLInputElement && selectedPublicStartInput.dataset.bound !== "1") {{
+        selectedPublicStartInput.dataset.bound = "1";
+        selectedPublicStartInput.addEventListener("change", async () => {{
+          const ok = await saveServerBotSettingsPatch({{
+            game_public_start_enabled: !!selectedPublicStartInput.checked,
+          }});
           if (!ok) {{
             renderBotsView(latestState);
             return;
@@ -9040,17 +9065,47 @@
 
     function renderManagedBotCommandList() {{
       const listEl = document.getElementById("bots-command-list");
+      const configEmptyEl = document.getElementById("bots-command-config-empty");
+      const configFormEl = document.getElementById("bots-command-config-form");
+      const selectedUsageEl = document.getElementById("bots-command-selected-usage");
+      const selectedKindEl = document.getElementById("bots-command-selected-kind");
+      const selectedNameEl = document.getElementById("bots-command-selected-name");
+      const selectedDescriptionEl = document.getElementById("bots-command-selected-description");
+      const selectedEnabledInput = document.getElementById("bots-command-selected-enabled");
+      const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
+      const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
+      const publicStartNote = document.getElementById("bots-command-selected-public-start-note");
       if (!(listEl instanceof HTMLElement)) return;
+      const showConfigEmpty = (message) => {{
+        if (configEmptyEl instanceof HTMLElement) {{
+          configEmptyEl.textContent = String(message || "Select a command to configure.");
+          configEmptyEl.hidden = false;
+        }}
+        if (configFormEl instanceof HTMLElement) {{
+          configFormEl.hidden = true;
+        }}
+      }};
       if (!serverBotSettings.available) {{
         listEl.innerHTML = '<div class="bots-history-empty">Backend bot settings endpoint unavailable on this node.</div>';
+        showConfigEmpty("Backend bot settings endpoint unavailable on this node.");
         return;
       }}
       const commands = Array.isArray(serverBotSettings.commands) ? serverBotSettings.commands : [];
       if (commands.length === 0) {{
         listEl.innerHTML = '<div class="bots-history-empty">No managed backend bot commands are currently exposed.</div>';
+        showConfigEmpty("No managed backend bot commands are currently exposed.");
         return;
       }}
-      const rows = commands.map((command) => {{
+      const orderedNames = commands
+        .map((command) => String(command && command.name || "").trim().toLowerCase())
+        .filter((name) => !!name);
+      const activeName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      if (!activeName || !orderedNames.includes(activeName)) {{
+        activeBotCommandSettingsId = orderedNames[0] || "";
+      }}
+      const selectedName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      const selectedCommand = commands.find((command) => String(command && command.name || "").trim().toLowerCase() === selectedName) || null;
+      const rows = commands.map((command, index) => {{
         const usage = String(command && command.usage || command && command.name || "").trim() || "unknown";
         const description = String(command && command.description || "").trim() || "Managed backend bot command.";
         const kindRaw = String(command && command.kind || "builtin").trim().toLowerCase();
@@ -9058,18 +9113,65 @@
           ? "custom"
           : (kindRaw === "game" ? "game" : "built-in");
         const name = String(command && command.name || "").trim().toLowerCase();
-        const checkedAttr = command && command.enabled ? " checked" : "";
-        const disabledAttr = (!serverBotSettings.available || botSettingsSaveInFlight) ? " disabled" : "";
-        return `<label class="bots-command-item" title="${{escAttr(description)}}">
+        const enabled = !!(command && command.enabled);
+        const orderLabel = `${{index + 1}}.`;
+        const stateLabel = enabled ? "on" : "off";
+        const disabledClass = enabled ? "" : " is-disabled";
+        const activeClass = name === selectedName ? " is-active" : "";
+        return `<button type="button" class="bots-command-item${{disabledClass}}${{activeClass}}" data-command-name="${{escAttr(name)}}" title="${{escAttr(description)}}" role="option" aria-selected="${{name === selectedName ? "true" : "false"}}">
+          <span class="bots-command-item-order">${{escAttr(orderLabel)}}</span>
           <span class="bots-command-copy">
-            <span class="bots-command-usage">${{escAttr(usage)}}</span>
+            <span class="bots-command-heading">
+              <span class="bots-command-usage">${{escAttr(usage)}}</span>
+              <span class="bots-command-kind">${{escAttr(kindLabel)}}</span>
+            </span>
             <span class="bots-command-description">${{escAttr(description)}}</span>
           </span>
-          <span class="bots-command-kind">${{escAttr(kindLabel)}}</span>
-          <input class="bots-command-toggle" type="checkbox" data-command-name="${{escAttr(name)}}"${{checkedAttr}}${{disabledAttr}} />
-        </label>`;
+          <span class="bots-command-state">${{escAttr(stateLabel)}}</span>
+        </button>`;
       }});
       listEl.innerHTML = rows.join("");
+      if (!selectedCommand) {{
+        showConfigEmpty("Select a command to configure.");
+        return;
+      }}
+      if (configEmptyEl instanceof HTMLElement) {{
+        configEmptyEl.hidden = true;
+      }}
+      if (configFormEl instanceof HTMLElement) {{
+        configFormEl.hidden = false;
+      }}
+      const usageText = String(selectedCommand.usage || selectedCommand.name || "unknown").trim() || "unknown";
+      const descriptionText = String(selectedCommand.description || "").trim() || "Managed backend bot command.";
+      const kindRaw = String(selectedCommand.kind || "builtin").trim().toLowerCase();
+      const kindLabel = kindRaw === "custom"
+        ? "custom"
+        : (kindRaw === "game" ? "game" : "built-in");
+      if (selectedUsageEl instanceof HTMLElement) {{
+        selectedUsageEl.textContent = usageText;
+      }}
+      if (selectedKindEl instanceof HTMLElement) {{
+        selectedKindEl.textContent = kindLabel;
+      }}
+      if (selectedNameEl instanceof HTMLElement) {{
+        selectedNameEl.textContent = `id: ${{selectedName}}`;
+      }}
+      if (selectedDescriptionEl instanceof HTMLElement) {{
+        selectedDescriptionEl.textContent = descriptionText;
+      }}
+      if (selectedEnabledInput instanceof HTMLInputElement) {{
+        selectedEnabledInput.checked = !!selectedCommand.enabled;
+      }}
+      const selectedIsZork = selectedName === "zork";
+      if (publicStartWrap instanceof HTMLElement) {{
+        publicStartWrap.hidden = !selectedIsZork;
+      }}
+      if (publicStartNote instanceof HTMLElement) {{
+        publicStartNote.hidden = !selectedIsZork;
+      }}
+      if (publicStartInput instanceof HTMLInputElement) {{
+        publicStartInput.checked = !!serverBotSettings.game_public_start_enabled;
+      }}
     }}
 
     function syncBotsReviewTabUi() {{
@@ -19486,6 +19588,14 @@
       return Math.max(42, Math.min(86, value));
     }}
 
+    function clampBotsMainPanePct(value) {{
+      return Math.max(30, Math.min(70, value));
+    }}
+
+    function clampBotsCommandListPct(value) {{
+      return Math.max(30, Math.min(70, value));
+    }}
+
     function applySplitState() {{
       const layout = document.querySelector(".layout");
       if (!(layout instanceof HTMLElement)) return;
@@ -19523,6 +19633,18 @@
       const layout = document.getElementById("dashboard-layout");
       if (!(layout instanceof HTMLElement)) return;
       layout.style.setProperty("--history-chat-main-pct", `${{historyChatMainPct}}%`);
+    }}
+
+    function applyBotsMainSplitState() {{
+      const layout = document.getElementById("dashboard-layout");
+      if (!(layout instanceof HTMLElement)) return;
+      layout.style.setProperty("--bots-pane-left-pct", `${{botsMainPanePct}}%`);
+    }}
+
+    function applyBotsCommandSplitState() {{
+      const layout = document.getElementById("dashboard-layout");
+      if (!(layout instanceof HTMLElement)) return;
+      layout.style.setProperty("--bots-command-list-pct", `${{botsCommandListPct}}%`);
     }}
 
     function loadSplitState() {{
@@ -19620,6 +19742,34 @@
       }} catch (_err) {{
       }}
       applyHistoryChatSplitState();
+    }}
+
+    function loadBotsMainSplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(botsMainSplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            botsMainPanePct = clampBotsMainPanePct(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applyBotsMainSplitState();
+    }}
+
+    function loadBotsCommandSplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(botsCommandSplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            botsCommandListPct = clampBotsCommandListPct(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applyBotsCommandSplitState();
     }}
 
 
@@ -19980,6 +20130,20 @@
     function persistHistoryChatSplitState() {{
       try {{
         window.localStorage.setItem(historyChatSplitStorageKey, String(historyChatMainPct));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistBotsMainSplitState() {{
+      try {{
+        window.localStorage.setItem(botsMainSplitStorageKey, String(botsMainPanePct));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistBotsCommandSplitState() {{
+      try {{
+        window.localStorage.setItem(botsCommandSplitStorageKey, String(botsCommandListPct));
       }} catch (_err) {{
       }}
     }}
@@ -21666,6 +21830,96 @@
           splitter.classList.remove("active");
           document.body.classList.remove("resizing-panels-y");
           persistNetworkNodesSplitState();
+          splitter.removeEventListener("pointermove", onMove);
+          splitter.removeEventListener("pointerup", onUp);
+          splitter.removeEventListener("pointercancel", onUp);
+        }};
+
+        splitter.addEventListener("pointermove", onMove);
+        splitter.addEventListener("pointerup", onUp);
+        splitter.addEventListener("pointercancel", onUp);
+      }});
+    }}
+
+    function bindBotsMainSplitter() {{
+      const splitter = document.getElementById("bots-main-splitter");
+      if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;
+      const grid = splitter.closest(".bots-grid");
+      if (!(grid instanceof HTMLElement)) return;
+      splitter.dataset.bound = "1";
+
+      splitter.addEventListener("pointerdown", (ev) => {{
+        if (activeLayoutView !== "bots") return;
+        if (window.matchMedia("(max-width: 1100px)").matches) return;
+        ev.preventDefault();
+        splitter.classList.add("active");
+        document.body.classList.add("resizing-panels-x");
+        splitter.setPointerCapture(ev.pointerId);
+
+        const updateFromClientX = (clientX) => {{
+          const rect = grid.getBoundingClientRect();
+          if (rect.width < 300) return;
+          const relativeX = clientX - rect.left;
+          const pct = clampBotsMainPanePct((relativeX / rect.width) * 100);
+          botsMainPanePct = pct;
+          applyBotsMainSplitState();
+        }};
+
+        updateFromClientX(ev.clientX);
+
+        const onMove = (moveEv) => {{
+          updateFromClientX(moveEv.clientX);
+        }};
+
+        const onUp = () => {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-x");
+          persistBotsMainSplitState();
+          splitter.removeEventListener("pointermove", onMove);
+          splitter.removeEventListener("pointerup", onUp);
+          splitter.removeEventListener("pointercancel", onUp);
+        }};
+
+        splitter.addEventListener("pointermove", onMove);
+        splitter.addEventListener("pointerup", onUp);
+        splitter.addEventListener("pointercancel", onUp);
+      }});
+    }}
+
+    function bindBotsCommandSplitter() {{
+      const splitter = document.getElementById("bots-command-splitter");
+      if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;
+      const shell = splitter.closest(".bots-command-shell");
+      if (!(shell instanceof HTMLElement)) return;
+      splitter.dataset.bound = "1";
+
+      splitter.addEventListener("pointerdown", (ev) => {{
+        if (activeLayoutView !== "bots") return;
+        if (window.matchMedia("(max-width: 1100px)").matches) return;
+        ev.preventDefault();
+        splitter.classList.add("active");
+        document.body.classList.add("resizing-panels-x");
+        splitter.setPointerCapture(ev.pointerId);
+
+        const updateFromClientX = (clientX) => {{
+          const rect = shell.getBoundingClientRect();
+          if (rect.width < 220) return;
+          const relativeX = clientX - rect.left;
+          const pct = clampBotsCommandListPct((relativeX / rect.width) * 100);
+          botsCommandListPct = pct;
+          applyBotsCommandSplitState();
+        }};
+
+        updateFromClientX(ev.clientX);
+
+        const onMove = (moveEv) => {{
+          updateFromClientX(moveEv.clientX);
+        }};
+
+        const onUp = () => {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-x");
+          persistBotsCommandSplitState();
           splitter.removeEventListener("pointermove", onMove);
           splitter.removeEventListener("pointerup", onUp);
           splitter.removeEventListener("pointercancel", onUp);
@@ -34968,6 +35222,8 @@
     loadSavedNodeHistorySplitState();
     loadHistoryActivitySplitState();
     loadHistoryChatSplitState();
+    loadBotsMainSplitState();
+    loadBotsCommandSplitState();
     loadNodesTableColPcts();
     loadSignalHeatDevKnobs();
     loadSignalHeatmapModePreference();
@@ -35013,6 +35269,8 @@
     bindSavedNodeHistorySplitter();
     bindHistoryActivitySplitter();
     bindHistoryChatSplitter();
+    bindBotsMainSplitter();
+    bindBotsCommandSplitter();
     bindFavoriteMenuControls();
     bindSelfRadioMenuControls();
     bindFavoriteToggleControls();

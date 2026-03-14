@@ -105,7 +105,7 @@ def test_render_html_includes_public_zork_handoff_toggle():
         revision_label="Rev: v0.1.0 (abc123)",
         revision_title="v0.1.0 / abc123",
     )
-    assert 'id="bots-game-public-start-enabled"' in html
+    assert 'id="bots-command-selected-public-start-enabled"' in html
 
 
 def test_render_html_includes_channel_control_center_structure():

@@ -1475,14 +1475,37 @@
                 <input id="bots-command-master-enabled" type="checkbox" />
                 <span>Enable Bot Responses</span>
               </label>
-              <label class="chat-bot-toggle-wrap" for="bots-game-public-start-enabled" title="When enabled, a public &quot;zork&quot; message gets a direct peer-to-peer game start reply. Follow-up commands still need to continue in direct chat.">
-                <input id="bots-game-public-start-enabled" type="checkbox" />
-                <span>Allow public "zork" handoff</span>
-              </label>
-              <div class="bots-setting-note">A public <code>zork</code> gets a direct game start reply. Follow-up moves still belong in peer-to-peer chat.</div>
-              <div class="chat-bot-cheatsheet bots-managed-commands-card" aria-label="Managed bot commands">
-                <div class="chat-bot-cheatsheet-title">Managed bot commands</div>
-                <div id="bots-command-list" class="bots-command-list" aria-live="polite"></div>
+              <div class="bots-setting-note">Select a command to edit its settings. The public <code>zork</code> handoff option appears when <code>zork</code> is selected.</div>
+              <div class="bots-command-shell" aria-label="Managed bot commands">
+                <div class="bots-command-list-wrap">
+                  <div class="chat-bot-cheatsheet-title">Managed bot commands</div>
+                  <div id="bots-command-list" class="bots-command-list" role="listbox" aria-label="Managed bot commands" aria-live="polite"></div>
+                </div>
+                <div id="bots-command-splitter" class="bots-command-splitter" title="Drag to resize command list and bot settings"></div>
+                <div class="bots-command-config">
+                  <div id="bots-command-config-empty" class="bots-history-empty">Select a command to configure.</div>
+                  <div id="bots-command-config-form" hidden>
+                    <div class="bots-command-config-head">
+                      <div class="bots-command-config-title-row">
+                        <span id="bots-command-selected-usage" class="bots-command-config-usage">n/a</span>
+                        <span id="bots-command-selected-kind" class="bots-command-kind">built-in</span>
+                      </div>
+                      <div id="bots-command-selected-name" class="bots-command-config-name">command</div>
+                    </div>
+                    <div id="bots-command-selected-description" class="bots-command-config-description">Managed backend bot command.</div>
+                    <label class="chat-bot-toggle-wrap bots-command-config-toggle" for="bots-command-selected-enabled" title="Enable or disable this backend bot command.">
+                      <input id="bots-command-selected-enabled" type="checkbox" />
+                      <span>Enabled</span>
+                    </label>
+                    <label id="bots-command-selected-public-start-wrap" class="chat-bot-toggle-wrap bots-command-config-toggle" for="bots-command-selected-public-start-enabled" title="When enabled, a public &quot;zork&quot; message gets a direct peer-to-peer game start reply. Follow-up commands still need to continue in direct chat." hidden>
+                      <input id="bots-command-selected-public-start-enabled" type="checkbox" />
+                      <span>Allow public &quot;zork&quot; handoff</span>
+                    </label>
+                    <div id="bots-command-selected-public-start-note" class="bots-setting-note" hidden>
+                      A public <code>zork</code> gets a direct game start reply. Follow-up moves still belong in peer-to-peer chat.
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="bots-panel bots-assistant-panel">
@@ -1513,6 +1536,7 @@
               </label>
             </div>
           </div>
+          <div id="bots-main-splitter" class="bots-main-splitter" title="Drag to resize bot controls and bot review"></div>
           <div class="bots-panel bots-history-panel">
             <div class="bots-history-head">
               <div class="bots-review-head-copy">
