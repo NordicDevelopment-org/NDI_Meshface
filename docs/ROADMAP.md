@@ -4,6 +4,11 @@ Meshyface is the working title for “Meshtastic Deep Dashboard, but chat‑firs
 
 This roadmap is written to be directly hand‑offable to a coding agent (Codex) and to a human reviewer.
 
+## Status (Audited 2026-03-14)
+
+- Milestone 0 is largely complete.
+- Milestones 1-5 remain planned work (Rooms are not implemented yet in this branch).
+
 ## Guiding principles
 
 - **Don’t break normal Meshtastic chat.** “Everyone” stays clean and interoperable.
@@ -64,7 +69,10 @@ This roadmap is written to be directly hand‑offable to a coding agent (Codex) 
 
 **Implementation notes (hotspots)**
 
-- Frontend: `meshdash/assets/dashboard.js.tmpl`
+- Frontend:
+  - `meshdash/assets/dashboard.js.chat.state.messaging.tmpl` (`classifyMessageChannel(msg)`)
+  - `meshdash/assets/dashboard.js.chat.render.tmpl` (dynamic channel list rendering)
+  - `meshdash/assets/dashboard.js.chat.state.core.tmpl` (`applyChatChannel(...)` + persistence)
   - Extend `classifyMessageChannel(msg)` to return `room:<slug>` when prefix matches.
   - Extend the channel list builder to include discovered rooms.
   - Extend `applyChatChannel(...)` and localStorage persistence to accept dynamic keys.

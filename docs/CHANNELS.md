@@ -8,7 +8,7 @@ This doc tries to make the dashboard’s behavior *obvious* to a beginner.
 | Concept | Where you see it in Meshyface | What it controls | Do other nodes need to match? |
 |---|---|---|---|
 | **Frequency slot** (LoRa physical frequency) | **Settings → LoRa → Frequency slot** (`lora.channel_num`) | The actual RF frequency your radio transmits/receives on | **Yes**. If this doesn’t match, you won’t hear each other at all. |
-| **Messaging channels** (Meshtastic channel index `0..7`) | **Chat header → Msg Ch** and **Settings → Channels** | Which *message group / encryption key* is used for a packet | **Yes** for reading messages: recipients need the same channel index + PSK to decrypt. |
+| **Messaging channels** (Meshtastic channel index `0..7`) | **Chat header → View Ch / Send Ch** and **Settings → Channels** | Which *message group / encryption key* is used for a packet | **Yes** for reading messages: recipients need the same channel index + PSK to decrypt. |
 | **Chat scope** (“Everyone” vs “Peer-to-peer”) | Chat left rail | The destination: broadcast (`^all`) vs a specific node (`!abcd1234`) | N/A (this is just “who you’re talking to”) |
 
 ### Key mental model
@@ -23,8 +23,10 @@ When you press **Send**:
 1. The UI chooses a destination:
    - **Everyone** → `^all`
    - **Peer-to-peer** → the selected node id like `!abcdef12`
-2. The UI chooses a Meshtastic **channel index** from the **Msg Ch** selector.
-   - If you selected **All channels (view)**, sending uses **Ch 0** (because “all” is a view filter, not a real transmit target).
+2. The UI chooses a Meshtastic **send channel index** from **Send Ch**.
+   - **View Ch** is only a feed filter.
+   - If you pick a specific View Ch, the dashboard can follow that into Send Ch for convenience.
+   - If you pick **All channels (view)**, Send Ch remains independently selectable.
 3. The backend calls the Meshtastic Python API with `channelIndex=<that index>`.
 
 ## How receiving works (and why “receive everything” is tricky)

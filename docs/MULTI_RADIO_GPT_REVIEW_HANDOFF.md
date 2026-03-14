@@ -2,6 +2,8 @@
 
 Use this for external architecture review of the new V2 direction.
 
+Status (audited 2026-03-14): review prompt/support doc for a proposed V2 architecture; not evidence of implemented V2 runtime behavior in this branch.
+
 ## Review Assumption
 
 This is a greenfield V2 plan.
