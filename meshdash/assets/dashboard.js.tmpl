@@ -4746,7 +4746,7 @@
       return output;
     }}
 
-    function trimMetricTickerPoints(points, cutoffMs) {{
+    function trimMetricTickerPoints(points, cutoffMs, maxPoints = metricTickerMaxPoints) {{
       while (points.length > 0) {{
         const firstMs = Number(points[0] && points[0].ms);
         if (Number.isFinite(firstMs) && firstMs >= cutoffMs) {{
@@ -4754,7 +4754,8 @@
         }}
         points.shift();
       }}
-      while (points.length > metricTickerMaxPoints) {{
+      const max = Math.max(1, Math.trunc(Number(maxPoints) || metricTickerMaxPoints));
+      while (points.length > max) {{
         points.shift();
       }}
     }}
@@ -4811,7 +4812,13 @@
       return resetStartIndex > 0 ? rows.slice(resetStartIndex) : rows;
     }}
 
-    function appendMetricTickerPoint(metricKey, rawValue, nowMs = Date.now()) {{
+    function appendMetricTickerPoint(
+      metricKey,
+      rawValue,
+      nowMs = Date.now(),
+      windowMs = metricTickerWindowMs,
+      maxPoints = metricTickerMaxPoints
+    ) {{
       const cleanKey = String(metricKey || "").trim();
       const value = Number(rawValue);
       if (!cleanKey || !Number.isFinite(value)) return [];
@@ -4823,7 +4830,8 @@
       }} else {{
         points.push({{ ms: bucketMs, value }});
       }}
-      trimMetricTickerPoints(points, bucketMs - metricTickerWindowMs);
+      const effectiveWindowMs = Math.max(60000, Number(windowMs) || metricTickerWindowMs);
+      trimMetricTickerPoints(points, bucketMs - effectiveWindowMs, maxPoints);
       metricTickerSeries.set(cleanKey, points);
       return points;
     }}
@@ -4873,7 +4881,13 @@
         container.hidden = true;
         return;
       }}
-      const points = appendMetricTickerPoint(metricKey, value);
+      const points = appendMetricTickerPoint(
+        metricKey,
+        value,
+        Date.now(),
+        Number(config.windowMs) || metricTickerWindowMs,
+        Number(config.maxPoints) || metricTickerMaxPoints
+      );
       if (!Array.isArray(points) || points.length === 0) {{
         container.hidden = true;
         return;
@@ -4882,20 +4896,22 @@
       const latest = Number(points[points.length - 1] && points[points.length - 1].value);
       const baseline = Number(points[0] && points[0].value);
       const delta = latest - baseline;
+      const valueUnit = String(config.valueUnit == null ? "" : config.valueUnit);
       const flatThreshold = Number(config.flatThreshold);
       const epsilon = Number.isFinite(flatThreshold) ? Math.max(0, flatThreshold) : 0;
       let trend = "flat";
       if (delta > epsilon) trend = "up";
       else if (delta < -epsilon) trend = "down";
 
-      const deltaAbsText = formatTickerNumber(Math.abs(delta), config.digits);
+      const deltaAbsBaseText = formatTickerNumber(Math.abs(delta), config.digits);
+      const deltaAbsText = `${{deltaAbsBaseText}}${{valueUnit}}`;
       const pct = baseline !== 0 ? ((delta / Math.abs(baseline)) * 100) : null;
       const pctText = Number.isFinite(pct)
         ? ` (${{pct > 0 ? "+" : ""}}${{Number(pct).toFixed(1)}}%)`
         : "";
       let deltaText = "";
       if (trend === "flat") {{
-        deltaText = `0${{pctText}}`;
+        deltaText = `0${{valueUnit}}${{pctText}}`;
       }} else {{
         const sign = trend === "up" ? "+" : "-";
         deltaText = `${{sign}}${{deltaAbsText}}${{pctText}}`;
@@ -4925,15 +4941,19 @@
         : Math.max(1, Math.round(metricTickerWindowMs / 60000));
       const rangeHours = Math.max(1 / 60, rangeMinutes / 60);
       const ratePerHour = delta / rangeHours;
-      const rateAbsText = formatTickerNumber(Math.abs(ratePerHour), Number.isFinite(Number(config.rateDigits)) ? Number(config.rateDigits) : 1);
+      const rateAbsBaseText = formatTickerNumber(
+        Math.abs(ratePerHour),
+        Number.isFinite(Number(config.rateDigits)) ? Number(config.rateDigits) : 1
+      );
+      const rateAbsText = `${{rateAbsBaseText}}${{valueUnit}}`;
       const rateSign = ratePerHour > 0 ? "+" : (ratePerHour < 0 ? "-" : "");
       const rateText = `${{rateSign}}${{rateAbsText}}/h`;
       if (rateEl instanceof HTMLElement) {{
         rateEl.textContent = rateText;
         rateEl.title = `Rate of change per hour across a ${{rangeMinutes}}m window`;
       }}
-      const fromText = formatTickerNumber(baseline, config.digits);
-      const toText = formatTickerNumber(latest, config.digits);
+      const fromText = `${{formatTickerNumber(baseline, config.digits)}}${{valueUnit}}`;
+      const toText = `${{formatTickerNumber(latest, config.digits)}}${{valueUnit}}`;
       container.title = `Trend (${{rangeMinutes}}m): ${{fromText}} -> ${{toText}}; delta ${{deltaText}}; rate ${{rateText}}`;
     }}
 
@@ -5962,6 +5982,178 @@
       return `${{text.slice(0, limit - 1)}}…`;
     }}
 
+    function coerceOptionalBool(value) {{
+      if (typeof value === "boolean") return value;
+      if (typeof value === "number" && Number.isFinite(value)) {{
+        return value !== 0;
+      }}
+      if (typeof value === "string") {{
+        const clean = value.trim().toLowerCase();
+        if (!clean) return null;
+        if (["1", "true", "yes", "on", "y"].includes(clean)) return true;
+        if (["0", "false", "no", "off", "n"].includes(clean)) return false;
+      }}
+      return null;
+    }}
+
+    function buildTargetWifiSummary(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const summary = (safeState.summary && typeof safeState.summary === "object") ? safeState.summary : {{}};
+      const radioConnection = (summary.radio_connection && typeof summary.radio_connection === "object")
+        ? summary.radio_connection
+        : null;
+      const wifi = (radioConnection && typeof radioConnection.wifi === "object") ? radioConnection.wifi : null;
+      if (!wifi) return null;
+
+      const connected = coerceOptionalBool(wifi.is_connected ?? wifi.isConnected);
+      const rssiRaw = Number(wifi.rssi_dbm ?? wifi.rssiDbm ?? wifi.rssi);
+      const rssi = Number.isFinite(rssiRaw) ? Math.trunc(rssiRaw) : null;
+      const ssid = String(wifi.ssid == null ? "" : wifi.ssid).trim();
+      const ip = String(wifi.ip_address ?? wifi.ipAddress ?? "").trim();
+      const ageRaw = Number(radioConnection && (radioConnection.age_seconds ?? radioConnection.ageSeconds));
+      const ageSeconds = Number.isFinite(ageRaw) && ageRaw >= 0 ? Math.trunc(ageRaw) : null;
+
+      let compact = "";
+      if (connected === false) {{
+        compact = "WiFi off";
+      }} else if (Number.isFinite(rssi)) {{
+        compact = `WiFi ${{rssi}}dBm`;
+      }} else if (connected === true) {{
+        compact = "WiFi on";
+      }} else if (ssid || ip) {{
+        compact = "WiFi ?";
+      }} else {{
+        return null;
+      }}
+
+      const detailParts = [];
+      if (connected === true) detailParts.push("wifi connected");
+      else if (connected === false) detailParts.push("wifi disconnected");
+      else detailParts.push("wifi status unknown");
+      if (Number.isFinite(rssi)) detailParts.push(`signal ${{rssi}} dBm`);
+      if (ssid) detailParts.push(`ssid "${{ssid}}"`);
+      if (ip) detailParts.push(`ip ${{ip}}`);
+      if (Number.isFinite(ageSeconds)) detailParts.push(`age ${{ageSeconds}}s`);
+
+      return {{
+        compact,
+        detail: detailParts.join(", "),
+      }};
+    }}
+
+    function resolveLocalNodeTelemetry(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const summary = (safeState.summary && typeof safeState.summary === "object") ? safeState.summary : {{}};
+      const localId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const localNode = nodes.find((node) => normalizeNodeId(node && node.id) === localId) || null;
+      const historyCapsById = new Map(
+        Object.entries((safeState.history_caps && typeof safeState.history_caps === "object") ? safeState.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
+      const caps = historyCapsById.get(localId) || null;
+      const wifiSummary = buildTargetWifiSummary(safeState);
+
+      const batteryRaw = Number(
+        (localNode && localNode.battery_level != null)
+          ? localNode.battery_level
+          : (caps && caps.battery_level)
+      );
+      const batteryPct = Number.isFinite(batteryRaw)
+        ? Math.max(0, Math.min(100, Math.round(batteryRaw * 10) / 10))
+        : null;
+      const voltageRaw = Number(localNode && localNode.voltage);
+      const voltage = Number.isFinite(voltageRaw) ? voltageRaw : null;
+      const hopsRaw = Number(
+        (localNode && localNode.hops_away != null)
+          ? localNode.hops_away
+          : (caps && caps.last_hops)
+      );
+      const hops = Number.isFinite(hopsRaw) && hopsRaw >= 0 ? Math.trunc(hopsRaw) : null;
+
+      const lat = Number(localNode && localNode.lat);
+      const lon = Number(localNode && localNode.lon);
+      const gpsFix = isValidMapCoord(lat, lon);
+      const gpsCapable = (caps && caps.has_position === true) || gpsFix;
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const lastSeenUnix = nodeLastHeardUnix(localNode);
+      const lastSeenText = Number.isFinite(lastSeenUnix)
+        ? savedDetailAge(lastSeenUnix, nowUnix)
+        : "n/a";
+      const presetText = formatModemPresetLabel(summary.modem_preset, "n/a");
+      const nodeName = preferredNodeName(localNode) || nodeNameCache.get(localId) || "Local node";
+      return {{
+        localId,
+        localNode,
+        caps,
+        wifiSummary,
+        batteryPct,
+        voltage,
+        hops,
+        lat,
+        lon,
+        gpsFix,
+        gpsCapable,
+        lastSeenUnix,
+        lastSeenText,
+        presetText,
+        nodeName,
+      }};
+    }}
+
+    function buildNodeTickerSummary(state = latestState) {{
+      const telemetry = resolveLocalNodeTelemetry(state);
+      const localId = telemetry.localId;
+      const wifiValue = (telemetry.wifiSummary && telemetry.wifiSummary.compact)
+        ? String(telemetry.wifiSummary.compact).replace(/^WiFi\\s*/i, "").trim()
+        : "n/a";
+      const gpsValue = telemetry.gpsFix
+        ? "fix"
+        : (telemetry.gpsCapable ? "ready" : "n/a");
+      const hopsText = Number.isFinite(telemetry.hops) ? String(telemetry.hops) : "n/a";
+      const rows = [
+        {{ key: "WiFi", value: wifiValue || "n/a" }},
+        {{ key: "GPS", value: gpsValue }},
+        {{ key: "Hops", value: hopsText }},
+        {{ key: "Seen", value: telemetry.lastSeenText }},
+      ];
+      const rowsHtml = rows
+        .map((row) => `<div class="node-ticker-row"><span class="node-ticker-key">${{escAttr(row.key)}}:</span><span class="node-ticker-val">${{escAttr(row.value)}}</span></div>`)
+        .join("");
+
+      const compactParts = [];
+      compactParts.push(`WiFi ${{wifiValue || "n/a"}}`);
+      compactParts.push(`GPS ${{gpsValue}}`);
+      compactParts.push(`Hops ${{hopsText}}`);
+      const text = compactParts.join(" · ");
+
+      const titleParts = [];
+      if (isCanonicalNodeId(localId)) {{
+        titleParts.push(`node ${{telemetry.nodeName}} (${{localId}})`);
+      }} else {{
+        titleParts.push(`node ${{telemetry.nodeName}}`);
+      }}
+      titleParts.push((telemetry.wifiSummary && telemetry.wifiSummary.detail) ? telemetry.wifiSummary.detail : "wifi status unavailable");
+      if (telemetry.gpsFix) {{
+        titleParts.push(`gps ${{telemetry.lat.toFixed(5)}}, ${{telemetry.lon.toFixed(5)}}`);
+      }} else {{
+        titleParts.push(telemetry.gpsCapable ? "gps capable (no fix)" : "gps unavailable");
+      }}
+      if (Number.isFinite(telemetry.hops)) {{
+        titleParts.push(`hops ${{telemetry.hops}}`);
+      }}
+      titleParts.push(`last seen ${{telemetry.lastSeenText}}`);
+      titleParts.push(`LoRa preset ${{telemetry.presetText}}`);
+
+      return {{
+        text: text || "n/a",
+        rows,
+        rows_html: rowsHtml,
+        title: titleParts.join(" | "),
+      }};
+    }}
+
     function buildRadioTrafficSnapshot(traffic, localNodeId, nowUnix = Math.floor(Date.now() / 1000), windowSec = 120) {{
       const packets = Array.isArray(traffic && traffic.recent_packets) ? traffic.recent_packets : [];
       let rxRecent = 0;
@@ -6035,6 +6227,9 @@
         : "n/a";
       const lastActivityCompact = String(lastActivityText).replace(/\s+ago$/, "");
       const activityText = `last activity ${{lastActivityText}}`;
+      const wifiSummary = buildTargetWifiSummary(safeState);
+      const wifiCompactText = (wifiSummary && wifiSummary.compact) ? ` · ${{wifiSummary.compact}}` : "";
+      const wifiTitleText = (wifiSummary && wifiSummary.detail) ? ` | ${{wifiSummary.detail}}` : "";
 
       const errors = [];
       if (localStateError) errors.push(`local state: ${{localStateError}}`);
@@ -6047,8 +6242,8 @@
         const detail = errorSummary || "local radio id unavailable";
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
-          title: `Local radio unavailable. ${{detail}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{wifiCompactText}}`,
+          title: `Local radio unavailable. ${{detail}}${{wifiTitleText}}`,
         }};
       }}
 
@@ -6080,18 +6275,18 @@
         const detail = errorSummary || "state polling failed";
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{wifiCompactText}}`,
           title: `Dashboard polling is stale (${{
             Number.isFinite(pollSuccessAge) ? `${{pollSuccessAge}}s since last success` : "no successful poll yet"
-          }}). ${{detail}} | ${{trafficText}} | ${{activityText}}`,
+          }}). ${{detail}} | ${{trafficText}} | ${{activityText}}${{wifiTitleText}}`,
         }};
       }}
       if (trackerReportsLost) {{
         const detail = errorSummary || trackerError;
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
-          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}} | ${{trafficText}} | ${{activityText}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{wifiCompactText}}`,
+          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}} | ${{trafficText}} | ${{activityText}}${{wifiTitleText}}`,
         }};
       }}
 
@@ -6101,7 +6296,7 @@
       else if (freshnessKey === "warn") label = "Aging";
       else if (freshnessKey === "stale") label = "Stale";
 
-      const text = `${{label}} · ${{lastActivityCompact}} · ${{trafficCompactText}}`;
+      const text = `${{label}} · ${{lastActivityCompact}} · ${{trafficCompactText}}${{wifiCompactText}}`;
       const statusUsesTraffic = Number.isFinite(statusFreshnessUnix)
         && Number.isFinite(trafficFreshnessUnix)
         && Math.trunc(statusFreshnessUnix) === Math.trunc(trafficFreshnessUnix)
@@ -6112,7 +6307,7 @@
       return {{
         key,
         text,
-        title: `${{localId}} | ${{label}} | ${{activityText}} | ${{trafficText}} | ${{lastSeenTitle}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}`,
+        title: `${{localId}} | ${{label}} | ${{activityText}} | ${{trafficText}} | ${{lastSeenTitle}}${{wifiTitleText}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}`,
       }};
     }}
 
@@ -27163,8 +27358,21 @@
       if (resetTickerScaleOnRestart) {{
         maybeResetMetricTickerSeries(livePacketTotal);
       }}
-      const realLinks = s.real_edge_count ?? s.edge_count ?? 0;
-      setText("m-links", realLinks);
+      const localTelemetry = resolveLocalNodeTelemetry(state);
+      const batteryPct = Number(localTelemetry && localTelemetry.batteryPct);
+      const voltage = Number(localTelemetry && localTelemetry.voltage);
+      const batteryPctText = Number.isFinite(batteryPct)
+        ? `${{Number.isInteger(batteryPct) ? batteryPct.toFixed(0) : batteryPct.toFixed(1)}}%`
+        : null;
+      const batteryVoltText = Number.isFinite(voltage) ? `${{voltage.toFixed(2)}}V` : null;
+      const batteryDisplayText = [batteryPctText, batteryVoltText].filter(Boolean).join(" · ") || "n/a";
+      setText("m-battery", batteryDisplayText);
+      const batteryMetricValueEl = document.getElementById("m-battery");
+      if (batteryMetricValueEl instanceof HTMLElement) {{
+        batteryMetricValueEl.title = Number.isFinite(batteryPct)
+          ? `Battery ${{batteryPctText || "n/a"}} | Voltage ${{batteryVoltText || "n/a"}} | Local node ${{localTelemetry.nodeName || "n/a"}}`
+          : `Battery n/a | Voltage ${{batteryVoltText || "n/a"}}`;
+      }}
       updateMetricTicker("nodes", s.node_count ?? 0, {{
         containerId: "ticker-nodes",
         deltaId: "ticker-delta-nodes",
@@ -27198,14 +27406,36 @@
       if (livePacketsMetric instanceof HTMLElement) {{
         livePacketsMetric.title = `Packets per minute (derived). Total packets in background: ${{formatTickerNumber(livePacketTotal, 0)}}`;
       }}
-      updateMetricTicker("real_links", realLinks, {{
-        containerId: "ticker-links",
-        deltaId: "ticker-delta-links",
-        rateId: "ticker-rate-links",
-        chartId: "ticker-chart-links",
-        digits: 0,
-      }});
-      setText("m-modem-preset", formatModemPresetLabel(s.modem_preset, "n/a"));
+      if (Number.isFinite(batteryPct)) {{
+        updateMetricTicker("battery_pct", batteryPct, {{
+          containerId: "ticker-battery",
+          deltaId: "ticker-delta-battery",
+          rateId: "ticker-rate-battery",
+          chartId: "ticker-chart-battery",
+          digits: 1,
+          rateDigits: 2,
+          flatThreshold: 0.15,
+          valueUnit: "%",
+          windowMs: 6 * 60 * 60 * 1000,
+          maxPoints: 480,
+        }});
+      }} else {{
+        const batteryTicker = document.getElementById("ticker-battery");
+        if (batteryTicker instanceof HTMLElement) {{
+          batteryTicker.hidden = true;
+        }}
+      }}
+      const nodeTicker = buildNodeTickerSummary(state);
+      const nodeTickerEl = document.getElementById("m-node-ticker");
+      if (nodeTickerEl instanceof HTMLElement) {{
+        const rowsHtml = String(nodeTicker && nodeTicker.rows_html ? nodeTicker.rows_html : "");
+        if (rowsHtml) {{
+          nodeTickerEl.innerHTML = rowsHtml;
+        }} else {{
+          nodeTickerEl.textContent = nodeTicker && nodeTicker.text ? String(nodeTicker.text) : "n/a";
+        }}
+        nodeTickerEl.title = nodeTicker.title || "Node summary unavailable";
+      }}
       const radioReportedTime = resolveRadioReportedTime(state);
       syncRadioTimeBase(radioReportedTime.unix, radioReportedTime.source);
       syncUptimeBase(s.uptime_seconds);

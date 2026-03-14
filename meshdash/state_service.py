@@ -15,6 +15,7 @@ from .nodes import (
     utc_now as _utc_now,
 )
 from .runtime_types import ToJsonableFn, UtcNowFn
+from .radio_connection_status import get_radio_connection_status as _get_radio_connection_status_helper
 from .state_node_contracts import CollectedNodes, coerce_collected_nodes
 from .state_payload_contracts import DashboardStatePayload, StateTrafficPayload
 from .state_service_contracts import (
@@ -23,6 +24,7 @@ from .state_service_contracts import (
     CollectLocalStateFn,
     CollectLocalStateSafeFn,
     CollectNodesFn,
+    GetRadioConnectionStatusFn,
     LoadTrackerNodeCapabilitiesSafeFn,
     LoadTrackerNodeSavedCountsSafeFn,
     LoadTrackerSnapshotSafeFn,
@@ -308,6 +310,7 @@ def build_dashboard_state_typed(
     modem_preset_from_local_state_fn: ModemPresetFromLocalStateFn = _modem_preset_from_local_state_helper,
     apply_node_saved_counts_fn: ApplyNodeSavedCountsFn = _apply_node_saved_counts_helper,
     build_summary_payload_fn: BuildSummaryPayloadFn = _build_summary_payload_helper,
+    get_radio_connection_status_fn: GetRadioConnectionStatusFn = _get_radio_connection_status_helper,
     load_tracker_snapshot_safe_fn: LoadTrackerSnapshotSafeFn = _load_tracker_snapshot_safe_helper,
     load_tracker_node_saved_counts_safe_fn: LoadTrackerNodeSavedCountsSafeFn = _load_tracker_node_saved_counts_safe_helper,
     load_tracker_node_capabilities_safe_fn: LoadTrackerNodeCapabilitiesSafeFn = _load_tracker_node_capabilities_safe_helper,
@@ -418,6 +421,15 @@ def build_dashboard_state_typed(
         metadata, metadata_error = None, None
         local_state, local_error = {}, None
         modem_preset = _modem_preset_quick_from_iface(iface)
+
+    radio_connection_status: dict[str, object] | None = None
+    try:
+        radio_connection_status_raw = get_radio_connection_status_fn(iface)
+        if isinstance(radio_connection_status_raw, Mapping):
+            radio_connection_status = dict(radio_connection_status_raw)
+    except Exception:
+        radio_connection_status = None
+
     summary_error: Optional[str] = None
     try:
         summary = build_summary_payload_fn(
@@ -457,6 +469,8 @@ def build_dashboard_state_typed(
             now_unix=int(time.time()),
         )
     summary["online_node_count"] = max(0, int(summary_online_node_count))
+    if isinstance(radio_connection_status, Mapping) and radio_connection_status:
+        summary["radio_connection"] = dict(radio_connection_status)
 
     merged_recent_chat = _merge_recent_chat_entries(
         recent_chat=tracker_data.recent_chat,
@@ -507,6 +521,7 @@ def build_dashboard_state(
     modem_preset_from_local_state_fn: ModemPresetFromLocalStateFn = _modem_preset_from_local_state_helper,
     apply_node_saved_counts_fn: ApplyNodeSavedCountsFn = _apply_node_saved_counts_helper,
     build_summary_payload_fn: BuildSummaryPayloadFn = _build_summary_payload_helper,
+    get_radio_connection_status_fn: GetRadioConnectionStatusFn = _get_radio_connection_status_helper,
     load_tracker_snapshot_safe_fn: LoadTrackerSnapshotSafeFn = _load_tracker_snapshot_safe_helper,
     load_tracker_node_saved_counts_safe_fn: LoadTrackerNodeSavedCountsSafeFn = _load_tracker_node_saved_counts_safe_helper,
     load_tracker_node_capabilities_safe_fn: LoadTrackerNodeCapabilitiesSafeFn = _load_tracker_node_capabilities_safe_helper,
@@ -527,6 +542,7 @@ def build_dashboard_state(
         modem_preset_from_local_state_fn=modem_preset_from_local_state_fn,
         apply_node_saved_counts_fn=apply_node_saved_counts_fn,
         build_summary_payload_fn=build_summary_payload_fn,
+        get_radio_connection_status_fn=get_radio_connection_status_fn,
         load_tracker_snapshot_safe_fn=load_tracker_snapshot_safe_fn,
         load_tracker_node_saved_counts_safe_fn=load_tracker_node_saved_counts_safe_fn,
         load_tracker_node_capabilities_safe_fn=load_tracker_node_capabilities_safe_fn,
@@ -556,6 +572,7 @@ def build_dashboard_state_lite(
     modem_preset_from_local_state_fn: ModemPresetFromLocalStateFn = _modem_preset_from_local_state_helper,
     apply_node_saved_counts_fn: ApplyNodeSavedCountsFn = _apply_node_saved_counts_helper,
     build_summary_payload_fn: BuildSummaryPayloadFn = _build_summary_payload_helper,
+    get_radio_connection_status_fn: GetRadioConnectionStatusFn = _get_radio_connection_status_helper,
     load_tracker_snapshot_safe_fn: LoadTrackerSnapshotSafeFn = _load_tracker_snapshot_safe_helper,
     load_tracker_node_saved_counts_safe_fn: LoadTrackerNodeSavedCountsSafeFn = _load_tracker_node_saved_counts_safe_helper,
     load_tracker_node_capabilities_safe_fn: LoadTrackerNodeCapabilitiesSafeFn = _load_tracker_node_capabilities_safe_helper,
@@ -582,6 +599,7 @@ def build_dashboard_state_lite(
         modem_preset_from_local_state_fn=modem_preset_from_local_state_fn,
         apply_node_saved_counts_fn=apply_node_saved_counts_fn,
         build_summary_payload_fn=build_summary_payload_fn,
+        get_radio_connection_status_fn=get_radio_connection_status_fn,
         load_tracker_snapshot_safe_fn=load_tracker_snapshot_safe_fn,
         load_tracker_node_saved_counts_safe_fn=load_tracker_node_saved_counts_safe_fn,
         load_tracker_node_capabilities_safe_fn=load_tracker_node_capabilities_safe_fn,
