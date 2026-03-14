@@ -15631,6 +15631,26 @@
           fallback = ack;
         }}
       }}
+      if (fallback) {{
+        return fallback;
+      }}
+      // Final escape hatch: if endpoints are missing or inconsistent in packet metadata,
+      // a transferId-only match is still safe because transfer IDs are random per send.
+      let transferIdOnlyFallback = null;
+      for (const ack of ackByTransferKey.values()) {{
+        if (!ack || typeof ack !== "object") continue;
+        if (String(ack.transferId || "") !== String(session.transferId || "")) continue;
+        const ackChannel = fileTransferExplicitChannelIndex(ack.channelIndex);
+        if (expectedChannel != null && ackChannel != null && ackChannel !== expectedChannel) {{
+          continue;
+        }}
+        if (!transferIdOnlyFallback || Number(ack.latestUnix || 0) > Number(transferIdOnlyFallback.latestUnix || 0)) {{
+          transferIdOnlyFallback = ack;
+        }}
+      }}
+      if (transferIdOnlyFallback) {{
+        return transferIdOnlyFallback;
+      }}
       return fallback;
     }}
 
