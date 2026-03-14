@@ -245,6 +245,54 @@ def test_ping_keeps_hops_na_when_packet_and_node_hops_are_unavailable():
     assert "hop count n/a" in text
 
 
+def test_ping_includes_last_hop_signal_hint_when_available():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet["rxRssi"] = -89
+    packet["rxSnr"] = 9.34
+    bot.on_receive(packet, iface)
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "link -89dbm / 9.3db (last-hop)" in text
+
+
+def test_ping_signal_hint_supports_partial_fields_and_snake_case_keys():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet["rx_snr"] = -1.76
+    bot.on_receive(packet, iface)
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "link -1.8db (last-hop)" in text
+    assert "/" not in text
+
+
 def test_ping_includes_bot_city_hint_when_local_node_has_position():
     iface = _FakeIface()
     iface.nodesByNum[0x02ED9B7C]["position"] = {

@@ -359,6 +359,40 @@ def _format_distance_mi_label(distance_km: object) -> str:
     return f"{int(round(value_mi))}mi"
 
 
+def _format_signal_rssi_label(value: object) -> str:
+    parsed = _to_float(value)
+    if parsed is None:
+        return ""
+    return f"{int(round(parsed))}dBm"
+
+
+def _format_signal_snr_label(value: object) -> str:
+    parsed = _to_float(value)
+    if parsed is None:
+        return ""
+    return f"{parsed:.1f}dB"
+
+
+def _packet_link_signal_hint(packet: dict[str, object]) -> str:
+    rx_rssi = _to_float(packet.get("rxRssi"))
+    if rx_rssi is None:
+        rx_rssi = _to_float(packet.get("rx_rssi"))
+    rx_snr = _to_float(packet.get("rxSnr"))
+    if rx_snr is None:
+        rx_snr = _to_float(packet.get("rx_snr"))
+
+    parts: list[str] = []
+    rssi_label = _format_signal_rssi_label(rx_rssi)
+    if rssi_label:
+        parts.append(rssi_label)
+    snr_label = _format_signal_snr_label(rx_snr)
+    if snr_label:
+        parts.append(snr_label)
+    if not parts:
+        return ""
+    return f"link {' / '.join(parts)} (last-hop)"
+
+
 def _nearest_city_hint_from_coords(lat: object, lon: object, *, max_distance_km: float) -> str:
     lat_f = _to_float(lat)
     lon_f = _to_float(lon)
@@ -1153,6 +1187,7 @@ class MeshResponseBot:
             requester = _find_node_for_query(from_id, nodes)
             local_node = _find_node_for_query(local_node_id, nodes) if local_node_id else None
             requester_label = _preferred_node_label(requester) if requester else (_node_suffix(from_id) or from_id or "unknown")
+            link_hint = _packet_link_signal_hint(packet)
             bot_city_hint = _bot_city_hint(local_node)
             distance_hint = _bot_to_requester_distance_hint(
                 packet=packet,
@@ -1160,16 +1195,18 @@ class MeshResponseBot:
                 local_node=local_node,
                 now_unix=now_unix,
             )
+            details: list[str] = []
+            if link_hint:
+                details.append(link_hint)
             if bot_city_hint and distance_hint:
-                return (
-                    f"{requester_label} {latency_text} round trip, {hop_text}, "
-                    f"bot near {bot_city_hint}, about {distance_hint} from you."
-                )
-            if bot_city_hint:
-                return f"{requester_label} {latency_text} round trip, {hop_text}, bot near {bot_city_hint}."
-            if distance_hint:
-                return f"{requester_label} {latency_text} round trip, {hop_text}, about {distance_hint} from you."
-            return f"{requester_label} {latency_text} round trip, {hop_text}."
+                details.append(f"bot near {bot_city_hint}, about {distance_hint} from you")
+            elif bot_city_hint:
+                details.append(f"bot near {bot_city_hint}")
+            elif distance_hint:
+                details.append(f"about {distance_hint} from you")
+            if not details:
+                return f"{requester_label} {latency_text} round trip, {hop_text}."
+            return f"{requester_label} {latency_text} round trip, {hop_text}, {', '.join(details)}."
 
         return None
 
