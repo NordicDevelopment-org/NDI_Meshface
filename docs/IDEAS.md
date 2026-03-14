@@ -1,5 +1,14 @@
 # Ideas Backlog
 
+
+- Wifi connection option like UART
+
+- can we tag a "type help for list of commands" on the very first message when someone ism playing zork remote? But we don't want to add it to the zork game, just somehow tag it on the inital "white house" message
+
+
+- can we add  adynamic wait time, it keeps a pace, but then waits longer before retrying aftwr each try? to not conguest?
+can each one have as timestamp to optimize the trasmissons?
+
 - can we add way to moid radio id?
 - #hastag creates channels based on trends on meshy
 - chess, checkers, 
