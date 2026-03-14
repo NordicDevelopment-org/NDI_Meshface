@@ -63,6 +63,9 @@ def test_render_html_includes_files_view_structure_tokens():
     assert 'id="files-input"' in html
     assert 'id="files-send-btn"' in html
     assert 'id="files-send-status"' in html
+    assert 'id="files-console-log"' in html
+    assert 'id="files-console-copy-btn"' in html
+    assert 'id="files-console-clear-btn"' in html
     assert 'id="files-transfer-table"' in html
 
 

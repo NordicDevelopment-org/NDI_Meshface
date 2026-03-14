@@ -13,8 +13,14 @@ def fetch_recent_packet_rows(conn: SqlConnection, limit: int) -> SqlRows:
 
 def fetch_recent_chat_rows(conn: SqlConnection, limit: int) -> SqlRows:
     return conn.execute(
-        "SELECT message_json FROM chat ORDER BY id DESC LIMIT ?",
-        (max(1, int(limit)),),
+        """
+        SELECT message_json
+        FROM chat
+        WHERE message_json NOT LIKE ?
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        ('%"text":"MF_FILE_V1|%', max(1, int(limit))),
     ).fetchall()
 
 

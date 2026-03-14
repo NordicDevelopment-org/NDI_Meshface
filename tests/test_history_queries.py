@@ -70,6 +70,20 @@ def test_fetch_recent_packet_and_chat_rows_apply_limit_and_newest_order():
         conn.close()
 
 
+def test_fetch_recent_chat_rows_excludes_file_transfer_protocol_messages_before_limit():
+    conn = sqlite3.connect(":memory:")
+    try:
+        initialize_history_schema(conn)
+        conn.execute("INSERT INTO chat(created_unix, message_json) VALUES(1, '{\"text\":\"real-old\"}')")
+        conn.execute(
+            "INSERT INTO chat(created_unix, message_json) VALUES(2, '{\"text\":\"MF_FILE_V1|A|mtest123|0|4|AA==\"}')"
+        )
+        rows = fetch_recent_chat_rows(conn, limit=1)
+        assert rows == [('{"text":"real-old"}',)]
+    finally:
+        conn.close()
+
+
 def test_fetch_history_and_aggregate_rows_from_metrics_tables():
     conn = sqlite3.connect(":memory:")
     try:

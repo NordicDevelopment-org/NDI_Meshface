@@ -78,5 +78,20 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "allow_experimental: !!channelsExperimentalEnabled" in js
     assert "fallbackCount: 8" in js
     assert 'idx === 0 ? "PRIMARY" : "DISABLED"' in js
+    assert "const fileTransferProtocolPrefix = \"MF_FILE_V1\";" in js
+    assert "const fileTransferAckPeriodicRefreshMs = 5000;" in js
+    assert "const fileTransferAckPeriodicRefreshMax = 6;" in js
+    assert "const channel = classifyMessageChannel(msg);" in js
+    assert "const includeInAllChannel = channelKey === \"all\" || isFileTransferFrame;" not in js
+    assert "if (isFileTransferProtocolMessage(msg)) continue;" in js
+    assert "const recentPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];" in js
+    assert "for (const entry of recentPackets)" in js
+    assert "const text = String(summary.decoded_text ?? decoded.text ?? \"\").trim();" in js
+    assert "function buildFileTransferAckFrame(transferId, receivedCount, totalChunks, bitmapBase64)" in js
+    assert "function maintainOutgoingFileTransferSessions(state = latestState)" in js
+    assert "function appendFileTransferConsole(message, options = null)" in js
+    assert "function copyFileTransferConsoleToClipboard()" in js
+    assert "function bindFilesConsoleControls()" in js
+    assert "function scheduleFileTransferMaintenance(state = latestState)" in js
     assert "{{" not in js
     assert "}}" not in js
