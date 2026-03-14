@@ -15,6 +15,14 @@ _EXPECTED_TEMPLATE_TOKENS = {
         "node_history_max_points",
         "reset_ticker_scale_on_restart",
     },
+    "dashboard.js.bootstrap.tmpl": {
+        "refresh_ms",
+        "node_history_hours",
+        "node_history_max_points",
+        "reset_ticker_scale_on_restart",
+    },
+    "dashboard.js.chat.tmpl": set(),
+    "dashboard.js.runtime.tmpl": set(),
     "dashboard.html.tmpl": {
         "app_title",
         "app_heading",
@@ -51,6 +59,14 @@ def test_rendered_asset_templates_leave_no_single_token_placeholders():
             "node_history_max_points": 1440,
             "reset_ticker_scale_on_restart": 1,
         },
+        "dashboard.js.bootstrap.tmpl": {
+            "refresh_ms": 3000,
+            "node_history_hours": 72,
+            "node_history_max_points": 1440,
+            "reset_ticker_scale_on_restart": 1,
+        },
+        "dashboard.js.chat.tmpl": {},
+        "dashboard.js.runtime.tmpl": {},
         "dashboard.html.tmpl": {
             "app_title": "Meshyface",
             "app_heading": "Meshyface",

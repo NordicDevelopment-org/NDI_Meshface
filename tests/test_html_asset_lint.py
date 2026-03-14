@@ -7,6 +7,9 @@ _TEMPLATE_FILES = (
     "dashboard.css.tmpl",
     "dashboard.html.tmpl",
     "dashboard.js.tmpl",
+    "dashboard.js.bootstrap.tmpl",
+    "dashboard.js.chat.tmpl",
+    "dashboard.js.runtime.tmpl",
 )
 _TRAILING_SPACE_RE = re.compile(r"[ \t]+$", re.MULTILINE)
 
