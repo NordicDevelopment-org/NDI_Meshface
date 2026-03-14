@@ -157,13 +157,13 @@
         <span id="revision-text" class="sub-text revision-text" title="{revision_title}">{revision_label}</span>
       </div>
       <div class="summary-ticker-row" aria-label="Summary tickers">
-        <div class="summary-ticker-item summary-ticker-item-target">
-          <div class="label">Target</div>
+        <div class="summary-ticker-item summary-ticker-item-target" id="summary-ticker-target" data-ticker-id="target">
+          <div class="label" data-ticker-label>Target</div>
           <div class="value" id="m-target">n/a</div>
           <div class="target-radio-status status-warn" id="m-target-radio-status" title="Radio status unavailable">Radio: n/a</div>
         </div>
-        <div class="summary-ticker-item">
-          <div class="label">Known Nodes</div>
+        <div class="summary-ticker-item" id="summary-ticker-known-nodes" data-ticker-id="known_nodes">
+          <div class="label" data-ticker-label>Known Nodes</div>
           <div class="value" id="m-nodes">0</div>
           <div class="metric-ticker" id="ticker-nodes" hidden>
             <span class="metric-ticker-delta" id="ticker-delta-nodes">n/a</span>
@@ -171,8 +171,8 @@
             <svg class="metric-ticker-chart" id="ticker-chart-nodes" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
         </div>
-        <div class="summary-ticker-item">
-          <div class="label">Nodes Online</div>
+        <div class="summary-ticker-item" id="summary-ticker-online-nodes" data-ticker-id="online_nodes">
+          <div class="label" data-ticker-label>Nodes Online</div>
           <div class="value" id="m-online-nodes">0</div>
           <div class="metric-ticker" id="ticker-online-nodes" hidden>
             <span class="metric-ticker-delta" id="ticker-delta-online-nodes">n/a</span>
@@ -180,8 +180,8 @@
             <svg class="metric-ticker-chart" id="ticker-chart-online-nodes" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
         </div>
-        <div class="summary-ticker-item">
-          <div class="label">Packets / min</div>
+        <div class="summary-ticker-item" id="summary-ticker-packets" data-ticker-id="packets_per_min">
+          <div class="label" data-ticker-label>Packets / min</div>
           <div class="value" id="m-live-packets">0</div>
           <div class="metric-ticker" id="ticker-live-packets" hidden>
             <span class="metric-ticker-delta" id="ticker-delta-live-packets">n/a</span>
@@ -189,8 +189,8 @@
             <svg class="metric-ticker-chart" id="ticker-chart-live-packets" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
         </div>
-        <div class="summary-ticker-item">
-          <div class="label">Battery</div>
+        <div class="summary-ticker-item" id="summary-ticker-battery" data-ticker-id="battery">
+          <div class="label" data-ticker-label>Battery</div>
           <div class="value" id="m-battery">n/a</div>
           <div class="metric-ticker" id="ticker-battery" hidden>
             <span class="metric-ticker-delta" id="ticker-delta-battery">n/a</span>
@@ -198,12 +198,12 @@
             <svg class="metric-ticker-chart" id="ticker-chart-battery" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
         </div>
-        <div class="summary-ticker-item">
-          <div class="label">Node</div>
+        <div class="summary-ticker-item" id="summary-ticker-node" data-ticker-id="node">
+          <div class="label" data-ticker-label>Node</div>
           <div class="value node-ticker-value" id="m-node-ticker">n/a</div>
         </div>
-        <div class="summary-ticker-item summary-ticker-item-time">
-          <div class="label">Time</div>
+        <div class="summary-ticker-item summary-ticker-item-time" id="summary-ticker-time" data-ticker-id="time">
+          <div class="label" data-ticker-label>Time</div>
           <div class="value time-ticker-value">
             <div class="time-ticker-row">
               <span class="time-ticker-key">RADIO TIME</span>
@@ -322,6 +322,16 @@
             data-settings-tab="advanced"
           >
             Advanced
+          </button>
+          <button
+            id="settings-tab-tickers-btn"
+            class="settings-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-settings-tab="tickers"
+          >
+            Tickers
           </button>
         </div>
 
@@ -1201,6 +1211,57 @@
                 <button id="settings-reset-dashboard-db" class="btn btn-danger" type="button">Reset Dashboard DB</button>
                 <button id="settings-regenerate-node-id" class="btn btn-danger" type="button">Regenerate Node ID</button>
                 <span class="settings-danger-note">Danger zone: resets radio discovery, clears dashboard history, or full-resets the radio to regenerate node ID.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel settings-panel-wide" data-settings-tab-panel="tickers" hidden>
+            <h3>Ticker Layout</h3>
+            <div class="settings-fields">
+              <div class="settings-help-note">
+                Choose which topbar tickers are visible, control their order, and tune minor behavior per ticker.
+              </div>
+              <div class="settings-ticker-shell">
+                <div class="settings-ticker-list-wrap">
+                  <div class="settings-label">Available tickers</div>
+                  <div id="settings-ticker-list" class="settings-ticker-list" role="listbox" aria-label="Available tickers"></div>
+                </div>
+                <div class="settings-ticker-config">
+                  <div id="settings-ticker-config-empty" class="settings-help-note">Select a ticker to configure.</div>
+                  <div id="settings-ticker-config-form" hidden>
+                    <div class="settings-row">
+                      <label class="settings-field settings-inline">
+                        <input id="settings-ticker-enabled" type="checkbox" />
+                        <span>Enabled</span>
+                      </label>
+                      <button id="settings-ticker-move-up" class="btn btn-secondary" type="button">Move Up</button>
+                      <button id="settings-ticker-move-down" class="btn btn-secondary" type="button">Move Down</button>
+                    </div>
+                    <label class="settings-field">
+                      <span class="settings-label">Label override</span>
+                      <input
+                        id="settings-ticker-label"
+                        class="settings-input"
+                        type="text"
+                        maxlength="26"
+                        autocomplete="off"
+                        placeholder="Leave blank to use default label"
+                      />
+                    </label>
+                    <label id="settings-ticker-show-trend-wrap" class="settings-field settings-inline" hidden>
+                      <input id="settings-ticker-show-trend" type="checkbox" />
+                      <span>Show trend delta/rate + sparkline</span>
+                    </label>
+                    <label id="settings-ticker-battery-window-wrap" class="settings-field" hidden>
+                      <span class="settings-label">Battery trend window (hours)</span>
+                      <input id="settings-ticker-battery-window-hours" class="settings-input" type="number" min="1" max="24" step="1" />
+                    </label>
+                    <div class="settings-row">
+                      <button id="settings-ticker-reset-selected" class="btn btn-secondary" type="button">Reset Selected</button>
+                      <button id="settings-ticker-reset-all" class="btn btn-secondary" type="button">Reset All Ticker Preferences</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

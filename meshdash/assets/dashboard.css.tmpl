@@ -221,6 +221,9 @@
       row-gap: 1px;
       align-items: end;
     }}
+    .topbar .summary-ticker-item[hidden] {{
+      display: none !important;
+    }}
     .topbar .summary-ticker-item-target {{
       grid-column: span 2;
       grid-template-rows: auto auto auto;
@@ -2801,6 +2804,89 @@
       color: #204231;
       line-height: 1.35;
       overflow-wrap: anywhere;
+    }}
+    .settings-ticker-shell {{
+      display: grid;
+      grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+      gap: 12px;
+      min-height: 0;
+    }}
+    .settings-ticker-list-wrap {{
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+    }}
+    .settings-ticker-list {{
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 360px;
+      overflow: auto;
+      border: 1px solid #d7e5d2;
+      border-radius: 10px;
+      padding: 8px;
+      background: #f8fbf7;
+    }}
+    .settings-ticker-item {{
+      width: 100%;
+      border: 1px solid #c8d7c4;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #1e3a2b;
+      padding: 6px 8px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.25;
+    }}
+    .settings-ticker-item:hover {{
+      border-color: #8daf99;
+      background: #eef6f1;
+    }}
+    .settings-ticker-item.is-active {{
+      border-color: #2f855a;
+      box-shadow: 0 0 0 1px rgba(47, 133, 90, 0.24);
+      background: #e9f5ee;
+      color: #1f5d3d;
+    }}
+    .settings-ticker-item.is-disabled {{
+      opacity: 0.62;
+    }}
+    .settings-ticker-item-order {{
+      font-size: 10px;
+      color: #4f6758;
+      min-width: 18px;
+    }}
+    .settings-ticker-item-label {{
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .settings-ticker-item-state {{
+      font-size: 10px;
+      color: #355b44;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+    }}
+    .settings-ticker-config {{
+      border: 1px solid #d7e5d2;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fdfefd;
+      min-height: 0;
+    }}
+    @media (max-width: 980px) {{
+      .settings-ticker-shell {{
+        grid-template-columns: 1fr;
+      }}
     }}
     .bots .body {{
       flex: 1 1 auto;
@@ -8522,6 +8608,35 @@
     }}
     [data-theme="dark"] .settings-status {{
       color: #9fbead;
+    }}
+    [data-theme="dark"] .settings-ticker-list {{
+      border-color: #31473b;
+      background: rgba(12, 21, 17, 0.35);
+    }}
+    [data-theme="dark"] .settings-ticker-item {{
+      border-color: #3a5346;
+      background: #21352a;
+      color: #c4ddcf;
+    }}
+    [data-theme="dark"] .settings-ticker-item:hover {{
+      border-color: #4b6a5a;
+      background: #2a4033;
+    }}
+    [data-theme="dark"] .settings-ticker-item.is-active {{
+      border-color: #4f8f6c;
+      box-shadow: 0 0 0 1px rgba(79, 143, 108, 0.3);
+      background: #2b4a39;
+      color: #d1eadb;
+    }}
+    [data-theme="dark"] .settings-ticker-item-order {{
+      color: #98b7a7;
+    }}
+    [data-theme="dark"] .settings-ticker-item-state {{
+      color: #9fbead;
+    }}
+    [data-theme="dark"] .settings-ticker-config {{
+      border-color: #31473b;
+      background: #1d2d24;
     }}
     [data-theme="dark"] .btn {{
       border-color: #3a5346;
