@@ -5,6 +5,9 @@ from pathlib import Path
 _ASSETS_DIR = Path(__file__).resolve().parents[1] / "meshdash" / "assets"
 _TEMPLATE_FILES = (
     "dashboard.css.tmpl",
+    "dashboard.css.base.tmpl",
+    "dashboard.css.layout.tmpl",
+    "dashboard.css.components.tmpl",
     "dashboard.html.tmpl",
     "dashboard.js.tmpl",
     "dashboard.js.bootstrap.tmpl",
@@ -13,6 +16,9 @@ _TEMPLATE_FILES = (
     "dashboard.js.bootstrap.shared.tmpl",
     "dashboard.js.chat.tmpl",
     "dashboard.js.chat.state.tmpl",
+    "dashboard.js.chat.state.core.tmpl",
+    "dashboard.js.chat.state.games.tmpl",
+    "dashboard.js.chat.state.messaging.tmpl",
     "dashboard.js.chat.events.tmpl",
     "dashboard.js.chat.events.core.tmpl",
     "dashboard.js.chat.events.settings_map.tmpl",

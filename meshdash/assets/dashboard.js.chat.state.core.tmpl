@@ -1,0 +1,2208 @@
+      const savedChip = document.getElementById("updated-freshness");
+      if (savedChip instanceof HTMLElement) {{
+        const savedNodeId = activeLayoutView === "saved"
+          ? resolveSavedViewNodeId(latestState)
+          : "";
+        if (activeLayoutView === "saved" && isSelectableNodeId(savedNodeId)) {{
+          const node = nodesById.get(savedNodeId);
+          const caps = capsById.get(savedNodeId);
+          const chatTouch = latestChatTouchByNode.get(savedNodeId) || null;
+          const lastSeenUnix = computeNodeFreshnessUnix(node, caps, chatTouch);
+          const status = freshnessStatus(lastSeenUnix, nowUnix);
+          const key = normalizeFreshnessKey(status);
+          savedChip.textContent = key === "online"
+            ? "Fresh"
+            : (key === "warn" ? "Aging" : (key === "stale" ? "Stale" : "Unknown"));
+          applyFreshnessClass(savedChip, key);
+          savedChip.hidden = false;
+        }} else {{
+          savedChip.textContent = "";
+          savedChip.hidden = true;
+          applyFreshnessClass(savedChip, "unknown");
+        }}
+      }}
+    }}
+
+
+    function normalizeChatChannel(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      if (knownChatChannels.has(clean)) return clean;
+      if (clean.startsWith("room:")) {{
+        const slug = clean.slice(5).trim();
+        if (roomSlugRe.test(slug)) return `room:${{slug}}`;
+      }}
+      return "all";
+    }}
+
+    function channelLabel(key) {{
+      if (key === "direct") return "Peer-to-peer";
+      if (typeof key === "string" && key.startsWith("room:")) return `#${{key.slice(5)}}`;
+      return "Everyone";
+    }}
+
+    function normalizeDeliveryState(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return knownDeliveryStates.has(clean) ? clean : "";
+    }}
+
+    function formatHopCountLabel(hops, fallback = "hops n/a") {{
+      const hopCount = Number(hops);
+      if (Number.isInteger(hopCount) && hopCount >= 0) {{
+        return `${{hopCount}} hop${{hopCount === 1 ? "" : "s"}}`;
+      }}
+      return String(fallback || "").trim() || "hops n/a";
+    }}
+
+    function computeRoundTripMs(sentMsRaw, responseMsRaw) {{
+      const sentMs = Number(sentMsRaw);
+      const responseMs = Number(responseMsRaw);
+      if (!Number.isFinite(sentMs) || sentMs <= 0) return null;
+      if (!Number.isFinite(responseMs) || responseMs <= 0) return null;
+      if (responseMs < sentMs) return null;
+      return Math.round(responseMs - sentMs);
+    }}
+
+    function buildResponseTelemetry(sentMsRaw, responseMsRaw, hopsRaw) {{
+      return {{
+        rttMs: computeRoundTripMs(sentMsRaw, responseMsRaw),
+        hopLabel: formatHopCountLabel(hopsRaw),
+      }};
+    }}
+
+    function buildResponseTelemetryMetaHtml(sentMsRaw, responseMsRaw, hopsRaw) {{
+      const telemetry = buildResponseTelemetry(sentMsRaw, responseMsRaw, hopsRaw);
+      return `<div class="bots-history-meta"><span>RTT ${{telemetry.rttMs == null ? "n/a" : `${{telemetry.rttMs}} ms`}}</span><span>${{escAttr(telemetry.hopLabel)}}</span></div>`;
+    }}
+
+    function buildDeliveredAckDetail(msg, ackMeta = null) {{
+      if (!msg || typeof msg !== "object") return "";
+      const sentMs = latestTimestampMs(
+        msg.sent_at,
+        msg.created_at,
+        msg.captured_at,
+        msg.rx_time,
+        msg.time,
+      );
+      const ackInfo = (ackMeta && typeof ackMeta === "object") ? ackMeta : null;
+      const ackMs = (
+        parseDashboardTimeToMs(ackInfo && (ackInfo.rx_ms ?? ackInfo.rxMs))
+        || latestTimestampMs(
+          msg.delivery_updated_unix,
+          msg.delivery_updated_at,
+          msg.updated_at,
+          msg.updatedAt,
+        )
+      );
+      const telemetry = buildResponseTelemetry(sentMs, ackMs, ackInfo && (ackInfo.hops ?? ackInfo.hopCount));
+      const parts = [
+        `RTT ${{telemetry.rttMs == null ? "n/a" : `${{telemetry.rttMs}} ms`}}`,
+        telemetry.hopLabel,
+      ];
+      const rxSnrRaw = Number(ackInfo && (ackInfo.rx_snr ?? ackInfo.rxSnr));
+      if (Number.isFinite(rxSnrRaw)) {{
+        parts.push(`snr ${{formatMetricValue(rxSnrRaw, 1)}} dB`);
+      }}
+      const rxRssiRaw = Number(ackInfo && (ackInfo.rx_rssi ?? ackInfo.rxRssi));
+      if (Number.isFinite(rxRssiRaw)) {{
+        parts.push(`rssi ${{formatMetricValue(rxRssiRaw, 0)}} dBm`);
+      }}
+      return parts.join(" | ");
+    }}
+
+    function indexMeshBotRequestsByMessageId(botRequestsRaw) {{
+      const requestByMessageId = new Map();
+      const responseByMessageId = new Map();
+      const rows = Array.isArray(botRequestsRaw) ? botRequestsRaw : [];
+      for (const rawRow of rows) {{
+        if (!rawRow || typeof rawRow !== "object") continue;
+        const source = String(rawRow.source || "").trim().toLowerCase();
+        if (source !== "mesh") continue;
+        const requestMessageId = parsePositiveMessageId(rawRow.message_id ?? rawRow.messageId);
+        const responseMessageId = parsePositiveMessageId(
+          rawRow.response_message_id ?? rawRow.responseMessageId
+        );
+        if (requestMessageId) {{
+          requestByMessageId.set(String(requestMessageId), rawRow);
+        }}
+        if (responseMessageId) {{
+          responseByMessageId.set(String(responseMessageId), rawRow);
+        }}
+      }}
+      return {{ requestByMessageId, responseByMessageId }};
+    }}
+
+    function buildPacketSummaryAndRoutingAckMaps(rawPackets) {{
+      const packetSummaryById = new Map();
+      const deliveryAckByRequestId = new Map();
+      const entries = Array.isArray(rawPackets) ? rawPackets : [];
+      for (const entry of entries) {{
+        const summary = (entry && entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const packet = (entry && entry.packet && typeof entry.packet === "object")
+          ? entry.packet
+          : {{}};
+        const decoded = (packet.decoded && typeof packet.decoded === "object")
+          ? packet.decoded
+          : {{}};
+        const packetId = parsePositiveMessageId(
+          summary.packet_id
+          ?? summary.message_id
+          ?? packet.id
+          ?? packet.packet_id
+          ?? packet.message_id
+        );
+        if (packetId) {{
+          packetSummaryById.set(String(packetId), entry);
+        }}
+
+        const portnum = String(summary.portnum ?? decoded.portnum ?? "").trim().toUpperCase();
+        if (portnum !== "ROUTING_APP") {{
+          continue;
+        }}
+        const routing = (decoded.routing && typeof decoded.routing === "object")
+          ? decoded.routing
+          : {{}};
+        const requestId = parsePositiveMessageId(
+          routing.requestId
+          ?? routing.request_id
+          ?? decoded.requestId
+          ?? decoded.request_id
+        );
+        if (!requestId) {{
+          continue;
+        }}
+        const ackMs = latestTimestampMs(
+          summary.rx_time_unix,
+          summary.rx_time,
+          summary.captured_at,
+          entry && (entry.captured_at || entry.rx_time),
+          packet.rxTime,
+        ) || 0;
+        const ackHops = hopCountOfChatPacket(summary) ?? hopCountOfChatPacket(packet);
+        const rxSnrRaw = Number(
+          summary.rx_snr
+          ?? summary.rxSnr
+          ?? packet.rx_snr
+          ?? packet.rxSnr
+        );
+        const rxRssiRaw = Number(
+          summary.rx_rssi
+          ?? summary.rxRssi
+          ?? packet.rx_rssi
+          ?? packet.rxRssi
+        );
+        const existingAck = deliveryAckByRequestId.get(String(requestId));
+        if (existingAck && Number(existingAck.rx_ms || 0) > ackMs) {{
+          continue;
+        }}
+        deliveryAckByRequestId.set(String(requestId), {{
+          request_id: requestId,
+          rx_ms: ackMs > 0 ? ackMs : null,
+          hops: Number.isInteger(ackHops) && ackHops >= 0 ? ackHops : null,
+          rx_snr: Number.isFinite(rxSnrRaw) ? rxSnrRaw : null,
+          rx_rssi: Number.isFinite(rxRssiRaw) ? Math.trunc(rxRssiRaw) : null,
+        }});
+      }}
+      return {{ packetSummaryById, deliveryAckByRequestId }};
+    }}
+
+    function formatLatencyLabel(latencyMsRaw) {{
+      const latencyMs = Number(latencyMsRaw);
+      if (!Number.isFinite(latencyMs) || latencyMs < 0) return "n/a";
+      const value = Math.max(0, Math.trunc(latencyMs));
+      if (value < 1000) return `${{value}}ms`;
+      if (value < 10000) return `${{(value / 1000).toFixed(1)}}s`;
+      const totalSeconds = Math.trunc(value / 1000);
+      const days = Math.trunc(totalSeconds / 86400);
+      const hours = Math.trunc((totalSeconds % 86400) / 3600);
+      const minutes = Math.trunc((totalSeconds % 3600) / 60);
+      const seconds = Math.trunc(totalSeconds % 60);
+      const parts = [];
+      if (days > 0) parts.push(`${{days}}d`);
+      if (hours > 0) parts.push(`${{hours}}h`);
+      if (minutes > 0) parts.push(`${{minutes}}m`);
+      if (seconds > 0 || parts.length === 0) parts.push(`${{seconds}}s`);
+      return parts.slice(0, 3).join(" ");
+    }}
+
+    function formatDistanceMiLabel(distanceKmRaw) {{
+      const distanceKm = Number(distanceKmRaw);
+      if (!Number.isFinite(distanceKm) || distanceKm < 0) return "";
+      const distanceMi = distanceKm * 0.621371;
+      if (distanceMi < 1) return "<1mi";
+      if (distanceMi < 10) return `${{distanceMi.toFixed(1)}}mi`;
+      return `${{Math.round(distanceMi)}}mi`;
+    }}
+
+    function formatSignalRssiLabel(valueRaw) {{
+      const value = Number(valueRaw);
+      if (!Number.isFinite(value)) return "";
+      return `${{Math.round(value)}}dBm`;
+    }}
+
+    function formatSignalSnrLabel(valueRaw) {{
+      const value = Number(valueRaw);
+      if (!Number.isFinite(value)) return "";
+      return `${{value.toFixed(1)}}dB`;
+    }}
+
+    function buildLinkSignalHintText(rssiRaw, snrRaw) {{
+      const parts = [];
+      const rssiLabel = formatSignalRssiLabel(rssiRaw);
+      if (rssiLabel) parts.push(rssiLabel);
+      const snrLabel = formatSignalSnrLabel(snrRaw);
+      if (snrLabel) parts.push(snrLabel);
+      if (parts.length === 0) return "";
+      return `link ${{parts.join(" / ")}} (last-hop)`;
+    }}
+
+    function haversineKm(latA, lonA, latB, lonB) {{
+      const earthRadiusKm = 6371.0;
+      const toRad = (value) => (Number(value) * Math.PI) / 180;
+      const latARad = toRad(latA);
+      const lonARad = toRad(lonA);
+      const latBRad = toRad(latB);
+      const lonBRad = toRad(lonB);
+      const dLat = latBRad - latARad;
+      const dLon = lonBRad - lonARad;
+      const hav = (
+        (Math.sin(dLat / 2) ** 2)
+        + (Math.cos(latARad) * Math.cos(latBRad) * (Math.sin(dLon / 2) ** 2))
+      );
+      return 2 * earthRadiusKm * Math.asin(Math.sqrt(Math.max(0, hav)));
+    }}
+
+    function nodeCoordsFromStateEntry(node) {{
+      if (!node || typeof node !== "object" || Array.isArray(node)) return null;
+      const candidates = [
+        node,
+        node.position,
+        node.local_position,
+        node.localPosition,
+      ].filter((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate));
+      for (const candidate of candidates) {{
+        const lat = coordinateValueFromSpecs(candidate, [
+          {{ key: "lat" }},
+          {{ key: "latitude" }},
+          {{ key: "latitude_i", scale: 1e-7 }},
+          {{ key: "latitudeI", scale: 1e-7 }},
+        ]);
+        const lon = coordinateValueFromSpecs(candidate, [
+          {{ key: "lon" }},
+          {{ key: "lng" }},
+          {{ key: "longitude" }},
+          {{ key: "longitude_i", scale: 1e-7 }},
+          {{ key: "longitudeI", scale: 1e-7 }},
+        ]);
+        if (!isValidLatLonRange(lat, lon)) continue;
+        if (Math.abs(Number(lat)) < 1e-9 && Math.abs(Number(lon)) < 1e-9) continue;
+        return {{ lat: Number(lat), lon: Number(lon) }};
+      }}
+      return null;
+    }}
+
+    function nodePositionUnix(node) {{
+      if (!node || typeof node !== "object" || Array.isArray(node)) return null;
+      const roots = [
+        node,
+        node.position,
+        node.local_position,
+        node.localPosition,
+      ].filter((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate));
+      const raw = firstNestedValue(roots, [
+        "position_unix",
+        "positionUnix",
+        "position_time",
+        "positionTime",
+        "last_position_unix",
+        "lastPositionUnix",
+        "timestamp",
+        "time",
+      ]);
+      return parseDashboardTimeToUnix(raw);
+    }}
+
+    function nodePositionIsRecent(node, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const positionUnix = Number(nodePositionUnix(node));
+      if (!Number.isFinite(positionUnix) || positionUnix <= 0) {{
+        // Some payloads do not expose per-position timestamps; keep coordinates usable.
+        return true;
+      }}
+      if (positionUnix > (nowUnix + 3600)) return false;
+      return (nowUnix - positionUnix) <= requesterPositionMaxAgeSeconds;
+    }}
+
+    function offlineAtlasCityRowsFromPayload(payload) {{
+      const layers = (payload && typeof payload === "object" && payload.layers && typeof payload.layers === "object")
+        ? payload.layers
+        : {{}};
+      const cities = normalizeOfflineAtlasCollection(layers.cities);
+      const features = Array.isArray(cities.features) ? cities.features : [];
+      const rows = [];
+      for (const feature of features) {{
+        const geometry = (feature && typeof feature.geometry === "object") ? feature.geometry : null;
+        const coordinates = Array.isArray(geometry && geometry.coordinates)
+          ? geometry.coordinates
+          : null;
+        if (!coordinates || coordinates.length < 2) continue;
+        const lon = Number(coordinates[0]);
+        const lat = Number(coordinates[1]);
+        if (!isValidLatLonRange(lat, lon)) continue;
+        const props = (feature && typeof feature.properties === "object") ? feature.properties : {{}};
+        const name = sanitizeOfflineLabel(props.name, "");
+        if (!name) continue;
+        const stateText = sanitizeOfflineLabel(
+          props.state || props.region || props.admin1 || props.adm1name,
+          ""
+        );
+        const countryText = sanitizeOfflineLabel(
+          props.country || props.admin0 || props.adm0name || props.iso_a2 || props.iso_a3,
+          ""
+        );
+        const populationRaw = Number(
+          props.population ?? props.pop_max ?? props.popMax ?? props.pop
+        );
+        rows.push({{
+          lat: Number(lat),
+          lon: Number(lon),
+          name,
+          state: stateText,
+          country: countryText,
+          population: Number.isFinite(populationRaw) ? populationRaw : 0,
+        }});
+      }}
+      return rows;
+    }}
+
+    async function loadOfflineAtlasCityRows() {{
+      if (Array.isArray(offlineAtlasCityRowsCache)) {{
+        return offlineAtlasCityRowsCache;
+      }}
+      if (offlineAtlasCityRowsPromise) {{
+        return offlineAtlasCityRowsPromise;
+      }}
+      offlineAtlasCityRowsPromise = (async () => {{
+        try {{
+          const payload = await fetchOfflineAtlasPayload();
+          const rows = payload ? offlineAtlasCityRowsFromPayload(payload) : [];
+          offlineAtlasCityRowsCache = Array.isArray(rows) ? rows : [];
+          return offlineAtlasCityRowsCache;
+        }} catch (_err) {{
+          offlineAtlasCityRowsCache = [];
+          return offlineAtlasCityRowsCache;
+        }} finally {{
+          offlineAtlasCityRowsPromise = null;
+        }}
+      }})();
+      return offlineAtlasCityRowsPromise;
+    }}
+
+    async function nearestOfflineCityHintFromCoords(latRaw, lonRaw, maxDistanceKm = botCityHintMaxDistanceKm) {{
+      const lat = Number(latRaw);
+      const lon = Number(lonRaw);
+      if (!isValidLatLonRange(lat, lon)) return "";
+      const rows = await loadOfflineAtlasCityRows();
+      if (!Array.isArray(rows) || rows.length === 0) return "";
+      const limitKm = Number(maxDistanceKm);
+      const maxDistance = Number.isFinite(limitKm) && limitKm > 0 ? limitKm : botCityHintMaxDistanceKm;
+      let best = null;
+      let bestDistanceKm = null;
+      for (const row of rows) {{
+        if (!row || typeof row !== "object") continue;
+        const cityLat = Number(row.lat);
+        const cityLon = Number(row.lon);
+        if (!isValidLatLonRange(cityLat, cityLon)) continue;
+        const distanceKm = haversineKm(lat, lon, cityLat, cityLon);
+        if (!Number.isFinite(distanceKm) || distanceKm < 0) continue;
+        if (best == null || bestDistanceKm == null || distanceKm < bestDistanceKm) {{
+          best = row;
+          bestDistanceKm = distanceKm;
+          continue;
+        }}
+        if (Math.abs(distanceKm - bestDistanceKm) < 0.01) {{
+          const candidatePop = Number(row.population) || 0;
+          const bestPop = Number(best.population) || 0;
+          if (candidatePop > bestPop) {{
+            best = row;
+            bestDistanceKm = distanceKm;
+          }}
+        }}
+      }}
+      if (!best || !Number.isFinite(bestDistanceKm) || bestDistanceKm > maxDistance) return "";
+      const cityName = sanitizeOfflineLabel(best.name, "");
+      if (!cityName) return "";
+      const stateName = sanitizeOfflineLabel(best.state, "");
+      const countryName = sanitizeOfflineLabel(best.country, "");
+      const place = stateName
+        ? `${{cityName}}, ${{stateName}}`
+        : (countryName ? `${{cityName}}, ${{countryName}}` : cityName);
+      const distanceLabel = formatDistanceMiLabel(bestDistanceKm);
+      if (distanceLabel) return `${{place}} (${{distanceLabel}})`;
+      return place;
+    }}
+
+    async function buildPongStyleAckReplyText(options = null, state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const sourceId = normalizeNodeId((options && options.source_id) || "");
+      const sourceNode = nodes.find((node) => normalizeNodeId(node && node.id) === sourceId) || null;
+      const sourceLabel = String((options && options.source_label) || "").replace(/\\s+/g, " ").trim();
+      const sourceFallback = (sourceId && `!${{nodeIdSuffixForWhois(sourceId)}}`) || sourceId || "unknown";
+      const requesterLabel = sourceLabel || preferredNodeName(sourceNode) || sourceFallback;
+
+      const receivedMs = parseDashboardTimeToMs(
+        options && (options.received_ms ?? options.received_unix ?? options.received_at)
+      );
+      const nowMs = Date.now();
+      const latencyMs = (Number.isFinite(receivedMs) && receivedMs > 0)
+        ? Math.max(0, nowMs - receivedMs)
+        : null;
+      const latencyText = formatLatencyLabel(latencyMs);
+      const hopText = formatHopCountLabel(options && options.hops, "hop count n/a");
+
+      const details = [];
+      const linkHint = buildLinkSignalHintText(
+        options && options.rx_rssi,
+        options && options.rx_snr
+      );
+      if (linkHint) {{
+        details.push(linkHint);
+      }}
+
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      const localNode = nodes.find((node) => normalizeNodeId(node && node.id) === localNodeId) || null;
+      const localCoords = nodeCoordsFromStateEntry(localNode);
+      let botCityHint = "";
+      if (localCoords) {{
+        botCityHint = await nearestOfflineCityHintFromCoords(
+          localCoords.lat,
+          localCoords.lon,
+          botCityHintMaxDistanceKm
+        );
+      }}
+
+      let distanceHint = "";
+      const nowUnix = Math.floor(nowMs / 1000);
+      const requesterCoords = (
+        sourceNode && nodePositionIsRecent(sourceNode, nowUnix)
+          ? nodeCoordsFromStateEntry(sourceNode)
+          : null
+      );
+      if (localCoords && requesterCoords) {{
+        const distanceKm = haversineKm(
+          localCoords.lat,
+          localCoords.lon,
+          requesterCoords.lat,
+          requesterCoords.lon
+        );
+        distanceHint = formatDistanceMiLabel(distanceKm);
+      }}
+
+      if (botCityHint && distanceHint) {{
+        details.push(`bot near ${{botCityHint}}, about ${{distanceHint}} from you`);
+      }} else if (botCityHint) {{
+        details.push(`bot near ${{botCityHint}}`);
+      }} else if (distanceHint) {{
+        details.push(`about ${{distanceHint}} from you`);
+      }}
+
+      if (details.length === 0) {{
+        return `${{requesterLabel}} ${{latencyText}} round trip, ${{hopText}}.`;
+      }}
+      return `${{requesterLabel}} ${{latencyText}} round trip, ${{hopText}}, ${{details.join(", ")}}.`;
+    }}
+
+    function deliveryStateLabel(state) {{
+      const clean = normalizeDeliveryState(state);
+      if (clean === "pending") return "Pending";
+      if (clean === "acked") return "Delivered";
+      if (clean === "nak") return "Failed";
+      if (clean === "timeout") return "Timed out";
+      if (clean === "error") return "Error";
+      if (clean === "sent") return "Sent";
+      return "";
+    }}
+
+    function deliveryStateTitle(state, errorText = "", ackDetailText = "") {{
+      const clean = normalizeDeliveryState(state);
+      const detail = String(errorText || "").trim();
+      if (!clean) return "";
+      if (detail) return `${{deliveryStateLabel(clean)}}. ${{detail}}`;
+      if (clean === "pending") return "Awaiting mesh ACK";
+      if (clean === "acked") {{
+        const ackDetail = String(ackDetailText || "").trim();
+        return ackDetail ? `ACK received. ${{ackDetail}}` : "ACK received";
+      }}
+      if (clean === "nak") return "NAK received";
+      if (clean === "timeout") return "No ACK received before timeout";
+      if (clean === "error") return "Delivery status error";
+      return "Message sent";
+    }}
+
+    function isRetryableDeliveryState(state) {{
+      const clean = normalizeDeliveryState(state);
+      return clean === "nak" || clean === "timeout" || clean === "error";
+    }}
+
+    function reactionPopoverElement() {{
+      const popover = document.getElementById("chat-reaction-popover");
+      return popover instanceof HTMLElement ? popover : null;
+    }}
+
+    function clearReactionPopoverHideTimer() {{
+      if (chatReactionPopoverHideTimer !== null) {{
+        clearTimeout(chatReactionPopoverHideTimer);
+        chatReactionPopoverHideTimer = null;
+      }}
+    }}
+
+    function scheduleReactionPopoverHide(delayMs = 120) {{
+      clearReactionPopoverHideTimer();
+      chatReactionPopoverHideTimer = window.setTimeout(() => {{
+        closeReactionPopover(true);
+      }}, Math.max(0, Number(delayMs) || 0));
+    }}
+
+    function normalizeReactionName(value) {{
+      const clean = String(value == null ? "" : value).replace(/\\s+/g, " ").trim();
+      if (!clean) return "Unknown node";
+      return clean;
+    }}
+
+    function reactionNameInitials(value) {{
+      const clean = normalizeReactionName(value).replace(/[^A-Za-z0-9 ]+/g, " ").trim();
+      if (!clean) return "?";
+      const parts = clean.split(/\\s+/).filter(Boolean);
+      if (parts.length <= 1) {{
+        return parts[0].slice(0, 2).toUpperCase();
+      }}
+      return `${{parts[0][0] || ""}}${{parts[1][0] || ""}}`.toUpperCase() || "?";
+    }}
+
+    function parseReactionChipNames(chip) {{
+      if (!(chip instanceof HTMLButtonElement)) return [];
+      const raw = String(chip.dataset.reactors || "").trim();
+      if (!raw) return [];
+      try {{
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .map((item) => normalizeReactionName(item))
+          .filter((name, idx, arr) => !!name && arr.indexOf(name) === idx);
+      }} catch (_err) {{
+        return [];
+      }}
+    }}
+
+    function parseReactionSummaryGroups(button) {{
+      if (!(button instanceof HTMLButtonElement)) return [];
+      const raw = String(button.dataset.reactionSummary || "").trim();
+      if (!raw) return [];
+      try {{
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .map((item) => {{
+            if (!item || typeof item !== "object") return null;
+            const emoji = String(item.emoji || "").trim();
+            const count = Number(item.count || 0);
+            const names = Array.isArray(item.names)
+              ? item.names
+                  .map((name) => normalizeReactionName(name))
+                  .filter((name, idx, arr) => !!name && arr.indexOf(name) === idx)
+              : [];
+            if (!emoji || !Number.isFinite(count) || count <= 0) return null;
+            return {{
+              emoji,
+              count: Math.trunc(count),
+              names,
+            }};
+          }})
+          .filter((item) => !!item);
+      }} catch (_err) {{
+        return [];
+      }}
+    }}
+
+    function positionReactionPopover(anchor, popover) {{
+      if (!(anchor instanceof HTMLElement) || !(popover instanceof HTMLElement) || popover.hidden) {{
+        return;
+      }}
+      const anchorRect = anchor.getBoundingClientRect();
+      const margin = 8;
+      const width = popover.offsetWidth || 240;
+      const height = popover.offsetHeight || 140;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1280;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 720;
+
+      let left = anchorRect.left + (anchorRect.width / 2) - (width / 2);
+      if (left < margin) left = margin;
+      if ((left + width) > (viewportWidth - margin)) {{
+        left = Math.max(margin, viewportWidth - width - margin);
+      }}
+
+      let top = anchorRect.top - height - 10;
+      if (top < margin) {{
+        top = anchorRect.bottom + 10;
+      }}
+      if ((top + height) > (viewportHeight - margin)) {{
+        top = Math.max(margin, viewportHeight - height - margin);
+      }}
+
+      popover.style.left = `${{Math.round(left)}}px`;
+      popover.style.top = `${{Math.round(top)}}px`;
+    }}
+
+    function openReactionPopoverForChip(chip) {{
+      if (!(chip instanceof HTMLButtonElement)) return;
+      const popover = reactionPopoverElement();
+      if (!(popover instanceof HTMLElement)) return;
+
+      const emoji = String(chip.dataset.emoji || "").trim() || "🙂";
+      const names = parseReactionChipNames(chip);
+      const rawCount = Number(chip.dataset.reactorCount || "");
+      const count = Number.isFinite(rawCount) && rawCount > 0 ? Math.trunc(rawCount) : names.length;
+      const shownNames = names.slice(0, reactionPopoverMaxNames);
+      const listRows = shownNames.map((name) => (
+        `<div class="chat-reaction-popover-row">
+          <span class="chat-reaction-popover-avatar">${{escAttr(reactionNameInitials(name))}}</span>
+          <span class="chat-reaction-popover-name">${{escAttr(name)}}</span>
+        </div>`
+      )).join("");
+      const unknownCount = Math.max(0, count - shownNames.length);
+
+      popover.innerHTML = `
+        <div class="chat-reaction-popover-head">
+          <span><span class="chat-reaction-popover-emoji">${{escAttr(emoji)}}</span> Reactions</span>
+          <span class="chat-reaction-popover-count">${{count}}</span>
+        </div>
+        <div class="chat-reaction-popover-list">
+          ${{listRows || `<div class="chat-reaction-popover-row"><span class="chat-reaction-popover-name">No named reactors yet</span></div>`}}
+        </div>
+        ${{unknownCount > 0 ? `<div class="chat-reaction-popover-more">+${{unknownCount}} more</div>` : ""}}
+      `;
+      popover.hidden = false;
+      chatReactionPopoverAnchor = chip;
+      positionReactionPopover(chip, popover);
+    }}
+
+    function openReactionPopoverForSummary(button) {{
+      if (!(button instanceof HTMLButtonElement)) return;
+      const popover = reactionPopoverElement();
+      if (!(popover instanceof HTMLElement)) return;
+
+      const groups = parseReactionSummaryGroups(button);
+      if (!groups.length) return;
+      const total = groups.reduce((sum, group) => sum + Math.max(0, Number(group.count || 0)), 0);
+      const listRows = groups.map((group) => {{
+        const shownNames = group.names.slice(0, 4);
+        const shownText = shownNames.length ? shownNames.join(", ") : "No named reactors yet";
+        const remaining = Math.max(0, group.count - shownNames.length);
+        const detail = remaining > 0 ? `${{shownText}} +${{remaining}}` : shownText;
+        return `<div class="chat-reaction-popover-row">
+          <span class="chat-reaction-popover-emoji">${{escAttr(group.emoji)}}</span>
+          <span class="chat-reaction-popover-name">${{escAttr(`${{group.count}} • ${{detail}}`)}}</span>
+        </div>`;
+      }}).join("");
+
+      popover.innerHTML = `
+        <div class="chat-reaction-popover-head">
+          <span>Reactions</span>
+          <span class="chat-reaction-popover-count">${{total}}</span>
+        </div>
+        <div class="chat-reaction-popover-list">
+          ${{listRows}}
+        </div>
+      `;
+      popover.hidden = false;
+      chatReactionPopoverAnchor = button;
+      positionReactionPopover(button, popover);
+    }}
+
+    function closeReactionPopover(force = false) {{
+      const popover = reactionPopoverElement();
+      if (!(popover instanceof HTMLElement)) return;
+      if (!force && popover.hidden) return;
+      clearReactionPopoverHideTimer();
+      popover.hidden = true;
+      popover.innerHTML = "";
+      chatReactionPopoverAnchor = null;
+    }}
+
+    function bindReactionPopover() {{
+      const popover = reactionPopoverElement();
+      if (!(popover instanceof HTMLElement) || popover.dataset.bound === "1") return;
+      popover.dataset.bound = "1";
+
+      popover.addEventListener("pointerenter", () => {{
+        clearReactionPopoverHideTimer();
+      }});
+      popover.addEventListener("pointerleave", () => {{
+        scheduleReactionPopoverHide(120);
+      }});
+
+      document.addEventListener("pointerdown", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) {{
+          closeReactionPopover(true);
+          return;
+        }}
+        if (target.closest(".chat-reaction-chip") || target.closest(".chat-reaction-summary") || target.closest("#chat-reaction-popover")) {{
+          return;
+        }}
+        closeReactionPopover(true);
+      }});
+
+      document.addEventListener("keydown", (ev) => {{
+        if (ev.key === "Escape") {{
+          closeReactionPopover(true);
+        }}
+      }});
+
+      window.addEventListener("resize", () => {{
+        const el = reactionPopoverElement();
+        if (!(el instanceof HTMLElement) || el.hidden) return;
+        if (!(chatReactionPopoverAnchor instanceof HTMLElement)) {{
+          closeReactionPopover(true);
+          return;
+        }}
+        positionReactionPopover(chatReactionPopoverAnchor, el);
+      }});
+      window.addEventListener("scroll", () => {{
+        const el = reactionPopoverElement();
+        if (!(el instanceof HTMLElement) || el.hidden) return;
+        if (!(chatReactionPopoverAnchor instanceof HTMLElement)) {{
+          closeReactionPopover(true);
+          return;
+        }}
+        positionReactionPopover(chatReactionPopoverAnchor, el);
+      }}, true);
+    }}
+
+    function compactInlineMessage(value, maxLen = 88) {{
+      const text = String(value == null ? "" : value).replace(/\\s+/g, " ").trim();
+      if (!text) return "(no text)";
+      if (text.length <= maxLen) return text;
+      return `${{text.slice(0, Math.max(8, maxLen - 1)).trimEnd()}}…`;
+    }}
+
+    function renderChatReplyContext() {{
+      const context = document.getElementById("chat-reply-context");
+      const top = document.querySelector(".chat-composer-top");
+      const label = document.getElementById("chat-reply-label");
+      if (!(context instanceof HTMLElement) || !(label instanceof HTMLElement)) return;
+      const replyId = Number(chatReplyTargetId);
+      if (!Number.isInteger(replyId) || replyId <= 0) {{
+        context.hidden = true;
+        if (top instanceof HTMLElement) {{
+          top.classList.remove("has-reply");
+        }}
+        label.textContent = "";
+        return;
+      }}
+      const fromName = String(chatReplyTargetName || "Unknown node").trim() || "Unknown node";
+      const snippet = compactInlineMessage(chatReplyTargetText, 96);
+      label.textContent = `Replying to ${{fromName}}: ${{snippet}}`;
+      context.hidden = false;
+      if (top instanceof HTMLElement) {{
+        top.classList.add("has-reply");
+      }}
+    }}
+
+    function clearChatReplyTarget() {{
+      chatReplyTargetId = null;
+      chatReplyTargetName = "";
+      chatReplyTargetText = "";
+      renderChatReplyContext();
+    }}
+
+    function setChatReplyTarget(replyId, fromName, text) {{
+      const parsed = Number(replyId);
+      if (!Number.isInteger(parsed) || parsed <= 0) {{
+        setChatSendStatus("Cannot reply: target message id is missing.", true);
+        return;
+      }}
+      chatReplyTargetId = parsed;
+      chatReplyTargetName = String(fromName || "Unknown node").trim() || "Unknown node";
+      chatReplyTargetText = String(text || "");
+      renderChatReplyContext();
+      const input = document.getElementById("chat-input");
+      if (input instanceof HTMLInputElement) {{
+        input.focus({{ preventScroll: true }});
+      }}
+      setChatSendStatus(`Reply target set: ${{chatReplyTargetName}}`, false);
+    }}
+
+    function applyChatChannel(channelKey, persist = true) {{
+      const nextChannel = normalizeChatChannel(channelKey);
+      const changed = activeChatChannel !== nextChannel;
+      activeChatChannel = nextChannel;
+      if (activeLayoutView === "chat" && !document.hidden && tabHasFocus) {{
+        clearVisibleChatUnread(activeChatChannel);
+      }}
+      syncMeshChannelViewControl();
+      syncTopbarChatContext(latestState);
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(chatChannelStorageKey, activeChatChannel);
+        }} catch (_err) {{
+        }}
+      }}
+      const usersTitle = document.getElementById("chat-users-title");
+      if (usersTitle) {{
+        usersTitle.textContent = activeChatChannel === "direct" ? "Users (Peer-to-peer)" : "Users (Everyone)";
+      }}
+      updateChatInputPlaceholder();
+      if (activeChatChannel !== "direct") {{
+        chatPeerAddPanelOpen = false;
+      }}
+      renderChatPeerAddPanel(latestState);
+      if (changed) {{
+        clearChatReplyTarget();
+      }} else {{
+        renderChatReplyContext();
+      }}
+      if (latestState) {{
+        renderChat(latestState);
+      }}
+      requestImmediatePoll(0);
+    }}
+
+    function resolvedDirectPeerForComposer() {{
+      const selected = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
+      if (isCanonicalNodeId(selected)) {{
+        return selected;
+      }}
+      const activePeer = normalizeNodeId(chatDirectActivePeerId || "");
+      return isCanonicalNodeId(activePeer) ? activePeer : "";
+    }}
+
+    function updateChatInputPlaceholder() {{
+      const input = document.getElementById("chat-input");
+      if (!(input instanceof HTMLInputElement)) return;
+      if (activeChatChannel !== "direct") {{
+        input.placeholder = "Message the room (^all)...";
+        return;
+      }}
+      const directPeer = resolvedDirectPeerForComposer();
+      input.placeholder = isCanonicalNodeId(directPeer)
+        ? `Direct message to ${{directPeer}}...`
+        : "Select a user to direct message...";
+    }}
+
+    function loadChatChannel() {{
+      let preferred = "all";
+      try {{
+        preferred = normalizeChatChannel(window.localStorage.getItem(chatChannelStorageKey) || "all");
+      }} catch (_err) {{
+      }}
+      applyChatChannel(preferred, false);
+    }}
+
+    function normalizeChatNotificationScope(value) {{
+      const clean = String(value || "").trim().toLowerCase();
+      return knownChatNotificationScopes.has(clean) ? clean : "all";
+    }}
+
+    function chatNotificationScopeLabel(scopeValue = chatNotificationScope) {{
+      const scope = normalizeChatNotificationScope(scopeValue);
+      return scope === "self" ? "Self only" : "All activity";
+    }}
+
+    function syncChatNotificationScopeControl() {{
+      const select = document.getElementById("chat-change-scope");
+      if (!(select instanceof HTMLSelectElement)) return;
+      const scope = normalizeChatNotificationScope(chatNotificationScope);
+      if (select.value !== scope) {{
+        select.value = scope;
+      }}
+      if (scope === "self") {{
+        select.title = "Notify only for direct messages to you, replies to your messages, and reactions to your messages.";
+      }} else {{
+        select.title = "Notify for all chat activity.";
+      }}
+    }}
+
+    function applyChatNotificationScope(scopeValue, persist = true) {{
+      const scope = normalizeChatNotificationScope(scopeValue);
+      const changed = chatNotificationScope !== scope;
+      chatNotificationScope = scope;
+      syncChatNotificationScopeControl();
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(chatNotificationScopeStorageKey, scope);
+        }} catch (_err) {{
+        }}
+      }}
+      if (!changed) return;
+      // Avoid stale message-unread counters when switching scope modes.
+      clearChatUnread();
+      renderChatChangeSummary();
+      if (latestState) {{
+        renderChat(latestState);
+      }}
+    }}
+
+    function loadChatNotificationScope() {{
+      let preferred = "all";
+      try {{
+        preferred = normalizeChatNotificationScope(
+          window.localStorage.getItem(chatNotificationScopeStorageKey) || "all"
+        );
+      }} catch (_err) {{
+      }}
+      applyChatNotificationScope(preferred, false);
+    }}
+
+    function normalizeWhoisCommandPrefix(value) {{
+      const clean = String(value || "").trim().toLowerCase();
+      return knownWhoisCommandPrefixes.has(clean) ? clean : "whois";
+    }}
+
+    function nodeIdSuffixForWhois(nodeId) {{
+      const clean = String(nodeId || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (!clean) return "";
+      return clean.slice(-4);
+    }}
+
+    function buildWhoisCommandForNode(nodeId, prefixValue = chatWhoisQuickActionPrefix) {{
+      const prefix = normalizeWhoisCommandPrefix(prefixValue);
+      const suffix = nodeIdSuffixForWhois(nodeId);
+      if (!suffix) return prefix;
+      return `${{prefix}} ${{suffix}}`;
+    }}
+
+    function normalizeServerBotCommand(raw) {{
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+      const name = String(raw.name || raw.command || "").trim().toLowerCase();
+      if (!name) return null;
+      const usage = String(raw.usage || name).trim() || name;
+      const description = String(raw.description || "").trim();
+      const kindRaw = String(raw.kind || "builtin").trim().toLowerCase();
+      const kind = kindRaw === "custom"
+        ? "custom"
+        : (kindRaw === "game" ? "game" : "builtin");
+      return {{
+        name,
+        usage,
+        description,
+        kind,
+        enabled: parseBoolToken(raw.enabled, true),
+      }};
+    }}
+
+    function normalizeServerBotSettings(raw) {{
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {{
+        return {{
+          available: false,
+          enabled: true,
+          log_enabled: true,
+          game_enabled: false,
+          game_public_start_enabled: false,
+          active_game_sessions: 0,
+          commands: [],
+          disabled_commands: [],
+        }};
+      }}
+      const sessionsRaw = Number(raw.active_game_sessions ?? raw.activeGameSessions ?? 0);
+      const commandsRaw = Array.isArray(raw.commands) ? raw.commands : [];
+      const commands = [];
+      const seen = new Set();
+      for (const row of commandsRaw) {{
+        const normalized = normalizeServerBotCommand(row);
+        if (!normalized || seen.has(normalized.name)) continue;
+        commands.push(normalized);
+        seen.add(normalized.name);
+      }}
+      const disabledRaw = Array.isArray(raw.disabled_commands ?? raw.disabledCommands)
+        ? (raw.disabled_commands ?? raw.disabledCommands)
+        : [];
+      const disabledCommands = [];
+      const disabledSeen = new Set();
+      for (const value of disabledRaw) {{
+        const clean = String(value || "").trim().toLowerCase();
+        if (!clean || disabledSeen.has(clean)) continue;
+        disabledCommands.push(clean);
+        disabledSeen.add(clean);
+      }}
+      return {{
+        available: true,
+        enabled: parseBoolToken(raw.enabled, true),
+        log_enabled: parseBoolToken(raw.log_enabled ?? raw.logEnabled, true),
+        game_enabled: parseBoolToken(raw.game_enabled ?? raw.gameEnabled, false),
+        game_public_start_enabled: parseBoolToken(
+          raw.game_public_start_enabled ?? raw.gamePublicStartEnabled,
+          false
+        ),
+        active_game_sessions: Number.isFinite(sessionsRaw) && sessionsRaw >= 0 ? Math.trunc(sessionsRaw) : 0,
+        commands,
+        disabled_commands: disabledCommands,
+      }};
+    }}
+
+    function applyServerBotSettingsFromState(state = latestState) {{
+      const normalized = normalizeServerBotSettings(state && state.bot_settings);
+      serverBotSettings = normalized;
+      return normalized.available;
+    }}
+
+    async function saveServerBotSettingsPatch(patch = {{}}, { quiet = false } = {{}}) {{
+      if (!patch || typeof patch !== "object") {{
+        return false;
+      }}
+      botSettingsSaveInFlight = true;
+      syncChatWhoisQuickActionControls();
+      try {{
+        const resp = await fetch(botSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(patch),
+        }});
+        const payload = await resp.json().catch(() => ({{ ok: false, error: `API ${{resp.status}}` }}));
+        if (!resp.ok || !payload || payload.ok === false) {{
+          const message = payload && payload.error ? payload.error : `API ${{resp.status}}`;
+          throw new Error(String(message));
+        }}
+        serverBotSettings = normalizeServerBotSettings(payload);
+        if (!quiet) {{
+          setChatSendStatus(
+            "Bot settings updated.",
+            false
+          );
+        }}
+        if (latestState && typeof latestState === "object") {{
+          latestState.bot_settings = {{ ...payload }};
+        }}
+        if (activeLayoutView === "bots") {{
+          renderBotsView(latestState);
+        }}
+        return true;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        if (!quiet) {{
+          setChatSendStatus(`Failed to update bot settings: ${{msg}}`, true);
+        }}
+        appendConsoleLine(`bot-settings-save|${{Date.now()}}|${{msg}}`, `[bot settings] save failed: ${{msg}}`);
+      }} finally {{
+        botSettingsSaveInFlight = false;
+        syncChatWhoisQuickActionControls();
+      }}
+      return false;
+    }}
+
+    function syncChatWhoisQuickActionControls() {{
+      const masterInput = document.getElementById("bots-command-master-enabled");
+      const commandEnabledInput = document.getElementById("bots-command-selected-enabled");
+      const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
+      const enabledInput = document.getElementById("chat-bot-whois-enabled");
+      const prefixSelect = document.getElementById("chat-bot-whois-prefix");
+      const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
+      const commandsInput = document.getElementById("chat-bot-commands-enabled");
+      const historyInput = document.getElementById("chat-bot-history-enabled");
+      const commandsEnabled = !!chatBotCommandsEnabled;
+      const enabled = commandsEnabled && !!chatWhoisQuickActionEnabled;
+      const prefix = normalizeWhoisCommandPrefix(chatWhoisQuickActionPrefix);
+      const zorkCommand = Array.isArray(serverBotSettings.commands)
+        ? serverBotSettings.commands.find((row) => String(row && row.name || "").trim().toLowerCase() === "zork")
+        : null;
+      const selectedCommandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      const selectedCommand = Array.isArray(serverBotSettings.commands)
+        ? serverBotSettings.commands.find((row) => String(row && row.name || "").trim().toLowerCase() === selectedCommandName)
+        : null;
+      const zorkEnabled = !!(zorkCommand && zorkCommand.enabled);
+      const selectedIsZork = !!(selectedCommand && selectedCommand.name === "zork");
+      const available = !!serverBotSettings.available;
+      if (enabledInput instanceof HTMLInputElement) {{
+        enabledInput.checked = !!chatWhoisQuickActionEnabled;
+        enabledInput.disabled = !commandsEnabled;
+      }}
+      if (prefixSelect instanceof HTMLSelectElement) {{
+        prefixSelect.value = prefix;
+        prefixSelect.disabled = !enabled;
+      }}
+      if (threadReplyInput instanceof HTMLInputElement) {{
+        threadReplyInput.checked = !!chatWhoisQuickActionThreadReply;
+        threadReplyInput.disabled = !enabled;
+      }}
+      if (commandsInput instanceof HTMLInputElement) {{
+        commandsInput.checked = commandsEnabled;
+      }}
+      if (historyInput instanceof HTMLInputElement) {{
+        historyInput.checked = !!chatBotHistoryEnabled;
+        historyInput.disabled = !commandsEnabled;
+      }}
+      if (masterInput instanceof HTMLInputElement) {{
+        masterInput.checked = !!serverBotSettings.enabled;
+        masterInput.disabled = !available || botSettingsSaveInFlight;
+        if (!available) {{
+          masterInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (botSettingsSaveInFlight) {{
+          masterInput.title = "Saving bot response setting...";
+        }} else {{
+          masterInput.title = "Enable or disable all backend bot responses on this node.";
+        }}
+      }}
+      if (commandEnabledInput instanceof HTMLInputElement) {{
+        commandEnabledInput.checked = !!(selectedCommand && selectedCommand.enabled);
+        commandEnabledInput.disabled = !available || !selectedCommand || botSettingsSaveInFlight;
+        if (!available) {{
+          commandEnabledInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedCommand) {{
+          commandEnabledInput.title = "Select a bot command to edit.";
+        }} else if (botSettingsSaveInFlight) {{
+          commandEnabledInput.title = "Saving bot command settings...";
+        }} else if (!serverBotSettings.enabled) {{
+          commandEnabledInput.title = "Bot responses are globally disabled. Per-command settings are preserved.";
+        }} else {{
+          commandEnabledInput.title = "Enable or disable this backend bot command.";
+        }}
+      }}
+      if (publicStartInput instanceof HTMLInputElement) {{
+        publicStartInput.checked = !!serverBotSettings.game_public_start_enabled;
+        publicStartInput.disabled = !available || botSettingsSaveInFlight || !selectedIsZork;
+        if (!available) {{
+          publicStartInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsZork) {{
+          publicStartInput.title = "Select the zork command to edit this setting.";
+        }} else if (botSettingsSaveInFlight) {{
+          publicStartInput.title = "Saving zork handoff setting...";
+        }} else if (!serverBotSettings.enabled) {{
+          publicStartInput.title = "Bot responses are globally disabled. This setting will apply when responses are enabled.";
+        }} else if (!zorkEnabled) {{
+          publicStartInput.title = "Zork is disabled. This setting is saved and will apply when the game command is enabled.";
+        }} else {{
+          publicStartInput.title = "When enabled, a public 'zork' message starts the game with a direct peer-to-peer reply. Follow-up commands still need to continue in direct chat.";
+        }}
+      }}
+    }}
+
+    function applyChatWhoisQuickActionConfig(config = {{}}, persist = true) {{
+      const nextEnabled = Object.prototype.hasOwnProperty.call(config, "enabled")
+        ? !!config.enabled
+        : !!chatWhoisQuickActionEnabled;
+      const nextPrefix = Object.prototype.hasOwnProperty.call(config, "prefix")
+        ? normalizeWhoisCommandPrefix(config.prefix)
+        : normalizeWhoisCommandPrefix(chatWhoisQuickActionPrefix);
+      const nextThreadReply = Object.prototype.hasOwnProperty.call(config, "threadReply")
+        ? !!config.threadReply
+        : !!chatWhoisQuickActionThreadReply;
+      const nextCommandsEnabled = Object.prototype.hasOwnProperty.call(config, "commandsEnabled")
+        ? !!config.commandsEnabled
+        : !!chatBotCommandsEnabled;
+      const nextHistoryEnabled = Object.prototype.hasOwnProperty.call(config, "historyEnabled")
+        ? !!config.historyEnabled
+        : !!chatBotHistoryEnabled;
+      const changed = (
+        chatWhoisQuickActionEnabled !== nextEnabled
+        || chatWhoisQuickActionPrefix !== nextPrefix
+        || chatWhoisQuickActionThreadReply !== nextThreadReply
+        || chatBotCommandsEnabled !== nextCommandsEnabled
+        || chatBotHistoryEnabled !== nextHistoryEnabled
+      );
+      chatWhoisQuickActionEnabled = nextEnabled;
+      chatWhoisQuickActionPrefix = nextPrefix;
+      chatWhoisQuickActionThreadReply = nextThreadReply;
+      chatBotCommandsEnabled = nextCommandsEnabled;
+      chatBotHistoryEnabled = nextHistoryEnabled;
+      syncChatWhoisQuickActionControls();
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(chatWhoisQuickActionEnabledStorageKey, nextEnabled ? "1" : "0");
+          window.localStorage.setItem(chatWhoisQuickActionPrefixStorageKey, nextPrefix);
+          window.localStorage.setItem(chatWhoisQuickActionThreadReplyStorageKey, nextThreadReply ? "1" : "0");
+          window.localStorage.setItem(chatBotCommandsEnabledStorageKey, nextCommandsEnabled ? "1" : "0");
+          window.localStorage.setItem(chatBotHistoryEnabledStorageKey, nextHistoryEnabled ? "1" : "0");
+        }} catch (_err) {{
+        }}
+      }}
+      if (changed && latestState) {{
+        if (activeLayoutView === "chat") {{
+          renderChat(latestState);
+        }}
+        if (activeLayoutView === "bots") {{
+          renderBotsView(latestState);
+        }}
+      }}
+    }}
+
+    function loadChatWhoisQuickActionConfig() {{
+      const config = {{}};
+      try {{
+        config.enabled = parseBoolToken(window.localStorage.getItem(chatWhoisQuickActionEnabledStorageKey), true);
+      }} catch (_err) {{
+        config.enabled = true;
+      }}
+      try {{
+        config.prefix = normalizeWhoisCommandPrefix(
+          window.localStorage.getItem(chatWhoisQuickActionPrefixStorageKey) || "whois"
+        );
+      }} catch (_err) {{
+        config.prefix = "whois";
+      }}
+      try {{
+        config.threadReply = parseBoolToken(
+          window.localStorage.getItem(chatWhoisQuickActionThreadReplyStorageKey),
+          true
+        );
+      }} catch (_err) {{
+        config.threadReply = true;
+      }}
+      try {{
+        config.commandsEnabled = parseBoolToken(
+          window.localStorage.getItem(chatBotCommandsEnabledStorageKey),
+          true
+        );
+      }} catch (_err) {{
+        config.commandsEnabled = true;
+      }}
+      try {{
+        config.historyEnabled = parseBoolToken(
+          window.localStorage.getItem(chatBotHistoryEnabledStorageKey),
+          true
+        );
+      }} catch (_err) {{
+        config.historyEnabled = true;
+      }}
+      applyChatWhoisQuickActionConfig(config, false);
+    }}
+
+    function bindChatWhoisQuickActionControls() {{
+      const enabledInput = document.getElementById("chat-bot-whois-enabled");
+      if (enabledInput instanceof HTMLInputElement && enabledInput.dataset.bound !== "1") {{
+        enabledInput.dataset.bound = "1";
+        enabledInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ enabled: enabledInput.checked }}, true);
+        }});
+      }}
+      const prefixSelect = document.getElementById("chat-bot-whois-prefix");
+      if (prefixSelect instanceof HTMLSelectElement && prefixSelect.dataset.bound !== "1") {{
+        prefixSelect.dataset.bound = "1";
+        prefixSelect.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ prefix: prefixSelect.value }}, true);
+        }});
+      }}
+      const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
+      if (threadReplyInput instanceof HTMLInputElement && threadReplyInput.dataset.bound !== "1") {{
+        threadReplyInput.dataset.bound = "1";
+        threadReplyInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ threadReply: threadReplyInput.checked }}, true);
+        }});
+      }}
+      const commandsInput = document.getElementById("chat-bot-commands-enabled");
+      if (commandsInput instanceof HTMLInputElement && commandsInput.dataset.bound !== "1") {{
+        commandsInput.dataset.bound = "1";
+        commandsInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ commandsEnabled: commandsInput.checked }}, true);
+        }});
+      }}
+      const historyInput = document.getElementById("chat-bot-history-enabled");
+      if (historyInput instanceof HTMLInputElement && historyInput.dataset.bound !== "1") {{
+        historyInput.dataset.bound = "1";
+        historyInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ historyEnabled: historyInput.checked }}, true);
+        }});
+      }}
+      syncChatWhoisQuickActionControls();
+    }}
+
+    function bindBotCommandCatalogControls() {{
+      const masterInput = document.getElementById("bots-command-master-enabled");
+      if (masterInput instanceof HTMLInputElement && masterInput.dataset.bound !== "1") {{
+        masterInput.dataset.bound = "1";
+        masterInput.addEventListener("change", async () => {{
+          const nextValue = !!masterInput.checked;
+          const ok = await saveServerBotSettingsPatch({{ enabled: nextValue }});
+          if (!ok) {{
+            masterInput.checked = !!serverBotSettings.enabled;
+          }}
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const list = document.getElementById("bots-command-list");
+      if (list instanceof HTMLElement && list.dataset.bound !== "1") {{
+        list.dataset.bound = "1";
+        list.addEventListener("click", (event) => {{
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const item = target.closest(".bots-command-item");
+          if (!(item instanceof HTMLButtonElement)) return;
+          const commandName = String(item.dataset.commandName || "").trim().toLowerCase();
+          if (!commandName) return;
+          activeBotCommandSettingsId = commandName;
+          renderManagedBotCommandList();
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const selectedEnabledInput = document.getElementById("bots-command-selected-enabled");
+      if (selectedEnabledInput instanceof HTMLInputElement && selectedEnabledInput.dataset.bound !== "1") {{
+        selectedEnabledInput.dataset.bound = "1";
+        selectedEnabledInput.addEventListener("change", async () => {{
+          const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+          if (!commandName) return;
+          const ok = await saveServerBotSettingsPatch({{
+            command_settings: {{
+              [commandName]: !!selectedEnabledInput.checked,
+            }},
+          }});
+          if (!ok) {{
+            renderBotsView(latestState);
+            return;
+          }}
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const selectedPublicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
+      if (selectedPublicStartInput instanceof HTMLInputElement && selectedPublicStartInput.dataset.bound !== "1") {{
+        selectedPublicStartInput.dataset.bound = "1";
+        selectedPublicStartInput.addEventListener("change", async () => {{
+          const ok = await saveServerBotSettingsPatch({{
+            game_public_start_enabled: !!selectedPublicStartInput.checked,
+          }});
+          if (!ok) {{
+            renderBotsView(latestState);
+            return;
+          }}
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+    }}
+
+    function makeBotRequestHistoryId(seed = "") {{
+      const cleanSeed = String(seed || "").trim().replace(/[^a-z0-9_-]/gi, "").toLowerCase().slice(0, 18);
+      const rand = Math.random().toString(36).slice(2, 8);
+      return `bot-${{Date.now().toString(36)}}-${{rand}}${{cleanSeed ? `-${{cleanSeed}}` : ""}}`;
+    }}
+
+    function normalizeTrackedBotCommandName(value) {{
+      const raw = String(value || "").trim().toLowerCase();
+      if (!raw) return "";
+      let text = raw;
+      if (text.startsWith("!") || text.startsWith("#")) {{
+        text = text.slice(1);
+      }}
+      return Array.from(text).filter((ch) => (
+        (ch >= "a" && ch <= "z")
+        || (ch >= "0" && ch <= "9")
+        || ch === "_"
+        || ch === "-"
+      )).join("");
+    }}
+
+    function botCommandHeadFromText(commandText) {{
+      const raw = String(commandText || "").trim().toLowerCase();
+      if (!raw) return "";
+      const head = raw.split(/\\s+/)[0] || "";
+      return head;
+    }}
+
+    function normalizeBotTrafficSnifferCommandHeads(raw) {{
+      const parts = Array.isArray(raw)
+        ? raw
+        : String(raw || "").split(/[\\s,;]+/);
+      const seen = new Set();
+      const output = [];
+      for (const part of parts) {{
+        const clean = normalizeTrackedBotCommandName(part);
+        if (!clean || seen.has(clean)) continue;
+        seen.add(clean);
+        output.push(clean);
+      }}
+      return output.length ? output : [...defaultBotTrafficSnifferCommandHeads];
+    }}
+
+    function persistBotTrafficSnifferCommandHeads() {{
+      try {{
+        window.localStorage.setItem(
+          botTrafficSnifferCommandsStorageKey,
+          JSON.stringify(botTrafficSnifferCommandHeads || [])
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function syncBotTrafficSnifferControls() {{
+      const input = document.getElementById("bots-sniffer-command-input");
+      if (input instanceof HTMLInputElement) {{
+        input.value = (botTrafficSnifferCommandHeads || []).join(", ");
+      }}
+    }}
+
+    function applyBotTrafficSnifferCommandHeads(raw, persist = true) {{
+      botTrafficSnifferCommandHeads = normalizeBotTrafficSnifferCommandHeads(raw);
+      syncBotTrafficSnifferControls();
+      if (persist) {{
+        persistBotTrafficSnifferCommandHeads();
+      }}
+      if (activeLayoutView === "bots") {{
+        renderBotsView(latestState);
+      }}
+    }}
+
+    function loadBotTrafficSnifferCommandHeads() {{
+      let loaded = [...defaultBotTrafficSnifferCommandHeads];
+      try {{
+        const raw = window.localStorage.getItem(botTrafficSnifferCommandsStorageKey);
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          loaded = normalizeBotTrafficSnifferCommandHeads(parsed);
+        }}
+      }} catch (_err) {{
+        loaded = [...defaultBotTrafficSnifferCommandHeads];
+      }}
+      botTrafficSnifferCommandHeads = loaded;
+      syncBotTrafficSnifferControls();
+      persistBotTrafficSnifferCommandHeads();
+    }}
+
+    function buildBotNodeLabelResolver(state = latestState) {{
+      const nodes = (state && Array.isArray(state.nodes)) ? state.nodes : [];
+      const nameById = new Map();
+      for (const node of nodes) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (!isCanonicalNodeId(nodeId)) continue;
+        nameById.set(nodeId, preferredNodeName(node) || nodeNameCache.get(nodeId) || nodeId);
+      }}
+      return (nodeId) => {{
+        const clean = normalizeNodeId(nodeId);
+        if (!clean || clean === "^all") return "All";
+        if (!isCanonicalNodeId(clean)) return clean || "n/a";
+        return nameById.get(clean) || nodeNameCache.get(clean) || clean;
+      }};
+    }}
+
+    function extractObservedBotTrafficEntries(state = latestState) {{
+      const trackedHeads = new Set(normalizeBotTrafficSnifferCommandHeads(botTrafficSnifferCommandHeads));
+      if (trackedHeads.size === 0) return [];
+      const traffic = (state && state.traffic && typeof state.traffic === "object")
+        ? state.traffic
+        : {{}};
+      const chatMessages = Array.isArray(traffic.recent_chat)
+        ? traffic.recent_chat
+        : [];
+      const packets = Array.isArray(traffic.recent_packets)
+        ? traffic.recent_packets
+        : [];
+      const output = [];
+      const seen = new Set();
+      const pushUnique = (row, dedupeKey) => {{
+        const cleanKey = String(dedupeKey || row && row.id || "").trim();
+        if (!row || !cleanKey || seen.has(cleanKey)) return;
+        seen.add(cleanKey);
+        output.push(row);
+      }};
+
+      for (const msg of chatMessages) {{
+        if (!msg || typeof msg !== "object") continue;
+        if (msg.local_echo === true || msg.localEcho === true) continue;
+        const kind = normalizeChatMessageKind(msg, msg.is_reaction === true);
+        if (kind !== "message") continue;
+        const text = String(msg.text ?? msg.decoded_text ?? msg.payload_text ?? "").trim();
+        if (!text) continue;
+        const head = normalizeTrackedBotCommandName(String(text.split(/\\s+/)[0] || ""));
+        if (!head || !trackedHeads.has(head)) continue;
+        const fromId = normalizeNodeId(msg.from || "");
+        if (!fromId) continue;
+        const toId = normalizeNodeId(msg.to || msg.destination || "") || "^all";
+        const channelIndex = messageMeshChannelIndex(msg);
+        const receivedUnix = latestUnixTimestamp(
+          msg.rx_time,
+          msg.captured_at,
+          msg.sent_at,
+          msg.created_at
+        ) || 0;
+        const messageId = messageIdOfChatPacket(msg);
+        const dedupeKey = messageId
+          ? `chat:${{messageId}}`
+          : `chat:${{fromId}}|${{toId}}|${{channelIndex}}|${{receivedUnix}}|${{text}}`;
+        pushUnique({{
+          id: `sniff-${{messageId || receivedUnix || output.length}}-${{head}}-${{fromId}}`,
+          command: text,
+          command_head: head,
+          from_id: fromId,
+          to_id: toId,
+          channel_index: channelIndex,
+          message_id: messageId,
+          received_unix: receivedUnix,
+          received_at: String(msg.rx_time ?? msg.captured_at ?? msg.sent_at ?? "").trim(),
+          hops: hopCountOfChatPacket(msg),
+        }}, dedupeKey);
+      }}
+
+      for (const entry of packets) {{
+        if (!entry || typeof entry !== "object") continue;
+        const summary = (entry.summary && typeof entry.summary === "object") ? entry.summary : {{}};
+        const packet = (entry.packet && typeof entry.packet === "object") ? entry.packet : {{}};
+        const decoded = (packet.decoded && typeof packet.decoded === "object") ? packet.decoded : {{}};
+        const text = String(summary.decoded_text ?? decoded.text ?? "").trim();
+        if (!text) continue;
+        const head = normalizeTrackedBotCommandName(String(text.split(/\\s+/)[0] || ""));
+        if (!head || !trackedHeads.has(head)) continue;
+        const fromId = normalizeNodeId(summary.from ?? packet.fromId ?? packet.from_id ?? "");
+        if (!fromId) continue;
+        const toId = normalizeNodeId(summary.to ?? packet.toId ?? packet.to_id ?? "") || "^all";
+        const channelIndex = normalizeMeshChannelIndex(summary.channel ?? packet.channel ?? 0);
+        const receivedUnix = latestUnixTimestamp(
+          summary.rx_time_unix,
+          packet.rxTime,
+          summary.rx_time,
+          summary.captured_at,
+          entry.rx_time_unix,
+          entry.rx_time,
+          entry.captured_at
+        ) || 0;
+        const packetId = parsePositiveMessageId(summary.packet_id ?? packet.id);
+        const dedupeKey = packetId
+          ? `packet:${{packetId}}`
+          : `packet:${{fromId}}|${{toId}}|${{channelIndex}}|${{receivedUnix}}|${{text}}`;
+        const hops = hopCountOfChatPacket({{
+          hops: summary.hops,
+          hop_start: summary.hop_start ?? packet.hopStart,
+          hop_limit: summary.hop_limit ?? packet.hopLimit,
+        }});
+        pushUnique({{
+          id: `sniff-${{packetId || receivedUnix || output.length}}-${{head}}-${{fromId}}`,
+          command: text,
+          command_head: head,
+          from_id: fromId,
+          to_id: toId,
+          channel_index: channelIndex,
+          message_id: packetId,
+          received_unix: receivedUnix,
+          received_at: String(summary.rx_time ?? summary.captured_at ?? "").trim(),
+          hops,
+        }}, dedupeKey);
+      }}
+      output.sort((a, b) => (
+        (Number(b.received_unix) || 0) - (Number(a.received_unix) || 0)
+      ));
+      return output.slice(0, botRequestLogMaxEntries);
+    }}
+
+    function normalizeBotRequestHistoryEntry(raw) {{
+      if (!raw || typeof raw !== "object") return null;
+      const command = String(raw.command || "").trim();
+      if (!command) return null;
+      const source = String(raw.source || "local").trim().toLowerCase() || "local";
+      const commandHead = String(raw.command_head || raw.commandHead || botCommandHeadFromText(command)).trim().toLowerCase();
+      const prefix = knownWhoisCommandPrefixes.has(commandHead)
+        ? normalizeWhoisCommandPrefix(raw.prefix || commandHead)
+        : String(raw.prefix || commandHead || command.split(/\\s+/)[0] || "").trim().toLowerCase();
+      const suffix = nodeIdSuffixForWhois(raw.suffix || command.split(/\\s+/).slice(1).join(" "));
+      const fromId = normalizeNodeId(raw.from_id ?? raw.fromId ?? "");
+      const destination = normalizeNodeId(raw.destination ?? raw.to_id ?? raw.toId ?? "^all") || "^all";
+      const messageId = parsePositiveMessageId(raw.message_id ?? raw.messageId);
+      const replyId = parsePositiveMessageId(raw.reply_id ?? raw.replyId);
+      const sentAtText = String(raw.sent_at ?? raw.sentAt ?? raw.received_at ?? raw.receivedAt ?? "").trim();
+      const sentMs = (
+        parseDashboardTimeToMs(raw.sent_ms ?? raw.sentMs)
+        || parseDashboardTimeToMs(raw.sent_at ?? raw.sentAt)
+        || parseDashboardTimeToMs(raw.sent_unix ?? raw.sentUnix)
+        || parseDashboardTimeToMs(raw.received_unix ?? raw.receivedUnix)
+        || parseDashboardTimeToMs(raw.received_at ?? raw.receivedAt)
+        || Date.now()
+      );
+      const sentUnix = (
+        parseDashboardTimeToUnix(raw.sent_unix ?? raw.sentUnix)
+        || parseDashboardTimeToUnix(raw.sent_at ?? raw.sentAt)
+        || parseDashboardTimeToUnix(raw.received_unix ?? raw.receivedUnix)
+        || parseDashboardTimeToUnix(raw.received_at ?? raw.receivedAt)
+        || Math.floor(sentMs / 1000)
+      );
+      const responseMessageId = parsePositiveMessageId(raw.response_message_id ?? raw.responseMessageId);
+      const responseMs = parseDashboardTimeToMs(raw.response_ms ?? raw.responseMs ?? raw.response_at ?? raw.responseAt);
+      const responseUnix = parseDashboardTimeToUnix(raw.response_unix ?? raw.responseUnix ?? raw.response_at ?? raw.responseAt);
+      const responseHopsRaw = Number(raw.response_hops ?? raw.responseHops);
+      const responseHops = (Number.isFinite(responseHopsRaw) && responseHopsRaw >= 0)
+        ? Math.trunc(responseHopsRaw)
+        : null;
+      const respondEnabled = parseBoolToken(raw.respond_enabled ?? raw.respondEnabled, true);
+      const responded = parseBoolToken(raw.responded, !!responseMessageId);
+      const responseError = String(raw.response_error ?? raw.responseError ?? "").trim();
+      return {{
+        id: String(raw.id || makeBotRequestHistoryId(suffix)).trim() || makeBotRequestHistoryId(suffix),
+        source,
+        command,
+        command_head: commandHead,
+        prefix,
+        suffix,
+        from_id: fromId,
+        destination,
+        channel_index: normalizeMeshChannelIndex(raw.channel_index ?? raw.channelIndex ?? 0),
+        reply_id: replyId,
+        reply_attached: parseBoolToken(raw.reply_attached ?? raw.replyAttached, !!replyId),
+        message_id: messageId,
+        sent_at: sentAtText,
+        sent_ms: sentMs,
+        sent_unix: sentUnix,
+        respond_enabled: respondEnabled,
+        responded,
+        response_message_id: responseMessageId,
+        response_ms: responseMs,
+        response_unix: responseUnix,
+        response_hops: responseHops,
+        response_from: normalizeNodeId(raw.response_from ?? raw.responseFrom ?? ""),
+        response_to: normalizeNodeId(raw.response_to ?? raw.responseTo ?? ""),
+        response_text: String(raw.response_text ?? raw.responseText ?? "").trim(),
+        response_error: responseError,
+      }};
+    }}
+
+    function pruneBotRequestHistoryEntries(entries, nowUnix = Math.floor(Date.now() / 1000)) {{
+      if (!Array.isArray(entries) || entries.length === 0) return [];
+      const normalized = entries
+        .map((entry) => normalizeBotRequestHistoryEntry(entry))
+        .filter((entry) => !!entry)
+        .sort((a, b) => (Number(b.sent_unix) || 0) - (Number(a.sent_unix) || 0));
+      const seenIds = new Set();
+      const output = [];
+      for (const entry of normalized) {{
+        if (seenIds.has(entry.id)) continue;
+        seenIds.add(entry.id);
+        const sentUnix = Number(entry.sent_unix) || 0;
+        if (sentUnix > 0 && (nowUnix - sentUnix) > botRequestLogMaxAgeSeconds) {{
+          continue;
+        }}
+        output.push(entry);
+        if (output.length >= botRequestLogMaxEntries) {{
+          break;
+        }}
+      }}
+      return output;
+    }}
+
+    function persistBotRequestHistory() {{
+      try {{
+        window.localStorage.setItem(botRequestLogStorageKey, JSON.stringify(botRequestHistory || []));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadBotRequestHistory() {{
+      let loaded = [];
+      try {{
+        const raw = window.localStorage.getItem(botRequestLogStorageKey);
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {{
+            loaded = parsed;
+          }}
+        }}
+      }} catch (_err) {{
+        loaded = [];
+      }}
+      botRequestHistory = pruneBotRequestHistoryEntries(loaded);
+      persistBotRequestHistory();
+      if (activeLayoutView === "bots") {{
+        renderBotsView(latestState);
+      }}
+    }}
+
+    function syncBackendBotRequestHistory(state = latestState) {{
+      const raw = (state && Array.isArray(state.bot_requests)) ? state.bot_requests : [];
+      backendBotRequestHistory = pruneBotRequestHistoryEntries(raw);
+    }}
+
+    function mergedBotRequestHistoryEntries(state = latestState) {{
+      syncBackendBotRequestHistory(state);
+      const localRows = Array.isArray(botRequestHistory) ? botRequestHistory : [];
+      const backendRows = Array.isArray(backendBotRequestHistory) ? backendBotRequestHistory : [];
+      return pruneBotRequestHistoryEntries([...(backendRows || []), ...(localRows || [])]);
+    }}
+
+    function parseTrackedBotCommandFromText(text) {{
+      const raw = String(text || "").trim();
+      if (!raw) return null;
+      const parts = raw.split(/\\s+/).filter((part) => !!part);
+      if (parts.length === 0) return null;
+      const prefixRaw = String(parts[0] || "").trim().toLowerCase();
+      if (knownBotSingleWordCommands.has(prefixRaw)) {{
+        if (parts.length !== 1) return null;
+        return {{
+          command: raw,
+          prefix: prefixRaw,
+          suffix: "",
+          head: prefixRaw,
+          kind: "single",
+        }};
+      }}
+      if (!knownBotArgumentCommands.has(prefixRaw)) return null;
+      if (parts.length < 2) return null;
+      const targetToken = String(parts[1] || "").trim();
+      const isWeatherCommand = prefixRaw === "wx" || prefixRaw === "!wx" || prefixRaw === "#wx";
+      const suffix = isWeatherCommand ? targetToken : nodeIdSuffixForWhois(targetToken);
+      return {{
+        command: raw,
+        prefix: knownWhoisCommandPrefixes.has(prefixRaw) ? normalizeWhoisCommandPrefix(prefixRaw) : prefixRaw,
+        suffix,
+        head: prefixRaw,
+        kind: "argument",
+      }};
+    }}
+
+    function recordBotRequestHistoryFromSend(requestBody, payload) {{
+      if (!chatBotHistoryEnabled || !chatBotCommandsEnabled) return;
+      const parsed = parseTrackedBotCommandFromText(requestBody && requestBody.text);
+      if (!parsed) return;
+      const sentMs = (
+        parseDashboardTimeToMs(payload && payload.sent_at)
+        || parseDashboardTimeToMs(payload && payload.rx_time)
+        || Date.now()
+      );
+      const sentUnix = (
+        parseDashboardTimeToUnix(payload && payload.sent_at)
+        || parseDashboardTimeToUnix(payload && payload.rx_time)
+        || Math.floor(sentMs / 1000)
+      );
+      const messageId = messageIdOfChatPacket(payload || {{}});
+      const replyId = parsePositiveMessageId(
+        (payload && (payload.reply_id ?? payload.replyId))
+        ?? (requestBody && requestBody.reply_id)
+      );
+      const entry = normalizeBotRequestHistoryEntry({{
+        id: makeBotRequestHistoryId(parsed.suffix),
+        command: parsed.command,
+        command_head: parsed.head,
+        prefix: parsed.prefix,
+        suffix: parsed.suffix,
+        destination: requestBody && requestBody.destination,
+        channel_index: requestBody && requestBody.channel_index,
+        reply_id: replyId,
+        reply_attached: Number.isInteger(replyId) && replyId > 0,
+        message_id: messageId,
+        sent_at: (payload && payload.sent_at) || "",
+        sent_ms: sentMs,
+        sent_unix: sentUnix,
+      }});
+      if (!entry) return;
+      botRequestHistory = pruneBotRequestHistoryEntries([entry, ...(botRequestHistory || [])], sentUnix);
+      persistBotRequestHistory();
+      if (activeLayoutView === "bots") {{
+        renderBotsView(latestState);
+      }}
+    }}
+
+    function syncBotRequestHistoryWithMessages(messages, state = latestState) {{
+      if (!chatBotHistoryEnabled || !chatBotCommandsEnabled) return false;
+      if (!Array.isArray(botRequestHistory) || botRequestHistory.length === 0) return false;
+      const responseByReplyId = new Map();
+      for (const msg of (Array.isArray(messages) ? messages : [])) {{
+        if (!msg || typeof msg !== "object") continue;
+        if (msg.local_echo === true || msg.localEcho === true) continue;
+        const messageId = messageIdOfChatPacket(msg);
+        const replyId = replyIdOfChatPacket(msg);
+        if (!messageId || !replyId) continue;
+        if (messageId === replyId) continue;
+        const fromId = normalizeNodeId(msg.from || "");
+        if (isSelfNodeId(fromId)) continue;
+        const msgMs = latestTimestampMs(
+          msg.rx_time,
+          msg.captured_at,
+          msg.sent_at,
+          msg.created_at
+        ) || Date.now();
+        const unix = latestUnixTimestamp(
+          msg.rx_time,
+          msg.captured_at,
+          msg.sent_at,
+          msg.created_at
+        ) || 0;
+        const existing = responseByReplyId.get(replyId);
+        if (existing && Number(existing.ms || 0) > msgMs) continue;
+        responseByReplyId.set(replyId, {{
+          messageId,
+          ms: msgMs,
+          unix,
+          hops: hopCountOfChatPacket(msg),
+          fromId,
+          toId: normalizeNodeId(msg.to || msg.destination || ""),
+          text: String(msg.text ?? msg.decoded_text ?? msg.payload_text ?? "").trim(),
+        }});
+      }}
+      if (responseByReplyId.size === 0) return false;
+      let changed = false;
+      const next = [];
+      for (const entry of botRequestHistory) {{
+        const normalized = normalizeBotRequestHistoryEntry(entry);
+        if (!normalized) continue;
+        if (!normalized.response_message_id && normalized.message_id) {{
+          const match = responseByReplyId.get(normalized.message_id);
+          if (match) {{
+            normalized.response_message_id = match.messageId;
+            normalized.response_ms = Number(match.ms) > 0 ? Number(match.ms) : null;
+            normalized.response_unix = Number(match.unix) > 0 ? Number(match.unix) : normalized.sent_unix;
+            normalized.response_hops = Number.isInteger(match.hops) ? Number(match.hops) : null;
+            normalized.response_from = match.fromId;
+            normalized.response_to = match.toId;
+            normalized.response_text = match.text;
+            changed = true;
+          }}
+        }}
+        next.push(normalized);
+      }}
+      if (!changed) return false;
+      botRequestHistory = pruneBotRequestHistoryEntries(next);
+      persistBotRequestHistory();
+      if (activeLayoutView === "bots") {{
+        renderBotsView(state);
+      }}
+      return true;
+    }}
+
+    function clearBotRequestHistory() {{
+      botRequestHistory = [];
+      persistBotRequestHistory();
+      if (activeLayoutView === "bots") {{
+        renderBotsView(latestState);
+      }}
+    }}
+
+    function renderManagedBotCommandList() {{
+      const listEl = document.getElementById("bots-command-list");
+      const configEmptyEl = document.getElementById("bots-command-config-empty");
+      const configFormEl = document.getElementById("bots-command-config-form");
+      const selectedUsageEl = document.getElementById("bots-command-selected-usage");
+      const selectedKindEl = document.getElementById("bots-command-selected-kind");
+      const selectedNameEl = document.getElementById("bots-command-selected-name");
+      const selectedDescriptionEl = document.getElementById("bots-command-selected-description");
+      const selectedEnabledInput = document.getElementById("bots-command-selected-enabled");
+      const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
+      const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
+      const publicStartNote = document.getElementById("bots-command-selected-public-start-note");
+      if (!(listEl instanceof HTMLElement)) return;
+      const showConfigEmpty = (message) => {{
+        if (configEmptyEl instanceof HTMLElement) {{
+          configEmptyEl.textContent = String(message || "Select a command to configure.");
+          configEmptyEl.hidden = false;
+        }}
+        if (configFormEl instanceof HTMLElement) {{
+          configFormEl.hidden = true;
+        }}
+      }};
+      if (!serverBotSettings.available) {{
+        listEl.innerHTML = '<div class="bots-history-empty">Backend bot settings endpoint unavailable on this node.</div>';
+        showConfigEmpty("Backend bot settings endpoint unavailable on this node.");
+        return;
+      }}
+      const commands = Array.isArray(serverBotSettings.commands) ? serverBotSettings.commands : [];
+      if (commands.length === 0) {{
+        listEl.innerHTML = '<div class="bots-history-empty">No managed backend bot commands are currently exposed.</div>';
+        showConfigEmpty("No managed backend bot commands are currently exposed.");
+        return;
+      }}
+      const orderedNames = commands
+        .map((command) => String(command && command.name || "").trim().toLowerCase())
+        .filter((name) => !!name);
+      const activeName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      if (!activeName || !orderedNames.includes(activeName)) {{
+        activeBotCommandSettingsId = orderedNames[0] || "";
+      }}
+      const selectedName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      const selectedCommand = commands.find((command) => String(command && command.name || "").trim().toLowerCase() === selectedName) || null;
+      const rows = commands.map((command, index) => {{
+        const usage = String(command && command.usage || command && command.name || "").trim() || "unknown";
+        const description = String(command && command.description || "").trim() || "Managed backend bot command.";
+        const kindRaw = String(command && command.kind || "builtin").trim().toLowerCase();
+        const kindLabel = kindRaw === "custom"
+          ? "custom"
+          : (kindRaw === "game" ? "game" : "built-in");
+        const name = String(command && command.name || "").trim().toLowerCase();
+        const enabled = !!(command && command.enabled);
+        const orderLabel = `${{index + 1}}.`;
+        const stateLabel = enabled ? "on" : "off";
+        const disabledClass = enabled ? "" : " is-disabled";
+        const activeClass = name === selectedName ? " is-active" : "";
+        return `<button type="button" class="bots-command-item${{disabledClass}}${{activeClass}}" data-command-name="${{escAttr(name)}}" title="${{escAttr(description)}}" role="option" aria-selected="${{name === selectedName ? "true" : "false"}}">
+          <span class="bots-command-item-order">${{escAttr(orderLabel)}}</span>
+          <span class="bots-command-copy">
+            <span class="bots-command-heading">
+              <span class="bots-command-usage">${{escAttr(usage)}}</span>
+              <span class="bots-command-kind">${{escAttr(kindLabel)}}</span>
+            </span>
+            <span class="bots-command-description">${{escAttr(description)}}</span>
+          </span>
+          <span class="bots-command-state">${{escAttr(stateLabel)}}</span>
+        </button>`;
+      }});
+      listEl.innerHTML = rows.join("");
+      if (!selectedCommand) {{
+        showConfigEmpty("Select a command to configure.");
+        return;
+      }}
+      if (configEmptyEl instanceof HTMLElement) {{
+        configEmptyEl.hidden = true;
+      }}
+      if (configFormEl instanceof HTMLElement) {{
+        configFormEl.hidden = false;
+      }}
+      const usageText = String(selectedCommand.usage || selectedCommand.name || "unknown").trim() || "unknown";
+      const descriptionText = String(selectedCommand.description || "").trim() || "Managed backend bot command.";
+      const kindRaw = String(selectedCommand.kind || "builtin").trim().toLowerCase();
+      const kindLabel = kindRaw === "custom"
+        ? "custom"
+        : (kindRaw === "game" ? "game" : "built-in");
+      if (selectedUsageEl instanceof HTMLElement) {{
+        selectedUsageEl.textContent = usageText;
+      }}
+      if (selectedKindEl instanceof HTMLElement) {{
+        selectedKindEl.textContent = kindLabel;
+      }}
+      if (selectedNameEl instanceof HTMLElement) {{
+        selectedNameEl.textContent = `id: ${{selectedName}}`;
+      }}
+      if (selectedDescriptionEl instanceof HTMLElement) {{
+        selectedDescriptionEl.textContent = descriptionText;
+      }}
+      if (selectedEnabledInput instanceof HTMLInputElement) {{
+        selectedEnabledInput.checked = !!selectedCommand.enabled;
+      }}
+      const selectedIsZork = selectedName === "zork";
+      if (publicStartWrap instanceof HTMLElement) {{
+        publicStartWrap.hidden = !selectedIsZork;
+      }}
+      if (publicStartNote instanceof HTMLElement) {{
+        publicStartNote.hidden = !selectedIsZork;
+      }}
+      if (publicStartInput instanceof HTMLInputElement) {{
+        publicStartInput.checked = !!serverBotSettings.game_public_start_enabled;
+      }}
+    }}
+
+    function syncBotsReviewTabUi() {{
+      const historyBtn = document.getElementById("bots-tab-history-btn");
+      const snifferBtn = document.getElementById("bots-tab-sniffer-btn");
+      const historyPanel = document.getElementById("bots-history-tab-panel");
+      const snifferPanel = document.getElementById("bots-sniffer-tab-panel");
+      const clearBtn = document.getElementById("bots-history-clear-btn");
+      const historyActive = activeBotsReviewTab !== "sniffer";
+      if (historyBtn instanceof HTMLButtonElement) {{
+        historyBtn.classList.toggle("is-active", historyActive);
+        historyBtn.setAttribute("aria-selected", historyActive ? "true" : "false");
+      }}
+      if (snifferBtn instanceof HTMLButtonElement) {{
+        snifferBtn.classList.toggle("is-active", !historyActive);
+        snifferBtn.setAttribute("aria-selected", historyActive ? "false" : "true");
+      }}
+      if (historyPanel instanceof HTMLElement) {{
+        historyPanel.hidden = !historyActive;
+      }}
+      if (snifferPanel instanceof HTMLElement) {{
+        snifferPanel.hidden = historyActive;
+      }}
+      if (clearBtn instanceof HTMLButtonElement) {{
+        clearBtn.hidden = !historyActive;
+      }}
+    }}
+
+    function renderBotTrafficSnifferTab(state = latestState) {{
+      const listEl = document.getElementById("bots-sniffer-list");
+      const totalEl = document.getElementById("bots-sniffer-total");
+      const sendersEl = document.getElementById("bots-sniffer-senders");
+      const commandsEl = document.getElementById("bots-sniffer-commands");
+      if (!(listEl instanceof HTMLElement)) return;
+
+      syncBotTrafficSnifferControls();
+      const entries = extractObservedBotTrafficEntries(state);
+      const uniqueSenders = new Set(
+        entries.map((entry) => normalizeNodeId(entry && entry.from_id)).filter((value) => !!value)
+      );
+      const uniqueCommands = new Set(
+        entries.map((entry) => String(entry && entry.command_head || "").trim().toLowerCase()).filter((value) => !!value)
+      );
+      if (totalEl instanceof HTMLElement) totalEl.textContent = String(entries.length);
+      if (sendersEl instanceof HTMLElement) sendersEl.textContent = String(uniqueSenders.size);
+      if (commandsEl instanceof HTMLElement) commandsEl.textContent = String(uniqueCommands.size);
+
+      if (entries.length === 0) {{
+        const trackedText = (botTrafficSnifferCommandHeads || []).join(", ");
+        listEl.innerHTML = `<div class="bots-history-empty">No matching bot traffic in retained decoded traffic for: <code>${{escAttr(trackedText || "none")}}</code>.</div>`;
+        return;
+      }}
+
+      const nodeLabel = buildBotNodeLabelResolver(state);
+      const rows = entries.map((entry) => {{
+        const sentLabel = formatLocalChatTime(entry.received_unix, entry.received_at || "n/a");
+        const fromLabel = nodeLabel(entry.from_id || "");
+        const toLabel = nodeLabel(entry.to_id || "");
+        const hasChannelIndex = Number.isInteger(entry.channel_index) && Number(entry.channel_index) >= 0;
+        const channelLabel = hasChannelIndex
+          ? meshChannelLabelForIndex(entry.channel_index, {{ allowAll: false }})
+          : "Channel ?";
+        const channelBadge = hasChannelIndex
+          ? meshChannelBadgeHtml(entry.channel_index, channelLabel, {{
+              allowAll: false,
+              extraClass: "bots-history-channel",
+              title: meshChannelLabelForIndex(entry.channel_index, {{ verbose: true, allowAll: false }}),
+            }})
+          : `<span>${{escAttr(channelLabel)}}</span>`;
+        const hops = Number(entry.hops);
+        const hopText = Number.isInteger(hops) && hops >= 0 ? `${{hops}} hop${{hops === 1 ? "" : "s"}}` : "hops n/a";
+        return `<article class="bots-history-item">
+          <div class="bots-history-item-head">
+            <span class="bots-history-command">${{escAttr(entry.command)}}</span>
+            <span class="bots-history-status-pill">${{escAttr(entry.command_head)}}</span>
+          </div>
+          <div class="bots-history-meta">
+            <span>${{escAttr(sentLabel)}}</span>
+            <span>from ${{escAttr(fromLabel || "n/a")}}</span>
+            ${{channelBadge}}
+            <span>to ${{escAttr(toLabel || "All")}}</span>
+            <span>${{escAttr(hopText)}}</span>
+          </div>
+        </article>`;
+      }});
+      listEl.innerHTML = rows.join("");
+    }}
+
+    function renderBotsView(state = latestState) {{
+      applyServerBotSettingsFromState(state);
+      renderManagedBotCommandList();
+      syncChatWhoisQuickActionControls();
+      syncBotsReviewTabUi();
+      renderBotTrafficSnifferTab(state);
+      const listEl = document.getElementById("bots-history-list");
+      const totalEl = document.getElementById("bots-history-total");
+      const pendingEl = document.getElementById("bots-history-pending");
+      const respondedEl = document.getElementById("bots-history-responded");
+      if (!(listEl instanceof HTMLElement)) return;
+
+      const entries = mergedBotRequestHistoryEntries(state);
+      const total = entries.length;
+      const responded = entries.reduce((acc, item) => (
+        acc + ((item && (item.response_message_id || item.responded)) ? 1 : 0)
+      ), 0);
+      const pending = Math.max(0, total - responded);
+
+      if (totalEl instanceof HTMLElement) totalEl.textContent = String(total);
+      if (pendingEl instanceof HTMLElement) pendingEl.textContent = String(pending);
+      if (respondedEl instanceof HTMLElement) respondedEl.textContent = String(responded);
+
+      if (entries.length === 0) {{
+        listEl.innerHTML = chatBotHistoryEnabled
+          ? '<div class="bots-history-empty">No tracked bot requests yet. Send a <code>whois</code> or <code>ping</code> command, or wait for mesh bot traffic.</div>'
+          : '<div class="bots-history-empty">Bot request history tracking is disabled.</div>';
+        return;
+      }}
+      const commandsDisabledNotice = !chatBotCommandsEnabled
+        ? '<div class="bots-history-empty">Quick actions are disabled for this browser. You can still type commands manually in chat; backend-observed mesh requests still appear here when available.</div>'
+        : "";
+      const disabledNotice = !chatBotHistoryEnabled
+        ? '<div class="bots-history-empty">Tracking is disabled. Existing history is shown read-only; new requests and matches will not be recorded.</div>'
+        : "";
+
+      const nodeLabel = buildBotNodeLabelResolver(state);
+
+      const rows = entries.map((entry) => {{
+        let statusClass = "pending";
+        let statusLabel = "Pending";
+        if (entry.response_message_id || entry.responded) {{
+          statusClass = "responded";
+          statusLabel = "Responded";
+        }} else if (entry.response_error) {{
+          statusClass = "pending";
+          statusLabel = "Error";
+        }} else if (entry.respond_enabled === false) {{
+          statusClass = "pending";
+          statusLabel = "Observed";
+        }}
+        const sentLabel = formatLocalChatTime(entry.sent_unix, entry.sent_at || "n/a");
+        const destLabel = entry.destination === "^all" ? "All" : nodeLabel(entry.destination);
+        const fromLabel = nodeLabel(entry.from_id || "");
+        const hasChannelIndex = Number.isInteger(entry.channel_index) && Number(entry.channel_index) >= 0;
+        const channelLabel = hasChannelIndex
+          ? meshChannelLabelForIndex(entry.channel_index, {{ allowAll: false }})
+          : "Channel ?";
+        const channelBadge = hasChannelIndex
+          ? meshChannelBadgeHtml(entry.channel_index, channelLabel, {{
+              allowAll: false,
+              extraClass: "bots-history-channel",
+              title: meshChannelLabelForIndex(entry.channel_index, {{ verbose: true, allowAll: false }}),
+            }})
+          : `<span>${{escAttr(channelLabel)}}</span>`;
+        const replyHint = entry.reply_attached ? "reply attached" : "new request";
+        const responseMeta = entry.response_message_id
+          ? buildResponseTelemetryMetaHtml(entry.sent_ms, entry.response_ms, entry.response_hops)
+          : "";
+        const responseText = String(entry.response_text || "").trim();
+        const responsePreview = responseText
+          ? compactInlineMessage(responseText, 200)
+          : "(no text)";
+        const responseBlock = entry.response_message_id
+          ? `<div class="bots-history-response"><strong>${{escAttr(nodeLabel(entry.response_from))}}:</strong> ${{escAttr(responsePreview)}}</div>`
+          : (
+            entry.response_error
+              ? `<div class="bots-history-response"><strong>error:</strong> ${{escAttr(entry.response_error)}}</div>`
+              : ""
+          );
+        return `<article class="bots-history-item">
+          <div class="bots-history-item-head">
+            <span class="bots-history-command">${{escAttr(entry.command)}}</span>
+            <span class="bots-history-status-pill ${{statusClass}}">${{statusLabel}}</span>
+          </div>
+          <div class="bots-history-meta">
+            <span>${{escAttr(sentLabel)}}</span>
+            <span>from ${{escAttr(fromLabel || "n/a")}}</span>
+            ${{channelBadge}}
+            <span>to ${{escAttr(destLabel)}}</span>
+            <span>${{escAttr(replyHint)}}</span>
+          </div>
+          ${{responseMeta}}
+          ${{responseBlock}}
+        </article>`;
+      }});
+      listEl.innerHTML = `${{commandsDisabledNotice}}${{disabledNotice}}${{rows.join("")}}`;
+    }}
+
+    function bindBotHistoryControls() {{
+      const clearBtn = document.getElementById("bots-history-clear-btn");
+      if (clearBtn instanceof HTMLButtonElement && clearBtn.dataset.bound !== "1") {{
+        clearBtn.dataset.bound = "1";
+        clearBtn.addEventListener("click", () => {{
+          clearBotRequestHistory();
+          setChatSendStatus("Cleared bot request history.");
+        }});
+      }}
+    }}
+
+    function bindBotsReviewControls() {{
+      const historyBtn = document.getElementById("bots-tab-history-btn");
+      if (historyBtn instanceof HTMLButtonElement && historyBtn.dataset.bound !== "1") {{
+        historyBtn.dataset.bound = "1";
+        historyBtn.addEventListener("click", () => {{
+          activeBotsReviewTab = "history";
+          syncBotsReviewTabUi();
+        }});
+      }}
+      const snifferBtn = document.getElementById("bots-tab-sniffer-btn");
+      if (snifferBtn instanceof HTMLButtonElement && snifferBtn.dataset.bound !== "1") {{
+        snifferBtn.dataset.bound = "1";
+        snifferBtn.addEventListener("click", () => {{
+          activeBotsReviewTab = "sniffer";
+          syncBotsReviewTabUi();
+        }});
+      }}
+      const applyBtn = document.getElementById("bots-sniffer-apply-btn");
+      const input = document.getElementById("bots-sniffer-command-input");
+      if (applyBtn instanceof HTMLButtonElement && applyBtn.dataset.bound !== "1") {{
+        applyBtn.dataset.bound = "1";
+        applyBtn.addEventListener("click", () => {{
+          applyBotTrafficSnifferCommandHeads(input instanceof HTMLInputElement ? input.value : "");
+        }});
+      }}
+      if (input instanceof HTMLInputElement && input.dataset.bound !== "1") {{
+        input.dataset.bound = "1";
+        input.addEventListener("keydown", (event) => {{
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          applyBotTrafficSnifferCommandHeads(input.value);
+        }});
+      }}
+      const resetBtn = document.getElementById("bots-sniffer-reset-btn");
+      if (resetBtn instanceof HTMLButtonElement && resetBtn.dataset.bound !== "1") {{
+        resetBtn.dataset.bound = "1";
+        resetBtn.addEventListener("click", () => {{
+          applyBotTrafficSnifferCommandHeads(defaultBotTrafficSnifferCommandHeads);
+        }});
+      }}
+    }}
+

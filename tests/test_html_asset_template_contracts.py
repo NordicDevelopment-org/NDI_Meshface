@@ -8,7 +8,10 @@ _ASSETS_DIR = Path(__file__).resolve().parents[1] / "meshdash" / "assets"
 _SINGLE_TEMPLATE_TOKEN_RE = re.compile(r"(?<![${])\{([a-z_][a-z0-9_]*)\}")
 
 _EXPECTED_TEMPLATE_TOKENS = {
-    "dashboard.css.tmpl": {"theme_css"},
+    "dashboard.css.tmpl": set(),
+    "dashboard.css.base.tmpl": {"theme_css"},
+    "dashboard.css.layout.tmpl": set(),
+    "dashboard.css.components.tmpl": set(),
     "dashboard.js.tmpl": {
         "refresh_ms",
         "node_history_hours",
@@ -26,6 +29,9 @@ _EXPECTED_TEMPLATE_TOKENS = {
     "dashboard.js.bootstrap.shared.tmpl": set(),
     "dashboard.js.chat.tmpl": set(),
     "dashboard.js.chat.state.tmpl": set(),
+    "dashboard.js.chat.state.core.tmpl": set(),
+    "dashboard.js.chat.state.games.tmpl": set(),
+    "dashboard.js.chat.state.messaging.tmpl": set(),
     "dashboard.js.chat.events.tmpl": set(),
     "dashboard.js.chat.events.core.tmpl": set(),
     "dashboard.js.chat.events.settings_map.tmpl": set(),
@@ -62,9 +68,12 @@ def test_asset_templates_expose_only_expected_tokens():
 
 def test_rendered_asset_templates_leave_no_single_token_placeholders():
     render_values = {
-        "dashboard.css.tmpl": {
+        "dashboard.css.tmpl": {},
+        "dashboard.css.base.tmpl": {
             "theme_css": ":root { --unit-test-token: #123456; }",
         },
+        "dashboard.css.layout.tmpl": {},
+        "dashboard.css.components.tmpl": {},
         "dashboard.js.tmpl": {
             "refresh_ms": 3000,
             "node_history_hours": 72,
@@ -82,6 +91,9 @@ def test_rendered_asset_templates_leave_no_single_token_placeholders():
         "dashboard.js.bootstrap.shared.tmpl": {},
         "dashboard.js.chat.tmpl": {},
         "dashboard.js.chat.state.tmpl": {},
+        "dashboard.js.chat.state.core.tmpl": {},
+        "dashboard.js.chat.state.games.tmpl": {},
+        "dashboard.js.chat.state.messaging.tmpl": {},
         "dashboard.js.chat.events.tmpl": {},
         "dashboard.js.chat.events.core.tmpl": {},
         "dashboard.js.chat.events.settings_map.tmpl": {},

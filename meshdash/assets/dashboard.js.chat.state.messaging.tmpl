@@ -1,0 +1,4492 @@
+    function bindChatNotificationScopeControl() {{
+      const select = document.getElementById("chat-change-scope");
+      if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+      syncChatNotificationScopeControl();
+      select.addEventListener("change", () => {{
+        applyChatNotificationScope(select.value, true);
+      }});
+    }}
+
+    // Meshtastic has its own notion of "channels" (0..N) which are distinct from this UI's
+    // chat scopes (Everyone vs Peer-to-peer).
+    //
+    // We expose a lightweight selector so outgoing chat packets can be sent on a user-chosen
+    // channel index. Default is channel 0.
+
+    function normalizeMeshChannelIndex(value, options = {{}}) {{
+      const allowAll = !!(options && options.allowAll);
+      const text = String(value == null ? "" : value).trim().toLowerCase();
+      if (allowAll && (text === "all" || text === "*")) {{
+        return meshChannelAllIndex;
+      }}
+      const num = Number(value);
+      if (!Number.isFinite(num)) return 0;
+      const idx = Math.trunc(num);
+      if (allowAll && idx === meshChannelAllIndex) {{
+        return meshChannelAllIndex;
+      }}
+      if (!Number.isInteger(idx) || idx < 0) return 0;
+      return idx;
+    }}
+
+    function meshChannelOptionLabel(opt) {{
+      if (!opt || typeof opt !== "object") return "";
+      const idx = Number(opt.index);
+      if (!Number.isInteger(idx) || idx < 0) return "";
+      const name = typeof opt.name === "string" ? opt.name.trim() : "";
+      if (name) return name;
+      return `Ch ${{idx}}`;
+    }}
+
+    function meshChannelOptionByIndex(rawIndex, sourceOptions = null) {{
+      const idx = normalizeMeshChannelIndex(rawIndex);
+      if (!Number.isInteger(idx) || idx < 0) return null;
+      const candidateLists = [];
+      if (Array.isArray(sourceOptions)) candidateLists.push(sourceOptions);
+      if (Array.isArray(meshChannelOptions) && sourceOptions !== meshChannelOptions) candidateLists.push(meshChannelOptions);
+      if (Array.isArray(meshChannelSendOptions) && sourceOptions !== meshChannelSendOptions) candidateLists.push(meshChannelSendOptions);
+      for (const list of candidateLists) {{
+        const match = list.find((opt) => Number(opt && opt.index) === idx);
+        if (match && typeof match === "object") {{
+          return {{ ...match, index: idx }};
+        }}
+      }}
+      return null;
+    }}
+
+    function meshChannelConfiguredName(rawIndex, sourceOptions = null) {{
+      const match = meshChannelOptionByIndex(rawIndex, sourceOptions);
+      const name = match && typeof match.name === "string" ? match.name.trim() : "";
+      return name || "";
+    }}
+
+    function meshChannelViewOptionLabel(opt) {{
+      if (!opt || typeof opt !== "object") return "";
+      const idx = Number(opt.index);
+      if (!Number.isInteger(idx) || idx < 0) return "";
+      const name = typeof opt.name === "string" ? opt.name.trim() : "";
+      if (name) return name;
+      return `Ch ${{idx}}`;
+    }}
+
+    function meshChannelIsPrimary(rawIndex) {{
+      return normalizeMeshChannelIndex(rawIndex) === 0;
+    }}
+
+    function meshChannelPrimaryBadgeHtml(rawIndex) {{
+      if (!meshChannelIsPrimary(rawIndex)) return "";
+      return '<span class="mesh-channel-primary-badge" aria-hidden="true">P</span>';
+    }}
+
+    function meshChannelSendOptionLabel(opt) {{
+      if (!opt || typeof opt !== "object") return "";
+      const idx = Number(opt.index);
+      if (!Number.isInteger(idx) || idx < 0) return "";
+      const name = typeof opt.name === "string" ? opt.name.trim() : "";
+      if (name) return name;
+      return `Ch ${{idx}}`;
+    }}
+
+    function meshChannelColorMeta(rawIndex, {{ allowAll = true, sourceOptions = null }} = {{}}) {{
+      const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll }});
+      if (idx === meshChannelAllIndex) {{
+        return {{
+          key: "all",
+          name: "all",
+          fill: "#FFFFFF",
+          title: "All channels view",
+        }};
+      }}
+      const configuredName = meshChannelConfiguredName(idx, sourceOptions);
+      if (!configuredName) {{
+        const neutral = meshChannelNeutralPalette[idx % meshChannelNeutralPalette.length] || meshChannelNeutralPalette[0];
+        const neutralName = String(neutral && neutral.name || "gray").trim() || "gray";
+        const fill = String(neutral && neutral.fill || "#BBBBBB").trim() || "#BBBBBB";
+        return {{
+          key: `public-${{idx}}`,
+          name: neutralName,
+          fill,
+          title: idx === 0 ? "Ch 0 • Primary channel" : `Ch ${{idx}}`,
+        }};
+      }}
+      const palette = meshChannelColorPalette[idx % meshChannelColorPalette.length] || meshChannelColorPalette[0];
+      const colorName = String(palette && palette.name || "channel").trim() || "channel";
+      const fill = String(palette && palette.fill || "#8DA3B1").trim() || "#8DA3B1";
+      const channelBaseLabel = configuredName || `Ch ${{idx}}`;
+      const colorTitle = `${{channelBaseLabel}} • ${{colorName.charAt(0).toUpperCase()}}${{colorName.slice(1)}} channel`;
+      return {{
+        key: colorName,
+        name: colorName,
+        fill,
+        title: colorTitle,
+      }};
+    }}
+
+    function hexColorRgbTriplet(fill) {{
+      const text = String(fill || "").trim();
+      const match = /^#?([0-9a-f]{6})$/i.exec(text);
+      if (!match) return "141, 163, 177";
+      const hex = match[1];
+      const r = Number.parseInt(hex.slice(0, 2), 16);
+      const g = Number.parseInt(hex.slice(2, 4), 16);
+      const b = Number.parseInt(hex.slice(4, 6), 16);
+      return `${{r}}, ${{g}}, ${{b}}`;
+    }}
+
+    function meshChannelBadgeStyle(rawIndex, {{ allowAll = false }} = {{}}) {{
+      const meta = meshChannelColorMeta(rawIndex, {{ allowAll }});
+      return `--mesh-channel-badge-fill: ${{meta.fill}}; --mesh-channel-badge-rgb: ${{hexColorRgbTriplet(meta.fill)}};`;
+    }}
+
+    function meshChannelBadgeHtml(rawIndex, label, {{ allowAll = false, extraClass = "", title = "" }} = {{}}) {{
+      const classNames = ["mesh-channel-badge"];
+      if (extraClass) classNames.push(String(extraClass).trim());
+      const text = String(label || "").trim() || meshChannelLabelForIndex(rawIndex, {{ compact: true, allowAll }});
+      const titleText = String(title || "").trim();
+      const styleAttr = escAttr(meshChannelBadgeStyle(rawIndex, {{ allowAll }}));
+      const titleAttr = titleText ? ` title="${{escAttr(titleText)}}"` : "";
+      return `<span class="${{escAttr(classNames.join(" "))}}" style="${{styleAttr}}"${{titleAttr}}>${{escAttr(text)}}</span>`;
+    }}
+
+    function meshChannelTintStyle(rawIndex, {{ allowAll = false }} = {{}}) {{
+      const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll }});
+      const meta = meshChannelColorMeta(idx, {{ allowAll }});
+      return `--chat-feed-channel-fill: ${{meta.fill}}; --chat-feed-channel-rgb: ${{hexColorRgbTriplet(meta.fill)}};`;
+    }}
+
+    function meshChannelViewMenuLabel(rawIndex) {{
+      const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll: true }});
+      if (idx === meshChannelAllIndex) {{
+        return "All channels";
+      }}
+      const match = meshChannelOptionByIndex(idx, meshChannelOptions);
+      return meshChannelViewOptionLabel(match ? {{ ...match, index: idx }} : {{ index: idx }});
+    }}
+
+    function syncMeshChannelViewControl() {{
+      renderMeshChannelPills(meshChannelOptions);
+      syncMeshChannelMismatchWarning();
+    }}
+
+    function renderMeshChannelPills(options) {{
+      const panel = document.getElementById("mesh-channel-pill-strip");
+      if (!(panel instanceof HTMLElement)) return;
+      const normalized = Array.isArray(options) ? options : [];
+      const activeScope = normalizeChatChannel(activeChatChannel);
+      const rows = [];
+      rows.push({{
+        index: meshChannelAllIndex,
+        label: meshChannelViewMenuLabel(meshChannelAllIndex),
+        meta: meshChannelColorMeta(meshChannelAllIndex, {{ allowAll: true }}),
+        all: true,
+        unread: Math.max(0, Number(chatUnreadByChannel[activeScope] || 0)),
+      }});
+      for (const opt of normalized) {{
+        const idx = normalizeMeshChannelIndex(opt && opt.index);
+        rows.push({{
+          index: idx,
+          label: meshChannelViewOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`,
+          meta: meshChannelColorMeta(idx, {{ allowAll: false }}),
+          all: false,
+          unread: getChatMeshChannelUnread(activeScope, idx),
+        }});
+      }}
+      panel.innerHTML = rows.map((row) => {{
+        const active = normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }}) === row.index;
+        const dotClass = row.all ? "channel-color-dot is-all" : "channel-color-dot";
+        const unreadLabel = row.unread > 99 ? "99+" : String(row.unread || "");
+        const primaryBadge = row.all ? "" : meshChannelPrimaryBadgeHtml(row.index);
+        return `<button
+          type="button"
+          class="mesh-channel-pill${{active ? " active" : ""}}"
+          role="tab"
+          aria-selected="${{active ? "true" : "false"}}"
+          data-mesh-channel-index="${{escAttr(row.index)}}"
+          title="${{escAttr(row.meta.title === row.label ? row.meta.title : `${{row.meta.title}} • ${{row.label}}`)}}"
+        >
+          <span class="${{dotClass}}" style="${{row.all ? "" : `--channel-dot-fill: ${{row.meta.fill}};`}}" aria-hidden="true"></span>
+          <span class="mesh-channel-pill-label">${{escAttr(row.label)}}</span>
+          ${{primaryBadge}}
+          ${{
+            row.unread > 0
+              ? `<span class="mesh-channel-pill-unread" aria-label="${{escAttr(`${{row.unread}} unread`)}}">(${{escAttr(unreadLabel)}})</span>`
+              : ""
+          }}
+        </button>`;
+      }}).join("");
+    }}
+
+    function meshChannelLabelForIndex(rawIndex, {{ verbose = false, compact = false, allowAll = true }} = {{}}) {{
+      const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll }});
+      if (idx === meshChannelAllIndex) {{
+        return compact ? "All" : "All channels";
+      }}
+      const name = meshChannelConfiguredName(idx, meshChannelOptions);
+      if (name) return compact ? name : verbose ? `Ch ${{idx}} (${{name}})` : name;
+      return `Ch ${{idx}}`;
+    }}
+
+    function activeMeshChannelFilterIndex() {{
+      return normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }});
+    }}
+
+    function activeMeshChannelSendIndex() {{
+      return normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+    }}
+
+    function currentMeshChannelViewLabel() {{
+      return meshChannelViewMenuLabel(activeMeshChannelIndex);
+    }}
+
+    function currentMeshChannelSendLabel() {{
+      const idx = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      const match = meshChannelOptionByIndex(idx, meshChannelSendOptions);
+      return meshChannelSendOptionLabel(match ? {{ ...match, index: idx }} : {{ index: idx }});
+    }}
+
+    function syncMeshChannelMismatchWarning() {{
+      const wrap = document.querySelector(".chat-send-channel-wrap");
+      const warningEl = document.getElementById("chat-channel-mismatch-warning");
+      if (!(wrap instanceof HTMLElement)) return;
+
+      const viewIdx = activeMeshChannelFilterIndex();
+      const sendIdx = activeMeshChannelSendIndex();
+      const mismatched = viewIdx !== meshChannelAllIndex && sendIdx !== viewIdx;
+      const warningText = mismatched
+        ? `Sending on ${{currentMeshChannelSendLabel()}} while viewing ${{currentMeshChannelViewLabel()}}. You may send something you cannot see here.`
+        : "";
+
+      wrap.classList.toggle("mismatch", mismatched);
+      wrap.title = mismatched
+        ? warningText
+        : "Choose which configured message channel to use for outgoing chat. This sets the encryption group used for sends and does NOT change your LoRa frequency slot.";
+      wrap.setAttribute("aria-label", mismatched ? warningText : "Outgoing chat channel");
+
+      if (warningEl instanceof HTMLElement) {{
+        warningEl.hidden = !mismatched;
+        warningEl.textContent = warningText;
+      }}
+    }}
+
+    function meshChannelSendContext() {{
+      const sendIndex = activeMeshChannelSendIndex();
+      return {{
+        sendIndex,
+        sendLabel: currentMeshChannelSendLabel(),
+      }};
+    }}
+
+    function meshChannelSendSelectElements() {{
+      const ids = ["chat-send-channel-select", "files-send-channel-select"];
+      const out = [];
+      for (const id of ids) {{
+        const el = document.getElementById(id);
+        if (el instanceof HTMLSelectElement) {{
+          out.push(el);
+        }}
+      }}
+      return out;
+    }}
+
+    function syncMeshChannelSendControl() {{
+      const dot = document.getElementById("chat-send-channel-dot");
+      const wrap = document.querySelector(".chat-send-channel-wrap");
+      const composeShell = document.querySelector(".chat-compose-shell");
+      const input = document.getElementById("chat-input");
+      const filesDot = document.getElementById("files-send-channel-dot");
+      const filesSelect = document.getElementById("files-send-channel-select");
+      const filesHint = document.getElementById("files-send-channel-hint");
+      const meta = meshChannelColorMeta(activeMeshSendChannelIndex, {{ allowAll: false }});
+      const rgb = hexColorRgbTriplet(meta.fill);
+      const sendLabel = currentMeshChannelSendLabel();
+      if (wrap instanceof HTMLElement) {{
+        wrap.style.setProperty("--chat-send-channel-fill", meta.fill);
+        wrap.style.setProperty("--chat-send-channel-rgb", rgb);
+      }}
+      if (composeShell instanceof HTMLElement) {{
+        composeShell.style.setProperty("--chat-send-channel-fill", meta.fill);
+        composeShell.style.setProperty("--chat-send-channel-rgb", rgb);
+      }}
+      if (input instanceof HTMLElement) {{
+        input.style.setProperty("--chat-send-channel-fill", meta.fill);
+        input.style.setProperty("--chat-send-channel-rgb", rgb);
+      }}
+      if (dot instanceof HTMLElement) {{
+        dot.classList.remove("is-all");
+        dot.style.setProperty("--channel-dot-fill", meta.fill);
+        dot.title = meta.title;
+        dot.setAttribute("aria-label", meta.title);
+      }}
+      if (filesDot instanceof HTMLElement) {{
+        filesDot.classList.remove("is-all");
+        filesDot.style.setProperty("--channel-dot-fill", meta.fill);
+        filesDot.title = meta.title;
+        filesDot.setAttribute("aria-label", meta.title);
+      }}
+      if (filesSelect instanceof HTMLSelectElement) {{
+        filesSelect.value = String(activeMeshSendChannelIndex);
+        filesSelect.title = `Outgoing file transfer channel: ${{sendLabel}}`;
+      }}
+      if (filesHint instanceof HTMLElement) {{
+        filesHint.textContent = `Files send on ${{sendLabel}}. Message channels are encryption groups, not frequency slots.`;
+      }}
+      const btn = document.getElementById("chat-send-channel-menu-btn");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.innerHTML = `${{meshChannelPrimaryBadgeHtml(activeMeshSendChannelIndex)}}<span class="mesh-channel-menu-btn-label">${{escAttr(sendLabel)}}</span>`;
+        btn.title = meta.title === sendLabel ? meta.title : `${{meta.title}} • ${{sendLabel}}`;
+        const select = document.getElementById("chat-send-channel-select");
+        const disabled = select instanceof HTMLSelectElement ? !!select.disabled : false;
+        btn.disabled = disabled;
+        btn.setAttribute("aria-disabled", disabled ? "true" : "false");
+      }}
+      syncMeshChannelMismatchWarning();
+    }}
+
+    function setMeshChannelSendMenuOpen(open) {{
+      meshChannelSendMenuOpen = !!open;
+      const panel = document.getElementById("chat-send-channel-menu");
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = !meshChannelSendMenuOpen;
+      }}
+      const btn = document.getElementById("chat-send-channel-menu-btn");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", meshChannelSendMenuOpen ? "true" : "false");
+      }}
+    }}
+
+    function collectMeshChannelOptionsFromLocalState(localState, options = {{}}) {{
+      const root = (localState && typeof localState === "object") ? localState : {{}};
+      const rawChannels = Array.isArray(root.channels) ? root.channels : [];
+      const byIndex = new Map();
+      const includeFallback = options.includeFallback !== false;
+      const fallbackCount = Math.max(1, Math.trunc(Number(options.fallbackCount) || 0));
+
+      for (let i = 0; i < rawChannels.length; i++) {{
+        const ch = rawChannels[i];
+        if (!ch || typeof ch !== "object") continue;
+
+        const idxRaw = ch.index ?? ch.channel_index ?? ch.channelIndex ?? i;
+        const idxNum = Math.trunc(Number(idxRaw));
+        const index = Number.isInteger(idxNum) && idxNum >= 0 ? idxNum : i;
+
+        const roleRaw = ch.role ?? ch.channel_role ?? ch.channelRole;
+        const role = typeof roleRaw === "string" ? roleRaw.trim() : (roleRaw != null ? String(roleRaw) : "");
+        const roleUpper = role.toUpperCase();
+        const roleNum = Number(role);
+        const disabled = (
+          roleUpper === "DISABLED"
+          || roleUpper === "CHANNEL_ROLE_DISABLED"
+          || (Number.isInteger(roleNum) && roleNum === 0)
+        );
+
+        const settings = (ch.settings && typeof ch.settings === "object") ? ch.settings
+          : (ch.channel_settings && typeof ch.channel_settings === "object") ? ch.channel_settings
+          : (ch.channelSettings && typeof ch.channelSettings === "object") ? ch.channelSettings
+          : null;
+        const nameRaw = (
+          settings && typeof settings.name === "string" ? settings.name
+          : settings && typeof settings.channel_name === "string" ? settings.channel_name
+          : settings && typeof settings.short_name === "string" ? settings.short_name
+          : typeof ch.name === "string" ? ch.name
+          : typeof ch.channel_name === "string" ? ch.channel_name
+          : ""
+        );
+        const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
+        const pskRaw = (
+          settings && settings.psk != null ? settings.psk
+          : settings && settings.channel_psk != null ? settings.channel_psk
+          : ch.psk != null ? ch.psk
+          : ch.channel_psk != null ? ch.channel_psk
+          : null
+        );
+        const hasPsk = Array.isArray(pskRaw)
+          ? pskRaw.length > 0
+          : (pskRaw != null && String(pskRaw).trim() !== "");
+
+        const opt = {{ index, name, role, disabled, hasPsk }};
+        if (!byIndex.has(index)) {{
+          byIndex.set(index, opt);
+        }} else {{
+          const prev = byIndex.get(index);
+          if (prev && typeof prev === "object") {{
+            if (!prev.name && name) prev.name = name;
+            if (!prev.role && role) prev.role = role;
+            prev.hasPsk = prev.hasPsk === true || hasPsk === true;
+            prev.disabled = prev.disabled && disabled;
+          }}
+        }}
+      }}
+
+      if (includeFallback) {{
+        const fillCount = Math.max(fallbackCount, rawChannels.length || 0);
+        for (let i = 0; i < fillCount; i++) {{
+          if (!byIndex.has(i)) {{
+            byIndex.set(i, {{ index: i, name: "", role: "", disabled: false, hasPsk: false }});
+          }}
+        }}
+      }}
+
+      const collectedOptions = Array.from(byIndex.values())
+        .filter((opt) => opt && Number.isInteger(Number(opt.index)) && Number(opt.index) >= 0)
+        .sort((a, b) => Number(a.index) - Number(b.index));
+
+      if (collectedOptions.length) return collectedOptions;
+      if (!includeFallback) return [];
+      return [{{ index: 0, name: "", role: "", disabled: false, hasPsk: false }}];
+    }}
+
+    function buildMeshChannelOptionsFromLocalState(localState) {{
+      const hasLocalChannels = !!(localState && Array.isArray(localState.channels) && localState.channels.length);
+      const collected = collectMeshChannelOptionsFromLocalState(localState, {{
+        includeFallback: !hasLocalChannels,
+        fallbackCount: Math.max(8, (localState && Array.isArray(localState.channels)) ? localState.channels.length : 0),
+      }}).filter((opt) => !(opt && opt.disabled));
+      if (collected.length) return collected;
+      return [{{ index: 0, name: "", role: "", disabled: false, hasPsk: false }}];
+    }}
+
+    function buildMeshChannelSendOptionsFromLocalState(localState) {{
+      const hasLocalChannels = !!(localState && Array.isArray(localState.channels) && localState.channels.length);
+      const collected = collectMeshChannelOptionsFromLocalState(localState, {{
+        includeFallback: !hasLocalChannels,
+        fallbackCount: Math.max(8, (localState && Array.isArray(localState.channels)) ? localState.channels.length : 0),
+      }}).filter((opt) => !(opt && opt.disabled));
+      if (collected.length) return collected;
+      return [{{ index: 0, name: "", role: "", disabled: false, hasPsk: false }}];
+    }}
+
+    function renderMeshChannelSelect(options) {{
+      const select = document.getElementById("mesh-channel-select");
+      if (!(select instanceof HTMLSelectElement)) return;
+
+      const normalized = Array.isArray(options) ? options : [];
+      select.innerHTML = "";
+      const allOption = document.createElement("option");
+      allOption.value = String(meshChannelAllIndex);
+      allOption.textContent = "All channels (view)";
+      allOption.title = "All channels view";
+      select.appendChild(allOption);
+      for (const opt of normalized) {{
+        const idx = normalizeMeshChannelIndex(opt && opt.index);
+        const plainLabel = meshChannelViewOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
+        const optionEl = document.createElement("option");
+        optionEl.value = String(idx);
+        optionEl.textContent = plainLabel;
+        optionEl.disabled = !!(opt && opt.disabled);
+        if (opt && opt.role) {{
+          optionEl.title = String(opt.role);
+        }}
+        select.appendChild(optionEl);
+      }}
+
+      // Pick an enabled value.
+      const desired = String(normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }}));
+      const desiredOpt = Array.from(select.options).find((o) => o.value === desired && !o.disabled);
+      if (desiredOpt) {{
+        select.value = desired;
+        return;
+      }}
+      const firstEnabled = Array.from(select.options).find((o) => !o.disabled);
+      const nextValue = firstEnabled ? firstEnabled.value : "0";
+      select.value = nextValue;
+      activeMeshChannelIndex = normalizeMeshChannelIndex(nextValue, {{ allowAll: true }});
+      syncMeshChannelViewControl();
+      try {{
+        window.localStorage.setItem(meshChannelIndexStorageKey, String(activeMeshChannelIndex));
+      }} catch (_err) {{}}
+    }}
+
+    function renderMeshChannelSendSelect(options, {{ preserveCurrent = false }} = {{}}) {{
+      const selects = meshChannelSendSelectElements();
+      if (!selects.length) return;
+
+      const normalized = Array.isArray(options) ? options.slice() : [];
+      const desiredIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === desiredIndex)) {{
+        normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
+      }}
+      const fillSelect = (select) => {{
+        select.innerHTML = "";
+        for (const opt of normalized) {{
+          const idx = normalizeMeshChannelIndex(opt && opt.index);
+          const label = meshChannelSendOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
+          const optionEl = document.createElement("option");
+          optionEl.value = String(idx);
+          optionEl.textContent = label;
+          optionEl.disabled = !!(opt && opt.disabled);
+          optionEl.title = `${{label}} • Ch ${{idx}}`;
+          select.appendChild(optionEl);
+        }}
+      }};
+      for (const select of selects) {{
+        fillSelect(select);
+      }}
+
+      const pickEnabledValue = (select, desiredValue) => {{
+        const desiredOpt = Array.from(select.options).find((o) => o.value === desiredValue && !o.disabled);
+        if (desiredOpt) return desiredValue;
+        const firstEnabled = Array.from(select.options).find((o) => !o.disabled);
+        return firstEnabled ? firstEnabled.value : "0";
+      }};
+
+      const desired = String(desiredIndex);
+      const resolvedValue = pickEnabledValue(selects[0], desired);
+      if (resolvedValue !== desired) {{
+        activeMeshSendChannelIndex = normalizeMeshChannelIndex(resolvedValue);
+        try {{
+          window.localStorage.setItem(meshChannelSendIndexStorageKey, String(activeMeshSendChannelIndex));
+        }} catch (_err) {{}}
+      }}
+      for (const select of selects) {{
+        select.value = pickEnabledValue(select, resolvedValue);
+      }}
+    }}
+
+    function renderMeshChannelSendMenu(options, {{ preserveCurrent = false }} = {{}}) {{
+      const panel = document.getElementById("chat-send-channel-menu");
+      if (!(panel instanceof HTMLElement)) return;
+
+      const normalized = Array.isArray(options) ? options.slice() : [];
+      const desiredIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === desiredIndex)) {{
+        normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
+      }}
+
+      panel.innerHTML = normalized.map((opt) => {{
+        const idx = normalizeMeshChannelIndex(opt && opt.index);
+        const label = meshChannelSendOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
+        const active = desiredIndex === idx;
+        const meta = meshChannelColorMeta(idx, {{ allowAll: false }});
+        const primaryBadge = meshChannelPrimaryBadgeHtml(idx);
+        return `<button
+          type="button"
+          class="mesh-channel-menu-item${{active ? " active" : ""}}"
+          role="option"
+          aria-selected="${{active ? "true" : "false"}}"
+          data-mesh-send-channel-index="${{escAttr(idx)}}"
+          title="${{escAttr(meta.title === label ? meta.title : `${{meta.title}} • ${{label}}`)}}"
+        >
+          <span class="channel-color-dot" style="--channel-dot-fill: ${{meta.fill}};" aria-hidden="true"></span>
+          <span class="mesh-channel-menu-item-main">
+            <span class="mesh-channel-menu-item-title">${{primaryBadge}}<span>${{escAttr(label)}}</span></span>
+          </span>
+        </button>`;
+      }}).join("");
+    }}
+
+    async function hydrateMeshChannelOptions(force = false) {{
+      const nowMs = Date.now();
+      const ttlMs = 60000;
+
+      let localState = (settingsLocalStateCache && typeof settingsLocalStateCache === "object")
+        ? settingsLocalStateCache
+        : null;
+      const stale = !settingsLocalStateFetchedAt || (nowMs - settingsLocalStateFetchedAt) > ttlMs;
+      if (force || !localState || stale || !Array.isArray(localState.channels)) {{
+        try {{
+          const data = await fetchRawJson("/api/raw/local_state", rawDataCache.localState, ttlMs);
+          const obj = (data && typeof data === "object") ? data : null;
+          if (obj) {{
+            settingsLocalStateCache = obj;
+            settingsLocalStateFetchedAt = nowMs;
+            localState = obj;
+          }}
+        }} catch (_err) {{}}
+      }}
+
+      const options = buildMeshChannelOptionsFromLocalState(localState);
+      const sendOptions = buildMeshChannelSendOptionsFromLocalState(localState);
+      meshChannelOptions = options;
+      meshChannelSendOptions = sendOptions;
+      renderMeshChannelSelect(options);
+      renderMeshChannelPills(options);
+      renderMeshChannelSendSelect(sendOptions);
+      renderMeshChannelSendMenu(sendOptions, {{ preserveCurrent: true }});
+      syncMeshChannelSendControl();
+      return options;
+    }}
+
+    function ensureChannelsViewLocalStateHydrated(force = false) {{
+      if (channelsViewHydrateInFlight) {{
+        return channelsViewHydrateInFlight;
+      }}
+      const cached = settingsLocalStateCache && typeof settingsLocalStateCache === "object"
+        ? settingsLocalStateCache
+        : null;
+      const stale = !settingsLocalStateFetchedAt || (Date.now() - settingsLocalStateFetchedAt) > 60000;
+      const missingChannels = !(cached && Array.isArray(cached.channels));
+      if (!force && !missingChannels && !stale) {{
+        return Promise.resolve(cached);
+      }}
+      channelsViewHydrateInFlight = hydrateMeshChannelOptions(force)
+        .catch(() => null)
+        .then(() => {{
+          if (activeLayoutView === "channels") {{
+            renderChannelsView(latestState);
+          }}
+          return settingsLocalStateCache;
+        }})
+        .finally(() => {{
+          channelsViewHydrateInFlight = null;
+        }});
+      return channelsViewHydrateInFlight;
+    }}
+
+    function applyMeshChannelIndex(rawIndex, persist = true) {{
+      const idx = normalizeMeshChannelIndex(rawIndex, {{ allowAll: true }});
+      const changed = idx !== activeMeshChannelIndex;
+      const shouldFollowForSend = idx !== meshChannelAllIndex;
+      activeMeshChannelIndex = idx;
+      syncMeshChannelViewControl();
+
+      const select = document.getElementById("mesh-channel-select");
+      if (select instanceof HTMLSelectElement) {{
+        select.value = String(activeMeshChannelIndex);
+      }}
+      renderMeshChannelPills(meshChannelOptions);
+
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(meshChannelIndexStorageKey, String(activeMeshChannelIndex));
+        }} catch (_err) {{}}
+      }}
+
+      if (shouldFollowForSend) {{
+        applyMeshSendChannelIndex(idx, persist, false);
+      }}
+
+      if (activeLayoutView === "chat" && !document.hidden && tabHasFocus) {{
+        clearVisibleChatUnread(activeChatChannel);
+      }}
+
+      if ((changed || shouldFollowForSend) && latestState) {{
+        if (activeLayoutView === "chat") {{
+          renderChat(latestState);
+        }} else if (activeLayoutView === "files") {{
+          renderFilesView(latestState);
+        }}
+      }}
+    }}
+
+    function applyMeshSendChannelIndex(rawIndex, persist = true, rerenderChat = true) {{
+      const idx = normalizeMeshChannelIndex(rawIndex);
+      const changed = idx !== activeMeshSendChannelIndex;
+      activeMeshSendChannelIndex = idx;
+
+      for (const select of meshChannelSendSelectElements()) {{
+        select.value = String(activeMeshSendChannelIndex);
+      }}
+      syncMeshChannelSendControl();
+      renderMeshChannelSendMenu(meshChannelSendOptions, {{ preserveCurrent: true }});
+
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(meshChannelSendIndexStorageKey, String(activeMeshSendChannelIndex));
+        }} catch (_err) {{}}
+      }}
+
+      if (rerenderChat && changed && latestState && activeLayoutView === "chat") {{
+        renderChat(latestState);
+      }}
+    }}
+
+    function loadMeshChannelIndex() {{
+      let preferred = 0;
+      let preferredSend = null;
+      try {{
+        preferred = normalizeMeshChannelIndex(
+          window.localStorage.getItem(meshChannelIndexStorageKey) || "0",
+          {{ allowAll: true }}
+        );
+        const storedSend = window.localStorage.getItem(meshChannelSendIndexStorageKey);
+        if (storedSend != null && String(storedSend).trim() !== "") {{
+          preferredSend = normalizeMeshChannelIndex(storedSend);
+        }}
+      }} catch (_err) {{}}
+      activeMeshChannelIndex = preferred;
+      activeMeshSendChannelIndex = preferredSend == null
+        ? normalizeMeshChannelIndex(preferred)
+        : normalizeMeshChannelIndex(preferredSend);
+    }}
+
+    function bindMeshChannelControl() {{
+      const select = document.getElementById("mesh-channel-select");
+      if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+
+      select.addEventListener("change", () => {{
+        applyMeshChannelIndex(select.value, true);
+      }});
+
+      // Seed fast fallback so the control is usable before the radio query returns.
+      const fallback = buildMeshChannelOptionsFromLocalState({{ channels: [] }});
+      const sendFallback = buildMeshChannelSendOptionsFromLocalState(null);
+      meshChannelOptions = fallback;
+      meshChannelSendOptions = sendFallback;
+      renderMeshChannelSelect(fallback);
+      renderMeshChannelPills(fallback);
+      renderMeshChannelSendSelect(sendFallback, {{ preserveCurrent: true }});
+      renderMeshChannelSendMenu(sendFallback, {{ preserveCurrent: true }});
+      select.value = String(activeMeshChannelIndex);
+      syncMeshChannelViewControl();
+      syncMeshChannelSendControl();
+
+      void hydrateMeshChannelOptions(false);
+    }}
+
+    function bindMeshChannelMenuControl() {{
+      const panel = document.getElementById("mesh-channel-pill-strip");
+      if (!(panel instanceof HTMLElement) || panel.dataset.bound === "1") return;
+      panel.dataset.bound = "1";
+
+      panel.addEventListener("pointerdown", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest(".mesh-channel-pill");
+        if (!(item instanceof HTMLButtonElement)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        applyMeshChannelIndex(item.dataset.meshChannelIndex || meshChannelAllIndex, true);
+      }});
+
+      syncMeshChannelViewControl();
+      renderMeshChannelPills(meshChannelOptions);
+    }}
+
+    function bindMeshChannelSendMenuControl() {{
+      const btn = document.getElementById("chat-send-channel-menu-btn");
+      const panel = document.getElementById("chat-send-channel-menu");
+      if (!(btn instanceof HTMLButtonElement) || !(panel instanceof HTMLElement) || btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+
+      btn.addEventListener("click", (ev) => {{
+        ev.preventDefault();
+        if (btn.disabled) return;
+        setMeshChannelSendMenuOpen(!meshChannelSendMenuOpen);
+      }});
+
+      panel.addEventListener("pointerdown", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest(".mesh-channel-menu-item");
+        if (!(item instanceof HTMLButtonElement)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        applyMeshSendChannelIndex(item.dataset.meshSendChannelIndex || 0, true);
+        setMeshChannelSendMenuOpen(false);
+      }});
+
+      if (document.body.dataset.meshChannelSendMenuBound !== "1") {{
+        document.body.dataset.meshChannelSendMenuBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          if (target.closest("#chat-send-channel-menu-btn") || target.closest("#chat-send-channel-menu")) return;
+          setMeshChannelSendMenuOpen(false);
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key === "Escape") {{
+            setMeshChannelSendMenuOpen(false);
+          }}
+        }});
+      }}
+
+      syncMeshChannelSendControl();
+      renderMeshChannelSendMenu(meshChannelSendOptions, {{ preserveCurrent: true }});
+    }}
+
+    function bindMeshChannelSendControl() {{
+      const selects = meshChannelSendSelectElements();
+      if (!selects.length) return;
+      for (const select of selects) {{
+        if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") continue;
+        select.dataset.bound = "1";
+        select.addEventListener("change", () => {{
+          applyMeshSendChannelIndex(select.value, true);
+        }});
+      }}
+
+      renderMeshChannelSendSelect(
+        meshChannelSendOptions.length ? meshChannelSendOptions : buildMeshChannelSendOptionsFromLocalState(null),
+        {{ preserveCurrent: true }},
+      );
+      renderMeshChannelSendMenu(
+        meshChannelSendOptions.length ? meshChannelSendOptions : buildMeshChannelSendOptionsFromLocalState(null),
+        {{ preserveCurrent: true }},
+      );
+      syncMeshChannelSendControl();
+    }}
+
+
+    function normalizeChannelsUiMode(raw) {{
+      const text = String(raw == null ? "" : raw).trim().toLowerCase();
+      if (text === "advanced" || text === "1" || text === "true" || text === "on") return "advanced";
+      return "simple";
+    }}
+
+    function applyChannelsUiMode() {{
+      const root = document.body;
+      if (root) {{
+        root.classList.toggle("channels-advanced-ui", !!channelsUiAdvanced);
+      }}
+      const addOnlyBtn = document.getElementById("settings-channels-import-url-add-btn");
+      if (addOnlyBtn instanceof HTMLButtonElement) {{
+        addOnlyBtn.hidden = !channelsUiAdvanced;
+      }}
+    }}
+
+    function setChannelsUiAdvanced(enabled, persist = true) {{
+      channelsUiAdvanced = !!enabled;
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(
+            channelsUiModeStorageKey,
+            channelsUiAdvanced ? "advanced" : "simple"
+          );
+        }} catch (_err) {{}}
+      }}
+      applyChannelsUiMode();
+    }}
+
+    function setChannelsExperimentalEnabled(enabled, persist = true) {{
+      channelsExperimentalEnabled = !!enabled;
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(
+            channelsExperimentalStorageKey,
+            channelsExperimentalEnabled ? "1" : "0"
+          );
+        }} catch (_err) {{}}
+      }}
+    }}
+
+    function loadChannelsUiMode() {{
+      let stored = "simple";
+      try {{
+        stored = normalizeChannelsUiMode(window.localStorage.getItem(channelsUiModeStorageKey) || "simple");
+      }} catch (_err) {{}}
+      channelsUiAdvanced = stored === "advanced";
+    }}
+
+    function loadChannelsExperimentalPreference() {{
+      let stored = false;
+      try {{
+        stored = parseBoolToken(window.localStorage.getItem(channelsExperimentalStorageKey), false);
+      }} catch (_err) {{}}
+      channelsExperimentalEnabled = !!stored;
+    }}
+
+
+    function requestImmediatePoll(delayMs = 0) {{
+      const waitMs = Math.max(0, Math.trunc(Number(delayMs) || 0));
+      if (chatImmediatePollTimer !== null) {{
+        clearTimeout(chatImmediatePollTimer);
+        chatImmediatePollTimer = null;
+      }}
+      chatImmediatePollTimer = window.setTimeout(() => {{
+        chatImmediatePollTimer = null;
+        if (document.hidden) return;
+        if (typeof pollOnce === "function") {{
+          void pollOnce();
+          return;
+        }}
+        void poll();
+      }}, waitMs);
+    }}
+
+    function persistManualDirectPeers() {{
+      try {{
+        const ids = Array.from(manualDirectPeerIds)
+          .map((entry) => normalizeNodeId(entry))
+          .filter((entry) => isCanonicalNodeId(entry))
+          .sort((a, b) => a.localeCompare(b));
+        window.localStorage.setItem(chatDirectPeersStorageKey, JSON.stringify(ids));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadManualDirectPeers() {{
+      manualDirectPeerIds.clear();
+      try {{
+        const raw = window.localStorage.getItem(chatDirectPeersStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        for (const entry of parsed) {{
+          const nodeId = normalizeNodeId(entry);
+          if (!isCanonicalNodeId(nodeId)) continue;
+          manualDirectPeerIds.add(nodeId);
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function addManualDirectPeer(rawNodeId, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const shouldSelect = opts.select !== false;
+      const nodeId = normalizeNodeId(rawNodeId);
+      if (!nodeId) {{
+        return {{ ok: false, error: "Enter a node ID to add." }};
+      }}
+      if (!isCanonicalNodeId(nodeId)) {{
+        return {{ ok: false, error: "Use a node ID like !49b54790." }};
+      }}
+      if (isSelfNodeId(nodeId)) {{
+        return {{ ok: false, error: "Cannot add your own radio to peer-to-peer list." }};
+      }}
+      const added = !manualDirectPeerIds.has(nodeId);
+      manualDirectPeerIds.add(nodeId);
+      persistManualDirectPeers();
+      if (shouldSelect) {{
+        selectNode(nodeId, true, false);
+      }} else if (latestState) {{
+        renderChat(latestState);
+      }}
+      return {{ ok: true, added, id: nodeId }};
+    }}
+
+    function removeManualDirectPeer(rawNodeId) {{
+      const nodeId = normalizeNodeId(rawNodeId);
+      if (!isCanonicalNodeId(nodeId)) return false;
+      if (!manualDirectPeerIds.delete(nodeId)) return false;
+      persistManualDirectPeers();
+      if (selectedNodeId && normalizeNodeId(selectedNodeId) === nodeId) {{
+        clearNodeSelection();
+      }} else if (latestState) {{
+        renderChat(latestState);
+      }}
+      return true;
+    }}
+
+    function detectedPeerCandidates(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const selfId = resolveLocalNodeId(safeState);
+      const unique = new Map();
+      for (const node of nodes) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (isCanonicalNodeId(selfId) && nodeId === selfId) continue;
+        if (!isCanonicalNodeId(nodeId) || unique.has(nodeId)) continue;
+        const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || nodeId;
+        const lastSeenUnix = nodeLastHeardUnix(node);
+        unique.set(nodeId, {{ id: nodeId, name, lastSeenUnix }});
+      }}
+      return Array.from(unique.values()).sort((a, b) => {{
+        const aSeen = Number(a.lastSeenUnix) || 0;
+        const bSeen = Number(b.lastSeenUnix) || 0;
+        if (aSeen !== bSeen) return bSeen - aSeen;
+        const nameDiff = String(a.name || "").localeCompare(String(b.name || ""));
+        if (nameDiff !== 0) return nameDiff;
+        return String(a.id || "").localeCompare(String(b.id || ""));
+      }});
+    }}
+
+    function renderChatPeerAddPanel(state = latestState) {{
+      const toggleBtn = document.getElementById("chat-peer-add-toggle-btn");
+      const panel = document.getElementById("chat-peer-add-panel");
+      const detectedSelect = document.getElementById("chat-peer-detected-select");
+      const detectedAddBtn = document.getElementById("chat-peer-add-detected-btn");
+      const manualInput = document.getElementById("chat-peer-manual-input");
+      const manualAddBtn = document.getElementById("chat-peer-add-manual-btn");
+      const savedList = document.getElementById("chat-peer-saved-list");
+      const directMode = activeChatChannel === "direct";
+      if (toggleBtn instanceof HTMLButtonElement) {{
+        toggleBtn.hidden = !directMode;
+        toggleBtn.setAttribute("aria-expanded", directMode && chatPeerAddPanelOpen ? "true" : "false");
+      }}
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = !(directMode && chatPeerAddPanelOpen);
+      }}
+
+      const candidates = detectedPeerCandidates(state);
+      if (detectedSelect instanceof HTMLSelectElement) {{
+        const previousValue = normalizeNodeId(detectedSelect.value || "");
+        const options = ['<option value="">Detected nodes...</option>'];
+        for (const entry of candidates) {{
+          const savedSuffix = manualDirectPeerIds.has(entry.id) ? " (saved)" : "";
+          const label = `${{entry.name}} (${{entry.id}})${{savedSuffix}}`;
+          options.push(`<option value="${{escAttr(entry.id)}}">${{escAttr(label)}}</option>`);
+        }}
+        detectedSelect.innerHTML = options.join("");
+        if (previousValue && candidates.some((entry) => entry.id === previousValue)) {{
+          detectedSelect.value = previousValue;
+        }} else if (isCanonicalNodeId(selectedNodeId) && candidates.some((entry) => entry.id === selectedNodeId)) {{
+          detectedSelect.value = normalizeNodeId(selectedNodeId);
+        }} else {{
+          detectedSelect.value = "";
+        }}
+        detectedSelect.disabled = !directMode || candidates.length === 0;
+      }}
+      if (detectedAddBtn instanceof HTMLButtonElement) {{
+        const hasChoice = detectedSelect instanceof HTMLSelectElement
+          && isCanonicalNodeId(detectedSelect.value || "");
+        detectedAddBtn.disabled = !directMode || !hasChoice;
+      }}
+      if (manualInput instanceof HTMLInputElement) {{
+        manualInput.disabled = !directMode;
+      }}
+      if (manualAddBtn instanceof HTMLButtonElement) {{
+        manualAddBtn.disabled = !directMode;
+      }}
+
+      if (savedList instanceof HTMLElement) {{
+        const safeState = (state && typeof state === "object") ? state : {{}};
+        const selfId = resolveLocalNodeId(safeState);
+        const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+        const nodesById = new Map(
+          nodes.map((node) => [normalizeNodeId(node && node.id), node])
+        );
+        const savedPeers = Array.from(manualDirectPeerIds)
+          .map((entry) => normalizeNodeId(entry))
+          .filter((entry) => isCanonicalNodeId(entry))
+          .filter((entry) => !(isCanonicalNodeId(selfId) && entry === selfId))
+          .map((entry) => {{
+            const node = nodesById.get(entry);
+            const name = preferredNodeName(node) || nodeNameCache.get(entry) || entry;
+            return {{ id: entry, name }};
+          }})
+          .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
+        if (savedPeers.length === 0) {{
+          savedList.innerHTML = '<div class="chat-peer-saved-empty">No saved peers yet.</div>';
+        }} else {{
+          savedList.innerHTML = savedPeers.map((entry) => (
+            `<div class="chat-peer-saved-item">
+              <span class="chat-peer-saved-main">
+                <span class="chat-peer-saved-name">${{escAttr(entry.name)}}</span>
+                <span class="chat-peer-saved-id">${{escAttr(entry.id)}}</span>
+              </span>
+              <button type="button" class="chat-peer-saved-remove-btn" data-node-id="${{escAttr(entry.id)}}" title="Remove ${{escAttr(entry.id)}} from peer-to-peer list" aria-label="Remove ${{escAttr(entry.id)}} from peer-to-peer list">&times;</button>
+            </div>`
+          )).join("");
+        }}
+      }}
+    }}
+
+    function bindChatPeerControls() {{
+      const toggleBtn = document.getElementById("chat-peer-add-toggle-btn");
+      const detectedSelect = document.getElementById("chat-peer-detected-select");
+      const detectedAddBtn = document.getElementById("chat-peer-add-detected-btn");
+      const manualInput = document.getElementById("chat-peer-manual-input");
+      const manualAddBtn = document.getElementById("chat-peer-add-manual-btn");
+      const savedList = document.getElementById("chat-peer-saved-list");
+
+      if (toggleBtn instanceof HTMLButtonElement && toggleBtn.dataset.bound !== "1") {{
+        toggleBtn.dataset.bound = "1";
+        toggleBtn.addEventListener("click", () => {{
+          if (activeChatChannel !== "direct") return;
+          chatPeerAddPanelOpen = !chatPeerAddPanelOpen;
+          renderChatPeerAddPanel(latestState);
+          if (chatPeerAddPanelOpen && manualInput instanceof HTMLInputElement) {{
+            manualInput.focus({{ preventScroll: true }});
+          }}
+        }});
+      }}
+
+      if (detectedAddBtn instanceof HTMLButtonElement && detectedAddBtn.dataset.bound !== "1") {{
+        detectedAddBtn.dataset.bound = "1";
+        detectedAddBtn.addEventListener("click", () => {{
+          const chosenId = normalizeNodeId(
+            detectedSelect instanceof HTMLSelectElement ? detectedSelect.value : ""
+          );
+          const result = addManualDirectPeer(chosenId, {{ select: true }});
+          if (!result.ok) {{
+            setChatSendStatus(result.error || "Unable to add peer.", true);
+            return;
+          }}
+          setChatSendStatus(
+            result.added
+              ? `Peer ${{result.id}} added to peer-to-peer list.`
+              : `Peer ${{result.id}} is already in your peer-to-peer list.`
+          );
+          renderChatPeerAddPanel(latestState);
+        }});
+      }}
+
+      if (detectedSelect instanceof HTMLSelectElement && detectedSelect.dataset.bound !== "1") {{
+        detectedSelect.dataset.bound = "1";
+        detectedSelect.addEventListener("change", () => {{
+          renderChatPeerAddPanel(latestState);
+        }});
+      }}
+
+      const submitManualPeer = () => {{
+        const raw = manualInput instanceof HTMLInputElement ? manualInput.value : "";
+        const result = addManualDirectPeer(raw, {{ select: true }});
+        if (!result.ok) {{
+          setChatSendStatus(result.error || "Unable to add peer.", true);
+          if (manualInput instanceof HTMLInputElement) {{
+            manualInput.focus({{ preventScroll: true }});
+          }}
+          return;
+        }}
+        if (manualInput instanceof HTMLInputElement) {{
+          manualInput.value = "";
+          manualInput.focus({{ preventScroll: true }});
+        }}
+        setChatSendStatus(
+          result.added
+            ? `Peer ${{result.id}} added to peer-to-peer list.`
+            : `Peer ${{result.id}} is already in your peer-to-peer list.`
+        );
+        renderChatPeerAddPanel(latestState);
+      }};
+
+      if (manualAddBtn instanceof HTMLButtonElement && manualAddBtn.dataset.bound !== "1") {{
+        manualAddBtn.dataset.bound = "1";
+        manualAddBtn.addEventListener("click", () => {{
+          submitManualPeer();
+        }});
+      }}
+
+      if (manualInput instanceof HTMLInputElement && manualInput.dataset.bound !== "1") {{
+        manualInput.dataset.bound = "1";
+        manualInput.addEventListener("keydown", (ev) => {{
+          if (ev.key !== "Enter") return;
+          ev.preventDefault();
+          submitManualPeer();
+        }});
+      }}
+
+      if (savedList instanceof HTMLElement && savedList.dataset.bound !== "1") {{
+        savedList.dataset.bound = "1";
+        savedList.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const removeBtn = target.closest(".chat-peer-saved-remove-btn");
+          if (!(removeBtn instanceof HTMLButtonElement)) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          const nodeId = normalizeNodeId(removeBtn.dataset.nodeId || "");
+          if (!isCanonicalNodeId(nodeId)) return;
+          const removed = removeManualDirectPeer(nodeId);
+          if (!removed) return;
+          setChatSendStatus(`Peer ${{nodeId}} removed from peer-to-peer list.`);
+          renderChatPeerAddPanel(latestState);
+        }});
+      }}
+
+      renderChatPeerAddPanel(latestState);
+    }}
+
+    function normalizeChatEmojiGroup(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      if (!clean || clean === "all") return "all";
+      return chatEmojiGroupsById.has(clean) ? clean : "all";
+    }}
+
+    function normalizeChatEmojiSearchQuery(raw) {{
+      const lowered = String(raw || "").trim().toLowerCase();
+      if (!lowered) return "";
+      const noShortcodeColons = lowered.replace(/(^:+|:+$)/g, " ");
+      return noShortcodeColons
+        .replace(/[_-]+/g, " ")
+        .replace(/[^a-z0-9+ ]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }}
+
+    function stemChatEmojiSearchToken(rawToken) {{
+      const token = String(rawToken || "").trim().toLowerCase();
+      if (!token) return "";
+      if (token.endsWith("ies") && token.length > 4) {{
+        return `${{token.slice(0, -3)}}y`;
+      }}
+      if (token.endsWith("ing") && token.length > 5) {{
+        return token.slice(0, -3);
+      }}
+      if (token.endsWith("ed") && token.length > 4) {{
+        return token.slice(0, -2);
+      }}
+      if (token.endsWith("es") && token.length > 4) {{
+        return token.slice(0, -2);
+      }}
+      if (token.endsWith("s") && token.length > 3) {{
+        return token.slice(0, -1);
+      }}
+      return token;
+    }}
+
+    function tokenizeChatEmojiSearchQuery(rawQuery) {{
+      const normalized = normalizeChatEmojiSearchQuery(rawQuery);
+      if (!normalized) return [];
+      const seen = new Set();
+      const out = [];
+      for (const rawToken of normalized.split(/\s+/g)) {{
+        const token = String(rawToken || "").trim();
+        if (!token) continue;
+        if (!seen.has(token)) {{
+          seen.add(token);
+          out.push(token);
+        }}
+        const stemmed = stemChatEmojiSearchToken(token);
+        if (stemmed && !seen.has(stemmed)) {{
+          seen.add(stemmed);
+          out.push(stemmed);
+        }}
+      }}
+      return out;
+    }}
+
+    function tokenizeChatEmojiSearchAliasParts(queryParts) {{
+      const base = Array.isArray(queryParts) ? queryParts : [];
+      if (!base.length) return [];
+      const seen = new Set(base);
+      const out = [];
+      for (const token of base) {{
+        const aliasText = String(chatEmojiQueryKeywordAliases[token] || "").trim();
+        if (!aliasText) continue;
+        for (const aliasToken of tokenizeChatEmojiSearchQuery(aliasText)) {{
+          if (!aliasToken || seen.has(aliasToken)) continue;
+          seen.add(aliasToken);
+          out.push(aliasToken);
+        }}
+      }}
+      return out;
+    }}
+
+    function collectChatEmojiCodepointAliasParts(rawEmoji) {{
+      const text = String(rawEmoji || "").trim();
+      if (!text) return [];
+      const out = [];
+      const seen = new Set();
+      for (const ch of text) {{
+        const cp = ch.codePointAt(0);
+        if (!Number.isInteger(cp)) continue;
+        if (chatEmojiCodepointIgnoredSet.has(cp)) continue;
+        if (cp >= 0xe0020 && cp <= 0xe007f) continue;
+        const key = cp.toString(16);
+        const keywords = String(chatEmojiCodepointKeywordMap[key] || "").trim();
+        if (!keywords) continue;
+        for (const part of tokenizeChatEmojiSearchQuery(keywords)) {{
+          if (!part || seen.has(part)) continue;
+          seen.add(part);
+          out.push(part);
+        }}
+      }}
+      return out;
+    }}
+
+    function boundedLevenshteinDistance(aRaw, bRaw, maxDistance = 2) {{
+      const a = String(aRaw || "");
+      const b = String(bRaw || "");
+      if (a === b) return 0;
+      if (!a || !b) {{
+        return Math.max(a.length, b.length);
+      }}
+      const aLen = a.length;
+      const bLen = b.length;
+      if (Math.abs(aLen - bLen) > maxDistance) {{
+        return maxDistance + 1;
+      }}
+      let prev = new Array(bLen + 1).fill(0);
+      let curr = new Array(bLen + 1).fill(0);
+      for (let j = 0; j <= bLen; j += 1) {{
+        prev[j] = j;
+      }}
+      for (let i = 1; i <= aLen; i += 1) {{
+        curr[0] = i;
+        for (let j = 1; j <= bLen; j += 1) {{
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          curr[j] = Math.min(
+            prev[j] + 1,
+            curr[j - 1] + 1,
+            prev[j - 1] + cost
+          );
+        }}
+        const swap = prev;
+        prev = curr;
+        curr = swap;
+      }}
+      return prev[bLen];
+    }}
+
+    function scoreChatEmojiPartMatch(part, tokens, searchText, allowFuzzy = false) {{
+      if (!part) return 0;
+      let best = 0;
+      for (const token of tokens) {{
+        if (!token) continue;
+        if (token === part) {{
+          best = Math.max(best, 460);
+          continue;
+        }}
+        if (token.startsWith(part)) {{
+          best = Math.max(best, 320);
+          continue;
+        }}
+        if (token.includes(part)) {{
+          best = Math.max(best, 180);
+        }}
+      }}
+      if (best > 0) {{
+        return best;
+      }}
+      if (searchText.includes(part)) {{
+        return 120;
+      }}
+      if (!allowFuzzy || part.length < 4) {{
+        return 0;
+      }}
+
+      const maxDistance = part.length >= 8 ? 2 : 1;
+      let closest = maxDistance + 1;
+      for (const token of tokens) {{
+        if (!token || token.length < 3) continue;
+        const distance = boundedLevenshteinDistance(part, token, maxDistance);
+        if (distance < closest) {{
+          closest = distance;
+        }}
+        if (closest === 0) {{
+          break;
+        }}
+      }}
+      if (closest > maxDistance) {{
+        return 0;
+      }}
+      return closest <= 1 ? 90 : 52;
+    }}
+
+    function scoreChatEmojiSearchMatch(emoji, queryText, queryParts, allowFuzzy = false) {{
+      const tokens = chatEmojiSearchTokensByEmoji.get(emoji) || [];
+      if (!tokens.length) {{
+        return 0;
+      }}
+      const searchText = String(chatEmojiSearchMetaByEmoji.get(emoji) || "");
+      let score = 0;
+      for (const part of queryParts) {{
+        const partScore = scoreChatEmojiPartMatch(part, tokens, searchText, allowFuzzy);
+        if (partScore <= 0) {{
+          return 0;
+        }}
+        score += partScore;
+      }}
+      if (queryText && searchText.includes(queryText)) {{
+        score += 35;
+      }}
+      return score;
+    }}
+
+    function rankChatEmojiSearchMatches(rawQuery, queryParts, allowFuzzy = false) {{
+      const queryText = normalizeChatEmojiSearchQuery(rawQuery);
+      const ranked = [];
+      const seen = new Set();
+      for (const emoji of chatEmojiAllChoices) {{
+        if (seen.has(emoji)) continue;
+        seen.add(emoji);
+        const score = scoreChatEmojiSearchMatch(
+          emoji,
+          queryText,
+          queryParts,
+          allowFuzzy,
+        );
+        if (score <= 0) {{
+          continue;
+        }}
+        ranked.push({{
+          emoji,
+          score,
+          order: Number(chatEmojiChoiceOrder.get(emoji) || 0),
+        }});
+      }}
+      ranked.sort((a, b) => (b.score - a.score) || (a.order - b.order));
+      return ranked.map((entry) => entry.emoji);
+    }}
+
+    function rankChatEmojiSearchMatchesAnyPart(rawQuery, queryParts, allowFuzzy = false) {{
+      const queryText = normalizeChatEmojiSearchQuery(rawQuery);
+      const ranked = [];
+      const seen = new Set();
+      for (const emoji of chatEmojiAllChoices) {{
+        if (seen.has(emoji)) continue;
+        seen.add(emoji);
+        const tokens = chatEmojiSearchTokensByEmoji.get(emoji) || [];
+        if (!tokens.length) continue;
+        const searchText = String(chatEmojiSearchMetaByEmoji.get(emoji) || "");
+        let matchedParts = 0;
+        let score = 0;
+        for (const part of queryParts) {{
+          const partScore = scoreChatEmojiPartMatch(part, tokens, searchText, allowFuzzy);
+          if (partScore <= 0) continue;
+          matchedParts += 1;
+          score += partScore;
+        }}
+        if (matchedParts <= 0) {{
+          continue;
+        }}
+        if (queryText && searchText.includes(queryText)) {{
+          score += 28;
+        }}
+        score += matchedParts * 24;
+        ranked.push({{
+          emoji,
+          score,
+          matchedParts,
+          order: Number(chatEmojiChoiceOrder.get(emoji) || 0),
+        }});
+      }}
+      ranked.sort((a, b) => (
+        (b.score - a.score)
+        || (b.matchedParts - a.matchedParts)
+        || (a.order - b.order)
+      ));
+      return ranked.map((entry) => entry.emoji);
+    }}
+
+    const reactionEmojiIgnoredCodepoints = new Set([0xFE0E, 0xFE0F]);
+
+    function reactionEmojiCodepoint(rawEmoji) {{
+      const text = String(rawEmoji == null ? "" : rawEmoji).trim();
+      if (!text) return null;
+      let baseCodepoint = null;
+      for (const ch of text) {{
+        const cp = ch.codePointAt(0);
+        if (!Number.isInteger(cp)) continue;
+        if (reactionEmojiIgnoredCodepoints.has(cp)) continue;
+        if (baseCodepoint !== null) {{
+          return null;
+        }}
+        baseCodepoint = cp;
+      }}
+      return Number.isInteger(baseCodepoint) && baseCodepoint > 0 ? baseCodepoint : null;
+    }}
+
+    function isReactionCompatibleEmoji(rawEmoji) {{
+      return Number.isInteger(reactionEmojiCodepoint(rawEmoji));
+    }}
+
+    function reactionCompatibleEmojiChoices(rawChoices) {{
+      const list = Array.isArray(rawChoices) ? rawChoices : [];
+      const deduped = [];
+      const seen = new Set();
+      for (const emoji of list) {{
+        const clean = String(emoji || "").trim();
+        if (!clean || seen.has(clean)) continue;
+        seen.add(clean);
+        if (!isReactionCompatibleEmoji(clean)) continue;
+        deduped.push(clean);
+      }}
+      return deduped;
+    }}
+
+    function chatEmojiChoicesForGroup(groupId) {{
+      const key = normalizeChatEmojiGroup(groupId);
+      if (key === "all") return chatEmojiAllChoices;
+      const group = chatEmojiGroupsById.get(key);
+      if (group && Array.isArray(group.emojis)) {{
+        return group.emojis;
+      }}
+      return chatEmojiAllChoices;
+    }}
+
+    function chatEmojiChoicesForSearch(rawQuery) {{
+      const rawText = String(rawQuery || "").trim();
+      if (rawText && chatEmojiChoiceSet.has(rawText)) {{
+        return [rawText];
+      }}
+      const query = normalizeChatEmojiSearchQuery(rawQuery);
+      if (!query) return [];
+      const cached = chatEmojiSearchCache.get(query);
+      if (Array.isArray(cached)) {{
+        return cached;
+      }}
+
+      const parts = tokenizeChatEmojiSearchQuery(query);
+      if (!parts.length) return [];
+      const aliasParts = tokenizeChatEmojiSearchAliasParts(parts);
+      let matches = rankChatEmojiSearchMatches(query, parts, false);
+      if (!matches.length) {{
+        matches = rankChatEmojiSearchMatches(query, parts, true);
+      }}
+      if (!matches.length) {{
+        const fallbackParts = aliasParts.length ? parts.concat(aliasParts) : parts;
+        matches = rankChatEmojiSearchMatchesAnyPart(query, fallbackParts, false);
+      }}
+      if (!matches.length) {{
+        const fallbackParts = aliasParts.length ? parts.concat(aliasParts) : parts;
+        matches = rankChatEmojiSearchMatchesAnyPart(query, fallbackParts, true);
+      }}
+      chatEmojiSearchCache.set(query, matches);
+      return matches;
+    }}
+
+    function buildChatEmojiNode(emoji, extraClass = "") {{
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = extraClass ? `chat-emoji-item ${{extraClass}}` : "chat-emoji-item";
+      btn.setAttribute("data-emoji", emoji);
+      btn.setAttribute("title", emoji);
+      btn.textContent = emoji;
+      return btn;
+    }}
+
+    function chatEmojiNodesForGroup(groupId) {{
+      const key = normalizeChatEmojiGroup(groupId);
+      const cached = chatEmojiNodesByGroup.get(key);
+      if (Array.isArray(cached)) {{
+        return cached;
+      }}
+      const nodes = [];
+      for (const emoji of chatEmojiChoicesForGroup(key)) {{
+        nodes.push(buildChatEmojiNode(emoji));
+      }}
+      chatEmojiNodesByGroup.set(key, nodes);
+      return nodes;
+    }}
+
+    function chatEmojiUsageEntries() {{
+      const enforceChoiceSet = chatEmojiChoiceSet.size > 0;
+      return Array.from(chatEmojiUsageCounts.entries())
+        .filter(([emoji, count]) => (
+          (!enforceChoiceSet || chatEmojiChoiceSet.has(emoji))
+          && Number.isFinite(count)
+          && count > 0
+        ))
+        .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])));
+    }}
+
+    function chatEmojiTopChoices() {{
+      const picked = [];
+      const used = new Set();
+      for (const [emoji] of chatEmojiUsageEntries()) {{
+        if (used.has(emoji)) continue;
+        used.add(emoji);
+        picked.push(emoji);
+        if (picked.length >= chatEmojiTopUsageCount) {{
+          return picked;
+        }}
+      }}
+      for (const emoji of chatEmojiPopularDefaults) {{
+        if (!chatEmojiChoiceSet.has(emoji) || used.has(emoji)) continue;
+        used.add(emoji);
+        picked.push(emoji);
+        if (picked.length >= chatEmojiTopUsageCount) {{
+          break;
+        }}
+      }}
+      return picked;
+    }}
+
+    function persistChatEmojiUsage() {{
+      try {{
+        const entries = chatEmojiUsageEntries().slice(0, chatEmojiUsagePersistMax);
+        const payload = {{}};
+        for (const [emoji, count] of entries) {{
+          payload[emoji] = count;
+        }}
+        window.localStorage.setItem(chatEmojiUsageStorageKey, JSON.stringify(payload));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadChatEmojiUsage() {{
+      const next = new Map();
+      const enforceChoiceSet = chatEmojiChoiceSet.size > 0;
+      try {{
+        const raw = window.localStorage.getItem(chatEmojiUsageStorageKey);
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {{
+            for (const [emojiRaw, countRaw] of Object.entries(parsed)) {{
+              const emoji = String(emojiRaw || "").trim();
+              const count = Math.floor(Number(countRaw));
+              if (!emoji || (enforceChoiceSet && !chatEmojiChoiceSet.has(emoji)) || !Number.isFinite(count) || count <= 0) {{
+                continue;
+              }}
+              next.set(emoji, count);
+            }}
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      chatEmojiUsageCounts = next;
+    }}
+
+    function noteChatEmojiUsage(rawEmoji) {{
+      const emoji = String(rawEmoji || "").trim();
+      if (!emoji) return;
+      if (chatEmojiChoiceSet.size > 0 && !chatEmojiChoiceSet.has(emoji)) return;
+      const nextCount = (chatEmojiUsageCounts.get(emoji) || 0) + 1;
+      chatEmojiUsageCounts.set(emoji, nextCount);
+      persistChatEmojiUsage();
+    }}
+
+    function persistChatEmojiPickerState() {{
+      try {{
+        window.localStorage.setItem(
+          chatEmojiPickerStateStorageKey,
+          JSON.stringify({{
+            group: chatEmojiPickerGroup,
+          }})
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadChatEmojiPickerState() {{
+      let preferredGroup = chatEmojiDefaultGroup;
+      try {{
+        const raw = window.localStorage.getItem(chatEmojiPickerStateStorageKey);
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {{
+            const storedGroup = String(parsed.group || "").trim();
+            if (storedGroup) {{
+              if (chatEmojiGroupsById.size <= 0) {{
+                preferredGroup = String(storedGroup || "").trim().toLowerCase() || chatEmojiDefaultGroup;
+              }} else {{
+                const normalized = normalizeChatEmojiGroup(storedGroup);
+                preferredGroup = (
+                  normalized === "all" && storedGroup.toLowerCase() !== "all"
+                ) ? chatEmojiDefaultGroup : normalized;
+              }}
+            }}
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      chatEmojiPickerGroup = preferredGroup;
+    }}
+
+    function classifyMessageChannel(msg) {{
+      if (!msg || typeof msg !== "object") return "all";
+      const toId = normalizeNodeId(msg.to || msg.destination || "");
+      if (!toId || toId === "^all" || toId === "all" || toId === "broadcast") {{
+        return "all";
+      }}
+      if (typeof msg.scope === "string" && msg.scope.trim()) {{
+        return normalizeChatChannel(msg.scope);
+      }}
+      return "direct";
+    }}
+
+    function utf8ByteLength(value) {{
+      const raw = String(value == null ? "" : value);
+      if (typeof TextEncoder !== "undefined") {{
+        try {{
+          return new TextEncoder().encode(raw).length;
+        }} catch (_err) {{
+        }}
+      }}
+      const encoded = encodeURIComponent(raw);
+      let count = 0;
+      for (let i = 0; i < encoded.length; i += 1) {{
+        if (encoded[i] === "%" && i + 2 < encoded.length) {{
+          count += 1;
+          i += 2;
+        }} else {{
+          count += 1;
+        }}
+      }}
+      return count;
+    }}
+
+    function waitFileTransferFrameGap() {{
+      const delayMs = Math.max(0, Math.trunc(Number(fileTransferInterFrameDelayMs) || 0));
+      if (delayMs <= 0) return Promise.resolve();
+      return new Promise((resolve) => {{
+        window.setTimeout(resolve, delayMs);
+      }});
+    }}
+
+    function formatFileTransferSize(rawBytes) {{
+      const bytes = Number(rawBytes);
+      if (!Number.isFinite(bytes) || bytes < 0) return "n/a";
+      if (bytes < 1024) return `${{Math.trunc(bytes)}} B`;
+      const kib = bytes / 1024;
+      if (kib < 1024) return `${{kib.toFixed(kib >= 100 ? 0 : 1)}} KiB`;
+      const mib = kib / 1024;
+      return `${{mib.toFixed(mib >= 100 ? 0 : 1)}} MiB`;
+    }}
+
+    function normalizeFileTransferName(rawName) {{
+      const compact = String(rawName == null ? "" : rawName)
+        .replace(/\r\n/g, " ")
+        .replace(/\r/g, " ")
+        .replace(/\n/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const fallback = "mesh-file.bin";
+      if (!compact) return fallback;
+      const maxChars = 64;
+      return compact.length > maxChars ? compact.slice(0, maxChars) : compact;
+    }}
+
+    function buildFileTransferId() {{
+      const stamp = Date.now().toString(36);
+      const rand = Math.random().toString(36).slice(2, 10);
+      return `${{stamp}}${{rand}}`.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 20);
+    }}
+
+    function buildFileTransferNameEncoding(rawName, maxEncodedLen = 92) {{
+      const normalized = normalizeFileTransferName(rawName);
+      const fallback = "mesh-file.bin";
+      let candidate = normalized;
+      while (candidate.length > 1) {{
+        const encoded = encodeURIComponent(candidate);
+        if (encoded.length <= maxEncodedLen) {{
+          return {{ name: candidate, encoded }};
+        }}
+        candidate = candidate.slice(0, -1).trim();
+      }}
+      return {{
+        name: fallback,
+        encoded: encodeURIComponent(fallback),
+      }};
+    }}
+
+    function buildFileTransferMetaFrame(transferId, fileName, fileSize, totalChunks) {{
+      const cleanId = String(transferId || "").trim().toLowerCase();
+      const cleanSize = Math.max(0, Math.trunc(Number(fileSize) || 0));
+      const cleanChunks = Math.max(1, Math.trunc(Number(totalChunks) || 1));
+      const nameBits = buildFileTransferNameEncoding(fileName);
+      return `${{fileTransferProtocolPrefix}}|M|${{cleanId}}|${{nameBits.encoded}}|${{cleanSize}}|${{cleanChunks}}`;
+    }}
+
+    function buildFileTransferChunkFrame(transferId, chunkIndex, payloadBase64) {{
+      const cleanId = String(transferId || "").trim().toLowerCase();
+      const cleanIdx = Math.max(0, Math.trunc(Number(chunkIndex) || 0));
+      const payload = String(payloadBase64 || "").trim();
+      return `${{fileTransferProtocolPrefix}}|C|${{cleanId}}|${{cleanIdx}}|${{payload}}`;
+    }}
+
+    function buildFileTransferChunkBitmapBase64(totalChunks, chunkIndexes) {{
+      const total = Math.max(0, Math.trunc(Number(totalChunks) || 0));
+      if (total <= 0) return "";
+      const byteLen = Math.max(1, Math.ceil(total / 8));
+      const bitmap = new Uint8Array(byteLen);
+      const indexes = Array.isArray(chunkIndexes)
+        ? chunkIndexes
+        : Array.from(chunkIndexes || []);
+      for (const rawIdx of indexes) {{
+        const idx = Math.trunc(Number(rawIdx));
+        if (!Number.isFinite(idx) || idx < 0 || idx >= total) continue;
+        const byteIdx = Math.floor(idx / 8);
+        const bitMask = 1 << (idx % 8);
+        bitmap[byteIdx] |= bitMask;
+      }}
+      return encodeBytesToBase64(bitmap);
+    }}
+
+    function decodeFileTransferChunkBitmap(rawBase64, totalChunks) {{
+      const total = Math.max(0, Math.trunc(Number(totalChunks) || 0));
+      const received = new Set();
+      if (total <= 0) return received;
+      const bytes = decodeBase64ToBytes(rawBase64);
+      if (!(bytes instanceof Uint8Array) || bytes.length <= 0) return received;
+      for (let idx = 0; idx < total; idx += 1) {{
+        const byteIdx = Math.floor(idx / 8);
+        if (byteIdx >= bytes.length) break;
+        const bitMask = 1 << (idx % 8);
+        if ((bytes[byteIdx] & bitMask) !== 0) {{
+          received.add(idx);
+        }}
+      }}
+      return received;
+    }}
+
+    function buildFileTransferAckFrame(transferId, receivedCount, totalChunks, bitmapBase64) {{
+      const cleanId = String(transferId || "").trim().toLowerCase();
+      const total = Math.max(1, Math.trunc(Number(totalChunks) || 1));
+      const received = Math.max(0, Math.min(total, Math.trunc(Number(receivedCount) || 0)));
+      const bitmap = String(bitmapBase64 || "").trim();
+      return `${{fileTransferProtocolPrefix}}|A|${{cleanId}}|${{received}}|${{total}}|${{bitmap}}`;
+    }}
+
+    function safeDecodeUriComponent(rawValue) {{
+      const text = String(rawValue == null ? "" : rawValue);
+      if (!text) return "";
+      try {{
+        return decodeURIComponent(text);
+      }} catch (_err) {{
+        return text;
+      }}
+    }}
+
+    function parseFileTransferFrameText(rawText) {{
+      const text = String(rawText == null ? "" : rawText).trim();
+      const prefix = `${{fileTransferProtocolPrefix}}|`;
+      if (!text || !text.startsWith(prefix)) return null;
+      const parts = text.split("|");
+      if (parts.length < 4) return null;
+      const frameType = String(parts[1] || "").trim().toUpperCase();
+      const transferId = String(parts[2] || "").trim().toLowerCase();
+      if (!/^[a-z0-9]{4,24}$/.test(transferId)) return null;
+      if (frameType === "M") {{
+        if (parts.length < 6) return null;
+        const fileName = normalizeFileTransferName(safeDecodeUriComponent(parts[3] || ""));
+        const fileSize = Math.trunc(Number(parts[4]));
+        const totalChunks = Math.trunc(Number(parts[5]));
+        if (!Number.isFinite(fileSize) || fileSize < 0) return null;
+        if (!Number.isFinite(totalChunks) || totalChunks <= 0) return null;
+        return {{
+          kind: "meta",
+          transferId,
+          fileName,
+          fileSize,
+          totalChunks,
+        }};
+      }}
+      if (frameType === "C") {{
+        if (parts.length < 5) return null;
+        const chunkIndex = Math.trunc(Number(parts[3]));
+        const chunkData = String(parts[4] || "").trim();
+        if (!Number.isFinite(chunkIndex) || chunkIndex < 0) return null;
+        if (!chunkData || !/^[A-Za-z0-9+/=]+$/.test(chunkData)) return null;
+        return {{
+          kind: "chunk",
+          transferId,
+          chunkIndex,
+          chunkData,
+        }};
+      }}
+      if (frameType === "A") {{
+        if (parts.length < 6) return null;
+        const receivedCount = Math.trunc(Number(parts[3]));
+        const totalChunks = Math.trunc(Number(parts[4]));
+        const bitmap = String(parts[5] || "").trim();
+        if (!Number.isFinite(receivedCount) || receivedCount < 0) return null;
+        if (!Number.isFinite(totalChunks) || totalChunks <= 0) return null;
+        if (!bitmap || !/^[A-Za-z0-9+/=]+$/.test(bitmap)) return null;
+        return {{
+          kind: "ack",
+          transferId,
+          receivedCount: Math.min(receivedCount, totalChunks),
+          totalChunks,
+          bitmap,
+        }};
+      }}
+      return null;
+    }}
+
+    function isFileTransferProtocolMessage(msg) {{
+      if (!msg || typeof msg !== "object") return false;
+      const text = String(msg.text == null ? "" : msg.text).trim();
+      if (!text.startsWith(`${{fileTransferProtocolPrefix}}|`)) return false;
+      return parseFileTransferFrameText(text) != null;
+    }}
+
+    function encodeBytesToBase64(bytes) {{
+      const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+      if (!source.length) return "";
+      let binary = "";
+      const step = 0x8000;
+      for (let offset = 0; offset < source.length; offset += step) {{
+        const slice = source.subarray(offset, Math.min(source.length, offset + step));
+        binary += String.fromCharCode(...slice);
+      }}
+      try {{
+        return btoa(binary);
+      }} catch (_err) {{
+        return "";
+      }}
+    }}
+
+    function decodeBase64ToBytes(rawBase64) {{
+      const text = String(rawBase64 || "").trim();
+      if (!text) return null;
+      let binary = "";
+      try {{
+        binary = atob(text);
+      }} catch (_err) {{
+        return null;
+      }}
+      const out = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {{
+        out[i] = binary.charCodeAt(i);
+      }}
+      return out;
+    }}
+
+    function explicitMessageMeshChannelIndex(msg) {{
+      if (!msg || typeof msg !== "object") return null;
+      const raw = msg.channel_index ?? msg.channelIndex ?? msg.channel;
+      if (raw == null || raw === "") return null;
+      const num = Number(raw);
+      return Number.isInteger(num) && num >= 0 ? Math.trunc(num) : null;
+    }}
+
+    function messageMeshChannelIndex(msg) {{
+      const explicit = explicitMessageMeshChannelIndex(msg);
+      return Number.isInteger(explicit) && explicit >= 0 ? explicit : 0;
+    }}
+
+    function messageMatchesActiveMeshChannel(msg) {{
+      const activeIdx = activeMeshChannelFilterIndex();
+      if (activeIdx === meshChannelAllIndex) return true;
+      return messageMeshChannelIndex(msg) === activeIdx;
+    }}
+
+    function setChatSendStatus(message, isError = false) {{
+      const el = document.getElementById("chat-send-status");
+      if (!(el instanceof HTMLElement)) return;
+      el.textContent = message ? String(message) : "";
+      el.classList.toggle("error", !!isError);
+    }}
+
+    function setChatSendBusy(isBusy) {{
+      chatSendInFlight = !!isBusy;
+      const btn = document.getElementById("chat-send-btn");
+      const emojiBtn = document.getElementById("chat-emoji-btn");
+      const replyClearBtn = document.getElementById("chat-reply-clear-btn");
+      const sendChannelSelect = document.getElementById("chat-send-channel-select");
+      const sendChannelBtn = document.getElementById("chat-send-channel-menu-btn");
+      const input = document.getElementById("chat-input");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.disabled = chatSendInFlight;
+        btn.textContent = chatSendInFlight ? "Sending..." : "Send";
+      }}
+      if (emojiBtn instanceof HTMLButtonElement) {{
+        emojiBtn.disabled = chatSendInFlight;
+      }}
+      if (replyClearBtn instanceof HTMLButtonElement) {{
+        replyClearBtn.disabled = chatSendInFlight;
+      }}
+      if (sendChannelSelect instanceof HTMLSelectElement) {{
+        sendChannelSelect.disabled = chatSendInFlight;
+      }}
+      if (sendChannelBtn instanceof HTMLButtonElement) {{
+        sendChannelBtn.disabled = chatSendInFlight;
+      }}
+      if (chatSendInFlight) {{
+        setMeshChannelSendMenuOpen(false);
+      }}
+      if (input instanceof HTMLInputElement) {{
+        input.disabled = chatSendInFlight;
+      }}
+      if (chatSendInFlight) {{
+        closeChatEmojiPanel();
+      }}
+    }}
+
+    function setFileTransferStatus(message, isError = false) {{
+      const el = document.getElementById("files-send-status");
+      if (!(el instanceof HTMLElement)) return;
+      el.textContent = message ? String(message) : "";
+      el.classList.toggle("error", !!isError);
+    }}
+
+    function fileTransferShortTransferId(rawTransferId) {{
+      const clean = String(rawTransferId || "").trim().toLowerCase();
+      if (!clean) return "n/a";
+      if (clean.length <= 12) return clean;
+      return `${{clean.slice(0, 6)}}...${{clean.slice(-4)}}`;
+    }}
+
+    function fileTransferConsoleTimestamp(unixMs = Date.now()) {{
+      const stamp = new Date(Number(unixMs) || Date.now());
+      return stamp.toLocaleTimeString([], {{ hour12: false }});
+    }}
+
+    function renderFileTransferConsole() {{
+      const logEl = document.getElementById("files-console-log");
+      if (!(logEl instanceof HTMLElement)) return;
+      const shouldStickBottom = (
+        logEl.scrollHeight - (logEl.scrollTop + logEl.clientHeight)
+      ) <= 20;
+      const lines = fileTransferConsoleLines.slice(-fileTransferConsoleMaxEntries);
+      logEl.textContent = lines.length ? lines.join("\n") : "No file transfer activity yet.";
+      if (shouldStickBottom) {{
+        logEl.scrollTop = logEl.scrollHeight;
+      }}
+    }}
+
+    function appendFileTransferConsole(message, options = null) {{
+      const text = String(message == null ? "" : message).trim();
+      if (!text) return;
+      const levelRaw = String(options && options.level ? options.level : "info").trim().toLowerCase();
+      const level = levelRaw === "error" || levelRaw === "warn" ? levelRaw : "info";
+      const tag = level === "error" ? "ERR" : level === "warn" ? "WRN" : "INF";
+      fileTransferConsoleLines.push(`${{fileTransferConsoleTimestamp()}} [${{tag}}] ${{text}}`);
+      if (fileTransferConsoleLines.length > fileTransferConsoleMaxEntries) {{
+        fileTransferConsoleLines.splice(0, fileTransferConsoleLines.length - fileTransferConsoleMaxEntries);
+      }}
+      renderFileTransferConsole();
+    }}
+
+    function clearFileTransferConsole() {{
+      fileTransferConsoleLines.length = 0;
+      renderFileTransferConsole();
+    }}
+
+    async function copyFileTransferConsoleToClipboard() {{
+      const text = fileTransferConsoleLines.length
+        ? fileTransferConsoleLines.join("\n")
+        : "No file transfer activity yet.";
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {{
+        try {{
+          await navigator.clipboard.writeText(text);
+          return true;
+        }} catch (_err) {{
+        }}
+      }}
+      try {{
+        // Browser fallback for non-secure contexts where navigator.clipboard is blocked.
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "readonly");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        let copied = false;
+        try {{
+          copied = document.execCommand("copy");
+        }} catch (_err) {{
+          copied = false;
+        }}
+        ta.remove();
+        return !!copied;
+      }} catch (_err) {{
+        return false;
+      }}
+    }}
+
+    function bindFilesConsoleControls() {{
+      const copyBtn = document.getElementById("files-console-copy-btn");
+      if (copyBtn instanceof HTMLButtonElement && copyBtn.dataset.bound !== "1") {{
+        copyBtn.dataset.bound = "1";
+        copyBtn.addEventListener("click", async () => {{
+          const copied = await copyFileTransferConsoleToClipboard();
+          if (!copied) {{
+            setFileTransferStatus("Could not copy transfer console.", true);
+            return;
+          }}
+          const count = fileTransferConsoleLines.length;
+          const countLabel = count > 0 ? count : 1;
+          setFileTransferStatus(`Copied ${{countLabel}} console line${{countLabel === 1 ? "" : "s"}}.`);
+        }});
+      }}
+      const clearBtn = document.getElementById("files-console-clear-btn");
+      if (clearBtn instanceof HTMLButtonElement && clearBtn.dataset.bound !== "1") {{
+        clearBtn.dataset.bound = "1";
+        clearBtn.addEventListener("click", () => {{
+          clearFileTransferConsole();
+          setFileTransferStatus("Transfer console cleared.");
+        }});
+      }}
+      renderFileTransferConsole();
+    }}
+
+    function setFileTransferBusy(isBusy) {{
+      fileTransferSendInFlight = !!isBusy;
+      const sendBtn = document.getElementById("files-send-btn");
+      const fileInput = document.getElementById("files-input");
+      const destinationInput = document.getElementById("files-destination-input");
+      const useSelectedBtn = document.getElementById("files-use-selected-btn");
+      const sendChannelSelect = document.getElementById("files-send-channel-select");
+      if (sendBtn instanceof HTMLButtonElement) {{
+        sendBtn.disabled = fileTransferSendInFlight;
+        sendBtn.textContent = fileTransferSendInFlight ? "Sending..." : "Send file";
+      }}
+      if (fileInput instanceof HTMLInputElement) {{
+        fileInput.disabled = fileTransferSendInFlight;
+      }}
+      if (destinationInput instanceof HTMLInputElement) {{
+        destinationInput.disabled = fileTransferSendInFlight;
+      }}
+      if (useSelectedBtn instanceof HTMLButtonElement) {{
+        useSelectedBtn.disabled = fileTransferSendInFlight;
+      }}
+      if (sendChannelSelect instanceof HTMLSelectElement) {{
+        sendChannelSelect.disabled = fileTransferSendInFlight;
+      }}
+    }}
+
+    function persistFileTransferDestinationPreference() {{
+      try {{
+        if (fileTransferDestinationId) {{
+          window.localStorage.setItem(fileTransferDestinationStorageKey, fileTransferDestinationId);
+        }} else {{
+          window.localStorage.removeItem(fileTransferDestinationStorageKey);
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function syncFileTransferDestinationInput() {{
+      const input = document.getElementById("files-destination-input");
+      if (!(input instanceof HTMLInputElement)) return;
+      const clean = normalizeNodeId(fileTransferDestinationId || "");
+      if (input.value !== clean) {{
+        input.value = clean;
+      }}
+    }}
+
+    function setFileTransferDestination(rawDestination, options = null) {{
+      const persist = !(options && options.persist === false);
+      const clean = normalizeNodeId(rawDestination || "");
+      fileTransferDestinationId = isCanonicalNodeId(clean) ? clean : "";
+      syncFileTransferDestinationInput();
+      if (persist) {{
+        persistFileTransferDestinationPreference();
+      }}
+    }}
+
+    function loadFileTransferDestinationPreference() {{
+      let stored = "";
+      try {{
+        stored = String(window.localStorage.getItem(fileTransferDestinationStorageKey) || "");
+      }} catch (_err) {{
+      }}
+      setFileTransferDestination(stored, {{ persist: false }});
+    }}
+
+    function resolveFileTransferDestination() {{
+      const input = document.getElementById("files-destination-input");
+      const rawInput = input instanceof HTMLInputElement ? input.value : "";
+      let destination = normalizeNodeId(rawInput || fileTransferDestinationId || "");
+      if (!isCanonicalNodeId(destination) && isSelectableNodeId(selectedNodeId)) {{
+        destination = normalizeNodeId(selectedNodeId || "");
+      }}
+      if (!isCanonicalNodeId(destination)) return "";
+      if (isSelfNodeId(destination)) return "";
+      return destination;
+    }}
+
+    async function sendFileTransferFrameText(frameText, destination, channelIndex) {{
+      const text = String(frameText || "").trim();
+      if (!text) {{
+        throw new Error("Cannot send an empty file frame.");
+      }}
+      const payloadBytes = utf8ByteLength(text);
+      if (payloadBytes > fileTransferChatMaxBytes) {{
+        throw new Error(`File frame too large (${payloadBytes} bytes).`);
+      }}
+      const body = {{
+        text,
+        destination,
+        channel_index: channelIndex,
+      }};
+      const resp = await fetch("/api/chat/send", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify(body),
+      }});
+      const payload = await resp.json().catch(() => ({{}}));
+      if (!resp.ok || !payload.ok) {{
+        const msg = payload && payload.error ? payload.error : `send failed (${{resp.status}})`;
+        throw new Error(msg);
+      }}
+      return payload;
+    }}
+
+    function buildFileTransferChunkFrames(transferId, bytes) {{
+      const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+      const frames = [];
+      let chunkIndex = 0;
+      let offset = 0;
+      while (offset < source.length) {{
+        let end = Math.min(source.length, offset + fileTransferChunkBytes);
+        let frame = "";
+        while (end > offset) {{
+          const chunkBytes = source.subarray(offset, end);
+          const payload = encodeBytesToBase64(chunkBytes);
+          frame = buildFileTransferChunkFrame(transferId, chunkIndex, payload);
+          if (payload && utf8ByteLength(frame) <= fileTransferChatMaxBytes) {{
+            break;
+          }}
+          end -= 1;
+        }}
+        if (end <= offset || !frame) {{
+          throw new Error(`Unable to encode chunk #${{chunkIndex + 1}} within message size limit.`);
+        }}
+        frames.push(frame);
+        offset = end;
+        chunkIndex += 1;
+      }}
+      return frames;
+    }}
+
+    async function sendSelectedFileTransfer() {{
+      if (fileTransferSendInFlight) return;
+      const fileInput = document.getElementById("files-input");
+      if (!(fileInput instanceof HTMLInputElement)) return;
+      const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+      if (!file) {{
+        setFileTransferStatus("Choose a file before sending.", true);
+        return;
+      }}
+      const destination = resolveFileTransferDestination();
+      if (!isCanonicalNodeId(destination)) {{
+        setFileTransferStatus("Enter a valid destination Node ID (for example !49b54790).", true);
+        return;
+      }}
+      setFileTransferDestination(destination);
+      const fileSize = Number(file.size);
+      if (!Number.isFinite(fileSize) || fileSize <= 0) {{
+        setFileTransferStatus("Selected file is empty.", true);
+        return;
+      }}
+      if (fileSize > fileTransferMaxFileBytes) {{
+        setFileTransferStatus(`File is too large (${formatFileTransferSize(fileSize)}). Limit: ${formatFileTransferSize(fileTransferMaxFileBytes)}.`, true);
+        return;
+      }}
+      let bytes = null;
+      try {{
+        const arrayBuffer = await file.arrayBuffer();
+        bytes = new Uint8Array(arrayBuffer);
+      }} catch (_err) {{
+        setFileTransferStatus("Could not read the selected file.", true);
+        return;
+      }}
+      if (!(bytes instanceof Uint8Array) || !bytes.length) {{
+        setFileTransferStatus("Selected file is empty.", true);
+        return;
+      }}
+
+      const transferId = buildFileTransferId();
+      const chunkFrames = buildFileTransferChunkFrames(transferId, bytes);
+      const metaFrame = buildFileTransferMetaFrame(
+        transferId,
+        file.name || "mesh-file.bin",
+        bytes.length,
+        chunkFrames.length
+      );
+      if (utf8ByteLength(metaFrame) > fileTransferChatMaxBytes) {{
+        setFileTransferStatus("File name is too long for transfer metadata. Rename the file and try again.", true);
+        return;
+      }}
+
+      const sendCtx = meshChannelSendContext();
+      setFileTransferBusy(true);
+      appendFileTransferConsole(
+        `Send requested: ${{normalizeFileTransferName(file.name)}} (${{formatFileTransferSize(bytes.length)}}) to ${{destination}} on ${{sendCtx.sendLabel}}.`
+      );
+      setFileTransferStatus(`Sending "${normalizeFileTransferName(file.name)}" to ${{destination}} on ${{sendCtx.sendLabel}}...`);
+      try {{
+        await sendFileTransferFrameText(metaFrame, destination, sendCtx.sendIndex);
+        appendFileTransferConsole(
+          `Metadata sent for ${{fileTransferShortTransferId(transferId)}} (${{chunkFrames.length}} chunk${{chunkFrames.length === 1 ? "" : "s"}}).`
+        );
+        await waitFileTransferFrameGap();
+        for (let i = 0; i < chunkFrames.length; i += 1) {{
+          await sendFileTransferFrameText(chunkFrames[i], destination, sendCtx.sendIndex);
+          if (i + 1 < chunkFrames.length) {{
+            await waitFileTransferFrameGap();
+          }}
+          if ((i + 1) % 5 === 0 || i + 1 === chunkFrames.length) {{
+            setFileTransferStatus(`Sending "${normalizeFileTransferName(file.name)}": chunk ${{i + 1}}/${{chunkFrames.length}}`);
+            appendFileTransferConsole(
+              `Chunk send progress for ${{fileTransferShortTransferId(transferId)}}: ${{i + 1}}/${{chunkFrames.length}}.`
+            );
+          }}
+        }}
+        registerOutgoingFileTransferSession({{
+          transferId,
+          senderId: normalizeNodeId(resolveLocalNodeId(latestState) || ""),
+          destination,
+          channelIndex: sendCtx.sendIndex,
+          fileName: file.name || "mesh-file.bin",
+          metaFrame,
+          chunkFrames,
+          totalChunks: chunkFrames.length,
+        }});
+        fileInput.value = "";
+        setFileTransferStatus(`File sent: ${normalizeFileTransferName(file.name)} (${chunkFrames.length} chunk${chunkFrames.length === 1 ? "" : "s"})`);
+        appendFileTransferConsole(
+          `Transfer ${{fileTransferShortTransferId(transferId)}} sent to ${{destination}}. Waiting for ACK from receiver.`
+        );
+        scheduleFileTransferMaintenance(latestState);
+        requestImmediatePoll(40);
+        await poll();
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        setFileTransferStatus(`File send error: ${{msg}}`, true);
+        appendFileTransferConsole(
+          `Send failed for ${{normalizeFileTransferName(file.name)}}: ${{msg}}`,
+          {{ level: "error" }}
+        );
+      }} finally {{
+        setFileTransferBusy(false);
+      }}
+    }}
+
+    function bindFilesControls() {{
+      const destinationInput = document.getElementById("files-destination-input");
+      if (destinationInput instanceof HTMLInputElement && destinationInput.dataset.bound !== "1") {{
+        destinationInput.dataset.bound = "1";
+        destinationInput.addEventListener("input", () => {{
+          const clean = normalizeNodeId(destinationInput.value || "");
+          fileTransferDestinationId = isCanonicalNodeId(clean) ? clean : "";
+          persistFileTransferDestinationPreference();
+        }});
+      }}
+      const useSelectedBtn = document.getElementById("files-use-selected-btn");
+      if (useSelectedBtn instanceof HTMLButtonElement && useSelectedBtn.dataset.bound !== "1") {{
+        useSelectedBtn.dataset.bound = "1";
+        useSelectedBtn.addEventListener("click", () => {{
+          const selected = normalizeNodeId(selectedNodeId || "");
+          if (!isCanonicalNodeId(selected)) {{
+            setFileTransferStatus("Select a node first, or enter a Node ID manually.", true);
+            return;
+          }}
+          if (isSelfNodeId(selected)) {{
+            setFileTransferStatus("Cannot send a file to your own radio.", true);
+            return;
+          }}
+          setFileTransferDestination(selected);
+          setFileTransferStatus(`Destination set to ${{selected}}`);
+          appendFileTransferConsole(`Destination set to ${{selected}}.`);
+        }});
+      }}
+      const sendBtn = document.getElementById("files-send-btn");
+      if (sendBtn instanceof HTMLButtonElement && sendBtn.dataset.bound !== "1") {{
+        sendBtn.dataset.bound = "1";
+        sendBtn.addEventListener("click", () => {{
+          void sendSelectedFileTransfer();
+        }});
+      }}
+      const fileInput = document.getElementById("files-input");
+      if (fileInput instanceof HTMLInputElement && fileInput.dataset.bound !== "1") {{
+        fileInput.dataset.bound = "1";
+        fileInput.addEventListener("change", () => {{
+          const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+          if (!file) {{
+            setFileTransferStatus("");
+            return;
+          }}
+          setFileTransferStatus(`Selected: ${{normalizeFileTransferName(file.name)}} (${{formatFileTransferSize(file.size)}})`);
+        }});
+      }}
+      bindFilesConsoleControls();
+      syncFileTransferDestinationInput();
+    }}
+
+    function safeFileTransferDownloadName(rawName) {{
+      const normalized = normalizeFileTransferName(rawName || "mesh-file.bin");
+      const cleaned = normalized
+        .replace(/[\\x00-\\x1F\\x7F]/g, "")
+        .replace(/[\\\\/:*?"<>|]/g, "_")
+        .replace(/\\s+/g, " ")
+        .trim();
+      return cleaned || "mesh-file.bin";
+    }}
+
+    function fileTransferDirectionMeta(fromId, toId, localNodeId) {{
+      const from = normalizeNodeId(fromId || "");
+      const to = normalizeNodeId(toId || "");
+      const selfId = normalizeNodeId(localNodeId || "");
+      if (isCanonicalNodeId(selfId) && from === selfId) {{
+        return {{
+          className: "outbound",
+          label: "Sent",
+          peerId: to || "",
+        }};
+      }}
+      if (isCanonicalNodeId(selfId) && to === selfId) {{
+        return {{
+          className: "inbound",
+          label: "Recv",
+          peerId: from || "",
+        }};
+      }}
+      return {{
+        className: "other",
+        label: "Seen",
+        peerId: from || to || "",
+      }};
+    }}
+
+    function fileTransferPeerMeta(nodeId, nodesById, localNodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean) {{
+        return {{ label: "n/a", title: "n/a" }};
+      }}
+      if (clean === "^all") {{
+        return {{ label: "All", title: "Broadcast (^all)" }};
+      }}
+      if (isCanonicalNodeId(localNodeId) && clean === normalizeNodeId(localNodeId)) {{
+        return {{ label: "You", title: `You (${{clean}})` }};
+      }}
+      const node = nodesById instanceof Map ? nodesById.get(clean) : null;
+      const preferred = preferredNodeName(node) || nodeNameCache.get(clean) || "";
+      if (preferred) {{
+        return {{ label: preferred, title: `${{preferred}} (${{clean}})` }};
+      }}
+      return {{ label: clean, title: clean }};
+    }}
+
+    function fileTransferKeyOf(fromId, toId, transferId) {{
+      const from = normalizeNodeId(fromId || "");
+      const to = normalizeNodeId(toId || "");
+      const id = String(transferId || "").trim().toLowerCase();
+      return `${{from}}|${{to}}|${{id}}`;
+    }}
+
+    function fileTransferOutgoingTokenFor(transferId, destination, channelIndex) {{
+      const id = String(transferId || "").trim().toLowerCase();
+      const to = normalizeNodeId(destination || "");
+      const ch = normalizeMeshChannelIndex(channelIndex);
+      return `${{id}}|${{to}}|${{ch}}`;
+    }}
+
+    function fileTransferExplicitChannelIndex(rawIndex) {{
+      if (rawIndex == null || rawIndex === "") return null;
+      const num = Number(rawIndex);
+      return Number.isInteger(num) && num >= 0 ? Math.trunc(num) : null;
+    }}
+
+    function findOutgoingFileTransferSession(transferId, destination, channelIndex = null) {{
+      const id = String(transferId || "").trim().toLowerCase();
+      const to = normalizeNodeId(destination || "");
+      if (!id || !isCanonicalNodeId(to)) return null;
+      const explicitChannel = fileTransferExplicitChannelIndex(channelIndex);
+      if (explicitChannel != null) {{
+        const exactToken = fileTransferOutgoingTokenFor(id, to, explicitChannel);
+        const exactSession = fileTransferOutgoingByToken.get(exactToken);
+        if (exactSession && typeof exactSession === "object") {{
+          return exactSession;
+        }}
+      }}
+      let fallback = null;
+      for (const session of fileTransferOutgoingByToken.values()) {{
+        if (!session || typeof session !== "object") continue;
+        if (String(session.transferId || "") !== id) continue;
+        if (normalizeNodeId(session.destination || "") !== to) continue;
+        if (!fallback || Number(session.createdAtMs || 0) > Number(fallback.createdAtMs || 0)) {{
+          fallback = session;
+        }}
+      }}
+      return fallback;
+    }}
+
+    function candidateAckChannelIndexes(transfer) {{
+      const explicit = fileTransferExplicitChannelIndex(transfer && transfer.channelIndex);
+      if (explicit != null) {{
+        return [explicit];
+      }}
+      const ordered = [];
+      const pushIdx = (raw) => {{
+        const idx = normalizeMeshChannelIndex(raw);
+        if (!Number.isInteger(idx) || idx < 0) return;
+        if (!ordered.includes(idx)) {{
+          ordered.push(idx);
+        }}
+      }};
+      pushIdx(activeMeshSendChannelIndex);
+      const activeViewIdx = activeMeshChannelFilterIndex();
+      if (activeViewIdx !== meshChannelAllIndex) {{
+        pushIdx(activeViewIdx);
+      }}
+      pushIdx(0);
+      const options = Array.isArray(meshChannelSendOptions) ? meshChannelSendOptions : [];
+      for (const opt of options) {{
+        pushIdx(opt && opt.index);
+      }}
+      return ordered;
+    }}
+
+    function registerOutgoingFileTransferSession(payload) {{
+      const session = (payload && typeof payload === "object") ? payload : {{}};
+      const token = fileTransferOutgoingTokenFor(
+        session.transferId,
+        session.destination,
+        session.channelIndex
+      );
+      const totalChunks = Math.max(1, Math.trunc(Number(session.totalChunks) || 1));
+      const normalized = {{
+        token,
+        transferId: String(session.transferId || "").trim().toLowerCase(),
+        senderId: normalizeNodeId(session.senderId || ""),
+        destination: normalizeNodeId(session.destination || ""),
+        channelIndex: normalizeMeshChannelIndex(session.channelIndex),
+        fileName: normalizeFileTransferName(session.fileName || "mesh-file.bin"),
+        metaFrame: String(session.metaFrame || "").trim(),
+        chunkFrames: Array.isArray(session.chunkFrames) ? session.chunkFrames.slice() : [],
+        totalChunks,
+        createdAtMs: Date.now(),
+        lastSendAtMs: Date.now(),
+        lastRetryAtMs: 0,
+        retryAttempts: 0,
+        retriesSinceProgress: 0,
+        retryChunkCursor: 0,
+        lastRetryErrorAtMs: 0,
+        maxRetries: Math.max(1, Math.trunc(Number(session.maxRetries) || fileTransferOutgoingMaxRetries)),
+        delivered: false,
+        failed: false,
+        deliveredAtMs: 0,
+        failedAtMs: 0,
+        ackedChunks: 0,
+        lastAckProgressAtMs: 0,
+        lastAckUnix: null,
+        lastAckChannelIndex: null,
+      }};
+      fileTransferOutgoingByToken.set(token, normalized);
+      return normalized;
+    }}
+
+    function pruneOutgoingFileTransferSessions(nowMs = Date.now()) {{
+      for (const [token, session] of fileTransferOutgoingByToken.entries()) {{
+        const createdAtMs = Number(session && session.createdAtMs) || 0;
+        const delivered = !!(session && session.delivered);
+        const failed = !!(session && session.failed);
+        const terminalAt = Number(session && (session.deliveredAtMs || session.failedAtMs)) || 0;
+        const staleTerminal = (delivered || failed) && terminalAt > 0 && (nowMs - terminalAt) > (25 * 60 * 1000);
+        const staleOpen = !delivered && !failed && createdAtMs > 0 && (nowMs - createdAtMs) > (45 * 60 * 1000);
+        if (staleTerminal || staleOpen) {{
+          fileTransferOutgoingByToken.delete(token);
+        }}
+      }}
+    }}
+
+    function collectFileTransferFrames(state = latestState, options = null) {{
+      const respectActiveChannel = !(options && options.respectActiveChannel === false);
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const recentPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const nodesById = new Map(
+        nodes.map((node) => [normalizeNodeId(node && node.id), node])
+      );
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      const transfers = new Map();
+      const ackByTransferKey = new Map();
+      const fileTransferMessages = [];
+
+      for (const msg of recentChat) {{
+        if (!msg || typeof msg !== "object") continue;
+        fileTransferMessages.push(msg);
+      }}
+      for (const entry of recentPackets) {{
+        if (!entry || typeof entry !== "object") continue;
+        const summary = (entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const packet = (entry.packet && typeof entry.packet === "object")
+          ? entry.packet
+          : {{}};
+        const decoded = (packet.decoded && typeof packet.decoded === "object")
+          ? packet.decoded
+          : {{}};
+        const text = String(summary.decoded_text ?? decoded.text ?? "").trim();
+        if (!text) continue;
+        const endpoints = packetEndpointIds(entry);
+        const packetChannelIndex = explicitPacketChannelIndex(entry);
+        fileTransferMessages.push({{
+          text,
+          from: endpoints.fromId || "",
+          to: endpoints.toId || "",
+          rx_time: summary.rx_time ?? entry.rx_time ?? "",
+          captured_at: summary.captured_at ?? entry.captured_at ?? "",
+          channel: Number.isInteger(packetChannelIndex) && packetChannelIndex >= 0 ? packetChannelIndex : null,
+        }});
+      }}
+
+      for (const msg of fileTransferMessages) {{
+        if (!msg || typeof msg !== "object") continue;
+        const activeIdx = activeMeshChannelFilterIndex();
+        const msgChannelIndex = explicitMessageMeshChannelIndex(msg);
+        if (respectActiveChannel && activeIdx !== meshChannelAllIndex) {{
+          if (!Number.isInteger(msgChannelIndex) || msgChannelIndex < 0 || msgChannelIndex !== activeIdx) {{
+            continue;
+          }}
+        }}
+        const frame = parseFileTransferFrameText(msg.text);
+        if (!frame) continue;
+        const fromId = normalizeNodeId(msg.from || "");
+        const toId = normalizeNodeId(msg.to || msg.destination || "");
+        const msgUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
+        const explicitChannelIndex = Number.isInteger(msgChannelIndex) && msgChannelIndex >= 0
+          ? Math.trunc(msgChannelIndex)
+          : null;
+
+        if (frame.kind === "ack") {{
+          const transferKey = fileTransferKeyOf(toId, fromId, frame.transferId);
+          const receivedSet = decodeFileTransferChunkBitmap(frame.bitmap, frame.totalChunks);
+          const receivedCount = Math.max(
+            Math.min(frame.totalChunks, frame.receivedCount),
+            Math.min(frame.totalChunks, receivedSet.size)
+          );
+          const ack = {{
+            transferKey,
+            transferId: frame.transferId,
+            originalSenderId: toId,
+            originalReceiverId: fromId,
+            channelIndex: explicitChannelIndex,
+            receivedCount,
+            totalChunks: Math.max(1, Math.trunc(Number(frame.totalChunks) || 1)),
+            bitmap: frame.bitmap,
+            receivedSet,
+            complete: receivedCount >= Math.max(1, Math.trunc(Number(frame.totalChunks) || 1)),
+            latestUnix: msgUnix || 0,
+          }};
+          const prev = ackByTransferKey.get(transferKey);
+          if (!prev || Number(ack.latestUnix || 0) >= Number(prev.latestUnix || 0)) {{
+            ackByTransferKey.set(transferKey, ack);
+          }}
+          continue;
+        }}
+
+        const key = fileTransferKeyOf(fromId, toId, frame.transferId);
+        let transfer = transfers.get(key);
+        if (!transfer) {{
+          transfer = {{
+            key,
+            transferId: frame.transferId,
+            fromId,
+            toId,
+            channelIndex: explicitChannelIndex,
+            firstUnix: null,
+            latestUnix: null,
+            fileName: "",
+            fileSize: null,
+            totalChunks: null,
+            chunks: new Map(),
+            hasDecodeError: false,
+          }};
+          transfers.set(key, transfer);
+        }}
+
+        if (!transfer.fromId && fromId) transfer.fromId = fromId;
+        if (!transfer.toId && toId) transfer.toId = toId;
+        if (msgUnix && (!transfer.firstUnix || msgUnix < transfer.firstUnix)) {{
+          transfer.firstUnix = msgUnix;
+        }}
+        transfer.latestUnix = latestUnixTimestamp(transfer.latestUnix, msgUnix);
+        if (Number.isInteger(explicitChannelIndex) && explicitChannelIndex >= 0) {{
+          transfer.channelIndex = explicitChannelIndex;
+        }}
+
+        if (frame.kind === "meta") {{
+          transfer.fileName = normalizeFileTransferName(frame.fileName || transfer.fileName || "mesh-file.bin");
+          transfer.fileSize = Math.max(0, Math.trunc(Number(frame.fileSize) || 0));
+          transfer.totalChunks = Math.max(1, Math.trunc(Number(frame.totalChunks) || 1));
+          continue;
+        }}
+
+        if (frame.kind === "chunk") {{
+          if (transfer.chunks.has(frame.chunkIndex)) {{
+            continue;
+          }}
+          const bytes = decodeBase64ToBytes(frame.chunkData);
+          if (!(bytes instanceof Uint8Array)) {{
+            transfer.hasDecodeError = true;
+            continue;
+          }}
+          transfer.chunks.set(frame.chunkIndex, bytes);
+        }}
+      }}
+
+      const nowMs = Date.now();
+      const activeTransferKeys = new Set();
+      for (const [key, transfer] of transfers.entries()) {{
+        if (!transfer || typeof transfer !== "object") continue;
+        activeTransferKeys.add(key);
+        const cacheRaw = fileTransferChunkCacheByKey.get(key);
+        let cacheChunks = new Map();
+        let cacheTotalChunks = null;
+        let cacheFileName = "";
+        let cacheFileSize = null;
+        let cacheChannelIndex = null;
+        let cacheLatestUnix = 0;
+        if (cacheRaw && typeof cacheRaw === "object") {{
+          const rawTotalChunks = Math.trunc(Number(cacheRaw.totalChunks));
+          if (Number.isFinite(rawTotalChunks) && rawTotalChunks > 0) {{
+            cacheTotalChunks = rawTotalChunks;
+          }}
+          cacheFileName = normalizeFileTransferName(cacheRaw.fileName || "");
+          const rawFileSize = Number(cacheRaw.fileSize);
+          if (Number.isFinite(rawFileSize) && rawFileSize >= 0) {{
+            cacheFileSize = Math.max(0, Math.trunc(rawFileSize));
+          }}
+          cacheChannelIndex = fileTransferExplicitChannelIndex(cacheRaw.channelIndex);
+          cacheLatestUnix = Math.max(0, Math.trunc(Number(cacheRaw.latestUnix) || 0));
+          if (cacheRaw.chunks instanceof Map) {{
+            for (const [idxRaw, bytes] of cacheRaw.chunks.entries()) {{
+              const idx = Math.trunc(Number(idxRaw));
+              if (!Number.isFinite(idx) || idx < 0) continue;
+              if (!(bytes instanceof Uint8Array)) continue;
+              cacheChunks.set(idx, bytes);
+            }}
+          }}
+        }}
+        const transferTotalChunksRaw = Math.trunc(Number(transfer.totalChunks));
+        const transferTotalChunks = Number.isFinite(transferTotalChunksRaw) && transferTotalChunksRaw > 0
+          ? transferTotalChunksRaw
+          : null;
+        if (cacheTotalChunks != null && transferTotalChunks != null && cacheTotalChunks !== transferTotalChunks) {{
+          cacheChunks = new Map();
+          cacheTotalChunks = transferTotalChunks;
+        }}
+        for (const [idxRaw, bytes] of transfer.chunks.entries()) {{
+          const idx = Math.trunc(Number(idxRaw));
+          if (!Number.isFinite(idx) || idx < 0) continue;
+          if (!(bytes instanceof Uint8Array)) continue;
+          cacheChunks.set(idx, bytes);
+        }}
+        const effectiveTotalChunks = transferTotalChunks != null ? transferTotalChunks : cacheTotalChunks;
+        if (effectiveTotalChunks != null) {{
+          for (const idx of Array.from(cacheChunks.keys())) {{
+            if (idx >= effectiveTotalChunks) {{
+              cacheChunks.delete(idx);
+            }}
+          }}
+        }}
+        transfer.chunks = cacheChunks;
+        if (transferTotalChunks == null && effectiveTotalChunks != null) {{
+          transfer.totalChunks = effectiveTotalChunks;
+        }}
+        if (!transfer.fileName && cacheFileName) {{
+          transfer.fileName = cacheFileName;
+        }}
+        const transferFileSize = Number(transfer.fileSize);
+        const hasTransferFileSize = Number.isFinite(transferFileSize) && transferFileSize >= 0;
+        if (!hasTransferFileSize && cacheFileSize != null) {{
+          transfer.fileSize = cacheFileSize;
+        }}
+        if (fileTransferExplicitChannelIndex(transfer.channelIndex) == null && cacheChannelIndex != null) {{
+          transfer.channelIndex = cacheChannelIndex;
+        }}
+        transfer.latestUnix = latestUnixTimestamp(transfer.latestUnix, cacheLatestUnix);
+        fileTransferChunkCacheByKey.set(key, {{
+          chunks: cacheChunks,
+          totalChunks: effectiveTotalChunks,
+          fileName: normalizeFileTransferName(transfer.fileName || cacheFileName || "mesh-file.bin"),
+          fileSize: Number.isFinite(Number(transfer.fileSize)) ? Math.max(0, Math.trunc(Number(transfer.fileSize) || 0)) : null,
+          channelIndex: fileTransferExplicitChannelIndex(transfer.channelIndex),
+          latestUnix: Number(transfer.latestUnix || transfer.firstUnix || 0),
+          lastSeenAtMs: nowMs,
+        }});
+      }}
+      const staleChunkCutoffMs = nowMs - (45 * 60 * 1000);
+      for (const [key, cacheRaw] of fileTransferChunkCacheByKey.entries()) {{
+        if (activeTransferKeys.has(key)) continue;
+        const lastSeenAtMs = Number(cacheRaw && cacheRaw.lastSeenAtMs) || 0;
+        if (lastSeenAtMs <= 0 || lastSeenAtMs < staleChunkCutoffMs) {{
+          fileTransferChunkCacheByKey.delete(key);
+        }}
+      }}
+
+      return {{
+        transfers,
+        ackByTransferKey,
+        nodesById,
+        localNodeId,
+      }};
+    }}
+
+    function buildFileTransferRows(state = latestState) {{
+      const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: true }});
+      const transfers = frameState.transfers;
+      const ackByTransferKey = frameState.ackByTransferKey;
+      const nodesById = frameState.nodesById;
+      const localNodeId = frameState.localNodeId;
+      const rows = [];
+      for (const transfer of transfers.values()) {{
+        const direction = fileTransferDirectionMeta(transfer.fromId, transfer.toId, localNodeId);
+        const peerMeta = fileTransferPeerMeta(direction.peerId, nodesById, localNodeId);
+        const expectedChunks = Number.isInteger(transfer.totalChunks) && transfer.totalChunks > 0
+          ? transfer.totalChunks
+          : Math.max(transfer.chunks.size, 1);
+        const receivedChunks = transfer.chunks.size;
+        let contiguous = receivedChunks >= expectedChunks;
+        if (contiguous) {{
+          for (let idx = 0; idx < expectedChunks; idx += 1) {{
+            if (!(transfer.chunks.get(idx) instanceof Uint8Array)) {{
+              contiguous = false;
+              break;
+            }}
+          }}
+        }}
+
+        let observedBytes = 0;
+        for (const bytes of transfer.chunks.values()) {{
+          observedBytes += Number(bytes && bytes.length) || 0;
+        }}
+
+        const declaredBytes = Number.isFinite(transfer.fileSize) ? Math.max(0, Math.trunc(Number(transfer.fileSize) || 0)) : null;
+        let assembled = null;
+        let complete = false;
+        let assembleError = "";
+        if (contiguous && expectedChunks > 0) {{
+          let totalLen = 0;
+          for (let idx = 0; idx < expectedChunks; idx += 1) {{
+            const part = transfer.chunks.get(idx);
+            totalLen += Number(part && part.length) || 0;
+          }}
+          const merged = new Uint8Array(totalLen);
+          let cursor = 0;
+          for (let idx = 0; idx < expectedChunks; idx += 1) {{
+            const part = transfer.chunks.get(idx);
+            if (!(part instanceof Uint8Array)) {{
+              assembleError = "Missing chunk data";
+              break;
+            }}
+            merged.set(part, cursor);
+            cursor += part.length;
+          }}
+          if (!assembleError) {{
+            let mergedView = merged;
+            if (declaredBytes != null) {{
+              if (declaredBytes < merged.length) {{
+                mergedView = merged.slice(0, declaredBytes);
+              }} else if (declaredBytes > merged.length) {{
+                assembleError = `Missing ${{declaredBytes - merged.length}} byte${{declaredBytes - merged.length === 1 ? "" : "s"}}`;
+              }}
+            }}
+            if (!assembleError) {{
+              assembled = new Uint8Array(mergedView);
+              complete = true;
+            }}
+          }}
+        }}
+
+        const percent = Math.max(
+          0,
+          Math.min(100, Math.round((receivedChunks / Math.max(expectedChunks, 1)) * 100))
+        );
+        const outgoing = direction.className === "outbound";
+        const ack = outgoing ? (ackByTransferKey.get(transfer.key) || null) : null;
+        const ackedChunks = ack
+          ? Math.max(
+            0,
+            Math.min(
+              expectedChunks,
+              Math.max(
+                Number(ack.receivedCount || 0),
+                (ack.receivedSet instanceof Set ? ack.receivedSet.size : 0)
+              )
+            )
+          )
+          : 0;
+        const deliveryPct = Math.max(0, Math.min(100, Math.round((ackedChunks / Math.max(expectedChunks, 1)) * 100)));
+        const outgoingSession = outgoing
+          ? findOutgoingFileTransferSession(transfer.transferId, transfer.toId, transfer.channelIndex)
+          : null;
+        const transferChannelIndex = fileTransferExplicitChannelIndex(transfer.channelIndex);
+        const sessionChannelIndex = fileTransferExplicitChannelIndex(outgoingSession && outgoingSession.channelIndex);
+        const resolvedChannelIndex = transferChannelIndex != null ? transferChannelIndex : sessionChannelIndex;
+        let delivered = outgoing
+          ? !!(ack && ack.complete && ackedChunks >= expectedChunks)
+          : complete;
+        if (outgoingSession && outgoingSession.delivered) {{
+          delivered = true;
+        }}
+
+        let progressLabel = "";
+        let progressSort = 0;
+        let outgoingRetrying = false;
+        if (outgoing) {{
+          if (outgoingSession && outgoingSession.failed && !delivered) {{
+            progressLabel = `Delivery failed (${{ackedChunks}}/${{expectedChunks}} acked)`;
+            progressSort = deliveryPct;
+          }} else if (delivered) {{
+            progressLabel = `Delivered (${{Math.max(ackedChunks, expectedChunks)}}/${{expectedChunks}} acked)`;
+            progressSort = 220;
+          }} else if (ack) {{
+            progressLabel = `${{deliveryPct}}% delivered (${{ackedChunks}}/${{expectedChunks}} acked)`;
+            progressSort = 100 + deliveryPct;
+          }} else {{
+            progressLabel = `Awaiting ACK (0/${{expectedChunks}} acked)`;
+            progressSort = 25;
+          }}
+          const activeRetries = Math.max(
+            0,
+            Math.trunc(Number(outgoingSession && outgoingSession.retriesSinceProgress) || Number(outgoingSession && outgoingSession.retryAttempts) || 0)
+          );
+          if (outgoingSession && !outgoingSession.delivered && !outgoingSession.failed && activeRetries > 0) {{
+            outgoingRetrying = true;
+            progressLabel = `${{progressLabel}} • retry ${{activeRetries}}/${{outgoingSession.maxRetries}}`;
+          }}
+        }} else {{
+          progressLabel = complete
+            ? "Complete"
+            : `${{percent}}% (${{receivedChunks}}/${{expectedChunks}} chunks)`;
+          progressSort = complete ? 100 : percent;
+          if (!complete && transfer.hasDecodeError) {{
+            progressLabel = "Error (invalid chunk)";
+          }} else if (!complete && assembleError) {{
+            progressLabel = `Error (${{assembleError}})`;
+          }}
+        }}
+
+        const sizeLabel = (() => {{
+          if (declaredBytes == null) {{
+            return formatFileTransferSize(observedBytes);
+          }}
+          if (complete || observedBytes <= 0) {{
+            return formatFileTransferSize(declaredBytes);
+          }}
+          if (observedBytes === declaredBytes) {{
+            return formatFileTransferSize(declaredBytes);
+          }}
+          return `${{formatFileTransferSize(observedBytes)}} / ${{formatFileTransferSize(declaredBytes)}}`;
+        }})();
+        const fileName = normalizeFileTransferName(transfer.fileName || `file-${{transfer.transferId}}.bin`);
+        const channelLabel = resolvedChannelIndex == null
+          ? "Unknown"
+          : meshChannelLabelForIndex(resolvedChannelIndex, {{ allowAll: false }});
+        const sortUnix = Number(transfer.latestUnix || transfer.firstUnix || 0);
+        rows.push({{
+          key: transfer.key,
+          transferId: transfer.transferId,
+          unix: sortUnix > 0 ? sortUnix : null,
+          sortUnix,
+          directionClass: direction.className,
+          directionLabel: direction.label,
+          peerId: direction.peerId,
+          peerLabel: peerMeta.label,
+          peerTitle: peerMeta.title,
+          fileName,
+          downloadName: safeFileTransferDownloadName(fileName),
+          progressLabel,
+          progressSort,
+          sizeLabel,
+          sizeSort: declaredBytes != null ? declaredBytes : observedBytes,
+          channelIndex: resolvedChannelIndex,
+          channelLabel,
+          delivered,
+          outgoingRetrying,
+          canDownload: complete && assembled instanceof Uint8Array,
+          bytes: assembled,
+        }});
+      }}
+
+      rows.sort((a, b) => {{
+        const unixDiff = Number(b.sortUnix || 0) - Number(a.sortUnix || 0);
+        if (unixDiff !== 0) return unixDiff;
+        const nameDiff = String(a.fileName || "").localeCompare(String(b.fileName || ""));
+        if (nameDiff !== 0) return nameDiff;
+        return String(a.key || "").localeCompare(String(b.key || ""));
+      }});
+      return rows;
+    }}
+
+    function fileTransferMissingChunkIndexes(totalChunks, receivedSet) {{
+      const total = Math.max(1, Math.trunc(Number(totalChunks) || 1));
+      const seen = receivedSet instanceof Set ? receivedSet : new Set();
+      const missing = [];
+      for (let idx = 0; idx < total; idx += 1) {{
+        if (!seen.has(idx)) {{
+          missing.push(idx);
+        }}
+      }}
+      return missing;
+    }}
+
+    function findAckForOutgoingSession(session, ackByTransferKey, localNodeId) {{
+      if (!session || !(ackByTransferKey instanceof Map)) return null;
+      const senderId = normalizeNodeId(localNodeId || session.senderId || "");
+      const expectedReceiver = normalizeNodeId(session.destination || "");
+      const expectedChannel = fileTransferExplicitChannelIndex(session.channelIndex);
+      if (!isCanonicalNodeId(expectedReceiver)) return null;
+      const directKey = isCanonicalNodeId(senderId)
+        ? fileTransferKeyOf(senderId, expectedReceiver, session.transferId)
+        : "";
+      if (directKey && ackByTransferKey.has(directKey)) {{
+        return ackByTransferKey.get(directKey) || null;
+      }}
+      function ackChannelMatchScore(ack) {{
+        if (!ack || typeof ack !== "object") return 0;
+        const ackChannel = fileTransferExplicitChannelIndex(ack.channelIndex);
+        if (expectedChannel == null || ackChannel == null) return 1;
+        return ackChannel === expectedChannel ? 2 : 0;
+      }}
+      let fallback = null;
+      let fallbackScore = -1;
+      for (const ack of ackByTransferKey.values()) {{
+        if (!ack || typeof ack !== "object") continue;
+        if (String(ack.transferId || "") !== String(session.transferId || "")) continue;
+        const ackOriginalReceiver = normalizeNodeId(ack.originalReceiverId || "");
+        const ackOriginalSender = normalizeNodeId(ack.originalSenderId || "");
+        if (isCanonicalNodeId(ackOriginalReceiver) && ackOriginalReceiver !== expectedReceiver) continue;
+        if (isCanonicalNodeId(senderId) && isCanonicalNodeId(ackOriginalSender) && ackOriginalSender !== senderId) continue;
+        const endpointConfidence = (
+          (isCanonicalNodeId(ackOriginalReceiver) && ackOriginalReceiver === expectedReceiver)
+          || (isCanonicalNodeId(senderId) && isCanonicalNodeId(ackOriginalSender) && ackOriginalSender === senderId)
+        );
+        if (!endpointConfidence) {{
+          const endpointsUnknown = !isCanonicalNodeId(ackOriginalReceiver) && !isCanonicalNodeId(ackOriginalSender);
+          if (!endpointsUnknown) {{
+            continue;
+          }}
+        }}
+        const score = ackChannelMatchScore(ack);
+        if (
+          !fallback
+          || score > fallbackScore
+          || (score === fallbackScore && Number(ack.latestUnix || 0) > Number(fallback.latestUnix || 0))
+        ) {{
+          fallback = ack;
+          fallbackScore = score;
+        }}
+      }}
+      if (fallback) {{
+        return fallback;
+      }}
+      // Final escape hatch: if endpoints are missing or inconsistent in packet metadata,
+      // a transferId-only match is still safe because transfer IDs are random per send.
+      let transferIdOnlyFallback = null;
+      let transferIdOnlyScore = -1;
+      for (const ack of ackByTransferKey.values()) {{
+        if (!ack || typeof ack !== "object") continue;
+        if (String(ack.transferId || "") !== String(session.transferId || "")) continue;
+        const score = ackChannelMatchScore(ack);
+        if (
+          !transferIdOnlyFallback
+          || score > transferIdOnlyScore
+          || (score === transferIdOnlyScore
+            && Number(ack.latestUnix || 0) > Number(transferIdOnlyFallback.latestUnix || 0))
+        ) {{
+          transferIdOnlyFallback = ack;
+          transferIdOnlyScore = score;
+        }}
+      }}
+      if (transferIdOnlyFallback) {{
+        return transferIdOnlyFallback;
+      }}
+      return fallback;
+    }}
+
+    async function maybeSendFileTransferAckFrames(state = latestState) {{
+      const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: false }});
+      const localNodeId = normalizeNodeId(frameState.localNodeId || "");
+      if (!isCanonicalNodeId(localNodeId)) return;
+      const nowMs = Date.now();
+      const nowUnix = Math.trunc(nowMs / 1000);
+      const activeAckTransferKeys = new Set();
+      for (const transfer of frameState.transfers.values()) {{
+        if (!transfer || typeof transfer !== "object") continue;
+        const receiverId = normalizeNodeId(transfer.toId || "");
+        const senderId = normalizeNodeId(transfer.fromId || "");
+        if (receiverId !== localNodeId) continue;
+        if (!isCanonicalNodeId(senderId) || senderId === localNodeId) continue;
+        const transferLatestUnix = Math.max(
+          0,
+          Math.trunc(Number(transfer.latestUnix || transfer.firstUnix) || 0)
+        );
+        if (
+          transferLatestUnix > 0
+          && (nowUnix - transferLatestUnix) > fileTransferAckActiveTransferWindowSec
+        ) {{
+          continue;
+        }}
+        const totalChunksRaw = Math.trunc(Number(transfer.totalChunks));
+        if (!Number.isFinite(totalChunksRaw) || totalChunksRaw <= 0) continue;
+        const totalChunks = totalChunksRaw;
+        const transferKey = String(transfer.key || "").trim();
+        if (!transferKey) continue;
+        activeAckTransferKeys.add(transferKey);
+        const receivedIndexes = Array.from(transfer.chunks.keys())
+          .map((idx) => Math.trunc(Number(idx)))
+          .filter((idx) => Number.isFinite(idx) && idx >= 0 && idx < totalChunks)
+          .sort((a, b) => a - b);
+        let observedIndexes = new Set();
+        const observedRaw = fileTransferAckObservedChunksByKey.get(transferKey);
+        if (
+          observedRaw
+          && typeof observedRaw === "object"
+          && Number(observedRaw.totalChunks || 0) === totalChunks
+          && observedRaw.indexes instanceof Set
+        ) {{
+          for (const idxRaw of observedRaw.indexes) {{
+            const idx = Math.trunc(Number(idxRaw));
+            if (Number.isFinite(idx) && idx >= 0 && idx < totalChunks) {{
+              observedIndexes.add(idx);
+            }}
+          }}
+        }}
+        for (const idx of receivedIndexes) {{
+          observedIndexes.add(idx);
+        }}
+        const mergedIndexes = Array.from(observedIndexes).sort((a, b) => a - b);
+        const bitmap = buildFileTransferChunkBitmapBase64(totalChunks, mergedIndexes);
+        if (!bitmap) continue;
+        const receivedCount = Math.max(0, Math.min(totalChunks, mergedIndexes.length));
+        fileTransferAckObservedChunksByKey.set(transferKey, {{
+          totalChunks,
+          indexes: observedIndexes,
+          lastSeenAtMs: nowMs,
+        }});
+        const signature = `${{receivedCount}}/${{totalChunks}}|${{bitmap}}`;
+        const prior = fileTransferAckSentState.get(transferKey) || null;
+        const lastSentAtMs = Number(prior && prior.lastSentAtMs) || 0;
+        const firstSentAtMs = Number(prior && prior.firstSentAtMs) || 0;
+        const periodicRefreshCount = Math.max(
+          0,
+          Math.trunc(Number(prior && prior.periodicRefreshCount) || 0)
+        );
+        const signatureChanged = !prior || signature !== String(prior.signature || "");
+        const periodicWithinWindow = firstSentAtMs <= 0
+          || (nowMs - firstSentAtMs) <= fileTransferAckPeriodicRefreshWindowMs;
+        const unknownChannelRefreshMs = Math.max(
+          fileTransferAckPeriodicRefreshMs,
+          fileTransferAckUnknownProbeRotateIntervalMs
+        );
+        const periodicRefreshMs = fileTransferExplicitChannelIndex(transfer.channelIndex) == null
+          ? unknownChannelRefreshMs
+          : fileTransferAckPeriodicRefreshMs;
+        const periodicRefresh = !signatureChanged
+          && receivedCount < totalChunks
+          && periodicRefreshCount < fileTransferAckPeriodicRefreshMax
+          && periodicWithinWindow
+          && (nowMs - lastSentAtMs) > periodicRefreshMs;
+        if (!signatureChanged && !periodicRefresh) {{
+          continue;
+        }}
+        if (lastSentAtMs > 0 && (nowMs - lastSentAtMs) < fileTransferMaintenanceCooldownMs) {{
+          continue;
+        }}
+        const ackChannelIndex = fileTransferExplicitChannelIndex(transfer.channelIndex);
+        const ackChannels = candidateAckChannelIndexes(transfer);
+        if (!ackChannels.length) {{
+          continue;
+        }}
+        const channelUnknown = ackChannelIndex == null;
+        let sendChannels = ackChannels.slice();
+        if (channelUnknown) {{
+          const probeRaw = fileTransferAckProbeStateByKey.get(transferKey);
+          const priorProbeCount = Math.max(0, Math.trunc(Number(probeRaw && probeRaw.lastReceivedCount) || 0));
+          let stagnationCount = Math.max(0, Math.trunc(Number(probeRaw && probeRaw.stagnationCount) || 0));
+          if (receivedCount > priorProbeCount) {{
+            stagnationCount = 0;
+          }} else if (probeRaw) {{
+            stagnationCount += 1;
+          }}
+          const priorProbeChannels = Array.isArray(probeRaw && probeRaw.channels)
+            ? probeRaw.channels
+                .map((idxRaw) => normalizeMeshChannelIndex(idxRaw))
+                .filter((idx, idxPos, list) => Number.isInteger(idx) && idx >= 0 && list.indexOf(idx) === idxPos)
+            : [];
+          const priorProbeChannel = priorProbeChannels.length > 0
+            ? priorProbeChannels[0]
+            : null;
+          const priorRotateAtMs = Math.max(0, Math.trunc(Number(probeRaw && probeRaw.lastRotateAtMs) || 0));
+          const priorProgressAtMs = Math.max(
+            0,
+            Math.trunc(Number(probeRaw && probeRaw.lastProgressAtMs) || 0)
+          );
+          const sawProgressThisTick = receivedCount > priorProbeCount;
+          const lastProgressAtMs = sawProgressThisTick
+            ? nowMs
+            : (priorProgressAtMs > 0 ? priorProgressAtMs : nowMs);
+          const noProgressMs = Math.max(0, nowMs - lastProgressAtMs);
+          let nextRotateAtMs = priorRotateAtMs > 0 ? priorRotateAtMs : nowMs;
+          if (fileTransferAckUnknownLockChannel) {{
+            let lockedChannel = fileTransferExplicitChannelIndex(probeRaw && probeRaw.lockedChannelIndex);
+            if (!Number.isInteger(lockedChannel) || lockedChannel < 0 || !sendChannels.includes(lockedChannel)) {{
+              lockedChannel = sendChannels.length > 0 ? sendChannels[0] : null;
+              nextRotateAtMs = nowMs;
+            }}
+            if (Number.isInteger(lockedChannel) && lockedChannel >= 0) {{
+              sendChannels = [lockedChannel];
+            }}
+          }} else {{
+            const shouldRotate = (
+              stagnationCount >= fileTransferAckUnknownProbeStagnationThreshold
+              || (priorRotateAtMs <= 0)
+              || (noProgressMs >= fileTransferAckUnknownProbeRotateIntervalMs)
+            );
+            if (Number.isInteger(priorProbeChannel) && !shouldRotate) {{
+              sendChannels = [priorProbeChannel];
+            }} else {{
+              const priorCursor = Math.max(
+                0,
+                Math.trunc(Number(fileTransferAckProbeCursorByKey.get(transferKey) || 0))
+              );
+              const selected = sendChannels.length > 0
+                ? [sendChannels[priorCursor % sendChannels.length]]
+                : [];
+              if (selected.length > 0) {{
+                const nextCursor = (priorCursor + 1) % sendChannels.length;
+                fileTransferAckProbeCursorByKey.set(transferKey, nextCursor);
+                sendChannels = selected;
+                stagnationCount = 0;
+              }}
+            }}
+            const nextProbeChannel = sendChannels.length > 0 ? sendChannels[0] : null;
+            const rotated = Number.isInteger(priorProbeChannel) && Number.isInteger(nextProbeChannel)
+              ? nextProbeChannel !== priorProbeChannel
+              : true;
+            nextRotateAtMs = rotated
+              ? nowMs
+              : (priorRotateAtMs > 0 ? priorRotateAtMs : nowMs);
+          }}
+          if (sendChannels.length > 1) {{
+            sendChannels = [sendChannels[0]];
+          }}
+          const nextProbeChannel = sendChannels.length > 0 ? sendChannels[0] : null;
+          fileTransferAckProbeStateByKey.set(transferKey, {{
+            channels: sendChannels.slice(),
+            stagnationCount,
+            lastReceivedCount: receivedCount,
+            lastProgressAtMs,
+            lastRotateAtMs: nextRotateAtMs,
+            lockedChannelIndex: nextProbeChannel,
+            updatedAtMs: nowMs,
+          }});
+          const lastWarnMs = Number(fileTransferAckMissingChannelWarnByKey.get(transferKey) || 0);
+          if ((nowMs - lastWarnMs) > fileTransferAckUnknownWarnIntervalMs) {{
+            fileTransferAckMissingChannelWarnByKey.set(transferKey, nowMs);
+            const labels = sendChannels.map((idx) => meshChannelLabelForIndex(idx, {{ allowAll: false }}));
+            appendFileTransferConsole(
+              `ACK channel unknown for ${{fileTransferShortTransferId(transfer.transferId)}} from ${{senderId}}. ${{fileTransferAckUnknownLockChannel ? "Locked on" : "Probing on"}} ${{labels.join(", ")}}.`,
+              {{ level: "warn" }}
+            );
+          }}
+        }} else {{
+          fileTransferAckMissingChannelWarnByKey.delete(transferKey);
+          fileTransferAckProbeCursorByKey.delete(transferKey);
+          fileTransferAckProbeStateByKey.delete(transferKey);
+        }}
+        const frame = buildFileTransferAckFrame(
+          transfer.transferId,
+          receivedCount,
+          totalChunks,
+          bitmap
+        );
+        if (utf8ByteLength(frame) > fileTransferChatMaxBytes) {{
+          continue;
+        }}
+        try {{
+          let sentChannels = [];
+          for (let idx = 0; idx < sendChannels.length; idx += 1) {{
+            const channelIndex = sendChannels[idx];
+            try {{
+              await sendFileTransferFrameText(frame, senderId, channelIndex);
+              sentChannels.push(channelIndex);
+            }} catch (_err) {{
+            }}
+            if (idx + 1 < sendChannels.length) {{
+              await waitFileTransferFrameGap();
+            }}
+          }}
+          if (!sentChannels.length) {{
+            throw new Error("no usable send channel for ACK");
+          }}
+          const sentAtMs = Date.now();
+          const nextPeriodicRefreshCount = signatureChanged
+            ? 0
+            : Math.max(0, periodicRefreshCount + (periodicRefresh ? 1 : 0));
+          const nextFirstSentAtMs = signatureChanged
+            ? sentAtMs
+            : (firstSentAtMs > 0 ? firstSentAtMs : sentAtMs);
+          fileTransferAckSentState.set(transferKey, {{
+            signature,
+            firstSentAtMs: nextFirstSentAtMs,
+            lastSentAtMs: sentAtMs,
+            periodicRefreshCount: nextPeriodicRefreshCount,
+            receivedCount,
+            totalChunks,
+          }});
+          if (signatureChanged || receivedCount >= totalChunks) {{
+            const channelLabel = sentChannels.length <= 1
+              ? meshChannelLabelForIndex(sentChannels[0], {{ allowAll: false }})
+              : `fallback channels (${sentChannels.map((idx) => meshChannelLabelForIndex(idx, {{ allowAll: false }})).join(", ")})`;
+            appendFileTransferConsole(
+              `ACK sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer.transferId)}} (${{receivedCount}}/${{totalChunks}} chunks) on ${{channelLabel}}.`
+            );
+          }}
+        }} catch (err) {{
+          const msg = err instanceof Error ? err.message : String(err || "unknown error");
+          appendFileTransferConsole(
+            `ACK send failed to ${{senderId}} for ${{fileTransferShortTransferId(transfer.transferId)}}: ${{msg}}`,
+            {{ level: "error" }}
+          );
+        }}
+      }}
+      const staleCutoffMs = nowMs - (20 * 60 * 1000);
+      for (const [key, value] of fileTransferAckObservedChunksByKey.entries()) {{
+        const seenAtMs = Number(value && value.lastSeenAtMs) || 0;
+        if (seenAtMs > 0 && seenAtMs < staleCutoffMs) {{
+          fileTransferAckObservedChunksByKey.delete(key);
+        }}
+      }}
+      for (const [key, value] of fileTransferAckProbeStateByKey.entries()) {{
+        const updatedAtMs = Number(value && value.updatedAtMs) || 0;
+        if (updatedAtMs > 0 && updatedAtMs < staleCutoffMs) {{
+          fileTransferAckProbeStateByKey.delete(key);
+        }}
+      }}
+      for (const [key, value] of fileTransferAckMissingChannelWarnByKey.entries()) {{
+        const warnAtMs = Number(value) || 0;
+        if (warnAtMs > 0 && warnAtMs < staleCutoffMs) {{
+          fileTransferAckMissingChannelWarnByKey.delete(key);
+        }}
+      }}
+      for (const key of Array.from(fileTransferAckProbeCursorByKey.keys())) {{
+        if (!activeAckTransferKeys.has(key) && !fileTransferAckProbeStateByKey.has(key)) {{
+          fileTransferAckProbeCursorByKey.delete(key);
+        }}
+      }}
+    }}
+
+    async function maintainOutgoingFileTransferSessions(state = latestState) {{
+      if (!(state && typeof state === "object")) return;
+      if (fileTransferOutgoingByToken.size <= 0) return;
+      const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: false }});
+      const ackByTransferKey = frameState.ackByTransferKey;
+      const localNodeId = normalizeNodeId(frameState.localNodeId || "");
+      const nowMs = Date.now();
+      for (const [token, session] of fileTransferOutgoingByToken.entries()) {{
+        if (!session || typeof session !== "object") {{
+          fileTransferOutgoingByToken.delete(token);
+          continue;
+        }}
+        if (session.delivered || session.failed) {{
+          continue;
+        }}
+        const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
+        if (ack) {{
+          const ackChannelIndex = fileTransferExplicitChannelIndex(ack.channelIndex);
+          const sendChannelIndex = fileTransferExplicitChannelIndex(session.channelIndex);
+          if (ackChannelIndex != null && sendChannelIndex != null && ackChannelIndex !== sendChannelIndex) {{
+            const priorLoggedAckChannel = fileTransferExplicitChannelIndex(session.lastAckChannelIndex);
+            if (priorLoggedAckChannel !== ackChannelIndex) {{
+              appendFileTransferConsole(
+                `ACK for ${{fileTransferShortTransferId(session.transferId)}} arrived on ${{meshChannelLabelForIndex(ackChannelIndex, {{ allowAll: false }})}} (send channel was ${{meshChannelLabelForIndex(sendChannelIndex, {{ allowAll: false }})}}).`
+              );
+            }}
+          }}
+          session.lastAckChannelIndex = ackChannelIndex;
+          const priorAckedChunks = Math.max(
+            0,
+            Math.min(
+              session.totalChunks,
+              Math.trunc(Number(session.ackedChunks) || 0)
+            )
+          );
+          const ackedChunksObserved = Math.max(
+            0,
+            Math.min(
+              session.totalChunks,
+              Math.max(
+                Number(ack.receivedCount || 0),
+                (ack.receivedSet instanceof Set ? ack.receivedSet.size : 0)
+              )
+            )
+          );
+          const ackedChunks = Math.max(priorAckedChunks, ackedChunksObserved);
+          session.ackedChunks = ackedChunks;
+          session.lastAckUnix = ack.latestUnix || session.lastAckUnix || null;
+          if (ackedChunks > priorAckedChunks) {{
+            session.retriesSinceProgress = 0;
+            session.lastAckProgressAtMs = nowMs;
+            appendFileTransferConsole(
+              `ACK progress for ${{fileTransferShortTransferId(session.transferId)}} from ${{session.destination}}: ${{ackedChunks}}/${{session.totalChunks}}.`
+            );
+          }}
+          if (ackedChunks >= session.totalChunks) {{
+            session.delivered = true;
+            session.deliveredAtMs = nowMs;
+            appendFileTransferConsole(
+              `Delivered ${{fileTransferShortTransferId(session.transferId)}} to ${{session.destination}} (${{session.totalChunks}}/${{session.totalChunks}} acked).`
+            );
+            continue;
+          }}
+        }}
+
+        const stallRetryAttempts = Math.max(
+          0,
+          Math.trunc(Number(session.retriesSinceProgress) || Number(session.retryAttempts) || 0)
+        );
+        const lastProgressAtMs = Math.max(0, Math.trunc(Number(session.lastAckProgressAtMs) || 0));
+        const lastSendAtMs = Number(session.lastSendAtMs) || Number(session.createdAtMs) || 0;
+        const maxedRetries = stallRetryAttempts >= session.maxRetries;
+        let retryCapped = false;
+        if (maxedRetries) {{
+          // After the aggressive retry budget is exhausted, continue low-rate recovery retries.
+          // Only fail once we have both exhausted retries and seen sustained no-progress.
+          const finalAckGraceMs = Math.max(fileTransferAckWaitBeforeRetryMs, fileTransferAckFinalGraceMs);
+          const waitingForLateAck = lastSendAtMs > 0 && (nowMs - lastSendAtMs) < finalAckGraceMs;
+          const progressAnchorMs = lastProgressAtMs > 0
+            ? lastProgressAtMs
+            : Math.max(0, Math.trunc(Number(session.createdAtMs) || 0));
+          const stalledTooLong = progressAnchorMs > 0 && (nowMs - progressAnchorMs) >= fileTransferAckProgressStallFailMs;
+          if (!waitingForLateAck && stalledTooLong) {{
+            session.failed = true;
+            session.failedAtMs = nowMs;
+            appendFileTransferConsole(
+              `Delivery failed for ${{fileTransferShortTransferId(session.transferId)}} to ${{session.destination}} after ${{stallRetryAttempts}}/${{session.maxRetries}} retries without ACK progress.`,
+              {{ level: "error" }}
+            );
+            continue;
+          }}
+          retryCapped = true;
+        }}
+
+        const lastRetryAtMs = Number(session.lastRetryAtMs) || 0;
+        const noAckYet = !ack;
+        const receivedSet = ack && ack.receivedSet instanceof Set
+          ? ack.receivedSet
+          : new Set();
+        const missingIndexes = noAckYet
+          ? Array.from({{ length: session.totalChunks }}, (_value, idx) => idx)
+          : fileTransferMissingChunkIndexes(session.totalChunks, receivedSet);
+        if (!missingIndexes.length) {{
+          continue;
+        }}
+        const endgame = !noAckYet
+          && missingIndexes.length > 0
+          && missingIndexes.length <= fileTransferEndgameMissingChunkThreshold;
+        let retryIntervalMs = fileTransferAckResendIntervalMs;
+        if (noAckYet) {{
+          retryIntervalMs = Math.max(fileTransferAckWaitBeforeRetryMs, fileTransferAckResendIntervalMs);
+        }} else {{
+          const missingCount = missingIndexes.length;
+          if (missingCount >= 30) {{
+            retryIntervalMs = 28000;
+          }} else if (missingCount >= 20) {{
+            retryIntervalMs = 20000;
+          }} else if (missingCount >= 12) {{
+            retryIntervalMs = 14000;
+          }} else if (missingCount >= 8) {{
+            retryIntervalMs = 9000;
+          }} else if (missingCount >= 5) {{
+            retryIntervalMs = 5500;
+          }} else {{
+            retryIntervalMs = fileTransferEndgameResendIntervalMs;
+          }}
+          const backoffSteps = Math.max(0, stallRetryAttempts - 1);
+          if (backoffSteps > 0) {{
+            retryIntervalMs = Math.round(retryIntervalMs * Math.pow(1.15, backoffSteps));
+          }}
+          const maxIntervalMs = endgame ? 7000 : 45000;
+          retryIntervalMs = Math.max(900, Math.min(maxIntervalMs, retryIntervalMs));
+        }}
+        if (retryCapped) {{
+          retryIntervalMs = Math.max(retryIntervalMs, fileTransferRetryRecoveryIntervalMs);
+        }}
+        if (noAckYet && (nowMs - lastSendAtMs) < fileTransferAckWaitBeforeRetryMs) {{
+          continue;
+        }}
+        if (!noAckYet && (nowMs - lastRetryAtMs) < retryIntervalMs) {{
+          continue;
+        }}
+        if (!noAckYet && (nowMs - lastSendAtMs) < fileTransferMaintenanceCooldownMs) {{
+          continue;
+        }}
+        const framesToSend = [];
+        const includeMeta = !!session.metaFrame && (noAckYet || (!endgame && (stallRetryAttempts % 4 === 0)));
+        if (includeMeta) {{
+          framesToSend.push(session.metaFrame);
+        }}
+        let retryMissingIndexes = missingIndexes.slice();
+        if (!noAckYet && missingIndexes.length > 0) {{
+          let burstSize = missingIndexes.length;
+          if (endgame) {{
+            burstSize = Math.max(1, Math.min(2, missingIndexes.length));
+          }} else if (missingIndexes.length >= 20) {{
+            burstSize = 14;
+          }} else if (missingIndexes.length >= 12) {{
+            burstSize = 10;
+          }} else if (missingIndexes.length >= 8) {{
+            burstSize = 8;
+          }}
+          if (missingIndexes.length > burstSize) {{
+            const cursorRaw = Math.max(0, Math.trunc(Number(session.retryChunkCursor) || 0));
+            const selected = [];
+            for (let idxPos = 0; idxPos < burstSize; idxPos += 1) {{
+              const pick = missingIndexes[(cursorRaw + idxPos) % missingIndexes.length];
+              if (!selected.includes(pick)) {{
+                selected.push(pick);
+              }}
+            }}
+            retryMissingIndexes = selected;
+            session.retryChunkCursor = (cursorRaw + burstSize) % missingIndexes.length;
+          }} else {{
+            session.retryChunkCursor = 0;
+          }}
+        }} else {{
+          session.retryChunkCursor = 0;
+        }}
+        const duplicateSends = endgame
+          ? Math.max(1, Math.min(4, fileTransferEndgameDuplicateSends + (retryMissingIndexes.length <= 2 ? 1 : 0)))
+          : 1;
+        for (const chunkIdx of retryMissingIndexes) {{
+          const frame = session.chunkFrames[chunkIdx];
+          if (typeof frame === "string" && frame.trim()) {{
+            if (endgame) {{
+              for (let copyIdx = 0; copyIdx < duplicateSends; copyIdx += 1) {{
+                framesToSend.push(frame.trim());
+              }}
+            }} else {{
+              framesToSend.push(frame.trim());
+            }}
+          }}
+        }}
+        if (!framesToSend.length) {{
+          continue;
+        }}
+        let sentCount = 0;
+        let firstSendError = "";
+        for (let frameIdx = 0; frameIdx < framesToSend.length; frameIdx += 1) {{
+          const frame = framesToSend[frameIdx];
+          try {{
+            await sendFileTransferFrameText(
+              frame,
+              session.destination,
+              session.channelIndex
+            );
+            sentCount += 1;
+            if (frameIdx + 1 < framesToSend.length) {{
+              await waitFileTransferFrameGap();
+            }}
+          }} catch (err) {{
+            firstSendError = err instanceof Error ? err.message : String(err || "send failed");
+            break;
+          }}
+        }}
+        if (sentCount > 0) {{
+          session.retryAttempts = Math.max(0, Math.trunc(Number(session.retryAttempts) || 0)) + 1;
+          session.retriesSinceProgress = Math.max(0, Math.trunc(Number(session.retriesSinceProgress) || 0)) + 1;
+          session.lastRetryAtMs = nowMs;
+          session.lastSendAtMs = Date.now();
+          const activeRetries = Math.max(0, Math.trunc(Number(session.retriesSinceProgress) || 0));
+          const intervalSec = (retryIntervalMs / 1000).toFixed(retryIntervalMs < 10000 ? 1 : 0);
+          const endgameLabel = endgame
+            ? ` (endgame, ${{missingIndexes.length}} missing chunk${{missingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence)`
+            : "";
+          appendFileTransferConsole(
+            `Retry ${{activeRetries}}/${{session.maxRetries}} for ${{fileTransferShortTransferId(session.transferId)}}: resent ${{sentCount}} frame${{sentCount === 1 ? "" : "s"}} to ${{session.destination}}${{endgameLabel}}.`,
+            {{ level: "warn" }}
+          );
+        }} else if (firstSendError) {{
+          const lastRetryErrorAtMs = Math.max(0, Math.trunc(Number(session.lastRetryErrorAtMs) || 0));
+          if ((nowMs - lastRetryErrorAtMs) >= fileTransferRetryErrorLogIntervalMs) {{
+            session.lastRetryErrorAtMs = nowMs;
+            appendFileTransferConsole(
+              `Retry send failed for ${{fileTransferShortTransferId(session.transferId)}} to ${{session.destination}}: ${{firstSendError}}.`,
+              {{ level: "warn" }}
+            );
+          }}
+        }}
+      }}
+      pruneOutgoingFileTransferSessions(nowMs);
+    }}
+
+    async function runFileTransferMaintenance(state = latestState) {{
+      await maybeSendFileTransferAckFrames(state);
+      await maintainOutgoingFileTransferSessions(state);
+      if (activeLayoutView === "files" && state) {{
+        renderFilesView(state);
+      }}
+    }}
+
+    function scheduleFileTransferMaintenance(state = latestState) {{
+      if (fileTransferMaintenanceInFlight) {{
+        fileTransferMaintenanceQueued = true;
+        return;
+      }}
+      fileTransferMaintenanceInFlight = true;
+      void (async () => {{
+        try {{
+          await runFileTransferMaintenance(state);
+        }} finally {{
+          fileTransferMaintenanceInFlight = false;
+          if (fileTransferMaintenanceQueued) {{
+            fileTransferMaintenanceQueued = false;
+            scheduleFileTransferMaintenance(latestState);
+          }}
+        }}
+      }})();
+    }}
+
+    function hasActiveFileTransferSessions() {{
+      for (const session of fileTransferOutgoingByToken.values()) {{
+        if (!session || typeof session !== "object") continue;
+        if (!session.delivered && !session.failed) {{
+          return true;
+        }}
+      }}
+      return false;
+    }}
+
+    function syncFileTransferBlobs(rows) {{
+      const activeKeys = new Set();
+      const list = Array.isArray(rows) ? rows : [];
+      for (const row of list) {{
+        const key = String(row && row.key ? row.key : "").trim();
+        if (!key) continue;
+        activeKeys.add(key);
+        const bytes = row && row.canDownload ? row.bytes : null;
+        if (!(bytes instanceof Uint8Array) || bytes.length <= 0) {{
+          fileTransferBlobByKey.delete(key);
+          const staleUrl = fileTransferDownloadUrlByKey.get(key);
+          if (staleUrl) {{
+            try {{
+              URL.revokeObjectURL(staleUrl);
+            }} catch (_err) {{
+            }}
+            fileTransferDownloadUrlByKey.delete(key);
+          }}
+          continue;
+        }}
+        const existingBlob = fileTransferBlobByKey.get(key);
+        const needsBlob = !(existingBlob instanceof Blob) || Number(existingBlob.size) !== bytes.length;
+        if (needsBlob) {{
+          fileTransferBlobByKey.set(key, new Blob([bytes], {{ type: "application/octet-stream" }}));
+          const staleUrl = fileTransferDownloadUrlByKey.get(key);
+          if (staleUrl) {{
+            try {{
+              URL.revokeObjectURL(staleUrl);
+            }} catch (_err) {{
+            }}
+            fileTransferDownloadUrlByKey.delete(key);
+          }}
+        }}
+      }}
+
+      for (const key of Array.from(fileTransferBlobByKey.keys())) {{
+        if (activeKeys.has(key)) continue;
+        fileTransferBlobByKey.delete(key);
+      }}
+      for (const key of Array.from(fileTransferDownloadUrlByKey.keys())) {{
+        if (activeKeys.has(key)) continue;
+        const staleUrl = fileTransferDownloadUrlByKey.get(key);
+        if (staleUrl) {{
+          try {{
+            URL.revokeObjectURL(staleUrl);
+          }} catch (_err) {{
+          }}
+        }}
+        fileTransferDownloadUrlByKey.delete(key);
+      }}
+    }}
+
+    function fileTransferDownloadUrlForKey(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return "";
+      const existing = fileTransferDownloadUrlByKey.get(key);
+      if (existing) return existing;
+      const blob = fileTransferBlobByKey.get(key);
+      if (!(blob instanceof Blob)) return "";
+      let created = "";
+      try {{
+        created = URL.createObjectURL(blob);
+      }} catch (_err) {{
+        created = "";
+      }}
+      if (created) {{
+        fileTransferDownloadUrlByKey.set(key, created);
+      }}
+      return created;
+    }}
+
+    function downloadFileTransferByKey(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return;
+      const row = fileTransferRows.find((entry) => entry && entry.key === key) || null;
+      if (!row || !row.canDownload) {{
+        setFileTransferStatus("This transfer is not complete yet.", true);
+        appendFileTransferConsole("Download blocked: transfer is not complete yet.", {{ level: "warn" }});
+        return;
+      }}
+      const url = fileTransferDownloadUrlForKey(key);
+      if (!url) {{
+        setFileTransferStatus("Could not prepare file download.", true);
+        appendFileTransferConsole("Download failed: could not prepare transfer blob.", {{ level: "error" }});
+        return;
+      }}
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = row.downloadName || "mesh-file.bin";
+      anchor.rel = "noopener";
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setFileTransferStatus(`Download ready: ${{row.downloadName || row.fileName}}`);
+      appendFileTransferConsole(
+        `Download ready for ${{row.downloadName || row.fileName}} (transfer ${{fileTransferShortTransferId(row.transferId)}}).`
+      );
+    }}
+
+    function bindFilesTransferTableControls() {{
+      const table = document.getElementById("files-transfer-table");
+      if (!(table instanceof HTMLTableElement) || table.dataset.bound === "1") {{
+        return;
+      }}
+      table.dataset.bound = "1";
+      table.addEventListener("click", (event) => {{
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const button = target.closest("button.files-transfer-action");
+        if (!(button instanceof HTMLButtonElement)) return;
+        const transferKey = String(button.dataset.transferKey || "").trim();
+        if (!transferKey) return;
+        downloadFileTransferByKey(transferKey);
+      }});
+    }}
+
+    function renderFilesView(state = latestState) {{
+      bindFilesTransferTableControls();
+      bindFilesConsoleControls();
+      renderFileTransferConsole();
+      const rows = buildFileTransferRows(state);
+      fileTransferRows = rows;
+      syncFileTransferBlobs(rows);
+
+      const caption = document.getElementById("files-caption");
+      if (caption instanceof HTMLElement) {{
+        const total = rows.length;
+        const complete = rows.filter((row) => row && row.delivered).length;
+        const pending = Math.max(0, total - complete);
+        const channelLabel = currentMeshChannelViewLabel();
+        const sendLabel = currentMeshChannelSendLabel();
+        if (!total) {{
+          caption.textContent = `No file transfers detected yet. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}}.`;
+        }} else {{
+          caption.textContent = `Showing ${{total}} transfer${{total === 1 ? "" : "s"}}. ${{complete}} complete, ${{pending}} pending. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}}.`;
+        }}
+      }}
+
+      const table = document.getElementById("files-transfer-table");
+      if (!(table instanceof HTMLTableElement)) return;
+      const tbody = table.querySelector("tbody");
+      if (!(tbody instanceof HTMLElement)) return;
+      if (!rows.length) {{
+        tbody.innerHTML = '<tr><td colspan="8">No file transfers yet.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = rows.map((row) => {{
+        const unix = Number(row && row.unix);
+        const when = Number.isFinite(unix) && unix > 0 ? formatLocalChatTime(unix, "n/a") : "n/a";
+        const peerText = row && row.peerLabel ? row.peerLabel : (row && row.peerId ? row.peerId : "n/a");
+        const peerTitle = row && row.peerTitle ? row.peerTitle : peerText;
+        const nameMain = compactInlineMessage(row && row.fileName ? row.fileName : "mesh-file.bin", 52);
+        const nameSub = `id:${{compactInlineMessage(String((row && row.transferId) || ""), 24)}}`;
+        const directionClass = String(row && row.directionClass ? row.directionClass : "other");
+        const directionLabel = String(row && row.directionLabel ? row.directionLabel : "Seen");
+        const channelLabel = String(row && row.channelLabel ? row.channelLabel : "Unknown");
+        const actionLabel = row && row.canDownload
+          ? "Download"
+          : (row && row.outgoingRetrying ? "Retrying" : "Waiting");
+        const actionDisabled = row && row.canDownload ? "" : " disabled";
+        const actionTitle = row && row.canDownload
+          ? `Download ${{row.downloadName || row.fileName || "file"}}`
+          : "Waiting for all chunks";
+        const channelIndexRaw = Number(row && row.channelIndex);
+        const hasChannelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0;
+        const channelBadge = hasChannelIndex
+          ? meshChannelBadgeHtml(
+            channelIndexRaw,
+            channelLabel,
+            {{
+              allowAll: false,
+              extraClass: "compact",
+              title: channelLabel,
+            }}
+          )
+          : `<span class="mesh-channel-badge compact" style="${{escAttr(meshChannelBadgeStyle(meshChannelAllIndex, {{ allowAll: true }}))}}" title="Channel unavailable from packet metadata">Unknown</span>`;
+        return `<tr>
+          <td data-sort="${{escAttr(unix)}}">${{escAttr(when)}}</td>
+          <td data-sort="${{escAttr(directionLabel)}}"><span class="files-transfer-dir ${{escAttr(directionClass)}}">${{escAttr(directionLabel)}}</span></td>
+          <td data-sort="${{escAttr(peerText)}}" title="${{escAttr(peerTitle)}}">${{escAttr(peerText)}}</td>
+          <td data-sort="${{escAttr(row.fileName || "")}}">
+            <span class="files-transfer-name">
+              <span class="files-transfer-name-main" title="${{escAttr(row.fileName || "")}}">${{escAttr(nameMain)}}</span>
+              <span class="files-transfer-name-sub" title="${{escAttr(row.transferId || "")}}">${{escAttr(nameSub)}}</span>
+            </span>
+          </td>
+          <td data-sort="${{escAttr(row.progressSort ?? 0)}}">${{escAttr(row.progressLabel || "n/a")}}</td>
+          <td data-sort="${{escAttr(row.sizeSort ?? 0)}}">${{escAttr(row.sizeLabel || "n/a")}}</td>
+          <td data-sort="${{escAttr(hasChannelIndex ? channelIndexRaw : -1)}}">${{channelBadge}}</td>
+          <td data-sort="${{escAttr(row.canDownload ? 1 : 0)}}">
+            <button
+              type="button"
+              class="files-transfer-action"
+              data-transfer-key="${{escAttr(row.key || "")}}"
+              title="${{escAttr(actionTitle)}}"
+              ${{actionDisabled}}
+            >${{escAttr(actionLabel)}}</button>
+          </td>
+        </tr>`;
+      }}).join("");
+    }}
+
+    async function sendChatPayload(body, successMessage) {{
+      if (chatSendInFlight) return null;
+      setChatSendBusy(true);
+      setChatSendStatus("Sending...");
+      try {{
+        const resp = await fetch("/api/chat/send", {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(body || {{}}),
+        }});
+        const payload = await resp.json().catch(() => ({{}}));
+        if (!resp.ok || !payload.ok) {{
+          const msg = payload && payload.error ? payload.error : `send failed (${{resp.status}})`;
+          throw new Error(msg);
+        }}
+        setChatSendStatus(successMessage || `Sent at ${{payload.sent_at || "now"}}`);
+        await poll();
+        return payload;
+      }} catch (err) {{
+        setChatSendStatus(`Send error: ${{err.message || err}}`, true);
+        return null;
+      }} finally {{
+        setChatSendBusy(false);
+        flushQueuedComposerSend();
+      }}
+    }}
+
+    async function postStandaloneZorkCommand(text, sessionId = "") {{
+      const body = {{
+        text: String(text == null ? "" : text),
+      }};
+      const cleanSessionId = String(sessionId == null ? "" : sessionId).trim();
+      if (cleanSessionId) {{
+        body.session_id = cleanSessionId;
+      }}
+      const resp = await fetch("/api/games/zork", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify(body),
+      }});
+      const payload = await resp.json().catch(() => ({{}}));
+      if (!resp.ok || !payload.ok) {{
+        const msg = payload && payload.error ? payload.error : `standalone zork failed (${{resp.status}})`;
+        throw new Error(msg);
+      }}
+      return payload;
+    }}
+
+    function restoreChatInputFocus(input) {{
+      if (!(input instanceof HTMLInputElement)) return;
+      window.requestAnimationFrame(() => {{
+        if (input.disabled) return;
+        input.focus({{ preventScroll: true }});
+        const tail = input.value.length;
+        input.setSelectionRange(tail, tail);
+      }});
+    }}
+
+    function flushQueuedComposerSend() {{
+      if (!queuedComposerSend || chatSendInFlight) return;
+      const input = document.getElementById("chat-input");
+      const hasText = input instanceof HTMLInputElement && String(input.value || "").trim().length > 0;
+      const preserveFocus = !!queuedComposerFocus;
+      queuedComposerSend = false;
+      queuedComposerFocus = false;
+      if (!hasText) return;
+      window.setTimeout(() => {{
+        void sendChatMessage({{ preserveFocus }});
+      }}, 0);
+    }}
+
+    async function sendChatMessage(options = null) {{
+      const input = document.getElementById("chat-input");
+      if (!(input instanceof HTMLInputElement)) return;
+      const preserveFocus = !!(options && options.preserveFocus);
+      const hadFocus = preserveFocus && document.activeElement === input;
+      if (chatSendInFlight) {{
+        const queuedText = String(input.value || "").trim();
+        if (queuedText) {{
+          queuedComposerSend = true;
+          if (preserveFocus || document.activeElement === input) {{
+            queuedComposerFocus = true;
+          }}
+          setChatSendStatus("Send in progress. Queued your message...");
+        }}
+        return;
+      }}
+      const text = input.value.trim();
+      if (!text) {{
+        setChatSendStatus("Enter a message before sending.", true);
+        if (hadFocus) {{
+          restoreChatInputFocus(input);
+        }}
+        return;
+      }}
+      let destination = "^all";
+      if (activeChatChannel === "direct") {{
+        const directPeer = resolvedDirectPeerForComposer();
+        if (!isCanonicalNodeId(directPeer)) {{
+          setChatSendStatus("Select a user before sending a peer-to-peer message.", true);
+          if (hadFocus) {{
+            restoreChatInputFocus(input);
+          }}
+          return;
+        }}
+        destination = directPeer;
+        if (isSelfNodeId(destination)) {{
+          setChatSendStatus("Cannot send peer-to-peer message to your own radio.", true);
+          if (hadFocus) {{
+            restoreChatInputFocus(input);
+          }}
+          return;
+        }}
+      }}
+      const replyId = Number(chatReplyTargetId);
+      const sendCtx = meshChannelSendContext();
+      const requestBody = {{
+        text,
+        destination,
+        channel_index: sendCtx.sendIndex,
+      }};
+      if (Number.isInteger(replyId) && replyId > 0) {{
+        requestBody.reply_id = replyId;
+      }}
+      const payload = await sendChatPayload(
+        requestBody,
+        null
+      );
+      if (payload && payload.ok) {{
+        recordBotRequestHistoryFromSend(requestBody, payload);
+        input.value = "";
+        const replied = Number.isInteger(replyId) && replyId > 0;
+        clearChatReplyTarget();
+        if (destination === "^all") {{
+          setChatSendStatus(`${{replied ? "Reply sent" : "Sent"}} to Everyone on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
+        }} else {{
+          const awaitingAck = payload.ack_requested === true && normalizeDeliveryState(payload.delivery_state) === "pending";
+          if (awaitingAck) {{
+            setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}} (awaiting ACK)`);
+          }} else {{
+            setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
+          }}
+        }}
+      }}
+      if (hadFocus) {{
+        restoreChatInputFocus(input);
+      }}
+    }}
+
+    async function sendChatReaction(replyId, emoji) {{
+      const replyNum = Number(replyId);
+      const cleanEmoji = String(emoji || "").trim();
+      if (!Number.isInteger(replyNum) || replyNum <= 0) {{
+        setChatSendStatus("Cannot react: target message id is missing.", true);
+        return;
+      }}
+      if (!cleanEmoji) {{
+        setChatSendStatus("Choose an emoji reaction.", true);
+        return;
+      }}
+      if (!isReactionCompatibleEmoji(cleanEmoji)) {{
+        setChatSendStatus("Choose a single-codepoint emoji for reactions.", true);
+        return;
+      }}
+      let destination = "^all";
+      const sendCtx = meshChannelSendContext();
+      if (activeChatChannel === "direct") {{
+        const directPeer = resolvedDirectPeerForComposer();
+        if (isCanonicalNodeId(directPeer)) {{
+          destination = directPeer;
+        }}
+        if (isSelfNodeId(destination)) {{
+          setChatSendStatus("Cannot react in peer-to-peer mode to your own radio.", true);
+          return;
+        }}
+      }}
+      const payload = await sendChatPayload(
+        {{
+          destination,
+          channel_index: sendCtx.sendIndex,
+          reply_id: replyNum,
+          emoji: cleanEmoji,
+        }},
+        null
+      );
+      if (payload && payload.ok) {{
+        setChatSendStatus(`Reacted ${{cleanEmoji}} on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
+      }}
+    }}
+
+    async function sendChatAck(options = null) {{
+      if (chatSendInFlight) return null;
+      const replyId = Number(options && options.reply_id);
+      if (!Number.isInteger(replyId) || replyId <= 0) {{
+        setChatSendStatus("Cannot ACK: target message id is missing.", true);
+        return null;
+      }}
+      const textMode = String((options && options.text_mode) || "").trim().toLowerCase();
+      let text = String((options && options.text) || "").trim();
+      if (textMode === "pong") {{
+        try {{
+          const pongText = await buildPongStyleAckReplyText(options, latestState);
+          if (pongText) {{
+            text = String(pongText).trim();
+          }}
+        }} catch (_err) {{
+          // Fall back to the pre-baked ACK text if pong-style generation fails.
+        }}
+      }}
+      if (!text) {{
+        setChatSendStatus("Cannot ACK: message details are unavailable.", true);
+        return null;
+      }}
+      let destination = normalizeNodeId((options && options.destination) || "^all");
+      if (!destination) destination = "^all";
+      if (destination !== "^all" && !isCanonicalNodeId(destination)) {{
+        setChatSendStatus("Cannot ACK: destination is unavailable.", true);
+        return null;
+      }}
+      const channelRaw = Number(options && options.channel_index);
+      const channelIndex = Number.isInteger(channelRaw) && channelRaw >= 0 ? channelRaw : 0;
+      const targetLabel = String((options && options.target_label) || "").trim()
+        || (destination === "^all" ? "Everyone" : destination);
+      const payload = await sendChatPayload(
+        {{
+          text,
+          destination,
+          channel_index: channelIndex,
+          reply_id: replyId,
+        }},
+        null
+      );
+      if (payload && payload.ok) {{
+        setChatSendStatus(`ACK sent to ${{targetLabel}} on ${{meshChannelLabelForIndex(channelIndex)}} at ${{payload.sent_at || "now"}}`);
+      }}
+      return payload;
+    }}
+
+    function chatAckOptionsFromButton(button) {{
+      if (!(button instanceof HTMLElement)) return null;
+      return {{
+        reply_id: Number(button.dataset.ackReplyId || ""),
+        text: button.dataset.ackText || "",
+        text_mode: button.dataset.ackTextMode || "",
+        destination: button.dataset.ackDestination || "^all",
+        channel_index: Number(button.dataset.ackChannel || ""),
+        target_label: button.dataset.ackTargetLabel || "",
+        source_id: button.dataset.ackSourceId || "",
+        source_label: button.dataset.ackSourceLabel || "",
+        received_unix: button.dataset.ackReceivedUnix || "",
+        hops: button.dataset.ackHopCount || "",
+        rx_snr: button.dataset.ackRxSnr || "",
+        rx_rssi: button.dataset.ackRxRssi || "",
+      }};
+    }}
+
+    async function retryChatMessage(options) {{
+      const text = String((options && options.text) || "").trim();
+      if (!text) {{
+        setChatSendStatus("Cannot retry: message text is empty.", true);
+        return;
+      }}
+
+      let destination = String((options && options.destination) || "^all").trim() || "^all";
+      if (destination.toLowerCase() === "all" || destination.toLowerCase() === "broadcast") {{
+        destination = "^all";
+      }}
+      if (!(destination === "^all" || destination.startsWith("!"))) {{
+        setChatSendStatus("Cannot retry: destination is invalid.", true);
+        return;
+      }}
+
+      const channelRaw = Number(options && options.channel_index);
+      const channelIndex = Number.isInteger(channelRaw) && channelRaw >= 0 ? channelRaw : 0;
+      const replyRaw = Number(options && options.reply_id);
+      const retryOfRaw = Number(options && options.retry_of);
+
+      const body = {{
+        text,
+        destination,
+        channel_index: channelIndex,
+      }};
+      if (Number.isInteger(replyRaw) && replyRaw > 0) {{
+        body.reply_id = replyRaw;
+      }}
+      if (Number.isInteger(retryOfRaw) && retryOfRaw > 0) {{
+        body.retry_of = retryOfRaw;
+      }}
+
+      const payload = await sendChatPayload(body, null);
+      if (payload && payload.ok) {{
+        const destLabel = destination === "^all" ? "Everyone" : destination;
+        setChatSendStatus(`Retried to ${{destLabel}} at ${{payload.sent_at || "now"}}`);
+      }}
+    }}
+
+    function normalizeChatEmojiPinnedChoices(rawChoices, maxCount = chatEmojiTopUsageCount) {{
+      const list = Array.isArray(rawChoices) ? rawChoices : [];
+      const out = [];
+      const seen = new Set();
+      for (const rawEmoji of list) {{
+        const emoji = String(rawEmoji || "").trim();
+        if (!emoji || seen.has(emoji) || !chatEmojiChoiceSet.has(emoji)) continue;
+        seen.add(emoji);
+        out.push(emoji);
+        if (out.length >= maxCount) {{
+          break;
+        }}
+      }}
+      return out;
+    }}
+
+    function renderChatEmojiTopRow(options = null) {{
+      const topLabel = document.getElementById("chat-emoji-top-label");
+      const topGrid = document.getElementById("chat-emoji-top-grid");
+      if (!(topGrid instanceof HTMLElement)) return;
+
+      const preferredChoices = normalizeChatEmojiPinnedChoices(
+        options && Array.isArray(options.choices) ? options.choices : [],
+        chatEmojiTopUsageCount,
+      );
+      const usePreferredChoices = preferredChoices.length > 0;
+      const sourceChoices = usePreferredChoices ? preferredChoices : chatEmojiTopChoices();
+      const labelText = usePreferredChoices
+        ? String((options && options.label) || "Top matches").trim() || "Top matches"
+        : "Top used";
+      const choices = chatEmojiMode === "react"
+        ? reactionCompatibleEmojiChoices(sourceChoices)
+        : sourceChoices;
+      const signature = `${{chatEmojiMode}}:${{labelText}}:${{choices.join("\u0000")}}`;
+      if ((topGrid.dataset.signature || "") === signature) {{
+        return;
+      }}
+
+      if (topLabel instanceof HTMLElement) {{
+        topLabel.textContent = labelText;
+      }}
+      topGrid.setAttribute("aria-label", labelText);
+
+      if (!choices.length) {{
+        const empty = document.createElement("div");
+        empty.className = "chat-emoji-top-empty";
+        empty.textContent = usePreferredChoices
+          ? (chatEmojiMode === "react"
+            ? "No compatible matches found."
+            : "No quick matches found.")
+          : (chatEmojiMode === "react"
+            ? "No compatible reaction emojis in your top list yet."
+            : "Use emojis and your top 8 will appear here.");
+        topGrid.replaceChildren(empty);
+        topGrid.dataset.signature = signature;
+        return;
+      }}
+      const nodes = choices.map((emoji) => buildChatEmojiNode(emoji, "chat-emoji-top-item"));
+      topGrid.replaceChildren(...nodes);
+      topGrid.dataset.signature = signature;
+    }}
+
+    function renderChatEmojiPickerPanel() {{
+      const groupSelect = document.getElementById("chat-emoji-group-select");
+      const searchInput = document.getElementById("chat-emoji-search");
+      const grid = document.getElementById("chat-emoji-grid");
+      const meta = document.getElementById("chat-emoji-meta");
+      if (!(grid instanceof HTMLElement)) return;
+
+      const selectedSearch = normalizeChatEmojiSearchQuery(
+        (searchInput instanceof HTMLInputElement)
+          ? searchInput.value
+          : chatEmojiSearchQuery
+      );
+      chatEmojiSearchQuery = selectedSearch;
+      if (searchInput instanceof HTMLInputElement && searchInput.value !== selectedSearch) {{
+        searchInput.value = selectedSearch;
+      }}
+
+      if (!chatEmojiCatalogLoaded) {{
+        if (groupSelect instanceof HTMLSelectElement) {{
+          const loadingOption = '<option value="all">All groups (loading...)</option>';
+          if (groupSelect.innerHTML !== loadingOption) {{
+            groupSelect.innerHTML = loadingOption;
+          }}
+          groupSelect.value = "all";
+          groupSelect.disabled = true;
+        }}
+        if (searchInput instanceof HTMLInputElement) {{
+          searchInput.disabled = true;
+        }}
+        if (meta instanceof HTMLElement) {{
+          if (chatEmojiCatalogLoadError) {{
+            meta.textContent = "Emoji catalog unavailable";
+            meta.title = chatEmojiCatalogLoadError;
+          }} else {{
+            meta.textContent = "Loading emoji catalog...";
+            meta.title = "Fetching Unicode emoji catalog...";
+          }}
+        }}
+        const loadingKey = chatEmojiCatalogLoadError ? "emoji-catalog:error" : "emoji-catalog:loading";
+        if ((grid.dataset.key || "") !== loadingKey) {{
+          const empty = document.createElement("div");
+          empty.className = "chat-emoji-empty";
+          empty.textContent = chatEmojiCatalogLoadError
+            ? "Emoji catalog unavailable. Try again in a moment."
+            : "Loading emoji catalog...";
+          grid.replaceChildren(empty);
+          grid.dataset.key = loadingKey;
+          grid.scrollTop = 0;
+        }}
+        renderChatEmojiTopRow(null);
+        return;
+      }}
+
+      if (searchInput instanceof HTMLInputElement) {{
+        searchInput.disabled = false;
+      }}
+      if (groupSelect instanceof HTMLSelectElement) {{
+        groupSelect.disabled = false;
+        const catalogSignature = `${{chatEmojiTotalChoices}}:${{chatEmojiGroups.map((group) => `${{group.id}}:${{group.emojis.length}}`).join("|")}}`;
+        if ((groupSelect.dataset.catalogSignature || "") !== catalogSignature) {{
+          const groupOptions = [
+            `<option value="all">All groups (${{chatEmojiTotalChoices}})</option>`,
+            ...chatEmojiGroups.map((group) => (
+              `<option value="${{escAttr(group.id)}}">${{escAttr(group.label)}} (${{group.emojis.length}})</option>`
+            )),
+          ].join("");
+          groupSelect.innerHTML = groupOptions;
+          groupSelect.dataset.catalogSignature = catalogSignature;
+          groupSelect.value = normalizeChatEmojiGroup(chatEmojiPickerGroup);
+        }}
+      }}
+
+      const selectedGroup = normalizeChatEmojiGroup(
+        (groupSelect instanceof HTMLSelectElement)
+          ? groupSelect.value
+          : chatEmojiPickerGroup
+      );
+      const previousGroup = chatEmojiPickerGroup;
+      chatEmojiPickerGroup = selectedGroup;
+      if (groupSelect instanceof HTMLSelectElement && groupSelect.value !== selectedGroup) {{
+        groupSelect.value = selectedGroup;
+      }}
+
+      const searchActive = !!selectedSearch;
+      const sourceChoices = searchActive
+        ? chatEmojiChoicesForSearch(selectedSearch)
+        : chatEmojiChoicesForGroup(selectedGroup);
+      const choices = chatEmojiMode === "react"
+        ? reactionCompatibleEmojiChoices(sourceChoices)
+        : sourceChoices;
+      const groupLabel = searchActive
+        ? `Search all: "${{selectedSearch}}"`
+        : (selectedGroup === "all"
+          ? "All groups"
+          : ((chatEmojiGroupsById.get(selectedGroup) || {{}}).label || "All groups"));
+      if (meta instanceof HTMLElement) {{
+        const countText = chatEmojiMode === "react"
+          ? `${{choices.length}} / ${{sourceChoices.length}} compatible`
+          : `${{choices.length}} / ${{chatEmojiTotalChoices}}`;
+        meta.textContent = `${{groupLabel}} · ${{countText}}`;
+        meta.title = `Unicode Emoji ${{chatEmojiDataVersion}} (${{
+          chatEmojiDataDate
+        }})`;
+      }}
+      const renderModeKey = chatEmojiMode === "react" ? "react" : "compose";
+      const renderKey = searchActive
+        ? `${{renderModeKey}}:search:${{selectedSearch}}`
+        : `${{renderModeKey}}:group:${{selectedGroup}}`;
+      if ((grid.dataset.key || "") !== renderKey) {{
+        if (choices.length) {{
+          const shouldUseCachedGroupNodes = !searchActive && chatEmojiMode !== "react";
+          const nodes = shouldUseCachedGroupNodes
+            ? chatEmojiNodesForGroup(selectedGroup)
+            : choices.map((emoji) => buildChatEmojiNode(emoji));
+          grid.replaceChildren(...nodes);
+        }} else {{
+          const empty = document.createElement("div");
+          empty.className = "chat-emoji-empty";
+          empty.textContent = chatEmojiMode === "react"
+            ? "No compatible single-codepoint emojis matched."
+            : "No emojis matched your search.";
+          grid.replaceChildren(empty);
+        }}
+        grid.dataset.key = renderKey;
+        grid.scrollTop = 0;
+      }}
+      if (previousGroup !== selectedGroup) {{
+        persistChatEmojiPickerState();
+      }}
+      const topRowOptions = searchActive && choices.length
+        ? {{
+          choices: choices.slice(0, chatEmojiTopUsageCount),
+          label: chatEmojiMode === "react" ? "Top reaction matches" : "Top matches",
+        }}
+        : null;
+      renderChatEmojiTopRow(topRowOptions);
+    }}
+
+    function focusChatEmojiSearchInput() {{
+      const panel = document.getElementById("chat-emoji-panel");
+      const searchInput = document.getElementById("chat-emoji-search");
+      if (!(panel instanceof HTMLElement) || panel.hidden) {{
+        return false;
+      }}
+      if (!(searchInput instanceof HTMLInputElement)) {{
+        return false;
+      }}
+      requestAnimationFrame(() => {{
+        if (panel.hidden) return;
+        searchInput.focus({{ preventScroll: true }});
+        const end = searchInput.value.length;
+        searchInput.setSelectionRange(end, end);
+      }});
+      return true;
+    }}
+
+    function openChatEmojiPanel(mode = "compose", reactionTargetId = null) {{
+      const panel = document.getElementById("chat-emoji-panel");
+      const btn = document.getElementById("chat-emoji-btn");
+      if (!(panel instanceof HTMLElement)) return;
+      chatEmojiMode = mode === "react" ? "react" : "compose";
+      const parsedTarget = Number(reactionTargetId);
+      chatReactionTargetId = (
+        chatEmojiMode === "react" && Number.isInteger(parsedTarget) && parsedTarget > 0
+      ) ? parsedTarget : null;
+      renderChatEmojiPickerPanel();
+      panel.hidden = false;
+      focusChatEmojiSearchInput();
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", "true");
+      }}
+      if (!chatEmojiCatalogLoaded) {{
+        void ensureChatEmojiCatalogLoaded(true).then((loaded) => {{
+          if (!loaded || panel.hidden) return;
+          renderChatEmojiPickerPanel();
+        }});
+      }}
+      if (chatEmojiMode === "react") {{
+        setChatSendStatus("Pick a single-codepoint reaction emoji...");
+      }}
+    }}
+
+    function closeChatEmojiPanel() {{
+      const panel = document.getElementById("chat-emoji-panel");
+      const btn = document.getElementById("chat-emoji-btn");
+      chatEmojiMode = "compose";
+      chatReactionTargetId = null;
+      chatEmojiSearchQuery = "";
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = true;
+      }}
+      const searchInput = document.getElementById("chat-emoji-search");
+      if (searchInput instanceof HTMLInputElement) {{
+        searchInput.value = "";
+      }}
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", "false");
+      }}
+    }}
+
+    function insertEmojiAtCursor(emoji) {{
+      const input = document.getElementById("chat-input");
+      if (!(input instanceof HTMLInputElement)) return;
+      const value = input.value || "";
+      const start = Number.isFinite(input.selectionStart) ? input.selectionStart : value.length;
+      const end = Number.isFinite(input.selectionEnd) ? input.selectionEnd : value.length;
+      input.value = value.slice(0, start) + emoji + value.slice(end);
+      const next = start + emoji.length;
+      input.focus({{ preventScroll: true }});
+      input.setSelectionRange(next, next);
+    }}
+
+    function bindEmojiPicker() {{
+      const panel = document.getElementById("chat-emoji-panel");
+      const btn = document.getElementById("chat-emoji-btn");
+      if (!(panel instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
+
+      if (panel.dataset.init !== "1") {{
+        const groupOptions = '<option value="all">All groups (loading...)</option>';
+        panel.innerHTML = `<div id="chat-emoji-top-label" class="chat-emoji-top-label">Top used</div>
+        <div id="chat-emoji-top-grid" class="chat-emoji-top-grid" aria-label="Top used"></div>
+        <div class="chat-emoji-toolbar chat-emoji-search-row">
+          <input
+            id="chat-emoji-search"
+            class="chat-emoji-filter chat-emoji-search"
+            type="search"
+            placeholder="Search all categories..."
+            aria-label="Search emojis across all categories"
+            autocomplete="off"
+            spellcheck="false"
+            title="Shortcut: Ctrl/Cmd+E"
+          />
+        </div>
+        <div class="chat-emoji-toolbar">
+          <select id="chat-emoji-group-select" class="chat-emoji-filter" aria-label="Emoji group">
+            ${{groupOptions}}
+          </select>
+          <span id="chat-emoji-meta" class="chat-emoji-meta"></span>
+        </div>
+        <div id="chat-emoji-grid" class="chat-emoji-grid"></div>`;
+        panel.dataset.init = "1";
+
+        const groupSelect = document.getElementById("chat-emoji-group-select");
+        if (groupSelect instanceof HTMLSelectElement && groupSelect.dataset.bound !== "1") {{
+          groupSelect.dataset.bound = "1";
+          groupSelect.value = normalizeChatEmojiGroup(chatEmojiPickerGroup);
+          groupSelect.addEventListener("change", () => {{
+            renderChatEmojiPickerPanel();
+          }});
+        }}
+        const searchInput = document.getElementById("chat-emoji-search");
+        if (searchInput instanceof HTMLInputElement && searchInput.dataset.bound !== "1") {{
+          searchInput.dataset.bound = "1";
+          searchInput.value = chatEmojiSearchQuery;
+          searchInput.addEventListener("input", () => {{
+            chatEmojiSearchQuery = normalizeChatEmojiSearchQuery(searchInput.value);
+            renderChatEmojiPickerPanel();
+          }});
+        }}
+
+        void ensureChatEmojiCatalogLoaded(false).then((loaded) => {{
+          if (!loaded) return;
+          renderChatEmojiPickerPanel();
+        }});
+      }}
+
+      if (btn.dataset.emojiBound !== "1") {{
+        btn.dataset.emojiBound = "1";
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          if (chatSendInFlight) return;
+          if (panel.hidden) {{
+            openChatEmojiPanel("compose", null);
+          }} else {{
+            closeChatEmojiPanel();
+          }}
+        }});
+      }}
+
+      if (panel.dataset.bound !== "1") {{
+        panel.dataset.bound = "1";
+        panel.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const emojiBtn = target.closest(".chat-emoji-item");
+          if (!(emojiBtn instanceof HTMLButtonElement)) return;
+          const emoji = String(emojiBtn.getAttribute("data-emoji") || emojiBtn.textContent || "").trim();
+          if (!emoji) return;
+          if (chatEmojiMode === "react" && !isReactionCompatibleEmoji(emoji)) {{
+            setChatSendStatus("Choose a single-codepoint emoji for reactions.", true);
+            return;
+          }}
+          noteChatEmojiUsage(emoji);
+          if (chatEmojiMode === "react" && Number.isInteger(chatReactionTargetId) && chatReactionTargetId > 0) {{
+            sendChatReaction(chatReactionTargetId, emoji);
+          }} else {{
+            insertEmojiAtCursor(emoji);
+          }}
+          closeChatEmojiPanel();
+        }});
+      }}
+
+      if (document.body.dataset.chatEmojiCloseBound !== "1") {{
+        document.body.dataset.chatEmojiCloseBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          if (!target.closest("#chat-emoji-panel") && !target.closest("#chat-emoji-btn")) {{
+            closeChatEmojiPanel();
+          }}
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key === "Escape") {{
+            closeChatEmojiPanel();
+            return;
+          }}
+          const key = String(ev.key || "").toLowerCase();
+          if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && key === "e") {{
+            ev.preventDefault();
+            if (panel.hidden) {{
+              if (chatSendInFlight) return;
+              openChatEmojiPanel("compose", null);
+              return;
+            }}
+            focusChatEmojiSearchInput();
+          }}
+        }});
+      }}
+    }}
+
