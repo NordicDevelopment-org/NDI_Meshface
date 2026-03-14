@@ -1,0 +1,1792 @@
+    function setText(id, value) {{
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value == null ? "n/a" : String(value);
+    }}
+
+    function formatTickerNumber(value, digits = 0) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "n/a";
+      const fixedDigits = Math.max(0, Math.min(2, Math.floor(Number(digits) || 0)));
+      return fixedDigits > 0 ? numeric.toFixed(fixedDigits) : `${{Math.round(numeric)}}`;
+    }}
+
+    function normalizeSmoothingWindow(rawWindow, pointCount = Number.MAX_SAFE_INTEGER) {{
+      const points = Math.max(1, Math.trunc(Number(pointCount) || 1));
+      const candidate = Math.trunc(Number(rawWindow) || 1);
+      if (!Number.isFinite(candidate) || candidate <= 1 || points <= 2) return 1;
+      let windowSize = Math.max(1, Math.min(points, candidate));
+      if ((windowSize % 2) === 0) {{
+        windowSize = Math.max(1, windowSize - 1);
+      }}
+      return windowSize <= 1 ? 1 : windowSize;
+    }}
+
+    function centeredMovingAverage(values, rawWindow) {{
+      const source = Array.isArray(values) ? values : [];
+      const windowSize = normalizeSmoothingWindow(rawWindow, source.length);
+      if (windowSize <= 1 || source.length <= 2) return source.slice();
+      const half = Math.floor(windowSize / 2);
+      const smoothed = new Array(source.length);
+      for (let idx = 0; idx < source.length; idx += 1) {{
+        const start = Math.max(0, idx - half);
+        const end = Math.min(source.length - 1, idx + half);
+        let total = 0;
+        let count = 0;
+        for (let sample = start; sample <= end; sample += 1) {{
+          const value = Number(source[sample]);
+          if (!Number.isFinite(value)) continue;
+          total += value;
+          count += 1;
+        }}
+        smoothed[idx] = count > 0 ? (total / count) : Number(source[idx] || 0);
+      }}
+      return smoothed;
+    }}
+
+    function smoothSeriesPointsWithBreaks(points, rawWindow) {{
+      const source = Array.isArray(points) ? points : [];
+      const baseWindow = normalizeSmoothingWindow(rawWindow, source.length);
+      if (baseWindow <= 1 || source.length <= 2) {{
+        return source.map((point) => ({{ ...point }}));
+      }}
+      const output = source.map((point) => ({{ ...point }}));
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        const segmentLength = idx - segmentStart;
+        const segmentWindow = normalizeSmoothingWindow(baseWindow, segmentLength);
+        if (segmentLength >= 3 && segmentWindow > 1) {{
+          const segmentValues = source
+            .slice(segmentStart, idx)
+            .map((point) => Number(point && point.value));
+          const segmentSmoothed = centeredMovingAverage(segmentValues, segmentWindow);
+          for (let segIdx = 0; segIdx < segmentSmoothed.length; segIdx += 1) {{
+            output[segmentStart + segIdx].value = Number(segmentSmoothed[segIdx]);
+          }}
+        }}
+        segmentStart = idx;
+      }}
+      return output;
+    }}
+
+    function buildSmoothSvgPath(points, rawTension = 0.18) {{
+      const source = Array.isArray(points) ? points : [];
+      if (!source.length) return "";
+      const tension = Math.max(0, Math.min(0.5, Number(rawTension) || 0.18));
+      const linearPath = (segment) => segment.map((pt, idx) => (
+        `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
+      )).join(" ");
+      let path = "";
+      const appendSegment = (segmentPoints) => {{
+        const segment = Array.isArray(segmentPoints)
+          ? segmentPoints.filter((pt) => Number.isFinite(Number(pt && pt.x)) && Number.isFinite(Number(pt && pt.y)))
+          : [];
+        if (!segment.length) return;
+        if (segment.length < 3) {{
+          path += `${{path ? " " : ""}}${{linearPath(segment)}}`;
+          return;
+        }}
+        path += `${{path ? " " : ""}}M ${{segment[0].x.toFixed(2)}} ${{segment[0].y.toFixed(2)}}`;
+        for (let i = 0; i < segment.length - 1; i += 1) {{
+          const p0 = i > 0 ? segment[i - 1] : segment[i];
+          const p1 = segment[i];
+          const p2 = segment[i + 1];
+          const p3 = (i + 2 < segment.length) ? segment[i + 2] : p2;
+          const cp1x = p1.x + ((p2.x - p0.x) * tension);
+          const cp1y = p1.y + ((p2.y - p0.y) * tension);
+          const cp2x = p2.x - ((p3.x - p1.x) * tension);
+          const cp2y = p2.y - ((p3.y - p1.y) * tension);
+          path += ` C ${{cp1x.toFixed(2)}} ${{cp1y.toFixed(2)}} ${{cp2x.toFixed(2)}} ${{cp2y.toFixed(2)}} ${{p2.x.toFixed(2)}} ${{p2.y.toFixed(2)}}`;
+        }}
+      }};
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        appendSegment(source.slice(segmentStart, idx));
+        segmentStart = idx;
+      }}
+      return path.trim();
+    }}
+
+    function aggregatePointsByXPixels(points, rawBucketWidthPx = 1.35) {{
+      const source = Array.isArray(points) ? points : [];
+      if (source.length <= 3) {{
+        return source.map((point) => ({{ ...point }}));
+      }}
+      const bucketWidthPx = Math.max(0.75, Number(rawBucketWidthPx) || 1.35);
+      const compressSegment = (segmentPoints) => {{
+        const segment = Array.isArray(segmentPoints)
+          ? segmentPoints.filter((pt) => Number.isFinite(Number(pt && pt.x)) && Number.isFinite(Number(pt && pt.y)))
+          : [];
+        if (segment.length <= 3) {{
+          return segment.map((pt) => ({{ ...pt, breakBefore: false }}));
+        }}
+        const first = segment[0];
+        const last = segment[segment.length - 1];
+        const startX = Number(first.x);
+        const buckets = new Map();
+        for (let i = 1; i < segment.length - 1; i += 1) {{
+          const x = Number(segment[i].x);
+          const y = Number(segment[i].y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+          const key = Math.floor((x - startX) / bucketWidthPx);
+          const existing = buckets.get(key);
+          if (existing) {{
+            existing.sumX += x;
+            existing.sumY += y;
+            existing.count += 1;
+          }} else {{
+            buckets.set(key, {{ sumX: x, sumY: y, count: 1 }});
+          }}
+        }}
+        const mids = Array.from(buckets.entries())
+          .sort((a, b) => Number(a[0]) - Number(b[0]))
+          .map(([, bucket]) => ({{
+            x: bucket.sumX / bucket.count,
+            y: bucket.sumY / bucket.count,
+            breakBefore: false,
+          }}));
+        return [
+          {{ x: Number(first.x), y: Number(first.y), breakBefore: false }},
+          ...mids,
+          {{ x: Number(last.x), y: Number(last.y), breakBefore: false }},
+        ];
+      }};
+
+      const output = [];
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        const segment = compressSegment(source.slice(segmentStart, idx));
+        for (let pointIndex = 0; pointIndex < segment.length; pointIndex += 1) {{
+          const point = segment[pointIndex];
+          output.push({{
+            ...point,
+            breakBefore: pointIndex === 0 && output.length > 0,
+          }});
+        }}
+        segmentStart = idx;
+      }}
+      return output;
+    }}
+
+    function derivePacketsPerMinuteFromTotals(points) {{
+      const series = Array.isArray(points) ? points : [];
+      if (series.length < 2) return 0;
+      const latestPoint = series[series.length - 1] || null;
+      const previousPoint = series[series.length - 2] || null;
+      const latestTotal = Number(latestPoint && latestPoint.value);
+      const previousTotal = Number(previousPoint && previousPoint.value);
+      if (!Number.isFinite(latestTotal) || !Number.isFinite(previousTotal)) {{
+        return 0;
+      }}
+      const latestMs = Number(latestPoint && latestPoint.ms);
+      const previousMs = Number(previousPoint && previousPoint.ms);
+      const spanMinutes = (Number.isFinite(latestMs) && Number.isFinite(previousMs) && latestMs > previousMs)
+        ? Math.max(1 / 60, (latestMs - previousMs) / 60000)
+        : 1;
+      const delta = latestTotal - previousTotal;
+      if (!Number.isFinite(delta) || delta <= 0) return 0;
+      return delta / spanMinutes;
+    }}
+
+    function derivePacketsPerMinuteSeriesFromTotals(points) {{
+      const series = Array.isArray(points) ? points : [];
+      if (series.length < 2) return [];
+      const output = [];
+      for (let i = 1; i < series.length; i += 1) {{
+        const previousPoint = series[i - 1] || null;
+        const currentPoint = series[i] || null;
+        const previousTotal = Number(previousPoint && previousPoint.value);
+        const currentTotal = Number(currentPoint && currentPoint.value);
+        if (!Number.isFinite(previousTotal) || !Number.isFinite(currentTotal)) continue;
+        const previousMs = Number(previousPoint && previousPoint.ms);
+        const currentMs = Number(currentPoint && currentPoint.ms);
+        const spanMinutes = (Number.isFinite(previousMs) && Number.isFinite(currentMs) && currentMs > previousMs)
+          ? Math.max(1 / 60, (currentMs - previousMs) / 60000)
+          : 1;
+        const delta = currentTotal - previousTotal;
+        const rate = Number.isFinite(delta) && delta > 0 ? (delta / spanMinutes) : 0;
+        output.push({{
+          ms: Number.isFinite(currentMs) ? currentMs : Date.now(),
+          value: rate,
+        }});
+      }}
+      return output;
+    }}
+
+    function trimMetricTickerPoints(points, cutoffMs, maxPoints = metricTickerMaxPoints) {{
+      while (points.length > 0) {{
+        const firstMs = Number(points[0] && points[0].ms);
+        if (Number.isFinite(firstMs) && firstMs >= cutoffMs) {{
+          break;
+        }}
+        points.shift();
+      }}
+      const max = Math.max(1, Math.trunc(Number(maxPoints) || metricTickerMaxPoints));
+      while (points.length > max) {{
+        points.shift();
+      }}
+    }}
+
+    function metricTickerLatestValue(metricKey) {{
+      const cleanKey = String(metricKey || "").trim();
+      if (!cleanKey) return null;
+      const points = metricTickerSeries.get(cleanKey);
+      if (!Array.isArray(points) || points.length === 0) return null;
+      const latest = Number(points[points.length - 1] && points[points.length - 1].value);
+      return Number.isFinite(latest) ? latest : null;
+    }}
+
+    function maybeResetMetricTickerSeries(livePacketTotal) {{
+      const latestLiveTotal = metricTickerLatestValue("live_packets");
+      const nextLiveTotal = Number(livePacketTotal);
+      if (!Number.isFinite(latestLiveTotal) || !Number.isFinite(nextLiveTotal)) {{
+        return false;
+      }}
+      // live_packet_count is monotonic within a runtime session. If it moves
+      // backward, assume a tracker/runtime reset and restart ticker history so
+      // scales don't stay anchored to the previous session.
+      if (hasLiveCounterReset(latestLiveTotal, nextLiveTotal)) {{
+        metricTickerSeries.clear();
+        return true;
+      }}
+      return false;
+    }}
+
+    function hasLiveCounterReset(previousTotal, currentTotal) {{
+      if (!resetTickerScaleOnRestart) return false;
+      const prev = Number(previousTotal);
+      const next = Number(currentTotal);
+      if (!Number.isFinite(prev) || !Number.isFinite(next)) return false;
+      return next + 1 < prev;
+    }}
+
+    function sliceSummaryPointsAfterLiveCounterReset(points) {{
+      const rows = Array.isArray(points) ? points : [];
+      if (!resetTickerScaleOnRestart || rows.length < 2) {{
+        return rows;
+      }}
+      let previousTotal = null;
+      let resetStartIndex = 0;
+      for (let i = 0; i < rows.length; i += 1) {{
+        const currentTotal = Number(rows[i] && rows[i].live_packet_count);
+        if (!Number.isFinite(currentTotal)) continue;
+        if (hasLiveCounterReset(previousTotal, currentTotal)) {{
+          // Keep the newest segment when the monotonic live counter rolls over.
+          resetStartIndex = i;
+        }}
+        previousTotal = currentTotal;
+      }}
+      return resetStartIndex > 0 ? rows.slice(resetStartIndex) : rows;
+    }}
+
+    function appendMetricTickerPoint(
+      metricKey,
+      rawValue,
+      nowMs = Date.now(),
+      windowMs = metricTickerWindowMs,
+      maxPoints = metricTickerMaxPoints
+    ) {{
+      const cleanKey = String(metricKey || "").trim();
+      const value = Number(rawValue);
+      if (!cleanKey || !Number.isFinite(value)) return [];
+      const bucketMs = Math.floor(nowMs / 60000) * 60000;
+      const points = metricTickerSeries.get(cleanKey) || [];
+      const last = points.length ? points[points.length - 1] : null;
+      if (last && Number(last.ms) === bucketMs) {{
+        last.value = value;
+      }} else {{
+        points.push({{ ms: bucketMs, value }});
+      }}
+      const effectiveWindowMs = Math.max(60000, Number(windowMs) || metricTickerWindowMs);
+      trimMetricTickerPoints(points, bucketMs - effectiveWindowMs, maxPoints);
+      metricTickerSeries.set(cleanKey, points);
+      return points;
+    }}
+
+    function buildMetricTickerPath(points, width = 72, height = 16, pad = 1.5) {{
+      if (!Array.isArray(points) || points.length === 0) return "";
+      const values = points
+        .map((point) => Number(point && point.value))
+        .filter((value) => Number.isFinite(value));
+      if (values.length === 0) return "";
+      const widthPx = Math.max(4, Number(width) || 72);
+      const heightPx = Math.max(4, Number(height) || 16);
+      const padPx = Math.max(0, Number(pad) || 0);
+      const top = padPx;
+      const bottom = Math.max(top + 1, heightPx - padPx);
+      const usableHeight = Math.max(1, bottom - top);
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const xSpan = Math.max(1, values.length - 1);
+      let d = "";
+      for (let idx = 0; idx < values.length; idx += 1) {{
+        const x = values.length === 1 ? (widthPx / 2) : ((idx / xSpan) * widthPx);
+        const normalized = maxValue === minValue
+          ? 0.5
+          : ((values[idx] - minValue) / (maxValue - minValue));
+        const y = bottom - (normalized * usableHeight);
+        d += `${{idx === 0 ? "M" : "L"}}${{x.toFixed(2)}} ${{y.toFixed(2)}} `;
+      }}
+      if (values.length === 1) {{
+        const x = widthPx / 2;
+        const y = (top + bottom) / 2;
+        d += `L${{x.toFixed(2)}} ${{y.toFixed(2)}}`;
+      }}
+      return d.trim();
+    }}
+
+    function updateMetricTicker(metricKey, rawValue, config = {{}}) {{
+      const container = document.getElementById(config.containerId || "");
+      const deltaEl = document.getElementById(config.deltaId || "");
+      const chart = document.getElementById(config.chartId || "");
+      const rateEl = document.getElementById(config.rateId || "");
+      if (!(container instanceof HTMLElement) || !(deltaEl instanceof HTMLElement) || !(chart instanceof SVGElement)) {{
+        return;
+      }}
+      const value = Number(rawValue);
+      if (!Number.isFinite(value)) {{
+        container.hidden = true;
+        return;
+      }}
+      const points = appendMetricTickerPoint(
+        metricKey,
+        value,
+        Date.now(),
+        Number(config.windowMs) || metricTickerWindowMs,
+        Number(config.maxPoints) || metricTickerMaxPoints
+      );
+      if (!Array.isArray(points) || points.length === 0) {{
+        container.hidden = true;
+        return;
+      }}
+
+      const latest = Number(points[points.length - 1] && points[points.length - 1].value);
+      const baseline = Number(points[0] && points[0].value);
+      const delta = latest - baseline;
+      const valueUnit = String(config.valueUnit == null ? "" : config.valueUnit);
+      const flatThreshold = Number(config.flatThreshold);
+      const epsilon = Number.isFinite(flatThreshold) ? Math.max(0, flatThreshold) : 0;
+      let trend = "flat";
+      if (delta > epsilon) trend = "up";
+      else if (delta < -epsilon) trend = "down";
+
+      const deltaAbsBaseText = formatTickerNumber(Math.abs(delta), config.digits);
+      const deltaAbsText = `${{deltaAbsBaseText}}${{valueUnit}}`;
+      const pct = baseline !== 0 ? ((delta / Math.abs(baseline)) * 100) : null;
+      const pctText = Number.isFinite(pct)
+        ? ` (${{pct > 0 ? "+" : ""}}${{Number(pct).toFixed(1)}}%)`
+        : "";
+      let deltaText = "";
+      if (trend === "flat") {{
+        deltaText = `0${{valueUnit}}${{pctText}}`;
+      }} else {{
+        const sign = trend === "up" ? "+" : "-";
+        deltaText = `${{sign}}${{deltaAbsText}}${{pctText}}`;
+      }}
+      deltaEl.textContent = deltaText;
+
+      container.classList.remove("trend-up", "trend-down", "trend-flat");
+      container.classList.add(`trend-${{trend}}`);
+      container.hidden = false;
+
+      chart.innerHTML = "";
+      const expandedTickerView = topbarElement instanceof HTMLElement && topbarElement.classList.contains("ticker-expanded");
+      const chartWidth = expandedTickerView ? 184 : 72;
+      const chartHeight = expandedTickerView ? 44 : 16;
+      const chartPad = expandedTickerView ? 3 : 1.5;
+      chart.setAttribute("viewBox", `0 0 ${{chartWidth}} ${{chartHeight}}`);
+      const pathData = buildMetricTickerPath(points, chartWidth, chartHeight, chartPad);
+      if (pathData) {{
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", pathData);
+        chart.appendChild(path);
+      }}
+
+      const firstMs = Number(points[0] && points[0].ms);
+      const rangeMinutes = Number.isFinite(firstMs)
+        ? Math.max(1, Math.round((Date.now() - firstMs) / 60000))
+        : Math.max(1, Math.round(metricTickerWindowMs / 60000));
+      const rangeHours = Math.max(1 / 60, rangeMinutes / 60);
+      const ratePerHour = delta / rangeHours;
+      const rateAbsBaseText = formatTickerNumber(
+        Math.abs(ratePerHour),
+        Number.isFinite(Number(config.rateDigits)) ? Number(config.rateDigits) : 1
+      );
+      const rateAbsText = `${{rateAbsBaseText}}${{valueUnit}}`;
+      const rateSign = ratePerHour > 0 ? "+" : (ratePerHour < 0 ? "-" : "");
+      const rateText = `${{rateSign}}${{rateAbsText}}/h`;
+      if (rateEl instanceof HTMLElement) {{
+        rateEl.textContent = rateText;
+        rateEl.title = `Rate of change per hour across a ${{rangeMinutes}}m window`;
+      }}
+      const fromText = `${{formatTickerNumber(baseline, config.digits)}}${{valueUnit}}`;
+      const toText = `${{formatTickerNumber(latest, config.digits)}}${{valueUnit}}`;
+      container.title = `Trend (${{rangeMinutes}}m): ${{fromText}} -> ${{toText}}; delta ${{deltaText}}; rate ${{rateText}}`;
+    }}
+
+    function compactTargetMetric(value, maxLen = 44) {{
+      const text = String(value == null ? "n/a" : value).replace(/\\s+/g, " ").trim();
+      if (!text) return "n/a";
+      const serialPrefix = "/dev/serial/by-id/";
+      const compactBase = text.startsWith(serialPrefix) ? text.slice(serialPrefix.length) : text;
+      if (compactBase.length <= maxLen) return compactBase;
+      const suffixLen = Math.max(12, Math.floor(maxLen * 0.45));
+      const prefixLen = Math.max(8, maxLen - suffixLen - 3);
+      return `${{compactBase.slice(0, prefixLen)}}...${{compactBase.slice(-suffixLen)}}`;
+    }}
+
+    function syncUptimeBase(uptimeSeconds) {{
+      const clean = Number(uptimeSeconds);
+      if (!Number.isFinite(clean)) return;
+      uptimeBaseSeconds = Math.max(0, Math.floor(clean));
+      uptimeBaseMs = Date.now();
+    }}
+
+    function formatUptimeHms(totalSeconds) {{
+      const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+      const hours = Math.floor(safe / 3600);
+      const minutes = Math.floor((safe % 3600) / 60);
+      const seconds = safe % 60;
+      return `${{String(hours).padStart(2, "0")}}:${{String(minutes).padStart(2, "0")}}:${{String(seconds).padStart(2, "0")}}`;
+    }}
+
+    function updateUptimeDisplay() {{
+      if (typeof uptimeBaseSeconds !== "number" || !Number.isFinite(uptimeBaseSeconds)) {{
+        return;
+      }}
+      const delta = Math.max(0, (Date.now() - (uptimeBaseMs || 0)) / 1000);
+      setText("m-uptime", formatUptimeHms(uptimeBaseSeconds + delta));
+    }}
+
+    function formatRadioTime(unixSeconds) {{
+      const ts = Number(unixSeconds);
+      if (!Number.isFinite(ts) || ts <= 0) return "n/a";
+      const date = new Date(ts * 1000);
+      if (!Number.isFinite(date.getTime())) return "n/a";
+      const now = new Date();
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mm = String(date.getMinutes()).padStart(2, "0");
+      const ss = String(date.getSeconds()).padStart(2, "0");
+      const sameDay = (
+        date.getFullYear() === now.getFullYear()
+        && date.getMonth() === now.getMonth()
+        && date.getDate() === now.getDate()
+      );
+      if (sameDay) {{
+        return `${{hh}}:${{mm}}:${{ss}}`;
+      }}
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${{month}}/${{day}} ${{hh}}:${{mm}}:${{ss}}`;
+    }}
+
+    function syncRadioTimeBase(unixSeconds, source = "") {{
+      const clean = Number(unixSeconds);
+      if (!Number.isFinite(clean) || clean <= 0) {{
+        radioTimeBaseUnix = null;
+        radioTimeBaseMs = 0;
+        radioTimeBaseSource = "";
+        setText("m-radio-time", "n/a");
+        return;
+      }}
+      radioTimeBaseUnix = Math.floor(clean);
+      radioTimeBaseMs = Date.now();
+      radioTimeBaseSource = String(source || "").trim();
+      updateRadioTimeDisplay();
+    }}
+
+    function updateRadioTimeDisplay() {{
+      if (typeof radioTimeBaseUnix !== "number" || !Number.isFinite(radioTimeBaseUnix) || radioTimeBaseUnix <= 0) {{
+        setText("m-radio-time", "n/a");
+        return;
+      }}
+      const delta = Math.max(0, (Date.now() - (radioTimeBaseMs || 0)) / 1000);
+      const displayUnix = radioTimeBaseUnix + Math.floor(delta);
+      setText("m-radio-time", formatRadioTime(displayUnix));
+      const el = document.getElementById("m-radio-time");
+      if (el instanceof HTMLElement) {{
+        const iso = new Date(displayUnix * 1000).toISOString();
+        const sourceSuffix = radioTimeBaseSource ? ` (source: ${{radioTimeBaseSource}})` : "";
+        el.title = `Radio reported time: ${{iso}}${{sourceSuffix}}`;
+      }}
+    }}
+
+    function resolveRadioReportedTime(state) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const candidateSpecs = [
+        ["my_info", safeState.my_info],
+        ["metadata", safeState.metadata],
+        ["local_state", safeState.local_state],
+      ];
+      const candidateKeys = [
+        "current_time",
+        "currentTime",
+        "device_time",
+        "deviceTime",
+        "radio_time",
+        "radioTime",
+        "time",
+        "timestamp",
+        "time_unix",
+        "timeUnix",
+      ];
+      for (const [sourcePrefix, candidateObj] of candidateSpecs) {{
+        if (!candidateObj || typeof candidateObj !== "object") continue;
+        for (const key of candidateKeys) {{
+          if (!Object.prototype.hasOwnProperty.call(candidateObj, key)) continue;
+          const unix = parseDashboardTimeToUnix(candidateObj[key]);
+          if (Number.isFinite(unix) && unix > 0) {{
+            return {{ unix, source: `${{sourcePrefix}}.${{key}}` }};
+          }}
+        }}
+      }}
+
+      const localNodeId = resolveLocalNodeId(safeState);
+      if (isCanonicalNodeId(localNodeId)) {{
+        const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+        const localNode = nodes.find((node) => normalizeNodeId(node && node.id) === localNodeId) || null;
+        const localNodeUnix = nodeLastHeardUnix(localNode);
+        if (Number.isFinite(localNodeUnix) && localNodeUnix > 0) {{
+          return {{ unix: localNodeUnix, source: "local_node.last_heard" }};
+        }}
+      }}
+
+      return {{ unix: null, source: "" }};
+    }}
+
+    function normalizeThemeMode(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return themeAcceptedModes.has(clean) ? clean : "auto";
+    }}
+
+    function normalizeThemeTokens(rawTokens) {{
+      if (!rawTokens || typeof rawTokens !== "object" || Array.isArray(rawTokens)) {{
+        return null;
+      }}
+      const normalized = {{}};
+      for (const [key, value] of Object.entries(rawTokens)) {{
+        const cleanKey = String(key || "").trim();
+        if (!cleanKey.startsWith("--")) {{
+          continue;
+        }}
+        normalized[cleanKey] = String(value ?? "");
+      }}
+      return Object.keys(normalized).length > 0 ? normalized : null;
+    }}
+
+    function normalizeThemePreset(rawPreset) {{
+      if (!rawPreset || typeof rawPreset !== "object" || Array.isArray(rawPreset)) {{
+        return null;
+      }}
+      const light = normalizeThemeTokens(rawPreset.light);
+      const dark = normalizeThemeTokens(rawPreset.dark);
+      if (!light || !dark) {{
+        return null;
+      }}
+      return {{ light, dark }};
+    }}
+
+    function normalizeThemePresetCatalog(rawCatalog) {{
+      const normalized = {{}};
+      if (rawCatalog && typeof rawCatalog === "object" && !Array.isArray(rawCatalog)) {{
+        for (const [name, rawPreset] of Object.entries(rawCatalog)) {{
+          const cleanName = String(name || "").trim();
+          if (!cleanName) continue;
+          const preset = normalizeThemePreset(rawPreset);
+          if (!preset) continue;
+          normalized[cleanName] = preset;
+        }}
+      }}
+      if (!Object.prototype.hasOwnProperty.call(normalized, "default")) {{
+        normalized.default = {{ light: {{}}, dark: {{}} }};
+      }}
+      return normalized;
+    }}
+
+    function normalizeThemePresetName(rawName, catalog = themePresetCatalog) {{
+      const clean = String(rawName || "").trim();
+      if (clean && Object.prototype.hasOwnProperty.call(catalog, clean)) {{
+        return clean;
+      }}
+      return "default";
+    }}
+
+    function orderedThemePresetNames(rawNames, catalog) {{
+      const seen = new Set();
+      const ordered = [];
+      if (Array.isArray(rawNames)) {{
+        for (const name of rawNames) {{
+          const clean = String(name || "").trim();
+          if (!clean || seen.has(clean) || !Object.prototype.hasOwnProperty.call(catalog, clean)) {{
+            continue;
+          }}
+          seen.add(clean);
+          ordered.push(clean);
+        }}
+      }}
+      for (const name of Object.keys(catalog)) {{
+        if (seen.has(name)) continue;
+        seen.add(name);
+        ordered.push(name);
+      }}
+      ordered.sort((a, b) => {{
+        if (a === "default") return -1;
+        if (b === "default") return 1;
+        return a.localeCompare(b);
+      }});
+      return ordered;
+    }}
+
+    function applyThemePresetTokens(resolvedTheme) {{
+      const selected = normalizeThemePresetName(themePresetSelected, themePresetCatalog);
+      const preset = themePresetCatalog[selected] || themePresetCatalog.default || {{ light: {{}}, dark: {{}} }};
+      const tokenMap = resolvedTheme === "dark" ? (preset.dark || {{}}) : (preset.light || {{}});
+      const nextKeys = new Set(Object.keys(tokenMap));
+      for (const key of themePresetAppliedKeys) {{
+        if (!nextKeys.has(key)) {{
+          document.documentElement.style.removeProperty(key);
+        }}
+      }}
+      for (const [key, value] of Object.entries(tokenMap)) {{
+        document.documentElement.style.setProperty(key, String(value));
+      }}
+      themePresetAppliedKeys.clear();
+      for (const key of nextKeys) {{
+        themePresetAppliedKeys.add(key);
+      }}
+    }}
+
+    function updateThemePresetControl(availablePresets = null) {{
+      const select = document.getElementById("theme-preset-select");
+      if (!(select instanceof HTMLSelectElement)) {{
+        return;
+      }}
+      const names = orderedThemePresetNames(
+        availablePresets,
+        themePresetCatalog,
+      );
+      const selected = normalizeThemePresetName(themePresetSelected, themePresetCatalog);
+      select.innerHTML = "";
+      for (const name of names) {{
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      }}
+      select.value = selected;
+      select.disabled = names.length <= 1;
+      select.title = names.length > 1
+        ? "Select runtime color preset"
+        : "Only one preset is available";
+    }}
+
+    function applyThemeSettingsPayload(payload) {{
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {{
+        return false;
+      }}
+      const normalizedCatalog = normalizeThemePresetCatalog(payload.presets);
+      themePresetCatalog = normalizedCatalog;
+      themePresetSelected = normalizeThemePresetName(payload.selected_preset, normalizedCatalog);
+      updateThemePresetControl(payload.available_presets);
+      applyThemePreference(themePreference, false);
+      return true;
+    }}
+
+    async function loadThemeSettingsFromServer(logErrors = true) {{
+      try {{
+        const resp = await fetch(themeSettingsEndpoint, {{ cache: "no-store" }});
+        if (!resp.ok) {{
+          throw new Error(`API ${{resp.status}}`);
+        }}
+        const payload = await resp.json();
+        if (!payload || payload.ok === false) {{
+          const message = payload && payload.error ? payload.error : "Invalid theme settings payload";
+          throw new Error(String(message));
+        }}
+        return applyThemeSettingsPayload(payload);
+      }} catch (err) {{
+        if (logErrors) {{
+          const msg = err instanceof Error ? err.message : String(err || "unknown error");
+          appendConsoleLine(`theme-settings-load|${{Date.now()}}|${{msg}}`, `[theme settings] load failed: ${{msg}}`);
+        }}
+      }}
+      return false;
+    }}
+
+    async function saveThemePresetSelection(presetName) {{
+      const clean = String(presetName || "").trim();
+      if (!clean) {{
+        return false;
+      }}
+      try {{
+        const resp = await fetch(themeSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{ preset_name: clean }}),
+        }});
+        const payload = await resp.json().catch(() => ({{ ok: false, error: `API ${{resp.status}}` }}));
+        if (!resp.ok || !payload || payload.ok === false) {{
+          const message = payload && payload.error ? payload.error : `API ${{resp.status}}`;
+          throw new Error(String(message));
+        }}
+        return applyThemeSettingsPayload(payload);
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        appendConsoleLine(`theme-settings-save|${{Date.now()}}|${{msg}}`, `[theme settings] save failed: ${{msg}}`);
+        updateThemePresetControl();
+      }}
+      return false;
+    }}
+
+    function bindThemePresetSelector() {{
+      const select = document.getElementById("theme-preset-select");
+      if (!(select instanceof HTMLSelectElement)) {{
+        return;
+      }}
+      if (select.dataset.bound === "1") {{
+        return;
+      }}
+      select.dataset.bound = "1";
+      updateThemePresetControl();
+      select.addEventListener("change", async () => {{
+        const selected = String(select.value || "").trim();
+        if (!selected) {{
+          updateThemePresetControl();
+          return;
+        }}
+        select.disabled = true;
+        await saveThemePresetSelection(selected);
+        updateThemePresetControl();
+      }});
+    }}
+
+    function systemPreferredTheme() {{
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {{
+        return "dark";
+      }}
+      return "light";
+    }}
+
+    function normalizeTickerDensityMode(mode) {{
+      const clean = String(mode || "").trim().toLowerCase();
+      return clean === "expanded" ? "expanded" : "compact";
+    }}
+
+    function normalizeWeeklySummaryMetric(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      if (clean === "packets" || clean === "live_packet_count") return "packets";
+      if (
+        clean === "nodes"
+        || clean === "node_count"
+        || clean === "online_node_count"
+        || clean === "saved_node_count"
+        || clean === "nodes_with_position"
+      ) return "nodes";
+      if (clean === "links" || clean === "real_edge_count") return "links";
+      return "packets";
+    }}
+
+    function normalizeWeeklySummaryNodesCompare(raw) {{
+      if (raw === true || raw === 1) return true;
+      const clean = String(raw || "").trim().toLowerCase();
+      return clean === "1" || clean === "true" || clean === "on" || clean === "yes";
+    }}
+
+    function normalizeWeeklySummaryNodeSeries(raw) {{
+      const normalized = {{}};
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        normalized[key] = weeklySummaryNodeSeriesDefaults[key] === true;
+      }}
+      if (raw && typeof raw === "object") {{
+        for (const key of weeklySummaryNodeSeriesOrder) {{
+          if (Object.prototype.hasOwnProperty.call(raw, key)) {{
+            normalized[key] = !!raw[key];
+          }}
+        }}
+      }}
+      if (!weeklySummaryNodeSeriesOrder.some((key) => normalized[key])) {{
+        normalized.online_nodes = true;
+      }}
+      return normalized;
+    }}
+
+    function weeklySummaryNodeSeriesPaletteColor(seriesKey) {{
+      const paletteName = String(weeklySummaryNodeSeriesPaletteNames[seriesKey] || "").trim().toLowerCase();
+      if (!paletteName) return "";
+      for (const palette of meshChannelColorPalette) {{
+        const name = String(palette && palette.name || "").trim().toLowerCase();
+        if (name !== paletteName) continue;
+        const fill = String(palette && palette.fill || "").trim();
+        if (fill) return fill;
+      }}
+      return "";
+    }}
+
+    function resolveWeeklySummaryMetricMeta(metricKey, nodeSeries = weeklySummaryNodeSeriesEnabled) {{
+      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const base = weeklySummaryMetricCatalog.get(metric) || {{
+        label: "Metric",
+        decimals: 0,
+      }};
+      if (metric !== "nodes") {{
+        return base;
+      }}
+      const normalizedSeries = normalizeWeeklySummaryNodeSeries(nodeSeries);
+      const seriesOrder = weeklySummaryNodeSeriesOrder.filter((key) => normalizedSeries[key]);
+      const resolvedStyles = {{}};
+      for (const seriesKey of weeklySummaryNodeSeriesOrder) {{
+        const baseStyle = (
+          weeklySummaryNodeSeriesStyles[seriesKey]
+          && typeof weeklySummaryNodeSeriesStyles[seriesKey] === "object"
+        ) ? weeklySummaryNodeSeriesStyles[seriesKey] : {{}};
+        const paletteColor = weeklySummaryNodeSeriesPaletteColor(seriesKey);
+        resolvedStyles[seriesKey] = paletteColor
+          ? {{
+              ...baseStyle,
+              color: paletteColor,
+              labelColor: paletteColor,
+            }}
+          : {{ ...baseStyle }};
+      }}
+      return {{
+        ...base,
+        seriesOrder: seriesOrder.length ? seriesOrder : ["online_nodes"],
+        seriesLabels: weeklySummaryNodeSeriesLabels,
+        seriesStyles: resolvedStyles,
+      }};
+    }}
+
+    function updateWeeklySummaryNodeSeriesControls(metricKey = weeklySummaryMetric) {{
+      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const showLines = metric === "nodes";
+      const wrap = document.getElementById("weekly-summary-node-lines-wrap");
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !showLines;
+      }}
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        const toggleId = weeklySummaryNodeSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        const seriesColor = weeklySummaryNodeSeriesPaletteColor(key);
+        if (seriesColor) {{
+          toggle.style.accentColor = seriesColor;
+        }} else {{
+          toggle.style.removeProperty("accent-color");
+        }}
+        toggle.checked = !!weeklySummaryNodeSeriesEnabled[key];
+        toggle.disabled = !showLines;
+      }}
+    }}
+
+    function applyWeeklySummaryMetric(metricKey, persist = true) {{
+      const normalized = normalizeWeeklySummaryMetric(metricKey);
+      weeklySummaryMetric = normalized;
+      const select = document.getElementById("weekly-summary-metric");
+      if (select instanceof HTMLSelectElement && select.value !== normalized) {{
+        select.value = normalized;
+      }}
+      updateWeeklySummaryNodeSeriesControls(normalized);
+      const cached = summaryMetricsCache.get(String(weeklySummaryHours));
+      if (cached && cached.data) {{
+        renderWeeklySummary(cached.data);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(weeklySummaryMetricStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function applyWeeklySummaryNodeSeries(nextSeries, persist = true) {{
+      weeklySummaryNodeSeriesEnabled = normalizeWeeklySummaryNodeSeries(nextSeries);
+      updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
+      const cached = summaryMetricsCache.get(String(weeklySummaryHours));
+      if (cached && cached.data) {{
+        renderWeeklySummary(cached.data);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(
+          weeklySummaryNodeSeriesStorageKey,
+          JSON.stringify(weeklySummaryNodeSeriesEnabled)
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function applyTickerDensity(mode, persist = true) {{
+      const normalized = normalizeTickerDensityMode(mode);
+      tickerDensity = normalized;
+      if (topbarElement instanceof HTMLElement) {{
+        topbarElement.classList.toggle("ticker-expanded", normalized === "expanded");
+      }}
+      requestTopbarLayoutMetricsSync();
+      window.setTimeout(() => {{
+        requestTopbarLayoutMetricsSync();
+      }}, 170);
+      if (latestState) {{
+        renderSummary(latestState);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(tickerDensityStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function normalizeTickerId(value) {{
+      const key = String(value || "").trim().toLowerCase();
+      return tickerCatalogById.has(key) ? key : "";
+    }}
+
+    function defaultTickerPreferences() {{
+      return {{
+        order: [...tickerDefaultOrder],
+        enabled: Object.fromEntries(tickerDefaultOrder.map((id) => [id, true])),
+        labels: {{}},
+        trend: {{ ...tickerDefaultTrendVisibility }},
+        battery_window_hours: tickerDefaultBatteryWindowHours,
+        node_rows: {{ ...nodeTickerDefaultRows }},
+      }};
+    }}
+
+    function normalizeTickerPreferences(value) {{
+      const raw = value && typeof value === "object" ? value : {{}};
+      const base = defaultTickerPreferences();
+      const order = [];
+      const seen = new Set();
+      const rawOrder = Array.isArray(raw.order) ? raw.order : [];
+      for (const rawId of rawOrder) {{
+        const id = normalizeTickerId(rawId);
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        order.push(id);
+      }}
+      for (const id of tickerDefaultOrder) {{
+        if (seen.has(id)) continue;
+        seen.add(id);
+        order.push(id);
+      }}
+
+      const enabledRaw = raw.enabled && typeof raw.enabled === "object" ? raw.enabled : {{}};
+      const enabled = {{}};
+      for (const id of tickerDefaultOrder) {{
+        if (!(id in enabledRaw)) {{
+          enabled[id] = true;
+          continue;
+        }}
+        enabled[id] = parseBoolToken(enabledRaw[id], true);
+      }}
+
+      const labelsRaw = raw.labels && typeof raw.labels === "object" ? raw.labels : {{}};
+      const labels = {{}};
+      for (const [rawId, rawValue] of Object.entries(labelsRaw)) {{
+        const id = normalizeTickerId(rawId);
+        if (!id) continue;
+        const text = String(rawValue == null ? "" : rawValue).trim().slice(0, 26);
+        if (!text) continue;
+        const defaultLabel = String((tickerCatalogById.get(id) && tickerCatalogById.get(id).defaultLabel) || id);
+        if (text === defaultLabel) continue;
+        labels[id] = text;
+      }}
+
+      const trendRaw = raw.trend && typeof raw.trend === "object" ? raw.trend : {{}};
+      const trend = {{}};
+      for (const id of tickerDefaultOrder) {{
+        const defaultTrend = !!tickerDefaultTrendVisibility[id];
+        if (!(id in trendRaw)) {{
+          trend[id] = defaultTrend;
+          continue;
+        }}
+        trend[id] = parseBoolToken(trendRaw[id], defaultTrend);
+      }}
+
+      const batteryWindowRaw = Number(raw.battery_window_hours ?? raw.batteryWindowHours);
+      const batteryWindowHours = Number.isFinite(batteryWindowRaw)
+        ? Math.max(1, Math.min(24, Math.round(batteryWindowRaw)))
+        : base.battery_window_hours;
+      const nodeRowsRaw = (
+        raw.node_rows && typeof raw.node_rows === "object"
+          ? raw.node_rows
+          : (raw.nodeRows && typeof raw.nodeRows === "object" ? raw.nodeRows : {{}})
+      );
+      const nodeRows = {{}};
+      for (const key of nodeTickerRowKeys) {{
+        const fallback = !!nodeTickerDefaultRows[key];
+        nodeRows[key] = key in nodeRowsRaw
+          ? parseBoolToken(nodeRowsRaw[key], fallback)
+          : fallback;
+      }}
+
+      return {{
+        order,
+        enabled,
+        labels,
+        trend,
+        battery_window_hours: batteryWindowHours,
+        node_rows: nodeRows,
+      }};
+    }}
+
+    function currentTickerPreferences() {{
+      if (!tickerPreferences || typeof tickerPreferences !== "object") {{
+        tickerPreferences = defaultTickerPreferences();
+      }}
+      return tickerPreferences;
+    }}
+
+    function persistTickerPreferences() {{
+      try {{
+        window.localStorage.setItem(
+          tickerPreferencesStorageKey,
+          JSON.stringify(normalizeTickerPreferences(currentTickerPreferences()))
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadTickerPreferences() {{
+      let parsed = null;
+      try {{
+        const raw = window.localStorage.getItem(tickerPreferencesStorageKey) || "";
+        if (raw) {{
+          parsed = JSON.parse(raw);
+        }}
+      }} catch (_err) {{
+        parsed = null;
+      }}
+      tickerPreferences = normalizeTickerPreferences(parsed || defaultTickerPreferences());
+      applyTickerPreferencesToTopbar();
+    }}
+
+    function tickerLabelText(tickerId) {{
+      const id = normalizeTickerId(tickerId);
+      if (!id) return "";
+      const prefs = currentTickerPreferences();
+      const custom = String((prefs.labels && prefs.labels[id]) || "").trim();
+      if (custom) return custom;
+      const defaultLabel = tickerCatalogById.get(id) && tickerCatalogById.get(id).defaultLabel;
+      return String(defaultLabel || id);
+    }}
+
+    function tickerEnabled(tickerId) {{
+      const id = normalizeTickerId(tickerId);
+      if (!id) return false;
+      const prefs = currentTickerPreferences();
+      if (!prefs.enabled || typeof prefs.enabled !== "object") return true;
+      if (!(id in prefs.enabled)) return true;
+      return !!prefs.enabled[id];
+    }}
+
+    function tickerTrendEnabled(tickerId) {{
+      const id = normalizeTickerId(tickerId);
+      if (!id || !tickerMetricIds.has(id)) return false;
+      const prefs = currentTickerPreferences();
+      if (!prefs.trend || typeof prefs.trend !== "object") return true;
+      if (!(id in prefs.trend)) return true;
+      return !!prefs.trend[id];
+    }}
+
+    function batteryTrendWindowHours() {{
+      const prefs = currentTickerPreferences();
+      const raw = Number(prefs && prefs.battery_window_hours);
+      if (!Number.isFinite(raw)) return tickerDefaultBatteryWindowHours;
+      return Math.max(1, Math.min(24, Math.round(raw)));
+    }}
+
+    function nodeTickerRowPreferences() {{
+      const prefs = currentTickerPreferences();
+      const raw = prefs && prefs.node_rows && typeof prefs.node_rows === "object"
+        ? prefs.node_rows
+        : {{}};
+      const normalized = {{}};
+      for (const key of nodeTickerRowKeys) {{
+        normalized[key] = key in raw
+          ? parseBoolToken(raw[key], !!nodeTickerDefaultRows[key])
+          : !!nodeTickerDefaultRows[key];
+      }}
+      return normalized;
+    }}
+
+    function isTickerSettingsControlId(controlId) {{
+      return String(controlId || "").trim().startsWith("settings-ticker-");
+    }}
+
+    function applyTickerPreferencesToTopbar() {{
+      const row = document.querySelector(".summary-ticker-row");
+      if (!(row instanceof HTMLElement)) return;
+      const prefs = currentTickerPreferences();
+
+      const orderedIds = [];
+      const seen = new Set();
+      for (const rawId of (Array.isArray(prefs.order) ? prefs.order : [])) {{
+        const id = normalizeTickerId(rawId);
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        orderedIds.push(id);
+      }}
+      for (const id of tickerDefaultOrder) {{
+        if (seen.has(id)) continue;
+        seen.add(id);
+        orderedIds.push(id);
+      }}
+
+      let orderIndex = 0;
+      for (const id of orderedIds) {{
+        const item = row.querySelector(`.summary-ticker-item[data-ticker-id="${{id}}"]`);
+        if (!(item instanceof HTMLElement)) continue;
+        item.style.order = String(orderIndex);
+        item.hidden = !tickerEnabled(id);
+        const labelEl = item.querySelector("[data-ticker-label]");
+        if (labelEl instanceof HTMLElement) {{
+          const defaultLabel = String((tickerCatalogById.get(id) && tickerCatalogById.get(id).defaultLabel) || id);
+          if (!labelEl.dataset.defaultLabel) {{
+            labelEl.dataset.defaultLabel = defaultLabel;
+          }}
+          labelEl.textContent = tickerLabelText(id) || defaultLabel;
+        }}
+        orderIndex += 1;
+      }}
+      requestTopbarLayoutMetricsSync();
+    }}
+
+    function saveTickerPreferences({{
+      rerenderSummary = true,
+      rerenderSettings = true,
+      status = "Ticker preferences saved locally.",
+    }} = {{}}) {{
+      tickerPreferences = normalizeTickerPreferences(currentTickerPreferences());
+      persistTickerPreferences();
+      applyTickerPreferencesToTopbar();
+      if (rerenderSummary && latestState) {{
+        renderSummary(latestState);
+      }}
+      if (rerenderSettings && activeSettingsTab === "tickers") {{
+        renderTickerSettingsUi();
+      }}
+      if (status) {{
+        setSettingsStatusText(status);
+      }}
+    }}
+
+    function resetTickerPreferencesForId(tickerId) {{
+      const id = normalizeTickerId(tickerId);
+      if (!id) return;
+      const prefs = currentTickerPreferences();
+      if (!prefs.enabled || typeof prefs.enabled !== "object") prefs.enabled = {{}};
+      if (!prefs.labels || typeof prefs.labels !== "object") prefs.labels = {{}};
+      if (!prefs.trend || typeof prefs.trend !== "object") prefs.trend = {{}};
+      prefs.enabled[id] = true;
+      delete prefs.labels[id];
+      prefs.trend[id] = !!tickerDefaultTrendVisibility[id];
+      if (id === "battery") {{
+        prefs.battery_window_hours = tickerDefaultBatteryWindowHours;
+      }}
+      if (id === "node") {{
+        prefs.node_rows = {{ ...nodeTickerDefaultRows }};
+      }}
+    }}
+
+    function updateThemeToggleLabel(resolvedTheme) {{
+      const btn = document.getElementById("theme-toggle-btn");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const resolvedText = resolvedTheme === "dark" ? "Dark" : "Light";
+      btn.textContent = `Theme: ${{resolvedText}}`;
+      if (themePreference === "auto") {{
+        btn.title = `Theme follows system (${{resolvedText}}). Click to lock Light/Dark toggle.`;
+      }} else {{
+        btn.title = `Theme locked to ${{resolvedText}}. Click to toggle Light/Dark.`;
+      }}
+      btn.setAttribute("aria-label", btn.title);
+    }}
+
+    function applyThemePreference(mode, persist = true) {{
+      const normalized = normalizeThemeMode(mode);
+      themePreference = normalized;
+      const resolvedTheme = normalized === "auto" ? systemPreferredTheme() : normalized;
+      applyThemePresetTokens(resolvedTheme);
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-pref", normalized);
+      applyMapTiles(resolvedTheme);
+      applySettingsFixedMapTiles(resolvedTheme);
+      updateThemeToggleLabel(resolvedTheme);
+      const historyNodeId = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : normalizeNodeId(selectedNodeId || "");
+      if (isSelectableNodeId(historyNodeId)) {{
+        const cached = nodeHistoryCache.get(historyNodeId);
+        if (cached && cached.data && Array.isArray(cached.data.points)) {{
+          renderSignalChart(cached.data.points);
+        }}
+      }}
+      if (activeMapDataMode === "activity") {{
+        const cachedWeekly = summaryMetricsCache.get(String(weeklySummaryHours));
+        if (cachedWeekly && cachedWeekly.data && Array.isArray(cachedWeekly.data.points)) {{
+          renderWeeklySummary(cachedWeekly.data);
+        }}
+      }}
+
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(themeStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function bindThemeToggle() {{
+      const btn = document.getElementById("theme-toggle-btn");
+      if (btn instanceof HTMLButtonElement && btn.dataset.bound !== "1") {{
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => {{
+          const resolved = themePreference === "auto" ? systemPreferredTheme() : themePreference;
+          const next = resolved === "dark" ? "light" : "dark";
+          applyThemePreference(next, true);
+        }});
+      }}
+
+      if (!themeMediaQuery && window.matchMedia) {{
+        themeMediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        const onThemeChange = () => {{
+          if (themePreference === "auto") {{
+            applyThemePreference("auto", false);
+          }}
+        }};
+        if (typeof themeMediaQuery.addEventListener === "function") {{
+          themeMediaQuery.addEventListener("change", onThemeChange);
+        }} else if (typeof themeMediaQuery.addListener === "function") {{
+          themeMediaQuery.addListener(onThemeChange);
+        }}
+      }}
+    }}
+
+    function bindSummaryTickerExpandControl() {{
+      const row = document.querySelector(".summary-ticker-row");
+      if (!(row instanceof HTMLElement) || row.dataset.expandBound === "1") return;
+      row.dataset.expandBound = "1";
+      row.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest(".summary-ticker-item");
+        if (!(item instanceof HTMLElement) || !row.contains(item)) return;
+        const next = tickerDensity === "expanded" ? "compact" : "expanded";
+        applyTickerDensity(next, true);
+      }});
+    }}
+
+    function renderTickerSettingsUi() {{
+      const listEl = document.getElementById("settings-ticker-list");
+      if (!(listEl instanceof HTMLElement)) return;
+      const prefs = currentTickerPreferences();
+      const order = Array.isArray(prefs.order) ? prefs.order.map((id) => normalizeTickerId(id)).filter(Boolean) : [];
+      const resolvedOrder = [];
+      const seen = new Set();
+      for (const id of order) {{
+        if (seen.has(id)) continue;
+        seen.add(id);
+        resolvedOrder.push(id);
+      }}
+      for (const id of tickerDefaultOrder) {{
+        if (seen.has(id)) continue;
+        seen.add(id);
+        resolvedOrder.push(id);
+      }}
+
+      if (!normalizeTickerId(activeTickerSettingsId) || !resolvedOrder.includes(activeTickerSettingsId)) {{
+        activeTickerSettingsId = resolvedOrder.length ? resolvedOrder[0] : "";
+      }}
+
+      listEl.innerHTML = "";
+      resolvedOrder.forEach((id, index) => {{
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "settings-ticker-item";
+        btn.dataset.tickerId = id;
+        if (id === activeTickerSettingsId) {{
+          btn.classList.add("is-active");
+        }}
+        if (!tickerEnabled(id)) {{
+          btn.classList.add("is-disabled");
+        }}
+        btn.setAttribute("role", "option");
+        btn.setAttribute("aria-selected", id === activeTickerSettingsId ? "true" : "false");
+
+        const orderEl = document.createElement("span");
+        orderEl.className = "settings-ticker-item-order";
+        orderEl.textContent = `${{index + 1}}.`;
+        btn.appendChild(orderEl);
+
+        const labelEl = document.createElement("span");
+        labelEl.className = "settings-ticker-item-label";
+        labelEl.textContent = tickerLabelText(id) || id;
+        btn.appendChild(labelEl);
+
+        const stateEl = document.createElement("span");
+        stateEl.className = "settings-ticker-item-state";
+        stateEl.textContent = tickerEnabled(id) ? "on" : "off";
+        btn.appendChild(stateEl);
+        listEl.appendChild(btn);
+      }});
+
+      const emptyEl = document.getElementById("settings-ticker-config-empty");
+      const formEl = document.getElementById("settings-ticker-config-form");
+      if (!(emptyEl instanceof HTMLElement) || !(formEl instanceof HTMLElement)) return;
+      const selectedId = normalizeTickerId(activeTickerSettingsId);
+      if (!selectedId) {{
+        emptyEl.hidden = false;
+        formEl.hidden = true;
+        return;
+      }}
+      emptyEl.hidden = true;
+      formEl.hidden = false;
+
+      const enabledToggle = document.getElementById("settings-ticker-enabled");
+      if (enabledToggle instanceof HTMLInputElement) {{
+        enabledToggle.checked = tickerEnabled(selectedId);
+      }}
+
+      const moveUpBtn = document.getElementById("settings-ticker-move-up");
+      const moveDownBtn = document.getElementById("settings-ticker-move-down");
+      const selectedIndex = resolvedOrder.indexOf(selectedId);
+      if (moveUpBtn instanceof HTMLButtonElement) {{
+        moveUpBtn.disabled = selectedIndex <= 0;
+      }}
+      if (moveDownBtn instanceof HTMLButtonElement) {{
+        moveDownBtn.disabled = selectedIndex < 0 || selectedIndex >= (resolvedOrder.length - 1);
+      }}
+
+      const labelInput = document.getElementById("settings-ticker-label");
+      if (labelInput instanceof HTMLInputElement) {{
+        const customLabel = String((prefs.labels && prefs.labels[selectedId]) || "");
+        if (labelInput.value !== customLabel) {{
+          labelInput.value = customLabel;
+        }}
+      }}
+
+      const trendWrap = document.getElementById("settings-ticker-show-trend-wrap");
+      const trendToggle = document.getElementById("settings-ticker-show-trend");
+      const supportsTrend = tickerMetricIds.has(selectedId);
+      if (trendWrap instanceof HTMLElement) {{
+        trendWrap.hidden = !supportsTrend;
+      }}
+      if (trendToggle instanceof HTMLInputElement) {{
+        trendToggle.checked = supportsTrend ? tickerTrendEnabled(selectedId) : false;
+        trendToggle.disabled = !supportsTrend;
+      }}
+
+      const batteryWindowWrap = document.getElementById("settings-ticker-battery-window-wrap");
+      const batteryWindowInput = document.getElementById("settings-ticker-battery-window-hours");
+      const isBattery = selectedId === "battery";
+      if (batteryWindowWrap instanceof HTMLElement) {{
+        batteryWindowWrap.hidden = !isBattery;
+      }}
+      if (batteryWindowInput instanceof HTMLInputElement) {{
+        batteryWindowInput.disabled = !isBattery;
+        batteryWindowInput.value = String(batteryTrendWindowHours());
+      }}
+
+      const nodeRowsWrap = document.getElementById("settings-ticker-node-rows-wrap");
+      const isNode = selectedId === "node";
+      if (nodeRowsWrap instanceof HTMLElement) {{
+        nodeRowsWrap.hidden = !isNode;
+      }}
+      const nodeRows = nodeTickerRowPreferences();
+      const nodeRowToggles = [
+        {{ key: "snr", id: "settings-ticker-node-row-snr" }},
+        {{ key: "rssi", id: "settings-ticker-node-row-rssi" }},
+        {{ key: "route", id: "settings-ticker-node-row-route" }},
+        {{ key: "hops", id: "settings-ticker-node-row-hops" }},
+      ];
+      for (const rowToggle of nodeRowToggles) {{
+        const toggle = document.getElementById(rowToggle.id);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        toggle.disabled = !isNode;
+        toggle.checked = !!nodeRows[rowToggle.key];
+      }}
+    }}
+
+    function bindTickerSettingsControls() {{
+      const listEl = document.getElementById("settings-ticker-list");
+      if (listEl instanceof HTMLElement && listEl.dataset.bound !== "1") {{
+        listEl.dataset.bound = "1";
+        listEl.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const btn = target.closest(".settings-ticker-item");
+          if (!(btn instanceof HTMLButtonElement)) return;
+          const id = normalizeTickerId(btn.dataset.tickerId || "");
+          if (!id) return;
+          activeTickerSettingsId = id;
+          renderTickerSettingsUi();
+        }});
+      }}
+
+      const enabledToggle = document.getElementById("settings-ticker-enabled");
+      if (enabledToggle instanceof HTMLInputElement && enabledToggle.dataset.bound !== "1") {{
+        enabledToggle.dataset.bound = "1";
+        enabledToggle.addEventListener("change", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.enabled || typeof prefs.enabled !== "object") prefs.enabled = {{}};
+          prefs.enabled[id] = !!enabledToggle.checked;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const moveUpBtn = document.getElementById("settings-ticker-move-up");
+      if (moveUpBtn instanceof HTMLButtonElement && moveUpBtn.dataset.bound !== "1") {{
+        moveUpBtn.dataset.bound = "1";
+        moveUpBtn.addEventListener("click", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          const prefs = currentTickerPreferences();
+          const order = Array.isArray(prefs.order) ? prefs.order.slice() : [...tickerDefaultOrder];
+          const idx = order.indexOf(id);
+          if (idx <= 0) return;
+          [order[idx - 1], order[idx]] = [order[idx], order[idx - 1]];
+          prefs.order = order;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const moveDownBtn = document.getElementById("settings-ticker-move-down");
+      if (moveDownBtn instanceof HTMLButtonElement && moveDownBtn.dataset.bound !== "1") {{
+        moveDownBtn.dataset.bound = "1";
+        moveDownBtn.addEventListener("click", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          const prefs = currentTickerPreferences();
+          const order = Array.isArray(prefs.order) ? prefs.order.slice() : [...tickerDefaultOrder];
+          const idx = order.indexOf(id);
+          if (idx < 0 || idx >= order.length - 1) return;
+          [order[idx + 1], order[idx]] = [order[idx], order[idx + 1]];
+          prefs.order = order;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const labelInput = document.getElementById("settings-ticker-label");
+      if (labelInput instanceof HTMLInputElement && labelInput.dataset.bound !== "1") {{
+        labelInput.dataset.bound = "1";
+        labelInput.addEventListener("input", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.labels || typeof prefs.labels !== "object") prefs.labels = {{}};
+          const next = String(labelInput.value || "").trim().slice(0, 26);
+          if (!next) {{
+            delete prefs.labels[id];
+          }} else {{
+            prefs.labels[id] = next;
+          }}
+          saveTickerPreferences();
+        }});
+      }}
+
+      const trendToggle = document.getElementById("settings-ticker-show-trend");
+      if (trendToggle instanceof HTMLInputElement && trendToggle.dataset.bound !== "1") {{
+        trendToggle.dataset.bound = "1";
+        trendToggle.addEventListener("change", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id || !tickerMetricIds.has(id)) return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.trend || typeof prefs.trend !== "object") prefs.trend = {{}};
+          prefs.trend[id] = !!trendToggle.checked;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const batteryWindowInput = document.getElementById("settings-ticker-battery-window-hours");
+      if (batteryWindowInput instanceof HTMLInputElement && batteryWindowInput.dataset.bound !== "1") {{
+        batteryWindowInput.dataset.bound = "1";
+        batteryWindowInput.addEventListener("change", () => {{
+          const raw = Number(batteryWindowInput.value);
+          const hours = Number.isFinite(raw)
+            ? Math.max(1, Math.min(24, Math.round(raw)))
+            : tickerDefaultBatteryWindowHours;
+          const prefs = currentTickerPreferences();
+          prefs.battery_window_hours = hours;
+          batteryWindowInput.value = String(hours);
+          saveTickerPreferences();
+        }});
+      }}
+
+      const nodeRowToggles = [
+        {{ key: "snr", id: "settings-ticker-node-row-snr" }},
+        {{ key: "rssi", id: "settings-ticker-node-row-rssi" }},
+        {{ key: "route", id: "settings-ticker-node-row-route" }},
+        {{ key: "hops", id: "settings-ticker-node-row-hops" }},
+      ];
+      for (const rowToggle of nodeRowToggles) {{
+        const toggle = document.getElementById(rowToggle.id);
+        if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === "1") continue;
+        toggle.dataset.bound = "1";
+        toggle.addEventListener("change", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (id !== "node") return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.node_rows || typeof prefs.node_rows !== "object") {{
+            prefs.node_rows = {{ ...nodeTickerDefaultRows }};
+          }}
+          prefs.node_rows[rowToggle.key] = !!toggle.checked;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const resetSelectedBtn = document.getElementById("settings-ticker-reset-selected");
+      if (resetSelectedBtn instanceof HTMLButtonElement && resetSelectedBtn.dataset.bound !== "1") {{
+        resetSelectedBtn.dataset.bound = "1";
+        resetSelectedBtn.addEventListener("click", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          resetTickerPreferencesForId(id);
+          saveTickerPreferences();
+        }});
+      }}
+
+      const resetAllBtn = document.getElementById("settings-ticker-reset-all");
+      if (resetAllBtn instanceof HTMLButtonElement && resetAllBtn.dataset.bound !== "1") {{
+        resetAllBtn.dataset.bound = "1";
+        resetAllBtn.addEventListener("click", () => {{
+          tickerPreferences = defaultTickerPreferences();
+          activeTickerSettingsId = tickerDefaultOrder[0] || "";
+          saveTickerPreferences({{
+            status: "Ticker preferences reset to defaults.",
+          }});
+        }});
+      }}
+    }}
+
+    function bindWeeklySummaryMetricControl() {{
+      const select = document.getElementById("weekly-summary-metric");
+      if (!(select instanceof HTMLSelectElement)) return;
+      if (select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+      select.value = normalizeWeeklySummaryMetric(weeklySummaryMetric);
+      updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
+      select.addEventListener("change", () => {{
+        applyWeeklySummaryMetric(select.value || "packets", true);
+        if (activeLayoutView === "history") {{
+          void refreshHistoryPanels(false);
+        }}
+      }});
+    }}
+
+    function bindWeeklySummaryNodeSeriesControls() {{
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        const toggleId = weeklySummaryNodeSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        if (toggle.dataset.bound === "1") continue;
+        toggle.dataset.bound = "1";
+        toggle.checked = !!weeklySummaryNodeSeriesEnabled[key];
+        toggle.addEventListener("change", () => {{
+          const nextSeries = {{}};
+          for (const innerKey of weeklySummaryNodeSeriesOrder) {{
+            const innerToggleId = weeklySummaryNodeSeriesControlIds[innerKey];
+            const innerToggle = document.getElementById(innerToggleId);
+            if (innerToggle instanceof HTMLInputElement) {{
+              nextSeries[innerKey] = innerToggle.checked;
+            }}
+          }}
+          applyWeeklySummaryNodeSeries(nextSeries, true);
+        }});
+      }}
+      updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
+    }}
+
+    function loadThemePreference() {{
+      let stored = "auto";
+      try {{
+        stored = window.localStorage.getItem(themeStorageKey) || "auto";
+      }} catch (_err) {{
+      }}
+      applyThemePreference(stored, false);
+    }}
+
+    function loadTickerDensityPreference() {{
+      let stored = "compact";
+      try {{
+        stored = window.localStorage.getItem(tickerDensityStorageKey) || "compact";
+      }} catch (_err) {{
+      }}
+      applyTickerDensity(stored, false);
+    }}
+
+    function loadWeeklySummaryMetricPreference() {{
+      let stored = "packets";
+      try {{
+        stored = window.localStorage.getItem(weeklySummaryMetricStorageKey) || "packets";
+      }} catch (_err) {{
+      }}
+      applyWeeklySummaryMetric(stored, false);
+    }}
+
+    function loadWeeklySummaryNodeSeriesPreference() {{
+      let storedJson = "";
+      try {{
+        storedJson = window.localStorage.getItem(weeklySummaryNodeSeriesStorageKey) || "";
+      }} catch (_err) {{
+      }}
+      if (storedJson) {{
+        try {{
+          const parsed = JSON.parse(storedJson);
+          applyWeeklySummaryNodeSeries(parsed, false);
+          return;
+        }} catch (_err) {{
+        }}
+      }}
+      let legacyCompare = "0";
+      try {{
+        legacyCompare = window.localStorage.getItem(weeklySummaryNodesCompareLegacyStorageKey) || "0";
+      }} catch (_err) {{
+      }}
+      if (normalizeWeeklySummaryNodesCompare(legacyCompare)) {{
+        applyWeeklySummaryNodeSeries({{
+          online_nodes: true,
+          known_nodes: true,
+          saved_nodes: true,
+          position_nodes: true,
+        }}, false);
+      }} else {{
+        applyWeeklySummaryNodeSeries({{
+          online_nodes: true,
+          known_nodes: false,
+          saved_nodes: false,
+          position_nodes: false,
+        }}, false);
+      }}
+    }}
+
+    function updateMapPacketLinesControl() {{
+      const wrap = document.getElementById("map-lines-wrap");
+      const toggle = document.getElementById("map-lines-toggle");
+      const inMapLineContext = activeLayoutView === "network";
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !inMapLineContext;
+        wrap.title = mapPacketLinesEnabled
+          ? "Hide packet lines between nodes."
+          : "Show packet lines between nodes.";
+      }}
+      if (toggle instanceof HTMLInputElement) {{
+        toggle.checked = mapPacketLinesEnabled;
+      }}
+    }}
+
+    function persistMapPacketLinesPreference() {{
+      try {{
+        window.localStorage.setItem(mapPacketLinesStorageKey, mapPacketLinesEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadMapPacketLinesPreference() {{
+      mapPacketLinesEnabled = true;
+      try {{
+        const stored = window.localStorage.getItem(mapPacketLinesStorageKey);
+        if (stored === "0") {{
+          mapPacketLinesEnabled = false;
+        }} else if (stored === "1") {{
+          mapPacketLinesEnabled = true;
+        }}
+      }} catch (_err) {{
+      }}
+      updateMapPacketLinesControl();
+    }}
+
+    function bindMapPacketLinesControl() {{
+      const toggle = document.getElementById("map-lines-toggle");
+      if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
+        toggle.dataset.bound = "1";
+        toggle.checked = mapPacketLinesEnabled;
+        toggle.addEventListener("change", () => {{
+          mapPacketLinesEnabled = !!toggle.checked;
+          persistMapPacketLinesPreference();
+          updateMapPacketLinesControl();
+          lastMapSignature = "";
+          lastMapGraphSignature = "";
+          lastMapRenderMode = "";
+          if (latestState && activeLayoutView === "network") {{
+            renderMap(
+              latestState.nodes || [],
+              (latestState.traffic || {{}}).edges || [],
+              null
+            );
+          }}
+        }});
+      }}
+      updateMapPacketLinesControl();
+    }}
+
+    function persistSignalHeatmapPreference() {{
+      try {{
+        window.localStorage.setItem(signalHeatmapStorageKey, signalHeatmapEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistSignalHeatmapModePreference() {{
+      try {{
+        window.localStorage.setItem(signalHeatmapModeStorageKey, normalizeSignalHeatmapMode(signalHeatmapMode));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadSignalHeatmapModePreference() {{
+      signalHeatmapMode = "coverage";
+      try {{
+        const stored = window.localStorage.getItem(signalHeatmapModeStorageKey);
+        signalHeatmapMode = normalizeSignalHeatmapMode(stored || "coverage");
+      }} catch (_err) {{
+      }}
+      updateSignalHeatmapControl(null, supportsSignalHeatmap());
+    }}
+
+    function loadSignalHeatmapPreference() {{
+      signalHeatmapEnabled = true;
+      try {{
+        const stored = window.localStorage.getItem(signalHeatmapStorageKey);
+        if (stored === "0") {{
+          signalHeatmapEnabled = false;
+        }} else if (stored === "1") {{
+          signalHeatmapEnabled = true;
+        }}
+      }} catch (_err) {{
+      }}
+      updateSignalHeatmapControl(null, supportsSignalHeatmap());
+    }}
+
+    function bindSignalHeatmapControl() {{
+      const toggle = document.getElementById("map-heatmap-toggle");
+      if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
+        toggle.dataset.bound = "1";
+        toggle.checked = signalHeatmapEnabled;
+        toggle.addEventListener("change", () => {{
+          signalHeatmapEnabled = !!toggle.checked;
+          persistSignalHeatmapPreference();
+          const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+          syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+        }});
+      }}
+      const modeSelect = document.getElementById("map-heatmap-mode");
+      if (modeSelect instanceof HTMLSelectElement && modeSelect.dataset.bound !== "1") {{
+        modeSelect.dataset.bound = "1";
+        modeSelect.value = normalizeSignalHeatmapMode(signalHeatmapMode);
+        modeSelect.addEventListener("change", () => {{
+          signalHeatmapMode = normalizeSignalHeatmapMode(modeSelect.value);
+          modeSelect.value = signalHeatmapMode;
+          persistSignalHeatmapModePreference();
+          const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+          syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+        }});
+      }}
+      const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+      syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+    }}
+

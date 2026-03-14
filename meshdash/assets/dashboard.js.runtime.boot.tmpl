@@ -1,0 +1,172 @@
+    loadStoredSelection();
+    loadNodeNameCache();
+    requestTopbarLayoutMetricsSync();
+    renderSelfRadioPill();
+    loadFavoriteNodes();
+    loadSplitState();
+    loadNetworkNodesSplitState();
+    loadSavedNodeSplitState();
+    loadSavedNodeHistorySplitState();
+    loadHistoryActivitySplitState();
+    loadHistoryChatSplitState();
+    loadBotsMainSplitState();
+    loadBotsCommandSplitState();
+    loadNodesTableColPcts();
+    loadSignalHeatDevKnobs();
+    loadSignalHeatmapModePreference();
+    loadSignalHeatmapPreference();
+    loadMapPacketLinesPreference();
+    loadChatPerfPreference();
+    loadConsoleFontSizePreference();
+    loadConsoleSessionState();
+    loadFileTransferDestinationPreference();
+    loadReversiState();
+    startNewCheckersGame();
+    startNewChessGame();
+    startNewPokerGame();
+    loadLayoutView();
+    loadManualDirectPeers();
+    loadChatChannel();
+    loadChatNotificationScope();
+    loadChatWhoisQuickActionConfig();
+    loadBotRequestHistory();
+    loadBotTrafficSnifferCommandHeads();
+    loadChatChangeNotices();
+    loadMeshChannelIndex();
+    loadChannelsUiMode();
+    applyChannelsUiMode();
+    loadChannelsExperimentalPreference();
+    loadChatEmojiPickerState();
+    loadChatEmojiUsage();
+    void ensureChatEmojiCatalogLoaded(false);
+    loadMapBasemapModePreference();
+    loadSettingsPositionSourcePreference();
+    loadSettingsTabPreference();
+    loadSettingsFixedPositionCache();
+    bindMapBasemapConnectivityHandlers();
+    loadThemePreference();
+    loadTickerPreferences();
+    loadTickerDensityPreference();
+    loadWeeklySummaryMetricPreference();
+    loadWeeklySummaryNodeSeriesPreference();
+    bindLayoutNav();
+    renderSavedRailStatus();
+    bindSplitters();
+    bindNetworkNodeSplitter();
+    bindSavedNodeSplitter();
+    bindSavedNodeHistorySplitter();
+    bindHistoryActivitySplitter();
+    bindHistoryChatSplitter();
+    bindBotsMainSplitter();
+    bindBotsCommandSplitter();
+    bindFavoriteMenuControls();
+    bindSelfRadioMenuControls();
+    bindFavoriteToggleControls();
+    bindFavoritesControls();
+    bindFavoriteMenuNodeSearchControls();
+    bindSavedNodeSearchControls();
+    bindNodeListSearchControls();
+    bindNodeRowClicks();
+    bindEncriptionRowClicks();
+    bindHistoryChatRowClicks();
+    bindNodesTableColResizers();
+    bindMapResetControl();
+    bindMapBasemapToggleControl();
+    bindConsoleControls();
+    bindChatComposer();
+    bindFilesControls();
+    bindChatPeerControls();
+    bindChatNotificationScopeControl();
+    bindChatWhoisQuickActionControls();
+    bindBotCommandCatalogControls();
+    bindBotHistoryControls();
+    bindBotsReviewControls();
+    bindGamesControls();
+    bindChatChangeSummaryControls();
+    bindHistoryNotificationControls();
+    renderChatChangeSummary();
+    bindChatSettingsMenuControls();
+    bindThemeToggle();
+    bindSummaryTickerExpandControl();
+    bindWeeklySummaryMetricControl();
+    bindWeeklySummaryNodeSeriesControls();
+    bindThemePresetSelector();
+    bindMeshChannelControl();
+    bindMeshChannelMenuControl();
+    bindMeshChannelSendControl();
+    bindMeshChannelSendMenuControl();
+    bindSignalHeatDevApi();
+    bindMapPacketLinesControl();
+    bindSignalHeatmapControl();
+    bindChatAutoScroll();
+    bindRawDataFetch();
+    bindTickerSettingsControls();
+    bindSettingsPanel();
+    bindHistoryTabs();
+    bindWheelPassthrough();
+    renderSelectionStatus();
+    const initialSavedNodeId = resolveSavedViewNodeId(latestState);
+    if (activeLayoutView === "saved" && isSelectableNodeId(initialSavedNodeId)) {{
+      renderNodeHistoryLoading(initialSavedNodeId);
+    }} else {{
+      setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
+    }}
+    renderFavorites({{}});
+    requestMapResize();
+    void loadThemeSettingsFromServer();
+
+    let pollInFlight = false;
+    let pollQueued = false;
+    async function pollOnce() {{
+      if (pollInFlight) {{
+        pollQueued = true;
+        return;
+      }}
+      pollInFlight = true;
+      try {{
+        await poll();
+      }} finally {{
+        pollInFlight = false;
+        if (pollQueued) {{
+          pollQueued = false;
+          void pollOnce();
+        }}
+      }}
+    }}
+
+    document.addEventListener("visibilitychange", () => {{
+      if (document.hidden) {{
+        tabHasFocus = false;
+        chatChangeCatchupArmed = true;
+        clearAllChatChangeAutoDismissTimers();
+        return;
+      }}
+      tabHasFocus = (typeof document.hasFocus === "function") ? !!document.hasFocus() : true;
+      void pollOnce();
+    }});
+    window.addEventListener("blur", () => {{
+      tabHasFocus = false;
+      chatChangeCatchupArmed = true;
+      clearAllChatChangeAutoDismissTimers();
+    }});
+    window.addEventListener("focus", () => {{
+      tabHasFocus = true;
+      void pollOnce();
+    }});
+
+    void pollOnce();
+    setInterval(pollOnce, refreshMs);
+    setInterval(() => {{
+      if (!hasActiveFileTransferSessions()) return;
+      scheduleFileTransferMaintenance(latestState);
+    }}, fileTransferMaintenanceHeartbeatMs);
+    // Keep time labels moving even when the server returns cached/304 state.
+    setInterval(() => {{
+      if (!document.hidden) {{
+        updateUptimeDisplay();
+        updateRadioTimeDisplay();
+      }}
+    }}, 1000);
+    setInterval(() => {{
+      void loadThemeSettingsFromServer(false);
+    }}, 60000);

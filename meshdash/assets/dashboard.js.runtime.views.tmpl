@@ -1,0 +1,869 @@
+    function renderPackets(traffic) {{
+      const packets = (traffic.recent_packets || []).slice().reverse().slice(0, 120);
+      const rows = packets.map((entry) => {{
+        const s = entry.summary || {{}};
+        const text = s.decoded_text == null ? "" : String(s.decoded_text);
+        return `<tr>
+          <td data-sort="${{escAttr(s.captured_at || "")}}">${{s.captured_at || "n/a"}}</td>
+          <td data-sort="${{escAttr(s.from || "")}}">${{s.from || "n/a"}}</td>
+          <td data-sort="${{escAttr(s.to || "")}}">${{s.to || "n/a"}}</td>
+          <td data-sort="${{escAttr(s.portnum || "")}}">${{s.portnum || "n/a"}}</td>
+          <td data-sort="${{escAttr(s.rx_snr ?? "")}}">${{s.rx_snr ?? "n/a"}}</td>
+          <td data-sort="${{escAttr(s.rx_rssi ?? "")}}">${{s.rx_rssi ?? "n/a"}}</td>
+          <td data-sort="${{escAttr(text)}}">${{text}}</td>
+        </tr>`;
+      }});
+      fillTable("packets-table", rows);
+    }}
+
+    function explicitPacketChannelIndex(entry) {{
+      const summary = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      const decoded = (packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : null;
+      const candidates = [
+        summary.channel_index,
+        summary.channelIndex,
+        summary.channel,
+        packet.channel_index,
+        packet.channelIndex,
+        packet.channel,
+        decoded && decoded.channel_index,
+        decoded && decoded.channelIndex,
+        decoded && decoded.channel,
+      ];
+      for (const candidate of candidates) {{
+        if (candidate == null || candidate === "") continue;
+        const num = Number(candidate);
+        if (Number.isInteger(num) && num >= 0) {{
+          return Math.trunc(num);
+        }}
+      }}
+      return null;
+    }}
+
+    function packetPortnumLabel(entry) {{
+      const summary = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      const decoded = (packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : null;
+      const candidates = [
+        summary.portnum,
+        packet.portnum,
+        decoded && decoded.portnum,
+      ];
+      for (const candidate of candidates) {{
+        const text = String(candidate == null ? "" : candidate).trim();
+        if (text) return text;
+      }}
+      return "encrypted/unknown";
+    }}
+
+    function packetEndpointIds(entry) {{
+      const summary = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      return {{
+        fromId: normalizeNodeId(summary.from ?? packet.from ?? ""),
+        toId: normalizeNodeId(summary.to ?? packet.to ?? packet.destination ?? ""),
+      }};
+    }}
+
+    function isMeshChannelRoleDisabled(roleRaw) {{
+      const roleText = String(roleRaw == null ? "" : roleRaw).trim();
+      const upper = roleText.toUpperCase();
+      if (upper === "DISABLED" || upper === "CHANNEL_ROLE_DISABLED") return true;
+      const num = Number(roleText);
+      return Number.isInteger(num) && num === 0;
+    }}
+
+    function formatMeshChannelRole(roleRaw) {{
+      const roleText = String(roleRaw == null ? "" : roleRaw).trim();
+      if (!roleText) return "";
+      const upper = roleText.toUpperCase();
+      if (upper === "CHANNEL_ROLE_DISABLED" || upper === "DISABLED" || upper === "0") return "Disabled";
+      if (upper === "CHANNEL_ROLE_PRIMARY" || upper === "PRIMARY" || upper === "1") return "Primary";
+      if (upper === "CHANNEL_ROLE_SECONDARY" || upper === "SECONDARY" || upper === "2") return "Secondary";
+      if (upper.startsWith("CHANNEL_ROLE_")) {{
+        return upper.slice("CHANNEL_ROLE_".length)
+          .toLowerCase()
+          .replace(/(^|_)([a-z])/g, (_m, prefix, ch) => `${{prefix === "_" ? " " : ""}}${{ch.toUpperCase()}}`);
+      }}
+      return roleText
+        .toLowerCase()
+        .replace(/(^|_)([a-z])/g, (_m, prefix, ch) => `${{prefix === "_" ? " " : ""}}${{ch.toUpperCase()}}`);
+    }}
+
+    function formatChannelTopPorts(portCounts, maxPorts = 3) {{
+      const rows = Array.from((portCounts instanceof Map) ? portCounts.entries() : [])
+        .map(([port, count]) => {{
+          const label = String(port == null ? "" : port).trim();
+          const num = Math.max(0, Math.trunc(Number(count) || 0));
+          return {{ label: label || "unknown", count: num }};
+        }})
+        .filter((row) => row.label && row.count > 0)
+        .sort((a, b) => (b.count - a.count) || String(a.label).localeCompare(String(b.label)));
+      if (!rows.length) return "n/a";
+      const limit = Math.max(1, Math.trunc(Number(maxPorts) || 3));
+      return rows.slice(0, limit).map((row) => `${{row.label}} x${{row.count}}`).join(", ");
+    }}
+
+    function channelEvidenceMeta(kind) {{
+      switch (String(kind || "")) {{
+        case "observed-local":
+          return {{
+            label: "Observed + local",
+            className: "kind-observed-local",
+            title: "Seen in recent packets and configured on this radio.",
+          }};
+        case "observed-only":
+          return {{
+            label: "Observed only",
+            className: "kind-observed-only",
+            title: "Seen in recent packets, but not present in this radio's local channel config.",
+          }};
+        case "local-only":
+          return {{
+            label: "Local only",
+            className: "kind-local-only",
+            title: "Configured on this radio, but not seen in the recent packet buffer.",
+          }};
+        case "disabled":
+          return {{
+            label: "Disabled local",
+            className: "kind-disabled",
+            title: "Present in local config but disabled. Recent packets may predate that change.",
+          }};
+        default:
+          return {{
+            label: "Unknown",
+            className: "",
+            title: "Insufficient evidence.",
+          }};
+      }}
+    }}
+
+    function renderChannelsView(source) {{
+      const context = resolveTrafficRenderContext(source);
+      const traffic = context.traffic;
+      const safeSource = (source && typeof source === "object") ? source : {{}};
+      const localState = settingsLocalStateFrom(safeSource);
+      const localOptions = collectMeshChannelOptionsFromLocalState(localState, {{ includeFallback: false }});
+      const localByIndex = new Map(
+        localOptions.map((opt) => [Number(opt && opt.index), opt])
+      );
+      const packets = Array.isArray(traffic && traffic.recent_packets)
+        ? traffic.recent_packets
+        : [];
+      const observed = new Map();
+      let packetsWithChannel = 0;
+      let packetsWithoutChannel = 0;
+
+      for (const entry of packets) {{
+        const index = explicitPacketChannelIndex(entry);
+        if (!Number.isInteger(index) || index < 0) {{
+          packetsWithoutChannel += 1;
+          continue;
+        }}
+        packetsWithChannel += 1;
+        let bucket = observed.get(index);
+        if (!(bucket && typeof bucket === "object")) {{
+          bucket = {{
+            packetCount: 0,
+            everyoneCount: 0,
+            directCount: 0,
+            nodeIds: new Set(),
+            portCounts: new Map(),
+            lastSeenUnix: 0,
+            lastSeenText: "",
+          }};
+          observed.set(index, bucket);
+        }}
+        bucket.packetCount += 1;
+        const endpoints = packetEndpointIds(entry);
+        if (endpoints.toId === "^all") {{
+          bucket.everyoneCount += 1;
+        }} else {{
+          bucket.directCount += 1;
+        }}
+        if (isSelectableNodeId(endpoints.fromId)) bucket.nodeIds.add(endpoints.fromId);
+        if (isSelectableNodeId(endpoints.toId)) bucket.nodeIds.add(endpoints.toId);
+        const portLabel = packetPortnumLabel(entry);
+        bucket.portCounts.set(portLabel, (bucket.portCounts.get(portLabel) || 0) + 1);
+
+        const summary = (entry && entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const entryUnix = latestUnixTimestamp(
+          summary.captured_at,
+          summary.rx_time,
+          summary.time,
+          entry && entry.captured_at,
+          entry && entry.rx_time,
+          entry && entry.time,
+        );
+        const entryText = String(
+          summary.captured_at
+          || summary.rx_time
+          || summary.time
+          || (entry && (entry.captured_at || entry.rx_time || entry.time))
+          || ""
+        ).trim();
+        if (Number.isFinite(entryUnix) && entryUnix > bucket.lastSeenUnix) {{
+          bucket.lastSeenUnix = Math.trunc(entryUnix);
+          bucket.lastSeenText = entryText;
+        }} else if (!bucket.lastSeenText && entryText) {{
+          bucket.lastSeenText = entryText;
+        }}
+      }}
+
+      const observedIndexes = Array.from(observed.keys()).sort((a, b) => a - b);
+      const highestSeenIndex = observedIndexes.length ? observedIndexes[observedIndexes.length - 1] : null;
+      const enabledLocalCount = localOptions.filter((opt) => !isMeshChannelRoleDisabled(opt && opt.role) && !opt.disabled).length;
+      const disabledLocalCount = localOptions.filter((opt) => isMeshChannelRoleDisabled(opt && opt.role) || !!opt.disabled).length;
+      const configuredUnseenCount = localOptions.filter((opt) => !isMeshChannelRoleDisabled(opt && opt.role) && !opt.disabled && !observed.has(Number(opt.index))).length;
+      const localConfigReady = !!(localState && Array.isArray(localState.channels));
+      const nowUnix = Math.floor(Date.now() / 1000);
+
+      try {{
+        renderChannelsTable(localState || {{}}, observed, nowUnix);
+      }} catch (_err) {{}}
+
+      const caption = document.getElementById("channels-caption");
+      if (caption instanceof HTMLElement) {{
+        const parts = [
+          `Observed ${{observedIndexes.length}} explicit message channel${{observedIndexes.length === 1 ? "" : "s"}} across ${{packets.length}} recent packet${{packets.length === 1 ? "" : "s"}}.`,
+          packetsWithoutChannel > 0
+            ? `${{packetsWithoutChannel}} packet${{packetsWithoutChannel === 1 ? "" : "s"}} lacked an explicit channel index, so the true count may be higher.`
+            : "All recent packets had an explicit channel index.",
+          localConfigReady
+            ? "Local names and roles come from this radio's channel config."
+            : "Local names and roles are still loading from this radio.",
+          "Message channels are encryption groups, not RF frequency slots.",
+        ];
+        caption.textContent = parts.join(" ");
+      }}
+
+      const overview = document.getElementById("channels-overview");
+      if (overview instanceof HTMLElement) {{
+        const items = [
+          ["Observed", observedIndexes.length],
+          ["Highest Seen", highestSeenIndex == null ? "n/a" : `Ch ${{highestSeenIndex}}`],
+          ["Attributed Packets", packetsWithChannel],
+          ["Unattributed", packetsWithoutChannel],
+          ["Local Active", enabledLocalCount],
+          ["Local Disabled", disabledLocalCount],
+          ["Configured Unseen", configuredUnseenCount],
+        ];
+        overview.innerHTML = items.map(([k, v]) => (
+          `<div class="overview-item"><div class="k">${{escAttr(String(k))}}</div><div class="v">${{escAttr(String(v))}}</div></div>`
+        )).join("");
+      }}
+    }}
+
+    function isLikelyEncryptedPacketEntry(entry) {{
+      const s = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      const decodedText = s.decoded_text == null ? "" : String(s.decoded_text).trim();
+      if (decodedText) return false;
+      const portnum = s.portnum == null ? "" : String(s.portnum).trim();
+      if (portnum) return false;
+
+      const decoded = packet.decoded;
+      if (decoded && typeof decoded === "object" && !Array.isArray(decoded) && Object.keys(decoded).length > 0) {{
+        return false;
+      }}
+
+      if (Object.prototype.hasOwnProperty.call(packet, "encrypted")) {{
+        return true;
+      }}
+      return true;
+    }}
+
+    function encryptedPacketReason(entry) {{
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      if (Object.prototype.hasOwnProperty.call(packet, "encrypted")) {{
+        return "encrypted payload";
+      }}
+      const payload = packet.payload;
+      if (typeof payload === "string" && payload.trim()) {{
+        return "payload only";
+      }}
+      return "no decoded payload";
+    }}
+
+    function compactEncryptedPayloadText(rawValue, maxChars = 84) {{
+      let text = "";
+      if (rawValue == null) {{
+        text = "";
+      }} else if (typeof rawValue === "string") {{
+        text = rawValue;
+      }} else if (typeof rawValue === "number" || typeof rawValue === "boolean") {{
+        text = String(rawValue);
+      }} else {{
+        try {{
+          text = JSON.stringify(rawValue);
+        }} catch (_err) {{
+          text = String(rawValue);
+        }}
+      }}
+      const compact = String(text || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!compact) return "";
+      if (compact.length <= maxChars) return compact;
+      const keep = Math.max(52, maxChars - 1);
+      const hidden = Math.max(0, compact.length - keep);
+      return `${{compact.slice(0, keep).trimEnd()}}... (+${{hidden}} chars)`;
+    }}
+
+    function encryptedPacketPayloadPreview(entry) {{
+      const packet = (entry && entry.packet && typeof entry.packet === "object")
+        ? entry.packet
+        : {{}};
+      const decoded = (packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : null;
+      const candidates = [
+        packet.encrypted,
+        packet.payload,
+        packet.payload_text,
+        packet.raw_payload,
+        packet.rawPayload,
+        decoded && decoded.payload,
+      ];
+      let full = "";
+      for (const candidate of candidates) {{
+        const candidateText = compactEncryptedPayloadText(candidate, 2400);
+        if (!candidateText) continue;
+        full = candidateText;
+        break;
+      }}
+      if (!full) {{
+        return {{
+          display: "n/a",
+          sort: "",
+          title: "",
+        }};
+      }}
+      const title = full.length > 480
+        ? `${{full.slice(0, 480)}}... (+${{full.length - 480}} chars)`
+        : full;
+      return {{
+        display: compactEncryptedPayloadText(full, 84),
+        sort: full,
+        title,
+      }};
+    }}
+
+    function encryptedPacketUnix(entry) {{
+      const summary = (entry && entry.summary && typeof entry.summary === "object")
+        ? entry.summary
+        : {{}};
+      return latestUnixTimestamp(
+        summary.captured_at,
+        summary.rx_time,
+        summary.time,
+        entry && entry.captured_at,
+        entry && entry.rx_time,
+        entry && entry.time,
+      );
+    }}
+
+    function formatEncryptedTrendTimeLabel(unixTs, includeDate = false) {{
+      const ts = Number(unixTs);
+      if (!Number.isFinite(ts) || ts <= 0) return "n/a";
+      const date = new Date(ts * 1000);
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mm = String(date.getMinutes()).padStart(2, "0");
+      if (!includeDate) {{
+        return `${{hh}}:${{mm}}`;
+      }}
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const month = monthNames[date.getMonth()] || "";
+      const day = date.getDate();
+      return `${{month}} ${{day}} ${{hh}}:${{mm}}`;
+    }}
+
+    function buildEncryptedTrendSeries(entries) {{
+      const encryptedEntries = Array.isArray(entries) ? entries : [];
+      const timestamps = [];
+      for (const entry of encryptedEntries) {{
+        const packetUnix = encryptedPacketUnix(entry);
+        if (Number.isFinite(packetUnix) && packetUnix > 0) {{
+          timestamps.push(Math.floor(packetUnix));
+        }}
+      }}
+      if (!timestamps.length) {{
+        return {{
+          points: [],
+          bucketSeconds: 300,
+          minUnix: null,
+          maxUnix: null,
+          maxCount: 0,
+        }};
+      }}
+
+      let minUnix = timestamps[0];
+      let maxUnix = timestamps[0];
+      for (const ts of timestamps) {{
+        if (ts < minUnix) minUnix = ts;
+        if (ts > maxUnix) maxUnix = ts;
+      }}
+      const spanSeconds = Math.max(0, maxUnix - minUnix);
+      let bucketSeconds = 300;
+      if (spanSeconds <= 45 * 60) {{
+        bucketSeconds = 60;
+      }} else if (spanSeconds <= 6 * 60 * 60) {{
+        bucketSeconds = 300;
+      }} else if (spanSeconds <= 24 * 60 * 60) {{
+        bucketSeconds = 900;
+      }} else {{
+        bucketSeconds = 3600;
+      }}
+      let bucketCount = Math.floor(spanSeconds / bucketSeconds) + 1;
+      while (bucketCount > 240) {{
+        bucketSeconds *= 2;
+        bucketCount = Math.floor(spanSeconds / bucketSeconds) + 1;
+      }}
+
+      const bucketStart = Math.floor(minUnix / bucketSeconds) * bucketSeconds;
+      const bucketEnd = Math.floor(maxUnix / bucketSeconds) * bucketSeconds;
+      const countsByBucket = new Map();
+      for (const ts of timestamps) {{
+        const bucketUnix = Math.floor(ts / bucketSeconds) * bucketSeconds;
+        countsByBucket.set(bucketUnix, (countsByBucket.get(bucketUnix) || 0) + 1);
+      }}
+
+      const points = [];
+      let maxCount = 0;
+      for (let bucketUnix = bucketStart; bucketUnix <= bucketEnd; bucketUnix += bucketSeconds) {{
+        const count = Math.max(0, Math.trunc(Number(countsByBucket.get(bucketUnix) || 0)));
+        if (count > maxCount) maxCount = count;
+        points.push({{ unix: bucketUnix, count }});
+      }}
+
+      return {{
+        points,
+        bucketSeconds,
+        minUnix,
+        maxUnix,
+        maxCount,
+      }};
+    }}
+
+    function formatEncryptedTrendBucketLabel(bucketSeconds) {{
+      const sec = Math.max(1, Math.trunc(Number(bucketSeconds) || 0));
+      if (sec % 3600 === 0) {{
+        return `${{Math.max(1, sec / 3600)}}h`;
+      }}
+      if (sec % 60 === 0) {{
+        return `${{Math.max(1, sec / 60)}}m`;
+      }}
+      return `${{sec}}s`;
+    }}
+
+    function renderEncriptionTrendChart(entries) {{
+      const svg = document.getElementById("encription-trend-chart");
+      const empty = document.getElementById("encription-trend-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+
+      const trend = buildEncryptedTrendSeries(entries);
+      const points = trend.points;
+      if (!points.length || trend.maxCount <= 0) {{
+        svg.innerHTML = "";
+        empty.textContent = "No encrypted packet timestamps in recent buffer.";
+        empty.hidden = false;
+        return;
+      }}
+      empty.hidden = true;
+
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const palette = darkTheme
+        ? {{
+          grid: "rgba(170, 196, 220, 0.22)",
+          line: "#f59f47",
+          fill: "rgba(245, 159, 71, 0.26)",
+          point: "#ffd089",
+          latest: "#ff8c42",
+          text: "#b7cde3",
+        }}
+        : {{
+          grid: "rgba(59, 96, 76, 0.2)",
+          line: "#bf6a17",
+          fill: "rgba(214, 138, 61, 0.2)",
+          point: "#2f855a",
+          latest: "#c05621",
+          text: "#3a5a47",
+        }};
+
+      const width = 900;
+      const height = 220;
+      const padLeft = 44;
+      const padRight = 12;
+      const padTop = 14;
+      const padBottom = 28;
+      const chartWidth = width - padLeft - padRight;
+      const chartHeight = height - padTop - padBottom;
+      const pointCount = points.length;
+      const yMax = Math.max(1, trend.maxCount);
+      const xForIndex = (idx) => (
+        pointCount <= 1
+          ? (padLeft + (chartWidth / 2))
+          : (padLeft + ((idx / (pointCount - 1)) * chartWidth))
+      );
+      const yForCount = (count) => (
+        padTop + ((1 - (Math.max(0, Number(count) || 0) / yMax)) * chartHeight)
+      );
+
+      const linePoints = points.map((point, idx) => `${{xForIndex(idx).toFixed(2)}},${{yForCount(point.count).toFixed(2)}}`);
+      const pathD = linePoints.length > 1
+        ? `M ${{linePoints[0]}} L ${{linePoints.slice(1).join(" L ")}}`
+        : "";
+      const areaD = linePoints.length
+        ? `M ${{linePoints[0]}} L ${{linePoints.slice(1).join(" L ")}} L ${{xForIndex(pointCount - 1).toFixed(2)}},${{(padTop + chartHeight).toFixed(2)}} L ${{xForIndex(0).toFixed(2)}},${{(padTop + chartHeight).toFixed(2)}} Z`
+        : "";
+
+      const yTickCandidates = [0, Math.round(yMax / 2), yMax];
+      const yTicks = Array.from(new Set(yTickCandidates))
+        .filter((value) => Number.isFinite(value) && value >= 0)
+        .sort((a, b) => a - b);
+      const yGrid = yTicks.map((tick) => {{
+        const y = yForCount(tick);
+        return `<line x1="${{padLeft}}" y1="${{y.toFixed(2)}}" x2="${{(padLeft + chartWidth).toFixed(2)}}" y2="${{y.toFixed(2)}}" stroke="${{palette.grid}}" stroke-width="1"></line>`;
+      }}).join("");
+      const yLabels = yTicks.map((tick) => {{
+        const y = yForCount(tick);
+        return `<text x="${{(padLeft - 6).toFixed(2)}}" y="${{(y + 4).toFixed(2)}}" text-anchor="end" fill="${{palette.text}}" font-size="11">${{tick}}</text>`;
+      }}).join("");
+
+      const maxTickCount = Math.min(6, Math.max(2, pointCount));
+      const xTickIndexes = [];
+      for (let i = 0; i < maxTickCount; i += 1) {{
+        const idx = Math.round((i / Math.max(1, maxTickCount - 1)) * (pointCount - 1));
+        if (!xTickIndexes.includes(idx)) {{
+          xTickIndexes.push(idx);
+        }}
+      }}
+      const includeDate = (trend.maxUnix - trend.minUnix) > (18 * 60 * 60);
+      const xGrid = xTickIndexes.map((idx) => {{
+        const x = xForIndex(idx);
+        return `<line x1="${{x.toFixed(2)}}" y1="${{padTop}}" x2="${{x.toFixed(2)}}" y2="${{(padTop + chartHeight).toFixed(2)}}" stroke="${{palette.grid}}" stroke-width="1"></line>`;
+      }}).join("");
+      const xLabels = xTickIndexes.map((idx) => {{
+        const x = xForIndex(idx);
+        const label = formatEncryptedTrendTimeLabel(points[idx].unix, includeDate);
+        return `<text x="${{x.toFixed(2)}}" y="${{(height - 8).toFixed(2)}}" text-anchor="middle" fill="${{palette.text}}" font-size="10">${{escAttr(label)}}</text>`;
+      }}).join("");
+
+      const latestPoint = points[points.length - 1];
+      const latestX = xForIndex(points.length - 1);
+      const latestY = yForCount(latestPoint.count);
+      const bucketLabel = formatEncryptedTrendBucketLabel(trend.bucketSeconds);
+
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.innerHTML = `
+        <g>
+          <rect x="${{padLeft}}" y="${{padTop}}" width="${{chartWidth}}" height="${{chartHeight}}" fill="none" stroke="${{palette.grid}}" stroke-width="1"></rect>
+          ${{yGrid}}
+          ${{xGrid}}
+          ${{areaD ? `<path d="${{areaD}}" fill="${{palette.fill}}" stroke="none"></path>` : ""}}
+          ${{pathD ? `<path d="${{pathD}}" fill="none" stroke="${{palette.line}}" stroke-width="2.2"></path>` : ""}}
+          <circle cx="${{latestX.toFixed(2)}}" cy="${{latestY.toFixed(2)}}" r="3.8" fill="${{palette.latest}}" stroke="${{palette.point}}" stroke-width="1.2"></circle>
+          ${{yLabels}}
+          ${{xLabels}}
+          <text x="${{(padLeft + 8).toFixed(2)}}" y="${{(padTop + 14).toFixed(2)}}" fill="${{palette.text}}" font-size="11">Packets per ${{bucketLabel}}</text>
+        </g>
+      `;
+    }}
+
+    function renderSortableListboxTable(tableId, rowModels, options = {{}}) {{
+      const rows = Array.isArray(rowModels) ? rowModels : [];
+      const emptyTextRaw = options && options.emptyText != null
+        ? String(options.emptyText)
+        : "No rows.";
+      const emptyText = emptyTextRaw.trim() || "No rows.";
+      const emptyColspan = Math.max(1, Math.trunc(Number(options && options.emptyColspan) || 1));
+      if (!rows.length) {{
+        fillTable(tableId, [`<tr><td colspan="${{emptyColspan}}">${{escAttr(emptyText)}}</td></tr>`]);
+        return;
+      }}
+
+      const renderedRows = rows.map((row) => {{
+        const rowModel = (row && typeof row === "object") ? row : {{}};
+        const cells = Array.isArray(rowModel.cells) ? rowModel.cells : [];
+        const className = String(rowModel.className || "").trim();
+        const dataset = (rowModel.dataset && typeof rowModel.dataset === "object")
+          ? rowModel.dataset
+          : {{}};
+
+        const attrs = [];
+        if (className) {{
+          attrs.push(`class="${{escAttr(className)}}"`);
+        }}
+        for (const [rawKey, rawValue] of Object.entries(dataset)) {{
+          const key = String(rawKey || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
+          if (!key) continue;
+          attrs.push(`data-${{key}}="${{escAttr(String(rawValue == null ? "" : rawValue))}}"`);
+        }}
+
+        const renderedCells = cells.map((cell) => {{
+          const cellModel = (cell && typeof cell === "object") ? cell : {{}};
+          const sortValue = String(cellModel.sort == null ? "" : cellModel.sort);
+          const titleValue = String(cellModel.title == null ? "" : cellModel.title);
+          const cellClass = String(cellModel.className || "").trim();
+          const content = cellModel.html != null
+            ? String(cellModel.html)
+            : escAttr(String(cellModel.text == null ? "" : cellModel.text));
+          const tdAttrs = [`data-sort="${{escAttr(sortValue)}}"`];
+          if (titleValue) {{
+            tdAttrs.push(`title="${{escAttr(titleValue)}}"`);
+          }}
+          if (cellClass) {{
+            tdAttrs.push(`class="${{escAttr(cellClass)}}"`);
+          }}
+          return `<td ${{tdAttrs.join(" ")}}>${{content}}</td>`;
+        }});
+
+        return `<tr ${{attrs.join(" ")}}>${{renderedCells.join("")}}</tr>`;
+      }});
+
+      fillTable(tableId, renderedRows);
+    }}
+
+    function renderEncription(source) {{
+      const context = resolveTrafficRenderContext(source);
+      const traffic = context.traffic;
+      const describeNode = buildHistoryNodeIdentityResolver(context.nodes);
+      const allPackets = Array.isArray(traffic && traffic.recent_packets)
+        ? traffic.recent_packets
+        : [];
+      const encrypted = allPackets
+        .slice()
+        .reverse()
+        .filter((entry) => isLikelyEncryptedPacketEntry(entry))
+        .slice(0, 200);
+
+      const packetRows = encrypted.map((entry) => {{
+        const s = (entry && entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const reason = encryptedPacketReason(entry);
+        const fromNodeId = normalizeNodeId(s.from || "");
+        const toNodeId = normalizeNodeId(s.to || "");
+        const rowSelectable = isSelectableNodeId(fromNodeId) || isSelectableNodeId(toNodeId);
+        const rowSelected = !!selectedNodeId && (
+          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
+          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
+        );
+        const fromIdentity = describeNode(fromNodeId || s.from || "");
+        const toIdentity = describeNode(toNodeId || s.to || "");
+        const payload = encryptedPacketPayloadPreview(entry);
+        return {{
+          className: `${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}`,
+          dataset: {{
+            "from-node-id": fromNodeId,
+            "to-node-id": toNodeId,
+          }},
+          cells: [
+            {{ sort: s.captured_at || "", text: s.captured_at || "n/a" }},
+            {{ sort: fromIdentity.sort, html: fromIdentity.html, title: fromIdentity.title }},
+            {{ sort: toIdentity.sort, html: toIdentity.html, title: toIdentity.title }},
+            {{ sort: s.hops ?? "", text: s.hops ?? "n/a" }},
+            {{ sort: s.rx_rssi ?? "", text: s.rx_rssi ?? "n/a" }},
+            {{ sort: s.rx_snr ?? "", text: s.rx_snr ?? "n/a" }},
+            {{ sort: payload.sort, text: payload.display, title: payload.title }},
+            {{ sort: reason, text: reason }},
+          ],
+        }};
+      }});
+      renderSortableListboxTable("encription-packets-table", packetRows, {{
+        emptyText: "No encrypted packets detected in recent buffer.",
+        emptyColspan: 8,
+      }});
+
+      const routes = new Map();
+      for (const entry of encrypted) {{
+        const s = (entry && entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const fromId = String(s.from || "n/a");
+        const toId = String(s.to || "n/a");
+        const key = `${{fromId}}->${{toId}}`;
+        const existing = routes.get(key) || {{
+          fromId,
+          toId,
+          count: 0,
+          lastSeen: "",
+          hopsTotal: 0,
+          hopsCount: 0,
+        }};
+        existing.count += 1;
+        const capturedAt = String(s.captured_at || "");
+        if (capturedAt && (!existing.lastSeen || capturedAt > existing.lastSeen)) {{
+          existing.lastSeen = capturedAt;
+        }}
+        const hops = Number(s.hops);
+        if (Number.isFinite(hops)) {{
+          existing.hopsTotal += hops;
+          existing.hopsCount += 1;
+        }}
+        routes.set(key, existing);
+      }}
+
+      const trafficRows = Array.from(routes.values())
+        .sort((a, b) => (
+          (b.count - a.count)
+          || String(b.lastSeen || "").localeCompare(String(a.lastSeen || ""))
+          || String(a.fromId || "").localeCompare(String(b.fromId || ""))
+          || String(a.toId || "").localeCompare(String(b.toId || ""))
+        ))
+        .map((item) => {{
+          const fromNodeId = normalizeNodeId(item.fromId || "");
+          const toNodeId = normalizeNodeId(item.toId || "");
+          const rowSelectable = isSelectableNodeId(fromNodeId) || isSelectableNodeId(toNodeId);
+          const rowSelected = !!selectedNodeId && (
+            (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
+            || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
+          );
+          const fromIdentity = describeNode(fromNodeId || item.fromId || "");
+          const toIdentity = describeNode(toNodeId || item.toId || "");
+          const avgHops = item.hopsCount > 0 ? item.hopsTotal / item.hopsCount : null;
+          const avgHopsLabel = avgHops == null ? "n/a" : avgHops.toFixed(1);
+          return {{
+            className: `${{rowSelectable ? "node-selectable" : ""}}${{rowSelected ? " selected-node" : ""}}`,
+            dataset: {{
+              "from-node-id": fromNodeId,
+              "to-node-id": toNodeId,
+            }},
+            cells: [
+              {{ sort: fromIdentity.sort, html: fromIdentity.html, title: fromIdentity.title }},
+              {{ sort: toIdentity.sort, html: toIdentity.html, title: toIdentity.title }},
+              {{ sort: item.count, text: item.count }},
+              {{ sort: avgHops == null ? "" : avgHops.toFixed(4), text: avgHopsLabel }},
+              {{ sort: item.lastSeen, text: item.lastSeen || "n/a" }},
+            ],
+          }};
+        }});
+      renderSortableListboxTable("encription-traffic-table", trafficRows, {{
+        emptyText: "No encrypted traffic routes yet.",
+        emptyColspan: 5,
+      }});
+      renderEncriptionTrendChart(encrypted);
+
+      const caption = document.getElementById("encription-caption");
+      if (caption instanceof HTMLElement) {{
+        const packetCount = encrypted.length;
+        const routeCount = routes.size;
+        caption.textContent = packetCount > 0
+          ? `${{packetCount}} encrypted packet${{packetCount === 1 ? "" : "s"}} across ${{routeCount}} route${{routeCount === 1 ? "" : "s"}} in recent buffer.`
+          : "No encrypted packets detected in recent buffer.";
+      }}
+    }}
+
+    function setRaw(id, value) {{
+      const el = document.getElementById(id);
+      if (!el) return;
+      const details = el.closest && el.closest("details");
+      if (details && !details.open) return;
+      el.textContent = JSON.stringify(value, null, 2);
+    }}
+
+    const rawDataCache = {{
+      myInfo: {{ fetchedAt: 0, data: null }},
+      metadata: {{ fetchedAt: 0, data: null }},
+      localState: {{ fetchedAt: 0, data: null }},
+      nodesFull: {{ fetchedAt: 0, data: null }},
+    }};
+
+    async function fetchRawJson(url, cacheEntry, ttlMs = 30000) {{
+      const nowMs = Date.now();
+      if (cacheEntry && cacheEntry.data != null && (nowMs - (cacheEntry.fetchedAt || 0)) < ttlMs) {{
+        return cacheEntry.data;
+      }}
+      const resp = await fetch(url, {{ cache: "no-store" }});
+      if (!resp.ok) throw new Error(`raw API ${{resp.status}}`);
+      const data = await resp.json();
+      if (cacheEntry) {{
+        cacheEntry.fetchedAt = nowMs;
+        cacheEntry.data = data;
+      }}
+      return data;
+    }}
+
+    async function loadRawMyInfo() {{
+      const data = await fetchRawJson("/api/raw/my_info", rawDataCache.myInfo, 60000);
+      setRaw("raw-my-info", data);
+      return data;
+    }}
+
+    async function loadRawMetadata() {{
+      const data = await fetchRawJson("/api/raw/metadata", rawDataCache.metadata, 60000);
+      setRaw("raw-metadata", data);
+      return data;
+    }}
+
+    async function loadRawLocalState() {{
+      const data = await fetchRawJson("/api/raw/local_state", rawDataCache.localState, 60000);
+      const obj = (data && typeof data === "object") ? data : {{}};
+      setRaw("raw-local-config", obj.local_config);
+      setRaw("raw-module-config", obj.module_config);
+      setRaw("raw-channels", obj.channels);
+      return data;
+    }}
+
+    async function loadRawNodesFull() {{
+      const data = await fetchRawJson("/api/raw/nodes_full", rawDataCache.nodesFull, 60000);
+      setRaw("raw-nodes-full", data);
+      return data;
+    }}
+
+    function bindRawDataFetch() {{
+      const pairs = [
+        ["raw-my-info", loadRawMyInfo],
+        ["raw-metadata", loadRawMetadata],
+        ["raw-local-config", loadRawLocalState],
+        ["raw-module-config", loadRawLocalState],
+        ["raw-channels", loadRawLocalState],
+        ["raw-nodes-full", loadRawNodesFull],
+      ];
+      for (const [preId, loader] of pairs) {{
+        const pre = document.getElementById(preId);
+        if (!pre) continue;
+        const details = pre.closest && pre.closest("details");
+        if (!details) continue;
+        details.addEventListener("toggle", () => {{
+          if (!details.open) return;
+          void loader().catch((err) => {{
+            const msg = err instanceof Error ? err.message : String(err || "unknown error");
+            setRaw(preId, {{ error: msg }});
+          }});
+        }});
+
+        if (details.open) {{
+          void loader().catch(() => {{}});
+        }}
+      }}
+    }}
+
