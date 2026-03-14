@@ -358,17 +358,33 @@
       text-align: right;
       flex: 1 1 auto;
     }}
-    .topbar .summary-ticker-item#summary-ticker-node {{
+    .topbar .summary-ticker-item#summary-ticker-node.has-extra-rows {{
       grid-template-rows: auto auto auto;
       row-gap: 2px;
     }}
-    .topbar .summary-ticker-item#summary-ticker-node .metric-ticker {{
+    .topbar .summary-ticker-item#summary-ticker-node.has-extra-rows .metric-ticker {{
       grid-column: 1 / span 2;
       grid-row: 3;
       justify-self: stretch;
     }}
-    .topbar .summary-ticker-item#summary-ticker-node .metric-ticker-chart {{
+    .topbar .summary-ticker-item#summary-ticker-node.has-extra-rows .metric-ticker-chart {{
       width: 64px;
+    }}
+    .topbar .summary-ticker-item .value.node-ticker-value.is-compact {{
+      grid-column: 1;
+      grid-row: 2;
+      margin-top: 0;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }}
+    .topbar .summary-ticker-item#summary-ticker-node .value.node-ticker-value.is-compact {{
+      font-size: 12px;
+      letter-spacing: -0.1px;
     }}
     .topbar .summary-ticker-item .value.wifi-ticker-value {{
       grid-column: 1;
@@ -541,6 +557,17 @@
     .topbar.ticker-expanded .summary-ticker-item .value.node-ticker-value {{
       font-size: 15px;
       line-height: 1.25;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item .value.node-ticker-value.is-compact {{
+      font-size: 20px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item#summary-ticker-node .value.node-ticker-value.is-compact {{
+      font-size: 18px;
     }}
     .topbar.ticker-expanded .summary-ticker-item .value.node-ticker-value .node-ticker-key {{
       font-size: 10px;

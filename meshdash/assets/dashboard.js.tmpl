@@ -342,6 +342,13 @@
       tickerCatalog.map((entry) => [entry.id, !!entry.metric])
     );
     const tickerDefaultBatteryWindowHours = 6;
+    const nodeTickerRowKeys = ["snr", "rssi", "route", "hops"];
+    const nodeTickerDefaultRows = {{
+      snr: false,
+      rssi: false,
+      route: false,
+      hops: false,
+    }};
     const weeklySummaryHours = 24 * 7;
     const weeklySummaryMetricStorageKey = "meshDashboardWeeklySummaryMetricV1";
     const weeklySummaryNodeSeriesStorageKey = "meshDashboardWeeklySummaryNodeSeriesV1";
@@ -5502,6 +5509,7 @@
         labels: {{}},
         trend: {{ ...tickerDefaultTrendVisibility }},
         battery_window_hours: tickerDefaultBatteryWindowHours,
+        node_rows: {{ ...nodeTickerDefaultRows }},
       }};
     }}
 
@@ -5560,6 +5568,18 @@
       const batteryWindowHours = Number.isFinite(batteryWindowRaw)
         ? Math.max(1, Math.min(24, Math.round(batteryWindowRaw)))
         : base.battery_window_hours;
+      const nodeRowsRaw = (
+        raw.node_rows && typeof raw.node_rows === "object"
+          ? raw.node_rows
+          : (raw.nodeRows && typeof raw.nodeRows === "object" ? raw.nodeRows : {{}})
+      );
+      const nodeRows = {{}};
+      for (const key of nodeTickerRowKeys) {{
+        const fallback = !!nodeTickerDefaultRows[key];
+        nodeRows[key] = key in nodeRowsRaw
+          ? parseBoolToken(nodeRowsRaw[key], fallback)
+          : fallback;
+      }}
 
       return {{
         order,
@@ -5567,6 +5587,7 @@
         labels,
         trend,
         battery_window_hours: batteryWindowHours,
+        node_rows: nodeRows,
       }};
     }}
 
@@ -5634,6 +5655,20 @@
       const raw = Number(prefs && prefs.battery_window_hours);
       if (!Number.isFinite(raw)) return tickerDefaultBatteryWindowHours;
       return Math.max(1, Math.min(24, Math.round(raw)));
+    }}
+
+    function nodeTickerRowPreferences() {{
+      const prefs = currentTickerPreferences();
+      const raw = prefs && prefs.node_rows && typeof prefs.node_rows === "object"
+        ? prefs.node_rows
+        : {{}};
+      const normalized = {{}};
+      for (const key of nodeTickerRowKeys) {{
+        normalized[key] = key in raw
+          ? parseBoolToken(raw[key], !!nodeTickerDefaultRows[key])
+          : !!nodeTickerDefaultRows[key];
+      }}
+      return normalized;
     }}
 
     function isTickerSettingsControlId(controlId) {{
@@ -5709,6 +5744,9 @@
       prefs.trend[id] = !!tickerDefaultTrendVisibility[id];
       if (id === "battery") {{
         prefs.battery_window_hours = tickerDefaultBatteryWindowHours;
+      }}
+      if (id === "node") {{
+        prefs.node_rows = {{ ...nodeTickerDefaultRows }};
       }}
     }}
 
@@ -5908,6 +5946,25 @@
         batteryWindowInput.disabled = !isBattery;
         batteryWindowInput.value = String(batteryTrendWindowHours());
       }}
+
+      const nodeRowsWrap = document.getElementById("settings-ticker-node-rows-wrap");
+      const isNode = selectedId === "node";
+      if (nodeRowsWrap instanceof HTMLElement) {{
+        nodeRowsWrap.hidden = !isNode;
+      }}
+      const nodeRows = nodeTickerRowPreferences();
+      const nodeRowToggles = [
+        {{ key: "snr", id: "settings-ticker-node-row-snr" }},
+        {{ key: "rssi", id: "settings-ticker-node-row-rssi" }},
+        {{ key: "route", id: "settings-ticker-node-row-route" }},
+        {{ key: "hops", id: "settings-ticker-node-row-hops" }},
+      ];
+      for (const rowToggle of nodeRowToggles) {{
+        const toggle = document.getElementById(rowToggle.id);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        toggle.disabled = !isNode;
+        toggle.checked = !!nodeRows[rowToggle.key];
+      }}
     }}
 
     function bindTickerSettingsControls() {{
@@ -6013,6 +6070,28 @@
           const prefs = currentTickerPreferences();
           prefs.battery_window_hours = hours;
           batteryWindowInput.value = String(hours);
+          saveTickerPreferences();
+        }});
+      }}
+
+      const nodeRowToggles = [
+        {{ key: "snr", id: "settings-ticker-node-row-snr" }},
+        {{ key: "rssi", id: "settings-ticker-node-row-rssi" }},
+        {{ key: "route", id: "settings-ticker-node-row-route" }},
+        {{ key: "hops", id: "settings-ticker-node-row-hops" }},
+      ];
+      for (const rowToggle of nodeRowToggles) {{
+        const toggle = document.getElementById(rowToggle.id);
+        if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === "1") continue;
+        toggle.dataset.bound = "1";
+        toggle.addEventListener("change", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (id !== "node") return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.node_rows || typeof prefs.node_rows !== "object") {{
+            prefs.node_rows = {{ ...nodeTickerDefaultRows }};
+          }}
+          prefs.node_rows[rowToggle.key] = !!toggle.checked;
           saveTickerPreferences();
         }});
       }}
@@ -6935,36 +7014,27 @@
       const routeText = Number.isFinite(telemetry.hops)
         ? (telemetry.hops <= 0 ? "direct" : `${{telemetry.hops}}-hop`)
         : "n/a";
-      const seenUnix = latestUnixTimestamp(
-        latestSignal && latestSignal.seenUnix,
-        telemetry && telemetry.lastSeenUnix
-      );
-      const seenText = Number.isFinite(seenUnix)
-        ? savedDetailAge(seenUnix, Math.floor(Date.now() / 1000))
-        : telemetry.lastSeenText;
       const snrText = Number.isFinite(snrDb)
         ? `${{formatTickerNumber(snrDb, 1)}}dB`
         : "n/a";
       const rssiText = Number.isFinite(rssiDbm)
         ? `${{rssiDbm}}dBm`
         : "n/a";
+      const rowPrefs = nodeTickerRowPreferences();
       const rows = [
-        {{ key: "SNR", value: snrText }},
-        {{ key: "RSSI", value: rssiText }},
-        {{ key: "Route", value: routeText }},
-        {{ key: "Hops", value: hopsText }},
-        {{ key: "Seen", value: seenText }},
       ];
+      if (rowPrefs.snr) rows.push({{ key: "SNR", value: snrText }});
+      if (rowPrefs.rssi) rows.push({{ key: "RSSI", value: rssiText }});
+      if (rowPrefs.route) rows.push({{ key: "Route", value: routeText }});
+      if (rowPrefs.hops) rows.push({{ key: "Hops", value: hopsText }});
       const rowsHtml = rows
         .map((row) => `<div class="node-ticker-row"><span class="node-ticker-key">${{escAttr(row.key)}}:</span><span class="node-ticker-val">${{escAttr(row.value)}}</span></div>`)
         .join("");
 
       const compactParts = [];
-      compactParts.push(`RSSI ${{rssiText}}`);
-      compactParts.push(`SNR ${{snrText}}`);
-      compactParts.push(`Hops ${{hopsText}}`);
-      compactParts.push(`Seen ${{seenText}}`);
-      const text = compactParts.join(" · ");
+      if (rssiText !== "n/a") compactParts.push(rssiText);
+      if (snrText !== "n/a") compactParts.push(snrText);
+      const text = compactParts.join(" · ") || "Signal n/a";
 
       const titleParts = [];
       if (isCanonicalNodeId(localId)) {{
@@ -6978,7 +7048,6 @@
         titleParts.push(`hops ${{telemetry.hops}}`);
       }}
       titleParts.push(`route ${{routeText}}`);
-      titleParts.push(`last seen ${{seenText}}`);
       titleParts.push(`LoRa preset ${{telemetry.presetText}}`);
 
       return {{
@@ -6986,6 +7055,7 @@
         rows,
         rows_html: rowsHtml,
         title: titleParts.join(" | "),
+        has_rows: rows.length > 0,
         snr_db: snrDb,
         rssi_dbm: rssiDbm,
       }};
@@ -7264,9 +7334,6 @@
         : "n/a";
       const lastActivityCompact = String(lastActivityText).replace(/\s+ago$/, "");
       const activityText = `last activity ${{lastActivityText}}`;
-      const wifiSummary = buildTargetWifiSummary(safeState);
-      const wifiCompactText = (wifiSummary && wifiSummary.compact) ? ` · ${{wifiSummary.compact}}` : "";
-      const wifiTitleText = (wifiSummary && wifiSummary.detail) ? ` | ${{wifiSummary.detail}}` : "";
 
       const errors = [];
       if (localStateError) errors.push(`local state: ${{localStateError}}`);
@@ -7279,8 +7346,8 @@
         const detail = errorSummary || "local radio id unavailable";
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{wifiCompactText}}`,
-          title: `Local radio unavailable. ${{detail}}${{wifiTitleText}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
+          title: `Local radio unavailable. ${{detail}}`,
         }};
       }}
 
@@ -7312,18 +7379,18 @@
         const detail = errorSummary || "state polling failed";
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{wifiCompactText}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
           title: `Dashboard polling is stale (${{
             Number.isFinite(pollSuccessAge) ? `${{pollSuccessAge}}s since last success` : "no successful poll yet"
-          }}). ${{detail}} | ${{trafficText}} | ${{activityText}}${{wifiTitleText}}`,
+          }}). ${{detail}} | ${{trafficText}} | ${{activityText}}`,
         }};
       }}
       if (trackerReportsLost) {{
         const detail = errorSummary || trackerError;
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{wifiCompactText}}`,
-          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}} | ${{trafficText}} | ${{activityText}}${{wifiTitleText}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
+          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}} | ${{trafficText}} | ${{activityText}}`,
         }};
       }}
 
@@ -7333,7 +7400,7 @@
       else if (freshnessKey === "warn") label = "Aging";
       else if (freshnessKey === "stale") label = "Stale";
 
-      const text = `${{label}} · ${{lastActivityCompact}} · ${{trafficCompactText}}${{wifiCompactText}}`;
+      const text = `${{label}} · ${{lastActivityCompact}} · ${{trafficCompactText}}`;
       const statusUsesTraffic = Number.isFinite(statusFreshnessUnix)
         && Number.isFinite(trafficFreshnessUnix)
         && Math.trunc(statusFreshnessUnix) === Math.trunc(trafficFreshnessUnix)
@@ -7344,7 +7411,7 @@
       return {{
         key,
         text,
-        title: `${{localId}} | ${{label}} | ${{activityText}} | ${{trafficText}} | ${{lastSeenTitle}}${{wifiTitleText}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}`,
+        title: `${{localId}} | ${{label}} | ${{activityText}} | ${{trafficText}} | ${{lastSeenTitle}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}`,
       }};
     }}
 
@@ -25620,6 +25687,10 @@
         "settings-ticker-label",
         "settings-ticker-show-trend",
         "settings-ticker-battery-window-hours",
+        "settings-ticker-node-row-snr",
+        "settings-ticker-node-row-rssi",
+        "settings-ticker-node-row-route",
+        "settings-ticker-node-row-hops",
         "settings-ticker-reset-selected",
         "settings-ticker-reset-all",
       ]) {{
@@ -28548,14 +28619,22 @@
       }}
       const nodeTicker = buildNodeTickerSummary(state);
       const nodeTickerEl = document.getElementById("m-node-ticker");
+      const nodeTickerItem = document.getElementById("summary-ticker-node");
       if (nodeTickerEl instanceof HTMLElement) {{
         const rowsHtml = String(nodeTicker && nodeTicker.rows_html ? nodeTicker.rows_html : "");
+        const hasRows = !!(nodeTicker && nodeTicker.has_rows && rowsHtml);
+        nodeTickerEl.classList.toggle("is-compact", !hasRows);
+        if (nodeTickerItem instanceof HTMLElement) {{
+          nodeTickerItem.classList.toggle("has-extra-rows", hasRows);
+        }}
         if (rowsHtml) {{
           nodeTickerEl.innerHTML = rowsHtml;
         }} else {{
           nodeTickerEl.textContent = nodeTicker && nodeTicker.text ? String(nodeTicker.text) : "n/a";
         }}
         nodeTickerEl.title = nodeTicker.title || "Node summary unavailable";
+      }} else if (nodeTickerItem instanceof HTMLElement) {{
+        nodeTickerItem.classList.remove("has-extra-rows");
       }}
       const nodeRssi = Number(nodeTicker && nodeTicker.rssi_dbm);
       const nodeSnr = Number(nodeTicker && nodeTicker.snr_db);
