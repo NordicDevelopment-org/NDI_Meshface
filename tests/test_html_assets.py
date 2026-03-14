@@ -11,6 +11,8 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert ".console-terminal-screen" in css
     assert ".console-command-input-proxy" in css
     assert ".self-radio-menu" in css
+    assert ".files-channel-row" in css
+    assert '[data-theme="dark"] .card.files' in css
     assert "#history-chat-table td.history-node-clickable" in css
     assert "#history-chat-table tbody tr.history-node-selectable.selected-node td" in css
     assert ".bots-setting-note" in css
@@ -93,5 +95,7 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "function copyFileTransferConsoleToClipboard()" in js
     assert "function bindFilesConsoleControls()" in js
     assert "function scheduleFileTransferMaintenance(state = latestState)" in js
+    assert "function meshChannelSendSelectElements()" in js
+    assert "files-send-channel-select" in js
     assert "{{" not in js
     assert "}}" not in js

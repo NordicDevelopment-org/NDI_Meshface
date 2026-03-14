@@ -13031,13 +13031,29 @@
       }};
     }}
 
+    function meshChannelSendSelectElements() {{
+      const ids = ["chat-send-channel-select", "files-send-channel-select"];
+      const out = [];
+      for (const id of ids) {{
+        const el = document.getElementById(id);
+        if (el instanceof HTMLSelectElement) {{
+          out.push(el);
+        }}
+      }}
+      return out;
+    }}
+
     function syncMeshChannelSendControl() {{
       const dot = document.getElementById("chat-send-channel-dot");
       const wrap = document.querySelector(".chat-send-channel-wrap");
       const composeShell = document.querySelector(".chat-compose-shell");
       const input = document.getElementById("chat-input");
+      const filesDot = document.getElementById("files-send-channel-dot");
+      const filesSelect = document.getElementById("files-send-channel-select");
+      const filesHint = document.getElementById("files-send-channel-hint");
       const meta = meshChannelColorMeta(activeMeshSendChannelIndex, {{ allowAll: false }});
       const rgb = hexColorRgbTriplet(meta.fill);
+      const sendLabel = currentMeshChannelSendLabel();
       if (wrap instanceof HTMLElement) {{
         wrap.style.setProperty("--chat-send-channel-fill", meta.fill);
         wrap.style.setProperty("--chat-send-channel-rgb", rgb);
@@ -13056,11 +13072,23 @@
         dot.title = meta.title;
         dot.setAttribute("aria-label", meta.title);
       }}
+      if (filesDot instanceof HTMLElement) {{
+        filesDot.classList.remove("is-all");
+        filesDot.style.setProperty("--channel-dot-fill", meta.fill);
+        filesDot.title = meta.title;
+        filesDot.setAttribute("aria-label", meta.title);
+      }}
+      if (filesSelect instanceof HTMLSelectElement) {{
+        filesSelect.value = String(activeMeshSendChannelIndex);
+        filesSelect.title = `Outgoing file transfer channel: ${{sendLabel}}`;
+      }}
+      if (filesHint instanceof HTMLElement) {{
+        filesHint.textContent = `Files send on ${{sendLabel}}. Message channels are encryption groups, not frequency slots.`;
+      }}
       const btn = document.getElementById("chat-send-channel-menu-btn");
       if (btn instanceof HTMLButtonElement) {{
-        const label = currentMeshChannelSendLabel();
-        btn.innerHTML = `${{meshChannelPrimaryBadgeHtml(activeMeshSendChannelIndex)}}<span class="mesh-channel-menu-btn-label">${{escAttr(label)}}</span>`;
-        btn.title = meta.title === label ? meta.title : `${{meta.title}} • ${{label}}`;
+        btn.innerHTML = `${{meshChannelPrimaryBadgeHtml(activeMeshSendChannelIndex)}}<span class="mesh-channel-menu-btn-label">${{escAttr(sendLabel)}}</span>`;
+        btn.title = meta.title === sendLabel ? meta.title : `${{meta.title}} • ${{sendLabel}}`;
         const select = document.getElementById("chat-send-channel-select");
         const disabled = select instanceof HTMLSelectElement ? !!select.disabled : false;
         btn.disabled = disabled;
@@ -13224,39 +13252,49 @@
     }}
 
     function renderMeshChannelSendSelect(options, {{ preserveCurrent = false }} = {{}}) {{
-      const select = document.getElementById("chat-send-channel-select");
-      if (!(select instanceof HTMLSelectElement)) return;
+      const selects = meshChannelSendSelectElements();
+      if (!selects.length) return;
 
       const normalized = Array.isArray(options) ? options.slice() : [];
       const desiredIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === desiredIndex)) {{
         normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
       }}
-      select.innerHTML = "";
-      for (const opt of normalized) {{
-        const idx = normalizeMeshChannelIndex(opt && opt.index);
-        const label = meshChannelSendOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
-        const optionEl = document.createElement("option");
-        optionEl.value = String(idx);
-        optionEl.textContent = label;
-        optionEl.disabled = !!(opt && opt.disabled);
-        optionEl.title = `${{label}} • Ch ${{idx}}`;
-        select.appendChild(optionEl);
+      const fillSelect = (select) => {{
+        select.innerHTML = "";
+        for (const opt of normalized) {{
+          const idx = normalizeMeshChannelIndex(opt && opt.index);
+          const label = meshChannelSendOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
+          const optionEl = document.createElement("option");
+          optionEl.value = String(idx);
+          optionEl.textContent = label;
+          optionEl.disabled = !!(opt && opt.disabled);
+          optionEl.title = `${{label}} • Ch ${{idx}}`;
+          select.appendChild(optionEl);
+        }}
+      }};
+      for (const select of selects) {{
+        fillSelect(select);
       }}
 
+      const pickEnabledValue = (select, desiredValue) => {{
+        const desiredOpt = Array.from(select.options).find((o) => o.value === desiredValue && !o.disabled);
+        if (desiredOpt) return desiredValue;
+        const firstEnabled = Array.from(select.options).find((o) => !o.disabled);
+        return firstEnabled ? firstEnabled.value : "0";
+      }};
+
       const desired = String(desiredIndex);
-      const desiredOpt = Array.from(select.options).find((o) => o.value === desired && !o.disabled);
-      if (desiredOpt) {{
-        select.value = desired;
-        return;
+      const resolvedValue = pickEnabledValue(selects[0], desired);
+      if (resolvedValue !== desired) {{
+        activeMeshSendChannelIndex = normalizeMeshChannelIndex(resolvedValue);
+        try {{
+          window.localStorage.setItem(meshChannelSendIndexStorageKey, String(activeMeshSendChannelIndex));
+        }} catch (_err) {{}}
       }}
-      const firstEnabled = Array.from(select.options).find((o) => !o.disabled);
-      const nextValue = firstEnabled ? firstEnabled.value : "0";
-      select.value = nextValue;
-      activeMeshSendChannelIndex = normalizeMeshChannelIndex(nextValue);
-      try {{
-        window.localStorage.setItem(meshChannelSendIndexStorageKey, String(activeMeshSendChannelIndex));
-      }} catch (_err) {{}}
+      for (const select of selects) {{
+        select.value = pickEnabledValue(select, resolvedValue);
+      }}
     }}
 
     function renderMeshChannelSendMenu(options, {{ preserveCurrent = false }} = {{}}) {{
@@ -13390,8 +13428,7 @@
       const changed = idx !== activeMeshSendChannelIndex;
       activeMeshSendChannelIndex = idx;
 
-      const select = document.getElementById("chat-send-channel-select");
-      if (select instanceof HTMLSelectElement) {{
+      for (const select of meshChannelSendSelectElements()) {{
         select.value = String(activeMeshSendChannelIndex);
       }}
       syncMeshChannelSendControl();
@@ -13514,13 +13551,15 @@
     }}
 
     function bindMeshChannelSendControl() {{
-      const select = document.getElementById("chat-send-channel-select");
-      if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") return;
-      select.dataset.bound = "1";
-
-      select.addEventListener("change", () => {{
-        applyMeshSendChannelIndex(select.value, true);
-      }});
+      const selects = meshChannelSendSelectElements();
+      if (!selects.length) return;
+      for (const select of selects) {{
+        if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") continue;
+        select.dataset.bound = "1";
+        select.addEventListener("change", () => {{
+          applyMeshSendChannelIndex(select.value, true);
+        }});
+      }}
 
       renderMeshChannelSendSelect(
         meshChannelSendOptions.length ? meshChannelSendOptions : buildMeshChannelSendOptionsFromLocalState(null),
@@ -13530,7 +13569,6 @@
         meshChannelSendOptions.length ? meshChannelSendOptions : buildMeshChannelSendOptionsFromLocalState(null),
         {{ preserveCurrent: true }},
       );
-      select.value = String(activeMeshChannelSendIndex());
       syncMeshChannelSendControl();
     }}
 
@@ -14746,6 +14784,7 @@
       const fileInput = document.getElementById("files-input");
       const destinationInput = document.getElementById("files-destination-input");
       const useSelectedBtn = document.getElementById("files-use-selected-btn");
+      const sendChannelSelect = document.getElementById("files-send-channel-select");
       if (sendBtn instanceof HTMLButtonElement) {{
         sendBtn.disabled = fileTransferSendInFlight;
         sendBtn.textContent = fileTransferSendInFlight ? "Sending..." : "Send file";
@@ -14758,6 +14797,9 @@
       }}
       if (useSelectedBtn instanceof HTMLButtonElement) {{
         useSelectedBtn.disabled = fileTransferSendInFlight;
+      }}
+      if (sendChannelSelect instanceof HTMLSelectElement) {{
+        sendChannelSelect.disabled = fileTransferSendInFlight;
       }}
     }}
 
@@ -15855,10 +15897,11 @@
         const complete = rows.filter((row) => row && row.delivered).length;
         const pending = Math.max(0, total - complete);
         const channelLabel = currentMeshChannelViewLabel();
+        const sendLabel = currentMeshChannelSendLabel();
         if (!total) {{
-          caption.textContent = `No file transfers detected yet. View channel: ${{channelLabel}}.`;
+          caption.textContent = `No file transfers detected yet. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}}.`;
         }} else {{
-          caption.textContent = `Showing ${{total}} transfer${{total === 1 ? "" : "s"}}. ${{complete}} complete, ${{pending}} pending. View channel: ${{channelLabel}}.`;
+          caption.textContent = `Showing ${{total}} transfer${{total === 1 ? "" : "s"}}. ${{complete}} complete, ${{pending}} pending. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}}.`;
         }}
       }}
 

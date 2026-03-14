@@ -60,6 +60,7 @@ def test_render_html_includes_files_view_structure_tokens():
     assert 'data-view="files"' in html
     assert 'id="files-destination-input"' in html
     assert 'id="files-use-selected-btn"' in html
+    assert 'id="files-send-channel-select"' in html
     assert 'id="files-input"' in html
     assert 'id="files-send-btn"' in html
     assert 'id="files-send-status"' in html

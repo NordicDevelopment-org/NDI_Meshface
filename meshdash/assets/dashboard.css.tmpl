@@ -1537,6 +1537,25 @@
       gap: 7px;
       align-items: center;
     }}
+    .files-channel-row {{
+      display: grid;
+      grid-template-columns: auto minmax(180px, 260px) minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+    }}
+    .files-channel-dot {{
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }}
+    .files-channel-select {{
+      max-width: 260px;
+    }}
+    .files-channel-hint {{
+      font-size: 11px;
+      line-height: 1.35;
+      color: #456352;
+    }}
     .files-input {{
       width: 100%;
       min-width: 0;
@@ -1561,6 +1580,14 @@
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+    }}
+    .files-controls .btn.btn-secondary {{
+      background: #e6f0ea;
+      border-color: #b7ccbe;
+      color: #1f4a35;
+    }}
+    .files-controls .btn.btn-secondary:hover {{
+      background: #dce9e1;
     }}
     .files-send-status {{
       font-size: 11px;
@@ -1647,6 +1674,14 @@
     .files-transfer-action:disabled {{
       opacity: 0.6;
       cursor: default;
+    }}
+    @media (max-width: 980px) {{
+      .files-channel-row {{
+        grid-template-columns: auto minmax(0, 1fr);
+      }}
+      .files-channel-hint {{
+        grid-column: 1 / -1;
+      }}
     }}
     .files-transfer-dir {{
       display: inline-flex;
@@ -8433,6 +8468,66 @@
     }}
     [data-theme="dark"] .btn.btn-secondary {{
       background: transparent;
+    }}
+    [data-theme="dark"] .card.files {{
+      border-color: #33483c;
+      background: #16241c;
+      color: #dbece3;
+    }}
+    [data-theme="dark"] .files-controls {{
+      border-color: #355042;
+      background: #1a2b22;
+    }}
+    [data-theme="dark"] .files-caption,
+    [data-theme="dark"] .files-send-status,
+    [data-theme="dark"] .files-channel-hint {{
+      color: #a8c6b7;
+    }}
+    [data-theme="dark"] .files-label {{
+      color: #9fbead;
+    }}
+    [data-theme="dark"] .files-input {{
+      background: #22352b;
+      border-color: #3b5949;
+      color: #deeee5;
+    }}
+    [data-theme="dark"] .files-input:focus {{
+      outline-color: #5f8a73;
+      border-color: #5f8a73;
+      background: #243b30;
+    }}
+    [data-theme="dark"] .files-console {{
+      border-color: #355042;
+      background: #182820;
+    }}
+    [data-theme="dark"] .files-console-title {{
+      color: #a7c4b5;
+    }}
+    [data-theme="dark"] .files-console-log {{
+      border-color: #355042;
+      background: #101a15;
+      color: #cfe6d8;
+    }}
+    [data-theme="dark"] .files-transfers-scroll {{
+      border-color: #355042;
+      background: #16241c;
+    }}
+    [data-theme="dark"] .files-transfer-action {{
+      border-color: #426452;
+      background: #263a30;
+      color: #d5e9de;
+    }}
+    [data-theme="dark"] .files-transfer-action:hover {{
+      background: #30493c;
+      border-color: #547d66;
+    }}
+    [data-theme="dark"] .files-controls .btn.btn-secondary {{
+      background: #22352b;
+      border-color: #3b5949;
+      color: #deeee5;
+    }}
+    [data-theme="dark"] .files-controls .btn.btn-secondary:hover {{
+      background: #2a4033;
     }}
     [data-theme="dark"] .btn.btn-danger {{
       border-color: #6a3a34;
