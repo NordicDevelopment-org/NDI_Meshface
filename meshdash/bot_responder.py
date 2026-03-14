@@ -3,6 +3,7 @@ import os
 import re
 import threading
 import time
+from math import asin, cos, radians, sin, sqrt
 from typing import Callable, Optional
 
 from .bot_commands import (
@@ -21,6 +22,7 @@ from .bot_settings_store import (
 )
 from .config import DEFAULT_CHAT_MAX_BYTES
 from .offline_atlas import nearest_city as _nearest_city_for_coords
+from .helpers import extract_packet_position as _extract_packet_position
 from .helpers import extract_position_fields as _extract_position_fields
 from .helpers import to_float as _to_float
 from .helpers import to_int as _to_int
@@ -47,6 +49,8 @@ _PUBLIC_PING_LIMIT_REACTION = "❌"
 _PUBLIC_PING_DIRECT_HANDOFF_TEXT = (
     "ping: public limit reached (3). Continue testing with direct peer-to-peer messages for 1 hour."
 )
+_BOT_CITY_HINT_MAX_DISTANCE_KM = 120.0
+_REQUESTER_POSITION_MAX_AGE_SECONDS = 24 * 3600
 
 
 def _parse_bool_token(value: object, default: bool) -> bool:
@@ -206,6 +210,37 @@ def _effective_hops(packet: dict[str, object], from_id: str, nodes: list[dict[st
     return _node_hops_away(requester)
 
 
+def _normalize_unix_seconds(value: object) -> Optional[int]:
+    parsed = _to_int(value)
+    if parsed is None or parsed <= 0:
+        return None
+    if parsed > 10**12:
+        parsed = parsed // 1000
+    if parsed <= 0:
+        return None
+    return parsed
+
+
+def _position_timestamp_unix(position: object) -> Optional[int]:
+    if not isinstance(position, dict):
+        return None
+    for key in (
+        "time",
+        "timestamp",
+        "timeSec",
+        "time_sec",
+        "unix",
+        "lastUpdated",
+        "last_updated",
+        "lastFixTime",
+        "last_fix_time",
+    ):
+        parsed = _normalize_unix_seconds(position.get(key))
+        if parsed is not None:
+            return parsed
+    return None
+
+
 def _packet_text(decoded: object) -> str:
     if not isinstance(decoded, dict):
         return ""
@@ -248,7 +283,9 @@ def _iter_known_nodes(interface: object) -> list[dict[str, object]]:
         hops_away = _to_int(info.get("hopsAway") or info.get("hops_away"))
         lat = None
         lon = None
-        coords = _extract_position_fields(info.get("position"))
+        position = info.get("position")
+        coords = _extract_position_fields(position)
+        position_unix = _position_timestamp_unix(position)
         if coords is not None:
             lat, lon = coords
         rows.append(
@@ -260,6 +297,7 @@ def _iter_known_nodes(interface: object) -> list[dict[str, object]]:
                 "hops_away": hops_away,
                 "lat": lat,
                 "lon": lon,
+                "position_unix": position_unix,
             }
         )
     return rows
@@ -309,26 +347,30 @@ def _format_hop_count_label(hops: Optional[int]) -> str:
     return f"{hops} hops"
 
 
-def _format_distance_km_label(distance_km: object) -> str:
-    value = _to_float(distance_km)
-    if value is None or value < 0:
+def _format_distance_mi_label(distance_km: object) -> str:
+    value_km = _to_float(distance_km)
+    if value_km is None or value_km < 0:
         return ""
-    if value < 1.0:
-        return "<1km"
-    if value < 10.0:
-        return f"{value:.1f}km"
-    return f"{int(round(value))}km"
+    value_mi = value_km * 0.621371
+    if value_mi < 1.0:
+        return "<1mi"
+    if value_mi < 10.0:
+        return f"{value_mi:.1f}mi"
+    return f"{int(round(value_mi))}mi"
 
 
-def _nearest_city_hint(node: Optional[dict[str, object]]) -> str:
-    if not isinstance(node, dict):
+def _nearest_city_hint_from_coords(lat: object, lon: object, *, max_distance_km: float) -> str:
+    lat_f = _to_float(lat)
+    lon_f = _to_float(lon)
+    if lat_f is None or lon_f is None:
         return ""
-    lat = _to_float(node.get("lat"))
-    lon = _to_float(node.get("lon"))
-    if lat is None or lon is None:
-        return ""
-    city = _nearest_city_for_coords(lat, lon)
+    city = _nearest_city_for_coords(lat_f, lon_f)
     if not isinstance(city, dict):
+        return ""
+    distance_value = _to_float(city.get("distance_km"))
+    if distance_value is None or distance_value < 0:
+        return ""
+    if distance_value > float(max_distance_km):
         return ""
     city_name = str(city.get("name") or "").strip()
     state_name = str(city.get("state") or "").strip()
@@ -341,10 +383,98 @@ def _nearest_city_hint(node: Optional[dict[str, object]]) -> str:
     elif country_name:
         place_parts.append(country_name)
     place = ", ".join(place_parts)
-    distance_label = _format_distance_km_label(city.get("distance_km"))
+    distance_label = _format_distance_mi_label(distance_value)
     if distance_label:
         return f"{place} ({distance_label})"
     return place
+
+
+def _node_coords(node: Optional[dict[str, object]]) -> Optional[tuple[float, float]]:
+    if not isinstance(node, dict):
+        return None
+    lat = _to_float(node.get("lat"))
+    lon = _to_float(node.get("lon"))
+    if lat is None or lon is None:
+        return None
+    if lat == 0.0 and lon == 0.0:
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    return lat, lon
+
+
+def _node_position_is_recent(node: Optional[dict[str, object]], *, now_unix: int) -> bool:
+    if not isinstance(node, dict):
+        return False
+    position_unix = _normalize_unix_seconds(node.get("position_unix"))
+    if position_unix is None:
+        return False
+    if position_unix > (now_unix + 3600):
+        return False
+    if (now_unix - position_unix) > _REQUESTER_POSITION_MAX_AGE_SECONDS:
+        return False
+    return True
+
+
+def _requester_coords(
+    *,
+    packet: dict[str, object],
+    node: Optional[dict[str, object]],
+    now_unix: int,
+) -> Optional[tuple[float, float]]:
+    packet_pos = _extract_packet_position(packet)
+    if isinstance(packet_pos, dict):
+        packet_coords = _node_coords(packet_pos)
+        if packet_coords is not None:
+            return packet_coords
+    if not _node_position_is_recent(node, now_unix=now_unix):
+        return None
+    return _node_coords(node)
+
+
+def _haversine_km(lat_a: float, lon_a: float, lat_b: float, lon_b: float) -> float:
+    earth_radius_km = 6371.0
+    lat_a_rad = radians(lat_a)
+    lon_a_rad = radians(lon_a)
+    lat_b_rad = radians(lat_b)
+    lon_b_rad = radians(lon_b)
+    d_lat = lat_b_rad - lat_a_rad
+    d_lon = lon_b_rad - lon_a_rad
+    hav = sin(d_lat / 2.0) ** 2 + cos(lat_a_rad) * cos(lat_b_rad) * sin(d_lon / 2.0) ** 2
+    return 2.0 * earth_radius_km * asin(sqrt(max(0.0, hav)))
+
+
+def _bot_city_hint(local_node: Optional[dict[str, object]]) -> str:
+    local_coords = _node_coords(local_node)
+    if local_coords is None:
+        return ""
+    return _nearest_city_hint_from_coords(
+        local_coords[0],
+        local_coords[1],
+        max_distance_km=_BOT_CITY_HINT_MAX_DISTANCE_KM,
+    )
+
+
+def _bot_to_requester_distance_hint(
+    *,
+    packet: dict[str, object],
+    requester_node: Optional[dict[str, object]],
+    local_node: Optional[dict[str, object]],
+    now_unix: int,
+) -> str:
+    local_coords = _node_coords(local_node)
+    if local_coords is None:
+        return ""
+    requester_coords = _requester_coords(packet=packet, node=requester_node, now_unix=now_unix)
+    if requester_coords is None:
+        return ""
+    distance_km = _haversine_km(
+        local_coords[0],
+        local_coords[1],
+        requester_coords[0],
+        requester_coords[1],
+    )
+    return _format_distance_mi_label(distance_km)
 
 
 def _format_short_node_label(node: dict[str, object], now_unix: int) -> str:
@@ -1021,10 +1151,24 @@ class MeshResponseBot:
             hops = _effective_hops(packet, from_id, nodes)
             hop_text = _format_hop_count_label(hops)
             requester = _find_node_for_query(from_id, nodes)
+            local_node = _find_node_for_query(local_node_id, nodes) if local_node_id else None
             requester_label = _preferred_node_label(requester) if requester else (_node_suffix(from_id) or from_id or "unknown")
-            city_hint = _nearest_city_hint(requester)
-            if city_hint:
-                return f"{requester_label} {latency_text} round trip, {hop_text}, near {city_hint}."
+            bot_city_hint = _bot_city_hint(local_node)
+            distance_hint = _bot_to_requester_distance_hint(
+                packet=packet,
+                requester_node=requester,
+                local_node=local_node,
+                now_unix=now_unix,
+            )
+            if bot_city_hint and distance_hint:
+                return (
+                    f"{requester_label} {latency_text} round trip, {hop_text}, "
+                    f"bot near {bot_city_hint}, about {distance_hint} from you."
+                )
+            if bot_city_hint:
+                return f"{requester_label} {latency_text} round trip, {hop_text}, bot near {bot_city_hint}."
+            if distance_hint:
+                return f"{requester_label} {latency_text} round trip, {hop_text}, about {distance_hint} from you."
             return f"{requester_label} {latency_text} round trip, {hop_text}."
 
         return None

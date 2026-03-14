@@ -245,9 +245,9 @@ def test_ping_keeps_hops_na_when_packet_and_node_hops_are_unavailable():
     assert "hop count n/a" in text
 
 
-def test_ping_includes_nearest_city_hint_when_sender_has_position():
+def test_ping_includes_bot_city_hint_when_local_node_has_position():
     iface = _FakeIface()
-    iface.nodesByNum[0x49B5DFF0]["position"] = {
+    iface.nodesByNum[0x02ED9B7C]["position"] = {
         "latitude": 44.98,
         "longitude": -93.26,
     }
@@ -277,7 +277,144 @@ def test_ping_includes_nearest_city_hint_when_sender_has_position():
 
     assert len(sent) == 1
     text = str(sent[0]["text"]).lower()
-    assert "near minneapolis, minnesota (2.4km)." in text
+    assert "bot near minneapolis, minnesota (1.5mi)." in text
+
+
+def test_ping_omits_bot_city_hint_when_local_node_position_is_unavailable():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    original_lookup = _bot_responder_module._nearest_city_for_coords
+    _bot_responder_module._nearest_city_for_coords = lambda _lat, _lon: {
+        "name": "Minneapolis",
+        "state": "Minnesota",
+        "country": "United States of America",
+        "distance_km": 2.4,
+    }
+    try:
+        bot.on_receive(_base_packet("ping 9b7c"), iface)
+    finally:
+        _bot_responder_module._nearest_city_for_coords = original_lookup
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "bot near " not in text
+
+
+def test_ping_includes_bot_to_requester_distance_when_both_positions_are_known():
+    iface = _FakeIface()
+    iface.nodesByNum[0x02ED9B7C]["position"] = {
+        "latitude": 44.9778,
+        "longitude": -93.2650,
+    }
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet["decoded"]["position"] = {
+        "latitude": 44.9778,
+        "longitude": -93.2650,
+    }
+    original_lookup = _bot_responder_module._nearest_city_for_coords
+    _bot_responder_module._nearest_city_for_coords = lambda _lat, _lon: {
+        "name": "Minneapolis",
+        "state": "Minnesota",
+        "country": "United States of America",
+        "distance_km": 0.8,
+    }
+    try:
+        bot.on_receive(packet, iface)
+    finally:
+        _bot_responder_module._nearest_city_for_coords = original_lookup
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "bot near minneapolis, minnesota" in text
+    assert "about <1mi from you." in text
+
+
+def test_ping_distance_falls_back_to_recent_requester_node_position():
+    iface = _FakeIface()
+    iface.nodesByNum[0x49B5DFF0]["position"] = {
+        "latitude": 44.98,
+        "longitude": -93.26,
+        "time": 1710001235,
+    }
+    iface.nodesByNum[0x02ED9B7C]["position"] = {
+        "latitude": 44.9778,
+        "longitude": -93.2650,
+    }
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("ping 9b7c"), iface)
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "from you." in text
+
+
+def test_ping_omits_bot_city_hint_when_nearest_city_is_too_far():
+    iface = _FakeIface()
+    iface.nodesByNum[0x02ED9B7C]["position"] = {
+        "latitude": 47.10,
+        "longitude": -88.57,
+    }
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    original_lookup = _bot_responder_module._nearest_city_for_coords
+    _bot_responder_module._nearest_city_for_coords = lambda _lat, _lon: {
+        "name": "Houghton",
+        "state": "Michigan",
+        "country": "United States of America",
+        "distance_km": 190.0,
+    }
+    try:
+        bot.on_receive(_base_packet("ping 9b7c"), iface)
+    finally:
+        _bot_responder_module._nearest_city_for_coords = original_lookup
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "bot near " not in text
 
 
 def test_public_ping_limit_handoff_and_one_hour_public_suppression():
