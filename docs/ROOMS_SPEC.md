@@ -1,5 +1,11 @@
 # Rooms spec (public, discoverable, non‑disruptive)
 
+Status (reviewed 2026-03-14):
+
+1. This is a forward-looking protocol/UX spec.
+2. Rooms are not implemented end-to-end in this branch yet.
+3. Current runtime chat behavior is documented in `docs/CHANNELS.md`.
+
 This document defines the “Rooms” feature for Meshyface.
 
 The core idea:
@@ -9,6 +15,8 @@ The core idea:
 - **Rooms are non‑disruptive.** Room traffic should *not* pollute the normal “Everyone” text feed.
 
 ## Requirements
+
+These are target requirements for implementation milestones, not statements of already-shipped behavior.
 
 ### Hard requirements
 

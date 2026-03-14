@@ -8,6 +8,7 @@ This roadmap is written to be directly hand‑offable to a coding agent (Codex) 
 
 - Milestone 0 is largely complete.
 - Milestones 1-5 remain planned work (Rooms are not implemented yet in this branch).
+- This document is planning/backlog guidance; current behavior should always be verified against code.
 
 ## Guiding principles
 

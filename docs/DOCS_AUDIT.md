@@ -21,6 +21,7 @@ Scope:
 | `docs/MULTI_RADIO_EXECUTION_PLAN.md` | Proposal (historical branch context) | Added status note and fixed stale ZIP artifact wording. |
 | `docs/MULTI_RADIO_V2_1_FROZEN_SPEC.md` | Normative spec (future) | Explicitly marked as not implemented in current branch. |
 | `docs/MULTI_RADIO_GPT_REVIEW_HANDOFF.md` | Review helper (future) | Explicitly marked as proposal/review aid only. |
+| `docs/README.md` | Active | Canonical docs index with lifecycle/status map. |
 
 ## Stale Items Fixed In This Audit
 
@@ -37,3 +38,4 @@ Use this quick rule when editing docs:
 1. If a doc describes current runtime behavior, verify against code before merging.
 2. If a doc is speculative/planning, add a clear status banner (`proposal`, `historical`, `active`).
 3. Keep one active feature roadmap (`docs/ROADMAP.md`) and treat others as scoped specs or archives.
+4. Keep `docs/README.md` updated whenever docs are added or doc status/lifecycle changes.
