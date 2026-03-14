@@ -1,21 +1,15 @@
 # Ideas Backlog
 
 
+- bot menu like ticker menu, toggles and settings
 
 
-- limit public bot responce per user to 3, react 4th request with X, send pm saying they can continue testing peer to peer, no public reponce for 1 hour.
-- add location in responce based on neartest city on offline map based on GPS location
 
-- can we tag a "type help for list of commands" on the very first message when someone ism playing zork remote? But we don't want to add it to the zork game, just somehow tag it on the inital "white house" message
+- can you make it so a #hashtag trends in puiblic chat creates channels? After X amount of the same #'s (we will start with 1) that will start a "channel", adding clickable icons below peer to peer, then when the channel is selected, the view is filtered to messages with the #, and the # is trimmed if it's at the end of the message to keep the view clean, if its in the middle of the message the # is stripped off and the treandy word is kept to keep it natual. And when someone transmits from the view # is auto tagged at the end, and if they type the # it stripped to prevent duplicates. Then for now a channel will timeout and be removed after 10 minutes of activity. What's cool is people can setup tx channels for private chat on  a #, but still keep the chat view to all to see the pubic chat alongside.
 
 
-- can we add  adynamic wait time, it keeps a pace, but then waits longer before retrying aftwr each try? to not conguest?
-can each one have as timestamp to optimize the trasmissons?
 
-- can we add way to moid radio id?
-- #hastag creates channels based on trends on meshy
-- chess, checkers, 
-- poker game, blackjack
+
 - bot activity show as (1)
 - at the base level, report to other users the version of meshyface
 - move channel config to channels, give setting tabs
