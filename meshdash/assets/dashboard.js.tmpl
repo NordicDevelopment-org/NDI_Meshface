@@ -15177,6 +15177,32 @@
       return fallback;
     }}
 
+    function candidateAckChannelIndexes(transfer) {{
+      const explicit = fileTransferExplicitChannelIndex(transfer && transfer.channelIndex);
+      if (explicit != null) {{
+        return [explicit];
+      }}
+      const ordered = [];
+      const pushIdx = (raw) => {{
+        const idx = normalizeMeshChannelIndex(raw);
+        if (!Number.isInteger(idx) || idx < 0) return;
+        if (!ordered.includes(idx)) {{
+          ordered.push(idx);
+        }}
+      }};
+      pushIdx(activeMeshSendChannelIndex);
+      const activeViewIdx = activeMeshChannelFilterIndex();
+      if (activeViewIdx !== meshChannelAllIndex) {{
+        pushIdx(activeViewIdx);
+      }}
+      pushIdx(0);
+      const options = Array.isArray(meshChannelSendOptions) ? meshChannelSendOptions : [];
+      for (const opt of options) {{
+        pushIdx(opt && opt.index);
+      }}
+      return ordered;
+    }}
+
     function registerOutgoingFileTransferSession(payload) {{
       const session = (payload && typeof payload === "object") ? payload : {{}};
       const token = fileTransferOutgoingTokenFor(
@@ -15640,18 +15666,24 @@
           continue;
         }}
         const ackChannelIndex = fileTransferExplicitChannelIndex(transfer.channelIndex);
-        if (ackChannelIndex == null) {{
+        const ackChannels = candidateAckChannelIndexes(transfer);
+        if (!ackChannels.length) {{
+          continue;
+        }}
+        const channelUnknown = ackChannelIndex == null;
+        if (channelUnknown) {{
           const lastWarnMs = Number(fileTransferAckMissingChannelWarnByKey.get(transfer.key) || 0);
           if ((nowMs - lastWarnMs) > (15 * 1000)) {{
             fileTransferAckMissingChannelWarnByKey.set(transfer.key, nowMs);
+            const labels = ackChannels.map((idx) => meshChannelLabelForIndex(idx, {{ allowAll: false }}));
             appendFileTransferConsole(
-              `ACK pending for ${{fileTransferShortTransferId(transfer.transferId)}} from ${{senderId}}: channel unknown, waiting for an explicit channel index.`,
+              `ACK channel unknown for ${{fileTransferShortTransferId(transfer.transferId)}} from ${{senderId}}. Probing on ${{labels.join(", ")}}.`,
               {{ level: "warn" }}
             );
           }}
-          continue;
+        }} else {{
+          fileTransferAckMissingChannelWarnByKey.delete(transfer.key);
         }}
-        fileTransferAckMissingChannelWarnByKey.delete(transfer.key);
         const frame = buildFileTransferAckFrame(
           transfer.transferId,
           receivedCount,
@@ -15662,7 +15694,21 @@
           continue;
         }}
         try {{
-          await sendFileTransferFrameText(frame, senderId, ackChannelIndex);
+          let sentChannels = [];
+          for (let idx = 0; idx < ackChannels.length; idx += 1) {{
+            const channelIndex = ackChannels[idx];
+            try {{
+              await sendFileTransferFrameText(frame, senderId, channelIndex);
+              sentChannels.push(channelIndex);
+            }} catch (_err) {{
+            }}
+            if (idx + 1 < ackChannels.length) {{
+              await waitFileTransferFrameGap();
+            }}
+          }}
+          if (!sentChannels.length) {{
+            throw new Error("no usable send channel for ACK");
+          }}
           const sentAtMs = Date.now();
           const nextPeriodicRefreshCount = signatureChanged
             ? 0
@@ -15679,8 +15725,11 @@
             totalChunks,
           }});
           if (signatureChanged || receivedCount >= totalChunks) {{
+            const channelLabel = sentChannels.length <= 1
+              ? meshChannelLabelForIndex(sentChannels[0], {{ allowAll: false }})
+              : `fallback channels (${sentChannels.map((idx) => meshChannelLabelForIndex(idx, {{ allowAll: false }})).join(", ")})`;
             appendFileTransferConsole(
-              `ACK sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer.transferId)}} (${{receivedCount}}/${{totalChunks}} chunks).`
+              `ACK sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer.transferId)}} (${{receivedCount}}/${{totalChunks}} chunks) on ${{channelLabel}}.`
             );
           }}
         }} catch (err) {{
