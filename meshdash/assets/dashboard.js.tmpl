@@ -2301,14 +2301,14 @@
     const fileTransferMaxFileBytes = 12 * 1024;
     const fileTransferChunkBytes = 64;
     const fileTransferDestinationStorageKey = "meshDashboardFileTransferDestinationV1";
-    const fileTransferInterFrameDelayMs = 260;
-    const fileTransferAckResendIntervalMs = 1500;
+    const fileTransferInterFrameDelayMs = 320;
+    const fileTransferAckResendIntervalMs = 2500;
     const fileTransferAckPeriodicRefreshMs = 5000;
     const fileTransferAckPeriodicRefreshMax = 6;
     const fileTransferAckPeriodicRefreshWindowMs = 45 * 1000;
-    const fileTransferAckWaitBeforeRetryMs = 2600;
+    const fileTransferAckWaitBeforeRetryMs = 4000;
     const fileTransferMaintenanceCooldownMs = 900;
-    const fileTransferOutgoingMaxRetries = 4;
+    const fileTransferOutgoingMaxRetries = 8;
     const fileTransferConsoleMaxEntries = 240;
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const reactionPopoverMaxNames = 12;
@@ -2389,6 +2389,7 @@
     const fileTransferOutgoingByToken = new Map();
     const fileTransferAckSentState = new Map();
     const fileTransferAckMissingChannelWarnByKey = new Map();
+    const fileTransferAckProbeCursorByKey = new Map();
     const fileTransferConsoleLines = [];
     let fileTransferMaintenanceInFlight = false;
     let fileTransferMaintenanceQueued = false;
@@ -14757,12 +14758,33 @@
       const text = fileTransferConsoleLines.length
         ? fileTransferConsoleLines.join("\n")
         : "No file transfer activity yet.";
-      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {{
-        return false;
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {{
+        try {{
+          await navigator.clipboard.writeText(text);
+          return true;
+        }} catch (_err) {{
+        }}
       }}
       try {{
-        await navigator.clipboard.writeText(text);
-        return true;
+        // Browser fallback for non-secure contexts where navigator.clipboard is blocked.
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "readonly");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        let copied = false;
+        try {{
+          copied = document.execCommand("copy");
+        }} catch (_err) {{
+          copied = false;
+        }}
+        ta.remove();
+        return !!copied;
       }} catch (_err) {{
         return false;
       }}
@@ -15232,6 +15254,7 @@
         failedAtMs: 0,
         ackedChunks: 0,
         lastAckUnix: null,
+        lastAckChannelIndex: null,
       }};
       fileTransferOutgoingByToken.set(token, normalized);
       return normalized;
@@ -15607,15 +15630,20 @@
       if (directKey && ackByTransferKey.has(directKey)) {{
         return ackByTransferKey.get(directKey) || null;
       }}
+      function ackChannelMatchScore(ack) {{
+        if (!ack || typeof ack !== "object") return 0;
+        const ackChannel = fileTransferExplicitChannelIndex(ack.channelIndex);
+        if (expectedChannel == null || ackChannel == null) return 1;
+        return ackChannel === expectedChannel ? 2 : 0;
+      }}
       let fallback = null;
+      let fallbackScore = -1;
       for (const ack of ackByTransferKey.values()) {{
         if (!ack || typeof ack !== "object") continue;
         if (String(ack.transferId || "") !== String(session.transferId || "")) continue;
         const ackOriginalReceiver = normalizeNodeId(ack.originalReceiverId || "");
         const ackOriginalSender = normalizeNodeId(ack.originalSenderId || "");
         if (isCanonicalNodeId(ackOriginalReceiver) && ackOriginalReceiver !== expectedReceiver) continue;
-        const ackChannel = fileTransferExplicitChannelIndex(ack.channelIndex);
-        if (expectedChannel != null && ackChannel != null && ackChannel !== expectedChannel) continue;
         if (isCanonicalNodeId(senderId) && isCanonicalNodeId(ackOriginalSender) && ackOriginalSender !== senderId) continue;
         const endpointConfidence = (
           (isCanonicalNodeId(ackOriginalReceiver) && ackOriginalReceiver === expectedReceiver)
@@ -15627,8 +15655,14 @@
             continue;
           }}
         }}
-        if (!fallback || Number(ack.latestUnix || 0) > Number(fallback.latestUnix || 0)) {{
+        const score = ackChannelMatchScore(ack);
+        if (
+          !fallback
+          || score > fallbackScore
+          || (score === fallbackScore && Number(ack.latestUnix || 0) > Number(fallback.latestUnix || 0))
+        ) {{
           fallback = ack;
+          fallbackScore = score;
         }}
       }}
       if (fallback) {{
@@ -15637,15 +15671,19 @@
       // Final escape hatch: if endpoints are missing or inconsistent in packet metadata,
       // a transferId-only match is still safe because transfer IDs are random per send.
       let transferIdOnlyFallback = null;
+      let transferIdOnlyScore = -1;
       for (const ack of ackByTransferKey.values()) {{
         if (!ack || typeof ack !== "object") continue;
         if (String(ack.transferId || "") !== String(session.transferId || "")) continue;
-        const ackChannel = fileTransferExplicitChannelIndex(ack.channelIndex);
-        if (expectedChannel != null && ackChannel != null && ackChannel !== expectedChannel) {{
-          continue;
-        }}
-        if (!transferIdOnlyFallback || Number(ack.latestUnix || 0) > Number(transferIdOnlyFallback.latestUnix || 0)) {{
+        const score = ackChannelMatchScore(ack);
+        if (
+          !transferIdOnlyFallback
+          || score > transferIdOnlyScore
+          || (score === transferIdOnlyScore
+            && Number(ack.latestUnix || 0) > Number(transferIdOnlyFallback.latestUnix || 0))
+        ) {{
           transferIdOnlyFallback = ack;
+          transferIdOnlyScore = score;
         }}
       }}
       if (transferIdOnlyFallback) {{
@@ -15703,11 +15741,29 @@
           continue;
         }}
         const channelUnknown = ackChannelIndex == null;
+        let sendChannels = ackChannels.slice();
+        if (channelUnknown && sendChannels.length > 2) {{
+          const priorCursor = Math.max(
+            0,
+            Math.trunc(Number(fileTransferAckProbeCursorByKey.get(transfer.key) || 0))
+          );
+          const width = 2;
+          const selected = [];
+          for (let i = 0; i < width; i += 1) {{
+            const idx = sendChannels[(priorCursor + i) % sendChannels.length];
+            if (!selected.includes(idx)) {{
+              selected.push(idx);
+            }}
+          }}
+          const nextCursor = (priorCursor + width) % sendChannels.length;
+          fileTransferAckProbeCursorByKey.set(transfer.key, nextCursor);
+          sendChannels = selected;
+        }}
         if (channelUnknown) {{
           const lastWarnMs = Number(fileTransferAckMissingChannelWarnByKey.get(transfer.key) || 0);
           if ((nowMs - lastWarnMs) > (15 * 1000)) {{
             fileTransferAckMissingChannelWarnByKey.set(transfer.key, nowMs);
-            const labels = ackChannels.map((idx) => meshChannelLabelForIndex(idx, {{ allowAll: false }}));
+            const labels = sendChannels.map((idx) => meshChannelLabelForIndex(idx, {{ allowAll: false }}));
             appendFileTransferConsole(
               `ACK channel unknown for ${{fileTransferShortTransferId(transfer.transferId)}} from ${{senderId}}. Probing on ${{labels.join(", ")}}.`,
               {{ level: "warn" }}
@@ -15715,6 +15771,7 @@
           }}
         }} else {{
           fileTransferAckMissingChannelWarnByKey.delete(transfer.key);
+          fileTransferAckProbeCursorByKey.delete(transfer.key);
         }}
         const frame = buildFileTransferAckFrame(
           transfer.transferId,
@@ -15727,14 +15784,14 @@
         }}
         try {{
           let sentChannels = [];
-          for (let idx = 0; idx < ackChannels.length; idx += 1) {{
-            const channelIndex = ackChannels[idx];
+          for (let idx = 0; idx < sendChannels.length; idx += 1) {{
+            const channelIndex = sendChannels[idx];
             try {{
               await sendFileTransferFrameText(frame, senderId, channelIndex);
               sentChannels.push(channelIndex);
             }} catch (_err) {{
             }}
-            if (idx + 1 < ackChannels.length) {{
+            if (idx + 1 < sendChannels.length) {{
               await waitFileTransferFrameGap();
             }}
           }}
@@ -15791,6 +15848,17 @@
         }}
         const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
         if (ack) {{
+          const ackChannelIndex = fileTransferExplicitChannelIndex(ack.channelIndex);
+          const sendChannelIndex = fileTransferExplicitChannelIndex(session.channelIndex);
+          if (ackChannelIndex != null && sendChannelIndex != null && ackChannelIndex !== sendChannelIndex) {{
+            const priorLoggedAckChannel = fileTransferExplicitChannelIndex(session.lastAckChannelIndex);
+            if (priorLoggedAckChannel !== ackChannelIndex) {{
+              appendFileTransferConsole(
+                `ACK for ${{fileTransferShortTransferId(session.transferId)}} arrived on ${{meshChannelLabelForIndex(ackChannelIndex, {{ allowAll: false }})}} (send channel was ${{meshChannelLabelForIndex(sendChannelIndex, {{ allowAll: false }})}}).`
+              );
+            }}
+          }}
+          session.lastAckChannelIndex = ackChannelIndex;
           const priorAckedChunks = Math.max(
             0,
             Math.min(
