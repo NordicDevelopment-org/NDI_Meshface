@@ -328,6 +328,7 @@
       {{ id: "online_nodes", defaultLabel: "Nodes Online", metric: true }},
       {{ id: "packets_per_min", defaultLabel: "Packets / min", metric: true }},
       {{ id: "battery", defaultLabel: "Battery", metric: true }},
+      {{ id: "wifi", defaultLabel: "Wi-Fi", metric: true }},
       {{ id: "node", defaultLabel: "Node", metric: false }},
       {{ id: "time", defaultLabel: "Time", metric: false }},
     ];
@@ -6522,6 +6523,11 @@
       return {{
         compact,
         detail: detailParts.join(", "),
+        connected,
+        rssi,
+        ssid,
+        ip,
+        age_seconds: ageSeconds,
       }};
     }}
 
@@ -6586,18 +6592,52 @@
       }};
     }}
 
+    function buildWifiTickerSummary(state = latestState) {{
+      const telemetry = resolveLocalNodeTelemetry(state);
+      const localId = telemetry.localId;
+      const wifiSummary = telemetry.wifiSummary;
+      const compactRaw = String((wifiSummary && wifiSummary.compact) || "").trim();
+      const compact = compactRaw.replace(/^WiFi\\s*/i, "").trim() || compactRaw || "n/a";
+      const connected = coerceOptionalBool(wifiSummary && wifiSummary.connected);
+      const rssiRaw = Number(wifiSummary && wifiSummary.rssi);
+      const rssi = Number.isFinite(rssiRaw) ? Math.trunc(rssiRaw) : null;
+      const rssiText = Number.isFinite(rssi)
+        ? `${{rssi}}dBm`
+        : (connected === false ? "off" : "n/a");
+      const ip = String((wifiSummary && wifiSummary.ip) || "").trim() || "n/a";
+      const ssid = String((wifiSummary && wifiSummary.ssid) || "").trim() || "n/a";
+      const detail = String((wifiSummary && wifiSummary.detail) || "").trim();
+      const rows = [
+        {{ key: "RSSI", value: rssiText }},
+      ];
+      const rowsHtml = rows
+        .map((row) => `<div class="wifi-ticker-row"><span class="wifi-ticker-key">${{escAttr(row.key)}}:</span><span class="wifi-ticker-val">${{escAttr(row.value)}}</span></div>`)
+        .join("");
+      const titleParts = [];
+      if (isCanonicalNodeId(localId)) {{
+        titleParts.push(`node ${{telemetry.nodeName}} (${{localId}})`);
+      }} else {{
+        titleParts.push(`node ${{telemetry.nodeName}}`);
+      }}
+      titleParts.push(`ssid "${{ssid}}"`);
+      titleParts.push(detail || "wifi status unavailable");
+      return {{
+        text: compact,
+        rows,
+        rows_html: rowsHtml,
+        title: titleParts.join(" | "),
+        rssi_dbm: rssi,
+      }};
+    }}
+
     function buildNodeTickerSummary(state = latestState) {{
       const telemetry = resolveLocalNodeTelemetry(state);
       const localId = telemetry.localId;
-      const wifiValue = (telemetry.wifiSummary && telemetry.wifiSummary.compact)
-        ? String(telemetry.wifiSummary.compact).replace(/^WiFi\\s*/i, "").trim()
-        : "n/a";
       const gpsValue = telemetry.gpsFix
         ? "fix"
         : (telemetry.gpsCapable ? "ready" : "n/a");
       const hopsText = Number.isFinite(telemetry.hops) ? String(telemetry.hops) : "n/a";
       const rows = [
-        {{ key: "WiFi", value: wifiValue || "n/a" }},
         {{ key: "GPS", value: gpsValue }},
         {{ key: "Hops", value: hopsText }},
         {{ key: "Seen", value: telemetry.lastSeenText }},
@@ -6607,9 +6647,9 @@
         .join("");
 
       const compactParts = [];
-      compactParts.push(`WiFi ${{wifiValue || "n/a"}}`);
       compactParts.push(`GPS ${{gpsValue}}`);
       compactParts.push(`Hops ${{hopsText}}`);
+      compactParts.push(`Seen ${{telemetry.lastSeenText}}`);
       const text = compactParts.join(" · ");
 
       const titleParts = [];
@@ -6618,7 +6658,6 @@
       }} else {{
         titleParts.push(`node ${{telemetry.nodeName}}`);
       }}
-      titleParts.push((telemetry.wifiSummary && telemetry.wifiSummary.detail) ? telemetry.wifiSummary.detail : "wifi status unavailable");
       if (telemetry.gpsFix) {{
         titleParts.push(`gps ${{telemetry.lat.toFixed(5)}}, ${{telemetry.lon.toFixed(5)}}`);
       }} else {{
@@ -27882,6 +27921,7 @@
       const showOnlineNodesTrend = tickerTrendEnabled("online_nodes");
       const showPacketsTrend = tickerTrendEnabled("packets_per_min");
       const showBatteryTrend = tickerTrendEnabled("battery");
+      const showWifiTrend = tickerTrendEnabled("wifi");
       const batteryTrendWindowMs = batteryTrendWindowHours() * 60 * 60 * 1000;
       setText("m-battery", batteryDisplayText);
       const batteryMetricValueEl = document.getElementById("m-battery");
@@ -27968,6 +28008,41 @@
           nodeTickerEl.textContent = nodeTicker && nodeTicker.text ? String(nodeTicker.text) : "n/a";
         }}
         nodeTickerEl.title = nodeTicker.title || "Node summary unavailable";
+      }}
+      const wifiTicker = buildWifiTickerSummary(state);
+      const wifiTickerEl = document.getElementById("m-wifi-ticker");
+      if (wifiTickerEl instanceof HTMLElement) {{
+        const rowsHtml = String(wifiTicker && wifiTicker.rows_html ? wifiTicker.rows_html : "");
+        if (rowsHtml) {{
+          wifiTickerEl.innerHTML = rowsHtml;
+        }} else {{
+          wifiTickerEl.textContent = wifiTicker && wifiTicker.text ? String(wifiTicker.text) : "n/a";
+        }}
+        wifiTickerEl.title = wifiTicker && wifiTicker.title ? String(wifiTicker.title) : "Wi-Fi summary unavailable";
+      }}
+      const wifiRssi = Number(wifiTicker && wifiTicker.rssi_dbm);
+      if (Number.isFinite(wifiRssi)) {{
+        updateMetricTicker("wifi_rssi_dbm", wifiRssi, {{
+          containerId: "ticker-wifi",
+          deltaId: "ticker-delta-wifi",
+          rateId: "ticker-rate-wifi",
+          chartId: "ticker-chart-wifi",
+          digits: 0,
+          rateDigits: 1,
+          flatThreshold: 1,
+          valueUnit: "dBm",
+          windowMs: 2 * 60 * 60 * 1000,
+          maxPoints: 240,
+        }});
+        const wifiMetricTicker = document.getElementById("ticker-wifi");
+        if (wifiMetricTicker instanceof HTMLElement && !showWifiTrend) {{
+          wifiMetricTicker.hidden = true;
+        }}
+      }} else {{
+        const wifiMetricTicker = document.getElementById("ticker-wifi");
+        if (wifiMetricTicker instanceof HTMLElement) {{
+          wifiMetricTicker.hidden = true;
+        }}
       }}
       const radioReportedTime = resolveRadioReportedTime(state);
       syncRadioTimeBase(radioReportedTime.unix, radioReportedTime.source);
