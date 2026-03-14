@@ -1,5 +1,6 @@
 # Ideas Backlog
 
+- can we add way to moid radio id?
 - #hastag creates channels based on trends on meshy
 - chess, checkers, 
 - poker game, blackjack
