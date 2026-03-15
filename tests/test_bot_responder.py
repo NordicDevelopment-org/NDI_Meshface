@@ -256,6 +256,59 @@ def test_ping_keeps_hops_na_when_packet_and_node_hops_are_unavailable():
     assert "hop count n/a" in text
 
 
+def test_ping_uses_explicit_packet_hops_when_present():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet.pop("hopStart", None)
+    packet.pop("hopLimit", None)
+    packet["hops"] = 0
+    bot.on_receive(packet, iface)
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "0 hops" in text
+    assert "hop count n/a" not in text
+
+
+def test_ping_uses_snake_case_hop_fields_when_present():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet.pop("hopStart", None)
+    packet.pop("hopLimit", None)
+    packet["hop_start"] = 7
+    packet["hop_limit"] = 7
+    bot.on_receive(packet, iface)
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "0 hops" in text
+    assert "hop count n/a" not in text
+
+
 def test_ping_includes_last_hop_signal_hint_when_available():
     iface = _FakeIface()
     sent = []

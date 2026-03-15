@@ -65,8 +65,15 @@ def _resolve_packet_node_id(raw_id: object, raw_num: object, interface: object) 
 
 
 def _packet_hops(packet: dict[str, object]) -> Optional[int]:
+    direct = _to_int(packet.get("hops"))
+    if direct is not None and direct >= 0:
+        return direct
     hop_start = _to_int(packet.get("hopStart"))
+    if hop_start is None:
+        hop_start = _to_int(packet.get("hop_start"))
     hop_limit = _to_int(packet.get("hopLimit"))
+    if hop_limit is None:
+        hop_limit = _to_int(packet.get("hop_limit"))
     if hop_start is None or hop_limit is None:
         return None
     diff = hop_start - hop_limit
