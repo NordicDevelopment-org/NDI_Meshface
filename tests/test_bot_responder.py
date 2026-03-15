@@ -1599,6 +1599,79 @@ def test_configure_allows_explicit_empty_joke_lines():
     assert bot.bot_settings()["joke_lines"] == []
 
 
+def test_configure_allows_explicit_empty_ping_triggers():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_ENABLED": "1"},
+    )
+    assert bot is not None
+
+    saved = bot.configure(ping_triggers=[])
+    assert saved["ok"] is True
+    assert saved["ping_triggers"] == []
+    assert bot.bot_settings()["ping_triggers"] == []
+
+    bot.on_receive(_base_packet("test"), iface)
+    bot.on_receive(_base_packet("can you see this?"), iface)
+    assert sent == []
+
+
+def test_configure_allows_explicit_empty_joke_triggers():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_ENABLED": "1"},
+    )
+    assert bot is not None
+
+    saved = bot.configure(joke_triggers=[])
+    assert saved["ok"] is True
+    assert saved["joke_triggers"] == []
+    assert bot.bot_settings()["joke_triggers"] == []
+
+    bot.on_receive(_base_packet("tell me a joke"), iface)
+    assert sent == []
+
+
+def test_empty_ping_triggers_persist_and_reload_without_default_fallback(tmp_path):
+    settings_path = tmp_path / "bot_settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "log_enabled": True,
+                "game_enabled": False,
+                "disabled_commands": [],
+                "ping_triggers": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_SETTINGS_FILE": str(settings_path)},
+    )
+    assert loaded is not None
+    assert loaded.bot_settings()["ping_triggers"] == []
+
+
 def test_empty_joke_lines_persist_and_reload_without_default_fallback(tmp_path):
     settings_path = tmp_path / "bot_settings.json"
     settings_path.write_text(

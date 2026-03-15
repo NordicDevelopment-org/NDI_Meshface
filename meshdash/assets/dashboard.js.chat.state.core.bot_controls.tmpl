@@ -1,9 +1,13 @@
-    function isBotsJokeEditorFocused() {{
+    function isBotsCommandEditorFocused() {{
       if (activeLayoutView !== "bots") return false;
       const activeEl = document.activeElement;
       if (!(activeEl instanceof HTMLElement)) return false;
       const activeId = String(activeEl.id || "");
-      return activeId === "bots-command-joke-triggers" || activeId === "bots-command-joke-lines";
+      return (
+        activeId === "bots-command-ping-triggers"
+        || activeId === "bots-command-joke-triggers"
+        || activeId === "bots-command-joke-lines"
+      );
     }}
 
     function renderBotsView(state = latestState) {{
@@ -11,7 +15,7 @@
       void refreshPacketBotRequestHistory(state);
       // Polling updates run every refresh interval; avoid clobbering in-progress
       // textarea edits/selections while the joke editor has focus.
-      if (!isBotsJokeEditorFocused()) {{
+      if (!isBotsCommandEditorFocused()) {{
         renderManagedBotCommandList();
         syncChatWhoisQuickActionControls();
       }}

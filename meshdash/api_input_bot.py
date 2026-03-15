@@ -88,6 +88,7 @@ class BotSettingsRequest:
     game_enabled: Optional[bool] = None
     game_public_start_enabled: Optional[bool] = None
     command_settings: Optional[dict[str, bool]] = None
+    ping_triggers: Optional[list[str]] = None
     joke_triggers: Optional[list[str]] = None
     joke_lines: Optional[list[str]] = None
     joke_delay_punchline_enabled: Optional[bool] = None
@@ -112,6 +113,12 @@ def parse_bot_settings_request(raw_body: bytes) -> BotSettingsRequest:
         ),
         command_settings=_parse_command_settings_payload(
             payload.get("command_settings", payload.get("commandSettings"))
+        ),
+        ping_triggers=_parse_string_list_payload(
+            payload.get("ping_triggers", payload.get("pingTriggers")),
+            split_commas=True,
+            max_items=64,
+            max_item_chars=160,
         ),
         joke_triggers=_parse_string_list_payload(
             payload.get("joke_triggers", payload.get("jokeTriggers")),

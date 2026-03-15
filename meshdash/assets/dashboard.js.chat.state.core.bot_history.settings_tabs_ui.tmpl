@@ -7,6 +7,8 @@
       const selectedNameEl = document.getElementById("bots-command-selected-name");
       const selectedDescriptionEl = document.getElementById("bots-command-selected-description");
       const selectedEnabledInput = document.getElementById("bots-command-selected-enabled");
+      const pingConfigWrap = document.getElementById("bots-command-ping-config-wrap");
+      const pingTriggersInput = document.getElementById("bots-command-ping-triggers");
       const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
       const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
       const publicStartNote = document.getElementById("bots-command-selected-public-start-note");
@@ -101,8 +103,20 @@
       if (selectedEnabledInput instanceof HTMLInputElement) {{
         selectedEnabledInput.checked = !!selectedCommand.enabled;
       }}
+      const selectedIsPing = selectedName === "ping";
       const selectedIsZork = selectedName === "zork";
       const selectedIsJoke = selectedName === "joke";
+      if (pingConfigWrap instanceof HTMLElement) {{
+        pingConfigWrap.hidden = !selectedIsPing;
+      }}
+      if (pingTriggersInput instanceof HTMLTextAreaElement) {{
+        const nextValue = selectedIsPing && Array.isArray(serverBotSettings.ping_triggers)
+          ? serverBotSettings.ping_triggers.join("\n")
+          : "";
+        if (document.activeElement !== pingTriggersInput || !selectedIsPing) {{
+          pingTriggersInput.value = nextValue;
+        }}
+      }}
       if (publicStartWrap instanceof HTMLElement) {{
         publicStartWrap.hidden = !selectedIsZork;
       }}

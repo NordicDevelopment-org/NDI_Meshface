@@ -49,10 +49,9 @@ STANDARD_BOT_COMMANDS = _STANDARD_BOT_COMMANDS
 
 _RECENT_PACKET_TTL_SECONDS = 180
 _RECENT_PACKET_MAX = 1024
-_BOT_COMMAND_ALIASES = {
-    "test": "ping",
-}
-_NATURAL_PING_PREFIXES = (
+_DEFAULT_PING_TRIGGERS = (
+    "ping",
+    "test",
     "can you see this",
 )
 _DEFAULT_JOKE_TRIGGERS = (
@@ -145,18 +144,15 @@ def _canonical_command_name(value: object) -> str:
     clean = _normalize_command_name(value)
     if not clean:
         return ""
-    return _BOT_COMMAND_ALIASES.get(clean, clean)
+    return clean
 
 
-def _parse_natural_ping_command(raw: str) -> tuple[str, list[str]] | None:
-    text = str(raw or "").strip()
-    if not text:
+def _parse_natural_ping_command(raw: str, triggers: list[str]) -> tuple[str, list[str]] | None:
+    normalized = _normalize_trigger_phrase(raw)
+    if not normalized:
         return None
-    lowered = text.lower()
-    for prefix in _NATURAL_PING_PREFIXES:
-        if lowered == prefix:
-            return ("ping", [])
-        if lowered == f"{prefix}?":
+    for trigger in triggers:
+        if normalized == trigger:
             return ("ping", [])
     return None
 
@@ -192,6 +188,8 @@ def _parse_phrase_items(value: object, *, split_commas: bool) -> list[str]:
 
 
 def _normalize_joke_triggers(value: object) -> list[str]:
+    if value is None:
+        return [item for item in (_normalize_trigger_phrase(v) for v in _DEFAULT_JOKE_TRIGGERS) if item]
     raw_items = _parse_phrase_items(value, split_commas=True)
     out: list[str] = []
     seen: set[str] = set()
@@ -205,7 +203,26 @@ def _normalize_joke_triggers(value: object) -> list[str]:
             break
     if out:
         return out
-    return [item for item in (_normalize_trigger_phrase(v) for v in _DEFAULT_JOKE_TRIGGERS) if item]
+    return []
+
+
+def _normalize_ping_triggers(value: object) -> list[str]:
+    if value is None:
+        return [item for item in (_normalize_trigger_phrase(v) for v in _DEFAULT_PING_TRIGGERS) if item]
+    raw_items = _parse_phrase_items(value, split_commas=True)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        clean = _normalize_trigger_phrase(raw_item)
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        out.append(clean[:160])
+        if len(out) >= 64:
+            break
+    if out:
+        return out
+    return []
 
 
 def _normalize_joke_lines(value: object) -> list[str]:
@@ -273,6 +290,7 @@ class MeshResponseBot:
         log_enabled: bool = True,
         game_enabled: bool = False,
         game_public_start_enabled: bool = False,
+        ping_triggers: Optional[list[str]] = None,
         joke_triggers: Optional[list[str]] = None,
         joke_lines: Optional[list[str]] = None,
         joke_delay_punchline_enabled: bool = _DEFAULT_JOKE_DELAY_PUNCHLINE_ENABLED,
@@ -302,6 +320,7 @@ class MeshResponseBot:
         self._sleep_fn = sleep_fn
         self._now_unix_fn = now_unix_fn
         self._game_public_start_enabled = bool(game_public_start_enabled)
+        self._ping_trigger_phrases = _normalize_ping_triggers(ping_triggers)
         self._joke_trigger_phrases = _normalize_joke_triggers(joke_triggers)
         self._joke_lines = _normalize_joke_lines(joke_lines)
         self._joke_delay_punchline_enabled = bool(joke_delay_punchline_enabled)
@@ -463,6 +482,15 @@ class MeshResponseBot:
             clear_pending = True
         if clear_pending:
             self._clear_pending_joke_punchlines_locked()
+
+    def _set_ping_settings_locked(
+        self,
+        *,
+        triggers: Optional[list[str]] = None,
+    ) -> None:
+        if triggers is None:
+            return
+        self._ping_trigger_phrases = _normalize_ping_triggers(triggers)
 
     def _next_joke_line_locked(self) -> str:
         if not self._joke_cycle:
@@ -750,6 +778,7 @@ class MeshResponseBot:
             "log_enabled": bool(self._log_enabled),
             "game_enabled": bool(self._bot_app_enabled.get("zork")),
             "game_public_start_enabled": bool(self._game_public_start_enabled),
+            "ping_triggers": list(self._ping_trigger_phrases),
             "joke_triggers": list(self._joke_trigger_phrases),
             "joke_lines": list(self._joke_lines),
             "joke_delay_punchline_enabled": bool(self._joke_delay_punchline_enabled),
@@ -764,6 +793,7 @@ class MeshResponseBot:
             "log_enabled": bool(self._log_enabled),
             "game_enabled": bool(self._bot_app_enabled.get("zork")),
             "game_public_start_enabled": bool(self._game_public_start_enabled),
+            "ping_triggers": list(self._ping_trigger_phrases),
             "joke_triggers": list(self._joke_trigger_phrases),
             "joke_lines": list(self._joke_lines),
             "joke_delay_punchline_enabled": bool(self._joke_delay_punchline_enabled),
@@ -782,6 +812,7 @@ class MeshResponseBot:
         game_enabled: Optional[bool] = None,
         game_public_start_enabled: Optional[bool] = None,
         command_settings: Optional[dict[str, bool]] = None,
+        ping_triggers: Optional[list[str]] = None,
         joke_triggers: Optional[list[str]] = None,
         joke_lines: Optional[list[str]] = None,
         joke_delay_punchline_enabled: Optional[bool] = None,
@@ -797,6 +828,8 @@ class MeshResponseBot:
                 self._game_public_start_enabled = bool(game_public_start_enabled)
             if command_settings:
                 self._apply_command_settings_locked(command_settings)
+            if ping_triggers is not None:
+                self._set_ping_settings_locked(triggers=ping_triggers)
             if (
                 joke_triggers is not None
                 or joke_lines is not None
@@ -931,11 +964,12 @@ class MeshResponseBot:
         raw = str(text or "").strip()
         if not raw:
             return None
-        natural_ping = _parse_natural_ping_command(raw)
+        with self._lock:
+            ping_triggers = list(self._ping_trigger_phrases)
+            joke_triggers = list(self._joke_trigger_phrases)
+        natural_ping = _parse_natural_ping_command(raw, ping_triggers)
         if natural_ping is not None:
             return natural_ping
-        with self._lock:
-            joke_triggers = list(self._joke_trigger_phrases)
         natural_joke = _parse_natural_joke_command(raw, joke_triggers)
         if natural_joke is not None:
             return natural_joke
@@ -1747,6 +1781,9 @@ def build_mesh_response_bot_from_env(
         _DEFAULT_SEGMENT_ACK_WAIT_SECONDS * 1000.0,
     )
     custom_commands = _load_custom_commands_from_env(env_map)
+    ping_triggers = _normalize_ping_triggers(persisted.get("ping_triggers"))
+    if "MESH_DASH_BOT_PING_TRIGGERS" in env_map:
+        ping_triggers = _normalize_ping_triggers(env_map.get("MESH_DASH_BOT_PING_TRIGGERS"))
     joke_triggers = _normalize_joke_triggers(persisted.get("joke_triggers"))
     if "MESH_DASH_BOT_JOKE_TRIGGERS" in env_map:
         joke_triggers = _normalize_joke_triggers(env_map.get("MESH_DASH_BOT_JOKE_TRIGGERS"))
@@ -1772,6 +1809,7 @@ def build_mesh_response_bot_from_env(
         log_enabled=log_enabled,
         game_enabled=game_enabled,
         game_public_start_enabled=game_public_start_enabled,
+        ping_triggers=ping_triggers,
         joke_triggers=joke_triggers,
         joke_lines=joke_lines,
         joke_delay_punchline_enabled=joke_delay_punchline_enabled,

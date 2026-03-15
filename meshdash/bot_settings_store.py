@@ -113,6 +113,14 @@ def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, objec
         out["game_public_start_enabled"] = game_public_start_enabled
     if disabled_commands is not None:
         out["disabled_commands"] = disabled_commands
+    ping_triggers = _parse_string_list(
+        payload.get("ping_triggers", payload.get("pingTriggers")),
+        split_commas=True,
+        max_items=64,
+        max_item_chars=160,
+    )
+    if ping_triggers is not None:
+        out["ping_triggers"] = ping_triggers
     joke_triggers = _parse_string_list(
         payload.get("joke_triggers", payload.get("jokeTriggers")),
         split_commas=True,
@@ -162,6 +170,14 @@ def save_persisted_bot_settings(
                 if clean
             }
         ),
+        "ping_triggers": [
+            item
+            for item in (
+                str(value or "").strip()
+                for value in (settings.get("ping_triggers") or [])
+            )
+            if item
+        ],
         "joke_triggers": [
             item
             for item in (

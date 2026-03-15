@@ -67,6 +67,7 @@
           log_enabled: true,
           game_enabled: false,
           game_public_start_enabled: false,
+          ping_triggers: [],
           joke_triggers: [],
           joke_lines: [],
           joke_delay_punchline_enabled: false,
@@ -104,6 +105,10 @@
         game_public_start_enabled: parseBoolToken(
           raw.game_public_start_enabled ?? raw.gamePublicStartEnabled,
           false
+        ),
+        ping_triggers: normalizeBotSettingsTextList(
+          raw.ping_triggers ?? raw.pingTriggers,
+          {{ splitCommas: true }}
         ),
         joke_triggers: normalizeBotSettingsTextList(
           raw.joke_triggers ?? raw.jokeTriggers,
@@ -176,6 +181,9 @@
     function syncChatWhoisQuickActionControls() {{
       const masterInput = document.getElementById("bots-command-master-enabled");
       const commandEnabledInput = document.getElementById("bots-command-selected-enabled");
+      const pingConfigWrap = document.getElementById("bots-command-ping-config-wrap");
+      const pingTriggersInput = document.getElementById("bots-command-ping-triggers");
+      const pingSaveBtn = document.getElementById("bots-command-ping-save-btn");
       const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
       const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
       const publicStartNote = document.getElementById("bots-command-selected-public-start-note");
@@ -200,9 +208,13 @@
         ? serverBotSettings.commands.find((row) => String(row && row.name || "").trim().toLowerCase() === selectedCommandName)
         : null;
       const zorkEnabled = !!(zorkCommand && zorkCommand.enabled);
+      const selectedIsPing = !!(selectedCommand && selectedCommand.name === "ping");
       const selectedIsZork = !!(selectedCommand && selectedCommand.name === "zork");
       const selectedIsJoke = !!(selectedCommand && selectedCommand.name === "joke");
       const available = !!serverBotSettings.available;
+      if (pingConfigWrap instanceof HTMLElement) {{
+        pingConfigWrap.hidden = !selectedIsPing;
+      }}
       if (publicStartWrap instanceof HTMLElement) {{
         publicStartWrap.hidden = !selectedIsZork;
       }}
@@ -256,6 +268,27 @@
         }} else {{
           commandEnabledInput.title = "Enable or disable this backend bot command.";
         }}
+      }}
+      if (pingTriggersInput instanceof HTMLTextAreaElement) {{
+        const value = selectedIsPing && Array.isArray(serverBotSettings.ping_triggers)
+          ? serverBotSettings.ping_triggers.join("\n")
+          : "";
+        if (document.activeElement !== pingTriggersInput || !selectedIsPing) {{
+          pingTriggersInput.value = value;
+        }}
+        pingTriggersInput.disabled = !available || botSettingsSaveInFlight || !selectedIsPing;
+        if (!available) {{
+          pingTriggersInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsPing) {{
+          pingTriggersInput.title = "Select the ping command to edit trigger phrases.";
+        }} else if (botSettingsSaveInFlight) {{
+          pingTriggersInput.title = "Saving ping settings...";
+        }} else {{
+          pingTriggersInput.title = "Delimited trigger phrases. One per line (or comma separated).";
+        }}
+      }}
+      if (pingSaveBtn instanceof HTMLButtonElement) {{
+        pingSaveBtn.disabled = !available || botSettingsSaveInFlight || !selectedIsPing;
       }}
       if (publicStartInput instanceof HTMLInputElement) {{
         publicStartInput.checked = !!serverBotSettings.game_public_start_enabled;
@@ -427,6 +460,24 @@
       syncChatWhoisQuickActionControls();
     }}
 
+    async function saveSelectedPingBotSettings() {{
+      const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      if (commandName !== "ping") return false;
+      const triggersInput = document.getElementById("bots-command-ping-triggers");
+      const triggers = normalizeBotSettingsTextList(
+        triggersInput instanceof HTMLTextAreaElement ? triggersInput.value : "",
+        {{ splitCommas: true }}
+      );
+      const ok = await saveServerBotSettingsPatch({{
+        ping_triggers: triggers,
+      }});
+      if (!ok) {{
+        renderBotsView(latestState);
+        return false;
+      }}
+      return true;
+    }}
+
     async function saveSelectedJokeBotSettings() {{
       const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
       if (commandName !== "joke") return false;
@@ -514,6 +565,14 @@
             renderBotsView(latestState);
             return;
           }}
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const pingSaveBtn = document.getElementById("bots-command-ping-save-btn");
+      if (pingSaveBtn instanceof HTMLButtonElement && pingSaveBtn.dataset.bound !== "1") {{
+        pingSaveBtn.dataset.bound = "1";
+        pingSaveBtn.addEventListener("click", async () => {{
+          await saveSelectedPingBotSettings();
           syncChatWhoisQuickActionControls();
         }});
       }}
