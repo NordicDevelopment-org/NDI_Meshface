@@ -19,12 +19,15 @@ _EXPECTED_TEMPLATE_TOKENS = {
         "reset_ticker_scale_on_restart",
     },
     "dashboard.js.bootstrap.tmpl": set(),
-    "dashboard.js.bootstrap.map.setup_emoji.tmpl": {
+    "dashboard.js.bootstrap.map.setup_emoji.base.tmpl": {
         "refresh_ms",
         "node_history_hours",
         "node_history_max_points",
         "reset_ticker_scale_on_restart",
     },
+    "dashboard.js.bootstrap.map.setup_emoji.catalog.tmpl": set(),
+    "dashboard.js.bootstrap.map.setup_emoji.state.tmpl": set(),
+    "dashboard.js.bootstrap.map.setup_emoji.tmpl": set(),
     "dashboard.js.bootstrap.map.offline_basemap.tmpl": set(),
     "dashboard.js.bootstrap.map.resize.tmpl": set(),
     "dashboard.js.bootstrap.map.signal_heatmap.tmpl": set(),
@@ -173,6 +176,14 @@ def test_rendered_asset_templates_leave_no_single_token_placeholders():
             "reset_ticker_scale_on_restart": 1,
         },
         "dashboard.js.bootstrap.tmpl": {},
+        "dashboard.js.bootstrap.map.setup_emoji.base.tmpl": {
+            "refresh_ms": 3000,
+            "node_history_hours": 72,
+            "node_history_max_points": 1440,
+            "reset_ticker_scale_on_restart": 1,
+        },
+        "dashboard.js.bootstrap.map.setup_emoji.catalog.tmpl": {},
+        "dashboard.js.bootstrap.map.setup_emoji.state.tmpl": {},
         "dashboard.js.bootstrap.map.setup_emoji.tmpl": {
             "refresh_ms": 3000,
             "node_history_hours": 72,

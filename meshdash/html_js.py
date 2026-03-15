@@ -1,7 +1,9 @@
 from .html_assets import render_asset_template as _render_asset_template_helper
 
 _DASHBOARD_JS_TEMPLATE_PARTS = (
-    "dashboard.js.bootstrap.map.setup_emoji.tmpl",
+    "dashboard.js.bootstrap.map.setup_emoji.base.tmpl",
+    "dashboard.js.bootstrap.map.setup_emoji.catalog.tmpl",
+    "dashboard.js.bootstrap.map.setup_emoji.state.tmpl",
     "dashboard.js.bootstrap.map.offline_basemap.tmpl",
     "dashboard.js.bootstrap.map.resize.tmpl",
     "dashboard.js.bootstrap.map.signal_heatmap.tmpl",
