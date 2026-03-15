@@ -1,0 +1,315 @@
+      const rawMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const rawPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const computeMessageEndpoints = (msg) => {{
+        const fromId = resolveMessageNodeId(
+          (msg && (msg.from || msg.from_id || msg.fromId || msg.source || msg.source_id || msg.sourceId)) || ""
+        );
+        const toId = resolveMessageNodeId(
+          (msg && (msg.to || msg.to_id || msg.toId || msg.destination || msg.dest || msg.dest_id || msg.destId)) || ""
+        );
+        return {{ fromId, toId }};
+      }};
+      let derived = null;
+      if (chatDerivedCache
+        && chatDerivedCache.rawMessagesRef === rawMessages
+        && chatDerivedCache.rawPacketsRef === rawPackets
+        && chatDerivedCache.nodesRef === nodes
+        && chatDerivedCache.historyCapsRef === historyCapsObj
+        && chatDerivedCache.localNodeId === localNodeId
+        && chatDerivedCache.meshChannelIndex === normalizeMeshChannelIndex(activeMeshChannelIndex)) {{
+        derived = chatDerivedCache;
+      }}
+      if (!derived) {{
+        const reactionBucketsLocal = new Map();
+        const baseMessagesLocal = [];
+        const messageIndexLocal = new Map();
+        const messageEndpointsLocal = new WeakMap();
+        const channelCountsLocal = {{ all: 0, direct: 0 }};
+        const channelMessagesLocal = {{ all: [], direct: [] }};
+        const directMessagesByPeerLocal = new Map();
+        const meshBotIndexes = indexMeshBotRequestsByMessageId(botRequests);
+        const meshBotRequestByMessageIdLocal = meshBotIndexes.requestByMessageId;
+        const meshBotResponseByMessageIdLocal = meshBotIndexes.responseByMessageId;
+        const packetMaps = buildPacketSummaryAndRoutingAckMaps(rawPackets);
+        const packetSummaryByIdLocal = packetMaps.packetSummaryById;
+        const deliveryAckByRequestIdLocal = packetMaps.deliveryAckByRequestId;
+
+        const endpointsForBuild = (msg) => {{
+          if (!msg || typeof msg !== "object") return {{ fromId: "", toId: "" }};
+          const cached = messageEndpointsLocal.get(msg);
+          if (cached) return cached;
+          const resolved = computeMessageEndpoints(msg);
+          messageEndpointsLocal.set(msg, resolved);
+          return resolved;
+        }};
+
+        for (const msg of rawMessages) {{
+          const msgChannelKey = classifyMessageChannel(msg) === "direct" ? "direct" : "all";
+          if (
+            !messageMatchesActiveMeshChannel(msg)
+            && !(activeChatChannel === "direct" && msgChannelKey === "direct")
+          ) {{
+            continue;
+          }}
+          if (isFileTransferProtocolMessage(msg)) {{
+            continue;
+          }}
+          const msgId = messageIdOf(msg);
+          if (msgId) {{
+            // Keep an index entry for every message id, including reactions.
+            // Replies can target reaction packets; without this, context depends
+            // on recent_packets retention and may appear missing across nodes.
+            messageIndexLocal.set(String(msgId), msg);
+          }}
+          if (isReactionMessage(msg)) {{
+            const replyId = replyIdOf(msg);
+            const emoji = emojiOf(msg);
+            if (!replyId || !emoji) continue;
+
+            const key = String(replyId);
+            let perMessage = reactionBucketsLocal.get(key);
+            if (!(perMessage instanceof Map)) {{
+              perMessage = new Map();
+              reactionBucketsLocal.set(key, perMessage);
+            }}
+
+            let bucket = perMessage.get(emoji);
+            if (!bucket) {{
+              bucket = {{
+                emoji,
+                count: 0,
+                reactors: new Set(),
+                names: [],
+                lastUnix: 0,
+              }};
+              perMessage.set(emoji, bucket);
+            }}
+
+            const reactorId = resolveMessageNodeId(msg.from || "");
+            const reactorMeta = chatEndpointParts(reactorId);
+            const reactorName = reactorMeta.label || reactorId || "Unknown node";
+            const dedupeKey = reactorId || `${{reactorName}}:${{msg.rx_time || msg.captured_at || bucket.count}}`;
+            if (!bucket.reactors.has(dedupeKey)) {{
+              bucket.reactors.add(dedupeKey);
+              bucket.count += 1;
+              bucket.names.push(reactorName);
+            }}
+            const reactionTime = latestUnixTimestamp(msg.rx_time, msg.captured_at);
+            if (reactionTime && reactionTime > bucket.lastUnix) {{
+              bucket.lastUnix = reactionTime;
+            }}
+            continue;
+          }}
+
+          baseMessagesLocal.push(msg);
+          const endpoints = endpointsForBuild(msg);
+          const key = msgChannelKey;
+          channelCountsLocal[key] += 1;
+          channelMessagesLocal[key].push(msg);
+          if (key === "direct") {{
+            const peers = [];
+            if (isCanonicalNodeId(endpoints.fromId)) peers.push(endpoints.fromId);
+            if (isCanonicalNodeId(endpoints.toId) && endpoints.toId !== endpoints.fromId) {{
+              peers.push(endpoints.toId);
+            }}
+            if (peers.length === 0) {{
+              const msgId = messageIdOf(msg);
+              const botRequestRow = msgId != null
+                ? meshBotRequestByMessageIdLocal.get(String(msgId)) || null
+                : null;
+              const botResponseRow = msgId != null
+                ? meshBotResponseByMessageIdLocal.get(String(msgId)) || null
+                : null;
+              const botRow = botResponseRow || botRequestRow;
+              if (botRow && typeof botRow === "object") {{
+                const candidateRaw = [
+                  botRow.response_to,
+                  botRow.responseTo,
+                  botRow.to_id,
+                  botRow.toId,
+                  botRow.from_id,
+                  botRow.fromId,
+                  botRow.response_from,
+                  botRow.responseFrom,
+                ];
+                for (const value of candidateRaw) {{
+                  const candidate = normalizeNodeId(value || "");
+                  if (!isCanonicalNodeId(candidate)) continue;
+                  if (isCanonicalNodeId(localNodeId) && candidate === localNodeId) continue;
+                  if (!peers.includes(candidate)) {{
+                    peers.push(candidate);
+                  }}
+                }}
+              }}
+            }}
+            for (const peerId of peers) {{
+              let bucket = directMessagesByPeerLocal.get(peerId);
+              if (!Array.isArray(bucket)) {{
+                bucket = [];
+                directMessagesByPeerLocal.set(peerId, bucket);
+              }}
+              bucket.push(msg);
+            }}
+          }}
+        }}
+
+        derived = {{
+          rawMessagesRef: rawMessages,
+          rawPacketsRef: rawPackets,
+          nodesRef: nodes,
+          historyCapsRef: historyCapsObj,
+          localNodeId,
+          meshChannelIndex: normalizeMeshChannelIndex(activeMeshChannelIndex),
+          reactionBuckets: reactionBucketsLocal,
+          baseMessages: baseMessagesLocal,
+          messageIndex: messageIndexLocal,
+          packetSummaryById: packetSummaryByIdLocal,
+          deliveryAckByRequestId: deliveryAckByRequestIdLocal,
+          messageEndpoints: messageEndpointsLocal,
+          channelCounts: channelCountsLocal,
+          channelMessages: channelMessagesLocal,
+          directMessagesByPeer: directMessagesByPeerLocal,
+        }};
+        chatDerivedCache = derived;
+      }}
+      const reactionBuckets = derived.reactionBuckets;
+      const baseMessages = derived.baseMessages;
+      const messageIndex = derived.messageIndex;
+      const packetSummaryById = derived.packetSummaryById;
+      const deliveryAckByRequestId = (
+        derived.deliveryAckByRequestId instanceof Map
+          ? derived.deliveryAckByRequestId
+          : new Map()
+      );
+      const messageEndpoints = derived.messageEndpoints;
+      const channelCounts = derived.channelCounts;
+      const channelMessages = derived.channelMessages;
+      const directMessagesByPeer = derived.directMessagesByPeer;
+      const endpointsForMessage = (msg) => {{
+        if (!msg || typeof msg !== "object") return {{ fromId: "", toId: "" }};
+        const cached = messageEndpoints.get(msg);
+        if (cached) return cached;
+        const resolved = computeMessageEndpoints(msg);
+        messageEndpoints.set(msg, resolved);
+        return resolved;
+      }};
+      const keyedMessages = collectChatMessageEntries(state);
+      syncChatUnreadFromEntries(keyedMessages, {{ clearActiveWhenInChat: true }});
+
+      const channelList = document.getElementById("chat-channel-list");
+      if (channelList) {{
+        channelList.innerHTML = [
+          {{ key: "all", label: "Everyone", count: channelCounts.all }},
+          {{ key: "direct", label: "Peer-to-peer", count: channelCounts.direct }},
+        ].map((entry) => {{
+          const unread = Math.max(0, Number(chatUnreadByChannel[entry.key] || 0));
+          const unreadLabel = unread > 99 ? "99+" : String(unread);
+          const unreadFrom = String(chatUnreadLatestByChannel[entry.key] || "").trim();
+          const unreadFromLine = (unread > 0 && unreadFrom)
+            ? `<span class="chat-channel-unread-from" title="Latest unread from ${{escAttr(unreadFrom)}}">new: ${{escAttr(unreadFrom)}}</span>`
+            : "";
+          return `<button type="button" class="chat-channel-item${{activeChatChannel === entry.key ? " active" : ""}}" data-channel="${{entry.key}}">
+            <span class="chat-channel-main">
+              <span class="chat-channel-name">${{entry.label}}</span>
+              ${{unreadFromLine}}
+            </span>
+            <span class="chat-channel-meta-wrap">
+              <span class="chat-channel-meta">${{entry.count}}</span>
+              ${{unread > 0 ? `<span class="chat-channel-unread" title="${{unread}} unread">${{unreadLabel}}</span>` : ""}}
+            </span>
+          </button>`;
+        }}).join("");
+        for (const btn of channelList.querySelectorAll(".chat-channel-item")) {{
+          if (!(btn instanceof HTMLButtonElement)) continue;
+          btn.addEventListener("click", () => {{
+            applyChatChannel(btn.dataset.channel || "all", true);
+          }});
+        }}
+      }}
+
+      const explicitDirectSelectedId = (
+        activeChatChannel === "direct" && isSelectableNodeId(selectedNodeId)
+      ) ? normalizeNodeId(selectedNodeId) : "";
+      const hasDirectBucketForPeer = (peerIdRaw) => {{
+        const peerId = normalizeNodeId(peerIdRaw || "");
+        if (!isCanonicalNodeId(peerId)) return false;
+        const bucket = directMessagesByPeer.get(peerId);
+        return Array.isArray(bucket) && bucket.length > 0;
+      }};
+      const noticeSuggestedDirectPeerId = (() => {{
+        if (activeChatChannel !== "direct") return "";
+        const notices = chatChangeNoticesForChannel("direct");
+        for (let idx = notices.length - 1; idx >= 0; idx -= 1) {{
+          const peerId = normalizeNodeId(notices[idx] && notices[idx].peerNodeId);
+          if (!hasDirectBucketForPeer(peerId)) continue;
+          return peerId;
+        }}
+        return "";
+      }})();
+      const fallbackDirectSelectedId = (() => {{
+        if (activeChatChannel !== "direct") return "";
+        if (hasDirectBucketForPeer(explicitDirectSelectedId)) return "";
+        let bestPeerId = "";
+        let bestUnix = -1;
+        for (const [peerIdRaw, bucketRaw] of directMessagesByPeer.entries()) {{
+          const peerId = normalizeNodeId(peerIdRaw || "");
+          if (!isCanonicalNodeId(peerId)) continue;
+          const bucket = Array.isArray(bucketRaw) ? bucketRaw : [];
+          if (bucket.length <= 0) continue;
+          const latestMsg = bucket[bucket.length - 1];
+          const unix = latestUnixTimestamp(latestMsg && latestMsg.rx_time, latestMsg && latestMsg.captured_at);
+          const score = Number.isFinite(unix) ? unix : 0;
+          if (!bestPeerId || score > bestUnix) {{
+            bestPeerId = peerId;
+            bestUnix = score;
+          }}
+        }}
+        return bestPeerId;
+      }})();
+      const directSelectedId = (
+        hasDirectBucketForPeer(explicitDirectSelectedId)
+          ? explicitDirectSelectedId
+          : (
+              noticeSuggestedDirectPeerId
+              || fallbackDirectSelectedId
+              || (isCanonicalNodeId(explicitDirectSelectedId) ? explicitDirectSelectedId : "")
+            )
+      );
+      chatDirectActivePeerId = isCanonicalNodeId(directSelectedId) ? directSelectedId : "";
+      updateChatInputPlaceholder();
+      const activeChannelMessages = (
+        activeChatChannel === "direct" ? channelMessages.direct : channelMessages.all
+      );
+      const messages = (() => {{
+        if (activeChatChannel !== "direct") {{
+          return activeChannelMessages;
+        }}
+        if (!isCanonicalNodeId(directSelectedId)) {{
+          return [];
+        }}
+        const directMessages = directMessagesByPeer.get(directSelectedId);
+        return Array.isArray(directMessages) ? directMessages : [];
+      }})();
+      const visibleMessages = messages.length > chatFeedMaxEntries
+        ? messages.slice(-chatFeedMaxEntries)
+        : messages;
+      const showAllMeshChannels = activeMeshChannelFilterIndex() === meshChannelAllIndex;
+      const activeSendMeshIdx = activeMeshChannelSendIndex();
+      const activeChangeFocusKeys = chatChangeFocusKeysForChannel(activeChatChannel);
+      const participantSourceMessages = (activeChatChannel === "direct")
+        ? channelMessages.direct
+        : messages;
+      for (const msg of participantSourceMessages) {{
+        const endpoints = endpointsForMessage(msg);
+        const sourceNode = endpoints.fromId;
+        const fallbackNode = endpoints.toId;
+        const msgTimeUnix = latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at);
+        const fromMeta = chatEndpointParts(sourceNode, msgTimeUnix);
+        const toMeta = chatEndpointParts(fallbackNode, msgTimeUnix);
+        touchParticipant(fromMeta, msgTimeUnix);
+        if (activeChatChannel === "direct") {{
+          touchParticipant(toMeta, msgTimeUnix);
+          touchNodeById(sourceNode, msgTimeUnix);
+          touchNodeById(fallbackNode, msgTimeUnix);
+        }}
+      }}

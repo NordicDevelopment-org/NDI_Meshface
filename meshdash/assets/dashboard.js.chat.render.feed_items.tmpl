@@ -1,0 +1,321 @@
+      const feedItems = visibleMessages.map((msg) => {{
+        const endpoints = endpointsForMessage(msg);
+        const sourceNode = endpoints.fromId;
+        const fallbackNode = endpoints.toId;
+        const messageKind = normalizeChatMessageKind(msg);
+        const isStatusMessage = messageKind === "status";
+        const primarySelectable = isSelectableNodeId(sourceNode) ? sourceNode : "";
+        const fallbackSelectable = isSelectableNodeId(fallbackNode) ? fallbackNode : "";
+        const nodeId = primarySelectable || fallbackSelectable;
+        const selectableClass = nodeId ? "chat-selectable" : "";
+        const msgTimeUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
+        const fromMeta = chatEndpointParts(sourceNode, msgTimeUnix);
+        const toMeta = chatEndpointParts(fallbackNode, msgTimeUnix);
+        const rawTimeText = String(msg.rx_time || msg.captured_at || "").trim();
+        const timeText = formatLocalChatTime(msgTimeUnix, rawTimeText || "n/a", nowUnix);
+        const localTimeTitle = Number.isFinite(msgTimeUnix)
+          ? new Date(Math.floor(msgTimeUnix) * 1000).toLocaleString()
+          : "";
+        const timeTitle = [localTimeTitle ? `Local: ${{localTimeTitle}}` : "", rawTimeText ? `Raw: ${{rawTimeText}}` : ""]
+          .filter((part) => !!part)
+          .join(" | ");
+        const textHtml = chatPlainTextToHtml(msg.text || "", true);
+        const textCompact = compactInlineMessage(msg.text || "", 140);
+        const hopNum = Number(msg.hops);
+        const hasHop = Number.isFinite(hopNum) && hopNum >= 0;
+        const meshIdx = messageMeshChannelIndex(msg);
+        const hasMeshTint = Number.isInteger(meshIdx) && meshIdx >= 0;
+        const meshTintClass = hasMeshTint ? " channel-tinted" : "";
+        const meshTintStyle = hasMeshTint
+          ? ` style="${{escAttr(meshChannelTintStyle(meshIdx, {{ allowAll: false }}))}}"`
+          : "";
+        const hopStart = Number(msg.hop_start ?? msg.hopStart);
+        const hopLimit = Number(msg.hop_limit ?? msg.hopLimit);
+        const hopLabel = hasHop
+          ? `${{Math.trunc(hopNum)}} hop${{Math.trunc(hopNum) === 1 ? "" : "s"}}`
+          : "";
+        const hopTitle = (
+          Number.isFinite(hopStart) && Number.isFinite(hopLimit)
+            ? `hopStart=${{Math.trunc(hopStart)}}, hopLimit=${{Math.trunc(hopLimit)}}`
+            : "Hop count"
+        );
+        const messageId = messageIdOf(msg);
+        const canReply = Number.isInteger(messageId) && messageId > 0;
+        const replyToId = replyIdOf(msg);
+        let replyTooltipSummary = "";
+        let replyTooltipPreview = "";
+        let replyInlineLabel = "";
+        let replyInlineText = "";
+        let replyInlineMissing = false;
+        if (Number.isInteger(replyToId) && replyToId > 0) {{
+          const parentMsg = messageIndex.get(String(replyToId));
+          if (parentMsg) {{
+            const parentFromMeta = chatEndpointParts(endpointsForMessage(parentMsg).fromId);
+            const parentLabel = parentFromMeta.label || "Unknown node";
+            const parentPreview = (
+              compactInlineMessage(parentMsg.text || "", 110)
+              || emojiOf(parentMsg)
+            );
+            replyTooltipSummary = `Replying to ${{parentLabel}}`;
+            replyTooltipPreview = parentPreview;
+            replyInlineLabel = parentLabel;
+            replyInlineText = parentPreview || "Original text not retained locally.";
+          }} else {{
+            const parentPacketEntry = packetSummaryById.get(String(replyToId));
+            if (parentPacketEntry && typeof parentPacketEntry === "object") {{
+              const parentSummary = (parentPacketEntry.summary && typeof parentPacketEntry.summary === "object")
+                ? parentPacketEntry.summary
+                : {{}};
+              const parentPacket = (parentPacketEntry.packet && typeof parentPacketEntry.packet === "object")
+                ? parentPacketEntry.packet
+                : {{}};
+              const parentDecoded = (parentPacket.decoded && typeof parentPacket.decoded === "object")
+                ? parentPacket.decoded
+                : {{}};
+              const parentEndpoints = packetEndpointIds(parentPacketEntry);
+              const parentUnix = latestUnixTimestamp(
+                parentSummary.rx_time_unix,
+                parentSummary.captured_at,
+                parentSummary.rx_time,
+                parentPacketEntry && (parentPacketEntry.captured_at || parentPacketEntry.rx_time),
+              );
+              const parentFromMeta = chatEndpointParts(parentEndpoints.fromId, parentUnix);
+              replyTooltipSummary = `Replying to ${{parentFromMeta.label || `packet #${{replyToId}}`}}`;
+              const parentText = compactInlineMessage(
+                parentSummary.decoded_text ?? parentDecoded.text ?? "",
+                110
+              );
+              const parentChannelIndex = explicitPacketChannelIndex(parentPacketEntry);
+              const metaParts = [`Packet #${{replyToId}}`];
+              if (Number.isInteger(parentChannelIndex) && parentChannelIndex >= 0) {{
+                metaParts.push(meshChannelViewMenuLabel(parentChannelIndex));
+              }}
+              const parentTimeRaw = String(parentSummary.rx_time || parentSummary.captured_at || "").trim();
+              if (parentTimeRaw) {{
+                metaParts.push(formatLocalChatTime(parentUnix, parentTimeRaw, nowUnix));
+              }}
+              replyTooltipPreview = parentText || metaParts.join(" • ") || "Original packet retained without decoded text.";
+              replyInlineLabel = parentFromMeta.label || `packet #${{replyToId}}`;
+              replyInlineText = parentText || "Original text not retained locally.";
+            }} else {{
+              replyTooltipSummary = `Reply to #${{replyToId}}`;
+              replyTooltipPreview = "Original packet not retained locally.";
+              replyInlineLabel = `#${{replyToId}}`;
+              replyInlineText = "Original packet not retained locally.";
+              replyInlineMissing = true;
+            }}
+          }}
+        }}
+        const messageReactions = messageId ? reactionBuckets.get(String(messageId)) : null;
+        const reactionGroups = messageReactions
+          ? Array.from(messageReactions.values())
+              .sort((a, b) => (b.count - a.count) || String(a.emoji).localeCompare(String(b.emoji)))
+              .map((bucket) => ({{
+                emoji: String(bucket.emoji || "").trim(),
+                count: Math.max(0, Number(bucket.count || 0)),
+                names: Array.from(new Set(bucket.names)).slice(0, 40),
+              }}))
+              .filter((bucket) => !!bucket.emoji && Number.isFinite(bucket.count) && bucket.count > 0)
+          : [];
+        const reactionTotal = reactionGroups.reduce((sum, bucket) => sum + Math.max(0, Number(bucket.count || 0)), 0);
+        const reactionSummaryTitle = reactionGroups.map((bucket) => `${{bucket.emoji}} ${{bucket.count}}`).join(" • ");
+        const reactionSummaryIcons = reactionGroups
+          .slice(0, 4)
+          .map((bucket) => `<span class="chat-reaction-summary-emoji">${{escAttr(bucket.emoji)}}</span>`)
+          .join("");
+        const reactionSummary = reactionGroups.length > 0
+          ? `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}" title="${{escAttr(reactionSummaryTitle)}}">
+              <span class="chat-reaction-summary-icons">${{reactionSummaryIcons}}</span>
+              <span class="chat-reaction-summary-total">${{reactionTotal}}</span>
+            </button>`
+          : "";
+        const isLocalEcho = msg.local_echo === true || msg.localEcho === true;
+        const deliveryState = normalizeDeliveryState(msg.delivery_state ?? msg.deliveryState);
+        const deliveryError = String(msg.delivery_error ?? msg.deliveryError ?? "").trim();
+        const deliveryAckMeta = (
+          isLocalEcho && Number.isInteger(messageId) && messageId > 0
+            ? (deliveryAckByRequestId.get(String(messageId)) || null)
+            : null
+        );
+        const deliveryAckDetail = (
+          isLocalEcho && deliveryState === "acked"
+            ? buildDeliveredAckDetail(msg, deliveryAckMeta)
+            : ""
+        );
+        const deliveryLabel = isLocalEcho ? deliveryStateLabel(deliveryState) : "";
+        const deliveryTitle = isLocalEcho ? deliveryStateTitle(deliveryState, deliveryError, deliveryAckDetail) : "";
+        const deliveryChip = (isLocalEcho && deliveryLabel)
+          ? `<span class="chat-delivery-pill state-${{escAttr(deliveryState)}}" title="${{escAttr(deliveryTitle)}}">${{escAttr(deliveryLabel)}}</span>`
+          : "";
+        const packetEntry = messageId ? packetSummaryById.get(String(messageId)) : null;
+        const packetSummary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+          ? packetEntry.summary
+          : {};
+        const rxSnrRaw = Number(
+          packetSummary.rx_snr
+          ?? packetSummary.rxSnr
+          ?? packetSummary.snr
+          ?? msg.rx_snr
+          ?? msg.rxSnr
+          ?? msg.snr
+        );
+        const rxSnr = Number.isFinite(rxSnrRaw) ? rxSnrRaw : null;
+        const rxRssiRaw = Number(
+          packetSummary.rx_rssi
+          ?? packetSummary.rxRssi
+          ?? packetSummary.rssi
+          ?? msg.rx_rssi
+          ?? msg.rxRssi
+          ?? msg.rssi
+        );
+        const rxRssi = Number.isFinite(rxRssiRaw) ? rxRssiRaw : null;
+        const portnumText = String(msg.portnum ?? packetSummary.portnum ?? "").trim() || "n/a";
+        const ackParts = ["ack"];
+        if (hasHop) ackParts.push(`hop ${{Math.trunc(hopNum)}}`);
+        ackParts.push(`snr ${{rxSnr == null ? "n/a" : formatMetricValue(rxSnr, 1)}}`);
+        ackParts.push(`rssi ${{rxRssi == null ? "n/a" : formatMetricValue(rxRssi, 0)}}`);
+        const ackText = ackParts.join(" ");
+        const ackHopCount = hasHop ? Math.trunc(hopNum) : "";
+        const ackReceivedUnix = (Number.isFinite(msgTimeUnix) && msgTimeUnix > 0)
+          ? Math.floor(msgTimeUnix)
+          : "";
+        const ackDestination = (() => {{
+          const normalizedTo = normalizeNodeId(fallbackNode);
+          if (!normalizedTo || normalizedTo === "^all") return "^all";
+          const normalizedFrom = normalizeNodeId(sourceNode);
+          if (isCanonicalNodeId(normalizedFrom) && !isSelfNodeId(normalizedFrom)) {{
+            return normalizedFrom;
+          }}
+          if (isCanonicalNodeId(normalizedTo) && !isSelfNodeId(normalizedTo)) {{
+            return normalizedTo;
+          }}
+          return "^all";
+        }})();
+        const ackTargetLabel = ackDestination === "^all"
+          ? "Everyone"
+          : (fromMeta.label || ackDestination);
+        const retryReplyId = Number.isInteger(replyToId) && replyToId > 0 ? replyToId : "";
+        const replyButton = canReply
+          ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message">Reply</button>`
+          : "";
+        const canAck = canReply && !isStatusMessage && !isLocalEcho && !isSelfNodeId(sourceNode);
+        const ackButton = canAck
+          ? `<button type="button" class="chat-ack-btn" data-ack-reply-id="${{escAttr(messageId)}}" data-ack-text="${{escAttr(ackText)}}" data-ack-text-mode="pong" data-ack-destination="${{escAttr(ackDestination)}}" data-ack-channel="${{escAttr(meshIdx)}}" data-ack-target-label="${{escAttr(ackTargetLabel)}}" data-ack-source-id="${{escAttr(sourceNode)}}" data-ack-source-label="${{escAttr(fromMeta.label || "")}}" data-ack-received-unix="${{escAttr(ackReceivedUnix)}}" data-ack-hop-count="${{escAttr(ackHopCount)}}" data-ack-rx-snr="${{escAttr(rxSnr == null ? "" : rxSnr)}}" data-ack-rx-rssi="${{escAttr(rxRssi == null ? "" : rxRssi)}}" title="Quick ACK reply (pong-style): ${{escAttr(ackText)}}">Ack</button>`
+          : "";
+        const whoisTargetId = normalizeNodeId(sourceNode);
+        const whoisSuffix = nodeIdSuffixForWhois(whoisTargetId);
+        const whoisCommand = buildWhoisCommandForNode(whoisTargetId);
+        const showWhoisButton = chatBotCommandsEnabled
+          && chatWhoisQuickActionEnabled
+          && isCanonicalNodeId(whoisTargetId)
+          && !!whoisSuffix;
+        const whoisButton = showWhoisButton
+          ? `<button type="button" class="chat-whois-btn" data-whois-target-id="${{escAttr(whoisTargetId)}}" title="Prepare ${{escAttr(whoisCommand)}} for ${{escAttr(whoisTargetId)}}">Whois</button>`
+          : "";
+        const hasReactions = reactionGroups.length > 0;
+        const reactButton = messageId
+          ? `<button type="button" class="chat-react-btn${{hasReactions ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
+          : "";
+        const retryButton = (
+          isLocalEcho
+          && isRetryableDeliveryState(deliveryState)
+          && String(msg.text || "").trim()
+        )
+          ? `<button type="button" class="chat-retry-btn" data-retry-text="${{escAttr(String(msg.text || ""))}}" data-retry-destination="${{escAttr(String(msg.to || "^all"))}}" data-retry-channel="${{escAttr(msg.channel ?? 0)}}" data-retry-reply-id="${{escAttr(retryReplyId)}}" data-retry-of="${{escAttr(messageId || "")}}" title="Retry this message">Retry</button>`
+          : "";
+        const reactionRowParts = [];
+        if (reactButton) reactionRowParts.push(reactButton);
+        if (replyButton) reactionRowParts.push(replyButton);
+        if (ackButton) reactionRowParts.push(ackButton);
+        const tailButtons = [];
+        if (whoisButton) tailButtons.push(whoisButton);
+        if (tailButtons.length > 0) {{
+          reactionRowParts.push(`<span class="chat-reply-tail">${{tailButtons.join("")}}</span>`);
+        }}
+        const reactionSummaryRow = reactionSummary
+          ? `<div class="chat-reaction-summary-row">${{reactionSummary}}</div>`
+          : "";
+        const reactionRow = reactionRowParts.length > 0
+          ? `<div class="chat-reaction-row">${{reactionRowParts.join("")}}</div>`
+          : "";
+        const selectedFeedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
+        const messageKey = chatMessageKey(msg);
+        const hasChangeMarker = !!messageKey && activeChangeFocusKeys.has(messageKey);
+        const changeClass = hasChangeMarker ? " has-change-marker" : "";
+        const statusClass = isStatusMessage ? " kind-status" : "";
+        const changeBadge = hasChangeMarker
+          ? '<span class="chat-feed-new-pill" title="Changed while you were away">NEW</span>'
+          : "";
+        const statusBadge = isStatusMessage
+          ? '<span class="chat-feed-status-pill" title="Status update">Status</span>'
+          : "";
+        const messageTooltipParts = [
+          `From: ${{fromMeta.label}}${{fromMeta.idTag ? ` (${{fromMeta.idTag}})` : ""}}`,
+          `To: ${{toMeta.label}}${{toMeta.idTag ? ` (${{toMeta.idTag}})` : ""}}`,
+          `Channel: ${{meshChannelLabelForIndex(meshIdx, {{ verbose: true, allowAll: false }})}}`,
+          `Port: ${{portnumText}}`,
+        ];
+        if (messageId) {{
+          messageTooltipParts.push(`Packet: #${{messageId}}`);
+        }}
+        if (Number.isInteger(replyToId) && replyToId > 0) {{
+          messageTooltipParts.push(`Reply to: #${{replyToId}}`);
+          if (replyTooltipSummary) {{
+            messageTooltipParts.push(replyTooltipSummary);
+          }}
+          if (replyTooltipPreview) {{
+            messageTooltipParts.push(`Reply context: ${{replyTooltipPreview}}`);
+          }}
+        }}
+        if (timeText) {{
+          messageTooltipParts.push(`Time: ${{timeText}}`);
+        }}
+        if (rawTimeText && rawTimeText !== timeText) {{
+          messageTooltipParts.push(`Raw time: ${{rawTimeText}}`);
+        }}
+        if (hasHop) {{
+          messageTooltipParts.push(`Hops: ${{hopTitle === "Hop count" ? hopLabel : `${{hopLabel}} (${{hopTitle}})`}}`);
+        }}
+        if (deliveryLabel) {{
+          messageTooltipParts.push(`Delivery: ${{deliveryTitle || deliveryLabel}}`);
+        }}
+        if (deliveryError) {{
+          messageTooltipParts.push(`Delivery error: ${{trimInlineError(deliveryError, 160)}}`);
+        }}
+        if (isStatusMessage) {{
+          messageTooltipParts.push("Kind: status");
+        }}
+        if (textCompact) {{
+          messageTooltipParts.push(`Message: ${{textCompact}}`);
+        }}
+        const messageTooltip = messageTooltipParts.join("\n");
+        const replyInline = replyInlineLabel
+          ? `<span class="chat-reply-inline${{replyInlineMissing ? " missing" : ""}}">
+              <span class="chat-reply-inline-label">↪ ${{escAttr(replyInlineLabel)}}</span>
+              <span class="chat-reply-inline-text">${{escAttr(replyInlineText)}}</span>
+            </span>`
+          : "";
+        const summaryBody = isStatusMessage
+          ? `${{replyInline}}${{statusBadge}}<span class="chat-feed-text chat-feed-text-inline">${{textHtml || "&nbsp;"}}</span>`
+          : `${{replyInline}}${{statusBadge}}
+              <span class="chat-endpoint chat-feed-author" title="${{escAttr(fromMeta.title)}}">
+                <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
+              </span>
+              <span class="chat-feed-colon">:</span>
+              <span class="chat-feed-text chat-feed-text-inline">${{textHtml || "&nbsp;"}}</span>`;
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
+          <div class="chat-feed-line">
+            <div class="chat-feed-summary">
+              ${{changeBadge}}
+              ${{summaryBody}}
+            </div>
+            <span class="chat-feed-side">
+              ${{retryButton}}
+              ${{deliveryChip}}
+              <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
+            </span>
+          </div>
+          ${{reactionSummaryRow}}
+          ${{reactionRow}}
+        </div>`;
+      }});

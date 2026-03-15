@@ -1,0 +1,181 @@
+      if (activeChatChannel === "all" && participants.size === 0) {{
+        for (const msg of baseMessages) {{
+          if (classifyMessageChannel(msg) !== "all") continue;
+          touchNodeById(msg.from, latestUnixTimestamp(msg.rx_time, msg.captured_at));
+        }}
+      }}
+      if (activeChatChannel === "direct") {{
+        for (const peerId of manualDirectPeerIds) {{
+          if (!isCanonicalNodeId(peerId)) continue;
+          if (isCanonicalNodeId(localNodeId) && peerId === localNodeId) continue;
+          const snapshot = resolveChatNodeFreshness(peerId);
+          const node = snapshot.node;
+          const name = preferredNodeName(node) || nodeNameCache.get(peerId) || peerId;
+          const existing = participants.get(peerId);
+          if (!existing) {{
+            participants.set(peerId, {{
+              id: peerId,
+              name,
+              status: snapshot.status,
+              lastSeenUnix: snapshot.lastSeenUnix,
+              lastMessageUnix: null,
+              p2pPinned: true,
+            }});
+            continue;
+          }}
+          existing.p2pPinned = true;
+          if (name && name !== "Unknown node") {{
+            existing.name = name;
+          }}
+          existing.lastSeenUnix = latestUnixTimestamp(existing.lastSeenUnix, snapshot.lastSeenUnix);
+          existing.status = freshnessStatus(existing.lastSeenUnix, nowUnix);
+        }}
+      }}
+      if (activeChatChannel === "direct" && isCanonicalNodeId(selectedNodeId)) {{
+        touchNodeById(selectedNodeId);
+      }}
+      const feed = document.getElementById("chat-feed");
+      if (feed) {{
+        const emptyText = (activeChatChannel === "direct" && !isCanonicalNodeId(directSelectedId))
+          ? "Select a user to view peer-to-peer messages."
+          : `No ${{channelLabel(activeChatChannel).toLowerCase()}} messages yet.`;
+        closeReactionPopover(true);
+        feed.innerHTML = feedItems.length > 0
+          ? feedItems.join("")
+          : `<div class="chat-feed-empty">${{emptyText}}</div>`;
+      }}
+      renderChatChangeSummary(nowUnix);
+
+      const roomList = document.getElementById("chat-room-list");
+      const roster = Array.from(participants.values())
+        .sort((a, b) => {{
+          const pinDiff = Number(!!b.p2pPinned) - Number(!!a.p2pPinned);
+          if (pinDiff !== 0) return pinDiff;
+          const rankDiff = statusRank(a.status) - statusRank(b.status);
+          if (rankDiff !== 0) return rankDiff;
+          const aTime = a.lastMessageUnix || 0;
+          const bTime = b.lastMessageUnix || 0;
+          if (aTime !== bTime) return bTime - aTime;
+          return String(a.name || a.id).localeCompare(String(b.name || b.id));
+        }})
+        .slice(0, chatRosterMaxEntries);
+      // Preserve the full (unfiltered) roster so tickFreshnessUI() can compute canonical
+      // online/aging/stale counts even when the user is search-filtering the roster DOM.
+      chatRosterModel = roster;
+      const rosterQuery = normalizeSearchQuery(chatUserSearchQuery);
+      const rosterFiltered = roster.filter((item) => (
+        matchesIdOrNameQuery(item.id, item.name, rosterQuery)
+      ));
+      const onlineCount = roster.filter((item) => item.status === "online").length;
+      const warnCount = roster.filter((item) => item.status === "warn").length;
+      const staleCount = roster.filter((item) => item.status === "stale").length;
+      if (roomList) {{
+        roomList.innerHTML = rosterFiltered.length > 0
+          ? rosterFiltered.map((item) => (
+              (() => {{
+                const meta = nodeIdentityMeta(item.id, {{ showHops: false }});
+                const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}}`;
+                const peerBadge = item.p2pPinned
+                  ? '<span class="chat-member-peer-badge" title="Saved peer-to-peer target">saved</span>'
+                  : "";
+                const removeBtn = (activeChatChannel === "direct" && item.p2pPinned)
+                  ? `<button type="button" class="chat-peer-remove-btn" data-node-id="${{escAttr(item.id)}}" title="Remove from peer-to-peer list" aria-label="Remove ${{escAttr(item.id)}} from peer-to-peer list">&times;</button>`
+                  : "";
+                return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(memberTitle)}}">
+                <span class="chat-member-status status-${{item.status}}">●</span>
+                <span class="chat-member-main">
+                  <span class="chat-member-name-row">
+                    <span class="chat-member-name-left">
+                      <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
+                      ${{meta.html ? `<span class="chat-name-meta">${{meta.html}}</span>` : ""}}
+                      ${{peerBadge}}
+                    </span>
+                    <span class="chat-member-actions">
+                      ${{favoriteToggleButtonHtml(item.id, "chat-favorite-btn")}}
+                      ${{removeBtn}}
+                    </span>
+                  </span>
+                  <span class="chat-member-id">${{escAttr(item.id)}}</span>
+                </span>
+              </div>`;
+              }})()
+            )).join("")
+          : (rosterQuery
+              ? '<div class="chat-member-empty">No users match this search.</div>'
+              : "");
+        for (const member of roomList.querySelectorAll(".chat-member-item")) {{
+          member.addEventListener("click", () => {{
+            selectNode(member.dataset.nodeId || "", true);
+          }});
+        }}
+        for (const removeBtn of roomList.querySelectorAll(".chat-peer-remove-btn")) {{
+          if (!(removeBtn instanceof HTMLButtonElement)) continue;
+          removeBtn.addEventListener("click", (ev) => {{
+            ev.preventDefault();
+            ev.stopPropagation();
+            const nodeId = normalizeNodeId(removeBtn.dataset.nodeId || "");
+            if (!isCanonicalNodeId(nodeId)) return;
+            const removed = removeManualDirectPeer(nodeId);
+            if (!removed) return;
+            setChatSendStatus(`Peer ${{nodeId}} removed from peer-to-peer list.`);
+            renderChatPeerAddPanel(latestState);
+          }});
+        }}
+      }}
+      const leftSub = document.getElementById("chat-left-sub");
+      if (leftSub) {{
+        leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • View Ch: ${{currentMeshChannelViewLabel()}} • Send Ch: ${{currentMeshChannelSendLabel()}} • ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale`;
+      }}
+
+      renderChatReplyContext();
+      bindChatAutoScroll();
+      bindChatFeedClicks();
+      bindChatReactionControls();
+      bindChatRetryControls();
+      bindChatChangeSummaryControls();
+      syncChatChangeAutoDismiss();
+      renderChatPeerAddPanel(state);
+      highlightNodeSelection();
+      if (pendingSelectionScroll) {{
+        scrollSelectionIntoView();
+      }} else if (chatScroller instanceof HTMLElement && shouldStickBottom) {{
+        requestAnimationFrame(() => {{
+          chatScroller.scrollTop = chatScroller.scrollHeight;
+          chatStickToBottom = true;
+          syncChatChangeAutoDismiss();
+        }});
+      }}
+      const chatRenderElapsedMs = (
+        chatRenderStartMs > 0
+        && typeof window.performance !== "undefined"
+        && typeof window.performance.now === "function"
+      ) ? Math.max(0, window.performance.now() - chatRenderStartMs) : 0;
+      recordChatPerfSample(chatRenderElapsedMs, feedItems.length, rosterFiltered.length);
+
+      const caption = document.getElementById("chat-caption");
+      if (caption) {{
+        const preset = formatModemPresetLabel(s.modem_preset, "unknown");
+        const directTargetText = (() => {{
+          if (activeChatChannel !== "direct") return "";
+          if (!isCanonicalNodeId(directSelectedId)) return " Target: none selected.";
+          const node = nodesById.get(directSelectedId);
+          const targetName = preferredNodeName(node) || nodeNameCache.get(directSelectedId) || directSelectedId;
+          return ` Target: ${{targetName}} (${{directSelectedId}}).`;
+        }})();
+        const perfSuffix = chatPerfEnabled
+          ? ` Render: ${{chatPerfStats.lastMs.toFixed(1)}}ms (ema ${{chatPerfStats.emaMs.toFixed(1)}}ms, rows ${{chatPerfStats.lastFeedCount}}/${{chatPerfStats.lastRosterCount}}).`
+          : "";
+        caption.textContent = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}.${{directTargetText}} View Ch: ${{currentMeshChannelViewLabel()}}. Send Ch: ${{currentMeshChannelSendLabel()}}. ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.${{perfSuffix}} Message channels are encryption groups, not frequency slots.`;
+        if (chatPerfEnabled) {{
+          caption.title = `Chat render avg ${{chatPerfStats.avgMs.toFixed(1)}}ms, max ${{chatPerfStats.maxMs.toFixed(1)}}ms, samples ${{chatPerfStats.samples}}`;
+        }} else {{
+          caption.removeAttribute("title");
+        }}
+      }}
+      const chatTitle = document.getElementById("chat-title");
+      if (chatTitle instanceof HTMLElement) {{
+        const titlePreset = formatModemPresetLabel(s.modem_preset, "Mesh");
+        chatTitle.textContent = `${{titlePreset}} Chat`;
+      }}
+    }}
+
