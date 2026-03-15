@@ -1,0 +1,257 @@
+    function normalizeLayoutView(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return knownLayoutViews.has(clean) ? clean : "chat";
+    }}
+
+    function isMapVisibleLayoutView(viewName) {{
+      const view = normalizeLayoutView(viewName);
+      return view === "network" || view === "saved";
+    }}
+
+    function syncNodeHistoryDock() {{
+      const nodeHistoryPanel = document.getElementById("map-data-node");
+      const mapDataBody = document.getElementById("map-data-body");
+      const networkHost = document.getElementById("network-node-history-host");
+      const savedHost = document.getElementById("saved-node-history-host");
+      const nodesTitle = document.getElementById("nodes-card-title");
+      if (!(nodeHistoryPanel instanceof HTMLElement)) return;
+      if (!(mapDataBody instanceof HTMLElement)) return;
+      if (!(networkHost instanceof HTMLElement)) return;
+
+      const dockInSaved = activeLayoutView === "saved" && (savedHost instanceof HTMLElement);
+      const target = dockInSaved ? savedHost : mapDataBody;
+      if (nodeHistoryPanel.parentElement !== target) {{
+        target.appendChild(nodeHistoryPanel);
+      }}
+
+      networkHost.hidden = true;
+      networkHost.classList.remove("empty");
+      if (nodesTitle instanceof HTMLElement) {{
+        nodesTitle.textContent = activeLayoutView === "network" ? "Network Explorer" : "Nodes";
+      }}
+    }}
+
+    function applyLayoutView(viewName, persist = true) {{
+      const layout = document.getElementById("dashboard-layout");
+      if (!(layout instanceof HTMLElement)) return;
+      const shell = document.querySelector(".workspace-shell");
+      const chatLeftPanel = document.getElementById("chat-left-panel");
+      const next = normalizeLayoutView(viewName);
+      activeLayoutView = next;
+      for (const name of knownLayoutViews) {{
+        layout.classList.remove(`view-${{name}}`);
+      }}
+      layout.classList.add(`view-${{next}}`);
+
+      // Keep rail selection in sync even if any later view-specific setup throws.
+      for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const isActive = normalizeLayoutView(btn.dataset.view || "") === next;
+        btn.classList.toggle("active", isActive);
+        btn.setAttribute("aria-current", isActive ? "page" : "false");
+      }}
+
+      const chatPanelOpen = next === "chat";
+      if (shell instanceof HTMLElement) {{
+        shell.classList.toggle("chat-panel-open", chatPanelOpen);
+      }}
+      if (chatLeftPanel instanceof HTMLElement) {{
+        chatLeftPanel.hidden = !chatPanelOpen;
+      }}
+      refreshMapCardTitle();
+      const mapResetBtn = document.getElementById("map-reset-view-btn");
+      if (mapResetBtn instanceof HTMLButtonElement) {{
+        mapResetBtn.hidden = next === "saved" || next === "history";
+      }}
+      updateMapPacketLinesControl();
+
+      const mapNodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+      try {{
+        syncSignalHeatmapLayer(mapNodes, next === "saved");
+      }} catch (_err) {{
+      }}
+      try {{
+        setMapWheelZoomActive(next === "network" || next === "saved");
+      }} catch (_err) {{
+      }}
+      if (chatPanelOpen) {{
+        if (activeWheelPane instanceof HTMLElement) {{
+          activeWheelPane.classList.remove("wheel-scroll-active");
+        }}
+        activeWheelPane = null;
+        if (activeWheelPaneLease !== null) {{
+          clearTimeout(activeWheelPaneLease);
+          activeWheelPaneLease = null;
+        }}
+        // Entering Chat should clear any stale rail badge regardless of which
+        // sub-channel (Everyone vs Peer-to-peer) previously accumulated it.
+        clearChatUnread();
+      }} else {{
+        clearAllChatChangeAutoDismissTimers();
+      }}
+      syncChatRailUnread();
+      if (typeof window.meshRefreshWheelHints === "function") {{
+        try {{
+          window.meshRefreshWheelHints();
+        }} catch (_err) {{
+        }}
+      }}
+
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(layoutViewStorageKey, next);
+        }} catch (_err) {{
+        }}
+      }}
+
+      if (next === "history") {{
+        mapDataFocus = "activity";
+      }}
+      if (next === "network" && mapDataFocus === "activity") {{
+        mapDataFocus = "auto";
+      }}
+      if (next === "network") {{
+        fitDone = false;
+      }}
+      if (next === "network" && isSelectableNodeId(selectedNodeId)) {{
+        pendingSelectionScroll = true;
+        highlightNodeSelection();
+        window.requestAnimationFrame(() => {{
+          scrollSelectionIntoView();
+        }});
+      }}
+      syncNodeHistoryDock();
+      if (latestState) {{
+        let cachedNodeHistory = null;
+        const viewHistoryNodeId = next === "saved"
+          ? resolveSavedViewNodeId(latestState)
+          : (next === "network" ? normalizeNodeId(selectedNodeId || "") : "");
+        if ((next === "saved" || next === "network") && isSelectableNodeId(viewHistoryNodeId)) {{
+          const cached = nodeHistoryCache.get(viewHistoryNodeId);
+          if (cached && cached.data) {{
+            cachedNodeHistory = cached.data;
+          }}
+        }}
+        // Render visible UI from cached state immediately on view switches.
+        // This prevents "blank" panes when the server legitimately returns 304s.
+        renderSummary(latestState);
+        if (next === "saved" || next === "network") {{
+          renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
+        }}
+        if (next === "network") {{
+          renderNodes(latestState.nodes || []);
+        }}
+        renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory);
+        if (next === "chat") {{
+          renderChat(latestState);
+        }}
+        if (next === "files") {{
+          renderFilesView(latestState);
+        }}
+        if (next === "bots") {{
+          renderBotsView(latestState);
+        }}
+        if (next === "games") {{
+          renderGamesView(latestState);
+        }}
+        if (next === "history") {{
+          renderHistoryChat(latestState.traffic || {{}});
+          setMapDataMode("activity");
+          void refreshHistoryPanels(false);
+        }}
+        if (next === "saved") {{
+          renderFavorites(latestState, cachedNodeHistory);
+        }} else {{
+          renderSavedNodeDetails(latestState, cachedNodeHistory);
+        }}
+        if (next === "settings") {{
+          renderSettings(latestState);
+          syncSettingsPositionSourceUi({{
+            source: settingsPositionSourcePref,
+            recenter: true,
+          }});
+        }}
+        if (next === "packets") {{
+          renderPackets(latestState.traffic || {{}});
+        }}
+        if (next === "channels") {{
+          renderChannelsView(latestState);
+          void ensureChannelsViewLocalStateHydrated(false);
+        }}
+        if (next === "encription") {{
+          renderEncription(latestState.traffic || {{}});
+        }}
+        if (next === "console") {{
+          renderConsole(latestState.traffic || {{}});
+        }}
+      }} else if (next === "network") {{
+        renderNodesPlaceholder("Syncing nodes...");
+      }} else if (next === "history") {{
+        setMapDataMode("activity");
+        renderWeeklySummaryLoading();
+        renderHistoryChat({{}});
+      }} else if (next === "files") {{
+        renderFilesView(latestState);
+      }} else if (next === "channels") {{
+        renderChannelsView(latestState);
+        void ensureChannelsViewLocalStateHydrated(false);
+      }} else if (next === "bots") {{
+        renderBotsView(latestState);
+      }} else if (next === "games") {{
+        renderGamesView(latestState);
+      }} else if (next === "encription") {{
+        renderEncription({{}});
+      }}
+      if (next === "console") {{
+        window.requestAnimationFrame(() => {{
+          focusConsoleCommandInput(false);
+        }});
+      }}
+      if (next !== "saved") {{
+        closeSavedNodeSearchDropdown();
+      }}
+      renderSavedNodeSearchDropdown(latestState);
+      renderFavoriteMenuNodeSearchDropdown(latestState);
+      // Ensure node history loads immediately when switching into the map views.
+      void refreshSelectedNodeHistory(false);
+      if (next === "chat" || next === "files" || next === "bots" || next === "games" || next === "history" || next === "network" || next === "saved" || next === "channels") {{
+        requestImmediatePoll(0);
+      }}
+      if (isMapVisibleLayoutView(next)) {{
+        requestMapResizeStabilized();
+      }} else {{
+        clearMapResizeStabilizeTimers();
+      }}
+      if (next === "settings") {{
+        if (ensureSettingsFixedMap()) {{
+          const shouldRecenterSettingsMap = (
+            activeSettingsTab === "core"
+            && normalizeSettingsPositionSource(readSettingsPositionSourceSelection()) === "fixed"
+          );
+          syncSettingsFixedMapFromInputs({{ recenter: shouldRecenterSettingsMap }});
+          requestSettingsFixedMapResizeStabilized();
+        }}
+      }} else {{
+        clearSettingsFixedMapResizeTimers();
+      }}
+    }}
+
+    function loadLayoutView() {{
+      let preferred = "chat";
+      try {{
+        preferred = normalizeLayoutView(window.localStorage.getItem(layoutViewStorageKey) || "chat");
+      }} catch (_err) {{
+      }}
+      applyLayoutView(preferred, false);
+    }}
+
+    function bindLayoutNav() {{
+      for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
+        if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") continue;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => {{
+          applyLayoutView(btn.dataset.view || "chat", true);
+        }});
+      }}
+    }}
+
