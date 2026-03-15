@@ -1,0 +1,2143 @@
+    function utf8ByteLength(value) {{
+      const raw = String(value == null ? "" : value);
+      if (typeof TextEncoder !== "undefined") {{
+        try {{
+          return new TextEncoder().encode(raw).length;
+        }} catch (_err) {{
+        }}
+      }}
+      const encoded = encodeURIComponent(raw);
+      let count = 0;
+      for (let i = 0; i < encoded.length; i += 1) {{
+        if (encoded[i] === "%" && i + 2 < encoded.length) {{
+          count += 1;
+          i += 2;
+        }} else {{
+          count += 1;
+        }}
+      }}
+      return count;
+    }}
+
+    function waitFileTransferFrameGap() {{
+      const delayMs = Math.max(0, Math.trunc(Number(fileTransferInterFrameDelayMs) || 0));
+      if (delayMs <= 0) return Promise.resolve();
+      return new Promise((resolve) => {{
+        window.setTimeout(resolve, delayMs);
+      }});
+    }}
+
+    function formatFileTransferSize(rawBytes) {{
+      const bytes = Number(rawBytes);
+      if (!Number.isFinite(bytes) || bytes < 0) return "n/a";
+      if (bytes < 1024) return `${{Math.trunc(bytes)}} B`;
+      const kib = bytes / 1024;
+      if (kib < 1024) return `${{kib.toFixed(kib >= 100 ? 0 : 1)}} KiB`;
+      const mib = kib / 1024;
+      return `${{mib.toFixed(mib >= 100 ? 0 : 1)}} MiB`;
+    }}
+
+    function normalizeFileTransferName(rawName) {{
+      const compact = String(rawName == null ? "" : rawName)
+        .replace(/\r\n/g, " ")
+        .replace(/\r/g, " ")
+        .replace(/\n/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const fallback = "mesh-file.bin";
+      if (!compact) return fallback;
+      const maxChars = 64;
+      return compact.length > maxChars ? compact.slice(0, maxChars) : compact;
+    }}
+
+    function buildFileTransferId() {{
+      const stamp = Date.now().toString(36);
+      const rand = Math.random().toString(36).slice(2, 10);
+      return `${{stamp}}${{rand}}`.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 20);
+    }}
+
+    function buildFileTransferNameEncoding(rawName, maxEncodedLen = 92) {{
+      const normalized = normalizeFileTransferName(rawName);
+      const fallback = "mesh-file.bin";
+      let candidate = normalized;
+      while (candidate.length > 1) {{
+        const encoded = encodeURIComponent(candidate);
+        if (encoded.length <= maxEncodedLen) {{
+          return {{ name: candidate, encoded }};
+        }}
+        candidate = candidate.slice(0, -1).trim();
+      }}
+      return {{
+        name: fallback,
+        encoded: encodeURIComponent(fallback),
+      }};
+    }}
+
+    function buildFileTransferMetaFrame(transferId, fileName, fileSize, totalChunks) {{
+      const cleanId = String(transferId || "").trim().toLowerCase();
+      const cleanSize = Math.max(0, Math.trunc(Number(fileSize) || 0));
+      const cleanChunks = Math.max(1, Math.trunc(Number(totalChunks) || 1));
+      const nameBits = buildFileTransferNameEncoding(fileName);
+      return `${{fileTransferProtocolPrefix}}|M|${{cleanId}}|${{nameBits.encoded}}|${{cleanSize}}|${{cleanChunks}}`;
+    }}
+
+    function buildFileTransferChunkFrame(transferId, chunkIndex, payloadBase64) {{
+      const cleanId = String(transferId || "").trim().toLowerCase();
+      const cleanIdx = Math.max(0, Math.trunc(Number(chunkIndex) || 0));
+      const payload = String(payloadBase64 || "").trim();
+      return `${{fileTransferProtocolPrefix}}|C|${{cleanId}}|${{cleanIdx}}|${{payload}}`;
+    }}
+
+    function buildFileTransferChunkBitmapBase64(totalChunks, chunkIndexes) {{
+      const total = Math.max(0, Math.trunc(Number(totalChunks) || 0));
+      if (total <= 0) return "";
+      const byteLen = Math.max(1, Math.ceil(total / 8));
+      const bitmap = new Uint8Array(byteLen);
+      const indexes = Array.isArray(chunkIndexes)
+        ? chunkIndexes
+        : Array.from(chunkIndexes || []);
+      for (const rawIdx of indexes) {{
+        const idx = Math.trunc(Number(rawIdx));
+        if (!Number.isFinite(idx) || idx < 0 || idx >= total) continue;
+        const byteIdx = Math.floor(idx / 8);
+        const bitMask = 1 << (idx % 8);
+        bitmap[byteIdx] |= bitMask;
+      }}
+      return encodeBytesToBase64(bitmap);
+    }}
+
+    function decodeFileTransferChunkBitmap(rawBase64, totalChunks) {{
+      const total = Math.max(0, Math.trunc(Number(totalChunks) || 0));
+      const received = new Set();
+      if (total <= 0) return received;
+      const bytes = decodeBase64ToBytes(rawBase64);
+      if (!(bytes instanceof Uint8Array) || bytes.length <= 0) return received;
+      for (let idx = 0; idx < total; idx += 1) {{
+        const byteIdx = Math.floor(idx / 8);
+        if (byteIdx >= bytes.length) break;
+        const bitMask = 1 << (idx % 8);
+        if ((bytes[byteIdx] & bitMask) !== 0) {{
+          received.add(idx);
+        }}
+      }}
+      return received;
+    }}
+
+    function buildFileTransferAckFrame(transferId, receivedCount, totalChunks, bitmapBase64) {{
+      const cleanId = String(transferId || "").trim().toLowerCase();
+      const total = Math.max(1, Math.trunc(Number(totalChunks) || 1));
+      const received = Math.max(0, Math.min(total, Math.trunc(Number(receivedCount) || 0)));
+      const bitmap = String(bitmapBase64 || "").trim();
+      return `${{fileTransferProtocolPrefix}}|A|${{cleanId}}|${{received}}|${{total}}|${{bitmap}}`;
+    }}
+
+    function safeDecodeUriComponent(rawValue) {{
+      const text = String(rawValue == null ? "" : rawValue);
+      if (!text) return "";
+      try {{
+        return decodeURIComponent(text);
+      }} catch (_err) {{
+        return text;
+      }}
+    }}
+
+    function parseFileTransferFrameText(rawText) {{
+      const text = String(rawText == null ? "" : rawText).trim();
+      const prefix = `${{fileTransferProtocolPrefix}}|`;
+      if (!text || !text.startsWith(prefix)) return null;
+      const parts = text.split("|");
+      if (parts.length < 4) return null;
+      const frameType = String(parts[1] || "").trim().toUpperCase();
+      const transferId = String(parts[2] || "").trim().toLowerCase();
+      if (!/^[a-z0-9]{4,24}$/.test(transferId)) return null;
+      if (frameType === "M") {{
+        if (parts.length < 6) return null;
+        const fileName = normalizeFileTransferName(safeDecodeUriComponent(parts[3] || ""));
+        const fileSize = Math.trunc(Number(parts[4]));
+        const totalChunks = Math.trunc(Number(parts[5]));
+        if (!Number.isFinite(fileSize) || fileSize < 0) return null;
+        if (!Number.isFinite(totalChunks) || totalChunks <= 0) return null;
+        return {{
+          kind: "meta",
+          transferId,
+          fileName,
+          fileSize,
+          totalChunks,
+        }};
+      }}
+      if (frameType === "C") {{
+        if (parts.length < 5) return null;
+        const chunkIndex = Math.trunc(Number(parts[3]));
+        const chunkData = String(parts[4] || "").trim();
+        if (!Number.isFinite(chunkIndex) || chunkIndex < 0) return null;
+        if (!chunkData || !/^[A-Za-z0-9+/=]+$/.test(chunkData)) return null;
+        return {{
+          kind: "chunk",
+          transferId,
+          chunkIndex,
+          chunkData,
+        }};
+      }}
+      if (frameType === "A") {{
+        if (parts.length < 6) return null;
+        const receivedCount = Math.trunc(Number(parts[3]));
+        const totalChunks = Math.trunc(Number(parts[4]));
+        const bitmap = String(parts[5] || "").trim();
+        if (!Number.isFinite(receivedCount) || receivedCount < 0) return null;
+        if (!Number.isFinite(totalChunks) || totalChunks <= 0) return null;
+        if (!bitmap || !/^[A-Za-z0-9+/=]+$/.test(bitmap)) return null;
+        return {{
+          kind: "ack",
+          transferId,
+          receivedCount: Math.min(receivedCount, totalChunks),
+          totalChunks,
+          bitmap,
+        }};
+      }}
+      return null;
+    }}
+
+    function isFileTransferProtocolMessage(msg) {{
+      if (!msg || typeof msg !== "object") return false;
+      const text = String(msg.text == null ? "" : msg.text).trim();
+      if (!text.startsWith(`${{fileTransferProtocolPrefix}}|`)) return false;
+      return parseFileTransferFrameText(text) != null;
+    }}
+
+    function encodeBytesToBase64(bytes) {{
+      const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+      if (!source.length) return "";
+      let binary = "";
+      const step = 0x8000;
+      for (let offset = 0; offset < source.length; offset += step) {{
+        const slice = source.subarray(offset, Math.min(source.length, offset + step));
+        binary += String.fromCharCode(...slice);
+      }}
+      try {{
+        return btoa(binary);
+      }} catch (_err) {{
+        return "";
+      }}
+    }}
+
+    function decodeBase64ToBytes(rawBase64) {{
+      const text = String(rawBase64 || "").trim();
+      if (!text) return null;
+      let binary = "";
+      try {{
+        binary = atob(text);
+      }} catch (_err) {{
+        return null;
+      }}
+      const out = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {{
+        out[i] = binary.charCodeAt(i);
+      }}
+      return out;
+    }}
+
+    function explicitMessageMeshChannelIndex(msg) {{
+      if (!msg || typeof msg !== "object") return null;
+      const raw = msg.channel_index ?? msg.channelIndex ?? msg.channel;
+      if (raw == null || raw === "") return null;
+      const num = Number(raw);
+      return Number.isInteger(num) && num >= 0 ? Math.trunc(num) : null;
+    }}
+
+    function messageMeshChannelIndex(msg) {{
+      const explicit = explicitMessageMeshChannelIndex(msg);
+      return Number.isInteger(explicit) && explicit >= 0 ? explicit : 0;
+    }}
+
+    function messageMatchesActiveMeshChannel(msg) {{
+      const activeIdx = activeMeshChannelFilterIndex();
+      if (activeIdx === meshChannelAllIndex) return true;
+      return messageMeshChannelIndex(msg) === activeIdx;
+    }}
+
+    function setChatSendStatus(message, isError = false) {{
+      const el = document.getElementById("chat-send-status");
+      if (!(el instanceof HTMLElement)) return;
+      el.textContent = message ? String(message) : "";
+      el.classList.toggle("error", !!isError);
+    }}
+
+    function setChatSendBusy(isBusy) {{
+      chatSendInFlight = !!isBusy;
+      const btn = document.getElementById("chat-send-btn");
+      const emojiBtn = document.getElementById("chat-emoji-btn");
+      const replyClearBtn = document.getElementById("chat-reply-clear-btn");
+      const sendChannelSelect = document.getElementById("chat-send-channel-select");
+      const sendChannelBtn = document.getElementById("chat-send-channel-menu-btn");
+      const input = document.getElementById("chat-input");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.disabled = chatSendInFlight;
+        btn.textContent = chatSendInFlight ? "Sending..." : "Send";
+      }}
+      if (emojiBtn instanceof HTMLButtonElement) {{
+        emojiBtn.disabled = chatSendInFlight;
+      }}
+      if (replyClearBtn instanceof HTMLButtonElement) {{
+        replyClearBtn.disabled = chatSendInFlight;
+      }}
+      if (sendChannelSelect instanceof HTMLSelectElement) {{
+        sendChannelSelect.disabled = chatSendInFlight;
+      }}
+      if (sendChannelBtn instanceof HTMLButtonElement) {{
+        sendChannelBtn.disabled = chatSendInFlight;
+      }}
+      if (chatSendInFlight) {{
+        setMeshChannelSendMenuOpen(false);
+      }}
+      if (input instanceof HTMLInputElement) {{
+        input.disabled = chatSendInFlight;
+      }}
+      if (chatSendInFlight) {{
+        closeChatEmojiPanel();
+      }}
+    }}
+
+    function setFileTransferStatus(message, isError = false) {{
+      const el = document.getElementById("files-send-status");
+      if (!(el instanceof HTMLElement)) return;
+      el.textContent = message ? String(message) : "";
+      el.classList.toggle("error", !!isError);
+    }}
+
+    function fileTransferShortTransferId(rawTransferId) {{
+      const clean = String(rawTransferId || "").trim().toLowerCase();
+      if (!clean) return "n/a";
+      if (clean.length <= 12) return clean;
+      return `${{clean.slice(0, 6)}}...${{clean.slice(-4)}}`;
+    }}
+
+    function fileTransferConsoleTimestamp(unixMs = Date.now()) {{
+      const stamp = new Date(Number(unixMs) || Date.now());
+      return stamp.toLocaleTimeString([], {{ hour12: false }});
+    }}
+
+    function renderFileTransferConsole() {{
+      const logEl = document.getElementById("files-console-log");
+      if (!(logEl instanceof HTMLElement)) return;
+      const shouldStickBottom = (
+        logEl.scrollHeight - (logEl.scrollTop + logEl.clientHeight)
+      ) <= 20;
+      const lines = fileTransferConsoleLines.slice(-fileTransferConsoleMaxEntries);
+      logEl.textContent = lines.length ? lines.join("\n") : "No file transfer activity yet.";
+      if (shouldStickBottom) {{
+        logEl.scrollTop = logEl.scrollHeight;
+      }}
+    }}
+
+    function appendFileTransferConsole(message, options = null) {{
+      const text = String(message == null ? "" : message).trim();
+      if (!text) return;
+      const levelRaw = String(options && options.level ? options.level : "info").trim().toLowerCase();
+      const level = levelRaw === "error" || levelRaw === "warn" ? levelRaw : "info";
+      const tag = level === "error" ? "ERR" : level === "warn" ? "WRN" : "INF";
+      fileTransferConsoleLines.push(`${{fileTransferConsoleTimestamp()}} [${{tag}}] ${{text}}`);
+      if (fileTransferConsoleLines.length > fileTransferConsoleMaxEntries) {{
+        fileTransferConsoleLines.splice(0, fileTransferConsoleLines.length - fileTransferConsoleMaxEntries);
+      }}
+      renderFileTransferConsole();
+    }}
+
+    function clearFileTransferConsole() {{
+      fileTransferConsoleLines.length = 0;
+      renderFileTransferConsole();
+    }}
+
+    async function copyFileTransferConsoleToClipboard() {{
+      const text = fileTransferConsoleLines.length
+        ? fileTransferConsoleLines.join("\n")
+        : "No file transfer activity yet.";
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {{
+        try {{
+          await navigator.clipboard.writeText(text);
+          return true;
+        }} catch (_err) {{
+        }}
+      }}
+      try {{
+        // Browser fallback for non-secure contexts where navigator.clipboard is blocked.
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "readonly");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        ta.style.top = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        let copied = false;
+        try {{
+          copied = document.execCommand("copy");
+        }} catch (_err) {{
+          copied = false;
+        }}
+        ta.remove();
+        return !!copied;
+      }} catch (_err) {{
+        return false;
+      }}
+    }}
+
+    function bindFilesConsoleControls() {{
+      const copyBtn = document.getElementById("files-console-copy-btn");
+      if (copyBtn instanceof HTMLButtonElement && copyBtn.dataset.bound !== "1") {{
+        copyBtn.dataset.bound = "1";
+        copyBtn.addEventListener("click", async () => {{
+          const copied = await copyFileTransferConsoleToClipboard();
+          if (!copied) {{
+            setFileTransferStatus("Could not copy transfer console.", true);
+            return;
+          }}
+          const count = fileTransferConsoleLines.length;
+          const countLabel = count > 0 ? count : 1;
+          setFileTransferStatus(`Copied ${{countLabel}} console line${{countLabel === 1 ? "" : "s"}}.`);
+        }});
+      }}
+      const clearBtn = document.getElementById("files-console-clear-btn");
+      if (clearBtn instanceof HTMLButtonElement && clearBtn.dataset.bound !== "1") {{
+        clearBtn.dataset.bound = "1";
+        clearBtn.addEventListener("click", () => {{
+          clearFileTransferConsole();
+          setFileTransferStatus("Transfer console cleared.");
+        }});
+      }}
+      renderFileTransferConsole();
+    }}
+
+    function setFileTransferBusy(isBusy) {{
+      fileTransferSendInFlight = !!isBusy;
+      const sendBtn = document.getElementById("files-send-btn");
+      const fileInput = document.getElementById("files-input");
+      const destinationInput = document.getElementById("files-destination-input");
+      const useSelectedBtn = document.getElementById("files-use-selected-btn");
+      const sendChannelSelect = document.getElementById("files-send-channel-select");
+      if (sendBtn instanceof HTMLButtonElement) {{
+        sendBtn.disabled = fileTransferSendInFlight;
+        sendBtn.textContent = fileTransferSendInFlight ? "Sending..." : "Send file";
+      }}
+      if (fileInput instanceof HTMLInputElement) {{
+        fileInput.disabled = fileTransferSendInFlight;
+      }}
+      if (destinationInput instanceof HTMLInputElement) {{
+        destinationInput.disabled = fileTransferSendInFlight;
+      }}
+      if (useSelectedBtn instanceof HTMLButtonElement) {{
+        useSelectedBtn.disabled = fileTransferSendInFlight;
+      }}
+      if (sendChannelSelect instanceof HTMLSelectElement) {{
+        sendChannelSelect.disabled = fileTransferSendInFlight;
+      }}
+    }}
+
+    function persistFileTransferDestinationPreference() {{
+      try {{
+        if (fileTransferDestinationId) {{
+          window.localStorage.setItem(fileTransferDestinationStorageKey, fileTransferDestinationId);
+        }} else {{
+          window.localStorage.removeItem(fileTransferDestinationStorageKey);
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function syncFileTransferDestinationInput() {{
+      const input = document.getElementById("files-destination-input");
+      if (!(input instanceof HTMLInputElement)) return;
+      const clean = normalizeNodeId(fileTransferDestinationId || "");
+      if (input.value !== clean) {{
+        input.value = clean;
+      }}
+    }}
+
+    function setFileTransferDestination(rawDestination, options = null) {{
+      const persist = !(options && options.persist === false);
+      const clean = normalizeNodeId(rawDestination || "");
+      fileTransferDestinationId = isCanonicalNodeId(clean) ? clean : "";
+      syncFileTransferDestinationInput();
+      if (persist) {{
+        persistFileTransferDestinationPreference();
+      }}
+    }}
+
+    function loadFileTransferDestinationPreference() {{
+      let stored = "";
+      try {{
+        stored = String(window.localStorage.getItem(fileTransferDestinationStorageKey) || "");
+      }} catch (_err) {{
+      }}
+      setFileTransferDestination(stored, {{ persist: false }});
+    }}
+
+    function resolveFileTransferDestination() {{
+      const input = document.getElementById("files-destination-input");
+      const rawInput = input instanceof HTMLInputElement ? input.value : "";
+      let destination = normalizeNodeId(rawInput || fileTransferDestinationId || "");
+      if (!isCanonicalNodeId(destination) && isSelectableNodeId(selectedNodeId)) {{
+        destination = normalizeNodeId(selectedNodeId || "");
+      }}
+      if (!isCanonicalNodeId(destination)) return "";
+      if (isSelfNodeId(destination)) return "";
+      return destination;
+    }}
+
+    async function sendFileTransferFrameText(frameText, destination, channelIndex) {{
+      const text = String(frameText || "").trim();
+      if (!text) {{
+        throw new Error("Cannot send an empty file frame.");
+      }}
+      const payloadBytes = utf8ByteLength(text);
+      if (payloadBytes > fileTransferChatMaxBytes) {{
+        throw new Error(`File frame too large (${payloadBytes} bytes).`);
+      }}
+      const body = {{
+        text,
+        destination,
+        channel_index: channelIndex,
+      }};
+      const resp = await fetch("/api/chat/send", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify(body),
+      }});
+      const payload = await resp.json().catch(() => ({{}}));
+      if (!resp.ok || !payload.ok) {{
+        const msg = payload && payload.error ? payload.error : `send failed (${{resp.status}})`;
+        throw new Error(msg);
+      }}
+      return payload;
+    }}
+
+    function buildFileTransferChunkFrames(transferId, bytes) {{
+      const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+      const frames = [];
+      let chunkIndex = 0;
+      let offset = 0;
+      while (offset < source.length) {{
+        let end = Math.min(source.length, offset + fileTransferChunkBytes);
+        let frame = "";
+        while (end > offset) {{
+          const chunkBytes = source.subarray(offset, end);
+          const payload = encodeBytesToBase64(chunkBytes);
+          frame = buildFileTransferChunkFrame(transferId, chunkIndex, payload);
+          if (payload && utf8ByteLength(frame) <= fileTransferChatMaxBytes) {{
+            break;
+          }}
+          end -= 1;
+        }}
+        if (end <= offset || !frame) {{
+          throw new Error(`Unable to encode chunk #${{chunkIndex + 1}} within message size limit.`);
+        }}
+        frames.push(frame);
+        offset = end;
+        chunkIndex += 1;
+      }}
+      return frames;
+    }}
+
+    async function sendSelectedFileTransfer() {{
+      if (fileTransferSendInFlight) return;
+      const fileInput = document.getElementById("files-input");
+      if (!(fileInput instanceof HTMLInputElement)) return;
+      const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+      if (!file) {{
+        setFileTransferStatus("Choose a file before sending.", true);
+        return;
+      }}
+      const destination = resolveFileTransferDestination();
+      if (!isCanonicalNodeId(destination)) {{
+        setFileTransferStatus("Enter a valid destination Node ID (for example !49b54790).", true);
+        return;
+      }}
+      setFileTransferDestination(destination);
+      const fileSize = Number(file.size);
+      if (!Number.isFinite(fileSize) || fileSize <= 0) {{
+        setFileTransferStatus("Selected file is empty.", true);
+        return;
+      }}
+      if (fileSize > fileTransferMaxFileBytes) {{
+        setFileTransferStatus(`File is too large (${formatFileTransferSize(fileSize)}). Limit: ${formatFileTransferSize(fileTransferMaxFileBytes)}.`, true);
+        return;
+      }}
+      let bytes = null;
+      try {{
+        const arrayBuffer = await file.arrayBuffer();
+        bytes = new Uint8Array(arrayBuffer);
+      }} catch (_err) {{
+        setFileTransferStatus("Could not read the selected file.", true);
+        return;
+      }}
+      if (!(bytes instanceof Uint8Array) || !bytes.length) {{
+        setFileTransferStatus("Selected file is empty.", true);
+        return;
+      }}
+
+      const transferId = buildFileTransferId();
+      const chunkFrames = buildFileTransferChunkFrames(transferId, bytes);
+      const metaFrame = buildFileTransferMetaFrame(
+        transferId,
+        file.name || "mesh-file.bin",
+        bytes.length,
+        chunkFrames.length
+      );
+      if (utf8ByteLength(metaFrame) > fileTransferChatMaxBytes) {{
+        setFileTransferStatus("File name is too long for transfer metadata. Rename the file and try again.", true);
+        return;
+      }}
+
+      const sendCtx = meshChannelSendContext();
+      setFileTransferBusy(true);
+      appendFileTransferConsole(
+        `Send requested: ${{normalizeFileTransferName(file.name)}} (${{formatFileTransferSize(bytes.length)}}) to ${{destination}} on ${{sendCtx.sendLabel}}.`
+      );
+      setFileTransferStatus(`Sending "${normalizeFileTransferName(file.name)}" to ${{destination}} on ${{sendCtx.sendLabel}}...`);
+      try {{
+        await sendFileTransferFrameText(metaFrame, destination, sendCtx.sendIndex);
+        appendFileTransferConsole(
+          `Metadata sent for ${{fileTransferShortTransferId(transferId)}} (${{chunkFrames.length}} chunk${{chunkFrames.length === 1 ? "" : "s"}}).`
+        );
+        await waitFileTransferFrameGap();
+        for (let i = 0; i < chunkFrames.length; i += 1) {{
+          await sendFileTransferFrameText(chunkFrames[i], destination, sendCtx.sendIndex);
+          if (i + 1 < chunkFrames.length) {{
+            await waitFileTransferFrameGap();
+          }}
+          if ((i + 1) % 5 === 0 || i + 1 === chunkFrames.length) {{
+            setFileTransferStatus(`Sending "${normalizeFileTransferName(file.name)}": chunk ${{i + 1}}/${{chunkFrames.length}}`);
+            appendFileTransferConsole(
+              `Chunk send progress for ${{fileTransferShortTransferId(transferId)}}: ${{i + 1}}/${{chunkFrames.length}}.`
+            );
+          }}
+        }}
+        registerOutgoingFileTransferSession({{
+          transferId,
+          senderId: normalizeNodeId(resolveLocalNodeId(latestState) || ""),
+          destination,
+          channelIndex: sendCtx.sendIndex,
+          fileName: file.name || "mesh-file.bin",
+          metaFrame,
+          chunkFrames,
+          totalChunks: chunkFrames.length,
+        }});
+        fileInput.value = "";
+        setFileTransferStatus(`File sent: ${normalizeFileTransferName(file.name)} (${chunkFrames.length} chunk${chunkFrames.length === 1 ? "" : "s"})`);
+        appendFileTransferConsole(
+          `Transfer ${{fileTransferShortTransferId(transferId)}} sent to ${{destination}}. Waiting for ACK from receiver.`
+        );
+        scheduleFileTransferMaintenance(latestState);
+        requestImmediatePoll(40);
+        await poll();
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        setFileTransferStatus(`File send error: ${{msg}}`, true);
+        appendFileTransferConsole(
+          `Send failed for ${{normalizeFileTransferName(file.name)}}: ${{msg}}`,
+          {{ level: "error" }}
+        );
+      }} finally {{
+        setFileTransferBusy(false);
+      }}
+    }}
+
+    function bindFilesControls() {{
+      const destinationInput = document.getElementById("files-destination-input");
+      if (destinationInput instanceof HTMLInputElement && destinationInput.dataset.bound !== "1") {{
+        destinationInput.dataset.bound = "1";
+        destinationInput.addEventListener("input", () => {{
+          const clean = normalizeNodeId(destinationInput.value || "");
+          fileTransferDestinationId = isCanonicalNodeId(clean) ? clean : "";
+          persistFileTransferDestinationPreference();
+        }});
+      }}
+      const useSelectedBtn = document.getElementById("files-use-selected-btn");
+      if (useSelectedBtn instanceof HTMLButtonElement && useSelectedBtn.dataset.bound !== "1") {{
+        useSelectedBtn.dataset.bound = "1";
+        useSelectedBtn.addEventListener("click", () => {{
+          const selected = normalizeNodeId(selectedNodeId || "");
+          if (!isCanonicalNodeId(selected)) {{
+            setFileTransferStatus("Select a node first, or enter a Node ID manually.", true);
+            return;
+          }}
+          if (isSelfNodeId(selected)) {{
+            setFileTransferStatus("Cannot send a file to your own radio.", true);
+            return;
+          }}
+          setFileTransferDestination(selected);
+          setFileTransferStatus(`Destination set to ${{selected}}`);
+          appendFileTransferConsole(`Destination set to ${{selected}}.`);
+        }});
+      }}
+      const sendBtn = document.getElementById("files-send-btn");
+      if (sendBtn instanceof HTMLButtonElement && sendBtn.dataset.bound !== "1") {{
+        sendBtn.dataset.bound = "1";
+        sendBtn.addEventListener("click", () => {{
+          void sendSelectedFileTransfer();
+        }});
+      }}
+      const fileInput = document.getElementById("files-input");
+      if (fileInput instanceof HTMLInputElement && fileInput.dataset.bound !== "1") {{
+        fileInput.dataset.bound = "1";
+        fileInput.addEventListener("change", () => {{
+          const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+          if (!file) {{
+            setFileTransferStatus("");
+            return;
+          }}
+          setFileTransferStatus(`Selected: ${{normalizeFileTransferName(file.name)}} (${{formatFileTransferSize(file.size)}})`);
+        }});
+      }}
+      bindFilesConsoleControls();
+      syncFileTransferDestinationInput();
+    }}
+
+    function safeFileTransferDownloadName(rawName) {{
+      const normalized = normalizeFileTransferName(rawName || "mesh-file.bin");
+      const cleaned = normalized
+        .replace(/[\\x00-\\x1F\\x7F]/g, "")
+        .replace(/[\\\\/:*?"<>|]/g, "_")
+        .replace(/\\s+/g, " ")
+        .trim();
+      return cleaned || "mesh-file.bin";
+    }}
+
+    function fileTransferDirectionMeta(fromId, toId, localNodeId) {{
+      const from = normalizeNodeId(fromId || "");
+      const to = normalizeNodeId(toId || "");
+      const selfId = normalizeNodeId(localNodeId || "");
+      if (isCanonicalNodeId(selfId) && from === selfId) {{
+        return {{
+          className: "outbound",
+          label: "Sent",
+          peerId: to || "",
+        }};
+      }}
+      if (isCanonicalNodeId(selfId) && to === selfId) {{
+        return {{
+          className: "inbound",
+          label: "Recv",
+          peerId: from || "",
+        }};
+      }}
+      return {{
+        className: "other",
+        label: "Seen",
+        peerId: from || to || "",
+      }};
+    }}
+
+    function fileTransferPeerMeta(nodeId, nodesById, localNodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean) {{
+        return {{ label: "n/a", title: "n/a" }};
+      }}
+      if (clean === "^all") {{
+        return {{ label: "All", title: "Broadcast (^all)" }};
+      }}
+      if (isCanonicalNodeId(localNodeId) && clean === normalizeNodeId(localNodeId)) {{
+        return {{ label: "You", title: `You (${{clean}})` }};
+      }}
+      const node = nodesById instanceof Map ? nodesById.get(clean) : null;
+      const preferred = preferredNodeName(node) || nodeNameCache.get(clean) || "";
+      if (preferred) {{
+        return {{ label: preferred, title: `${{preferred}} (${{clean}})` }};
+      }}
+      return {{ label: clean, title: clean }};
+    }}
+
+    function fileTransferKeyOf(fromId, toId, transferId) {{
+      const from = normalizeNodeId(fromId || "");
+      const to = normalizeNodeId(toId || "");
+      const id = String(transferId || "").trim().toLowerCase();
+      return `${{from}}|${{to}}|${{id}}`;
+    }}
+
+    function fileTransferOutgoingTokenFor(transferId, destination, channelIndex) {{
+      const id = String(transferId || "").trim().toLowerCase();
+      const to = normalizeNodeId(destination || "");
+      const ch = normalizeMeshChannelIndex(channelIndex);
+      return `${{id}}|${{to}}|${{ch}}`;
+    }}
+
+    function fileTransferExplicitChannelIndex(rawIndex) {{
+      if (rawIndex == null || rawIndex === "") return null;
+      const num = Number(rawIndex);
+      return Number.isInteger(num) && num >= 0 ? Math.trunc(num) : null;
+    }}
+
+    function findOutgoingFileTransferSession(transferId, destination, channelIndex = null) {{
+      const id = String(transferId || "").trim().toLowerCase();
+      const to = normalizeNodeId(destination || "");
+      if (!id || !isCanonicalNodeId(to)) return null;
+      const explicitChannel = fileTransferExplicitChannelIndex(channelIndex);
+      if (explicitChannel != null) {{
+        const exactToken = fileTransferOutgoingTokenFor(id, to, explicitChannel);
+        const exactSession = fileTransferOutgoingByToken.get(exactToken);
+        if (exactSession && typeof exactSession === "object") {{
+          return exactSession;
+        }}
+      }}
+      let fallback = null;
+      for (const session of fileTransferOutgoingByToken.values()) {{
+        if (!session || typeof session !== "object") continue;
+        if (String(session.transferId || "") !== id) continue;
+        if (normalizeNodeId(session.destination || "") !== to) continue;
+        if (!fallback || Number(session.createdAtMs || 0) > Number(fallback.createdAtMs || 0)) {{
+          fallback = session;
+        }}
+      }}
+      return fallback;
+    }}
+
+    function candidateAckChannelIndexes(transfer) {{
+      const explicit = fileTransferExplicitChannelIndex(transfer && transfer.channelIndex);
+      if (explicit != null) {{
+        return [explicit];
+      }}
+      const ordered = [];
+      const pushIdx = (raw) => {{
+        const idx = normalizeMeshChannelIndex(raw);
+        if (!Number.isInteger(idx) || idx < 0) return;
+        if (!ordered.includes(idx)) {{
+          ordered.push(idx);
+        }}
+      }};
+      pushIdx(activeMeshSendChannelIndex);
+      const activeViewIdx = activeMeshChannelFilterIndex();
+      if (activeViewIdx !== meshChannelAllIndex) {{
+        pushIdx(activeViewIdx);
+      }}
+      pushIdx(0);
+      const options = Array.isArray(meshChannelSendOptions) ? meshChannelSendOptions : [];
+      for (const opt of options) {{
+        pushIdx(opt && opt.index);
+      }}
+      return ordered;
+    }}
+
+    function registerOutgoingFileTransferSession(payload) {{
+      const session = (payload && typeof payload === "object") ? payload : {{}};
+      const token = fileTransferOutgoingTokenFor(
+        session.transferId,
+        session.destination,
+        session.channelIndex
+      );
+      const totalChunks = Math.max(1, Math.trunc(Number(session.totalChunks) || 1));
+      const normalized = {{
+        token,
+        transferId: String(session.transferId || "").trim().toLowerCase(),
+        senderId: normalizeNodeId(session.senderId || ""),
+        destination: normalizeNodeId(session.destination || ""),
+        channelIndex: normalizeMeshChannelIndex(session.channelIndex),
+        fileName: normalizeFileTransferName(session.fileName || "mesh-file.bin"),
+        metaFrame: String(session.metaFrame || "").trim(),
+        chunkFrames: Array.isArray(session.chunkFrames) ? session.chunkFrames.slice() : [],
+        totalChunks,
+        createdAtMs: Date.now(),
+        lastSendAtMs: Date.now(),
+        lastRetryAtMs: 0,
+        retryAttempts: 0,
+        retriesSinceProgress: 0,
+        retryChunkCursor: 0,
+        lastRetryErrorAtMs: 0,
+        maxRetries: Math.max(1, Math.trunc(Number(session.maxRetries) || fileTransferOutgoingMaxRetries)),
+        delivered: false,
+        failed: false,
+        deliveredAtMs: 0,
+        failedAtMs: 0,
+        ackedChunks: 0,
+        lastAckProgressAtMs: 0,
+        lastAckUnix: null,
+        lastAckChannelIndex: null,
+      }};
+      fileTransferOutgoingByToken.set(token, normalized);
+      return normalized;
+    }}
+
+    function pruneOutgoingFileTransferSessions(nowMs = Date.now()) {{
+      for (const [token, session] of fileTransferOutgoingByToken.entries()) {{
+        const createdAtMs = Number(session && session.createdAtMs) || 0;
+        const delivered = !!(session && session.delivered);
+        const failed = !!(session && session.failed);
+        const terminalAt = Number(session && (session.deliveredAtMs || session.failedAtMs)) || 0;
+        const staleTerminal = (delivered || failed) && terminalAt > 0 && (nowMs - terminalAt) > (25 * 60 * 1000);
+        const staleOpen = !delivered && !failed && createdAtMs > 0 && (nowMs - createdAtMs) > (45 * 60 * 1000);
+        if (staleTerminal || staleOpen) {{
+          fileTransferOutgoingByToken.delete(token);
+        }}
+      }}
+    }}
+
+    function collectFileTransferFrames(state = latestState, options = null) {{
+      const respectActiveChannel = !(options && options.respectActiveChannel === false);
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const recentPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const nodesById = new Map(
+        nodes.map((node) => [normalizeNodeId(node && node.id), node])
+      );
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      const transfers = new Map();
+      const ackByTransferKey = new Map();
+      const fileTransferMessages = [];
+
+      for (const msg of recentChat) {{
+        if (!msg || typeof msg !== "object") continue;
+        fileTransferMessages.push(msg);
+      }}
+      for (const entry of recentPackets) {{
+        if (!entry || typeof entry !== "object") continue;
+        const summary = (entry.summary && typeof entry.summary === "object")
+          ? entry.summary
+          : {{}};
+        const packet = (entry.packet && typeof entry.packet === "object")
+          ? entry.packet
+          : {{}};
+        const decoded = (packet.decoded && typeof packet.decoded === "object")
+          ? packet.decoded
+          : {{}};
+        const text = String(summary.decoded_text ?? decoded.text ?? "").trim();
+        if (!text) continue;
+        const endpoints = packetEndpointIds(entry);
+        const packetChannelIndex = explicitPacketChannelIndex(entry);
+        fileTransferMessages.push({{
+          text,
+          from: endpoints.fromId || "",
+          to: endpoints.toId || "",
+          rx_time: summary.rx_time ?? entry.rx_time ?? "",
+          captured_at: summary.captured_at ?? entry.captured_at ?? "",
+          channel: Number.isInteger(packetChannelIndex) && packetChannelIndex >= 0 ? packetChannelIndex : null,
+        }});
+      }}
+
+      for (const msg of fileTransferMessages) {{
+        if (!msg || typeof msg !== "object") continue;
+        const activeIdx = activeMeshChannelFilterIndex();
+        const msgChannelIndex = explicitMessageMeshChannelIndex(msg);
+        if (respectActiveChannel && activeIdx !== meshChannelAllIndex) {{
+          if (!Number.isInteger(msgChannelIndex) || msgChannelIndex < 0 || msgChannelIndex !== activeIdx) {{
+            continue;
+          }}
+        }}
+        const frame = parseFileTransferFrameText(msg.text);
+        if (!frame) continue;
+        const fromId = normalizeNodeId(msg.from || "");
+        const toId = normalizeNodeId(msg.to || msg.destination || "");
+        const msgUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
+        const explicitChannelIndex = Number.isInteger(msgChannelIndex) && msgChannelIndex >= 0
+          ? Math.trunc(msgChannelIndex)
+          : null;
+
+        if (frame.kind === "ack") {{
+          const transferKey = fileTransferKeyOf(toId, fromId, frame.transferId);
+          const receivedSet = decodeFileTransferChunkBitmap(frame.bitmap, frame.totalChunks);
+          const receivedCount = Math.max(
+            Math.min(frame.totalChunks, frame.receivedCount),
+            Math.min(frame.totalChunks, receivedSet.size)
+          );
+          const ack = {{
+            transferKey,
+            transferId: frame.transferId,
+            originalSenderId: toId,
+            originalReceiverId: fromId,
+            channelIndex: explicitChannelIndex,
+            receivedCount,
+            totalChunks: Math.max(1, Math.trunc(Number(frame.totalChunks) || 1)),
+            bitmap: frame.bitmap,
+            receivedSet,
+            complete: receivedCount >= Math.max(1, Math.trunc(Number(frame.totalChunks) || 1)),
+            latestUnix: msgUnix || 0,
+          }};
+          const prev = ackByTransferKey.get(transferKey);
+          if (!prev || Number(ack.latestUnix || 0) >= Number(prev.latestUnix || 0)) {{
+            ackByTransferKey.set(transferKey, ack);
+          }}
+          continue;
+        }}
+
+        const key = fileTransferKeyOf(fromId, toId, frame.transferId);
+        let transfer = transfers.get(key);
+        if (!transfer) {{
+          transfer = {{
+            key,
+            transferId: frame.transferId,
+            fromId,
+            toId,
+            channelIndex: explicitChannelIndex,
+            firstUnix: null,
+            latestUnix: null,
+            fileName: "",
+            fileSize: null,
+            totalChunks: null,
+            chunks: new Map(),
+            hasDecodeError: false,
+          }};
+          transfers.set(key, transfer);
+        }}
+
+        if (!transfer.fromId && fromId) transfer.fromId = fromId;
+        if (!transfer.toId && toId) transfer.toId = toId;
+        if (msgUnix && (!transfer.firstUnix || msgUnix < transfer.firstUnix)) {{
+          transfer.firstUnix = msgUnix;
+        }}
+        transfer.latestUnix = latestUnixTimestamp(transfer.latestUnix, msgUnix);
+        if (Number.isInteger(explicitChannelIndex) && explicitChannelIndex >= 0) {{
+          transfer.channelIndex = explicitChannelIndex;
+        }}
+
+        if (frame.kind === "meta") {{
+          transfer.fileName = normalizeFileTransferName(frame.fileName || transfer.fileName || "mesh-file.bin");
+          transfer.fileSize = Math.max(0, Math.trunc(Number(frame.fileSize) || 0));
+          transfer.totalChunks = Math.max(1, Math.trunc(Number(frame.totalChunks) || 1));
+          continue;
+        }}
+
+        if (frame.kind === "chunk") {{
+          if (transfer.chunks.has(frame.chunkIndex)) {{
+            continue;
+          }}
+          const bytes = decodeBase64ToBytes(frame.chunkData);
+          if (!(bytes instanceof Uint8Array)) {{
+            transfer.hasDecodeError = true;
+            continue;
+          }}
+          transfer.chunks.set(frame.chunkIndex, bytes);
+        }}
+      }}
+
+      const nowMs = Date.now();
+      const activeTransferKeys = new Set();
+      for (const [key, transfer] of transfers.entries()) {{
+        if (!transfer || typeof transfer !== "object") continue;
+        activeTransferKeys.add(key);
+        const cacheRaw = fileTransferChunkCacheByKey.get(key);
+        let cacheChunks = new Map();
+        let cacheTotalChunks = null;
+        let cacheFileName = "";
+        let cacheFileSize = null;
+        let cacheChannelIndex = null;
+        let cacheLatestUnix = 0;
+        if (cacheRaw && typeof cacheRaw === "object") {{
+          const rawTotalChunks = Math.trunc(Number(cacheRaw.totalChunks));
+          if (Number.isFinite(rawTotalChunks) && rawTotalChunks > 0) {{
+            cacheTotalChunks = rawTotalChunks;
+          }}
+          cacheFileName = normalizeFileTransferName(cacheRaw.fileName || "");
+          const rawFileSize = Number(cacheRaw.fileSize);
+          if (Number.isFinite(rawFileSize) && rawFileSize >= 0) {{
+            cacheFileSize = Math.max(0, Math.trunc(rawFileSize));
+          }}
+          cacheChannelIndex = fileTransferExplicitChannelIndex(cacheRaw.channelIndex);
+          cacheLatestUnix = Math.max(0, Math.trunc(Number(cacheRaw.latestUnix) || 0));
+          if (cacheRaw.chunks instanceof Map) {{
+            for (const [idxRaw, bytes] of cacheRaw.chunks.entries()) {{
+              const idx = Math.trunc(Number(idxRaw));
+              if (!Number.isFinite(idx) || idx < 0) continue;
+              if (!(bytes instanceof Uint8Array)) continue;
+              cacheChunks.set(idx, bytes);
+            }}
+          }}
+        }}
+        const transferTotalChunksRaw = Math.trunc(Number(transfer.totalChunks));
+        const transferTotalChunks = Number.isFinite(transferTotalChunksRaw) && transferTotalChunksRaw > 0
+          ? transferTotalChunksRaw
+          : null;
+        if (cacheTotalChunks != null && transferTotalChunks != null && cacheTotalChunks !== transferTotalChunks) {{
+          cacheChunks = new Map();
+          cacheTotalChunks = transferTotalChunks;
+        }}
+        for (const [idxRaw, bytes] of transfer.chunks.entries()) {{
+          const idx = Math.trunc(Number(idxRaw));
+          if (!Number.isFinite(idx) || idx < 0) continue;
+          if (!(bytes instanceof Uint8Array)) continue;
+          cacheChunks.set(idx, bytes);
+        }}
+        const effectiveTotalChunks = transferTotalChunks != null ? transferTotalChunks : cacheTotalChunks;
+        if (effectiveTotalChunks != null) {{
+          for (const idx of Array.from(cacheChunks.keys())) {{
+            if (idx >= effectiveTotalChunks) {{
+              cacheChunks.delete(idx);
+            }}
+          }}
+        }}
+        transfer.chunks = cacheChunks;
+        if (transferTotalChunks == null && effectiveTotalChunks != null) {{
+          transfer.totalChunks = effectiveTotalChunks;
+        }}
+        if (!transfer.fileName && cacheFileName) {{
+          transfer.fileName = cacheFileName;
+        }}
+        const transferFileSize = Number(transfer.fileSize);
+        const hasTransferFileSize = Number.isFinite(transferFileSize) && transferFileSize >= 0;
+        if (!hasTransferFileSize && cacheFileSize != null) {{
+          transfer.fileSize = cacheFileSize;
+        }}
+        if (fileTransferExplicitChannelIndex(transfer.channelIndex) == null && cacheChannelIndex != null) {{
+          transfer.channelIndex = cacheChannelIndex;
+        }}
+        transfer.latestUnix = latestUnixTimestamp(transfer.latestUnix, cacheLatestUnix);
+        fileTransferChunkCacheByKey.set(key, {{
+          chunks: cacheChunks,
+          totalChunks: effectiveTotalChunks,
+          fileName: normalizeFileTransferName(transfer.fileName || cacheFileName || "mesh-file.bin"),
+          fileSize: Number.isFinite(Number(transfer.fileSize)) ? Math.max(0, Math.trunc(Number(transfer.fileSize) || 0)) : null,
+          channelIndex: fileTransferExplicitChannelIndex(transfer.channelIndex),
+          latestUnix: Number(transfer.latestUnix || transfer.firstUnix || 0),
+          lastSeenAtMs: nowMs,
+        }});
+      }}
+      const staleChunkCutoffMs = nowMs - (45 * 60 * 1000);
+      for (const [key, cacheRaw] of fileTransferChunkCacheByKey.entries()) {{
+        if (activeTransferKeys.has(key)) continue;
+        const lastSeenAtMs = Number(cacheRaw && cacheRaw.lastSeenAtMs) || 0;
+        if (lastSeenAtMs <= 0 || lastSeenAtMs < staleChunkCutoffMs) {{
+          fileTransferChunkCacheByKey.delete(key);
+        }}
+      }}
+
+      return {{
+        transfers,
+        ackByTransferKey,
+        nodesById,
+        localNodeId,
+      }};
+    }}
+
+    function buildFileTransferRows(state = latestState) {{
+      const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: true }});
+      const transfers = frameState.transfers;
+      const ackByTransferKey = frameState.ackByTransferKey;
+      const nodesById = frameState.nodesById;
+      const localNodeId = frameState.localNodeId;
+      const rows = [];
+      for (const transfer of transfers.values()) {{
+        const direction = fileTransferDirectionMeta(transfer.fromId, transfer.toId, localNodeId);
+        const peerMeta = fileTransferPeerMeta(direction.peerId, nodesById, localNodeId);
+        const expectedChunks = Number.isInteger(transfer.totalChunks) && transfer.totalChunks > 0
+          ? transfer.totalChunks
+          : Math.max(transfer.chunks.size, 1);
+        const receivedChunks = transfer.chunks.size;
+        let contiguous = receivedChunks >= expectedChunks;
+        if (contiguous) {{
+          for (let idx = 0; idx < expectedChunks; idx += 1) {{
+            if (!(transfer.chunks.get(idx) instanceof Uint8Array)) {{
+              contiguous = false;
+              break;
+            }}
+          }}
+        }}
+
+        let observedBytes = 0;
+        for (const bytes of transfer.chunks.values()) {{
+          observedBytes += Number(bytes && bytes.length) || 0;
+        }}
+
+        const declaredBytes = Number.isFinite(transfer.fileSize) ? Math.max(0, Math.trunc(Number(transfer.fileSize) || 0)) : null;
+        let assembled = null;
+        let complete = false;
+        let assembleError = "";
+        if (contiguous && expectedChunks > 0) {{
+          let totalLen = 0;
+          for (let idx = 0; idx < expectedChunks; idx += 1) {{
+            const part = transfer.chunks.get(idx);
+            totalLen += Number(part && part.length) || 0;
+          }}
+          const merged = new Uint8Array(totalLen);
+          let cursor = 0;
+          for (let idx = 0; idx < expectedChunks; idx += 1) {{
+            const part = transfer.chunks.get(idx);
+            if (!(part instanceof Uint8Array)) {{
+              assembleError = "Missing chunk data";
+              break;
+            }}
+            merged.set(part, cursor);
+            cursor += part.length;
+          }}
+          if (!assembleError) {{
+            let mergedView = merged;
+            if (declaredBytes != null) {{
+              if (declaredBytes < merged.length) {{
+                mergedView = merged.slice(0, declaredBytes);
+              }} else if (declaredBytes > merged.length) {{
+                assembleError = `Missing ${{declaredBytes - merged.length}} byte${{declaredBytes - merged.length === 1 ? "" : "s"}}`;
+              }}
+            }}
+            if (!assembleError) {{
+              assembled = new Uint8Array(mergedView);
+              complete = true;
+            }}
+          }}
+        }}
+
+        const percent = Math.max(
+          0,
+          Math.min(100, Math.round((receivedChunks / Math.max(expectedChunks, 1)) * 100))
+        );
+        const outgoing = direction.className === "outbound";
+        const ack = outgoing ? (ackByTransferKey.get(transfer.key) || null) : null;
+        const ackedChunks = ack
+          ? Math.max(
+            0,
+            Math.min(
+              expectedChunks,
+              Math.max(
+                Number(ack.receivedCount || 0),
+                (ack.receivedSet instanceof Set ? ack.receivedSet.size : 0)
+              )
+            )
+          )
+          : 0;
+        const deliveryPct = Math.max(0, Math.min(100, Math.round((ackedChunks / Math.max(expectedChunks, 1)) * 100)));
+        const outgoingSession = outgoing
+          ? findOutgoingFileTransferSession(transfer.transferId, transfer.toId, transfer.channelIndex)
+          : null;
+        const transferChannelIndex = fileTransferExplicitChannelIndex(transfer.channelIndex);
+        const sessionChannelIndex = fileTransferExplicitChannelIndex(outgoingSession && outgoingSession.channelIndex);
+        const resolvedChannelIndex = transferChannelIndex != null ? transferChannelIndex : sessionChannelIndex;
+        let delivered = outgoing
+          ? !!(ack && ack.complete && ackedChunks >= expectedChunks)
+          : complete;
+        if (outgoingSession && outgoingSession.delivered) {{
+          delivered = true;
+        }}
+
+        let progressLabel = "";
+        let progressSort = 0;
+        let outgoingRetrying = false;
+        if (outgoing) {{
+          if (outgoingSession && outgoingSession.failed && !delivered) {{
+            progressLabel = `Delivery failed (${{ackedChunks}}/${{expectedChunks}} acked)`;
+            progressSort = deliveryPct;
+          }} else if (delivered) {{
+            progressLabel = `Delivered (${{Math.max(ackedChunks, expectedChunks)}}/${{expectedChunks}} acked)`;
+            progressSort = 220;
+          }} else if (ack) {{
+            progressLabel = `${{deliveryPct}}% delivered (${{ackedChunks}}/${{expectedChunks}} acked)`;
+            progressSort = 100 + deliveryPct;
+          }} else {{
+            progressLabel = `Awaiting ACK (0/${{expectedChunks}} acked)`;
+            progressSort = 25;
+          }}
+          const activeRetries = Math.max(
+            0,
+            Math.trunc(Number(outgoingSession && outgoingSession.retriesSinceProgress) || Number(outgoingSession && outgoingSession.retryAttempts) || 0)
+          );
+          if (outgoingSession && !outgoingSession.delivered && !outgoingSession.failed && activeRetries > 0) {{
+            outgoingRetrying = true;
+            progressLabel = `${{progressLabel}} • retry ${{activeRetries}}/${{outgoingSession.maxRetries}}`;
+          }}
+        }} else {{
+          progressLabel = complete
+            ? "Complete"
+            : `${{percent}}% (${{receivedChunks}}/${{expectedChunks}} chunks)`;
+          progressSort = complete ? 100 : percent;
+          if (!complete && transfer.hasDecodeError) {{
+            progressLabel = "Error (invalid chunk)";
+          }} else if (!complete && assembleError) {{
+            progressLabel = `Error (${{assembleError}})`;
+          }}
+        }}
+
+        const sizeLabel = (() => {{
+          if (declaredBytes == null) {{
+            return formatFileTransferSize(observedBytes);
+          }}
+          if (complete || observedBytes <= 0) {{
+            return formatFileTransferSize(declaredBytes);
+          }}
+          if (observedBytes === declaredBytes) {{
+            return formatFileTransferSize(declaredBytes);
+          }}
+          return `${{formatFileTransferSize(observedBytes)}} / ${{formatFileTransferSize(declaredBytes)}}`;
+        }})();
+        const fileName = normalizeFileTransferName(transfer.fileName || `file-${{transfer.transferId}}.bin`);
+        const channelLabel = resolvedChannelIndex == null
+          ? "Unknown"
+          : meshChannelLabelForIndex(resolvedChannelIndex, {{ allowAll: false }});
+        const sortUnix = Number(transfer.latestUnix || transfer.firstUnix || 0);
+        rows.push({{
+          key: transfer.key,
+          transferId: transfer.transferId,
+          unix: sortUnix > 0 ? sortUnix : null,
+          sortUnix,
+          directionClass: direction.className,
+          directionLabel: direction.label,
+          peerId: direction.peerId,
+          peerLabel: peerMeta.label,
+          peerTitle: peerMeta.title,
+          fileName,
+          downloadName: safeFileTransferDownloadName(fileName),
+          progressLabel,
+          progressSort,
+          sizeLabel,
+          sizeSort: declaredBytes != null ? declaredBytes : observedBytes,
+          channelIndex: resolvedChannelIndex,
+          channelLabel,
+          delivered,
+          outgoingRetrying,
+          canDownload: complete && assembled instanceof Uint8Array,
+          bytes: assembled,
+        }});
+      }}
+
+      rows.sort((a, b) => {{
+        const unixDiff = Number(b.sortUnix || 0) - Number(a.sortUnix || 0);
+        if (unixDiff !== 0) return unixDiff;
+        const nameDiff = String(a.fileName || "").localeCompare(String(b.fileName || ""));
+        if (nameDiff !== 0) return nameDiff;
+        return String(a.key || "").localeCompare(String(b.key || ""));
+      }});
+      return rows;
+    }}
+
+    function fileTransferMissingChunkIndexes(totalChunks, receivedSet) {{
+      const total = Math.max(1, Math.trunc(Number(totalChunks) || 1));
+      const seen = receivedSet instanceof Set ? receivedSet : new Set();
+      const missing = [];
+      for (let idx = 0; idx < total; idx += 1) {{
+        if (!seen.has(idx)) {{
+          missing.push(idx);
+        }}
+      }}
+      return missing;
+    }}
+
+    function findAckForOutgoingSession(session, ackByTransferKey, localNodeId) {{
+      if (!session || !(ackByTransferKey instanceof Map)) return null;
+      const senderId = normalizeNodeId(localNodeId || session.senderId || "");
+      const expectedReceiver = normalizeNodeId(session.destination || "");
+      const expectedChannel = fileTransferExplicitChannelIndex(session.channelIndex);
+      if (!isCanonicalNodeId(expectedReceiver)) return null;
+      const directKey = isCanonicalNodeId(senderId)
+        ? fileTransferKeyOf(senderId, expectedReceiver, session.transferId)
+        : "";
+      if (directKey && ackByTransferKey.has(directKey)) {{
+        return ackByTransferKey.get(directKey) || null;
+      }}
+      function ackChannelMatchScore(ack) {{
+        if (!ack || typeof ack !== "object") return 0;
+        const ackChannel = fileTransferExplicitChannelIndex(ack.channelIndex);
+        if (expectedChannel == null || ackChannel == null) return 1;
+        return ackChannel === expectedChannel ? 2 : 0;
+      }}
+      let fallback = null;
+      let fallbackScore = -1;
+      for (const ack of ackByTransferKey.values()) {{
+        if (!ack || typeof ack !== "object") continue;
+        if (String(ack.transferId || "") !== String(session.transferId || "")) continue;
+        const ackOriginalReceiver = normalizeNodeId(ack.originalReceiverId || "");
+        const ackOriginalSender = normalizeNodeId(ack.originalSenderId || "");
+        if (isCanonicalNodeId(ackOriginalReceiver) && ackOriginalReceiver !== expectedReceiver) continue;
+        if (isCanonicalNodeId(senderId) && isCanonicalNodeId(ackOriginalSender) && ackOriginalSender !== senderId) continue;
+        const endpointConfidence = (
+          (isCanonicalNodeId(ackOriginalReceiver) && ackOriginalReceiver === expectedReceiver)
+          || (isCanonicalNodeId(senderId) && isCanonicalNodeId(ackOriginalSender) && ackOriginalSender === senderId)
+        );
+        if (!endpointConfidence) {{
+          const endpointsUnknown = !isCanonicalNodeId(ackOriginalReceiver) && !isCanonicalNodeId(ackOriginalSender);
+          if (!endpointsUnknown) {{
+            continue;
+          }}
+        }}
+        const score = ackChannelMatchScore(ack);
+        if (
+          !fallback
+          || score > fallbackScore
+          || (score === fallbackScore && Number(ack.latestUnix || 0) > Number(fallback.latestUnix || 0))
+        ) {{
+          fallback = ack;
+          fallbackScore = score;
+        }}
+      }}
+      if (fallback) {{
+        return fallback;
+      }}
+      // Final escape hatch: if endpoints are missing or inconsistent in packet metadata,
+      // a transferId-only match is still safe because transfer IDs are random per send.
+      let transferIdOnlyFallback = null;
+      let transferIdOnlyScore = -1;
+      for (const ack of ackByTransferKey.values()) {{
+        if (!ack || typeof ack !== "object") continue;
+        if (String(ack.transferId || "") !== String(session.transferId || "")) continue;
+        const score = ackChannelMatchScore(ack);
+        if (
+          !transferIdOnlyFallback
+          || score > transferIdOnlyScore
+          || (score === transferIdOnlyScore
+            && Number(ack.latestUnix || 0) > Number(transferIdOnlyFallback.latestUnix || 0))
+        ) {{
+          transferIdOnlyFallback = ack;
+          transferIdOnlyScore = score;
+        }}
+      }}
+      if (transferIdOnlyFallback) {{
+        return transferIdOnlyFallback;
+      }}
+      return fallback;
+    }}
+
+    async function maybeSendFileTransferAckFrames(state = latestState) {{
+      const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: false }});
+      const localNodeId = normalizeNodeId(frameState.localNodeId || "");
+      if (!isCanonicalNodeId(localNodeId)) return;
+      const nowMs = Date.now();
+      const nowUnix = Math.trunc(nowMs / 1000);
+      const activeAckTransferKeys = new Set();
+      for (const transfer of frameState.transfers.values()) {{
+        if (!transfer || typeof transfer !== "object") continue;
+        const receiverId = normalizeNodeId(transfer.toId || "");
+        const senderId = normalizeNodeId(transfer.fromId || "");
+        if (receiverId !== localNodeId) continue;
+        if (!isCanonicalNodeId(senderId) || senderId === localNodeId) continue;
+        const transferLatestUnix = Math.max(
+          0,
+          Math.trunc(Number(transfer.latestUnix || transfer.firstUnix) || 0)
+        );
+        if (
+          transferLatestUnix > 0
+          && (nowUnix - transferLatestUnix) > fileTransferAckActiveTransferWindowSec
+        ) {{
+          continue;
+        }}
+        const totalChunksRaw = Math.trunc(Number(transfer.totalChunks));
+        if (!Number.isFinite(totalChunksRaw) || totalChunksRaw <= 0) continue;
+        const totalChunks = totalChunksRaw;
+        const transferKey = String(transfer.key || "").trim();
+        if (!transferKey) continue;
+        activeAckTransferKeys.add(transferKey);
+        const receivedIndexes = Array.from(transfer.chunks.keys())
+          .map((idx) => Math.trunc(Number(idx)))
+          .filter((idx) => Number.isFinite(idx) && idx >= 0 && idx < totalChunks)
+          .sort((a, b) => a - b);
+        let observedIndexes = new Set();
+        const observedRaw = fileTransferAckObservedChunksByKey.get(transferKey);
+        if (
+          observedRaw
+          && typeof observedRaw === "object"
+          && Number(observedRaw.totalChunks || 0) === totalChunks
+          && observedRaw.indexes instanceof Set
+        ) {{
+          for (const idxRaw of observedRaw.indexes) {{
+            const idx = Math.trunc(Number(idxRaw));
+            if (Number.isFinite(idx) && idx >= 0 && idx < totalChunks) {{
+              observedIndexes.add(idx);
+            }}
+          }}
+        }}
+        for (const idx of receivedIndexes) {{
+          observedIndexes.add(idx);
+        }}
+        const mergedIndexes = Array.from(observedIndexes).sort((a, b) => a - b);
+        const bitmap = buildFileTransferChunkBitmapBase64(totalChunks, mergedIndexes);
+        if (!bitmap) continue;
+        const receivedCount = Math.max(0, Math.min(totalChunks, mergedIndexes.length));
+        fileTransferAckObservedChunksByKey.set(transferKey, {{
+          totalChunks,
+          indexes: observedIndexes,
+          lastSeenAtMs: nowMs,
+        }});
+        const signature = `${{receivedCount}}/${{totalChunks}}|${{bitmap}}`;
+        const prior = fileTransferAckSentState.get(transferKey) || null;
+        const lastSentAtMs = Number(prior && prior.lastSentAtMs) || 0;
+        const firstSentAtMs = Number(prior && prior.firstSentAtMs) || 0;
+        const periodicRefreshCount = Math.max(
+          0,
+          Math.trunc(Number(prior && prior.periodicRefreshCount) || 0)
+        );
+        const signatureChanged = !prior || signature !== String(prior.signature || "");
+        const periodicWithinWindow = firstSentAtMs <= 0
+          || (nowMs - firstSentAtMs) <= fileTransferAckPeriodicRefreshWindowMs;
+        const unknownChannelRefreshMs = Math.max(
+          fileTransferAckPeriodicRefreshMs,
+          fileTransferAckUnknownProbeRotateIntervalMs
+        );
+        const periodicRefreshMs = fileTransferExplicitChannelIndex(transfer.channelIndex) == null
+          ? unknownChannelRefreshMs
+          : fileTransferAckPeriodicRefreshMs;
+        const periodicRefresh = !signatureChanged
+          && receivedCount < totalChunks
+          && periodicRefreshCount < fileTransferAckPeriodicRefreshMax
+          && periodicWithinWindow
+          && (nowMs - lastSentAtMs) > periodicRefreshMs;
+        if (!signatureChanged && !periodicRefresh) {{
+          continue;
+        }}
+        if (lastSentAtMs > 0 && (nowMs - lastSentAtMs) < fileTransferMaintenanceCooldownMs) {{
+          continue;
+        }}
+        const ackChannelIndex = fileTransferExplicitChannelIndex(transfer.channelIndex);
+        const ackChannels = candidateAckChannelIndexes(transfer);
+        if (!ackChannels.length) {{
+          continue;
+        }}
+        const channelUnknown = ackChannelIndex == null;
+        let sendChannels = ackChannels.slice();
+        if (channelUnknown) {{
+          const probeRaw = fileTransferAckProbeStateByKey.get(transferKey);
+          const priorProbeCount = Math.max(0, Math.trunc(Number(probeRaw && probeRaw.lastReceivedCount) || 0));
+          let stagnationCount = Math.max(0, Math.trunc(Number(probeRaw && probeRaw.stagnationCount) || 0));
+          if (receivedCount > priorProbeCount) {{
+            stagnationCount = 0;
+          }} else if (probeRaw) {{
+            stagnationCount += 1;
+          }}
+          const priorProbeChannels = Array.isArray(probeRaw && probeRaw.channels)
+            ? probeRaw.channels
+                .map((idxRaw) => normalizeMeshChannelIndex(idxRaw))
+                .filter((idx, idxPos, list) => Number.isInteger(idx) && idx >= 0 && list.indexOf(idx) === idxPos)
+            : [];
+          const priorProbeChannel = priorProbeChannels.length > 0
+            ? priorProbeChannels[0]
+            : null;
+          const priorRotateAtMs = Math.max(0, Math.trunc(Number(probeRaw && probeRaw.lastRotateAtMs) || 0));
+          const priorProgressAtMs = Math.max(
+            0,
+            Math.trunc(Number(probeRaw && probeRaw.lastProgressAtMs) || 0)
+          );
+          const sawProgressThisTick = receivedCount > priorProbeCount;
+          const lastProgressAtMs = sawProgressThisTick
+            ? nowMs
+            : (priorProgressAtMs > 0 ? priorProgressAtMs : nowMs);
+          const noProgressMs = Math.max(0, nowMs - lastProgressAtMs);
+          let nextRotateAtMs = priorRotateAtMs > 0 ? priorRotateAtMs : nowMs;
+          if (fileTransferAckUnknownLockChannel) {{
+            let lockedChannel = fileTransferExplicitChannelIndex(probeRaw && probeRaw.lockedChannelIndex);
+            if (!Number.isInteger(lockedChannel) || lockedChannel < 0 || !sendChannels.includes(lockedChannel)) {{
+              lockedChannel = sendChannels.length > 0 ? sendChannels[0] : null;
+              nextRotateAtMs = nowMs;
+            }}
+            if (Number.isInteger(lockedChannel) && lockedChannel >= 0) {{
+              sendChannels = [lockedChannel];
+            }}
+          }} else {{
+            const shouldRotate = (
+              stagnationCount >= fileTransferAckUnknownProbeStagnationThreshold
+              || (priorRotateAtMs <= 0)
+              || (noProgressMs >= fileTransferAckUnknownProbeRotateIntervalMs)
+            );
+            if (Number.isInteger(priorProbeChannel) && !shouldRotate) {{
+              sendChannels = [priorProbeChannel];
+            }} else {{
+              const priorCursor = Math.max(
+                0,
+                Math.trunc(Number(fileTransferAckProbeCursorByKey.get(transferKey) || 0))
+              );
+              const selected = sendChannels.length > 0
+                ? [sendChannels[priorCursor % sendChannels.length]]
+                : [];
+              if (selected.length > 0) {{
+                const nextCursor = (priorCursor + 1) % sendChannels.length;
+                fileTransferAckProbeCursorByKey.set(transferKey, nextCursor);
+                sendChannels = selected;
+                stagnationCount = 0;
+              }}
+            }}
+            const nextProbeChannel = sendChannels.length > 0 ? sendChannels[0] : null;
+            const rotated = Number.isInteger(priorProbeChannel) && Number.isInteger(nextProbeChannel)
+              ? nextProbeChannel !== priorProbeChannel
+              : true;
+            nextRotateAtMs = rotated
+              ? nowMs
+              : (priorRotateAtMs > 0 ? priorRotateAtMs : nowMs);
+          }}
+          if (sendChannels.length > 1) {{
+            sendChannels = [sendChannels[0]];
+          }}
+          const nextProbeChannel = sendChannels.length > 0 ? sendChannels[0] : null;
+          fileTransferAckProbeStateByKey.set(transferKey, {{
+            channels: sendChannels.slice(),
+            stagnationCount,
+            lastReceivedCount: receivedCount,
+            lastProgressAtMs,
+            lastRotateAtMs: nextRotateAtMs,
+            lockedChannelIndex: nextProbeChannel,
+            updatedAtMs: nowMs,
+          }});
+          const lastWarnMs = Number(fileTransferAckMissingChannelWarnByKey.get(transferKey) || 0);
+          if ((nowMs - lastWarnMs) > fileTransferAckUnknownWarnIntervalMs) {{
+            fileTransferAckMissingChannelWarnByKey.set(transferKey, nowMs);
+            const labels = sendChannels.map((idx) => meshChannelLabelForIndex(idx, {{ allowAll: false }}));
+            appendFileTransferConsole(
+              `ACK channel unknown for ${{fileTransferShortTransferId(transfer.transferId)}} from ${{senderId}}. ${{fileTransferAckUnknownLockChannel ? "Locked on" : "Probing on"}} ${{labels.join(", ")}}.`,
+              {{ level: "warn" }}
+            );
+          }}
+        }} else {{
+          fileTransferAckMissingChannelWarnByKey.delete(transferKey);
+          fileTransferAckProbeCursorByKey.delete(transferKey);
+          fileTransferAckProbeStateByKey.delete(transferKey);
+        }}
+        const frame = buildFileTransferAckFrame(
+          transfer.transferId,
+          receivedCount,
+          totalChunks,
+          bitmap
+        );
+        if (utf8ByteLength(frame) > fileTransferChatMaxBytes) {{
+          continue;
+        }}
+        try {{
+          let sentChannels = [];
+          for (let idx = 0; idx < sendChannels.length; idx += 1) {{
+            const channelIndex = sendChannels[idx];
+            try {{
+              await sendFileTransferFrameText(frame, senderId, channelIndex);
+              sentChannels.push(channelIndex);
+            }} catch (_err) {{
+            }}
+            if (idx + 1 < sendChannels.length) {{
+              await waitFileTransferFrameGap();
+            }}
+          }}
+          if (!sentChannels.length) {{
+            throw new Error("no usable send channel for ACK");
+          }}
+          const sentAtMs = Date.now();
+          const nextPeriodicRefreshCount = signatureChanged
+            ? 0
+            : Math.max(0, periodicRefreshCount + (periodicRefresh ? 1 : 0));
+          const nextFirstSentAtMs = signatureChanged
+            ? sentAtMs
+            : (firstSentAtMs > 0 ? firstSentAtMs : sentAtMs);
+          fileTransferAckSentState.set(transferKey, {{
+            signature,
+            firstSentAtMs: nextFirstSentAtMs,
+            lastSentAtMs: sentAtMs,
+            periodicRefreshCount: nextPeriodicRefreshCount,
+            receivedCount,
+            totalChunks,
+          }});
+          if (signatureChanged || receivedCount >= totalChunks) {{
+            const channelLabel = sentChannels.length <= 1
+              ? meshChannelLabelForIndex(sentChannels[0], {{ allowAll: false }})
+              : `fallback channels (${sentChannels.map((idx) => meshChannelLabelForIndex(idx, {{ allowAll: false }})).join(", ")})`;
+            appendFileTransferConsole(
+              `ACK sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer.transferId)}} (${{receivedCount}}/${{totalChunks}} chunks) on ${{channelLabel}}.`
+            );
+          }}
+        }} catch (err) {{
+          const msg = err instanceof Error ? err.message : String(err || "unknown error");
+          appendFileTransferConsole(
+            `ACK send failed to ${{senderId}} for ${{fileTransferShortTransferId(transfer.transferId)}}: ${{msg}}`,
+            {{ level: "error" }}
+          );
+        }}
+      }}
+      const staleCutoffMs = nowMs - (20 * 60 * 1000);
+      for (const [key, value] of fileTransferAckObservedChunksByKey.entries()) {{
+        const seenAtMs = Number(value && value.lastSeenAtMs) || 0;
+        if (seenAtMs > 0 && seenAtMs < staleCutoffMs) {{
+          fileTransferAckObservedChunksByKey.delete(key);
+        }}
+      }}
+      for (const [key, value] of fileTransferAckProbeStateByKey.entries()) {{
+        const updatedAtMs = Number(value && value.updatedAtMs) || 0;
+        if (updatedAtMs > 0 && updatedAtMs < staleCutoffMs) {{
+          fileTransferAckProbeStateByKey.delete(key);
+        }}
+      }}
+      for (const [key, value] of fileTransferAckMissingChannelWarnByKey.entries()) {{
+        const warnAtMs = Number(value) || 0;
+        if (warnAtMs > 0 && warnAtMs < staleCutoffMs) {{
+          fileTransferAckMissingChannelWarnByKey.delete(key);
+        }}
+      }}
+      for (const key of Array.from(fileTransferAckProbeCursorByKey.keys())) {{
+        if (!activeAckTransferKeys.has(key) && !fileTransferAckProbeStateByKey.has(key)) {{
+          fileTransferAckProbeCursorByKey.delete(key);
+        }}
+      }}
+    }}
+
+    async function maintainOutgoingFileTransferSessions(state = latestState) {{
+      if (!(state && typeof state === "object")) return;
+      if (fileTransferOutgoingByToken.size <= 0) return;
+      const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: false }});
+      const ackByTransferKey = frameState.ackByTransferKey;
+      const localNodeId = normalizeNodeId(frameState.localNodeId || "");
+      const nowMs = Date.now();
+      for (const [token, session] of fileTransferOutgoingByToken.entries()) {{
+        if (!session || typeof session !== "object") {{
+          fileTransferOutgoingByToken.delete(token);
+          continue;
+        }}
+        if (session.delivered || session.failed) {{
+          continue;
+        }}
+        const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
+        if (ack) {{
+          const ackChannelIndex = fileTransferExplicitChannelIndex(ack.channelIndex);
+          const sendChannelIndex = fileTransferExplicitChannelIndex(session.channelIndex);
+          if (ackChannelIndex != null && sendChannelIndex != null && ackChannelIndex !== sendChannelIndex) {{
+            const priorLoggedAckChannel = fileTransferExplicitChannelIndex(session.lastAckChannelIndex);
+            if (priorLoggedAckChannel !== ackChannelIndex) {{
+              appendFileTransferConsole(
+                `ACK for ${{fileTransferShortTransferId(session.transferId)}} arrived on ${{meshChannelLabelForIndex(ackChannelIndex, {{ allowAll: false }})}} (send channel was ${{meshChannelLabelForIndex(sendChannelIndex, {{ allowAll: false }})}}).`
+              );
+            }}
+          }}
+          session.lastAckChannelIndex = ackChannelIndex;
+          const priorAckedChunks = Math.max(
+            0,
+            Math.min(
+              session.totalChunks,
+              Math.trunc(Number(session.ackedChunks) || 0)
+            )
+          );
+          const ackedChunksObserved = Math.max(
+            0,
+            Math.min(
+              session.totalChunks,
+              Math.max(
+                Number(ack.receivedCount || 0),
+                (ack.receivedSet instanceof Set ? ack.receivedSet.size : 0)
+              )
+            )
+          );
+          const ackedChunks = Math.max(priorAckedChunks, ackedChunksObserved);
+          session.ackedChunks = ackedChunks;
+          session.lastAckUnix = ack.latestUnix || session.lastAckUnix || null;
+          if (ackedChunks > priorAckedChunks) {{
+            session.retriesSinceProgress = 0;
+            session.lastAckProgressAtMs = nowMs;
+            appendFileTransferConsole(
+              `ACK progress for ${{fileTransferShortTransferId(session.transferId)}} from ${{session.destination}}: ${{ackedChunks}}/${{session.totalChunks}}.`
+            );
+          }}
+          if (ackedChunks >= session.totalChunks) {{
+            session.delivered = true;
+            session.deliveredAtMs = nowMs;
+            appendFileTransferConsole(
+              `Delivered ${{fileTransferShortTransferId(session.transferId)}} to ${{session.destination}} (${{session.totalChunks}}/${{session.totalChunks}} acked).`
+            );
+            continue;
+          }}
+        }}
+
+        const stallRetryAttempts = Math.max(
+          0,
+          Math.trunc(Number(session.retriesSinceProgress) || Number(session.retryAttempts) || 0)
+        );
+        const lastProgressAtMs = Math.max(0, Math.trunc(Number(session.lastAckProgressAtMs) || 0));
+        const lastSendAtMs = Number(session.lastSendAtMs) || Number(session.createdAtMs) || 0;
+        const maxedRetries = stallRetryAttempts >= session.maxRetries;
+        let retryCapped = false;
+        if (maxedRetries) {{
+          // After the aggressive retry budget is exhausted, continue low-rate recovery retries.
+          // Only fail once we have both exhausted retries and seen sustained no-progress.
+          const finalAckGraceMs = Math.max(fileTransferAckWaitBeforeRetryMs, fileTransferAckFinalGraceMs);
+          const waitingForLateAck = lastSendAtMs > 0 && (nowMs - lastSendAtMs) < finalAckGraceMs;
+          const progressAnchorMs = lastProgressAtMs > 0
+            ? lastProgressAtMs
+            : Math.max(0, Math.trunc(Number(session.createdAtMs) || 0));
+          const stalledTooLong = progressAnchorMs > 0 && (nowMs - progressAnchorMs) >= fileTransferAckProgressStallFailMs;
+          if (!waitingForLateAck && stalledTooLong) {{
+            session.failed = true;
+            session.failedAtMs = nowMs;
+            appendFileTransferConsole(
+              `Delivery failed for ${{fileTransferShortTransferId(session.transferId)}} to ${{session.destination}} after ${{stallRetryAttempts}}/${{session.maxRetries}} retries without ACK progress.`,
+              {{ level: "error" }}
+            );
+            continue;
+          }}
+          retryCapped = true;
+        }}
+
+        const lastRetryAtMs = Number(session.lastRetryAtMs) || 0;
+        const noAckYet = !ack;
+        const receivedSet = ack && ack.receivedSet instanceof Set
+          ? ack.receivedSet
+          : new Set();
+        const missingIndexes = noAckYet
+          ? Array.from({{ length: session.totalChunks }}, (_value, idx) => idx)
+          : fileTransferMissingChunkIndexes(session.totalChunks, receivedSet);
+        if (!missingIndexes.length) {{
+          continue;
+        }}
+        const endgame = !noAckYet
+          && missingIndexes.length > 0
+          && missingIndexes.length <= fileTransferEndgameMissingChunkThreshold;
+        let retryIntervalMs = fileTransferAckResendIntervalMs;
+        if (noAckYet) {{
+          retryIntervalMs = Math.max(fileTransferAckWaitBeforeRetryMs, fileTransferAckResendIntervalMs);
+        }} else {{
+          const missingCount = missingIndexes.length;
+          if (missingCount >= 30) {{
+            retryIntervalMs = 28000;
+          }} else if (missingCount >= 20) {{
+            retryIntervalMs = 20000;
+          }} else if (missingCount >= 12) {{
+            retryIntervalMs = 14000;
+          }} else if (missingCount >= 8) {{
+            retryIntervalMs = 9000;
+          }} else if (missingCount >= 5) {{
+            retryIntervalMs = 5500;
+          }} else {{
+            retryIntervalMs = fileTransferEndgameResendIntervalMs;
+          }}
+          const backoffSteps = Math.max(0, stallRetryAttempts - 1);
+          if (backoffSteps > 0) {{
+            retryIntervalMs = Math.round(retryIntervalMs * Math.pow(1.15, backoffSteps));
+          }}
+          const maxIntervalMs = endgame ? 7000 : 45000;
+          retryIntervalMs = Math.max(900, Math.min(maxIntervalMs, retryIntervalMs));
+        }}
+        if (retryCapped) {{
+          retryIntervalMs = Math.max(retryIntervalMs, fileTransferRetryRecoveryIntervalMs);
+        }}
+        if (noAckYet && (nowMs - lastSendAtMs) < fileTransferAckWaitBeforeRetryMs) {{
+          continue;
+        }}
+        if (!noAckYet && (nowMs - lastRetryAtMs) < retryIntervalMs) {{
+          continue;
+        }}
+        if (!noAckYet && (nowMs - lastSendAtMs) < fileTransferMaintenanceCooldownMs) {{
+          continue;
+        }}
+        const framesToSend = [];
+        const includeMeta = !!session.metaFrame && (noAckYet || (!endgame && (stallRetryAttempts % 4 === 0)));
+        if (includeMeta) {{
+          framesToSend.push(session.metaFrame);
+        }}
+        let retryMissingIndexes = missingIndexes.slice();
+        if (!noAckYet && missingIndexes.length > 0) {{
+          let burstSize = missingIndexes.length;
+          if (endgame) {{
+            burstSize = Math.max(1, Math.min(2, missingIndexes.length));
+          }} else if (missingIndexes.length >= 20) {{
+            burstSize = 14;
+          }} else if (missingIndexes.length >= 12) {{
+            burstSize = 10;
+          }} else if (missingIndexes.length >= 8) {{
+            burstSize = 8;
+          }}
+          if (missingIndexes.length > burstSize) {{
+            const cursorRaw = Math.max(0, Math.trunc(Number(session.retryChunkCursor) || 0));
+            const selected = [];
+            for (let idxPos = 0; idxPos < burstSize; idxPos += 1) {{
+              const pick = missingIndexes[(cursorRaw + idxPos) % missingIndexes.length];
+              if (!selected.includes(pick)) {{
+                selected.push(pick);
+              }}
+            }}
+            retryMissingIndexes = selected;
+            session.retryChunkCursor = (cursorRaw + burstSize) % missingIndexes.length;
+          }} else {{
+            session.retryChunkCursor = 0;
+          }}
+        }} else {{
+          session.retryChunkCursor = 0;
+        }}
+        const duplicateSends = endgame
+          ? Math.max(1, Math.min(4, fileTransferEndgameDuplicateSends + (retryMissingIndexes.length <= 2 ? 1 : 0)))
+          : 1;
+        for (const chunkIdx of retryMissingIndexes) {{
+          const frame = session.chunkFrames[chunkIdx];
+          if (typeof frame === "string" && frame.trim()) {{
+            if (endgame) {{
+              for (let copyIdx = 0; copyIdx < duplicateSends; copyIdx += 1) {{
+                framesToSend.push(frame.trim());
+              }}
+            }} else {{
+              framesToSend.push(frame.trim());
+            }}
+          }}
+        }}
+        if (!framesToSend.length) {{
+          continue;
+        }}
+        let sentCount = 0;
+        let firstSendError = "";
+        for (let frameIdx = 0; frameIdx < framesToSend.length; frameIdx += 1) {{
+          const frame = framesToSend[frameIdx];
+          try {{
+            await sendFileTransferFrameText(
+              frame,
+              session.destination,
+              session.channelIndex
+            );
+            sentCount += 1;
+            if (frameIdx + 1 < framesToSend.length) {{
+              await waitFileTransferFrameGap();
+            }}
+          }} catch (err) {{
+            firstSendError = err instanceof Error ? err.message : String(err || "send failed");
+            break;
+          }}
+        }}
+        if (sentCount > 0) {{
+          session.retryAttempts = Math.max(0, Math.trunc(Number(session.retryAttempts) || 0)) + 1;
+          session.retriesSinceProgress = Math.max(0, Math.trunc(Number(session.retriesSinceProgress) || 0)) + 1;
+          session.lastRetryAtMs = nowMs;
+          session.lastSendAtMs = Date.now();
+          const activeRetries = Math.max(0, Math.trunc(Number(session.retriesSinceProgress) || 0));
+          const intervalSec = (retryIntervalMs / 1000).toFixed(retryIntervalMs < 10000 ? 1 : 0);
+          const endgameLabel = endgame
+            ? ` (endgame, ${{missingIndexes.length}} missing chunk${{missingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence)`
+            : "";
+          appendFileTransferConsole(
+            `Retry ${{activeRetries}}/${{session.maxRetries}} for ${{fileTransferShortTransferId(session.transferId)}}: resent ${{sentCount}} frame${{sentCount === 1 ? "" : "s"}} to ${{session.destination}}${{endgameLabel}}.`,
+            {{ level: "warn" }}
+          );
+        }} else if (firstSendError) {{
+          const lastRetryErrorAtMs = Math.max(0, Math.trunc(Number(session.lastRetryErrorAtMs) || 0));
+          if ((nowMs - lastRetryErrorAtMs) >= fileTransferRetryErrorLogIntervalMs) {{
+            session.lastRetryErrorAtMs = nowMs;
+            appendFileTransferConsole(
+              `Retry send failed for ${{fileTransferShortTransferId(session.transferId)}} to ${{session.destination}}: ${{firstSendError}}.`,
+              {{ level: "warn" }}
+            );
+          }}
+        }}
+      }}
+      pruneOutgoingFileTransferSessions(nowMs);
+    }}
+
+    async function runFileTransferMaintenance(state = latestState) {{
+      await maybeSendFileTransferAckFrames(state);
+      await maintainOutgoingFileTransferSessions(state);
+      if (activeLayoutView === "files" && state) {{
+        renderFilesView(state);
+      }}
+    }}
+
+    function scheduleFileTransferMaintenance(state = latestState) {{
+      if (fileTransferMaintenanceInFlight) {{
+        fileTransferMaintenanceQueued = true;
+        return;
+      }}
+      fileTransferMaintenanceInFlight = true;
+      void (async () => {{
+        try {{
+          await runFileTransferMaintenance(state);
+        }} finally {{
+          fileTransferMaintenanceInFlight = false;
+          if (fileTransferMaintenanceQueued) {{
+            fileTransferMaintenanceQueued = false;
+            scheduleFileTransferMaintenance(latestState);
+          }}
+        }}
+      }})();
+    }}
+
+    function hasActiveFileTransferSessions() {{
+      for (const session of fileTransferOutgoingByToken.values()) {{
+        if (!session || typeof session !== "object") continue;
+        if (!session.delivered && !session.failed) {{
+          return true;
+        }}
+      }}
+      return false;
+    }}
+
+    function syncFileTransferBlobs(rows) {{
+      const activeKeys = new Set();
+      const list = Array.isArray(rows) ? rows : [];
+      for (const row of list) {{
+        const key = String(row && row.key ? row.key : "").trim();
+        if (!key) continue;
+        activeKeys.add(key);
+        const bytes = row && row.canDownload ? row.bytes : null;
+        if (!(bytes instanceof Uint8Array) || bytes.length <= 0) {{
+          fileTransferBlobByKey.delete(key);
+          const staleUrl = fileTransferDownloadUrlByKey.get(key);
+          if (staleUrl) {{
+            try {{
+              URL.revokeObjectURL(staleUrl);
+            }} catch (_err) {{
+            }}
+            fileTransferDownloadUrlByKey.delete(key);
+          }}
+          continue;
+        }}
+        const existingBlob = fileTransferBlobByKey.get(key);
+        const needsBlob = !(existingBlob instanceof Blob) || Number(existingBlob.size) !== bytes.length;
+        if (needsBlob) {{
+          fileTransferBlobByKey.set(key, new Blob([bytes], {{ type: "application/octet-stream" }}));
+          const staleUrl = fileTransferDownloadUrlByKey.get(key);
+          if (staleUrl) {{
+            try {{
+              URL.revokeObjectURL(staleUrl);
+            }} catch (_err) {{
+            }}
+            fileTransferDownloadUrlByKey.delete(key);
+          }}
+        }}
+      }}
+
+      for (const key of Array.from(fileTransferBlobByKey.keys())) {{
+        if (activeKeys.has(key)) continue;
+        fileTransferBlobByKey.delete(key);
+      }}
+      for (const key of Array.from(fileTransferDownloadUrlByKey.keys())) {{
+        if (activeKeys.has(key)) continue;
+        const staleUrl = fileTransferDownloadUrlByKey.get(key);
+        if (staleUrl) {{
+          try {{
+            URL.revokeObjectURL(staleUrl);
+          }} catch (_err) {{
+          }}
+        }}
+        fileTransferDownloadUrlByKey.delete(key);
+      }}
+    }}
+
+    function fileTransferDownloadUrlForKey(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return "";
+      const existing = fileTransferDownloadUrlByKey.get(key);
+      if (existing) return existing;
+      const blob = fileTransferBlobByKey.get(key);
+      if (!(blob instanceof Blob)) return "";
+      let created = "";
+      try {{
+        created = URL.createObjectURL(blob);
+      }} catch (_err) {{
+        created = "";
+      }}
+      if (created) {{
+        fileTransferDownloadUrlByKey.set(key, created);
+      }}
+      return created;
+    }}
+
+    function downloadFileTransferByKey(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return;
+      const row = fileTransferRows.find((entry) => entry && entry.key === key) || null;
+      if (!row || !row.canDownload) {{
+        setFileTransferStatus("This transfer is not complete yet.", true);
+        appendFileTransferConsole("Download blocked: transfer is not complete yet.", {{ level: "warn" }});
+        return;
+      }}
+      const url = fileTransferDownloadUrlForKey(key);
+      if (!url) {{
+        setFileTransferStatus("Could not prepare file download.", true);
+        appendFileTransferConsole("Download failed: could not prepare transfer blob.", {{ level: "error" }});
+        return;
+      }}
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = row.downloadName || "mesh-file.bin";
+      anchor.rel = "noopener";
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setFileTransferStatus(`Download ready: ${{row.downloadName || row.fileName}}`);
+      appendFileTransferConsole(
+        `Download ready for ${{row.downloadName || row.fileName}} (transfer ${{fileTransferShortTransferId(row.transferId)}}).`
+      );
+    }}
+
+    function bindFilesTransferTableControls() {{
+      const table = document.getElementById("files-transfer-table");
+      if (!(table instanceof HTMLTableElement) || table.dataset.bound === "1") {{
+        return;
+      }}
+      table.dataset.bound = "1";
+      table.addEventListener("click", (event) => {{
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const button = target.closest("button.files-transfer-action");
+        if (!(button instanceof HTMLButtonElement)) return;
+        const transferKey = String(button.dataset.transferKey || "").trim();
+        if (!transferKey) return;
+        downloadFileTransferByKey(transferKey);
+      }});
+    }}
+
+    function renderFilesView(state = latestState) {{
+      bindFilesTransferTableControls();
+      bindFilesConsoleControls();
+      renderFileTransferConsole();
+      const rows = buildFileTransferRows(state);
+      fileTransferRows = rows;
+      syncFileTransferBlobs(rows);
+
+      const caption = document.getElementById("files-caption");
+      if (caption instanceof HTMLElement) {{
+        const total = rows.length;
+        const complete = rows.filter((row) => row && row.delivered).length;
+        const pending = Math.max(0, total - complete);
+        const channelLabel = currentMeshChannelViewLabel();
+        const sendLabel = currentMeshChannelSendLabel();
+        if (!total) {{
+          caption.textContent = `No file transfers detected yet. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}}.`;
+        }} else {{
+          caption.textContent = `Showing ${{total}} transfer${{total === 1 ? "" : "s"}}. ${{complete}} complete, ${{pending}} pending. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}}.`;
+        }}
+      }}
+
+      const table = document.getElementById("files-transfer-table");
+      if (!(table instanceof HTMLTableElement)) return;
+      const tbody = table.querySelector("tbody");
+      if (!(tbody instanceof HTMLElement)) return;
+      if (!rows.length) {{
+        tbody.innerHTML = '<tr><td colspan="8">No file transfers yet.</td></tr>';
+        return;
+      }}
+
+      tbody.innerHTML = rows.map((row) => {{
+        const unix = Number(row && row.unix);
+        const when = Number.isFinite(unix) && unix > 0 ? formatLocalChatTime(unix, "n/a") : "n/a";
+        const peerText = row && row.peerLabel ? row.peerLabel : (row && row.peerId ? row.peerId : "n/a");
+        const peerTitle = row && row.peerTitle ? row.peerTitle : peerText;
+        const nameMain = compactInlineMessage(row && row.fileName ? row.fileName : "mesh-file.bin", 52);
+        const nameSub = `id:${{compactInlineMessage(String((row && row.transferId) || ""), 24)}}`;
+        const directionClass = String(row && row.directionClass ? row.directionClass : "other");
+        const directionLabel = String(row && row.directionLabel ? row.directionLabel : "Seen");
+        const channelLabel = String(row && row.channelLabel ? row.channelLabel : "Unknown");
+        const actionLabel = row && row.canDownload
+          ? "Download"
+          : (row && row.outgoingRetrying ? "Retrying" : "Waiting");
+        const actionDisabled = row && row.canDownload ? "" : " disabled";
+        const actionTitle = row && row.canDownload
+          ? `Download ${{row.downloadName || row.fileName || "file"}}`
+          : "Waiting for all chunks";
+        const channelIndexRaw = Number(row && row.channelIndex);
+        const hasChannelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0;
+        const channelBadge = hasChannelIndex
+          ? meshChannelBadgeHtml(
+            channelIndexRaw,
+            channelLabel,
+            {{
+              allowAll: false,
+              extraClass: "compact",
+              title: channelLabel,
+            }}
+          )
+          : `<span class="mesh-channel-badge compact" style="${{escAttr(meshChannelBadgeStyle(meshChannelAllIndex, {{ allowAll: true }}))}}" title="Channel unavailable from packet metadata">Unknown</span>`;
+        return `<tr>
+          <td data-sort="${{escAttr(unix)}}">${{escAttr(when)}}</td>
+          <td data-sort="${{escAttr(directionLabel)}}"><span class="files-transfer-dir ${{escAttr(directionClass)}}">${{escAttr(directionLabel)}}</span></td>
+          <td data-sort="${{escAttr(peerText)}}" title="${{escAttr(peerTitle)}}">${{escAttr(peerText)}}</td>
+          <td data-sort="${{escAttr(row.fileName || "")}}">
+            <span class="files-transfer-name">
+              <span class="files-transfer-name-main" title="${{escAttr(row.fileName || "")}}">${{escAttr(nameMain)}}</span>
+              <span class="files-transfer-name-sub" title="${{escAttr(row.transferId || "")}}">${{escAttr(nameSub)}}</span>
+            </span>
+          </td>
+          <td data-sort="${{escAttr(row.progressSort ?? 0)}}">${{escAttr(row.progressLabel || "n/a")}}</td>
+          <td data-sort="${{escAttr(row.sizeSort ?? 0)}}">${{escAttr(row.sizeLabel || "n/a")}}</td>
+          <td data-sort="${{escAttr(hasChannelIndex ? channelIndexRaw : -1)}}">${{channelBadge}}</td>
+          <td data-sort="${{escAttr(row.canDownload ? 1 : 0)}}">
+            <button
+              type="button"
+              class="files-transfer-action"
+              data-transfer-key="${{escAttr(row.key || "")}}"
+              title="${{escAttr(actionTitle)}}"
+              ${{actionDisabled}}
+            >${{escAttr(actionLabel)}}</button>
+          </td>
+        </tr>`;
+      }}).join("");
+    }}
+
