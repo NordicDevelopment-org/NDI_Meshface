@@ -455,6 +455,38 @@ def test_ping_keeps_hops_na_when_packet_and_node_hops_are_unavailable():
     assert "hop count n/a" in text
 
 
+def test_ping_uses_last_known_hops_when_future_packet_loses_hop_fields():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=2001), iface)
+
+    # Simulate later packets that lack both packet hop fields and node cache hops_away.
+    iface.nodesByNum[0x49B5DFF0].pop("hopsAway", None)
+    packet = _base_packet("ping 9b7c", packet_id=2002)
+    packet.pop("hopStart", None)
+    packet.pop("hopLimit", None)
+    bot.on_receive(packet, iface)
+
+    assert len(sent) == 2
+    text = str(sent[-1]["text"]).lower()
+    assert "3 hops" in text
+    assert "hop count n/a" not in text
+    history = bot.recent_requests(limit=2)
+    assert history[0]["hops"] == 3
+    assert history[0]["response_hops"] == 3
+
+
 def test_ping_uses_explicit_packet_hops_when_present():
     iface = _FakeIface()
     sent = []

@@ -361,6 +361,7 @@ class MeshResponseBot:
         self._request_log: list[dict[str, object]] = []
         self._request_seq = 0
         self._public_ping_state: dict[str, dict[str, int]] = {}
+        self._last_known_hops_by_node: dict[str, int] = {}
         self._lock = threading.Lock()
 
     @property
@@ -904,6 +905,28 @@ class MeshResponseBot:
             break
         return local_node_id, aliases, nodes
 
+    def _effective_hops_with_fallback(
+        self,
+        *,
+        packet: dict[str, object],
+        from_id: str,
+        nodes: list[dict[str, object]],
+    ) -> Optional[int]:
+        hops = _effective_hops(packet, from_id, nodes)
+        clean_from_id = _normalize_node_id(from_id).lower()
+        if hops is not None:
+            if clean_from_id:
+                with self._lock:
+                    self._last_known_hops_by_node[clean_from_id] = hops
+            return hops
+        if not clean_from_id:
+            return None
+        with self._lock:
+            cached = _to_int(self._last_known_hops_by_node.get(clean_from_id))
+        if cached is None or cached < 0:
+            return None
+        return cached
+
     def _parse_command(self, text: str) -> tuple[str, list[str]] | None:
         raw = str(text or "").strip()
         if not raw:
@@ -1032,7 +1055,7 @@ class MeshResponseBot:
             tx_ms = int(self._now_unix_fn() * 1000)
             latency_ms = max(0, tx_ms - int(received_ms))
             latency_text = _format_latency_label(latency_ms)
-            hops = _effective_hops(packet, from_id, nodes)
+            hops = self._effective_hops_with_fallback(packet=packet, from_id=from_id, nodes=nodes)
             hop_text = _format_hop_count_label(hops)
             requester = _find_node_for_query(from_id, nodes)
             local_node = _find_node_for_query(local_node_id, nodes) if local_node_id else None
@@ -1490,7 +1513,7 @@ class MeshResponseBot:
             "reply_id": None,
             "received_unix": received_unix,
             "received_at": _safe_strftime(received_unix),
-            "hops": _effective_hops(packet, from_id, nodes),
+            "hops": self._effective_hops_with_fallback(packet=packet, from_id=from_id, nodes=nodes),
             "respond_enabled": bool(self._enabled),
             "responded": False,
             "response_message_id": None,
@@ -1580,7 +1603,7 @@ class MeshResponseBot:
                 responded=True,
                 response_message_id=response_message_id,
                 response_unix=response_unix if response_unix and response_unix > 0 else int(self._now_unix_fn()),
-                response_hops=_effective_hops(packet, from_id, nodes),
+                response_hops=self._effective_hops_with_fallback(packet=packet, from_id=from_id, nodes=nodes),
                 response_from=response_from,
                 response_to=response_to,
                 response_text="\n".join(response_segments),
