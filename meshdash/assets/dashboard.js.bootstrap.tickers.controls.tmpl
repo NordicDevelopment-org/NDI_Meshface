@@ -1,0 +1,525 @@
+    function bindSummaryTickerExpandControl() {{
+      const row = document.querySelector(".summary-ticker-row");
+      if (!(row instanceof HTMLElement) || row.dataset.expandBound === "1") return;
+      row.dataset.expandBound = "1";
+      row.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest(".summary-ticker-item");
+        if (!(item instanceof HTMLElement) || !row.contains(item)) return;
+        const next = tickerDensity === "expanded" ? "compact" : "expanded";
+        applyTickerDensity(next, true);
+      }});
+    }}
+
+    function renderTickerSettingsUi() {{
+      const listEl = document.getElementById("settings-ticker-list");
+      if (!(listEl instanceof HTMLElement)) return;
+      const prefs = currentTickerPreferences();
+      const order = Array.isArray(prefs.order) ? prefs.order.map((id) => normalizeTickerId(id)).filter(Boolean) : [];
+      const resolvedOrder = [];
+      const seen = new Set();
+      for (const id of order) {{
+        if (seen.has(id)) continue;
+        seen.add(id);
+        resolvedOrder.push(id);
+      }}
+      for (const id of tickerDefaultOrder) {{
+        if (seen.has(id)) continue;
+        seen.add(id);
+        resolvedOrder.push(id);
+      }}
+
+      if (!normalizeTickerId(activeTickerSettingsId) || !resolvedOrder.includes(activeTickerSettingsId)) {{
+        activeTickerSettingsId = resolvedOrder.length ? resolvedOrder[0] : "";
+      }}
+
+      listEl.innerHTML = "";
+      resolvedOrder.forEach((id, index) => {{
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "settings-ticker-item";
+        btn.dataset.tickerId = id;
+        if (id === activeTickerSettingsId) {{
+          btn.classList.add("is-active");
+        }}
+        if (!tickerEnabled(id)) {{
+          btn.classList.add("is-disabled");
+        }}
+        btn.setAttribute("role", "option");
+        btn.setAttribute("aria-selected", id === activeTickerSettingsId ? "true" : "false");
+
+        const orderEl = document.createElement("span");
+        orderEl.className = "settings-ticker-item-order";
+        orderEl.textContent = `${{index + 1}}.`;
+        btn.appendChild(orderEl);
+
+        const labelEl = document.createElement("span");
+        labelEl.className = "settings-ticker-item-label";
+        labelEl.textContent = tickerLabelText(id) || id;
+        btn.appendChild(labelEl);
+
+        const stateEl = document.createElement("span");
+        stateEl.className = "settings-ticker-item-state";
+        stateEl.textContent = tickerEnabled(id) ? "on" : "off";
+        btn.appendChild(stateEl);
+        listEl.appendChild(btn);
+      }});
+
+      const emptyEl = document.getElementById("settings-ticker-config-empty");
+      const formEl = document.getElementById("settings-ticker-config-form");
+      if (!(emptyEl instanceof HTMLElement) || !(formEl instanceof HTMLElement)) return;
+      const selectedId = normalizeTickerId(activeTickerSettingsId);
+      if (!selectedId) {{
+        emptyEl.hidden = false;
+        formEl.hidden = true;
+        return;
+      }}
+      emptyEl.hidden = true;
+      formEl.hidden = false;
+
+      const enabledToggle = document.getElementById("settings-ticker-enabled");
+      if (enabledToggle instanceof HTMLInputElement) {{
+        enabledToggle.checked = tickerEnabled(selectedId);
+      }}
+
+      const moveUpBtn = document.getElementById("settings-ticker-move-up");
+      const moveDownBtn = document.getElementById("settings-ticker-move-down");
+      const selectedIndex = resolvedOrder.indexOf(selectedId);
+      if (moveUpBtn instanceof HTMLButtonElement) {{
+        moveUpBtn.disabled = selectedIndex <= 0;
+      }}
+      if (moveDownBtn instanceof HTMLButtonElement) {{
+        moveDownBtn.disabled = selectedIndex < 0 || selectedIndex >= (resolvedOrder.length - 1);
+      }}
+
+      const labelInput = document.getElementById("settings-ticker-label");
+      if (labelInput instanceof HTMLInputElement) {{
+        const customLabel = String((prefs.labels && prefs.labels[selectedId]) || "");
+        if (labelInput.value !== customLabel) {{
+          labelInput.value = customLabel;
+        }}
+      }}
+
+      const trendWrap = document.getElementById("settings-ticker-show-trend-wrap");
+      const trendToggle = document.getElementById("settings-ticker-show-trend");
+      const supportsTrend = tickerMetricIds.has(selectedId);
+      if (trendWrap instanceof HTMLElement) {{
+        trendWrap.hidden = !supportsTrend;
+      }}
+      if (trendToggle instanceof HTMLInputElement) {{
+        trendToggle.checked = supportsTrend ? tickerTrendEnabled(selectedId) : false;
+        trendToggle.disabled = !supportsTrend;
+      }}
+
+      const batteryWindowWrap = document.getElementById("settings-ticker-battery-window-wrap");
+      const batteryWindowInput = document.getElementById("settings-ticker-battery-window-hours");
+      const isBattery = selectedId === "battery";
+      if (batteryWindowWrap instanceof HTMLElement) {{
+        batteryWindowWrap.hidden = !isBattery;
+      }}
+      if (batteryWindowInput instanceof HTMLInputElement) {{
+        batteryWindowInput.disabled = !isBattery;
+        batteryWindowInput.value = String(batteryTrendWindowHours());
+      }}
+
+      const nodeRowsWrap = document.getElementById("settings-ticker-node-rows-wrap");
+      const isNode = selectedId === "node";
+      if (nodeRowsWrap instanceof HTMLElement) {{
+        nodeRowsWrap.hidden = !isNode;
+      }}
+      const nodeRows = nodeTickerRowPreferences();
+      const nodeRowToggles = [
+        {{ key: "snr", id: "settings-ticker-node-row-snr" }},
+        {{ key: "rssi", id: "settings-ticker-node-row-rssi" }},
+        {{ key: "route", id: "settings-ticker-node-row-route" }},
+        {{ key: "hops", id: "settings-ticker-node-row-hops" }},
+      ];
+      for (const rowToggle of nodeRowToggles) {{
+        const toggle = document.getElementById(rowToggle.id);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        toggle.disabled = !isNode;
+        toggle.checked = !!nodeRows[rowToggle.key];
+      }}
+    }}
+
+    function bindTickerSettingsControls() {{
+      const listEl = document.getElementById("settings-ticker-list");
+      if (listEl instanceof HTMLElement && listEl.dataset.bound !== "1") {{
+        listEl.dataset.bound = "1";
+        listEl.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const btn = target.closest(".settings-ticker-item");
+          if (!(btn instanceof HTMLButtonElement)) return;
+          const id = normalizeTickerId(btn.dataset.tickerId || "");
+          if (!id) return;
+          activeTickerSettingsId = id;
+          renderTickerSettingsUi();
+        }});
+      }}
+
+      const enabledToggle = document.getElementById("settings-ticker-enabled");
+      if (enabledToggle instanceof HTMLInputElement && enabledToggle.dataset.bound !== "1") {{
+        enabledToggle.dataset.bound = "1";
+        enabledToggle.addEventListener("change", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.enabled || typeof prefs.enabled !== "object") prefs.enabled = {{}};
+          prefs.enabled[id] = !!enabledToggle.checked;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const moveUpBtn = document.getElementById("settings-ticker-move-up");
+      if (moveUpBtn instanceof HTMLButtonElement && moveUpBtn.dataset.bound !== "1") {{
+        moveUpBtn.dataset.bound = "1";
+        moveUpBtn.addEventListener("click", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          const prefs = currentTickerPreferences();
+          const order = Array.isArray(prefs.order) ? prefs.order.slice() : [...tickerDefaultOrder];
+          const idx = order.indexOf(id);
+          if (idx <= 0) return;
+          [order[idx - 1], order[idx]] = [order[idx], order[idx - 1]];
+          prefs.order = order;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const moveDownBtn = document.getElementById("settings-ticker-move-down");
+      if (moveDownBtn instanceof HTMLButtonElement && moveDownBtn.dataset.bound !== "1") {{
+        moveDownBtn.dataset.bound = "1";
+        moveDownBtn.addEventListener("click", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          const prefs = currentTickerPreferences();
+          const order = Array.isArray(prefs.order) ? prefs.order.slice() : [...tickerDefaultOrder];
+          const idx = order.indexOf(id);
+          if (idx < 0 || idx >= order.length - 1) return;
+          [order[idx + 1], order[idx]] = [order[idx], order[idx + 1]];
+          prefs.order = order;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const labelInput = document.getElementById("settings-ticker-label");
+      if (labelInput instanceof HTMLInputElement && labelInput.dataset.bound !== "1") {{
+        labelInput.dataset.bound = "1";
+        labelInput.addEventListener("input", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.labels || typeof prefs.labels !== "object") prefs.labels = {{}};
+          const next = String(labelInput.value || "").trim().slice(0, 26);
+          if (!next) {{
+            delete prefs.labels[id];
+          }} else {{
+            prefs.labels[id] = next;
+          }}
+          saveTickerPreferences();
+        }});
+      }}
+
+      const trendToggle = document.getElementById("settings-ticker-show-trend");
+      if (trendToggle instanceof HTMLInputElement && trendToggle.dataset.bound !== "1") {{
+        trendToggle.dataset.bound = "1";
+        trendToggle.addEventListener("change", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id || !tickerMetricIds.has(id)) return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.trend || typeof prefs.trend !== "object") prefs.trend = {{}};
+          prefs.trend[id] = !!trendToggle.checked;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const batteryWindowInput = document.getElementById("settings-ticker-battery-window-hours");
+      if (batteryWindowInput instanceof HTMLInputElement && batteryWindowInput.dataset.bound !== "1") {{
+        batteryWindowInput.dataset.bound = "1";
+        batteryWindowInput.addEventListener("change", () => {{
+          const raw = Number(batteryWindowInput.value);
+          const hours = Number.isFinite(raw)
+            ? Math.max(1, Math.min(24, Math.round(raw)))
+            : tickerDefaultBatteryWindowHours;
+          const prefs = currentTickerPreferences();
+          prefs.battery_window_hours = hours;
+          batteryWindowInput.value = String(hours);
+          saveTickerPreferences();
+        }});
+      }}
+
+      const nodeRowToggles = [
+        {{ key: "snr", id: "settings-ticker-node-row-snr" }},
+        {{ key: "rssi", id: "settings-ticker-node-row-rssi" }},
+        {{ key: "route", id: "settings-ticker-node-row-route" }},
+        {{ key: "hops", id: "settings-ticker-node-row-hops" }},
+      ];
+      for (const rowToggle of nodeRowToggles) {{
+        const toggle = document.getElementById(rowToggle.id);
+        if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === "1") continue;
+        toggle.dataset.bound = "1";
+        toggle.addEventListener("change", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (id !== "node") return;
+          const prefs = currentTickerPreferences();
+          if (!prefs.node_rows || typeof prefs.node_rows !== "object") {{
+            prefs.node_rows = {{ ...nodeTickerDefaultRows }};
+          }}
+          prefs.node_rows[rowToggle.key] = !!toggle.checked;
+          saveTickerPreferences();
+        }});
+      }}
+
+      const resetSelectedBtn = document.getElementById("settings-ticker-reset-selected");
+      if (resetSelectedBtn instanceof HTMLButtonElement && resetSelectedBtn.dataset.bound !== "1") {{
+        resetSelectedBtn.dataset.bound = "1";
+        resetSelectedBtn.addEventListener("click", () => {{
+          const id = normalizeTickerId(activeTickerSettingsId);
+          if (!id) return;
+          resetTickerPreferencesForId(id);
+          saveTickerPreferences();
+        }});
+      }}
+
+      const resetAllBtn = document.getElementById("settings-ticker-reset-all");
+      if (resetAllBtn instanceof HTMLButtonElement && resetAllBtn.dataset.bound !== "1") {{
+        resetAllBtn.dataset.bound = "1";
+        resetAllBtn.addEventListener("click", () => {{
+          tickerPreferences = defaultTickerPreferences();
+          activeTickerSettingsId = tickerDefaultOrder[0] || "";
+          saveTickerPreferences({{
+            status: "Ticker preferences reset to defaults.",
+          }});
+        }});
+      }}
+    }}
+
+    function bindWeeklySummaryMetricControl() {{
+      const select = document.getElementById("weekly-summary-metric");
+      if (!(select instanceof HTMLSelectElement)) return;
+      if (select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+      select.value = normalizeWeeklySummaryMetric(weeklySummaryMetric);
+      updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
+      select.addEventListener("change", () => {{
+        applyWeeklySummaryMetric(select.value || "packets", true);
+        if (activeLayoutView === "history") {{
+          void refreshHistoryPanels(false);
+        }}
+      }});
+    }}
+
+    function bindWeeklySummaryNodeSeriesControls() {{
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        const toggleId = weeklySummaryNodeSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        if (toggle.dataset.bound === "1") continue;
+        toggle.dataset.bound = "1";
+        toggle.checked = !!weeklySummaryNodeSeriesEnabled[key];
+        toggle.addEventListener("change", () => {{
+          const nextSeries = {{}};
+          for (const innerKey of weeklySummaryNodeSeriesOrder) {{
+            const innerToggleId = weeklySummaryNodeSeriesControlIds[innerKey];
+            const innerToggle = document.getElementById(innerToggleId);
+            if (innerToggle instanceof HTMLInputElement) {{
+              nextSeries[innerKey] = innerToggle.checked;
+            }}
+          }}
+          applyWeeklySummaryNodeSeries(nextSeries, true);
+        }});
+      }}
+      updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
+    }}
+
+    function loadThemePreference() {{
+      let stored = "auto";
+      try {{
+        stored = window.localStorage.getItem(themeStorageKey) || "auto";
+      }} catch (_err) {{
+      }}
+      applyThemePreference(stored, false);
+    }}
+
+    function loadTickerDensityPreference() {{
+      let stored = "compact";
+      try {{
+        stored = window.localStorage.getItem(tickerDensityStorageKey) || "compact";
+      }} catch (_err) {{
+      }}
+      applyTickerDensity(stored, false);
+    }}
+
+    function loadWeeklySummaryMetricPreference() {{
+      let stored = "packets";
+      try {{
+        stored = window.localStorage.getItem(weeklySummaryMetricStorageKey) || "packets";
+      }} catch (_err) {{
+      }}
+      applyWeeklySummaryMetric(stored, false);
+    }}
+
+    function loadWeeklySummaryNodeSeriesPreference() {{
+      let storedJson = "";
+      try {{
+        storedJson = window.localStorage.getItem(weeklySummaryNodeSeriesStorageKey) || "";
+      }} catch (_err) {{
+      }}
+      if (storedJson) {{
+        try {{
+          const parsed = JSON.parse(storedJson);
+          applyWeeklySummaryNodeSeries(parsed, false);
+          return;
+        }} catch (_err) {{
+        }}
+      }}
+      let legacyCompare = "0";
+      try {{
+        legacyCompare = window.localStorage.getItem(weeklySummaryNodesCompareLegacyStorageKey) || "0";
+      }} catch (_err) {{
+      }}
+      if (normalizeWeeklySummaryNodesCompare(legacyCompare)) {{
+        applyWeeklySummaryNodeSeries({{
+          online_nodes: true,
+          known_nodes: true,
+          saved_nodes: true,
+          position_nodes: true,
+        }}, false);
+      }} else {{
+        applyWeeklySummaryNodeSeries({{
+          online_nodes: true,
+          known_nodes: false,
+          saved_nodes: false,
+          position_nodes: false,
+        }}, false);
+      }}
+    }}
+
+    function updateMapPacketLinesControl() {{
+      const wrap = document.getElementById("map-lines-wrap");
+      const toggle = document.getElementById("map-lines-toggle");
+      const inMapLineContext = activeLayoutView === "network";
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !inMapLineContext;
+        wrap.title = mapPacketLinesEnabled
+          ? "Hide packet lines between nodes."
+          : "Show packet lines between nodes.";
+      }}
+      if (toggle instanceof HTMLInputElement) {{
+        toggle.checked = mapPacketLinesEnabled;
+      }}
+    }}
+
+    function persistMapPacketLinesPreference() {{
+      try {{
+        window.localStorage.setItem(mapPacketLinesStorageKey, mapPacketLinesEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadMapPacketLinesPreference() {{
+      mapPacketLinesEnabled = true;
+      try {{
+        const stored = window.localStorage.getItem(mapPacketLinesStorageKey);
+        if (stored === "0") {{
+          mapPacketLinesEnabled = false;
+        }} else if (stored === "1") {{
+          mapPacketLinesEnabled = true;
+        }}
+      }} catch (_err) {{
+      }}
+      updateMapPacketLinesControl();
+    }}
+
+    function bindMapPacketLinesControl() {{
+      const toggle = document.getElementById("map-lines-toggle");
+      if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
+        toggle.dataset.bound = "1";
+        toggle.checked = mapPacketLinesEnabled;
+        toggle.addEventListener("change", () => {{
+          mapPacketLinesEnabled = !!toggle.checked;
+          persistMapPacketLinesPreference();
+          updateMapPacketLinesControl();
+          lastMapSignature = "";
+          lastMapGraphSignature = "";
+          lastMapRenderMode = "";
+          if (latestState && activeLayoutView === "network") {{
+            renderMap(
+              latestState.nodes || [],
+              (latestState.traffic || {{}}).edges || [],
+              null
+            );
+          }}
+        }});
+      }}
+      updateMapPacketLinesControl();
+    }}
+
+    function persistSignalHeatmapPreference() {{
+      try {{
+        window.localStorage.setItem(signalHeatmapStorageKey, signalHeatmapEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistSignalHeatmapModePreference() {{
+      try {{
+        window.localStorage.setItem(signalHeatmapModeStorageKey, normalizeSignalHeatmapMode(signalHeatmapMode));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadSignalHeatmapModePreference() {{
+      signalHeatmapMode = "coverage";
+      try {{
+        const stored = window.localStorage.getItem(signalHeatmapModeStorageKey);
+        signalHeatmapMode = normalizeSignalHeatmapMode(stored || "coverage");
+      }} catch (_err) {{
+      }}
+      updateSignalHeatmapControl(null, supportsSignalHeatmap());
+    }}
+
+    function loadSignalHeatmapPreference() {{
+      signalHeatmapEnabled = true;
+      try {{
+        const stored = window.localStorage.getItem(signalHeatmapStorageKey);
+        if (stored === "0") {{
+          signalHeatmapEnabled = false;
+        }} else if (stored === "1") {{
+          signalHeatmapEnabled = true;
+        }}
+      }} catch (_err) {{
+      }}
+      updateSignalHeatmapControl(null, supportsSignalHeatmap());
+    }}
+
+    function bindSignalHeatmapControl() {{
+      const toggle = document.getElementById("map-heatmap-toggle");
+      if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
+        toggle.dataset.bound = "1";
+        toggle.checked = signalHeatmapEnabled;
+        toggle.addEventListener("change", () => {{
+          signalHeatmapEnabled = !!toggle.checked;
+          persistSignalHeatmapPreference();
+          const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+          syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+        }});
+      }}
+      const modeSelect = document.getElementById("map-heatmap-mode");
+      if (modeSelect instanceof HTMLSelectElement && modeSelect.dataset.bound !== "1") {{
+        modeSelect.dataset.bound = "1";
+        modeSelect.value = normalizeSignalHeatmapMode(signalHeatmapMode);
+        modeSelect.addEventListener("change", () => {{
+          signalHeatmapMode = normalizeSignalHeatmapMode(modeSelect.value);
+          modeSelect.value = signalHeatmapMode;
+          persistSignalHeatmapModePreference();
+          const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+          syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+        }});
+      }}
+      const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+      syncSignalHeatmapLayer(nodes, activeLayoutView === "saved");
+    }}
+

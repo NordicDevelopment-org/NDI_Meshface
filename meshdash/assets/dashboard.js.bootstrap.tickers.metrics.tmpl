@@ -1,0 +1,775 @@
+    function setText(id, value) {{
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value == null ? "n/a" : String(value);
+    }}
+
+    function formatTickerNumber(value, digits = 0) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "n/a";
+      const fixedDigits = Math.max(0, Math.min(2, Math.floor(Number(digits) || 0)));
+      return fixedDigits > 0 ? numeric.toFixed(fixedDigits) : `${{Math.round(numeric)}}`;
+    }}
+
+    function normalizeSmoothingWindow(rawWindow, pointCount = Number.MAX_SAFE_INTEGER) {{
+      const points = Math.max(1, Math.trunc(Number(pointCount) || 1));
+      const candidate = Math.trunc(Number(rawWindow) || 1);
+      if (!Number.isFinite(candidate) || candidate <= 1 || points <= 2) return 1;
+      let windowSize = Math.max(1, Math.min(points, candidate));
+      if ((windowSize % 2) === 0) {{
+        windowSize = Math.max(1, windowSize - 1);
+      }}
+      return windowSize <= 1 ? 1 : windowSize;
+    }}
+
+    function centeredMovingAverage(values, rawWindow) {{
+      const source = Array.isArray(values) ? values : [];
+      const windowSize = normalizeSmoothingWindow(rawWindow, source.length);
+      if (windowSize <= 1 || source.length <= 2) return source.slice();
+      const half = Math.floor(windowSize / 2);
+      const smoothed = new Array(source.length);
+      for (let idx = 0; idx < source.length; idx += 1) {{
+        const start = Math.max(0, idx - half);
+        const end = Math.min(source.length - 1, idx + half);
+        let total = 0;
+        let count = 0;
+        for (let sample = start; sample <= end; sample += 1) {{
+          const value = Number(source[sample]);
+          if (!Number.isFinite(value)) continue;
+          total += value;
+          count += 1;
+        }}
+        smoothed[idx] = count > 0 ? (total / count) : Number(source[idx] || 0);
+      }}
+      return smoothed;
+    }}
+
+    function smoothSeriesPointsWithBreaks(points, rawWindow) {{
+      const source = Array.isArray(points) ? points : [];
+      const baseWindow = normalizeSmoothingWindow(rawWindow, source.length);
+      if (baseWindow <= 1 || source.length <= 2) {{
+        return source.map((point) => ({{ ...point }}));
+      }}
+      const output = source.map((point) => ({{ ...point }}));
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        const segmentLength = idx - segmentStart;
+        const segmentWindow = normalizeSmoothingWindow(baseWindow, segmentLength);
+        if (segmentLength >= 3 && segmentWindow > 1) {{
+          const segmentValues = source
+            .slice(segmentStart, idx)
+            .map((point) => Number(point && point.value));
+          const segmentSmoothed = centeredMovingAverage(segmentValues, segmentWindow);
+          for (let segIdx = 0; segIdx < segmentSmoothed.length; segIdx += 1) {{
+            output[segmentStart + segIdx].value = Number(segmentSmoothed[segIdx]);
+          }}
+        }}
+        segmentStart = idx;
+      }}
+      return output;
+    }}
+
+    function buildSmoothSvgPath(points, rawTension = 0.18) {{
+      const source = Array.isArray(points) ? points : [];
+      if (!source.length) return "";
+      const tension = Math.max(0, Math.min(0.5, Number(rawTension) || 0.18));
+      const linearPath = (segment) => segment.map((pt, idx) => (
+        `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
+      )).join(" ");
+      let path = "";
+      const appendSegment = (segmentPoints) => {{
+        const segment = Array.isArray(segmentPoints)
+          ? segmentPoints.filter((pt) => Number.isFinite(Number(pt && pt.x)) && Number.isFinite(Number(pt && pt.y)))
+          : [];
+        if (!segment.length) return;
+        if (segment.length < 3) {{
+          path += `${{path ? " " : ""}}${{linearPath(segment)}}`;
+          return;
+        }}
+        path += `${{path ? " " : ""}}M ${{segment[0].x.toFixed(2)}} ${{segment[0].y.toFixed(2)}}`;
+        for (let i = 0; i < segment.length - 1; i += 1) {{
+          const p0 = i > 0 ? segment[i - 1] : segment[i];
+          const p1 = segment[i];
+          const p2 = segment[i + 1];
+          const p3 = (i + 2 < segment.length) ? segment[i + 2] : p2;
+          const cp1x = p1.x + ((p2.x - p0.x) * tension);
+          const cp1y = p1.y + ((p2.y - p0.y) * tension);
+          const cp2x = p2.x - ((p3.x - p1.x) * tension);
+          const cp2y = p2.y - ((p3.y - p1.y) * tension);
+          path += ` C ${{cp1x.toFixed(2)}} ${{cp1y.toFixed(2)}} ${{cp2x.toFixed(2)}} ${{cp2y.toFixed(2)}} ${{p2.x.toFixed(2)}} ${{p2.y.toFixed(2)}}`;
+        }}
+      }};
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        appendSegment(source.slice(segmentStart, idx));
+        segmentStart = idx;
+      }}
+      return path.trim();
+    }}
+
+    function aggregatePointsByXPixels(points, rawBucketWidthPx = 1.35) {{
+      const source = Array.isArray(points) ? points : [];
+      if (source.length <= 3) {{
+        return source.map((point) => ({{ ...point }}));
+      }}
+      const bucketWidthPx = Math.max(0.75, Number(rawBucketWidthPx) || 1.35);
+      const compressSegment = (segmentPoints) => {{
+        const segment = Array.isArray(segmentPoints)
+          ? segmentPoints.filter((pt) => Number.isFinite(Number(pt && pt.x)) && Number.isFinite(Number(pt && pt.y)))
+          : [];
+        if (segment.length <= 3) {{
+          return segment.map((pt) => ({{ ...pt, breakBefore: false }}));
+        }}
+        const first = segment[0];
+        const last = segment[segment.length - 1];
+        const startX = Number(first.x);
+        const buckets = new Map();
+        for (let i = 1; i < segment.length - 1; i += 1) {{
+          const x = Number(segment[i].x);
+          const y = Number(segment[i].y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+          const key = Math.floor((x - startX) / bucketWidthPx);
+          const existing = buckets.get(key);
+          if (existing) {{
+            existing.sumX += x;
+            existing.sumY += y;
+            existing.count += 1;
+          }} else {{
+            buckets.set(key, {{ sumX: x, sumY: y, count: 1 }});
+          }}
+        }}
+        const mids = Array.from(buckets.entries())
+          .sort((a, b) => Number(a[0]) - Number(b[0]))
+          .map(([, bucket]) => ({{
+            x: bucket.sumX / bucket.count,
+            y: bucket.sumY / bucket.count,
+            breakBefore: false,
+          }}));
+        return [
+          {{ x: Number(first.x), y: Number(first.y), breakBefore: false }},
+          ...mids,
+          {{ x: Number(last.x), y: Number(last.y), breakBefore: false }},
+        ];
+      }};
+
+      const output = [];
+      let segmentStart = 0;
+      for (let idx = 1; idx <= source.length; idx += 1) {{
+        const startsNewSegment = idx < source.length && !!source[idx].breakBefore;
+        if (idx !== source.length && !startsNewSegment) continue;
+        const segment = compressSegment(source.slice(segmentStart, idx));
+        for (let pointIndex = 0; pointIndex < segment.length; pointIndex += 1) {{
+          const point = segment[pointIndex];
+          output.push({{
+            ...point,
+            breakBefore: pointIndex === 0 && output.length > 0,
+          }});
+        }}
+        segmentStart = idx;
+      }}
+      return output;
+    }}
+
+    function derivePacketsPerMinuteFromTotals(points) {{
+      const series = Array.isArray(points) ? points : [];
+      if (series.length < 2) return 0;
+      const latestPoint = series[series.length - 1] || null;
+      const previousPoint = series[series.length - 2] || null;
+      const latestTotal = Number(latestPoint && latestPoint.value);
+      const previousTotal = Number(previousPoint && previousPoint.value);
+      if (!Number.isFinite(latestTotal) || !Number.isFinite(previousTotal)) {{
+        return 0;
+      }}
+      const latestMs = Number(latestPoint && latestPoint.ms);
+      const previousMs = Number(previousPoint && previousPoint.ms);
+      const spanMinutes = (Number.isFinite(latestMs) && Number.isFinite(previousMs) && latestMs > previousMs)
+        ? Math.max(1 / 60, (latestMs - previousMs) / 60000)
+        : 1;
+      const delta = latestTotal - previousTotal;
+      if (!Number.isFinite(delta) || delta <= 0) return 0;
+      return delta / spanMinutes;
+    }}
+
+    function derivePacketsPerMinuteSeriesFromTotals(points) {{
+      const series = Array.isArray(points) ? points : [];
+      if (series.length < 2) return [];
+      const output = [];
+      for (let i = 1; i < series.length; i += 1) {{
+        const previousPoint = series[i - 1] || null;
+        const currentPoint = series[i] || null;
+        const previousTotal = Number(previousPoint && previousPoint.value);
+        const currentTotal = Number(currentPoint && currentPoint.value);
+        if (!Number.isFinite(previousTotal) || !Number.isFinite(currentTotal)) continue;
+        const previousMs = Number(previousPoint && previousPoint.ms);
+        const currentMs = Number(currentPoint && currentPoint.ms);
+        const spanMinutes = (Number.isFinite(previousMs) && Number.isFinite(currentMs) && currentMs > previousMs)
+          ? Math.max(1 / 60, (currentMs - previousMs) / 60000)
+          : 1;
+        const delta = currentTotal - previousTotal;
+        const rate = Number.isFinite(delta) && delta > 0 ? (delta / spanMinutes) : 0;
+        output.push({{
+          ms: Number.isFinite(currentMs) ? currentMs : Date.now(),
+          value: rate,
+        }});
+      }}
+      return output;
+    }}
+
+    function trimMetricTickerPoints(points, cutoffMs, maxPoints = metricTickerMaxPoints) {{
+      while (points.length > 0) {{
+        const firstMs = Number(points[0] && points[0].ms);
+        if (Number.isFinite(firstMs) && firstMs >= cutoffMs) {{
+          break;
+        }}
+        points.shift();
+      }}
+      const max = Math.max(1, Math.trunc(Number(maxPoints) || metricTickerMaxPoints));
+      while (points.length > max) {{
+        points.shift();
+      }}
+    }}
+
+    function metricTickerLatestValue(metricKey) {{
+      const cleanKey = String(metricKey || "").trim();
+      if (!cleanKey) return null;
+      const points = metricTickerSeries.get(cleanKey);
+      if (!Array.isArray(points) || points.length === 0) return null;
+      const latest = Number(points[points.length - 1] && points[points.length - 1].value);
+      return Number.isFinite(latest) ? latest : null;
+    }}
+
+    function maybeResetMetricTickerSeries(livePacketTotal) {{
+      const latestLiveTotal = metricTickerLatestValue("live_packets");
+      const nextLiveTotal = Number(livePacketTotal);
+      if (!Number.isFinite(latestLiveTotal) || !Number.isFinite(nextLiveTotal)) {{
+        return false;
+      }}
+      // live_packet_count is monotonic within a runtime session. If it moves
+      // backward, assume a tracker/runtime reset and restart ticker history so
+      // scales don't stay anchored to the previous session.
+      if (hasLiveCounterReset(latestLiveTotal, nextLiveTotal)) {{
+        metricTickerSeries.clear();
+        return true;
+      }}
+      return false;
+    }}
+
+    function hasLiveCounterReset(previousTotal, currentTotal) {{
+      if (!resetTickerScaleOnRestart) return false;
+      const prev = Number(previousTotal);
+      const next = Number(currentTotal);
+      if (!Number.isFinite(prev) || !Number.isFinite(next)) return false;
+      return next + 1 < prev;
+    }}
+
+    function sliceSummaryPointsAfterLiveCounterReset(points) {{
+      const rows = Array.isArray(points) ? points : [];
+      if (!resetTickerScaleOnRestart || rows.length < 2) {{
+        return rows;
+      }}
+      let previousTotal = null;
+      let resetStartIndex = 0;
+      for (let i = 0; i < rows.length; i += 1) {{
+        const currentTotal = Number(rows[i] && rows[i].live_packet_count);
+        if (!Number.isFinite(currentTotal)) continue;
+        if (hasLiveCounterReset(previousTotal, currentTotal)) {{
+          // Keep the newest segment when the monotonic live counter rolls over.
+          resetStartIndex = i;
+        }}
+        previousTotal = currentTotal;
+      }}
+      return resetStartIndex > 0 ? rows.slice(resetStartIndex) : rows;
+    }}
+
+    function appendMetricTickerPoint(
+      metricKey,
+      rawValue,
+      nowMs = Date.now(),
+      windowMs = metricTickerWindowMs,
+      maxPoints = metricTickerMaxPoints
+    ) {{
+      const cleanKey = String(metricKey || "").trim();
+      const value = Number(rawValue);
+      if (!cleanKey || !Number.isFinite(value)) return [];
+      const bucketMs = Math.floor(nowMs / 60000) * 60000;
+      const points = metricTickerSeries.get(cleanKey) || [];
+      const last = points.length ? points[points.length - 1] : null;
+      if (last && Number(last.ms) === bucketMs) {{
+        last.value = value;
+      }} else {{
+        points.push({{ ms: bucketMs, value }});
+      }}
+      const effectiveWindowMs = Math.max(60000, Number(windowMs) || metricTickerWindowMs);
+      trimMetricTickerPoints(points, bucketMs - effectiveWindowMs, maxPoints);
+      metricTickerSeries.set(cleanKey, points);
+      return points;
+    }}
+
+    function buildMetricTickerPath(points, width = 72, height = 16, pad = 1.5) {{
+      if (!Array.isArray(points) || points.length === 0) return "";
+      const values = points
+        .map((point) => Number(point && point.value))
+        .filter((value) => Number.isFinite(value));
+      if (values.length === 0) return "";
+      const widthPx = Math.max(4, Number(width) || 72);
+      const heightPx = Math.max(4, Number(height) || 16);
+      const padPx = Math.max(0, Number(pad) || 0);
+      const top = padPx;
+      const bottom = Math.max(top + 1, heightPx - padPx);
+      const usableHeight = Math.max(1, bottom - top);
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const xSpan = Math.max(1, values.length - 1);
+      let d = "";
+      for (let idx = 0; idx < values.length; idx += 1) {{
+        const x = values.length === 1 ? (widthPx / 2) : ((idx / xSpan) * widthPx);
+        const normalized = maxValue === minValue
+          ? 0.5
+          : ((values[idx] - minValue) / (maxValue - minValue));
+        const y = bottom - (normalized * usableHeight);
+        d += `${{idx === 0 ? "M" : "L"}}${{x.toFixed(2)}} ${{y.toFixed(2)}} `;
+      }}
+      if (values.length === 1) {{
+        const x = widthPx / 2;
+        const y = (top + bottom) / 2;
+        d += `L${{x.toFixed(2)}} ${{y.toFixed(2)}}`;
+      }}
+      return d.trim();
+    }}
+
+    function updateMetricTicker(metricKey, rawValue, config = {{}}) {{
+      const container = document.getElementById(config.containerId || "");
+      const deltaEl = document.getElementById(config.deltaId || "");
+      const chart = document.getElementById(config.chartId || "");
+      const rateEl = document.getElementById(config.rateId || "");
+      if (!(container instanceof HTMLElement) || !(deltaEl instanceof HTMLElement) || !(chart instanceof SVGElement)) {{
+        return;
+      }}
+      const value = Number(rawValue);
+      if (!Number.isFinite(value)) {{
+        container.hidden = true;
+        return;
+      }}
+      const points = appendMetricTickerPoint(
+        metricKey,
+        value,
+        Date.now(),
+        Number(config.windowMs) || metricTickerWindowMs,
+        Number(config.maxPoints) || metricTickerMaxPoints
+      );
+      if (!Array.isArray(points) || points.length === 0) {{
+        container.hidden = true;
+        return;
+      }}
+
+      const latest = Number(points[points.length - 1] && points[points.length - 1].value);
+      const baseline = Number(points[0] && points[0].value);
+      const delta = latest - baseline;
+      const valueUnit = String(config.valueUnit == null ? "" : config.valueUnit);
+      const flatThreshold = Number(config.flatThreshold);
+      const epsilon = Number.isFinite(flatThreshold) ? Math.max(0, flatThreshold) : 0;
+      let trend = "flat";
+      if (delta > epsilon) trend = "up";
+      else if (delta < -epsilon) trend = "down";
+
+      const deltaAbsBaseText = formatTickerNumber(Math.abs(delta), config.digits);
+      const deltaAbsText = `${{deltaAbsBaseText}}${{valueUnit}}`;
+      const pct = baseline !== 0 ? ((delta / Math.abs(baseline)) * 100) : null;
+      const pctText = Number.isFinite(pct)
+        ? ` (${{pct > 0 ? "+" : ""}}${{Number(pct).toFixed(1)}}%)`
+        : "";
+      let deltaText = "";
+      if (trend === "flat") {{
+        deltaText = `0${{valueUnit}}${{pctText}}`;
+      }} else {{
+        const sign = trend === "up" ? "+" : "-";
+        deltaText = `${{sign}}${{deltaAbsText}}${{pctText}}`;
+      }}
+      deltaEl.textContent = deltaText;
+
+      container.classList.remove("trend-up", "trend-down", "trend-flat");
+      container.classList.add(`trend-${{trend}}`);
+      container.hidden = false;
+
+      chart.innerHTML = "";
+      const expandedTickerView = topbarElement instanceof HTMLElement && topbarElement.classList.contains("ticker-expanded");
+      const chartWidth = expandedTickerView ? 184 : 72;
+      const chartHeight = expandedTickerView ? 44 : 16;
+      const chartPad = expandedTickerView ? 3 : 1.5;
+      chart.setAttribute("viewBox", `0 0 ${{chartWidth}} ${{chartHeight}}`);
+      const pathData = buildMetricTickerPath(points, chartWidth, chartHeight, chartPad);
+      if (pathData) {{
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", pathData);
+        chart.appendChild(path);
+      }}
+
+      const firstMs = Number(points[0] && points[0].ms);
+      const rangeMinutes = Number.isFinite(firstMs)
+        ? Math.max(1, Math.round((Date.now() - firstMs) / 60000))
+        : Math.max(1, Math.round(metricTickerWindowMs / 60000));
+      const rangeHours = Math.max(1 / 60, rangeMinutes / 60);
+      const ratePerHour = delta / rangeHours;
+      const rateAbsBaseText = formatTickerNumber(
+        Math.abs(ratePerHour),
+        Number.isFinite(Number(config.rateDigits)) ? Number(config.rateDigits) : 1
+      );
+      const rateAbsText = `${{rateAbsBaseText}}${{valueUnit}}`;
+      const rateSign = ratePerHour > 0 ? "+" : (ratePerHour < 0 ? "-" : "");
+      const rateText = `${{rateSign}}${{rateAbsText}}/h`;
+      if (rateEl instanceof HTMLElement) {{
+        rateEl.textContent = rateText;
+        rateEl.title = `Rate of change per hour across a ${{rangeMinutes}}m window`;
+      }}
+      const fromText = `${{formatTickerNumber(baseline, config.digits)}}${{valueUnit}}`;
+      const toText = `${{formatTickerNumber(latest, config.digits)}}${{valueUnit}}`;
+      container.title = `Trend (${{rangeMinutes}}m): ${{fromText}} -> ${{toText}}; delta ${{deltaText}}; rate ${{rateText}}`;
+    }}
+
+    function compactTargetMetric(value, maxLen = 44) {{
+      const text = String(value == null ? "n/a" : value).replace(/\\s+/g, " ").trim();
+      if (!text) return "n/a";
+      const serialPrefix = "/dev/serial/by-id/";
+      const compactBase = text.startsWith(serialPrefix) ? text.slice(serialPrefix.length) : text;
+      if (compactBase.length <= maxLen) return compactBase;
+      const suffixLen = Math.max(12, Math.floor(maxLen * 0.45));
+      const prefixLen = Math.max(8, maxLen - suffixLen - 3);
+      return `${{compactBase.slice(0, prefixLen)}}...${{compactBase.slice(-suffixLen)}}`;
+    }}
+
+    function syncUptimeBase(uptimeSeconds) {{
+      const clean = Number(uptimeSeconds);
+      if (!Number.isFinite(clean)) return;
+      uptimeBaseSeconds = Math.max(0, Math.floor(clean));
+      uptimeBaseMs = Date.now();
+    }}
+
+    function formatUptimeHms(totalSeconds) {{
+      const safe = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+      const hours = Math.floor(safe / 3600);
+      const minutes = Math.floor((safe % 3600) / 60);
+      const seconds = safe % 60;
+      return `${{String(hours).padStart(2, "0")}}:${{String(minutes).padStart(2, "0")}}:${{String(seconds).padStart(2, "0")}}`;
+    }}
+
+    function updateUptimeDisplay() {{
+      if (typeof uptimeBaseSeconds !== "number" || !Number.isFinite(uptimeBaseSeconds)) {{
+        return;
+      }}
+      const delta = Math.max(0, (Date.now() - (uptimeBaseMs || 0)) / 1000);
+      setText("m-uptime", formatUptimeHms(uptimeBaseSeconds + delta));
+    }}
+
+    function formatRadioTime(unixSeconds) {{
+      const ts = Number(unixSeconds);
+      if (!Number.isFinite(ts) || ts <= 0) return "n/a";
+      const date = new Date(ts * 1000);
+      if (!Number.isFinite(date.getTime())) return "n/a";
+      const now = new Date();
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mm = String(date.getMinutes()).padStart(2, "0");
+      const ss = String(date.getSeconds()).padStart(2, "0");
+      const sameDay = (
+        date.getFullYear() === now.getFullYear()
+        && date.getMonth() === now.getMonth()
+        && date.getDate() === now.getDate()
+      );
+      if (sameDay) {{
+        return `${{hh}}:${{mm}}:${{ss}}`;
+      }}
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${{month}}/${{day}} ${{hh}}:${{mm}}:${{ss}}`;
+    }}
+
+    function syncRadioTimeBase(unixSeconds, source = "") {{
+      const clean = Number(unixSeconds);
+      if (!Number.isFinite(clean) || clean <= 0) {{
+        radioTimeBaseUnix = null;
+        radioTimeBaseMs = 0;
+        radioTimeBaseSource = "";
+        setText("m-radio-time", "n/a");
+        return;
+      }}
+      radioTimeBaseUnix = Math.floor(clean);
+      radioTimeBaseMs = Date.now();
+      radioTimeBaseSource = String(source || "").trim();
+      updateRadioTimeDisplay();
+    }}
+
+    function updateRadioTimeDisplay() {{
+      if (typeof radioTimeBaseUnix !== "number" || !Number.isFinite(radioTimeBaseUnix) || radioTimeBaseUnix <= 0) {{
+        setText("m-radio-time", "n/a");
+        return;
+      }}
+      const delta = Math.max(0, (Date.now() - (radioTimeBaseMs || 0)) / 1000);
+      const displayUnix = radioTimeBaseUnix + Math.floor(delta);
+      setText("m-radio-time", formatRadioTime(displayUnix));
+      const el = document.getElementById("m-radio-time");
+      if (el instanceof HTMLElement) {{
+        const iso = new Date(displayUnix * 1000).toISOString();
+        const sourceSuffix = radioTimeBaseSource ? ` (source: ${{radioTimeBaseSource}})` : "";
+        el.title = `Radio reported time: ${{iso}}${{sourceSuffix}}`;
+      }}
+    }}
+
+    function resolveRadioReportedTime(state) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const candidateSpecs = [
+        ["my_info", safeState.my_info],
+        ["metadata", safeState.metadata],
+        ["local_state", safeState.local_state],
+      ];
+      const candidateKeys = [
+        "current_time",
+        "currentTime",
+        "device_time",
+        "deviceTime",
+        "radio_time",
+        "radioTime",
+        "time",
+        "timestamp",
+        "time_unix",
+        "timeUnix",
+      ];
+      for (const [sourcePrefix, candidateObj] of candidateSpecs) {{
+        if (!candidateObj || typeof candidateObj !== "object") continue;
+        for (const key of candidateKeys) {{
+          if (!Object.prototype.hasOwnProperty.call(candidateObj, key)) continue;
+          const unix = parseDashboardTimeToUnix(candidateObj[key]);
+          if (Number.isFinite(unix) && unix > 0) {{
+            return {{ unix, source: `${{sourcePrefix}}.${{key}}` }};
+          }}
+        }}
+      }}
+
+      const localNodeId = resolveLocalNodeId(safeState);
+      if (isCanonicalNodeId(localNodeId)) {{
+        const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+        const localNode = nodes.find((node) => normalizeNodeId(node && node.id) === localNodeId) || null;
+        const localNodeUnix = nodeLastHeardUnix(localNode);
+        if (Number.isFinite(localNodeUnix) && localNodeUnix > 0) {{
+          return {{ unix: localNodeUnix, source: "local_node.last_heard" }};
+        }}
+      }}
+
+      return {{ unix: null, source: "" }};
+    }}
+
+    function normalizeThemeMode(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return themeAcceptedModes.has(clean) ? clean : "auto";
+    }}
+
+    function normalizeThemeTokens(rawTokens) {{
+      if (!rawTokens || typeof rawTokens !== "object" || Array.isArray(rawTokens)) {{
+        return null;
+      }}
+      const normalized = {{}};
+      for (const [key, value] of Object.entries(rawTokens)) {{
+        const cleanKey = String(key || "").trim();
+        if (!cleanKey.startsWith("--")) {{
+          continue;
+        }}
+        normalized[cleanKey] = String(value ?? "");
+      }}
+      return Object.keys(normalized).length > 0 ? normalized : null;
+    }}
+
+    function normalizeThemePreset(rawPreset) {{
+      if (!rawPreset || typeof rawPreset !== "object" || Array.isArray(rawPreset)) {{
+        return null;
+      }}
+      const light = normalizeThemeTokens(rawPreset.light);
+      const dark = normalizeThemeTokens(rawPreset.dark);
+      if (!light || !dark) {{
+        return null;
+      }}
+      return {{ light, dark }};
+    }}
+
+    function normalizeThemePresetCatalog(rawCatalog) {{
+      const normalized = {{}};
+      if (rawCatalog && typeof rawCatalog === "object" && !Array.isArray(rawCatalog)) {{
+        for (const [name, rawPreset] of Object.entries(rawCatalog)) {{
+          const cleanName = String(name || "").trim();
+          if (!cleanName) continue;
+          const preset = normalizeThemePreset(rawPreset);
+          if (!preset) continue;
+          normalized[cleanName] = preset;
+        }}
+      }}
+      if (!Object.prototype.hasOwnProperty.call(normalized, "default")) {{
+        normalized.default = {{ light: {{}}, dark: {{}} }};
+      }}
+      return normalized;
+    }}
+
+    function normalizeThemePresetName(rawName, catalog = themePresetCatalog) {{
+      const clean = String(rawName || "").trim();
+      if (clean && Object.prototype.hasOwnProperty.call(catalog, clean)) {{
+        return clean;
+      }}
+      return "default";
+    }}
+
+    function orderedThemePresetNames(rawNames, catalog) {{
+      const seen = new Set();
+      const ordered = [];
+      if (Array.isArray(rawNames)) {{
+        for (const name of rawNames) {{
+          const clean = String(name || "").trim();
+          if (!clean || seen.has(clean) || !Object.prototype.hasOwnProperty.call(catalog, clean)) {{
+            continue;
+          }}
+          seen.add(clean);
+          ordered.push(clean);
+        }}
+      }}
+      for (const name of Object.keys(catalog)) {{
+        if (seen.has(name)) continue;
+        seen.add(name);
+        ordered.push(name);
+      }}
+      ordered.sort((a, b) => {{
+        if (a === "default") return -1;
+        if (b === "default") return 1;
+        return a.localeCompare(b);
+      }});
+      return ordered;
+    }}
+
+    function applyThemePresetTokens(resolvedTheme) {{
+      const selected = normalizeThemePresetName(themePresetSelected, themePresetCatalog);
+      const preset = themePresetCatalog[selected] || themePresetCatalog.default || {{ light: {{}}, dark: {{}} }};
+      const tokenMap = resolvedTheme === "dark" ? (preset.dark || {{}}) : (preset.light || {{}});
+      const nextKeys = new Set(Object.keys(tokenMap));
+      for (const key of themePresetAppliedKeys) {{
+        if (!nextKeys.has(key)) {{
+          document.documentElement.style.removeProperty(key);
+        }}
+      }}
+      for (const [key, value] of Object.entries(tokenMap)) {{
+        document.documentElement.style.setProperty(key, String(value));
+      }}
+      themePresetAppliedKeys.clear();
+      for (const key of nextKeys) {{
+        themePresetAppliedKeys.add(key);
+      }}
+    }}
+
+    function updateThemePresetControl(availablePresets = null) {{
+      const select = document.getElementById("theme-preset-select");
+      if (!(select instanceof HTMLSelectElement)) {{
+        return;
+      }}
+      const names = orderedThemePresetNames(
+        availablePresets,
+        themePresetCatalog,
+      );
+      const selected = normalizeThemePresetName(themePresetSelected, themePresetCatalog);
+      select.innerHTML = "";
+      for (const name of names) {{
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      }}
+      select.value = selected;
+      select.disabled = names.length <= 1;
+      select.title = names.length > 1
+        ? "Select runtime color preset"
+        : "Only one preset is available";
+    }}
+
+    function applyThemeSettingsPayload(payload) {{
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) {{
+        return false;
+      }}
+      const normalizedCatalog = normalizeThemePresetCatalog(payload.presets);
+      themePresetCatalog = normalizedCatalog;
+      themePresetSelected = normalizeThemePresetName(payload.selected_preset, normalizedCatalog);
+      updateThemePresetControl(payload.available_presets);
+      applyThemePreference(themePreference, false);
+      return true;
+    }}
+
+    async function loadThemeSettingsFromServer(logErrors = true) {{
+      try {{
+        const resp = await fetch(themeSettingsEndpoint, {{ cache: "no-store" }});
+        if (!resp.ok) {{
+          throw new Error(`API ${{resp.status}}`);
+        }}
+        const payload = await resp.json();
+        if (!payload || payload.ok === false) {{
+          const message = payload && payload.error ? payload.error : "Invalid theme settings payload";
+          throw new Error(String(message));
+        }}
+        return applyThemeSettingsPayload(payload);
+      }} catch (err) {{
+        if (logErrors) {{
+          const msg = err instanceof Error ? err.message : String(err || "unknown error");
+          appendConsoleLine(`theme-settings-load|${{Date.now()}}|${{msg}}`, `[theme settings] load failed: ${{msg}}`);
+        }}
+      }}
+      return false;
+    }}
+
+    async function saveThemePresetSelection(presetName) {{
+      const clean = String(presetName || "").trim();
+      if (!clean) {{
+        return false;
+      }}
+      try {{
+        const resp = await fetch(themeSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{ preset_name: clean }}),
+        }});
+        const payload = await resp.json().catch(() => ({{ ok: false, error: `API ${{resp.status}}` }}));
+        if (!resp.ok || !payload || payload.ok === false) {{
+          const message = payload && payload.error ? payload.error : `API ${{resp.status}}`;
+          throw new Error(String(message));
+        }}
+        return applyThemeSettingsPayload(payload);
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        appendConsoleLine(`theme-settings-save|${{Date.now()}}|${{msg}}`, `[theme settings] save failed: ${{msg}}`);
+        updateThemePresetControl();
+      }}
+      return false;
+    }}
+
+    function bindThemePresetSelector() {{
+      const select = document.getElementById("theme-preset-select");
+      if (!(select instanceof HTMLSelectElement)) {{
+        return;
+      }}
+      if (select.dataset.bound === "1") {{
+        return;
+      }}
+      select.dataset.bound = "1";
+      updateThemePresetControl();
+      select.addEventListener("change", async () => {{
+        const selected = String(select.value || "").trim();
+        if (!selected) {{
+          updateThemePresetControl();
+          return;
+        }}
+        select.disabled = true;
+        await saveThemePresetSelection(selected);
+        updateThemePresetControl();
+      }});
+    }}
+
+    function systemPreferredTheme() {{
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {{
+        return "dark";
+      }}
+      return "light";
+    }}
+
