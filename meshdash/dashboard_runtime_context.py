@@ -378,6 +378,37 @@ def build_dashboard_runtime_context(
             except Exception:
                 pass
 
+    load_environment_metrics_history_fn = getattr(
+        history_store,
+        "load_environment_metrics_history",
+        None,
+    )
+    if callable(load_environment_metrics_history_fn):
+        def _environment_metrics_history(
+            *,
+            window_hours=None,
+            metric=None,
+            node_id=None,
+            limit=None,
+        ):
+            return load_environment_metrics_history_fn(
+                window_hours=window_hours,
+                metric=metric,
+                node_id=node_id,
+                limit=limit,
+            )
+
+        try:
+            setattr(loaders.state_fn, "environment_metrics_history_fn", _environment_metrics_history)
+        except Exception:
+            pass
+        state_lite_fn = getattr(loaders.state_fn, "lite", None)
+        if callable(state_lite_fn):
+            try:
+                setattr(state_lite_fn, "environment_metrics_history_fn", _environment_metrics_history)
+            except Exception:
+                pass
+
     return DashboardRuntimeContext(
         target=target,
         iface=iface,

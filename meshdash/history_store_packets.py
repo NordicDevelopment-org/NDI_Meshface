@@ -1,13 +1,18 @@
 import time
 
 from .history_queries import (
+    fetch_environment_metric_packet_rows as _fetch_environment_metric_packet_rows_helper,
     fetch_packet_search_rows as _fetch_packet_search_rows_helper,
     fetch_recent_packet_rows as _fetch_recent_packet_rows_helper,
 )
 from .history_raw_writes import (
     save_packet_record as _save_packet_record_helper,
 )
-from .helpers import safe_json_loads as _safe_json_loads
+from .helpers import (
+    format_epoch as _format_epoch,
+    safe_json_loads as _safe_json_loads,
+    to_int as _to_int,
+)
 from .history_read_api import (
     load_recent_packets_data as _load_recent_packets_data_helper,
 )
@@ -21,6 +26,267 @@ from .history_store_runtime_contracts import (
 from .history_writes import (
     save_packet_event_and_rollups as _save_packet_event_and_rollups_helper,
 )
+
+_ENV_METRIC_ALIAS_MAP = {
+    "relativehumidity": "relative_humidity",
+    "barometricpressure": "barometric_pressure",
+    "gasresistance": "gas_resistance",
+    "iaq": "iaq",
+}
+
+
+def _is_hex_text(value: str) -> bool:
+    return bool(value) and all(ch in "0123456789abcdefABCDEF" for ch in value)
+
+
+def _normalize_env_metric_key(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    cleaned = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in text)
+    cleaned = "_".join(part for part in cleaned.split("_") if part).lower()
+    if not cleaned:
+        return ""
+    squashed = cleaned.replace("_", "")
+    return _ENV_METRIC_ALIAS_MAP.get(squashed, cleaned)
+
+
+def _format_env_metric_label(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "Metric"
+    words = "".join(ch if (ch.isalnum() or ch in ("_", "-")) else " " for ch in text)
+    words = words.replace("_", " ").replace("-", " ")
+    return " ".join(part.capitalize() for part in words.split() if part) or "Metric"
+
+
+def _metric_float(value: object) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        out = float(value)
+        return out if out == out and abs(out) != float("inf") else None
+    text = str(value).strip().replace(",", "")
+    if not text:
+        return None
+    try:
+        out = float(text)
+    except Exception:
+        return None
+    return out if out == out and abs(out) != float("inf") else None
+
+
+def _normalize_unix_seconds(value: object) -> int | None:
+    parsed = _to_int(value)
+    if parsed is None or parsed <= 0:
+        return None
+    if parsed > 10**12:
+        parsed //= 1000
+    return parsed if parsed > 0 else None
+
+
+def _latest_unix(*values: object) -> int:
+    latest = 0
+    for value in values:
+        parsed = _normalize_unix_seconds(value)
+        if parsed is not None and parsed > latest:
+            latest = parsed
+    return latest
+
+
+def _canonical_node_id(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    lowered = text.lower()
+    if lowered in {"^all", "all", "broadcast", "!ffffffff", "ffffffff", "0xffffffff", "4294967295"}:
+        return "^all"
+    if text.startswith("!") and len(text) == 9 and _is_hex_text(text[1:]):
+        return f"!{text[1:].lower()}"
+    if len(text) == 8 and _is_hex_text(text):
+        return f"!{text.lower()}"
+
+    parsed_num: int | None = None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        parsed_num = int(value)
+    elif text.isdigit():
+        try:
+            parsed_num = int(text, 10)
+        except Exception:
+            parsed_num = None
+    if parsed_num is not None and 0 <= parsed_num <= 0xFFFFFFFF:
+        return f"!{parsed_num:08x}"
+    return text
+
+
+def _extract_node_label(summary: dict[str, object], packet: dict[str, object], fallback: str) -> str:
+    decoded = packet.get("decoded")
+    user = decoded.get("user") if isinstance(decoded, dict) else None
+    candidates = (
+        summary.get("from_long_name"),
+        summary.get("from_short_name"),
+        summary.get("from_name"),
+        user.get("longName") if isinstance(user, dict) else None,
+        user.get("shortName") if isinstance(user, dict) else None,
+        fallback,
+    )
+    for candidate in candidates:
+        text = str(candidate or "").strip()
+        if text:
+            return text
+    return fallback
+
+
+def _collect_environment_metric_containers(source: object) -> list[dict[str, object]]:
+    out: list[dict[str, object]] = []
+    stack = [source]
+    seen: set[int] = set()
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            current_id = id(current)
+            if current_id in seen:
+                continue
+            seen.add(current_id)
+            for raw_key, raw_value in current.items():
+                key = "".join(ch for ch in str(raw_key or "") if ch.isalnum()).lower()
+                if key == "environmentmetrics" and isinstance(raw_value, dict):
+                    out.append(raw_value)
+                if isinstance(raw_value, (dict, list)):
+                    stack.append(raw_value)
+        elif isinstance(current, list):
+            current_id = id(current)
+            if current_id in seen:
+                continue
+            seen.add(current_id)
+            for item in current:
+                if isinstance(item, (dict, list)):
+                    stack.append(item)
+    return out
+
+
+def _build_environment_points(
+    rows: list[tuple[object, ...]],
+    *,
+    metric_filter: str,
+    node_filter: str,
+) -> tuple[list[dict[str, object]], dict[str, dict[str, object]], dict[str, dict[str, object]]]:
+    points: list[dict[str, object]] = []
+    metric_meta: dict[str, dict[str, object]] = {}
+    node_meta: dict[str, dict[str, object]] = {}
+
+    for row in rows:
+        packet_row_id = _to_int(row[0]) if len(row) > 0 else None
+        created_unix = _to_int(row[1]) if len(row) > 1 else None
+        summary_json = row[2] if len(row) > 2 else None
+        packet_json = row[3] if len(row) > 3 else None
+
+        summary = _safe_json_loads(summary_json, {})
+        if not isinstance(summary, dict):
+            summary = {}
+        packet = _safe_json_loads(packet_json, {})
+        if not isinstance(packet, dict):
+            packet = {}
+        decoded = packet.get("decoded")
+        if not isinstance(decoded, dict):
+            decoded = {}
+
+        containers = _collect_environment_metric_containers(decoded)
+        if not containers:
+            continue
+
+        node_id = _canonical_node_id(
+            summary.get("from")
+            or summary.get("from_id")
+            or summary.get("from_num")
+            or packet.get("fromId")
+            or packet.get("from_id")
+            or packet.get("from")
+        )
+        if not node_id:
+            continue
+        if node_filter and node_id != node_filter:
+            continue
+        node_label = _extract_node_label(summary, packet, node_id)
+
+        telemetry = decoded.get("telemetry")
+        if not isinstance(telemetry, dict):
+            telemetry = {}
+        sample_unix = _latest_unix(
+            summary.get("rx_time_unix"),
+            summary.get("time"),
+            summary.get("captured_at_unix"),
+            packet.get("rxTime"),
+            packet.get("rx_time"),
+            telemetry.get("time"),
+            created_unix,
+        )
+        if sample_unix <= 0:
+            sample_unix = _normalize_unix_seconds(created_unix) or 0
+
+        for container in containers:
+            for raw_key, raw_value in container.items():
+                metric_key = _normalize_env_metric_key(raw_key)
+                if not metric_key:
+                    continue
+                if metric_filter and metric_key != metric_filter:
+                    continue
+                numeric_value = _metric_float(raw_value)
+                if numeric_value is None:
+                    continue
+
+                point = {
+                    "packet_row_id": packet_row_id,
+                    "unix": sample_unix,
+                    "time": _format_epoch(sample_unix) if sample_unix > 0 else "n/a",
+                    "node_id": node_id,
+                    "node_label": node_label,
+                    "metric_key": metric_key,
+                    "metric_label": _format_env_metric_label(raw_key),
+                    "value": numeric_value,
+                }
+                points.append(point)
+
+                metric_state = metric_meta.setdefault(
+                    metric_key,
+                    {
+                        "key": metric_key,
+                        "label": _format_env_metric_label(raw_key),
+                        "count": 0,
+                        "node_ids": set(),
+                        "min": numeric_value,
+                        "max": numeric_value,
+                    },
+                )
+                metric_state["count"] = int(metric_state.get("count", 0)) + 1
+                metric_state["node_ids"].add(node_id)
+                metric_state["min"] = min(float(metric_state.get("min", numeric_value)), numeric_value)
+                metric_state["max"] = max(float(metric_state.get("max", numeric_value)), numeric_value)
+
+                node_state = node_meta.setdefault(
+                    node_id,
+                    {
+                        "id": node_id,
+                        "label": node_label,
+                        "count": 0,
+                        "metric_keys": set(),
+                        "last_unix": sample_unix,
+                    },
+                )
+                node_state["count"] = int(node_state.get("count", 0)) + 1
+                node_state["metric_keys"].add(metric_key)
+                node_state["last_unix"] = max(int(node_state.get("last_unix", 0)), sample_unix)
+                if node_state.get("label") in ("", node_id):
+                    node_state["label"] = node_label
+
+    points.sort(
+        key=lambda point: (
+            int(_to_int(point.get("unix")) or 0),
+            str(point.get("node_id") or ""),
+            str(point.get("metric_key") or ""),
+        )
+    )
+    return points, metric_meta, node_meta
 
 
 def load_recent_packets(store: HistoryStoreReadState, limit: int) -> list[dict[str, object]]:
@@ -172,6 +438,87 @@ def search_packets(
         "matches": total_matches,
         "returned_matches": len(selected_match_indexes),
         "entries": entries,
+    }
+
+
+def load_environment_metrics_history(
+    store: HistoryStoreReadState,
+    *,
+    window_hours: int | None = None,
+    metric: str | None = None,
+    node_id: str | None = None,
+    limit: int | None = None,
+) -> dict[str, object]:
+    clean_hours = max(1, min(24 * 365, int(window_hours) if isinstance(window_hours, int) else 72))
+    clean_limit = max(200, min(50000, int(limit) if isinstance(limit, int) else 6000))
+    clean_metric = _normalize_env_metric_key(metric or "")
+    clean_node_id = _canonical_node_id(node_id or "")
+
+    cutoff = int(time.time()) - (clean_hours * 3600)
+    read_conn = getattr(store, "_read_conn", None)
+    if read_conn is None or read_conn is store._conn:
+        read_conn = store._conn
+        read_lock = store._lock
+    else:
+        read_lock = getattr(store, "_read_lock", None) or store._lock
+
+    with read_lock:
+        rows = list(
+            _fetch_environment_metric_packet_rows_helper(
+                read_conn,
+                cutoff=cutoff,
+                limit=clean_limit,
+            )
+        )
+
+    points, metric_meta_map, node_meta_map = _build_environment_points(
+        rows,
+        metric_filter=clean_metric,
+        node_filter=clean_node_id,
+    )
+
+    metric_rows = [
+        {
+            "key": str(meta.get("key") or ""),
+            "label": str(meta.get("label") or "Metric"),
+            "count": int(meta.get("count") or 0),
+            "nodes": len(meta.get("node_ids") or []),
+            "min": float(meta.get("min") or 0.0),
+            "max": float(meta.get("max") or 0.0),
+        }
+        for meta in metric_meta_map.values()
+    ]
+    metric_rows.sort(key=lambda item: (-int(item["count"]), str(item["label"])))
+
+    node_rows = [
+        {
+            "id": str(meta.get("id") or ""),
+            "label": str(meta.get("label") or meta.get("id") or "node"),
+            "count": int(meta.get("count") or 0),
+            "metrics": len(meta.get("metric_keys") or []),
+            "last_unix": int(meta.get("last_unix") or 0),
+            "last_seen": _format_epoch(int(meta.get("last_unix") or 0)) if int(meta.get("last_unix") or 0) > 0 else "n/a",
+        }
+        for meta in node_meta_map.values()
+    ]
+    node_rows.sort(key=lambda item: (-int(item["count"]), str(item["label"]), str(item["id"])))
+
+    return {
+        "ok": True,
+        "window_hours": clean_hours,
+        "cutoff_unix": cutoff,
+        "cutoff_time": _format_epoch(cutoff),
+        "query": {
+            "metric": clean_metric,
+            "node_id": clean_node_id,
+            "limit": clean_limit,
+        },
+        "scanned_packets": len(rows),
+        "total_points": len(points),
+        "returned_points": len(points),
+        "metrics": metric_rows,
+        "nodes": node_rows,
+        "points": points,
     }
 
 

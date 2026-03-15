@@ -124,6 +124,61 @@ def handle_dashboard_get(
         deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
         return
 
+    if path == "/api/history/environment":
+        query_obj = parse_qs(query or "")
+        hours_override = deps.to_int_fn(
+            query_obj.get("hours", [""])[0]
+        )
+        limit = deps.to_int_fn(
+            query_obj.get("limit", [""])[0]
+            or query_obj.get("scan", [""])[0]
+        )
+        metric = str(query_obj.get("metric", [""])[0] or "").strip()
+        node_id = str(
+            query_obj.get("node_id", [""])[0]
+            or query_obj.get("node", [""])[0]
+            or ""
+        ).strip()
+        environment_history_fn = getattr(deps.state_fn, "environment_metrics_history_fn", None)
+        if callable(environment_history_fn):
+            try:
+                response_obj = environment_history_fn(
+                    window_hours=hours_override,
+                    metric=metric or None,
+                    node_id=node_id or None,
+                    limit=limit,
+                )
+            except Exception as exc:
+                response_obj = {
+                    "ok": False,
+                    "error": str(exc or "environment history failed"),
+                    "window_hours": hours_override,
+                    "query": {
+                        "metric": metric,
+                        "node_id": node_id,
+                        "limit": limit,
+                    },
+                    "points": [],
+                    "metrics": [],
+                    "nodes": [],
+                }
+        else:
+            response_obj = {
+                "ok": False,
+                "error": "environment history unavailable on this node",
+                "window_hours": hours_override,
+                "query": {
+                    "metric": metric,
+                    "node_id": node_id,
+                    "limit": limit,
+                },
+                "points": [],
+                "metrics": [],
+                "nodes": [],
+            }
+        deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
+        return
+
     if path == "/api/history/search":
         query_obj = parse_qs(query or "")
         query_text = str(

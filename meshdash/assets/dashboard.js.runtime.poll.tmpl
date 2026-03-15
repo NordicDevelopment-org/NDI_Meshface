@@ -70,6 +70,9 @@
           if (activeLayoutView === "encription") {{
             renderEncription(traffic304);
           }}
+          if (activeLayoutView === "environment") {{
+            void renderEnvironmentMetricsView(false);
+          }}
           if (activeLayoutView === "bots") {{
             renderBotsView(latestState);
           }}
@@ -225,6 +228,10 @@
           renderEncription(state.traffic || {{}});
         }}
 
+        if (activeLayoutView === "environment") {{
+          void renderEnvironmentMetricsView(false);
+        }}
+
         if (activeLayoutView === "settings") {{
           renderSettings(state);
         }}
@@ -255,4 +262,3 @@
         appendConsoleLine(`error|${{Date.now()}}|${{msg}}`, `[poll error] ${{msg}}`);
       }}
     }}
-

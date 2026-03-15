@@ -58,6 +58,20 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
         def __call__(self):
             return {"ok": True}
 
+        def environment_metrics_history_fn(self, **kwargs):
+            return {
+                "ok": True,
+                "window_hours": kwargs.get("window_hours"),
+                "query": {
+                    "metric": kwargs.get("metric"),
+                    "node_id": kwargs.get("node_id"),
+                    "limit": kwargs.get("limit"),
+                },
+                "points": [],
+                "metrics": [],
+                "nodes": [],
+            }
+
         def search_history_packets_fn(self, query_text, **kwargs):
             return {
                 "ok": True,
@@ -79,6 +93,12 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
     routes_get.handle_dashboard_get(handler, path="/api/history/summary", query="hours=12", deps=deps)
     routes_get.handle_dashboard_get(
         handler,
+        path="/api/history/environment",
+        query="hours=36&metric=temperature&node_id=!abcd1234&limit=500",
+        deps=deps,
+    )
+    routes_get.handle_dashboard_get(
+        handler,
         path="/api/history/search",
         query="q=!3369d0b8&before=1&after=2&scope=both&scan=300",
         deps=deps,
@@ -96,14 +116,17 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
     assert json_calls[1]["payload_obj"]["node_id"] == "!abcd1234"
     assert json_calls[2]["payload_obj"]["window_hours"] == 12
     assert json_calls[3]["payload_obj"]["summary_hours"] == 12
-    assert json_calls[4]["payload_obj"]["query"] == "!3369d0b8"
-    assert json_calls[4]["payload_obj"]["kwargs"]["before"] == 1
-    assert json_calls[4]["payload_obj"]["kwargs"]["after"] == 2
-    assert json_calls[4]["payload_obj"]["kwargs"]["scope"] == "both"
-    assert json_calls[4]["payload_obj"]["kwargs"]["scan_limit"] == 300
-    assert json_calls[5]["payload_obj"]["layers"][0]["id"] == "osm"
-    assert json_calls[6]["payload_obj"]["version"] == "17.0"
-    assert json_calls[6]["payload_obj"]["groups"][0]["id"] == "smileys-emotion"
+    assert json_calls[4]["payload_obj"]["query"]["metric"] == "temperature"
+    assert json_calls[4]["payload_obj"]["query"]["node_id"] == "!abcd1234"
+    assert json_calls[4]["payload_obj"]["query"]["limit"] == 500
+    assert json_calls[5]["payload_obj"]["query"] == "!3369d0b8"
+    assert json_calls[5]["payload_obj"]["kwargs"]["before"] == 1
+    assert json_calls[5]["payload_obj"]["kwargs"]["after"] == 2
+    assert json_calls[5]["payload_obj"]["kwargs"]["scope"] == "both"
+    assert json_calls[5]["payload_obj"]["kwargs"]["scan_limit"] == 300
+    assert json_calls[6]["payload_obj"]["layers"][0]["id"] == "osm"
+    assert json_calls[7]["payload_obj"]["version"] == "17.0"
+    assert json_calls[7]["payload_obj"]["groups"][0]["id"] == "smileys-emotion"
     assert text_calls[0]["status_code"] == 404
 
 
@@ -195,3 +218,23 @@ def test_handle_dashboard_get_history_search_returns_error_payload_when_unavaila
     assert "unavailable" in json_calls[0]["payload_obj"]["error"]
     assert json_calls[1]["payload_obj"]["ok"] is False
     assert "missing query text" in json_calls[1]["payload_obj"]["error"]
+
+
+def test_handle_dashboard_get_environment_history_returns_error_payload_when_unavailable():
+    json_calls = []
+    deps = _build_get_deps(
+        state_fn=lambda: {"ok": True},
+        json_calls=json_calls,
+        text_calls=[],
+        html_calls=[],
+    )
+    handler = object()
+    routes_get.handle_dashboard_get(
+        handler,
+        path="/api/history/environment",
+        query="hours=24&metric=temperature&node_id=!abcd1234",
+        deps=deps,
+    )
+    assert json_calls[0]["status_code"] == 200
+    assert json_calls[0]["payload_obj"]["ok"] is False
+    assert "unavailable" in json_calls[0]["payload_obj"]["error"]

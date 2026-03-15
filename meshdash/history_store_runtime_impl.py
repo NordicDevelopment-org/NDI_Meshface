@@ -24,6 +24,7 @@ from .history_store_nodes import (
     load_online_activity as _load_online_activity_helper,
 )
 from .history_store_packets import (
+    load_environment_metrics_history as _load_environment_metrics_history_helper,
     load_recent_packets as _load_recent_packets_helper,
     search_packets as _search_packets_helper,
     save_packet as _save_packet_helper,
@@ -92,6 +93,22 @@ class HistoryStore:
             after=after,
             scope=scope,
             scan_limit=scan_limit,
+        )
+
+    def load_environment_metrics_history(
+        self,
+        *,
+        window_hours: int | None = None,
+        metric: str | None = None,
+        node_id: str | None = None,
+        limit: int | None = None,
+    ) -> dict[str, object]:
+        return _load_environment_metrics_history_helper(
+            self,
+            window_hours=window_hours,
+            metric=metric,
+            node_id=node_id,
+            limit=limit,
         )
 
     def load_recent_chat(self, limit: int) -> list[dict[str, object]]:

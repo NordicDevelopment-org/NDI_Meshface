@@ -32,6 +32,30 @@ def fetch_packet_search_rows(conn: SqlConnection, limit: int) -> SqlRows:
     ).fetchall()
 
 
+def fetch_environment_metric_packet_rows(
+    conn: SqlConnection,
+    *,
+    cutoff: int,
+    limit: int,
+) -> SqlRows:
+    clean_limit = max(1, min(50000, int(limit)))
+    clean_cutoff = max(0, int(cutoff))
+    return conn.execute(
+        """
+        SELECT id, created_unix, summary_json, packet_json
+        FROM (
+          SELECT id, created_unix, summary_json, packet_json
+          FROM packets
+          WHERE created_unix >= ?
+          ORDER BY id DESC
+          LIMIT ?
+        )
+        ORDER BY id ASC
+        """,
+        (clean_cutoff, clean_limit),
+    ).fetchall()
+
+
 def fetch_recent_chat_rows(conn: SqlConnection, limit: int) -> SqlRows:
     return conn.execute(
         """

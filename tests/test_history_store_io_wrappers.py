@@ -18,6 +18,7 @@ from meshdash.history_store_nodes import (
     load_node_saved_counts as load_node_saved_counts_domain,
 )
 from meshdash.history_store_packets import (
+    load_environment_metrics_history as load_environment_metrics_history_domain,
     load_recent_packets as load_recent_packets_domain,
     search_packets as search_packets_domain,
     save_packet as save_packet_domain,
@@ -226,6 +227,51 @@ def test_history_store_domain_packet_search_supports_scope_and_context(tmp_path)
         assert entries[1]["match"] is True
         assert entries[2]["match"] is False
         assert entries[1]["summary"]["text"] == "needle-hit"
+    finally:
+        store.close()
+
+
+def test_history_store_domain_environment_metrics_history_extracts_telemetry_points(tmp_path):
+    store = _make_store(tmp_path)
+    try:
+        save_packet_domain(
+            store,
+            {
+                "summary": {
+                    "from": "!a1b2c3d4",
+                    "from_short_name": "alpha",
+                    "rx_time_unix": 1_700_000_010,
+                    "portnum": "TELEMETRY_APP",
+                },
+                "packet": {
+                    "fromId": "!a1b2c3d4",
+                    "rxTime": 1_700_000_010,
+                    "decoded": {
+                        "portnum": "TELEMETRY_APP",
+                        "telemetry": {
+                            "time": 1_700_000_010,
+                            "environmentMetrics": {
+                                "temperature": 23.4,
+                                "relativeHumidity": 55.2,
+                            },
+                        },
+                    },
+                },
+            },
+        )
+        payload = load_environment_metrics_history_domain(
+            store,
+            window_hours=24,
+            metric="temperature",
+            node_id="!a1b2c3d4",
+            limit=1000,
+        )
+        assert payload["ok"] is True
+        assert payload["points"]
+        assert payload["metrics"][0]["key"] == "temperature"
+        assert payload["nodes"][0]["id"] == "!a1b2c3d4"
+        assert payload["points"][0]["metric_key"] == "temperature"
+        assert payload["points"][0]["node_label"] == "alpha"
     finally:
         store.close()
 

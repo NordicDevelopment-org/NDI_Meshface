@@ -13,6 +13,573 @@
       nodesFull: {{ fetchedAt: 0, data: null }},
     }};
 
+    const envMetricsViewState = {{
+      points: [],
+      metrics: [],
+      nodes: [],
+      selectedMetric: "",
+      selectedNodeId: "",
+      selectedWindowHours: 72,
+      scannedPackets: 0,
+      cutoffUnix: 0,
+    }};
+
+    const envMetricsHistoryCache = new Map();
+    const envMetricColorPalette = [
+      "#2f855a",
+      "#2b6cb0",
+      "#b7791f",
+      "#9b2c2c",
+      "#6b46c1",
+      "#2c7a7b",
+      "#c05621",
+      "#4a5568",
+      "#805ad5",
+      "#276749",
+    ];
+
+    function normalizeEnvMetricKey(raw) {{
+      return String(raw == null ? "" : raw)
+        .trim()
+        .replace(/[^a-zA-Z0-9_]+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .toLowerCase();
+    }}
+
+    function formatEnvMetricLabel(raw) {{
+      const text = String(raw == null ? "" : raw)
+        .replace(/[_-]+/g, " ")
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .trim();
+      if (!text) return "Metric";
+      return text.replace(/\b([a-z])/gi, (match) => match.toUpperCase());
+    }}
+
+    function envMetricFiniteNumber(raw) {{
+      if (typeof raw === "boolean" || raw == null) return null;
+      if (typeof raw === "number") {{
+        return Number.isFinite(raw) ? raw : null;
+      }}
+      const text = String(raw).trim();
+      if (!text) return null;
+      const normalized = text.replace(/,/g, "");
+      const num = Number(normalized);
+      return Number.isFinite(num) ? num : null;
+    }}
+
+    function envMetricValueText(raw, fallback = "n/a") {{
+      const num = Number(raw);
+      if (!Number.isFinite(num)) return fallback;
+      const abs = Math.abs(num);
+      const decimals = abs >= 100 ? 0 : (abs >= 10 ? 1 : 2);
+      const text = num.toFixed(decimals);
+      return text.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+    }}
+
+    function normalizeEnvHistoryHours(raw) {{
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) return 72;
+      return Math.max(1, Math.min(24 * 365, Math.trunc(parsed)));
+    }}
+
+    function formatEnvHistoryTime(unix) {{
+      const parsed = Number(unix);
+      if (!Number.isFinite(parsed) || parsed <= 0) return "n/a";
+      try {{
+        return new Date(parsed * 1000).toLocaleString();
+      }} catch (_err) {{
+        return "n/a";
+      }}
+    }}
+
+    function setEnvironmentMetricsStatus(text, kind = "info") {{
+      const status = document.getElementById("env-metrics-status");
+      if (!(status instanceof HTMLElement)) return;
+      status.textContent = String(text == null ? "" : text).trim() || "n/a";
+      status.dataset.kind = String(kind || "info");
+    }}
+
+    function syncEnvironmentWindowPicker() {{
+      const select = document.getElementById("env-window-select");
+      const nextHours = normalizeEnvHistoryHours(envMetricsViewState.selectedWindowHours || (select && select.value));
+      envMetricsViewState.selectedWindowHours = nextHours;
+      if (select instanceof HTMLSelectElement && String(select.value) !== String(nextHours)) {{
+        select.value = String(nextHours);
+      }}
+      return nextHours;
+    }}
+
+    function syncEnvironmentMetricPicker(metrics) {{
+      const select = document.getElementById("env-metric-select");
+      if (!(select instanceof HTMLSelectElement)) return "";
+      const safeMetrics = Array.isArray(metrics) ? metrics : [];
+      if (!safeMetrics.length) {{
+        select.innerHTML = '<option value="">No sensor metrics</option>';
+        select.disabled = true;
+        envMetricsViewState.selectedMetric = "";
+        return "";
+      }}
+      const optionsHtml = safeMetrics.map((meta) => (
+        `<option value="${{escAttr(meta.key)}}">${{escAttr(meta.label)}} (${{Math.max(0, Math.trunc(Number(meta.count) || 0))}})</option>`
+      )).join("");
+      if (select.innerHTML !== optionsHtml) {{
+        select.innerHTML = optionsHtml;
+      }}
+      const requested = normalizeEnvMetricKey(envMetricsViewState.selectedMetric || select.value);
+      const hasRequested = safeMetrics.some((meta) => meta.key === requested);
+      const nextKey = hasRequested ? requested : safeMetrics[0].key;
+      if (select.value !== nextKey) {{
+        select.value = nextKey;
+      }}
+      select.disabled = false;
+      envMetricsViewState.selectedMetric = nextKey;
+      return nextKey;
+    }}
+
+    function syncEnvironmentNodePicker(nodes) {{
+      const select = document.getElementById("env-node-select");
+      if (!(select instanceof HTMLSelectElement)) return "";
+      const safeNodes = Array.isArray(nodes) ? nodes : [];
+      const optionsHtml = [
+        '<option value="">All nodes</option>',
+        ...safeNodes.map((meta) => (
+          `<option value="${{escAttr(meta.id)}}">${{escAttr(meta.label || meta.id)}} (${{Math.max(0, Math.trunc(Number(meta.count) || 0))}})</option>`
+        )),
+      ].join("");
+      if (select.innerHTML !== optionsHtml) {{
+        select.innerHTML = optionsHtml;
+      }}
+      const requested = normalizeNodeId(envMetricsViewState.selectedNodeId || select.value);
+      const hasRequested = safeNodes.some((meta) => normalizeNodeId(meta.id) === requested);
+      const nextNodeId = hasRequested ? requested : "";
+      if (select.value !== nextNodeId) {{
+        select.value = nextNodeId;
+      }}
+      envMetricsViewState.selectedNodeId = nextNodeId;
+      return nextNodeId;
+    }}
+
+    function resolveEnvironmentMetricMeta(metrics, metricKey) {{
+      const safeMetrics = Array.isArray(metrics) ? metrics : [];
+      const key = normalizeEnvMetricKey(metricKey);
+      if (!key) return safeMetrics[0] || null;
+      return safeMetrics.find((meta) => meta.key === key) || safeMetrics[0] || null;
+    }}
+
+    function resolveEnvironmentNodeMeta(nodes, nodeId) {{
+      const safeNodes = Array.isArray(nodes) ? nodes : [];
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!cleanNodeId) return null;
+      return safeNodes.find((node) => normalizeNodeId(node.id) === cleanNodeId) || null;
+    }}
+
+    function filterEnvironmentMetricPoints(points, metricKey, nodeId) {{
+      const cleanMetric = normalizeEnvMetricKey(metricKey || "");
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      return (Array.isArray(points) ? points : [])
+        .filter((point) => {{
+          const pointMetric = normalizeEnvMetricKey(point && point.metric_key);
+          if (!cleanMetric || pointMetric !== cleanMetric) return false;
+          if (!cleanNodeId) return true;
+          return normalizeNodeId(point && point.node_id) === cleanNodeId;
+        }});
+    }}
+
+    function renderEnvironmentMetricLegend(metrics, nodes, metricMeta, nodeMeta, filteredPoints) {{
+      const host = document.getElementById("env-metrics-available");
+      if (!(host instanceof HTMLElement)) return;
+      const safeMetrics = Array.isArray(metrics) ? metrics : [];
+      const safeNodes = Array.isArray(nodes) ? nodes : [];
+      if (!safeMetrics.length || !safeNodes.length) {{
+        host.textContent = "No sensor metric keys detected yet in saved telemetry history.";
+        return;
+      }}
+      const totalPoints = Math.max(0, Math.trunc(Number((Array.isArray(filteredPoints) ? filteredPoints.length : 0)) || 0));
+      const selectionSummary = metricMeta
+        ? `${{metricMeta.label}}${{nodeMeta ? ` @ ${{nodeMeta.label || nodeMeta.id}}` : " @ all nodes"}}`
+        : "No metric selected";
+      host.innerHTML = [
+        `<span class="env-metric-chip">${{escAttr(selectionSummary)}} <span class="env-metric-chip-count">${{totalPoints}}</span></span>`,
+        ...safeMetrics.slice(0, 10).map((meta) => (
+          `<span class="env-metric-chip">${{escAttr(meta.label)}} <span class="env-metric-chip-count">${{Math.max(0, Math.trunc(Number(meta.count) || 0))}}</span></span>`
+        )),
+        safeMetrics.length > 10
+          ? `<span class="env-metric-chip">+${{safeMetrics.length - 10}} more metrics</span>`
+          : "",
+        `<span class="env-metric-chip">Nodes <span class="env-metric-chip-count">${{safeNodes.length}}</span></span>`,
+      ].filter(Boolean).join("");
+    }}
+
+    function renderEnvironmentMetricsTable(points, metricMeta, nodeMeta) {{
+      const valueHeader = document.getElementById("env-metrics-value-col");
+      if (valueHeader instanceof HTMLElement) {{
+        valueHeader.textContent = metricMeta && metricMeta.label ? metricMeta.label : "Value";
+      }}
+      if (!metricMeta || !metricMeta.key) {{
+        fillTable("env-metrics-table", ['<tr><td colspan="5">No sensor metrics available yet.</td></tr>']);
+        return 0;
+      }}
+      const safePoints = (Array.isArray(points) ? points : [])
+        .slice()
+        .sort((a, b) => Number(b && b.unix) - Number(a && a.unix));
+      if (!safePoints.length) {{
+        const nodeLabel = nodeMeta ? ` for ${{nodeMeta.label || nodeMeta.id}}` : "";
+        fillTable("env-metrics-table", [`<tr><td colspan="5">No saved points for ${{escAttr(metricMeta.label)}}${{escAttr(nodeLabel)}}.</td></tr>`]);
+        return 0;
+      }}
+      const capped = safePoints.slice(0, 800);
+      const rows = capped.map((point) => {{
+        const pointUnix = Number(point && point.unix);
+        const timeText = formatEnvHistoryTime(pointUnix);
+        const nodeLabel = String((point && point.node_label) || (point && point.node_id) || "unknown");
+        const nodeId = String((point && point.node_id) || "n/a");
+        const metricLabel = String((point && point.metric_label) || metricMeta.label || "Metric");
+        const numericValue = envMetricFiniteNumber(point && point.value);
+        return `<tr>
+          <td data-sort="${{escAttr(pointUnix)}}">${{escAttr(timeText)}}</td>
+          <td data-sort="${{escAttr(nodeLabel)}}">${{escAttr(nodeLabel)}}</td>
+          <td class="mono" data-sort="${{escAttr(nodeId)}}">${{escAttr(nodeId)}}</td>
+          <td data-sort="${{escAttr(numericValue)}}">${{escAttr(envMetricValueText(numericValue))}}</td>
+          <td data-sort="${{escAttr(metricLabel)}}">${{escAttr(metricLabel)}}</td>
+        </tr>`;
+      }});
+      if (safePoints.length > capped.length) {{
+        rows.push(`<tr><td colspan="5">Showing newest ${{capped.length}} of ${{safePoints.length}} points.</td></tr>`);
+      }}
+      fillTable("env-metrics-table", rows);
+      return safePoints.length;
+    }}
+
+    function downsampleEnvironmentSeries(points, maxPoints = 260) {{
+      const safePoints = Array.isArray(points) ? points : [];
+      if (safePoints.length <= maxPoints) return safePoints;
+      const step = Math.max(1, Math.ceil(safePoints.length / maxPoints));
+      const out = [];
+      for (let idx = 0; idx < safePoints.length; idx += step) {{
+        out.push(safePoints[idx]);
+      }}
+      const tail = safePoints[safePoints.length - 1];
+      if (out[out.length - 1] !== tail) {{
+        out.push(tail);
+      }}
+      return out;
+    }}
+
+    function renderEnvironmentMetricsChart(points, metricMeta, nodeMeta) {{
+      const svg = document.getElementById("env-metrics-chart");
+      const empty = document.getElementById("env-metrics-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+
+      if (!metricMeta || !metricMeta.key) {{
+        svg.innerHTML = "";
+        empty.textContent = "No historical sensor metrics found yet.";
+        empty.hidden = false;
+        return;
+      }}
+
+      const safePoints = Array.isArray(points) ? points : [];
+      if (!safePoints.length) {{
+        svg.innerHTML = "";
+        empty.textContent = `No historical points for ${{metricMeta.label}}${{nodeMeta ? ` from ${{nodeMeta.label || nodeMeta.id}}` : ""}}.`;
+        empty.hidden = false;
+        return;
+      }}
+
+      const seriesByNodeId = new Map();
+      for (const point of safePoints) {{
+        const nodeId = normalizeNodeId(point && point.node_id) || "unknown";
+        const nodeLabel = String((point && point.node_label) || nodeId);
+        const pointUnix = Number(point && point.unix);
+        const value = envMetricFiniteNumber(point && point.value);
+        if (!Number.isFinite(pointUnix) || pointUnix <= 0 || !Number.isFinite(value)) continue;
+        if (!seriesByNodeId.has(nodeId)) {{
+          seriesByNodeId.set(nodeId, {{
+            nodeId,
+            label: nodeLabel,
+            points: [],
+          }});
+        }}
+        seriesByNodeId.get(nodeId).points.push({{
+          unix: Math.trunc(pointUnix),
+          value,
+        }});
+      }}
+
+      let seriesList = Array.from(seriesByNodeId.values())
+        .map((series) => {{
+          const sorted = series.points
+            .slice()
+            .sort((a, b) => Number(a.unix) - Number(b.unix));
+          return {{
+            nodeId: series.nodeId,
+            label: series.label,
+            points: downsampleEnvironmentSeries(sorted),
+          }};
+        }})
+        .filter((series) => series.points.length > 0)
+        .sort((a, b) => (b.points.length - a.points.length) || String(a.label).localeCompare(String(b.label)));
+
+      if (!seriesList.length) {{
+        svg.innerHTML = "";
+        empty.textContent = "No valid timestamped telemetry points in this selection.";
+        empty.hidden = false;
+        return;
+      }}
+
+      if (!nodeMeta && seriesList.length > 8) {{
+        seriesList = seriesList.slice(0, 8);
+      }}
+
+      const allPoints = seriesList.flatMap((series) => series.points);
+      const minUnix = Math.min(...allPoints.map((point) => Number(point.unix)));
+      const maxUnix = Math.max(...allPoints.map((point) => Number(point.unix)));
+      let minValue = Math.min(...allPoints.map((point) => Number(point.value)));
+      let maxValue = Math.max(...allPoints.map((point) => Number(point.value)));
+
+      if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {{
+        svg.innerHTML = "";
+        empty.textContent = "No numeric values in this selection.";
+        empty.hidden = false;
+        return;
+      }}
+
+      if (Math.abs(maxValue - minValue) < 1e-9) {{
+        minValue -= 1;
+        maxValue += 1;
+      }} else {{
+        const pad = (maxValue - minValue) * 0.1;
+        minValue -= pad;
+        maxValue += pad;
+      }}
+
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const palette = darkTheme
+        ? {{
+          grid: "rgba(173, 198, 222, 0.22)",
+          text: "#b8cfde",
+          axis: "#84a7bf",
+          pointStroke: "rgba(7, 19, 30, 0.52)",
+        }}
+        : {{
+          grid: "rgba(58, 95, 76, 0.2)",
+          text: "#3a5a47",
+          axis: "#527565",
+          pointStroke: "rgba(15, 35, 25, 0.38)",
+        }};
+
+      const width = 900;
+      const height = 260;
+      const padLeft = 56;
+      const padRight = 12;
+      const padTop = 16;
+      const padBottom = 38;
+      const chartWidth = width - padLeft - padRight;
+      const chartHeight = height - padTop - padBottom;
+      const unixSpan = Math.max(1, maxUnix - minUnix);
+      const valueSpan = Math.max(1e-9, maxValue - minValue);
+      const xForUnix = (unix) => padLeft + (((Number(unix) - minUnix) / unixSpan) * chartWidth);
+      const yForValue = (value) => padTop + (((maxValue - Number(value)) / valueSpan) * chartHeight);
+
+      const yTicks = 5;
+      const yGrid = [];
+      const yLabels = [];
+      for (let idx = 0; idx < yTicks; idx += 1) {{
+        const ratio = yTicks <= 1 ? 0 : (idx / (yTicks - 1));
+        const value = maxValue - (ratio * valueSpan);
+        const y = yForValue(value);
+        yGrid.push(`<line x1="${{padLeft}}" y1="${{y.toFixed(2)}}" x2="${{(padLeft + chartWidth).toFixed(2)}}" y2="${{y.toFixed(2)}}" stroke="${{palette.grid}}" stroke-width="1"></line>`);
+        yLabels.push(`<text x="${{(padLeft - 7).toFixed(2)}}" y="${{(y + 4).toFixed(2)}}" text-anchor="end" fill="${{palette.text}}" font-size="10">${{escAttr(envMetricValueText(value))}}</text>`);
+      }}
+
+      const xTicks = 6;
+      const xGrid = [];
+      const xLabels = [];
+      for (let idx = 0; idx < xTicks; idx += 1) {{
+        const ratio = xTicks <= 1 ? 0 : (idx / (xTicks - 1));
+        const unix = Math.round(minUnix + (ratio * unixSpan));
+        const x = xForUnix(unix);
+        xGrid.push(`<line x1="${{x.toFixed(2)}}" y1="${{padTop}}" x2="${{x.toFixed(2)}}" y2="${{(padTop + chartHeight).toFixed(2)}}" stroke="${{palette.grid}}" stroke-width="1"></line>`);
+        xLabels.push(`<text x="${{x.toFixed(2)}}" y="${{(height - 10).toFixed(2)}}" text-anchor="middle" fill="${{palette.text}}" font-size="10">${{escAttr(formatEnvHistoryTime(unix))}}</text>`);
+      }}
+
+      const linePaths = [];
+      const pointDots = [];
+      seriesList.forEach((series, idx) => {{
+        const color = envMetricColorPalette[idx % envMetricColorPalette.length];
+        const pathD = series.points.map((point, pointIdx) => {{
+          const x = xForUnix(point.unix);
+          const y = yForValue(point.value);
+          return `${{pointIdx === 0 ? "M" : "L"}}${{x.toFixed(2)}},${{y.toFixed(2)}}`;
+        }}).join(" ");
+        linePaths.push(`<path d="${{pathD}}" fill="none" stroke="${{color}}" stroke-width="1.8"></path>`);
+        for (const point of series.points) {{
+          const x = xForUnix(point.unix);
+          const y = yForValue(point.value);
+          const title = `${{series.label}} (${{series.nodeId}}) • ${{formatEnvHistoryTime(point.unix)}} • ${{envMetricValueText(point.value)}}`;
+          pointDots.push(`<circle cx="${{x.toFixed(2)}}" cy="${{y.toFixed(2)}}" r="2.3" fill="${{color}}" stroke="${{palette.pointStroke}}" stroke-width="0.7"><title>${{escAttr(title)}}</title></circle>`);
+        }}
+      }});
+
+      const subtitle = nodeMeta
+        ? `${{metricMeta.label}} for ${{nodeMeta.label || nodeMeta.id}}`
+        : `${{metricMeta.label}} across ${{seriesList.length}} node${{seriesList.length === 1 ? "" : "s"}}`;
+
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.innerHTML = `
+        <g>
+          <rect x="${{padLeft}}" y="${{padTop}}" width="${{chartWidth}}" height="${{chartHeight}}" fill="none" stroke="${{palette.grid}}" stroke-width="1"></rect>
+          ${{yGrid.join("")}}
+          ${{xGrid.join("")}}
+          ${{linePaths.join("")}}
+          ${{pointDots.join("")}}
+          ${{yLabels.join("")}}
+          ${{xLabels.join("")}}
+          <text x="${{(padLeft + 8).toFixed(2)}}" y="${{(padTop + 12).toFixed(2)}}" fill="${{palette.text}}" font-size="11">${{escAttr(subtitle)}}</text>
+        </g>
+      `;
+      empty.hidden = true;
+    }}
+
+    function renderEnvironmentMetricsSnapshot() {{
+      const points = Array.isArray(envMetricsViewState.points) ? envMetricsViewState.points : [];
+      const metrics = Array.isArray(envMetricsViewState.metrics) ? envMetricsViewState.metrics : [];
+      const nodes = Array.isArray(envMetricsViewState.nodes) ? envMetricsViewState.nodes : [];
+      const windowHours = syncEnvironmentWindowPicker();
+      const selectedMetric = syncEnvironmentMetricPicker(metrics);
+      const selectedNodeId = syncEnvironmentNodePicker(nodes);
+      const metricMeta = resolveEnvironmentMetricMeta(metrics, selectedMetric);
+      const nodeMeta = resolveEnvironmentNodeMeta(nodes, selectedNodeId);
+      const filteredPoints = filterEnvironmentMetricPoints(points, selectedMetric, selectedNodeId);
+      renderEnvironmentMetricLegend(metrics, nodes, metricMeta, nodeMeta, filteredPoints);
+      const renderedCount = renderEnvironmentMetricsTable(filteredPoints, metricMeta, nodeMeta);
+      renderEnvironmentMetricsChart(filteredPoints, metricMeta, nodeMeta);
+
+      if (!metrics.length || !nodes.length) {{
+        setEnvironmentMetricsStatus("No historical sensor telemetry has been saved yet.", "warn");
+        return;
+      }}
+      if (!metricMeta) {{
+        setEnvironmentMetricsStatus("Metric list loaded, but no metric is currently selected.", "warn");
+        return;
+      }}
+      const nodeSummary = nodeMeta
+        ? `${{nodeMeta.label || nodeMeta.id}} (${{nodeMeta.id}})`
+        : `${{nodes.length}} nodes`;
+      setEnvironmentMetricsStatus(
+        `Window ${{windowHours}}h • Metric: ${{metricMeta.label}} • Scope: ${{nodeSummary}} • Points: ${{renderedCount}} • Scanned packets: ${{Math.max(0, Math.trunc(Number(envMetricsViewState.scannedPackets) || 0))}}`,
+        filteredPoints.length ? "info" : "warn",
+      );
+    }}
+
+    function applyEnvironmentMetricsPayload(payload) {{
+      const data = (payload && typeof payload === "object") ? payload : {{}};
+      envMetricsViewState.points = Array.isArray(data.points) ? data.points : [];
+      envMetricsViewState.metrics = Array.isArray(data.metrics) ? data.metrics : [];
+      envMetricsViewState.nodes = Array.isArray(data.nodes) ? data.nodes : [];
+      envMetricsViewState.scannedPackets = Math.max(0, Math.trunc(Number(data.scanned_packets) || 0));
+      envMetricsViewState.cutoffUnix = Math.max(0, Math.trunc(Number(data.cutoff_unix) || 0));
+      envMetricsViewState.selectedWindowHours = normalizeEnvHistoryHours(data.window_hours || envMetricsViewState.selectedWindowHours);
+      if (!envMetricsViewState.selectedMetric) {{
+        const firstMetric = envMetricsViewState.metrics[0];
+        envMetricsViewState.selectedMetric = firstMetric ? normalizeEnvMetricKey(firstMetric.key) : "";
+      }}
+      const cleanSelectedNode = normalizeNodeId(envMetricsViewState.selectedNodeId || "");
+      if (cleanSelectedNode && !envMetricsViewState.nodes.some((node) => normalizeNodeId(node.id) === cleanSelectedNode)) {{
+        envMetricsViewState.selectedNodeId = "";
+      }}
+    }}
+
+    async function fetchEnvironmentMetricsHistory(windowHours, forceRefresh = false) {{
+      const cleanHours = normalizeEnvHistoryHours(windowHours);
+      const cacheKey = String(cleanHours);
+      const nowMs = Date.now();
+      const cached = envMetricsHistoryCache.get(cacheKey);
+      const ttlMs = Math.max(refreshMs * 4, 15000);
+      if (!forceRefresh && cached && cached.data && (nowMs - (cached.fetchedAt || 0)) < ttlMs) {{
+        return cached.data;
+      }}
+      const params = new URLSearchParams();
+      params.set("hours", String(cleanHours));
+      params.set("limit", "8000");
+      const resp = await fetch(`/api/history/environment?${{params.toString()}}`, {{ cache: "no-store" }});
+      if (!resp.ok) throw new Error(`sensor history API ${{resp.status}}`);
+      const payload = await resp.json();
+      if (!payload || typeof payload !== "object") {{
+        throw new Error("sensor history returned an invalid payload");
+      }}
+      if (payload.ok === false) {{
+        throw new Error(String(payload.error || "sensor history unavailable"));
+      }}
+      envMetricsHistoryCache.set(cacheKey, {{
+        fetchedAt: nowMs,
+        data: payload,
+      }});
+      return payload;
+    }}
+
+    function bindEnvironmentMetricsControls() {{
+      const windowSelect = document.getElementById("env-window-select");
+      if (windowSelect instanceof HTMLSelectElement && windowSelect.dataset.bound !== "1") {{
+        windowSelect.dataset.bound = "1";
+        windowSelect.addEventListener("change", () => {{
+          envMetricsViewState.selectedWindowHours = normalizeEnvHistoryHours(windowSelect.value);
+          void renderEnvironmentMetricsView(false);
+        }});
+      }}
+
+      const metricSelect = document.getElementById("env-metric-select");
+      if (metricSelect instanceof HTMLSelectElement && metricSelect.dataset.bound !== "1") {{
+        metricSelect.dataset.bound = "1";
+        metricSelect.addEventListener("change", () => {{
+          envMetricsViewState.selectedMetric = normalizeEnvMetricKey(metricSelect.value);
+          renderEnvironmentMetricsSnapshot();
+        }});
+      }}
+
+      const nodeSelect = document.getElementById("env-node-select");
+      if (nodeSelect instanceof HTMLSelectElement && nodeSelect.dataset.bound !== "1") {{
+        nodeSelect.dataset.bound = "1";
+        nodeSelect.addEventListener("change", () => {{
+          envMetricsViewState.selectedNodeId = normalizeNodeId(nodeSelect.value || "");
+          renderEnvironmentMetricsSnapshot();
+        }});
+      }}
+
+      const refreshBtn = document.getElementById("env-metrics-refresh-btn");
+      if (refreshBtn instanceof HTMLButtonElement && refreshBtn.dataset.bound !== "1") {{
+        refreshBtn.dataset.bound = "1";
+        refreshBtn.addEventListener("click", () => {{
+          if (typeof requestImmediatePoll === "function") {{
+            try {{
+              requestImmediatePoll(0);
+            }} catch (_err) {{
+            }}
+          }}
+          void renderEnvironmentMetricsView(true);
+        }});
+      }}
+    }}
+
+    async function renderEnvironmentMetricsView(forceRefresh = false) {{
+      bindEnvironmentMetricsControls();
+      const windowHours = syncEnvironmentWindowPicker();
+      setEnvironmentMetricsStatus(`Loading saved sensor telemetry (${windowHours}h window)...`, "info");
+      try {{
+        const payload = await fetchEnvironmentMetricsHistory(windowHours, forceRefresh);
+        applyEnvironmentMetricsPayload(payload);
+        renderEnvironmentMetricsSnapshot();
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        envMetricsViewState.points = [];
+        envMetricsViewState.metrics = [];
+        envMetricsViewState.nodes = [];
+        envMetricsViewState.scannedPackets = 0;
+        renderEnvironmentMetricsSnapshot();
+        setEnvironmentMetricsStatus(`Sensor history unavailable: ${{msg}}`, "error");
+      }}
+    }}
+
     async function fetchRawJson(url, cacheEntry, ttlMs = 30000) {{
       const nowMs = Date.now();
       if (cacheEntry && cacheEntry.data != null && (nowMs - (cacheEntry.fetchedAt || 0)) < ttlMs) {{
@@ -49,13 +616,15 @@
       return data;
     }}
 
-    async function loadRawNodesFull() {{
-      const data = await fetchRawJson("/api/raw/nodes_full", rawDataCache.nodesFull, 60000);
+    async function loadRawNodesFull(ttlMs = 60000) {{
+      const safeTtlMs = Number.isFinite(Number(ttlMs)) ? Math.max(0, Math.trunc(Number(ttlMs))) : 60000;
+      const data = await fetchRawJson("/api/raw/nodes_full", rawDataCache.nodesFull, safeTtlMs);
       setRaw("raw-nodes-full", data);
       return data;
     }}
 
     function bindRawDataFetch() {{
+      bindEnvironmentMetricsControls();
       const pairs = [
         ["raw-my-info", loadRawMyInfo],
         ["raw-metadata", loadRawMetadata],
@@ -81,5 +650,8 @@
           void loader().catch(() => {{}});
         }}
       }}
-    }}
 
+      if (activeLayoutView === "environment") {{
+        void renderEnvironmentMetricsView(false);
+      }}
+    }}
