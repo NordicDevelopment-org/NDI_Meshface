@@ -1,5 +1,8 @@
 # Multi-Radio Federated Backend Plan (V2, Greenfield)
 
+Doc status: proposal
+Last reviewed: 2026-03-14
+
 Status (audited 2026-03-14):
 
 1. Proposal/spec document only.

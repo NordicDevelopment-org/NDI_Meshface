@@ -1,5 +1,8 @@
 # Meshyface Roadmap
 
+Doc status: active-planning
+Last reviewed: 2026-03-14
+
 Meshyface is the working title for “Meshtastic Deep Dashboard, but chat‑first” — with a bonus goal: **explorable public rooms** that feel like AOL/Prodigy chatrooms, without spamming the standard Meshtastic public text feed.
 
 This roadmap is written to be directly hand‑offable to a coding agent (Codex) and to a human reviewer.

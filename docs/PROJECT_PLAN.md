@@ -1,5 +1,8 @@
 # Meshyface Product Plan (working title)
 
+Doc status: active-planning
+Last reviewed: 2026-03-14
+
 Status (reviewed 2026-03-14):
 
 1. This is a direction/intent doc, not an implementation checklist.

@@ -1,5 +1,8 @@
 # Rooms spec (public, discoverable, non‑disruptive)
 
+Doc status: active-planning-spec
+Last reviewed: 2026-03-14
+
 Status (reviewed 2026-03-14):
 
 1. This is a forward-looking protocol/UX spec.

@@ -1,6 +1,7 @@
 # Docs Index
 
-Status reviewed: 2026-03-14
+Doc status: active-doc-index
+Last reviewed: 2026-03-14
 
 Rule of thumb: **code is the source of truth**. Docs should describe current behavior and planned work clearly. If code and docs disagree, update the docs.
 

@@ -1,5 +1,8 @@
 # Docs Audit
 
+Doc status: active-doc-ops
+Last reviewed: 2026-03-14
+
 Last audit: 2026-03-14
 
 Scope:
@@ -29,7 +32,7 @@ Scope:
 2. `docs/CHANNELS.md` updated from outdated single `Msg Ch` wording to current split `View Ch` / `Send Ch` model.
 3. `docs/REFACTOR_ROADMAP.md` template references updated from monolithic CSS/JS files to current partial assembly + compatibility stubs.
 4. Multi-radio docs now clearly state they are planning/spec artifacts and not implemented behavior in this branch.
-5. Removed stale in-repo implication of `docs/MULTI_RADIO_V2_CODEX_HANDOFF.md` by clarifying it was an external ZIP artifact.
+5. Removed stale in-repo implication of `MULTI_RADIO_V2_CODEX_HANDOFF.md` by clarifying it was an external ZIP artifact.
 
 ## Triage Guidance
 

@@ -1,5 +1,8 @@
 # Repository Structure
 
+Doc status: active-runtime
+Last reviewed: 2026-03-14
+
 This repo is deliberately “boring” in the best way:
 
 - One Python process (`mesh_dashboard.py`) runs a tiny HTTP server + Meshtastic connection.

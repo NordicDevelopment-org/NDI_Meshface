@@ -1,5 +1,8 @@
 # Mesh Dashboard Refactor Roadmap
 
+Doc status: historical-log
+Last reviewed: 2026-03-14
+
 > **Status note:** this document is intentionally detailed and reads like an engineering log.
 > Most of the modularization work described below has already landed in `meshdash/`.
 > For current, forward‑looking work (especially **Rooms**), start with:

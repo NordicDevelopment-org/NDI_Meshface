@@ -1,5 +1,8 @@
 # Channels, frequency slots, and chat scope
 
+Doc status: active-runtime
+Last reviewed: 2026-03-14
+
 Meshtastic is an adorable pile of radio + crypto + mesh routing… and it reuses the word **“channel”** for multiple things.
 This doc tries to make the dashboard’s behavior *obvious* to a beginner.
 
