@@ -60,6 +60,9 @@
     let chatBotHistoryEnabled = true;
     let botRequestHistory = [];
     let backendBotRequestHistory = [];
+    let packetBotRequestHistory = [];
+    let packetBotRequestHistoryFetchedAtMs = 0;
+    let packetBotRequestHistoryInFlight = null;
     let activeBotsReviewTab = "history";
     let activeBotCommandSettingsId = "";
     let botTrafficSnifferCommandHeads = [...defaultBotTrafficSnifferCommandHeads];

@@ -4,26 +4,28 @@
       const parts = raw.split(/\\s+/).filter((part) => !!part);
       if (parts.length === 0) return null;
       const prefixRaw = String(parts[0] || "").trim().toLowerCase();
-      if (knownBotSingleWordCommands.has(prefixRaw)) {{
+      const canonicalPrefix = canonicalTrackedBotCommandHead(prefixRaw) || prefixRaw;
+      if (knownBotSingleWordCommands.has(canonicalPrefix)) {{
         if (parts.length !== 1) return null;
         return {{
           command: raw,
-          prefix: prefixRaw,
+          prefix: canonicalPrefix,
           suffix: "",
-          head: prefixRaw,
+          head: canonicalPrefix,
           kind: "single",
         }};
       }}
-      if (!knownBotArgumentCommands.has(prefixRaw)) return null;
-      if (parts.length < 2) return null;
+      if (!knownBotArgumentCommands.has(canonicalPrefix)) return null;
+      const allowsNoArgs = canonicalPrefix === "ping" || canonicalPrefix === "!ping" || canonicalPrefix === "#ping";
+      if (!allowsNoArgs && parts.length < 2) return null;
       const targetToken = String(parts[1] || "").trim();
-      const isWeatherCommand = prefixRaw === "wx" || prefixRaw === "!wx" || prefixRaw === "#wx";
+      const isWeatherCommand = canonicalPrefix === "wx" || canonicalPrefix === "!wx" || canonicalPrefix === "#wx";
       const suffix = isWeatherCommand ? targetToken : nodeIdSuffixForWhois(targetToken);
       return {{
         command: raw,
-        prefix: knownWhoisCommandPrefixes.has(prefixRaw) ? normalizeWhoisCommandPrefix(prefixRaw) : prefixRaw,
+        prefix: knownWhoisCommandPrefixes.has(canonicalPrefix) ? normalizeWhoisCommandPrefix(canonicalPrefix) : canonicalPrefix,
         suffix,
-        head: prefixRaw,
+        head: canonicalPrefix,
         kind: "argument",
       }};
     }}
@@ -144,4 +146,3 @@
         renderBotsView(latestState);
       }}
     }}
-

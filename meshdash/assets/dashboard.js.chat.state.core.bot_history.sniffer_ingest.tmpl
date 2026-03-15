@@ -7,7 +7,7 @@
     function normalizeTrackedBotCommandName(value) {{
       const raw = String(value || "").trim().toLowerCase();
       if (!raw) return "";
-      let text = raw;
+      let text = canonicalTrackedBotCommandHead(raw);
       if (text.startsWith("!") || text.startsWith("#")) {{
         text = text.slice(1);
       }}
@@ -19,11 +19,28 @@
       )).join("");
     }}
 
+    function canonicalTrackedBotCommandHead(value) {{
+      const raw = String(value || "").trim().toLowerCase();
+      if (!raw) return "";
+      const prefix = (raw.startsWith("!") || raw.startsWith("#")) ? raw.slice(0, 1) : "";
+      const bodyRaw = prefix ? raw.slice(1) : raw;
+      const bodyClean = Array.from(bodyRaw).filter((ch) => (
+        (ch >= "a" && ch <= "z")
+        || (ch >= "0" && ch <= "9")
+        || ch === "_"
+        || ch === "-"
+      )).join("");
+      if (!bodyClean) return "";
+      const mappedBody = String(botCommandAliasByName.get(bodyClean) || bodyClean).trim().toLowerCase();
+      if (!mappedBody) return "";
+      return `${{prefix}}${{mappedBody}}`;
+    }}
+
     function botCommandHeadFromText(commandText) {{
       const raw = String(commandText || "").trim().toLowerCase();
       if (!raw) return "";
       const head = raw.split(/\\s+/)[0] || "";
-      return head;
+      return canonicalTrackedBotCommandHead(head);
     }}
 
     function normalizeBotTrafficSnifferCommandHeads(raw) {{
@@ -129,7 +146,7 @@
         if (kind !== "message") continue;
         const text = String(msg.text ?? msg.decoded_text ?? msg.payload_text ?? "").trim();
         if (!text) continue;
-        const head = normalizeTrackedBotCommandName(String(text.split(/\\s+/)[0] || ""));
+        const head = normalizeTrackedBotCommandName(botCommandHeadFromText(text));
         if (!head || !trackedHeads.has(head)) continue;
         const fromId = normalizeNodeId(msg.from || "");
         if (!fromId) continue;
@@ -166,7 +183,7 @@
         const decoded = (packet.decoded && typeof packet.decoded === "object") ? packet.decoded : {{}};
         const text = String(summary.decoded_text ?? decoded.text ?? "").trim();
         if (!text) continue;
-        const head = normalizeTrackedBotCommandName(String(text.split(/\\s+/)[0] || ""));
+        const head = normalizeTrackedBotCommandName(botCommandHeadFromText(text));
         if (!head || !trackedHeads.has(head)) continue;
         const fromId = normalizeNodeId(summary.from ?? packet.fromId ?? packet.from_id ?? "");
         if (!fromId) continue;
@@ -208,4 +225,3 @@
       ));
       return output.slice(0, botRequestLogMaxEntries);
     }}
-

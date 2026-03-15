@@ -1,5 +1,6 @@
     function renderBotsView(state = latestState) {{
       applyServerBotSettingsFromState(state);
+      void refreshPacketBotRequestHistory(state);
       renderManagedBotCommandList();
       syncChatWhoisQuickActionControls();
       syncBotsReviewTabUi();
@@ -21,7 +22,10 @@
       if (respondedEl instanceof HTMLElement) respondedEl.textContent = String(responded);
 
       if (entries.length === 0) {{
-        listEl.innerHTML = '<div class="bots-history-empty">No tracked bot requests yet. Send a <code>whois</code> or <code>ping</code> command, or wait for mesh bot traffic.</div>';
+        const loadingHistorical = !!packetBotRequestHistoryInFlight;
+        listEl.innerHTML = loadingHistorical
+          ? '<div class="bots-history-empty">Loading historical bot usage from packet history...</div>'
+          : '<div class="bots-history-empty">No tracked bot requests yet. Send a <code>whois</code> or <code>ping</code> command, or wait for mesh bot traffic.</div>';
         return;
       }}
 
