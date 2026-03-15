@@ -1,3 +1,4 @@
+from meshdash import html_js as html_js_module
 from meshdash.html_css import build_dashboard_css
 from meshdash.html_js import build_dashboard_js
 
@@ -122,3 +123,16 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "files-send-channel-select" in js
     assert "{{" not in js
     assert "}}" not in js
+
+
+def test_dashboard_js_template_order_guards_known_unsafe_splice_points():
+    parts = html_js_module._DASHBOARD_JS_TEMPLATE_PARTS
+
+    # bootstrap.shared and chat.state.core are a single logical seam; inserting
+    # templates between them can break JS scope continuity and blank the UI.
+    shared_idx = parts.index("dashboard.js.bootstrap.shared.tmpl")
+    assert parts[shared_idx + 1] == "dashboard.js.chat.state.core.tmpl"
+
+    # The shared UI helpers must stay on a safe boundary that we validated.
+    bindings_idx = parts.index("dashboard.js.chat.events.bindings.tmpl")
+    assert parts[bindings_idx + 1] == "dashboard.js.ui.shared_controls.tmpl"
