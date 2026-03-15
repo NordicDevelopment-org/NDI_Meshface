@@ -74,7 +74,7 @@ This roadmap is written to be directly hand‑offable to a coding agent (Codex) 
 **Implementation notes (hotspots)**
 
 - Frontend:
-  - `meshdash/assets/dashboard.js.chat.state.messaging.tmpl` (`classifyMessageChannel(msg)`)
+  - `meshdash/assets/dashboard.js.chat.state.messaging.send_flow.tmpl` (`classifyMessageChannel(msg)`)
   - `meshdash/assets/dashboard.js.chat.render.tmpl` (dynamic channel list rendering)
   - `meshdash/assets/dashboard.js.chat.state.core.tmpl` (`applyChatChannel(...)` + persistence)
   - Extend `classifyMessageChannel(msg)` to return `room:<slug>` when prefix matches.

@@ -4,6 +4,7 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.bootstrap.map.tmpl",
     "dashboard.js.bootstrap.tickers.tmpl",
     "dashboard.js.bootstrap.shared.tmpl",
+    "dashboard.js.ui.shared_controls.tmpl",
     "dashboard.js.chat.state.core.tmpl",
     "dashboard.js.chat.state.channels.tmpl",
     "dashboard.js.chat.state.games.reversi_local.tmpl",

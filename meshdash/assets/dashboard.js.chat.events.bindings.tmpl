@@ -236,19 +236,16 @@
     }}
 
     function bindFavoritesControls() {{
-      const searchInput = document.getElementById("favorites-search-input");
-      if (searchInput instanceof HTMLInputElement) {{
-        if (searchInput.dataset.bound !== "1") {{
-          searchInput.dataset.bound = "1";
-          searchInput.addEventListener("input", () => {{
-            favoritesSearchQuery = normalizeSearchQuery(searchInput.value);
-            if (latestState) {{
-              renderFavorites(latestState);
-            }}
-          }});
-        }}
-        searchInput.value = favoritesSearchQuery;
-      }}
+      bindSearchTextInput("favorites-search-input", {{
+        value: favoritesSearchQuery,
+        normalize: normalizeSearchQuery,
+        onInput: (query) => {{
+          favoritesSearchQuery = query;
+          if (latestState) {{
+            renderFavorites(latestState);
+          }}
+        }},
+      }});
     }}
 
     function bindFavoriteMenuNodeSearchControls() {{
@@ -409,33 +406,27 @@
     }}
 
     function bindNodeListSearchControls() {{
-      const nodesInput = document.getElementById("nodes-search-input");
-      if (nodesInput instanceof HTMLInputElement) {{
-        if (nodesInput.dataset.bound !== "1") {{
-          nodesInput.dataset.bound = "1";
-          nodesInput.addEventListener("input", () => {{
-            nodesSearchQuery = normalizeSearchQuery(nodesInput.value);
-            if (latestState) {{
-              renderNodes(latestState.nodes || []);
-            }}
-          }});
-        }}
-        nodesInput.value = nodesSearchQuery;
-      }}
+      bindSearchTextInput("nodes-search-input", {{
+        value: nodesSearchQuery,
+        normalize: normalizeSearchQuery,
+        onInput: (query) => {{
+          nodesSearchQuery = query;
+          if (latestState) {{
+            renderNodes(latestState.nodes || []);
+          }}
+        }},
+      }});
 
-      const chatInput = document.getElementById("chat-user-search-input");
-      if (chatInput instanceof HTMLInputElement) {{
-        if (chatInput.dataset.bound !== "1") {{
-          chatInput.dataset.bound = "1";
-          chatInput.addEventListener("input", () => {{
-            chatUserSearchQuery = normalizeSearchQuery(chatInput.value);
-            if (latestState) {{
-              renderChat(latestState);
-            }}
-          }});
-        }}
-        chatInput.value = chatUserSearchQuery;
-      }}
+      bindSearchTextInput("chat-user-search-input", {{
+        value: chatUserSearchQuery,
+        normalize: normalizeSearchQuery,
+        onInput: (query) => {{
+          chatUserSearchQuery = query;
+          if (latestState) {{
+            renderChat(latestState);
+          }}
+        }},
+      }});
     }}
 
     map.on("click", () => {{
@@ -445,4 +436,3 @@
       }}
       clearNodeSelection();
     }});
-

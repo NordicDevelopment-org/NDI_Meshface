@@ -14,6 +14,7 @@ _TEMPLATE_FILES = (
     "dashboard.js.bootstrap.map.tmpl",
     "dashboard.js.bootstrap.tickers.tmpl",
     "dashboard.js.bootstrap.shared.tmpl",
+    "dashboard.js.ui.shared_controls.tmpl",
     "dashboard.js.chat.tmpl",
     "dashboard.js.chat.state.tmpl",
     "dashboard.js.chat.state.core.tmpl",
