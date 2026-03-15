@@ -1,0 +1,127 @@
+    function renderStarredNodeSelect(state) {{
+      const selectedList = document.getElementById("favorite-menu-selected-list");
+      const list = document.getElementById("favorite-menu-saved-list");
+      if (!(list instanceof HTMLElement)) return;
+
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const nodesById = new Map(nodes.map((node) => [normalizeNodeId(node.id || ""), node]));
+      const resolveEntryName = (nodeId) => {{
+        const normalized = normalizeNodeId(nodeId);
+        const node = nodesById.get(normalized);
+        return preferredNodeName(node) || nodeNameCache.get(normalized) || `Node ${{normalized}}`;
+      }};
+      const entries = Array.from(favoriteNodeIds)
+        .map((nodeId) => {{
+          const name = resolveEntryName(nodeId);
+          return {{ id: nodeId, name }};
+        }})
+        .sort((a, b) => {{
+          const nameDiff = String(a.name || "").localeCompare(String(b.name || ""));
+          if (nameDiff !== 0) return nameDiff;
+          return String(a.id || "").localeCompare(String(b.id || ""));
+        }});
+      const selectedNodeValue = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
+      const showSelectedTopRow = !!selectedNodeValue;
+
+      if (selectedList instanceof HTMLElement) {{
+        if (showSelectedTopRow) {{
+          closeFavoriteMenuNodeSearchDropdown();
+          const selectedName = resolveEntryName(selectedNodeValue);
+          const title = `Selected: ${{selectedName}} (${{selectedNodeValue}}). Click to clear selection.`;
+          selectedList.innerHTML = `<button type="button" role="listitem" class="favorite-menu-saved-item favorite-menu-selected-item active" data-node-id="${{escAttr(selectedNodeValue)}}" title="${{escAttr(title)}}" aria-label="${{escAttr(title)}}">
+            <span class="favorite-menu-saved-main">
+              <span class="favorite-menu-selected-prefix">Selected</span>
+              <span class="favorite-menu-saved-name">${{escAttr(selectedName)}}</span>
+            </span>
+            <span class="favorite-menu-saved-id">${{escAttr(selectedNodeValue)}}</span>
+          </button>`;
+        }} else {{
+          let searchInput = document.getElementById("favorite-menu-node-search-input");
+          let searchDropdown = document.getElementById("favorite-menu-node-search-dropdown");
+          const hasSearchControls = (
+            searchInput instanceof HTMLInputElement
+            && searchDropdown instanceof HTMLElement
+            && selectedList.contains(searchInput)
+            && selectedList.contains(searchDropdown)
+          );
+          if (!hasSearchControls) {{
+            selectedList.innerHTML = `<div class="favorite-menu-node-search-wrap">
+              <input
+                id="favorite-menu-node-search-input"
+                class="list-search-input"
+                type="search"
+                placeholder="Search by ID or name"
+                autocomplete="off"
+              />
+              <div id="favorite-menu-node-search-dropdown" class="node-search-dropdown favorite-menu-node-search-dropdown" hidden></div>
+            </div>`;
+            searchInput = document.getElementById("favorite-menu-node-search-input");
+            searchDropdown = document.getElementById("favorite-menu-node-search-dropdown");
+          }}
+          if (searchInput instanceof HTMLInputElement) {{
+            searchInput.value = favoriteMenuNodeSearchQuery;
+          }}
+          bindFavoriteMenuNodeSearchControls();
+          renderFavoriteMenuNodeSearchDropdown(safeState);
+        }}
+      }}
+      if (!entries.length) {{
+        list.innerHTML = '<div class="favorite-menu-saved-empty">No saved nodes yet.</div>';
+        return;
+      }}
+      list.innerHTML = entries.map((entry) => {{
+        const title = `${{entry.name}} (${{entry.id}})`;
+        return `<button type="button" role="listitem" class="favorite-menu-saved-item" data-node-id="${{escAttr(entry.id)}}" title="${{escAttr(title)}}" aria-label="${{escAttr(title)}}">
+          <span class="favorite-menu-saved-name">${{escAttr(entry.name)}}</span>
+          <span class="favorite-menu-saved-id">${{escAttr(entry.id)}}</span>
+        </button>`;
+      }}).join("");
+    }}
+
+    function refreshFavoriteToggleButtons() {{
+      for (const btn of document.querySelectorAll(".favorite-toggle-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const nodeId = normalizeNodeId(btn.dataset.nodeId || "");
+        const active = isFavoriteNode(nodeId);
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+        const title = active ? "Remove from saved nodes" : "Save node";
+        btn.title = title;
+        btn.setAttribute("aria-label", title);
+        const icon = btn.querySelector(".favorite-toggle-icon");
+        if (icon) {{
+          icon.textContent = active ? "★" : "☆";
+        }}
+        const cell = btn.closest && btn.closest("td");
+        if (cell instanceof HTMLElement) {{
+          cell.setAttribute("data-sort", active ? "1" : "0");
+        }}
+      }}
+      syncMapTitleFavoriteToggle();
+      renderSavedRailStatus();
+
+      const nodesSort = tableSortState["nodes-table"];
+      if (nodesSort && Number(nodesSort.index) === 9) {{
+        sortTableRows("nodes-table");
+      }}
+    }}
+
+    function toggleFavoriteNode(nodeId, forceActive = null) {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized)) return;
+      const targetActive = forceActive == null ? !favoriteNodeIds.has(normalized) : !!forceActive;
+      if (targetActive) {{
+        favoriteNodeIds.add(normalized);
+      }} else {{
+        favoriteNodeIds.delete(normalized);
+      }}
+      persistFavoriteNodes();
+      refreshFavoriteToggleButtons();
+      if (latestState) {{
+        renderFavorites(latestState);
+      }} else {{
+        renderStarredNodeSelect({{}});
+      }}
+    }}
+

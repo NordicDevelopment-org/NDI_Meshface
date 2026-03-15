@@ -1,0 +1,89 @@
+    function loadFavoriteNodes() {{
+      favoriteNodeIds.clear();
+      try {{
+        const raw = window.localStorage.getItem(favoritesStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        for (const entry of parsed) {{
+          const nodeId = normalizeNodeId(entry);
+          if (isSelectableNodeId(nodeId)) {{
+            favoriteNodeIds.add(nodeId);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistFavoriteNodes() {{
+      try {{
+        const ids = Array.from(favoriteNodeIds).slice(0, 2000);
+        window.localStorage.setItem(favoritesStorageKey, JSON.stringify(ids));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function isFavoriteNode(nodeId) {{
+      const normalized = normalizeNodeId(nodeId);
+      return isSelectableNodeId(normalized) && favoriteNodeIds.has(normalized);
+    }}
+
+    function favoriteToggleButtonHtml(nodeId, extraClass = "") {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized)) return "";
+      const active = favoriteNodeIds.has(normalized);
+      const title = active ? "Remove from saved nodes" : "Save node";
+      return `<button type="button" class="favorite-toggle-btn ${{extraClass}}${{active ? " active" : ""}}" data-node-id="${{escAttr(normalized)}}" title="${{title}}" aria-label="${{title}}" aria-pressed="${{active ? "true" : "false"}}"><span class="favorite-toggle-icon">${{active ? "★" : "☆"}}</span></button>`;
+    }}
+
+    function renderSavedRailStatus() {{
+      const count = Math.max(0, favoriteNodeIds.size);
+      const explicitSelectedId = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
+      const selectedId = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : explicitSelectedId;
+      const usingLocalFallback = activeLayoutView === "saved" && !explicitSelectedId && !!selectedId;
+      const selectedName = selectedId
+        ? (
+            usingLocalFallback
+              ? (resolveSavedViewNodeName(latestState, selectedId) || selectedId)
+              : (resolveSelectedNodeName() || selectedId)
+          )
+        : "";
+      const btn = document.querySelector('.teams-rail .rail-btn[data-view="saved"]');
+      if (btn instanceof HTMLButtonElement) {{
+        if (!btn.dataset.baseTitle) {{
+          btn.dataset.baseTitle = btn.getAttribute("title") || "Node details and saved nodes";
+        }}
+        btn.textContent = "Node";
+        const baseTitle = btn.dataset.baseTitle || "Node details and saved nodes";
+        if (selectedId) {{
+          btn.title = usingLocalFallback
+            ? `${{baseTitle}}. Showing local node: ${{selectedName}}.`
+            : `${{baseTitle}}. Selected: ${{selectedName}}.`;
+        }} else {{
+          btn.title = count > 0
+            ? `${{baseTitle}}. ${{count}} saved node${{count === 1 ? "" : "s"}}.`
+            : `${{baseTitle}}. No saved nodes yet.`;
+        }}
+        btn.setAttribute("aria-label", btn.title);
+      }}
+
+      const favMenuBtn = document.getElementById("favorite-menu-toggle-btn");
+      if (favMenuBtn instanceof HTMLButtonElement) {{
+        favMenuBtn.classList.toggle("has-saved", count > 0);
+        favMenuBtn.classList.toggle("has-selected", !!selectedId);
+        const title = selectedId
+          ? (
+              usingLocalFallback
+                ? `Showing local node: ${{selectedName}}. Open node menu.`
+                : `Selected node: ${{selectedName}}. Open node menu.`
+            )
+          : (count > 0
+            ? `${{count}} saved node${{count === 1 ? "" : "s"}}. Open node menu.`
+            : "No node selected. Open node menu.");
+        favMenuBtn.title = title;
+        favMenuBtn.setAttribute("aria-label", title);
+      }}
+    }}
+
