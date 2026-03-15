@@ -2687,7 +2687,8 @@
       letter-spacing: 0.2px;
       flex: 0 0 auto;
     }}
-    .favorite-toggle-btn {{
+    .favorite-toggle-btn,
+    .mute-toggle-btn {{
       border: 1px solid rgba(103, 132, 115, 0.35);
       background: transparent;
       color: #6b7f72;
@@ -2705,7 +2706,8 @@
       opacity: 0.76;
       transition: color 120ms ease, border-color 120ms ease, background 120ms ease, opacity 120ms ease;
     }}
-    .favorite-toggle-btn:hover {{
+    .favorite-toggle-btn:hover,
+    .mute-toggle-btn:hover {{
       background: rgba(72, 110, 87, 0.08);
       border-color: rgba(63, 103, 80, 0.55);
       color: #355d48;
@@ -2717,9 +2719,20 @@
       color: #6f5600;
       opacity: 0.95;
     }}
+    .mute-toggle-btn.active {{
+      border-color: rgba(162, 70, 70, 0.78);
+      background: rgba(215, 102, 102, 0.22);
+      color: #7b2020;
+      opacity: 0.95;
+    }}
     .favorite-toggle-icon {{
       line-height: 1;
       transform: translateY(-0.5px);
+    }}
+    .mute-toggle-icon {{
+      line-height: 1;
+      transform: translateY(-0.5px);
+      font-size: 8px;
     }}
     .node-favorite-btn {{
       min-width: 16px;
@@ -2731,6 +2744,9 @@
       height: 15px;
       font-size: 8px;
       padding: 0 2px;
+    }}
+    .chat-mute-btn {{
+      font-size: 7px;
     }}
     .chat-member-actions {{
       display: inline-flex;

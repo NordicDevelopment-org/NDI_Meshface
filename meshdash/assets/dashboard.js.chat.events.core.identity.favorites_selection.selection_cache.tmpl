@@ -107,6 +107,23 @@
       }}
     }}
 
+    function refreshMuteToggleButtons() {{
+      for (const btn of document.querySelectorAll(".mute-toggle-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const nodeId = normalizeNodeId(btn.dataset.nodeId || "");
+        const active = isMutedNode(nodeId);
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+        const title = active ? "Unmute this user in chat feed" : "Mute this user in chat feed";
+        btn.title = title;
+        btn.setAttribute("aria-label", title);
+        const icon = btn.querySelector(".mute-toggle-icon");
+        if (icon) {{
+          icon.textContent = active ? "🔇" : "🔊";
+        }}
+      }}
+    }}
+
     function toggleFavoriteNode(nodeId, forceActive = null) {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return;
@@ -125,3 +142,24 @@
       }}
     }}
 
+    function toggleMutedNode(nodeId, forceActive = null) {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized) || isSelfNodeId(normalized)) return;
+      const targetActive = forceActive == null ? !mutedNodeIds.has(normalized) : !!forceActive;
+      if (targetActive) {{
+        mutedNodeIds.add(normalized);
+      }} else {{
+        mutedNodeIds.delete(normalized);
+      }}
+      persistMutedNodes();
+      if (latestState) {{
+        renderChat(latestState);
+      }} else {{
+        refreshMuteToggleButtons();
+      }}
+      setChatSendStatus(
+        targetActive
+          ? `Muted ${{normalized}} in chat feed.`
+          : `Unmuted ${{normalized}} in chat feed.`
+      );
+    }}

@@ -2,6 +2,9 @@
         const endpoints = endpointsForMessage(msg);
         const sourceNode = endpoints.fromId;
         const fallbackNode = endpoints.toId;
+        if (typeof isMutedNode === "function" && isMutedNode(sourceNode)) {{
+          return "";
+        }}
         const messageKind = normalizeChatMessageKind(msg);
         const isStatusMessage = messageKind === "status";
         const primarySelectable = isSelectableNodeId(sourceNode) ? sourceNode : "";
@@ -309,4 +312,4 @@
           ${{reactionSummaryRow}}
           ${{reactionRow}}
         </div>`;
-      }});
+      }}).filter((item) => !!item);

@@ -23,9 +23,39 @@
       }}
     }}
 
+    function loadMutedNodes() {{
+      mutedNodeIds.clear();
+      try {{
+        const raw = window.localStorage.getItem(mutedNodesStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        for (const entry of parsed) {{
+          const nodeId = normalizeNodeId(entry);
+          if (isSelectableNodeId(nodeId) && !isSelfNodeId(nodeId)) {{
+            mutedNodeIds.add(nodeId);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistMutedNodes() {{
+      try {{
+        const ids = Array.from(mutedNodeIds).slice(0, 2000);
+        window.localStorage.setItem(mutedNodesStorageKey, JSON.stringify(ids));
+      }} catch (_err) {{
+      }}
+    }}
+
     function isFavoriteNode(nodeId) {{
       const normalized = normalizeNodeId(nodeId);
       return isSelectableNodeId(normalized) && favoriteNodeIds.has(normalized);
+    }}
+
+    function isMutedNode(nodeId) {{
+      const normalized = normalizeNodeId(nodeId);
+      return isSelectableNodeId(normalized) && mutedNodeIds.has(normalized);
     }}
 
     function favoriteToggleButtonHtml(nodeId, extraClass = "") {{
@@ -34,6 +64,14 @@
       const active = favoriteNodeIds.has(normalized);
       const title = active ? "Remove from saved nodes" : "Save node";
       return `<button type="button" class="favorite-toggle-btn ${{extraClass}}${{active ? " active" : ""}}" data-node-id="${{escAttr(normalized)}}" title="${{title}}" aria-label="${{title}}" aria-pressed="${{active ? "true" : "false"}}"><span class="favorite-toggle-icon">${{active ? "★" : "☆"}}</span></button>`;
+    }}
+
+    function muteToggleButtonHtml(nodeId, extraClass = "") {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized) || isSelfNodeId(normalized)) return "";
+      const active = mutedNodeIds.has(normalized);
+      const title = active ? "Unmute this user in chat feed" : "Mute this user in chat feed";
+      return `<button type="button" class="mute-toggle-btn ${{extraClass}}${{active ? " active" : ""}}" data-node-id="${{escAttr(normalized)}}" title="${{title}}" aria-label="${{title}}" aria-pressed="${{active ? "true" : "false"}}"><span class="mute-toggle-icon">${{active ? "🔇" : "🔊"}}</span></button>`;
     }}
 
     function renderSavedRailStatus() {{
@@ -86,4 +124,3 @@
         favMenuBtn.setAttribute("aria-label", title);
       }}
     }}
-

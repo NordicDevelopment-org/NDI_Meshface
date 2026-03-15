@@ -235,6 +235,20 @@
       }}, true);
     }}
 
+    function bindMuteToggleControls() {{
+      if (document.body.dataset.muteBound === "1") return;
+      document.body.dataset.muteBound = "1";
+      document.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const btn = target.closest(".mute-toggle-btn");
+        if (!(btn instanceof HTMLButtonElement)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        toggleMutedNode(btn.dataset.nodeId || "");
+      }}, true);
+    }}
+
     function bindFavoritesControls() {{
       bindSearchTextInput("favorites-search-input", {{
         value: favoritesSearchQuery,
