@@ -1,0 +1,38 @@
+    function renderTraffic(traffic, nodes, nodeHistory) {{
+      if (mapDataFocus === "activity") {{
+        setMapDataMode("activity");
+        return;
+      }}
+
+      const savedNodeId = activeLayoutView === "saved"
+        ? resolveSavedViewNodeId(latestState)
+        : "";
+      const showNodeHistory = activeLayoutView === "saved" && isSelectableNodeId(savedNodeId);
+      if (showNodeHistory) {{
+        if (nodeHistory && normalizeNodeId(nodeHistory.node_id) === savedNodeId) {{
+          renderNodeHistory(nodeHistory, nodes);
+        }} else {{
+          renderNodeHistoryLoading(savedNodeId);
+        }}
+        return;
+      }}
+
+      setMapDataMode("live");
+      const ports = (traffic.port_counts || []).slice(0, 30).map((item) => (
+        `<tr><td data-sort="${{escAttr(item.portnum ?? "")}}">${{item.portnum}}</td><td data-sort="${{escAttr(item.count ?? "")}}">${{item.count}}</td></tr>`
+      ));
+      fillTable("ports-table", ports);
+
+      const links = (traffic.edges || []).slice(0, 60).map((edge) => (
+        `<tr>
+          <td data-sort="${{escAttr(edge.from ?? "")}}">${{edge.from}}</td>
+          <td data-sort="${{escAttr(edge.to ?? "")}}">${{edge.to}}</td>
+          <td data-sort="${{escAttr(edge.lifetime_count ?? edge.count ?? 0)}}">${{edge.lifetime_count ?? edge.count ?? 0}}</td>
+          <td data-sort="${{escAttr(edge.avg_hops ?? "")}}">${{edge.avg_hops == null ? "n/a" : edge.avg_hops}}</td>
+          <td data-sort="${{escAttr(edge.confidence || (edge.is_real ? "confirmed" : "observed"))}}">${{edge.confidence || (edge.is_real ? "confirmed" : "observed")}}</td>
+          <td data-sort="${{escAttr(edge.last_rx_time ?? "")}}">${{edge.last_rx_time || "n/a"}}</td>
+        </tr>`
+      ));
+      fillTable("links-table", links);
+    }}
+
