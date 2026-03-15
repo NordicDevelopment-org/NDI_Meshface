@@ -346,6 +346,9 @@
           const payload = await fetchEnvironmentMetricsHistory(envAggregateTickerWindowHours, forceRefresh);
           const points = Array.isArray(payload && payload.points) ? payload.points : [];
           envAggregateTickerSnapshots = buildEnvironmentAggregateSnapshotsFromPoints(points);
+          if (typeof scheduleMetricTickerSeriesPersist === "function") {{
+            scheduleMetricTickerSeriesPersist();
+          }}
           envAggregateTickerHydrated = true;
           envAggregateTickerLastHydratedMs = Date.now();
           if (latestState) {{
@@ -357,6 +360,9 @@
             envAggregateTickerSnapshots = new Map();
             for (const def of envAggregateTickerMetricDefs) {{
               metricTickerSeries.delete(def.seriesMetricKey);
+            }}
+            if (typeof scheduleMetricTickerSeriesPersist === "function") {{
+              scheduleMetricTickerSeriesPersist();
             }}
           }}
         }} finally {{

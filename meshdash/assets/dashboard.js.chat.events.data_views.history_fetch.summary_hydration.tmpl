@@ -102,11 +102,16 @@
       }}
 
       const cutoffMs = Date.now() - metricTickerWindowMs;
+      let loadedAny = false;
       for (const [metricKey, series] of byKey.entries()) {{
         if (!Array.isArray(series) || series.length === 0) continue;
         series.sort((a, b) => Number(a.ms) - Number(b.ms));
         trimMetricTickerPoints(series, cutoffMs);
         metricTickerSeries.set(metricKey, series);
+        loadedAny = true;
+      }}
+      if (loadedAny && typeof scheduleMetricTickerSeriesPersist === "function") {{
+        scheduleMetricTickerSeriesPersist();
       }}
     }}
 
@@ -147,4 +152,3 @@
         renderWeeklySummaryError(message);
       }}
     }}
-

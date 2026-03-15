@@ -4,6 +4,13 @@
       el.textContent = value == null ? "n/a" : String(value);
     }}
 
+    const metricTickerSeriesStorageKey = "meshDashboardMetricTickerSeriesV1";
+    const metricTickerSeriesPersistMaxAgeMs = 24 * 60 * 60 * 1000;
+    const metricTickerSeriesPersistMaxPointsPerMetric = 2400;
+    const metricTickerSeriesPersistThrottleMs = Math.max(4000, refreshMs * 3);
+    let metricTickerSeriesPersistTimer = null;
+    let metricTickerSeriesLastPersistMs = 0;
+
     function formatTickerNumber(value, digits = 0) {{
       const numeric = Number(value);
       if (!Number.isFinite(numeric)) return "n/a";
@@ -233,6 +240,92 @@
       }}
     }}
 
+    function persistMetricTickerSeriesNow() {{
+      const payload = {{
+        saved_unix: Math.floor(Date.now() / 1000),
+        series: {{}},
+      }};
+      const cutoffMs = Date.now() - metricTickerSeriesPersistMaxAgeMs;
+      for (const [metricKey, points] of metricTickerSeries.entries()) {{
+        const cleanKey = String(metricKey || "").trim();
+        if (!cleanKey) continue;
+        const safePoints = (Array.isArray(points) ? points : [])
+          .map((point) => ({{
+            ms: Number(point && point.ms),
+            value: Number(point && point.value),
+          }}))
+          .filter((point) => Number.isFinite(point.ms) && Number.isFinite(point.value))
+          .sort((a, b) => Number(a.ms) - Number(b.ms));
+        if (!safePoints.length) continue;
+        trimMetricTickerPoints(
+          safePoints,
+          cutoffMs,
+          metricTickerSeriesPersistMaxPointsPerMetric,
+        );
+        if (!safePoints.length) continue;
+        payload.series[cleanKey] = safePoints;
+      }}
+      try {{
+        window.localStorage.setItem(metricTickerSeriesStorageKey, JSON.stringify(payload));
+      }} catch (_err) {{
+      }}
+      metricTickerSeriesLastPersistMs = Date.now();
+    }}
+
+    function scheduleMetricTickerSeriesPersist() {{
+      if (metricTickerSeriesPersistTimer != null) return;
+      const nowMs = Date.now();
+      const elapsedMs = Math.max(0, nowMs - (metricTickerSeriesLastPersistMs || 0));
+      const waitMs = Math.max(0, metricTickerSeriesPersistThrottleMs - elapsedMs);
+      metricTickerSeriesPersistTimer = window.setTimeout(() => {{
+        metricTickerSeriesPersistTimer = null;
+        persistMetricTickerSeriesNow();
+      }}, waitMs);
+    }}
+
+    function loadPersistedMetricTickerSeries() {{
+      let raw = "";
+      try {{
+        raw = window.localStorage.getItem(metricTickerSeriesStorageKey) || "";
+      }} catch (_err) {{
+      }}
+      if (!raw) return 0;
+      let payload = null;
+      try {{
+        payload = JSON.parse(raw);
+      }} catch (_err) {{
+        return 0;
+      }}
+      const seriesMap = (payload && typeof payload === "object" && payload.series && typeof payload.series === "object")
+        ? payload.series
+        : null;
+      if (!seriesMap) return 0;
+      const cutoffMs = Date.now() - metricTickerSeriesPersistMaxAgeMs;
+      let loaded = 0;
+      for (const [metricKey, rows] of Object.entries(seriesMap)) {{
+        const cleanKey = String(metricKey || "").trim();
+        if (!cleanKey) continue;
+        const safePoints = (Array.isArray(rows) ? rows : [])
+          .map((point) => ({{
+            ms: Number(point && point.ms),
+            value: Number(point && point.value),
+          }}))
+          .filter((point) => Number.isFinite(point.ms) && Number.isFinite(point.value))
+          .sort((a, b) => Number(a.ms) - Number(b.ms));
+        if (!safePoints.length) continue;
+        trimMetricTickerPoints(
+          safePoints,
+          cutoffMs,
+          metricTickerSeriesPersistMaxPointsPerMetric,
+        );
+        if (!safePoints.length) continue;
+        metricTickerSeries.set(cleanKey, safePoints);
+        loaded += 1;
+      }}
+      metricTickerSeriesLastPersistMs = Date.now();
+      return loaded;
+    }}
+
     function metricTickerLatestValue(metricKey) {{
       const cleanKey = String(metricKey || "").trim();
       if (!cleanKey) return null;
@@ -253,6 +346,7 @@
       // scales don't stay anchored to the previous session.
       if (hasLiveCounterReset(latestLiveTotal, nextLiveTotal)) {{
         metricTickerSeries.clear();
+        scheduleMetricTickerSeriesPersist();
         return true;
       }}
       return false;
@@ -306,6 +400,7 @@
       const effectiveWindowMs = Math.max(60000, Number(windowMs) || metricTickerWindowMs);
       trimMetricTickerPoints(points, bucketMs - effectiveWindowMs, maxPoints);
       metricTickerSeries.set(cleanKey, points);
+      scheduleMetricTickerSeriesPersist();
       return points;
     }}
 
@@ -340,4 +435,3 @@
       }}
       return d.trim();
     }}
-
