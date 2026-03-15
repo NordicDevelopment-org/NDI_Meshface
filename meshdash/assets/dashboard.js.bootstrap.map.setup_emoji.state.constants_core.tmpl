@@ -1,0 +1,147 @@
+    const consoleMaxLines = 1200;
+    const consolePacketPreviewMaxChars = 140;
+    const consoleCommandHistoryMax = 120;
+    const consoleFontSizePxByKey = Object.freeze({{ sm: 10, md: 12, lg: 14, xl: 16 }});
+    const consoleCommandRegistry = new Map();
+    const tableSortState = {{
+      "nodes-table": {{ index: 0, dir: "desc" }},
+      "links-table": {{ index: 2, dir: "desc" }},
+      "ports-table": {{ index: 1, dir: "desc" }},
+      "history-chat-table": {{ index: 0, dir: "desc" }},
+      "packets-table": {{ index: 0, dir: "desc" }},
+      "encription-packets-table": {{ index: 0, dir: "desc" }},
+      "encription-traffic-table": {{ index: 2, dir: "desc" }},
+    }};
+    const wheelActivationLeaseMs = 1400;
+    const knownLayoutViews = new Set(["chat", "files", "bots", "games", "history", "network", "saved", "packets", "channels", "encription", "data", "console", "settings"]);
+    const reversiBoardSize = 8;
+    const reversiPiece = Object.freeze({{ empty: 0, black: 1, white: -1 }});
+    const reversiDirections = Object.freeze([
+      [-1, -1], [-1, 0], [-1, 1],
+      [0, -1],            [0, 1],
+      [1, -1],  [1, 0],   [1, 1],
+    ]);
+    const reversiProtocolVersion = "rv1";
+    const reversiMaxSeenNetworkMessages = 2400;
+    const reversiInviteMaxRows = 6;
+    const reversiInviteStaleSeconds = 15 * 60;
+    const checkersProtocolVersion = "ck1";
+    const checkersMaxSeenNetworkMessages = 2400;
+    const chessProtocolVersion = "ch1";
+    const chessMaxSeenNetworkMessages = 2400;
+    const checkersBoardSize = 8;
+    const chessBoardSize = 8;
+    const chessFiles = "abcdefgh";
+    const pokerMinPlayers = 2;
+    const pokerMaxPlayers = 4;
+    const pokerDefaultPlayers = 4;
+    const pokerHandSize = 5;
+    const pokerDefaultStartingStack = 200;
+    const pokerDefaultAnte = 1;
+    const pokerDefaultSmallBlind = 0;
+    const pokerDefaultBigBlind = 0;
+    const pokerMinStartingStack = 10;
+    const pokerMaxStartingStack = 5000;
+    const pokerMaxAnte = 500;
+    const pokerMaxSmallBlind = 500;
+    const pokerMaxBigBlind = 1000;
+    // Shared standard-card primitives are intentionally reusable for Hold'em/Blackjack.
+    const standardCardRanks = Object.freeze(["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"]);
+    const standardCardSuits = Object.freeze(["S", "H", "D", "C"]);
+    const standardCardSuitSymbols = Object.freeze({{
+      S: "\u2660",
+      H: "\u2665",
+      D: "\u2666",
+      C: "\u2663",
+    }});
+    const standardCardSuitColors = Object.freeze({{
+      S: "black",
+      H: "red",
+      D: "red",
+      C: "black",
+    }});
+    const knownChatChannels = new Set(["all", "direct"]);
+    const meshChannelAllIndex = -1;
+    const meshChannelColorPalette = [
+      {{ name: "blue", fill: "#0072B2" }},
+      {{ name: "orange", fill: "#E69F00" }},
+      {{ name: "bluish green", fill: "#009E73" }},
+      {{ name: "yellow", fill: "#F0E442" }},
+      {{ name: "sky blue", fill: "#56B4E9" }},
+      {{ name: "vermillion", fill: "#D55E00" }},
+      {{ name: "reddish purple", fill: "#CC79A7" }},
+      {{ name: "gray", fill: "#999999" }},
+    ];
+    const meshChannelNeutralPalette = [
+      {{ name: "light gray", fill: "#BEBEBE" }},
+      {{ name: "silver", fill: "#AEAEAE" }},
+      {{ name: "soft gray", fill: "#9E9E9E" }},
+      {{ name: "gray", fill: "#8F8F8F" }},
+      {{ name: "slate gray", fill: "#808080" }},
+      {{ name: "charcoal gray", fill: "#717171" }},
+      {{ name: "graphite", fill: "#626262" }},
+      {{ name: "dark gray", fill: "#545454" }},
+    ];
+    const knownChatNotificationScopes = new Set(["all", "self"]);
+    const knownWhoisCommandPrefixes = new Set(["whois", "!whois", "#whois"]);
+    const knownBotSingleWordCommands = new Set([
+      "cmd", "!cmd", "#cmd",
+      "help", "!help", "#help",
+      "whoami", "!whoami", "#whoami",
+      "lheard", "!lheard", "#lheard",
+      "zork", "!zork", "#zork",
+    ]);
+    const knownBotArgumentCommands = new Set([
+      "whois", "!whois", "#whois",
+      "whohas", "!whohas", "#whohas",
+      "ping", "!ping", "#ping",
+      "wx", "!wx", "#wx",
+    ]);
+    const defaultBotTrafficSnifferCommandHeads = [
+      "cmd",
+      "help",
+      "whoami",
+      "whois",
+      "whohas",
+      "ping",
+      "wx",
+      "lheard",
+      "zork",
+    ];
+    const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+    const fileTransferProtocolPrefix = "MF_FILE_V1";
+    const fileTransferChatMaxBytes = 220;
+    const fileTransferMaxFileBytes = 12 * 1024;
+    const fileTransferChunkBytes = 64;
+    const fileTransferDestinationStorageKey = "meshDashboardFileTransferDestinationV1";
+    const fileTransferInterFrameDelayMs = 320;
+    const fileTransferAckResendIntervalMs = 2500;
+    const fileTransferAckPeriodicRefreshMs = 5000;
+    const fileTransferAckPeriodicRefreshMax = 6;
+    const fileTransferAckPeriodicRefreshWindowMs = 45 * 1000;
+    const fileTransferAckWaitBeforeRetryMs = 4000;
+    const fileTransferAckFinalGraceMs = 15 * 1000;
+    const fileTransferAckProgressStallFailMs = 3 * 60 * 1000;
+    const fileTransferAckActiveTransferWindowSec = 4 * 60;
+    const fileTransferAckUnknownLockChannel = true;
+    const fileTransferEndgameMissingChunkThreshold = 4;
+    const fileTransferEndgameResendIntervalMs = 1200;
+    const fileTransferEndgameDuplicateSends = 3;
+    const fileTransferRetryRecoveryIntervalMs = 12000;
+    const fileTransferMaintenanceHeartbeatMs = 1500;
+    const fileTransferRetryErrorLogIntervalMs = 5000;
+    const fileTransferAckUnknownProbeStagnationThreshold = 6;
+    const fileTransferAckUnknownProbeRotateIntervalMs = 25 * 1000;
+    const fileTransferAckUnknownWarnIntervalMs = 30 * 1000;
+    const fileTransferMaintenanceCooldownMs = 900;
+    const fileTransferOutgoingMaxRetries = 8;
+    const fileTransferConsoleMaxEntries = 240;
+    const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
+    const botCityHintMaxDistanceKm = 120;
+    const requesterPositionMaxAgeSeconds = 24 * 3600;
+    const reactionPopoverMaxNames = 12;
+    const sortableTables = new Set(Object.keys(tableSortState));
+    const consoleLines = [];
+    const consoleKeyQueue = [];
+    const consoleSeen = new Set();
+    const wheelPaneSelector = ".scroll, details pre";
