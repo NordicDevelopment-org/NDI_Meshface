@@ -1,5 +1,6 @@
 # Ideas Backlog
 
+- view for environment_metrics
 
 - bot menu like ticker menu, toggles and settings
 
