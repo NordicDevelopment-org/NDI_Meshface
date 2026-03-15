@@ -67,6 +67,8 @@ _TEMPLATE_FILES = (
     "dashboard.js.chat.events.core.navigation.tmpl",
     "dashboard.js.chat.events.console.tmpl",
     "dashboard.js.chat.events.console.session.tmpl",
+    "dashboard.js.chat.events.console.commands.helpers.tmpl",
+    "dashboard.js.chat.events.console.commands.registry.tmpl",
     "dashboard.js.chat.events.console.commands.tmpl",
     "dashboard.js.chat.events.console.formatting.tmpl",
     "dashboard.js.chat.events.console.ui.tmpl",
