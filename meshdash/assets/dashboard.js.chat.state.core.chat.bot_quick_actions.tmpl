@@ -176,7 +176,10 @@
     function syncChatWhoisQuickActionControls() {{
       const masterInput = document.getElementById("bots-command-master-enabled");
       const commandEnabledInput = document.getElementById("bots-command-selected-enabled");
+      const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
       const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
+      const publicStartNote = document.getElementById("bots-command-selected-public-start-note");
+      const jokeConfigWrap = document.getElementById("bots-command-joke-config-wrap");
       const jokeDelayPunchlineInput = document.getElementById("bots-command-joke-delay-punchline-enabled");
       const jokeTriggersInput = document.getElementById("bots-command-joke-triggers");
       const jokeLinesInput = document.getElementById("bots-command-joke-lines");
@@ -200,6 +203,15 @@
       const selectedIsZork = !!(selectedCommand && selectedCommand.name === "zork");
       const selectedIsJoke = !!(selectedCommand && selectedCommand.name === "joke");
       const available = !!serverBotSettings.available;
+      if (publicStartWrap instanceof HTMLElement) {{
+        publicStartWrap.hidden = !selectedIsZork;
+      }}
+      if (publicStartNote instanceof HTMLElement) {{
+        publicStartNote.hidden = !selectedIsZork;
+      }}
+      if (jokeConfigWrap instanceof HTMLElement) {{
+        jokeConfigWrap.hidden = !selectedIsJoke;
+      }}
       if (enabledInput instanceof HTMLInputElement) {{
         enabledInput.checked = !!chatWhoisQuickActionEnabled;
         enabledInput.disabled = !commandsEnabled;
