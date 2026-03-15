@@ -65,6 +65,9 @@ _EXPECTED_TEMPLATE_TOKENS = {
     "dashboard.js.chat.render.tmpl": set(),
     "dashboard.js.runtime.tmpl": set(),
     "dashboard.js.runtime.views.tmpl": set(),
+    "dashboard.js.runtime.views.packet_channels.tmpl": set(),
+    "dashboard.js.runtime.views.encryption.tmpl": set(),
+    "dashboard.js.runtime.views.raw_data.tmpl": set(),
     "dashboard.js.runtime.poll.tmpl": set(),
     "dashboard.js.runtime.boot.tmpl": set(),
     "dashboard.html.tmpl": {
@@ -153,6 +156,9 @@ def test_rendered_asset_templates_leave_no_single_token_placeholders():
         "dashboard.js.chat.render.tmpl": {},
         "dashboard.js.runtime.tmpl": {},
         "dashboard.js.runtime.views.tmpl": {},
+        "dashboard.js.runtime.views.packet_channels.tmpl": {},
+        "dashboard.js.runtime.views.encryption.tmpl": {},
+        "dashboard.js.runtime.views.raw_data.tmpl": {},
         "dashboard.js.runtime.poll.tmpl": {},
         "dashboard.js.runtime.boot.tmpl": {},
         "dashboard.html.tmpl": {

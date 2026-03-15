@@ -52,6 +52,9 @@ _TEMPLATE_FILES = (
     "dashboard.js.chat.render.tmpl",
     "dashboard.js.runtime.tmpl",
     "dashboard.js.runtime.views.tmpl",
+    "dashboard.js.runtime.views.packet_channels.tmpl",
+    "dashboard.js.runtime.views.encryption.tmpl",
+    "dashboard.js.runtime.views.raw_data.tmpl",
     "dashboard.js.runtime.poll.tmpl",
     "dashboard.js.runtime.boot.tmpl",
 )
