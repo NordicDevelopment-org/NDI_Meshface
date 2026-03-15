@@ -10,6 +10,9 @@
       const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
       const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
       const publicStartNote = document.getElementById("bots-command-selected-public-start-note");
+      const jokeConfigWrap = document.getElementById("bots-command-joke-config-wrap");
+      const jokeTriggersInput = document.getElementById("bots-command-joke-triggers");
+      const jokeLinesInput = document.getElementById("bots-command-joke-lines");
       if (!(listEl instanceof HTMLElement)) return;
       const showConfigEmpty = (message) => {{
         if (configEmptyEl instanceof HTMLElement) {{
@@ -98,6 +101,7 @@
         selectedEnabledInput.checked = !!selectedCommand.enabled;
       }}
       const selectedIsZork = selectedName === "zork";
+      const selectedIsJoke = selectedName === "joke";
       if (publicStartWrap instanceof HTMLElement) {{
         publicStartWrap.hidden = !selectedIsZork;
       }}
@@ -106,6 +110,19 @@
       }}
       if (publicStartInput instanceof HTMLInputElement) {{
         publicStartInput.checked = !!serverBotSettings.game_public_start_enabled;
+      }}
+      if (jokeConfigWrap instanceof HTMLElement) {{
+        jokeConfigWrap.hidden = !selectedIsJoke;
+      }}
+      if (jokeTriggersInput instanceof HTMLTextAreaElement) {{
+        jokeTriggersInput.value = selectedIsJoke && Array.isArray(serverBotSettings.joke_triggers)
+          ? serverBotSettings.joke_triggers.join("\n")
+          : "";
+      }}
+      if (jokeLinesInput instanceof HTMLTextAreaElement) {{
+        jokeLinesInput.value = selectedIsJoke && Array.isArray(serverBotSettings.joke_lines)
+          ? serverBotSettings.joke_lines.join("\n")
+          : "";
       }}
     }}
 

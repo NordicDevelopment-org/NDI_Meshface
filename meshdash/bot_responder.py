@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import threading
 import time
 from typing import Callable, Optional
@@ -53,6 +54,21 @@ _BOT_COMMAND_ALIASES = {
 }
 _NATURAL_PING_PREFIXES = (
     "can you see this",
+)
+_DEFAULT_JOKE_TRIGGERS = (
+    "tell me a joke",
+)
+_DEFAULT_JOKE_LINES = (
+    "Why did the packet bring a map? It kept getting routed in circles.",
+    "I told my node to stay positive. Now it only reports good SNR.",
+    "My radio joined a band. It only plays LoRa classics.",
+    "I asked the mesh for directions. It said, 'Take the shortest hop path.'",
+    "Why was the telemetry calm? It had stable readings under pressure.",
+    "I tried to hide from the network. The node list found me anyway.",
+    "What do sleepy packets do? They take a little latency nap.",
+    "The antenna got promoted. It really knows how to reach people.",
+    "I told a bot to chill. It replied, 'Current temperature already sampled.'",
+    "Why did the signal cross the hill? Better line of sight.",
 )
 _REPLY_PACKET_TEXT_RESERVE_BYTES = 20
 _DEFAULT_SEGMENT_DELAY_SECONDS = 1.5
@@ -143,6 +159,77 @@ def _parse_natural_ping_command(raw: str) -> tuple[str, list[str]] | None:
     return None
 
 
+def _parse_natural_joke_command(raw: str, triggers: list[str]) -> tuple[str, list[str]] | None:
+    normalized = _normalize_trigger_phrase(raw)
+    if not normalized:
+        return None
+    for trigger in triggers:
+        if normalized == trigger:
+            return ("joke", [])
+    return None
+
+
+def _normalize_trigger_phrase(value: object) -> str:
+    text = " ".join(str(value or "").strip().lower().split())
+    if not text:
+        return ""
+    text = text.rstrip("?.!;,")
+    return text.strip()
+
+
+def _parse_phrase_items(value: object, *, split_commas: bool) -> list[str]:
+    if isinstance(value, list):
+        return [str(item or "").strip() for item in value]
+    text = str(value or "").strip()
+    if not text:
+        return []
+    normalized = text.replace(";", "\n")
+    if split_commas:
+        normalized = normalized.replace(",", "\n")
+    return [item.strip() for item in normalized.splitlines()]
+
+
+def _normalize_joke_triggers(value: object) -> list[str]:
+    raw_items = _parse_phrase_items(value, split_commas=True)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        clean = _normalize_trigger_phrase(raw_item)
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        out.append(clean[:160])
+        if len(out) >= 64:
+            break
+    if out:
+        return out
+    return [item for item in (_normalize_trigger_phrase(v) for v in _DEFAULT_JOKE_TRIGGERS) if item]
+
+
+def _normalize_joke_lines(value: object) -> list[str]:
+    raw_items = _parse_phrase_items(value, split_commas=False)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        clean = str(raw_item or "").strip()
+        if not clean:
+            continue
+        if len(clean) > 240:
+            clean = clean[:240].rstrip()
+        if not clean:
+            continue
+        dedupe_key = clean.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        out.append(clean)
+        if len(out) >= 600:
+            break
+    if out:
+        return out
+    return [str(line).strip() for line in _DEFAULT_JOKE_LINES if str(line).strip()]
+
+
 def _bot_city_hint(local_node: Optional[dict[str, object]]) -> str:
     # Compatibility shim: tests monkeypatch bot_responder._nearest_city_for_coords.
     previous_lookup = _bot_nodes._nearest_city_for_coords
@@ -165,6 +252,8 @@ class MeshResponseBot:
         log_enabled: bool = True,
         game_enabled: bool = False,
         game_public_start_enabled: bool = False,
+        joke_triggers: Optional[list[str]] = None,
+        joke_lines: Optional[list[str]] = None,
         reply_broadcast: bool = False,
         settings_path: Optional[str] = None,
         chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
@@ -189,6 +278,10 @@ class MeshResponseBot:
         self._sleep_fn = sleep_fn
         self._now_unix_fn = now_unix_fn
         self._game_public_start_enabled = bool(game_public_start_enabled)
+        self._joke_trigger_phrases = _normalize_joke_triggers(joke_triggers)
+        self._joke_lines = _normalize_joke_lines(joke_lines)
+        self._joke_cycle: list[str] = []
+        self._rng = random.Random()
         self._custom_commands = {
             _normalize_command_name(name): str(template or "").strip()
             for name, template in (custom_commands or {}).items()
@@ -316,6 +409,28 @@ class MeshResponseBot:
             if _normalize_command_name(getattr(spec, "name", ""))
         }
 
+    def _set_joke_settings_locked(
+        self,
+        *,
+        triggers: Optional[list[str]] = None,
+        lines: Optional[list[str]] = None,
+    ) -> None:
+        if triggers is not None:
+            self._joke_trigger_phrases = _normalize_joke_triggers(triggers)
+            self._joke_cycle = []
+        if lines is not None:
+            self._joke_lines = _normalize_joke_lines(lines)
+            self._joke_cycle = []
+
+    def _next_joke_line_locked(self) -> str:
+        if not self._joke_cycle:
+            refreshed = list(self._joke_lines)
+            self._rng.shuffle(refreshed)
+            self._joke_cycle = refreshed
+        if not self._joke_cycle:
+            return "I tried to tell a joke, but my punchline got dropped in transit."
+        return self._joke_cycle.pop()
+
     def _command_enabled_locked(self, command: str) -> bool:
         clean = _normalize_command_name(command)
         if not clean:
@@ -378,6 +493,8 @@ class MeshResponseBot:
             "log_enabled": bool(self._log_enabled),
             "game_enabled": bool(self._bot_app_enabled.get("zork")),
             "game_public_start_enabled": bool(self._game_public_start_enabled),
+            "joke_triggers": list(self._joke_trigger_phrases),
+            "joke_lines": list(self._joke_lines),
             "active_game_sessions": self._active_game_sessions_locked(),
             "disabled_commands": sorted(self._disabled_commands),
             "commands": self._managed_command_rows_locked(),
@@ -389,6 +506,8 @@ class MeshResponseBot:
             "log_enabled": bool(self._log_enabled),
             "game_enabled": bool(self._bot_app_enabled.get("zork")),
             "game_public_start_enabled": bool(self._game_public_start_enabled),
+            "joke_triggers": list(self._joke_trigger_phrases),
+            "joke_lines": list(self._joke_lines),
             "disabled_commands": sorted(self._disabled_commands),
         }
 
@@ -404,6 +523,8 @@ class MeshResponseBot:
         game_enabled: Optional[bool] = None,
         game_public_start_enabled: Optional[bool] = None,
         command_settings: Optional[dict[str, bool]] = None,
+        joke_triggers: Optional[list[str]] = None,
+        joke_lines: Optional[list[str]] = None,
     ) -> dict[str, object]:
         with self._lock:
             if enabled is not None:
@@ -416,6 +537,11 @@ class MeshResponseBot:
                 self._game_public_start_enabled = bool(game_public_start_enabled)
             if command_settings:
                 self._apply_command_settings_locked(command_settings)
+            if joke_triggers is not None or joke_lines is not None:
+                self._set_joke_settings_locked(
+                    triggers=joke_triggers,
+                    lines=joke_lines,
+                )
             out = self._bot_settings_locked()
             persist_payload = self._persistable_bot_settings_locked()
         persist_error = save_persisted_bot_settings(self._settings_path, persist_payload)
@@ -521,6 +647,11 @@ class MeshResponseBot:
         natural_ping = _parse_natural_ping_command(raw)
         if natural_ping is not None:
             return natural_ping
+        with self._lock:
+            joke_triggers = list(self._joke_trigger_phrases)
+        natural_joke = _parse_natural_joke_command(raw, joke_triggers)
+        if natural_joke is not None:
+            return natural_joke
         parts = [part for part in raw.split() if part]
         if not parts:
             return None
@@ -543,10 +674,14 @@ class MeshResponseBot:
             return False
         if not _normalize_node_id(local_node_id).startswith("!"):
             return False
-        parsed = self._parse_command(text)
-        if parsed is None:
+        # Avoid re-entering _parse_command while the main receive lock is held.
+        raw = str(text or "").strip()
+        if not raw:
             return False
-        command, _args = parsed
+        parts = [part for part in raw.split() if part]
+        if not parts:
+            return False
+        command = _canonical_command_name(parts[0])
         return command == "zork"
 
     def _build_standard_reply(
@@ -585,6 +720,10 @@ class MeshResponseBot:
             if short_name:
                 return f"whoami: {local_node_id} short={short_name} hops={hops_text}"
             return f"whoami: {local_node_id} hops={hops_text}"
+
+        if command == "joke":
+            with self._lock:
+                return self._next_joke_line_locked()
 
         if command in ("whois", "whohas"):
             if not args:
@@ -1285,6 +1424,12 @@ def build_mesh_response_bot_from_env(
         _DEFAULT_SEGMENT_ACK_WAIT_SECONDS * 1000.0,
     )
     custom_commands = _load_custom_commands_from_env(env_map)
+    joke_triggers = _normalize_joke_triggers(persisted.get("joke_triggers"))
+    if "MESH_DASH_BOT_JOKE_TRIGGERS" in env_map:
+        joke_triggers = _normalize_joke_triggers(env_map.get("MESH_DASH_BOT_JOKE_TRIGGERS"))
+    joke_lines = _normalize_joke_lines(persisted.get("joke_lines"))
+    if "MESH_DASH_BOT_JOKE_LINES" in env_map:
+        joke_lines = _normalize_joke_lines(env_map.get("MESH_DASH_BOT_JOKE_LINES"))
     if "MESH_DASH_BOT_DISABLED_COMMANDS" in env_map:
         disabled_commands = _load_disabled_commands_from_env(env_map)
     elif isinstance(persisted.get("disabled_commands"), list):
@@ -1304,6 +1449,8 @@ def build_mesh_response_bot_from_env(
         log_enabled=log_enabled,
         game_enabled=game_enabled,
         game_public_start_enabled=game_public_start_enabled,
+        joke_triggers=joke_triggers,
+        joke_lines=joke_lines,
         reply_broadcast=reply_broadcast,
         settings_path=settings_path,
         chat_max_bytes=chat_max_bytes,

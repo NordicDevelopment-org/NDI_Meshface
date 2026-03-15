@@ -41,6 +41,49 @@ def _parse_disabled_commands(value: object) -> Optional[list[str]]:
     return out
 
 
+def _parse_string_list(
+    value: object,
+    *,
+    split_commas: bool,
+    max_items: int,
+    max_item_chars: int,
+) -> Optional[list[str]]:
+    explicit_list = isinstance(value, list)
+    raw_items: list[object]
+    if explicit_list:
+        raw_items = list(value)
+    else:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        normalized = text.replace(";", "\n")
+        if split_commas:
+            normalized = normalized.replace(",", "\n")
+        raw_items = normalized.splitlines()
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        item = str(raw_item or "").strip()
+        if not item:
+            continue
+        if len(item) > max_item_chars:
+            item = item[:max_item_chars].rstrip()
+        if not item:
+            continue
+        dedupe_key = item.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        out.append(item)
+        if len(out) >= max_items:
+            break
+    if out:
+        return out
+    if explicit_list:
+        return []
+    return None
+
+
 def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, object]:
     if not settings_path:
         return {}
@@ -70,6 +113,22 @@ def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, objec
         out["game_public_start_enabled"] = game_public_start_enabled
     if disabled_commands is not None:
         out["disabled_commands"] = disabled_commands
+    joke_triggers = _parse_string_list(
+        payload.get("joke_triggers", payload.get("jokeTriggers")),
+        split_commas=True,
+        max_items=64,
+        max_item_chars=160,
+    )
+    if joke_triggers is not None:
+        out["joke_triggers"] = joke_triggers
+    joke_lines = _parse_string_list(
+        payload.get("joke_lines", payload.get("jokeLines")),
+        split_commas=False,
+        max_items=600,
+        max_item_chars=240,
+    )
+    if joke_lines is not None:
+        out["joke_lines"] = joke_lines
     return out
 
 
@@ -95,6 +154,22 @@ def save_persisted_bot_settings(
                 if clean
             }
         ),
+        "joke_triggers": [
+            item
+            for item in (
+                str(value or "").strip()
+                for value in (settings.get("joke_triggers") or [])
+            )
+            if item
+        ],
+        "joke_lines": [
+            item
+            for item in (
+                str(value or "").strip()
+                for value in (settings.get("joke_lines") or [])
+            )
+            if item
+        ],
     }
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

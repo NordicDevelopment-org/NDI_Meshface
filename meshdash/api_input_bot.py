@@ -38,6 +38,49 @@ def _parse_command_settings_payload(value: object) -> Optional[dict[str, bool]]:
     return out or None
 
 
+def _parse_string_list_payload(
+    value: object,
+    *,
+    split_commas: bool,
+    max_items: int,
+    max_item_chars: int,
+) -> Optional[list[str]]:
+    explicit_list = isinstance(value, list)
+    raw_items: list[object]
+    if explicit_list:
+        raw_items = list(value)
+    else:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        normalized = text.replace(";", "\n")
+        if split_commas:
+            normalized = normalized.replace(",", "\n")
+        raw_items = normalized.splitlines()
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        item = str(raw_item or "").strip()
+        if not item:
+            continue
+        if len(item) > max_item_chars:
+            item = item[:max_item_chars].rstrip()
+        if not item:
+            continue
+        dedupe_key = item.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        out.append(item)
+        if len(out) >= max_items:
+            break
+    if out:
+        return out
+    if explicit_list:
+        return []
+    return None
+
+
 @dataclass(frozen=True)
 class BotSettingsRequest:
     enabled: Optional[bool] = None
@@ -45,6 +88,8 @@ class BotSettingsRequest:
     game_enabled: Optional[bool] = None
     game_public_start_enabled: Optional[bool] = None
     command_settings: Optional[dict[str, bool]] = None
+    joke_triggers: Optional[list[str]] = None
+    joke_lines: Optional[list[str]] = None
 
 
 def parse_bot_settings_request(raw_body: bytes) -> BotSettingsRequest:
@@ -66,5 +111,17 @@ def parse_bot_settings_request(raw_body: bytes) -> BotSettingsRequest:
         ),
         command_settings=_parse_command_settings_payload(
             payload.get("command_settings", payload.get("commandSettings"))
+        ),
+        joke_triggers=_parse_string_list_payload(
+            payload.get("joke_triggers", payload.get("jokeTriggers")),
+            split_commas=True,
+            max_items=64,
+            max_item_chars=160,
+        ),
+        joke_lines=_parse_string_list_payload(
+            payload.get("joke_lines", payload.get("jokeLines")),
+            split_commas=False,
+            max_items=600,
+            max_item_chars=240,
         ),
     )

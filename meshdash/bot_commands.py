@@ -11,6 +11,7 @@ class BotCommandSpec:
 
 DEFAULT_ENABLED_MANAGED_BOT_COMMAND_NAMES = (
     "ping",
+    "joke",
     "zork",
 )
 
@@ -35,6 +36,11 @@ MANAGED_BOT_COMMAND_SPECS = (
         name="ping",
         usage="ping [target]",
         description="measure reply latency and hop path",
+    ),
+    BotCommandSpec(
+        name="joke",
+        usage="joke",
+        description="tell a random joke",
     ),
     BotCommandSpec(
         name="zork",

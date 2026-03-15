@@ -35,6 +35,30 @@
       }};
     }}
 
+    function normalizeBotSettingsTextList(value, {{ splitCommas = false }} = {{}}) {{
+      let rawItems = [];
+      if (Array.isArray(value)) {{
+        rawItems = value;
+      }} else {{
+        let normalized = String(value || "").replace(/;/g, "\n");
+        if (splitCommas) {{
+          normalized = normalized.replace(/,/g, "\n");
+        }}
+        rawItems = normalized.split(/\r?\n/);
+      }}
+      const out = [];
+      const seen = new Set();
+      for (const rawItem of rawItems) {{
+        const clean = String(rawItem || "").trim();
+        if (!clean) continue;
+        const key = clean.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(clean);
+      }}
+      return out;
+    }}
+
     function normalizeServerBotSettings(raw) {{
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) {{
         return {{
@@ -43,6 +67,8 @@
           log_enabled: true,
           game_enabled: false,
           game_public_start_enabled: false,
+          joke_triggers: [],
+          joke_lines: [],
           active_game_sessions: 0,
           commands: [],
           disabled_commands: [],
@@ -77,6 +103,14 @@
         game_public_start_enabled: parseBoolToken(
           raw.game_public_start_enabled ?? raw.gamePublicStartEnabled,
           false
+        ),
+        joke_triggers: normalizeBotSettingsTextList(
+          raw.joke_triggers ?? raw.jokeTriggers,
+          {{ splitCommas: true }}
+        ),
+        joke_lines: normalizeBotSettingsTextList(
+          raw.joke_lines ?? raw.jokeLines,
+          {{ splitCommas: false }}
         ),
         active_game_sessions: Number.isFinite(sessionsRaw) && sessionsRaw >= 0 ? Math.trunc(sessionsRaw) : 0,
         commands,
@@ -138,6 +172,9 @@
       const masterInput = document.getElementById("bots-command-master-enabled");
       const commandEnabledInput = document.getElementById("bots-command-selected-enabled");
       const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
+      const jokeTriggersInput = document.getElementById("bots-command-joke-triggers");
+      const jokeLinesInput = document.getElementById("bots-command-joke-lines");
+      const jokeSaveBtn = document.getElementById("bots-command-joke-save-btn");
       const enabledInput = document.getElementById("chat-bot-whois-enabled");
       const prefixSelect = document.getElementById("chat-bot-whois-prefix");
       const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
@@ -155,6 +192,7 @@
         : null;
       const zorkEnabled = !!(zorkCommand && zorkCommand.enabled);
       const selectedIsZork = !!(selectedCommand && selectedCommand.name === "zork");
+      const selectedIsJoke = !!(selectedCommand && selectedCommand.name === "joke");
       const available = !!serverBotSettings.available;
       if (enabledInput instanceof HTMLInputElement) {{
         enabledInput.checked = !!chatWhoisQuickActionEnabled;
@@ -217,6 +255,45 @@
         }} else {{
           publicStartInput.title = "When enabled, a public 'zork' message starts the game with a direct peer-to-peer reply. Follow-up commands still need to continue in direct chat.";
         }}
+      }}
+      if (jokeTriggersInput instanceof HTMLTextAreaElement) {{
+        const value = Array.isArray(serverBotSettings.joke_triggers)
+          ? serverBotSettings.joke_triggers.join("\n")
+          : "";
+        if (document.activeElement !== jokeTriggersInput || !selectedIsJoke) {{
+          jokeTriggersInput.value = value;
+        }}
+        jokeTriggersInput.disabled = !available || botSettingsSaveInFlight || !selectedIsJoke;
+        if (!available) {{
+          jokeTriggersInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsJoke) {{
+          jokeTriggersInput.title = "Select the joke command to edit trigger phrases.";
+        }} else if (botSettingsSaveInFlight) {{
+          jokeTriggersInput.title = "Saving joke settings...";
+        }} else {{
+          jokeTriggersInput.title = "Delimited trigger phrases. One per line (or comma separated).";
+        }}
+      }}
+      if (jokeLinesInput instanceof HTMLTextAreaElement) {{
+        const value = Array.isArray(serverBotSettings.joke_lines)
+          ? serverBotSettings.joke_lines.join("\n")
+          : "";
+        if (document.activeElement !== jokeLinesInput || !selectedIsJoke) {{
+          jokeLinesInput.value = value;
+        }}
+        jokeLinesInput.disabled = !available || botSettingsSaveInFlight || !selectedIsJoke;
+        if (!available) {{
+          jokeLinesInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsJoke) {{
+          jokeLinesInput.title = "Select the joke command to edit joke lines.";
+        }} else if (botSettingsSaveInFlight) {{
+          jokeLinesInput.title = "Saving joke settings...";
+        }} else {{
+          jokeLinesInput.title = "One joke per line.";
+        }}
+      }}
+      if (jokeSaveBtn instanceof HTMLButtonElement) {{
+        jokeSaveBtn.disabled = !available || botSettingsSaveInFlight || !selectedIsJoke;
       }}
     }}
 
@@ -319,6 +396,30 @@
       syncChatWhoisQuickActionControls();
     }}
 
+    async function saveSelectedJokeBotSettings() {{
+      const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      if (commandName !== "joke") return false;
+      const triggersInput = document.getElementById("bots-command-joke-triggers");
+      const linesInput = document.getElementById("bots-command-joke-lines");
+      const triggers = normalizeBotSettingsTextList(
+        triggersInput instanceof HTMLTextAreaElement ? triggersInput.value : "",
+        {{ splitCommas: true }}
+      );
+      const jokeLines = normalizeBotSettingsTextList(
+        linesInput instanceof HTMLTextAreaElement ? linesInput.value : "",
+        {{ splitCommas: false }}
+      );
+      const ok = await saveServerBotSettingsPatch({{
+        joke_triggers: triggers,
+        joke_lines: jokeLines,
+      }});
+      if (!ok) {{
+        renderBotsView(latestState);
+        return false;
+      }}
+      return true;
+    }}
+
     function bindBotCommandCatalogControls() {{
       const masterInput = document.getElementById("bots-command-master-enabled");
       if (masterInput instanceof HTMLInputElement && masterInput.dataset.bound !== "1") {{
@@ -376,6 +477,14 @@
             renderBotsView(latestState);
             return;
           }}
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const jokeSaveBtn = document.getElementById("bots-command-joke-save-btn");
+      if (jokeSaveBtn instanceof HTMLButtonElement && jokeSaveBtn.dataset.bound !== "1") {{
+        jokeSaveBtn.dataset.bound = "1";
+        jokeSaveBtn.addEventListener("click", async () => {{
+          await saveSelectedJokeBotSettings();
           syncChatWhoisQuickActionControls();
         }});
       }}

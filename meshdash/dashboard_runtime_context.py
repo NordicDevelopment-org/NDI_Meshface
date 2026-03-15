@@ -306,6 +306,8 @@ def build_dashboard_runtime_context(
                 game_enabled=getattr(request, "game_enabled", None),
                 game_public_start_enabled=getattr(request, "game_public_start_enabled", None),
                 command_settings=getattr(request, "command_settings", None),
+                joke_triggers=getattr(request, "joke_triggers", None),
+                joke_lines=getattr(request, "joke_lines", None),
             )
         try:
             setattr(loaders.state_fn, "bot_request_history_fn", response_bot.recent_requests)

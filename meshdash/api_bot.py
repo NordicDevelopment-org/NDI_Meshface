@@ -46,6 +46,8 @@ def handle_bot_settings_post(
         and request.game_enabled is None
         and request.game_public_start_enabled is None
         and request.command_settings is None
+        and request.joke_triggers is None
+        and request.joke_lines is None
     ):
         write_json_response_fn(
             handler,

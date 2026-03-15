@@ -183,6 +183,110 @@ def test_natural_ping_phrase_ignores_extra_trailing_words():
     assert bot.recent_requests() == []
 
 
+def test_natural_joke_trigger_replies_with_random_joke_and_logs_as_joke():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("tell me a joke"), iface)
+
+    assert len(sent) == 1
+    assert sent[0]["destination"] == "^all"
+    assert sent[0]["reply_id"] == 1001
+    assert str(sent[0]["text"]).strip()
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["command"] == "tell me a joke"
+    assert history[0]["command_head"] == "joke"
+
+
+def test_joke_trigger_and_joke_lines_are_configurable():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.configure(
+        joke_triggers=["make me laugh"],
+        joke_lines=["mesh joke one", "mesh joke two"],
+    )
+    bot.on_receive(_base_packet("tell me a joke"), iface)
+    bot.on_receive(_base_packet("make me laugh", packet_id=1002), iface)
+
+    assert len(sent) == 1
+    assert str(sent[0]["text"]).strip() in {"mesh joke one", "mesh joke two"}
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["command_head"] == "joke"
+
+
+def test_joke_rotation_avoids_repeats_until_cycle_resets():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.configure(joke_lines=["j1", "j2", "j3"])
+    bot.on_receive(_base_packet("joke", packet_id=1101), iface)
+    bot.on_receive(_base_packet("joke", packet_id=1102), iface)
+    bot.on_receive(_base_packet("joke", packet_id=1103), iface)
+    bot.on_receive(_base_packet("joke", packet_id=1104), iface)
+
+    assert len(sent) == 4
+    first_cycle = {str(row["text"]).strip() for row in sent[:3]}
+    assert first_cycle == {"j1", "j2", "j3"}
+    assert str(sent[3]["text"]).strip() in {"j1", "j2", "j3"}
+
+
+def test_joke_command_can_be_disabled_without_disabling_bot():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.configure(command_settings={"joke": False})
+    bot.on_receive(_base_packet("joke"), iface)
+
+    assert sent == []
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["command_head"] == "joke"
+    assert history[0]["command_enabled"] is False
+
+
 def test_direct_ping_replies_direct_with_reply_id():
     iface = _FakeIface()
     sent = []
@@ -787,7 +891,7 @@ def test_build_bot_from_env_defaults_bot_responses_to_disabled():
     assert bot.game_enabled is True
     settings = bot.bot_settings()
     enabled_names = [row["name"] for row in settings["commands"] if row["enabled"]]
-    assert enabled_names == ["ping", "zork"]
+    assert enabled_names == ["ping", "joke", "zork"]
 
 
 def test_build_bot_from_env_can_disable_bot_and_logging():
@@ -845,10 +949,12 @@ def test_bot_settings_expose_managed_command_catalog():
     names = {row["name"] for row in commands}
 
     assert "ping" in names
+    assert "joke" in names
     assert "zork" in names
     assert "status" in names
     assert commands[0]["name"] == "ping"
-    assert commands[1]["name"] == "zork"
+    assert commands[1]["name"] == "joke"
+    assert commands[2]["name"] == "zork"
     ping = next(row for row in commands if row["name"] == "ping")
     assert ping["enabled"] is True
 
@@ -1295,6 +1401,7 @@ def test_build_bot_from_env_empty_disabled_commands_enables_full_catalog():
     settings = bot.bot_settings()
     rows = {row["name"]: row for row in settings["commands"]}
     assert rows["ping"]["enabled"] is True
+    assert rows["joke"]["enabled"] is True
     assert rows["zork"]["enabled"] is True
     assert rows["cmd"]["enabled"] is True
     assert rows["whois"]["enabled"] is True
@@ -1314,6 +1421,8 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
         enabled=True,
         game_enabled=False,
         command_settings={"whois": True},
+        joke_triggers=["tell me a joke", "make me laugh"],
+        joke_lines=["line 1", "line 2"],
     )
     assert saved["ok"] is True
     assert settings_path.exists()
@@ -1322,6 +1431,8 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert payload["enabled"] is True
     assert payload["game_enabled"] is False
     assert payload["game_public_start_enabled"] is False
+    assert payload["joke_triggers"] == ["tell me a joke", "make me laugh"]
+    assert payload["joke_lines"] == ["line 1", "line 2"]
     assert "whois" not in payload["disabled_commands"]
     assert "cmd" in payload["disabled_commands"]
 
@@ -1339,6 +1450,9 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert rows["zork"]["enabled"] is False
     assert rows["whois"]["enabled"] is True
     assert rows["cmd"]["enabled"] is False
+    loaded_settings = loaded.bot_settings()
+    assert loaded_settings["joke_triggers"] == ["tell me a joke", "make me laugh"]
+    assert loaded_settings["joke_lines"] == ["line 1", "line 2"]
 
 
 def test_public_game_start_setting_is_persisted_and_loaded_from_file(tmp_path):

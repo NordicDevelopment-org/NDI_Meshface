@@ -97,3 +97,32 @@ def test_handle_bot_settings_post_accepts_command_settings_patch():
     assert calls["payload_obj"]["commands"][0]["name"] == "ping"
     assert calls["payload_obj"]["commands"][0]["enabled"] is False
     assert captured["request"].command_settings == {"ping": False}
+
+
+def test_handle_bot_settings_post_accepts_joke_settings_patch():
+    calls = {}
+    captured = {}
+    body = b'{"joke_triggers":["tell me a joke"],"joke_lines":["line one","line two"]}'
+    handle_bot_settings_post(
+        _handler(body=body),
+        apply_bot_settings_fn=lambda req: (
+            captured.update({"request": req})
+            or {
+                "ok": True,
+                "joke_triggers": ["tell me a joke"],
+                "joke_lines": ["line one", "line two"],
+            }
+        ),
+        to_int_fn=lambda value: int(value) if value not in (None, "") else None,
+        validate_content_length_fn=lambda *_args, **_kwargs: len(body),
+        parse_bot_settings_request_fn=lambda _raw: BotSettingsRequest(
+            joke_triggers=["tell me a joke"],
+            joke_lines=["line one", "line two"],
+        ),
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+    assert calls["status_code"] == 200
+    assert calls["payload_obj"]["joke_triggers"] == ["tell me a joke"]
+    assert calls["payload_obj"]["joke_lines"] == ["line one", "line two"]
+    assert captured["request"].joke_triggers == ["tell me a joke"]
+    assert captured["request"].joke_lines == ["line one", "line two"]
