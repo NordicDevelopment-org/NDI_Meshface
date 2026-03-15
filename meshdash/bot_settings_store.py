@@ -137,6 +137,14 @@ def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, objec
     )
     if joke_lines is not None:
         out["joke_lines"] = joke_lines
+    joke_near_guess_lines = _parse_string_list(
+        payload.get("joke_near_guess_lines", payload.get("jokeNearGuessLines")),
+        split_commas=False,
+        max_items=300,
+        max_item_chars=240,
+    )
+    if joke_near_guess_lines is not None:
+        out["joke_near_guess_lines"] = joke_near_guess_lines
     joke_delay_punchline_enabled = _parse_optional_bool_token(
         payload.get(
             "joke_delay_punchline_enabled",
@@ -191,6 +199,14 @@ def save_persisted_bot_settings(
             for item in (
                 str(value or "").strip()
                 for value in (settings.get("joke_lines") or [])
+            )
+            if item
+        ],
+        "joke_near_guess_lines": [
+            item
+            for item in (
+                str(value or "").strip()
+                for value in (settings.get("joke_near_guess_lines") or [])
             )
             if item
         ],

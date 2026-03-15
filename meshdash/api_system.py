@@ -103,6 +103,7 @@ def _bot_settings_etag_marker(settings: object) -> str:
     ping_triggers = settings.get("ping_triggers")
     joke_triggers = settings.get("joke_triggers")
     joke_lines = settings.get("joke_lines")
+    joke_near_guess_lines = settings.get("joke_near_guess_lines")
     command_marker_parts = []
     if isinstance(commands, list):
         for row in commands:
@@ -123,6 +124,7 @@ def _bot_settings_etag_marker(settings: object) -> str:
             str(len(ping_triggers) if isinstance(ping_triggers, list) else 0),
             str(len(joke_triggers) if isinstance(joke_triggers, list) else 0),
             str(len(joke_lines) if isinstance(joke_lines, list) else 0),
+            str(len(joke_near_guess_lines) if isinstance(joke_near_guess_lines, list) else 0),
             ",".join(command_marker_parts),
         ]
     )

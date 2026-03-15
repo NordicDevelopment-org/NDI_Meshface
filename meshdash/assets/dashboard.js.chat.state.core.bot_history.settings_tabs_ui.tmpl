@@ -16,6 +16,7 @@
       const jokeDelayPunchlineInput = document.getElementById("bots-command-joke-delay-punchline-enabled");
       const jokeTriggersInput = document.getElementById("bots-command-joke-triggers");
       const jokeLinesInput = document.getElementById("bots-command-joke-lines");
+      const jokeNearGuessLinesInput = document.getElementById("bots-command-joke-near-guess-lines");
       if (!(listEl instanceof HTMLElement)) return;
       const showConfigEmpty = (message) => {{
         if (configEmptyEl instanceof HTMLElement) {{
@@ -148,6 +149,14 @@
           : "";
         if (document.activeElement !== jokeLinesInput || !selectedIsJoke) {{
           jokeLinesInput.value = nextValue;
+        }}
+      }}
+      if (jokeNearGuessLinesInput instanceof HTMLTextAreaElement) {{
+        const nextValue = selectedIsJoke && Array.isArray(serverBotSettings.joke_near_guess_lines)
+          ? serverBotSettings.joke_near_guess_lines.join("\n")
+          : "";
+        if (document.activeElement !== jokeNearGuessLinesInput || !selectedIsJoke) {{
+          jokeNearGuessLinesInput.value = nextValue;
         }}
       }}
     }}

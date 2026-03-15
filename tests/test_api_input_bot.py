@@ -34,18 +34,20 @@ def test_parse_bot_settings_request_handles_invalid_or_missing_values():
 
 def test_parse_bot_settings_request_parses_joke_settings_lists():
     parsed = parse_bot_settings_request(
-        b'{"jokeTriggers":"tell me a joke; joke time","jokeLines":"line one\\nline two"}'
+        b'{"jokeTriggers":"tell me a joke; joke time","jokeLines":"line one\\nline two","jokeNearGuessLines":"close one\\nclose two"}'
     )
     assert parsed.joke_triggers == ["tell me a joke", "joke time"]
     assert parsed.joke_lines == ["line one", "line two"]
+    assert parsed.joke_near_guess_lines == ["close one", "close two"]
 
 
 def test_parse_bot_settings_request_preserves_explicit_empty_joke_lists():
     parsed = parse_bot_settings_request(
-        b'{"joke_triggers":[],"joke_lines":[]}'
+        b'{"joke_triggers":[],"joke_lines":[],"joke_near_guess_lines":[]}'
     )
     assert parsed.joke_triggers == []
     assert parsed.joke_lines == []
+    assert parsed.joke_near_guess_lines == []
 
 
 def test_parse_bot_settings_request_parses_joke_delay_toggle():

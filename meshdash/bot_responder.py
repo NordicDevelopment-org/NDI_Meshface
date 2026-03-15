@@ -69,6 +69,9 @@ _DEFAULT_JOKE_LINES = (
     "I told a bot to chill. It replied, 'Current temperature already sampled.'",
     "Why did the signal cross the hill? Better line of sight.",
 )
+_DEFAULT_JOKE_NEAR_GUESS_LINES = (
+    "Nice guess, close enough. {punchline}",
+)
 _DEFAULT_JOKE_DELAY_PUNCHLINE_ENABLED = False
 _DEFAULT_JOKE_PUNCHLINE_DELAY_SECONDS = 15.0
 _REPLY_PACKET_TEXT_RESERVE_BYTES = 20
@@ -253,6 +256,34 @@ def _normalize_joke_lines(value: object) -> list[str]:
     return [str(line).strip() for line in _DEFAULT_JOKE_LINES if str(line).strip()]
 
 
+def _normalize_joke_near_guess_lines(value: object) -> list[str]:
+    if value is None:
+        return [str(line).strip() for line in _DEFAULT_JOKE_NEAR_GUESS_LINES if str(line).strip()]
+    raw_items = _parse_phrase_items(value, split_commas=False)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        clean = str(raw_item or "").strip()
+        if not clean:
+            continue
+        if len(clean) > 240:
+            clean = clean[:240].rstrip()
+        if not clean:
+            continue
+        dedupe_key = clean.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        out.append(clean)
+        if len(out) >= 300:
+            break
+    if out:
+        return out
+    if isinstance(value, list):
+        return []
+    return [str(line).strip() for line in _DEFAULT_JOKE_NEAR_GUESS_LINES if str(line).strip()]
+
+
 def _split_joke_prompt_and_punchline(text: object) -> tuple[str, str] | None:
     raw = str(text or "").strip()
     if not raw:
@@ -266,6 +297,82 @@ def _split_joke_prompt_and_punchline(text: object) -> tuple[str, str] | None:
     if not prompt or not punchline:
         return None
     return prompt, punchline
+
+
+def _joke_match_tokens(text: object) -> set[str]:
+    raw = str(text or "").strip().lower()
+    if not raw:
+        return set()
+    cleaned_chars: list[str] = []
+    for ch in raw:
+        cleaned_chars.append(ch if ch.isalnum() else " ")
+    stop_words = {
+        "the",
+        "and",
+        "for",
+        "you",
+        "your",
+        "with",
+        "that",
+        "this",
+        "have",
+        "from",
+        "just",
+        "what",
+        "when",
+        "where",
+        "into",
+        "they",
+        "them",
+        "then",
+        "than",
+        "was",
+        "were",
+        "are",
+    }
+    out: set[str] = set()
+    for token in "".join(cleaned_chars).split():
+        if len(token) < 3:
+            continue
+        if token in stop_words:
+            continue
+        out.add(token)
+    return out
+
+
+def _is_close_joke_guess(guess_text: object, punchline_text: object) -> bool:
+    guess = str(guess_text or "").strip().lower()
+    punchline = str(punchline_text or "").strip().lower()
+    if not guess or not punchline:
+        return False
+    if guess == punchline:
+        return True
+    if len(guess) >= 6 and guess in punchline:
+        return True
+    if len(punchline) >= 6 and punchline in guess:
+        return True
+    guess_tokens = _joke_match_tokens(guess)
+    punchline_tokens = _joke_match_tokens(punchline)
+    if not guess_tokens or not punchline_tokens:
+        return False
+    overlap = guess_tokens.intersection(punchline_tokens)
+    if len(overlap) >= 3:
+        return True
+    smaller = min(len(guess_tokens), len(punchline_tokens))
+    if smaller <= 0:
+        return False
+    return len(overlap) >= 2 and (len(overlap) / float(smaller)) >= 0.5
+
+
+def _render_near_guess_reply(template: object, punchline: object) -> str:
+    clean_template = str(template or "").strip()
+    clean_punchline = str(punchline or "").strip()
+    if not clean_template:
+        return clean_punchline
+    if "{punchline}" in clean_template:
+        return clean_template.replace("{punchline}", clean_punchline).strip()
+    # No placeholder means caller wants a pure custom response with no answer reveal.
+    return clean_template
 
 
 def _bot_city_hint(local_node: Optional[dict[str, object]]) -> str:
@@ -293,6 +400,7 @@ class MeshResponseBot:
         ping_triggers: Optional[list[str]] = None,
         joke_triggers: Optional[list[str]] = None,
         joke_lines: Optional[list[str]] = None,
+        joke_near_guess_lines: Optional[list[str]] = None,
         joke_delay_punchline_enabled: bool = _DEFAULT_JOKE_DELAY_PUNCHLINE_ENABLED,
         joke_punchline_delay_seconds: float = _DEFAULT_JOKE_PUNCHLINE_DELAY_SECONDS,
         reply_broadcast: bool = False,
@@ -323,12 +431,14 @@ class MeshResponseBot:
         self._ping_trigger_phrases = _normalize_ping_triggers(ping_triggers)
         self._joke_trigger_phrases = _normalize_joke_triggers(joke_triggers)
         self._joke_lines = _normalize_joke_lines(joke_lines)
+        self._joke_near_guess_lines = _normalize_joke_near_guess_lines(joke_near_guess_lines)
         self._joke_delay_punchline_enabled = bool(joke_delay_punchline_enabled)
         self._joke_punchline_delay_seconds = _parse_nonnegative_float_token(
             joke_punchline_delay_seconds,
             _DEFAULT_JOKE_PUNCHLINE_DELAY_SECONDS,
         )
         self._joke_cycle: list[str] = []
+        self._joke_near_guess_cycle: list[str] = []
         self._pending_joke_punchlines: dict[str, dict[str, object]] = {}
         self._pending_joke_seq = 0
         self._rng = random.Random()
@@ -466,6 +576,7 @@ class MeshResponseBot:
         *,
         triggers: Optional[list[str]] = None,
         lines: Optional[list[str]] = None,
+        near_guess_lines: Optional[list[str]] = None,
         delay_punchline_enabled: Optional[bool] = None,
     ) -> None:
         clear_pending = False
@@ -476,6 +587,10 @@ class MeshResponseBot:
         if lines is not None:
             self._joke_lines = _normalize_joke_lines(lines)
             self._joke_cycle = []
+            clear_pending = True
+        if near_guess_lines is not None:
+            self._joke_near_guess_lines = _normalize_joke_near_guess_lines(near_guess_lines)
+            self._joke_near_guess_cycle = []
             clear_pending = True
         if delay_punchline_enabled is not None:
             self._joke_delay_punchline_enabled = bool(delay_punchline_enabled)
@@ -500,6 +615,15 @@ class MeshResponseBot:
         if not self._joke_cycle:
             return "I tried to tell a joke, but my punchline got dropped in transit."
         return self._joke_cycle.pop()
+
+    def _next_joke_near_guess_line_locked(self) -> str:
+        if not self._joke_near_guess_cycle:
+            refreshed = list(self._joke_near_guess_lines)
+            self._rng.shuffle(refreshed)
+            self._joke_near_guess_cycle = refreshed
+        if not self._joke_near_guess_cycle:
+            return ""
+        return self._joke_near_guess_cycle.pop()
 
     def _clear_pending_joke_punchlines_locked(self) -> None:
         pending_rows = list(self._pending_joke_punchlines.values())
@@ -557,6 +681,7 @@ class MeshResponseBot:
                 entry_id=entry_id,
                 reply_id=None,
                 reason="timeout",
+                reply_text=None,
             ),
         )
         with self._lock:
@@ -619,6 +744,7 @@ class MeshResponseBot:
         entry_id: str,
         reply_id: Optional[int],
         reason: str,
+        reply_text: Optional[str] = None,
     ) -> bool:
         if not self._enabled:
             with self._lock:
@@ -649,10 +775,16 @@ class MeshResponseBot:
         if reply_id_to_use is None or reply_id_to_use <= 0:
             reply_id_to_use = fallback_reply_id if fallback_reply_id and fallback_reply_id > 0 else None
         punchline = str(entry.get("punchline") or "").strip()
+        response_text = punchline
+        if reason == "reply" and _is_close_joke_guess(reply_text, punchline):
+            with self._lock:
+                near_guess_template = self._next_joke_near_guess_line_locked()
+            if near_guess_template:
+                response_text = _render_near_guess_reply(near_guess_template, punchline)
         request_id = str(entry.get("request_id") or "").strip()
         try:
             response_segments, response_payloads = self._send_reply_text(
-                text=punchline,
+                text=response_text,
                 destination=destination,
                 channel_index=channel_index,
                 reply_id=reply_id_to_use,
@@ -686,6 +818,7 @@ class MeshResponseBot:
         to_id: str,
         channel_index: int,
         packet_id: Optional[int],
+        message_text: str = "",
     ) -> bool:
         clean_from_id = _normalize_node_id(from_id)
         clean_to_id = _normalize_node_id(to_id)
@@ -714,6 +847,7 @@ class MeshResponseBot:
             entry_id=pending_id,
             reply_id=packet_id,
             reason="reply",
+            reply_text=message_text,
         )
 
     def _command_enabled_locked(self, command: str) -> bool:
@@ -781,6 +915,7 @@ class MeshResponseBot:
             "ping_triggers": list(self._ping_trigger_phrases),
             "joke_triggers": list(self._joke_trigger_phrases),
             "joke_lines": list(self._joke_lines),
+            "joke_near_guess_lines": list(self._joke_near_guess_lines),
             "joke_delay_punchline_enabled": bool(self._joke_delay_punchline_enabled),
             "active_game_sessions": self._active_game_sessions_locked(),
             "disabled_commands": sorted(self._disabled_commands),
@@ -796,6 +931,7 @@ class MeshResponseBot:
             "ping_triggers": list(self._ping_trigger_phrases),
             "joke_triggers": list(self._joke_trigger_phrases),
             "joke_lines": list(self._joke_lines),
+            "joke_near_guess_lines": list(self._joke_near_guess_lines),
             "joke_delay_punchline_enabled": bool(self._joke_delay_punchline_enabled),
             "disabled_commands": sorted(self._disabled_commands),
         }
@@ -815,6 +951,7 @@ class MeshResponseBot:
         ping_triggers: Optional[list[str]] = None,
         joke_triggers: Optional[list[str]] = None,
         joke_lines: Optional[list[str]] = None,
+        joke_near_guess_lines: Optional[list[str]] = None,
         joke_delay_punchline_enabled: Optional[bool] = None,
     ) -> dict[str, object]:
         with self._lock:
@@ -833,11 +970,13 @@ class MeshResponseBot:
             if (
                 joke_triggers is not None
                 or joke_lines is not None
+                or joke_near_guess_lines is not None
                 or joke_delay_punchline_enabled is not None
             ):
                 self._set_joke_settings_locked(
                     triggers=joke_triggers,
                     lines=joke_lines,
+                    near_guess_lines=joke_near_guess_lines,
                     delay_punchline_enabled=joke_delay_punchline_enabled,
                 )
             out = self._bot_settings_locked()
@@ -1472,6 +1611,7 @@ class MeshResponseBot:
             to_id=to_id,
             channel_index=channel_index,
             packet_id=packet_id,
+            message_text=text,
         )
         app_result = None
         with self._lock:
@@ -1790,6 +1930,9 @@ def build_mesh_response_bot_from_env(
     joke_lines = _normalize_joke_lines(persisted.get("joke_lines"))
     if "MESH_DASH_BOT_JOKE_LINES" in env_map:
         joke_lines = _normalize_joke_lines(env_map.get("MESH_DASH_BOT_JOKE_LINES"))
+    joke_near_guess_lines = _normalize_joke_near_guess_lines(persisted.get("joke_near_guess_lines"))
+    if "MESH_DASH_BOT_JOKE_NEAR_GUESS_LINES" in env_map:
+        joke_near_guess_lines = _normalize_joke_near_guess_lines(env_map.get("MESH_DASH_BOT_JOKE_NEAR_GUESS_LINES"))
     if "MESH_DASH_BOT_DISABLED_COMMANDS" in env_map:
         disabled_commands = _load_disabled_commands_from_env(env_map)
     elif isinstance(persisted.get("disabled_commands"), list):
@@ -1812,6 +1955,7 @@ def build_mesh_response_bot_from_env(
         ping_triggers=ping_triggers,
         joke_triggers=joke_triggers,
         joke_lines=joke_lines,
+        joke_near_guess_lines=joke_near_guess_lines,
         joke_delay_punchline_enabled=joke_delay_punchline_enabled,
         reply_broadcast=reply_broadcast,
         settings_path=settings_path,

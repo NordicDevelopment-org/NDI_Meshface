@@ -382,6 +382,123 @@ def test_joke_delay_punchline_sends_timeout_punchline_after_delay():
     assert sent[1]["reply_id"] == 1401
 
 
+def test_joke_delay_punchline_sends_close_guess_variant_when_reply_matches():
+    iface = _FakeIface()
+    sent = []
+    fake_timers = _FakeTimerFactory()
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        joke_lines=["Why did the packet cross the mesh? Better line of sight."],
+        joke_delay_punchline_enabled=True,
+        timer_factory=fake_timers,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("joke", packet_id=1501), iface)
+
+    assert len(sent) == 1
+    assert str(sent[0]["text"]).strip() == "Why did the packet cross the mesh?"
+
+    bot.on_receive(_base_packet("line of sight", packet_id=1502), iface)
+
+    assert len(sent) == 2
+    reply_text = str(sent[1]["text"]).strip().lower()
+    assert reply_text.startswith("nice guess, close enough.")
+    assert "better line of sight." in reply_text
+    assert sent[1]["reply_id"] == 1502
+    assert fake_timers.timers[0].cancelled is True
+
+
+def test_joke_delay_punchline_uses_custom_near_guess_template():
+    iface = _FakeIface()
+    sent = []
+    fake_timers = _FakeTimerFactory()
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        joke_lines=["Why did the packet cross the mesh? Better line of sight."],
+        joke_near_guess_lines=["You nailed it: {punchline}"],
+        joke_delay_punchline_enabled=True,
+        timer_factory=fake_timers,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("joke", packet_id=1503), iface)
+    bot.on_receive(_base_packet("line of sight", packet_id=1504), iface)
+
+    assert len(sent) == 2
+    assert str(sent[1]["text"]).strip() == "You nailed it: Better line of sight."
+    assert sent[1]["reply_id"] == 1504
+    assert fake_timers.timers[0].cancelled is True
+
+
+def test_joke_delay_punchline_template_without_placeholder_hides_punchline():
+    iface = _FakeIface()
+    sent = []
+    fake_timers = _FakeTimerFactory()
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        joke_lines=["Why did the packet cross the mesh? Better line of sight."],
+        joke_near_guess_lines=["Nope. Try harder."],
+        joke_delay_punchline_enabled=True,
+        timer_factory=fake_timers,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("joke", packet_id=1507), iface)
+    bot.on_receive(_base_packet("line of sight", packet_id=1508), iface)
+
+    assert len(sent) == 2
+    assert str(sent[1]["text"]).strip() == "Nope. Try harder."
+    assert sent[1]["reply_id"] == 1508
+    assert fake_timers.timers[0].cancelled is True
+
+
+def test_joke_delay_punchline_with_empty_near_guess_lines_uses_plain_punchline():
+    iface = _FakeIface()
+    sent = []
+    fake_timers = _FakeTimerFactory()
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        joke_lines=["Why did the packet cross the mesh? Better line of sight."],
+        joke_near_guess_lines=[],
+        joke_delay_punchline_enabled=True,
+        timer_factory=fake_timers,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("joke", packet_id=1505), iface)
+    bot.on_receive(_base_packet("line of sight", packet_id=1506), iface)
+
+    assert len(sent) == 2
+    assert str(sent[1]["text"]).strip() == "Better line of sight."
+    assert sent[1]["reply_id"] == 1506
+    assert fake_timers.timers[0].cancelled is True
+
+
 def test_direct_ping_replies_direct_with_reply_id():
     iface = _FakeIface()
     sent = []
@@ -1551,6 +1668,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
         command_settings={"whois": True},
         joke_triggers=["tell me a joke", "make me laugh"],
         joke_lines=["line 1", "line 2"],
+        joke_near_guess_lines=["close enough {punchline}"],
     )
     assert saved["ok"] is True
     assert settings_path.exists()
@@ -1562,6 +1680,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert payload["joke_delay_punchline_enabled"] is False
     assert payload["joke_triggers"] == ["tell me a joke", "make me laugh"]
     assert payload["joke_lines"] == ["line 1", "line 2"]
+    assert payload["joke_near_guess_lines"] == ["close enough {punchline}"]
     assert "whois" not in payload["disabled_commands"]
     assert "cmd" in payload["disabled_commands"]
 
@@ -1582,6 +1701,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     loaded_settings = loaded.bot_settings()
     assert loaded_settings["joke_triggers"] == ["tell me a joke", "make me laugh"]
     assert loaded_settings["joke_lines"] == ["line 1", "line 2"]
+    assert loaded_settings["joke_near_guess_lines"] == ["close enough {punchline}"]
     assert loaded_settings["joke_delay_punchline_enabled"] is False
 
 
@@ -1597,6 +1717,20 @@ def test_configure_allows_explicit_empty_joke_lines():
     assert saved["ok"] is True
     assert saved["joke_lines"] == []
     assert bot.bot_settings()["joke_lines"] == []
+
+
+def test_configure_allows_explicit_empty_joke_near_guess_lines():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_ENABLED": "1"},
+    )
+    assert bot is not None
+
+    saved = bot.configure(joke_near_guess_lines=[])
+    assert saved["ok"] is True
+    assert saved["joke_near_guess_lines"] == []
+    assert bot.bot_settings()["joke_near_guess_lines"] == []
 
 
 def test_configure_allows_explicit_empty_ping_triggers():
@@ -1694,6 +1828,30 @@ def test_empty_joke_lines_persist_and_reload_without_default_fallback(tmp_path):
     )
     assert loaded is not None
     assert loaded.bot_settings()["joke_lines"] == []
+
+
+def test_empty_joke_near_guess_lines_persist_and_reload_without_default_fallback(tmp_path):
+    settings_path = tmp_path / "bot_settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "log_enabled": True,
+                "game_enabled": False,
+                "disabled_commands": [],
+                "joke_near_guess_lines": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_SETTINGS_FILE": str(settings_path)},
+    )
+    assert loaded is not None
+    assert loaded.bot_settings()["joke_near_guess_lines"] == []
 
 
 def test_public_game_start_setting_is_persisted_and_loaded_from_file(tmp_path):

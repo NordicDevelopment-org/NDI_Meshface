@@ -70,6 +70,7 @@
           ping_triggers: [],
           joke_triggers: [],
           joke_lines: [],
+          joke_near_guess_lines: [],
           joke_delay_punchline_enabled: false,
           active_game_sessions: 0,
           commands: [],
@@ -116,6 +117,10 @@
         ),
         joke_lines: normalizeBotSettingsTextList(
           raw.joke_lines ?? raw.jokeLines,
+          {{ splitCommas: false }}
+        ),
+        joke_near_guess_lines: normalizeBotSettingsTextList(
+          raw.joke_near_guess_lines ?? raw.jokeNearGuessLines,
           {{ splitCommas: false }}
         ),
         joke_delay_punchline_enabled: parseBoolToken(
@@ -191,6 +196,7 @@
       const jokeDelayPunchlineInput = document.getElementById("bots-command-joke-delay-punchline-enabled");
       const jokeTriggersInput = document.getElementById("bots-command-joke-triggers");
       const jokeLinesInput = document.getElementById("bots-command-joke-lines");
+      const jokeNearGuessLinesInput = document.getElementById("bots-command-joke-near-guess-lines");
       const jokeSaveBtn = document.getElementById("bots-command-joke-save-btn");
       const enabledInput = document.getElementById("chat-bot-whois-enabled");
       const prefixSelect = document.getElementById("chat-bot-whois-prefix");
@@ -356,6 +362,24 @@
           jokeLinesInput.title = "One joke per line.";
         }}
       }}
+      if (jokeNearGuessLinesInput instanceof HTMLTextAreaElement) {{
+        const value = selectedIsJoke && Array.isArray(serverBotSettings.joke_near_guess_lines)
+          ? serverBotSettings.joke_near_guess_lines.join("\n")
+          : "";
+        if (document.activeElement !== jokeNearGuessLinesInput || !selectedIsJoke) {{
+          jokeNearGuessLinesInput.value = value;
+        }}
+        jokeNearGuessLinesInput.disabled = !available || botSettingsSaveInFlight || !selectedIsJoke;
+        if (!available) {{
+          jokeNearGuessLinesInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsJoke) {{
+          jokeNearGuessLinesInput.title = "Select the joke command to edit near-guess responses.";
+        }} else if (botSettingsSaveInFlight) {{
+          jokeNearGuessLinesInput.title = "Saving joke settings...";
+        }} else {{
+          jokeNearGuessLinesInput.title = "One near-guess response per line. Include {{punchline}} if you want to reveal the answer.";
+        }}
+      }}
       if (jokeSaveBtn instanceof HTMLButtonElement) {{
         jokeSaveBtn.disabled = !available || botSettingsSaveInFlight || !selectedIsJoke;
       }}
@@ -483,6 +507,7 @@
       if (commandName !== "joke") return false;
       const triggersInput = document.getElementById("bots-command-joke-triggers");
       const linesInput = document.getElementById("bots-command-joke-lines");
+      const nearGuessLinesInput = document.getElementById("bots-command-joke-near-guess-lines");
       const delayPunchlineInput = document.getElementById("bots-command-joke-delay-punchline-enabled");
       const triggers = normalizeBotSettingsTextList(
         triggersInput instanceof HTMLTextAreaElement ? triggersInput.value : "",
@@ -492,9 +517,14 @@
         linesInput instanceof HTMLTextAreaElement ? linesInput.value : "",
         {{ splitCommas: false }}
       );
+      const jokeNearGuessLines = normalizeBotSettingsTextList(
+        nearGuessLinesInput instanceof HTMLTextAreaElement ? nearGuessLinesInput.value : "",
+        {{ splitCommas: false }}
+      );
       const ok = await saveServerBotSettingsPatch({{
         joke_triggers: triggers,
         joke_lines: jokeLines,
+        joke_near_guess_lines: jokeNearGuessLines,
         joke_delay_punchline_enabled: !!(
           delayPunchlineInput instanceof HTMLInputElement
           ? delayPunchlineInput.checked

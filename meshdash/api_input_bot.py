@@ -91,6 +91,7 @@ class BotSettingsRequest:
     ping_triggers: Optional[list[str]] = None
     joke_triggers: Optional[list[str]] = None
     joke_lines: Optional[list[str]] = None
+    joke_near_guess_lines: Optional[list[str]] = None
     joke_delay_punchline_enabled: Optional[bool] = None
 
 
@@ -130,6 +131,12 @@ def parse_bot_settings_request(raw_body: bytes) -> BotSettingsRequest:
             payload.get("joke_lines", payload.get("jokeLines")),
             split_commas=False,
             max_items=600,
+            max_item_chars=240,
+        ),
+        joke_near_guess_lines=_parse_string_list_payload(
+            payload.get("joke_near_guess_lines", payload.get("jokeNearGuessLines")),
+            split_commas=False,
+            max_items=300,
             max_item_chars=240,
         ),
         joke_delay_punchline_enabled=_parse_optional_bool_token(

@@ -309,6 +309,7 @@ def build_dashboard_runtime_context(
                 ping_triggers=getattr(request, "ping_triggers", None),
                 joke_triggers=getattr(request, "joke_triggers", None),
                 joke_lines=getattr(request, "joke_lines", None),
+                joke_near_guess_lines=getattr(request, "joke_near_guess_lines", None),
                 joke_delay_punchline_enabled=getattr(
                     request,
                     "joke_delay_punchline_enabled",
