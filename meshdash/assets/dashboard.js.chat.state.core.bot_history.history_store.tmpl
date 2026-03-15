@@ -1,0 +1,131 @@
+    function normalizeBotRequestHistoryEntry(raw) {{
+      if (!raw || typeof raw !== "object") return null;
+      const command = String(raw.command || "").trim();
+      if (!command) return null;
+      const source = String(raw.source || "local").trim().toLowerCase() || "local";
+      const commandHead = String(raw.command_head || raw.commandHead || botCommandHeadFromText(command)).trim().toLowerCase();
+      const prefix = knownWhoisCommandPrefixes.has(commandHead)
+        ? normalizeWhoisCommandPrefix(raw.prefix || commandHead)
+        : String(raw.prefix || commandHead || command.split(/\\s+/)[0] || "").trim().toLowerCase();
+      const suffix = nodeIdSuffixForWhois(raw.suffix || command.split(/\\s+/).slice(1).join(" "));
+      const fromId = normalizeNodeId(raw.from_id ?? raw.fromId ?? "");
+      const destination = normalizeNodeId(raw.destination ?? raw.to_id ?? raw.toId ?? "^all") || "^all";
+      const messageId = parsePositiveMessageId(raw.message_id ?? raw.messageId);
+      const replyId = parsePositiveMessageId(raw.reply_id ?? raw.replyId);
+      const sentAtText = String(raw.sent_at ?? raw.sentAt ?? raw.received_at ?? raw.receivedAt ?? "").trim();
+      const sentMs = (
+        parseDashboardTimeToMs(raw.sent_ms ?? raw.sentMs)
+        || parseDashboardTimeToMs(raw.sent_at ?? raw.sentAt)
+        || parseDashboardTimeToMs(raw.sent_unix ?? raw.sentUnix)
+        || parseDashboardTimeToMs(raw.received_unix ?? raw.receivedUnix)
+        || parseDashboardTimeToMs(raw.received_at ?? raw.receivedAt)
+        || Date.now()
+      );
+      const sentUnix = (
+        parseDashboardTimeToUnix(raw.sent_unix ?? raw.sentUnix)
+        || parseDashboardTimeToUnix(raw.sent_at ?? raw.sentAt)
+        || parseDashboardTimeToUnix(raw.received_unix ?? raw.receivedUnix)
+        || parseDashboardTimeToUnix(raw.received_at ?? raw.receivedAt)
+        || Math.floor(sentMs / 1000)
+      );
+      const responseMessageId = parsePositiveMessageId(raw.response_message_id ?? raw.responseMessageId);
+      const responseMs = parseDashboardTimeToMs(raw.response_ms ?? raw.responseMs ?? raw.response_at ?? raw.responseAt);
+      const responseUnix = parseDashboardTimeToUnix(raw.response_unix ?? raw.responseUnix ?? raw.response_at ?? raw.responseAt);
+      const responseHopsRaw = Number(raw.response_hops ?? raw.responseHops);
+      const responseHops = (Number.isFinite(responseHopsRaw) && responseHopsRaw >= 0)
+        ? Math.trunc(responseHopsRaw)
+        : null;
+      const respondEnabled = parseBoolToken(raw.respond_enabled ?? raw.respondEnabled, true);
+      const responded = parseBoolToken(raw.responded, !!responseMessageId);
+      const responseError = String(raw.response_error ?? raw.responseError ?? "").trim();
+      return {{
+        id: String(raw.id || makeBotRequestHistoryId(suffix)).trim() || makeBotRequestHistoryId(suffix),
+        source,
+        command,
+        command_head: commandHead,
+        prefix,
+        suffix,
+        from_id: fromId,
+        destination,
+        channel_index: normalizeMeshChannelIndex(raw.channel_index ?? raw.channelIndex ?? 0),
+        reply_id: replyId,
+        reply_attached: parseBoolToken(raw.reply_attached ?? raw.replyAttached, !!replyId),
+        message_id: messageId,
+        sent_at: sentAtText,
+        sent_ms: sentMs,
+        sent_unix: sentUnix,
+        respond_enabled: respondEnabled,
+        responded,
+        response_message_id: responseMessageId,
+        response_ms: responseMs,
+        response_unix: responseUnix,
+        response_hops: responseHops,
+        response_from: normalizeNodeId(raw.response_from ?? raw.responseFrom ?? ""),
+        response_to: normalizeNodeId(raw.response_to ?? raw.responseTo ?? ""),
+        response_text: String(raw.response_text ?? raw.responseText ?? "").trim(),
+        response_error: responseError,
+      }};
+    }}
+
+    function pruneBotRequestHistoryEntries(entries, nowUnix = Math.floor(Date.now() / 1000)) {{
+      if (!Array.isArray(entries) || entries.length === 0) return [];
+      const normalized = entries
+        .map((entry) => normalizeBotRequestHistoryEntry(entry))
+        .filter((entry) => !!entry)
+        .sort((a, b) => (Number(b.sent_unix) || 0) - (Number(a.sent_unix) || 0));
+      const seenIds = new Set();
+      const output = [];
+      for (const entry of normalized) {{
+        if (seenIds.has(entry.id)) continue;
+        seenIds.add(entry.id);
+        const sentUnix = Number(entry.sent_unix) || 0;
+        if (sentUnix > 0 && (nowUnix - sentUnix) > botRequestLogMaxAgeSeconds) {{
+          continue;
+        }}
+        output.push(entry);
+        if (output.length >= botRequestLogMaxEntries) {{
+          break;
+        }}
+      }}
+      return output;
+    }}
+
+    function persistBotRequestHistory() {{
+      try {{
+        window.localStorage.setItem(botRequestLogStorageKey, JSON.stringify(botRequestHistory || []));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadBotRequestHistory() {{
+      let loaded = [];
+      try {{
+        const raw = window.localStorage.getItem(botRequestLogStorageKey);
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {{
+            loaded = parsed;
+          }}
+        }}
+      }} catch (_err) {{
+        loaded = [];
+      }}
+      botRequestHistory = pruneBotRequestHistoryEntries(loaded);
+      persistBotRequestHistory();
+      if (activeLayoutView === "bots") {{
+        renderBotsView(latestState);
+      }}
+    }}
+
+    function syncBackendBotRequestHistory(state = latestState) {{
+      const raw = (state && Array.isArray(state.bot_requests)) ? state.bot_requests : [];
+      backendBotRequestHistory = pruneBotRequestHistoryEntries(raw);
+    }}
+
+    function mergedBotRequestHistoryEntries(state = latestState) {{
+      syncBackendBotRequestHistory(state);
+      const localRows = Array.isArray(botRequestHistory) ? botRequestHistory : [];
+      const backendRows = Array.isArray(backendBotRequestHistory) ? backendBotRequestHistory : [];
+      return pruneBotRequestHistoryEntries([...(backendRows || []), ...(localRows || [])]);
+    }}
+
