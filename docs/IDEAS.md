@@ -1,8 +1,9 @@
 # Ideas Backlog
 
 - view for environment_metrics
-
+- ticker for overall average of temp, preesure, humidy. environment_metrics
 - bot menu like ticker menu, toggles and settings
+- add way to mute a user from chat
 
 
 
