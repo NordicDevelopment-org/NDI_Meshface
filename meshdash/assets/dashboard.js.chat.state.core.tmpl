@@ -447,9 +447,6 @@
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       const sourceId = normalizeNodeId((options && options.source_id) || "");
       const sourceNode = nodes.find((node) => normalizeNodeId(node && node.id) === sourceId) || null;
-      const sourceLabel = String((options && options.source_label) || "").replace(/\\s+/g, " ").trim();
-      const sourceFallback = (sourceId && `!${{nodeIdSuffixForWhois(sourceId)}}`) || sourceId || "unknown";
-      const requesterLabel = sourceLabel || preferredNodeName(sourceNode) || sourceFallback;
 
       const receivedMs = parseDashboardTimeToMs(
         options && (options.received_ms ?? options.received_unix ?? options.received_at)
@@ -508,9 +505,9 @@
       }}
 
       if (details.length === 0) {{
-        return `${{requesterLabel}} ${{latencyText}} round trip, ${{hopText}}.`;
+        return `${{latencyText}} round trip, ${{hopText}}.`;
       }}
-      return `${{requesterLabel}} ${{latencyText}} round trip, ${{hopText}}, ${{details.join(", ")}}.`;
+      return `${{latencyText}} round trip, ${{hopText}}, ${{details.join(", ")}}.`;
     }}
 
     function deliveryStateLabel(state) {{
@@ -2205,4 +2202,3 @@
         }});
       }}
     }}
-

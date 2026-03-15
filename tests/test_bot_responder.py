@@ -97,7 +97,8 @@ def test_ping_targeted_to_local_suffix_replies_with_human_readable_reply():
     assert sent[0]["reply_id"] == 1001
     assert sent[0]["channel_index"] == 0
     text = str(sent[0]["text"]).lower()
-    assert "brew hq" in text
+    assert "brew hq" not in text
+    assert text.startswith("6.0s round trip")
     assert "6.0s round trip" in text
     assert "3 hops" in text
     assert "pong" not in text
@@ -125,7 +126,7 @@ def test_test_alias_replies_with_human_readable_ping_text_and_logs_as_ping():
     assert sent[0]["destination"] == "^all"
     assert sent[0]["reply_id"] == 1001
     text = str(sent[0]["text"]).lower()
-    assert "brew hq" in text
+    assert "brew hq" not in text
     assert "round trip" in text
     history = bot.recent_requests()
     assert len(history) == 1
@@ -153,7 +154,7 @@ def test_natural_ping_phrase_replies_with_human_readable_ping_text():
     assert sent[0]["destination"] == "^all"
     assert sent[0]["reply_id"] == 1001
     text = str(sent[0]["text"]).lower()
-    assert "brew hq" in text
+    assert "brew hq" not in text
     assert "round trip" in text
     assert "hops" in text
     history = bot.recent_requests()

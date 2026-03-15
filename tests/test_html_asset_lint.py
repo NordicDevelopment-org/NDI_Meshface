@@ -17,6 +17,7 @@ _TEMPLATE_FILES = (
     "dashboard.js.chat.tmpl",
     "dashboard.js.chat.state.tmpl",
     "dashboard.js.chat.state.core.tmpl",
+    "dashboard.js.chat.state.channels.tmpl",
     "dashboard.js.chat.state.games.tmpl",
     "dashboard.js.chat.state.messaging.tmpl",
     "dashboard.js.chat.state.files.tmpl",

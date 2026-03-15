@@ -5,6 +5,7 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.bootstrap.tickers.tmpl",
     "dashboard.js.bootstrap.shared.tmpl",
     "dashboard.js.chat.state.core.tmpl",
+    "dashboard.js.chat.state.channels.tmpl",
     "dashboard.js.chat.state.games.tmpl",
     "dashboard.js.chat.state.messaging.tmpl",
     "dashboard.js.chat.state.files.tmpl",

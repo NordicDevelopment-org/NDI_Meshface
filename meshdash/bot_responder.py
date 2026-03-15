@@ -1213,7 +1213,6 @@ class MeshResponseBot:
             hop_text = _format_hop_count_label(hops)
             requester = _find_node_for_query(from_id, nodes)
             local_node = _find_node_for_query(local_node_id, nodes) if local_node_id else None
-            requester_label = _preferred_node_label(requester) if requester else (_node_suffix(from_id) or from_id or "unknown")
             link_hint = _packet_link_signal_hint(packet)
             bot_city_hint = _bot_city_hint(local_node)
             distance_hint = _bot_to_requester_distance_hint(
@@ -1232,8 +1231,8 @@ class MeshResponseBot:
             elif distance_hint:
                 details.append(f"about {distance_hint} from you")
             if not details:
-                return f"{requester_label} {latency_text} round trip, {hop_text}."
-            return f"{requester_label} {latency_text} round trip, {hop_text}, {', '.join(details)}."
+                return f"{latency_text} round trip, {hop_text}."
+            return f"{latency_text} round trip, {hop_text}, {', '.join(details)}."
 
         return None
 
