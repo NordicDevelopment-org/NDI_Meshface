@@ -174,6 +174,40 @@
       return safeNodes.find((node) => normalizeNodeId(node.id) === cleanNodeId) || null;
     }}
 
+    function resolveEnvironmentNodeDisplayName(nodeId, fallbackLabel = "") {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      const safeFallback = String(fallbackLabel || "").trim();
+      const safeState = (latestState && typeof latestState === "object") ? latestState : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const stateNode = nodes.find((node) => normalizeNodeId(node && node.id) === cleanNodeId) || null;
+      if (stateNode && typeof stateNode === "object") {{
+        const preferred = String(preferredNodeName(stateNode) || "").trim();
+        if (preferred) return preferred;
+        const shortName = String(stateNode.short_name || "").trim();
+        if (shortName) return shortName;
+      }}
+      if (cleanNodeId && nodeNameCache instanceof Map) {{
+        const cached = String(nodeNameCache.get(cleanNodeId) || "").trim();
+        if (cached) return cached;
+      }}
+      if (safeFallback && normalizeNodeId(safeFallback) !== cleanNodeId) {{
+        return safeFallback;
+      }}
+      return safeFallback || cleanNodeId || "unknown";
+    }}
+
+    function formatEnvironmentNodeTooltipLabel(nodeId, fallbackLabel = "") {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      const displayName = resolveEnvironmentNodeDisplayName(cleanNodeId, fallbackLabel);
+      const cleanDisplay = String(displayName || "").trim();
+      if (!cleanNodeId) return cleanDisplay || "unknown";
+      if (!cleanDisplay) return cleanNodeId;
+      if (normalizeNodeId(cleanDisplay) === cleanNodeId) {{
+        return cleanDisplay;
+      }}
+      return `${{cleanDisplay}} (${{cleanNodeId}})`;
+    }}
+
     function filterEnvironmentMetricPoints(points, metricKey, nodeId) {{
       const cleanMetric = normalizeEnvMetricKey(metricKey || "");
       const cleanNodeId = normalizeNodeId(nodeId || "");
@@ -416,7 +450,7 @@
       seriesList.forEach((series, idx) => {{
         const color = envMetricColorPalette[idx % envMetricColorPalette.length];
         const seriesNodeId = String(series.nodeId || "").trim();
-        const seriesTitle = `${{series.label}} (${{seriesNodeId}})`;
+        const seriesTitle = formatEnvironmentNodeTooltipLabel(seriesNodeId, series.label);
         const pathD = series.points.map((point, pointIdx) => {{
           const x = xForUnix(point.unix);
           const y = yForValue(point.value);
@@ -427,7 +461,7 @@
         for (const point of series.points) {{
           const x = xForUnix(point.unix);
           const y = yForValue(point.value);
-          const title = `${{series.label}} (${{series.nodeId}}) • ${{formatEnvHistoryTime(point.unix)}} • ${{envMetricValueText(point.value)}}`;
+          const title = `${{seriesTitle}} • ${{formatEnvHistoryTime(point.unix)}} • ${{envMetricValueText(point.value)}}`;
           pointDots.push(`<circle cx="${{x.toFixed(2)}}" cy="${{y.toFixed(2)}}" r="2.3" fill="${{color}}" stroke="${{palette.pointStroke}}" stroke-width="0.7" data-node-id="${{escAttr(seriesNodeId)}}" style="cursor:pointer;"><title>${{escAttr(`${{title}} • click to focus node`)}}</title></circle>`);
         }}
       }});
