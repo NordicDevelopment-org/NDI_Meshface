@@ -305,11 +305,7 @@ def _nearest_city_hint_from_coords(lat: object, lon: object, *, max_distance_km:
         place_parts.append(state_name)
     elif country_name:
         place_parts.append(country_name)
-    place = ", ".join(place_parts)
-    distance_label = _format_distance_mi_label(distance_value)
-    if distance_label:
-        return f"{place} ({distance_label})"
-    return place
+    return ", ".join(place_parts)
 
 
 def _node_coords(node: Optional[dict[str, object]]) -> Optional[tuple[float, float]]:

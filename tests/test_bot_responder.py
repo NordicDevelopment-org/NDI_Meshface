@@ -737,7 +737,7 @@ def test_ping_includes_bot_city_hint_when_local_node_has_position():
 
     assert len(sent) == 1
     text = str(sent[0]["text"]).lower()
-    assert "bot near minneapolis, minnesota (1.5mi)." in text
+    assert "bot near minneapolis, minnesota." in text
 
 
 def test_ping_omits_bot_city_hint_when_local_node_position_is_unavailable():
