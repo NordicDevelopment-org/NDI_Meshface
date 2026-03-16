@@ -1,5 +1,6 @@
     function collectFileTransferFrames(state = latestState, options = null) {{
       const respectActiveChannel = !(options && options.respectActiveChannel === false);
+      const inboundProtocolLocked = hardDisableIncomingAutomationAndFileTransferEnabled();
       const safeState = (state && typeof state === "object") ? state : {{}};
       const traffic = (safeState.traffic && typeof safeState.traffic === "object")
         ? safeState.traffic
@@ -55,6 +56,7 @@
         }}
         const frame = parseFileTransferFrameText(msg.text);
         if (!frame) continue;
+        if (inboundProtocolLocked && frame.kind !== "ack") continue;
         const fromId = normalizeNodeId(msg.from || "");
         const toId = normalizeNodeId(msg.to || msg.destination || "");
         const msgUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
@@ -236,4 +238,3 @@
         localNodeId,
       }};
     }}
-

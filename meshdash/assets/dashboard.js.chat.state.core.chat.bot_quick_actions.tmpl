@@ -67,8 +67,10 @@
           log_enabled: true,
           game_enabled: false,
           game_public_start_enabled: false,
+          hard_disabled_incoming_commands: [],
           ping_triggers: [],
           joke_triggers: [],
+          zork_triggers: [],
           joke_lines: [],
           joke_near_guess_lines: [],
           joke_delay_punchline_enabled: false,
@@ -107,12 +109,20 @@
           raw.game_public_start_enabled ?? raw.gamePublicStartEnabled,
           false
         ),
+        hard_disabled_incoming_commands: normalizeBotSettingsTextList(
+          raw.hard_disabled_incoming_commands ?? raw.hardDisabledIncomingCommands,
+          {{ splitCommas: true }}
+        ),
         ping_triggers: normalizeBotSettingsTextList(
           raw.ping_triggers ?? raw.pingTriggers,
           {{ splitCommas: true }}
         ),
         joke_triggers: normalizeBotSettingsTextList(
           raw.joke_triggers ?? raw.jokeTriggers,
+          {{ splitCommas: true }}
+        ),
+        zork_triggers: normalizeBotSettingsTextList(
+          raw.zork_triggers ?? raw.zorkTriggers,
           {{ splitCommas: true }}
         ),
         joke_lines: normalizeBotSettingsTextList(
@@ -137,6 +147,13 @@
       const normalized = normalizeServerBotSettings(state && state.bot_settings);
       serverBotSettings = normalized;
       return normalized.available;
+    }}
+
+    function hardDisableIncomingAutomationAndFileTransferEnabled() {{
+      const hardDisabled = Array.isArray(serverBotSettings.hard_disabled_incoming_commands)
+        ? serverBotSettings.hard_disabled_incoming_commands.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean)
+        : [];
+      return hardDisabled.includes("all");
     }}
 
     async function saveServerBotSettingsPatch(patch = {{}}, { quiet = false } = {{}}) {{
@@ -185,10 +202,14 @@
 
     function syncChatWhoisQuickActionControls() {{
       const masterInput = document.getElementById("bots-command-master-enabled");
+      const hardDisableAllInput = document.getElementById("bots-command-hard-disable-all");
       const commandEnabledInput = document.getElementById("bots-command-selected-enabled");
       const pingConfigWrap = document.getElementById("bots-command-ping-config-wrap");
       const pingTriggersInput = document.getElementById("bots-command-ping-triggers");
       const pingSaveBtn = document.getElementById("bots-command-ping-save-btn");
+      const zorkConfigWrap = document.getElementById("bots-command-zork-config-wrap");
+      const zorkTriggersInput = document.getElementById("bots-command-zork-triggers");
+      const zorkSaveBtn = document.getElementById("bots-command-zork-save-btn");
       const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
       const publicStartInput = document.getElementById("bots-command-selected-public-start-enabled");
       const publicStartNote = document.getElementById("bots-command-selected-public-start-note");
@@ -218,8 +239,12 @@
       const selectedIsZork = !!(selectedCommand && selectedCommand.name === "zork");
       const selectedIsJoke = !!(selectedCommand && selectedCommand.name === "joke");
       const available = !!serverBotSettings.available;
+      const hardDisableAll = hardDisableIncomingAutomationAndFileTransferEnabled();
       if (pingConfigWrap instanceof HTMLElement) {{
         pingConfigWrap.hidden = !selectedIsPing;
+      }}
+      if (zorkConfigWrap instanceof HTMLElement) {{
+        zorkConfigWrap.hidden = !selectedIsZork;
       }}
       if (publicStartWrap instanceof HTMLElement) {{
         publicStartWrap.hidden = !selectedIsZork;
@@ -260,6 +285,17 @@
           masterInput.title = "Enable or disable all backend bot responses on this node.";
         }}
       }}
+      if (hardDisableAllInput instanceof HTMLInputElement) {{
+        hardDisableAllInput.checked = hardDisableAll;
+        hardDisableAllInput.disabled = !available || botSettingsSaveInFlight;
+        if (!available) {{
+          hardDisableAllInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (botSettingsSaveInFlight) {{
+          hardDisableAllInput.title = "Saving hard-disable setting...";
+        }} else {{
+          hardDisableAllInput.title = "Hard-disable all incoming bot commands and incoming file-transfer protocol handling. Outgoing file sends are not blocked.";
+        }}
+      }}
       if (commandEnabledInput instanceof HTMLInputElement) {{
         commandEnabledInput.checked = !!(selectedCommand && selectedCommand.enabled);
         commandEnabledInput.disabled = !available || !selectedCommand || botSettingsSaveInFlight;
@@ -295,6 +331,27 @@
       }}
       if (pingSaveBtn instanceof HTMLButtonElement) {{
         pingSaveBtn.disabled = !available || botSettingsSaveInFlight || !selectedIsPing;
+      }}
+      if (zorkTriggersInput instanceof HTMLTextAreaElement) {{
+        const value = selectedIsZork && Array.isArray(serverBotSettings.zork_triggers)
+          ? serverBotSettings.zork_triggers.join("\n")
+          : "";
+        if (document.activeElement !== zorkTriggersInput || !selectedIsZork) {{
+          zorkTriggersInput.value = value;
+        }}
+        zorkTriggersInput.disabled = !available || botSettingsSaveInFlight || !selectedIsZork;
+        if (!available) {{
+          zorkTriggersInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsZork) {{
+          zorkTriggersInput.title = "Select the zork command to edit trigger phrases.";
+        }} else if (botSettingsSaveInFlight) {{
+          zorkTriggersInput.title = "Saving zork settings...";
+        }} else {{
+          zorkTriggersInput.title = "Delimited trigger phrases. One per line (or comma separated). Use the nodename placeholder to optionally match your local node name.";
+        }}
+      }}
+      if (zorkSaveBtn instanceof HTMLButtonElement) {{
+        zorkSaveBtn.disabled = !available || botSettingsSaveInFlight || !selectedIsZork;
       }}
       if (publicStartInput instanceof HTMLInputElement) {{
         publicStartInput.checked = !!serverBotSettings.game_public_start_enabled;
@@ -502,6 +559,24 @@
       return true;
     }}
 
+    async function saveSelectedZorkBotSettings() {{
+      const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      if (commandName !== "zork") return false;
+      const triggersInput = document.getElementById("bots-command-zork-triggers");
+      const triggers = normalizeBotSettingsTextList(
+        triggersInput instanceof HTMLTextAreaElement ? triggersInput.value : "",
+        {{ splitCommas: true }}
+      );
+      const ok = await saveServerBotSettingsPatch({{
+        zork_triggers: triggers,
+      }});
+      if (!ok) {{
+        renderBotsView(latestState);
+        return false;
+      }}
+      return true;
+    }}
+
     async function saveSelectedJokeBotSettings() {{
       const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
       if (commandName !== "joke") return false;
@@ -547,6 +622,20 @@
           const ok = await saveServerBotSettingsPatch({{ enabled: nextValue }});
           if (!ok) {{
             masterInput.checked = !!serverBotSettings.enabled;
+          }}
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const hardDisableAllInput = document.getElementById("bots-command-hard-disable-all");
+      if (hardDisableAllInput instanceof HTMLInputElement && hardDisableAllInput.dataset.bound !== "1") {{
+        hardDisableAllInput.dataset.bound = "1";
+        hardDisableAllInput.addEventListener("change", async () => {{
+          const nextList = hardDisableAllInput.checked ? ["all"] : [];
+          const ok = await saveServerBotSettingsPatch({{
+            hard_disabled_incoming_commands: nextList,
+          }});
+          if (!ok) {{
+            hardDisableAllInput.checked = hardDisableIncomingAutomationAndFileTransferEnabled();
           }}
           syncChatWhoisQuickActionControls();
         }});
@@ -603,6 +692,14 @@
         pingSaveBtn.dataset.bound = "1";
         pingSaveBtn.addEventListener("click", async () => {{
           await saveSelectedPingBotSettings();
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const zorkSaveBtn = document.getElementById("bots-command-zork-save-btn");
+      if (zorkSaveBtn instanceof HTMLButtonElement && zorkSaveBtn.dataset.bound !== "1") {{
+        zorkSaveBtn.dataset.bound = "1";
+        zorkSaveBtn.addEventListener("click", async () => {{
+          await saveSelectedZorkBotSettings();
           syncChatWhoisQuickActionControls();
         }});
       }}

@@ -118,6 +118,7 @@ def test_ping_targeted_to_local_suffix_replies_with_human_readable_reply():
         send_chat_fn=_send_chat,
         get_local_node_id_fn=lambda _iface: "!02ed9b7c",
         custom_commands={},
+        game_enabled=True,
         now_unix_fn=lambda: 1710001240.0,
     )
     bot.on_receive(_base_packet("ping 9b7c"), iface)
@@ -148,6 +149,7 @@ def test_test_alias_replies_with_human_readable_ping_text_and_logs_as_ping():
         send_chat_fn=_send_chat,
         get_local_node_id_fn=lambda _iface: "!02ed9b7c",
         custom_commands={},
+        game_enabled=True,
         now_unix_fn=lambda: 1710001240.0,
     )
     bot.on_receive(_base_packet("test"), iface)
@@ -176,6 +178,7 @@ def test_natural_ping_phrase_replies_with_human_readable_ping_text():
         send_chat_fn=_send_chat,
         get_local_node_id_fn=lambda _iface: "!02ed9b7c",
         custom_commands={},
+        game_enabled=True,
         now_unix_fn=lambda: 1710001240.0,
     )
     bot.on_receive(_base_packet("can you see this?"), iface)
@@ -239,6 +242,30 @@ def test_natural_joke_trigger_replies_with_random_joke_and_logs_as_joke():
     assert history[0]["command_head"] == "joke"
 
 
+def test_nodename_placeholder_triggers_match_with_and_without_prefix():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("crash override ping", packet_id=1001), iface)
+    bot.on_receive(_base_packet("ping", packet_id=1002), iface)
+
+    assert len(sent) == 2
+    history = bot.recent_requests()
+    assert len(history) == 2
+    assert history[0]["command_head"] == "ping"
+    assert history[1]["command_head"] == "ping"
+
+
 def test_joke_trigger_and_joke_lines_are_configurable():
     iface = _FakeIface()
     sent = []
@@ -265,6 +292,37 @@ def test_joke_trigger_and_joke_lines_are_configurable():
     history = bot.recent_requests()
     assert len(history) == 1
     assert history[0]["command_head"] == "joke"
+
+
+def test_zork_start_triggers_are_configurable_with_nodename_placeholder():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.configure(zork_triggers=["{nodename} play zork"])
+
+    bot.on_receive(_base_packet("zork", packet_id=1001, to_id="!02ed9b7c"), iface)
+    assert sent == []
+
+    bot.on_receive(_base_packet("play zork", packet_id=1002, to_id="!02ed9b7c"), iface)
+    assert sent
+    assert any("session started" in str(row.get("text") or "").lower() for row in sent)
+
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["command"] == "play zork"
+    assert history[0]["command_head"] == "zork"
+    assert history[0]["responded"] is True
 
 
 def test_joke_rotation_avoids_repeats_until_cycle_resets():
@@ -1636,6 +1694,56 @@ def test_build_bot_from_env_can_disable_specific_command():
     assert whois["enabled"] is False
 
 
+def test_build_bot_from_env_can_hard_disable_all_incoming_commands():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_HARD_DISABLED_INCOMING_COMMANDS": "all",
+        },
+    )
+    assert bot is not None
+    settings = bot.bot_settings()
+    assert settings["hard_disabled_incoming_commands"] == ["all"]
+
+    bot.on_receive(_base_packet("test", packet_id=1901), iface)
+    bot.on_receive(_base_packet("tell me a joke", packet_id=1902), iface)
+    assert sent == []
+
+    history = bot.recent_requests()
+    assert len(history) == 2
+    heads = {str(row.get("command_head") or "") for row in history}
+    assert heads == {"ping", "joke"}
+    assert all(row.get("command_enabled") is False for row in history)
+
+
+def test_hard_disabled_command_cannot_be_reenabled_via_command_settings():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_HARD_DISABLED_INCOMING_COMMANDS": "ping",
+        },
+    )
+    assert bot is not None
+    rows = {row["name"]: row for row in bot.bot_settings()["commands"]}
+    assert rows["ping"]["enabled"] is False
+
+    saved = bot.configure(command_settings={"ping": True})
+    assert saved["ok"] is True
+    rows_after = {row["name"]: row for row in bot.bot_settings()["commands"]}
+    assert rows_after["ping"]["enabled"] is False
+
+
 def test_build_bot_from_env_empty_disabled_commands_enables_full_catalog():
     bot = build_mesh_response_bot_from_env(
         send_chat_fn=lambda **_kwargs: {"ok": True},
@@ -1666,6 +1774,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
         enabled=True,
         game_enabled=False,
         command_settings={"whois": True},
+        zork_triggers=["{nodename} zork", "{nodename} play zork"],
         joke_triggers=["tell me a joke", "make me laugh"],
         joke_lines=["line 1", "line 2"],
         joke_near_guess_lines=["close enough {punchline}"],
@@ -1678,6 +1787,8 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert payload["game_enabled"] is False
     assert payload["game_public_start_enabled"] is False
     assert payload["joke_delay_punchline_enabled"] is False
+    assert payload["hard_disabled_incoming_commands"] == []
+    assert payload["zork_triggers"] == ["{nodename} zork", "{nodename} play zork"]
     assert payload["joke_triggers"] == ["tell me a joke", "make me laugh"]
     assert payload["joke_lines"] == ["line 1", "line 2"]
     assert payload["joke_near_guess_lines"] == ["close enough {punchline}"]
@@ -1699,6 +1810,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert rows["whois"]["enabled"] is True
     assert rows["cmd"]["enabled"] is False
     loaded_settings = loaded.bot_settings()
+    assert loaded_settings["zork_triggers"] == ["{nodename} zork", "{nodename} play zork"]
     assert loaded_settings["joke_triggers"] == ["tell me a joke", "make me laugh"]
     assert loaded_settings["joke_lines"] == ["line 1", "line 2"]
     assert loaded_settings["joke_near_guess_lines"] == ["close enough {punchline}"]
@@ -1782,6 +1894,31 @@ def test_configure_allows_explicit_empty_joke_triggers():
     assert sent == []
 
 
+def test_configure_allows_explicit_empty_zork_triggers():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_ENABLED": "1"},
+    )
+    assert bot is not None
+
+    saved = bot.configure(zork_triggers=[])
+    assert saved["ok"] is True
+    assert saved["zork_triggers"] == []
+    assert bot.bot_settings()["zork_triggers"] == []
+
+    bot.on_receive(_base_packet("zork"), iface)
+    bot.on_receive(_base_packet("play zork", packet_id=1002), iface)
+    assert sent == []
+
+
 def test_empty_ping_triggers_persist_and_reload_without_default_fallback(tmp_path):
     settings_path = tmp_path / "bot_settings.json"
     settings_path.write_text(
@@ -1804,6 +1941,54 @@ def test_empty_ping_triggers_persist_and_reload_without_default_fallback(tmp_pat
     )
     assert loaded is not None
     assert loaded.bot_settings()["ping_triggers"] == []
+
+
+def test_empty_zork_triggers_persist_and_reload_without_default_fallback(tmp_path):
+    settings_path = tmp_path / "bot_settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "log_enabled": True,
+                "game_enabled": False,
+                "disabled_commands": [],
+                "zork_triggers": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_SETTINGS_FILE": str(settings_path)},
+    )
+    assert loaded is not None
+    assert loaded.bot_settings()["zork_triggers"] == []
+
+
+def test_hard_disabled_incoming_commands_persist_and_reload(tmp_path):
+    settings_path = tmp_path / "bot_settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "log_enabled": True,
+                "game_enabled": False,
+                "disabled_commands": [],
+                "hard_disabled_incoming_commands": ["all"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_SETTINGS_FILE": str(settings_path)},
+    )
+    assert loaded is not None
+    assert loaded.bot_settings()["hard_disabled_incoming_commands"] == ["all"]
 
 
 def test_empty_joke_lines_persist_and_reload_without_default_fallback(tmp_path):

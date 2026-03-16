@@ -102,6 +102,8 @@ def _bot_settings_etag_marker(settings: object) -> str:
     commands = settings.get("commands")
     ping_triggers = settings.get("ping_triggers")
     joke_triggers = settings.get("joke_triggers")
+    zork_triggers = settings.get("zork_triggers")
+    hard_disabled_incoming_commands = settings.get("hard_disabled_incoming_commands")
     joke_lines = settings.get("joke_lines")
     joke_near_guess_lines = settings.get("joke_near_guess_lines")
     command_marker_parts = []
@@ -123,6 +125,12 @@ def _bot_settings_etag_marker(settings: object) -> str:
             str(settings.get("active_game_sessions") or 0),
             str(len(ping_triggers) if isinstance(ping_triggers, list) else 0),
             str(len(joke_triggers) if isinstance(joke_triggers, list) else 0),
+            str(len(zork_triggers) if isinstance(zork_triggers, list) else 0),
+            str(
+                len(hard_disabled_incoming_commands)
+                if isinstance(hard_disabled_incoming_commands, list)
+                else 0
+            ),
             str(len(joke_lines) if isinstance(joke_lines, list) else 0),
             str(len(joke_near_guess_lines) if isinstance(joke_near_guess_lines, list) else 0),
             ",".join(command_marker_parts),

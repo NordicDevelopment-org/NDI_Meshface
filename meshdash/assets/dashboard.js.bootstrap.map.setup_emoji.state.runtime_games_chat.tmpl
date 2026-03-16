@@ -72,8 +72,10 @@
       log_enabled: true,
       game_enabled: false,
       game_public_start_enabled: false,
+      hard_disabled_incoming_commands: [],
       ping_triggers: [],
       joke_triggers: [],
+      zork_triggers: [],
       joke_lines: [],
       joke_near_guess_lines: [],
       joke_delay_punchline_enabled: false,
@@ -95,6 +97,7 @@
     let chatEmojiPickerGroup = chatEmojiDefaultGroup;
     let chatEmojiSearchQuery = "";
     let chatEmojiUsageCounts = new Map();
+    let chatEmojiTopTailOverride = "";
     let chatReactionTargetId = null;
     let chatReactionPickerExpanded = false;
     let chatEmojiAnchorElement = null;

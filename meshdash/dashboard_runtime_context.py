@@ -306,8 +306,14 @@ def build_dashboard_runtime_context(
                 game_enabled=getattr(request, "game_enabled", None),
                 game_public_start_enabled=getattr(request, "game_public_start_enabled", None),
                 command_settings=getattr(request, "command_settings", None),
+                hard_disabled_incoming_commands=getattr(
+                    request,
+                    "hard_disabled_incoming_commands",
+                    None,
+                ),
                 ping_triggers=getattr(request, "ping_triggers", None),
                 joke_triggers=getattr(request, "joke_triggers", None),
+                zork_triggers=getattr(request, "zork_triggers", None),
                 joke_lines=getattr(request, "joke_lines", None),
                 joke_near_guess_lines=getattr(request, "joke_near_guess_lines", None),
                 joke_delay_punchline_enabled=getattr(

@@ -373,6 +373,42 @@
         .sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])));
     }}
 
+    function normalizeChatEmojiTopTailOverride(rawEmoji) {{
+      const emoji = String(rawEmoji || "").trim();
+      if (!emoji) return "";
+      if (chatEmojiChoiceSet.size > 0 && !chatEmojiChoiceSet.has(emoji)) return "";
+      return emoji;
+    }}
+
+    function setChatEmojiTopTailOverride(rawEmoji) {{
+      const emoji = normalizeChatEmojiTopTailOverride(rawEmoji);
+      if (!emoji) {{
+        return false;
+      }}
+      chatEmojiTopTailOverride = emoji;
+      persistChatEmojiPickerState();
+      return true;
+    }}
+
+    function applyChatEmojiTopTailOverride(choices) {{
+      const base = Array.isArray(choices) ? choices.slice(0, chatEmojiTopUsageCount) : [];
+      const override = normalizeChatEmojiTopTailOverride(chatEmojiTopTailOverride);
+      if (!override) {{
+        return base;
+      }}
+      if (base.includes(override)) {{
+        // Once usage naturally pushes this emoji into top choices, stop forcing slot-8 placement.
+        chatEmojiTopTailOverride = "";
+        persistChatEmojiPickerState();
+        return base;
+      }}
+      const next = base
+        .filter((emoji) => emoji !== override)
+        .slice(0, Math.max(0, chatEmojiTopUsageCount - 1));
+      next.push(override);
+      return next;
+    }}
+
     function chatEmojiTopChoices() {{
       const picked = [];
       const used = new Set();
@@ -381,7 +417,7 @@
         used.add(emoji);
         picked.push(emoji);
         if (picked.length >= chatEmojiTopUsageCount) {{
-          return picked;
+          break;
         }}
       }}
       for (const emoji of chatEmojiPopularDefaults) {{
@@ -392,7 +428,7 @@
           break;
         }}
       }}
-      return picked;
+      return applyChatEmojiTopTailOverride(picked);
     }}
 
     function persistChatEmojiUsage() {{
@@ -445,6 +481,7 @@
           chatEmojiPickerStateStorageKey,
           JSON.stringify({{
             group: chatEmojiPickerGroup,
+            top_tail_emoji: chatEmojiTopTailOverride,
           }})
         );
       }} catch (_err) {{
@@ -453,6 +490,7 @@
 
     function loadChatEmojiPickerState() {{
       let preferredGroup = chatEmojiDefaultGroup;
+      let preferredTopTailEmoji = "";
       try {{
         const raw = window.localStorage.getItem(chatEmojiPickerStateStorageKey);
         if (raw) {{
@@ -469,10 +507,13 @@
                 ) ? chatEmojiDefaultGroup : normalized;
               }}
             }}
+            preferredTopTailEmoji = normalizeChatEmojiTopTailOverride(
+              parsed.top_tail_emoji || parsed.topTailEmoji || ""
+            );
           }}
         }}
       }} catch (_err) {{
       }}
       chatEmojiPickerGroup = preferredGroup;
+      chatEmojiTopTailOverride = preferredTopTailEmoji;
     }}
-

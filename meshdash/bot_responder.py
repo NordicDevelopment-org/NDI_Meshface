@@ -50,12 +50,16 @@ STANDARD_BOT_COMMANDS = _STANDARD_BOT_COMMANDS
 _RECENT_PACKET_TTL_SECONDS = 180
 _RECENT_PACKET_MAX = 1024
 _DEFAULT_PING_TRIGGERS = (
-    "ping",
-    "test",
-    "can you see this",
+    "{nodename} ping",
+    "{nodename} test",
+    "{nodename} can you see this",
 )
 _DEFAULT_JOKE_TRIGGERS = (
-    "tell me a joke",
+    "{nodename} tell me a joke",
+)
+_DEFAULT_ZORK_TRIGGERS = (
+    "{nodename} zork",
+    "{nodename} play zork",
 )
 _DEFAULT_JOKE_LINES = (
     "Why did the packet bring a map? It kept getting routed in circles.",
@@ -79,6 +83,7 @@ _DEFAULT_SEGMENT_DELAY_SECONDS = 1.5
 _DEFAULT_SEGMENT_RETRY_COUNT = 0
 _DEFAULT_SEGMENT_ACK_WAIT_SECONDS = 2.5
 _SEGMENT_ACK_POLL_SECONDS = 0.2
+_HARD_DISABLE_ALL_TOKEN = "all"
 _PUBLIC_PING_LIMIT = 3
 _PUBLIC_PING_SUPPRESS_SECONDS = 3600
 _PUBLIC_PING_LIMIT_REACTION = "❌"
@@ -150,24 +155,99 @@ def _canonical_command_name(value: object) -> str:
     return clean
 
 
-def _parse_natural_ping_command(raw: str, triggers: list[str]) -> tuple[str, list[str]] | None:
+def _normalize_trigger_aliases(local_aliases: Optional[set[str]]) -> list[str]:
+    if not local_aliases:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_alias in local_aliases:
+        clean = _normalize_trigger_phrase(raw_alias)
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        out.append(clean)
+    out.sort(key=len, reverse=True)
+    return out
+
+
+def _expand_nodename_trigger_variants(trigger: str, node_aliases: list[str]) -> list[str]:
+    clean_trigger = _normalize_trigger_phrase(trigger)
+    if not clean_trigger:
+        return []
+    if "{nodename}" not in clean_trigger:
+        return [clean_trigger]
+    out: list[str] = []
+    seen: set[str] = set()
+    # Placeholder is optional: allow plain trigger without node-name prefix.
+    no_prefix_variant = _normalize_trigger_phrase(clean_trigger.replace("{nodename}", " "))
+    if no_prefix_variant and no_prefix_variant not in seen:
+        seen.add(no_prefix_variant)
+        out.append(no_prefix_variant)
+    for alias in node_aliases:
+        expanded = _normalize_trigger_phrase(clean_trigger.replace("{nodename}", alias))
+        if not expanded or expanded in seen:
+            continue
+        seen.add(expanded)
+        out.append(expanded)
+    return out
+
+
+def _parse_natural_command(
+    raw: str,
+    *,
+    command: str,
+    triggers: list[str],
+    local_aliases: Optional[set[str]] = None,
+) -> tuple[str, list[str]] | None:
     normalized = _normalize_trigger_phrase(raw)
     if not normalized:
         return None
+    aliases = _normalize_trigger_aliases(local_aliases)
     for trigger in triggers:
-        if normalized == trigger:
-            return ("ping", [])
+        variants = _expand_nodename_trigger_variants(trigger, aliases)
+        for variant in variants:
+            if normalized == variant:
+                return (command, [])
     return None
 
 
-def _parse_natural_joke_command(raw: str, triggers: list[str]) -> tuple[str, list[str]] | None:
-    normalized = _normalize_trigger_phrase(raw)
-    if not normalized:
-        return None
-    for trigger in triggers:
-        if normalized == trigger:
-            return ("joke", [])
-    return None
+def _parse_natural_ping_command(
+    raw: str,
+    triggers: list[str],
+    local_aliases: Optional[set[str]] = None,
+) -> tuple[str, list[str]] | None:
+    return _parse_natural_command(
+        raw,
+        command="ping",
+        triggers=triggers,
+        local_aliases=local_aliases,
+    )
+
+
+def _parse_natural_joke_command(
+    raw: str,
+    triggers: list[str],
+    local_aliases: Optional[set[str]] = None,
+) -> tuple[str, list[str]] | None:
+    return _parse_natural_command(
+        raw,
+        command="joke",
+        triggers=triggers,
+        local_aliases=local_aliases,
+    )
+
+
+def _parse_natural_zork_command(
+    raw: str,
+    triggers: list[str],
+    local_aliases: Optional[set[str]] = None,
+) -> tuple[str, list[str]] | None:
+    return _parse_natural_command(
+        raw,
+        command="zork",
+        triggers=triggers,
+        local_aliases=local_aliases,
+    )
 
 
 def _normalize_trigger_phrase(value: object) -> str:
@@ -209,6 +289,25 @@ def _normalize_joke_triggers(value: object) -> list[str]:
     return []
 
 
+def _normalize_zork_triggers(value: object) -> list[str]:
+    if value is None:
+        return [item for item in (_normalize_trigger_phrase(v) for v in _DEFAULT_ZORK_TRIGGERS) if item]
+    raw_items = _parse_phrase_items(value, split_commas=True)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        clean = _normalize_trigger_phrase(raw_item)
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        out.append(clean[:160])
+        if len(out) >= 64:
+            break
+    if out:
+        return out
+    return []
+
+
 def _normalize_ping_triggers(value: object) -> list[str]:
     if value is None:
         return [item for item in (_normalize_trigger_phrase(v) for v in _DEFAULT_PING_TRIGGERS) if item]
@@ -226,6 +325,28 @@ def _normalize_ping_triggers(value: object) -> list[str]:
     if out:
         return out
     return []
+
+
+def _normalize_hard_disabled_commands(value: object) -> list[str]:
+    if value is None:
+        return []
+    raw_items = _parse_phrase_items(value, split_commas=True)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        raw_text = str(raw_item or "").strip().lower()
+        if not raw_text:
+            continue
+        if raw_text in ("*", _HARD_DISABLE_ALL_TOKEN):
+            return [_HARD_DISABLE_ALL_TOKEN]
+        clean = _normalize_command_name(raw_text)
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        out.append(clean)
+        if len(out) >= 128:
+            break
+    return out
 
 
 def _normalize_joke_lines(value: object) -> list[str]:
@@ -399,6 +520,8 @@ class MeshResponseBot:
         game_public_start_enabled: bool = False,
         ping_triggers: Optional[list[str]] = None,
         joke_triggers: Optional[list[str]] = None,
+        zork_triggers: Optional[list[str]] = None,
+        hard_disabled_incoming_commands: Optional[list[str]] = None,
         joke_lines: Optional[list[str]] = None,
         joke_near_guess_lines: Optional[list[str]] = None,
         joke_delay_punchline_enabled: bool = _DEFAULT_JOKE_DELAY_PUNCHLINE_ENABLED,
@@ -430,6 +553,12 @@ class MeshResponseBot:
         self._game_public_start_enabled = bool(game_public_start_enabled)
         self._ping_trigger_phrases = _normalize_ping_triggers(ping_triggers)
         self._joke_trigger_phrases = _normalize_joke_triggers(joke_triggers)
+        self._zork_trigger_phrases = _normalize_zork_triggers(zork_triggers)
+        self._hard_disabled_incoming_commands = {
+            str(item).strip()
+            for item in _normalize_hard_disabled_commands(hard_disabled_incoming_commands)
+            if str(item).strip()
+        }
         self._joke_lines = _normalize_joke_lines(joke_lines)
         self._joke_near_guess_lines = _normalize_joke_near_guess_lines(joke_near_guess_lines)
         self._joke_delay_punchline_enabled = bool(joke_delay_punchline_enabled)
@@ -606,6 +735,28 @@ class MeshResponseBot:
         if triggers is None:
             return
         self._ping_trigger_phrases = _normalize_ping_triggers(triggers)
+
+    def _set_zork_settings_locked(
+        self,
+        *,
+        triggers: Optional[list[str]] = None,
+    ) -> None:
+        if triggers is None:
+            return
+        self._zork_trigger_phrases = _normalize_zork_triggers(triggers)
+
+    def _set_hard_disabled_incoming_commands_locked(
+        self,
+        *,
+        commands: Optional[list[str]] = None,
+    ) -> None:
+        if commands is None:
+            return
+        self._hard_disabled_incoming_commands = {
+            str(item).strip()
+            for item in _normalize_hard_disabled_commands(commands)
+            if str(item).strip()
+        }
 
     def _next_joke_line_locked(self) -> str:
         if not self._joke_cycle:
@@ -854,9 +1005,19 @@ class MeshResponseBot:
         clean = _normalize_command_name(command)
         if not clean:
             return False
+        if self._command_hard_disabled_locked(clean):
+            return False
         if clean in self._bot_app_enabled:
             return bool(self._bot_app_enabled.get(clean))
         return clean not in self._disabled_commands
+
+    def _command_hard_disabled_locked(self, command: str) -> bool:
+        clean = _normalize_command_name(command)
+        if not clean:
+            return False
+        if _HARD_DISABLE_ALL_TOKEN in self._hard_disabled_incoming_commands:
+            return True
+        return clean in self._hard_disabled_incoming_commands
 
     def _managed_command_rows_locked(self) -> list[dict[str, object]]:
         out: list[dict[str, object]] = []
@@ -898,6 +1059,10 @@ class MeshResponseBot:
             enabled = bool(raw_enabled)
             if not name:
                 continue
+            if self._command_hard_disabled_locked(name):
+                if name in self._bot_app_enabled:
+                    self._set_bot_app_enabled_locked(name, False)
+                continue
             if name in self._bot_app_enabled:
                 self._set_bot_app_enabled_locked(name, enabled)
                 continue
@@ -914,6 +1079,8 @@ class MeshResponseBot:
             "game_public_start_enabled": bool(self._game_public_start_enabled),
             "ping_triggers": list(self._ping_trigger_phrases),
             "joke_triggers": list(self._joke_trigger_phrases),
+            "zork_triggers": list(self._zork_trigger_phrases),
+            "hard_disabled_incoming_commands": sorted(self._hard_disabled_incoming_commands),
             "joke_lines": list(self._joke_lines),
             "joke_near_guess_lines": list(self._joke_near_guess_lines),
             "joke_delay_punchline_enabled": bool(self._joke_delay_punchline_enabled),
@@ -930,6 +1097,8 @@ class MeshResponseBot:
             "game_public_start_enabled": bool(self._game_public_start_enabled),
             "ping_triggers": list(self._ping_trigger_phrases),
             "joke_triggers": list(self._joke_trigger_phrases),
+            "zork_triggers": list(self._zork_trigger_phrases),
+            "hard_disabled_incoming_commands": sorted(self._hard_disabled_incoming_commands),
             "joke_lines": list(self._joke_lines),
             "joke_near_guess_lines": list(self._joke_near_guess_lines),
             "joke_delay_punchline_enabled": bool(self._joke_delay_punchline_enabled),
@@ -948,8 +1117,10 @@ class MeshResponseBot:
         game_enabled: Optional[bool] = None,
         game_public_start_enabled: Optional[bool] = None,
         command_settings: Optional[dict[str, bool]] = None,
+        hard_disabled_incoming_commands: Optional[list[str]] = None,
         ping_triggers: Optional[list[str]] = None,
         joke_triggers: Optional[list[str]] = None,
+        zork_triggers: Optional[list[str]] = None,
         joke_lines: Optional[list[str]] = None,
         joke_near_guess_lines: Optional[list[str]] = None,
         joke_delay_punchline_enabled: Optional[bool] = None,
@@ -965,8 +1136,14 @@ class MeshResponseBot:
                 self._game_public_start_enabled = bool(game_public_start_enabled)
             if command_settings:
                 self._apply_command_settings_locked(command_settings)
+            if hard_disabled_incoming_commands is not None:
+                self._set_hard_disabled_incoming_commands_locked(
+                    commands=hard_disabled_incoming_commands
+                )
             if ping_triggers is not None:
                 self._set_ping_settings_locked(triggers=ping_triggers)
+            if zork_triggers is not None:
+                self._set_zork_settings_locked(triggers=zork_triggers)
             if (
                 joke_triggers is not None
                 or joke_lines is not None
@@ -1099,19 +1276,28 @@ class MeshResponseBot:
             return None
         return cached
 
-    def _parse_command(self, text: str) -> tuple[str, list[str]] | None:
+    def _parse_command(
+        self,
+        text: str,
+        *,
+        local_aliases: Optional[set[str]] = None,
+    ) -> tuple[str, list[str]] | None:
         raw = str(text or "").strip()
         if not raw:
             return None
         with self._lock:
             ping_triggers = list(self._ping_trigger_phrases)
             joke_triggers = list(self._joke_trigger_phrases)
-        natural_ping = _parse_natural_ping_command(raw, ping_triggers)
+            zork_triggers = list(self._zork_trigger_phrases)
+        natural_ping = _parse_natural_ping_command(raw, ping_triggers, local_aliases=local_aliases)
         if natural_ping is not None:
             return natural_ping
-        natural_joke = _parse_natural_joke_command(raw, joke_triggers)
+        natural_joke = _parse_natural_joke_command(raw, joke_triggers, local_aliases=local_aliases)
         if natural_joke is not None:
             return natural_joke
+        natural_zork = _parse_natural_zork_command(raw, zork_triggers, local_aliases=local_aliases)
+        if natural_zork is not None:
+            return natural_zork
         parts = [part for part in raw.split() if part]
         if not parts:
             return None
@@ -1127,6 +1313,7 @@ class MeshResponseBot:
         text: str,
         to_id: str,
         local_node_id: str,
+        local_aliases: Optional[set[str]] = None,
     ) -> bool:
         if app_name != "zork" or not self._game_public_start_enabled:
             return False
@@ -1135,14 +1322,12 @@ class MeshResponseBot:
         if not _normalize_node_id(local_node_id).startswith("!"):
             return False
         # Avoid re-entering _parse_command while the main receive lock is held.
-        raw = str(text or "").strip()
-        if not raw:
-            return False
-        parts = [part for part in raw.split() if part]
-        if not parts:
-            return False
-        command = _canonical_command_name(parts[0])
-        return command == "zork"
+        parsed = _parse_natural_zork_command(
+            str(text or ""),
+            list(self._zork_trigger_phrases),
+            local_aliases=local_aliases,
+        )
+        return parsed is not None
 
     def _build_standard_reply(
         self,
@@ -1616,17 +1801,39 @@ class MeshResponseBot:
         app_result = None
         with self._lock:
             for app_name, app in self._prioritized_bot_apps_locked(from_id):
+                if self._command_hard_disabled_locked(app_name):
+                    continue
                 effective_to_id = to_id
                 bootstrapped_public_start = self._should_bootstrap_public_game_start(
                     app_name=app_name,
                     text=text,
                     to_id=to_id,
                     local_node_id=local_node_id,
+                    local_aliases=local_aliases,
                 )
                 if bootstrapped_public_start:
                     effective_to_id = local_node_id
+                app_text = text
+                if app_name == "zork":
+                    clean_from_id = _normalize_node_id(from_id)
+                    has_session = False
+                    try:
+                        has_session = app.has_active_session(clean_from_id)
+                    except Exception:
+                        has_session = False
+                    zork_start = _parse_natural_zork_command(
+                        text,
+                        list(self._zork_trigger_phrases),
+                        local_aliases=local_aliases,
+                    )
+                    if zork_start is not None:
+                        # Route all configured start phrases through the canonical start command.
+                        app_text = "zork"
+                    elif not has_session:
+                        # No active session and no configured start phrase matched.
+                        continue
                 result = app.try_handle_message(
-                    text=text,
+                    text=app_text,
                     from_id=from_id,
                     to_id=effective_to_id,
                     local_node_id=local_node_id,
@@ -1651,7 +1858,7 @@ class MeshResponseBot:
                 app_name=app_name,
             )
         else:
-            parsed = self._parse_command(text)
+            parsed = self._parse_command(text, local_aliases=local_aliases)
             if parsed is None:
                 return
             command, args = parsed
@@ -1927,6 +2134,16 @@ def build_mesh_response_bot_from_env(
     joke_triggers = _normalize_joke_triggers(persisted.get("joke_triggers"))
     if "MESH_DASH_BOT_JOKE_TRIGGERS" in env_map:
         joke_triggers = _normalize_joke_triggers(env_map.get("MESH_DASH_BOT_JOKE_TRIGGERS"))
+    zork_triggers = _normalize_zork_triggers(persisted.get("zork_triggers"))
+    if "MESH_DASH_BOT_ZORK_TRIGGERS" in env_map:
+        zork_triggers = _normalize_zork_triggers(env_map.get("MESH_DASH_BOT_ZORK_TRIGGERS"))
+    hard_disabled_incoming_commands = _normalize_hard_disabled_commands(
+        persisted.get("hard_disabled_incoming_commands")
+    )
+    if "MESH_DASH_BOT_HARD_DISABLED_INCOMING_COMMANDS" in env_map:
+        hard_disabled_incoming_commands = _normalize_hard_disabled_commands(
+            env_map.get("MESH_DASH_BOT_HARD_DISABLED_INCOMING_COMMANDS")
+        )
     joke_lines = _normalize_joke_lines(persisted.get("joke_lines"))
     if "MESH_DASH_BOT_JOKE_LINES" in env_map:
         joke_lines = _normalize_joke_lines(env_map.get("MESH_DASH_BOT_JOKE_LINES"))
@@ -1954,6 +2171,8 @@ def build_mesh_response_bot_from_env(
         game_public_start_enabled=game_public_start_enabled,
         ping_triggers=ping_triggers,
         joke_triggers=joke_triggers,
+        zork_triggers=zork_triggers,
+        hard_disabled_incoming_commands=hard_disabled_incoming_commands,
         joke_lines=joke_lines,
         joke_near_guess_lines=joke_near_guess_lines,
         joke_delay_punchline_enabled=joke_delay_punchline_enabled,

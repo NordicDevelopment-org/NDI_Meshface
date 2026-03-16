@@ -129,6 +129,25 @@ def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, objec
     )
     if joke_triggers is not None:
         out["joke_triggers"] = joke_triggers
+    zork_triggers = _parse_string_list(
+        payload.get("zork_triggers", payload.get("zorkTriggers")),
+        split_commas=True,
+        max_items=64,
+        max_item_chars=160,
+    )
+    if zork_triggers is not None:
+        out["zork_triggers"] = zork_triggers
+    hard_disabled_incoming_commands = _parse_string_list(
+        payload.get(
+            "hard_disabled_incoming_commands",
+            payload.get("hardDisabledIncomingCommands"),
+        ),
+        split_commas=True,
+        max_items=128,
+        max_item_chars=64,
+    )
+    if hard_disabled_incoming_commands is not None:
+        out["hard_disabled_incoming_commands"] = hard_disabled_incoming_commands
     joke_lines = _parse_string_list(
         payload.get("joke_lines", payload.get("jokeLines")),
         split_commas=False,
@@ -191,6 +210,22 @@ def save_persisted_bot_settings(
             for item in (
                 str(value or "").strip()
                 for value in (settings.get("joke_triggers") or [])
+            )
+            if item
+        ],
+        "zork_triggers": [
+            item
+            for item in (
+                str(value or "").strip()
+                for value in (settings.get("zork_triggers") or [])
+            )
+            if item
+        ],
+        "hard_disabled_incoming_commands": [
+            item
+            for item in (
+                str(value or "").strip()
+                for value in (settings.get("hard_disabled_incoming_commands") or [])
             )
             if item
         ],

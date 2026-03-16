@@ -50,6 +50,25 @@ def test_parse_bot_settings_request_preserves_explicit_empty_joke_lists():
     assert parsed.joke_near_guess_lines == []
 
 
+def test_parse_bot_settings_request_parses_zork_triggers_list():
+    parsed = parse_bot_settings_request(
+        b'{"zorkTriggers":"{nodename} zork; {nodename} play zork"}'
+    )
+    assert parsed.zork_triggers == ["{nodename} zork", "{nodename} play zork"]
+
+
+def test_parse_bot_settings_request_preserves_explicit_empty_zork_triggers():
+    parsed = parse_bot_settings_request(b'{"zork_triggers":[]}')
+    assert parsed.zork_triggers == []
+
+
+def test_parse_bot_settings_request_parses_hard_disabled_incoming_commands():
+    parsed = parse_bot_settings_request(
+        b'{"hardDisabledIncomingCommands":"all; ping"}'
+    )
+    assert parsed.hard_disabled_incoming_commands == ["all", "ping"]
+
+
 def test_parse_bot_settings_request_parses_joke_delay_toggle():
     parsed = parse_bot_settings_request(
         b'{"joke_delay_punchline_enabled":"yes"}'

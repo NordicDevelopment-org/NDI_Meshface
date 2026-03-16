@@ -49,8 +49,10 @@ def handle_bot_settings_post(
         and request.game_enabled is None
         and request.game_public_start_enabled is None
         and request.command_settings is None
+        and request.hard_disabled_incoming_commands is None
         and request.ping_triggers is None
         and request.joke_triggers is None
+        and request.zork_triggers is None
         and request.joke_lines is None
         and request.joke_near_guess_lines is None
         and request.joke_delay_punchline_enabled is None

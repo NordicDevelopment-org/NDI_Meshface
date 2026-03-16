@@ -147,6 +147,7 @@
         key === "core"
         || key === "device"
         || key === "connectivity"
+        || key === "security"
         || key === "advanced"
         || key === "tickers"
       ) return key;
@@ -205,6 +206,8 @@
           source: readSettingsPositionSourceSelection(),
           recenter: activeLayoutView === "settings" && settingsFixedMapPanelVisible,
         }});
+      }} else if (next === "security") {{
+        syncChatWhoisQuickActionControls();
       }} else if (next === "tickers") {{
         renderTickerSettingsUi();
       }}
@@ -216,4 +219,3 @@
       if (lon < -180 || lon > 180) return false;
       return true;
     }}
-

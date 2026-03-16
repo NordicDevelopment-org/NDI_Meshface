@@ -485,6 +485,20 @@
           }}
           closeChatEmojiPanel();
         }});
+        panel.addEventListener("contextmenu", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const emojiBtn = target.closest(".chat-emoji-item");
+          if (!(emojiBtn instanceof HTMLButtonElement)) return;
+          if (!(chatEmojiMode === "react" && chatReactionPickerExpanded)) return;
+          const emoji = String(emojiBtn.getAttribute("data-emoji") || emojiBtn.textContent || "").trim();
+          if (!emoji || !isReactionCompatibleEmoji(emoji)) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (!setChatEmojiTopTailOverride(emoji)) return;
+          renderChatEmojiPickerPanel();
+          setChatSendStatus(`Pinned ${{emoji}} to quick reactions slot 8.`, false);
+        }});
       }}
 
       if (document.body.dataset.chatEmojiCloseBound !== "1") {{

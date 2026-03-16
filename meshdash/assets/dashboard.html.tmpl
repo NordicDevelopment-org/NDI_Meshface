@@ -373,6 +373,16 @@
             Connectivity
           </button>
           <button
+            id="settings-tab-security-btn"
+            class="settings-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-settings-tab="security"
+          >
+            Security
+          </button>
+          <button
             id="settings-tab-advanced-btn"
             class="settings-tab-btn"
             type="button"
@@ -954,7 +964,7 @@
           </div>
 
           <div class="settings-panel" data-settings-tab-panel="connectivity" hidden>
-            <h3>Network + Bluetooth + Security</h3>
+            <h3>Network + Bluetooth</h3>
             <div class="settings-fields">
               <div class="settings-row">
                 <label class="settings-field settings-inline">
@@ -1025,24 +1035,6 @@
                 </label>
               </div>
 
-              <div class="settings-row">
-                <label class="settings-field settings-inline">
-                  <input id="settings-security-serial-enabled" type="checkbox" />
-                  <span>Security serial enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-security-debug-log-api-enabled" type="checkbox" />
-                  <span>Debug log API enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-security-admin-channel-enabled" type="checkbox" />
-                  <span>Admin channel enabled</span>
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Security settings</span>
-                  <button id="settings-apply-security" class="btn btn-secondary" type="button">Apply Security</button>
-                </label>
-              </div>
             </div>
           </div>
 
@@ -1215,6 +1207,40 @@
                   <span class="settings-label">Notification settings</span>
                   <button id="settings-apply-ext-notify" class="btn btn-secondary" type="button">Apply Notifications</button>
                 </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel" data-settings-tab-panel="security" hidden>
+            <h3>Security</h3>
+            <div class="settings-fields">
+              <div class="settings-help-note">Radio firmware security controls and dashboard inbound protocol lock.</div>
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-security-serial-enabled" type="checkbox" />
+                  <span>Security serial enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-security-debug-log-api-enabled" type="checkbox" />
+                  <span>Debug log API enabled</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-security-admin-channel-enabled" type="checkbox" />
+                  <span>Admin channel enabled</span>
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Radio security settings</span>
+                  <button id="settings-apply-security" class="btn btn-secondary" type="button">Apply Radio Security</button>
+                </label>
+              </div>
+              <div class="settings-row">
+                <label class="chat-bot-toggle-wrap bots-master-toggle settings-bot-hard-disable-toggle" for="bots-command-hard-disable-all" title="Hard-disable all incoming bot command handling and incoming file-transfer protocol handling. Outgoing file sends are not blocked.">
+                  <input id="bots-command-hard-disable-all" type="checkbox" />
+                  <span>Hard Disable Incoming Bot Commands + File Transfer Commands</span>
+                </label>
+              </div>
+              <div class="settings-help-note">
+                When enabled, this node ignores incoming bot command triggers and incoming file-transfer protocol frames. Outgoing file sends are still allowed.
               </div>
             </div>
           </div>
@@ -1531,11 +1557,24 @@
                         id="bots-command-ping-triggers"
                         class="bots-command-config-textarea"
                         rows="3"
-                        placeholder="ping&#10;test&#10;can you see this"
+                        placeholder="&#123;nodename&#125; ping&#10;&#123;nodename&#125; test&#10;&#123;nodename&#125; can you see this"
                       ></textarea>
-                      <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>ping</code>, <code>test</code>, and <code>can you see this</code> work by default.</div>
+                      <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>&#123;nodename&#125; ping</code>, <code>&#123;nodename&#125; test</code>, and <code>&#123;nodename&#125; can you see this</code> are defaults. <code>&#123;nodename&#125;</code> is optional in matching.</div>
                       <div class="bots-command-config-actions">
                         <button id="bots-command-ping-save-btn" class="btn btn-secondary" type="button">Save Ping Triggers</button>
+                      </div>
+                    </div>
+                    <div id="bots-command-zork-config-wrap" class="bots-command-config-section" hidden>
+                      <label class="bots-command-config-label" for="bots-command-zork-triggers">Zork start triggers</label>
+                      <textarea
+                        id="bots-command-zork-triggers"
+                        class="bots-command-config-textarea"
+                        rows="3"
+                        placeholder="&#123;nodename&#125; zork&#10;&#123;nodename&#125; play zork"
+                      ></textarea>
+                      <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>&#123;nodename&#125; zork</code> and <code>&#123;nodename&#125; play zork</code> are defaults. <code>&#123;nodename&#125;</code> is optional in matching.</div>
+                      <div class="bots-command-config-actions">
+                        <button id="bots-command-zork-save-btn" class="btn btn-secondary" type="button">Save Zork Triggers</button>
                       </div>
                     </div>
                     <label id="bots-command-selected-public-start-wrap" class="chat-bot-toggle-wrap bots-command-config-toggle" for="bots-command-selected-public-start-enabled" title="When enabled, a public &quot;zork&quot; message gets a direct peer-to-peer game start reply. Follow-up commands still need to continue in direct chat." hidden>
@@ -1560,9 +1599,9 @@
                         id="bots-command-joke-triggers"
                         class="bots-command-config-textarea"
                         rows="3"
-                        placeholder="tell me a joke&#10;joke time"
+                        placeholder="&#123;nodename&#125; tell me a joke&#10;joke time"
                       ></textarea>
-                      <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>tell me a joke</code> works by default.</div>
+                      <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>&#123;nodename&#125; tell me a joke</code> works by default, and <code>&#123;nodename&#125;</code> is optional in matching.</div>
                       <label class="bots-command-config-label" for="bots-command-joke-lines">Jokes (one per line)</label>
                       <textarea
                         id="bots-command-joke-lines"
