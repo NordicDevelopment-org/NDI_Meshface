@@ -1,4 +1,41 @@
     let channelsTableFillRaf = 0;
+    const channelSettingsDraftByIndex = new Map();
+
+    function normalizeChannelDraftIndex(value) {{
+      const idx = Number(value);
+      if (!Number.isInteger(idx) || idx < 0) return null;
+      return idx;
+    }}
+
+    function channelDraftForIndex(index) {{
+      const idx = normalizeChannelDraftIndex(index);
+      if (idx == null) return null;
+      const draft = channelSettingsDraftByIndex.get(idx);
+      return draft && typeof draft === "object" ? draft : null;
+    }}
+
+    function clearChannelDraft(index) {{
+      const idx = normalizeChannelDraftIndex(index);
+      if (idx == null) return;
+      channelSettingsDraftByIndex.delete(idx);
+    }}
+
+    function updateChannelDraftFromRow(row) {{
+      if (!(row instanceof HTMLElement)) return;
+      const idx = normalizeChannelDraftIndex(row.dataset.channelIndex);
+      if (idx == null) return;
+      const getInput = (field) => row.querySelector(`[data-field=\"${{field}}\"]`);
+      const nameEl = getInput("name");
+      const uplinkEl = getInput("uplink_enabled");
+      const downlinkEl = getInput("downlink_enabled");
+      const pskEl = getInput("psk");
+      channelSettingsDraftByIndex.set(idx, {{
+        name: nameEl instanceof HTMLInputElement ? String(nameEl.value || "") : "",
+        uplink_enabled: uplinkEl instanceof HTMLInputElement && uplinkEl.type === "checkbox" ? !!uplinkEl.checked : false,
+        downlink_enabled: downlinkEl instanceof HTMLInputElement && downlinkEl.type === "checkbox" ? !!downlinkEl.checked : false,
+        psk: pskEl instanceof HTMLInputElement ? String(pskEl.value || "") : "",
+      }});
+    }}
 
     function syncChannelsTableFillRows() {{
       const tbody = document.getElementById("settings-channels-tbody");
@@ -154,6 +191,7 @@
       const label = isDisabledRole ? `Adding channel ${{idx}}…` : `Saving channel ${{idx}}…`;
       const res = await postChannelSettingsPayload(payload, label, `Channel ${{idx}} updated`);
       if (res.ok) {{
+        clearChannelDraft(idx);
         setTimeout(() => {{
           void fetchSettingsFromRadio();
         }}, 700);
@@ -170,6 +208,7 @@
       }};
       const res = await postChannelSettingsPayload(payload, `Disabling channel ${{idx}}…`, `Channel ${{idx}} disabled`);
       if (res.ok) {{
+        clearChannelDraft(idx);
         setTimeout(() => {{
           void fetchSettingsFromRadio();
         }}, 700);
@@ -189,4 +228,3 @@
         );
       }}
     }}
-

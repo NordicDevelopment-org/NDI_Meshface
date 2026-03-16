@@ -106,6 +106,24 @@
       const tbody = document.getElementById("settings-channels-tbody");
       if (!(tbody instanceof HTMLElement)) return;
 
+      const activeEl = document.activeElement;
+      let focusedFieldState = null;
+      if (activeEl instanceof HTMLInputElement && tbody.contains(activeEl)) {{
+        const activeRow = activeEl.closest("tr[data-channel-index]");
+        if (activeRow instanceof HTMLElement) {{
+          const focusIndex = normalizeChannelDraftIndex(activeRow.dataset.channelIndex);
+          const focusField = String(activeEl.dataset.field || "").trim();
+          if (focusIndex != null && focusField) {{
+            focusedFieldState = {{
+              index: focusIndex,
+              field: focusField,
+              selectionStart: Number.isFinite(activeEl.selectionStart) ? activeEl.selectionStart : null,
+              selectionEnd: Number.isFinite(activeEl.selectionEnd) ? activeEl.selectionEnd : null,
+            }};
+          }}
+        }}
+      }}
+
       // Meshtastic channel roles are usually strings (PRIMARY/SECONDARY/DISABLED),
       // but some protobuf -> JSON conversions may yield numeric enums.
       const channelRoleIsDisabled = (roleRaw) => {{
@@ -238,9 +256,19 @@
             ].filter((part) => !!part).join(" | ")
           : "No recent packet timestamps";
 
-        const nameValue = String(settings.name || "");
-        const uplinkEnabled = !!settings.uplink_enabled;
-        const downlinkEnabled = !!settings.downlink_enabled;
+        const draft = channelDraftForIndex(idx);
+        const nameValue = draft && typeof draft.name === "string"
+          ? draft.name
+          : String(settings.name || "");
+        const uplinkEnabled = draft && typeof draft.uplink_enabled === "boolean"
+          ? draft.uplink_enabled
+          : !!settings.uplink_enabled;
+        const downlinkEnabled = draft && typeof draft.downlink_enabled === "boolean"
+          ? draft.downlink_enabled
+          : !!settings.downlink_enabled;
+        const pskValue = draft && typeof draft.psk === "string"
+          ? draft.psk
+          : "";
 
         const tr = document.createElement("tr");
         tr.dataset.channelIndex = String(idx);
@@ -304,7 +332,7 @@
         const psk = document.createElement("input");
         psk.type = "text";
         psk.className = "settings-input";
-        psk.value = "";
+        psk.value = pskValue;
         psk.disabled = !hasLocalConfig;
         const pskHint = !hasLocalConfig
           ? "n/a"
@@ -315,6 +343,18 @@
         psk.dataset.field = "psk";
         tdPsk.appendChild(psk);
         tr.appendChild(tdPsk);
+
+        if (hasLocalConfig) {{
+          const captureDraft = () => {{
+            updateChannelDraftFromRow(tr);
+          }};
+          nameInput.addEventListener("input", captureDraft);
+          nameInput.addEventListener("change", captureDraft);
+          uplink.addEventListener("change", captureDraft);
+          downlink.addEventListener("change", captureDraft);
+          psk.addEventListener("input", captureDraft);
+          psk.addEventListener("change", captureDraft);
+        }}
 
         const tdActions = document.createElement("td");
         const actions = document.createElement("div");
@@ -396,4 +436,27 @@
       }}
 
       scheduleChannelsTableFillRows();
+
+      if (focusedFieldState) {{
+        const restoreFocus = () => {{
+          const row = tbody.querySelector(`tr[data-channel-index=\"${{focusedFieldState.index}}\"]`);
+          if (!(row instanceof HTMLElement)) return;
+          const field = row.querySelector(`[data-field=\"${{focusedFieldState.field}}\"]`);
+          if (!(field instanceof HTMLInputElement)) return;
+          field.focus({{ preventScroll: true }});
+          if (
+            field.type === "text"
+            || field.type === "search"
+            || field.type === "url"
+            || field.type === "tel"
+            || field.type === "password"
+          ) {{
+            const start = Number.isFinite(focusedFieldState.selectionStart) ? focusedFieldState.selectionStart : field.value.length;
+            const end = Number.isFinite(focusedFieldState.selectionEnd) ? focusedFieldState.selectionEnd : start;
+            field.setSelectionRange(start, end);
+          }}
+        }};
+        restoreFocus();
+        requestAnimationFrame(restoreFocus);
+      }}
     }}
