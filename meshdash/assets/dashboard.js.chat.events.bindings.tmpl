@@ -102,12 +102,25 @@
           ev.preventDefault();
           ev.stopPropagation();
           if (chatSendInFlight) return;
+          const panel = document.getElementById("chat-emoji-panel");
           const replyId = Number(btn.dataset.replyId || "");
           if (!Number.isInteger(replyId) || replyId <= 0) {{
             setChatSendStatus("Cannot react: target message id is missing.", true);
             return;
           }}
-          openChatEmojiPanel("react", replyId);
+          const panelOpenForSameTarget = (
+            panel instanceof HTMLElement
+            && !panel.hidden
+            && chatEmojiMode === "react"
+            && Number.isInteger(chatReactionTargetId)
+            && chatReactionTargetId === replyId
+            && chatEmojiAnchorElement === btn
+          );
+          if (panelOpenForSameTarget) {{
+            closeChatEmojiPanel();
+            return;
+          }}
+          openChatEmojiPanel("react", replyId, btn);
         }});
       }}
 
