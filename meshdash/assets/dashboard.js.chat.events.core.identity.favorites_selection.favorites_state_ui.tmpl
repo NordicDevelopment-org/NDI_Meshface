@@ -48,6 +48,123 @@
       }}
     }}
 
+    function normalizeNodeNoteText(rawValue, maxChars = 1200) {{
+      let text = String(rawValue == null ? "" : rawValue)
+        .replace(/\r\n?/g, "\n")
+        .replace(/\u0000/g, "");
+      const cap = Math.max(80, Math.trunc(Number(maxChars) || 1200));
+      if (text.length > cap) {{
+        text = text.slice(0, cap);
+      }}
+      if (!text.trim()) {{
+        return "";
+      }}
+      return text.trim();
+    }}
+
+    function loadNodeNotes() {{
+      nodeNotesById.clear();
+      try {{
+        const raw = window.localStorage.getItem(nodeNotesStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const entries = Array.isArray(parsed)
+          ? parsed
+          : (parsed && typeof parsed === "object" ? Object.entries(parsed) : []);
+        for (const item of entries) {{
+          let rawNodeId = "";
+          let rawEntry = null;
+          if (Array.isArray(item)) {{
+            rawNodeId = String(item[0] || "");
+            rawEntry = item[1];
+          }} else {{
+            continue;
+          }}
+          const nodeId = normalizeNodeId(rawNodeId);
+          if (!isSelectableNodeId(nodeId)) continue;
+          const rawNote = (
+            typeof rawEntry === "string"
+              ? rawEntry
+              : (rawEntry && (rawEntry.note ?? rawEntry.text))
+          );
+          const note = normalizeNodeNoteText(rawNote);
+          if (!note) continue;
+          const updatedRaw = Number(rawEntry && (rawEntry.updated_unix ?? rawEntry.updatedUnix));
+          const updatedUnix = Number.isFinite(updatedRaw) && updatedRaw > 0
+            ? Math.trunc(updatedRaw)
+            : 0;
+          nodeNotesById.set(nodeId, {{
+            note,
+            updatedUnix,
+          }});
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistNodeNotes() {{
+      try {{
+        const payload = {{}};
+        let count = 0;
+        for (const [nodeId, rawEntry] of nodeNotesById.entries()) {{
+          if (count >= 4000) break;
+          const cleanNodeId = normalizeNodeId(nodeId);
+          if (!isSelectableNodeId(cleanNodeId)) continue;
+          const note = normalizeNodeNoteText(rawEntry && rawEntry.note);
+          if (!note) continue;
+          const updatedRaw = Number(rawEntry && rawEntry.updatedUnix);
+          const updatedUnix = Number.isFinite(updatedRaw) && updatedRaw > 0
+            ? Math.trunc(updatedRaw)
+            : Math.floor(Date.now() / 1000);
+          payload[cleanNodeId] = {{
+            note,
+            updated_unix: updatedUnix,
+          }};
+          count += 1;
+        }}
+        window.localStorage.setItem(nodeNotesStorageKey, JSON.stringify(payload));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function nodeNoteEntry(nodeId) {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized)) return null;
+      const rawEntry = nodeNotesById.get(normalized);
+      if (!rawEntry || typeof rawEntry !== "object") return null;
+      const note = normalizeNodeNoteText(rawEntry.note);
+      if (!note) return null;
+      const updatedRaw = Number(rawEntry.updatedUnix);
+      const updatedUnix = Number.isFinite(updatedRaw) && updatedRaw > 0
+        ? Math.trunc(updatedRaw)
+        : 0;
+      return {{
+        nodeId: normalized,
+        note,
+        updatedUnix,
+      }};
+    }}
+
+    function saveNodeNote(nodeId, rawNote) {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized)) {{
+        return {{ ok: false, nodeId: normalized, note: "", updatedUnix: 0, cleared: false }};
+      }}
+      const note = normalizeNodeNoteText(rawNote);
+      if (!note) {{
+        nodeNotesById.delete(normalized);
+        persistNodeNotes();
+        return {{ ok: true, nodeId: normalized, note: "", updatedUnix: 0, cleared: true }};
+      }}
+      const updatedUnix = Math.floor(Date.now() / 1000);
+      nodeNotesById.set(normalized, {{
+        note,
+        updatedUnix,
+      }});
+      persistNodeNotes();
+      return {{ ok: true, nodeId: normalized, note, updatedUnix, cleared: false }};
+    }}
+
     function isFavoriteNode(nodeId) {{
       const normalized = normalizeNodeId(nodeId);
       return isSelectableNodeId(normalized) && favoriteNodeIds.has(normalized);

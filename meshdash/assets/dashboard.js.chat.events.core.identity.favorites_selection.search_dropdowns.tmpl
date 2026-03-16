@@ -2,11 +2,23 @@
       return String(value == null ? "" : value).trim().toLowerCase();
     }}
 
-    function matchesIdOrNameQuery(nodeId, nodeName, query) {{
-      if (!query) return true;
+    function nodeSearchKeywordText(nodeId, nodeName) {{
       const idKey = normalizeSearchQuery(nodeId);
       const nameKey = normalizeSearchQuery(nodeName);
-      return idKey.includes(query) || nameKey.includes(query);
+      const noteEntry = (typeof nodeNoteEntry === "function")
+        ? nodeNoteEntry(nodeId)
+        : null;
+      const noteKey = normalizeSearchQuery(
+        noteEntry && noteEntry.note != null
+          ? String(noteEntry.note).replace(/\s+/g, " ")
+          : ""
+      );
+      return [idKey, nameKey, noteKey].filter(Boolean).join(" ");
+    }}
+
+    function matchesIdOrNameQuery(nodeId, nodeName, query) {{
+      if (!query) return true;
+      return nodeSearchKeywordText(nodeId, nodeName).includes(query);
     }}
 
     function closeSavedNodeSearchDropdown() {{
@@ -36,17 +48,48 @@
     function buildNodeSearchResults(state, query, limit = 250) {{
       const safeState = state && typeof state === "object" ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
-      const results = [];
+      const nodeById = new Map();
       for (const node of nodes) {{
         const nodeId = normalizeNodeId(node && node.id);
         if (!isSelectableNodeId(nodeId)) continue;
-        const name = nodeLabel(node);
+        nodeById.set(nodeId, node);
+      }}
+
+      const orderedNodeIds = [];
+      const seenNodeIds = new Set();
+      const pushNodeId = (nodeId) => {{
+        const cleanNodeId = normalizeNodeId(nodeId);
+        if (!isSelectableNodeId(cleanNodeId) || seenNodeIds.has(cleanNodeId)) return;
+        seenNodeIds.add(cleanNodeId);
+        orderedNodeIds.push(cleanNodeId);
+      }};
+
+      for (const node of nodes) {{
+        pushNodeId(node && node.id);
+      }}
+      if (typeof favoriteNodeIds !== "undefined" && favoriteNodeIds && typeof favoriteNodeIds.forEach === "function") {{
+        favoriteNodeIds.forEach((nodeId) => {{
+          pushNodeId(nodeId);
+        }});
+      }}
+      if (typeof nodeNotesById !== "undefined" && nodeNotesById && typeof nodeNotesById.forEach === "function") {{
+        nodeNotesById.forEach((_entry, nodeId) => {{
+          pushNodeId(nodeId);
+        }});
+      }}
+      pushNodeId(selectedNodeId || "");
+
+      const maxRows = Math.max(1, Number(limit) || 250);
+      const results = [];
+      for (const nodeId of orderedNodeIds) {{
+        const node = nodeById.get(nodeId);
+        const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
         if (!matchesIdOrNameQuery(nodeId, name, query)) continue;
         results.push({{
           nodeId,
           name: String(name || nodeId),
         }});
-        if (results.length >= Math.max(1, Number(limit) || 250)) break;
+        if (results.length >= maxRows) break;
       }}
       return results;
     }}
@@ -121,4 +164,3 @@
       }}).join("");
       dropdown.hidden = false;
     }}
-
