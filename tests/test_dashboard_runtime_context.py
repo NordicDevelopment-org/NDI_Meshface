@@ -613,3 +613,6 @@ def test_build_dashboard_runtime_context_attaches_history_search_hook():
     assert search_fn("needle", limit=12, before=1, after=2) == {"ok": True, "query": "needle"}
     assert calls["query"] == "needle"
     assert calls["kwargs"] == {"limit": 12, "before": 1, "after": 2, "scope": None, "scan_limit": None}
+    assert search_fn("needle-chat", source="chat") == {"ok": True, "query": "needle-chat"}
+    assert calls["query"] == "needle-chat"
+    assert calls["kwargs"] == {"limit": None, "before": None, "after": None, "scope": None, "scan_limit": None, "source": "chat"}

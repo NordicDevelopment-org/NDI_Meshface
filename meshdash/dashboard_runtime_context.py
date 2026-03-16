@@ -372,14 +372,20 @@ def build_dashboard_runtime_context(
             after=None,
             scope=None,
             scan_limit=None,
+            source=None,
         ):
+            kwargs = {
+                "limit": limit,
+                "before": before,
+                "after": after,
+                "scope": scope,
+                "scan_limit": scan_limit,
+            }
+            if source is not None:
+                kwargs["source"] = source
             return search_history_packets_fn(
                 query_text,
-                limit=limit,
-                before=before,
-                after=after,
-                scope=scope,
-                scan_limit=scan_limit,
+                **kwargs,
             )
 
         try:

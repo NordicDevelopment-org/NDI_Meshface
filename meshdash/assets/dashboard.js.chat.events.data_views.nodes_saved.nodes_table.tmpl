@@ -44,7 +44,7 @@
       for (const node of sourceNodes) {{
         const nodeId = normalizeNodeId(node && node.id);
         const name = nodeLabel(node);
-        if (!matchesIdOrNameQuery(nodeId, name, query)) continue;
+        if (!matchesIdOrNameQuery(nodeId, name, query, {{ node }})) continue;
 
         entries.push({{ node, nodeId, name }});
 
@@ -202,4 +202,3 @@
         scrollSelectionIntoView();
       }}
     }}
-

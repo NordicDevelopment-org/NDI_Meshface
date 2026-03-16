@@ -541,8 +541,6 @@
           const node = nodesById.get(nodeId);
           const caps = historyCapsById.get(nodeId);
           const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
-          const noteEntry = nodeNoteEntry(nodeId);
-          const noteKeywordText = normalizeSearchQuery(noteEntry && noteEntry.note);
           const freshness = resolveNodeFreshness(node, caps, null, latestChatTouchByNode.get(nodeId) || null);
           const status = freshnessStatus(freshness.unix, nowUnix);
           const lastSeenText = savedDetailText(freshness.text);
@@ -567,9 +565,7 @@
           )
             ? `${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}`
             : ((caps && caps.has_position === true) ? "history" : "n/a");
-          const searchable = [normalizeSearchQuery(nodeId), normalizeSearchQuery(name), noteKeywordText]
-            .filter(Boolean)
-            .join(" ");
+          const searchable = nodeSearchKeywordText(nodeId, name, {{ node }});
           return {{
             id: nodeId,
             name,

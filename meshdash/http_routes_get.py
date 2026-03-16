@@ -203,6 +203,11 @@ def handle_dashboard_get(
             before = max(before or 0, context)
             after = max(after or 0, context)
         scope = str(query_obj.get("scope", ["both"])[0] or "both").strip().lower() or "both"
+        source = str(
+            query_obj.get("source", [""])[0]
+            or query_obj.get("src", [""])[0]
+            or ""
+        ).strip().lower()
         scan_limit = deps.to_int_fn(
             query_obj.get("scan", [""])[0]
             or query_obj.get("scan_limit", [""])[0]
@@ -219,14 +224,16 @@ def handle_dashboard_get(
             }
         elif callable(search_fn):
             try:
-                response_obj = search_fn(
-                    query_text,
-                    limit=limit,
-                    before=before,
-                    after=after,
-                    scope=scope,
-                    scan_limit=scan_limit,
-                )
+                search_kwargs = {
+                    "limit": limit,
+                    "before": before,
+                    "after": after,
+                    "scope": scope,
+                    "scan_limit": scan_limit,
+                }
+                if source:
+                    search_kwargs["source"] = source
+                response_obj = search_fn(query_text, **search_kwargs)
             except Exception as exc:
                 response_obj = {
                     "ok": False,

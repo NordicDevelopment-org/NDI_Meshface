@@ -231,6 +231,79 @@ def test_history_store_domain_packet_search_supports_scope_and_context(tmp_path)
         store.close()
 
 
+def test_history_store_domain_packet_search_supports_chat_and_combined_sources(tmp_path):
+    store = _make_store(tmp_path)
+    try:
+        save_packet_domain(
+            store,
+            {
+                "summary": {"from": "!a", "to": "^all", "text": "needle in packet"},
+                "packet": {"id": 1},
+            },
+        )
+        save_packet_domain(
+            store,
+            {
+                "summary": {"from": "!b", "to": "^all", "text": "packet only"},
+                "packet": {"id": 2},
+            },
+        )
+        save_chat_domain(
+            store,
+            {
+                "from": "!c",
+                "to": "^all",
+                "text": "needle in chat",
+                "rx_time": "2026-03-16 00:00:00Z",
+            },
+        )
+        save_chat_domain(
+            store,
+            {
+                "from": "!d",
+                "to": "^all",
+                "text": "chat only",
+                "rx_time": "2026-03-16 00:00:01Z",
+            },
+        )
+
+        chat_payload = search_packets_domain(
+            store,
+            "needle",
+            limit=5,
+            before=0,
+            after=0,
+            scope="both",
+            source="chat",
+        )
+        assert chat_payload["source"] == "chat"
+        assert chat_payload["matches"] == 1
+        assert chat_payload["returned_matches"] == 1
+        assert chat_payload["scanned_packets"] == 0
+        assert chat_payload["scanned_chat"] >= 2
+        assert chat_payload["entries"]
+        assert chat_payload["entries"][0]["source"] == "chat"
+        assert "needle" in str(chat_payload["entries"][0]["chat"].get("text", "")).lower()
+
+        both_payload = search_packets_domain(
+            store,
+            "needle",
+            limit=10,
+            before=0,
+            after=0,
+            scope="both",
+            source="both",
+        )
+        assert both_payload["source"] == "both"
+        assert both_payload["matches"] >= 2
+        assert both_payload["returned_matches"] >= 2
+        entry_sources = {str(entry.get("source")) for entry in both_payload["entries"] if isinstance(entry, dict)}
+        assert "packet" in entry_sources
+        assert "chat" in entry_sources
+    finally:
+        store.close()
+
+
 def test_history_store_domain_environment_metrics_history_extracts_telemetry_points(tmp_path):
     store = _make_store(tmp_path)
     try:
@@ -587,6 +660,11 @@ def test_search_packets_uses_primary_lock_when_read_connection_missing(monkeypat
         "_fetch_packet_search_rows_helper",
         _fake_fetch_packet_search_rows,
     )
+    monkeypatch.setattr(
+        history_store_packets_module,
+        "_fetch_chat_search_rows_helper",
+        lambda _conn, _limit: [],
+    )
 
     class _Store:
         def __init__(self):
@@ -625,6 +703,11 @@ def test_search_packets_uses_read_lock_when_read_connection_present(monkeypatch)
         history_store_packets_module,
         "_fetch_packet_search_rows_helper",
         _fake_fetch_packet_search_rows,
+    )
+    monkeypatch.setattr(
+        history_store_packets_module,
+        "_fetch_chat_search_rows_helper",
+        lambda _conn, _limit: [],
     )
 
     class _Store:

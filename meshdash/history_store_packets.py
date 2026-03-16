@@ -1,6 +1,7 @@
 import time
 
 from .history_queries import (
+    fetch_chat_search_rows as _fetch_chat_search_rows_helper,
     fetch_environment_metric_packet_rows as _fetch_environment_metric_packet_rows_helper,
     fetch_packet_search_rows as _fetch_packet_search_rows_helper,
     fetch_recent_packet_rows as _fetch_recent_packet_rows_helper,
@@ -317,11 +318,15 @@ def search_packets(
     after: int | None = None,
     scope: str | None = None,
     scan_limit: int | None = None,
+    source: str | None = None,
 ) -> dict[str, object]:
     clean_needle = str(needle or "").strip()
     clean_scope = str(scope or "both").strip().lower()
     if clean_scope not in {"both", "summary", "packet"}:
         clean_scope = "both"
+    clean_source = str(source or "both").strip().lower()
+    if clean_source not in {"both", "packet", "chat"}:
+        clean_source = "both"
 
     clean_limit = max(1, min(500, int(limit) if isinstance(limit, int) else 120))
     clean_before = max(0, min(30, int(before) if isinstance(before, int) else 0))
@@ -340,33 +345,20 @@ def search_packets(
         read_lock = getattr(store, "_read_lock", None) or store._lock
 
     with read_lock:
-        rows = list(
-            _fetch_packet_search_rows_helper(
-                read_conn,
-                clean_scan_limit,
-            )
+        packet_rows = (
+            list(_fetch_packet_search_rows_helper(read_conn, clean_scan_limit))
+            if clean_source in {"both", "packet"}
+            else []
+        )
+        chat_rows = (
+            list(_fetch_chat_search_rows_helper(read_conn, clean_scan_limit))
+            if clean_source in {"both", "chat"}
+            else []
         )
 
-    scanned_packets = len(rows)
-    if not clean_needle:
-        return {
-            "ok": True,
-            "query": "",
-            "scope": clean_scope,
-            "limit": clean_limit,
-            "before": clean_before,
-            "after": clean_after,
-            "scan_limit": clean_scan_limit,
-            "scanned_packets": scanned_packets,
-            "matches": 0,
-            "returned_matches": 0,
-            "entries": [],
-        }
-
-    needle_lower = clean_needle.lower()
-    match_indexes: list[int] = []
-    for idx, row in enumerate(rows):
-        _packet_id, _created_unix, summary_json, packet_json = row
+    rows: list[dict[str, object]] = []
+    for packet_row in packet_rows:
+        packet_id, created_unix, summary_json, packet_json = packet_row
         summary_text = str(summary_json or "")
         packet_text = str(packet_json or "")
         if clean_scope == "summary":
@@ -375,6 +367,63 @@ def search_packets(
             haystack = packet_text
         else:
             haystack = f"{summary_text}\n{packet_text}"
+        rows.append(
+            {
+                "source": "packet",
+                "row_id": int(packet_id) if packet_id is not None else None,
+                "created_unix": int(created_unix) if created_unix is not None else None,
+                "summary_json": summary_json,
+                "packet_json": packet_json,
+                "haystack": haystack,
+            }
+        )
+
+    for chat_row in chat_rows:
+        chat_id, created_unix, message_json = chat_row
+        message_text = str(message_json or "")
+        rows.append(
+            {
+                "source": "chat",
+                "row_id": int(chat_id) if chat_id is not None else None,
+                "created_unix": int(created_unix) if created_unix is not None else None,
+                "message_json": message_json,
+                "haystack": message_text,
+            }
+        )
+
+    rows.sort(
+        key=lambda row: (
+            int(_to_int(row.get("created_unix")) or 0),
+            0 if str(row.get("source") or "") == "packet" else 1,
+            int(_to_int(row.get("row_id")) or 0),
+        )
+    )
+
+    scanned_packets = len(packet_rows)
+    scanned_chat = len(chat_rows)
+    scanned_total = len(rows)
+    if not clean_needle:
+        return {
+            "ok": True,
+            "query": "",
+            "scope": clean_scope,
+            "source": clean_source,
+            "limit": clean_limit,
+            "before": clean_before,
+            "after": clean_after,
+            "scan_limit": clean_scan_limit,
+            "scanned_packets": scanned_packets,
+            "scanned_chat": scanned_chat,
+            "scanned_total": scanned_total,
+            "matches": 0,
+            "returned_matches": 0,
+            "entries": [],
+        }
+
+    needle_lower = clean_needle.lower()
+    match_indexes: list[int] = []
+    for idx, row in enumerate(rows):
+        haystack = str(row.get("haystack") or "")
         if needle_lower in haystack.lower():
             match_indexes.append(idx)
 
@@ -387,11 +436,14 @@ def search_packets(
             "ok": True,
             "query": clean_needle,
             "scope": clean_scope,
+            "source": clean_source,
             "limit": clean_limit,
             "before": clean_before,
             "after": clean_after,
             "scan_limit": clean_scan_limit,
             "scanned_packets": scanned_packets,
+            "scanned_chat": scanned_chat,
+            "scanned_total": scanned_total,
             "matches": 0,
             "returned_matches": 0,
             "entries": [],
@@ -400,7 +452,7 @@ def search_packets(
     ranges: list[tuple[int, int]] = []
     for idx in selected_match_indexes:
         start = max(0, idx - clean_before)
-        end = min(scanned_packets - 1, idx + clean_after)
+        end = min(scanned_total - 1, idx + clean_after)
         if not ranges or start > (ranges[-1][1] + 1):
             ranges.append((start, end))
         else:
@@ -411,7 +463,27 @@ def search_packets(
         if range_idx > 0:
             entries.append({"separator": True})
         for idx in range(start, end + 1):
-            packet_id, created_unix, summary_json, packet_json = rows[idx]
+            row = rows[idx]
+            source_kind = str(row.get("source") or "packet")
+            if source_kind == "chat":
+                message_json = row.get("message_json")
+                chat = _safe_json_loads(message_json, {})
+                if not isinstance(chat, dict):
+                    chat = {}
+                entries.append(
+                    {
+                        "separator": False,
+                        "source": "chat",
+                        "match": idx in selected_match_set,
+                        "chat_row_id": int(_to_int(row.get("row_id")) or 0) or None,
+                        "created_unix": int(_to_int(row.get("created_unix")) or 0) or None,
+                        "chat": chat,
+                    }
+                )
+                continue
+
+            summary_json = row.get("summary_json")
+            packet_json = row.get("packet_json")
             summary = _safe_json_loads(summary_json, {})
             if not isinstance(summary, dict):
                 summary = {}
@@ -421,9 +493,10 @@ def search_packets(
             entries.append(
                 {
                     "separator": False,
+                    "source": "packet",
                     "match": idx in selected_match_set,
-                    "packet_row_id": int(packet_id) if packet_id is not None else None,
-                    "created_unix": int(created_unix) if created_unix is not None else None,
+                    "packet_row_id": int(_to_int(row.get("row_id")) or 0) or None,
+                    "created_unix": int(_to_int(row.get("created_unix")) or 0) or None,
                     "summary": summary,
                     "packet": packet,
                 }
@@ -433,11 +506,14 @@ def search_packets(
         "ok": True,
         "query": clean_needle,
         "scope": clean_scope,
+        "source": clean_source,
         "limit": clean_limit,
         "before": clean_before,
         "after": clean_after,
         "scan_limit": clean_scan_limit,
         "scanned_packets": scanned_packets,
+        "scanned_chat": scanned_chat,
+        "scanned_total": scanned_total,
         "matches": total_matches,
         "returned_matches": len(selected_match_indexes),
         "entries": entries,

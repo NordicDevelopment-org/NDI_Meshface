@@ -100,7 +100,7 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
     routes_get.handle_dashboard_get(
         handler,
         path="/api/history/search",
-        query="q=!3369d0b8&before=1&after=2&scope=both&scan=300",
+        query="q=!3369d0b8&before=1&after=2&scope=both&source=chat&scan=300",
         deps=deps,
     )
     routes_get.handle_dashboard_get(handler, path="/api/offline/atlas", query="", deps=deps)
@@ -123,6 +123,7 @@ def test_handle_dashboard_get_main_routes(monkeypatch):
     assert json_calls[5]["payload_obj"]["kwargs"]["before"] == 1
     assert json_calls[5]["payload_obj"]["kwargs"]["after"] == 2
     assert json_calls[5]["payload_obj"]["kwargs"]["scope"] == "both"
+    assert json_calls[5]["payload_obj"]["kwargs"]["source"] == "chat"
     assert json_calls[5]["payload_obj"]["kwargs"]["scan_limit"] == 300
     assert json_calls[6]["payload_obj"]["layers"][0]["id"] == "osm"
     assert json_calls[7]["payload_obj"]["version"] == "17.0"

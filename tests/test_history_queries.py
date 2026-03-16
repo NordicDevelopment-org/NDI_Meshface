@@ -1,6 +1,7 @@
 import sqlite3
 
 from meshdash.history_queries import (
+    fetch_chat_search_rows,
     fetch_connection_rows,
     fetch_environment_metric_packet_rows,
     fetch_node_capability_rows,
@@ -97,6 +98,30 @@ def test_fetch_packet_search_rows_returns_chronological_rows_with_optional_limit
         assert [row[2] for row in limited_rows] == [
             '{"k":"b"}',
             '{"k":"c"}',
+        ]
+    finally:
+        conn.close()
+
+
+def test_fetch_chat_search_rows_returns_chronological_rows_with_optional_limit():
+    conn = sqlite3.connect(":memory:")
+    try:
+        initialize_history_schema(conn)
+        conn.execute("INSERT INTO chat(created_unix, message_json) VALUES(1, '{\"m\":\"a\"}')")
+        conn.execute("INSERT INTO chat(created_unix, message_json) VALUES(2, '{\"m\":\"b\"}')")
+        conn.execute("INSERT INTO chat(created_unix, message_json) VALUES(3, '{\"m\":\"c\"}')")
+
+        all_rows = fetch_chat_search_rows(conn, limit=0)
+        limited_rows = fetch_chat_search_rows(conn, limit=2)
+
+        assert [row[2] for row in all_rows] == [
+            '{"m":"a"}',
+            '{"m":"b"}',
+            '{"m":"c"}',
+        ]
+        assert [row[2] for row in limited_rows] == [
+            '{"m":"b"}',
+            '{"m":"c"}',
         ]
     finally:
         conn.close()

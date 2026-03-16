@@ -99,7 +99,7 @@ def test_http_api_state_and_history_endpoints():
 
     sent, data = _run_get(
         handler_cls,
-        "/api/history/search?q=!3369d0b8&before=1&after=1&scope=both&scan=300",
+        "/api/history/search?q=!3369d0b8&before=1&after=1&scope=both&source=chat&scan=300",
     )
     assert sent["status"] == 200
     search_payload = json.loads(data.decode("utf-8"))
@@ -108,6 +108,7 @@ def test_http_api_state_and_history_endpoints():
     assert search_payload["kwargs"]["before"] == 1
     assert search_payload["kwargs"]["after"] == 1
     assert search_payload["kwargs"]["scope"] == "both"
+    assert search_payload["kwargs"]["source"] == "chat"
     assert search_payload["kwargs"]["scan_limit"] == 300
 
 

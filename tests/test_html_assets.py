@@ -61,7 +61,10 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "function parseConsoleLiveLayerSelection(ctx)" in js
     assert "async function fetchConsoleHistorySearch(opts = null)" in js
     assert "name: \"grep\"," in js
-    assert "usage: \"grep <text> [-A<n>|-B<n>|-C<n>] [limit=<n>] [scope=both|summary|packet] [scan=<n>]\"" in js
+    assert (
+        "usage: \"grep <text> [-A<n>|-B<n>|-C<n>] [limit=<n>] [scope=both|summary|packet] [source=both|packet|chat] [scan=<n>]\""
+        in js
+    )
     assert "const timestampsToggle = document.getElementById(\"console-timestamps\");" in js
     assert "timestampsToggle.checked = true;" in js
     assert "const filterInput = document.getElementById(\"console-filter-input\");" in js

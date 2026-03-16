@@ -2,23 +2,54 @@
       return String(value == null ? "" : value).trim().toLowerCase();
     }}
 
-    function nodeSearchKeywordText(nodeId, nodeName) {{
-      const idKey = normalizeSearchQuery(nodeId);
-      const nameKey = normalizeSearchQuery(nodeName);
-      const noteEntry = (typeof nodeNoteEntry === "function")
-        ? nodeNoteEntry(nodeId)
-        : null;
-      const noteKey = normalizeSearchQuery(
-        noteEntry && noteEntry.note != null
-          ? String(noteEntry.note).replace(/\s+/g, " ")
-          : ""
-      );
-      return [idKey, nameKey, noteKey].filter(Boolean).join(" ");
+    function nodeSearchKeywordText(nodeId, nodeName, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const terms = [];
+      const pushTerm = (value) => {{
+        const normalized = normalizeSearchQuery(
+          value == null ? "" : String(value).replace(/\s+/g, " ")
+        );
+        if (!normalized || terms.includes(normalized)) return;
+        terms.push(normalized);
+      }};
+
+      pushTerm(nodeId);
+      pushTerm(nodeName);
+
+      const node = opts.node && typeof opts.node === "object" ? opts.node : null;
+      if (node) {{
+        pushTerm(node.short_name);
+        pushTerm(node.long_name);
+        pushTerm(node.role);
+        pushTerm(node.hardware);
+        pushTerm(node.hardware_model);
+        pushTerm(node.num);
+      }}
+
+      const extras = Array.isArray(opts.extraValues)
+        ? opts.extraValues
+        : (opts.extraValues == null ? [] : [opts.extraValues]);
+      for (const extra of extras) {{
+        pushTerm(extra);
+      }}
+
+      const includeNotes = opts.includeNotes !== false;
+      if (includeNotes) {{
+        const noteEntry = (typeof nodeNoteEntry === "function")
+          ? nodeNoteEntry(nodeId)
+          : null;
+        const noteText = noteEntry && noteEntry.note != null
+          ? noteEntry.note
+          : "";
+        pushTerm(noteText);
+      }}
+
+      return terms.join(" ");
     }}
 
-    function matchesIdOrNameQuery(nodeId, nodeName, query) {{
+    function matchesIdOrNameQuery(nodeId, nodeName, query, options = null) {{
       if (!query) return true;
-      return nodeSearchKeywordText(nodeId, nodeName).includes(query);
+      return nodeSearchKeywordText(nodeId, nodeName, options).includes(query);
     }}
 
     function closeSavedNodeSearchDropdown() {{
@@ -84,7 +115,7 @@
       for (const nodeId of orderedNodeIds) {{
         const node = nodeById.get(nodeId);
         const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
-        if (!matchesIdOrNameQuery(nodeId, name, query)) continue;
+        if (!matchesIdOrNameQuery(nodeId, name, query, {{ node }})) continue;
         results.push({{
           nodeId,
           name: String(name || nodeId),

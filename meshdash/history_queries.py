@@ -32,6 +32,35 @@ def fetch_packet_search_rows(conn: SqlConnection, limit: int) -> SqlRows:
     ).fetchall()
 
 
+def fetch_chat_search_rows(conn: SqlConnection, limit: int) -> SqlRows:
+    clean_limit = int(limit)
+    file_transfer_like = '%"text":"MF_FILE_V1|%'
+    if clean_limit <= 0:
+        return conn.execute(
+            """
+            SELECT id, created_unix, message_json
+            FROM chat
+            WHERE message_json NOT LIKE ?
+            ORDER BY id ASC
+            """,
+            (file_transfer_like,),
+        ).fetchall()
+    return conn.execute(
+        """
+        SELECT id, created_unix, message_json
+        FROM (
+          SELECT id, created_unix, message_json
+          FROM chat
+          WHERE message_json NOT LIKE ?
+          ORDER BY id DESC
+          LIMIT ?
+        )
+        ORDER BY id ASC
+        """,
+        (file_transfer_like, clean_limit),
+    ).fetchall()
+
+
 def fetch_environment_metric_packet_rows(
     conn: SqlConnection,
     *,

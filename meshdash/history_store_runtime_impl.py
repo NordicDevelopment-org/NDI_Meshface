@@ -84,6 +84,7 @@ class HistoryStore:
         after: int | None = None,
         scope: str | None = None,
         scan_limit: int | None = None,
+        source: str | None = None,
     ) -> dict[str, object]:
         return _search_packets_helper(
             self,
@@ -93,6 +94,7 @@ class HistoryStore:
             after=after,
             scope=scope,
             scan_limit=scan_limit,
+            source=source,
         )
 
     def load_environment_metrics_history(

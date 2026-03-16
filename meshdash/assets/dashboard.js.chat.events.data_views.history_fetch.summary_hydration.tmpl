@@ -41,6 +41,7 @@
       const after = Number(options.after);
       const scanLimit = Number(options.scanLimit);
       const scope = String(options.scope || "").trim().toLowerCase();
+      const source = String(options.source || "").trim().toLowerCase();
       if (Number.isFinite(limit) && limit > 0) {{
         params.set("limit", String(Math.trunc(limit)));
       }}
@@ -55,6 +56,9 @@
       }}
       if (scope) {{
         params.set("scope", scope);
+      }}
+      if (source) {{
+        params.set("source", source);
       }}
       const resp = await fetch(`/api/history/search?${{params.toString()}}`, {{ cache: "no-store" }});
       if (!resp.ok) throw new Error(`history search API ${{resp.status}}`);

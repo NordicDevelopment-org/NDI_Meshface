@@ -73,8 +73,8 @@
       }});
       registerConsoleCommand({{
         name: "grep",
-        usage: "grep <text> [-A<n>|-B<n>|-C<n>] [limit=<n>] [scope=both|summary|packet] [scan=<n>]",
-        description: "Search retained history packets (non-live) with grep-style context windows.",
+        usage: "grep <text> [-A<n>|-B<n>|-C<n>] [limit=<n>] [scope=both|summary|packet] [source=both|packet|chat] [scan=<n>]",
+        description: "Search retained history (packets and/or chat) with grep-style context windows.",
         supportsVerbosity: true,
         run: async (ctx) => {{
           const args = Array.isArray(ctx && ctx.args) ? ctx.args : [];
@@ -144,6 +144,11 @@
           if (!["both", "summary", "packet"].includes(scope)) {{
             return `[grep] invalid scope: ${{scope}} (use both|summary|packet)`;
           }}
+          const sourceRaw = String(options.source ?? options.src ?? "both").trim().toLowerCase();
+          const source = sourceRaw || "both";
+          if (!["both", "packet", "chat"].includes(source)) {{
+            return `[grep] invalid source: ${{source}} (use both|packet|chat)`;
+          }}
 
           const payload = await fetchConsoleHistorySearch({{
             queryText,
@@ -151,6 +156,7 @@
             before,
             after,
             scope,
+            source,
             scanLimit,
           }});
           if (!(payload && payload.ok)) {{
@@ -162,17 +168,29 @@
           const totalMatchesRaw = Number(payload.matches);
           const shownMatchesRaw = Number(payload.returned_matches);
           const scannedPacketsRaw = Number(payload.scanned_packets);
+          const scannedChatRaw = Number(payload.scanned_chat);
+          const scannedTotalRaw = Number(payload.scanned_total);
           const totalMatches = Number.isFinite(totalMatchesRaw) ? Math.max(0, Math.trunc(totalMatchesRaw)) : 0;
           const shownMatches = Number.isFinite(shownMatchesRaw) ? Math.max(0, Math.trunc(shownMatchesRaw)) : totalMatches;
           const scannedPackets = Number.isFinite(scannedPacketsRaw) ? Math.max(0, Math.trunc(scannedPacketsRaw)) : 0;
+          const scannedChat = Number.isFinite(scannedChatRaw) ? Math.max(0, Math.trunc(scannedChatRaw)) : 0;
+          const scannedTotal = Number.isFinite(scannedTotalRaw)
+            ? Math.max(0, Math.trunc(scannedTotalRaw))
+            : (scannedPackets + scannedChat);
           const queryLabel = String(payload.query || queryText);
           const scopeLabel = String(payload.scope || scope);
+          const sourceLabel = String(payload.source || source);
+          const scannedLabel = (() => {{
+            if (sourceLabel === "packet") return `${{scannedPackets}}`;
+            if (sourceLabel === "chat") return `${{scannedChat}}`;
+            return `total=${{scannedTotal}}, packets=${{scannedPackets}}, chat=${{scannedChat}}`;
+          }})();
           if (totalMatches < 1 || entries.length < 1) {{
-            return `[grep] no matches for "${{queryLabel}}" (scope=${{scopeLabel}}, scanned=${{scannedPackets}}).`;
+            return `[grep] no matches for "${{queryLabel}}" (source=${{sourceLabel}}, scope=${{scopeLabel}}, scanned=${{scannedLabel}}).`;
           }}
 
           appendConsoleEventLine(
-            `[grep] query="${{queryLabel}}" scope=${{scopeLabel}} matches=${{totalMatches}} showing=${{shownMatches}} scanned=${{scannedPackets}}`
+            `[grep] query="${{queryLabel}}" source=${{sourceLabel}} scope=${{scopeLabel}} matches=${{totalMatches}} showing=${{shownMatches}} scanned=${{scannedLabel}}`
           );
           consoleGrepRunCounter += 1;
           const runId = consoleGrepRunCounter;
@@ -183,36 +201,75 @@
               continue;
             }}
             if (!entry || typeof entry !== "object") continue;
+            const sourceKind = String(entry.source || "packet").trim().toLowerCase() || "packet";
+            const isChatEntry = sourceKind === "chat";
             const summary = (entry.summary && typeof entry.summary === "object")
               ? entry.summary
               : {{}};
             const packet = (entry.packet && typeof entry.packet === "object")
               ? entry.packet
               : {{}};
+            const chat = (entry.chat && typeof entry.chat === "object")
+              ? entry.chat
+              : {{}};
             const isMatch = entry.match === true;
-            const packetLines = formatConsoleLine({{ summary, packet }}, verbosity);
+            const packetLines = isChatEntry
+              ? formatConsoleLine({{
+                  summary: {{
+                    from: chat.from ?? summary.from,
+                    to: chat.to ?? summary.to,
+                    portnum: chat.portnum ?? summary.portnum,
+                    rx_snr: chat.rx_snr ?? summary.rx_snr,
+                    rx_rssi: chat.rx_rssi ?? summary.rx_rssi,
+                    hop_start: chat.hop_start ?? summary.hop_start,
+                    hop_limit: chat.hop_limit ?? summary.hop_limit,
+                    text: chat.text ?? summary.text ?? "",
+                    reply_id: chat.reply_id ?? summary.reply_id,
+                    emoji: chat.emoji ?? summary.emoji,
+                    channel: chat.channel ?? summary.channel,
+                    packet_id: chat.message_id ?? summary.packet_id,
+                  }},
+                  packet: {{
+                    id: chat.message_id ?? packet.id ?? null,
+                    channel: chat.channel ?? packet.channel ?? null,
+                    text: chat.text ?? packet.text ?? "",
+                    emoji: chat.emoji ?? packet.emoji ?? "",
+                    reply_id: chat.reply_id ?? packet.reply_id ?? null,
+                    fromId: chat.from ?? packet.fromId ?? null,
+                    toId: chat.to ?? packet.toId ?? null,
+                  }},
+                  chat,
+                }}, verbosity)
+              : formatConsoleLine({{ summary, packet }}, verbosity);
             const lineList = Array.isArray(packetLines)
               ? packetLines
               : [String(packetLines == null ? "" : packetLines)];
-            const packetUnix = latestUnixTimestamp(
-              summary.captured_at,
-              summary.rx_time,
-              entry.created_unix,
-            );
+            const packetUnix = isChatEntry
+              ? latestUnixTimestamp(
+                  chat.captured_at,
+                  chat.rx_time,
+                  entry.created_unix,
+                )
+              : latestUnixTimestamp(
+                  summary.captured_at,
+                  summary.rx_time,
+                  entry.created_unix,
+                );
             const packetMs = Number.isFinite(packetUnix) && packetUnix > 0
               ? packetUnix * 1000
               : Date.now();
-            const packetRowId = Number(entry.packet_row_id);
+            const packetRowId = Number(isChatEntry ? (entry.chat_row_id ?? entry.packet_row_id) : entry.packet_row_id);
             const packetKey = Number.isFinite(packetRowId)
-              ? Math.trunc(packetRowId)
+              ? `${{isChatEntry ? "chat" : "packet"}}-${{Math.trunc(packetRowId)}}`
               : `scan-${{fallbackLineCounter}}`;
             for (let i = 0; i < lineList.length; i += 1) {{
               const lineRaw = String(lineList[i] == null ? "" : lineList[i]);
               const prefix = i === 0 ? (isMatch ? "> " : "  ") : "  ";
+              const sourcePrefix = (isChatEntry && i === 0) ? "[chat] " : "";
               fallbackLineCounter += 1;
               appendConsoleLine(
                 `grep|${{runId}}|${{packetKey}}|${{i}}|${{fallbackLineCounter}}`,
-                `${{prefix}}${{lineRaw}}`,
+                `${{prefix}}${{sourcePrefix}}${{lineRaw}}`,
                 packetMs,
               );
             }}
@@ -440,4 +497,3 @@
         }},
       }});
     }}
-
