@@ -276,6 +276,51 @@ def test_history_store_domain_environment_metrics_history_extracts_telemetry_poi
         store.close()
 
 
+def test_history_store_domain_environment_metrics_history_extracts_channel_utilization(tmp_path):
+    store = _make_store(tmp_path)
+    try:
+        save_packet_domain(
+            store,
+            {
+                "summary": {
+                    "from": "!01020304",
+                    "from_short_name": "delta",
+                    "rx_time_unix": 1_700_000_020,
+                    "portnum": "TELEMETRY_APP",
+                },
+                "packet": {
+                    "fromId": "!01020304",
+                    "rxTime": 1_700_000_020,
+                    "decoded": {
+                        "portnum": "TELEMETRY_APP",
+                        "telemetry": {
+                            "time": 1_700_000_020,
+                            "deviceMetrics": {
+                                "channelUtilization": 7.25,
+                                "airUtilTx": 1.5,
+                            },
+                        },
+                    },
+                },
+            },
+        )
+        payload = load_environment_metrics_history_domain(
+            store,
+            window_hours=24,
+            metric="channel_utilization",
+            node_id="!01020304",
+            limit=1000,
+        )
+        assert payload["ok"] is True
+        assert payload["points"]
+        assert payload["metrics"][0]["key"] == "channel_utilization"
+        assert payload["nodes"][0]["id"] == "!01020304"
+        assert payload["points"][0]["metric_key"] == "channel_utilization"
+        assert payload["points"][0]["value"] == 7.25
+    finally:
+        store.close()
+
+
 def test_history_store_domain_node_history_and_online_wrappers_delegate(monkeypatch):
     calls = {"node_history": None, "online_activity": None}
 

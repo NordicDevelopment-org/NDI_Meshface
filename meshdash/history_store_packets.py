@@ -32,6 +32,8 @@ _ENV_METRIC_ALIAS_MAP = {
     "barometricpressure": "barometric_pressure",
     "gasresistance": "gas_resistance",
     "iaq": "iaq",
+    "channelutilization": "channel_utilization",
+    "airutiltx": "air_util_tx",
 }
 
 
@@ -139,6 +141,7 @@ def _extract_node_label(summary: dict[str, object], packet: dict[str, object], f
 
 def _collect_environment_metric_containers(source: object) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
+    metric_container_keys = {"environmentmetrics", "devicemetrics"}
     stack = [source]
     seen: set[int] = set()
     while stack:
@@ -150,7 +153,7 @@ def _collect_environment_metric_containers(source: object) -> list[dict[str, obj
             seen.add(current_id)
             for raw_key, raw_value in current.items():
                 key = "".join(ch for ch in str(raw_key or "") if ch.isalnum()).lower()
-                if key == "environmentmetrics" and isinstance(raw_value, dict):
+                if key in metric_container_keys and isinstance(raw_value, dict):
                     out.append(raw_value)
                 if isinstance(raw_value, (dict, list)):
                     stack.append(raw_value)
