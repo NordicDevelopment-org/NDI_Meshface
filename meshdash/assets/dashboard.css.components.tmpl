@@ -236,6 +236,9 @@
       gap: 6px;
       min-width: 0;
     }}
+    .chat-emoji-toolbar[hidden] {{
+      display: none !important;
+    }}
     .chat-emoji-search-row {{
       align-items: stretch;
     }}
@@ -287,6 +290,32 @@
       padding: 6px 8px;
       text-align: center;
     }}
+    .chat-emoji-react-toggle-row {{
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      min-height: 0;
+    }}
+    .chat-emoji-react-toggle-row[hidden] {{
+      display: none !important;
+    }}
+    .chat-emoji-react-toggle-btn {{
+      border: 1px solid #c9dbcc;
+      border-radius: 6px;
+      background: #f4faf6;
+      color: #2f5d45;
+      padding: 3px 8px;
+      font-size: 11px;
+      line-height: 1.2;
+      cursor: pointer;
+    }}
+    .chat-emoji-react-toggle-btn:hover {{
+      background: #e8f4ec;
+      border-color: #b6d1be;
+    }}
+    .chat-emoji-panel.chat-emoji-panel-react-collapsed {{
+      width: min(360px, 92vw);
+    }}
     .chat-emoji-grid {{
       display: grid;
       grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -294,6 +323,9 @@
       max-height: min(56vh, 320px);
       overflow: auto;
       padding-right: 2px;
+    }}
+    .chat-emoji-grid[hidden] {{
+      display: none !important;
     }}
     .chat-emoji-empty {{
       grid-column: 1 / -1;
@@ -1417,6 +1449,15 @@
     }}
     [data-theme="dark"] .chat-emoji-top-label {{
       color: #aac8ba;
+    }}
+    [data-theme="dark"] .chat-emoji-react-toggle-btn {{
+      background: #243a2f;
+      border-color: #3f5d4d;
+      color: #d7ebe0;
+    }}
+    [data-theme="dark"] .chat-emoji-react-toggle-btn:hover {{
+      background: #2b4437;
+      border-color: #567764;
     }}
     [data-theme="dark"] .channel-color-dot {{
       border-color: rgba(201, 226, 212, 0.42);

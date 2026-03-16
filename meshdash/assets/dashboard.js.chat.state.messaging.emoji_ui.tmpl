@@ -61,11 +61,35 @@
     }}
 
     function renderChatEmojiPickerPanel() {{
+      const panel = document.getElementById("chat-emoji-panel");
       const groupSelect = document.getElementById("chat-emoji-group-select");
       const searchInput = document.getElementById("chat-emoji-search");
+      const searchRow = document.getElementById("chat-emoji-search-row");
+      const controlsRow = document.getElementById("chat-emoji-controls-row");
+      const reactToggleRow = document.getElementById("chat-emoji-react-toggle-row");
+      const reactToggleBtn = document.getElementById("chat-emoji-react-toggle");
       const grid = document.getElementById("chat-emoji-grid");
       const meta = document.getElementById("chat-emoji-meta");
       if (!(grid instanceof HTMLElement)) return;
+      const reactionCollapsed = chatEmojiMode === "react" && !chatReactionPickerExpanded;
+
+      if (panel instanceof HTMLElement) {{
+        panel.classList.toggle("chat-emoji-panel-react-collapsed", reactionCollapsed);
+      }}
+      if (reactToggleRow instanceof HTMLElement) {{
+        reactToggleRow.hidden = chatEmojiMode !== "react";
+      }}
+      if (reactToggleBtn instanceof HTMLButtonElement) {{
+        reactToggleBtn.textContent = reactionCollapsed ? "More reactions ▸" : "Less reactions ▾";
+        reactToggleBtn.setAttribute("aria-expanded", reactionCollapsed ? "false" : "true");
+      }}
+      if (searchRow instanceof HTMLElement) {{
+        searchRow.hidden = reactionCollapsed;
+      }}
+      if (controlsRow instanceof HTMLElement) {{
+        controlsRow.hidden = reactionCollapsed;
+      }}
+      grid.hidden = reactionCollapsed;
 
       const selectedSearch = normalizeChatEmojiSearchQuery(
         (searchInput instanceof HTMLInputElement)
@@ -115,10 +139,10 @@
       }}
 
       if (searchInput instanceof HTMLInputElement) {{
-        searchInput.disabled = false;
+        searchInput.disabled = reactionCollapsed;
       }}
       if (groupSelect instanceof HTMLSelectElement) {{
-        groupSelect.disabled = false;
+        groupSelect.disabled = reactionCollapsed;
         const catalogSignature = `${{chatEmojiTotalChoices}}:${{chatEmojiGroups.map((group) => `${{group.id}}:${{group.emojis.length}}`).join("|")}}`;
         if ((groupSelect.dataset.catalogSignature || "") !== catalogSignature) {{
           const groupOptions = [
@@ -238,27 +262,45 @@
       const height = panel.offsetHeight || 240;
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1280;
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 720;
+      const topbar = document.querySelector(".topbar");
+      const topbarBottom = (
+        topbar instanceof HTMLElement
+          ? Math.max(0, Math.trunc(topbar.getBoundingClientRect().bottom))
+          : 0
+      );
+      const minTop = Math.max(margin, topbarBottom + 6);
 
-      let left = chatEmojiMode === "react"
-        ? anchorRect.left + (anchorRect.width / 2) - (width / 2)
-        : anchorRect.right - width;
+      let left = anchorRect.right - width;
+      if (chatEmojiMode === "react") {{
+        if (chatReactionPickerExpanded) {{
+          left = anchorRect.right + 10;
+          if ((left + width) > (viewportWidth - margin)) {{
+            left = anchorRect.left - width - 10;
+          }}
+          if (left < margin || (left + width) > (viewportWidth - margin)) {{
+            left = anchorRect.left + (anchorRect.width / 2) - (width / 2);
+          }}
+        }} else {{
+          left = anchorRect.left + (anchorRect.width / 2) - (width / 2);
+        }}
+      }}
       if (left < margin) left = margin;
       if ((left + width) > (viewportWidth - margin)) {{
         left = Math.max(margin, viewportWidth - width - margin);
       }}
 
-      const preferBelow = chatEmojiMode === "react";
-      let top = preferBelow
-        ? (anchorRect.bottom + 6)
-        : (anchorRect.top - height - 6);
+      const preferBelow = chatEmojiMode === "react" && !chatReactionPickerExpanded;
+      let top = (chatEmojiMode === "react" && chatReactionPickerExpanded)
+        ? (anchorRect.top - 2)
+        : (preferBelow ? (anchorRect.bottom + 6) : (anchorRect.top - height - 6));
       if (preferBelow && (top + height) > (viewportHeight - margin)) {{
         top = anchorRect.top - height - 6;
-      }} else if (!preferBelow && top < margin) {{
+      }} else if (!preferBelow && top < minTop) {{
         top = anchorRect.bottom + 6;
       }}
-      if (top < margin) top = margin;
+      if (top < minTop) top = minTop;
       if ((top + height) > (viewportHeight - margin)) {{
-        top = Math.max(margin, viewportHeight - height - margin);
+        top = Math.max(minTop, viewportHeight - height - margin);
       }}
 
       panel.style.position = "fixed";
@@ -273,6 +315,7 @@
       const btn = document.getElementById("chat-emoji-btn");
       if (!(panel instanceof HTMLElement)) return;
       chatEmojiMode = mode === "react" ? "react" : "compose";
+      chatReactionPickerExpanded = chatEmojiMode !== "react";
       const parsedTarget = Number(reactionTargetId);
       chatReactionTargetId = (
         chatEmojiMode === "react" && Number.isInteger(parsedTarget) && parsedTarget > 0
@@ -283,7 +326,9 @@
       renderChatEmojiPickerPanel();
       panel.hidden = false;
       positionChatEmojiPanel();
-      focusChatEmojiSearchInput();
+      if (!(chatEmojiMode === "react" && !chatReactionPickerExpanded)) {{
+        focusChatEmojiSearchInput();
+      }}
       if (btn instanceof HTMLButtonElement) {{
         btn.setAttribute("aria-expanded", "true");
       }}
@@ -304,10 +349,12 @@
       const btn = document.getElementById("chat-emoji-btn");
       chatEmojiMode = "compose";
       chatReactionTargetId = null;
+      chatReactionPickerExpanded = false;
       chatEmojiAnchorElement = null;
       chatEmojiSearchQuery = "";
       if (panel instanceof HTMLElement) {{
         panel.hidden = true;
+        panel.classList.remove("chat-emoji-panel-react-collapsed");
         panel.style.position = "";
         panel.style.left = "";
         panel.style.top = "";
@@ -344,7 +391,10 @@
         const groupOptions = '<option value="all">All groups (loading...)</option>';
         panel.innerHTML = `<div id="chat-emoji-top-label" class="chat-emoji-top-label">Top used</div>
         <div id="chat-emoji-top-grid" class="chat-emoji-top-grid" aria-label="Top used"></div>
-        <div class="chat-emoji-toolbar chat-emoji-search-row">
+        <div id="chat-emoji-react-toggle-row" class="chat-emoji-react-toggle-row" hidden>
+          <button id="chat-emoji-react-toggle" class="chat-emoji-react-toggle-btn" type="button" aria-expanded="false">More reactions ▸</button>
+        </div>
+        <div id="chat-emoji-search-row" class="chat-emoji-toolbar chat-emoji-search-row">
           <input
             id="chat-emoji-search"
             class="chat-emoji-filter chat-emoji-search"
@@ -356,7 +406,7 @@
             title="Shortcut: Ctrl/Cmd+E"
           />
         </div>
-        <div class="chat-emoji-toolbar">
+        <div id="chat-emoji-controls-row" class="chat-emoji-toolbar">
           <select id="chat-emoji-group-select" class="chat-emoji-filter" aria-label="Emoji group">
             ${{groupOptions}}
           </select>
@@ -380,6 +430,18 @@
           searchInput.addEventListener("input", () => {{
             chatEmojiSearchQuery = normalizeChatEmojiSearchQuery(searchInput.value);
             renderChatEmojiPickerPanel();
+          }});
+        }}
+        const reactToggleBtn = document.getElementById("chat-emoji-react-toggle");
+        if (reactToggleBtn instanceof HTMLButtonElement && reactToggleBtn.dataset.bound !== "1") {{
+          reactToggleBtn.dataset.bound = "1";
+          reactToggleBtn.addEventListener("click", (ev) => {{
+            ev.preventDefault();
+            chatReactionPickerExpanded = !chatReactionPickerExpanded;
+            renderChatEmojiPickerPanel();
+            if (chatReactionPickerExpanded) {{
+              focusChatEmojiSearchInput();
+            }}
           }});
         }}
 
