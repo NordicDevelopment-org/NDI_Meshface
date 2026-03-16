@@ -154,6 +154,9 @@
         if (next === "games") {{
           renderGamesView(latestState);
         }}
+        if (next === "remote") {{
+          renderRemoteView(latestState);
+        }}
         if (next === "history") {{
           renderHistoryChat(latestState.traffic || {{}});
           setMapDataMode("activity");
@@ -202,6 +205,8 @@
         renderBotsView(latestState);
       }} else if (next === "games") {{
         renderGamesView(latestState);
+      }} else if (next === "remote") {{
+        renderRemoteView(latestState);
       }} else if (next === "encription") {{
         renderEncription({{}});
       }} else if (next === "environment") {{
@@ -219,7 +224,7 @@
       renderFavoriteMenuNodeSearchDropdown(latestState);
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
-      if (next === "chat" || next === "files" || next === "bots" || next === "games" || next === "history" || next === "network" || next === "saved" || next === "channels" || next === "data" || next === "environment") {{
+      if (next === "chat" || next === "files" || next === "bots" || next === "games" || next === "remote" || next === "history" || next === "network" || next === "saved" || next === "channels" || next === "data" || next === "environment") {{
         requestImmediatePoll(0);
       }}
       if (isMapVisibleLayoutView(next)) {{

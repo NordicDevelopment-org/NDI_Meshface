@@ -282,6 +282,7 @@
       <button class="rail-btn active" data-view="chat" type="button" title="Teams-style chat workspace">Chat</button>
       <button class="rail-btn" data-view="network" type="button" title="Topology, nodes, and links">Network</button>
       <button class="rail-btn" data-view="saved" type="button" title="Node details and saved nodes">Node</button>
+      <button class="rail-btn" data-view="remote" type="button" title="Remote-node actions workspace">Remote</button>
       <button class="rail-btn" data-view="packets" type="button" title="Recent packet stream">Packets</button>
       <button class="rail-btn" data-view="channels" type="button" title="Inferred message channel activity">Channels</button>
       <button class="rail-btn" data-view="encription" type="button" title="Encrypted packets and route activity">Encription</button>
@@ -1513,6 +1514,49 @@
                 <tr><td colspan="8">No file transfers yet.</td></tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card remote" aria-label="Remote node operations">
+      <h2>Remote</h2>
+      <div class="body">
+        <div class="remote-shell">
+          <aside class="remote-sidebar">
+            <label class="remote-field" for="remote-node-search-input">Search nodes</label>
+            <input
+              id="remote-node-search-input"
+              class="remote-search-input"
+              type="search"
+              placeholder="Search name, ID, role, hardware"
+              autocomplete="off"
+            />
+            <div id="remote-node-list-caption" class="remote-list-caption">Scanning remote nodes...</div>
+            <div id="remote-node-list" class="remote-node-list" role="listbox" aria-label="Remote nodes"></div>
+          </aside>
+          <div class="remote-main">
+            <div class="remote-panel remote-summary-panel">
+              <div class="remote-panel-head">
+                <h3 id="remote-target-title">Select a node</h3>
+                <button id="remote-refresh-btn" class="btn btn-secondary remote-refresh-btn" type="button">Refresh</button>
+              </div>
+              <div id="remote-target-meta" class="remote-target-meta">Choose a node to inspect potential remote operations.</div>
+            </div>
+            <div class="remote-panel">
+              <h3>Capability Probe</h3>
+              <div id="remote-capability-list" class="remote-capability-list"></div>
+            </div>
+            <div class="remote-panel">
+              <h3>Quick Actions</h3>
+              <div class="remote-action-row">
+                <button id="remote-open-node-btn" class="btn btn-secondary" type="button">Open Node View</button>
+                <button id="remote-open-direct-chat-btn" class="btn btn-secondary" type="button">Open Direct Chat</button>
+                <button id="remote-stage-ping-btn" class="btn" type="button">Stage Ping</button>
+                <button id="remote-stage-whois-btn" class="btn btn-secondary" type="button">Stage Whois</button>
+              </div>
+              <div id="remote-action-status" class="remote-action-status">Select a node to start exploring remote actions.</div>
+            </div>
           </div>
         </div>
       </div>

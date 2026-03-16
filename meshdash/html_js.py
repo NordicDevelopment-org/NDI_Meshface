@@ -160,6 +160,7 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.runtime.views.packet_channels.encryption_trend.tmpl",
     "dashboard.js.runtime.views.encryption.tmpl",
     "dashboard.js.runtime.views.raw_data.tmpl",
+    "dashboard.js.runtime.views.remote.tmpl",
     "dashboard.js.runtime.poll.tmpl",
     "dashboard.js.runtime.boot.tmpl",
 )

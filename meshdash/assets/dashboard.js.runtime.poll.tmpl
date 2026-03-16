@@ -79,6 +79,9 @@
           if (activeLayoutView === "games") {{
             renderGamesView(latestState);
           }}
+          if (activeLayoutView === "remote") {{
+            renderRemoteView(latestState);
+          }}
           if (activeLayoutView === "saved") {{
             const loadingId304 = (activeLayoutView === "saved" && historyRelevant304 && !cachedHistory304)
               ? historyTargetId304
@@ -200,6 +203,8 @@
           renderBotsView(state);
         }} else if (activeLayoutView === "games") {{
           renderGamesView(state);
+        }} else if (activeLayoutView === "remote") {{
+          renderRemoteView(state);
           syncChatUnreadFromState(state, {{ clearActiveWhenInChat: false }});
           renderChatChangeSummary();
           bindChatChangeSummaryControls();
