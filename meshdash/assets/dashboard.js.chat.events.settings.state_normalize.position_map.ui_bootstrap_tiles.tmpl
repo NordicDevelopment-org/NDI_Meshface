@@ -127,7 +127,6 @@
         return;
       }}
 
-      const cfg = mapTileConfigs[nextTheme] || mapTileConfigs.light;
       if (settingsFixedMapTileLayer) {{
         settingsFixedMapTileLayer.off();
         settingsFixedMap.removeLayer(settingsFixedMapTileLayer);
@@ -136,14 +135,13 @@
       const sessionId = settingsFixedMapTileSession;
       settingsFixedMapTileLoads = 0;
       settingsFixedMapTileErrors = 0;
-      const layerOptions = cfg && cfg.options && typeof cfg.options === "object"
-        ? Object.assign({{}}, cfg.options)
-        : {{}};
-      layerOptions.updateWhenZooming = false;
-      layerOptions.updateWhenIdle = true;
-      layerOptions.keepBuffer = 3;
-      layerOptions.crossOrigin = true;
-      settingsFixedMapTileLayer = L.tileLayer(cfg.url, layerOptions);
+      const builtLayer = createDashboardMapTileLayer(nextTheme, {{
+        updateWhenZooming: false,
+        updateWhenIdle: true,
+        keepBuffer: 3,
+        crossOrigin: true,
+      }});
+      settingsFixedMapTileLayer = builtLayer.layer;
       settingsFixedMapTileLayer.on("tileload", () => {{
         if (sessionId !== settingsFixedMapTileSession) return;
         settingsFixedMapTileLoads += 1;
@@ -164,6 +162,5 @@
         }}
       }});
       settingsFixedMapTileLayer.addTo(settingsFixedMap);
-      settingsFixedMapTileTheme = nextTheme;
+      settingsFixedMapTileTheme = builtLayer.theme;
     }}
-

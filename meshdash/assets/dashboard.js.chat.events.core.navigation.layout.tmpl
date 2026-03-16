@@ -74,6 +74,9 @@
         setMapWheelZoomActive(next === "network" || next === "saved");
       }} catch (_err) {{
       }}
+      if (isMapVisibleLayoutView(next)) {{
+        requestMapResizeNow();
+      }}
       if (chatPanelOpen) {{
         if (activeWheelPane instanceof HTMLElement) {{
           activeWheelPane.classList.remove("wheel-scroll-active");

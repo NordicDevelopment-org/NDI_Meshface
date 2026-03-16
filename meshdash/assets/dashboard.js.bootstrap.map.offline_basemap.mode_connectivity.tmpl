@@ -202,7 +202,6 @@
         && map.hasLayer(mapTileLayer)) {{
         return;
       }}
-      const cfg = mapTileConfigs[nextTheme] || mapTileConfigs.light;
       if (mapTileLayer) {{
         mapTileLayer.off();
         map.removeLayer(mapTileLayer);
@@ -212,10 +211,10 @@
       mapTileLoadSuccesses = 0;
       mapTileLoadErrors = 0;
       setMapBasemapStatus("loading", "Checking map tile availability...");
-      const layerOptions = Object.assign({{}}, cfg.options || {{}}, {{
+      const builtLayer = createDashboardMapTileLayer(nextTheme, {{
         crossOrigin: true,
       }});
-      mapTileLayer = L.tileLayer(cfg.url, layerOptions);
+      mapTileLayer = builtLayer.layer;
       mapTileLayer.on("tileloadstart", () => {{
         if (mapBasemapMode === "offline") {{
           return;
@@ -271,6 +270,5 @@
         mapTileLayer.addTo(map);
         scheduleMapTileProbe(sessionId);
       }}
-      mapTileTheme = nextTheme;
+      mapTileTheme = builtLayer.theme;
     }}
-

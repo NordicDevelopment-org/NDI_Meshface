@@ -2,7 +2,9 @@
     const nodeHistoryHours = {node_history_hours};
     const nodeHistoryMaxPoints = {node_history_max_points};
     const resetTickerScaleOnRestart = Number({reset_ticker_scale_on_restart}) === 1;
-    const map = L.map("map", {{
+    const dashboardMapDefaultCenter = Object.freeze([39.5, -98.35]);
+    const dashboardMapDefaultZoom = 4;
+    const dashboardMapDefaultLeafletOptions = Object.freeze({{
       preferCanvas: true,
       zoomAnimation: false,
       fadeAnimation: false,
@@ -11,7 +13,32 @@
       // Wheel zoom should work out of the box. (We previously guarded this to avoid
       // hijacking page scroll, but that can feel broken and isn't worth the friction.)
       scrollWheelZoom: true,
-    }}).setView([39.5, -98.35], 4);
+    }});
+
+    function normalizeDashboardMapCenter(center) {{
+      if (Array.isArray(center) && center.length >= 2) {{
+        const lat = Number(center[0]);
+        const lon = Number(center[1]);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {{
+          return [lat, lon];
+        }}
+      }}
+      return [dashboardMapDefaultCenter[0], dashboardMapDefaultCenter[1]];
+    }}
+
+    function createDashboardLeafletMap(containerId, options = null) {{
+      const input = options && typeof options === "object" ? options : {{}};
+      const center = normalizeDashboardMapCenter(input.center);
+      const zoomRaw = Number(input.zoom);
+      const zoom = Number.isFinite(zoomRaw) ? zoomRaw : dashboardMapDefaultZoom;
+      const leafletOverrides = input.leaflet && typeof input.leaflet === "object"
+        ? input.leaflet
+        : {{}};
+      const leafletOptions = Object.assign({{}}, dashboardMapDefaultLeafletOptions, leafletOverrides);
+      return L.map(containerId, leafletOptions).setView(center, zoom);
+    }}
+
+    const map = createDashboardLeafletMap("map");
 
     // Leaflet.heat (via simpleheat) uses a fixed shadow offset of 200px when
     // generating its blurred circle stamp.
@@ -74,6 +101,24 @@
         }},
       }},
     }};
+
+    function normalizeDashboardMapTileTheme(themeName) {{
+      return themeName === "dark" ? "dark" : "light";
+    }}
+
+    function createDashboardMapTileLayer(themeName, optionOverrides = null) {{
+      const theme = normalizeDashboardMapTileTheme(themeName);
+      const cfg = mapTileConfigs[theme] || mapTileConfigs.light;
+      const overrides = optionOverrides && typeof optionOverrides === "object"
+        ? optionOverrides
+        : {{}};
+      const layerOptions = Object.assign({{}}, (cfg && cfg.options) || {{}}, overrides);
+      return {{
+        theme,
+        layer: L.tileLayer(cfg.url, layerOptions),
+      }};
+    }}
+
     const mapOfflineGridPaneName = "mapOfflineGridPane";
     const mapOfflineAtlasEndpoint = "/api/offline/atlas";
     const mapOfflineLandmarkCoverageKm = 32;
@@ -82,8 +127,8 @@
 
     const mapElement = document.getElementById("map");
     const settingsFixedMapElement = document.getElementById("settings-fixed-map");
-    const settingsFixedMapDefaultCenter = [39.5, -98.35];
-    const settingsFixedMapDefaultZoom = 4;
+    const settingsFixedMapDefaultCenter = [dashboardMapDefaultCenter[0], dashboardMapDefaultCenter[1]];
+    const settingsFixedMapDefaultZoom = dashboardMapDefaultZoom;
     const mapFrameElement = mapElement ? mapElement.closest(".map-frame") : null;
     const topbarElement = document.querySelector(".topbar");
     const topbarNotifyCornerElement = document.querySelector(".topbar-notify-corner");

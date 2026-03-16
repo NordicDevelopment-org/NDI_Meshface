@@ -1,3 +1,12 @@
+    function requestMapResizeNow() {{
+      if (!(mapElement instanceof HTMLElement)) return;
+      const rect = mapElement.getBoundingClientRect();
+      const width = Math.round(Number(rect && rect.width) || mapElement.clientWidth || 0);
+      const height = Math.round(Number(rect && rect.height) || mapElement.clientHeight || 0);
+      if (width <= 0 || height <= 0) return;
+      map.invalidateSize({{ pan: false, animate: false }});
+    }}
+
     function requestMapResize() {{
       if (mapResizeRaf !== null) {{
         cancelAnimationFrame(mapResizeRaf);
@@ -12,11 +21,17 @@
       if (!(mapElement instanceof HTMLElement)) return;
       const width = Math.round(mapElement.clientWidth || 0);
       const height = Math.round(mapElement.clientHeight || 0);
-      if (width <= 0 || height <= 0) return;
+      if (width <= 0 || height <= 0) {{
+        if (isMapVisibleLayoutView(activeLayoutView)) {{
+          requestMapResize();
+        }}
+        return;
+      }}
       const mapSize = map.getSize();
       const mapW = Math.round((mapSize && mapSize.x) || 0);
       const mapH = Math.round((mapSize && mapSize.y) || 0);
       if (Math.abs(mapW - width) > 2 || Math.abs(mapH - height) > 2) {{
+        requestMapResizeNow();
         requestMapResize();
       }}
     }}
@@ -32,7 +47,7 @@
     function requestMapResizeStabilized() {{
       clearMapResizeStabilizeTimers();
       requestMapResize();
-      for (const delayMs of [90, 220, 420]) {{
+      for (const delayMs of [90, 220, 420, 900, 1600, 2600]) {{
         const timerId = window.setTimeout(() => {{
           mapResizeStabilizeTimers = mapResizeStabilizeTimers.filter((id) => id !== timerId);
           requestMapResize();
@@ -135,4 +150,3 @@
       }});
       mapResizeObserver.observe(mapFrameElement);
     }}
-

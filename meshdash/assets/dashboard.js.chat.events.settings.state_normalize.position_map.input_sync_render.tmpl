@@ -48,14 +48,10 @@
         return true;
       }}
 
-      settingsFixedMap = L.map("settings-fixed-map", {{
-        preferCanvas: true,
-        zoomAnimation: false,
-        fadeAnimation: false,
-        markerZoomAnimation: false,
-        inertia: false,
-        scrollWheelZoom: true,
-      }}).setView(settingsFixedMapDefaultCenter, settingsFixedMapDefaultZoom);
+      settingsFixedMap = createDashboardLeafletMap("settings-fixed-map", {{
+        center: settingsFixedMapDefaultCenter,
+        zoom: settingsFixedMapDefaultZoom,
+      }});
       applySettingsFixedMapTiles();
 
       settingsFixedMap.on("zoomend", () => {{
@@ -96,4 +92,3 @@
       requestSettingsFixedMapResizeStabilized();
       return true;
     }}
-
