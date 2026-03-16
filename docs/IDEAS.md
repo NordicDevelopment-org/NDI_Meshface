@@ -1,9 +1,10 @@
 # Ideas Backlog
 
 
-
-- quick reply popups, with hops, top 5 emojie, etc?
-- make them sortable
+- map improvements
+- reusable map.
+- faster load
+- 
 
 
 
