@@ -914,9 +914,10 @@
       overflow: hidden;
     }}
     .workspace-shell.chat-panel-open {{
-      grid-template-columns: var(--rail-width) minmax(190px, var(--chat-panel-width)) minmax(0, 1fr);
+      grid-template-columns: var(--rail-width) minmax(0, 1fr) minmax(190px, var(--chat-panel-width));
     }}
     .workspace-main {{
+      order: 2;
       min-width: 0;
       width: 100%;
       min-height: 0;
@@ -974,6 +975,7 @@
       font-weight: 700;
     }}
     .chat-left-panel {{
+      order: 3;
       position: sticky;
       top: var(--topbar-sticky-offset, 72px);
       height: 100%;

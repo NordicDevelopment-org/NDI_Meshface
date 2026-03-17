@@ -51,12 +51,12 @@
         btn.setAttribute("aria-current", isActive ? "page" : "false");
       }}
 
-      const chatPanelOpen = next === "chat";
+      const chatViewActive = next === "chat";
       if (shell instanceof HTMLElement) {{
-        shell.classList.toggle("chat-panel-open", chatPanelOpen);
+        shell.classList.add("chat-panel-open");
       }}
       if (chatLeftPanel instanceof HTMLElement) {{
-        chatLeftPanel.hidden = !chatPanelOpen;
+        chatLeftPanel.hidden = false;
       }}
       refreshMapCardTitle();
       const mapResetBtn = document.getElementById("map-reset-view-btn");
@@ -77,7 +77,7 @@
       if (isMapVisibleLayoutView(next)) {{
         requestMapResizeNow();
       }}
-      if (chatPanelOpen) {{
+      if (chatViewActive) {{
         if (activeWheelPane instanceof HTMLElement) {{
           activeWheelPane.classList.remove("wheel-scroll-active");
         }}
