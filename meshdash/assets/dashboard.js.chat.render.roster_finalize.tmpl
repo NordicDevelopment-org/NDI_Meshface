@@ -72,6 +72,11 @@
           if (aTime !== bTime) return bTime - aTime;
           return String(a.name || a.id).localeCompare(String(b.name || b.id));
         }});
+      for (const item of rosterAll) {{
+        const nodeId = normalizeNodeId(item && item.id);
+        if (!isSelectableNodeId(nodeId)) continue;
+        updateNodeOnlineSession(nodeId, normalizeFreshnessKey(item && item.status) === "online", nowUnix);
+      }}
       const roster = rosterQuery
         ? rosterAll
         : rosterAll.slice(0, chatRosterMaxEntries);
@@ -91,7 +96,10 @@
           ? rosterFiltered.map((item) => (
               (() => {{
                 const meta = nodeIdentityMeta(item.id, {{ showHops: false }});
-                const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}}`;
+                const onlineSeconds = nodeOnlineSessionSeconds(item.id, nowUnix);
+                const onlineCompact = formatNodeOnlineSessionDuration(onlineSeconds);
+                const onlineTitle = `Online this session: ${{formatUptimeHms(onlineSeconds)}}`;
+                const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}} · ${{onlineTitle}}`;
                 const peerBadge = item.p2pPinned
                   ? '<span class="chat-member-peer-badge" title="Saved peer-to-peer target">saved</span>'
                   : "";
@@ -114,6 +122,7 @@
                     </span>
                   </span>
                   <span class="chat-member-id">${{escAttr(item.id)}}</span>
+                  <span class="chat-member-online-time" title="${{escAttr(`Total online time seen in this dashboard session (${{formatUptimeHms(onlineSeconds)}})`)}}">Online: ${{escAttr(onlineCompact)}}</span>
                 </span>
               </div>`;
               }})()
