@@ -129,7 +129,7 @@
     }}
 
     function renderNodes(nodes) {{
-      const query = normalizeSearchQuery(nodesSearchQuery);
+      const query = globalNodeSearchQuery();
       const model = buildNodesTableModel(nodes || [], query);
       const computedHash = model.hash;
       if (computedHash === nodesTableLastHash && query === nodesTableLastQuery) {{

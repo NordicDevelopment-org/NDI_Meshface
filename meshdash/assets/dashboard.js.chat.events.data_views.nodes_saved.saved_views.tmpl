@@ -583,7 +583,7 @@
           return String(a.name || a.id).localeCompare(String(b.name || b.id));
         }});
 
-      const query = normalizeSearchQuery(favoritesSearchQuery);
+      const query = globalNodeSearchQuery();
       const filtered = query
         ? entries.filter((entry) => entry.searchable.includes(query))
         : entries;

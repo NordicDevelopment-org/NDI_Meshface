@@ -59,7 +59,7 @@
       }}
       renderChatChangeSummary(nowUnix);
 
-      const rosterQuery = normalizeSearchQuery(chatUserSearchQuery);
+      const rosterQuery = globalNodeSearchQuery();
       const roomList = document.getElementById("chat-room-list");
       const rosterAll = Array.from(participants.values())
         .sort((a, b) => {{

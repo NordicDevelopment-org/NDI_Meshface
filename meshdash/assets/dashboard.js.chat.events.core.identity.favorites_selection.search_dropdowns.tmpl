@@ -2,6 +2,50 @@
       return String(value == null ? "" : value).trim().toLowerCase();
     }}
 
+    function globalNodeSearchQuery() {{
+      return normalizeSearchQuery(chatUserSearchQuery);
+    }}
+
+    function syncGlobalNodeSearchInputs(query, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const valueText = normalizeSearchQuery(query);
+      const sourceInputId = String(opts.sourceInputId || "").trim();
+      const skipSourceInput = opts.skipSourceInput === true;
+      const inputIds = [
+        "chat-user-search-input",
+        "nodes-search-input",
+        "favorites-search-input",
+        "saved-node-search-input",
+        "favorite-menu-node-search-input",
+        "remote-node-search-input",
+      ];
+      for (const inputId of inputIds) {{
+        if (!inputId) continue;
+        if (skipSourceInput && sourceInputId && inputId === sourceInputId) continue;
+        const input = document.getElementById(inputId);
+        if (!(input instanceof HTMLInputElement)) continue;
+        if (input.value !== valueText) {{
+          input.value = valueText;
+        }}
+      }}
+    }}
+
+    function setGlobalNodeSearchQuery(value, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const query = normalizeSearchQuery(value);
+      const changed = query !== globalNodeSearchQuery();
+      chatUserSearchQuery = query;
+      nodesSearchQuery = query;
+      favoritesSearchQuery = query;
+      savedNodeSearchQuery = query;
+      favoriteMenuNodeSearchQuery = query;
+      remoteNodeSearchTerm = query;
+      if (opts.syncInputs !== false) {{
+        syncGlobalNodeSearchInputs(query, opts);
+      }}
+      return changed;
+    }}
+
     function nodeSearchKeywordText(nodeId, nodeName, options = null) {{
       const opts = options && typeof options === "object" ? options : {{}};
       const terms = [];
@@ -141,7 +185,7 @@
         return;
       }}
 
-      const query = normalizeSearchQuery(savedNodeSearchQuery);
+      const query = globalNodeSearchQuery();
       const rows = buildNodeSearchResults(state, query, 250);
       if (!rows.length) {{
         dropdown.innerHTML = '<div class="node-search-empty">No nodes match this search.</div>';
@@ -180,7 +224,7 @@
         return;
       }}
 
-      const query = normalizeSearchQuery(favoriteMenuNodeSearchQuery);
+      const query = globalNodeSearchQuery();
       const rows = buildNodeSearchResults(state, query, 250);
       if (!rows.length) {{
         dropdown.innerHTML = '<div class="node-search-empty">No nodes match this search.</div>';

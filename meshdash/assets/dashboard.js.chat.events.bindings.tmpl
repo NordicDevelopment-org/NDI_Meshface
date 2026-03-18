@@ -262,14 +262,34 @@
       }}, true);
     }}
 
+    function rerenderNodeSearchDependents(state = latestState) {{
+      const safeState = state && typeof state === "object" ? state : null;
+      if (!safeState) return;
+      renderChat(safeState);
+      if (activeLayoutView === "network") {{
+        renderNodes(safeState.nodes || []);
+      }}
+      if (activeLayoutView === "saved") {{
+        renderFavorites(safeState);
+      }}
+      if (activeLayoutView === "remote") {{
+        renderRemoteView(safeState);
+      }}
+      renderSavedNodeSearchDropdown(safeState);
+      renderFavoriteMenuNodeSearchDropdown(safeState);
+    }}
+
     function bindFavoritesControls() {{
       bindSearchTextInput("favorites-search-input", {{
-        value: favoritesSearchQuery,
+        value: globalNodeSearchQuery(),
         normalize: normalizeSearchQuery,
         onInput: (query) => {{
-          favoritesSearchQuery = query;
-          if (latestState) {{
-            renderFavorites(latestState);
+          const changed = setGlobalNodeSearchQuery(query, {{
+            sourceInputId: "favorites-search-input",
+            skipSourceInput: true,
+          }});
+          if (changed && latestState) {{
+            rerenderNodeSearchDependents(latestState);
           }}
         }},
       }});
@@ -287,15 +307,24 @@
             clearTimeout(favoriteMenuNodeSearchBlurTimer);
             favoriteMenuNodeSearchBlurTimer = null;
           }}
-          favoriteMenuNodeSearchQuery = normalizeSearchQuery(input.value);
+          setGlobalNodeSearchQuery(input.value, {{
+            sourceInputId: "favorite-menu-node-search-input",
+            skipSourceInput: true,
+          }});
           favoriteMenuNodeSearchOpen = true;
           renderFavoriteMenuNodeSearchDropdown(latestState);
         }};
         input.addEventListener("focus", openFavoriteNodeSearch);
         input.addEventListener("click", openFavoriteNodeSearch);
         input.addEventListener("input", () => {{
-          favoriteMenuNodeSearchQuery = normalizeSearchQuery(input.value);
+          const changed = setGlobalNodeSearchQuery(input.value, {{
+            sourceInputId: "favorite-menu-node-search-input",
+            skipSourceInput: true,
+          }});
           favoriteMenuNodeSearchOpen = true;
+          if (changed && latestState) {{
+            rerenderNodeSearchDependents(latestState);
+          }}
           renderFavoriteMenuNodeSearchDropdown(latestState);
         }});
         input.addEventListener("keydown", (ev) => {{
@@ -314,7 +343,7 @@
           }}, 120);
         }});
       }}
-      input.value = favoriteMenuNodeSearchQuery;
+      input.value = globalNodeSearchQuery();
 
       if (dropdown.dataset.bound !== "1") {{
         dropdown.dataset.bound = "1";
@@ -365,7 +394,10 @@
             clearTimeout(savedNodeSearchBlurTimer);
             savedNodeSearchBlurTimer = null;
           }}
-          savedNodeSearchQuery = normalizeSearchQuery(input.value);
+          setGlobalNodeSearchQuery(input.value, {{
+            sourceInputId: "saved-node-search-input",
+            skipSourceInput: true,
+          }});
           savedNodeSearchOpen = true;
           renderSavedNodeSearchDropdown(latestState);
         }};
@@ -374,8 +406,14 @@
         // Reopen on click so the list pops every time the user clicks it.
         input.addEventListener("click", openSavedNodeSearch);
         input.addEventListener("input", () => {{
-          savedNodeSearchQuery = normalizeSearchQuery(input.value);
+          const changed = setGlobalNodeSearchQuery(input.value, {{
+            sourceInputId: "saved-node-search-input",
+            skipSourceInput: true,
+          }});
           savedNodeSearchOpen = true;
+          if (changed && latestState) {{
+            rerenderNodeSearchDependents(latestState);
+          }}
           renderSavedNodeSearchDropdown(latestState);
         }});
         input.addEventListener("keydown", (ev) => {{
@@ -394,7 +432,7 @@
           }}, 120);
         }});
       }}
-      input.value = savedNodeSearchQuery;
+      input.value = globalNodeSearchQuery();
 
       if (dropdown.dataset.bound !== "1") {{
         dropdown.dataset.bound = "1";
@@ -434,23 +472,29 @@
 
     function bindNodeListSearchControls() {{
       bindSearchTextInput("nodes-search-input", {{
-        value: nodesSearchQuery,
+        value: globalNodeSearchQuery(),
         normalize: normalizeSearchQuery,
         onInput: (query) => {{
-          nodesSearchQuery = query;
-          if (latestState) {{
-            renderNodes(latestState.nodes || []);
+          const changed = setGlobalNodeSearchQuery(query, {{
+            sourceInputId: "nodes-search-input",
+            skipSourceInput: true,
+          }});
+          if (changed && latestState) {{
+            rerenderNodeSearchDependents(latestState);
           }}
         }},
       }});
 
       bindSearchTextInput("chat-user-search-input", {{
-        value: chatUserSearchQuery,
+        value: globalNodeSearchQuery(),
         normalize: normalizeSearchQuery,
         onInput: (query) => {{
-          chatUserSearchQuery = query;
-          if (latestState) {{
-            renderChat(latestState);
+          const changed = setGlobalNodeSearchQuery(query, {{
+            sourceInputId: "chat-user-search-input",
+            skipSourceInput: true,
+          }});
+          if (changed && latestState) {{
+            rerenderNodeSearchDependents(latestState);
           }}
         }},
       }});

@@ -184,14 +184,23 @@
       if (searchInput instanceof HTMLInputElement && searchInput.dataset.bound !== "1") {{
         searchInput.dataset.bound = "1";
         searchInput.addEventListener("input", () => {{
-          remoteNodeSearchTerm = String(searchInput.value || "");
-          renderRemoteView(latestState);
+          const changed = setGlobalNodeSearchQuery(searchInput.value, {{
+            sourceInputId: "remote-node-search-input",
+            skipSourceInput: true,
+          }});
+          if (changed && latestState) {{
+            rerenderNodeSearchDependents(latestState);
+          }}
         }});
         searchInput.addEventListener("keydown", (event) => {{
           if (event.key !== "Escape") return;
-          remoteNodeSearchTerm = "";
-          searchInput.value = "";
-          renderRemoteView(latestState);
+          const changed = setGlobalNodeSearchQuery("", {{
+            sourceInputId: "remote-node-search-input",
+            skipSourceInput: false,
+          }});
+          if (changed && latestState) {{
+            rerenderNodeSearchDependents(latestState);
+          }}
         }});
       }}
 
@@ -289,8 +298,8 @@
       const targetFromAll = resolveRemoteTargetNodeId(allEntries, safeState);
       remoteTargetNodeId = targetFromAll;
 
-      const queryText = String(remoteNodeSearchTerm || "").trim();
-      const query = normalizeSearchQuery(queryText);
+      const queryText = globalNodeSearchQuery();
+      const query = queryText;
       const filteredEntries = query
         ? allEntries.filter((entry) => entry.searchText.includes(query))
         : allEntries;
@@ -317,8 +326,8 @@
 
       const searchInput = document.getElementById("remote-node-search-input");
       if (searchInput instanceof HTMLInputElement && document.activeElement !== searchInput) {{
-        if (searchInput.value !== remoteNodeSearchTerm) {{
-          searchInput.value = remoteNodeSearchTerm;
+        if (searchInput.value !== queryText) {{
+          searchInput.value = queryText;
         }}
       }}
 
