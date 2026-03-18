@@ -33,6 +33,74 @@
         const packetMaps = buildPacketSummaryAndRoutingAckMaps(rawPackets);
         const packetSummaryByIdLocal = packetMaps.packetSummaryById;
         const deliveryAckByRequestIdLocal = packetMaps.deliveryAckByRequestId;
+        const packetTickerByNodeLocal = new Map();
+        const packetSparklineByNodeLocal = new Map();
+        const packetSparklineWindowSec = 60 * 60;
+        const packetSparklineBucketCount = 24;
+        const packetSparklineBucketSpanSec = packetSparklineWindowSec / packetSparklineBucketCount;
+        for (const packetEntry of rawPackets) {{
+          const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+            ? packetEntry.summary
+            : {{}};
+          const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
+            ? packetEntry.packet
+            : {{}};
+          const fromId = normalizeNodeId(
+            summary.from_id
+            ?? summary.fromId
+            ?? summary.from
+            ?? packet.from_id
+            ?? packet.fromId
+            ?? packet.from
+          );
+          if (!isSelectableNodeId(fromId)) continue;
+          const packetUnix = latestUnixTimestamp(
+            summary.rx_time_unix,
+            summary.captured_at,
+            summary.rx_time,
+            summary.time,
+            packetEntry && (packetEntry.captured_at || packetEntry.rx_time || packetEntry.time),
+            packet.rxTime,
+          );
+          let bucket = packetTickerByNodeLocal.get(fromId);
+          if (!bucket) {{
+            bucket = {{
+              total: 0,
+              recent5m: 0,
+              lastPacketUnix: null,
+            }};
+            packetTickerByNodeLocal.set(fromId, bucket);
+          }}
+          bucket.total += 1;
+          bucket.lastPacketUnix = latestUnixTimestamp(bucket.lastPacketUnix, packetUnix);
+          if (
+            Number.isFinite(packetUnix)
+            && packetUnix > 0
+            && (nowUnix - packetUnix) <= 300
+          ) {{
+            bucket.recent5m += 1;
+          }}
+          let spark = packetSparklineByNodeLocal.get(fromId);
+          if (!spark) {{
+            spark = {{
+              buckets: new Array(packetSparklineBucketCount).fill(0),
+              windowSec: packetSparklineWindowSec,
+              bucketCount: packetSparklineBucketCount,
+            }};
+            packetSparklineByNodeLocal.set(fromId, spark);
+          }}
+          if (Number.isFinite(packetUnix) && packetUnix > 0) {{
+            const ageSec = nowUnix - packetUnix;
+            if (ageSec >= 0 && ageSec <= packetSparklineWindowSec) {{
+              let bucketIndex = Math.floor((packetSparklineWindowSec - ageSec) / packetSparklineBucketSpanSec);
+              if (!Number.isFinite(bucketIndex)) {{
+                bucketIndex = packetSparklineBucketCount - 1;
+              }}
+              bucketIndex = Math.max(0, Math.min(packetSparklineBucketCount - 1, Math.trunc(bucketIndex)));
+              spark.buckets[bucketIndex] = Math.max(0, Math.trunc(Number(spark.buckets[bucketIndex]) || 0) + 1);
+            }}
+          }}
+        }}
 
         const endpointsForBuild = (msg) => {{
           if (!msg || typeof msg !== "object") return {{ fromId: "", toId: "" }};
@@ -165,6 +233,8 @@
           messageIndex: messageIndexLocal,
           packetSummaryById: packetSummaryByIdLocal,
           deliveryAckByRequestId: deliveryAckByRequestIdLocal,
+          packetTickerByNode: packetTickerByNodeLocal,
+          packetSparklineByNode: packetSparklineByNodeLocal,
           messageEndpoints: messageEndpointsLocal,
           channelCounts: channelCountsLocal,
           channelMessages: channelMessagesLocal,
@@ -185,6 +255,16 @@
       const channelCounts = derived.channelCounts;
       const channelMessages = derived.channelMessages;
       const directMessagesByPeer = derived.directMessagesByPeer;
+      const packetTickerByNode = (
+        derived.packetTickerByNode instanceof Map
+          ? derived.packetTickerByNode
+          : new Map()
+      );
+      const packetSparklineByNode = (
+        derived.packetSparklineByNode instanceof Map
+          ? derived.packetSparklineByNode
+          : new Map()
+      );
       const endpointsForMessage = (msg) => {{
         if (!msg || typeof msg !== "object") return {{ fromId: "", toId: "" }};
         const cached = messageEndpoints.get(msg);

@@ -86,6 +86,63 @@
           node: nodesById.get(normalizeNodeId(item.id)),
         }})
       ));
+      const buildNodePacketSparklinePath = (bucketValuesRaw, width = 56, height = 12) => {{
+        const buckets = Array.isArray(bucketValuesRaw)
+          ? bucketValuesRaw.map((value) => Math.max(0, Number(value) || 0))
+          : [];
+        const plotWidth = Math.max(12, Number(width) || 56);
+        const plotHeight = Math.max(8, Number(height) || 12);
+        const baselineY = Math.max(1, plotHeight - 1);
+        if (buckets.length <= 0) {{
+          return `M 0 ${{baselineY.toFixed(2)}} L ${{plotWidth.toFixed(2)}} ${{baselineY.toFixed(2)}}`;
+        }}
+        const maxValue = Math.max(0, ...buckets);
+        const padY = 1;
+        const usableHeight = Math.max(2, plotHeight - (padY * 2));
+        const points = buckets.map((value, idx) => {{
+          const x = buckets.length <= 1
+            ? (plotWidth / 2)
+            : ((idx / Math.max(1, buckets.length - 1)) * plotWidth);
+          const y = maxValue > 0
+            ? (padY + ((maxValue - value) / maxValue) * usableHeight)
+            : baselineY;
+          return {{
+            x,
+            y,
+          }};
+        }});
+        if (typeof buildSmoothSvgPath === "function") {{
+          const smoothPath = buildSmoothSvgPath(points, 0.2);
+          if (smoothPath) {{
+            return smoothPath;
+          }}
+        }}
+        return points.map((point, idx) => (
+          `${{idx === 0 ? "M" : "L"}} ${{point.x.toFixed(2)}} ${{point.y.toFixed(2)}}`
+        )).join(" ");
+      }};
+      const classifyNodePacketSparklineTrend = (bucketValuesRaw) => {{
+        const buckets = Array.isArray(bucketValuesRaw)
+          ? bucketValuesRaw.map((value) => Math.max(0, Number(value) || 0))
+          : [];
+        if (buckets.length <= 1) return "trend-flat";
+        const segmentSize = Math.max(1, Math.trunc(buckets.length / 3));
+        const startSlice = buckets.slice(0, segmentSize);
+        const endSlice = buckets.slice(-segmentSize);
+        const avg = (rows) => {{
+          const list = Array.isArray(rows) ? rows : [];
+          if (list.length === 0) return 0;
+          const total = list.reduce((sum, value) => sum + (Number(value) || 0), 0);
+          return total / Math.max(1, list.length);
+        }};
+        const startAvg = avg(startSlice);
+        const endAvg = avg(endSlice);
+        const delta = endAvg - startAvg;
+        const threshold = Math.max(0.5, Math.max(...buckets, 0) * 0.15);
+        if (delta > threshold) return "trend-up";
+        if (delta < -threshold) return "trend-down";
+        return "trend-flat";
+      }};
       const onlineCount = rosterAll.filter((item) => item.status === "online").length;
       const warnCount = rosterAll.filter((item) => item.status === "warn").length;
       const staleCount = rosterAll.filter((item) => item.status === "stale").length;
@@ -140,12 +197,44 @@
                 const idleText = Number.isFinite(snapshot.lastSeenUnix)
                   ? formatIdleAge(snapshot.lastSeenUnix, nowUnix)
                   : "n/a";
+                const packetTicker = (
+                  packetTickerByNode instanceof Map
+                    ? (packetTickerByNode.get(nodeId) || null)
+                    : null
+                );
+                const packetSparkline = (
+                  packetSparklineByNode instanceof Map
+                    ? (packetSparklineByNode.get(nodeId) || null)
+                    : null
+                );
+                const packetSparklineBuckets = Array.isArray(packetSparkline && packetSparkline.buckets)
+                  ? packetSparkline.buckets
+                  : [];
+                const packetSparklineWindowSec = Math.max(
+                  60,
+                  Math.trunc(Number(packetSparkline && packetSparkline.windowSec) || 3600)
+                );
+                const packetSparklineWindowMin = Math.max(1, Math.round(packetSparklineWindowSec / 60));
+                const packetSparklinePath = buildNodePacketSparklinePath(packetSparklineBuckets, 56, 12);
+                const packetSparklineTrend = classifyNodePacketSparklineTrend(packetSparklineBuckets);
+                const packetTotal = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.total) || 0));
+                const packetRecent5m = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.recent5m) || 0));
+                const packetLastUnix = Number(packetTicker && packetTicker.lastPacketUnix);
+                const packetLastText = (
+                  Number.isFinite(packetLastUnix) && packetLastUnix > 0
+                    ? `${{formatLocalChatTime(packetLastUnix, "n/a", nowUnix)}} (${{formatIdleAge(packetLastUnix, nowUnix)}})`
+                    : "n/a"
+                );
+                const packetTickerDetail = packetTotal > 0
+                  ? `Packets: ${{packetRecent5m}} in 5m, ${{packetTotal}} total, last ${{packetLastText}}. Trend window: ${{packetSparklineWindowMin}}m`
+                  : "Packets: none in current packet buffer";
                 const idleLine = `Idle: ${{idleText}}`;
                 const tooltipLines = [
                   `${{item.name}} (${{item.id}})`,
                   `Status: ${{statusLabel}}`,
                   `Last seen: ${{lastSeenText}}`,
                   idleLine,
+                  packetTickerDetail,
                   `Role: ${{roleText}}`,
                   `Hardware: ${{hardwareText}}`,
                   `Battery: ${{batteryText}}`,
@@ -164,6 +253,15 @@
                   ? `Last seen ${{formatLocalChatTime(snapshot.lastSeenUnix, "n/a", nowUnix)}}`
                   : "Last seen n/a";
                 const idleRowHtml = `<span class="chat-member-idle-time" title="${{escAttr(idleRowTitle)}}">Idle: ${{escAttr(idleText)}}</span>`;
+                const packetRowTitle = packetTotal > 0
+                  ? `Packet trend: last ${{packetSparklineWindowMin}}m. ${{packetRecent5m}} in last 5m, ${{packetTotal}} total. Last packet ${{packetLastText}}`
+                  : `No packets from this node in the current packet buffer. Trend window: ${{packetSparklineWindowMin}}m`;
+                const packetRowHtml = `<span class="chat-member-packet-trend metric-ticker ${{packetSparklineTrend}}" title="${{escAttr(packetRowTitle)}}">
+                  <svg class="metric-ticker-chart chat-member-packet-sparkline" viewBox="0 0 56 12" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                    <path d="${{escAttr(packetSparklinePath)}}" />
+                  </svg>
+                </span>`;
+                const memberMetaRowHtml = `<span class="chat-member-meta-row">${{idleRowHtml}}${{packetRowHtml}}</span>`;
                 const favoriteBtnHtml = (typeof favoriteToggleButtonHtml === "function")
                   ? favoriteToggleButtonHtml(item.id, "chat-favorite-btn")
                   : "";
@@ -183,7 +281,7 @@
                       ${{removeBtn}}
                     </span>
                   </span>
-                  ${{idleRowHtml}}
+                  ${{memberMetaRowHtml}}
                 </span>
               </div>`;
                 }} catch (err) {{
