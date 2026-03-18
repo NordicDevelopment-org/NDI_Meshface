@@ -4,12 +4,18 @@
       const sourceId = normalizeNodeId((options && options.source_id) || "");
       const sourceNode = nodes.find((node) => normalizeNodeId(node && node.id) === sourceId) || null;
 
+      const actionStartMs = parseDashboardTimeToMs(
+        options && (options.action_start_ms ?? options.ack_started_ms ?? options.started_ms)
+      );
       const receivedMs = parseDashboardTimeToMs(
         options && (options.received_ms ?? options.received_unix ?? options.received_at)
       );
       const nowMs = Date.now();
-      const latencyMs = (Number.isFinite(receivedMs) && receivedMs > 0)
-        ? Math.max(0, nowMs - receivedMs)
+      const latencyBaselineMs = (Number.isFinite(actionStartMs) && actionStartMs > 0)
+        ? actionStartMs
+        : receivedMs;
+      const latencyMs = (Number.isFinite(latencyBaselineMs) && latencyBaselineMs > 0)
+        ? Math.max(0, nowMs - latencyBaselineMs)
         : null;
       const latencyText = formatLatencyLabel(latencyMs);
       const hopText = formatHopCountLabel(options && options.hops, "hop count n/a");
@@ -61,9 +67,9 @@
       }}
 
       if (details.length === 0) {{
-        return `${{latencyText}} round trip, ${{hopText}}.`;
+        return `${{latencyText}}, ${{hopText}}.`;
       }}
-      return `${{latencyText}} round trip, ${{hopText}}, ${{details.join(", ")}}.`;
+      return `${{latencyText}}, ${{hopText}}, ${{details.join(", ")}}.`;
     }}
 
     function deliveryStateLabel(state) {{
@@ -97,4 +103,3 @@
       const clean = normalizeDeliveryState(state);
       return clean === "nak" || clean === "timeout" || clean === "error";
     }}
-

@@ -202,6 +202,7 @@
 
     async function sendChatAck(options = null) {{
       if (chatSendInFlight) return null;
+      const ackActionStartMs = Date.now();
       const replyId = Number(options && options.reply_id);
       if (!Number.isInteger(replyId) || replyId <= 0) {{
         setChatSendStatus("Cannot ACK: target message id is missing.", true);
@@ -211,7 +212,11 @@
       let text = String((options && options.text) || "").trim();
       if (textMode === "pong") {{
         try {{
-          const pongText = await buildPongStyleAckReplyText(options, latestState);
+          const pongOptions = {{
+            ...((options && typeof options === "object") ? options : {{}}),
+            action_start_ms: ackActionStartMs,
+          }};
+          const pongText = await buildPongStyleAckReplyText(pongOptions, latestState);
           if (pongText) {{
             text = String(pongText).trim();
           }}
@@ -305,4 +310,3 @@
         setChatSendStatus(`Retried to ${{destLabel}} at ${{payload.sent_at || "now"}}`);
       }}
     }}
-
