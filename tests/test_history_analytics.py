@@ -15,6 +15,7 @@ def test_build_node_history_payload_handles_empty_node_id():
         "points": [],
         "positions": [],
         "name_history": [],
+        "packet_timestamps": [],
         "summary": {},
     }
 
@@ -60,6 +61,7 @@ def test_build_node_history_payload_aggregates_rows_and_positions():
     assert payload["positions"][0]["time_unix"] == 120
     assert payload["positions"][1]["time_unix"] == 210
     assert len(payload["name_history"]) == 2
+    assert payload["packet_timestamps"] == [220, 240]
     assert payload["name_history"][0]["short_name"] == "N1"
     assert payload["name_history"][1]["short_name"] == "N2"
 

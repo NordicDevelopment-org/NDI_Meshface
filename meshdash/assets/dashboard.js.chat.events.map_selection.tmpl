@@ -271,14 +271,18 @@
     }}
 
     function setHistoryTab(tabName) {{
-      activeHistoryTab = tabName === "overview" ? "overview" : "signal";
+      activeHistoryTab = (tabName === "overview" || tabName === "online")
+        ? tabName
+        : "signal";
       for (const btn of document.querySelectorAll(".history-tab-btn")) {{
         const isActive = btn.dataset.tab === activeHistoryTab;
         btn.classList.toggle("active", isActive);
       }}
       const signalPanel = document.getElementById("tab-panel-signal");
+      const onlinePanel = document.getElementById("tab-panel-online");
       const overviewPanel = document.getElementById("tab-panel-overview");
       if (signalPanel) signalPanel.hidden = activeHistoryTab !== "signal";
+      if (onlinePanel) onlinePanel.hidden = activeHistoryTab !== "online";
       if (overviewPanel) overviewPanel.hidden = activeHistoryTab !== "overview";
     }}
 
@@ -315,6 +319,16 @@
         empty.textContent = "Loading historical signal points...";
       }}
       setSignalTimelineMessage("Loading timeline...");
+      const onlineSvg = document.getElementById("node-online-chart");
+      if (onlineSvg) {{
+        onlineSvg.innerHTML = "";
+      }}
+      const onlineEmpty = document.getElementById("node-online-empty");
+      if (onlineEmpty) {{
+        onlineEmpty.hidden = false;
+        onlineEmpty.textContent = "Loading historical online points...";
+      }}
+      setNodeOnlineTimelineMessage("Loading timeline...");
       renderSavedNodeDetails(latestState || {{}}, null, nodeId);
     }}
 
@@ -488,4 +502,3 @@
         selectNode(nodeId, true, false);
       }});
     }}
-

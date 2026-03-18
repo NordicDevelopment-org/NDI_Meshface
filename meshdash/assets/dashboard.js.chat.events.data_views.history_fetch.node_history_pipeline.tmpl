@@ -41,6 +41,11 @@
         caption.textContent = `${{name}} (${{historyNodeId || fallbackNodeId || "n/a"}}). ${{loc}} History window: ${{history.window_hours || nodeHistoryHours}}h, packets: ${{span.total_packets ?? 0}}, trail points: ${{trailPoints}}.`;
       }}
       renderSignalChart(history.points || []);
+      renderNodeOnlineChart(
+        history.points || [],
+        history.window_hours,
+        Array.isArray(history.packet_timestamps) ? history.packet_timestamps : []
+      );
       renderNodeHistoryOverview(history, node);
       setHistoryTab(activeHistoryTab);
     }}
@@ -190,4 +195,3 @@
         }}
       }}
     }}
-

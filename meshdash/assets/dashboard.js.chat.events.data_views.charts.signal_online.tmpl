@@ -113,6 +113,188 @@
       renderSignalTimeline(plotRows, padLeft, padRight, width);
     }}
 
+    function setNodeOnlineTimelineMessage(message) {{
+      setTimelineMessage("node-online-timeline", message);
+    }}
+
+    function renderNodeOnlineChart(points, windowHours = null, packetTimestamps = null) {{
+      const svg = document.getElementById("node-online-chart");
+      const empty = document.getElementById("node-online-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+
+      const normalizeUnixSeconds = (raw) => {{
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric) || numeric <= 0) return null;
+        // Accept both second and millisecond unix timestamps.
+        if (numeric > 100000000000) {{
+          return Math.floor(numeric / 1000);
+        }}
+        return Math.floor(numeric);
+      }};
+
+      const rows = Array.isArray(points) ? points : [];
+      const timestampRows = Array.isArray(packetTimestamps) ? packetTimestamps : [];
+      const windowHoursRaw = Number(windowHours);
+      const defaultWindowHours = Number(nodeHistoryHours);
+      const resolvedWindowHours = Number.isFinite(windowHoursRaw) && windowHoursRaw > 0
+        ? windowHoursRaw
+        : (Number.isFinite(defaultWindowHours) && defaultWindowHours > 0 ? defaultWindowHours : 72);
+      const windowSeconds = Math.max(60, Math.round(resolvedWindowHours * 3600));
+      const endUnix = Math.floor(Date.now() / 1000);
+      const startUnix = endUnix - windowSeconds;
+      const packetsByBucket = new Map();
+      for (const rawTs of timestampRows) {{
+        const ts = normalizeUnixSeconds(rawTs);
+        if (!Number.isFinite(ts) || ts <= 0) continue;
+        const bucketMinute = Math.floor(ts / 60) * 60;
+        packetsByBucket.set(bucketMinute, (packetsByBucket.get(bucketMinute) || 0) + 1);
+      }}
+      // Merge rollup packet_count buckets as a second source. This protects against
+      // partial packet timestamp availability and keeps the series resilient.
+      for (const row of rows) {{
+        const bucket = normalizeUnixSeconds(row && row.bucket_unix);
+        if (!Number.isFinite(bucket)) continue;
+        const bucketMinute = Math.floor(bucket / 60) * 60;
+        const packetCount = Number(row && row.packet_count);
+        const normalizedCount = Number.isFinite(packetCount) ? Math.max(0, Math.trunc(packetCount)) : 0;
+        if (normalizedCount > 0) {{
+          packetsByBucket.set(bucketMinute, Math.max(normalizedCount, packetsByBucket.get(bucketMinute) || 0));
+        }}
+      }}
+      const onlineHoldSeconds = Math.max(
+        60,
+        Math.round((Number(chatStaleWindowSeconds) || Number(chatWarnWindowSeconds) || 1800) / 60) * 60
+      );
+      const width = signalChartLayout.width;
+      const height = signalChartLayout.height;
+      const padLeft = signalChartLayout.padLeft;
+      const padRight = signalChartLayout.padRight;
+      const padTop = signalChartLayout.padTop;
+      const padBottom = signalChartLayout.padBottom;
+      const plotW = width - padLeft - padRight;
+      const plotH = height - padTop - padBottom;
+      const yOnline = padTop + (plotH * 0.22);
+      const yOffline = padTop + (plotH * 0.82);
+
+      const eventBuckets = Array.from(packetsByBucket.entries())
+        .filter(([bucket, count]) => Number.isFinite(bucket) && Number.isFinite(count) && count > 0)
+        .map(([bucket]) => Math.trunc(bucket))
+        .sort((a, b) => a - b);
+
+      const intervals = [];
+      for (const bucket of eventBuckets) {{
+        const packetUnix = Math.max(startUnix - onlineHoldSeconds, Math.trunc(bucket));
+        const intervalStart = Math.max(startUnix, packetUnix);
+        const intervalEnd = Math.min(endUnix, packetUnix + onlineHoldSeconds);
+        if (!(intervalEnd > intervalStart)) continue;
+        const last = intervals[intervals.length - 1];
+        if (last && intervalStart <= last.end_unix) {{
+          last.end_unix = Math.max(last.end_unix, intervalEnd);
+        }} else {{
+          intervals.push({{
+            start_unix: intervalStart,
+            end_unix: intervalEnd,
+          }});
+        }}
+      }}
+
+      const xFromUnix = (unixTs) => {{
+        const ratio = Math.max(0, Math.min(1, (Number(unixTs) - startUnix) / windowSeconds));
+        return padLeft + (ratio * plotW);
+      }};
+
+      const timelinePoints = new Set([startUnix, endUnix]);
+      for (const bucket of eventBuckets) {{
+        if (bucket >= startUnix && bucket <= endUnix) {{
+          timelinePoints.add(bucket);
+        }}
+      }}
+      for (const interval of intervals) {{
+        timelinePoints.add(interval.start_unix);
+        timelinePoints.add(interval.end_unix);
+      }}
+      const plotRows = Array.from(timelinePoints)
+        .filter((unixTs) => Number.isFinite(unixTs))
+        .sort((a, b) => a - b)
+        .map((unixTs) => ({{ bucket_unix: Math.trunc(unixTs) }}));
+
+      if (plotRows.length === 0) {{
+        svg.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = "No historical online points yet for this node.";
+        renderTimeline(
+          "node-online-timeline",
+          plotRows,
+          padLeft,
+          padRight,
+          width,
+          (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
+        );
+        return;
+      }}
+      empty.hidden = intervals.length > 0;
+
+      let path = `M ${{xFromUnix(startUnix).toFixed(2)}} ${{yOffline.toFixed(2)}}`;
+      const onlineRects = [];
+      let onlineDuration = 0;
+      for (const interval of intervals) {{
+        const startX = xFromUnix(interval.start_unix);
+        const endX = xFromUnix(interval.end_unix);
+        path += ` L ${{startX.toFixed(2)}} ${{yOffline.toFixed(2)}}`;
+        path += ` L ${{startX.toFixed(2)}} ${{yOnline.toFixed(2)}}`;
+        path += ` L ${{endX.toFixed(2)}} ${{yOnline.toFixed(2)}}`;
+        path += ` L ${{endX.toFixed(2)}} ${{yOffline.toFixed(2)}}`;
+        const rectW = Math.max(1, endX - startX);
+        onlineRects.push(
+          `<rect x="${{startX.toFixed(2)}}" y="${{padTop.toFixed(2)}}" width="${{rectW.toFixed(2)}}" height="${{plotH.toFixed(2)}}" fill="currentColor" opacity="0.12"></rect>`
+        );
+        onlineDuration += Math.max(0, Number(interval.end_unix) - Number(interval.start_unix));
+      }}
+      path += ` L ${{xFromUnix(endUnix).toFixed(2)}} ${{yOffline.toFixed(2)}}`;
+
+      const onlinePercent = windowSeconds > 0 ? (onlineDuration / windowSeconds) * 100 : 0;
+      const onlinePercentText = onlinePercent < 1
+        ? onlinePercent.toFixed(1)
+        : String(Math.round(onlinePercent));
+      if (intervals.length === 0) {{
+        empty.textContent = "No online packets observed in selected window.";
+      }}
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const chartPalette = darkTheme
+        ? {{
+            grid: "#324152",
+            line: "#58c878",
+            label: "#a4d0ff",
+          }}
+        : {{
+            grid: "#dce8df",
+            line: "#1f6f53",
+            label: "#3b5c4b",
+          }};
+
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.innerHTML = `
+        <rect x="0" y="0" width="${{width}}" height="${{height}}" fill="none"></rect>
+        <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{yOnline.toFixed(2)}}" x2="${{width - padRight}}" y2="${{yOnline.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{yOffline.toFixed(2)}}" x2="${{width - padRight}}" y2="${{yOffline.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <g style="color:${{chartPalette.line}}">${{onlineRects.join("")}}</g>
+        <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
+        <text x="${{padLeft - 4}}" y="${{(yOnline + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">Online</text>
+        <text x="${{padLeft - 4}}" y="${{(yOffline + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">Offline</text>
+        <text x="${{width - padRight + 4}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">${{onlinePercentText}}% online</text>
+      `;
+
+      renderTimeline(
+        "node-online-timeline",
+        plotRows,
+        padLeft,
+        padRight,
+        width,
+        (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
+      );
+    }}
+
     function rerenderOnlineActivityChartFromCache() {{
       const chartState = historyTrendCharts.online;
       const points = chartState && Array.isArray(chartState.points) ? chartState.points : [];
@@ -356,4 +538,3 @@
       renderOnlineActivityChart(activity.points || []);
       renderOnlineActivityOverview(activity);
     }}
-
