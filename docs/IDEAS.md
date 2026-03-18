@@ -1,8 +1,8 @@
 # Ideas Backlog
 
 
-
-- send files from node list
+- strip out main peer to peer, only have the new popup
+- send files from node list, progress bar on node, FILES view becomes file management.
 - have ai "test" zork and print the gameplay
 
 
