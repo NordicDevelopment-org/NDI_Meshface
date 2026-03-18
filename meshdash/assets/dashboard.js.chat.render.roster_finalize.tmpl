@@ -95,14 +95,63 @@
         roomList.innerHTML = rosterFiltered.length > 0
           ? rosterFiltered.map((item) => (
               (() => {{
-                const meta = nodeIdentityMeta(item.id, {{ showHops: false }});
+                const nodeId = normalizeNodeId(item.id);
+                const snapshot = resolveChatNodeFreshness(nodeId);
+                const node = nodesById.get(nodeId);
+                const caps = historyCapsById.get(nodeId);
                 const onlineSeconds = nodeOnlineSessionSeconds(item.id, nowUnix);
                 const onlineCompact = formatNodeOnlineSessionDuration(onlineSeconds);
-                const onlineTitle = `Online this session: ${{formatUptimeHms(onlineSeconds)}}`;
-                const memberTitle = `${{item.name}} (${{item.id}})${{meta.title ? ` - ${{meta.title}}` : ""}} · ${{onlineTitle}}`;
-                const peerBadge = item.p2pPinned
-                  ? '<span class="chat-member-peer-badge" title="Saved peer-to-peer target">saved</span>'
-                  : "";
+                const statusKey = normalizeFreshnessKey(item.status);
+                const statusLabel = statusKey === "online"
+                  ? "Online"
+                  : (statusKey === "warn" ? "Aging" : (statusKey === "stale" ? "Stale" : "Unknown"));
+                const lastSeenText = Number.isFinite(snapshot.lastSeenUnix)
+                  ? `${{formatLocalChatTime(snapshot.lastSeenUnix, "n/a", nowUnix)}} (${{savedDetailAge(snapshot.lastSeenUnix, nowUnix)}})`
+                  : "n/a";
+                const roleText = String((node && node.role) || "").trim() || "n/a";
+                const hardwareText = String((node && (node.hardware_model || node.hardware)) || "").trim() || "n/a";
+                const batteryRaw = Number(
+                  (node && node.battery_level != null)
+                    ? node.battery_level
+                    : (caps && caps.battery_level)
+                );
+                const batteryText = Number.isFinite(batteryRaw)
+                  ? `${{Math.max(0, Math.min(100, Math.round(batteryRaw)))}}%`
+                  : "n/a";
+                const hopsRaw = Number(
+                  (node && node.hops_away != null)
+                    ? node.hops_away
+                    : (caps && caps.last_hops)
+                );
+                const hopsText = Number.isFinite(hopsRaw) && hopsRaw >= 0
+                  ? String(Math.trunc(hopsRaw))
+                  : "n/a";
+                const hasLivePosition = (
+                  node
+                  && Number.isFinite(Number(node.lat))
+                  && Number.isFinite(Number(node.lon))
+                );
+                const gpsText = hasLivePosition
+                  ? `${{Number(node.lat).toFixed(5)}}, ${{Number(node.lon).toFixed(5)}}`
+                  : ((caps && caps.has_position === true) ? "history only" : "n/a");
+                const noteEntry = (typeof nodeNoteEntry === "function") ? nodeNoteEntry(nodeId) : null;
+                const noteText = String((noteEntry && noteEntry.note) || "").trim();
+                const tooltipLines = [
+                  `${{item.name}} (${{item.id}})`,
+                  `Status: ${{statusLabel}}`,
+                  `Last seen: ${{lastSeenText}}`,
+                  `Online this session: ${{formatUptimeHms(onlineSeconds)}}`,
+                  `Role: ${{roleText}}`,
+                  `Hardware: ${{hardwareText}}`,
+                  `Battery: ${{batteryText}}`,
+                  `Hops: ${{hopsText}}`,
+                  `GPS: ${{gpsText}}`,
+                  `Saved P2P: ${{item.p2pPinned ? "yes" : "no"}}`,
+                ];
+                if (noteText) {{
+                  tooltipLines.push(`Notes: ${{noteText}}`);
+                }}
+                const memberTitle = tooltipLines.join("\n");
                 const removeBtn = (activeChatChannel === "direct" && item.p2pPinned)
                   ? `<button type="button" class="chat-peer-remove-btn" data-node-id="${{escAttr(item.id)}}" title="Remove from peer-to-peer list" aria-label="Remove ${{escAttr(item.id)}} from peer-to-peer list">&times;</button>`
                   : "";
@@ -112,8 +161,6 @@
                   <span class="chat-member-name-row">
                     <span class="chat-member-name-left">
                       <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
-                      ${{meta.html ? `<span class="chat-name-meta">${{meta.html}}</span>` : ""}}
-                      ${{peerBadge}}
                     </span>
                     <span class="chat-member-actions">
                       ${{favoriteToggleButtonHtml(item.id, "chat-favorite-btn")}}
