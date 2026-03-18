@@ -14,6 +14,11 @@
         const msgTimeUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
         const fromMeta = chatEndpointParts(sourceNode, msgTimeUnix);
         const toMeta = chatEndpointParts(fallbackNode, msgTimeUnix);
+        const fromStatusKey = normalizeFreshnessKey(fromMeta.status);
+        const fromStatusLabel = fromStatusKey === "online"
+          ? "Online"
+          : (fromStatusKey === "warn" ? "Aging" : (fromStatusKey === "stale" ? "Stale" : "Unknown"));
+        const fromStatusDotTitle = `Sender status: ${{fromStatusLabel}}`;
         const rawTimeText = String(msg.rx_time || msg.captured_at || "").trim();
         const timeText = formatLocalChatTime(msgTimeUnix, rawTimeText || "n/a", nowUnix);
         const localTimeTitle = Number.isFinite(msgTimeUnix)
@@ -293,6 +298,7 @@
           ? `${{replyInline}}${{statusBadge}}<span class="chat-feed-text chat-feed-text-inline">${{textHtml || "&nbsp;"}}</span>`
           : `${{replyInline}}${{statusBadge}}
               <span class="chat-endpoint chat-feed-author" title="${{escAttr(fromMeta.title)}}">
+                <span class="node-status-dot chat-feed-status-dot status-${{fromStatusKey}}" title="${{escAttr(fromStatusDotTitle)}}" aria-hidden="true">●</span>
                 <span class="chat-name status-${{fromMeta.status}}">${{escAttr(fromMeta.label)}}</span>
               </span>
               <span class="chat-feed-colon">:</span>
