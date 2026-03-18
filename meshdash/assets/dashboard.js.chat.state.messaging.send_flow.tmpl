@@ -10,10 +10,17 @@
       return "direct";
     }}
 
-    async function sendChatPayload(body, successMessage) {{
+    async function sendChatPayload(body, successMessage, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const statusFn = (typeof opts.statusFn === "function") ? opts.statusFn : setChatSendStatus;
+      const showSendingStatus = opts.showSendingStatus !== false;
+      const showSuccessStatus = opts.showSuccessStatus !== false;
+      const showErrorStatus = opts.showErrorStatus !== false;
       if (chatSendInFlight) return null;
       setChatSendBusy(true);
-      setChatSendStatus("Sending...");
+      if (showSendingStatus) {{
+        statusFn("Sending...");
+      }}
       try {{
         const resp = await fetch("/api/chat/send", {{
           method: "POST",
@@ -25,11 +32,15 @@
           const msg = payload && payload.error ? payload.error : `send failed (${{resp.status}})`;
           throw new Error(msg);
         }}
-        setChatSendStatus(successMessage || `Sent at ${{payload.sent_at || "now"}}`);
+        if (showSuccessStatus) {{
+          statusFn(successMessage || `Sent at ${{payload.sent_at || "now"}}`);
+        }}
         await poll();
         return payload;
       }} catch (err) {{
-        setChatSendStatus(`Send error: ${{err.message || err}}`, true);
+        if (showErrorStatus) {{
+          statusFn(`Send error: ${{err.message || err}}`, true);
+        }}
         return null;
       }} finally {{
         setChatSendBusy(false);
@@ -147,6 +158,21 @@
           setChatSendStatus(`${{replied ? "Reply sent" : "Sent"}} to Everyone on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
         }} else {{
           const awaitingAck = payload.ack_requested === true && normalizeDeliveryState(payload.delivery_state) === "pending";
+          const messageId = Number(payload && payload.message_id);
+          if (awaitingAck && Number.isInteger(messageId) && messageId > 0) {{
+            chatPendingDirectAck = {{
+              messageId,
+              destination,
+              channelIndex: sendCtx.sendIndex,
+              sentUnix: latestUnixTimestamp(
+                payload && payload.sent_unix,
+                payload && payload.sent_at,
+                Math.floor(Date.now() / 1000)
+              ),
+            }};
+          }} else {{
+            chatPendingDirectAck = null;
+          }}
           if (awaitingAck) {{
             setChatSendStatus(`${{replied ? "Reply sent direct" : "Sent direct"}} to ${{destination}} on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}} (awaiting ACK)`);
           }} else {{

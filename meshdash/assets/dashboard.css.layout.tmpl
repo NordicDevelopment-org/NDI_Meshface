@@ -2831,6 +2831,32 @@
       margin-left: auto;
       flex: 0 0 auto;
     }}
+    .chat-member-action-row {{
+      display: flex;
+      align-items: center;
+      margin-top: 2px;
+      min-width: 0;
+    }}
+    .chat-member-dm-link {{
+      border: 0;
+      background: transparent;
+      color: #1f6f4c;
+      font-size: 10px;
+      line-height: 1.2;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+    }}
+    .chat-member-dm-link:hover {{
+      color: #134d33;
+    }}
+    .chat-member-dm-link:focus-visible {{
+      outline: 1px solid #6fae8d;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }}
     .chat-peer-remove-btn {{
       border: 1px solid rgba(103, 132, 115, 0.45);
       background: transparent;
@@ -3706,10 +3732,14 @@
       padding: 7px 8px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "input send"
+        "status status";
       gap: 7px;
       align-items: center;
     }}
     .peer-dm-popout-input {{
+      grid-area: input;
       border: 1px solid #bfd4c3;
       border-radius: 999px;
       background: #ffffff;
@@ -3725,6 +3755,7 @@
       outline-offset: 1px;
     }}
     .peer-dm-popout-send-btn {{
+      grid-area: send;
       border: 1px solid #4b9a6d;
       background: #2f7f58;
       color: #ecfff4;
@@ -3739,6 +3770,23 @@
     .peer-dm-popout-send-btn:hover {{
       background: #276e4c;
       border-color: #3f8e63;
+    }}
+    .peer-dm-popout-status {{
+      grid-area: status;
+      min-height: 12px;
+      font-size: 10px;
+      line-height: 1.2;
+      color: #4f6f5d;
+      padding: 0 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    .peer-dm-popout-status[hidden] {{
+      display: none !important;
+    }}
+    .peer-dm-popout-status.is-error {{
+      color: #8d3a3a;
     }}
     @media (max-width: 900px) {{
       .peer-dm-popout-host {{

@@ -52,6 +52,8 @@
     function setPeerDmMenuOpen(open) {{
       peerDmMenuOpen = !!open;
       if (peerDmMenuOpen) {{
+        // Keep DM notifications independent from system notifications (bell).
+        markChatChangeAlertsAcknowledged("direct");
         setSelfRadioMenuOpen(false);
         setChatChangeMenuOpen(false);
         setChatSettingsMenuOpen(false);
@@ -282,7 +284,7 @@
         btn.addEventListener("click", (ev) => {{
           ev.preventDefault();
           ev.stopPropagation();
-          markChatChangeAlertsAcknowledged();
+          markChatChangeAlertsAcknowledged("all");
           const nextOpen = !chatChangeMenuOpen;
           setChatChangeMenuOpen(nextOpen);
           if (nextOpen) {{
@@ -322,7 +324,7 @@
       if (clearBtn instanceof HTMLButtonElement) {{
         clearBtn.addEventListener("click", (ev) => {{
           ev.preventDefault();
-          clearChatChangeNotices();
+          clearChatChangeNotices("all");
           clearChatFeedChangeFocus();
           if (latestState) {{
             renderChat(latestState);
