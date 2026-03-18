@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 import threading
 import time
 from collections.abc import Mapping
@@ -15,6 +16,14 @@ except Exception:  # pragma: no cover - exercised via runtime fallback
 _DEFAULT_REFRESH_SECONDS = 20
 _DEFAULT_REQUEST_TIMEOUT_SECONDS = 8
 _CONNECTION_STATUS_SOURCE = "admin.get_device_connection_status"
+_DEFAULT_ENABLED = str(os.getenv("MESHDASH_RADIO_CONNECTION_STATUS_ENABLED", "0")).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+    "y",
+}
+_ENABLED = _DEFAULT_ENABLED
 
 _CACHE_LOCK = threading.Lock()
 _CACHE: dict[int, dict[str, object]] = {}
@@ -261,6 +270,10 @@ def get_radio_connection_status(
     refresh_seconds: int = _DEFAULT_REFRESH_SECONDS,
     request_timeout_seconds: int = _DEFAULT_REQUEST_TIMEOUT_SECONDS,
 ) -> dict[str, object] | None:
+    with _CACHE_LOCK:
+        if not _ENABLED:
+            return None
+
     now = float(now_ts_fn())
     cache_key = id(iface)
     trigger_request = False
@@ -323,3 +336,18 @@ def get_radio_connection_status(
             return {"error": error}
     return None
 
+
+def set_radio_connection_status_enabled(enabled: bool) -> bool:
+    global _ENABLED
+    with _CACHE_LOCK:
+        _ENABLED = bool(enabled)
+        if not _ENABLED:
+            for entry in _CACHE.values():
+                entry["in_flight"] = False
+                entry["last_error"] = None
+    return _ENABLED
+
+
+def radio_connection_status_enabled() -> bool:
+    with _CACHE_LOCK:
+        return bool(_ENABLED)

@@ -197,6 +197,7 @@
                 const idleText = Number.isFinite(snapshot.lastSeenUnix)
                   ? formatIdleAge(snapshot.lastSeenUnix, nowUnix)
                   : "n/a";
+                const showPacketTrend = nodeNavigatorPacketTrendEnabled();
                 const packetTicker = (
                   packetTickerByNode instanceof Map
                     ? (packetTickerByNode.get(nodeId) || null)
@@ -215,26 +216,39 @@
                   Math.trunc(Number(packetSparkline && packetSparkline.windowSec) || 3600)
                 );
                 const packetSparklineWindowMin = Math.max(1, Math.round(packetSparklineWindowSec / 60));
-                const packetSparklinePath = buildNodePacketSparklinePath(packetSparklineBuckets, 56, 12);
-                const packetSparklineTrend = classifyNodePacketSparklineTrend(packetSparklineBuckets);
                 const packetTotal = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.total) || 0));
                 const packetRecent5m = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.recent5m) || 0));
+                const packetTxTotal = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.txTotal) || 0));
+                const packetTxRecent5m = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.txRecent5m) || 0));
+                const packetRxTotal = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.rxTotal) || 0));
+                const packetRxRecent5m = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.rxRecent5m) || 0));
                 const packetLastUnix = Number(packetTicker && packetTicker.lastPacketUnix);
+                const packetLastTxUnix = Number(packetTicker && packetTicker.lastTxUnix);
+                const packetLastRxUnix = Number(packetTicker && packetTicker.lastRxUnix);
                 const packetLastText = (
                   Number.isFinite(packetLastUnix) && packetLastUnix > 0
                     ? `${{formatLocalChatTime(packetLastUnix, "n/a", nowUnix)}} (${{formatIdleAge(packetLastUnix, nowUnix)}})`
                     : "n/a"
                 );
+                const packetLastTxText = (
+                  Number.isFinite(packetLastTxUnix) && packetLastTxUnix > 0
+                    ? `${{formatLocalChatTime(packetLastTxUnix, "n/a", nowUnix)}} (${{formatIdleAge(packetLastTxUnix, nowUnix)}})`
+                    : "n/a"
+                );
+                const packetLastRxText = (
+                  Number.isFinite(packetLastRxUnix) && packetLastRxUnix > 0
+                    ? `${{formatLocalChatTime(packetLastRxUnix, "n/a", nowUnix)}} (${{formatIdleAge(packetLastRxUnix, nowUnix)}})`
+                    : "n/a"
+                );
                 const packetTickerDetail = packetTotal > 0
-                  ? `Packets: ${{packetRecent5m}} in 5m, ${{packetTotal}} total, last ${{packetLastText}}. Trend window: ${{packetSparklineWindowMin}}m`
-                  : "Packets: none in current packet buffer";
+                  ? `Radio packets: RX ${{packetRxRecent5m}} / TX ${{packetTxRecent5m}} in 5m, RX ${{packetRxTotal}} / TX ${{packetTxTotal}} total, last any ${{packetLastText}}, last RX ${{packetLastRxText}}, last TX ${{packetLastTxText}}. Trend window: ${{packetSparklineWindowMin}}m`
+                  : "Radio packets: none in current packet buffer";
                 const idleLine = `Idle: ${{idleText}}`;
                 const tooltipLines = [
                   `${{item.name}} (${{item.id}})`,
                   `Status: ${{statusLabel}}`,
                   `Last seen: ${{lastSeenText}}`,
                   idleLine,
-                  packetTickerDetail,
                   `Role: ${{roleText}}`,
                   `Hardware: ${{hardwareText}}`,
                   `Battery: ${{batteryText}}`,
@@ -242,6 +256,9 @@
                   `GPS: ${{gpsText}}`,
                   `Saved P2P: ${{item.p2pPinned ? "yes" : "no"}}`,
                 ];
+                if (showPacketTrend) {{
+                  tooltipLines.splice(4, 0, packetTickerDetail);
+                }}
                 if (noteText) {{
                   tooltipLines.push(`Notes: ${{noteText}}`);
                 }}
@@ -253,14 +270,22 @@
                   ? `Last seen ${{formatLocalChatTime(snapshot.lastSeenUnix, "n/a", nowUnix)}}`
                   : "Last seen n/a";
                 const idleRowHtml = `<span class="chat-member-idle-time" title="${{escAttr(idleRowTitle)}}">Idle: ${{escAttr(idleText)}}</span>`;
-                const packetRowTitle = packetTotal > 0
-                  ? `Packet trend: last ${{packetSparklineWindowMin}}m. ${{packetRecent5m}} in last 5m, ${{packetTotal}} total. Last packet ${{packetLastText}}`
-                  : `No packets from this node in the current packet buffer. Trend window: ${{packetSparklineWindowMin}}m`;
-                const packetRowHtml = `<span class="chat-member-packet-trend metric-ticker ${{packetSparklineTrend}}" title="${{escAttr(packetRowTitle)}}">
+                let packetRowHtml = "";
+                if (showPacketTrend) {{
+                  const packetSparklinePath = buildNodePacketSparklinePath(packetSparklineBuckets, 56, 12);
+                  const packetSparklineTrend = classifyNodePacketSparklineTrend(packetSparklineBuckets);
+                  const packetRowTitle = packetTotal > 0
+                    ? `Packet trend: last ${{packetSparklineWindowMin}}m. RX ${{packetRxRecent5m}} / TX ${{packetTxRecent5m}} in last 5m, RX ${{packetRxTotal}} / TX ${{packetTxTotal}} total. Last any ${{packetLastText}}. Last RX ${{packetLastRxText}}. Last TX ${{packetLastTxText}}`
+                    : `No packets from this node in the current packet buffer. Trend window: ${{packetSparklineWindowMin}}m`;
+                  packetRowHtml = `<span class="chat-member-packet-trend-wrap">
+                  <span class="chat-member-packet-direction" title="Per-node radio packet direction in last 5 minutes">RX ${{packetRxRecent5m}} · TX ${{packetTxRecent5m}}</span>
+                  <span class="chat-member-packet-trend metric-ticker ${{packetSparklineTrend}}" title="${{escAttr(packetRowTitle)}}">
                   <svg class="metric-ticker-chart chat-member-packet-sparkline" viewBox="0 0 56 12" preserveAspectRatio="none" aria-hidden="true" focusable="false">
                     <path d="${{escAttr(packetSparklinePath)}}" />
                   </svg>
+                </span>
                 </span>`;
+                }}
                 const memberMetaRowHtml = `<span class="chat-member-meta-row">${{idleRowHtml}}${{packetRowHtml}}</span>`;
                 const favoriteBtnHtml = (typeof favoriteToggleButtonHtml === "function")
                   ? favoriteToggleButtonHtml(item.id, "chat-favorite-btn")

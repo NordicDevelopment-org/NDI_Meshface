@@ -70,6 +70,8 @@ def test_parse_device_connection_status_packet_supports_snake_case_shapes():
 
 def test_get_radio_connection_status_uses_cached_response_and_throttles_requests():
     _clear_connection_status_cache()
+    original_enabled = connection_status_mod.radio_connection_status_enabled()
+    connection_status_mod.set_radio_connection_status_enabled(True)
 
     class _AdminMessage:
         def __init__(self):
@@ -144,4 +146,30 @@ def test_get_radio_connection_status_uses_cached_response_and_throttles_requests
         assert second["age_seconds"] == 1
         assert iface.localNode.calls == 1
     finally:
+        connection_status_mod.set_radio_connection_status_enabled(original_enabled)
         connection_status_mod.admin_pb2 = original_admin_pb2
+
+
+def test_get_radio_connection_status_returns_none_when_disabled():
+    _clear_connection_status_cache()
+    original_enabled = connection_status_mod.radio_connection_status_enabled()
+    connection_status_mod.set_radio_connection_status_enabled(False)
+
+    class _LocalNode:
+        def __init__(self):
+            self.calls = 0
+
+        def _sendAdmin(self, *_args, **_kwargs):
+            self.calls += 1
+
+    class _Iface:
+        def __init__(self):
+            self.localNode = _LocalNode()
+
+    try:
+        iface = _Iface()
+        result = connection_status_mod.get_radio_connection_status(iface, now_ts_fn=lambda: 100.0)
+        assert result is None
+        assert iface.localNode.calls == 0
+    finally:
+        connection_status_mod.set_radio_connection_status_enabled(original_enabled)

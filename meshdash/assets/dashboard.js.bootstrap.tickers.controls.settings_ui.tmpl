@@ -82,6 +82,10 @@
       if (enabledToggle instanceof HTMLInputElement) {{
         enabledToggle.checked = tickerEnabled(selectedId);
       }}
+      const nodePacketTrendToggle = document.getElementById("settings-ticker-node-packet-trend-enabled");
+      if (nodePacketTrendToggle instanceof HTMLInputElement) {{
+        nodePacketTrendToggle.checked = nodeNavigatorPacketTrendEnabled();
+      }}
 
       const moveUpBtn = document.getElementById("settings-ticker-move-up");
       const moveDownBtn = document.getElementById("settings-ticker-move-down");
@@ -142,4 +146,3 @@
         toggle.checked = !!nodeRows[rowToggle.key];
       }}
     }}
-

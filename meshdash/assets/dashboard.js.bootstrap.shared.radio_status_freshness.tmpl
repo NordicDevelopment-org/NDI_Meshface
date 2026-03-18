@@ -1,3 +1,48 @@
+    function isMeshRadioActivityPacket(packetEntry, localNodeId = "") {{
+      const summary = (packetEntry && typeof packetEntry.summary === "object")
+        ? packetEntry.summary
+        : ((packetEntry && typeof packetEntry === "object") ? packetEntry : {{}});
+      const packet = (packetEntry && typeof packetEntry.packet === "object")
+        ? packetEntry.packet
+        : ((packetEntry && typeof packetEntry === "object") ? packetEntry : {{}});
+      const decoded = (packet && typeof packet.decoded === "object")
+        ? packet.decoded
+        : {{}};
+      const fromRaw = (
+        summary && (summary.from_id ?? summary.fromId ?? summary.from)
+      ) ?? (
+        packet && (packet.from_id ?? packet.fromId ?? packet.from)
+      );
+      const fromId = normalizeNodeId(fromRaw);
+      const toRaw = (
+        summary && (summary.to_id ?? summary.toId ?? summary.to)
+      ) ?? (
+        packet && (packet.to_id ?? packet.toId ?? packet.to ?? packet.destination)
+      );
+      const toId = normalizeNodeId(toRaw);
+      const portnumRaw = (
+        summary && summary.portnum
+      ) ?? (
+        decoded && decoded.portnum
+      ) ?? (
+        packet && packet.portnum
+      ) ?? "";
+      const portnum = String(portnumRaw).trim().toUpperCase();
+      if (portnum === "ADMIN_APP") {{
+        return false;
+      }}
+      if (toId === "^local") {{
+        return false;
+      }}
+      if (isCanonicalNodeId(localNodeId) && fromId === localNodeId && toId === localNodeId) {{
+        return false;
+      }}
+      const hasKnownFrom = isCanonicalNodeId(fromId);
+      const hasKnownTo = isCanonicalNodeId(toId);
+      const isBroadcastToAll = toId === "^all";
+      return hasKnownFrom || hasKnownTo || isBroadcastToAll;
+    }}
+
     function buildRadioTrafficSnapshot(traffic, localNodeId, nowUnix = Math.floor(Date.now() / 1000), windowSec = 120) {{
       const packets = Array.isArray(traffic && traffic.recent_packets) ? traffic.recent_packets : [];
       let rxRecent = 0;
@@ -14,13 +59,12 @@
           packet && packet.rx_time,
           packet && packet.time,
         );
-        if (Number.isFinite(packetUnix) && packetUnix > 0) {{
-          if (!Number.isFinite(lastPacketUnix) || packetUnix > lastPacketUnix) {{
-            lastPacketUnix = packetUnix;
-          }}
-        }}
         if (!Number.isFinite(packetUnix) || packetUnix <= 0) continue;
         if ((nowUnix - packetUnix) > windowSeconds) continue;
+        if (!isMeshRadioActivityPacket(packet, localNodeId)) continue;
+        if (!Number.isFinite(lastPacketUnix) || packetUnix > lastPacketUnix) {{
+          lastPacketUnix = packetUnix;
+        }}
 
         const fromId = normalizeNodeId(
           summary && (summary.from_id ?? summary.fromId ?? summary.from)

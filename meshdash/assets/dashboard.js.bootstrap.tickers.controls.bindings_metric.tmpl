@@ -26,6 +26,25 @@
           saveTickerPreferences();
         }});
       }}
+      const nodePacketTrendToggle = document.getElementById("settings-ticker-node-packet-trend-enabled");
+      if (nodePacketTrendToggle instanceof HTMLInputElement && nodePacketTrendToggle.dataset.bound !== "1") {{
+        nodePacketTrendToggle.dataset.bound = "1";
+        nodePacketTrendToggle.addEventListener("change", () => {{
+          const prefs = currentTickerPreferences();
+          prefs.node_packet_trend = !!nodePacketTrendToggle.checked;
+          saveTickerPreferences({{
+            rerenderSummary: false,
+            rerenderSettings: true,
+            status: nodePacketTrendToggle.checked
+              ? "Node navigator packet trend enabled locally."
+              : "Node navigator packet trend hidden locally.",
+          }});
+          chatDerivedCache = null;
+          if (latestState) {{
+            renderChat(latestState);
+          }}
+        }});
+      }}
 
       const moveUpBtn = document.getElementById("settings-ticker-move-up");
       if (moveUpBtn instanceof HTMLButtonElement && moveUpBtn.dataset.bound !== "1") {{
@@ -150,4 +169,3 @@
         }});
       }}
     }}
-

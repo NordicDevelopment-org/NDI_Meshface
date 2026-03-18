@@ -16,7 +16,8 @@
         && chatDerivedCache.nodesRef === nodes
         && chatDerivedCache.historyCapsRef === historyCapsObj
         && chatDerivedCache.localNodeId === localNodeId
-        && chatDerivedCache.meshChannelIndex === normalizeMeshChannelIndex(activeMeshChannelIndex)) {{
+        && chatDerivedCache.meshChannelIndex === normalizeMeshChannelIndex(activeMeshChannelIndex)
+        && chatDerivedCache.nodePacketTrendEnabled === nodeNavigatorPacketTrendEnabled()) {{
         derived = chatDerivedCache;
       }}
       if (!derived) {{
@@ -35,70 +36,124 @@
         const deliveryAckByRequestIdLocal = packetMaps.deliveryAckByRequestId;
         const packetTickerByNodeLocal = new Map();
         const packetSparklineByNodeLocal = new Map();
+        const includeNodePacketTrend = nodeNavigatorPacketTrendEnabled();
         const packetSparklineWindowSec = 60 * 60;
         const packetSparklineBucketCount = 24;
         const packetSparklineBucketSpanSec = packetSparklineWindowSec / packetSparklineBucketCount;
-        for (const packetEntry of rawPackets) {{
-          const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
-            ? packetEntry.summary
-            : {{}};
-          const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
-            ? packetEntry.packet
-            : {{}};
-          const fromId = normalizeNodeId(
-            summary.from_id
-            ?? summary.fromId
-            ?? summary.from
-            ?? packet.from_id
-            ?? packet.fromId
-            ?? packet.from
-          );
-          if (!isSelectableNodeId(fromId)) continue;
-          const packetUnix = latestUnixTimestamp(
-            summary.rx_time_unix,
-            summary.captured_at,
-            summary.rx_time,
-            summary.time,
-            packetEntry && (packetEntry.captured_at || packetEntry.rx_time || packetEntry.time),
-            packet.rxTime,
-          );
-          let bucket = packetTickerByNodeLocal.get(fromId);
-          if (!bucket) {{
-            bucket = {{
-              total: 0,
-              recent5m: 0,
-              lastPacketUnix: null,
-            }};
-            packetTickerByNodeLocal.set(fromId, bucket);
-          }}
-          bucket.total += 1;
-          bucket.lastPacketUnix = latestUnixTimestamp(bucket.lastPacketUnix, packetUnix);
-          if (
-            Number.isFinite(packetUnix)
-            && packetUnix > 0
-            && (nowUnix - packetUnix) <= 300
-          ) {{
-            bucket.recent5m += 1;
-          }}
-          let spark = packetSparklineByNodeLocal.get(fromId);
-          if (!spark) {{
-            spark = {{
-              buckets: new Array(packetSparklineBucketCount).fill(0),
-              windowSec: packetSparklineWindowSec,
-              bucketCount: packetSparklineBucketCount,
-            }};
-            packetSparklineByNodeLocal.set(fromId, spark);
-          }}
-          if (Number.isFinite(packetUnix) && packetUnix > 0) {{
-            const ageSec = nowUnix - packetUnix;
-            if (ageSec >= 0 && ageSec <= packetSparklineWindowSec) {{
-              let bucketIndex = Math.floor((packetSparklineWindowSec - ageSec) / packetSparklineBucketSpanSec);
-              if (!Number.isFinite(bucketIndex)) {{
-                bucketIndex = packetSparklineBucketCount - 1;
-              }}
-              bucketIndex = Math.max(0, Math.min(packetSparklineBucketCount - 1, Math.trunc(bucketIndex)));
-              spark.buckets[bucketIndex] = Math.max(0, Math.trunc(Number(spark.buckets[bucketIndex]) || 0) + 1);
+        if (includeNodePacketTrend) {{
+          const ensurePacketBucket = (nodeId) => {{
+            if (!isSelectableNodeId(nodeId)) return null;
+            let bucket = packetTickerByNodeLocal.get(nodeId);
+            if (!bucket) {{
+              bucket = {{
+                total: 0,
+                recent5m: 0,
+                txTotal: 0,
+                txRecent5m: 0,
+                rxTotal: 0,
+                rxRecent5m: 0,
+                lastPacketUnix: null,
+                lastTxUnix: null,
+                lastRxUnix: null,
+              }};
+              packetTickerByNodeLocal.set(nodeId, bucket);
             }}
+            return bucket;
+          }};
+          const ensureSparklineBucket = (nodeId) => {{
+            if (!isSelectableNodeId(nodeId)) return null;
+            let spark = packetSparklineByNodeLocal.get(nodeId);
+            if (!spark) {{
+              spark = {{
+                buckets: new Array(packetSparklineBucketCount).fill(0),
+                windowSec: packetSparklineWindowSec,
+                bucketCount: packetSparklineBucketCount,
+              }};
+              packetSparklineByNodeLocal.set(nodeId, spark);
+            }}
+            return spark;
+          }};
+          const touchPacketDirection = (nodeId, direction, packetUnix, inRecent5m) => {{
+            const bucket = ensurePacketBucket(nodeId);
+            if (!bucket) return;
+            if (direction === "tx") {{
+              bucket.txTotal += 1;
+              bucket.lastTxUnix = latestUnixTimestamp(bucket.lastTxUnix, packetUnix);
+              if (inRecent5m) {{
+                bucket.txRecent5m += 1;
+              }}
+            }} else if (direction === "rx") {{
+              bucket.rxTotal += 1;
+              bucket.lastRxUnix = latestUnixTimestamp(bucket.lastRxUnix, packetUnix);
+              if (inRecent5m) {{
+                bucket.rxRecent5m += 1;
+              }}
+            }}
+            bucket.total = Math.max(0, Math.trunc(Number(bucket.txTotal) || 0) + Math.trunc(Number(bucket.rxTotal) || 0));
+            bucket.recent5m = Math.max(
+              0,
+              Math.trunc(Number(bucket.txRecent5m) || 0) + Math.trunc(Number(bucket.rxRecent5m) || 0)
+            );
+            bucket.lastPacketUnix = latestUnixTimestamp(bucket.lastTxUnix, bucket.lastRxUnix, packetUnix);
+          }};
+          const touchSparkline = (nodeId, packetUnix) => {{
+            if (!Number.isFinite(packetUnix) || packetUnix <= 0) return;
+            const spark = ensureSparklineBucket(nodeId);
+            if (!spark) return;
+            const ageSec = nowUnix - packetUnix;
+            if (ageSec < 0 || ageSec > packetSparklineWindowSec) return;
+            let bucketIndex = Math.floor((packetSparklineWindowSec - ageSec) / packetSparklineBucketSpanSec);
+            if (!Number.isFinite(bucketIndex)) {{
+              bucketIndex = packetSparklineBucketCount - 1;
+            }}
+            bucketIndex = Math.max(0, Math.min(packetSparklineBucketCount - 1, Math.trunc(bucketIndex)));
+            spark.buckets[bucketIndex] = Math.max(0, Math.trunc(Number(spark.buckets[bucketIndex]) || 0) + 1);
+          }};
+          for (const packetEntry of rawPackets) {{
+            const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+              ? packetEntry.summary
+              : {{}};
+            const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
+              ? packetEntry.packet
+              : {{}};
+            const isRadioPacket = (typeof isMeshRadioActivityPacket === "function")
+              ? isMeshRadioActivityPacket(packetEntry, localNodeId)
+              : true;
+            if (!isRadioPacket) continue;
+            const fromId = normalizeNodeId(
+              summary.from_id
+              ?? summary.fromId
+              ?? summary.from
+              ?? packet.from_id
+              ?? packet.fromId
+              ?? packet.from
+            );
+            const toId = normalizeNodeId(
+              summary.to_id
+              ?? summary.toId
+              ?? summary.to
+              ?? packet.to_id
+              ?? packet.toId
+              ?? packet.to
+              ?? packet.destination
+            );
+            const packetUnix = latestUnixTimestamp(
+              summary.rx_time_unix,
+              summary.captured_at,
+              summary.rx_time,
+              summary.time,
+              packetEntry && (packetEntry.captured_at || packetEntry.rx_time || packetEntry.time),
+              packet.rxTime,
+            );
+            const inRecent5m = (
+              Number.isFinite(packetUnix)
+              && packetUnix > 0
+              && (nowUnix - packetUnix) <= 300
+            );
+            touchPacketDirection(fromId, "tx", packetUnix, inRecent5m);
+            touchPacketDirection(toId, "rx", packetUnix, inRecent5m);
+            touchSparkline(fromId, packetUnix);
+            touchSparkline(toId, packetUnix);
           }}
         }}
 
@@ -235,6 +290,7 @@
           deliveryAckByRequestId: deliveryAckByRequestIdLocal,
           packetTickerByNode: packetTickerByNodeLocal,
           packetSparklineByNode: packetSparklineByNodeLocal,
+          nodePacketTrendEnabled: includeNodePacketTrend,
           messageEndpoints: messageEndpointsLocal,
           channelCounts: channelCountsLocal,
           channelMessages: channelMessagesLocal,

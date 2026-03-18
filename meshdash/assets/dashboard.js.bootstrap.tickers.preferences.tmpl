@@ -178,6 +178,7 @@
         trend: {{ ...tickerDefaultTrendVisibility }},
         battery_window_hours: tickerDefaultBatteryWindowHours,
         node_rows: {{ ...nodeTickerDefaultRows }},
+        node_packet_trend: true,
       }};
     }}
 
@@ -248,6 +249,13 @@
           ? parseBoolToken(nodeRowsRaw[key], fallback)
           : fallback;
       }}
+      const nodePacketTrend = parseBoolToken(
+        raw.node_packet_trend
+          ?? raw.nodePacketTrend
+          ?? raw.node_list_packet_sparkline
+          ?? raw.nodeListPacketSparkline,
+        true
+      );
 
       return {{
         order,
@@ -256,6 +264,7 @@
         trend,
         battery_window_hours: batteryWindowHours,
         node_rows: nodeRows,
+        node_packet_trend: nodePacketTrend,
       }};
     }}
 
@@ -337,6 +346,11 @@
           : !!nodeTickerDefaultRows[key];
       }}
       return normalized;
+    }}
+
+    function nodeNavigatorPacketTrendEnabled() {{
+      const prefs = currentTickerPreferences();
+      return parseBoolToken(prefs && prefs.node_packet_trend, true);
     }}
 
     function isTickerSettingsControlId(controlId) {{
@@ -489,4 +503,3 @@
         }}
       }}
     }}
-
