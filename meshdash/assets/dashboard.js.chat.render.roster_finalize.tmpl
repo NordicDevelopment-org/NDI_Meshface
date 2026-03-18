@@ -34,6 +34,19 @@
       if (activeChatChannel === "direct" && isCanonicalNodeId(selectedNodeId)) {{
         touchNodeById(selectedNodeId);
       }}
+      for (const node of nodes) {{
+        touchNodeById(node && node.id);
+      }}
+      if (favoriteNodeIds && typeof favoriteNodeIds.forEach === "function") {{
+        favoriteNodeIds.forEach((nodeId) => {{
+          touchNodeById(nodeId);
+        }});
+      }}
+      if (nodeNotesById && typeof nodeNotesById.forEach === "function") {{
+        nodeNotesById.forEach((_entry, nodeId) => {{
+          touchNodeById(nodeId);
+        }});
+      }}
       const feed = document.getElementById("chat-feed");
       if (feed) {{
         const emptyText = (activeChatChannel === "direct" && !isCanonicalNodeId(directSelectedId))
@@ -46,8 +59,9 @@
       }}
       renderChatChangeSummary(nowUnix);
 
+      const rosterQuery = normalizeSearchQuery(chatUserSearchQuery);
       const roomList = document.getElementById("chat-room-list");
-      const roster = Array.from(participants.values())
+      const rosterAll = Array.from(participants.values())
         .sort((a, b) => {{
           const pinDiff = Number(!!b.p2pPinned) - Number(!!a.p2pPinned);
           if (pinDiff !== 0) return pinDiff;
@@ -57,18 +71,21 @@
           const bTime = b.lastMessageUnix || 0;
           if (aTime !== bTime) return bTime - aTime;
           return String(a.name || a.id).localeCompare(String(b.name || b.id));
-        }})
-        .slice(0, chatRosterMaxEntries);
+        }});
+      const roster = rosterQuery
+        ? rosterAll
+        : rosterAll.slice(0, chatRosterMaxEntries);
       // Preserve the full (unfiltered) roster so tickFreshnessUI() can compute canonical
       // online/aging/stale counts even when the user is search-filtering the roster DOM.
-      chatRosterModel = roster;
-      const rosterQuery = normalizeSearchQuery(chatUserSearchQuery);
+      chatRosterModel = rosterAll;
       const rosterFiltered = roster.filter((item) => (
-        matchesIdOrNameQuery(item.id, item.name, rosterQuery)
+        matchesIdOrNameQuery(item.id, item.name, rosterQuery, {{
+          node: nodesById.get(normalizeNodeId(item.id)),
+        }})
       ));
-      const onlineCount = roster.filter((item) => item.status === "online").length;
-      const warnCount = roster.filter((item) => item.status === "warn").length;
-      const staleCount = roster.filter((item) => item.status === "stale").length;
+      const onlineCount = rosterAll.filter((item) => item.status === "online").length;
+      const warnCount = rosterAll.filter((item) => item.status === "warn").length;
+      const staleCount = rosterAll.filter((item) => item.status === "stale").length;
       if (roomList) {{
         roomList.innerHTML = rosterFiltered.length > 0
           ? rosterFiltered.map((item) => (
