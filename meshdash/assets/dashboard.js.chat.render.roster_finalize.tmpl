@@ -361,11 +361,12 @@
         Array.isArray(activePopoutBucketRaw)
         && activePopoutBucketRaw.length > 0
       );
+      const activePopoutIsKnownPeer = isKnownPeerNode(activePopoutPeerId);
       if (
         !isCanonicalNodeId(activePopoutPeerId)
         || (
-          !directConversationPeerIds.has(activePopoutPeerId)
-          && !manualDirectPeerIds.has(activePopoutPeerId)
+          !activePopoutIsKnownPeer
+          && !directConversationPeerIds.has(activePopoutPeerId)
           && !activePopoutHasMessages
         )
       ) {{
