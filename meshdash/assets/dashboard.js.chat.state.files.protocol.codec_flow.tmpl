@@ -77,12 +77,24 @@
       }};
     }}
 
-    function buildFileTransferMetaFrame(transferId, fileName, fileSize, totalChunks) {{
+    function normalizeFileTransferCompressionCodec(rawCodec) {{
+      const codec = String(rawCodec || "").trim().toLowerCase();
+      if (codec === fileTransferCompressionCodecLzss) return fileTransferCompressionCodecLzss;
+      return fileTransferCompressionCodecRaw;
+    }}
+
+    function buildFileTransferMetaFrame(transferId, fileName, fileSize, totalChunks, options = null) {{
       const cleanId = String(transferId || "").trim().toLowerCase();
       const cleanSize = Math.max(0, Math.trunc(Number(fileSize) || 0));
       const cleanChunks = Math.max(1, Math.trunc(Number(totalChunks) || 1));
       const nameBits = buildFileTransferNameEncoding(fileName);
-      return `${{fileTransferProtocolPrefix}}|M|${{cleanId}}|${{nameBits.encoded}}|${{cleanSize}}|${{cleanChunks}}`;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const codec = normalizeFileTransferCompressionCodec(opts.codec);
+      const originalSize = Math.max(
+        0,
+        Math.trunc(Number(opts.originalFileSize != null ? opts.originalFileSize : cleanSize) || cleanSize)
+      );
+      return `${{fileTransferProtocolPrefix}}|M|${{cleanId}}|${{nameBits.encoded}}|${{cleanSize}}|${{cleanChunks}}|${{codec}}|${{originalSize}}`;
     }}
 
     function buildFileTransferChunkFrame(transferId, chunkIndex, payloadBase64) {{
@@ -159,6 +171,11 @@
         const fileName = normalizeFileTransferName(safeDecodeUriComponent(parts[3] || ""));
         const fileSize = Math.trunc(Number(parts[4]));
         const totalChunks = Math.trunc(Number(parts[5]));
+        const codec = normalizeFileTransferCompressionCodec(parts.length >= 7 ? parts[6] : fileTransferCompressionCodecRaw);
+        const parsedOriginalSize = Math.trunc(Number(parts.length >= 8 ? parts[7] : fileSize));
+        const originalFileSize = Number.isFinite(parsedOriginalSize) && parsedOriginalSize >= 0
+          ? parsedOriginalSize
+          : fileSize;
         if (!Number.isFinite(fileSize) || fileSize < 0) return null;
         if (!Number.isFinite(totalChunks) || totalChunks <= 0) return null;
         return {{
@@ -167,6 +184,8 @@
           fileName,
           fileSize,
           totalChunks,
+          codec,
+          originalFileSize,
         }};
       }}
       if (frameType === "C") {{
@@ -238,6 +257,148 @@
         out[i] = binary.charCodeAt(i);
       }}
       return out;
+    }}
+
+    function fileTransferLzssCompressBytes(inputBytes) {{
+      const source = inputBytes instanceof Uint8Array ? inputBytes : new Uint8Array(inputBytes || []);
+      if (!source.length) return new Uint8Array(0);
+      const windowSize = Math.max(64, Math.trunc(Number(fileTransferCompressionWindowBytes) || 1024));
+      const minMatch = Math.max(3, Math.trunc(Number(fileTransferCompressionMinMatchBytes) || 4));
+      const maxMatch = Math.max(minMatch, Math.min(130, Math.trunc(Number(fileTransferCompressionMaxMatchBytes) || 130)));
+      const out = [];
+      const literalBuffer = [];
+      const flushLiterals = () => {{
+        if (!literalBuffer.length) return;
+        out.push(literalBuffer.length - 1);
+        for (const byte of literalBuffer) {{
+          out.push(byte);
+        }}
+        literalBuffer.length = 0;
+      }};
+      let cursor = 0;
+      while (cursor < source.length) {{
+        const windowStart = Math.max(0, cursor - windowSize);
+        const maxLenHere = Math.min(maxMatch, source.length - cursor);
+        let bestLen = 0;
+        let bestOffset = 0;
+        for (let probe = cursor - 1; probe >= windowStart; probe -= 1) {{
+          if (source[probe] !== source[cursor]) continue;
+          let run = 1;
+          while (run < maxLenHere && source[probe + run] === source[cursor + run]) {{
+            run += 1;
+          }}
+          if (run >= minMatch && run > bestLen) {{
+            bestLen = run;
+            bestOffset = cursor - probe;
+            if (run >= maxLenHere) {{
+              break;
+            }}
+          }}
+        }}
+        if (bestLen >= minMatch && bestOffset > 0) {{
+          flushLiterals();
+          out.push(0x80 | (bestLen - 3));
+          out.push((bestOffset >> 8) & 0xff);
+          out.push(bestOffset & 0xff);
+          cursor += bestLen;
+          continue;
+        }}
+        literalBuffer.push(source[cursor]);
+        if (literalBuffer.length >= 128) {{
+          flushLiterals();
+        }}
+        cursor += 1;
+      }}
+      flushLiterals();
+      return new Uint8Array(out);
+    }}
+
+    function fileTransferLzssDecompressBytes(inputBytes, expectedSize = null) {{
+      const source = inputBytes instanceof Uint8Array ? inputBytes : new Uint8Array(inputBytes || []);
+      if (!source.length) return new Uint8Array(0);
+      const out = [];
+      let cursor = 0;
+      while (cursor < source.length) {{
+        const token = source[cursor];
+        cursor += 1;
+        if ((token & 0x80) === 0) {{
+          const literalLen = (token & 0x7f) + 1;
+          if ((cursor + literalLen) > source.length) return null;
+          for (let i = 0; i < literalLen; i += 1) {{
+            out.push(source[cursor + i]);
+          }}
+          cursor += literalLen;
+          continue;
+        }}
+        const matchLen = (token & 0x7f) + 3;
+        if ((cursor + 2) > source.length) return null;
+        const offset = ((source[cursor] << 8) | source[cursor + 1]);
+        cursor += 2;
+        if (!Number.isFinite(offset) || offset <= 0 || offset > out.length) return null;
+        for (let i = 0; i < matchLen; i += 1) {{
+          const srcIdx = out.length - offset;
+          if (srcIdx < 0 || srcIdx >= out.length) return null;
+          out.push(out[srcIdx]);
+        }}
+      }}
+      const decoded = new Uint8Array(out);
+      const expected = expectedSize == null ? null : Math.max(0, Math.trunc(Number(expectedSize) || 0));
+      if (expected != null && decoded.length !== expected) return null;
+      return decoded;
+    }}
+
+    function buildFileTransferPayloadPlan(inputBytes) {{
+      const source = inputBytes instanceof Uint8Array ? inputBytes : new Uint8Array(inputBytes || []);
+      const originalSize = source.length;
+      const rawPlan = {{
+        codec: fileTransferCompressionCodecRaw,
+        wireBytes: source,
+        wireSize: originalSize,
+        originalSize,
+        compressed: false,
+        savingsBytes: 0,
+      }};
+      if (originalSize <= 0) return rawPlan;
+      if (!fileTransferCompressionEnabled) return rawPlan;
+      if (originalSize < Math.max(1, Math.trunc(Number(fileTransferCompressionMinInputBytes) || 1))) {{
+        return rawPlan;
+      }}
+      const compressed = fileTransferLzssCompressBytes(source);
+      if (!(compressed instanceof Uint8Array) || compressed.length <= 0) {{
+        return rawPlan;
+      }}
+      if (compressed.length >= originalSize) {{
+        return rawPlan;
+      }}
+      const savingsBytes = originalSize - compressed.length;
+      const savingsRatio = compressed.length / Math.max(originalSize, 1);
+      const minSavingsBytes = Math.max(1, Math.trunc(Number(fileTransferCompressionMinSavingsBytes) || 1));
+      const maxSavedRatio = Math.max(0.1, Math.min(0.99, Number(fileTransferCompressionMinSavingsRatio) || 0.92));
+      if (savingsBytes < minSavingsBytes || savingsRatio > maxSavedRatio) {{
+        return rawPlan;
+      }}
+      return {{
+        codec: fileTransferCompressionCodecLzss,
+        wireBytes: compressed,
+        wireSize: compressed.length,
+        originalSize,
+        compressed: true,
+        savingsBytes,
+      }};
+    }}
+
+    function decodeFileTransferPayloadBytes(wireBytes, rawCodec, expectedSize = null) {{
+      const codec = normalizeFileTransferCompressionCodec(rawCodec);
+      const source = wireBytes instanceof Uint8Array ? wireBytes : new Uint8Array(wireBytes || []);
+      if (codec === fileTransferCompressionCodecRaw) {{
+        const expected = expectedSize == null ? null : Math.max(0, Math.trunc(Number(expectedSize) || 0));
+        if (expected != null && expected !== source.length) return null;
+        return new Uint8Array(source);
+      }}
+      if (codec === fileTransferCompressionCodecLzss) {{
+        return fileTransferLzssDecompressBytes(source, expectedSize);
+      }}
+      return null;
     }}
 
     function explicitMessageMeshChannelIndex(msg) {{

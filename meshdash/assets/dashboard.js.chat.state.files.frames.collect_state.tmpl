@@ -107,6 +107,8 @@
             latestUnix: null,
             fileName: "",
             fileSize: null,
+            originalFileSize: null,
+            codec: fileTransferCompressionCodecRaw,
             totalChunks: null,
             chunks: new Map(),
             hasDecodeError: false,
@@ -127,6 +129,8 @@
         if (frame.kind === "meta") {{
           transfer.fileName = normalizeFileTransferName(frame.fileName || transfer.fileName || "mesh-file.bin");
           transfer.fileSize = Math.max(0, Math.trunc(Number(frame.fileSize) || 0));
+          transfer.originalFileSize = Math.max(0, Math.trunc(Number(frame.originalFileSize != null ? frame.originalFileSize : frame.fileSize) || 0));
+          transfer.codec = normalizeFileTransferCompressionCodec(frame.codec || fileTransferCompressionCodecRaw);
           transfer.totalChunks = Math.max(1, Math.trunc(Number(frame.totalChunks) || 1));
           continue;
         }}
@@ -154,6 +158,8 @@
         let cacheTotalChunks = null;
         let cacheFileName = "";
         let cacheFileSize = null;
+        let cacheOriginalFileSize = null;
+        let cacheCodec = fileTransferCompressionCodecRaw;
         let cacheChannelIndex = null;
         let cacheLatestUnix = 0;
         if (cacheRaw && typeof cacheRaw === "object") {{
@@ -166,6 +172,11 @@
           if (Number.isFinite(rawFileSize) && rawFileSize >= 0) {{
             cacheFileSize = Math.max(0, Math.trunc(rawFileSize));
           }}
+          const rawOriginalFileSize = Number(cacheRaw.originalFileSize);
+          if (Number.isFinite(rawOriginalFileSize) && rawOriginalFileSize >= 0) {{
+            cacheOriginalFileSize = Math.max(0, Math.trunc(rawOriginalFileSize));
+          }}
+          cacheCodec = normalizeFileTransferCompressionCodec(cacheRaw.codec || fileTransferCompressionCodecRaw);
           cacheChannelIndex = fileTransferExplicitChannelIndex(cacheRaw.channelIndex);
           cacheLatestUnix = Math.max(0, Math.trunc(Number(cacheRaw.latestUnix) || 0));
           if (cacheRaw.chunks instanceof Map) {{
@@ -211,6 +222,14 @@
         if (!hasTransferFileSize && cacheFileSize != null) {{
           transfer.fileSize = cacheFileSize;
         }}
+        const transferOriginalSize = Number(transfer.originalFileSize);
+        const hasTransferOriginalSize = Number.isFinite(transferOriginalSize) && transferOriginalSize >= 0;
+        if (!hasTransferOriginalSize && cacheOriginalFileSize != null) {{
+          transfer.originalFileSize = cacheOriginalFileSize;
+        }}
+        transfer.codec = normalizeFileTransferCompressionCodec(
+          transfer.codec || cacheCodec || fileTransferCompressionCodecRaw
+        );
         if (fileTransferExplicitChannelIndex(transfer.channelIndex) == null && cacheChannelIndex != null) {{
           transfer.channelIndex = cacheChannelIndex;
         }}
@@ -220,6 +239,8 @@
           totalChunks: effectiveTotalChunks,
           fileName: normalizeFileTransferName(transfer.fileName || cacheFileName || "mesh-file.bin"),
           fileSize: Number.isFinite(Number(transfer.fileSize)) ? Math.max(0, Math.trunc(Number(transfer.fileSize) || 0)) : null,
+          originalFileSize: Number.isFinite(Number(transfer.originalFileSize)) ? Math.max(0, Math.trunc(Number(transfer.originalFileSize) || 0)) : null,
+          codec: normalizeFileTransferCompressionCodec(transfer.codec || cacheCodec || fileTransferCompressionCodecRaw),
           channelIndex: fileTransferExplicitChannelIndex(transfer.channelIndex),
           latestUnix: Number(transfer.latestUnix || transfer.firstUnix || 0),
           lastSeenAtMs: nowMs,

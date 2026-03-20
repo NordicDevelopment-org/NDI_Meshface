@@ -29,7 +29,11 @@
           observedBytes += Number(bytes && bytes.length) || 0;
         }}
 
-        const declaredBytes = Number.isFinite(transfer.fileSize) ? Math.max(0, Math.trunc(Number(transfer.fileSize) || 0)) : null;
+        const wireDeclaredBytes = Number.isFinite(transfer.fileSize) ? Math.max(0, Math.trunc(Number(transfer.fileSize) || 0)) : null;
+        const originalDeclaredBytes = Number.isFinite(transfer.originalFileSize)
+          ? Math.max(0, Math.trunc(Number(transfer.originalFileSize) || 0))
+          : wireDeclaredBytes;
+        const payloadCodec = normalizeFileTransferCompressionCodec(transfer.codec || fileTransferCompressionCodecRaw);
         let assembled = null;
         let complete = false;
         let assembleError = "";
@@ -52,16 +56,27 @@
           }}
           if (!assembleError) {{
             let mergedView = merged;
-            if (declaredBytes != null) {{
-              if (declaredBytes < merged.length) {{
-                mergedView = merged.slice(0, declaredBytes);
-              }} else if (declaredBytes > merged.length) {{
-                assembleError = `Missing ${{declaredBytes - merged.length}} byte${{declaredBytes - merged.length === 1 ? "" : "s"}}`;
+            if (wireDeclaredBytes != null) {{
+              if (wireDeclaredBytes < merged.length) {{
+                mergedView = merged.slice(0, wireDeclaredBytes);
+              }} else if (wireDeclaredBytes > merged.length) {{
+                assembleError = `Missing ${{wireDeclaredBytes - merged.length}} byte${{wireDeclaredBytes - merged.length === 1 ? "" : "s"}}`;
               }}
             }}
             if (!assembleError) {{
-              assembled = new Uint8Array(mergedView);
-              complete = true;
+              const decodedView = decodeFileTransferPayloadBytes(
+                mergedView,
+                payloadCodec,
+                originalDeclaredBytes
+              );
+              if (!(decodedView instanceof Uint8Array)) {{
+                assembleError = payloadCodec === fileTransferCompressionCodecRaw
+                  ? "Decode failed"
+                  : `Decode failed (${{payloadCodec}})`;
+              }} else {{
+                assembled = decodedView;
+                complete = true;
+              }}
             }}
           }}
         }}
@@ -136,16 +151,17 @@
         }}
 
         const sizeLabel = (() => {{
-          if (declaredBytes == null) {{
+          if (originalDeclaredBytes == null) {{
             return formatFileTransferSize(observedBytes);
           }}
           if (complete || observedBytes <= 0) {{
-            return formatFileTransferSize(declaredBytes);
+            return formatFileTransferSize(originalDeclaredBytes);
           }}
-          if (observedBytes === declaredBytes) {{
-            return formatFileTransferSize(declaredBytes);
+          if (wireDeclaredBytes != null && observedBytes === wireDeclaredBytes) {{
+            return formatFileTransferSize(originalDeclaredBytes);
           }}
-          return `${{formatFileTransferSize(observedBytes)}} / ${{formatFileTransferSize(declaredBytes)}}`;
+          const expectedWireBytes = wireDeclaredBytes != null ? wireDeclaredBytes : originalDeclaredBytes;
+          return `${{formatFileTransferSize(observedBytes)}} / ${{formatFileTransferSize(expectedWireBytes)}}`;
         }})();
         const fileName = normalizeFileTransferName(transfer.fileName || `file-${{transfer.transferId}}.bin`);
         const channelLabel = resolvedChannelIndex == null
@@ -167,7 +183,7 @@
           progressLabel,
           progressSort,
           sizeLabel,
-          sizeSort: declaredBytes != null ? declaredBytes : observedBytes,
+          sizeSort: originalDeclaredBytes != null ? originalDeclaredBytes : observedBytes,
           channelIndex: resolvedChannelIndex,
           channelLabel,
           delivered,
