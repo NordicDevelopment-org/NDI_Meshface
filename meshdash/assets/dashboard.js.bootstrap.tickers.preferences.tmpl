@@ -171,9 +171,14 @@
     }}
 
     function defaultTickerPreferences() {{
+      const defaultEnabled = Object.fromEntries(
+        tickerDefaultOrder.map((id) => [id, true])
+      );
+      defaultEnabled.chat_channels = false;
+      defaultEnabled.chat_roster = false;
       return {{
         order: [...tickerDefaultOrder],
-        enabled: Object.fromEntries(tickerDefaultOrder.map((id) => [id, true])),
+        enabled: defaultEnabled,
         labels: {{}},
         trend: {{ ...tickerDefaultTrendVisibility }},
         battery_window_hours: tickerDefaultBatteryWindowHours,
@@ -203,11 +208,12 @@
       const enabledRaw = raw.enabled && typeof raw.enabled === "object" ? raw.enabled : {{}};
       const enabled = {{}};
       for (const id of tickerDefaultOrder) {{
+        const fallbackEnabled = parseBoolToken(base.enabled[id], true);
         if (!(id in enabledRaw)) {{
-          enabled[id] = true;
+          enabled[id] = fallbackEnabled;
           continue;
         }}
-        enabled[id] = parseBoolToken(enabledRaw[id], true);
+        enabled[id] = parseBoolToken(enabledRaw[id], fallbackEnabled);
       }}
 
       const labelsRaw = raw.labels && typeof raw.labels === "object" ? raw.labels : {{}};

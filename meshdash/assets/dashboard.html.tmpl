@@ -274,6 +274,14 @@
             <svg class="metric-ticker-chart" id="ticker-chart-node-signal" viewBox="0 0 72 16" preserveAspectRatio="none" aria-hidden="true"></svg>
           </div>
         </div>
+        <div class="summary-ticker-item" id="summary-ticker-chat-channels" data-ticker-id="chat_channels">
+          <div class="label" data-ticker-label>Chat Channels</div>
+          <div class="value node-ticker-value" id="m-chat-channels">n/a</div>
+        </div>
+        <div class="summary-ticker-item" id="summary-ticker-chat-roster" data-ticker-id="chat_roster">
+          <div class="label" data-ticker-label>Roster Health</div>
+          <div class="value node-ticker-value" id="m-chat-roster">n/a</div>
+        </div>
         <div class="summary-ticker-item" id="summary-ticker-gps" data-ticker-id="gps">
           <div class="label" data-ticker-label>GPS</div>
           <div class="value node-ticker-value" id="m-gps-ticker">n/a</div>
@@ -319,12 +327,9 @@
     </aside>
     <aside id="chat-left-panel" class="chat-left-panel" aria-label="Global node selection and search">
       <div class="chat-left-head">
-        <div class="chat-left-title">Node Navigator</div>
-        <div id="chat-left-sub" class="chat-left-sub">Loading…</div>
-      </div>
-      <div class="chat-left-section">
-        <div class="chat-left-label">Channels</div>
-        <div id="chat-channel-list" class="chat-channel-list"></div>
+        <div class="chat-user-search-wrap">
+          <input id="chat-user-search-input" class="list-search-input" type="search" placeholder="Search nodes by ID or name" autocomplete="off" />
+        </div>
       </div>
       <div class="chat-left-section chat-users-section">
         <div class="chat-users-head">
@@ -347,11 +352,6 @@
           </div>
         </div>
         <div id="chat-room-list" class="chat-member-list"></div>
-        <div class="chat-left-bottom-bar">
-          <div class="chat-user-search-wrap">
-            <input id="chat-user-search-input" class="list-search-input" type="search" placeholder="Search nodes by ID or name" autocomplete="off" />
-          </div>
-        </div>
       </div>
     </aside>
     <div id="chat-panel-splitter" class="chat-panel-splitter" title="Drag to resize chat workspace and node navigator" aria-hidden="true"></div>
