@@ -16,7 +16,9 @@ except Exception:  # pragma: no cover - exercised via runtime fallback
 _DEFAULT_REFRESH_SECONDS = 20
 _DEFAULT_REQUEST_TIMEOUT_SECONDS = 8
 _CONNECTION_STATUS_SOURCE = "admin.get_device_connection_status"
-_DEFAULT_ENABLED = str(os.getenv("MESHDASH_RADIO_CONNECTION_STATUS_ENABLED", "0")).strip().lower() in {
+# Keep connection-status polling on by default so Wi-Fi telemetry remains available
+# unless explicitly disabled via environment.
+_DEFAULT_ENABLED = str(os.getenv("MESHDASH_RADIO_CONNECTION_STATUS_ENABLED", "1")).strip().lower() in {
     "1",
     "true",
     "yes",
