@@ -59,6 +59,16 @@ def _coerce_optional_int(value: object) -> int | None:
         return None
 
 
+def _coerce_optional_wifi_rssi_dbm(value: object) -> int | None:
+    rssi = _coerce_optional_int(value)
+    if rssi is None:
+        return None
+    # Proto default values can surface as 0 when RSSI is unknown; treat that as unavailable.
+    if -140 <= rssi <= -1:
+        return rssi
+    return None
+
+
 def _coerce_ipv4_text(value: object) -> str | None:
     if value is None:
         return None
@@ -114,7 +124,7 @@ def _parse_wifi_status(raw: object) -> dict[str, object]:
         ssid = str(ssid_raw).strip()
         if ssid:
             out["ssid"] = ssid
-    rssi = _coerce_optional_int(_mapping_get(raw, "rssi"))
+    rssi = _coerce_optional_wifi_rssi_dbm(_mapping_get(raw, "rssi"))
     if rssi is not None:
         out["rssi_dbm"] = rssi
     return out

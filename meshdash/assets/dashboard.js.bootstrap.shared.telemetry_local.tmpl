@@ -9,7 +9,9 @@
 
       const connected = coerceOptionalBool(wifi.is_connected ?? wifi.isConnected);
       const rssiRaw = Number(wifi.rssi_dbm ?? wifi.rssiDbm ?? wifi.rssi);
-      const rssi = Number.isFinite(rssiRaw) ? Math.trunc(rssiRaw) : null;
+      const rssi = Number.isFinite(rssiRaw) && rssiRaw <= -1 && rssiRaw >= -140
+        ? Math.trunc(rssiRaw)
+        : null;
       const ssid = String(wifi.ssid == null ? "" : wifi.ssid).trim();
       const ip = String(wifi.ip_address ?? wifi.ipAddress ?? "").trim();
       const ageRaw = Number(radioConnection && (radioConnection.age_seconds ?? radioConnection.ageSeconds));
@@ -136,4 +138,3 @@
         nodeName,
       }};
     }}
-
