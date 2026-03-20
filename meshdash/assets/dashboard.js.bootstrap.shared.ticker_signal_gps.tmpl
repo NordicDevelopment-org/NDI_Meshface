@@ -77,8 +77,11 @@
       const compactRaw = String((wifiSummary && wifiSummary.compact) || "").trim();
       const compact = compactRaw.replace(/^WiFi\\s*/i, "").trim() || compactRaw || "n/a";
       const connected = coerceOptionalBool(wifiSummary && wifiSummary.connected);
-      const rssiRaw = Number(wifiSummary && wifiSummary.rssi);
-      const rssi = Number.isFinite(rssiRaw) ? Math.trunc(rssiRaw) : null;
+      const rssiValue = wifiSummary ? wifiSummary.rssi : null;
+      const rssiRaw = (rssiValue == null || rssiValue === "") ? NaN : Number(rssiValue);
+      const rssi = Number.isFinite(rssiRaw) && rssiRaw <= -1 && rssiRaw >= -140
+        ? Math.trunc(rssiRaw)
+        : null;
       const rssiText = Number.isFinite(rssi)
         ? `${{rssi}}dBm`
         : (connected === false ? "off" : "n/a");
@@ -260,4 +263,3 @@
         title: titleParts.join(" | "),
       }};
     }}
-

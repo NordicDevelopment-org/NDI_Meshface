@@ -812,7 +812,11 @@
         }}
         wifiTickerEl.title = wifiTicker && wifiTicker.title ? String(wifiTicker.title) : "Wi-Fi summary unavailable";
       }}
-      const wifiRssi = Number(wifiTicker && wifiTicker.rssi_dbm);
+      const wifiRssiValue = wifiTicker ? wifiTicker.rssi_dbm : null;
+      const wifiRssiRaw = (wifiRssiValue == null || wifiRssiValue === "") ? NaN : Number(wifiRssiValue);
+      const wifiRssi = Number.isFinite(wifiRssiRaw) && wifiRssiRaw <= -1 && wifiRssiRaw >= -140
+        ? wifiRssiRaw
+        : NaN;
       if (Number.isFinite(wifiRssi)) {{
         updateMetricTicker("wifi_rssi_dbm", wifiRssi, {{
           containerId: "ticker-wifi",
