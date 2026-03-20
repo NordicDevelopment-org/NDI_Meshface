@@ -272,5 +272,10 @@
           `<div class="overview-item"><div class="k">${{escAttr(String(k))}}</div><div class="v">${{escAttr(String(v))}}</div></div>`
         )).join("");
       }}
-    }}
 
+      try {{
+        bindMeshChannelAppRoutingControls();
+        const appRoutingOptions = buildMeshChannelSendOptionsFromLocalState(localState);
+        renderMeshChannelAppRoutingControls(appRoutingOptions);
+      }} catch (_err) {{}}
+    }}

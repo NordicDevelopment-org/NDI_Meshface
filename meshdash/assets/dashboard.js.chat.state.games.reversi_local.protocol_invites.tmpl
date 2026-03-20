@@ -30,7 +30,7 @@
       const channelIndexRaw = Number(overrides.channel_index ?? overrides.channelIndex);
       const channelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0
         ? channelIndexRaw
-        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+        : meshChannelEffectiveSendIndexForApp("games");
       return {{
         mode: mode === "connected" || mode === "pending_host" ? mode : "local",
         role: role === "host" || role === "guest" ? role : "",
@@ -252,7 +252,7 @@
         return false;
       }}
       const channelIndex = normalizeMeshChannelIndex(
-        channel_index == null ? activeMeshSendChannelIndex : channel_index
+        channel_index == null ? meshChannelEffectiveSendIndexForApp("games") : channel_index
       );
       const payload = await sendChatPayload(
         {{
@@ -268,4 +268,3 @@
       }}
       return true;
     }}
-

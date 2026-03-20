@@ -113,7 +113,7 @@
       const channelIndexRaw = Number(overrides.channel_index ?? overrides.channelIndex);
       const channelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0
         ? channelIndexRaw
-        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+        : meshChannelEffectiveSendIndexForApp("games");
       const localColor = boardGameParseColor(overrides.local_color, refs.defaultLocalColor);
       const remoteColor = boardGameParseColor(overrides.remote_color, refs.defaultRemoteColor);
       return {{
@@ -358,7 +358,7 @@
         return false;
       }}
       const channelIndex = normalizeMeshChannelIndex(
-        channel_index == null ? activeMeshSendChannelIndex : channel_index
+        channel_index == null ? meshChannelEffectiveSendIndexForApp("games") : channel_index
       );
       const payload = await sendChatPayload(
         {{
@@ -431,4 +431,3 @@
       checkersSelectedCell = null;
       refreshCheckersGame();
     }}
-

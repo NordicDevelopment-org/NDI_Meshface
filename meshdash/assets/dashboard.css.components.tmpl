@@ -1067,6 +1067,34 @@
     [data-theme="dark"] .channels-action-placeholder {{
       color: #8ea99b;
     }}
+    [data-theme="dark"] .channels-app-routing {{
+      border-color: #31473b;
+      background: #15241c;
+    }}
+    [data-theme="dark"] .channels-app-routing-copy {{
+      color: #98b7a7;
+    }}
+    [data-theme="dark"] .channels-app-routing-summary {{
+      color: #a9c7b8;
+    }}
+    [data-theme="dark"] .channels-app-route-placeholder {{
+      color: #8ea99b;
+    }}
+    [data-theme="dark"] .channels-app-route-row {{
+      border-color: #31473b;
+      background: #122017;
+    }}
+    [data-theme="dark"] .channels-app-route-title,
+    [data-theme="dark"] .channels-app-route-effective-value {{
+      color: #d7eadf;
+    }}
+    [data-theme="dark"] .channels-app-route-copy,
+    [data-theme="dark"] .channels-app-route-effective-copy {{
+      color: #8ea99b;
+    }}
+    [data-theme="dark"] .channels-app-route-effective-label {{
+      color: #7ea08f;
+    }}
 
     [data-theme="dark"] .settings-channels-simple-actions {{
       border-color: #31473b;
@@ -3464,19 +3492,37 @@
       color: #c8ffe0;
     }}
     [data-theme="dark"] .peer-dm-popout-window {{
-      border-color: #2f4d3d;
-      background: #0f1f17;
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.5);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--peer-dm-channel-rgb), 0.2) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.08) 52%,
+          rgba(var(--peer-dm-channel-rgb), 0.03) 100%
+        ),
+        #0f1f17;
       box-shadow: 0 16px 34px rgba(0, 0, 0, 0.62);
     }}
     [data-theme="dark"] .peer-dm-popout-head {{
-      border-color: #2a4638;
-      background: #13241b;
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.42);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--peer-dm-channel-rgb), 0.25) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.1) 100%
+        ),
+        #13241b;
     }}
     [data-theme="dark"] .peer-dm-popout-name {{
       color: #c6e8d5;
     }}
     [data-theme="dark"] .peer-dm-popout-id {{
       color: #93b8a6;
+    }}
+    [data-theme="dark"] .peer-dm-popout-channel {{
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.56);
+      background: rgba(var(--peer-dm-channel-rgb), 0.22);
+      color: #d4f0e0;
     }}
     [data-theme="dark"] .peer-dm-popout-btn {{
       background: #162820;
@@ -3489,7 +3535,14 @@
       color: #e2f6eb;
     }}
     [data-theme="dark"] .peer-dm-popout-body {{
-      background: #13241b;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--peer-dm-channel-rgb), 0.14) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.05) 48%,
+          rgba(var(--peer-dm-channel-rgb), 0.02) 100%
+        ),
+        #13241b;
     }}
     [data-theme="dark"] .peer-dm-popout-empty {{
       color: #9ab7a7;
@@ -3497,25 +3550,31 @@
       background: rgba(19, 36, 27, 0.68);
     }}
     [data-theme="dark"] .peer-dm-popout-msg {{
-      border-color: #2a4638;
-      background: #162820;
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.45);
+      background: rgba(var(--peer-dm-channel-rgb), 0.12);
       color: #c5e2d2;
     }}
     [data-theme="dark"] .peer-dm-popout-msg.is-own {{
-      border-color: #467560;
-      background: #1e3a2f;
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.64);
+      background: rgba(var(--peer-dm-channel-rgb), 0.26);
       color: #e6fbef;
     }}
     [data-theme="dark"] .peer-dm-popout-msg-meta {{
       color: #9ab7a7;
     }}
     [data-theme="dark"] .peer-dm-popout-composer {{
-      border-color: #2a4638;
-      background: #13241b;
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.42);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--peer-dm-channel-rgb), 0.18) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.08) 100%
+        ),
+        #13241b;
     }}
     [data-theme="dark"] .peer-dm-popout-input {{
       background: #152633;
-      border-color: #35556d;
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.62);
       color: #dbeeff;
     }}
     [data-theme="dark"] .peer-dm-popout-input::placeholder {{
@@ -3543,15 +3602,15 @@
       color: #e2f6eb;
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress {{
-      border-color: #2a4638;
-      background: #162820;
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.42);
+      background: rgba(var(--peer-dm-channel-rgb), 0.12);
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress-text,
     [data-theme="dark"] .peer-dm-popout-file-progress-pct {{
       color: #9ab7a7;
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress-meter {{
-      background: #23382d;
+      background: rgba(var(--peer-dm-channel-rgb), 0.24);
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress-meter > span {{
       background: #4aa878;

@@ -225,8 +225,183 @@
 
     function currentMeshChannelSendLabel() {{
       const idx = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      return meshChannelSendLabelForIndex(idx);
+    }}
+
+    function meshChannelSendLabelForIndex(rawIndex) {{
+      const idx = normalizeMeshChannelIndex(rawIndex);
       const match = meshChannelOptionByIndex(idx, meshChannelSendOptions);
       return meshChannelSendOptionLabel(match ? {{ ...match, index: idx }} : {{ index: idx }});
+    }}
+
+    function meshChannelAppRoutingRows() {{
+      return [
+        {{
+          id: "files",
+          label: "Files",
+          description: "Peer file transfer sessions",
+        }},
+        {{
+          id: "games",
+          label: "Games",
+          description: "Reversi, Checkers, and Chess link traffic",
+        }},
+        {{
+          id: "bbs",
+          label: "BBS",
+          description: "Directory beacons and board posts",
+        }},
+      ];
+    }}
+
+    function normalizeMeshChannelAppId(rawAppId) {{
+      const token = String(rawAppId == null ? "" : rawAppId).trim().toLowerCase();
+      if (token === "files") return "files";
+      if (token === "games") return "games";
+      if (token === "bbs") return "bbs";
+      return "";
+    }}
+
+    function normalizeMeshChannelAppSendMode(rawMode) {{
+      const token = String(rawMode == null ? "" : rawMode).trim().toLowerCase();
+      if (token === "fixed" || token === "locked" || token === "pin") return "fixed";
+      return "global";
+    }}
+
+    function meshChannelDefaultAppSendPrefs() {{
+      const sendIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      return {{
+        files: {{ mode: "global", channel_index: sendIndex }},
+        games: {{ mode: "global", channel_index: sendIndex }},
+        bbs: {{ mode: "global", channel_index: sendIndex }},
+      }};
+    }}
+
+    function coerceMeshChannelAppSendPrefs(rawPrefs) {{
+      const defaults = meshChannelDefaultAppSendPrefs();
+      const source = (rawPrefs && typeof rawPrefs === "object") ? rawPrefs : {{}};
+      const next = {{}};
+      for (const row of meshChannelAppRoutingRows()) {{
+        const appId = row.id;
+        const fallback = defaults[appId] || {{ mode: "global", channel_index: 0 }};
+        const rawApp = (source[appId] && typeof source[appId] === "object")
+          ? source[appId]
+          : {{}};
+        next[appId] = {{
+          mode: normalizeMeshChannelAppSendMode(rawApp.mode ?? rawApp.send_mode ?? fallback.mode),
+          channel_index: normalizeMeshChannelIndex(
+            rawApp.channel_index
+            ?? rawApp.channelIndex
+            ?? rawApp.send_index
+            ?? rawApp.sendIndex
+            ?? fallback.channel_index
+          ),
+        }};
+      }}
+      return next;
+    }}
+
+    function persistMeshChannelAppSendPrefs() {{
+      try {{
+        window.localStorage.setItem(
+          meshChannelAppSendPrefsStorageKey,
+          JSON.stringify(coerceMeshChannelAppSendPrefs(meshChannelAppSendPrefs))
+        );
+      }} catch (_err) {{}}
+    }}
+
+    function loadMeshChannelAppSendPrefs() {{
+      let parsed = null;
+      try {{
+        const raw = window.localStorage.getItem(meshChannelAppSendPrefsStorageKey);
+        parsed = raw ? JSON.parse(raw) : null;
+      }} catch (_err) {{
+        parsed = null;
+      }}
+      meshChannelAppSendPrefs = coerceMeshChannelAppSendPrefs(parsed);
+    }}
+
+    function meshChannelAppSendPreference(appId) {{
+      const normalizedAppId = normalizeMeshChannelAppId(appId);
+      const defaults = meshChannelDefaultAppSendPrefs();
+      if (!normalizedAppId) {{
+        return {{
+          mode: "global",
+          channel_index: normalizeMeshChannelIndex(activeMeshSendChannelIndex),
+        }};
+      }}
+      const source = (meshChannelAppSendPrefs && typeof meshChannelAppSendPrefs === "object")
+        ? meshChannelAppSendPrefs
+        : defaults;
+      const raw = (source[normalizedAppId] && typeof source[normalizedAppId] === "object")
+        ? source[normalizedAppId]
+        : defaults[normalizedAppId];
+      return {{
+        mode: normalizeMeshChannelAppSendMode(raw && raw.mode),
+        channel_index: normalizeMeshChannelIndex(
+          raw && (raw.channel_index ?? raw.channelIndex ?? raw.send_index ?? raw.sendIndex)
+        ),
+      }};
+    }}
+
+    function meshChannelAppUsesFixedChannel(appId) {{
+      return meshChannelAppSendPreference(appId).mode === "fixed";
+    }}
+
+    function meshChannelEffectiveSendIndexForApp(appId) {{
+      const normalizedAppId = normalizeMeshChannelAppId(appId);
+      if (!normalizedAppId) return activeMeshChannelSendIndex();
+      const pref = meshChannelAppSendPreference(normalizedAppId);
+      if (pref.mode === "fixed") {{
+        return normalizeMeshChannelIndex(pref.channel_index);
+      }}
+      return activeMeshChannelSendIndex();
+    }}
+
+    function meshChannelEffectiveSendLabelForApp(appId) {{
+      return meshChannelSendLabelForIndex(meshChannelEffectiveSendIndexForApp(appId));
+    }}
+
+    function setMeshChannelAppSendPreference(appId, nextPref, persist = true) {{
+      const normalizedAppId = normalizeMeshChannelAppId(appId);
+      if (!normalizedAppId) return;
+      const currentPrefs = coerceMeshChannelAppSendPrefs(meshChannelAppSendPrefs);
+      const merged = {{
+        ...meshChannelAppSendPreference(normalizedAppId),
+        ...(nextPref && typeof nextPref === "object" ? nextPref : {{}}),
+      }};
+      currentPrefs[normalizedAppId] = {{
+        mode: normalizeMeshChannelAppSendMode(merged.mode),
+        channel_index: normalizeMeshChannelIndex(merged.channel_index ?? merged.channelIndex),
+      }};
+      meshChannelAppSendPrefs = currentPrefs;
+      if (persist) {{
+        persistMeshChannelAppSendPrefs();
+      }}
+      syncMeshChannelSendControl();
+      if (latestState) {{
+        if (activeLayoutView === "files") {{
+          renderFilesView(latestState);
+        }} else if (activeLayoutView === "games") {{
+          renderGamesView(latestState);
+        }} else if (activeLayoutView === "bbs") {{
+          renderBbsView(latestState);
+        }} else if (activeLayoutView === "channels") {{
+          renderChannelsView(latestState);
+        }}
+      }}
+    }}
+
+    function setMeshChannelAppSendMode(appId, mode, persist = true) {{
+      setMeshChannelAppSendPreference(appId, {{ mode: normalizeMeshChannelAppSendMode(mode) }}, persist);
+    }}
+
+    function setMeshChannelAppSendIndex(appId, channelIndex, persist = true) {{
+      setMeshChannelAppSendPreference(
+        appId,
+        {{ channel_index: normalizeMeshChannelIndex(channelIndex) }},
+        persist
+      );
     }}
 
     function syncMeshChannelMismatchWarning() {{
@@ -253,11 +428,16 @@
       }}
     }}
 
-    function meshChannelSendContext() {{
-      const sendIndex = activeMeshChannelSendIndex();
+    function meshChannelSendContext(options = {{}}) {{
+      const appId = normalizeMeshChannelAppId(options && options.appId);
+      const sendMode = appId ? meshChannelAppSendPreference(appId).mode : "global";
+      const sendIndex = appId
+        ? meshChannelEffectiveSendIndexForApp(appId)
+        : activeMeshChannelSendIndex();
       return {{
+        appId,
+        sendMode,
         sendIndex,
-        sendLabel: currentMeshChannelSendLabel(),
+        sendLabel: meshChannelSendLabelForIndex(sendIndex),
       }};
     }}
-

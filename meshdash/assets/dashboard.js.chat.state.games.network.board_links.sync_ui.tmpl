@@ -15,7 +15,7 @@
       const sessionChannelRaw = Number(link.channel_index);
       const sessionChannel = Number.isInteger(sessionChannelRaw) && sessionChannelRaw >= 0
         ? sessionChannelRaw
-        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+        : meshChannelEffectiveSendIndexForApp("games");
       const sent = await sendBoardGameProtocolMessage(
         "checkers",
         "move",
@@ -37,7 +37,7 @@
       const sessionChannelRaw = Number(link.channel_index);
       const sessionChannel = Number.isInteger(sessionChannelRaw) && sessionChannelRaw >= 0
         ? sessionChannelRaw
-        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+        : meshChannelEffectiveSendIndexForApp("games");
       const sent = await sendBoardGameProtocolMessage(
         "chess",
         "move",
@@ -258,4 +258,3 @@
         hostColorSelect.disabled = link.mode === "connected" || link.mode === "pending_host";
       }}
     }}
-

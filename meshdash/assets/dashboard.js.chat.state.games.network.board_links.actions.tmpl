@@ -8,7 +8,7 @@
       }}
       const hostColor = boardGameParseColor(refs.getHostColorPreference(), refs.defaultLocalColor);
       const guestColor = refs.opponent(hostColor);
-      const sessionChannel = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      const sessionChannel = meshChannelEffectiveSendIndexForApp("games");
       const sessionId = generateBoardGameSessionId(gameId);
 
       startBoardGameLocalState(gameId);
@@ -55,7 +55,7 @@
       const inviteChannelRaw = Number(invite.channel_index);
       const inviteChannel = Number.isInteger(inviteChannelRaw) && inviteChannelRaw >= 0
         ? inviteChannelRaw
-        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+        : meshChannelEffectiveSendIndexForApp("games");
       if (!isCanonicalNodeId(peerId) || !sessionId) {{
         boardGameUpdateLinkStatus(gameId, "Invite details are invalid.");
         if (activeLayoutView === "games") renderGamesView(latestState);
@@ -77,7 +77,7 @@
           [link.session_id],
           {{
             destination_id: link.peer_id,
-            channel_index: Number.isInteger(Number(link.channel_index)) ? Number(link.channel_index) : normalizeMeshChannelIndex(activeMeshSendChannelIndex),
+            channel_index: Number.isInteger(Number(link.channel_index)) ? Number(link.channel_index) : meshChannelEffectiveSendIndexForApp("games"),
           }}
         );
       }}
@@ -131,11 +131,10 @@
           [link.session_id],
           {{
             destination_id: link.peer_id,
-            channel_index: Number.isInteger(Number(link.channel_index)) ? Number(link.channel_index) : normalizeMeshChannelIndex(activeMeshSendChannelIndex),
+            channel_index: Number.isInteger(Number(link.channel_index)) ? Number(link.channel_index) : meshChannelEffectiveSendIndexForApp("games"),
           }}
         );
       }}
       boardGameResetNetworkLink(gameId, "Disconnected. Local hotseat mode.", {{ keepPeer: true }});
       if (activeLayoutView === "games") renderGamesView(latestState);
     }}
-

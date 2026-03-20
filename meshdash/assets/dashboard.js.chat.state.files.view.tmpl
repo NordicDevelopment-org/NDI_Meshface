@@ -228,11 +228,13 @@
         const complete = rows.filter((row) => row && row.delivered).length;
         const pending = Math.max(0, total - complete);
         const channelLabel = currentMeshChannelViewLabel();
-        const sendLabel = currentMeshChannelSendLabel();
+        const sendCtx = meshChannelSendContext({{ appId: "files" }});
+        const sendLabel = sendCtx.sendLabel;
+        const sendModeLabel = sendCtx.sendMode === "fixed" ? "Fixed" : "Global";
         if (!total) {{
-          caption.textContent = `No file transfers detected yet. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}}.`;
+          caption.textContent = `No file transfers detected yet. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}} (${{sendModeLabel}}).`;
         }} else {{
-          caption.textContent = `Showing ${{total}} transfer${{total === 1 ? "" : "s"}}. ${{complete}} complete, ${{pending}} pending. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}}.`;
+          caption.textContent = `Showing ${{total}} transfer${{total === 1 ? "" : "s"}}. ${{complete}} complete, ${{pending}} pending. View channel: ${{channelLabel}}. Send channel: ${{sendLabel}} (${{sendModeLabel}}).`;
         }}
       }}
 

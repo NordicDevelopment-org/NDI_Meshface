@@ -18,44 +18,52 @@
       const filesDot = document.getElementById("files-send-channel-dot");
       const filesSelect = document.getElementById("files-send-channel-select");
       const filesHint = document.getElementById("files-send-channel-hint");
-      const meta = meshChannelColorMeta(activeMeshSendChannelIndex, {{ allowAll: false }});
-      const rgb = hexColorRgbTriplet(meta.fill);
+      const globalMeta = meshChannelColorMeta(activeMeshSendChannelIndex, {{ allowAll: false }});
+      const globalRgb = hexColorRgbTriplet(globalMeta.fill);
       const sendLabel = currentMeshChannelSendLabel();
+      const filesSendCtx = meshChannelSendContext({{ appId: "files" }});
+      const filesMeta = meshChannelColorMeta(filesSendCtx.sendIndex, {{ allowAll: false }});
+      const filesFixed = filesSendCtx.sendMode === "fixed";
       if (wrap instanceof HTMLElement) {{
-        wrap.style.setProperty("--chat-send-channel-fill", meta.fill);
-        wrap.style.setProperty("--chat-send-channel-rgb", rgb);
+        wrap.style.setProperty("--chat-send-channel-fill", globalMeta.fill);
+        wrap.style.setProperty("--chat-send-channel-rgb", globalRgb);
       }}
       if (composeShell instanceof HTMLElement) {{
-        composeShell.style.setProperty("--chat-send-channel-fill", meta.fill);
-        composeShell.style.setProperty("--chat-send-channel-rgb", rgb);
+        composeShell.style.setProperty("--chat-send-channel-fill", globalMeta.fill);
+        composeShell.style.setProperty("--chat-send-channel-rgb", globalRgb);
       }}
       if (input instanceof HTMLElement) {{
-        input.style.setProperty("--chat-send-channel-fill", meta.fill);
-        input.style.setProperty("--chat-send-channel-rgb", rgb);
+        input.style.setProperty("--chat-send-channel-fill", globalMeta.fill);
+        input.style.setProperty("--chat-send-channel-rgb", globalRgb);
       }}
       if (dot instanceof HTMLElement) {{
         dot.classList.remove("is-all");
-        dot.style.setProperty("--channel-dot-fill", meta.fill);
-        dot.title = meta.title;
-        dot.setAttribute("aria-label", meta.title);
+        dot.style.setProperty("--channel-dot-fill", globalMeta.fill);
+        dot.title = globalMeta.title;
+        dot.setAttribute("aria-label", globalMeta.title);
       }}
       if (filesDot instanceof HTMLElement) {{
         filesDot.classList.remove("is-all");
-        filesDot.style.setProperty("--channel-dot-fill", meta.fill);
-        filesDot.title = meta.title;
-        filesDot.setAttribute("aria-label", meta.title);
+        filesDot.style.setProperty("--channel-dot-fill", filesMeta.fill);
+        filesDot.title = filesMeta.title;
+        filesDot.setAttribute("aria-label", filesMeta.title);
       }}
       if (filesSelect instanceof HTMLSelectElement) {{
-        filesSelect.value = String(activeMeshSendChannelIndex);
-        filesSelect.title = `Outgoing file transfer channel: ${{sendLabel}}`;
+        filesSelect.value = String(filesSendCtx.sendIndex);
+        filesSelect.disabled = !!fileTransferSendInFlight || filesFixed;
+        filesSelect.title = filesFixed
+          ? `Outgoing file transfer channel is fixed to ${{filesSendCtx.sendLabel}} (set in Channels -> App Channels).`
+          : `Outgoing file transfer channel: ${{filesSendCtx.sendLabel}}`;
       }}
       if (filesHint instanceof HTMLElement) {{
-        filesHint.textContent = `Files send on ${{sendLabel}}. Message channels are encryption groups, not frequency slots.`;
+        filesHint.textContent = filesFixed
+          ? `Files are locked to ${{filesSendCtx.sendLabel}} (Channels -> App Channels). Message channels are encryption groups, not frequency slots.`
+          : `Files follow global send on ${{filesSendCtx.sendLabel}}. Message channels are encryption groups, not frequency slots.`;
       }}
       const btn = document.getElementById("chat-send-channel-menu-btn");
       if (btn instanceof HTMLButtonElement) {{
         btn.innerHTML = `${{meshChannelPrimaryBadgeHtml(activeMeshSendChannelIndex)}}<span class="mesh-channel-menu-btn-label">${{escAttr(sendLabel)}}</span>`;
-        btn.title = meta.title === sendLabel ? meta.title : `${{meta.title}} • ${{sendLabel}}`;
+        btn.title = globalMeta.title === sendLabel ? globalMeta.title : `${{globalMeta.title}} • ${{sendLabel}}`;
         const select = document.getElementById("chat-send-channel-select");
         const disabled = select instanceof HTMLSelectElement ? !!select.disabled : false;
         btn.disabled = disabled;
@@ -224,8 +232,12 @@
 
       const normalized = Array.isArray(options) ? options.slice() : [];
       const desiredIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      const filesDesiredIndex = normalizeMeshChannelIndex(meshChannelEffectiveSendIndexForApp("files"));
       if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === desiredIndex)) {{
         normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
+      }}
+      if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === filesDesiredIndex)) {{
+        normalized.unshift({{ index: filesDesiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
       }}
       const fillSelect = (select) => {{
         select.innerHTML = "";
@@ -252,7 +264,8 @@
       }};
 
       const desired = String(desiredIndex);
-      const resolvedValue = pickEnabledValue(selects[0], desired);
+      const chatSelect = selects.find((select) => select.id === "chat-send-channel-select") || selects[0];
+      const resolvedValue = pickEnabledValue(chatSelect, desired);
       if (resolvedValue !== desired) {{
         activeMeshSendChannelIndex = normalizeMeshChannelIndex(resolvedValue);
         try {{
@@ -260,6 +273,11 @@
         }} catch (_err) {{}}
       }}
       for (const select of selects) {{
+        if (select.id === "files-send-channel-select") {{
+          const filesDesired = String(normalizeMeshChannelIndex(meshChannelEffectiveSendIndexForApp("files")));
+          select.value = pickEnabledValue(select, filesDesired);
+          continue;
+        }}
         select.value = pickEnabledValue(select, resolvedValue);
       }}
     }}
@@ -296,6 +314,135 @@
       }}).join("");
     }}
 
+    function renderMeshChannelAppRoutingSummary() {{
+      const summaryEl = document.getElementById("channels-app-routing-summary");
+      if (!(summaryEl instanceof HTMLElement)) return;
+      const parts = meshChannelAppRoutingRows().map((row) => {{
+        const appId = normalizeMeshChannelAppId(row.id);
+        const sendCtx = meshChannelSendContext({{ appId }});
+        const modeLabel = sendCtx.sendMode === "fixed" ? "fixed" : "global";
+        return `${{row.label}}: ${{sendCtx.sendLabel}} (${{modeLabel}})`;
+      }});
+      summaryEl.textContent = parts.join(" | ");
+    }}
+
+    function renderMeshChannelAppRoutingControls(sourceOptions = null) {{
+      const host = document.getElementById("channels-app-routing-grid");
+      if (!(host instanceof HTMLElement)) return;
+      const rawOptions = Array.isArray(sourceOptions) && sourceOptions.length
+        ? sourceOptions
+        : (Array.isArray(meshChannelSendOptions) && meshChannelSendOptions.length
+          ? meshChannelSendOptions
+          : buildMeshChannelSendOptionsFromLocalState(settingsLocalStateCache));
+      const dedupedByIndex = new Map();
+      for (const opt of rawOptions) {{
+        const idx = normalizeMeshChannelIndex(opt && opt.index);
+        if (!Number.isInteger(idx) || idx < 0) continue;
+        const normalized = {{
+          ...(opt && typeof opt === "object" ? opt : {{}}),
+          index: idx,
+          disabled: !!(opt && opt.disabled),
+        }};
+        if (!dedupedByIndex.has(idx) || !normalized.disabled) {{
+          dedupedByIndex.set(idx, normalized);
+        }}
+      }}
+      let normalizedOptions = Array.from(dedupedByIndex.values())
+        .filter((opt) => !(opt && opt.disabled))
+        .sort((a, b) => Number(a.index) - Number(b.index));
+      if (!normalizedOptions.length) {{
+        normalizedOptions = [{{ index: 0, name: "", role: "", disabled: false, hasPsk: false }}];
+      }}
+
+      host.innerHTML = meshChannelAppRoutingRows().map((row) => {{
+        const appId = normalizeMeshChannelAppId(row.id);
+        const pref = meshChannelAppSendPreference(appId);
+        const fixed = pref.mode === "fixed";
+        const prefIndex = normalizeMeshChannelIndex(pref.channel_index);
+        const effectiveIndex = meshChannelEffectiveSendIndexForApp(appId);
+        const effectiveLabel = meshChannelSendLabelForIndex(effectiveIndex);
+        const modeSummary = fixed
+          ? `Fixed to ${{effectiveLabel}}.`
+          : `Using global send (${{currentMeshChannelSendLabel()}}).`;
+        const optionsForSelect = normalizedOptions.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === prefIndex)
+          ? normalizedOptions
+          : [{{ index: prefIndex, name: "", role: "", disabled: false, hasPsk: false }}, ...normalizedOptions];
+        const modeValue = fixed ? "fixed" : "global";
+        return `<div class="channels-app-route-row" data-mesh-app-id="${{escAttr(appId)}}">
+          <div class="channels-app-route-meta">
+            <div class="channels-app-route-title">${{escAttr(row.label)}}</div>
+            <div class="channels-app-route-copy">${{escAttr(row.description)}}</div>
+          </div>
+          <label class="settings-field channels-app-route-field">
+            <span class="settings-label">Mode</span>
+            <select class="settings-select" data-mesh-app-mode aria-label="${{escAttr(`${{row.label}} send mode`)}}">
+              <option value="global"${{modeValue === "global" ? " selected" : ""}}>Global send</option>
+              <option value="fixed"${{modeValue === "fixed" ? " selected" : ""}}>Fixed channel</option>
+            </select>
+          </label>
+          <label class="settings-field channels-app-route-field">
+            <span class="settings-label">Channel</span>
+            <select
+              class="settings-select"
+              data-mesh-app-channel
+              aria-label="${{escAttr(`${{row.label}} fixed channel`)}}"
+              ${{fixed ? "" : "disabled"}}
+            >
+              ${{
+                optionsForSelect.map((opt) => {{
+                  const idx = normalizeMeshChannelIndex(opt && opt.index);
+                  const label = meshChannelSendOptionLabel({{ ...opt, index: idx }}) || `Ch ${{idx}}`;
+                  const selected = idx === prefIndex;
+                  return `<option value="${{escAttr(idx)}}"${{selected ? " selected" : ""}}>${{escAttr(label)}}</option>`;
+                }}).join("")
+              }}
+            </select>
+          </label>
+          <div class="channels-app-route-effective">
+            <span class="channels-app-route-effective-label">Active</span>
+            <span class="channels-app-route-effective-value">${{escAttr(effectiveLabel)}}</span>
+            <span class="channels-app-route-effective-copy">${{escAttr(modeSummary)}}</span>
+          </div>
+        </div>`;
+      }}).join("");
+      renderMeshChannelAppRoutingSummary();
+      if (typeof applyChannelsAppRoutingExpanded === "function") {{
+        applyChannelsAppRoutingExpanded();
+      }}
+    }}
+
+    function bindMeshChannelAppRoutingControls() {{
+      const host = document.getElementById("channels-app-routing-grid");
+      if (host instanceof HTMLElement && host.dataset.bound !== "1") {{
+        host.dataset.bound = "1";
+        host.addEventListener("change", (event) => {{
+          const target = event.target;
+          if (!(target instanceof HTMLSelectElement)) return;
+          const row = target.closest("[data-mesh-app-id]");
+          if (!(row instanceof HTMLElement)) return;
+          const appId = normalizeMeshChannelAppId(row.dataset.meshAppId || "");
+          if (!appId) return;
+          if (target.hasAttribute("data-mesh-app-mode")) {{
+            setMeshChannelAppSendMode(appId, target.value, true);
+            return;
+          }}
+          if (target.hasAttribute("data-mesh-app-channel")) {{
+            setMeshChannelAppSendIndex(appId, target.value, true);
+          }}
+        }});
+      }}
+      const toggleBtn = document.getElementById("channels-app-routing-toggle-btn");
+      if (toggleBtn instanceof HTMLButtonElement && toggleBtn.dataset.bound !== "1") {{
+        toggleBtn.dataset.bound = "1";
+        toggleBtn.addEventListener("click", () => {{
+          setChannelsAppRoutingExpanded(!channelsAppRoutingExpanded, true);
+        }});
+      }}
+      if (typeof applyChannelsAppRoutingExpanded === "function") {{
+        applyChannelsAppRoutingExpanded();
+      }}
+    }}
+
     async function hydrateMeshChannelOptions(force = false) {{
       const nowMs = Date.now();
       const ttlMs = 60000;
@@ -322,8 +469,9 @@
       meshChannelSendOptions = sendOptions;
       renderMeshChannelSelect(options);
       renderMeshChannelPills(options);
-      renderMeshChannelSendSelect(sendOptions);
+      renderMeshChannelSendSelect(sendOptions, {{ preserveCurrent: true }});
       renderMeshChannelSendMenu(sendOptions, {{ preserveCurrent: true }});
+      renderMeshChannelAppRoutingControls(sendOptions);
       syncMeshChannelSendControl();
       return options;
     }}
@@ -353,4 +501,3 @@
         }});
       return channelsViewHydrateInFlight;
     }}
-

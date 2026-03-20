@@ -32,6 +32,10 @@
           renderFilesView(latestState);
         }} else if (activeLayoutView === "bbs") {{
           renderBbsView(latestState);
+        }} else if (activeLayoutView === "games") {{
+          renderGamesView(latestState);
+        }} else if (activeLayoutView === "channels") {{
+          renderChannelsView(latestState);
         }}
       }}
     }}
@@ -56,8 +60,14 @@
       if (rerenderChat && changed && latestState) {{
         if (activeLayoutView === "chat") {{
           renderChat(latestState);
+        }} else if (activeLayoutView === "files") {{
+          renderFilesView(latestState);
         }} else if (activeLayoutView === "bbs") {{
           renderBbsView(latestState);
+        }} else if (activeLayoutView === "games") {{
+          renderGamesView(latestState);
+        }} else if (activeLayoutView === "channels") {{
+          renderChannelsView(latestState);
         }}
       }}
     }}
@@ -79,6 +89,7 @@
       activeMeshSendChannelIndex = preferredSend == null
         ? normalizeMeshChannelIndex(preferred)
         : normalizeMeshChannelIndex(preferredSend);
+      loadMeshChannelAppSendPrefs();
     }}
 
     function bindMeshChannelControl() {{
@@ -174,6 +185,10 @@
         if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") continue;
         select.dataset.bound = "1";
         select.addEventListener("change", () => {{
+          if (select.id === "files-send-channel-select" && meshChannelAppUsesFixedChannel("files")) {{
+            setMeshChannelAppSendIndex("files", select.value, true);
+            return;
+          }}
           applyMeshSendChannelIndex(select.value, true);
         }});
       }}
@@ -232,6 +247,42 @@
       }}
     }}
 
+    function applyChannelsAppRoutingExpanded() {{
+      const section = document.querySelector(".channels-app-routing");
+      if (section instanceof HTMLElement) {{
+        section.classList.toggle("is-expanded", !!channelsAppRoutingExpanded);
+      }}
+      const toggleBtn = document.getElementById("channels-app-routing-toggle-btn");
+      if (toggleBtn instanceof HTMLButtonElement) {{
+        toggleBtn.setAttribute("aria-expanded", channelsAppRoutingExpanded ? "true" : "false");
+        toggleBtn.textContent = channelsAppRoutingExpanded ? "Collapse" : "Expand";
+      }}
+      const grid = document.getElementById("channels-app-routing-grid");
+      if (grid instanceof HTMLElement) {{
+        grid.hidden = !channelsAppRoutingExpanded;
+      }}
+      const copy = document.getElementById("channels-app-routing-copy");
+      if (copy instanceof HTMLElement) {{
+        copy.hidden = !channelsAppRoutingExpanded;
+      }}
+      if (typeof renderMeshChannelAppRoutingSummary === "function") {{
+        renderMeshChannelAppRoutingSummary();
+      }}
+    }}
+
+    function setChannelsAppRoutingExpanded(expanded, persist = true) {{
+      channelsAppRoutingExpanded = !!expanded;
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(
+            channelsAppRoutingExpandedStorageKey,
+            channelsAppRoutingExpanded ? "1" : "0"
+          );
+        }} catch (_err) {{}}
+      }}
+      applyChannelsAppRoutingExpanded();
+    }}
+
     function loadChannelsUiMode() {{
       let stored = "simple";
       try {{
@@ -248,3 +299,10 @@
       channelsExperimentalEnabled = !!stored;
     }}
 
+    function loadChannelsAppRoutingExpandedPreference() {{
+      let stored = false;
+      try {{
+        stored = parseBoolToken(window.localStorage.getItem(channelsAppRoutingExpandedStorageKey), false);
+      }} catch (_err) {{}}
+      channelsAppRoutingExpanded = !!stored;
+    }}

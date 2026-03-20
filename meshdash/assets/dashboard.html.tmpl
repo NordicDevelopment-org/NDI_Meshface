@@ -1490,7 +1490,7 @@
       <div class="body">
         <div class="files-shell">
           <div class="files-controls">
-            <div id="files-caption" class="files-caption">Send small files as chunked direct messages on the active send channel.</div>
+            <div id="files-caption" class="files-caption">Send small files as chunked direct messages on your configured Files send channel.</div>
             <label class="files-field">
               <span class="files-label">Destination Node ID</span>
               <div class="files-row">
@@ -1512,7 +1512,7 @@
                 <select id="files-send-channel-select" class="files-input files-channel-select" aria-label="Outgoing file transfer channel">
                   <option value="0">Ch 0</option>
                 </select>
-                <span id="files-send-channel-hint" class="files-channel-hint">Files send on Ch 0 (same selector as chat send).</span>
+                <span id="files-send-channel-hint" class="files-channel-hint">Files follow global send by default. You can lock Files to a fixed channel in Channels → App Channels.</span>
               </div>
             </label>
             <label class="files-field">
@@ -2424,6 +2424,24 @@ Ready.
               </div>
             </div>
             <div id="channels-overview" class="overview-grid"></div>
+            <section class="channels-app-routing" aria-label="App channel routing">
+              <div class="channels-app-routing-head">
+                <div class="channels-app-routing-head-main">
+                  <h4>App Channels</h4>
+                  <button
+                    id="channels-app-routing-toggle-btn"
+                    class="btn btn-secondary channels-app-routing-toggle"
+                    type="button"
+                    aria-expanded="false"
+                  >Expand</button>
+                </div>
+                <div id="channels-app-routing-summary" class="channels-app-routing-summary">Loading app routing summary…</div>
+                <div id="channels-app-routing-copy" class="channels-app-routing-copy" hidden>Choose whether Files, Games, and BBS follow global send or stay locked to a fixed channel.</div>
+              </div>
+              <div id="channels-app-routing-grid" class="channels-app-routing-grid" hidden>
+                <div class="channels-app-route-placeholder">Loading app channel routing controls…</div>
+              </div>
+            </section>
             <div class="channels-summary-footer">
               <div class="settings-help-note channels-current-note">
                 Blank <strong>PSK</strong> keeps the current key. <strong>Ch 0</strong> may be active with no name.

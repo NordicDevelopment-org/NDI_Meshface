@@ -323,7 +323,7 @@
         useSelectedBtn.disabled = fileTransferSendInFlight;
       }}
       if (sendChannelSelect instanceof HTMLSelectElement) {{
-        sendChannelSelect.disabled = fileTransferSendInFlight;
+        sendChannelSelect.disabled = fileTransferSendInFlight || meshChannelAppUsesFixedChannel("files");
       }}
       if (peerAttachBtn instanceof HTMLButtonElement) {{
         peerAttachBtn.disabled = fileTransferSendInFlight;
@@ -618,7 +618,7 @@
           return {{ ok: false, error: msg }};
         }}
 
-        const sendCtx = meshChannelSendContext();
+        const sendCtx = meshChannelSendContext({{ appId: "files" }});
         appendFileTransferConsole(
           `Send requested: ${{fileName}} (${{formatFileTransferSize(bytes.length)}}) to ${{destination}} on ${{sendCtx.sendLabel}}.`
         );

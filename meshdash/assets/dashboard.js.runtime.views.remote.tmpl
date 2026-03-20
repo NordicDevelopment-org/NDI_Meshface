@@ -797,7 +797,7 @@
         return false;
       }}
       const channelIndex = normalizeMeshChannelIndex(
-        channel_index == null ? activeMeshSendChannelIndex : channel_index
+        channel_index == null ? meshChannelEffectiveSendIndexForApp("bbs") : channel_index
       );
       const payload = await sendChatPayload(
         {{
@@ -933,7 +933,7 @@
         motdInput instanceof HTMLInputElement ? motdInput.value : bbsHostState.motd,
         bbsMaxMotdChars
       ) || "2400 baud online.";
-      const channelIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      const channelIndex = meshChannelEffectiveSendIndexForApp("bbs");
       bbsHostState = createBbsHostState({{
         enabled: true,
         board_id: boardId,
@@ -1262,7 +1262,7 @@
       const channelRaw = Number(activeRow.channel_index);
       const channelIndex = Number.isInteger(channelRaw) && channelRaw >= 0
         ? channelRaw
-        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+        : meshChannelEffectiveSendIndexForApp("bbs");
       const sent = await sendBbsProtocolMessage(
         "post",
         [

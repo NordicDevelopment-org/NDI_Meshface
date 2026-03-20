@@ -399,6 +399,26 @@
           const popoutFileProgressTitle = popoutFileLabel
             ? `File transfer: ${{popoutFileLabel}}`
             : "File transfer";
+          const popoutThreadChannelIndex = (() => {{
+            for (let idx = popoutBucket.length - 1; idx >= 0; idx -= 1) {{
+              const candidate = popoutBucket[idx];
+              if (!candidate || typeof candidate !== "object") continue;
+              const explicitIdx = (typeof explicitMessageMeshChannelIndex === "function")
+                ? explicitMessageMeshChannelIndex(candidate)
+                : null;
+              if (Number.isInteger(explicitIdx) && explicitIdx >= 0) {{
+                return Math.trunc(explicitIdx);
+              }}
+            }}
+            const sendCtx = meshChannelSendContext();
+            return normalizeMeshChannelIndex(sendCtx && sendCtx.sendIndex);
+          }})();
+          const popoutThreadChannelLabel = meshChannelLabelForIndex(
+            popoutThreadChannelIndex,
+            {{ compact: true, allowAll: false }}
+          );
+          const popoutThreadChannelMeta = meshChannelColorMeta(popoutThreadChannelIndex, {{ allowAll: false }});
+          const popoutThreadChannelStyle = `--peer-dm-channel-fill: ${{popoutThreadChannelMeta.fill}}; --peer-dm-channel-rgb: ${{hexColorRgbTriplet(popoutThreadChannelMeta.fill)}};`;
           const popoutMessageRows = popoutMessages.length > 0
             ? popoutMessages.map((msg) => {{
                 const endpoints = endpointsForMessage(msg);
@@ -439,11 +459,19 @@
                 </div>`;
               }}).join("")
             : '<div class="peer-dm-popout-empty">No messages in this peer thread yet.</div>';
-          peerDmHost.innerHTML = `<section class="peer-dm-popout-window" data-peer-node-id="${{escAttr(activePopoutPeerId)}}">
+          peerDmHost.innerHTML = `<section
+            class="peer-dm-popout-window"
+            data-peer-node-id="${{escAttr(activePopoutPeerId)}}"
+            data-peer-dm-channel-index="${{escAttr(popoutThreadChannelIndex)}}"
+            style="${{escAttr(popoutThreadChannelStyle)}}"
+          >
             <header class="peer-dm-popout-head">
               <div class="peer-dm-popout-title">
                 <span class="peer-dm-popout-name">${{escAttr(popoutName)}}</span>
-                <span class="peer-dm-popout-id">${{escAttr(activePopoutPeerId)}}</span>
+                <span class="peer-dm-popout-id-row">
+                  <span class="peer-dm-popout-id">${{escAttr(activePopoutPeerId)}}</span>
+                  <span class="peer-dm-popout-channel" title="Thread channel">${{escAttr(popoutThreadChannelLabel)}}</span>
+                </span>
               </div>
               <div class="peer-dm-popout-actions">
                 <button type="button" id="peer-dm-popout-open-main-btn" class="peer-dm-popout-btn" title="Focus this peer in the node list">Focus node</button>
@@ -616,12 +644,16 @@
             const text = String(popoutInput.value || "").trim();
             if (!text) return;
             setPopoutStatus("Sending...");
-            const sendCtx = meshChannelSendContext();
+            const sendChannelIndex = normalizeMeshChannelIndex(popoutThreadChannelIndex);
+            const sendChannelLabel = meshChannelLabelForIndex(
+              sendChannelIndex,
+              {{ compact: true, allowAll: false }}
+            );
             const payload = await sendChatPayload(
               {{
                 text,
                 destination: activePopoutPeerId,
-                channel_index: sendCtx.sendIndex,
+                channel_index: sendChannelIndex,
               }},
               null,
               {{
@@ -639,9 +671,9 @@
               && normalizeDeliveryState(payload.delivery_state) === "pending"
             );
             if (awaitingAck) {{
-              setPopoutStatus(`Sent on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}} (awaiting ACK)`);
+              setPopoutStatus(`Sent on ${{sendChannelLabel}} at ${{payload.sent_at || "now"}} (awaiting ACK)`);
             }} else {{
-              setPopoutStatus(`Sent on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
+              setPopoutStatus(`Sent on ${{sendChannelLabel}} at ${{payload.sent_at || "now"}}`);
             }}
             if (latestState) {{
               renderChat(latestState);

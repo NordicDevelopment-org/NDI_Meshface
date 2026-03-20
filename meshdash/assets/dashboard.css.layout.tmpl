@@ -1378,6 +1378,135 @@
     .channels-dashboard-panel-summary .overview-item {{
       min-height: 0;
     }}
+    .channels-app-routing {{
+      border: 1px solid #d7e5d2;
+      border-radius: 12px;
+      background: #fcfffc;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }}
+    .channels-app-routing-head {{
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
+    .channels-app-routing-head-main {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }}
+    .channels-app-routing-head h4 {{
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      opacity: 0.82;
+    }}
+    .channels-app-routing-toggle.btn {{
+      padding: 3px 9px;
+      min-height: 0;
+      font-size: 10px;
+      line-height: 1.2;
+    }}
+    .channels-app-routing-summary {{
+      font-size: 11px;
+      color: #355948;
+      line-height: 1.35;
+    }}
+    .channels-app-routing-copy {{
+      color: #466656;
+      font-size: 10px;
+      line-height: 1.4;
+    }}
+    .channels-app-routing-grid {{
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }}
+    .channels-app-route-placeholder {{
+      color: #597767;
+      font-size: 11px;
+      line-height: 1.4;
+    }}
+    .channels-app-route-row {{
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(120px, 160px) minmax(120px, 160px) minmax(0, 1fr);
+      gap: 8px;
+      align-items: end;
+      border: 1px solid #dce9d9;
+      border-radius: 10px;
+      background: #f8fcf8;
+      padding: 6px 8px;
+    }}
+    .channels-app-route-meta {{
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }}
+    .channels-app-route-title {{
+      font-size: 12px;
+      font-weight: 700;
+      color: #214233;
+    }}
+    .channels-app-route-copy {{
+      color: #597767;
+      font-size: 10px;
+      line-height: 1.35;
+      display: none;
+    }}
+    .channels-app-route-field {{
+      margin: 0;
+      min-width: 0;
+    }}
+    .channels-app-route-field .settings-label {{
+      font-size: 10px;
+    }}
+    .channels-app-route-field .settings-select {{
+      min-width: 0;
+    }}
+    .channels-app-route-effective {{
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+      align-self: stretch;
+      justify-content: center;
+    }}
+    .channels-app-route-effective-label {{
+      font-size: 10px;
+      color: #567061;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }}
+    .channels-app-route-effective-value {{
+      font-size: 12px;
+      font-weight: 700;
+      color: #214233;
+    }}
+    .channels-app-route-effective-copy {{
+      font-size: 10px;
+      color: #4b6858;
+      line-height: 1.35;
+    }}
+    .channels-app-routing:not(.is-expanded) .channels-app-routing-copy {{
+      display: none;
+    }}
+    .channels-app-routing:not(.is-expanded) .channels-app-routing-grid {{
+      display: none;
+    }}
+    @media (max-width: 1120px) {{
+      .channels-app-route-row {{
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }}
+      .channels-app-route-effective {{
+        grid-column: 1 / -1;
+      }}
+    }}
     .channels-view #settings-channels-table {{
       min-width: 1320px;
     }}
@@ -3656,20 +3785,35 @@
       min-height: 0;
     }}
     .peer-dm-popout-window {{
+      --peer-dm-channel-fill: #8da3b1;
+      --peer-dm-channel-rgb: 141, 163, 177;
       pointer-events: auto;
       width: min(400px, calc(100vw - 24px));
       max-width: calc(100vw - 24px);
-      border: 1px solid #ccddcf;
+      border: 1px solid rgba(var(--peer-dm-channel-rgb), 0.44);
       border-radius: 12px;
-      background: #f6fcf7;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--peer-dm-channel-rgb), 0.17) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.08) 42%,
+          rgba(var(--peer-dm-channel-rgb), 0.03) 100%
+        ),
+        #f6fcf7;
       box-shadow: 0 16px 34px rgba(21, 47, 33, 0.3);
       display: grid;
       grid-template-rows: auto minmax(120px, 300px) auto;
       overflow: hidden;
     }}
     .peer-dm-popout-head {{
-      border-bottom: 1px solid #d6e5d9;
-      background: #edf6ef;
+      border-bottom: 1px solid rgba(var(--peer-dm-channel-rgb), 0.35);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--peer-dm-channel-rgb), 0.22) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.1) 100%
+        ),
+        #edf6ef;
       padding: 7px 9px;
       display: flex;
       align-items: center;
@@ -3696,6 +3840,27 @@
       color: #5a7464;
       font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
     }}
+    .peer-dm-popout-id-row {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }}
+    .peer-dm-popout-channel {{
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid rgba(var(--peer-dm-channel-rgb), 0.45);
+      background: rgba(var(--peer-dm-channel-rgb), 0.16);
+      color: #244936;
+      border-radius: 999px;
+      padding: 1px 7px;
+      font-size: 9px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }}
     .peer-dm-popout-actions {{
       display: inline-flex;
       align-items: center;
@@ -3720,30 +3885,37 @@
     .peer-dm-popout-body {{
       padding: 7px 8px;
       overflow: auto;
-      background: #fbfefb;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--peer-dm-channel-rgb), 0.1) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.03) 46%,
+          rgba(var(--peer-dm-channel-rgb), 0.01) 100%
+        ),
+        #fbfefb;
       display: flex;
       flex-direction: column;
       gap: 6px;
       min-height: 0;
     }}
     .peer-dm-popout-empty {{
-      border: 1px dashed #c5d7ca;
+      border: 1px dashed rgba(var(--peer-dm-channel-rgb), 0.42);
       border-radius: 8px;
       padding: 10px 9px;
       color: #4f6a5b;
       font-size: 11px;
       line-height: 1.35;
       text-align: center;
-      background: #fbfefb;
+      background: rgba(var(--peer-dm-channel-rgb), 0.06);
     }}
     .peer-dm-popout-msg {{
       display: inline-flex;
       flex-direction: column;
       gap: 3px;
       max-width: 85%;
-      border: 1px solid #d3e3d6;
+      border: 1px solid rgba(var(--peer-dm-channel-rgb), 0.3);
       border-radius: 10px;
-      background: #ffffff;
+      background: rgba(var(--peer-dm-channel-rgb), 0.09);
       padding: 5px 7px;
       color: #214836;
       line-height: 1.3;
@@ -3751,8 +3923,8 @@
     }}
     .peer-dm-popout-msg.is-own {{
       margin-left: auto;
-      border-color: #9cc5ad;
-      background: #e9f6ef;
+      border-color: rgba(var(--peer-dm-channel-rgb), 0.56);
+      background: rgba(var(--peer-dm-channel-rgb), 0.2);
       color: #1f4231;
     }}
     .peer-dm-popout-msg-meta {{
@@ -3769,8 +3941,14 @@
       line-height: 1.35;
     }}
     .peer-dm-popout-composer {{
-      border-top: 1px solid #d6e5d9;
-      background: #f2f9f4;
+      border-top: 1px solid rgba(var(--peer-dm-channel-rgb), 0.35);
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--peer-dm-channel-rgb), 0.15) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.08) 100%
+        ),
+        #f2f9f4;
       padding: 7px 8px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -3784,7 +3962,7 @@
     }}
     .peer-dm-popout-input {{
       grid-area: input;
-      border: 1px solid #bfd4c3;
+      border: 1px solid rgba(var(--peer-dm-channel-rgb), 0.46);
       border-radius: 999px;
       background: #ffffff;
       color: #264634;
@@ -3846,9 +4024,9 @@
     }}
     .peer-dm-popout-file-progress {{
       grid-area: fileprogress;
-      border: 1px solid #ccdfd1;
+      border: 1px solid rgba(var(--peer-dm-channel-rgb), 0.34);
       border-radius: 8px;
-      background: #f9fdf9;
+      background: rgba(var(--peer-dm-channel-rgb), 0.08);
       padding: 5px 7px;
       display: flex;
       flex-direction: column;
@@ -3885,7 +4063,7 @@
     .peer-dm-popout-file-progress-meter {{
       height: 5px;
       border-radius: 999px;
-      background: #d7e6da;
+      background: rgba(var(--peer-dm-channel-rgb), 0.23);
       overflow: hidden;
     }}
     .peer-dm-popout-file-progress-meter > span {{

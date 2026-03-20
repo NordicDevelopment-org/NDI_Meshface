@@ -9,7 +9,7 @@
         ? reversiPiece.white
         : reversiPiece.black;
       const guestColor = reversiOpponent(hostColor);
-      const sessionChannel = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      const sessionChannel = meshChannelEffectiveSendIndexForApp("games");
       const sessionId = generateReversiSessionId();
       reversiState = createNewReversiState();
       refreshReversiDerivedState({{ autoPass: true }});
@@ -54,7 +54,7 @@
       const inviteChannelRaw = Number(invite.channel_index);
       const inviteChannel = Number.isInteger(inviteChannelRaw) && inviteChannelRaw >= 0
         ? inviteChannelRaw
-        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+        : meshChannelEffectiveSendIndexForApp("games");
       if (!isCanonicalNodeId(peerId) || !sessionId) {{
         updateReversiLinkStatus("Invite details are invalid.");
         if (activeLayoutView === "games") renderGamesView(latestState);
@@ -74,7 +74,7 @@
           [reversiLink.session_id],
           {{
             destination_id: reversiLink.peer_id,
-            channel_index: Number.isInteger(Number(reversiLink.channel_index)) ? Number(reversiLink.channel_index) : normalizeMeshChannelIndex(activeMeshSendChannelIndex),
+            channel_index: Number.isInteger(Number(reversiLink.channel_index)) ? Number(reversiLink.channel_index) : meshChannelEffectiveSendIndexForApp("games"),
           }}
         );
       }}
@@ -126,11 +126,10 @@
           [reversiLink.session_id],
           {{
             destination_id: reversiLink.peer_id,
-            channel_index: Number.isInteger(Number(reversiLink.channel_index)) ? Number(reversiLink.channel_index) : normalizeMeshChannelIndex(activeMeshSendChannelIndex),
+            channel_index: Number.isInteger(Number(reversiLink.channel_index)) ? Number(reversiLink.channel_index) : meshChannelEffectiveSendIndexForApp("games"),
           }}
         );
       }}
       resetReversiNetworkLink("Disconnected. Local hotseat mode.", {{ keepPeer: true }});
       if (activeLayoutView === "games") renderGamesView(latestState);
     }}
-

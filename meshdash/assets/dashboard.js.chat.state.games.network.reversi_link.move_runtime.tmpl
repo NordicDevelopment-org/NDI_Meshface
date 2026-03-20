@@ -16,7 +16,7 @@
       const sessionChannelRaw = Number(reversiLink.channel_index);
       const sessionChannel = Number.isInteger(sessionChannelRaw) && sessionChannelRaw >= 0
         ? sessionChannelRaw
-        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+        : meshChannelEffectiveSendIndexForApp("games");
       const sent = await sendReversiProtocolMessage(
         "move",
         [reversiLink.session_id, seq, row, col],
@@ -91,4 +91,3 @@
       }}
       return true;
     }}
-
