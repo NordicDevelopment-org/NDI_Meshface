@@ -637,11 +637,21 @@
         appendFileTransferConsole(
           `Metadata sent for ${{fileTransferShortTransferId(transferId)}} (${{chunkFrames.length}} chunk${{chunkFrames.length === 1 ? "" : "s"}}).`
         );
+        const shortTransfer = chunkFrames.length <= Math.max(
+          1,
+          Math.trunc(Number(fileTransferShortTransferChunkThreshold) || 1)
+        );
+        const shortBurstExtra = shortTransfer
+          ? Math.max(0, Math.trunc(Number(fileTransferShortInitialBurstExtraChunks) || 0))
+          : 0;
         const initialBurstChunks = Math.max(
           1,
           Math.min(
             chunkFrames.length,
-            Math.trunc(Number(fileTransferInitialChunkBurst) || 1)
+            Math.max(
+              1,
+              Math.trunc(Number(fileTransferInitialChunkBurst) || 1)
+            ) + shortBurstExtra
           )
         );
         await waitFileTransferFrameGap();

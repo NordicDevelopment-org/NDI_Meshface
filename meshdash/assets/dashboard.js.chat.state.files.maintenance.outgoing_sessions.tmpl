@@ -220,6 +220,10 @@
         }}
         const endgame = missingIndexes.length > 0
           && missingIndexes.length <= fileTransferEndgameMissingChunkThreshold;
+        const shortTransfer = session.totalChunks <= Math.max(
+          1,
+          Math.trunc(Number(fileTransferShortTransferChunkThreshold) || 1)
+        );
         const adaptiveRtoMs = Math.max(
           fileTransferRtoMinMs,
           Math.min(fileTransferRtoMaxMs, Math.trunc(Number(session.rtoMs) || fileTransferRtoInitialMs))
@@ -240,7 +244,9 @@
           }} else if (missingCount >= 5) {{
             legacyRetryIntervalMs = hasRecentAckProgress ? 2200 : 5500;
           }} else {{
-            legacyRetryIntervalMs = fileTransferEndgameResendIntervalMs;
+            legacyRetryIntervalMs = shortTransfer
+              ? Math.max(fileTransferRtoMinMs, Math.trunc(Number(fileTransferShortEndgameResendIntervalMs) || fileTransferEndgameResendIntervalMs))
+              : fileTransferEndgameResendIntervalMs;
           }}
         }}
         let retryIntervalMs = hasRecentAckProgress
@@ -251,7 +257,7 @@
           retryIntervalMs = Math.round(retryIntervalMs * Math.pow(1.12, backoffSteps));
         }}
         const maxIntervalMs = endgame
-          ? 5500
+          ? (shortTransfer ? 4200 : 5500)
           : (hasRecentAckProgress ? 7000 : fileTransferRtoMaxMs);
         retryIntervalMs = Math.max(fileTransferRtoMinMs, Math.min(maxIntervalMs, retryIntervalMs));
         if (retryCapped) {{
@@ -494,8 +500,11 @@
                 fileTransferCwndMinChunks,
                 Math.min(fileTransferCwndMaxChunks, Math.floor(priorCwnd / 2))
               );
+              const shortBackoffFloor = shortTransfer
+                ? Math.max(fileTransferCwndMinChunks, Math.trunc(Number(fileTransferShortCwndBackoffFloorChunks) || fileTransferCwndMinChunks))
+                : fileTransferCwndMinChunks;
               session.ssthreshChunks = ssthresh;
-              session.cwndChunks = Math.max(fileTransferCwndMinChunks, ssthresh);
+              session.cwndChunks = Math.max(shortBackoffFloor, ssthresh);
               session.frameGapMs = clampFrameGapMs(
                 Math.round(session.frameGapMs * Number(fileTransferInterFrameDelayBackoffMultiplier || 1.12))
               );
