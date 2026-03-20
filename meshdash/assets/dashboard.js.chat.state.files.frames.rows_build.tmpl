@@ -125,12 +125,23 @@
 
         let progressLabel = "";
         let progressSort = 0;
+        let progressPercent = Math.max(0, Math.min(100, Math.trunc(percent)));
+        let progressState = "active";
         let outgoingRetrying = false;
         if (outgoing) {{
           const waitingForAccept = !!(outgoingSession && outgoingSession.waitingForAccept && !outgoingSession.failed && !outgoingSession.delivered);
+          const sentChunksVisual = outgoingSession
+            ? Math.max(
+              0,
+              Math.min(expectedChunks, Math.trunc(Number(outgoingSession.sentChunks) || 0))
+            )
+            : 0;
+          const sentPct = Math.max(0, Math.min(100, Math.round((sentChunksVisual / Math.max(expectedChunks, 1)) * 100)));
           if (outgoingSession && outgoingSession.failed && !delivered) {{
             progressLabel = `Delivery failed (${{ackedChunks}}/${{expectedChunks}} acked)`;
             progressSort = deliveryPct;
+            progressPercent = deliveryPct;
+            progressState = "error";
           }} else if (waitingForAccept) {{
             const acceptProbeAttempts = Math.max(
               0,
@@ -141,15 +152,23 @@
               progressLabel += ` (ping ${{acceptProbeAttempts}})`;
             }}
             progressSort = 12;
+            progressPercent = 0;
+            progressState = "pending";
           }} else if (delivered) {{
             progressLabel = `Delivered (${{Math.max(ackedChunks, expectedChunks)}}/${{expectedChunks}} acked)`;
             progressSort = 220;
+            progressPercent = 100;
+            progressState = "success";
           }} else if (ack) {{
             progressLabel = `${{deliveryPct}}% delivered (${{ackedChunks}}/${{expectedChunks}} acked)`;
             progressSort = 100 + deliveryPct;
+            progressPercent = deliveryPct;
+            progressState = "active";
           }} else {{
-            progressLabel = `Awaiting ACK (0/${{expectedChunks}} acked)`;
+            progressLabel = `Awaiting ACK (${{ackedChunks}}/${{expectedChunks}} acked, ${{sentChunksVisual}}/${{expectedChunks}} sent)`;
             progressSort = 25;
+            progressPercent = Math.max(deliveryPct, sentPct);
+            progressState = "pending";
           }}
           const activeRetries = Math.max(
             0,
@@ -158,23 +177,34 @@
           if (outgoingSession && !outgoingSession.delivered && !outgoingSession.failed && activeRetries > 0) {{
             outgoingRetrying = true;
             progressLabel = `${{progressLabel}} • retry ${{activeRetries}}/${{outgoingSession.maxRetries}}`;
+            if (progressState === "active") {{
+              progressState = "pending";
+            }}
           }}
         }} else {{
           if (inboundPending) {{
             progressLabel = "Awaiting acceptance";
             progressSort = 14;
+            progressPercent = 0;
+            progressState = "pending";
           }} else if (inboundDeclined) {{
             progressLabel = "Declined (no ACKs sent)";
             progressSort = 6;
+            progressPercent = 0;
+            progressState = "pending";
           }} else {{
             progressLabel = complete
               ? "Complete"
               : `${{percent}}% (${{receivedChunks}}/${{expectedChunks}} chunks)`;
             progressSort = complete ? 100 : percent;
+            progressPercent = complete ? 100 : percent;
+            progressState = complete ? "success" : "active";
             if (!complete && transfer.hasDecodeError) {{
               progressLabel = "Error (invalid chunk)";
+              progressState = "error";
             }} else if (!complete && assembleError) {{
               progressLabel = `Error (${{assembleError}})`;
+              progressState = "error";
             }}
           }}
         }}
@@ -213,6 +243,8 @@
           downloadName: safeFileTransferDownloadName(fileName),
           progressLabel,
           progressSort,
+          progressPercent,
+          progressState,
           sizeLabel,
           sizeSort: originalDeclaredBytes != null ? originalDeclaredBytes : observedBytes,
           channelIndex: resolvedChannelIndex,
@@ -276,6 +308,8 @@
             ? `Delivered (${{totalChunks}}/${{totalChunks}} acked)`
             : `${{deliveryPct}}% delivered (${{ackedChunks}}/${{totalChunks}} acked)`,
           progressSort: delivered ? 220 : (100 + deliveryPct),
+          progressPercent: delivered ? 100 : deliveryPct,
+          progressState: delivered ? "success" : "active",
           sizeLabel: "n/a",
           sizeSort: 0,
           channelIndex,

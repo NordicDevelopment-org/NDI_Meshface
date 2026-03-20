@@ -1952,6 +1952,67 @@
       white-space: nowrap;
       max-width: 280px;
     }}
+    .files-transfer-progress {{
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+      max-width: 300px;
+    }}
+    .files-transfer-progress-head {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }}
+    .files-transfer-progress-text {{
+      font-size: 10px;
+      line-height: 1.2;
+      color: #365746;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      flex: 1 1 auto;
+    }}
+    .files-transfer-progress-pct {{
+      font-size: 10px;
+      line-height: 1.2;
+      color: #2f4f3e;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }}
+    .files-transfer-progress-meter {{
+      height: 5px;
+      border-radius: 999px;
+      background: #d7e6da;
+      overflow: hidden;
+    }}
+    .files-transfer-progress-meter > span {{
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: #3a9263;
+      transition: width 140ms ease;
+    }}
+    .files-transfer-progress.is-pending .files-transfer-progress-meter > span {{
+      background: #b28a3d;
+    }}
+    .files-transfer-progress.is-error .files-transfer-progress-text,
+    .files-transfer-progress.is-error .files-transfer-progress-pct {{
+      color: #8b3a3a;
+    }}
+    .files-transfer-progress.is-error .files-transfer-progress-meter {{
+      background: #f1d0d0;
+    }}
+    .files-transfer-progress.is-error .files-transfer-progress-meter > span {{
+      background: #b24d4d;
+    }}
+    .files-transfer-progress.is-success .files-transfer-progress-meter > span {{
+      background: #2f8a5c;
+    }}
     .remote {{
       grid-column: 1 / span 3;
       grid-row: 2 / 9;

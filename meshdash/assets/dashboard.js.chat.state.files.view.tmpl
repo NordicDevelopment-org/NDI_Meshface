@@ -259,6 +259,37 @@
         const inboundAccepted = !!(row && row.inboundAccepted);
         const inboundPending = !!(row && row.inboundPending);
         const inboundDeclined = !!(row && row.inboundDeclined);
+        const progressPctRaw = Number(row && row.progressPercent);
+        const progressPct = Number.isFinite(progressPctRaw)
+          ? Math.max(0, Math.min(100, Math.round(progressPctRaw)))
+          : 0;
+        const progressStateRaw = String(row && row.progressState ? row.progressState : "active").trim().toLowerCase();
+        const progressState = (
+          progressStateRaw === "success"
+          || progressStateRaw === "error"
+          || progressStateRaw === "pending"
+        ) ? progressStateRaw : "active";
+        const progressClass = progressState === "success"
+          ? "files-transfer-progress is-success"
+          : (
+            progressState === "error"
+              ? "files-transfer-progress is-error"
+              : (
+                progressState === "pending"
+                  ? "files-transfer-progress is-pending"
+                  : "files-transfer-progress"
+              )
+          );
+        const progressLabelText = String(row && row.progressLabel ? row.progressLabel : "n/a");
+        const progressHtml = `<span class="${{escAttr(progressClass)}}">
+            <span class="files-transfer-progress-head">
+              <span class="files-transfer-progress-text">${{escAttr(progressLabelText)}}</span>
+              <span class="files-transfer-progress-pct">${{escAttr(`${{progressPct}}%`)}}</span>
+            </span>
+            <span class="files-transfer-progress-meter">
+              <span style="width:${{escAttr(String(progressPct))}}%;"></span>
+            </span>
+          </span>`;
         const channelIndexRaw = Number(row && row.channelIndex);
         const hasChannelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0;
         const channelBadge = hasChannelIndex
@@ -327,7 +358,7 @@
               <span class="files-transfer-name-sub" title="${{escAttr(row.transferId || "")}}">${{escAttr(nameSub)}}</span>
             </span>
           </td>
-          <td data-sort="${{escAttr(row.progressSort ?? 0)}}">${{escAttr(row.progressLabel || "n/a")}}</td>
+          <td data-sort="${{escAttr(row.progressSort ?? 0)}}">${{progressHtml}}</td>
           <td data-sort="${{escAttr(row.sizeSort ?? 0)}}">${{escAttr(row.sizeLabel || "n/a")}}</td>
           <td data-sort="${{escAttr(hasChannelIndex ? channelIndexRaw : -1)}}">${{channelBadge}}</td>
           <td data-sort="${{escAttr(actionSort)}}">${{actionHtml}}</td>
