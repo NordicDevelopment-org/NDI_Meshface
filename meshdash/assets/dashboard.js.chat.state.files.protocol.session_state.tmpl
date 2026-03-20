@@ -157,6 +157,31 @@
           Math.min(totalChunks, Math.trunc(Number(session.sentChunks) || totalChunks))
         ),
         ackedChunks: 0,
+        srttMs: Math.max(0, Number(session.srttMs) || 0),
+        rttvarMs: Math.max(0, Number(session.rttvarMs) || 0),
+        rtoMs: Math.max(
+          fileTransferRtoMinMs,
+          Math.min(
+            fileTransferRtoMaxMs,
+            Math.trunc(Number(session.rtoMs) || fileTransferRtoInitialMs)
+          )
+        ),
+        cwndChunks: Math.max(
+          fileTransferCwndMinChunks,
+          Math.min(
+            fileTransferCwndMaxChunks,
+            Number(session.cwndChunks) || fileTransferCwndInitialChunks
+          )
+        ),
+        ssthreshChunks: Math.max(
+          fileTransferCwndMinChunks,
+          Math.min(
+            fileTransferCwndMaxChunks,
+            Math.trunc(Number(session.ssthreshChunks) || fileTransferSsthreshInitialChunks)
+          )
+        ),
+        lastWindowSendAtMs: Math.max(0, Math.trunc(Number(session.lastWindowSendAtMs) || 0)),
+        lastCongestionBackoffAtMs: Math.max(0, Math.trunc(Number(session.lastCongestionBackoffAtMs) || 0)),
         lastAckProgressAtMs: 0,
         lastAckUnix: null,
         lastAckChannelIndex: null,

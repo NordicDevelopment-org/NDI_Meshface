@@ -659,6 +659,10 @@
           totalChunks: chunkFrames.length,
           sentChunks: initialBurstChunks,
           retryChunkCursor: initialBurstChunks % Math.max(chunkFrames.length, 1),
+          cwndChunks: Math.max(fileTransferCwndMinChunks, Number(fileTransferCwndInitialChunks) || initialBurstChunks),
+          ssthreshChunks: Math.max(fileTransferCwndMinChunks, Number(fileTransferSsthreshInitialChunks) || fileTransferCwndInitialChunks),
+          rtoMs: Math.max(fileTransferRtoMinMs, Number(fileTransferRtoInitialMs) || 3000),
+          lastWindowSendAtMs: Date.now(),
         }});
         statusFn(`File transfer started: ${{fileName}} (${{initialBurstChunks}}/${{chunkFrames.length}} chunks queued)`);
         pushPeerState({{
