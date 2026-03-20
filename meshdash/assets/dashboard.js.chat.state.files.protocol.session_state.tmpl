@@ -145,13 +145,17 @@
         lastRetryAtMs: 0,
         retryAttempts: 0,
         retriesSinceProgress: 0,
-        retryChunkCursor: 0,
+        retryChunkCursor: Math.max(0, Math.trunc(Number(session.retryChunkCursor) || 0)),
         lastRetryErrorAtMs: 0,
         maxRetries: Math.max(1, Math.trunc(Number(session.maxRetries) || fileTransferOutgoingMaxRetries)),
         delivered: false,
         failed: false,
         deliveredAtMs: 0,
         failedAtMs: 0,
+        sentChunks: Math.max(
+          0,
+          Math.min(totalChunks, Math.trunc(Number(session.sentChunks) || totalChunks))
+        ),
         ackedChunks: 0,
         lastAckProgressAtMs: 0,
         lastAckUnix: null,
@@ -174,4 +178,3 @@
         }}
       }}
     }}
-

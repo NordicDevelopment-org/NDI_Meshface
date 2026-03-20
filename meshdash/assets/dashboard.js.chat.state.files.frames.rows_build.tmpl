@@ -5,7 +5,9 @@
       const nodesById = frameState.nodesById;
       const localNodeId = frameState.localNodeId;
       const rows = [];
+      const transferKeysSeen = new Set();
       for (const transfer of transfers.values()) {{
+        transferKeysSeen.add(String(transfer && transfer.key ? transfer.key : ""));
         const direction = fileTransferDirectionMeta(transfer.fromId, transfer.toId, localNodeId);
         const peerMeta = fileTransferPeerMeta(direction.peerId, nodesById, localNodeId);
         const expectedChunks = Number.isInteger(transfer.totalChunks) && transfer.totalChunks > 0
@@ -175,6 +177,64 @@
         }});
       }}
 
+      // Refresh fallback: if only ACK frames are available (for example after a page reload
+      // where local outgoing in-memory session state was reset), still render delivery progress.
+      for (const [transferKeyRaw, ack] of ackByTransferKey.entries()) {{
+        const transferKey = String(transferKeyRaw || "").trim();
+        if (!transferKey) continue;
+        if (transferKeysSeen.has(transferKey)) continue;
+        if (!(ack && typeof ack === "object")) continue;
+        const senderId = normalizeNodeId(ack.originalSenderId || "");
+        const receiverId = normalizeNodeId(ack.originalReceiverId || "");
+        if (!isCanonicalNodeId(senderId) || !isCanonicalNodeId(receiverId)) continue;
+        // ACK-only rows are useful to the sender (the side waiting for ACK progression).
+        if (!isCanonicalNodeId(localNodeId) || senderId !== localNodeId) continue;
+        const totalChunks = Math.max(1, Math.trunc(Number(ack.totalChunks) || 1));
+        const ackedChunks = Math.max(
+          0,
+          Math.min(totalChunks, Math.trunc(Number(ack.receivedCount) || 0))
+        );
+        const delivered = ackedChunks >= totalChunks || !!ack.complete;
+        const deliveryPct = Math.max(0, Math.min(100, Math.round((ackedChunks / totalChunks) * 100)));
+        const direction = fileTransferDirectionMeta(senderId, receiverId, localNodeId);
+        const peerMeta = fileTransferPeerMeta(direction.peerId, nodesById, localNodeId);
+        const channelIndex = fileTransferExplicitChannelIndex(ack.channelIndex);
+        const channelLabel = channelIndex == null
+          ? "Unknown"
+          : meshChannelLabelForIndex(channelIndex, {{ allowAll: false }});
+        const transferId = String(ack.transferId || "").trim().toLowerCase();
+        const fallbackName = normalizeFileTransferName(
+          transferId
+            ? `unknown-file-${{fileTransferShortTransferId(transferId)}}`
+            : "unknown-file"
+        );
+        rows.push({{
+          key: `${{transferKey}}|ack-only`,
+          transferId,
+          unix: Number(ack.latestUnix || 0) || null,
+          sortUnix: Number(ack.latestUnix || 0) || 0,
+          directionClass: direction.className,
+          directionLabel: direction.label,
+          peerId: direction.peerId,
+          peerLabel: peerMeta.label,
+          peerTitle: peerMeta.title,
+          fileName: fallbackName,
+          downloadName: safeFileTransferDownloadName(fallbackName),
+          progressLabel: delivered
+            ? `Delivered (${{totalChunks}}/${{totalChunks}} acked)`
+            : `${{deliveryPct}}% delivered (${{ackedChunks}}/${{totalChunks}} acked)`,
+          progressSort: delivered ? 220 : (100 + deliveryPct),
+          sizeLabel: "n/a",
+          sizeSort: 0,
+          channelIndex,
+          channelLabel,
+          delivered,
+          outgoingRetrying: false,
+          canDownload: false,
+          bytes: null,
+        }});
+      }}
+
       rows.sort((a, b) => {{
         const unixDiff = Number(b.sortUnix || 0) - Number(a.sortUnix || 0);
         if (unixDiff !== 0) return unixDiff;
@@ -184,4 +244,3 @@
       }});
       return rows;
     }}
-

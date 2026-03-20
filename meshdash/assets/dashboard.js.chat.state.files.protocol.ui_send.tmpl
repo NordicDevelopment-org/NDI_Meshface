@@ -47,6 +47,142 @@
       el.classList.toggle("error", !!isError);
     }}
 
+    function fileTransferClampPercent(rawPercent) {{
+      const num = Number(rawPercent);
+      if (!Number.isFinite(num)) return 0;
+      return Math.max(0, Math.min(100, Math.round(num)));
+    }}
+
+    function setPeerDmFileTransferUiState(peerIdRaw, state = null) {{
+      const peerId = normalizeNodeId(peerIdRaw || "");
+      if (!isCanonicalNodeId(peerId)) return null;
+      if (!(state && typeof state === "object")) {{
+        peerDmFileTransferUiByPeer.delete(peerId);
+        return null;
+      }}
+      const normalized = {{
+        peerId,
+        phase: String(state.phase || "sending").trim().toLowerCase(),
+        text: String(state.text || "").trim(),
+        isError: !!state.isError,
+        percent: fileTransferClampPercent(state.percent),
+        transferId: String(state.transferId || "").trim().toLowerCase(),
+        fileName: normalizeFileTransferName(state.fileName || "mesh-file.bin"),
+        sentChunks: Math.max(0, Math.trunc(Number(state.sentChunks) || 0)),
+        ackedChunks: Math.max(0, Math.trunc(Number(state.ackedChunks) || 0)),
+        totalChunks: Math.max(0, Math.trunc(Number(state.totalChunks) || 0)),
+        updatedAtMs: Date.now(),
+      }};
+      peerDmFileTransferUiByPeer.set(peerId, normalized);
+      return normalized;
+    }}
+
+    function latestOutgoingFileTransferSessionForPeer(peerIdRaw) {{
+      const peerId = normalizeNodeId(peerIdRaw || "");
+      if (!isCanonicalNodeId(peerId)) return null;
+      let selected = null;
+      let selectedStamp = 0;
+      for (const session of fileTransferOutgoingByToken.values()) {{
+        if (!session || typeof session !== "object") continue;
+        if (normalizeNodeId(session.destination || "") !== peerId) continue;
+        const stamp = Math.max(
+          0,
+          Number(session.deliveredAtMs) || 0,
+          Number(session.failedAtMs) || 0,
+          Number(session.lastAckProgressAtMs) || 0,
+          Number(session.lastRetryAtMs) || 0,
+          Number(session.lastSendAtMs) || 0,
+          Number(session.createdAtMs) || 0
+        );
+        if (!selected || stamp >= selectedStamp) {{
+          selected = session;
+          selectedStamp = stamp;
+        }}
+      }}
+      return selected;
+    }}
+
+    function summarizePeerDmFileTransferState(peerIdRaw) {{
+      const peerId = normalizeNodeId(peerIdRaw || "");
+      if (!isCanonicalNodeId(peerId)) return null;
+      const nowMs = Date.now();
+      const uiStateRaw = peerDmFileTransferUiByPeer.get(peerId) || null;
+      if (uiStateRaw && (nowMs - Math.max(0, Number(uiStateRaw.updatedAtMs) || 0)) > (20 * 60 * 1000)) {{
+        peerDmFileTransferUiByPeer.delete(peerId);
+      }}
+      const uiState = peerDmFileTransferUiByPeer.get(peerId) || null;
+      const session = latestOutgoingFileTransferSessionForPeer(peerId);
+      let sessionState = null;
+      if (session) {{
+        const totalChunks = Math.max(1, Math.trunc(Number(session.totalChunks) || 1));
+        const ackedChunks = Math.max(
+          0,
+          Math.min(totalChunks, Math.trunc(Number(session.ackedChunks) || 0))
+        );
+        const sentChunks = Math.max(
+          ackedChunks,
+          Math.min(totalChunks, Math.trunc(Number(session.sentChunks) || totalChunks))
+        );
+        const activeRetries = Math.max(
+          0,
+          Math.trunc(Number(session.retriesSinceProgress) || Number(session.retryAttempts) || 0)
+        );
+        let phase = "awaiting_ack";
+        let text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: awaiting ACK (${{ackedChunks}}/${{totalChunks}} acked)`;
+        let isError = false;
+        if (session.failed) {{
+          phase = "failed";
+          text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: delivery failed (${{ackedChunks}}/${{totalChunks}} acked)`;
+          isError = true;
+        }} else if (session.delivered) {{
+          phase = "delivered";
+          text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: delivered (${{totalChunks}}/${{totalChunks}} acked)`;
+        }} else if (ackedChunks <= 0 && sentChunks < totalChunks) {{
+          phase = "sending";
+          text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: sending bursts (${{sentChunks}}/${{totalChunks}} sent)`;
+        }} else if (activeRetries > 0) {{
+          phase = "retrying";
+          text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: retry ${{activeRetries}}/${{session.maxRetries}} (${{ackedChunks}}/${{totalChunks}} acked)`;
+        }}
+        const updatedAtMs = Math.max(
+          0,
+          Number(session.deliveredAtMs) || 0,
+          Number(session.failedAtMs) || 0,
+          Number(session.lastAckProgressAtMs) || 0,
+          Number(session.lastRetryAtMs) || 0,
+          Number(session.lastSendAtMs) || 0,
+          Number(session.createdAtMs) || 0
+        );
+        sessionState = {{
+          peerId,
+          phase,
+          text,
+          isError,
+          percent: session.delivered
+            ? 100
+            : fileTransferClampPercent((ackedChunks / Math.max(totalChunks, 1)) * 100),
+          transferId: String(session.transferId || "").trim().toLowerCase(),
+          fileName: normalizeFileTransferName(session.fileName || "mesh-file.bin"),
+          sentChunks,
+          ackedChunks,
+          totalChunks,
+          updatedAtMs,
+        }};
+      }}
+      if (uiState && sessionState) {{
+        const sameTransfer = (
+          !uiState.transferId
+          || !sessionState.transferId
+          || uiState.transferId === sessionState.transferId
+        );
+        if (sameTransfer && uiState.phase === "sending") {{
+          return uiState;
+        }}
+        return sessionState.updatedAtMs >= uiState.updatedAtMs ? sessionState : uiState;
+      }}
+      return sessionState || uiState || null;
+    }}
+
     function fileTransferShortTransferId(rawTransferId) {{
       const clean = String(rawTransferId || "").trim().toLowerCase();
       if (!clean) return "n/a";
@@ -159,6 +295,8 @@
       const destinationInput = document.getElementById("files-destination-input");
       const useSelectedBtn = document.getElementById("files-use-selected-btn");
       const sendChannelSelect = document.getElementById("files-send-channel-select");
+      const peerAttachBtn = document.getElementById("peer-dm-popout-file-attach-btn");
+      const peerFileInput = document.getElementById("peer-dm-popout-file-input");
       if (sendBtn instanceof HTMLButtonElement) {{
         sendBtn.disabled = fileTransferSendInFlight;
         sendBtn.textContent = fileTransferSendInFlight ? "Sending..." : "Send file";
@@ -174,6 +312,13 @@
       }}
       if (sendChannelSelect instanceof HTMLSelectElement) {{
         sendChannelSelect.disabled = fileTransferSendInFlight;
+      }}
+      if (peerAttachBtn instanceof HTMLButtonElement) {{
+        peerAttachBtn.disabled = fileTransferSendInFlight;
+        peerAttachBtn.textContent = fileTransferSendInFlight ? "Sending..." : "Attach file";
+      }}
+      if (peerFileInput instanceof HTMLInputElement) {{
+        peerFileInput.disabled = fileTransferSendInFlight;
       }}
     }}
 
@@ -282,77 +427,224 @@
       return frames;
     }}
 
-    async function sendSelectedFileTransfer() {{
-      if (fileTransferSendInFlight) return;
-      const fileInput = document.getElementById("files-input");
-      if (!(fileInput instanceof HTMLInputElement)) return;
-      const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    async function sendFileTransferToDestination(fileCandidate, destinationRaw, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const statusFn = (typeof opts.statusFn === "function") ? opts.statusFn : setFileTransferStatus;
+      const progressFn = (typeof opts.progressFn === "function") ? opts.progressFn : null;
+      const manageBusy = opts.manageBusy !== false;
+      const persistDestination = opts.persistDestination !== false;
+      const destination = normalizeNodeId(destinationRaw || "");
+      const peerTrackId = normalizeNodeId(opts.peerId || destination || "");
+      const trackPeerState = isCanonicalNodeId(peerTrackId);
+      const emitProgress = (payload) => {{
+        if (typeof progressFn !== "function") return;
+        try {{
+          progressFn(payload);
+        }} catch (_err) {{
+        }}
+      }};
+      const pushPeerState = (state) => {{
+        if (!trackPeerState) return null;
+        const next = setPeerDmFileTransferUiState(peerTrackId, state);
+        emitProgress(next || null);
+        return next;
+      }};
+
+      if (fileTransferSendInFlight) {{
+        const msg = "A file transfer is already in progress.";
+        statusFn(msg, true);
+        pushPeerState({{
+          phase: "failed",
+          text: msg,
+          isError: true,
+          percent: 0,
+        }});
+        return {{ ok: false, error: msg }};
+      }}
+      const file = (
+        fileCandidate
+        && typeof fileCandidate === "object"
+        && typeof fileCandidate.arrayBuffer === "function"
+      ) ? fileCandidate : null;
       if (!file) {{
-        setFileTransferStatus("Choose a file before sending.", true);
-        return;
+        const msg = "Choose a file before sending.";
+        statusFn(msg, true);
+        pushPeerState({{
+          phase: "failed",
+          text: msg,
+          isError: true,
+          percent: 0,
+        }});
+        return {{ ok: false, error: msg }};
       }}
-      const destination = resolveFileTransferDestination();
       if (!isCanonicalNodeId(destination)) {{
-        setFileTransferStatus("Enter a valid destination Node ID (for example !49b54790).", true);
-        return;
+        const msg = "Enter a valid destination Node ID (for example !49b54790).";
+        statusFn(msg, true);
+        pushPeerState({{
+          phase: "failed",
+          text: msg,
+          isError: true,
+          percent: 0,
+          fileName: file.name || "mesh-file.bin",
+        }});
+        return {{ ok: false, error: msg }};
       }}
-      setFileTransferDestination(destination);
+      if (isSelfNodeId(destination)) {{
+        const msg = "Cannot send a file to your own radio.";
+        statusFn(msg, true);
+        pushPeerState({{
+          phase: "failed",
+          text: msg,
+          isError: true,
+          percent: 0,
+          fileName: file.name || "mesh-file.bin",
+        }});
+        return {{ ok: false, error: msg }};
+      }}
+      if (persistDestination) {{
+        setFileTransferDestination(destination);
+      }}
+
+      const fileName = normalizeFileTransferName(file.name || "mesh-file.bin");
       const fileSize = Number(file.size);
       if (!Number.isFinite(fileSize) || fileSize <= 0) {{
-        setFileTransferStatus("Selected file is empty.", true);
-        return;
+        const msg = "Selected file is empty.";
+        statusFn(msg, true);
+        pushPeerState({{
+          phase: "failed",
+          text: `${{fileName}}: ${{msg.toLowerCase()}}`,
+          isError: true,
+          percent: 0,
+          fileName,
+        }});
+        return {{ ok: false, error: msg }};
       }}
       if (fileSize > fileTransferMaxFileBytes) {{
-        setFileTransferStatus(`File is too large (${formatFileTransferSize(fileSize)}). Limit: ${formatFileTransferSize(fileTransferMaxFileBytes)}.`, true);
-        return;
-      }}
-      let bytes = null;
-      try {{
-        const arrayBuffer = await file.arrayBuffer();
-        bytes = new Uint8Array(arrayBuffer);
-      }} catch (_err) {{
-        setFileTransferStatus("Could not read the selected file.", true);
-        return;
-      }}
-      if (!(bytes instanceof Uint8Array) || !bytes.length) {{
-        setFileTransferStatus("Selected file is empty.", true);
-        return;
+        const msg = `File is too large (${formatFileTransferSize(fileSize)}). Limit: ${{formatFileTransferSize(fileTransferMaxFileBytes)}}.`;
+        statusFn(msg, true);
+        pushPeerState({{
+          phase: "failed",
+          text: `${{fileName}}: too large (${formatFileTransferSize(fileSize)})`,
+          isError: true,
+          percent: 0,
+          fileName,
+        }});
+        return {{ ok: false, error: msg }};
       }}
 
-      const transferId = buildFileTransferId();
-      const chunkFrames = buildFileTransferChunkFrames(transferId, bytes);
-      const metaFrame = buildFileTransferMetaFrame(
-        transferId,
-        file.name || "mesh-file.bin",
-        bytes.length,
-        chunkFrames.length
-      );
-      if (utf8ByteLength(metaFrame) > fileTransferChatMaxBytes) {{
-        setFileTransferStatus("File name is too long for transfer metadata. Rename the file and try again.", true);
-        return;
+      if (manageBusy) {{
+        setFileTransferBusy(true);
       }}
+      pushPeerState({{
+        phase: "preparing",
+        text: `${{fileName}}: preparing...`,
+        isError: false,
+        percent: 0,
+        fileName,
+      }});
 
-      const sendCtx = meshChannelSendContext();
-      setFileTransferBusy(true);
-      appendFileTransferConsole(
-        `Send requested: ${{normalizeFileTransferName(file.name)}} (${{formatFileTransferSize(bytes.length)}}) to ${{destination}} on ${{sendCtx.sendLabel}}.`
-      );
-      setFileTransferStatus(`Sending "${normalizeFileTransferName(file.name)}" to ${{destination}} on ${{sendCtx.sendLabel}}...`);
       try {{
+        let bytes = null;
+        try {{
+          const arrayBuffer = await file.arrayBuffer();
+          bytes = new Uint8Array(arrayBuffer);
+        }} catch (_err) {{
+          const msg = "Could not read the selected file.";
+          statusFn(msg, true);
+          pushPeerState({{
+            phase: "failed",
+            text: `${{fileName}}: could not read file`,
+            isError: true,
+            percent: 0,
+            fileName,
+          }});
+          return {{ ok: false, error: msg }};
+        }}
+        if (!(bytes instanceof Uint8Array) || !bytes.length) {{
+          const msg = "Selected file is empty.";
+          statusFn(msg, true);
+          pushPeerState({{
+            phase: "failed",
+            text: `${{fileName}}: selected file is empty`,
+            isError: true,
+            percent: 0,
+            fileName,
+          }});
+          return {{ ok: false, error: msg }};
+        }}
+
+        const transferId = buildFileTransferId();
+        const chunkFrames = buildFileTransferChunkFrames(transferId, bytes);
+        const metaFrame = buildFileTransferMetaFrame(
+          transferId,
+          fileName,
+          bytes.length,
+          chunkFrames.length
+        );
+        if (utf8ByteLength(metaFrame) > fileTransferChatMaxBytes) {{
+          const msg = "File name is too long for transfer metadata. Rename the file and try again.";
+          statusFn(msg, true);
+          pushPeerState({{
+            phase: "failed",
+            text: `${{fileName}}: file name is too long`,
+            isError: true,
+            percent: 0,
+            transferId,
+            fileName,
+            totalChunks: chunkFrames.length,
+          }});
+          return {{ ok: false, error: msg }};
+        }}
+
+        const sendCtx = meshChannelSendContext();
+        appendFileTransferConsole(
+          `Send requested: ${{fileName}} (${{formatFileTransferSize(bytes.length)}}) to ${{destination}} on ${{sendCtx.sendLabel}}.`
+        );
+        statusFn(`Sending "${{fileName}}" to ${{destination}} on ${{sendCtx.sendLabel}}...`);
+        pushPeerState({{
+          phase: "sending",
+          text: `${{fileName}}: sending metadata...`,
+          isError: false,
+          percent: 0,
+          transferId,
+          fileName,
+          sentChunks: 0,
+          totalChunks: chunkFrames.length,
+        }});
+
         await sendFileTransferFrameText(metaFrame, destination, sendCtx.sendIndex);
         appendFileTransferConsole(
           `Metadata sent for ${{fileTransferShortTransferId(transferId)}} (${{chunkFrames.length}} chunk${{chunkFrames.length === 1 ? "" : "s"}}).`
         );
+        const initialBurstChunks = Math.max(
+          1,
+          Math.min(
+            chunkFrames.length,
+            Math.trunc(Number(fileTransferInitialChunkBurst) || 1)
+          )
+        );
         await waitFileTransferFrameGap();
-        for (let i = 0; i < chunkFrames.length; i += 1) {{
+        for (let i = 0; i < initialBurstChunks; i += 1) {{
           await sendFileTransferFrameText(chunkFrames[i], destination, sendCtx.sendIndex);
-          if (i + 1 < chunkFrames.length) {{
+          if (i + 1 < initialBurstChunks) {{
             await waitFileTransferFrameGap();
           }}
-          if ((i + 1) % 5 === 0 || i + 1 === chunkFrames.length) {{
-            setFileTransferStatus(`Sending "${normalizeFileTransferName(file.name)}": chunk ${{i + 1}}/${{chunkFrames.length}}`);
+          const sentChunks = i + 1;
+          const sendPercent = fileTransferClampPercent((sentChunks / Math.max(chunkFrames.length, 1)) * 100);
+          pushPeerState({{
+            phase: "sending",
+            text: `${{fileName}}: sending chunk ${{sentChunks}}/${{chunkFrames.length}}`,
+            isError: false,
+            percent: sendPercent,
+            transferId,
+            fileName,
+            sentChunks,
+            totalChunks: chunkFrames.length,
+          }});
+          if ((i + 1) % 3 === 0 || i + 1 === initialBurstChunks) {{
+            statusFn(`Sending "${{fileName}}": starter burst ${{i + 1}}/${{chunkFrames.length}}`);
             appendFileTransferConsole(
-              `Chunk send progress for ${{fileTransferShortTransferId(transferId)}}: ${{i + 1}}/${{chunkFrames.length}}.`
+              `Starter burst for ${{fileTransferShortTransferId(transferId)}}: ${{i + 1}}/${{chunkFrames.length}} chunks queued.`
             );
           }}
         }}
@@ -361,28 +653,76 @@
           senderId: normalizeNodeId(resolveLocalNodeId(latestState) || ""),
           destination,
           channelIndex: sendCtx.sendIndex,
-          fileName: file.name || "mesh-file.bin",
+          fileName,
           metaFrame,
           chunkFrames,
           totalChunks: chunkFrames.length,
+          sentChunks: initialBurstChunks,
+          retryChunkCursor: initialBurstChunks % Math.max(chunkFrames.length, 1),
         }});
-        fileInput.value = "";
-        setFileTransferStatus(`File sent: ${normalizeFileTransferName(file.name)} (${chunkFrames.length} chunk${chunkFrames.length === 1 ? "" : "s"})`);
+        statusFn(`File transfer started: ${{fileName}} (${{initialBurstChunks}}/${{chunkFrames.length}} chunks queued)`);
+        pushPeerState({{
+          phase: "awaiting_ack",
+          text: `${{fileName}}: awaiting ACK (0/${{chunkFrames.length}} acked, ${{initialBurstChunks}}/${{chunkFrames.length}} sent)`,
+          isError: false,
+          percent: fileTransferClampPercent((initialBurstChunks / Math.max(chunkFrames.length, 1)) * 100),
+          transferId,
+          fileName,
+          sentChunks: initialBurstChunks,
+          ackedChunks: 0,
+          totalChunks: chunkFrames.length,
+        }});
         appendFileTransferConsole(
-          `Transfer ${{fileTransferShortTransferId(transferId)}} sent to ${{destination}}. Waiting for ACK from receiver.`
+          `Transfer ${{fileTransferShortTransferId(transferId)}} started to ${{destination}} with starter burst ${{initialBurstChunks}}/${{chunkFrames.length}}. Waiting for ACK-driven refill.`
         );
         scheduleFileTransferMaintenance(latestState);
         requestImmediatePoll(40);
         await poll();
+        return {{
+          ok: true,
+          transferId,
+          fileName,
+          sizeBytes: bytes.length,
+          destination,
+          totalChunks: chunkFrames.length,
+          channelIndex: sendCtx.sendIndex,
+          sendLabel: sendCtx.sendLabel,
+        }};
       }} catch (err) {{
         const msg = err instanceof Error ? err.message : String(err || "unknown error");
-        setFileTransferStatus(`File send error: ${{msg}}`, true);
+        statusFn(`File send error: ${{msg}}`, true);
+        pushPeerState({{
+          phase: "failed",
+          text: `${{fileName}}: send failed (${{msg}})`,
+          isError: true,
+          percent: 0,
+          fileName,
+        }});
         appendFileTransferConsole(
-          `Send failed for ${{normalizeFileTransferName(file.name)}}: ${{msg}}`,
+          `Send failed for ${{fileName}}: ${{msg}}`,
           {{ level: "error" }}
         );
+        return {{ ok: false, error: msg }};
       }} finally {{
-        setFileTransferBusy(false);
+        if (manageBusy) {{
+          setFileTransferBusy(false);
+        }}
+      }}
+    }}
+
+    async function sendSelectedFileTransfer() {{
+      if (fileTransferSendInFlight) return;
+      const fileInput = document.getElementById("files-input");
+      if (!(fileInput instanceof HTMLInputElement)) return;
+      const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+      const destination = resolveFileTransferDestination();
+      const result = await sendFileTransferToDestination(file, destination, {{
+        statusFn: setFileTransferStatus,
+        manageBusy: true,
+        persistDestination: true,
+      }});
+      if (result && result.ok) {{
+        fileInput.value = "";
       }}
     }}
 
@@ -436,4 +776,3 @@
       bindFilesConsoleControls();
       syncFileTransferDestinationInput();
     }}
-

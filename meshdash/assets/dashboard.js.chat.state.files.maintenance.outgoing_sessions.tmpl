@@ -45,6 +45,16 @@
           );
           const ackedChunks = Math.max(priorAckedChunks, ackedChunksObserved);
           session.ackedChunks = ackedChunks;
+          session.sentChunks = Math.max(
+            ackedChunks,
+            Math.min(
+              session.totalChunks,
+              Math.max(
+                Math.trunc(Number(session.sentChunks) || 0),
+                ackedChunks
+              )
+            )
+          );
           session.lastAckUnix = ack.latestUnix || session.lastAckUnix || null;
           if (ackedChunks > priorAckedChunks) {{
             session.retriesSinceProgress = 0;
@@ -144,15 +154,45 @@
           continue;
         }}
         const framesToSend = [];
-        const includeMeta = !!session.metaFrame && (noAckYet || (!endgame && (stallRetryAttempts % 4 === 0)));
+        const includeMeta = !!session.metaFrame && (
+          noAckYet
+            ? (
+              stallRetryAttempts === 0
+              || (
+                stallRetryAttempts % Math.max(
+                  1,
+                  Math.trunc(Number(fileTransferNoAckMetaResendEveryRetries) || 1)
+                )
+              ) === 0
+            )
+            : (!endgame && (stallRetryAttempts % 4 === 0))
+        );
         if (includeMeta) {{
           framesToSend.push(session.metaFrame);
         }}
         let retryMissingIndexes = missingIndexes.slice();
-        if (!noAckYet && missingIndexes.length > 0) {{
+        if (missingIndexes.length > 0) {{
           let burstSize = missingIndexes.length;
           if (endgame) {{
             burstSize = Math.max(1, Math.min(2, missingIndexes.length));
+          }} else if (noAckYet) {{
+            const baseBurst = Math.max(
+              1,
+              Math.trunc(Number(fileTransferNoAckBurstMin) || 1)
+            );
+            const maxBurst = Math.max(
+              baseBurst,
+              Math.trunc(Number(fileTransferNoAckBurstMax) || baseBurst)
+            );
+            const growth = Math.max(0, Math.floor(stallRetryAttempts / 2));
+            burstSize = Math.max(
+              1,
+              Math.min(
+                missingIndexes.length,
+                maxBurst,
+                baseBurst + growth
+              )
+            );
           }} else if (missingIndexes.length >= 20) {{
             burstSize = 14;
           }} else if (missingIndexes.length >= 12) {{
@@ -215,17 +255,36 @@
           }}
         }}
         if (sentCount > 0) {{
+          const priorSentChunks = Math.max(
+            0,
+            Math.min(session.totalChunks, Math.trunc(Number(session.sentChunks) || 0))
+          );
+          if (noAckYet) {{
+            const noAckAdvance = Math.max(
+              0,
+              Math.min(session.totalChunks, retryMissingIndexes.length)
+            );
+            session.sentChunks = Math.max(
+              priorSentChunks,
+              Math.min(session.totalChunks, priorSentChunks + noAckAdvance)
+            );
+          }} else {{
+            session.sentChunks = Math.max(priorSentChunks, session.totalChunks);
+          }}
           session.retryAttempts = Math.max(0, Math.trunc(Number(session.retryAttempts) || 0)) + 1;
           session.retriesSinceProgress = Math.max(0, Math.trunc(Number(session.retriesSinceProgress) || 0)) + 1;
           session.lastRetryAtMs = nowMs;
           session.lastSendAtMs = Date.now();
           const activeRetries = Math.max(0, Math.trunc(Number(session.retriesSinceProgress) || 0));
           const intervalSec = (retryIntervalMs / 1000).toFixed(retryIntervalMs < 10000 ? 1 : 0);
+          const noAckLabel = noAckYet
+            ? ` (no ACK yet, paced burst of ${{retryMissingIndexes.length}} chunk${{retryMissingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence)`
+            : "";
           const endgameLabel = endgame
             ? ` (endgame, ${{missingIndexes.length}} missing chunk${{missingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence)`
             : "";
           appendFileTransferConsole(
-            `Retry ${{activeRetries}}/${{session.maxRetries}} for ${{fileTransferShortTransferId(session.transferId)}}: resent ${{sentCount}} frame${{sentCount === 1 ? "" : "s"}} to ${{session.destination}}${{endgameLabel}}.`,
+            `Retry ${{activeRetries}}/${{session.maxRetries}} for ${{fileTransferShortTransferId(session.transferId)}}: resent ${{sentCount}} frame${{sentCount === 1 ? "" : "s"}} to ${{session.destination}}${{noAckLabel || endgameLabel}}.`,
             {{ level: "warn" }}
           );
         }} else if (firstSendError) {{
@@ -241,4 +300,3 @@
       }}
       pruneOutgoingFileTransferSessions(nowMs);
     }}
-

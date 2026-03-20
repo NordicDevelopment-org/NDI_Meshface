@@ -50,7 +50,10 @@
         const activeIdx = activeMeshChannelFilterIndex();
         const msgChannelIndex = explicitMessageMeshChannelIndex(msg);
         if (respectActiveChannel && activeIdx !== meshChannelAllIndex) {{
-          if (!Number.isInteger(msgChannelIndex) || msgChannelIndex < 0 || msgChannelIndex !== activeIdx) {{
+          // Keep unknown-channel frames visible while scoped to a concrete channel.
+          // LoRa capture metadata can lose explicit channel tags, and dropping these
+          // frames makes completed transfers appear as "no transfers" on the receiver.
+          if (Number.isInteger(msgChannelIndex) && msgChannelIndex >= 0 && msgChannelIndex !== activeIdx) {{
             continue;
           }}
         }}
