@@ -180,6 +180,13 @@
             Math.trunc(Number(session.ssthreshChunks) || fileTransferSsthreshInitialChunks)
           )
         ),
+        frameGapMs: Math.max(
+          fileTransferInterFrameDelayMinMs,
+          Math.min(
+            fileTransferInterFrameDelayMaxMs,
+            Math.trunc(Number(session.frameGapMs) || fileTransferInterFrameDelayMs)
+          )
+        ),
         lastWindowSendAtMs: Math.max(0, Math.trunc(Number(session.lastWindowSendAtMs) || 0)),
         lastCongestionBackoffAtMs: Math.max(0, Math.trunc(Number(session.lastCongestionBackoffAtMs) || 0)),
         lastAckProgressAtMs: 0,

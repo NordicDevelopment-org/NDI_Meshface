@@ -4,6 +4,16 @@
       const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: false }});
       const ackByTransferKey = frameState.ackByTransferKey;
       const localNodeId = normalizeNodeId(frameState.localNodeId || "");
+      const minFrameGapMs = Math.max(0, Math.trunc(Number(fileTransferInterFrameDelayMinMs) || 0));
+      const maxFrameGapMs = Math.max(minFrameGapMs, Math.trunc(Number(fileTransferInterFrameDelayMaxMs) || minFrameGapMs));
+      const baselineFrameGapMs = Math.max(
+        minFrameGapMs,
+        Math.min(maxFrameGapMs, Math.trunc(Number(fileTransferInterFrameDelayMs) || minFrameGapMs))
+      );
+      const clampFrameGapMs = (rawValue) => {{
+        const parsed = Math.trunc(Number(rawValue) || baselineFrameGapMs);
+        return Math.max(minFrameGapMs, Math.min(maxFrameGapMs, parsed));
+      }};
       const nowMs = Date.now();
       for (const [token, session] of fileTransferOutgoingByToken.entries()) {{
         if (!session || typeof session !== "object") {{
@@ -36,6 +46,7 @@
             Math.trunc(Number(session.ssthreshChunks) || fileTransferSsthreshInitialChunks)
           )
         );
+        session.frameGapMs = clampFrameGapMs(session.frameGapMs);
         session.lastWindowSendAtMs = Math.max(0, Math.trunc(Number(session.lastWindowSendAtMs) || 0));
         session.lastCongestionBackoffAtMs = Math.max(0, Math.trunc(Number(session.lastCongestionBackoffAtMs) || 0));
         const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
@@ -109,6 +120,15 @@
               const add = Math.max(ackDelta / Math.max(1, session.cwndChunks), 0.2);
               session.cwndChunks = Math.min(fileTransferCwndMaxChunks, session.cwndChunks + add);
             }}
+            let targetGapMs = baselineFrameGapMs;
+            if (session.srttMs > 0) {{
+              const divisor = Math.max(2, Math.min(8, Math.ceil(Number(session.cwndChunks) || 2)));
+              targetGapMs = clampFrameGapMs(Math.round(session.srttMs / divisor));
+            }}
+            const recoveredGapMs = clampFrameGapMs(
+              Math.round(session.frameGapMs * Number(fileTransferInterFrameDelayRecoverMultiplier || 0.88))
+            );
+            session.frameGapMs = clampFrameGapMs(Math.min(targetGapMs, recoveredGapMs));
             session.retriesSinceProgress = 0;
             session.lastAckProgressAtMs = nowMs;
             appendFileTransferConsole(
@@ -287,8 +307,14 @@
           }} else if (missingIndexes.length >= 8) {{
             burstSize = 8;
           }}
-          const budgetFloor = cwndBudget > 0 ? cwndBudget : 1;
-          burstSize = Math.max(1, Math.min(burstSize, budgetFloor));
+          const progressBurstFloor = hasRecentAckProgress
+            ? (missingIndexes.length >= 20 ? 3 : 2)
+            : 1;
+          const softBudgetFloor = hasRecentAckProgress
+            ? Math.max(progressBurstFloor, Math.ceil(congestionWindow * 0.8))
+            : 1;
+          const budgetFloor = cwndBudget > 0 ? cwndBudget : softBudgetFloor;
+          burstSize = Math.max(progressBurstFloor, Math.min(burstSize, budgetFloor));
           if (missingIndexes.length > burstSize) {{
             // Prioritize forward progress: send unsent frontier chunks first, then fill
             // remaining burst budget with older missing chunks for selective retransmit.
@@ -382,7 +408,7 @@
             );
             sentCount += 1;
             if (frameIdx + 1 < framesToSend.length) {{
-              await waitFileTransferFrameGap();
+              await waitFileTransferFrameGap(session.frameGapMs);
             }}
           }} catch (err) {{
             firstSendError = err instanceof Error ? err.message : String(err || "send failed");
@@ -394,7 +420,15 @@
             0,
             Math.min(session.totalChunks, Math.trunc(Number(session.sentChunks) || 0))
           );
-          if (stallRetryAttempts > 0 && !endgame) {{
+          const noRecentProgressForBackoff = (
+            noAckYet
+            || !hasRecentAckProgress
+            || (
+              lastProgressAtMs > 0
+              && (nowMs - lastProgressAtMs) > Math.max(6000, Math.round(adaptiveRtoMs * 1.35))
+            )
+          );
+          if (stallRetryAttempts > 0 && !endgame && noRecentProgressForBackoff) {{
             const backoffWindowMs = Math.max(fileTransferRtoMinMs, Math.trunc(Number(session.rtoMs) || fileTransferRtoInitialMs));
             if ((nowMs - Math.max(0, Number(session.lastCongestionBackoffAtMs) || 0)) >= backoffWindowMs) {{
               const priorCwnd = Math.max(
@@ -407,6 +441,9 @@
               );
               session.ssthreshChunks = ssthresh;
               session.cwndChunks = Math.max(fileTransferCwndMinChunks, ssthresh);
+              session.frameGapMs = clampFrameGapMs(
+                Math.round(session.frameGapMs * Number(fileTransferInterFrameDelayBackoffMultiplier || 1.12))
+              );
               session.lastCongestionBackoffAtMs = nowMs;
             }}
           }}
@@ -431,20 +468,24 @@
             Math.min(fileTransferCwndMaxChunks, Number(session.cwndChunks) || fileTransferCwndInitialChunks)
           ).toFixed(1);
           const rtoLabelMs = Math.max(fileTransferRtoMinMs, Math.trunc(Number(session.rtoMs) || fileTransferRtoInitialMs));
+          const frameGapLabelMs = clampFrameGapMs(session.frameGapMs);
           const noAckLabel = noAckYet
-            ? ` (no ACK yet, paced burst of ${{retryMissingIndexes.length}} chunk${{retryMissingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence, cwnd ${{cwndLabel}}, rto ${{rtoLabelMs}}ms)`
+            ? ` (no ACK yet, paced burst of ${{retryMissingIndexes.length}} chunk${{retryMissingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence, cwnd ${{cwndLabel}}, rto ${{rtoLabelMs}}ms, gap ${{frameGapLabelMs}}ms)`
             : "";
           const endgameLabel = endgame
-            ? ` (endgame, ${{missingIndexes.length}} missing chunk${{missingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence, cwnd ${{cwndLabel}}, rto ${{rtoLabelMs}}ms)`
+            ? ` (endgame, ${{missingIndexes.length}} missing chunk${{missingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence, cwnd ${{cwndLabel}}, rto ${{rtoLabelMs}}ms, gap ${{frameGapLabelMs}}ms)`
             : "";
           const flowLabel = (!noAckYet && !endgame)
-            ? ` (~${{intervalSec}}s cadence, cwnd ${{cwndLabel}}, rto ${{rtoLabelMs}}ms, in-flight ${{Math.max(0, (priorSentChunks + frontierAdvance) - Math.max(0, Math.trunc(Number(session.ackedChunks) || 0)))}})`
+            ? ` (~${{intervalSec}}s cadence, cwnd ${{cwndLabel}}, rto ${{rtoLabelMs}}ms, gap ${{frameGapLabelMs}}ms, in-flight ${{Math.max(0, (priorSentChunks + frontierAdvance) - Math.max(0, Math.trunc(Number(session.ackedChunks) || 0)))}})`
             : "";
           appendFileTransferConsole(
             `Retry ${{activeRetries}}/${{session.maxRetries}} for ${{fileTransferShortTransferId(session.transferId)}}: resent ${{sentCount}} frame${{sentCount === 1 ? "" : "s"}} to ${{session.destination}}${{noAckLabel || endgameLabel || flowLabel}}.`,
             {{ level: "warn" }}
           );
         }} else if (firstSendError) {{
+          session.frameGapMs = clampFrameGapMs(
+            Math.round(session.frameGapMs * Number(fileTransferInterFrameDelayBackoffMultiplier || 1.12))
+          );
           const lastRetryErrorAtMs = Math.max(0, Math.trunc(Number(session.lastRetryErrorAtMs) || 0));
           if ((nowMs - lastRetryErrorAtMs) >= fileTransferRetryErrorLogIntervalMs) {{
             session.lastRetryErrorAtMs = nowMs;

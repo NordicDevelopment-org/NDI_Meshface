@@ -19,8 +19,12 @@
       return count;
     }}
 
-    function waitFileTransferFrameGap() {{
-      const delayMs = Math.max(0, Math.trunc(Number(fileTransferInterFrameDelayMs) || 0));
+    function waitFileTransferFrameGap(rawDelayMs = null) {{
+      const fallbackDelayMs = Math.max(0, Math.trunc(Number(fileTransferInterFrameDelayMs) || 0));
+      const parsedDelayMs = rawDelayMs == null
+        ? fallbackDelayMs
+        : Math.max(0, Math.trunc(Number(rawDelayMs) || fallbackDelayMs));
+      const delayMs = parsedDelayMs;
       if (delayMs <= 0) return Promise.resolve();
       return new Promise((resolve) => {{
         window.setTimeout(resolve, delayMs);
@@ -254,4 +258,3 @@
       if (activeIdx === meshChannelAllIndex) return true;
       return messageMeshChannelIndex(msg) === activeIdx;
     }}
-

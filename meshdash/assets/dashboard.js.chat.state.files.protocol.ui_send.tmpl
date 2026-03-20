@@ -662,6 +662,7 @@
           cwndChunks: Math.max(fileTransferCwndMinChunks, Number(fileTransferCwndInitialChunks) || initialBurstChunks),
           ssthreshChunks: Math.max(fileTransferCwndMinChunks, Number(fileTransferSsthreshInitialChunks) || fileTransferCwndInitialChunks),
           rtoMs: Math.max(fileTransferRtoMinMs, Number(fileTransferRtoInitialMs) || 3000),
+          frameGapMs: Math.max(fileTransferInterFrameDelayMinMs, Number(fileTransferInterFrameDelayMs) || 320),
           lastWindowSendAtMs: Date.now(),
         }});
         statusFn(`File transfer started: ${{fileName}} (${{initialBurstChunks}}/${{chunkFrames.length}} chunks queued)`);
