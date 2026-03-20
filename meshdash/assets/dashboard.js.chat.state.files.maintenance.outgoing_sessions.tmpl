@@ -49,6 +49,7 @@
         session.frameGapMs = clampFrameGapMs(session.frameGapMs);
         session.lastWindowSendAtMs = Math.max(0, Math.trunc(Number(session.lastWindowSendAtMs) || 0));
         session.lastCongestionBackoffAtMs = Math.max(0, Math.trunc(Number(session.lastCongestionBackoffAtMs) || 0));
+        let ackProgressThisTick = false;
         const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
         if (ack) {{
           const ackChannelIndex = fileTransferExplicitChannelIndex(ack.channelIndex);
@@ -92,6 +93,19 @@
             )
           );
           session.lastAckUnix = ack.latestUnix || session.lastAckUnix || null;
+          if (ack.receivedSet instanceof Set && ack.receivedSet.size > 0) {{
+            const normalizedReceivedIndexes = [];
+            for (const idx of ack.receivedSet.values()) {{
+              const parsedIdx = Math.trunc(Number(idx));
+              if (Number.isInteger(parsedIdx) && parsedIdx >= 0 && parsedIdx < session.totalChunks) {{
+                normalizedReceivedIndexes.push(parsedIdx);
+              }}
+            }}
+            if (normalizedReceivedIndexes.length > 0) {{
+              normalizedReceivedIndexes.sort((a, b) => a - b);
+              session.lastAckReceivedIndexes = normalizedReceivedIndexes;
+            }}
+          }}
           if (ackedChunks > priorAckedChunks) {{
             const ackDelta = Math.max(1, ackedChunks - priorAckedChunks);
             const sampleRttMs = session.lastWindowSendAtMs > 0
@@ -131,6 +145,7 @@
             session.frameGapMs = clampFrameGapMs(Math.min(targetGapMs, recoveredGapMs));
             session.retriesSinceProgress = 0;
             session.lastAckProgressAtMs = nowMs;
+            ackProgressThisTick = true;
             appendFileTransferConsole(
               `ACK progress for ${{fileTransferShortTransferId(session.transferId)}} from ${{session.destination}}: ${{ackedChunks}}/${{session.totalChunks}}.`
             );
@@ -176,24 +191,35 @@
 
         const lastRetryAtMs = Number(session.lastRetryAtMs) || 0;
         const noAckYet = !ack;
-        const receivedSet = ack && ack.receivedSet instanceof Set
-          ? ack.receivedSet
-          : new Set();
-        const missingIndexes = noAckYet
-          ? Array.from({{ length: session.totalChunks }}, (_value, idx) => idx)
-          : fileTransferMissingChunkIndexes(session.totalChunks, receivedSet);
-        if (!missingIndexes.length) {{
-          continue;
-        }}
-        const endgame = !noAckYet
-          && missingIndexes.length > 0
-          && missingIndexes.length <= fileTransferEndgameMissingChunkThreshold;
         const lastProgressDeltaMs = lastProgressAtMs > 0
           ? Math.max(0, nowMs - lastProgressAtMs)
           : Number.POSITIVE_INFINITY;
-        const hasRecentAckProgress = !noAckYet
-          && lastProgressAtMs > 0
+        const hasRecentAckProgress = lastProgressAtMs > 0
           && lastProgressDeltaMs <= (45 * 1000);
+        const receivedSet = ack && ack.receivedSet instanceof Set
+          ? ack.receivedSet
+          : new Set();
+        const cachedAckIndexes = Array.isArray(session.lastAckReceivedIndexes)
+          ? session.lastAckReceivedIndexes
+          : [];
+        const cachedReceivedSet = new Set();
+        for (const idx of cachedAckIndexes) {{
+          const parsedIdx = Math.trunc(Number(idx));
+          if (Number.isInteger(parsedIdx) && parsedIdx >= 0 && parsedIdx < session.totalChunks) {{
+            cachedReceivedSet.add(parsedIdx);
+          }}
+        }}
+        const effectiveReceivedSet = receivedSet.size > 0
+          ? receivedSet
+          : cachedReceivedSet;
+        const missingIndexes = effectiveReceivedSet.size > 0
+          ? fileTransferMissingChunkIndexes(session.totalChunks, effectiveReceivedSet)
+          : Array.from({{ length: session.totalChunks }}, (_value, idx) => idx);
+        if (!missingIndexes.length) {{
+          continue;
+        }}
+        const endgame = missingIndexes.length > 0
+          && missingIndexes.length <= fileTransferEndgameMissingChunkThreshold;
         const adaptiveRtoMs = Math.max(
           fileTransferRtoMinMs,
           Math.min(fileTransferRtoMaxMs, Math.trunc(Number(session.rtoMs) || fileTransferRtoInitialMs))
@@ -225,7 +251,7 @@
           retryIntervalMs = Math.round(retryIntervalMs * Math.pow(1.12, backoffSteps));
         }}
         const maxIntervalMs = endgame
-          ? 7000
+          ? 5500
           : (hasRecentAckProgress ? 7000 : fileTransferRtoMaxMs);
         retryIntervalMs = Math.max(fileTransferRtoMinMs, Math.min(maxIntervalMs, retryIntervalMs));
         if (retryCapped) {{
@@ -238,7 +264,10 @@
         if (noAckYet && (nowMs - lastSendAtMs) < noAckGateMs) {{
           continue;
         }}
-        if (!noAckYet && (nowMs - lastRetryAtMs) < retryIntervalMs) {{
+        const retryGateMs = ackProgressThisTick
+          ? Math.max(fileTransferMaintenanceCooldownMs, Math.round(retryIntervalMs * 0.4))
+          : retryIntervalMs;
+        if (!noAckYet && (nowMs - lastRetryAtMs) < retryGateMs) {{
           continue;
         }}
         if (!noAckYet && (nowMs - lastSendAtMs) < fileTransferMaintenanceCooldownMs) {{
@@ -256,7 +285,7 @@
                 )
               ) === 0
             )
-            : (!endgame && (stallRetryAttempts % 4 === 0))
+            : (!endgame && !hasRecentAckProgress && (stallRetryAttempts % 4 === 0))
         );
         if (includeMeta) {{
           framesToSend.push(session.metaFrame);
@@ -277,11 +306,11 @@
         );
         const targetInFlightChunks = Math.max(
           2,
-          Math.ceil(congestionWindow * (hasRecentAckProgress ? 1.2 : 1.0))
+          Math.ceil(congestionWindow * (hasRecentAckProgress ? 1.0 : 0.95))
         );
         const inFlightHardCap = Math.max(
           3,
-          Math.ceil(congestionWindow * (hasRecentAckProgress ? 1.45 : 1.2))
+          Math.ceil(congestionWindow * (hasRecentAckProgress ? 1.2 : 1.1))
         );
         const inFlightOverCap = inFlightChunks > inFlightHardCap;
         const cwndBudget = Math.max(0, targetInFlightChunks - inFlightChunks);
@@ -309,6 +338,10 @@
                 baseBurst + growth
               )
             );
+            if (hasRecentAckProgress) {{
+              // If ACKs were recently flowing but we missed a refresh frame, probe lightly.
+              burstSize = Math.max(1, Math.min(2, burstSize));
+            }}
           }} else if (missingIndexes.length >= 20) {{
             burstSize = 14;
           }} else if (missingIndexes.length >= 12) {{
@@ -316,12 +349,17 @@
           }} else if (missingIndexes.length >= 8) {{
             burstSize = 8;
           }}
+          if (!noAckYet && !endgame && hasRecentAckProgress) {{
+            // Keep active-progress retries lean to avoid overfilling the air queue.
+            const progressBurstCap = Math.max(3, Math.min(8, Math.ceil(congestionWindow * 0.65)));
+            burstSize = Math.min(burstSize, progressBurstCap);
+          }}
           const progressBurstFloor = hasRecentAckProgress
             ? (missingIndexes.length >= 20 ? 3 : 2)
             : 1;
           const minBurstAllowed = inFlightOverCap ? 1 : progressBurstFloor;
           const softBudgetFloor = hasRecentAckProgress && !inFlightOverCap
-            ? Math.max(minBurstAllowed, Math.ceil(congestionWindow * 0.55))
+            ? Math.max(minBurstAllowed, Math.ceil(congestionWindow * 0.45))
             : 1;
           const budgetFloor = cwndBudget > 0 ? cwndBudget : softBudgetFloor;
           burstSize = Math.max(minBurstAllowed, Math.min(burstSize, budgetFloor));
@@ -333,12 +371,13 @@
             const olderMissing = missingIndexes.filter((idx) => idx < frontierIndex);
             const selected = [];
             if (!endgame && !inFlightOverCap && unsentMissing.length > 0) {{
+              const newChunkBias = hasRecentAckProgress ? 0.82 : 0.7;
               const desiredNew = Math.max(
                 1,
                 Math.min(
                   unsentMissing.length,
                   burstSize,
-                  Math.ceil(burstSize * 0.7)
+                  Math.ceil(burstSize * newChunkBias)
                 )
               );
               for (let i = 0; i < desiredNew; i += 1) {{
@@ -391,7 +430,11 @@
           session.retryChunkCursor = 0;
         }}
         const duplicateSends = endgame
-          ? Math.max(1, Math.min(4, fileTransferEndgameDuplicateSends + (retryMissingIndexes.length <= 2 ? 1 : 0)))
+          ? (
+            hasRecentAckProgress
+              ? Math.max(1, Math.min(2, fileTransferEndgameDuplicateSends))
+              : Math.max(1, Math.min(4, fileTransferEndgameDuplicateSends + (retryMissingIndexes.length <= 2 ? 1 : 0)))
+          )
           : 1;
         for (const chunkIdx of retryMissingIndexes) {{
           const frame = session.chunkFrames[chunkIdx];
