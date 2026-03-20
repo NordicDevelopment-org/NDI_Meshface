@@ -257,6 +257,7 @@
         );
         const cwndBudget = Math.max(0, Math.floor(congestionWindow) - inFlightChunks);
         let retryMissingIndexes = missingIndexes.slice();
+        let plannedFrontierAdvance = 0;
         if (missingIndexes.length > 0) {{
           let burstSize = missingIndexes.length;
           if (endgame) {{
@@ -289,18 +290,64 @@
           const budgetFloor = cwndBudget > 0 ? cwndBudget : 1;
           burstSize = Math.max(1, Math.min(burstSize, budgetFloor));
           if (missingIndexes.length > burstSize) {{
-            const cursorRaw = Math.max(0, Math.trunc(Number(session.retryChunkCursor) || 0));
+            // Prioritize forward progress: send unsent frontier chunks first, then fill
+            // remaining burst budget with older missing chunks for selective retransmit.
+            const frontierIndex = Math.max(0, Math.min(session.totalChunks, sessionSentChunks));
+            const unsentMissing = missingIndexes.filter((idx) => idx >= frontierIndex);
+            const olderMissing = missingIndexes.filter((idx) => idx < frontierIndex);
             const selected = [];
-            for (let idxPos = 0; idxPos < burstSize; idxPos += 1) {{
-              const pick = missingIndexes[(cursorRaw + idxPos) % missingIndexes.length];
-              if (!selected.includes(pick)) {{
-                selected.push(pick);
+            if (!endgame && unsentMissing.length > 0) {{
+              const desiredNew = Math.max(
+                1,
+                Math.min(
+                  unsentMissing.length,
+                  burstSize,
+                  Math.ceil(burstSize * 0.7)
+                )
+              );
+              for (let i = 0; i < desiredNew; i += 1) {{
+                selected.push(unsentMissing[i]);
+              }}
+              plannedFrontierAdvance = selected.length;
+            }}
+            let fillPool = olderMissing;
+            if (!fillPool.length) {{
+              fillPool = unsentMissing.slice(selected.length);
+            }}
+            if (selected.length < burstSize && fillPool.length > 0) {{
+              const cursorRaw = Math.max(0, Math.trunc(Number(session.retryChunkCursor) || 0));
+              const needed = burstSize - selected.length;
+              for (let i = 0; i < needed; i += 1) {{
+                const pick = fillPool[(cursorRaw + i) % fillPool.length];
+                if (!selected.includes(pick)) {{
+                  selected.push(pick);
+                }}
+              }}
+              session.retryChunkCursor = (cursorRaw + needed) % fillPool.length;
+            }} else {{
+              session.retryChunkCursor = 0;
+            }}
+            if (selected.length < burstSize) {{
+              for (const idx of unsentMissing) {{
+                if (selected.length >= burstSize) break;
+                if (!selected.includes(idx)) {{
+                  selected.push(idx);
+                  if (idx >= frontierIndex) {{
+                    plannedFrontierAdvance += 1;
+                  }}
+                }}
               }}
             }}
-            retryMissingIndexes = selected;
-            session.retryChunkCursor = (cursorRaw + burstSize) % missingIndexes.length;
+            retryMissingIndexes = selected.length > 0
+              ? selected
+              : missingIndexes.slice(0, burstSize);
+            if (plannedFrontierAdvance <= 0) {{
+              plannedFrontierAdvance = retryMissingIndexes.filter((idx) => idx >= frontierIndex).length;
+            }}
           }} else {{
             session.retryChunkCursor = 0;
+            const frontierIndex = Math.max(0, Math.min(session.totalChunks, sessionSentChunks));
+            plannedFrontierAdvance = retryMissingIndexes.filter((idx) => idx >= frontierIndex).length;
           }}
         }} else {{
           session.retryChunkCursor = 0;
@@ -363,12 +410,11 @@
               session.lastCongestionBackoffAtMs = nowMs;
             }}
           }}
-          let frontierAdvance = 0;
-          for (const idxRaw of retryMissingIndexes) {{
-            const idx = Math.trunc(Number(idxRaw));
-            if (!Number.isFinite(idx) || idx < priorSentChunks) continue;
-            frontierAdvance += 1;
-          }}
+          const sentChunkFrames = Math.max(0, sentCount - (includeMeta ? 1 : 0));
+          const frontierAdvance = Math.max(
+            0,
+            Math.min(plannedFrontierAdvance, sentChunkFrames)
+          );
           session.sentChunks = Math.max(
             priorSentChunks,
             Math.min(session.totalChunks, priorSentChunks + frontierAdvance)
@@ -391,8 +437,11 @@
           const endgameLabel = endgame
             ? ` (endgame, ${{missingIndexes.length}} missing chunk${{missingIndexes.length === 1 ? "" : "s"}}, ~${{intervalSec}}s cadence, cwnd ${{cwndLabel}}, rto ${{rtoLabelMs}}ms)`
             : "";
+          const flowLabel = (!noAckYet && !endgame)
+            ? ` (~${{intervalSec}}s cadence, cwnd ${{cwndLabel}}, rto ${{rtoLabelMs}}ms, in-flight ${{Math.max(0, (priorSentChunks + frontierAdvance) - Math.max(0, Math.trunc(Number(session.ackedChunks) || 0)))}})`
+            : "";
           appendFileTransferConsole(
-            `Retry ${{activeRetries}}/${{session.maxRetries}} for ${{fileTransferShortTransferId(session.transferId)}}: resent ${{sentCount}} frame${{sentCount === 1 ? "" : "s"}} to ${{session.destination}}${{noAckLabel || endgameLabel}}.`,
+            `Retry ${{activeRetries}}/${{session.maxRetries}} for ${{fileTransferShortTransferId(session.transferId)}}: resent ${{sentCount}} frame${{sentCount === 1 ? "" : "s"}} to ${{session.destination}}${{noAckLabel || endgameLabel || flowLabel}}.`,
             {{ level: "warn" }}
           );
         }} else if (firstSendError) {{
