@@ -124,6 +124,10 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "function scheduleFileTransferMaintenance(state = latestState)" in js
     assert "function meshChannelSendSelectElements()" in js
     assert "files-send-channel-select" in js
+    assert "const fromNeedsBackfill = !resolved.fromId || resolved.fromId === \"Unknown\" || resolved.fromId === \"n/a\";" in js
+    assert "const packetEntry = (msgId != null) ? packetSummaryByIdLocal.get(String(msgId)) : null;" in js
+    assert "const reactorId = endpointsForBuild(msg).fromId || resolveMessageNodeId(msg.from || \"\");" in js
+    assert "const fallbackName = isCanonicalNodeId(clean) ? clean : \"Unknown node\";" in js
     assert "const rssiRaw = Number(wifiSummary && wifiSummary.rssi);" not in js
     assert "const rssiValue = wifiSummary ? wifiSummary.rssi : null;" in js
     assert ": (connected === false ? \"off\" : (connected === true ? \"on\" : \"n/a\"));" in js

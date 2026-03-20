@@ -156,7 +156,8 @@
         }} else {{
           const snapshot = resolveChatNodeFreshness(clean);
           const node = snapshot.node;
-          const name = preferredNodeName(node) || nodeNameCache.get(clean) || "Unknown node";
+          const fallbackName = isCanonicalNodeId(clean) ? clean : "Unknown node";
+          const name = preferredNodeName(node) || nodeNameCache.get(clean) || fallbackName;
           const meta = nodeIdentityMeta(clean);
           endpoint = {{
             label: name,
@@ -350,4 +351,3 @@
         const emoji = emojiOf(msg);
         return !!(replyId && emoji);
       }};
-

@@ -1,8 +1,6 @@
 # Ideas Backlog
 
-- compresion for files, learn form modem tech?
 - bbs host / client view
-- send files from node list, progress bar on node, FILES view becomes file management.
 
 - add scrolling notifcation ticker to the top screen.
 
