@@ -91,6 +91,51 @@ def test_parse_device_connection_status_packet_ignores_zero_wifi_rssi():
     assert "rssi_dbm" not in parsed["wifi"]
 
 
+def test_parse_device_connection_status_packet_reads_rssi_from_wifi_status_block():
+    packet = {
+        "decoded": {
+            "admin": {
+                "getDeviceConnectionStatusResponse": {
+                    "wifi": {
+                        "status": {
+                            "isConnected": True,
+                            "rssi": -64,
+                        },
+                        "ssid": "mesh",
+                    }
+                }
+            }
+        }
+    }
+
+    parsed = connection_status_mod._parse_device_connection_status_packet(packet)
+    assert parsed is not None
+    assert parsed["wifi"]["is_connected"] is True
+    assert parsed["wifi"]["rssi_dbm"] == -64
+
+
+def test_parse_device_connection_status_packet_supports_wrapped_uint32_rssi():
+    packet = {
+        "decoded": {
+            "admin": {
+                "getDeviceConnectionStatusResponse": {
+                    "wifi": {
+                        "status": {
+                            "isConnected": True,
+                        },
+                        "ssid": "mesh",
+                        "rssi": 4294967231,  # -65 encoded as uint32
+                    }
+                }
+            }
+        }
+    }
+
+    parsed = connection_status_mod._parse_device_connection_status_packet(packet)
+    assert parsed is not None
+    assert parsed["wifi"]["rssi_dbm"] == -65
+
+
 def test_get_radio_connection_status_uses_cached_response_and_throttles_requests():
     _clear_connection_status_cache()
     original_enabled = connection_status_mod.radio_connection_status_enabled()

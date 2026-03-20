@@ -63,6 +63,12 @@ def _coerce_optional_wifi_rssi_dbm(value: object) -> int | None:
     rssi = _coerce_optional_int(value)
     if rssi is None:
         return None
+    if 0x80000000 <= rssi <= 0xFFFFFFFF:
+        # Some protobuf/json paths can surface signed int32 values as wrapped uint32.
+        rssi = rssi - 0x100000000
+    elif 0x80 <= rssi <= 0xFF:
+        # Defensive fallback for wrapped int8-style payloads.
+        rssi = rssi - 0x100
     # Proto default values can surface as 0 when RSSI is unknown; treat that as unavailable.
     if -140 <= rssi <= -1:
         return rssi
@@ -124,7 +130,13 @@ def _parse_wifi_status(raw: object) -> dict[str, object]:
         ssid = str(ssid_raw).strip()
         if ssid:
             out["ssid"] = ssid
-    rssi = _coerce_optional_wifi_rssi_dbm(_mapping_get(raw, "rssi"))
+    rssi = _coerce_optional_wifi_rssi_dbm(_mapping_get(raw, "rssi", "rssi_dbm", "rssiDbm"))
+    if rssi is None:
+        status_raw = _mapping_get(raw, "status")
+        if isinstance(status_raw, Mapping):
+            rssi = _coerce_optional_wifi_rssi_dbm(
+                _mapping_get(status_raw, "rssi", "rssi_dbm", "rssiDbm")
+            )
     if rssi is not None:
         out["rssi_dbm"] = rssi
     return out

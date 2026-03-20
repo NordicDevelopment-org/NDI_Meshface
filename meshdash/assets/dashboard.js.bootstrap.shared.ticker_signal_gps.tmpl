@@ -84,7 +84,7 @@
         : null;
       const rssiText = Number.isFinite(rssi)
         ? `${{rssi}}dBm`
-        : (connected === false ? "off" : "n/a");
+        : (connected === false ? "off" : (connected === true ? "on" : "n/a"));
       const ip = String((wifiSummary && wifiSummary.ip) || "").trim() || "n/a";
       const ssid = String((wifiSummary && wifiSummary.ssid) || "").trim() || "n/a";
       const detail = String((wifiSummary && wifiSummary.detail) || "").trim();

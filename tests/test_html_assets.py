@@ -126,6 +126,7 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "files-send-channel-select" in js
     assert "const rssiRaw = Number(wifiSummary && wifiSummary.rssi);" not in js
     assert "const rssiValue = wifiSummary ? wifiSummary.rssi : null;" in js
+    assert ": (connected === false ? \"off\" : (connected === true ? \"on\" : \"n/a\"));" in js
     assert "const wifiRssi = Number(wifiTicker && wifiTicker.rssi_dbm);" not in js
     assert "const wifiRssiValue = wifiTicker ? wifiTicker.rssi_dbm : null;" in js
     assert "{{" not in js
