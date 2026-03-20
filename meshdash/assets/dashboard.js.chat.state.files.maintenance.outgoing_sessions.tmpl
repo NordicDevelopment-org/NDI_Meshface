@@ -168,6 +168,12 @@
         const endgame = !noAckYet
           && missingIndexes.length > 0
           && missingIndexes.length <= fileTransferEndgameMissingChunkThreshold;
+        const lastProgressDeltaMs = lastProgressAtMs > 0
+          ? Math.max(0, nowMs - lastProgressAtMs)
+          : Number.POSITIVE_INFINITY;
+        const hasRecentAckProgress = !noAckYet
+          && lastProgressAtMs > 0
+          && lastProgressDeltaMs <= (45 * 1000);
         const adaptiveRtoMs = Math.max(
           fileTransferRtoMinMs,
           Math.min(fileTransferRtoMaxMs, Math.trunc(Number(session.rtoMs) || fileTransferRtoInitialMs))
@@ -178,25 +184,29 @@
         }} else {{
           const missingCount = missingIndexes.length;
           if (missingCount >= 30) {{
-            legacyRetryIntervalMs = 28000;
+            legacyRetryIntervalMs = hasRecentAckProgress ? 9000 : 28000;
           }} else if (missingCount >= 20) {{
-            legacyRetryIntervalMs = 20000;
+            legacyRetryIntervalMs = hasRecentAckProgress ? 7000 : 20000;
           }} else if (missingCount >= 12) {{
-            legacyRetryIntervalMs = 14000;
+            legacyRetryIntervalMs = hasRecentAckProgress ? 5200 : 14000;
           }} else if (missingCount >= 8) {{
-            legacyRetryIntervalMs = 9000;
+            legacyRetryIntervalMs = hasRecentAckProgress ? 3800 : 9000;
           }} else if (missingCount >= 5) {{
-            legacyRetryIntervalMs = 5500;
+            legacyRetryIntervalMs = hasRecentAckProgress ? 2600 : 5500;
           }} else {{
             legacyRetryIntervalMs = fileTransferEndgameResendIntervalMs;
           }}
         }}
-        let retryIntervalMs = Math.round((legacyRetryIntervalMs + adaptiveRtoMs) / 2);
+        let retryIntervalMs = hasRecentAckProgress
+          ? Math.round((legacyRetryIntervalMs * 0.45) + (adaptiveRtoMs * 0.55))
+          : Math.round((legacyRetryIntervalMs + adaptiveRtoMs) / 2);
         const backoffSteps = Math.max(0, stallRetryAttempts - 1);
         if (backoffSteps > 0) {{
           retryIntervalMs = Math.round(retryIntervalMs * Math.pow(1.12, backoffSteps));
         }}
-        const maxIntervalMs = endgame ? 7000 : fileTransferRtoMaxMs;
+        const maxIntervalMs = endgame
+          ? 7000
+          : (hasRecentAckProgress ? 9000 : fileTransferRtoMaxMs);
         retryIntervalMs = Math.max(fileTransferRtoMinMs, Math.min(maxIntervalMs, retryIntervalMs));
         if (retryCapped) {{
           retryIntervalMs = Math.max(retryIntervalMs, fileTransferRetryRecoveryIntervalMs);
