@@ -1,8 +1,11 @@
 # Ideas Backlog
 
-
-- strip out main peer to peer, only have the new popup
+- compresion for files, learn form modem tech?
+- bbs host / client view
 - send files from node list, progress bar on node, FILES view becomes file management.
+
+- add scrolling notifcation ticker to the top screen.
+
 - have ai "test" zork and print the gameplay
 
 
