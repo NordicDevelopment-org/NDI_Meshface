@@ -252,7 +252,7 @@
         }}
         const maxIntervalMs = endgame
           ? 5500
-          : (hasRecentAckProgress ? 7000 : fileTransferRtoMaxMs);
+          : (hasRecentAckProgress ? 7000 : 9000);
         retryIntervalMs = Math.max(fileTransferRtoMinMs, Math.min(maxIntervalMs, retryIntervalMs));
         if (retryCapped) {{
           retryIntervalMs = Math.max(retryIntervalMs, fileTransferRetryRecoveryIntervalMs);
@@ -355,7 +355,11 @@
             burstSize = Math.min(burstSize, progressBurstCap);
           }}
           const progressBurstFloor = hasRecentAckProgress
-            ? (missingIndexes.length >= 20 ? 3 : 2)
+            ? (
+              inFlightChunks >= targetInFlightChunks
+                ? 1
+                : (missingIndexes.length >= 20 ? 2 : 1)
+            )
             : 1;
           const minBurstAllowed = inFlightOverCap ? 1 : progressBurstFloor;
           const softBudgetFloor = hasRecentAckProgress && !inFlightOverCap
