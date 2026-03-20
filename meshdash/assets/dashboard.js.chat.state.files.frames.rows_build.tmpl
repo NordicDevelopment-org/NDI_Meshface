@@ -10,6 +10,11 @@
         transferKeysSeen.add(String(transfer && transfer.key ? transfer.key : ""));
         const direction = fileTransferDirectionMeta(transfer.fromId, transfer.toId, localNodeId);
         const peerMeta = fileTransferPeerMeta(direction.peerId, nodesById, localNodeId);
+        const inboundRequiresAccept = !!transfer.requiresInboundAccept;
+        const inboundDecision = normalizeFileTransferInboundDecision(transfer.inboundDecision);
+        const inboundAccepted = !inboundRequiresAccept || inboundDecision === "accepted";
+        const inboundDeclined = inboundRequiresAccept && inboundDecision === "declined";
+        const inboundPending = inboundRequiresAccept && !inboundAccepted && !inboundDeclined;
         const expectedChunks = Number.isInteger(transfer.totalChunks) && transfer.totalChunks > 0
           ? transfer.totalChunks
           : Math.max(transfer.chunks.size, 1);
@@ -80,6 +85,11 @@
             }}
           }}
         }}
+        if (!inboundAccepted) {{
+          assembled = null;
+          complete = false;
+          assembleError = "";
+        }}
 
         const percent = Math.max(
           0,
@@ -108,7 +118,7 @@
         const resolvedChannelIndex = transferChannelIndex != null ? transferChannelIndex : sessionChannelIndex;
         let delivered = outgoing
           ? !!(ack && ack.complete && ackedChunks >= expectedChunks)
-          : complete;
+          : (complete && inboundAccepted);
         if (outgoingSession && outgoingSession.delivered) {{
           delivered = true;
         }}
@@ -117,9 +127,20 @@
         let progressSort = 0;
         let outgoingRetrying = false;
         if (outgoing) {{
+          const waitingForAccept = !!(outgoingSession && outgoingSession.waitingForAccept && !outgoingSession.failed && !outgoingSession.delivered);
           if (outgoingSession && outgoingSession.failed && !delivered) {{
             progressLabel = `Delivery failed (${{ackedChunks}}/${{expectedChunks}} acked)`;
             progressSort = deliveryPct;
+          }} else if (waitingForAccept) {{
+            const acceptProbeAttempts = Math.max(
+              0,
+              Math.trunc(Number(outgoingSession && outgoingSession.acceptProbeAttempts) || 0)
+            );
+            progressLabel = "Awaiting receiver accept";
+            if (acceptProbeAttempts > 0) {{
+              progressLabel += ` (ping ${{acceptProbeAttempts}})`;
+            }}
+            progressSort = 12;
           }} else if (delivered) {{
             progressLabel = `Delivered (${{Math.max(ackedChunks, expectedChunks)}}/${{expectedChunks}} acked)`;
             progressSort = 220;
@@ -139,14 +160,22 @@
             progressLabel = `${{progressLabel}} • retry ${{activeRetries}}/${{outgoingSession.maxRetries}}`;
           }}
         }} else {{
-          progressLabel = complete
-            ? "Complete"
-            : `${{percent}}% (${{receivedChunks}}/${{expectedChunks}} chunks)`;
-          progressSort = complete ? 100 : percent;
-          if (!complete && transfer.hasDecodeError) {{
-            progressLabel = "Error (invalid chunk)";
-          }} else if (!complete && assembleError) {{
-            progressLabel = `Error (${{assembleError}})`;
+          if (inboundPending) {{
+            progressLabel = "Awaiting acceptance";
+            progressSort = 14;
+          }} else if (inboundDeclined) {{
+            progressLabel = "Declined (no ACKs sent)";
+            progressSort = 6;
+          }} else {{
+            progressLabel = complete
+              ? "Complete"
+              : `${{percent}}% (${{receivedChunks}}/${{expectedChunks}} chunks)`;
+            progressSort = complete ? 100 : percent;
+            if (!complete && transfer.hasDecodeError) {{
+              progressLabel = "Error (invalid chunk)";
+            }} else if (!complete && assembleError) {{
+              progressLabel = `Error (${{assembleError}})`;
+            }}
           }}
         }}
 
@@ -175,6 +204,8 @@
           sortUnix,
           directionClass: direction.className,
           directionLabel: direction.label,
+          fromId: normalizeNodeId(transfer.fromId || ""),
+          toId: normalizeNodeId(transfer.toId || ""),
           peerId: direction.peerId,
           peerLabel: peerMeta.label,
           peerTitle: peerMeta.title,
@@ -187,8 +218,13 @@
           channelIndex: resolvedChannelIndex,
           channelLabel,
           delivered,
+          requiresInboundAccept: inboundRequiresAccept,
+          inboundAccepted,
+          inboundPending,
+          inboundDeclined,
+          outgoingWaitingForAccept: !!(outgoingSession && outgoingSession.waitingForAccept),
           outgoingRetrying,
-          canDownload: complete && assembled instanceof Uint8Array,
+          canDownload: inboundAccepted && complete && assembled instanceof Uint8Array,
           bytes: assembled,
         }});
       }}
@@ -245,6 +281,13 @@
           channelIndex,
           channelLabel,
           delivered,
+          fromId: senderId,
+          toId: receiverId,
+          requiresInboundAccept: false,
+          inboundAccepted: true,
+          inboundPending: false,
+          inboundDeclined: false,
+          outgoingWaitingForAccept: false,
           outgoingRetrying: false,
           canDownload: false,
           bytes: null,

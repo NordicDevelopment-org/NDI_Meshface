@@ -95,6 +95,10 @@
         }}
 
         const key = fileTransferKeyOf(fromId, toId, frame.transferId);
+        const requiresInboundAccept = fileTransferInboundTransferNeedsAccept(fromId, toId, localNodeId);
+        const inboundDecision = requiresInboundAccept
+          ? fileTransferInboundDecisionForKey(key)
+          : "accepted";
         let transfer = transfers.get(key);
         if (!transfer) {{
           transfer = {{
@@ -112,12 +116,18 @@
             totalChunks: null,
             chunks: new Map(),
             hasDecodeError: false,
+            requiresInboundAccept,
+            inboundDecision: requiresInboundAccept ? inboundDecision : "",
           }};
           transfers.set(key, transfer);
         }}
 
         if (!transfer.fromId && fromId) transfer.fromId = fromId;
         if (!transfer.toId && toId) transfer.toId = toId;
+        transfer.requiresInboundAccept = !!(transfer.requiresInboundAccept || requiresInboundAccept);
+        transfer.inboundDecision = transfer.requiresInboundAccept
+          ? fileTransferInboundDecisionForKey(key)
+          : "";
         if (msgUnix && (!transfer.firstUnix || msgUnix < transfer.firstUnix)) {{
           transfer.firstUnix = msgUnix;
         }}
@@ -136,6 +146,9 @@
         }}
 
         if (frame.kind === "chunk") {{
+          if (transfer.requiresInboundAccept && transfer.inboundDecision !== "accepted") {{
+            continue;
+          }}
           if (transfer.chunks.has(frame.chunkIndex)) {{
             continue;
           }}
@@ -153,6 +166,13 @@
       for (const [key, transfer] of transfers.entries()) {{
         if (!transfer || typeof transfer !== "object") continue;
         activeTransferKeys.add(key);
+        const requiresInboundAccept = !!transfer.requiresInboundAccept;
+        const inboundDecision = requiresInboundAccept
+          ? fileTransferInboundDecisionForKey(key)
+          : "";
+        const inboundAccepted = !requiresInboundAccept || inboundDecision === "accepted";
+        transfer.requiresInboundAccept = requiresInboundAccept;
+        transfer.inboundDecision = inboundDecision;
         const cacheRaw = fileTransferChunkCacheByKey.get(key);
         let cacheChunks = new Map();
         let cacheTotalChunks = null;
@@ -179,7 +199,7 @@
           cacheCodec = normalizeFileTransferCompressionCodec(cacheRaw.codec || fileTransferCompressionCodecRaw);
           cacheChannelIndex = fileTransferExplicitChannelIndex(cacheRaw.channelIndex);
           cacheLatestUnix = Math.max(0, Math.trunc(Number(cacheRaw.latestUnix) || 0));
-          if (cacheRaw.chunks instanceof Map) {{
+          if (inboundAccepted && cacheRaw.chunks instanceof Map) {{
             for (const [idxRaw, bytes] of cacheRaw.chunks.entries()) {{
               const idx = Math.trunc(Number(idxRaw));
               if (!Number.isFinite(idx) || idx < 0) continue;
@@ -196,11 +216,13 @@
           cacheChunks = new Map();
           cacheTotalChunks = transferTotalChunks;
         }}
-        for (const [idxRaw, bytes] of transfer.chunks.entries()) {{
-          const idx = Math.trunc(Number(idxRaw));
-          if (!Number.isFinite(idx) || idx < 0) continue;
-          if (!(bytes instanceof Uint8Array)) continue;
-          cacheChunks.set(idx, bytes);
+        if (inboundAccepted) {{
+          for (const [idxRaw, bytes] of transfer.chunks.entries()) {{
+            const idx = Math.trunc(Number(idxRaw));
+            if (!Number.isFinite(idx) || idx < 0) continue;
+            if (!(bytes instanceof Uint8Array)) continue;
+            cacheChunks.set(idx, bytes);
+          }}
         }}
         const effectiveTotalChunks = transferTotalChunks != null ? transferTotalChunks : cacheTotalChunks;
         if (effectiveTotalChunks != null) {{
@@ -210,7 +232,11 @@
             }}
           }}
         }}
-        transfer.chunks = cacheChunks;
+        transfer.chunks = inboundAccepted ? cacheChunks : new Map();
+        if (!inboundAccepted) {{
+          transfer.hasDecodeError = false;
+          cacheChunks = new Map();
+        }}
         if (transferTotalChunks == null && effectiveTotalChunks != null) {{
           transfer.totalChunks = effectiveTotalChunks;
         }}
@@ -246,6 +272,7 @@
           lastSeenAtMs: nowMs,
         }});
       }}
+      pruneFileTransferInboundDecisionState(activeTransferKeys, nowMs);
       const staleChunkCutoffMs = nowMs - (45 * 60 * 1000);
       for (const [key, cacheRaw] of fileTransferChunkCacheByKey.entries()) {{
         if (activeTransferKeys.has(key)) continue;

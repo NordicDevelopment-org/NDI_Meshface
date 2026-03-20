@@ -26,6 +26,32 @@
         const totalChunks = totalChunksRaw;
         const transferKey = String(transfer.key || "").trim();
         if (!transferKey) continue;
+        const requiresInboundAccept = fileTransferInboundTransferNeedsAccept(
+          senderId,
+          receiverId,
+          localNodeId
+        );
+        if (requiresInboundAccept) {{
+          const inboundDecision = fileTransferInboundDecisionForKey(transferKey);
+          if (inboundDecision !== "accepted") {{
+            fileTransferAckSentState.delete(transferKey);
+            fileTransferAckObservedChunksByKey.delete(transferKey);
+            fileTransferAckProbeCursorByKey.delete(transferKey);
+            fileTransferAckProbeStateByKey.delete(transferKey);
+            fileTransferAckMissingChannelWarnByKey.delete(transferKey);
+            const lastPromptAtMs = Number(fileTransferInboundDecisionPromptByKey.get(transferKey) || 0);
+            const promptIntervalMs = 30 * 1000;
+            if ((nowMs - lastPromptAtMs) >= promptIntervalMs) {{
+              fileTransferInboundDecisionPromptByKey.set(transferKey, nowMs);
+              const actionLabel = inboundDecision === "declined" ? "declined" : "pending acceptance";
+              appendFileTransferConsole(
+                `Inbound transfer ${{fileTransferShortTransferId(transfer.transferId)}} from ${{senderId}} is ${{actionLabel}}. ACKs paused until you accept it.`,
+                {{ level: "warn" }}
+              );
+            }}
+            continue;
+          }}
+        }}
         activeAckTransferKeys.add(transferKey);
         const receivedIndexes = Array.from(transfer.chunks.keys())
           .map((idx) => Math.trunc(Number(idx)))
@@ -270,4 +296,3 @@
         }}
       }}
     }}
-

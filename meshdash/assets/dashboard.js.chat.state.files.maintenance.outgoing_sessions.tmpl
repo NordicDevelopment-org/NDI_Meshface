@@ -49,6 +49,10 @@
         session.frameGapMs = clampFrameGapMs(session.frameGapMs);
         session.lastWindowSendAtMs = Math.max(0, Math.trunc(Number(session.lastWindowSendAtMs) || 0));
         session.lastCongestionBackoffAtMs = Math.max(0, Math.trunc(Number(session.lastCongestionBackoffAtMs) || 0));
+        session.waitingForAccept = !!session.waitingForAccept;
+        session.acceptedAtMs = Math.max(0, Math.trunc(Number(session.acceptedAtMs) || 0));
+        session.acceptProbeAttempts = Math.max(0, Math.trunc(Number(session.acceptProbeAttempts) || 0));
+        session.lastAcceptProbeAtMs = Math.max(0, Math.trunc(Number(session.lastAcceptProbeAtMs) || 0));
         let ackProgressThisTick = false;
         const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
         if (ack) {{
@@ -158,6 +162,78 @@
             );
             continue;
           }}
+        }}
+        if (session.waitingForAccept && ack) {{
+          session.waitingForAccept = false;
+          session.acceptedAtMs = nowMs;
+          session.acceptProbeAttempts = 0;
+          session.lastAcceptProbeAtMs = 0;
+          session.retryAttempts = 0;
+          session.retriesSinceProgress = 0;
+          session.lastRetryAtMs = 0;
+          appendFileTransferConsole(
+            `Receiver accepted ${{fileTransferShortTransferId(session.transferId)}} at ${{session.destination}}. Starting chunk transfer.`
+          );
+        }}
+        if (session.waitingForAccept) {{
+          const createdAtMs = Math.max(0, Math.trunc(Number(session.createdAtMs) || 0));
+          const waitElapsedMs = createdAtMs > 0 ? Math.max(0, nowMs - createdAtMs) : 0;
+          const acceptTimeoutMs = Math.max(fileTransferAckProgressStallFailMs, 5 * 60 * 1000);
+          if (waitElapsedMs >= acceptTimeoutMs) {{
+            session.failed = true;
+            session.failedAtMs = nowMs;
+            appendFileTransferConsole(
+              `Delivery failed for ${{fileTransferShortTransferId(session.transferId)}}: receiver never accepted the transfer.`,
+              {{ level: "error" }}
+            );
+            continue;
+          }}
+          const probeIntervalMs = Math.max(
+            fileTransferAckWaitBeforeRetryMs,
+            Math.min(
+              fileTransferRtoMaxMs,
+              Math.trunc(Number(session.rtoMs) || fileTransferRtoInitialMs)
+            )
+          );
+          const probeDue = (
+            session.lastAcceptProbeAtMs <= 0
+            || (nowMs - session.lastAcceptProbeAtMs) >= probeIntervalMs
+          );
+          if (!probeDue) {{
+            continue;
+          }}
+          const metaFrame = String(session.metaFrame || "").trim();
+          if (!metaFrame) {{
+            continue;
+          }}
+          try {{
+            await sendFileTransferFrameText(
+              metaFrame,
+              session.destination,
+              session.channelIndex
+            );
+            session.lastAcceptProbeAtMs = Date.now();
+            session.lastSendAtMs = session.lastAcceptProbeAtMs;
+            session.acceptProbeAttempts += 1;
+            const probes = Math.max(1, Math.trunc(Number(session.acceptProbeAttempts) || 0));
+            if (probes === 1 || probes % 2 === 0) {{
+              appendFileTransferConsole(
+                `Waiting for receiver accept on ${{fileTransferShortTransferId(session.transferId)}}: metadata ping ${{probes}} sent to ${{session.destination}}.`,
+                {{ level: "warn" }}
+              );
+            }}
+          }} catch (err) {{
+            const msg = err instanceof Error ? err.message : String(err || "send failed");
+            const lastRetryErrorAtMs = Math.max(0, Math.trunc(Number(session.lastRetryErrorAtMs) || 0));
+            if ((nowMs - lastRetryErrorAtMs) >= fileTransferRetryErrorLogIntervalMs) {{
+              session.lastRetryErrorAtMs = nowMs;
+              appendFileTransferConsole(
+                `Receiver-accept probe failed for ${{fileTransferShortTransferId(session.transferId)}}: ${{msg}}`,
+                {{ level: "warn" }}
+              );
+            }}
+          }}
+          continue;
         }}
 
         const stallRetryAttempts = Math.max(

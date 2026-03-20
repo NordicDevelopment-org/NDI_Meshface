@@ -127,6 +127,71 @@
       );
     }}
 
+    function fileTransferRowByKey(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return null;
+      return fileTransferRows.find((entry) => entry && entry.key === key) || null;
+    }}
+
+    function clearFileTransferBlobStateForKey(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return;
+      fileTransferBlobByKey.delete(key);
+      const staleUrl = fileTransferDownloadUrlByKey.get(key);
+      if (staleUrl) {{
+        try {{
+          URL.revokeObjectURL(staleUrl);
+        }} catch (_err) {{
+        }}
+      }}
+      fileTransferDownloadUrlByKey.delete(key);
+    }}
+
+    function setFileTransferInboundDecisionAction(transferKey, decisionRaw) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return;
+      const decision = normalizeFileTransferInboundDecision(decisionRaw);
+      if (!decision) return;
+      const row = fileTransferRowByKey(key);
+      if (!(row && typeof row === "object")) {{
+        setFileTransferStatus("Transfer row is no longer available.", true);
+        return;
+      }}
+      if (!row.requiresInboundAccept) {{
+        setFileTransferStatus("This transfer does not require receiver acceptance.", true);
+        return;
+      }}
+      setFileTransferInboundDecisionByKey(key, decision, {{
+        transferId: row.transferId,
+        senderId: row.fromId,
+        receiverId: row.toId,
+        fileName: row.fileName,
+      }});
+      if (decision === "declined") {{
+        fileTransferChunkCacheByKey.delete(key);
+        clearFileTransferBlobStateForKey(key);
+        fileTransferAckSentState.delete(key);
+        fileTransferAckObservedChunksByKey.delete(key);
+        fileTransferAckProbeCursorByKey.delete(key);
+        fileTransferAckProbeStateByKey.delete(key);
+        fileTransferAckMissingChannelWarnByKey.delete(key);
+        setFileTransferStatus(`Declined inbound transfer "${{row.fileName || "mesh-file.bin"}}".`);
+        appendFileTransferConsole(
+          `Declined inbound transfer ${{fileTransferShortTransferId(row.transferId)}} from ${{row.peerId || "unknown sender"}}.`,
+          {{ level: "warn" }}
+        );
+      }} else {{
+        setFileTransferStatus(`Accepted inbound transfer "${{row.fileName || "mesh-file.bin"}}".`);
+        appendFileTransferConsole(
+          `Accepted inbound transfer ${{fileTransferShortTransferId(row.transferId)}} from ${{row.peerId || "unknown sender"}}.`
+        );
+      }}
+      renderFilesView(latestState);
+      scheduleFileTransferMaintenance(latestState);
+      requestImmediatePoll(40);
+      void poll();
+    }}
+
     function bindFilesTransferTableControls() {{
       const table = document.getElementById("files-transfer-table");
       if (!(table instanceof HTMLTableElement) || table.dataset.bound === "1") {{
@@ -140,6 +205,11 @@
         if (!(button instanceof HTMLButtonElement)) return;
         const transferKey = String(button.dataset.transferKey || "").trim();
         if (!transferKey) return;
+        const action = String(button.dataset.action || "download").trim().toLowerCase();
+        if (action === "accept" || action === "decline") {{
+          setFileTransferInboundDecisionAction(transferKey, action === "accept" ? "accepted" : "declined");
+          return;
+        }}
         downloadFileTransferByKey(transferKey);
       }});
     }}
@@ -185,13 +255,10 @@
         const directionClass = String(row && row.directionClass ? row.directionClass : "other");
         const directionLabel = String(row && row.directionLabel ? row.directionLabel : "Seen");
         const channelLabel = String(row && row.channelLabel ? row.channelLabel : "Unknown");
-        const actionLabel = row && row.canDownload
-          ? "Download"
-          : (row && row.outgoingRetrying ? "Retrying" : "Waiting");
-        const actionDisabled = row && row.canDownload ? "" : " disabled";
-        const actionTitle = row && row.canDownload
-          ? `Download ${{row.downloadName || row.fileName || "file"}}`
-          : "Waiting for all chunks";
+        const requiresInboundAccept = !!(row && row.requiresInboundAccept);
+        const inboundAccepted = !!(row && row.inboundAccepted);
+        const inboundPending = !!(row && row.inboundPending);
+        const inboundDeclined = !!(row && row.inboundDeclined);
         const channelIndexRaw = Number(row && row.channelIndex);
         const hasChannelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0;
         const channelBadge = hasChannelIndex
@@ -205,6 +272,51 @@
             }}
           )
           : `<span class="mesh-channel-badge compact" style="${{escAttr(meshChannelBadgeStyle(meshChannelAllIndex, {{ allowAll: true }}))}}" title="Channel unavailable from packet metadata">Unknown</span>`;
+        let actionSort = 0;
+        let actionHtml = "";
+        if (requiresInboundAccept && !inboundAccepted) {{
+          const acceptTitle = `Accept inbound transfer ${{row.fileName || "file"}}`;
+          const declineTitle = inboundDeclined
+            ? "Transfer is declined"
+            : `Decline inbound transfer ${{row.fileName || "file"}}`;
+          const declineDisabled = inboundDeclined ? " disabled" : "";
+          const declineLabel = inboundDeclined ? "Declined" : "Decline";
+          actionSort = inboundPending ? 2 : 1;
+          actionHtml = `<span class="files-transfer-action-group">
+              <button
+                type="button"
+                class="files-transfer-action accept"
+                data-action="accept"
+                data-transfer-key="${{escAttr(row.key || "")}}"
+                title="${{escAttr(acceptTitle)}}"
+              >Accept</button>
+              <button
+                type="button"
+                class="files-transfer-action decline"
+                data-action="decline"
+                data-transfer-key="${{escAttr(row.key || "")}}"
+                title="${{escAttr(declineTitle)}}"
+                ${{declineDisabled}}
+              >${{escAttr(declineLabel)}}</button>
+            </span>`;
+        }} else {{
+          const actionLabel = row && row.canDownload
+            ? "Download"
+            : (row && row.outgoingRetrying ? "Retrying" : "Waiting");
+          const actionDisabled = row && row.canDownload ? "" : " disabled";
+          const actionTitle = row && row.canDownload
+            ? `Download ${{row.downloadName || row.fileName || "file"}}`
+            : (row && row.outgoingWaitingForAccept ? "Waiting for receiver accept" : "Waiting for all chunks");
+          actionSort = row && row.canDownload ? 3 : 0;
+          actionHtml = `<button
+              type="button"
+              class="files-transfer-action"
+              data-action="download"
+              data-transfer-key="${{escAttr(row.key || "")}}"
+              title="${{escAttr(actionTitle)}}"
+              ${{actionDisabled}}
+            >${{escAttr(actionLabel)}}</button>`;
+        }}
         return `<tr>
           <td data-sort="${{escAttr(unix)}}">${{escAttr(when)}}</td>
           <td data-sort="${{escAttr(directionLabel)}}"><span class="files-transfer-dir ${{escAttr(directionClass)}}">${{escAttr(directionLabel)}}</span></td>
@@ -218,16 +330,7 @@
           <td data-sort="${{escAttr(row.progressSort ?? 0)}}">${{escAttr(row.progressLabel || "n/a")}}</td>
           <td data-sort="${{escAttr(row.sizeSort ?? 0)}}">${{escAttr(row.sizeLabel || "n/a")}}</td>
           <td data-sort="${{escAttr(hasChannelIndex ? channelIndexRaw : -1)}}">${{channelBadge}}</td>
-          <td data-sort="${{escAttr(row.canDownload ? 1 : 0)}}">
-            <button
-              type="button"
-              class="files-transfer-action"
-              data-transfer-key="${{escAttr(row.key || "")}}"
-              title="${{escAttr(actionTitle)}}"
-              ${{actionDisabled}}
-            >${{escAttr(actionLabel)}}</button>
-          </td>
+          <td data-sort="${{escAttr(actionSort)}}">${{actionHtml}}</td>
         </tr>`;
       }}).join("");
     }}
-

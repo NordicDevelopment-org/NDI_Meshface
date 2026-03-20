@@ -72,6 +72,131 @@
       return Number.isInteger(num) && num >= 0 ? Math.trunc(num) : null;
     }}
 
+    function normalizeFileTransferInboundDecision(rawDecision) {{
+      const clean = String(rawDecision || "").trim().toLowerCase();
+      if (clean === "accepted" || clean === "declined") {{
+        return clean;
+      }}
+      return "";
+    }}
+
+    function fileTransferInboundTransferNeedsAccept(fromId, toId, localNodeId) {{
+      const sender = normalizeNodeId(fromId || "");
+      const receiver = normalizeNodeId(toId || "");
+      const local = normalizeNodeId(localNodeId || "");
+      if (!isCanonicalNodeId(local)) return false;
+      if (receiver !== local) return false;
+      if (sender === local) return false;
+      return true;
+    }}
+
+    function fileTransferInboundDecisionForKey(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return "";
+      const entry = fileTransferInboundDecisionByKey.get(key);
+      if (!(entry && typeof entry === "object")) return "";
+      const decision = normalizeFileTransferInboundDecision(entry.decision);
+      if (!decision) {{
+        fileTransferInboundDecisionByKey.delete(key);
+        return "";
+      }}
+      return decision;
+    }}
+
+    function setFileTransferInboundDecisionByKey(transferKey, decisionRaw, details = null) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return null;
+      const decision = normalizeFileTransferInboundDecision(decisionRaw);
+      if (!decision) {{
+        fileTransferInboundDecisionByKey.delete(key);
+        fileTransferInboundDecisionPromptByKey.delete(key);
+        return null;
+      }}
+      const info = (details && typeof details === "object") ? details : {{}};
+      const nowMs = Date.now();
+      const prior = fileTransferInboundDecisionByKey.get(key);
+      const priorDecision = normalizeFileTransferInboundDecision(prior && prior.decision);
+      const entry = {{
+        transferKey: key,
+        decision,
+        transferId: String(
+          info.transferId != null
+            ? info.transferId
+            : (prior && prior.transferId != null ? prior.transferId : "")
+        ).trim().toLowerCase(),
+        senderId: normalizeNodeId(
+          info.senderId != null
+            ? info.senderId
+            : (prior && prior.senderId != null ? prior.senderId : "")
+        ),
+        receiverId: normalizeNodeId(
+          info.receiverId != null
+            ? info.receiverId
+            : (prior && prior.receiverId != null ? prior.receiverId : "")
+        ),
+        fileName: normalizeFileTransferName(
+          info.fileName != null
+            ? info.fileName
+            : (prior && prior.fileName ? prior.fileName : "mesh-file.bin")
+        ),
+        totalChunks: Math.max(
+          0,
+          Math.trunc(
+            Number(
+              info.totalChunks != null
+                ? info.totalChunks
+                : (prior && prior.totalChunks != null ? prior.totalChunks : 0)
+            ) || 0
+          )
+        ),
+        decidedAtMs: (
+          priorDecision === decision
+            ? Math.max(0, Math.trunc(Number(prior && prior.decidedAtMs) || 0))
+            : nowMs
+        ) || nowMs,
+        updatedAtMs: nowMs,
+      }};
+      fileTransferInboundDecisionByKey.set(key, entry);
+      if (decision === "accepted") {{
+        fileTransferInboundDecisionPromptByKey.delete(key);
+      }}
+      return entry;
+    }}
+
+    function setFileTransferInboundDecisionForTransfer(transfer, decisionRaw) {{
+      if (!(transfer && typeof transfer === "object")) return null;
+      const key = String(transfer.key || "").trim();
+      if (!key) return null;
+      return setFileTransferInboundDecisionByKey(key, decisionRaw, {{
+        transferId: transfer.transferId,
+        senderId: transfer.fromId,
+        receiverId: transfer.toId,
+        fileName: transfer.fileName,
+        totalChunks: transfer.totalChunks,
+      }});
+    }}
+
+    function pruneFileTransferInboundDecisionState(activeTransferKeys = null, nowMs = Date.now()) {{
+      const active = activeTransferKeys instanceof Set ? activeTransferKeys : null;
+      const staleDecisionMs = 75 * 60 * 1000;
+      const stalePromptMs = 20 * 60 * 1000;
+      for (const [key, entry] of fileTransferInboundDecisionByKey.entries()) {{
+        if (active && active.has(key)) continue;
+        const updatedAtMs = Math.max(0, Math.trunc(Number(entry && entry.updatedAtMs) || 0));
+        if (updatedAtMs <= 0 || (nowMs - updatedAtMs) > staleDecisionMs) {{
+          fileTransferInboundDecisionByKey.delete(key);
+          fileTransferInboundDecisionPromptByKey.delete(key);
+        }}
+      }}
+      for (const [key, promptAtMsRaw] of fileTransferInboundDecisionPromptByKey.entries()) {{
+        if (active && active.has(key)) continue;
+        const promptAtMs = Math.max(0, Math.trunc(Number(promptAtMsRaw) || 0));
+        if (promptAtMs <= 0 || (nowMs - promptAtMs) > stalePromptMs) {{
+          fileTransferInboundDecisionPromptByKey.delete(key);
+        }}
+      }}
+    }}
+
     function findOutgoingFileTransferSession(transferId, destination, channelIndex = null) {{
       const id = String(transferId || "").trim().toLowerCase();
       const to = normalizeNodeId(destination || "");
@@ -152,9 +277,13 @@
         failed: false,
         deliveredAtMs: 0,
         failedAtMs: 0,
+        waitingForAccept: !!session.waitingForAccept,
+        acceptedAtMs: Math.max(0, Math.trunc(Number(session.acceptedAtMs) || 0)),
+        acceptProbeAttempts: Math.max(0, Math.trunc(Number(session.acceptProbeAttempts) || 0)),
+        lastAcceptProbeAtMs: Math.max(0, Math.trunc(Number(session.lastAcceptProbeAtMs) || 0)),
         sentChunks: Math.max(
           0,
-          Math.min(totalChunks, Math.trunc(Number(session.sentChunks) || totalChunks))
+          Math.min(totalChunks, Math.trunc(Number(session.sentChunks) || 0))
         ),
         ackedChunks: 0,
         srttMs: Math.max(0, Number(session.srttMs) || 0),

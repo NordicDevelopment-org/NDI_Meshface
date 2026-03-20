@@ -121,12 +121,14 @@
         );
         const sentChunks = Math.max(
           ackedChunks,
-          Math.min(totalChunks, Math.trunc(Number(session.sentChunks) || totalChunks))
+          Math.min(totalChunks, Math.trunc(Number(session.sentChunks) || 0))
         );
         const activeRetries = Math.max(
           0,
           Math.trunc(Number(session.retriesSinceProgress) || Number(session.retryAttempts) || 0)
         );
+        const waitingForAccept = !!session.waitingForAccept;
+        const acceptProbeAttempts = Math.max(0, Math.trunc(Number(session.acceptProbeAttempts) || 0));
         let phase = "awaiting_ack";
         let text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: awaiting ACK (${{ackedChunks}}/${{totalChunks}} acked)`;
         let isError = false;
@@ -137,6 +139,12 @@
         }} else if (session.delivered) {{
           phase = "delivered";
           text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: delivered (${{totalChunks}}/${{totalChunks}} acked)`;
+        }} else if (waitingForAccept) {{
+          phase = "awaiting_accept";
+          text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: awaiting receiver accept`;
+          if (acceptProbeAttempts > 0) {{
+            text += ` (ping ${{acceptProbeAttempts}})`;
+          }}
         }} else if (ackedChunks <= 0 && sentChunks < totalChunks) {{
           phase = "sending";
           text = `${{normalizeFileTransferName(session.fileName || "mesh-file.bin")}}: sending bursts (${{sentChunks}}/${{totalChunks}} sent)`;
@@ -160,7 +168,11 @@
           isError,
           percent: session.delivered
             ? 100
-            : fileTransferClampPercent((ackedChunks / Math.max(totalChunks, 1)) * 100),
+            : (
+              waitingForAccept
+                ? 0
+                : fileTransferClampPercent((ackedChunks / Math.max(totalChunks, 1)) * 100)
+            ),
           transferId: String(session.transferId || "").trim().toLowerCase(),
           fileName: normalizeFileTransferName(session.fileName || "mesh-file.bin"),
           sentChunks,
@@ -637,48 +649,6 @@
         appendFileTransferConsole(
           `Metadata sent for ${{fileTransferShortTransferId(transferId)}} (${{chunkFrames.length}} chunk${{chunkFrames.length === 1 ? "" : "s"}}).`
         );
-        const shortTransfer = chunkFrames.length <= Math.max(
-          1,
-          Math.trunc(Number(fileTransferShortTransferChunkThreshold) || 1)
-        );
-        const shortBurstExtra = shortTransfer
-          ? Math.max(0, Math.trunc(Number(fileTransferShortInitialBurstExtraChunks) || 0))
-          : 0;
-        const initialBurstChunks = Math.max(
-          1,
-          Math.min(
-            chunkFrames.length,
-            Math.max(
-              1,
-              Math.trunc(Number(fileTransferInitialChunkBurst) || 1)
-            ) + shortBurstExtra
-          )
-        );
-        await waitFileTransferFrameGap();
-        for (let i = 0; i < initialBurstChunks; i += 1) {{
-          await sendFileTransferFrameText(chunkFrames[i], destination, sendCtx.sendIndex);
-          if (i + 1 < initialBurstChunks) {{
-            await waitFileTransferFrameGap();
-          }}
-          const sentChunks = i + 1;
-          const sendPercent = fileTransferClampPercent((sentChunks / Math.max(chunkFrames.length, 1)) * 100);
-          pushPeerState({{
-            phase: "sending",
-            text: `${{fileName}}: sending chunk ${{sentChunks}}/${{chunkFrames.length}}`,
-            isError: false,
-            percent: sendPercent,
-            transferId,
-            fileName,
-            sentChunks,
-            totalChunks: chunkFrames.length,
-          }});
-          if ((i + 1) % 3 === 0 || i + 1 === initialBurstChunks) {{
-            statusFn(`Sending "${{fileName}}": starter burst ${{i + 1}}/${{chunkFrames.length}}`);
-            appendFileTransferConsole(
-              `Starter burst for ${{fileTransferShortTransferId(transferId)}}: ${{i + 1}}/${{chunkFrames.length}} chunks queued.`
-            );
-          }}
-        }}
         registerOutgoingFileTransferSession({{
           transferId,
           senderId: normalizeNodeId(resolveLocalNodeId(latestState) || ""),
@@ -688,28 +658,31 @@
           metaFrame,
           chunkFrames,
           totalChunks: chunkFrames.length,
-          sentChunks: initialBurstChunks,
-          retryChunkCursor: initialBurstChunks % Math.max(chunkFrames.length, 1),
-          cwndChunks: Math.max(fileTransferCwndMinChunks, Number(fileTransferCwndInitialChunks) || initialBurstChunks),
+          sentChunks: 0,
+          retryChunkCursor: 0,
+          waitingForAccept: true,
+          acceptProbeAttempts: 0,
+          lastAcceptProbeAtMs: Date.now(),
+          cwndChunks: Math.max(fileTransferCwndMinChunks, Number(fileTransferCwndInitialChunks) || 1),
           ssthreshChunks: Math.max(fileTransferCwndMinChunks, Number(fileTransferSsthreshInitialChunks) || fileTransferCwndInitialChunks),
           rtoMs: Math.max(fileTransferRtoMinMs, Number(fileTransferRtoInitialMs) || 3000),
           frameGapMs: Math.max(fileTransferInterFrameDelayMinMs, Number(fileTransferInterFrameDelayMs) || 320),
-          lastWindowSendAtMs: Date.now(),
+          lastWindowSendAtMs: 0,
         }});
-        statusFn(`File transfer started: ${{fileName}} (${{initialBurstChunks}}/${{chunkFrames.length}} chunks queued)`);
+        statusFn(`Awaiting receiver accept for "${{fileName}}" on ${{sendCtx.sendLabel}}...`);
         pushPeerState({{
-          phase: "awaiting_ack",
-          text: `${{fileName}}: awaiting ACK (0/${{chunkFrames.length}} acked, ${{initialBurstChunks}}/${{chunkFrames.length}} sent)`,
+          phase: "awaiting_accept",
+          text: `${{fileName}}: awaiting receiver accept`,
           isError: false,
-          percent: fileTransferClampPercent((initialBurstChunks / Math.max(chunkFrames.length, 1)) * 100),
+          percent: 0,
           transferId,
           fileName,
-          sentChunks: initialBurstChunks,
+          sentChunks: 0,
           ackedChunks: 0,
           totalChunks: chunkFrames.length,
         }});
         appendFileTransferConsole(
-          `Transfer ${{fileTransferShortTransferId(transferId)}} started to ${{destination}} with starter burst ${{initialBurstChunks}}/${{chunkFrames.length}}. Waiting for ACK-driven refill.`
+          `Transfer ${{fileTransferShortTransferId(transferId)}} is waiting for receiver acceptance from ${{destination}} before chunk send begins.`
         );
         scheduleFileTransferMaintenance(latestState);
         requestImmediatePoll(40);
