@@ -1,3 +1,18 @@
+    function shouldHydrateNodeNavigatorRoster(state = latestState) {{
+      if (activeLayoutView === "chat") return false;
+      const safeState = (state && typeof state === "object") ? state : null;
+      if (!safeState) return false;
+      const query = (typeof globalNodeSearchQuery === "function")
+        ? String(globalNodeSearchQuery() || "").trim()
+        : "";
+      if (query) return false;
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      if (nodes.length <= 0) return false;
+      const rosterModel = Array.isArray(chatRosterModel) ? chatRosterModel : [];
+      if (rosterModel.length <= 0) return true;
+      return activeChatChannel === "all" && nodes.length > rosterModel.length;
+    }}
+
     async function poll() {{
       try {{
         const stateUrlBase = "/api/state?lite=1";
@@ -87,6 +102,9 @@
               ? historyTargetId304
               : null;
             renderFavorites(latestState, cachedHistory304, loadingId304);
+          }}
+          if (shouldHydrateNodeNavigatorRoster(latestState)) {{
+            renderChat(latestState);
           }}
           if ((activeLayoutView === "saved" || activeLayoutView === "network")
             && mapDataFocus !== "activity"
@@ -195,6 +213,10 @@
           }} else {{
             renderWeeklySummaryLoading();
           }}
+        }}
+
+        if (activeLayoutView !== "chat" && shouldHydrateNodeNavigatorRoster(state)) {{
+          renderChat(state);
         }}
 
         if (activeLayoutView === "chat") {{
