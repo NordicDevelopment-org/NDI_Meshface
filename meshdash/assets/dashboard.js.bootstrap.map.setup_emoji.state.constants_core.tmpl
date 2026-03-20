@@ -14,7 +14,7 @@
       "encription-traffic-table": {{ index: 2, dir: "desc" }},
     }};
     const wheelActivationLeaseMs = 1400;
-    const knownLayoutViews = new Set(["chat", "files", "bots", "games", "history", "network", "saved", "remote", "packets", "channels", "encription", "data", "environment", "console", "settings"]);
+    const knownLayoutViews = new Set(["chat", "files", "bbs", "bots", "games", "history", "network", "saved", "remote", "packets", "channels", "encription", "data", "environment", "console", "settings"]);
     const reversiBoardSize = 8;
     const reversiPiece = Object.freeze({{ empty: 0, black: 1, white: -1 }});
     const reversiDirections = Object.freeze([
@@ -173,6 +173,16 @@
     const fileTransferMaintenanceCooldownMs = 900;
     const fileTransferOutgoingMaxRetries = 8;
     const fileTransferConsoleMaxEntries = 240;
+    const bbsProtocolVersion = "bbs1";
+    const bbsMaxSeenNetworkMessages = 2200;
+    const bbsBoardMaxPosts = 260;
+    const bbsBoardDirectoryMaxRows = 32;
+    const bbsBoardStaleSeconds = 45 * 60;
+    const bbsHostAnnounceIntervalMs = 90 * 1000;
+    const bbsStorageKey = "meshDashboardBbsV1";
+    const bbsMaxTitleChars = 42;
+    const bbsMaxMotdChars = 120;
+    const bbsMaxPostChars = 220;
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const botCityHintMaxDistanceKm = 120;
     const requesterPositionMaxAgeSeconds = 24 * 3600;

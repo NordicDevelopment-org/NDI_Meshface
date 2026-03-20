@@ -30,6 +30,8 @@
           renderChat(latestState);
         }} else if (activeLayoutView === "files") {{
           renderFilesView(latestState);
+        }} else if (activeLayoutView === "bbs") {{
+          renderBbsView(latestState);
         }}
       }}
     }}
@@ -51,8 +53,12 @@
         }} catch (_err) {{}}
       }}
 
-      if (rerenderChat && changed && latestState && activeLayoutView === "chat") {{
-        renderChat(latestState);
+      if (rerenderChat && changed && latestState) {{
+        if (activeLayoutView === "chat") {{
+          renderChat(latestState);
+        }} else if (activeLayoutView === "bbs") {{
+          renderBbsView(latestState);
+        }}
       }}
     }}
 
@@ -241,5 +247,4 @@
       }} catch (_err) {{}}
       channelsExperimentalEnabled = !!stored;
     }}
-
 

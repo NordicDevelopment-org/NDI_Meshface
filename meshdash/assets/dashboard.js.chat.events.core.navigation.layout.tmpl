@@ -154,6 +154,9 @@
         if (next === "files") {{
           renderFilesView(latestState);
         }}
+        if (next === "bbs") {{
+          renderBbsView(latestState);
+        }}
         if (next === "bots") {{
           renderBotsView(latestState);
         }}
@@ -204,6 +207,8 @@
         renderHistoryChat({{}});
       }} else if (next === "files") {{
         renderFilesView(latestState);
+      }} else if (next === "bbs") {{
+        renderBbsView(latestState);
       }} else if (next === "channels") {{
         renderChannelsView(latestState);
         void ensureChannelsViewLocalStateHydrated(false);
@@ -230,7 +235,7 @@
       renderFavoriteMenuNodeSearchDropdown(latestState);
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
-      if (next === "chat" || next === "files" || next === "bots" || next === "games" || next === "remote" || next === "history" || next === "network" || next === "saved" || next === "channels" || next === "data" || next === "environment") {{
+      if (next === "chat" || next === "files" || next === "bbs" || next === "bots" || next === "games" || next === "remote" || next === "history" || next === "network" || next === "saved" || next === "channels" || next === "data" || next === "environment") {{
         requestImmediatePoll(0);
       }}
       if (isMapVisibleLayoutView(next)) {{

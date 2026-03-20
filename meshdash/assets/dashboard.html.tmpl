@@ -322,6 +322,7 @@
       <button class="rail-btn" data-view="console" type="button" title="Realtime dashboard console">Console</button>
       <button class="rail-btn" data-view="bots" type="button" title="Mesh bot tools and request history">Bots</button>
       <button class="rail-btn" data-view="files" type="button" title="Peer-to-peer file transfer">Files</button>
+      <button class="rail-btn" data-view="bbs" type="button" title="Retro dial-up style bulletin board">BBS</button>
       <button class="rail-btn" data-view="games" type="button" title="Local game prototypes">Games</button>
       <button class="rail-btn" data-view="settings" type="button" title="Radio + dashboard settings">Settings</button>
     </aside>
@@ -1549,6 +1550,87 @@
       </div>
     </section>
 
+    <section class="card bbs" aria-label="Dial-up bulletin board">
+      <h2>BBS</h2>
+      <div class="body">
+        <div class="bbs-shell">
+          <aside class="bbs-sidebar">
+            <div class="bbs-panel">
+              <div class="bbs-panel-title">Host Console</div>
+              <label class="bbs-field">
+                <span class="bbs-label">Board Title</span>
+                <input
+                  id="bbs-host-title-input"
+                  class="bbs-input"
+                  type="text"
+                  maxlength="42"
+                  placeholder="Packet Exchange"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="bbs-field">
+                <span class="bbs-label">Board ID</span>
+                <input
+                  id="bbs-host-id-input"
+                  class="bbs-input"
+                  type="text"
+                  maxlength="24"
+                  placeholder="packet-exchange"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+              <label class="bbs-field">
+                <span class="bbs-label">Welcome Banner</span>
+                <input
+                  id="bbs-host-motd-input"
+                  class="bbs-input"
+                  type="text"
+                  maxlength="120"
+                  placeholder="2400 baud online."
+                  autocomplete="off"
+                />
+              </label>
+              <div class="bbs-actions">
+                <button id="bbs-host-start-btn" class="btn" type="button">Host Board</button>
+                <button id="bbs-host-stop-btn" class="btn btn-secondary" type="button">Go Offline</button>
+                <button id="bbs-host-announce-btn" class="btn btn-secondary" type="button">Broadcast</button>
+              </div>
+              <div id="bbs-host-status" class="bbs-host-status" aria-live="polite">Offline.</div>
+            </div>
+            <div class="bbs-panel">
+              <div class="bbs-panel-title">Dial Directory</div>
+              <div id="bbs-board-list" class="bbs-board-list" role="listbox" aria-label="Available BBS boards"></div>
+              <div class="bbs-actions">
+                <button id="bbs-refresh-directory-btn" class="btn btn-secondary" type="button">Refresh Directory</button>
+              </div>
+            </div>
+          </aside>
+          <div class="bbs-main">
+            <div class="bbs-terminal-head">
+              <div id="bbs-terminal-title" class="bbs-terminal-title">No board selected</div>
+              <div id="bbs-terminal-meta" class="bbs-terminal-meta">Host a board or dial a listing from the directory.</div>
+            </div>
+            <pre id="bbs-terminal-log" class="bbs-terminal-log" aria-live="polite">*** CONNECT 2400 ***
+Ready.
+</pre>
+            <div class="bbs-compose-row">
+              <input
+                id="bbs-post-input"
+                class="bbs-post-input"
+                type="text"
+                maxlength="220"
+                placeholder="Write a board post..."
+                autocomplete="off"
+              />
+              <button id="bbs-post-send-btn" class="btn" type="button">Post</button>
+            </div>
+            <div id="bbs-post-status" class="bbs-post-status" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="card remote" aria-label="Remote node operations">
       <h2>Remote</h2>
       <div class="body">
@@ -2100,6 +2182,15 @@
       <h2 id="nodes-card-title">Nodes</h2>
       <div class="body nodes-body">
         <div class="network-node-stack">
+          <div class="saved-node-search-wrap">
+            <input
+              id="nodes-search-input"
+              class="list-search-input"
+              type="search"
+              placeholder="Search nodes by ID, name, or hardware"
+              autocomplete="off"
+            />
+          </div>
           <div class="scroll nodes-table-scroll">
             <table id="nodes-table">
               <colgroup id="nodes-table-cols">

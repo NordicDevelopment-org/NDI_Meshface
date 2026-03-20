@@ -87,6 +87,23 @@
     const fileTransferConsoleLines = [];
     let fileTransferMaintenanceInFlight = false;
     let fileTransferMaintenanceQueued = false;
+    let bbsHostState = {{
+      enabled: false,
+      board_id: "",
+      title: "Packet Exchange",
+      motd: "2400 baud online.",
+      started_unix: 0,
+      channel_index: 0,
+      host_id: "",
+    }};
+    let bbsActiveBoardKey = "";
+    let bbsDiscoveredBoards = [];
+    const bbsBoardPostsByKey = new Map();
+    let bbsSeenMessageKeys = new Set();
+    let bbsSeenMessageOrder = [];
+    let bbsHostAnnounceTimer = null;
+    let bbsPostStatusText = "";
+    let bbsPostStatusError = false;
     let settingsApplyInFlight = false;
     let settingsFetchInFlight = false;
     let settingsAutoFetchAttempted = false;

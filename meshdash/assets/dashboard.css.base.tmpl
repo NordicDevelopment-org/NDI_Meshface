@@ -2013,6 +2013,245 @@
     .files-transfer-progress.is-success .files-transfer-progress-meter > span {{
       background: #2f8a5c;
     }}
+    .bbs .body {{
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+    }}
+    .bbs-shell {{
+      display: grid;
+      grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+      gap: 12px;
+      min-height: 0;
+      height: 100%;
+      flex: 1 1 auto;
+    }}
+    .bbs-sidebar {{
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      overflow: auto;
+    }}
+    .bbs-panel {{
+      border: 1px solid #d2e1d0;
+      border-radius: 10px;
+      background: #edf6ec;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }}
+    .bbs-panel-title {{
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      color: #3f5c4c;
+    }}
+    .bbs-field {{
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }}
+    .bbs-label {{
+      font-size: 10px;
+      color: #4f6758;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      font-weight: 700;
+    }}
+    .bbs-input {{
+      width: 100%;
+      min-width: 0;
+      border: 1px solid #c2d8c7;
+      border-radius: 7px;
+      padding: 5px 7px;
+      font-size: 11px;
+      line-height: 1.25;
+      color: #183223;
+      background: #ffffff;
+      box-sizing: border-box;
+    }}
+    .bbs-input:focus {{
+      outline: 2px solid #9ac5aa;
+      outline-offset: 0;
+      border-color: #9ac5aa;
+      background: #ffffff;
+      box-shadow: none;
+    }}
+    .bbs-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+    }}
+    .bbs-host-status,
+    .bbs-post-status {{
+      font-size: 11px;
+      line-height: 1.3;
+      color: #355343;
+      min-height: 14px;
+    }}
+    .bbs-post-status.is-error {{
+      color: #8b3a3a;
+      font-weight: 700;
+    }}
+    .bbs-board-list {{
+      border: 1px solid #d2e1d0;
+      border-radius: 8px;
+      background: #f7fbf6;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 130px;
+      max-height: 280px;
+      overflow: auto;
+    }}
+    .bbs-board-empty {{
+      border: 1px dashed #c8d7c4;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #5b7365;
+      font-size: 11px;
+      line-height: 1.35;
+      padding: 8px;
+    }}
+    .bbs-board-item {{
+      width: 100%;
+      border: 1px solid #c8d7c4;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #1e3a2b;
+      padding: 7px;
+      text-align: left;
+      font: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      cursor: pointer;
+    }}
+    .bbs-board-item:hover {{
+      border-color: #8daf99;
+      background: #eef6f1;
+    }}
+    .bbs-board-item.is-active {{
+      border-color: #2f855a;
+      box-shadow: 0 0 0 1px rgba(47, 133, 90, 0.24);
+      background: #e9f5ee;
+      color: #1f5d3d;
+    }}
+    .bbs-board-main {{
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.2;
+    }}
+    .bbs-board-meta {{
+      font-size: 10px;
+      line-height: 1.3;
+      color: #486352;
+    }}
+    .bbs-board-motd {{
+      font-size: 10px;
+      line-height: 1.3;
+      color: #5b7365;
+    }}
+    .bbs-main {{
+      min-height: 0;
+      border: 1px solid #617e6b;
+      border-radius: 10px;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(79, 166, 112, 0.08), transparent 52%),
+        linear-gradient(180deg, #0b180f 0%, #09140c 100%);
+      color: #9ff2bf;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }}
+    .bbs-terminal-head {{
+      border-bottom: 1px solid rgba(146, 206, 165, 0.25);
+      padding: 8px 10px;
+      background: rgba(24, 48, 32, 0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }}
+    .bbs-terminal-title {{
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.2;
+      color: #c8ffd9;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+    }}
+    .bbs-terminal-meta {{
+      font-size: 10px;
+      line-height: 1.3;
+      color: #8ad3a8;
+    }}
+    .bbs-terminal-log {{
+      flex: 1 1 auto;
+      min-height: 0;
+      margin: 0;
+      padding: 10px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: #9ff2bf;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      text-shadow: 0 0 4px rgba(102, 191, 131, 0.2);
+    }}
+    .bbs-compose-row {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      padding: 8px 10px 4px;
+      border-top: 1px solid rgba(146, 206, 165, 0.22);
+      background: rgba(24, 48, 32, 0.45);
+    }}
+    .bbs-post-input {{
+      border: 1px solid #4e7c61;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.2;
+      color: #cbffde;
+      background: #102017;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+    }}
+    .bbs-post-input::placeholder {{
+      color: #84c19e;
+    }}
+    .bbs-post-input:focus {{
+      outline: 2px solid #4da275;
+      outline-offset: 1px;
+      border-color: #4da275;
+    }}
+    .bbs-post-status {{
+      padding: 0 10px 8px;
+      color: #86caa5;
+    }}
+    @media (max-width: 1100px) {{
+      .bbs-shell {{
+        grid-template-columns: minmax(0, 1fr);
+      }}
+      .bbs-board-list {{
+        max-height: 200px;
+      }}
+    }}
     .remote {{
       grid-column: 1 / span 3;
       grid-row: 2 / 9;
@@ -3202,6 +3441,13 @@
       min-height: 0;
     }}
     .bots {{
+      grid-column: 1 / span 3;
+      grid-row: 2 / 9;
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .bbs {{
       grid-column: 1 / span 3;
       grid-row: 2 / 9;
       display: none;

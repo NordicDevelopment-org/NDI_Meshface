@@ -62,6 +62,7 @@
           syncReversiNetworkState(latestState);
           syncBoardGameNetworkState("checkers", latestState);
           syncBoardGameNetworkState("chess", latestState);
+          syncBbsNetworkState(latestState);
           renderSummary(latestState);
           if (mapVisible304) {{
             renderMap(nodes304, traffic304.edges || [], cachedHistory304);
@@ -74,6 +75,9 @@
           }}
           if (activeLayoutView === "files") {{
             renderFilesView(latestState);
+          }}
+          if (activeLayoutView === "bbs") {{
+            renderBbsView(latestState);
           }}
           if (activeLayoutView === "history") {{
             renderHistoryChat(traffic304);
@@ -142,6 +146,7 @@
         syncReversiNetworkState(state);
         syncBoardGameNetworkState("checkers", state);
         syncBoardGameNetworkState("chess", state);
+        syncBbsNetworkState(state);
         renderSelfRadioPill(state);
         if (!summaryMetricsHydrated && !summaryMetricsHydrateInFlight) {{
           summaryMetricsHydrateInFlight = hydrateSummaryMetricTickers()
@@ -221,6 +226,8 @@
 
         if (activeLayoutView === "chat") {{
           renderChat(state);
+        }} else if (activeLayoutView === "bbs") {{
+          renderBbsView(state);
         }} else if (activeLayoutView === "bots") {{
           renderBotsView(state);
         }} else if (activeLayoutView === "games") {{
