@@ -86,19 +86,36 @@
         const botResponseRow = msgId != null
           ? meshBotResponseByMessageId.get(String(msgId)) || null
           : null;
-        const botInteractionRow = botResponseRow || botRequestRow || null;
+        const botRequestFromId = normalizeNodeId(
+          (botRequestRow && (botRequestRow.from_id ?? botRequestRow.fromId))
+            ? (botRequestRow.from_id ?? botRequestRow.fromId)
+            : ""
+        );
+        const botRequestToId = normalizeNodeId(
+          (botRequestRow && (botRequestRow.to_id ?? botRequestRow.toId))
+            ? (botRequestRow.to_id ?? botRequestRow.toId)
+            : ""
+        );
+        const botResponseToId = normalizeNodeId(
+          (botResponseRow && (botResponseRow.response_to ?? botResponseRow.responseTo ?? botResponseRow.to_id ?? botResponseRow.toId))
+            ? (botResponseRow.response_to ?? botResponseRow.responseTo ?? botResponseRow.to_id ?? botResponseRow.toId)
+            : ""
+        );
         const senderIsSelf = hasLocalNodeId && fromId === localNodeId;
         const directToSelf = hasLocalNodeId && channel === "direct" && toId === localNodeId;
         const referencesSelfMessage = hasLocalNodeId && !!replyId && replyTargetSenderId === localNodeId;
         const botPeerNodeId = normalizeNodeId(
-          (botResponseRow && (botResponseRow.from_id ?? botResponseRow.fromId))
+          (botResponseRow && (botResponseRow.from_id ?? botResponseRow.fromId ?? botResponseRow.response_from ?? botResponseRow.responseFrom))
           || (botRequestRow && (botRequestRow.from_id ?? botRequestRow.fromId))
           || ""
         );
-        const botInteraction = !!botInteractionRow;
+        const botInteractionRelevantToLocal = hasLocalNodeId && (
+          (botRequestRow && (botRequestFromId === localNodeId || botRequestToId === localNodeId))
+          || (botResponseRow && botResponseToId === localNodeId)
+        );
         const systemRelevant = hasLocalNodeId && (
           (!senderIsSelf && (directToSelf || referencesSelfMessage))
-          || botInteraction
+          || botInteractionRelevantToLocal
         );
         const peerNodeId = channel === "direct"
           ? normalizeNodeId(
@@ -117,7 +134,7 @@
           sender: chatSenderLabelFromMessage(msg, nodesById),
           preview: chatChangePreviewFromMessage(msg, isReaction),
           kind,
-          countsUnread: !senderIsSelf || !!botResponseRow,
+          countsUnread: !senderIsSelf,
           selfRelevant: systemRelevant,
           systemRelevant,
           unix: latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at),

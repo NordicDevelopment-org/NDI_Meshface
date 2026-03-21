@@ -324,13 +324,14 @@
         : freshnessLabel(status);
       const selfName = preferredNodeName(selfNode) || nodeNameCache.get(selfId) || "";
       const profileLabel = selfName || selfId;
+      const profileShortLabel = selfRadioProfileShortLabel(selfId);
       const profileIdentity = selfName ? `${{selfName}} • ID: ${{selfId}}` : selfId;
       const profileTitle = `Connected local radio: ${{profileIdentity}} • Status: ${{statusDetail}}`;
       if (hasPill) {{
         pill.textContent = profileLabel;
         pill.title = profileTitle;
       }}
-      setProfile(profileLabel, profileTitle);
+      setProfile(profileShortLabel, profileTitle);
       setProfileFreshness(status, lastSeenUnix);
       syncConsoleCommandInputState(safeState);
     }}
