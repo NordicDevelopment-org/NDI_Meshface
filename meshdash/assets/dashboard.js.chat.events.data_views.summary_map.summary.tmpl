@@ -516,6 +516,106 @@
     const topbarUpdateTickerEventByKey = new Map();
     let topbarUpdateTickerLastTrainText = "";
     let topbarUpdateTickerRenderRaf = 0;
+    let topbarUpdateTickerClearHideTimer = 0;
+    let topbarUpdateTickerClearFadeTimer = 0;
+
+    function parseTopbarTickerDurationMs(rawValue) {{
+      const raw = String(rawValue == null ? "" : rawValue).trim();
+      if (!raw) return NaN;
+      const token = raw.split(",")[0].trim();
+      if (!token) return NaN;
+      if (token.endsWith("ms")) {{
+        const value = Number(token.slice(0, -2));
+        return Number.isFinite(value) ? value : NaN;
+      }}
+      if (token.endsWith("s")) {{
+        const value = Number(token.slice(0, -1));
+        return Number.isFinite(value) ? value * 1000 : NaN;
+      }}
+      const value = Number(token);
+      return Number.isFinite(value) ? value : NaN;
+    }}
+
+    function topbarUpdateTickerRemainingCycleMs(trackEl) {{
+      if (trackEl instanceof HTMLElement && typeof trackEl.getAnimations === "function") {{
+        const animation = trackEl.getAnimations().find((item) => item && item.playState !== "idle") || null;
+        if (animation && animation.effect && typeof animation.effect.getTiming === "function") {{
+          const durationMs = Number(animation.effect.getTiming().duration);
+          const currentMs = Number(animation.currentTime);
+          if (Number.isFinite(durationMs) && durationMs > 0 && Number.isFinite(currentMs)) {{
+            const progress = ((currentMs % durationMs) + durationMs) % durationMs;
+            return Math.max(120, durationMs - progress);
+          }}
+        }}
+      }}
+      const styleDurationMs = parseTopbarTickerDurationMs(trackEl instanceof HTMLElement ? trackEl.style.getPropertyValue("--topbar-update-duration") : "");
+      if (Number.isFinite(styleDurationMs) && styleDurationMs > 0) {{
+        return Math.max(120, styleDurationMs);
+      }}
+      const computedDurationMs = parseTopbarTickerDurationMs(
+        trackEl instanceof HTMLElement && typeof window !== "undefined" && typeof window.getComputedStyle === "function"
+          ? window.getComputedStyle(trackEl).animationDuration
+          : ""
+      );
+      if (Number.isFinite(computedDurationMs) && computedDurationMs > 0) {{
+        return Math.max(120, computedDurationMs);
+      }}
+      return 320;
+    }}
+
+    function cancelTopbarTickerClearTimers(tickerEl = null) {{
+      if (topbarUpdateTickerClearHideTimer) {{
+        window.clearTimeout(topbarUpdateTickerClearHideTimer);
+        topbarUpdateTickerClearHideTimer = 0;
+      }}
+      if (topbarUpdateTickerClearFadeTimer) {{
+        window.clearTimeout(topbarUpdateTickerClearFadeTimer);
+        topbarUpdateTickerClearFadeTimer = 0;
+      }}
+      if (tickerEl instanceof HTMLElement) {{
+        tickerEl.classList.remove("is-fading");
+      }}
+    }}
+
+    function hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl) {{
+      tickerEl.hidden = true;
+      tickerEl.classList.add("is-static");
+      tickerEl.classList.remove("is-fading");
+      primaryEl.textContent = "";
+      secondaryEl.textContent = "";
+      secondaryEl.hidden = true;
+      tickerEl.title = "";
+      trackEl.style.removeProperty("--topbar-update-start");
+      trackEl.style.removeProperty("--topbar-update-shift");
+      trackEl.style.removeProperty("--topbar-update-duration");
+      trackEl.style.animation = "none";
+      topbarUpdateTickerLastTrainText = "";
+    }}
+
+    function scheduleTopbarTickerClear(tickerEl, trackEl, primaryEl, secondaryEl) {{
+      if (topbarUpdateTickerClearHideTimer) return;
+      cancelTopbarTickerClearTimers(tickerEl);
+      const staticTicker = tickerEl.classList.contains("is-static");
+      const remainingMs = staticTicker ? 240 : Math.round(topbarUpdateTickerRemainingCycleMs(trackEl));
+      const fadeMs = 220;
+      const fadeDelayMs = Math.max(0, remainingMs - fadeMs);
+      if (fadeDelayMs <= 0) {{
+        tickerEl.classList.add("is-fading");
+      }} else {{
+        topbarUpdateTickerClearFadeTimer = window.setTimeout(() => {{
+          topbarUpdateTickerClearFadeTimer = 0;
+          tickerEl.classList.add("is-fading");
+        }}, fadeDelayMs);
+      }}
+      topbarUpdateTickerClearHideTimer = window.setTimeout(() => {{
+        topbarUpdateTickerClearHideTimer = 0;
+        if (topbarUpdateTickerClearFadeTimer) {{
+          window.clearTimeout(topbarUpdateTickerClearFadeTimer);
+          topbarUpdateTickerClearFadeTimer = 0;
+        }}
+        hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl);
+      }}, remainingMs);
+    }}
 
     function compactTopbarTickerText(rawValue, maxLen = 120) {{
       const cleaned = String(rawValue == null ? "" : rawValue)
@@ -556,9 +656,6 @@
         kept.push(entry);
       }}
       topbarUpdateTickerEvents = kept;
-      if (!topbarUpdateTickerEvents.length) {{
-        topbarUpdateTickerLastTrainText = "";
-      }}
     }}
 
     function clearTopbarUpdateTickerEventsByPrefix(rawPrefix) {{
@@ -627,6 +724,7 @@
         window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
         topbarUpdateTickerRenderRaf = 0;
       }}
+      cancelTopbarTickerClearTimers();
     }}
 
     function topbarTickerDirectUnreadCount() {{
@@ -682,19 +780,16 @@
           window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
           topbarUpdateTickerRenderRaf = 0;
         }}
-        tickerEl.hidden = true;
-        tickerEl.classList.add("is-static");
-        primaryEl.textContent = "";
-        secondaryEl.textContent = "";
-        secondaryEl.hidden = true;
-        tickerEl.title = "";
-        trackEl.style.removeProperty("--topbar-update-start");
-        trackEl.style.removeProperty("--topbar-update-shift");
-        trackEl.style.removeProperty("--topbar-update-duration");
-        trackEl.style.animation = "none";
-        topbarUpdateTickerLastTrainText = "";
+        const hasVisibleTrain = !tickerEl.hidden && String(topbarUpdateTickerLastTrainText || "").trim().length > 0;
+        if (hasVisibleTrain) {{
+          scheduleTopbarTickerClear(tickerEl, trackEl, primaryEl, secondaryEl);
+          return;
+        }}
+        cancelTopbarTickerClearTimers(tickerEl);
+        hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl);
         return;
       }}
+      cancelTopbarTickerClearTimers(tickerEl);
       tickerEl.hidden = false;
       const trainChanged = text !== topbarUpdateTickerLastTrainText;
       primaryEl.textContent = text;
