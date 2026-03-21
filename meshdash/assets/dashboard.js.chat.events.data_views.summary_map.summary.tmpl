@@ -736,9 +736,7 @@
     }}
 
     function publishTopbarUpdateTickerEvent(rawText, rawKey = "", options = null) {{
-      const key = String(rawKey || "").trim();
-      if (!key.startsWith("direct:")) return false;
-      return pushTopbarUpdateTickerEvent(rawText, key, options);
+      return pushTopbarUpdateTickerEvent(rawText, rawKey, options);
     }}
 
     function syncTopbarUpdateTickerEvents(state, _context = null) {{
@@ -747,19 +745,62 @@
         return;
       }}
       pruneTopbarUpdateTickerEvents();
-      if (topbarTickerDirectUnreadCount() <= 0) {{
+      const directUnreadCount = topbarTickerDirectUnreadCount();
+      const unacknowledgedSystemNoticeCount = typeof totalSystemNotificationCount === "function"
+        ? Math.max(0, Math.trunc(Number(totalSystemNotificationCount()) || 0))
+        : directUnreadCount;
+      if (directUnreadCount <= 0 || unacknowledgedSystemNoticeCount <= 0) {{
         clearTopbarUpdateTickerEventsByPrefix("direct:");
       }}
     }}
 
     function topbarUpdateTickerTrainText(state, context = null) {{
       syncTopbarUpdateTickerEvents(state, context);
-      const rows = topbarUpdateTickerEvents
-        .filter((entry) => String(entry && entry.key ? entry.key : "").trim().startsWith("direct:"))
+      const unseenNoticeRows = [];
+      const seenNoticeKeys = new Set();
+      const appendChannelNotices = (channelKey) => {{
+        if (typeof chatChangeNoticesForChannel !== "function") return;
+        const notices = chatChangeNoticesForChannel(channelKey);
+        if (!Array.isArray(notices) || !notices.length) return;
+        const ackSet = typeof chatChangeAcknowledgedKeySetForChannel === "function"
+          ? chatChangeAcknowledgedKeySetForChannel(channelKey)
+          : null;
+        for (const notice of notices) {{
+          const noticeKey = String(notice && notice.key ? notice.key : "").trim();
+          if (ackSet instanceof Set && noticeKey && ackSet.has(noticeKey)) {{
+            continue;
+          }}
+          const dedupeKey = `${{normalizeChatChannel(channelKey)}}:${{noticeKey}}`;
+          if (noticeKey && seenNoticeKeys.has(dedupeKey)) {{
+            continue;
+          }}
+          if (noticeKey) {{
+            seenNoticeKeys.add(dedupeKey);
+          }}
+          const sender = String(notice && notice.sender ? notice.sender : "").trim() || "Unknown node";
+          const unix = Number(notice && notice.unix);
+          unseenNoticeRows.push({{
+            text: `NEW MESSAGE FROM ${{sender}}`,
+            unix: Number.isFinite(unix) ? unix : 0,
+          }});
+        }}
+      }};
+      appendChannelNotices("all");
+      appendChannelNotices("direct");
+      unseenNoticeRows.sort((a, b) => Number(b.unix || 0) - Number(a.unix || 0));
+      if (unseenNoticeRows.length > 0) {{
+        return unseenNoticeRows
+          .slice(0, topbarUpdateTickerQueueMax)
+          .map((entry) => compactTopbarTickerText(entry && entry.text ? entry.text : "", 160))
+          .filter(Boolean)
+          .join("   |   ");
+      }}
+      const oneShotRows = topbarUpdateTickerEvents
+        .filter((entry) => String(entry && entry.key ? entry.key : "").trim().startsWith("oneshot:"))
         .map((entry) => compactTopbarTickerText(entry && entry.text ? entry.text : "", 160))
         .filter(Boolean);
-      if (!rows.length) return "";
-      return rows.join("   |   ");
+      if (!oneShotRows.length) return "";
+      return oneShotRows.join("   |   ");
     }}
 
     function renderTopbarUpdateTicker(state, context = null) {{

@@ -45,6 +45,54 @@
           }}
         }});
       }}
+      const nodeOnlineOneShotToggle = document.getElementById("settings-ticker-oneshot-node-online-enabled");
+      if (nodeOnlineOneShotToggle instanceof HTMLInputElement && nodeOnlineOneShotToggle.dataset.bound !== "1") {{
+        nodeOnlineOneShotToggle.dataset.bound = "1";
+        nodeOnlineOneShotToggle.addEventListener("change", () => {{
+          const prefs = currentTickerPreferences();
+          if (!prefs.oneshots || typeof prefs.oneshots !== "object") {{
+            prefs.oneshots = defaultTickerOneshotPreferences();
+          }}
+          if (!prefs.oneshots.node_online || typeof prefs.oneshots.node_online !== "object") {{
+            prefs.oneshots.node_online = {{
+              enabled: false,
+              favorites_only: true,
+            }};
+          }}
+          prefs.oneshots.node_online.enabled = !!nodeOnlineOneShotToggle.checked;
+          saveTickerPreferences({{
+            rerenderSummary: false,
+            rerenderSettings: true,
+            status: nodeOnlineOneShotToggle.checked
+              ? "Node-online one-shot topbar ticker enabled locally."
+              : "Node-online one-shot topbar ticker disabled locally.",
+          }});
+        }});
+      }}
+      const nodeOnlineFavoritesOnlyToggle = document.getElementById("settings-ticker-oneshot-node-online-favorites-only");
+      if (nodeOnlineFavoritesOnlyToggle instanceof HTMLInputElement && nodeOnlineFavoritesOnlyToggle.dataset.bound !== "1") {{
+        nodeOnlineFavoritesOnlyToggle.dataset.bound = "1";
+        nodeOnlineFavoritesOnlyToggle.addEventListener("change", () => {{
+          const prefs = currentTickerPreferences();
+          if (!prefs.oneshots || typeof prefs.oneshots !== "object") {{
+            prefs.oneshots = defaultTickerOneshotPreferences();
+          }}
+          if (!prefs.oneshots.node_online || typeof prefs.oneshots.node_online !== "object") {{
+            prefs.oneshots.node_online = {{
+              enabled: false,
+              favorites_only: true,
+            }};
+          }}
+          prefs.oneshots.node_online.favorites_only = !!nodeOnlineFavoritesOnlyToggle.checked;
+          saveTickerPreferences({{
+            rerenderSummary: false,
+            rerenderSettings: true,
+            status: nodeOnlineFavoritesOnlyToggle.checked
+              ? "Node-online one-shots limited to favorite nodes locally."
+              : "Node-online one-shots include all nodes locally.",
+          }});
+        }});
+      }}
 
       const moveUpBtn = document.getElementById("settings-ticker-move-up");
       if (moveUpBtn instanceof HTMLButtonElement && moveUpBtn.dataset.bound !== "1") {{

@@ -170,6 +170,15 @@
       return tickerCatalogById.has(key) ? key : "";
     }}
 
+    function defaultTickerOneshotPreferences() {{
+      return {{
+        node_online: {{
+          enabled: false,
+          favorites_only: true,
+        }},
+      }};
+    }}
+
     function defaultTickerPreferences() {{
       const defaultEnabled = Object.fromEntries(
         tickerDefaultOrder.map((id) => [id, true])
@@ -184,6 +193,7 @@
         battery_window_hours: tickerDefaultBatteryWindowHours,
         node_rows: {{ ...nodeTickerDefaultRows }},
         node_packet_trend: true,
+        oneshots: defaultTickerOneshotPreferences(),
       }};
     }}
 
@@ -262,6 +272,37 @@
           ?? raw.nodeListPacketSparkline,
         true
       );
+      const oneshotsRaw = (
+        raw.oneshots && typeof raw.oneshots === "object"
+          ? raw.oneshots
+          : (raw.one_shots && typeof raw.one_shots === "object" ? raw.one_shots : {{}})
+      );
+      const defaultOneshots = defaultTickerOneshotPreferences();
+      const nodeOnlineRaw = (
+        oneshotsRaw.node_online && typeof oneshotsRaw.node_online === "object"
+          ? oneshotsRaw.node_online
+          : {{}}
+      );
+      const nodeOnlineEnabled = parseBoolToken(
+        nodeOnlineRaw.enabled
+          ?? nodeOnlineRaw.on
+          ?? raw.node_online_oneshot_enabled
+          ?? raw.nodeOnlineOneshotEnabled,
+        !!(defaultOneshots.node_online && defaultOneshots.node_online.enabled)
+      );
+      const nodeOnlineFavoritesOnly = parseBoolToken(
+        nodeOnlineRaw.favorites_only
+          ?? nodeOnlineRaw.favoritesOnly
+          ?? raw.node_online_oneshot_favorites_only
+          ?? raw.nodeOnlineOneshotFavoritesOnly,
+        !!(defaultOneshots.node_online && defaultOneshots.node_online.favorites_only)
+      );
+      const oneshots = {{
+        node_online: {{
+          enabled: nodeOnlineEnabled,
+          favorites_only: nodeOnlineFavoritesOnly,
+        }},
+      }};
 
       return {{
         order,
@@ -271,6 +312,7 @@
         battery_window_hours: batteryWindowHours,
         node_rows: nodeRows,
         node_packet_trend: nodePacketTrend,
+        oneshots,
       }};
     }}
 
@@ -357,6 +399,28 @@
     function nodeNavigatorPacketTrendEnabled() {{
       const prefs = currentTickerPreferences();
       return parseBoolToken(prefs && prefs.node_packet_trend, true);
+    }}
+
+    function topbarOneshotNodeOnlineEnabled() {{
+      const prefs = currentTickerPreferences();
+      const oneShots = prefs && prefs.oneshots && typeof prefs.oneshots === "object"
+        ? prefs.oneshots
+        : {{}};
+      const nodeOnline = oneShots.node_online && typeof oneShots.node_online === "object"
+        ? oneShots.node_online
+        : {{}};
+      return parseBoolToken(nodeOnline.enabled, false);
+    }}
+
+    function topbarOneshotNodeOnlineFavoritesOnly() {{
+      const prefs = currentTickerPreferences();
+      const oneShots = prefs && prefs.oneshots && typeof prefs.oneshots === "object"
+        ? prefs.oneshots
+        : {{}};
+      const nodeOnline = oneShots.node_online && typeof oneShots.node_online === "object"
+        ? oneShots.node_online
+        : {{}};
+      return parseBoolToken(nodeOnline.favorites_only, true);
     }}
 
     function isTickerSettingsControlId(controlId) {{
