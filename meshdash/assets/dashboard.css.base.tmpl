@@ -50,6 +50,7 @@
     }}
     .topbar-self-profile {{
       min-width: 30px;
+      max-width: min(30vw, 220px);
       height: 30px;
       border-radius: 999px;
       border: 1px solid rgba(214, 238, 223, 0.55);
@@ -61,7 +62,10 @@
       padding: 0 8px;
       margin: 0;
       font: inherit;
+      font-size: 14px;
+      font-weight: 700;
       line-height: 1;
+      letter-spacing: 0.1px;
       white-space: nowrap;
       user-select: none;
       cursor: pointer;
@@ -95,11 +99,12 @@
       color: #f1fff6;
     }}
     .topbar-self-profile-short {{
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.35px;
+      display: block;
+      font-size: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
       text-transform: none;
-      max-width: 5ch;
+      max-width: min(20ch, 28vw);
       overflow: hidden;
       text-overflow: ellipsis;
     }}
@@ -212,16 +217,18 @@
       justify-self: center;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       max-width: min(52vw, 420px);
       padding: 3px 10px;
-      border: 1px solid rgba(214, 238, 223, 0.26);
+      border: none;
       border-radius: 999px;
       background: rgba(248, 255, 251, 0.08);
       color: rgba(241, 255, 246, 0.94);
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.12px;
-      line-height: 1.2;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+      line-height: 1.1;
+      transform: translateX(calc(var(--topbar-corner-reserve, 172px) / 2));
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;

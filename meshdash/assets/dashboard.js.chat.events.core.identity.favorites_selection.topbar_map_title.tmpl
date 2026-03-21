@@ -109,9 +109,7 @@
         || ""
       ).trim();
       let display = "";
-      if (longName && shortName && shortName !== longName) {{
-        display = `${{longName}} (${{shortName}})`;
-      }} else if (longName) {{
+      if (longName) {{
         display = longName;
       }} else if (shortName) {{
         display = shortName;
@@ -119,7 +117,10 @@
         display = nodeNameCache.get(selfId) || selfId;
       }}
       labelEl.textContent = display;
-      labelEl.title = `Connected local radio: ${{display}} (${{selfId}})`;
+      const titleIdentity = display && display !== selfId
+        ? `${{display}} (${{selfId}})`
+        : selfId;
+      labelEl.title = `Connected local radio: ${{titleIdentity}}`;
     }}
 
     function formatSavedViewMapTitle(state = latestState) {{
@@ -191,4 +192,3 @@
       }}
       syncMapTitleFavoriteToggle();
     }}
-

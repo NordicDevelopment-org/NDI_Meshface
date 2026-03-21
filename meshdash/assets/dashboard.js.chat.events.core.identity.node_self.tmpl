@@ -240,9 +240,9 @@
       const profile = document.getElementById("self-radio-profile");
       const profileShort = document.getElementById("self-radio-profile-short");
       const copyBtn = document.getElementById("self-radio-copy-id-btn");
-      const setProfile = (shortText, titleText) => {{
+      const setProfile = (labelText, titleText) => {{
         if (profileShort instanceof HTMLElement) {{
-          profileShort.textContent = String(shortText || "na");
+          profileShort.textContent = String(labelText || "na");
         }}
         if (profile instanceof HTMLElement) {{
           profile.title = String(titleText || "Connected local radio: unavailable");
@@ -323,28 +323,14 @@
         ? `${{freshnessLabel(status)}} (seen ${{savedDetailAge(lastSeenUnix, nowUnix)}})`
         : freshnessLabel(status);
       const selfName = preferredNodeName(selfNode) || nodeNameCache.get(selfId) || "";
-      if (selfName) {{
-        const profileTitle = `Connected local radio: ${{selfName}} (${{selfId}}) • Status: ${{statusDetail}}`;
-        if (hasPill) {{
-          pill.textContent = `${{selfName}} (${{selfId}})`;
-          pill.title = profileTitle;
-        }}
-        setProfile(
-          selfRadioProfileShortLabel(selfId),
-          profileTitle
-        );
-      }} else {{
-        const profileTitle = `Connected local radio: ${{selfId}} • Status: ${{statusDetail}}`;
-        if (hasPill) {{
-          pill.textContent = `${{selfId}}`;
-          pill.title = profileTitle;
-        }}
-        setProfile(
-          selfRadioProfileShortLabel(selfId),
-          profileTitle
-        );
+      const profileLabel = selfName || selfId;
+      const profileIdentity = selfName ? `${{selfName}} • ID: ${{selfId}}` : selfId;
+      const profileTitle = `Connected local radio: ${{profileIdentity}} • Status: ${{statusDetail}}`;
+      if (hasPill) {{
+        pill.textContent = profileLabel;
+        pill.title = profileTitle;
       }}
+      setProfile(profileLabel, profileTitle);
       setProfileFreshness(status, lastSeenUnix);
       syncConsoleCommandInputState(safeState);
     }}
-
