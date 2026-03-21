@@ -778,7 +778,13 @@
       if (topbarUpdateTickerActiveRowByKey.size > 0) return;
       if (topbarUpdateTickerPendingSpawnKeys.length > 0) return;
       if (topbarUpdateTickerVisibleItemCount > 0 || topbarUpdateTickerAnyLiveItems(trackEl)) return;
-      cancelTopbarTickerClearTimers(tickerEl);
+      if (tickerEl.hidden) {{
+        cancelTopbarTickerClearTimers(tickerEl);
+        return;
+      }}
+      if (topbarUpdateTickerClearHideTimer || topbarUpdateTickerClearFadeTimer) {{
+        return;
+      }}
       topbarUpdateTickerClearFadeTimer = window.setTimeout(() => {{
         topbarUpdateTickerClearFadeTimer = 0;
         tickerEl.classList.add("is-fading");
@@ -843,10 +849,10 @@
         scheduleTopbarTickerHideWhenIdle(tickerEl, trackEl, primaryEl, secondaryEl);
         return;
       }}
-      const nowMs = (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+      const requestNowMs = (typeof performance !== "undefined" && performance && typeof performance.now === "function")
         ? performance.now()
         : Date.now();
-      const delayMs = Math.max(0, Math.round(topbarUpdateTickerNextSpawnAtMs - nowMs));
+      const delayMs = Math.max(0, Math.round(topbarUpdateTickerNextSpawnAtMs - requestNowMs));
       topbarUpdateTickerSpawnTimer = window.setTimeout(() => {{
         topbarUpdateTickerSpawnTimer = 0;
         if (!topbarUpdateTickerPendingSpawnKeys.length) {{
@@ -890,7 +896,10 @@
         const distancePx = Math.max(1, startX - endX);
         const durationMs = Math.max(1200, (distancePx / topbarUpdateTickerSpeedPxPerSecond) * 1000);
         topbarUpdateTickerAdjustVisibleCount(key, +1);
-        topbarUpdateTickerNextSpawnAtMs = nowMs + Math.max(
+        const spawnNowMs = (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+          ? performance.now()
+          : Date.now();
+        topbarUpdateTickerNextSpawnAtMs = spawnNowMs + Math.max(
           120,
           ((itemWidth + topbarUpdateTickerGapPx) / topbarUpdateTickerSpeedPxPerSecond) * 1000
         );
