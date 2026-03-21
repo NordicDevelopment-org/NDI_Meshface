@@ -511,13 +511,26 @@
     const topbarUpdateTickerQueueMax = 24;
     const topbarUpdateTickerOneShotMs = 90 * 1000;
     const topbarUpdateTickerGapPx = 16;
+    const topbarUpdateTickerSeparator = "   ";
+    const topbarUpdateTickerSpeedPxPerSecond = 36;
     let topbarUpdateTickerBootstrapped = false;
     let topbarUpdateTickerEvents = [];
     const topbarUpdateTickerEventByKey = new Map();
     let topbarUpdateTickerLastTrainText = "";
+    let topbarUpdateTickerLastRows = [];
+    let topbarUpdateTickerPendingRows = [];
     let topbarUpdateTickerRenderRaf = 0;
+    let topbarUpdateTickerSpawnTimer = 0;
+    let topbarUpdateTickerNextSpawnAtMs = 0;
     let topbarUpdateTickerClearHideTimer = 0;
     let topbarUpdateTickerClearFadeTimer = 0;
+    let topbarUpdateTickerTrackIterationBound = false;
+    const topbarUpdateTickerActiveRowByKey = new Map();
+    let topbarUpdateTickerPendingSpawnKeys = [];
+    const topbarUpdateTickerPendingSpawnKeySet = new Set();
+    const topbarUpdateTickerVisibleCountByKey = new Map();
+    let topbarUpdateTickerVisibleItemCount = 0;
+    const topbarUpdateTickerOneShotShownKeys = new Set();
 
     function parseTopbarTickerDurationMs(rawValue) {{
       const raw = String(rawValue == null ? "" : rawValue).trim();
@@ -578,9 +591,25 @@
     }}
 
     function hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl) {{
+      if (topbarUpdateTickerSpawnTimer) {{
+        window.clearTimeout(topbarUpdateTickerSpawnTimer);
+        topbarUpdateTickerSpawnTimer = 0;
+      }}
       tickerEl.hidden = true;
       tickerEl.classList.add("is-static");
       tickerEl.classList.remove("is-fading");
+      for (const itemEl of Array.from(trackEl.querySelectorAll(".topbar-update-item"))) {{
+        if (itemEl instanceof HTMLElement && typeof itemEl.getAnimations === "function") {{
+          for (const anim of itemEl.getAnimations()) {{
+            if (anim && typeof anim.cancel === "function") {{
+              anim.cancel();
+            }}
+          }}
+        }}
+        if (itemEl instanceof HTMLElement && itemEl.parentNode) {{
+          itemEl.parentNode.removeChild(itemEl);
+        }}
+      }}
       primaryEl.textContent = "";
       secondaryEl.textContent = "";
       secondaryEl.hidden = true;
@@ -590,6 +619,359 @@
       trackEl.style.removeProperty("--topbar-update-duration");
       trackEl.style.animation = "none";
       topbarUpdateTickerLastTrainText = "";
+      topbarUpdateTickerLastRows = [];
+      topbarUpdateTickerPendingRows = [];
+      topbarUpdateTickerPendingSpawnKeys = [];
+      topbarUpdateTickerPendingSpawnKeySet.clear();
+      topbarUpdateTickerActiveRowByKey.clear();
+      topbarUpdateTickerVisibleCountByKey.clear();
+      topbarUpdateTickerVisibleItemCount = 0;
+      topbarUpdateTickerOneShotShownKeys.clear();
+      topbarUpdateTickerNextSpawnAtMs = 0;
+    }}
+
+    function scheduleTopbarUpdateTickerTrackLayout(tickerEl, viewportEl, trackEl, primaryEl) {{
+      if (topbarUpdateTickerRenderRaf) {{
+        window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
+        topbarUpdateTickerRenderRaf = 0;
+      }}
+      topbarUpdateTickerRenderRaf = window.requestAnimationFrame(() => {{
+        topbarUpdateTickerRenderRaf = 0;
+        const viewportWidth = Math.max(viewportEl.clientWidth, 0);
+        const textWidth = Math.max(trackEl.scrollWidth, primaryEl.scrollWidth, 0);
+        if (!(textWidth > 0) || !(viewportWidth > 0)) {{
+          tickerEl.classList.add("is-static");
+          trackEl.style.removeProperty("--topbar-update-start");
+          trackEl.style.removeProperty("--topbar-update-shift");
+          trackEl.style.removeProperty("--topbar-update-duration");
+          trackEl.style.removeProperty("--topbar-update-gap");
+          return;
+        }}
+        const start = Math.max(8, Math.ceil(viewportWidth));
+        const shift = Math.max(120, Math.ceil(viewportWidth + textWidth + topbarUpdateTickerGapPx));
+        const speedPxPerSecond = 36;
+        const durationSec = Math.max(16, Math.min(180, shift / speedPxPerSecond));
+        trackEl.style.setProperty("--topbar-update-start", `${{start}}px`);
+        trackEl.style.setProperty("--topbar-update-shift", `${{shift}}px`);
+        trackEl.style.setProperty("--topbar-update-gap", `${{topbarUpdateTickerGapPx}}px`);
+        trackEl.style.setProperty("--topbar-update-duration", `${{durationSec.toFixed(2)}}s`);
+        trackEl.style.removeProperty("animation");
+        tickerEl.classList.remove("is-static");
+      }});
+    }}
+
+    function applyTopbarUpdateTickerText(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl, rawText) {{
+      const text = String(rawText == null ? "" : rawText).trim();
+      if (!text) return;
+      primaryEl.textContent = text;
+      secondaryEl.textContent = "";
+      secondaryEl.hidden = true;
+      tickerEl.title = text;
+      topbarUpdateTickerLastTrainText = text;
+      scheduleTopbarUpdateTickerTrackLayout(tickerEl, viewportEl, trackEl, primaryEl);
+    }}
+
+    function cloneTopbarUpdateTickerRows(rows) {{
+      if (!Array.isArray(rows)) return [];
+      return rows.map((entry) => ({{
+        key: String(entry && entry.key ? entry.key : "").trim(),
+        text: compactTopbarTickerText(entry && entry.text ? entry.text : "", 160),
+        mode: String(entry && entry.mode ? entry.mode : "sticky").trim().toLowerCase() === "oneshot"
+          ? "oneshot"
+          : "sticky",
+        sortMs: Number(entry && entry.sortMs),
+      }})).filter((entry) => entry.text.length > 0);
+    }}
+
+    function topbarUpdateTickerRowsText(rows) {{
+      const normalizedRows = cloneTopbarUpdateTickerRows(rows);
+      if (!normalizedRows.length) return "";
+      return normalizedRows.map((entry) => entry.text).join(topbarUpdateTickerSeparator);
+    }}
+
+    function topbarUpdateTickerRowsEqual(leftRows, rightRows) {{
+      const left = Array.isArray(leftRows) ? leftRows : [];
+      const right = Array.isArray(rightRows) ? rightRows : [];
+      if (left.length !== right.length) return false;
+      for (let idx = 0; idx < left.length; idx += 1) {{
+        const leftKey = String(left[idx] && left[idx].key ? left[idx].key : "").trim();
+        const rightKey = String(right[idx] && right[idx].key ? right[idx].key : "").trim();
+        const leftText = String(left[idx] && left[idx].text ? left[idx].text : "").trim();
+        const rightText = String(right[idx] && right[idx].text ? right[idx].text : "").trim();
+        if (leftKey !== rightKey || leftText !== rightText) return false;
+      }}
+      return true;
+    }}
+
+    function topbarUpdateTickerAppendedRows(previousRows, nextRows) {{
+      const previous = Array.isArray(previousRows) ? previousRows : [];
+      const next = Array.isArray(nextRows) ? nextRows : [];
+      if (!previous.length || next.length < previous.length) return [];
+      for (let idx = 0; idx < previous.length; idx += 1) {{
+        const prevKey = String(previous[idx] && previous[idx].key ? previous[idx].key : "").trim();
+        const nextKey = String(next[idx] && next[idx].key ? next[idx].key : "").trim();
+        const prevText = String(previous[idx] && previous[idx].text ? previous[idx].text : "").trim();
+        const nextText = String(next[idx] && next[idx].text ? next[idx].text : "").trim();
+        if (prevKey !== nextKey || prevText !== nextText) return [];
+      }}
+      return next.slice(previous.length);
+    }}
+
+    function topbarUpdateTickerAdditionalRows(previousRows, nextRows) {{
+      const previous = Array.isArray(previousRows) ? previousRows : [];
+      const next = Array.isArray(nextRows) ? nextRows : [];
+      if (!next.length) return [];
+      const previousIdentity = new Set(
+        previous.map((entry) => `${{String(entry && entry.key ? entry.key : "").trim()}}::${{String(entry && entry.text ? entry.text : "").trim()}}`)
+      );
+      return next.filter((entry) => {{
+        const identity = `${{String(entry && entry.key ? entry.key : "").trim()}}::${{String(entry && entry.text ? entry.text : "").trim()}}`;
+        return !previousIdentity.has(identity);
+      }});
+    }}
+
+    function topbarUpdateTickerRemovePendingSpawnKey(key) {{
+      const cleanKey = String(key || "").trim();
+      if (!cleanKey || !topbarUpdateTickerPendingSpawnKeySet.has(cleanKey)) return;
+      topbarUpdateTickerPendingSpawnKeySet.delete(cleanKey);
+      topbarUpdateTickerPendingSpawnKeys = topbarUpdateTickerPendingSpawnKeys.filter((rowKey) => rowKey !== cleanKey);
+    }}
+
+    function topbarUpdateTickerQueueSpawnKey(key) {{
+      const cleanKey = String(key || "").trim();
+      if (!cleanKey) return false;
+      if (topbarUpdateTickerPendingSpawnKeySet.has(cleanKey)) return false;
+      if (!topbarUpdateTickerActiveRowByKey.has(cleanKey)) return false;
+      topbarUpdateTickerPendingSpawnKeySet.add(cleanKey);
+      topbarUpdateTickerPendingSpawnKeys.push(cleanKey);
+      return true;
+    }}
+
+    function topbarUpdateTickerVisibleCountForKey(key) {{
+      const cleanKey = String(key || "").trim();
+      const value = Number(topbarUpdateTickerVisibleCountByKey.get(cleanKey) || 0);
+      return Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0;
+    }}
+
+    function topbarUpdateTickerAdjustVisibleCount(key, delta) {{
+      const cleanKey = String(key || "").trim();
+      if (!cleanKey) return;
+      const nextValue = Math.max(0, topbarUpdateTickerVisibleCountForKey(cleanKey) + Math.trunc(Number(delta) || 0));
+      if (nextValue <= 0) {{
+        topbarUpdateTickerVisibleCountByKey.delete(cleanKey);
+      }} else {{
+        topbarUpdateTickerVisibleCountByKey.set(cleanKey, nextValue);
+      }}
+      if (delta > 0) {{
+        topbarUpdateTickerVisibleItemCount += Math.trunc(delta);
+      }} else if (delta < 0) {{
+        topbarUpdateTickerVisibleItemCount = Math.max(0, topbarUpdateTickerVisibleItemCount + Math.trunc(delta));
+      }}
+    }}
+
+    function topbarUpdateTickerAnyLiveItems(trackEl) {{
+      if (!(trackEl instanceof HTMLElement)) return false;
+      return !!trackEl.querySelector(".topbar-update-item");
+    }}
+
+    function scheduleTopbarTickerHideWhenIdle(tickerEl, trackEl, primaryEl, secondaryEl) {{
+      if (topbarUpdateTickerActiveRowByKey.size > 0) return;
+      if (topbarUpdateTickerPendingSpawnKeys.length > 0) return;
+      if (topbarUpdateTickerVisibleItemCount > 0 || topbarUpdateTickerAnyLiveItems(trackEl)) return;
+      cancelTopbarTickerClearTimers(tickerEl);
+      topbarUpdateTickerClearFadeTimer = window.setTimeout(() => {{
+        topbarUpdateTickerClearFadeTimer = 0;
+        tickerEl.classList.add("is-fading");
+      }}, 0);
+      topbarUpdateTickerClearHideTimer = window.setTimeout(() => {{
+        topbarUpdateTickerClearHideTimer = 0;
+        hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl);
+      }}, 220);
+    }}
+
+    function syncTopbarUpdateTickerActiveRows(rows) {{
+      const normalized = cloneTopbarUpdateTickerRows(rows).map((entry) => ({{
+        key: String(entry && entry.key ? entry.key : "").trim(),
+        text: compactTopbarTickerText(entry && entry.text ? entry.text : "", 160),
+        mode: String(entry && entry.mode ? entry.mode : "sticky").trim().toLowerCase() === "oneshot"
+          ? "oneshot"
+          : "sticky",
+        sortMs: Number(entry && entry.sortMs),
+      }})).filter((entry) => entry.key && entry.text);
+      const nextByKey = new Map(normalized.map((entry) => [entry.key, entry]));
+
+      for (const key of Array.from(topbarUpdateTickerActiveRowByKey.keys())) {{
+        if (nextByKey.has(key)) continue;
+        topbarUpdateTickerActiveRowByKey.delete(key);
+        topbarUpdateTickerRemovePendingSpawnKey(key);
+        topbarUpdateTickerOneShotShownKeys.delete(key);
+      }}
+
+      for (const entry of normalized) {{
+        const key = entry.key;
+        const previous = topbarUpdateTickerActiveRowByKey.get(key) || null;
+        topbarUpdateTickerActiveRowByKey.set(key, entry);
+        const visible = topbarUpdateTickerVisibleCountForKey(key) > 0;
+        const queued = topbarUpdateTickerPendingSpawnKeySet.has(key);
+        if (entry.mode === "oneshot") {{
+          if (!topbarUpdateTickerOneShotShownKeys.has(key) && !visible && !queued) {{
+            topbarUpdateTickerQueueSpawnKey(key);
+          }}
+          continue;
+        }}
+        if (!visible && !queued) {{
+          topbarUpdateTickerQueueSpawnKey(key);
+        }} else if (previous && previous.text !== entry.text) {{
+          // Sticky text changed while active; next loop render uses latest row snapshot.
+        }}
+      }}
+    }}
+
+    function updateTopbarTickerTitleFromActiveRows(tickerEl) {{
+      const text = Array.from(topbarUpdateTickerActiveRowByKey.values())
+        .sort((a, b) => Number(a && a.sortMs ? a.sortMs : 0) - Number(b && b.sortMs ? b.sortMs : 0))
+        .map((entry) => compactTopbarTickerText(entry && entry.text ? entry.text : "", 160))
+        .filter(Boolean)
+        .join(topbarUpdateTickerSeparator);
+      tickerEl.title = text;
+      topbarUpdateTickerLastTrainText = text;
+    }}
+
+    function topbarUpdateTickerScheduleSpawnPump(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl) {{
+      if (topbarUpdateTickerSpawnTimer) return;
+      if (!topbarUpdateTickerPendingSpawnKeys.length) {{
+        scheduleTopbarTickerHideWhenIdle(tickerEl, trackEl, primaryEl, secondaryEl);
+        return;
+      }}
+      const nowMs = (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+        ? performance.now()
+        : Date.now();
+      const delayMs = Math.max(0, Math.round(topbarUpdateTickerNextSpawnAtMs - nowMs));
+      topbarUpdateTickerSpawnTimer = window.setTimeout(() => {{
+        topbarUpdateTickerSpawnTimer = 0;
+        if (!topbarUpdateTickerPendingSpawnKeys.length) {{
+          scheduleTopbarTickerHideWhenIdle(tickerEl, trackEl, primaryEl, secondaryEl);
+          return;
+        }}
+        const key = String(topbarUpdateTickerPendingSpawnKeys.shift() || "").trim();
+        if (key) {{
+          topbarUpdateTickerPendingSpawnKeySet.delete(key);
+        }}
+        const row = key ? (topbarUpdateTickerActiveRowByKey.get(key) || null) : null;
+        if (!row) {{
+          topbarUpdateTickerScheduleSpawnPump(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl);
+          return;
+        }}
+
+        tickerEl.hidden = false;
+        tickerEl.classList.remove("is-static");
+        cancelTopbarTickerClearTimers(tickerEl);
+        const itemEl = document.createElement("span");
+        itemEl.className = "topbar-update-item";
+        if (row.mode === "oneshot") {{
+          itemEl.classList.add("is-oneshot");
+          topbarUpdateTickerOneShotShownKeys.add(key);
+        }}
+        itemEl.textContent = row.text;
+        itemEl.dataset.tickerKey = key;
+        itemEl.dataset.tickerMode = row.mode;
+        trackEl.appendChild(itemEl);
+
+        const viewportWidth = Math.max(viewportEl.clientWidth, 0);
+        const itemWidth = Math.max(itemEl.offsetWidth, 0);
+        if (!(viewportWidth > 0) || !(itemWidth > 0)) {{
+          if (itemEl.parentNode) itemEl.parentNode.removeChild(itemEl);
+          topbarUpdateTickerScheduleSpawnPump(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl);
+          return;
+        }}
+
+        const startX = viewportWidth + 10;
+        const endX = -itemWidth - 10;
+        const distancePx = Math.max(1, startX - endX);
+        const durationMs = Math.max(1200, (distancePx / topbarUpdateTickerSpeedPxPerSecond) * 1000);
+        topbarUpdateTickerAdjustVisibleCount(key, +1);
+        topbarUpdateTickerNextSpawnAtMs = nowMs + Math.max(
+          120,
+          ((itemWidth + topbarUpdateTickerGapPx) / topbarUpdateTickerSpeedPxPerSecond) * 1000
+        );
+
+        const animation = itemEl.animate(
+          [
+            {{ transform: `translate3d(${{startX}}px, -50%, 0)` }},
+            {{ transform: `translate3d(${{endX}}px, -50%, 0)` }},
+          ],
+          {{
+            duration: durationMs,
+            easing: "linear",
+            fill: "forwards",
+          }}
+        );
+
+        const settle = () => {{
+          if (itemEl.parentNode) {{
+            itemEl.parentNode.removeChild(itemEl);
+          }}
+          topbarUpdateTickerAdjustVisibleCount(key, -1);
+          const currentRow = topbarUpdateTickerActiveRowByKey.get(key) || null;
+          if (currentRow && currentRow.mode === "sticky") {{
+            topbarUpdateTickerQueueSpawnKey(key);
+          }}
+          updateTopbarTickerTitleFromActiveRows(tickerEl);
+          topbarUpdateTickerScheduleSpawnPump(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl);
+          scheduleTopbarTickerHideWhenIdle(tickerEl, trackEl, primaryEl, secondaryEl);
+        }};
+        animation.onfinish = settle;
+        animation.oncancel = settle;
+
+        updateTopbarTickerTitleFromActiveRows(tickerEl);
+        topbarUpdateTickerScheduleSpawnPump(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl);
+      }}, delayMs);
+    }}
+
+    function applyTopbarUpdateTickerRows(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl, rows) {{
+      const normalizedRows = cloneTopbarUpdateTickerRows(rows);
+      const text = topbarUpdateTickerRowsText(normalizedRows);
+      if (!text) return false;
+      applyTopbarUpdateTickerText(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl, text);
+      topbarUpdateTickerLastRows = normalizedRows;
+      return true;
+    }}
+
+    function appendTopbarUpdateTickerTailRows(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl, appendRows, fullRows) {{
+      const appendText = topbarUpdateTickerRowsText(appendRows);
+      if (!appendText) return false;
+      const existingTail = String(secondaryEl.textContent == null ? "" : secondaryEl.textContent);
+      secondaryEl.textContent = `${{existingTail}}${{topbarUpdateTickerSeparator}}${{appendText}}`;
+      secondaryEl.hidden = false;
+      const fullText = topbarUpdateTickerRowsText(fullRows);
+      tickerEl.title = fullText;
+      topbarUpdateTickerLastTrainText = fullText;
+      topbarUpdateTickerLastRows = cloneTopbarUpdateTickerRows(fullRows);
+      scheduleTopbarUpdateTickerTrackLayout(tickerEl, viewportEl, trackEl, primaryEl);
+      return true;
+    }}
+
+    function bindTopbarUpdateTickerIteration(trackEl) {{
+      if (topbarUpdateTickerTrackIterationBound) return;
+      topbarUpdateTickerTrackIterationBound = true;
+      trackEl.addEventListener("animationiteration", () => {{
+        const pendingRows = cloneTopbarUpdateTickerRows(topbarUpdateTickerPendingRows);
+        if (!pendingRows.length) return;
+        const tickerEl = document.getElementById("topbar-update-ticker");
+        const viewportEl = document.getElementById("topbar-update-viewport");
+        const liveTrackEl = document.getElementById("topbar-update-track");
+        const primaryEl = document.getElementById("topbar-update-text-primary");
+        const secondaryEl = document.getElementById("topbar-update-text-secondary");
+        if (!(tickerEl instanceof HTMLElement)) return;
+        if (!(viewportEl instanceof HTMLElement)) return;
+        if (!(liveTrackEl instanceof HTMLElement)) return;
+        if (!(primaryEl instanceof HTMLElement)) return;
+        if (!(secondaryEl instanceof HTMLElement)) return;
+        topbarUpdateTickerPendingRows = [];
+        cancelTopbarTickerClearTimers(tickerEl);
+        tickerEl.hidden = false;
+        applyTopbarUpdateTickerRows(tickerEl, viewportEl, liveTrackEl, primaryEl, secondaryEl, pendingRows);
+      }});
     }}
 
     function scheduleTopbarTickerClear(tickerEl, trackEl, primaryEl, secondaryEl) {{
@@ -720,6 +1102,19 @@
       topbarUpdateTickerEvents = [];
       topbarUpdateTickerEventByKey.clear();
       topbarUpdateTickerLastTrainText = "";
+      topbarUpdateTickerLastRows = [];
+      topbarUpdateTickerPendingRows = [];
+      topbarUpdateTickerActiveRowByKey.clear();
+      topbarUpdateTickerPendingSpawnKeys = [];
+      topbarUpdateTickerPendingSpawnKeySet.clear();
+      topbarUpdateTickerVisibleCountByKey.clear();
+      topbarUpdateTickerVisibleItemCount = 0;
+      topbarUpdateTickerOneShotShownKeys.clear();
+      topbarUpdateTickerNextSpawnAtMs = 0;
+      if (topbarUpdateTickerSpawnTimer) {{
+        window.clearTimeout(topbarUpdateTickerSpawnTimer);
+        topbarUpdateTickerSpawnTimer = 0;
+      }}
       if (topbarUpdateTickerRenderRaf) {{
         window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
         topbarUpdateTickerRenderRaf = 0;
@@ -754,8 +1149,15 @@
       }}
     }}
 
-    function topbarUpdateTickerTrainText(state, context = null) {{
+    function topbarUpdateTickerRows(state, context = null) {{
       syncTopbarUpdateTickerEvents(state, context);
+      const normalizeTickerSortMs = (rawValue) => {{
+        const value = Number(rawValue);
+        if (!Number.isFinite(value) || value <= 0) return 0;
+        if (value > 1e12) return value;
+        if (value > 1e9) return value * 1000;
+        return value;
+      }};
       const unseenNoticeRows = [];
       const seenNoticeKeys = new Set();
       const appendChannelNotices = (channelKey) => {{
@@ -779,28 +1181,48 @@
           }}
           const sender = String(notice && notice.sender ? notice.sender : "").trim() || "Unknown node";
           const unix = Number(notice && notice.unix);
+          const rowKey = noticeKey
+            ? `notice:${{normalizeChatChannel(channelKey)}}:${{noticeKey}}`
+            : `notice:${{normalizeChatChannel(channelKey)}}:${{sender.toLowerCase()}}:${{Math.trunc(Number.isFinite(unix) ? unix : 0)}}:${{unseenNoticeRows.length}}`;
           unseenNoticeRows.push({{
+            key: rowKey,
             text: `NEW MESSAGE FROM ${{sender}}`,
-            unix: Number.isFinite(unix) ? unix : 0,
+            mode: "sticky",
+            sortMs: normalizeTickerSortMs(unix),
           }});
         }}
       }};
       appendChannelNotices("all");
       appendChannelNotices("direct");
-      unseenNoticeRows.sort((a, b) => Number(b.unix || 0) - Number(a.unix || 0));
-      if (unseenNoticeRows.length > 0) {{
-        return unseenNoticeRows
-          .slice(0, topbarUpdateTickerQueueMax)
-          .map((entry) => compactTopbarTickerText(entry && entry.text ? entry.text : "", 160))
-          .filter(Boolean)
-          .join("   |   ");
-      }}
       const oneShotRows = topbarUpdateTickerEvents
         .filter((entry) => String(entry && entry.key ? entry.key : "").trim().startsWith("oneshot:"))
-        .map((entry) => compactTopbarTickerText(entry && entry.text ? entry.text : "", 160))
-        .filter(Boolean);
-      if (!oneShotRows.length) return "";
-      return oneShotRows.join("   |   ");
+        .map((entry) => ({{
+          key: String(entry && entry.key ? entry.key : "").trim(),
+          text: compactTopbarTickerText(entry && entry.text ? entry.text : "", 160),
+          mode: "oneshot",
+          sortMs: normalizeTickerSortMs((entry && entry.updatedAtMs) || (entry && entry.createdAtMs) || 0),
+        }}))
+        .filter((entry) => String(entry && entry.text ? entry.text : "").trim().length > 0);
+      const allRows = unseenNoticeRows.concat(oneShotRows);
+      if (!allRows.length) return [];
+      allRows.sort((a, b) => Number(a && a.sortMs ? a.sortMs : 0) - Number(b && b.sortMs ? b.sortMs : 0));
+      const dedupedRows = [];
+      const seenRowKeys = new Set();
+      for (const row of allRows) {{
+        const key = String(row && row.key ? row.key : "").trim() || `row:${{dedupedRows.length}}`;
+        if (seenRowKeys.has(key)) continue;
+        const text = compactTopbarTickerText(row && row.text ? row.text : "", 160);
+        if (!text) continue;
+        seenRowKeys.add(key);
+        dedupedRows.push({{
+          key,
+          text,
+          mode: String(row && row.mode ? row.mode : "sticky").trim().toLowerCase() === "oneshot" ? "oneshot" : "sticky",
+          sortMs: Number(row && row.sortMs),
+        }});
+        if (dedupedRows.length >= topbarUpdateTickerQueueMax) break;
+      }}
+      return dedupedRows;
     }}
 
     function renderTopbarUpdateTicker(state, context = null) {{
@@ -814,66 +1236,25 @@
       if (!(trackEl instanceof HTMLElement)) return;
       if (!(primaryEl instanceof HTMLElement)) return;
       if (!(secondaryEl instanceof HTMLElement)) return;
-
-      const text = topbarUpdateTickerTrainText(state, context);
-      if (!text) {{
-        if (topbarUpdateTickerRenderRaf) {{
-          window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
-          topbarUpdateTickerRenderRaf = 0;
-        }}
-        const hasVisibleTrain = !tickerEl.hidden && String(topbarUpdateTickerLastTrainText || "").trim().length > 0;
-        if (hasVisibleTrain) {{
-          scheduleTopbarTickerClear(tickerEl, trackEl, primaryEl, secondaryEl);
-          return;
-        }}
-        cancelTopbarTickerClearTimers(tickerEl);
-        hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl);
+      const rows = topbarUpdateTickerRows(state, context);
+      primaryEl.textContent = "";
+      primaryEl.hidden = true;
+      secondaryEl.textContent = "";
+      secondaryEl.hidden = true;
+      tickerEl.classList.remove("is-static");
+      syncTopbarUpdateTickerActiveRows(rows);
+      updateTopbarTickerTitleFromActiveRows(tickerEl);
+      if (
+        topbarUpdateTickerActiveRowByKey.size <= 0
+        && topbarUpdateTickerPendingSpawnKeys.length <= 0
+        && topbarUpdateTickerVisibleItemCount <= 0
+      ) {{
+        scheduleTopbarTickerHideWhenIdle(tickerEl, trackEl, primaryEl, secondaryEl);
         return;
       }}
       cancelTopbarTickerClearTimers(tickerEl);
       tickerEl.hidden = false;
-      const trainChanged = text !== topbarUpdateTickerLastTrainText;
-      primaryEl.textContent = text;
-      secondaryEl.textContent = "";
-      secondaryEl.hidden = true;
-      tickerEl.title = text;
-      if (trainChanged) {{
-        topbarUpdateTickerLastTrainText = text;
-      }}
-      if (topbarUpdateTickerRenderRaf) {{
-        window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
-        topbarUpdateTickerRenderRaf = 0;
-      }}
-
-      topbarUpdateTickerRenderRaf = window.requestAnimationFrame(() => {{
-        topbarUpdateTickerRenderRaf = 0;
-        const viewportWidth = Math.max(viewportEl.clientWidth, 0);
-        const textWidth = Math.max(primaryEl.scrollWidth, 0);
-        if (!(textWidth > 0) || !(viewportWidth > 0)) {{
-          tickerEl.classList.add("is-static");
-          trackEl.style.removeProperty("--topbar-update-start");
-          trackEl.style.removeProperty("--topbar-update-shift");
-          trackEl.style.removeProperty("--topbar-update-duration");
-          trackEl.style.removeProperty("--topbar-update-gap");
-          return;
-        }}
-        const start = Math.max(8, Math.ceil(viewportWidth));
-        const shift = Math.max(120, Math.ceil(viewportWidth + textWidth + topbarUpdateTickerGapPx));
-        const speedPxPerSecond = 36;
-        const durationSec = Math.max(16, Math.min(180, shift / speedPxPerSecond));
-        trackEl.style.setProperty("--topbar-update-start", `${{start}}px`);
-        trackEl.style.setProperty("--topbar-update-shift", `${{shift}}px`);
-        trackEl.style.setProperty("--topbar-update-gap", `${{topbarUpdateTickerGapPx}}px`);
-        trackEl.style.setProperty("--topbar-update-duration", `${{durationSec.toFixed(2)}}s`);
-        if (trainChanged) {{
-          trackEl.style.animation = "none";
-          void trackEl.offsetWidth;
-          trackEl.style.removeProperty("animation");
-        }} else {{
-          trackEl.style.removeProperty("animation");
-        }}
-        tickerEl.classList.remove("is-static");
-      }});
+      topbarUpdateTickerScheduleSpawnPump(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl);
     }}
 
     function renderSummary(state) {{

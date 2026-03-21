@@ -289,14 +289,29 @@
       -webkit-mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 97%, transparent 100%);
     }}
     .topbar .sub .topbar-update-track {{
-      display: inline-flex;
-      align-items: center;
-      min-width: max-content;
-      gap: var(--topbar-update-gap, 16px);
-      animation: topbarUpdateScroll var(--topbar-update-duration) linear infinite;
-      will-change: transform;
+      position: relative;
+      display: block;
+      width: 100%;
+      min-width: 0;
+      min-height: 1.2em;
+      animation: none;
+      transform: none;
+      overflow: visible;
     }}
     .topbar .sub .topbar-update-text {{
+      display: none;
+      align-items: center;
+      font-size: 14px;
+      line-height: 1.2;
+      letter-spacing: 0.12px;
+      color: rgba(244, 255, 249, 0.96);
+      white-space: nowrap;
+      text-shadow: 0 0 8px rgba(101, 217, 160, 0.16);
+    }}
+    .topbar .sub .topbar-update-item {{
+      position: absolute;
+      left: 0;
+      top: 50%;
       display: inline-flex;
       align-items: center;
       font-size: 14px;
@@ -305,6 +320,12 @@
       color: rgba(244, 255, 249, 0.96);
       white-space: nowrap;
       text-shadow: 0 0 8px rgba(101, 217, 160, 0.16);
+      will-change: transform;
+      pointer-events: none;
+      transform: translate3d(0, -50%, 0);
+    }}
+    .topbar .sub .topbar-update-item.is-oneshot {{
+      color: rgba(220, 245, 231, 0.95);
     }}
     .topbar .sub .topbar-update-ticker.is-static .topbar-update-track {{
       animation: none;
