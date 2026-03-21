@@ -13,6 +13,8 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert ".console-terminal-screen" in css
     assert ".console-command-input-proxy" in css
     assert ".self-radio-menu" in css
+    assert ".topbar-update-ticker" in css
+    assert "@keyframes topbarUpdateScroll" in css
     assert ".files-channel-row" in css
     assert '[data-theme="dark"] .card.files' in css
     assert "#history-chat-table td.history-node-clickable" in css
@@ -128,6 +130,24 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "const packetEntry = (msgId != null) ? packetSummaryByIdLocal.get(String(msgId)) : null;" in js
     assert "const reactorId = endpointsForBuild(msg).fromId || resolveMessageNodeId(msg.from || \"\");" in js
     assert "const fallbackName = isCanonicalNodeId(clean) ? clean : \"Unknown node\";" in js
+    assert "const topbarUpdateTickerDefaultMessage = \"No new updates yet.\";" in js
+    assert "function publishTopbarUpdateTickerEvent(rawText, rawKey = \"\", options = null)" in js
+    assert "function syncTopbarUpdateTickerEvents(state, _context = null)" in js
+    assert "function renderTopbarUpdateTicker(state, context = null)" in js
+    assert "if (!key.startsWith(\"direct:\")) return false;" in js
+    assert "const topbarUpdateTickerOneShotMs = 90 * 1000;" in js
+    assert "const topbarUpdateTickerEventByKey = new Map();" in js
+    assert "function topbarUpdateTickerTrainText(state, context = null)" in js
+    assert "tickerEl.hidden = true;" in js
+    assert "const tickerEl = document.getElementById(\"topbar-update-ticker\");" in js
+    assert "secondaryEl.textContent = text;" not in js
+    assert "secondaryEl.hidden = true;" in js
+    assert "trackEl.style.setProperty(\"--topbar-update-start\", `${start}px`);" in js
+    assert "trackEl.style.setProperty(\"--topbar-update-shift\", `${shift}px`);" in js
+    assert "&& entry.channel === \"direct\"" in js
+    assert "const tickerText = `You got a NEW message from ${sender}`;" in js
+    assert "publishTopbarUpdateTickerEvent(tickerText, `direct:${String(entry.key || \"\").trim()}`);" in js
+    assert "Local state warning:" not in js
     assert "const rssiRaw = Number(wifiSummary && wifiSummary.rssi);" not in js
     assert "const rssiValue = wifiSummary ? wifiSummary.rssi : null;" in js
     assert ": (connected === false ? \"off\" : (connected === true ? \"on\" : \"n/a\"));" in js

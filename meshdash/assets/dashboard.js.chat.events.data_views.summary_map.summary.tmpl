@@ -508,6 +508,237 @@
       }}
     }}
 
+    const topbarUpdateTickerDefaultMessage = "No new updates yet.";
+    const topbarUpdateTickerQueueMax = 24;
+    const topbarUpdateTickerOneShotMs = 90 * 1000;
+    const topbarUpdateTickerGapPx = 16;
+    let topbarUpdateTickerBootstrapped = false;
+    let topbarUpdateTickerEvents = [];
+    const topbarUpdateTickerEventByKey = new Map();
+    let topbarUpdateTickerLastTrainText = "";
+    let topbarUpdateTickerRenderRaf = 0;
+
+    function compactTopbarTickerText(rawValue, maxLen = 120) {{
+      const cleaned = String(rawValue == null ? "" : rawValue)
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!cleaned) return "";
+      const limit = Math.max(8, Number(maxLen) || 120);
+      if (cleaned.length <= limit) return cleaned;
+      return `${{cleaned.slice(0, Math.max(1, limit - 3)).trimEnd()}}...`;
+    }}
+
+    function normalizeTopbarUpdateTickerMode(rawMode) {{
+      const mode = String(rawMode || "").trim().toLowerCase();
+      return mode === "oneshot" ? "oneshot" : "sticky";
+    }}
+
+    function removeTopbarUpdateTickerEventByKey(rawKey) {{
+      const key = String(rawKey || "").trim();
+      if (!key) return;
+      topbarUpdateTickerEventByKey.delete(key);
+      topbarUpdateTickerEvents = topbarUpdateTickerEvents.filter(
+        (entry) => String(entry && entry.key ? entry.key : "").trim() !== key
+      );
+    }}
+
+    function pruneTopbarUpdateTickerEvents(nowMs = Date.now()) {{
+      const kept = [];
+      for (const entry of topbarUpdateTickerEvents) {{
+        const key = String(entry && entry.key ? entry.key : "").trim();
+        if (!key) continue;
+        const mode = normalizeTopbarUpdateTickerMode(entry && entry.mode);
+        const expiresAtMs = Number(entry && entry.expiresAtMs);
+        const expired = mode === "oneshot" && Number.isFinite(expiresAtMs) && nowMs >= expiresAtMs;
+        if (expired) {{
+          topbarUpdateTickerEventByKey.delete(key);
+          continue;
+        }}
+        kept.push(entry);
+      }}
+      topbarUpdateTickerEvents = kept;
+      if (!topbarUpdateTickerEvents.length) {{
+        topbarUpdateTickerLastTrainText = "";
+      }}
+    }}
+
+    function clearTopbarUpdateTickerEventsByPrefix(rawPrefix) {{
+      const prefix = String(rawPrefix || "").trim();
+      if (!prefix) return;
+      const removeKeys = [];
+      for (const entry of topbarUpdateTickerEvents) {{
+        const key = String(entry && entry.key ? entry.key : "").trim();
+        if (!key) continue;
+        if (key.startsWith(prefix)) {{
+          removeKeys.push(key);
+        }}
+      }}
+      for (const key of removeKeys) {{
+        removeTopbarUpdateTickerEventByKey(key);
+      }}
+    }}
+
+    function pushTopbarUpdateTickerEvent(rawText, rawKey = "", options = null) {{
+      const text = compactTopbarTickerText(rawText, 160);
+      if (!text) return false;
+      const nowMs = Date.now();
+      let key = String(rawKey || "").trim();
+      if (!key) {{
+        key = `ticker:${{text.toLowerCase()}}:${{nowMs}}`;
+      }}
+      const mode = normalizeTopbarUpdateTickerMode(options && options.mode);
+      const expiresAtMs = mode === "oneshot" ? (nowMs + topbarUpdateTickerOneShotMs) : null;
+
+      const existing = topbarUpdateTickerEventByKey.get(key) || null;
+      if (existing) {{
+        existing.text = text;
+        existing.mode = mode;
+        existing.updatedAtMs = nowMs;
+        existing.expiresAtMs = expiresAtMs;
+        return true;
+      }}
+
+      const next = {{
+        key,
+        text,
+        mode,
+        createdAtMs: nowMs,
+        updatedAtMs: nowMs,
+        expiresAtMs,
+      }};
+      topbarUpdateTickerEvents.push(next);
+      topbarUpdateTickerEventByKey.set(key, next);
+      if (topbarUpdateTickerEvents.length > topbarUpdateTickerQueueMax) {{
+        const overflow = topbarUpdateTickerEvents.length - topbarUpdateTickerQueueMax;
+        const dropped = topbarUpdateTickerEvents.splice(0, overflow);
+        for (const item of dropped) {{
+          const dropKey = String(item && item.key ? item.key : "").trim();
+          if (!dropKey) continue;
+          topbarUpdateTickerEventByKey.delete(dropKey);
+        }}
+      }}
+      return true;
+    }}
+
+    function clearTopbarUpdateTickerState() {{
+      topbarUpdateTickerEvents = [];
+      topbarUpdateTickerEventByKey.clear();
+      topbarUpdateTickerLastTrainText = "";
+      if (topbarUpdateTickerRenderRaf) {{
+        window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
+        topbarUpdateTickerRenderRaf = 0;
+      }}
+    }}
+
+    function topbarTickerDirectUnreadCount() {{
+      const bucket = (typeof chatUnreadByChannel === "object" && chatUnreadByChannel)
+        ? chatUnreadByChannel
+        : null;
+      const directRaw = bucket ? Number(bucket.direct) : 0;
+      return Math.max(0, Math.trunc(Number.isFinite(directRaw) ? directRaw : 0));
+    }}
+
+    function publishTopbarUpdateTickerEvent(rawText, rawKey = "", options = null) {{
+      const key = String(rawKey || "").trim();
+      if (!key.startsWith("direct:")) return false;
+      return pushTopbarUpdateTickerEvent(rawText, key, options);
+    }}
+
+    function syncTopbarUpdateTickerEvents(state, _context = null) {{
+      if (!topbarUpdateTickerBootstrapped) {{
+        topbarUpdateTickerBootstrapped = true;
+        return;
+      }}
+      pruneTopbarUpdateTickerEvents();
+      if (topbarTickerDirectUnreadCount() <= 0) {{
+        clearTopbarUpdateTickerEventsByPrefix("direct:");
+      }}
+    }}
+
+    function topbarUpdateTickerTrainText(state, context = null) {{
+      syncTopbarUpdateTickerEvents(state, context);
+      const rows = topbarUpdateTickerEvents
+        .filter((entry) => String(entry && entry.key ? entry.key : "").trim().startsWith("direct:"))
+        .map((entry) => compactTopbarTickerText(entry && entry.text ? entry.text : "", 160))
+        .filter(Boolean);
+      if (!rows.length) return "";
+      return rows.join("   |   ");
+    }}
+
+    function renderTopbarUpdateTicker(state, context = null) {{
+      const tickerEl = document.getElementById("topbar-update-ticker");
+      const viewportEl = document.getElementById("topbar-update-viewport");
+      const trackEl = document.getElementById("topbar-update-track");
+      const primaryEl = document.getElementById("topbar-update-text-primary");
+      const secondaryEl = document.getElementById("topbar-update-text-secondary");
+      if (!(tickerEl instanceof HTMLElement)) return;
+      if (!(viewportEl instanceof HTMLElement)) return;
+      if (!(trackEl instanceof HTMLElement)) return;
+      if (!(primaryEl instanceof HTMLElement)) return;
+      if (!(secondaryEl instanceof HTMLElement)) return;
+
+      const text = topbarUpdateTickerTrainText(state, context);
+      if (!text) {{
+        if (topbarUpdateTickerRenderRaf) {{
+          window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
+          topbarUpdateTickerRenderRaf = 0;
+        }}
+        tickerEl.hidden = true;
+        tickerEl.classList.add("is-static");
+        primaryEl.textContent = topbarUpdateTickerDefaultMessage;
+        secondaryEl.textContent = "";
+        secondaryEl.hidden = true;
+        tickerEl.title = topbarUpdateTickerDefaultMessage;
+        trackEl.style.removeProperty("--topbar-update-start");
+        trackEl.style.removeProperty("--topbar-update-shift");
+        trackEl.style.removeProperty("--topbar-update-duration");
+        trackEl.style.animation = "none";
+        topbarUpdateTickerLastTrainText = "";
+        return;
+      }}
+      tickerEl.hidden = false;
+      const trainChanged = text !== topbarUpdateTickerLastTrainText;
+      primaryEl.textContent = text;
+      secondaryEl.textContent = "";
+      secondaryEl.hidden = true;
+      tickerEl.title = text;
+      if (trainChanged) {{
+        topbarUpdateTickerLastTrainText = text;
+      }}
+      if (topbarUpdateTickerRenderRaf) {{
+        window.cancelAnimationFrame(topbarUpdateTickerRenderRaf);
+        topbarUpdateTickerRenderRaf = 0;
+      }}
+
+      topbarUpdateTickerRenderRaf = window.requestAnimationFrame(() => {{
+        topbarUpdateTickerRenderRaf = 0;
+        const textWidth = Math.max(primaryEl.scrollWidth, 0);
+        const viewportWidth = Math.max(viewportEl.clientWidth, 0);
+        if (!(textWidth > 0) || !(viewportWidth > 0)) {{
+          tickerEl.classList.add("is-static");
+          trackEl.style.removeProperty("--topbar-update-start");
+          trackEl.style.removeProperty("--topbar-update-shift");
+          trackEl.style.removeProperty("--topbar-update-duration");
+          return;
+        }}
+        const start = Math.max(16, Math.ceil(viewportWidth));
+        const shift = Math.max(120, Math.ceil(viewportWidth + textWidth + topbarUpdateTickerGapPx));
+        const speedPxPerSecond = 36;
+        const durationSec = Math.max(18, Math.min(180, shift / speedPxPerSecond));
+        trackEl.style.setProperty("--topbar-update-start", `${{start}}px`);
+        trackEl.style.setProperty("--topbar-update-shift", `${{shift}}px`);
+        trackEl.style.setProperty("--topbar-update-duration", `${{durationSec.toFixed(2)}}s`);
+        if (trainChanged) {{
+          trackEl.style.animation = "none";
+          void trackEl.offsetWidth;
+          trackEl.style.removeProperty("animation");
+        }} else {{
+          trackEl.style.removeProperty("animation");
+        }}
+        tickerEl.classList.remove("is-static");
+      }});
+    }}
+
     function renderSummary(state) {{
       syncTopbarChatContext(state);
       const s = state.summary || {{}};
@@ -840,6 +1071,7 @@
           wifiMetricTicker.hidden = true;
         }}
       }}
+      renderTopbarUpdateTicker(state);
       const radioReportedTime = resolveRadioReportedTime(state);
       syncRadioTimeBase(radioReportedTime.unix, radioReportedTime.source);
       syncUptimeBase(s.uptime_seconds);
