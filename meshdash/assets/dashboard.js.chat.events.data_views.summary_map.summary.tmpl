@@ -1186,14 +1186,17 @@
             seenNoticeKeys.add(dedupeKey);
           }}
           const sender = String(notice && notice.sender ? notice.sender : "").trim() || "Unknown node";
+          const preview = compactTopbarTickerText(notice && notice.preview ? notice.preview : "", 96);
           const unix = Number(notice && notice.unix);
           const rowKey = noticeKey
             ? `notice:${{normalizeChatChannel(channelKey)}}:${{noticeKey}}`
             : `notice:${{normalizeChatChannel(channelKey)}}:${{sender.toLowerCase()}}:${{Math.trunc(Number.isFinite(unix) ? unix : 0)}}:${{unseenNoticeRows.length}}`;
           unseenNoticeRows.push({{
             key: rowKey,
-            text: `PUBLIC CHAT FROM ${{sender}}`,
-            mode: "sticky",
+            text: preview
+              ? `PUBLIC CHAT ${{sender}}: ${{preview}}`
+              : `PUBLIC CHAT FROM ${{sender}}`,
+            mode: "oneshot",
             sortMs: normalizeTickerSortMs(unix),
           }});
         }}
