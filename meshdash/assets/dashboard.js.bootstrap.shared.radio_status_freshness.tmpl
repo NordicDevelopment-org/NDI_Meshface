@@ -499,21 +499,6 @@
       if (leftSub) {{
         leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • View Ch: ${{currentMeshChannelViewLabel()}} • Send Ch: ${{currentMeshChannelSendLabel()}} • ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale`;
       }}
-      const preset = formatModemPresetLabel(
-        (state.summary && state.summary.modem_preset) ? state.summary.modem_preset : "",
-        "unknown"
-      );
-      const captionSummary = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}. View Ch: ${{currentMeshChannelViewLabel()}}. Send Ch: ${{currentMeshChannelSendLabel()}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale.`;
-      const caption = document.getElementById("chat-caption");
-      const searchMeta = document.getElementById("chat-feed-search-meta");
-      const queryActive = String(chatFeedSearchQuery == null ? "" : chatFeedSearchQuery).trim().length > 0;
-      if (searchMeta instanceof HTMLElement) {{
-        if (!queryActive) {{
-          searchMeta.textContent = captionSummary;
-        }}
-      }} else if (caption) {{
-        caption.textContent = captionSummary;
-      }}
 
       // Saved nodes list freshness.
       const favList = document.getElementById("favorites-list");

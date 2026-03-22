@@ -1022,7 +1022,7 @@
       ) ? Math.max(0, window.performance.now() - chatRenderStartMs) : 0;
       recordChatPerfSample(chatRenderElapsedMs, feedItems.length, rosterFiltered.length);
 
-      const applyChatFeedSearchFilter = (summaryText = "") => {{
+      const applyChatFeedSearchFilter = () => {{
         if (!(feed instanceof HTMLElement)) return;
         const queryRaw = String(chatFeedSearchQuery == null ? "" : chatFeedSearchQuery);
         const queryLabel = queryRaw.trim();
@@ -1050,26 +1050,8 @@
         }} else if (searchEmpty instanceof HTMLElement) {{
           searchEmpty.remove();
         }}
-        const searchMeta = document.getElementById("chat-feed-search-meta");
-        if (!(searchMeta instanceof HTMLElement)) return;
-        if (!query) {{
-          searchMeta.textContent = summaryText;
-          return;
-        }}
-        searchMeta.textContent = feedRows.length <= 0
-          ? "No messages available yet."
-          : `Search: showing ${{visibleRows}} of ${{feedRows.length}} messages for "${{queryLabel}}".`;
       }};
 
-      const preset = formatModemPresetLabel(s.modem_preset, "unknown");
-      const directTargetText = (() => {{
-        if (activeChatChannel !== "direct") return "";
-        if (!isCanonicalNodeId(directSelectedId)) return " Target: none selected.";
-        const node = nodesById.get(directSelectedId);
-        const targetName = preferredNodeName(node) || nodeNameCache.get(directSelectedId) || directSelectedId;
-        return ` Target: ${{targetName}} (${{directSelectedId}}).`;
-      }})();
-      const searchSummaryText = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}.${{directTargetText}} View Ch: ${{currentMeshChannelViewLabel()}}. Send Ch: ${{currentMeshChannelSendLabel()}}. ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale.`;
       const caption = document.getElementById("chat-caption");
       let searchInput = document.getElementById("chat-feed-search-input");
       if (!(searchInput instanceof HTMLInputElement) && caption instanceof HTMLElement) {{
@@ -1083,21 +1065,16 @@
           searchInput.dataset.bound = "1";
           searchInput.addEventListener("input", () => {{
             chatFeedSearchQuery = String(searchInput.value || "").slice(0, 120);
-            applyChatFeedSearchFilter(searchSummaryText);
+            applyChatFeedSearchFilter();
           }});
         }}
       }}
-      applyChatFeedSearchFilter(searchSummaryText);
+      applyChatFeedSearchFilter();
       if (caption instanceof HTMLElement) {{
         if (chatPerfEnabled) {{
           caption.title = `Chat render avg ${{chatPerfStats.avgMs.toFixed(1)}}ms, max ${{chatPerfStats.maxMs.toFixed(1)}}ms, samples ${{chatPerfStats.samples}}`;
         }} else {{
           caption.removeAttribute("title");
         }}
-      }}
-      const chatTitle = document.getElementById("chat-title");
-      if (chatTitle instanceof HTMLElement) {{
-        const titlePreset = formatModemPresetLabel(s.modem_preset, "Mesh");
-        chatTitle.textContent = `${{titlePreset}} Chat`;
       }}
     }}
