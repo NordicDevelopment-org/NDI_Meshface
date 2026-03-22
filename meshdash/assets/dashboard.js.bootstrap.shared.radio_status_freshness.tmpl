@@ -499,13 +499,20 @@
       if (leftSub) {{
         leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • View Ch: ${{currentMeshChannelViewLabel()}} • Send Ch: ${{currentMeshChannelSendLabel()}} • ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale`;
       }}
+      const preset = formatModemPresetLabel(
+        (state.summary && state.summary.modem_preset) ? state.summary.modem_preset : "",
+        "unknown"
+      );
+      const captionSummary = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}. View Ch: ${{currentMeshChannelViewLabel()}}. Send Ch: ${{currentMeshChannelSendLabel()}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale.`;
       const caption = document.getElementById("chat-caption");
-      if (caption) {{
-        const preset = formatModemPresetLabel(
-          (state.summary && state.summary.modem_preset) ? state.summary.modem_preset : "",
-          "unknown"
-        );
-        caption.textContent = `LoRa preset: ${{preset}}. Scope: ${{channelLabel(activeChatChannel)}}. View Ch: ${{currentMeshChannelViewLabel()}}. Send Ch: ${{currentMeshChannelSendLabel()}}. ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale. Message channels are encryption groups, not frequency slots.`;
+      const searchMeta = document.getElementById("chat-feed-search-meta");
+      const queryActive = String(chatFeedSearchQuery == null ? "" : chatFeedSearchQuery).trim().length > 0;
+      if (searchMeta instanceof HTMLElement) {{
+        if (!queryActive) {{
+          searchMeta.textContent = captionSummary;
+        }}
+      }} else if (caption) {{
+        caption.textContent = captionSummary;
       }}
 
       // Saved nodes list freshness.

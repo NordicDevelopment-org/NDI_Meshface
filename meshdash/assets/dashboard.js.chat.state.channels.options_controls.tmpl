@@ -321,9 +321,22 @@
         const appId = normalizeMeshChannelAppId(row.id);
         const sendCtx = meshChannelSendContext({{ appId }});
         const modeLabel = sendCtx.sendMode === "fixed" ? "fixed" : "global";
-        return `${{row.label}}: ${{sendCtx.sendLabel}} (${{modeLabel}})`;
+        const badgeHtml = meshChannelBadgeHtml(
+          sendCtx.sendIndex,
+          sendCtx.sendLabel,
+          {{
+            allowAll: false,
+            extraClass: "channels-app-routing-summary-badge",
+            title: meshChannelLabelForIndex(sendCtx.sendIndex, {{ verbose: true, allowAll: false }}),
+          }}
+        );
+        return `<span class="channels-app-routing-summary-item">
+          <span class="channels-app-routing-summary-label">${{escAttr(row.label)}}:</span>
+          ${{badgeHtml}}
+          <span class="channels-app-routing-summary-mode">(${{escAttr(modeLabel)}})</span>
+        </span>`;
       }});
-      summaryEl.textContent = parts.join(" | ");
+      summaryEl.innerHTML = parts.join("");
     }}
 
     function renderMeshChannelAppRoutingControls(sourceOptions = null) {{
@@ -361,8 +374,17 @@
         const prefIndex = normalizeMeshChannelIndex(pref.channel_index);
         const effectiveIndex = meshChannelEffectiveSendIndexForApp(appId);
         const effectiveLabel = meshChannelSendLabelForIndex(effectiveIndex);
+        const effectiveBadge = meshChannelBadgeHtml(
+          effectiveIndex,
+          effectiveLabel,
+          {{
+            allowAll: false,
+            extraClass: "channels-app-route-effective-badge",
+            title: meshChannelLabelForIndex(effectiveIndex, {{ verbose: true, allowAll: false }}),
+          }}
+        );
         const modeSummary = fixed
-          ? `Fixed to ${{effectiveLabel}}.`
+          ? "Fixed channel for this app."
           : `Using global send (${{currentMeshChannelSendLabel()}}).`;
         const optionsForSelect = normalizedOptions.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === prefIndex)
           ? normalizedOptions
@@ -400,7 +422,7 @@
           </label>
           <div class="channels-app-route-effective">
             <span class="channels-app-route-effective-label">Active</span>
-            <span class="channels-app-route-effective-value">${{escAttr(effectiveLabel)}}</span>
+            <span class="channels-app-route-effective-value">${{effectiveBadge}}</span>
             <span class="channels-app-route-effective-copy">${{escAttr(modeSummary)}}</span>
           </div>
         </div>`;

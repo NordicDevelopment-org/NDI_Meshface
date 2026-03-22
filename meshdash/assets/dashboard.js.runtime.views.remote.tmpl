@@ -550,16 +550,49 @@
       bbsSeenMessageOrder = [];
       bbsPostStatusText = "";
       bbsPostStatusError = false;
+      bbsPostStatusChannelIndex = null;
       clearBbsAnnounceTimer();
     }}
 
-    function setBbsPostStatus(message, isError = false) {{
+    function setBbsPostStatus(message, isError = false, options = null) {{
       bbsPostStatusText = String(message == null ? "" : message).trim();
       bbsPostStatusError = !!isError;
+      const hasChannelIndex = !!(
+        options
+        && typeof options === "object"
+        && options.channel_index !== null
+        && options.channel_index !== undefined
+        && String(options.channel_index).trim() !== ""
+      );
+      const rawChannelIndex = hasChannelIndex ? Number(options.channel_index) : NaN;
+      if (!bbsPostStatusError && Number.isInteger(rawChannelIndex) && rawChannelIndex >= 0) {{
+        bbsPostStatusChannelIndex = Math.trunc(rawChannelIndex);
+      }} else {{
+        bbsPostStatusChannelIndex = null;
+      }}
       const statusEl = document.getElementById("bbs-post-status");
       if (!(statusEl instanceof HTMLElement)) return;
-      statusEl.textContent = bbsPostStatusText;
       statusEl.classList.toggle("is-error", bbsPostStatusError);
+      if (
+        bbsPostStatusError
+        || !Number.isInteger(bbsPostStatusChannelIndex)
+        || bbsPostStatusChannelIndex < 0
+      ) {{
+        statusEl.textContent = bbsPostStatusText;
+        return;
+      }}
+      const channelIndex = normalizeMeshChannelIndex(bbsPostStatusChannelIndex);
+      const channelLabel = meshChannelLabelForIndex(channelIndex, {{ compact: true, allowAll: false }});
+      const channelBadge = meshChannelBadgeHtml(
+        channelIndex,
+        channelLabel,
+        {{
+          allowAll: false,
+          extraClass: "bbs-channel-badge",
+          title: meshChannelLabelForIndex(channelIndex, {{ verbose: true, allowAll: false }}),
+        }}
+      );
+      statusEl.innerHTML = `${{escAttr(bbsPostStatusText)}} • ${{channelBadge}}`;
     }}
 
     function bbsHostNodeId(state = latestState) {{
@@ -903,7 +936,11 @@
         bbsActiveBoardKey = bbsBoardKey(boardId, hostId);
       }}
       if (!opts.quiet) {{
-        setBbsPostStatus(`Broadcast listing sent for "${{bbsHostState.title}}".`);
+        setBbsPostStatus(
+          `Broadcast listing sent for "${{bbsHostState.title}}".`,
+          false,
+          {{ channel_index: bbsHostState.channel_index }}
+        );
       }}
       return true;
     }}
@@ -954,7 +991,7 @@
       bbsActiveBoardKey = hostKey || bbsBoardKey(boardId, localId);
       bbsPersistState();
       armBbsAnnounceTimer();
-      setBbsPostStatus(`Hosting "${{title}}" on ${{meshChannelLabelForIndex(channelIndex, {{ compact: true, allowAll: false }})}}.`);
+      setBbsPostStatus(`Hosting "${{title}}".`, false, {{ channel_index: channelIndex }});
       void announceHostedBbs({{ quiet: true }});
       if (activeLayoutView === "bbs") {{
         renderBbsView(latestState);
@@ -1013,6 +1050,15 @@
         const chRaw = Number(row && row.channel_index);
         const channelIndex = Number.isInteger(chRaw) && chRaw >= 0 ? Math.trunc(chRaw) : 0;
         const channelLabel = meshChannelLabelForIndex(channelIndex, {{ compact: true, allowAll: false }});
+        const channelBadge = meshChannelBadgeHtml(
+          channelIndex,
+          channelLabel,
+          {{
+            allowAll: false,
+            extraClass: "bbs-channel-badge",
+            title: meshChannelLabelForIndex(channelIndex, {{ verbose: true, allowAll: false }}),
+          }}
+        );
         const roleLabel = isSelfNodeId(hostId, state) ? "local" : "remote";
         return `<button
           type="button"
@@ -1022,7 +1068,7 @@
           aria-selected="${{isActive ? "true" : "false"}}"
         >
           <span class="bbs-board-main">${{escAttr(title)}}</span>
-          <span class="bbs-board-meta">${{escAttr(boardId)}} • host ${{escAttr(hostLabel)}} (${{escAttr(roleLabel)}}) • ${{escAttr(channelLabel)}} • seen ${{escAttr(formatLocalChatTime(seenUnix, "n/a"))}}</span>
+          <span class="bbs-board-meta">${{escAttr(boardId)}} • host ${{escAttr(hostLabel)}} (${{escAttr(roleLabel)}}) • ${{channelBadge}} • seen ${{escAttr(formatLocalChatTime(seenUnix, "n/a"))}}</span>
           <span class="bbs-board-motd">${{escAttr(motd || "No banner set.")}}</span>
         </button>`;
       }}).join("");
@@ -1059,8 +1105,18 @@
       }}
       if (metaEl instanceof HTMLElement) {{
         const motd = sanitizeBbsWireField(activeRow.motd, bbsMaxMotdChars) || "No banner set.";
-        const channelLabel = meshChannelLabelForIndex(activeRow.channel_index, {{ compact: true, allowAll: false }});
-        metaEl.textContent = `${{motd}} | ${{channelLabel}}`;
+        const channelIndex = normalizeMeshChannelIndex(activeRow.channel_index);
+        const channelLabel = meshChannelLabelForIndex(channelIndex, {{ compact: true, allowAll: false }});
+        const channelBadge = meshChannelBadgeHtml(
+          channelIndex,
+          channelLabel,
+          {{
+            allowAll: false,
+            extraClass: "bbs-channel-badge",
+            title: meshChannelLabelForIndex(channelIndex, {{ verbose: true, allowAll: false }}),
+          }}
+        );
+        metaEl.innerHTML = `${{escAttr(motd)}} | ${{channelBadge}}`;
       }}
       if (inputEl instanceof HTMLInputElement) {{
         inputEl.disabled = false;
@@ -1101,6 +1157,7 @@
       const startBtn = document.getElementById("bbs-host-start-btn");
       const stopBtn = document.getElementById("bbs-host-stop-btn");
       const announceBtn = document.getElementById("bbs-host-announce-btn");
+      const hostChannel = document.getElementById("bbs-host-channel");
       const hostStatus = document.getElementById("bbs-host-status");
       if (titleInput instanceof HTMLInputElement && document.activeElement !== titleInput) {{
         if (titleInput.value !== String(bbsHostState.title || "")) {{
@@ -1119,6 +1176,12 @@
       }}
       const localId = bbsHostNodeId(state);
       const hostEnabled = !!(bbsHostState && bbsHostState.enabled);
+      const effectiveChannelRaw = hostEnabled
+        ? normalizeMeshChannelIndex(bbsHostState.channel_index)
+        : meshChannelEffectiveSendIndexForApp("bbs");
+      const effectiveChannelIndex = Number.isInteger(effectiveChannelRaw) && effectiveChannelRaw >= 0
+        ? Math.trunc(effectiveChannelRaw)
+        : 0;
       if (startBtn instanceof HTMLButtonElement) {{
         startBtn.disabled = hostEnabled || !isCanonicalNodeId(localId);
       }}
@@ -1128,20 +1191,48 @@
       if (announceBtn instanceof HTMLButtonElement) {{
         announceBtn.disabled = !hostEnabled;
       }}
+      if (hostChannel instanceof HTMLElement) {{
+        const channelLabel = meshChannelLabelForIndex(
+          effectiveChannelIndex,
+          {{ compact: true, allowAll: false }}
+        );
+        const channelBadge = meshChannelBadgeHtml(
+          effectiveChannelIndex,
+          channelLabel,
+          {{
+            allowAll: false,
+            extraClass: "bbs-channel-badge",
+            title: meshChannelLabelForIndex(effectiveChannelIndex, {{ verbose: true, allowAll: false }}),
+          }}
+        );
+        hostChannel.innerHTML = hostEnabled
+          ? `Hosting + broadcast channel: ${{channelBadge}}`
+          : `Next host + broadcast channel: ${{channelBadge}}`;
+      }}
       if (hostStatus instanceof HTMLElement) {{
         if (!isCanonicalNodeId(localId)) {{
           hostStatus.textContent = "Waiting for local node identity before hosting can start.";
         }} else if (!hostEnabled) {{
           hostStatus.textContent = "Offline. Fill out board details and click Host Board.";
         }} else {{
+          const channelIndex = effectiveChannelIndex;
           const channelLabel = meshChannelLabelForIndex(
-            bbsHostState.channel_index,
+            channelIndex,
             {{ compact: true, allowAll: false }}
           );
-          hostStatus.textContent = `Online as "${{bbsHostState.title}}" (${{bbsHostState.board_id}}) on ${{channelLabel}}. Beacon every ${{Math.round(bbsHostAnnounceIntervalMs / 1000)}}s.`;
+          const channelBadge = meshChannelBadgeHtml(
+            channelIndex,
+            channelLabel,
+            {{
+              allowAll: false,
+              extraClass: "bbs-channel-badge",
+              title: meshChannelLabelForIndex(channelIndex, {{ verbose: true, allowAll: false }}),
+            }}
+          );
+          hostStatus.innerHTML = `Online as "${{escAttr(bbsHostState.title)}}" (${{escAttr(bbsHostState.board_id)}}) on ${{channelBadge}}. Beacon every ${{Math.round(bbsHostAnnounceIntervalMs / 1000)}}s.`;
         }}
       }}
-      setBbsPostStatus(bbsPostStatusText, bbsPostStatusError);
+      setBbsPostStatus(bbsPostStatusText, bbsPostStatusError, {{ channel_index: bbsPostStatusChannelIndex }});
     }}
 
     function syncBbsNetworkState(state = latestState) {{
@@ -1288,7 +1379,7 @@
         unix: Math.floor(Date.now() / 1000),
       }});
       input.value = "";
-      setBbsPostStatus(`Posted to ${{activeRow.title || activeRow.board_id}} on ${{meshChannelLabelForIndex(channelIndex, {{ compact: true, allowAll: false }})}}.`);
+      setBbsPostStatus(`Posted to ${{activeRow.title || activeRow.board_id}}.`, false, {{ channel_index: channelIndex }});
       if (activeLayoutView === "bbs") {{
         renderBbsTerminal(latestState);
       }}

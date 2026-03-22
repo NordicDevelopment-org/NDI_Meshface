@@ -582,6 +582,14 @@
       width: 100%;
       height: 220px;
       display: block;
+      cursor: zoom-in;
+      touch-action: none;
+    }}
+    #env-metrics-chart.zoomed {{
+      cursor: grab;
+    }}
+    #env-metrics-chart.chart-dragging {{
+      cursor: grabbing;
     }}
     .env-metrics-available {{
       display: flex;
@@ -1289,6 +1297,7 @@
       border-color: #5f8a73;
       background: #243b30;
     }}
+    [data-theme="dark"] .bbs-host-channel,
     [data-theme="dark"] .bbs-host-status,
     [data-theme="dark"] .bbs-post-status,
     [data-theme="dark"] .bbs-board-meta,
@@ -2134,6 +2143,7 @@
       border-color: #39af72;
     }}
     [data-theme="dark"] #chat-caption,
+    [data-theme="dark"] .chat-feed-search-meta,
     [data-theme="dark"] #updated-at,
     [data-theme="dark"] #local-state-error {{
       color: #9df4be !important;
@@ -2171,6 +2181,7 @@
     [data-theme="dark"] .topbar .sub .sub-text,
     [data-theme="dark"] .topbar .revision-text,
     [data-theme="dark"] #chat-caption,
+    [data-theme="dark"] .chat-feed-search-meta,
     [data-theme="dark"] #updated-at,
     [data-theme="dark"] #local-state-error,
     [data-theme="dark"] .signal-legend .legend-chip {{

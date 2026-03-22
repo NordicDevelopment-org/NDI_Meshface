@@ -1455,8 +1455,16 @@
         <div class="chat-card-head-row">
           <h2 id="chat-title">Mesh Chat</h2>
         </div>
-        <div id="chat-caption">
-          Showing decoded text messages from recent packets.
+        <div id="chat-caption" class="chat-caption-search" role="search" aria-label="Chat search">
+          <input
+            id="chat-feed-search-input"
+            class="list-search-input chat-feed-search-input"
+            type="search"
+            maxlength="120"
+            placeholder="Search visible chat by name or message text..."
+            autocomplete="off"
+          />
+          <div id="chat-feed-search-meta" class="chat-feed-search-meta">Filter visible chat messages.</div>
         </div>
       </div>
       <div class="body">
@@ -1620,6 +1628,7 @@
                 <button id="bbs-host-stop-btn" class="btn btn-secondary" type="button">Go Offline</button>
                 <button id="bbs-host-announce-btn" class="btn btn-secondary" type="button">Broadcast</button>
               </div>
+              <div id="bbs-host-channel" class="bbs-host-channel" aria-live="polite"></div>
               <div id="bbs-host-status" class="bbs-host-status" aria-live="polite">Offline.</div>
             </div>
             <div class="bbs-panel">

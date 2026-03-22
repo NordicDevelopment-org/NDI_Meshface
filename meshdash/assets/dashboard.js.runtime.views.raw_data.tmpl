@@ -37,6 +37,22 @@
       "#805ad5",
       "#276749",
     ];
+    const envMetricsChartLayout = {{
+      width: 900,
+      height: 260,
+      padLeft: 56,
+      padRight: 12,
+      padTop: 16,
+      padBottom: 38,
+    }};
+    const envMetricsChartZoomMinPoints = 12;
+    const envMetricsChartState = {{
+      zoomStart: 0,
+      zoomEnd: 1,
+      pointerDrag: null,
+      scopeKey: "",
+      suppressClickUntilMs: 0,
+    }};
 
     function normalizeEnvMetricKey(raw) {{
       return String(raw == null ? "" : raw)
@@ -308,24 +324,246 @@
       return out;
     }}
 
+    function clampEnvironmentMetricChartUnit(value) {{
+      const num = Number(value);
+      if (!Number.isFinite(num)) return 0;
+      if (num < 0) return 0;
+      if (num > 1) return 1;
+      return num;
+    }}
+
+    function environmentMetricsChartZoomMinSpan(totalPoints) {{
+      const total = Math.max(0, Math.floor(Number(totalPoints) || 0));
+      if (total <= 2) return 1;
+      const minPoints = Math.max(2, Math.min(total, envMetricsChartZoomMinPoints));
+      return Math.max(1 / Math.max(1, total - 1), (minPoints - 1) / Math.max(1, total - 1));
+    }}
+
+    function normalizeEnvironmentMetricsChartZoomWindow(totalPoints) {{
+      const minSpan = environmentMetricsChartZoomMinSpan(totalPoints);
+      let start = clampEnvironmentMetricChartUnit(envMetricsChartState.zoomStart);
+      let end = clampEnvironmentMetricChartUnit(envMetricsChartState.zoomEnd);
+      if (end <= start) {{
+        end = Math.min(1, start + minSpan);
+      }}
+      let span = end - start;
+      if (span < minSpan) {{
+        const center = start + (span / 2);
+        span = minSpan;
+        start = center - (span / 2);
+        end = center + (span / 2);
+      }}
+      if (start < 0) {{
+        end = Math.min(1, end - start);
+        start = 0;
+      }}
+      if (end > 1) {{
+        start = Math.max(0, start - (end - 1));
+        end = 1;
+      }}
+      span = end - start;
+      if (span < minSpan) {{
+        start = Math.max(0, end - minSpan);
+        end = Math.min(1, start + minSpan);
+      }}
+      envMetricsChartState.zoomStart = clampEnvironmentMetricChartUnit(start);
+      envMetricsChartState.zoomEnd = clampEnvironmentMetricChartUnit(end);
+    }}
+
+    function setEnvironmentMetricsChartZoomWindow(start, end, totalPoints) {{
+      const prevStart = envMetricsChartState.zoomStart;
+      const prevEnd = envMetricsChartState.zoomEnd;
+      envMetricsChartState.zoomStart = start;
+      envMetricsChartState.zoomEnd = end;
+      normalizeEnvironmentMetricsChartZoomWindow(totalPoints);
+      return Math.abs(envMetricsChartState.zoomStart - prevStart) > 1e-6
+        || Math.abs(envMetricsChartState.zoomEnd - prevEnd) > 1e-6;
+    }}
+
+    function resetEnvironmentMetricsChartZoom(scopeKey = "") {{
+      envMetricsChartState.zoomStart = 0;
+      envMetricsChartState.zoomEnd = 1;
+      envMetricsChartState.pointerDrag = null;
+      envMetricsChartState.scopeKey = String(scopeKey || "").trim();
+      envMetricsChartState.suppressClickUntilMs = 0;
+    }}
+
+    function getEnvironmentMetricsChartAxisBounds(svg) {{
+      const rect = svg.getBoundingClientRect();
+      const axisStartPx = rect.left + ((envMetricsChartLayout.padLeft / envMetricsChartLayout.width) * rect.width);
+      const axisEndPx = rect.left + (((envMetricsChartLayout.width - envMetricsChartLayout.padRight) / envMetricsChartLayout.width) * rect.width);
+      const axisWidthPx = Math.max(1, axisEndPx - axisStartPx);
+      return {{ axisStartPx, axisEndPx, axisWidthPx }};
+    }}
+
+    function currentEnvironmentMetricSelectionMeta() {{
+      const points = Array.isArray(envMetricsViewState.points) ? envMetricsViewState.points : [];
+      const metrics = Array.isArray(envMetricsViewState.metrics) ? envMetricsViewState.metrics : [];
+      const nodes = Array.isArray(envMetricsViewState.nodes) ? envMetricsViewState.nodes : [];
+      const selectedMetric = normalizeEnvMetricKey(envMetricsViewState.selectedMetric || "");
+      const selectedNodeId = normalizeNodeId(envMetricsViewState.selectedNodeId || "");
+      const metricMeta = resolveEnvironmentMetricMeta(metrics, selectedMetric);
+      const nodeMeta = resolveEnvironmentNodeMeta(nodes, selectedNodeId);
+      const filteredPoints = filterEnvironmentMetricPoints(points, selectedMetric, selectedNodeId);
+      return {{ filteredPoints, metricMeta, nodeMeta }};
+    }}
+
+    function rerenderEnvironmentMetricsChartFromSelection() {{
+      const {{ filteredPoints, metricMeta, nodeMeta }} = currentEnvironmentMetricSelectionMeta();
+      renderEnvironmentMetricsChart(filteredPoints, metricMeta, nodeMeta);
+    }}
+
+    function setEnvironmentMetricsChartTitle(svg, metricLabel, zoomed) {{
+      if (!(svg instanceof SVGElement)) return;
+      const chartLabel = String(metricLabel || "Sensor history chart").trim() || "Sensor history chart";
+      svg.classList.toggle("zoomed", !!zoomed);
+      svg.setAttribute(
+        "title",
+        zoomed
+          ? `${{chartLabel}} zoomed. Wheel to zoom, drag to pan, double-click or Esc to reset.`
+          : `${{chartLabel}}. Wheel to zoom, drag to pan, double-click or Esc to reset.`
+      );
+    }}
+
+    function bindEnvironmentMetricsChartZoom() {{
+      const svg = document.getElementById("env-metrics-chart");
+      if (!(svg instanceof SVGElement) || svg.dataset.zoomBound === "1") return;
+      svg.dataset.zoomBound = "1";
+      svg.setAttribute("tabindex", "0");
+
+      svg.addEventListener("wheel", (ev) => {{
+        const total = Number(svg.dataset.zoomPointCount || "0");
+        if (!Number.isFinite(total) || total < 3) return;
+        const {{ axisStartPx, axisEndPx, axisWidthPx }} = getEnvironmentMetricsChartAxisBounds(svg);
+        if (ev.clientX < axisStartPx || ev.clientX > axisEndPx) return;
+        ev.preventDefault();
+        const anchorRatio = clampEnvironmentMetricChartUnit((ev.clientX - axisStartPx) / axisWidthPx);
+        const currentSpan = Math.max(1e-6, envMetricsChartState.zoomEnd - envMetricsChartState.zoomStart);
+        const zoomFactor = ev.deltaY < 0 ? 0.84 : 1.19;
+        const minSpan = environmentMetricsChartZoomMinSpan(total);
+        const nextSpan = Math.max(minSpan, Math.min(1, currentSpan * zoomFactor));
+        const anchor = envMetricsChartState.zoomStart + (anchorRatio * currentSpan);
+        const nextStart = anchor - (anchorRatio * nextSpan);
+        const nextEnd = nextStart + nextSpan;
+        if (setEnvironmentMetricsChartZoomWindow(nextStart, nextEnd, total)) {{
+          rerenderEnvironmentMetricsChartFromSelection();
+        }}
+      }}, {{ passive: false }});
+
+      svg.addEventListener("dblclick", (ev) => {{
+        ev.preventDefault();
+        const total = Number(svg.dataset.zoomPointCount || "0");
+        if (setEnvironmentMetricsChartZoomWindow(0, 1, total || 2)) {{
+          rerenderEnvironmentMetricsChartFromSelection();
+        }}
+      }});
+
+      svg.addEventListener("pointerdown", (ev) => {{
+        if (ev.button !== 0) return;
+        const total = Number(svg.dataset.zoomPointCount || "0");
+        if (!Number.isFinite(total) || total < 3) return;
+        const {{ axisStartPx, axisEndPx }} = getEnvironmentMetricsChartAxisBounds(svg);
+        if (ev.clientX < axisStartPx || ev.clientX > axisEndPx) return;
+        envMetricsChartState.pointerDrag = {{
+          pointerId: ev.pointerId,
+          startClientX: ev.clientX,
+          startZoomStart: envMetricsChartState.zoomStart,
+          startZoomEnd: envMetricsChartState.zoomEnd,
+          moved: false,
+        }};
+        svg.classList.add("chart-dragging");
+        try {{
+          svg.setPointerCapture(ev.pointerId);
+        }} catch (_err) {{
+        }}
+        ev.preventDefault();
+      }});
+
+      svg.addEventListener("pointermove", (ev) => {{
+        const drag = envMetricsChartState.pointerDrag;
+        if (!drag || drag.pointerId !== ev.pointerId) return;
+        const total = Number(svg.dataset.zoomPointCount || "0");
+        if (!Number.isFinite(total) || total < 3) return;
+        const {{ axisWidthPx }} = getEnvironmentMetricsChartAxisBounds(svg);
+        const deltaPx = ev.clientX - drag.startClientX;
+        if (Math.abs(deltaPx) > 3) {{
+          drag.moved = true;
+        }}
+        const deltaRatio = deltaPx / axisWidthPx;
+        const dragSpan = drag.startZoomEnd - drag.startZoomStart;
+        const nextStart = drag.startZoomStart - (deltaRatio * dragSpan);
+        const nextEnd = drag.startZoomEnd - (deltaRatio * dragSpan);
+        if (setEnvironmentMetricsChartZoomWindow(nextStart, nextEnd, total)) {{
+          rerenderEnvironmentMetricsChartFromSelection();
+        }}
+      }});
+
+      const clearDrag = (ev) => {{
+        const drag = envMetricsChartState.pointerDrag;
+        if (!drag) return;
+        if (ev && drag.pointerId !== ev.pointerId) return;
+        const dragged = drag.moved === true;
+        envMetricsChartState.pointerDrag = null;
+        svg.classList.remove("chart-dragging");
+        if (dragged) {{
+          envMetricsChartState.suppressClickUntilMs = Date.now() + 180;
+        }}
+        if (ev) {{
+          try {{
+            svg.releasePointerCapture(ev.pointerId);
+          }} catch (_err) {{
+          }}
+        }}
+      }};
+      svg.addEventListener("pointerup", clearDrag);
+      svg.addEventListener("pointercancel", clearDrag);
+      svg.addEventListener("lostpointercapture", clearDrag);
+      svg.addEventListener("keydown", (ev) => {{
+        if (ev.key !== "Escape") return;
+        const total = Number(svg.dataset.zoomPointCount || "0");
+        if (setEnvironmentMetricsChartZoomWindow(0, 1, total || 2)) {{
+          rerenderEnvironmentMetricsChartFromSelection();
+        }}
+      }});
+    }}
+
     function renderEnvironmentMetricsChart(points, metricMeta, nodeMeta) {{
       const svg = document.getElementById("env-metrics-chart");
       const empty = document.getElementById("env-metrics-empty");
       if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+      bindEnvironmentMetricsChartZoom();
+
+      const metricLabel = String(metricMeta && metricMeta.label ? metricMeta.label : "Sensor history chart").trim() || "Sensor history chart";
+      const clearChart = (emptyText) => {{
+        svg.innerHTML = "";
+        svg.dataset.zoomPointCount = "0";
+        svg.classList.remove("zoomed", "chart-dragging");
+        envMetricsChartState.pointerDrag = null;
+        setEnvironmentMetricsChartTitle(svg, metricLabel, false);
+        if (emptyText) {{
+          empty.textContent = String(emptyText || "").trim();
+          empty.hidden = false;
+        }}
+      }};
 
       if (!metricMeta || !metricMeta.key) {{
-        svg.innerHTML = "";
-        empty.textContent = "No historical sensor metrics found yet.";
-        empty.hidden = false;
+        clearChart("No historical sensor metrics found yet.");
         return;
       }}
 
       const safePoints = Array.isArray(points) ? points : [];
       if (!safePoints.length) {{
-        svg.innerHTML = "";
-        empty.textContent = `No historical points for ${{metricMeta.label}}${{nodeMeta ? ` from ${{nodeMeta.label || nodeMeta.id}}` : ""}}.`;
-        empty.hidden = false;
+        clearChart(`No historical points for ${{metricMeta.label}}${{nodeMeta ? ` from ${{nodeMeta.label || nodeMeta.id}}` : ""}}.`);
         return;
+      }}
+
+      const selectionScopeKey = [
+        normalizeEnvMetricKey(metricMeta.key),
+        normalizeNodeId(nodeMeta && nodeMeta.id ? nodeMeta.id : ""),
+        String(normalizeEnvHistoryHours(envMetricsViewState.selectedWindowHours || 72)),
+      ].join("|");
+      if (envMetricsChartState.scopeKey !== selectionScopeKey) {{
+        resetEnvironmentMetricsChartZoom(selectionScopeKey);
       }}
 
       const seriesByNodeId = new Map();
@@ -363,9 +601,7 @@
         .sort((a, b) => (b.points.length - a.points.length) || String(a.label).localeCompare(String(b.label)));
 
       if (!seriesList.length) {{
-        svg.innerHTML = "";
-        empty.textContent = "No valid timestamped telemetry points in this selection.";
-        empty.hidden = false;
+        clearChart("No valid timestamped telemetry points in this selection.");
         return;
       }}
 
@@ -374,15 +610,52 @@
       }}
 
       const allPoints = seriesList.flatMap((series) => series.points);
-      const minUnix = Math.min(...allPoints.map((point) => Number(point.unix)));
-      const maxUnix = Math.max(...allPoints.map((point) => Number(point.unix)));
-      let minValue = Math.min(...allPoints.map((point) => Number(point.value)));
-      let maxValue = Math.max(...allPoints.map((point) => Number(point.value)));
+      const fullMinUnix = Math.min(...allPoints.map((point) => Number(point.unix)));
+      const fullMaxUnix = Math.max(...allPoints.map((point) => Number(point.unix)));
+      const uniqueUnix = Array.from(
+        new Set(
+          allPoints
+            .map((point) => Math.trunc(Number(point && point.unix)))
+            .filter((unix) => Number.isFinite(unix) && unix > 0)
+        )
+      ).sort((a, b) => a - b);
+      const zoomPointCount = uniqueUnix.length;
+      svg.dataset.zoomPointCount = String(zoomPointCount);
+      normalizeEnvironmentMetricsChartZoomWindow(zoomPointCount);
+
+      const fullUnixSpan = Math.max(1, fullMaxUnix - fullMinUnix);
+      let visibleMinUnix = fullMinUnix;
+      let visibleMaxUnix = fullMaxUnix;
+      if (zoomPointCount > 1) {{
+        visibleMinUnix = fullMinUnix + (envMetricsChartState.zoomStart * fullUnixSpan);
+        visibleMaxUnix = fullMinUnix + (envMetricsChartState.zoomEnd * fullUnixSpan);
+      }}
+      const unixWindowPad = Math.max(1, fullUnixSpan * 0.0005);
+      let visibleSeriesList = seriesList
+        .map((series) => ({{
+          nodeId: series.nodeId,
+          label: series.label,
+          points: series.points.filter((point) => {{
+            const unix = Number(point && point.unix);
+            return Number.isFinite(unix) && unix >= (visibleMinUnix - unixWindowPad) && unix <= (visibleMaxUnix + unixWindowPad);
+          }}),
+        }}))
+        .filter((series) => series.points.length > 0);
+
+      if (!visibleSeriesList.length) {{
+        if (setEnvironmentMetricsChartZoomWindow(0, 1, zoomPointCount || 2)) {{
+          visibleMinUnix = fullMinUnix;
+          visibleMaxUnix = fullMaxUnix;
+        }}
+        visibleSeriesList = seriesList;
+      }}
+
+      const visiblePoints = visibleSeriesList.flatMap((series) => series.points);
+      let minValue = Math.min(...visiblePoints.map((point) => Number(point.value)));
+      let maxValue = Math.max(...visiblePoints.map((point) => Number(point.value)));
 
       if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {{
-        svg.innerHTML = "";
-        empty.textContent = "No numeric values in this selection.";
-        empty.hidden = false;
+        clearChart("No numeric values in this selection.");
         return;
       }}
 
@@ -410,17 +683,17 @@
           pointStroke: "rgba(15, 35, 25, 0.38)",
         }};
 
-      const width = 900;
-      const height = 260;
-      const padLeft = 56;
-      const padRight = 12;
-      const padTop = 16;
-      const padBottom = 38;
+      const width = envMetricsChartLayout.width;
+      const height = envMetricsChartLayout.height;
+      const padLeft = envMetricsChartLayout.padLeft;
+      const padRight = envMetricsChartLayout.padRight;
+      const padTop = envMetricsChartLayout.padTop;
+      const padBottom = envMetricsChartLayout.padBottom;
       const chartWidth = width - padLeft - padRight;
       const chartHeight = height - padTop - padBottom;
-      const unixSpan = Math.max(1, maxUnix - minUnix);
+      const unixSpan = Math.max(1, visibleMaxUnix - visibleMinUnix);
       const valueSpan = Math.max(1e-9, maxValue - minValue);
-      const xForUnix = (unix) => padLeft + (((Number(unix) - minUnix) / unixSpan) * chartWidth);
+      const xForUnix = (unix) => padLeft + (((Number(unix) - visibleMinUnix) / unixSpan) * chartWidth);
       const yForValue = (value) => padTop + (((maxValue - Number(value)) / valueSpan) * chartHeight);
 
       const yTicks = 5;
@@ -439,7 +712,7 @@
       const xLabels = [];
       for (let idx = 0; idx < xTicks; idx += 1) {{
         const ratio = xTicks <= 1 ? 0 : (idx / (xTicks - 1));
-        const unix = Math.round(minUnix + (ratio * unixSpan));
+        const unix = Math.round(visibleMinUnix + (ratio * unixSpan));
         const x = xForUnix(unix);
         xGrid.push(`<line x1="${{x.toFixed(2)}}" y1="${{padTop}}" x2="${{x.toFixed(2)}}" y2="${{(padTop + chartHeight).toFixed(2)}}" stroke="${{palette.grid}}" stroke-width="1"></line>`);
         xLabels.push(`<text x="${{x.toFixed(2)}}" y="${{(height - 10).toFixed(2)}}" text-anchor="middle" fill="${{palette.text}}" font-size="10">${{escAttr(formatEnvHistoryTime(unix))}}</text>`);
@@ -447,7 +720,7 @@
 
       const linePaths = [];
       const pointDots = [];
-      seriesList.forEach((series, idx) => {{
+      visibleSeriesList.forEach((series, idx) => {{
         const color = envMetricColorPalette[idx % envMetricColorPalette.length];
         const seriesNodeId = String(series.nodeId || "").trim();
         const seriesTitle = formatEnvironmentNodeTooltipLabel(seriesNodeId, series.label);
@@ -466,9 +739,14 @@
         }}
       }});
 
-      const subtitle = nodeMeta
+      const zoomed = zoomPointCount > 1 && (
+        envMetricsChartState.zoomStart > 1e-6
+        || envMetricsChartState.zoomEnd < (1 - 1e-6)
+      );
+      const baseSubtitle = nodeMeta
         ? `${{metricMeta.label}} for ${{nodeMeta.label || nodeMeta.id}}`
-        : `${{metricMeta.label}} across ${{seriesList.length}} node${{seriesList.length === 1 ? "" : "s"}}`;
+        : `${{metricMeta.label}} across ${{visibleSeriesList.length}} node${{visibleSeriesList.length === 1 ? "" : "s"}}`;
+      const subtitle = zoomed ? `${{baseSubtitle}} (zoomed)` : baseSubtitle;
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `
@@ -486,6 +764,10 @@
       if (svg.dataset.nodeClickBound !== "1") {{
         svg.dataset.nodeClickBound = "1";
         svg.addEventListener("click", (event) => {{
+          if (Date.now() < Number(envMetricsChartState.suppressClickUntilMs || 0)) {{
+            event.preventDefault();
+            return;
+          }}
           const target = event.target;
           if (!(target instanceof Element)) return;
           const hit = target.closest("[data-node-id]");
@@ -496,6 +778,7 @@
           focusEnvironmentNodeFromChart(nodeId);
         }});
       }}
+      setEnvironmentMetricsChartTitle(svg, metricMeta.label || "Sensor history chart", zoomed);
       empty.hidden = true;
     }}
 

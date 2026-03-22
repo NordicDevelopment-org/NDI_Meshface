@@ -205,6 +205,16 @@
         const inviteKey = boardGameInviteKey(fromId, sessionId);
         const inviteChannelRaw = Number(invite && invite.channel_index);
         const inviteChannel = Number.isInteger(inviteChannelRaw) && inviteChannelRaw >= 0 ? inviteChannelRaw : 0;
+        const inviteChannelLabel = meshChannelLabelForIndex(inviteChannel, {{ compact: true, allowAll: false }});
+        const inviteChannelBadge = meshChannelBadgeHtml(
+          inviteChannel,
+          inviteChannelLabel,
+          {{
+            allowAll: false,
+            extraClass: "reversi-invite-channel-badge",
+            title: meshChannelLabelForIndex(inviteChannel, {{ verbose: true, allowAll: false }}),
+          }}
+        );
         const selectedClass = inviteKey === String(refs.getSelectedInviteKey() || "").trim().toLowerCase()
           ? " is-selected"
           : "";
@@ -217,7 +227,7 @@
           data-session-id="${{escAttr(sessionId)}}"
         >
           <div class="reversi-invite-main">${{escAttr(reversiNodeLabel(fromId, state))}}</div>
-          <div class="reversi-invite-meta">${{escAttr(fromId)}} • ${{escAttr(formatLocalChatTime(whenUnix, "now"))}} • ch ${{escAttr(inviteChannel)}} • host ${{escAttr(refs.playerLabel(hostColor))}} • you ${{escAttr(yourColorLabel)}}</div>
+          <div class="reversi-invite-meta">${{escAttr(fromId)}} • ${{escAttr(formatLocalChatTime(whenUnix, "now"))}} • ${{inviteChannelBadge}} • host ${{escAttr(refs.playerLabel(hostColor))}} • you ${{escAttr(yourColorLabel)}}</div>
         </button>`;
       }});
       listEl.innerHTML = rows.join("");
@@ -233,7 +243,18 @@
       }}
       const statusEl = document.getElementById(`${{refs.id}}-link-status`);
       if (statusEl instanceof HTMLElement) {{
-        statusEl.textContent = String(refs.getLink() && refs.getLink().status || "Local hotseat mode.");
+        const sendCtx = meshChannelSendContext({{ appId: "games" }});
+        const channelBadge = meshChannelBadgeHtml(
+          sendCtx.sendIndex,
+          sendCtx.sendLabel,
+          {{
+            allowAll: false,
+            extraClass: "games-link-channel-badge",
+            title: meshChannelLabelForIndex(sendCtx.sendIndex, {{ verbose: true, allowAll: false }}),
+          }}
+        );
+        const statusText = String(refs.getLink() && refs.getLink().status || "Local hotseat mode.");
+        statusEl.innerHTML = `${{escAttr(statusText)}} • ${{channelBadge}}`;
       }}
       const hostBtn = document.getElementById(`${{refs.id}}-host-btn`);
       const acceptBtn = document.getElementById(`${{refs.id}}-accept-btn`);
