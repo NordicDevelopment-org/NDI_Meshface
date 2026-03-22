@@ -51,7 +51,6 @@
       }}
 
       let didScroll = false;
-      // Keep chat stable; selection auto-scroll only applies to the node list.
       for (const tableId of ["nodes-table"]) {{
         let targetRow = null;
         for (const row of document.querySelectorAll(`#${{tableId}} tbody tr`)) {{
@@ -82,7 +81,47 @@
           const delta = rowRect.bottom - bottomSafe;
           scroller.scrollTo({{ top: scroller.scrollTop + delta, behavior: "smooth" }});
         }}
+        const nameCell = targetRow.cells && targetRow.cells.length > 2
+          ? targetRow.cells[2]
+          : null;
+        if (nameCell instanceof HTMLTableCellElement) {{
+          const nameRect = nameCell.getBoundingClientRect();
+          const leftSafe = scrollerRect.left + 3;
+          const rightSafe = scrollerRect.right - 3;
+          if (nameRect.left < leftSafe) {{
+            const delta = nameRect.left - leftSafe;
+            scroller.scrollTo({{ left: scroller.scrollLeft + delta, behavior: "smooth" }});
+          }} else if (nameRect.right > rightSafe) {{
+            const delta = nameRect.right - rightSafe;
+            scroller.scrollTo({{ left: scroller.scrollLeft + delta, behavior: "smooth" }});
+          }}
+        }}
         didScroll = true;
+      }}
+
+      const chatRoomList = document.getElementById("chat-room-list");
+      if (isVisibleForSelectionScroll(chatRoomList)) {{
+        let selectedMember = null;
+        for (const member of chatRoomList.querySelectorAll(".chat-member-item")) {{
+          if (normalizeNodeId(member.dataset.nodeId || "") === selectedNodeId) {{
+            selectedMember = member;
+            break;
+          }}
+        }}
+        if (selectedMember instanceof HTMLElement) {{
+          const listRect = chatRoomList.getBoundingClientRect();
+          const rowRect = selectedMember.getBoundingClientRect();
+          const topSafe = listRect.top + 3;
+          const bottomSafe = listRect.bottom - 3;
+          if (rowRect.top < topSafe) {{
+            const delta = rowRect.top - topSafe;
+            chatRoomList.scrollTo({{ top: chatRoomList.scrollTop + delta, behavior: "smooth" }});
+          }} else if (rowRect.bottom > bottomSafe) {{
+            const delta = rowRect.bottom - bottomSafe;
+            chatRoomList.scrollTo({{ top: chatRoomList.scrollTop + delta, behavior: "smooth" }});
+          }}
+          didScroll = true;
+        }}
       }}
 
       const favoritesList = document.getElementById("favorites-list");
@@ -110,7 +149,7 @@
         }}
       }}
 
-      pendingSelectionScroll = !didScroll;
+      pendingSelectionScroll = activeLayoutView === "chat" ? false : !didScroll;
     }}
 
     function withProgrammaticMapMove(fn) {{
@@ -341,7 +380,7 @@
       }}
       selectedNodeId = normalized;
       mapDataFocus = "auto";
-      pendingSelectionScroll = activeLayoutView !== "chat";
+      pendingSelectionScroll = true;
       persistSelection();
       renderSelectionStatus();
       renderSavedNodeSearchDropdown(latestState);
