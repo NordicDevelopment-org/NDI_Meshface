@@ -899,10 +899,13 @@
         const spawnNowMs = (typeof performance !== "undefined" && performance && typeof performance.now === "function")
           ? performance.now()
           : Date.now();
-        topbarUpdateTickerNextSpawnAtMs = spawnNowMs + Math.max(
-          120,
-          ((itemWidth + topbarUpdateTickerGapPx) / topbarUpdateTickerSpeedPxPerSecond) * 1000
-        );
+        const staggerMs = row.mode === "oneshot"
+          ? (durationMs + 140)
+          : Math.max(
+            120,
+            ((itemWidth + topbarUpdateTickerGapPx) / topbarUpdateTickerSpeedPxPerSecond) * 1000
+          );
+        topbarUpdateTickerNextSpawnAtMs = spawnNowMs + staggerMs;
 
         const animation = itemEl.animate(
           [
@@ -1131,14 +1134,6 @@
       cancelTopbarTickerClearTimers();
     }}
 
-    function topbarTickerDirectUnreadCount() {{
-      const bucket = (typeof chatUnreadByChannel === "object" && chatUnreadByChannel)
-        ? chatUnreadByChannel
-        : null;
-      const directRaw = bucket ? Number(bucket.direct) : 0;
-      return Math.max(0, Math.trunc(Number.isFinite(directRaw) ? directRaw : 0));
-    }}
-
     function publishTopbarUpdateTickerEvent(rawText, rawKey = "", options = null) {{
       return pushTopbarUpdateTickerEvent(rawText, rawKey, options);
     }}
@@ -1149,12 +1144,14 @@
         return;
       }}
       pruneTopbarUpdateTickerEvents();
-      const directUnreadCount = topbarTickerDirectUnreadCount();
-      const unacknowledgedSystemNoticeCount = typeof totalSystemNotificationCount === "function"
-        ? Math.max(0, Math.trunc(Number(totalSystemNotificationCount()) || 0))
-        : directUnreadCount;
-      if (directUnreadCount <= 0 || unacknowledgedSystemNoticeCount <= 0) {{
-        clearTopbarUpdateTickerEventsByPrefix("direct:");
+      // Keep ticker scoped to public chat updates only.
+      clearTopbarUpdateTickerEventsByPrefix("direct:");
+      for (const entry of [...topbarUpdateTickerEvents]) {{
+        const key = String(entry && entry.key ? entry.key : "").trim();
+        if (!key) continue;
+        if (key.startsWith("oneshot:") && !key.startsWith("oneshot:public:")) {{
+          removeTopbarUpdateTickerEventByKey(key);
+        }}
       }}
     }}
 
@@ -1195,15 +1192,15 @@
             : `notice:${{normalizeChatChannel(channelKey)}}:${{sender.toLowerCase()}}:${{Math.trunc(Number.isFinite(unix) ? unix : 0)}}:${{unseenNoticeRows.length}}`;
           unseenNoticeRows.push({{
             key: rowKey,
-            text: `NEW MESSAGE FROM ${{sender}}`,
+            text: `PUBLIC CHAT FROM ${{sender}}`,
             mode: "sticky",
             sortMs: normalizeTickerSortMs(unix),
           }});
         }}
       }};
-      appendChannelNotices("direct");
+      appendChannelNotices("all");
       const oneShotRows = topbarUpdateTickerEvents
-        .filter((entry) => String(entry && entry.key ? entry.key : "").trim().startsWith("oneshot:"))
+        .filter((entry) => String(entry && entry.key ? entry.key : "").trim().startsWith("oneshot:public:"))
         .map((entry) => ({{
           key: String(entry && entry.key ? entry.key : "").trim(),
           text: compactTopbarTickerText(entry && entry.text ? entry.text : "", 160),

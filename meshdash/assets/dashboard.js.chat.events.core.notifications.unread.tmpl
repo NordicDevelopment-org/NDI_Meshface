@@ -188,14 +188,6 @@
         if (!rememberSeenChatMessage(entry.key)) continue;
         if (
           entry.countsUnread !== false
-          && entry.channel === "direct"
-          && typeof publishTopbarUpdateTickerEvent === "function"
-        ) {{
-          const sender = String(entry.sender || "").trim() || "Unknown node";
-          const tickerText = `You got a NEW message from ${{sender}}`;
-          publishTopbarUpdateTickerEvent(tickerText, `direct:${{String(entry.key || "").trim()}}`);
-        }} else if (
-          entry.countsUnread !== false
           && entry.channel === "all"
           && activeLayoutView !== "chat"
           && typeof publishTopbarUpdateTickerEvent === "function"
