@@ -1,5 +1,6 @@
       const rawMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
       const rawPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const localInfoMessages = Array.isArray(chatLocalInfoRows) ? chatLocalInfoRows : [];
       const computeMessageEndpoints = (msg) => {{
         const fromId = resolveMessageNodeId(
           (msg && (msg.from || msg.from_id || msg.fromId || msg.source || msg.source_id || msg.sourceId)) || ""
@@ -13,6 +14,7 @@
       if (chatDerivedCache
         && chatDerivedCache.rawMessagesRef === rawMessages
         && chatDerivedCache.rawPacketsRef === rawPackets
+        && chatDerivedCache.localInfoVersion === chatLocalInfoVersion
         && chatDerivedCache.nodesRef === nodes
         && chatDerivedCache.historyCapsRef === historyCapsObj
         && chatDerivedCache.localNodeId === localNodeId
@@ -218,7 +220,11 @@
           return resolved;
         }};
 
-        for (const msg of rawMessages) {{
+        const mergedMessages = localInfoMessages.length
+          ? rawMessages.concat(localInfoMessages)
+          : rawMessages;
+
+        for (const msg of mergedMessages) {{
           const msgChannelKey = classifyMessageChannel(msg) === "direct" ? "direct" : "all";
           const includeDirectForPopout = !chatMainDirectModeEnabled && msgChannelKey === "direct";
           if (
@@ -333,6 +339,7 @@
         derived = {{
           rawMessagesRef: rawMessages,
           rawPacketsRef: rawPackets,
+          localInfoVersion: chatLocalInfoVersion,
           nodesRef: nodes,
           historyCapsRef: historyCapsObj,
           localNodeId,

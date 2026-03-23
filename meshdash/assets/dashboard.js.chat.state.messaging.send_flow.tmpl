@@ -10,6 +10,75 @@
       return "direct";
     }}
 
+    const chatTextMacroMap = Object.freeze({{
+      "/shrug": "¯\\_(ツ)_/¯",
+      "/tableflip": "(╯°□°)╯︵ ┻━┻",
+      "/flip": "(╯°□°)╯︵ ┻━┻",
+      "/unflip": "┬─┬ ノ( ゜-゜ノ)",
+      "/give": "༼ つ ◕_◕ ༽つ",
+      "/lenny": "( ͡° ͜ʖ ͡°)",
+      "/cheer": "ᕕ( ᐛ )ᕗ",
+    }});
+
+    function parseChatTextMacro(rawText) {{
+      const text = String(rawText == null ? "" : rawText).trim();
+      if (!text) return null;
+      const lowered = text.toLowerCase();
+      if (lowered === "/macros" || lowered === "/help") {{
+        return {{
+          kind: "help",
+          text: "",
+          source: lowered,
+        }};
+      }}
+      const mapped = chatTextMacroMap[lowered];
+      if (!mapped) return null;
+      return {{
+        kind: "replace",
+        text: mapped,
+        source: lowered,
+      }};
+    }}
+
+    function chatMacroHelpText() {{
+      return "Macros: /shrug, /tableflip (/flip), /unflip, /give, /lenny, /cheer · use /macros or /help";
+    }}
+
+    function appendLocalInfoChatRow(rawText, options = null) {{
+      const text = String(rawText == null ? "" : rawText).trim();
+      if (!text) return null;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const explicitChannel = Number(opts.channel_index);
+      const sendCtx = meshChannelSendContext();
+      const channelIndex = Number.isInteger(explicitChannel) && explicitChannel >= 0
+        ? explicitChannel
+        : sendCtx.sendIndex;
+      const nowIso = new Date().toISOString();
+      chatLocalInfoSeq += 1;
+      const row = {{
+        kind: "status",
+        from: "local",
+        to: "^all",
+        text,
+        rx_time: nowIso,
+        captured_at: nowIso,
+        channel_index: channelIndex,
+        local_only: true,
+        local_info_seq: chatLocalInfoSeq,
+      }};
+      chatLocalInfoRows.push(row);
+      const maxRows = Math.max(6, Math.trunc(Number(chatLocalInfoMaxRows) || 24));
+      if (chatLocalInfoRows.length > maxRows) {{
+        chatLocalInfoRows.splice(0, chatLocalInfoRows.length - maxRows);
+      }}
+      chatLocalInfoVersion += 1;
+      chatDerivedCache = null;
+      if (latestState && typeof latestState === "object") {{
+        renderChat(latestState);
+      }}
+      return row;
+    }}
+
     async function sendChatPayload(body, successMessage, options = null) {{
       const opts = (options && typeof options === "object") ? options : {{}};
       const statusFn = (typeof opts.statusFn === "function") ? opts.statusFn : setChatSendStatus;
@@ -108,14 +177,26 @@
         }}
         return;
       }}
-      const text = input.value.trim();
-      if (!text) {{
+      const rawText = input.value.trim();
+      if (!rawText) {{
         setChatSendStatus("Enter a message before sending.", true);
         if (hadFocus) {{
           restoreChatInputFocus(input);
         }}
         return;
       }}
+      const macro = parseChatTextMacro(rawText);
+      if (macro && macro.kind === "help") {{
+        appendLocalInfoChatRow(chatMacroHelpText());
+        input.value = "";
+        if (hadFocus) {{
+          restoreChatInputFocus(input);
+        }}
+        return;
+      }}
+      const text = (macro && macro.kind === "replace")
+        ? macro.text
+        : rawText;
       let destination = "^all";
       if (chatMainDirectModeEnabled && activeChatChannel === "direct") {{
         const directPeer = resolvedDirectPeerForComposer();
@@ -154,7 +235,13 @@
         input.value = "";
         const replied = Number.isInteger(replyId) && replyId > 0;
         clearChatReplyTarget();
-        if (destination === "^all") {{
+        if (macro && macro.kind === "replace") {{
+          if (destination === "^all") {{
+            setChatSendStatus(`Sent macro ${{macro.source}} on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
+          }} else {{
+            setChatSendStatus(`Sent macro ${{macro.source}} to ${{destination}} on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
+          }}
+        }} else if (destination === "^all") {{
           setChatSendStatus(`${{replied ? "Reply sent" : "Sent"}} to Everyone on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
         }} else {{
           const awaitingAck = payload.ack_requested === true && normalizeDeliveryState(payload.delivery_state) === "pending";
