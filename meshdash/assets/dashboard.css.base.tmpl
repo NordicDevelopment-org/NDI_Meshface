@@ -1613,6 +1613,89 @@
       border-bottom: 1px solid #d2e1d0;
       background: #edf6ec;
     }}
+    .games-chat-banner {{
+      margin: 0;
+      padding: 6px 10px;
+      min-height: 32px;
+      border-bottom: 1px solid #d2e1d0;
+      background: #edf6ec;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: text;
+      user-select: none;
+      text-transform: none;
+      letter-spacing: 0.1px;
+    }}
+    .games-chat-banner:focus-visible {{
+      outline: 2px solid #5da77f;
+      outline-offset: -2px;
+    }}
+    .games-chat-banner.is-disabled {{
+      cursor: default;
+    }}
+    .games-chat-ticker {{
+      display: block;
+      width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      line-height: 1.2;
+    }}
+    .games-chat-ticker-track {{
+      display: inline-block;
+      white-space: nowrap;
+      color: #274935;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+      padding-right: 28px;
+      animation: gamesChatTickerScroll var(--games-chat-duration, 26s) linear infinite;
+    }}
+    .games-chat-ticker.is-static .games-chat-ticker-track {{
+      animation: none;
+      transform: translateX(0);
+    }}
+    .games-chat-compose {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      min-width: 0;
+    }}
+    .games-chat-input {{
+      flex: 1 1 auto;
+      min-width: 0;
+      border: 1px solid #bfd4c3;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #254837;
+      font-size: 11px;
+      line-height: 1.25;
+      padding: 5px 8px;
+      height: 27px;
+      box-sizing: border-box;
+    }}
+    .games-chat-input:focus {{
+      outline: 2px solid #9ac5aa;
+      outline-offset: 0;
+      border-color: #9ac5aa;
+      background: #ffffff;
+      box-shadow: none;
+    }}
+    .games-chat-send-btn {{
+      min-width: 56px;
+      padding: 5px 10px;
+      height: 27px;
+      line-height: 1;
+    }}
+    @keyframes gamesChatTickerScroll {{
+      from {{
+        transform: translateX(100%);
+      }}
+      to {{
+        transform: translateX(calc(-100% - 28px));
+      }}
+    }}
     .map-card-head {{
       margin: 0;
       padding: 8px 10px 7px 10px;

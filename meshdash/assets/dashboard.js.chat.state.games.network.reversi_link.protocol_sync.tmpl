@@ -133,6 +133,25 @@
           continue;
         }}
 
+        if (parsed.type === "chat") {{
+          const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
+          const sentUnix = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));
+          const chatText = String(parsed.parts[4] || "").trim();
+          if (!sessionId || !chatText) continue;
+          if (!reversiIsNetworkLinked()) continue;
+          if (reversiLink.session_id !== sessionId) continue;
+          if (normalizeNodeId(reversiLink.peer_id) !== fromId) continue;
+          ingestGamesQuickChatMessage({{
+            key: `reversi-chat:${{dedupeKey}}`,
+            game_id: "reversi",
+            session_id: sessionId,
+            from_id: fromId,
+            text: chatText,
+            unix: Math.max(reversiProtocolMessageUnix(msg), sentUnix),
+          }}, safeState);
+          continue;
+        }}
+
         if (parsed.type === "move") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const seq = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));
@@ -157,4 +176,3 @@
         reversiSelectedInviteKey = "";
       }}
     }}
-

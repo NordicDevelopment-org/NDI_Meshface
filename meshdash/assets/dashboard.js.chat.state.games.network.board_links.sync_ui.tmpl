@@ -126,6 +126,26 @@
           continue;
         }}
 
+        if (parsed.type === "chat") {{
+          const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
+          const sentUnix = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));
+          const chatText = String(parsed.parts[4] || "").trim();
+          const link = refs.getLink();
+          if (!sessionId || !chatText) continue;
+          if (!boardGameIsNetworkLinked(gameId)) continue;
+          if (link.session_id !== sessionId) continue;
+          if (normalizeNodeId(link.peer_id) !== fromId) continue;
+          ingestGamesQuickChatMessage({{
+            key: `${{boardGameNormalizeId(gameId)}}-chat:${{dedupeKey}}`,
+            game_id: boardGameNormalizeId(gameId),
+            session_id: sessionId,
+            from_id: fromId,
+            text: chatText,
+            unix: Math.max(reversiProtocolMessageUnix(msg), sentUnix),
+          }}, safeState);
+          continue;
+        }}
+
         if (parsed.type === "move") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const seq = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));

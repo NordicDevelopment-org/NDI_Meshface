@@ -1833,7 +1833,22 @@ Ready.
     </section>
 
     <section class="card games" aria-label="Games">
-      <h2>Games</h2>
+      <h2 id="games-chat-banner" class="games-chat-banner" role="button" tabindex="0" aria-label="Game table chat ticker">
+        <span id="games-chat-ticker" class="games-chat-ticker" aria-live="polite">
+          <span id="games-chat-ticker-track" class="games-chat-ticker-track">Game table chat. Connect to a peer and click here to reply.</span>
+        </span>
+        <span id="games-chat-compose" class="games-chat-compose" hidden>
+          <input
+            id="games-chat-input"
+            class="games-chat-input"
+            type="text"
+            maxlength="120"
+            placeholder="Type table message..."
+            autocomplete="off"
+          />
+          <button id="games-chat-send-btn" class="btn games-chat-send-btn" type="button">Send</button>
+        </span>
+      </h2>
       <div class="body">
         <div class="games-shell">
           <aside class="games-sidebar">
