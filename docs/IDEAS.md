@@ -1,16 +1,20 @@
 # Ideas Backlog
 
-- bbs host / client view
 
-- add scrolling notifcation ticker to the top screen.
 
-- have ai "test" zork and print the gameplay
+- MULTILINE MACROS!!!!!!!!!!
+[21:07:51][   ][MF] 9680 [in reply to 777P] Do not redeem
+[21:11:25][   ][MF]   🍁 [in reply to 852b] 4 hops cold spring
+[21:12:55][   ][MF] HOBO Jos?
+[21:15:42][   ][MF] 777P [in reply to 9680] 😩
+[21:19:49][   ][MF] SGMT [in reply to 777P] 🔥
+[21:26:51][   ][MF] c4f8 ¯\_(ツ)_/¯
+
+- allow public bot shutdown with opt in
 
 
 - can you make it so a #hashtag trends in puiblic chat creates channels? After X amount of the same #'s (we will start with 1) that will start a "channel", adding clickable icons below peer to peer, then when the channel is selected, the view is filtered to messages with the #, and the # is trimmed if it's at the end of the message to keep the view clean, if its in the middle of the message the # is stripped off and the treandy word is kept to keep it natual. And when someone transmits from the view # is auto tagged at the end, and if they type the # it stripped to prevent duplicates. Then for now a channel will timeout and be removed after 10 minutes of activity. What's cool is people can setup tx channels for private chat on  a #, but still keep the chat view to all to see the pubic chat alongside.
 
-- custom emojies!!!!
-- allow public bot shutdown with opt in
 
 
 - bot activity show as (1)
@@ -36,3 +40,16 @@
 
 
 
+
+## PotatoMesh Learnings
+
+- Quick win: add optional API token auth mode for write endpoints (chat send/settings apply) so WAN/VPN deployments are safer.
+- Quick win: add a `PRIVATE_MODE` toggle to hide/disable public chat and message APIs for sensitive deployments.
+- Quick win: add `/api/version` and `/api/health` endpoints for easier remote ops checks.
+- Quick win: expose Prometheus-style metrics endpoint (`/metrics`) for packet rate, node count, poll errors, and radio link status.
+- Medium: split ingest from UI process so multiple remote radios can feed one Meshyface instance without direct USB attachment.
+- Medium: add ingestor identity/heartbeat table and UI panel ("which feeds are alive, last seen, packet volume").
+- Medium: add allowed/hidden channel filters at ingest edge to reduce clutter and protect sensitive channels.
+- Bigger bet: optional federation mode (instance directory + peer discovery + staleness pruning) while keeping default local-first.
+- Bigger bet: region/community profile in UI (site name, channel/frequency label, map center, contact link) via env vars.
+- Guardrail: keep Meshyface chat-first UX; borrow backend/ops patterns from PotatoMesh without adopting its full product direction.
