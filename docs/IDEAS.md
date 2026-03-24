@@ -3,6 +3,8 @@
 
 
 - MULTILINE MACROS!!!!!!!!!!
+- create macro screen with active preview window
+- acsii pallets to give the same coversion a differnt look
 [21:07:51][   ][MF] 9680 [in reply to 777P] Do not redeem
 [21:11:25][   ][MF]   🍁 [in reply to 852b] 4 hops cold spring
 [21:12:55][   ][MF] HOBO Jos?
