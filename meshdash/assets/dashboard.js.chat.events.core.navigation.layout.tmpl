@@ -110,6 +110,9 @@
         }}
       }}
       applyChatViewMode(next === "macros" ? "monitor" : "default", false);
+      if (next === "macros" && typeof applyMacrosPanelSplitState === "function") {{
+        applyMacrosPanelSplitState();
+      }}
 
       if (next === "history") {{
         mapDataFocus = "activity";

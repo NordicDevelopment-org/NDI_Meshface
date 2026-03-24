@@ -92,6 +92,12 @@
       splitMidPx = clampMidSplitPx(splitMidPx);
       splitLowPx = clampLowSplitPx(splitLowPx);
       applySplitState();
+      if (typeof applyChatPanelSplitState === "function") {{
+        applyChatPanelSplitState();
+      }}
+      if (typeof applyMacrosPanelSplitState === "function") {{
+        applyMacrosPanelSplitState();
+      }}
       requestMapResize();
     }}
 

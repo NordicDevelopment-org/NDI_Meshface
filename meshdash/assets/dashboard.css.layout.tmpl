@@ -1770,29 +1770,128 @@
       background: #191c22 !important;
       border-color: #3a3f48 !important;
       box-shadow: none !important;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
     }}
     .layout.view-macros .card.chat .chat-card-head {{
       display: none !important;
     }}
     .layout.view-macros .card.chat .body {{
-      display: flex;
-      align-items: flex-start;
-      justify-content: flex-start;
+      display: grid;
+      grid-template-columns: minmax(360px, var(--macros-panel-width, 460px)) 12px minmax(280px, 1fr);
+      align-items: stretch;
+      justify-content: stretch;
       padding: 6px;
       background: #191c22 !important;
+      column-gap: 0;
+      row-gap: 0;
+      min-height: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+    }}
+    .macros-panel-splitter {{
+      display: none;
+    }}
+    .macros-right-pane {{
+      display: none;
     }}
     .layout.view-macros .card.chat .chat-shell {{
       position: relative;
-      width: 33%;
-      max-width: 33%;
-      min-width: 420px;
-      height: 60vh;
+      width: auto;
+      min-width: 0;
+      max-width: none;
+      height: auto;
+      min-height: 0;
       border: 1px solid #444;
       border-radius: 8px;
       background: #222 !important;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-sizing: border-box;
+    }}
+    .layout.view-macros .card.chat .macros-panel-splitter {{
+      display: block;
+      position: relative;
+      width: 12px;
+      min-width: 12px;
+      max-width: 12px;
+      height: auto;
+      min-height: 0;
+      align-self: stretch;
+      cursor: col-resize;
+      touch-action: none;
+      user-select: none;
+      z-index: 2;
+    }}
+    .layout.view-macros .card.chat .macros-panel-splitter::before {{
+      content: "";
+      position: absolute;
+      left: 5px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #596276;
+      border-radius: 1px;
+      opacity: 0.9;
+    }}
+    .layout.view-macros .card.chat .macros-panel-splitter::after {{
+      content: "";
+      position: absolute;
+      left: 1px;
+      top: 50%;
+      width: 9px;
+      height: 56px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      border: 1px solid #6e778b;
+      background: rgba(118, 130, 152, 0.26);
+      box-shadow: inset 0 0 0 1px rgba(11, 16, 24, 0.22);
+    }}
+    .layout.view-macros .card.chat .macros-panel-splitter:hover::before,
+    .layout.view-macros .card.chat .macros-panel-splitter.active::before {{
+      background: #4ab0ff;
+      opacity: 1;
+    }}
+    .layout.view-macros .card.chat .macros-panel-splitter:hover::after,
+    .layout.view-macros .card.chat .macros-panel-splitter.active::after {{
+      border-color: #4ab0ff;
+      background: rgba(74, 176, 255, 0.28);
+    }}
+    .layout.view-macros .card.chat .macros-right-pane {{
+      display: block;
+      min-width: 0;
+      min-height: 0;
+      height: auto;
+      border: 1px solid #343a46;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #1a1f28, #141a24);
+      overflow: hidden;
+      box-sizing: border-box;
+    }}
+    .layout.view-macros .card.chat .macros-right-pane-inner {{
+      height: 100%;
+      min-height: 0;
+      padding: 14px;
+      color: #90a4c0;
+      font-size: 12px;
+      line-height: 1.45;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }}
+    .layout.view-macros .card.chat .macros-right-pane-inner h3 {{
+      margin: 0 0 6px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      color: #d7e2f3;
+    }}
+    .layout.view-macros .card.chat .macros-right-pane-inner p {{
+      margin: 0;
+      color: #8ea2bc;
     }}
     .layout.view-macros .card.chat .chat-shell::before {{
       content: "Log";
@@ -1827,8 +1926,10 @@
     }}
     .layout.view-macros .card.chat .chat-main-pane {{
       row-gap: 0 !important;
-      height: 100%;
+      height: auto;
       padding-top: 24px;
+      min-height: 0;
+      overflow: hidden;
     }}
     .layout.view-macros .card.chat .chat-compose-shell {{
       display: none !important;
@@ -1839,7 +1940,8 @@
       border-top: 1px solid #2f9cff !important;
       border-radius: 0 !important;
       box-shadow: none !important;
-      height: 100%;
+      min-height: 0;
+      overflow: auto;
     }}
     .layout.view-macros .card.chat .chat-feed {{
       background: #222 !important;
@@ -1903,10 +2005,18 @@
       color: #9bd !important;
     }}
     @media (max-width: 1100px) {{
+      .layout.view-macros .card.chat .body {{
+        grid-template-columns: minmax(0, 1fr);
+      }}
       .layout.view-macros .card.chat .chat-shell {{
-        width: 100%;
+        width: auto;
+        max-width: none;
         min-width: 0;
-        height: min(65vh, 560px);
+        height: auto;
+      }}
+      .layout.view-macros .card.chat .macros-panel-splitter,
+      .layout.view-macros .card.chat .macros-right-pane {{
+        display: none !important;
       }}
       .layout.view-macros .card.chat .chat-shell::before {{
         left: 24%;
