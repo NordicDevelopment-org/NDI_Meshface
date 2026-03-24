@@ -68,6 +68,29 @@ def test_parse_device_connection_status_packet_supports_snake_case_shapes():
     assert parsed["wifi"]["rssi_dbm"] == -70
 
 
+def test_parse_device_connection_status_packet_decodes_little_endian_numeric_ipv4():
+    packet = {
+        "decoded": {
+            "admin": {
+                "getDeviceConnectionStatusResponse": {
+                    "wifi": {
+                        "status": {
+                            # 192.168.1.69 represented as little-endian uint32.
+                            "ipAddress": 0x4501A8C0,
+                            "isConnected": True,
+                        },
+                        "ssid": "mesh",
+                    }
+                }
+            }
+        }
+    }
+
+    parsed = connection_status_mod._parse_device_connection_status_packet(packet)
+    assert parsed is not None
+    assert parsed["wifi"]["ip_address"] == "192.168.1.69"
+
+
 def test_parse_device_connection_status_packet_ignores_zero_wifi_rssi():
     packet = {
         "decoded": {

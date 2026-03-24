@@ -93,9 +93,35 @@ def _coerce_ipv4_text(value: object) -> str | None:
     if numeric is None or numeric < 0 or numeric > 0xFFFFFFFF:
         return None
     try:
-        return str(ipaddress.IPv4Address(numeric))
+        network_order = ipaddress.IPv4Address(numeric)
     except Exception:
         return None
+
+    # Some firmware/protobuf paths may surface IPv4 uint32 values in host order.
+    # Keep network order by default, but prefer host-order decoding when it clearly
+    # resolves to a more local address class (e.g. RFC1918/private).
+    swapped = int.from_bytes(numeric.to_bytes(4, byteorder="big"), byteorder="little")
+    if swapped == numeric:
+        return str(network_order)
+    try:
+        host_order = ipaddress.IPv4Address(swapped)
+    except Exception:
+        return str(network_order)
+
+    def _locality_rank(addr: ipaddress.IPv4Address) -> int:
+        if addr.is_loopback:
+            return 4
+        if addr.is_link_local:
+            return 3
+        if addr.is_private:
+            return 2
+        if addr.is_global:
+            return 1
+        return 0
+
+    if _locality_rank(host_order) > _locality_rank(network_order):
+        return str(host_order)
+    return str(network_order)
 
 
 def _parse_network_status(raw: object) -> dict[str, object]:

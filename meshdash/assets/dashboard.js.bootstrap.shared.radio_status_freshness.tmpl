@@ -92,6 +92,10 @@
     function buildTargetRadioStatus(state = latestState) {{
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nowUnix = Math.floor(Date.now() / 1000);
+      const wifiSummary = buildTargetWifiSummary(safeState);
+      const radioIp = String((wifiSummary && wifiSummary.ip) || "").trim();
+      const ipCompactSuffix = radioIp ? ` · IP ${{radioIp}}` : "";
+      const ipDetailSuffix = radioIp ? ` | ip ${{radioIp}}` : "";
       const localStateError = trimInlineError(safeState.local_state_error || "");
       const trackerError = trimInlineError(safeState.tracker_error || "");
       const pollError = trimInlineError(lastPollError || "");
@@ -127,8 +131,8 @@
         const detail = errorSummary || "local radio id unavailable";
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
-          title: `Local radio unavailable. ${{detail}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{ipCompactSuffix}}`,
+          title: `Local radio unavailable. ${{detail}}${{ipDetailSuffix}}`,
         }};
       }}
 
@@ -160,18 +164,18 @@
         const detail = errorSummary || "state polling failed";
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{ipCompactSuffix}}`,
           title: `Dashboard polling is stale (${{
             Number.isFinite(pollSuccessAge) ? `${{pollSuccessAge}}s since last success` : "no successful poll yet"
-          }}). ${{detail}} | ${{trafficText}} | ${{activityText}}`,
+          }}). ${{detail}} | ${{trafficText}} | ${{activityText}}${{ipDetailSuffix}}`,
         }};
       }}
       if (trackerReportsLost) {{
         const detail = errorSummary || trackerError;
         return {{
           key: "lost",
-          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}`,
-          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}} | ${{trafficText}} | ${{activityText}}`,
+          text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{ipCompactSuffix}}`,
+          title: `Meshtastic interface reported radio disconnect. ${{detail || "radio link lost"}} | ${{trafficText}} | ${{activityText}}${{ipDetailSuffix}}`,
         }};
       }}
 
@@ -181,7 +185,7 @@
       else if (freshnessKey === "warn") label = "Aging";
       else if (freshnessKey === "stale") label = "Stale";
 
-      const text = `${{label}} · ${{lastActivityCompact}} · ${{trafficCompactText}}`;
+      const text = `${{label}} · ${{lastActivityCompact}} · ${{trafficCompactText}}${{ipCompactSuffix}}`;
       const statusUsesTraffic = Number.isFinite(statusFreshnessUnix)
         && Number.isFinite(trafficFreshnessUnix)
         && Math.trunc(statusFreshnessUnix) === Math.trunc(trafficFreshnessUnix)
@@ -192,7 +196,7 @@
       return {{
         key,
         text,
-        title: `${{localId}} | ${{label}} | ${{activityText}} | ${{trafficText}} | ${{lastSeenTitle}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}`,
+        title: `${{localId}} | ${{label}} | ${{activityText}} | ${{trafficText}} | ${{lastSeenTitle}}${{errorSummary ? ` | ${{errorSummary}}` : ""}}${{ipDetailSuffix}}`,
       }};
     }}
 
