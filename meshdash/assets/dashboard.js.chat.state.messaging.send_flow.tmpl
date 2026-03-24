@@ -44,6 +44,474 @@
       return "Macros: /shrug, /tableflip (/flip), /unflip, /give, /lenny, /cheer · use /macros or /help";
     }}
 
+    function clampMacrosAsciiDimension(rawValue, fallbackValue = 16, minValue = 8, maxValue = 96) {{
+      const numeric = Math.trunc(Number(rawValue));
+      if (!Number.isFinite(numeric)) return fallbackValue;
+      return Math.max(minValue, Math.min(maxValue, numeric));
+    }}
+
+    function normalizeMacrosAsciiRamp(rawRamp) {{
+      const fallback = "@%#*+=-:. ";
+      const value = String(rawRamp == null ? "" : rawRamp);
+      const chars = [];
+      const seen = new Set();
+      for (const char of value) {{
+        if (char === "\n" || char === "\r") continue;
+        if (seen.has(char)) continue;
+        chars.push(char);
+        seen.add(char);
+      }}
+      const ramp = chars.join("");
+      return ramp.length >= 2 ? ramp : fallback;
+    }}
+
+    function parseMacrosAsciiLines(rawText) {{
+      const normalized = String(rawText == null ? "" : rawText).replace(/\r\n?/g, "\n");
+      const rows = normalized.split("\n").slice(0, 120).map((line) => String(line || "").slice(0, 280));
+      while (rows.length > 0 && rows[rows.length - 1] === "") {{
+        rows.pop();
+      }}
+      return rows;
+    }}
+
+    function macrosAsciiSettingsFromInputs() {{
+      const widthInput = document.getElementById("macros-ascii-width");
+      const heightInput = document.getElementById("macros-ascii-height");
+      const rampInput = document.getElementById("macros-ascii-ramp");
+      const invertInput = document.getElementById("macros-ascii-invert");
+      return {{
+        width: clampMacrosAsciiDimension(widthInput && widthInput.value, 16, 8, 96),
+        height: clampMacrosAsciiDimension(heightInput && heightInput.value, 16, 8, 96),
+        ramp: normalizeMacrosAsciiRamp(rampInput && rampInput.value),
+        invert: !!(invertInput && invertInput.checked),
+      }};
+    }}
+
+    function setMacrosStatus(rawText, isError = false) {{
+      const status = document.getElementById("macros-status");
+      if (!(status instanceof HTMLElement)) return;
+      status.textContent = String(rawText == null ? "" : rawText);
+      status.classList.toggle("is-error", !!isError);
+    }}
+
+    function updateMacrosLineCount(lineCount) {{
+      const label = document.getElementById("macros-line-count");
+      if (!(label instanceof HTMLElement)) return;
+      const count = Math.max(0, Math.trunc(Number(lineCount) || 0));
+      label.textContent = `${{count}} line${{count === 1 ? "" : "s"}}`;
+    }}
+
+    function applyMacrosPreviewLines(lines, sourceLabel = "") {{
+      const normalizedLines = Array.isArray(lines)
+        ? lines.slice(0, 120).map((line) => String(line == null ? "" : line).slice(0, 280))
+        : [];
+      macrosPreviewLines = normalizedLines;
+      macrosPreviewSourceLabel = String(sourceLabel || "");
+      macrosPreviewUpdatedAtUnix = Math.floor(Date.now() / 1000);
+      updateMacrosLineCount(normalizedLines.length);
+      if (latestState && typeof latestState === "object" && activeLayoutView === "macros") {{
+        renderChat(latestState);
+      }}
+    }}
+
+    function syncMacrosPreviewFromOutput(sourceLabel = "") {{
+      const output = document.getElementById("macros-ascii-output");
+      if (!(output instanceof HTMLTextAreaElement)) {{
+        applyMacrosPreviewLines([], sourceLabel);
+        return [];
+      }}
+      const rows = parseMacrosAsciiLines(output.value);
+      applyMacrosPreviewLines(rows, sourceLabel);
+      return rows;
+    }}
+
+    function macrosImageDataToAsciiLines(imageData, width, height, ramp, invert = false) {{
+      const safeWidth = clampMacrosAsciiDimension(width, 16, 8, 96);
+      const safeHeight = clampMacrosAsciiDimension(height, 16, 8, 96);
+      const chars = normalizeMacrosAsciiRamp(ramp);
+      const maxIndex = Math.max(0, chars.length - 1);
+      const lines = [];
+      const pixels = imageData && imageData.data ? imageData.data : null;
+      if (!pixels) return lines;
+
+      for (let y = 0; y < safeHeight; y += 1) {{
+        let row = "";
+        for (let x = 0; x < safeWidth; x += 1) {{
+          const idx = ((y * safeWidth) + x) * 4;
+          const r = Number(pixels[idx] || 0);
+          const g = Number(pixels[idx + 1] || 0);
+          const b = Number(pixels[idx + 2] || 0);
+          const a = Number(pixels[idx + 3] || 0) / 255;
+          const luminance = ((0.2126 * r) + (0.7152 * g) + (0.0722 * b)) * a + (255 * (1 - a));
+          const normalized = Math.max(0, Math.min(1, (invert ? (255 - luminance) : luminance) / 255));
+          const rampIndex = Math.max(0, Math.min(maxIndex, Math.round(normalized * maxIndex)));
+          row += chars.charAt(rampIndex) || " ";
+        }}
+        lines.push(row);
+      }}
+      return lines;
+    }}
+
+    function buildScaledImageDataFromElement(imageElement, width, height) {{
+      if (!(imageElement instanceof HTMLImageElement)) return null;
+      const safeWidth = clampMacrosAsciiDimension(width, 16, 8, 96);
+      const safeHeight = clampMacrosAsciiDimension(height, 16, 8, 96);
+      const canvas = document.createElement("canvas");
+      canvas.width = safeWidth;
+      canvas.height = safeHeight;
+      const ctx = canvas.getContext("2d", {{ willReadFrequently: true }});
+      if (!ctx) return null;
+      ctx.imageSmoothingEnabled = true;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, safeWidth, safeHeight);
+      ctx.drawImage(imageElement, 0, 0, safeWidth, safeHeight);
+      return ctx.getImageData(0, 0, safeWidth, safeHeight);
+    }}
+
+    function buildTextRenderImageData(rawText, settings, fontFamily = "monospace", fontWeight = "700") {{
+      const text = String(rawText == null ? "" : rawText).replace(/\r\n?/g, "\n");
+      const lines = text.split("\n").map((line) => line.trimEnd()).filter((line) => line.length > 0);
+      if (lines.length <= 0) return null;
+      const widthChars = clampMacrosAsciiDimension(settings.width, 16, 8, 96);
+      const heightChars = clampMacrosAsciiDimension(settings.height, 16, 8, 96);
+      const pixelWidth = Math.max(64, widthChars * 8);
+      const pixelHeight = Math.max(40, heightChars * 14);
+      const canvas = document.createElement("canvas");
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+      const ctx = canvas.getContext("2d", {{ willReadFrequently: true }});
+      if (!ctx) return null;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, pixelWidth, pixelHeight);
+      ctx.fillStyle = "#000000";
+
+      let fontPx = Math.max(12, Math.floor(pixelHeight / Math.max(1, lines.length) * 0.74));
+      const family = String(fontFamily || "monospace").replace(/[^A-Za-z0-9\-\s,]/g, "").trim() || "monospace";
+      const weight = String(fontWeight || "700").replace(/[^0-9]/g, "").trim() || "700";
+
+      const setFont = () => {{
+        ctx.font = `${{weight}} ${{fontPx}}px ${{family}}`;
+      }};
+      setFont();
+
+      const maxTextWidth = () => lines.reduce((largest, line) => (
+        Math.max(largest, ctx.measureText(line).width || 0)
+      ), 0);
+
+      let measuredWidth = maxTextWidth();
+      let guard = 0;
+      while (measuredWidth > (pixelWidth * 0.92) && fontPx > 8 && guard < 12) {{
+        fontPx = Math.max(8, Math.floor(fontPx * 0.88));
+        setFont();
+        measuredWidth = maxTextWidth();
+        guard += 1;
+      }}
+
+      const lineHeight = Math.max(10, Math.floor(fontPx * 1.12));
+      const blockHeight = lineHeight * lines.length;
+      const startY = Math.floor((pixelHeight - blockHeight) / 2) + Math.floor(lineHeight / 2);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      lines.forEach((line, idx) => {{
+        ctx.fillText(line, pixelWidth / 2, startY + (idx * lineHeight));
+      }});
+
+      const outputCanvas = document.createElement("canvas");
+      outputCanvas.width = widthChars;
+      outputCanvas.height = heightChars;
+      const outputCtx = outputCanvas.getContext("2d", {{ willReadFrequently: true }});
+      if (!outputCtx) return null;
+      outputCtx.imageSmoothingEnabled = true;
+      outputCtx.fillStyle = "#ffffff";
+      outputCtx.fillRect(0, 0, widthChars, heightChars);
+      outputCtx.drawImage(canvas, 0, 0, widthChars, heightChars);
+      return outputCtx.getImageData(0, 0, widthChars, heightChars);
+    }}
+
+    async function readImageFileAsElement(file) {{
+      if (!(file instanceof File)) return null;
+      const objectUrl = URL.createObjectURL(file);
+      try {{
+        const img = await new Promise((resolve, reject) => {{
+          const node = new Image();
+          node.addEventListener("load", () => resolve(node), {{ once: true }});
+          node.addEventListener("error", () => reject(new Error("image decode failed")), {{ once: true }});
+          node.src = objectUrl;
+        }});
+        return img instanceof HTMLImageElement ? img : null;
+      }} finally {{
+        URL.revokeObjectURL(objectUrl);
+      }}
+    }}
+
+    function updateMacrosImageMeta() {{
+      const label = document.getElementById("macros-image-meta");
+      if (!(label instanceof HTMLElement)) return;
+      if (!(macrosImageSourceElement instanceof HTMLImageElement)) {{
+        label.textContent = "No image loaded.";
+        return;
+      }}
+      const name = macrosImageSourceName || "image";
+      const width = Math.max(0, Math.trunc(macrosImageSourceWidth || macrosImageSourceElement.naturalWidth || 0));
+      const height = Math.max(0, Math.trunc(macrosImageSourceHeight || macrosImageSourceElement.naturalHeight || 0));
+      label.textContent = `${{name}} · ${{width}}x${{height}}`;
+    }}
+
+    function writeMacrosOutput(lines, sourceLabel = "") {{
+      const output = document.getElementById("macros-ascii-output");
+      if (!(output instanceof HTMLTextAreaElement)) return;
+      const text = Array.isArray(lines) ? lines.join("\n") : "";
+      output.value = text;
+      const previewLines = syncMacrosPreviewFromOutput(sourceLabel);
+      setMacrosStatus(`Preview updated: ${{previewLines.length}} line${{previewLines.length === 1 ? "" : "s"}}.`);
+    }}
+
+    async function generateMacrosAsciiFromImage() {{
+      if (!(macrosImageSourceElement instanceof HTMLImageElement)) {{
+        setMacrosStatus("Load an image first.", true);
+        return;
+      }}
+      const settings = macrosAsciiSettingsFromInputs();
+      const imageData = buildScaledImageDataFromElement(macrosImageSourceElement, settings.width, settings.height);
+      if (!imageData) {{
+        setMacrosStatus("Could not process image pixels.", true);
+        return;
+      }}
+      const lines = macrosImageDataToAsciiLines(imageData, settings.width, settings.height, settings.ramp, settings.invert);
+      writeMacrosOutput(lines, `image:${{macrosImageSourceName || "image"}}`);
+    }}
+
+    function generateMacrosAsciiFromText() {{
+      const textInput = document.getElementById("macros-text-input");
+      const fontSelect = document.getElementById("macros-text-font");
+      const weightSelect = document.getElementById("macros-text-weight");
+      const rawText = textInput instanceof HTMLInputElement ? String(textInput.value || "") : "";
+      const trimmed = rawText.trim();
+      if (!trimmed) {{
+        setMacrosStatus("Enter text first.", true);
+        return [];
+      }}
+      const settings = macrosAsciiSettingsFromInputs();
+      const fontFamily = fontSelect instanceof HTMLSelectElement ? String(fontSelect.value || "monospace") : "monospace";
+      const fontWeight = weightSelect instanceof HTMLSelectElement ? String(weightSelect.value || "700") : "700";
+      const imageData = buildTextRenderImageData(trimmed, settings, fontFamily, fontWeight);
+      if (!imageData) {{
+        setMacrosStatus("Could not render text to image data.", true);
+        return [];
+      }}
+      const lines = macrosImageDataToAsciiLines(imageData, settings.width, settings.height, settings.ramp, settings.invert);
+      writeMacrosOutput(lines, `text:${{trimmed.slice(0, 36)}}`);
+      return lines;
+    }}
+
+    function encodeAsciiMacroLineForSend(line) {{
+      const raw = String(line == null ? "" : line);
+      if (!raw) return "\u00A0";
+      const normalized = raw.replace(/\t/g, "  ").slice(0, 280);
+      return normalized.replace(/ /g, "\u00A0");
+    }}
+
+    function setMacrosSendBusy(isBusy) {{
+      const sendBtn = document.getElementById("macros-send-lines-btn");
+      if (!(sendBtn instanceof HTMLButtonElement)) return;
+      sendBtn.disabled = !!isBusy;
+      sendBtn.textContent = isBusy ? "Sending..." : "Send As Lines";
+    }}
+
+    async function sendMacrosPreviewAsLines() {{
+      if (macrosSendInFlight || chatSendInFlight) {{
+        setMacrosStatus("Wait for the current send to finish.", true);
+        return;
+      }}
+      const output = document.getElementById("macros-ascii-output");
+      if (!(output instanceof HTMLTextAreaElement)) {{
+        setMacrosStatus("ASCII output box not found.", true);
+        return;
+      }}
+      const lines = parseMacrosAsciiLines(output.value);
+      if (lines.length <= 0) {{
+        setMacrosStatus("Generate or paste ASCII lines first.", true);
+        return;
+      }}
+      if (lines.length > 120) {{
+        setMacrosStatus("Limit preview to 120 lines before sending.", true);
+        return;
+      }}
+      let destination = "^all";
+      if (chatMainDirectModeEnabled && activeChatChannel === "direct") {{
+        const directPeer = resolvedDirectPeerForComposer();
+        if (!isCanonicalNodeId(directPeer)) {{
+          setMacrosStatus("Select a direct peer before sending in P2P mode.", true);
+          return;
+        }}
+        destination = directPeer;
+        if (isSelfNodeId(destination)) {{
+          setMacrosStatus("Cannot send direct macros to your own radio.", true);
+          return;
+        }}
+      }}
+      const sendCtx = meshChannelSendContext();
+      macrosSendInFlight = true;
+      setMacrosSendBusy(true);
+      let sentCount = 0;
+      try {{
+        for (const line of lines) {{
+          setMacrosStatus(`Sending line ${{sentCount + 1}} / ${{lines.length}}...`);
+          const payload = await sendChatPayload(
+            {{
+              text: encodeAsciiMacroLineForSend(line),
+              destination,
+              channel_index: sendCtx.sendIndex,
+            }},
+            null,
+            {{
+              showSendingStatus: false,
+              showSuccessStatus: false,
+              showErrorStatus: false,
+              statusFn: () => {{}},
+            }},
+          );
+          if (!payload || !payload.ok) {{
+            throw new Error(`send failed at line ${{sentCount + 1}}`);
+          }}
+          sentCount += 1;
+        }}
+        setMacrosStatus(`Sent ${{sentCount}} ASCII line${{sentCount === 1 ? "" : "s"}} on ${{sendCtx.sendLabel}}.`);
+      }} catch (err) {{
+        setMacrosStatus(`Send error: ${{err && err.message ? err.message : err}}`, true);
+      }} finally {{
+        macrosSendInFlight = false;
+        setMacrosSendBusy(false);
+      }}
+    }}
+
+    function bindMacrosStudioControls() {{
+      const panel = document.getElementById("macros-right-pane");
+      if (!(panel instanceof HTMLElement) || panel.dataset.bound === "1") return;
+      panel.dataset.bound = "1";
+
+      const imageInput = document.getElementById("macros-image-input");
+      const imageBtn = document.getElementById("macros-image-generate-btn");
+      const textBtn = document.getElementById("macros-text-generate-btn");
+      const textSendBtn = document.getElementById("macros-text-send-btn");
+      const output = document.getElementById("macros-ascii-output");
+      const previewBtn = document.getElementById("macros-preview-apply-btn");
+      const clearBtn = document.getElementById("macros-clear-btn");
+      const copyBtn = document.getElementById("macros-copy-btn");
+      const sendBtn = document.getElementById("macros-send-lines-btn");
+      const textInput = document.getElementById("macros-text-input");
+
+      if (imageInput instanceof HTMLInputElement) {{
+        imageInput.addEventListener("change", async () => {{
+          const file = imageInput.files && imageInput.files[0];
+          if (!(file instanceof File)) {{
+            macrosImageSourceElement = null;
+            macrosImageSourceName = "";
+            macrosImageSourceWidth = 0;
+            macrosImageSourceHeight = 0;
+            updateMacrosImageMeta();
+            setMacrosStatus("No image selected.", true);
+            return;
+          }}
+          try {{
+            const img = await readImageFileAsElement(file);
+            if (!(img instanceof HTMLImageElement)) {{
+              throw new Error("image decode failed");
+            }}
+            macrosImageSourceElement = img;
+            macrosImageSourceName = String(file.name || "image");
+            macrosImageSourceWidth = Math.trunc(Number(img.naturalWidth) || 0);
+            macrosImageSourceHeight = Math.trunc(Number(img.naturalHeight) || 0);
+            updateMacrosImageMeta();
+            setMacrosStatus(`Loaded image ${{macrosImageSourceName}}.`);
+          }} catch (err) {{
+            macrosImageSourceElement = null;
+            macrosImageSourceName = "";
+            macrosImageSourceWidth = 0;
+            macrosImageSourceHeight = 0;
+            updateMacrosImageMeta();
+            setMacrosStatus(`Image load failed: ${{err && err.message ? err.message : err}}`, true);
+          }}
+        }});
+      }}
+
+      if (imageBtn instanceof HTMLButtonElement) {{
+        imageBtn.addEventListener("click", () => {{
+          void generateMacrosAsciiFromImage();
+        }});
+      }}
+
+      if (textBtn instanceof HTMLButtonElement) {{
+        textBtn.addEventListener("click", () => {{
+          generateMacrosAsciiFromText();
+        }});
+      }}
+      if (textSendBtn instanceof HTMLButtonElement) {{
+        textSendBtn.addEventListener("click", () => {{
+          const lines = generateMacrosAsciiFromText();
+          if (!Array.isArray(lines) || lines.length <= 0) return;
+          void sendMacrosPreviewAsLines();
+        }});
+      }}
+
+      if (textInput instanceof HTMLInputElement) {{
+        textInput.addEventListener("keydown", (ev) => {{
+          if (ev.key === "Enter" && !ev.shiftKey) {{
+            ev.preventDefault();
+            generateMacrosAsciiFromText();
+          }}
+        }});
+      }}
+
+      if (previewBtn instanceof HTMLButtonElement) {{
+        previewBtn.addEventListener("click", () => {{
+          const lines = syncMacrosPreviewFromOutput("manual");
+          setMacrosStatus(`Preview refreshed: ${{lines.length}} line${{lines.length === 1 ? "" : "s"}}.`);
+        }});
+      }}
+
+      if (output instanceof HTMLTextAreaElement) {{
+        output.addEventListener("input", () => {{
+          syncMacrosPreviewFromOutput("edited");
+        }});
+      }}
+
+      if (clearBtn instanceof HTMLButtonElement) {{
+        clearBtn.addEventListener("click", () => {{
+          if (output instanceof HTMLTextAreaElement) {{
+            output.value = "";
+          }}
+          applyMacrosPreviewLines([], "");
+          setMacrosStatus("Cleared preview.");
+        }});
+      }}
+
+      if (copyBtn instanceof HTMLButtonElement) {{
+        copyBtn.addEventListener("click", async () => {{
+          if (!(output instanceof HTMLTextAreaElement) || !String(output.value || "").trim()) {{
+            setMacrosStatus("Nothing to copy yet.", true);
+            return;
+          }}
+          try {{
+            await navigator.clipboard.writeText(output.value);
+            setMacrosStatus("Copied ASCII output.");
+          }} catch (err) {{
+            setMacrosStatus(`Copy failed: ${{err && err.message ? err.message : err}}`, true);
+          }}
+        }});
+      }}
+
+      if (sendBtn instanceof HTMLButtonElement) {{
+        sendBtn.addEventListener("click", () => {{
+          void sendMacrosPreviewAsLines();
+        }});
+      }}
+
+      updateMacrosImageMeta();
+      syncMacrosPreviewFromOutput("init");
+      setMacrosStatus("Load an image or type text to build a macro.");
+    }}
+
     function appendLocalInfoChatRow(rawText, options = null) {{
       const text = String(rawText == null ? "" : rawText).trim();
       if (!text) return null;

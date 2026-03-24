@@ -50,6 +50,12 @@
         btn.classList.toggle("active", isActive);
         btn.setAttribute("aria-current", isActive ? "page" : "false");
       }}
+      const chatRailBtn = document.querySelector('.teams-rail .rail-btn[data-view="chat"]');
+      if (chatRailBtn instanceof HTMLButtonElement) {{
+        const hideChatWhileMacros = next === "macros";
+        chatRailBtn.hidden = hideChatWhileMacros;
+        chatRailBtn.disabled = hideChatWhileMacros;
+      }}
 
       const chatViewActive = next === "chat" || next === "macros";
       if (shell instanceof HTMLElement) {{

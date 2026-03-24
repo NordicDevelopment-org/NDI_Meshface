@@ -59,10 +59,19 @@
         const emptyText = (activeChatChannel === "direct" && !isCanonicalNodeId(directSelectedId))
           ? "Select a user to view peer-to-peer messages."
           : `No ${{channelLabel(activeChatChannel).toLowerCase()}} messages yet.`;
+        const macroPreviewRows = (activeLayoutView === "macros")
+          ? buildMacrosPreviewFeedItems(macrosPreviewLines)
+          : [];
         closeReactionPopover(true);
-        feed.innerHTML = feedItems.length > 0
-          ? feedItems.join("")
-          : `<div class="chat-feed-empty">${{emptyText}}</div>`;
+        if (activeLayoutView === "macros") {{
+          feed.innerHTML = macroPreviewRows.length > 0
+            ? macroPreviewRows.join("")
+            : '<div class="chat-feed-empty">Generate ASCII in MACROS Studio on the right to preview line-by-line output here.</div>';
+        }} else {{
+          feed.innerHTML = feedItems.length > 0
+            ? feedItems.join("")
+            : `<div class="chat-feed-empty">${{emptyText}}</div>`;
+        }}
       }}
       renderChatChangeSummary(nowUnix);
 

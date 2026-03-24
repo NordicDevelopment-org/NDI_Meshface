@@ -1520,8 +1520,96 @@
         ></div>
         <div id="macros-right-pane" class="macros-right-pane" aria-label="Macros controls workspace">
           <div class="macros-right-pane-inner">
-            <h3>MACROS Controls</h3>
-            <p>Reserved space for drawing/macro tools and mode toggles.</p>
+            <div class="macros-studio-head">
+              <h3>MACROS Studio</h3>
+              <p>Build tiny ASCII macros from images or text. Left panel shows the emulated send preview.</p>
+            </div>
+            <div class="macros-studio-grid">
+              <section class="macros-tool-card" aria-label="ASCII settings">
+                <h4>ASCII Settings</h4>
+                <div class="macros-tool-row">
+                  <label class="macros-tool-field">
+                    <span>Width</span>
+                    <input id="macros-ascii-width" type="number" min="8" max="96" step="1" value="16" />
+                  </label>
+                  <label class="macros-tool-field">
+                    <span>Height</span>
+                    <input id="macros-ascii-height" type="number" min="8" max="96" step="1" value="16" />
+                  </label>
+                </div>
+                <label class="macros-tool-field">
+                  <span>Ramp (dark to light)</span>
+                  <input id="macros-ascii-ramp" type="text" value="@%#*+=-:. " maxlength="40" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="macros-tool-check">
+                  <input id="macros-ascii-invert" type="checkbox" />
+                  <span>Invert luminance</span>
+                </label>
+              </section>
+
+              <section class="macros-tool-card" aria-label="Image to ASCII">
+                <h4>Image to ASCII</h4>
+                <label class="macros-tool-field">
+                  <span>Import image</span>
+                  <input id="macros-image-input" type="file" accept="image/*" />
+                </label>
+                <div id="macros-image-meta" class="macros-mini-meta">No image loaded.</div>
+                <button id="macros-image-generate-btn" class="btn" type="button">Generate From Image</button>
+              </section>
+
+              <section class="macros-tool-card" aria-label="Text to ASCII">
+                <h4>Text to ASCII</h4>
+                <label class="macros-tool-field">
+                  <span>Text</span>
+                  <input id="macros-text-input" type="text" maxlength="120" placeholder="TYPE SOMETHING" autocomplete="off" />
+                </label>
+                <div class="macros-tool-row">
+                  <label class="macros-tool-field">
+                    <span>Font</span>
+                    <select id="macros-text-font">
+                      <option value="monospace">Monospace</option>
+                      <option value="sans-serif">Sans Serif</option>
+                      <option value="serif">Serif</option>
+                      <option value="fantasy">Fantasy</option>
+                    </select>
+                  </label>
+                  <label class="macros-tool-field">
+                    <span>Weight</span>
+                    <select id="macros-text-weight">
+                      <option value="700">Bold</option>
+                      <option value="600">Semi</option>
+                      <option value="500">Medium</option>
+                      <option value="400">Normal</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="macros-tool-actions">
+                  <button id="macros-text-generate-btn" class="btn" type="button">Generate From Text</button>
+                  <button id="macros-text-send-btn" class="btn btn-secondary" type="button">Send Text As Lines</button>
+                </div>
+              </section>
+            </div>
+
+            <section class="macros-output-card" aria-label="ASCII output">
+              <div class="macros-output-head">
+                <h4>ASCII Output</h4>
+                <span id="macros-line-count" class="macros-mini-meta">0 lines</span>
+              </div>
+              <textarea
+                id="macros-ascii-output"
+                class="macros-ascii-output"
+                rows="10"
+                placeholder="ASCII output appears here..."
+                spellcheck="false"
+              ></textarea>
+              <div class="macros-output-actions">
+                <button id="macros-preview-apply-btn" class="btn btn-secondary" type="button">Refresh Preview</button>
+                <button id="macros-copy-btn" class="btn btn-secondary" type="button">Copy</button>
+                <button id="macros-clear-btn" class="btn btn-secondary" type="button">Clear</button>
+                <button id="macros-send-lines-btn" class="btn" type="button">Send As Lines</button>
+              </div>
+              <div id="macros-status" class="macros-status" aria-live="polite"></div>
+            </section>
           </div>
         </div>
       </div>
