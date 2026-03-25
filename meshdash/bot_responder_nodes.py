@@ -64,16 +64,16 @@ def _resolve_packet_node_id(raw_id: object, raw_num: object, interface: object) 
     return _format_node_id_from_num(number)
 
 
-def _packet_hops(packet: dict[str, object]) -> Optional[int]:
-    direct = _to_int(packet.get("hops"))
-    if direct is not None and direct >= 0:
-        return direct
-    hop_start = _to_int(packet.get("hopStart"))
-    if hop_start is None:
-        hop_start = _to_int(packet.get("hop_start"))
-    hop_limit = _to_int(packet.get("hopLimit"))
-    if hop_limit is None:
-        hop_limit = _to_int(packet.get("hop_limit"))
+def _nonnegative_hops(value: object) -> Optional[int]:
+    hops = _to_int(value)
+    if hops is None or hops < 0:
+        return None
+    return hops
+
+
+def _hops_from_start_limit(start_value: object, limit_value: object) -> Optional[int]:
+    hop_start = _to_int(start_value)
+    hop_limit = _to_int(limit_value)
     if hop_start is None or hop_limit is None:
         return None
     diff = hop_start - hop_limit
@@ -82,13 +82,73 @@ def _packet_hops(packet: dict[str, object]) -> Optional[int]:
     return diff
 
 
+def _packet_hops_from_mapping(container: object, _seen: Optional[set[int]] = None) -> Optional[int]:
+    if not isinstance(container, dict):
+        return None
+    seen = _seen if isinstance(_seen, set) else set()
+    marker = id(container)
+    if marker in seen:
+        return None
+    seen.add(marker)
+
+    for key in (
+        "hops",
+        "hop_count",
+        "hopCount",
+        "hopsAway",
+        "hops_away",
+        "last_hops",
+        "lastHops",
+    ):
+        direct = _nonnegative_hops(container.get(key))
+        if direct is not None:
+            return direct
+
+    for start_key, limit_key in (
+        ("hopStart", "hopLimit"),
+        ("hop_start", "hop_limit"),
+        ("hopstart", "hoplimit"),
+    ):
+        derived = _hops_from_start_limit(container.get(start_key), container.get(limit_key))
+        if derived is not None:
+            return derived
+
+    for nested_key in (
+        "routing",
+        "route",
+        "metadata",
+        "meta",
+        "rx_metadata",
+        "rxMetadata",
+        "summary",
+        "packet",
+        "payload",
+        "raw",
+    ):
+        nested = container.get(nested_key)
+        nested_hops = _packet_hops_from_mapping(nested, seen)
+        if nested_hops is not None:
+            return nested_hops
+
+    return None
+
+
+def _packet_hops(packet: dict[str, object]) -> Optional[int]:
+    hops = _packet_hops_from_mapping(packet)
+    if hops is not None:
+        return hops
+    decoded = packet.get("decoded")
+    return _packet_hops_from_mapping(decoded)
+
+
 def _node_hops_away(node: Optional[dict[str, object]]) -> Optional[int]:
     if not isinstance(node, dict):
         return None
-    hops = _to_int(node.get("hops_away"))
-    if hops is None or hops < 0:
-        return None
-    return hops
+    for key in ("hops_away", "hopsAway", "hops", "last_hops", "lastHops"):
+        hops = _nonnegative_hops(node.get(key))
+        if hops is not None:
+            return hops
+    return None
 
 
 def _effective_hops(packet: dict[str, object], from_id: str, nodes: list[dict[str, object]]) -> Optional[int]:
@@ -169,7 +229,7 @@ def _iter_known_nodes(interface: object) -> list[dict[str, object]]:
         short_name = str(user.get("shortName") or user.get("short_name") or "").strip()
         long_name = str(user.get("longName") or user.get("long_name") or "").strip()
         last_heard = _to_int(info.get("lastHeard") or info.get("last_heard"))
-        hops_away = _to_int(info.get("hopsAway") or info.get("hops_away"))
+        hops_away = _node_hops_away(info)
         lat = None
         lon = None
         position = info.get("position")

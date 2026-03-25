@@ -129,8 +129,8 @@ def test_ping_targeted_to_local_suffix_replies_with_human_readable_reply():
     assert sent[0]["channel_index"] == 0
     text = str(sent[0]["text"]).lower()
     assert "brew hq" not in text
-    assert text.startswith("6.0s round trip")
-    assert "6.0s round trip" in text
+    assert text.startswith("3 hops")
+    assert "request age" not in text
     assert "3 hops" in text
     assert "pong" not in text
     assert "rx=" not in text
@@ -159,7 +159,7 @@ def test_test_alias_replies_with_human_readable_ping_text_and_logs_as_ping():
     assert sent[0]["reply_id"] == 1001
     text = str(sent[0]["text"]).lower()
     assert "brew hq" not in text
-    assert "round trip" in text
+    assert "hops" in text
     history = bot.recent_requests()
     assert len(history) == 1
     assert history[0]["command"] == "test"
@@ -188,7 +188,7 @@ def test_natural_ping_phrase_replies_with_human_readable_ping_text():
     assert sent[0]["reply_id"] == 1001
     text = str(sent[0]["text"]).lower()
     assert "brew hq" not in text
-    assert "round trip" in text
+    assert "hops" in text
     assert "hops" in text
     history = bot.recent_requests()
     assert len(history) == 1
@@ -576,7 +576,7 @@ def test_direct_ping_replies_direct_with_reply_id():
     assert len(sent) == 1
     assert sent[0]["destination"] == "!49b5dff0"
     assert sent[0]["reply_id"] == 1001
-    assert "round trip" in str(sent[0]["text"]).lower()
+    assert "hops" in str(sent[0]["text"]).lower()
 
 
 def test_ping_falls_back_to_known_node_hops_when_packet_hops_missing():
@@ -715,7 +715,65 @@ def test_ping_uses_snake_case_hop_fields_when_present():
     assert "hop count n/a" not in text
 
 
-def test_ping_includes_last_hop_signal_hint_when_available():
+def test_ping_uses_nested_packet_metadata_hops_when_top_level_hops_missing():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet.pop("hopStart", None)
+    packet.pop("hopLimit", None)
+    packet["metadata"] = {
+        "routing": {
+            "hopStart": 5,
+            "hopLimit": 1,
+        }
+    }
+    bot.on_receive(packet, iface)
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "4 hops" in text
+    assert "hop count n/a" not in text
+
+
+def test_ping_falls_back_to_alternate_node_hop_keys_when_packet_hops_missing():
+    iface = _FakeIface()
+    iface.nodesByNum[0x49B5DFF0].pop("hopsAway", None)
+    iface.nodesByNum[0x49B5DFF0]["last_hops"] = 6
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet.pop("hopStart", None)
+    packet.pop("hopLimit", None)
+    bot.on_receive(packet, iface)
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "6 hops" in text
+    assert "hop count n/a" not in text
+
+
+def test_ping_ignores_signal_fields_when_present():
     iface = _FakeIface()
     sent = []
 
@@ -736,10 +794,11 @@ def test_ping_includes_last_hop_signal_hint_when_available():
 
     assert len(sent) == 1
     text = str(sent[0]["text"]).lower()
-    assert "link -89dbm / 9.3db (last-hop)" in text
+    assert "link " not in text
+    assert "3 hops" in text
 
 
-def test_ping_signal_hint_supports_partial_fields_and_snake_case_keys():
+def test_ping_ignores_snake_case_signal_fields_when_present():
     iface = _FakeIface()
     sent = []
 
@@ -759,8 +818,8 @@ def test_ping_signal_hint_supports_partial_fields_and_snake_case_keys():
 
     assert len(sent) == 1
     text = str(sent[0]["text"]).lower()
-    assert "link -1.8db (last-hop)" in text
-    assert "/" not in text
+    assert "link " not in text
+    assert "3 hops" in text
 
 
 def test_ping_includes_bot_city_hint_when_local_node_has_position():
@@ -957,7 +1016,7 @@ def test_public_ping_limit_handoff_and_one_hour_public_suppression():
 
     assert len(sent) == 3
     assert all(row["destination"] == "^all" for row in sent[:3])
-    assert all("round trip" in str(row["text"]).lower() for row in sent[:3])
+    assert all("hops" in str(row["text"]).lower() for row in sent[:3])
 
     bot.on_receive(_base_packet("ping 9b7c", packet_id=3004), iface)
 
@@ -1002,7 +1061,7 @@ def test_public_ping_suppression_does_not_block_direct_ping():
 
     assert len(sent) == sent_before_direct_ping + 1
     assert sent[-1]["destination"] == "!49b5dff0"
-    assert "round trip" in str(sent[-1]["text"]).lower()
+    assert "hops" in str(sent[-1]["text"]).lower()
 
 
 def test_public_ping_limit_resets_after_one_hour():
@@ -1033,7 +1092,7 @@ def test_public_ping_limit_resets_after_one_hour():
 
     assert len(sent) == sent_after_suppression + 1
     assert sent[-1]["destination"] == "^all"
-    assert "round trip" in str(sent[-1]["text"]).lower()
+    assert "hops" in str(sent[-1]["text"]).lower()
 
 
 def test_public_ping_handoff_direct_message_uses_incoming_channel_index():
@@ -1289,7 +1348,7 @@ def test_ping_command_can_be_disabled_without_disabling_bot():
     assert ping["enabled"] is False
 
 
-def test_ping_formats_long_round_trip_as_human_readable_duration():
+def test_ping_does_not_include_request_age_when_rx_time_is_old():
     iface = _FakeIface()
     sent = []
 
@@ -1309,7 +1368,8 @@ def test_ping_formats_long_round_trip_as_human_readable_duration():
 
     assert len(sent) == 1
     text = str(sent[0]["text"]).lower()
-    assert "1h 32m 13s round trip" in text
+    assert "request age" not in text
+    assert "3 hops" in text
 
 
 def test_zork_game_starts_only_for_direct_messages():

@@ -20,13 +20,11 @@ from .bot_responder_nodes import (
     _effective_hops,
     _find_node_for_query,
     _format_hop_count_label,
-    _format_latency_label,
     _iter_known_nodes,
     _is_text_message_packet,
     _node_suffix,
     _normalize_node_id,
     _packet_hops,
-    _packet_link_signal_hint,
     _packet_text,
     _resolve_packet_node_id,
 )
@@ -1410,14 +1408,10 @@ class MeshResponseBot:
             target = str(args[0] or "").strip().lower() if args else ""
             if target and target not in local_aliases:
                 return None
-            tx_ms = int(self._now_unix_fn() * 1000)
-            latency_ms = max(0, tx_ms - int(received_ms))
-            latency_text = _format_latency_label(latency_ms)
             hops = self._effective_hops_with_fallback(packet=packet, from_id=from_id, nodes=nodes)
             hop_text = _format_hop_count_label(hops)
             requester = _find_node_for_query(from_id, nodes)
             local_node = _find_node_for_query(local_node_id, nodes) if local_node_id else None
-            link_hint = _packet_link_signal_hint(packet)
             bot_city_hint = _bot_city_hint(local_node)
             distance_hint = _bot_to_requester_distance_hint(
                 packet=packet,
@@ -1426,8 +1420,6 @@ class MeshResponseBot:
                 now_unix=now_unix,
             )
             details: list[str] = []
-            if link_hint:
-                details.append(link_hint)
             if bot_city_hint and distance_hint:
                 details.append(f"bot near {bot_city_hint}, about {distance_hint} from you")
             elif bot_city_hint:
@@ -1435,8 +1427,8 @@ class MeshResponseBot:
             elif distance_hint:
                 details.append(f"about {distance_hint} from you")
             if not details:
-                return f"{latency_text} round trip, {hop_text}."
-            return f"{latency_text} round trip, {hop_text}, {', '.join(details)}."
+                return f"{hop_text}."
+            return f"{hop_text}, {', '.join(details)}."
 
         return None
 
