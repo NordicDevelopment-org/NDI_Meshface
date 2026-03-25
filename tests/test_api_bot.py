@@ -157,6 +157,31 @@ def test_handle_bot_settings_post_accepts_zork_triggers_patch():
     assert captured["request"].zork_triggers == ["{nodename} zork", "{nodename} play zork"]
 
 
+def test_handle_bot_settings_post_accepts_ping_response_template_patch():
+    calls = {}
+    captured = {}
+    body = b'{"ping_response_template":"Hey $sender, you are $hops hops away!"}'
+    handle_bot_settings_post(
+        _handler(body=body),
+        apply_bot_settings_fn=lambda req: (
+            captured.update({"request": req})
+            or {
+                "ok": True,
+                "ping_response_template": "Hey $sender, you are $hops hops away!",
+            }
+        ),
+        to_int_fn=lambda value: int(value) if value not in (None, "") else None,
+        validate_content_length_fn=lambda *_args, **_kwargs: len(body),
+        parse_bot_settings_request_fn=lambda _raw: BotSettingsRequest(
+            ping_response_template="Hey $sender, you are $hops hops away!",
+        ),
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+    assert calls["status_code"] == 200
+    assert calls["payload_obj"]["ping_response_template"] == "Hey $sender, you are $hops hops away!"
+    assert captured["request"].ping_response_template == "Hey $sender, you are $hops hops away!"
+
+
 def test_handle_bot_settings_post_accepts_joke_delay_toggle_patch():
     calls = {}
     captured = {}

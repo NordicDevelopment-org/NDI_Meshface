@@ -1879,8 +1879,17 @@ Ready.
                         placeholder="&#123;nodename&#125; ping&#10;&#123;nodename&#125; test&#10;&#123;nodename&#125; can you see this"
                       ></textarea>
                       <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>&#123;nodename&#125; ping</code>, <code>&#123;nodename&#125; test</code>, and <code>&#123;nodename&#125; can you see this</code> are defaults. <code>&#123;nodename&#125;</code> is optional in matching.</div>
+                      <label class="bots-command-config-label" for="bots-command-ping-response-template">Ping reply template (optional)</label>
+                      <input
+                        id="bots-command-ping-response-template"
+                        class="chat-input"
+                        type="text"
+                        maxlength="240"
+                        placeholder="Hey $sender, you are $hops hops away!"
+                      />
+                      <div class="bots-setting-note">Leave blank for default reply. Tokens: <code>$sender</code>, <code>$sender_id</code>, <code>$hops</code>, <code>$hop_label</code>, <code>$bot</code>, <code>$bot_id</code>, <code>$city</code>, <code>$distance</code>.</div>
                       <div class="bots-command-config-actions">
-                        <button id="bots-command-ping-save-btn" class="btn btn-secondary" type="button">Save Ping Triggers</button>
+                        <button id="bots-command-ping-save-btn" class="btn btn-secondary" type="button">Save Ping Settings</button>
                       </div>
                     </div>
                     <div id="bots-command-zork-config-wrap" class="bots-command-config-section" hidden>

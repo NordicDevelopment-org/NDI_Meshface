@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import re
 import threading
 import time
 from typing import Callable, Optional
@@ -26,6 +27,7 @@ from .bot_responder_nodes import (
     _normalize_node_id,
     _packet_hops,
     _packet_text,
+    _preferred_node_label,
     _resolve_packet_node_id,
 )
 from .bot_responder_text import (
@@ -52,6 +54,7 @@ _DEFAULT_PING_TRIGGERS = (
     "{nodename} test",
     "{nodename} can you see this",
 )
+_DEFAULT_PING_RESPONSE_TEMPLATE = ""
 _DEFAULT_JOKE_TRIGGERS = (
     "{nodename} tell me a joke",
 )
@@ -87,6 +90,9 @@ _PUBLIC_PING_SUPPRESS_SECONDS = 3600
 _PUBLIC_PING_LIMIT_REACTION = "❌"
 _PUBLIC_PING_DIRECT_HANDOFF_TEXT = (
     "ping: public limit reached (3). Continue testing with direct peer-to-peer messages for 1 hour."
+)
+_PING_TEMPLATE_TOKEN_RE = re.compile(
+    r"\$(?:\{(?P<braced>[a-zA-Z_][a-zA-Z0-9_]*)\}|(?P<plain>[a-zA-Z_][a-zA-Z0-9_]*))"
 )
 
 
@@ -325,6 +331,68 @@ def _normalize_ping_triggers(value: object) -> list[str]:
     return []
 
 
+def _normalize_ping_response_template(value: object) -> str:
+    if value is None:
+        return _DEFAULT_PING_RESPONSE_TEMPLATE
+    clean = str(value).strip()
+    if len(clean) > 240:
+        clean = clean[:240].rstrip()
+    return clean
+
+
+def _fallback_node_label(node_id: object) -> str:
+    clean_id = _normalize_node_id(node_id)
+    if not clean_id:
+        return "unknown"
+    return _node_suffix(clean_id) or clean_id
+
+
+def _node_label_for_ping_template(node: Optional[dict[str, object]], node_id: object) -> str:
+    if isinstance(node, dict):
+        preferred = str(_preferred_node_label(node) or "").strip()
+        if preferred:
+            return preferred
+    return _fallback_node_label(node_id)
+
+
+def _render_ping_response_template(
+    template: object,
+    *,
+    sender: str,
+    sender_id: str,
+    bot: str,
+    bot_id: str,
+    hops: Optional[int],
+    hop_label: str,
+    city: str,
+    distance: str,
+) -> str:
+    clean_template = _normalize_ping_response_template(template)
+    if not clean_template:
+        return ""
+    token_values = {
+        "sender": sender,
+        "sender_id": sender_id,
+        "bot": bot,
+        "bot_id": bot_id,
+        "hops": "n/a" if hops is None else str(hops),
+        "hop_count": "n/a" if hops is None else str(hops),
+        "hop_label": hop_label,
+        "city": city or "n/a",
+        "distance": distance or "n/a",
+    }
+    protected = clean_template.replace("$$", "\0")
+
+    def _replace(match: re.Match[str]) -> str:
+        key = str(match.group("braced") or match.group("plain") or "").strip().lower()
+        if key in token_values:
+            return str(token_values.get(key) or "")
+        return match.group(0)
+
+    rendered = _PING_TEMPLATE_TOKEN_RE.sub(_replace, protected).replace("\0", "$")
+    return rendered.strip()
+
+
 def _normalize_hard_disabled_commands(value: object) -> list[str]:
     if value is None:
         return []
@@ -517,6 +585,7 @@ class MeshResponseBot:
         game_enabled: bool = False,
         game_public_start_enabled: bool = False,
         ping_triggers: Optional[list[str]] = None,
+        ping_response_template: Optional[str] = None,
         joke_triggers: Optional[list[str]] = None,
         zork_triggers: Optional[list[str]] = None,
         hard_disabled_incoming_commands: Optional[list[str]] = None,
@@ -550,6 +619,9 @@ class MeshResponseBot:
         self._now_unix_fn = now_unix_fn
         self._game_public_start_enabled = bool(game_public_start_enabled)
         self._ping_trigger_phrases = _normalize_ping_triggers(ping_triggers)
+        self._ping_response_template = _normalize_ping_response_template(
+            ping_response_template
+        )
         self._joke_trigger_phrases = _normalize_joke_triggers(joke_triggers)
         self._zork_trigger_phrases = _normalize_zork_triggers(zork_triggers)
         self._hard_disabled_incoming_commands = {
@@ -729,10 +801,14 @@ class MeshResponseBot:
         self,
         *,
         triggers: Optional[list[str]] = None,
+        response_template: Optional[str] = None,
     ) -> None:
-        if triggers is None:
-            return
-        self._ping_trigger_phrases = _normalize_ping_triggers(triggers)
+        if triggers is not None:
+            self._ping_trigger_phrases = _normalize_ping_triggers(triggers)
+        if response_template is not None:
+            self._ping_response_template = _normalize_ping_response_template(
+                response_template
+            )
 
     def _set_zork_settings_locked(
         self,
@@ -1076,6 +1152,7 @@ class MeshResponseBot:
             "game_enabled": bool(self._bot_app_enabled.get("zork")),
             "game_public_start_enabled": bool(self._game_public_start_enabled),
             "ping_triggers": list(self._ping_trigger_phrases),
+            "ping_response_template": str(self._ping_response_template or ""),
             "joke_triggers": list(self._joke_trigger_phrases),
             "zork_triggers": list(self._zork_trigger_phrases),
             "hard_disabled_incoming_commands": sorted(self._hard_disabled_incoming_commands),
@@ -1094,6 +1171,7 @@ class MeshResponseBot:
             "game_enabled": bool(self._bot_app_enabled.get("zork")),
             "game_public_start_enabled": bool(self._game_public_start_enabled),
             "ping_triggers": list(self._ping_trigger_phrases),
+            "ping_response_template": str(self._ping_response_template or ""),
             "joke_triggers": list(self._joke_trigger_phrases),
             "zork_triggers": list(self._zork_trigger_phrases),
             "hard_disabled_incoming_commands": sorted(self._hard_disabled_incoming_commands),
@@ -1117,6 +1195,7 @@ class MeshResponseBot:
         command_settings: Optional[dict[str, bool]] = None,
         hard_disabled_incoming_commands: Optional[list[str]] = None,
         ping_triggers: Optional[list[str]] = None,
+        ping_response_template: Optional[str] = None,
         joke_triggers: Optional[list[str]] = None,
         zork_triggers: Optional[list[str]] = None,
         joke_lines: Optional[list[str]] = None,
@@ -1138,8 +1217,11 @@ class MeshResponseBot:
                 self._set_hard_disabled_incoming_commands_locked(
                     commands=hard_disabled_incoming_commands
                 )
-            if ping_triggers is not None:
-                self._set_ping_settings_locked(triggers=ping_triggers)
+            if ping_triggers is not None or ping_response_template is not None:
+                self._set_ping_settings_locked(
+                    triggers=ping_triggers,
+                    response_template=ping_response_template,
+                )
             if zork_triggers is not None:
                 self._set_zork_settings_locked(triggers=zork_triggers)
             if (
@@ -1419,6 +1501,24 @@ class MeshResponseBot:
                 local_node=local_node,
                 now_unix=now_unix,
             )
+            with self._lock:
+                ping_response_template = str(self._ping_response_template or "").strip()
+            if ping_response_template:
+                sender_id = _normalize_node_id(from_id) or str(from_id or "").strip() or "unknown"
+                bot_id = _normalize_node_id(local_node_id) or str(local_node_id or "").strip() or "unknown"
+                rendered_template = _render_ping_response_template(
+                    ping_response_template,
+                    sender=_node_label_for_ping_template(requester, sender_id),
+                    sender_id=sender_id,
+                    bot=_node_label_for_ping_template(local_node, bot_id),
+                    bot_id=bot_id,
+                    hops=hops,
+                    hop_label=hop_text,
+                    city=bot_city_hint,
+                    distance=distance_hint,
+                )
+                if rendered_template:
+                    return rendered_template
             details: list[str] = []
             if bot_city_hint and distance_hint:
                 details.append(f"bot near {bot_city_hint}, about {distance_hint} from you")
@@ -2123,6 +2223,13 @@ def build_mesh_response_bot_from_env(
     ping_triggers = _normalize_ping_triggers(persisted.get("ping_triggers"))
     if "MESH_DASH_BOT_PING_TRIGGERS" in env_map:
         ping_triggers = _normalize_ping_triggers(env_map.get("MESH_DASH_BOT_PING_TRIGGERS"))
+    ping_response_template = _normalize_ping_response_template(
+        persisted.get("ping_response_template")
+    )
+    if "MESH_DASH_BOT_PING_RESPONSE_TEMPLATE" in env_map:
+        ping_response_template = _normalize_ping_response_template(
+            env_map.get("MESH_DASH_BOT_PING_RESPONSE_TEMPLATE")
+        )
     joke_triggers = _normalize_joke_triggers(persisted.get("joke_triggers"))
     if "MESH_DASH_BOT_JOKE_TRIGGERS" in env_map:
         joke_triggers = _normalize_joke_triggers(env_map.get("MESH_DASH_BOT_JOKE_TRIGGERS"))
@@ -2162,6 +2269,7 @@ def build_mesh_response_bot_from_env(
         game_enabled=game_enabled,
         game_public_start_enabled=game_public_start_enabled,
         ping_triggers=ping_triggers,
+        ping_response_template=ping_response_template,
         joke_triggers=joke_triggers,
         zork_triggers=zork_triggers,
         hard_disabled_incoming_commands=hard_disabled_incoming_commands,

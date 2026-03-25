@@ -84,6 +84,17 @@ def _parse_string_list(
     return None
 
 
+def _parse_text_value(
+    value: object,
+    *,
+    max_chars: int,
+) -> str:
+    clean = str(value or "").strip()
+    if len(clean) > max_chars:
+        clean = clean[:max_chars].rstrip()
+    return clean
+
+
 def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, object]:
     if not settings_path:
         return {}
@@ -121,6 +132,11 @@ def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, objec
     )
     if ping_triggers is not None:
         out["ping_triggers"] = ping_triggers
+    if "ping_response_template" in payload or "pingResponseTemplate" in payload:
+        out["ping_response_template"] = _parse_text_value(
+            payload.get("ping_response_template", payload.get("pingResponseTemplate")),
+            max_chars=240,
+        )
     joke_triggers = _parse_string_list(
         payload.get("joke_triggers", payload.get("jokeTriggers")),
         split_commas=True,
@@ -205,6 +221,10 @@ def save_persisted_bot_settings(
             )
             if item
         ],
+        "ping_response_template": _parse_text_value(
+            settings.get("ping_response_template"),
+            max_chars=240,
+        ),
         "joke_triggers": [
             item
             for item in (

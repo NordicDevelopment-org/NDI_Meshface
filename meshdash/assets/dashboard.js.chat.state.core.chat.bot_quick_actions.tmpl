@@ -69,6 +69,7 @@
           game_public_start_enabled: false,
           hard_disabled_incoming_commands: [],
           ping_triggers: [],
+          ping_response_template: "",
           joke_triggers: [],
           zork_triggers: [],
           joke_lines: [],
@@ -117,6 +118,9 @@
           raw.ping_triggers ?? raw.pingTriggers,
           {{ splitCommas: true }}
         ),
+        ping_response_template: String(
+          raw.ping_response_template ?? raw.pingResponseTemplate ?? ""
+        ).trim().slice(0, 240),
         joke_triggers: normalizeBotSettingsTextList(
           raw.joke_triggers ?? raw.jokeTriggers,
           {{ splitCommas: true }}
@@ -206,6 +210,7 @@
       const commandEnabledInput = document.getElementById("bots-command-selected-enabled");
       const pingConfigWrap = document.getElementById("bots-command-ping-config-wrap");
       const pingTriggersInput = document.getElementById("bots-command-ping-triggers");
+      const pingResponseTemplateInput = document.getElementById("bots-command-ping-response-template");
       const pingSaveBtn = document.getElementById("bots-command-ping-save-btn");
       const zorkConfigWrap = document.getElementById("bots-command-zork-config-wrap");
       const zorkTriggersInput = document.getElementById("bots-command-zork-triggers");
@@ -327,6 +332,24 @@
           pingTriggersInput.title = "Saving ping settings...";
         }} else {{
           pingTriggersInput.title = "Delimited trigger phrases. One per line (or comma separated).";
+        }}
+      }}
+      if (pingResponseTemplateInput instanceof HTMLInputElement) {{
+        const value = selectedIsPing
+          ? String(serverBotSettings.ping_response_template || "")
+          : "";
+        if (document.activeElement !== pingResponseTemplateInput || !selectedIsPing) {{
+          pingResponseTemplateInput.value = value;
+        }}
+        pingResponseTemplateInput.disabled = !available || botSettingsSaveInFlight || !selectedIsPing;
+        if (!available) {{
+          pingResponseTemplateInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsPing) {{
+          pingResponseTemplateInput.title = "Select the ping command to edit reply template.";
+        }} else if (botSettingsSaveInFlight) {{
+          pingResponseTemplateInput.title = "Saving ping settings...";
+        }} else {{
+          pingResponseTemplateInput.title = "Optional ping reply template. Use tokens like $sender, $hops, $hop_label, $bot, $city, and $distance.";
         }}
       }}
       if (pingSaveBtn instanceof HTMLButtonElement) {{
@@ -545,12 +568,17 @@
       const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
       if (commandName !== "ping") return false;
       const triggersInput = document.getElementById("bots-command-ping-triggers");
+      const responseTemplateInput = document.getElementById("bots-command-ping-response-template");
       const triggers = normalizeBotSettingsTextList(
         triggersInput instanceof HTMLTextAreaElement ? triggersInput.value : "",
         {{ splitCommas: true }}
       );
+      const responseTemplate = String(
+        responseTemplateInput instanceof HTMLInputElement ? responseTemplateInput.value : ""
+      ).trim().slice(0, 240);
       const ok = await saveServerBotSettingsPatch({{
         ping_triggers: triggers,
+        ping_response_template: responseTemplate,
       }});
       if (!ok) {{
         renderBotsView(latestState);

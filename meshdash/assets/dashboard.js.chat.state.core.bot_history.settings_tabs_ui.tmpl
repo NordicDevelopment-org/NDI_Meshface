@@ -9,6 +9,7 @@
       const selectedEnabledInput = document.getElementById("bots-command-selected-enabled");
       const pingConfigWrap = document.getElementById("bots-command-ping-config-wrap");
       const pingTriggersInput = document.getElementById("bots-command-ping-triggers");
+      const pingResponseTemplateInput = document.getElementById("bots-command-ping-response-template");
       const zorkConfigWrap = document.getElementById("bots-command-zork-config-wrap");
       const zorkTriggersInput = document.getElementById("bots-command-zork-triggers");
       const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
@@ -118,6 +119,14 @@
           : "";
         if (document.activeElement !== pingTriggersInput || !selectedIsPing) {{
           pingTriggersInput.value = nextValue;
+        }}
+      }}
+      if (pingResponseTemplateInput instanceof HTMLInputElement) {{
+        const nextValue = selectedIsPing
+          ? String(serverBotSettings.ping_response_template || "")
+          : "";
+        if (document.activeElement !== pingResponseTemplateInput || !selectedIsPing) {{
+          pingResponseTemplateInput.value = nextValue;
         }}
       }}
       if (zorkConfigWrap instanceof HTMLElement) {{

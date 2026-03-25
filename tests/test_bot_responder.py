@@ -579,6 +579,54 @@ def test_direct_ping_replies_direct_with_reply_id():
     assert "hops" in str(sent[0]["text"]).lower()
 
 
+def test_ping_response_template_supports_sender_and_hops_tokens():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        ping_response_template="Hey $sender, you are $hops hops away!",
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("ping 9b7c"), iface)
+
+    assert len(sent) == 1
+    assert str(sent[0]["text"]).strip() == "Hey Brew HQ, you are 3 hops away!"
+
+
+def test_ping_response_template_can_be_cleared_to_restore_default_reply():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        ping_response_template="$sender/$hops",
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=1001), iface)
+    assert len(sent) == 1
+    assert str(sent[0]["text"]).strip() == "Brew HQ/3"
+
+    saved = bot.configure(ping_response_template="")
+    assert saved["ping_response_template"] == ""
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=1002), iface)
+
+    assert len(sent) == 2
+    assert str(sent[1]["text"]).lower().startswith("3 hops")
+
+
 def test_ping_falls_back_to_known_node_hops_when_packet_hops_missing():
     iface = _FakeIface()
     sent = []
@@ -1834,6 +1882,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
         enabled=True,
         game_enabled=False,
         command_settings={"whois": True},
+        ping_response_template="Hey $sender, you are $hops hops away!",
         zork_triggers=["{nodename} zork", "{nodename} play zork"],
         joke_triggers=["tell me a joke", "make me laugh"],
         joke_lines=["line 1", "line 2"],
@@ -1848,6 +1897,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert payload["game_public_start_enabled"] is False
     assert payload["joke_delay_punchline_enabled"] is False
     assert payload["hard_disabled_incoming_commands"] == []
+    assert payload["ping_response_template"] == "Hey $sender, you are $hops hops away!"
     assert payload["zork_triggers"] == ["{nodename} zork", "{nodename} play zork"]
     assert payload["joke_triggers"] == ["tell me a joke", "make me laugh"]
     assert payload["joke_lines"] == ["line 1", "line 2"]
@@ -1870,6 +1920,7 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert rows["whois"]["enabled"] is True
     assert rows["cmd"]["enabled"] is False
     loaded_settings = loaded.bot_settings()
+    assert loaded_settings["ping_response_template"] == "Hey $sender, you are $hops hops away!"
     assert loaded_settings["zork_triggers"] == ["{nodename} zork", "{nodename} play zork"]
     assert loaded_settings["joke_triggers"] == ["tell me a joke", "make me laugh"]
     assert loaded_settings["joke_lines"] == ["line 1", "line 2"]
@@ -1928,6 +1979,24 @@ def test_configure_allows_explicit_empty_ping_triggers():
     bot.on_receive(_base_packet("test"), iface)
     bot.on_receive(_base_packet("can you see this?"), iface)
     assert sent == []
+
+
+def test_configure_allows_explicit_empty_ping_response_template():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_ENABLED": "1"},
+    )
+    assert bot is not None
+
+    saved = bot.configure(ping_response_template="$sender:$hops")
+    assert saved["ok"] is True
+    assert saved["ping_response_template"] == "$sender:$hops"
+
+    saved = bot.configure(ping_response_template="")
+    assert saved["ok"] is True
+    assert saved["ping_response_template"] == ""
+    assert bot.bot_settings()["ping_response_template"] == ""
 
 
 def test_configure_allows_explicit_empty_joke_triggers():

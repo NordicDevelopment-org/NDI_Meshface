@@ -57,6 +57,18 @@ def test_parse_bot_settings_request_parses_zork_triggers_list():
     assert parsed.zork_triggers == ["{nodename} zork", "{nodename} play zork"]
 
 
+def test_parse_bot_settings_request_parses_ping_response_template():
+    parsed = parse_bot_settings_request(
+        b'{"ping_response_template":"Hey $sender, you are $hops hops away!"}'
+    )
+    assert parsed.ping_response_template == "Hey $sender, you are $hops hops away!"
+
+
+def test_parse_bot_settings_request_preserves_empty_ping_response_template():
+    parsed = parse_bot_settings_request(b'{"ping_response_template":""}')
+    assert parsed.ping_response_template == ""
+
+
 def test_parse_bot_settings_request_preserves_explicit_empty_zork_triggers():
     parsed = parse_bot_settings_request(b'{"zork_triggers":[]}')
     assert parsed.zork_triggers == []

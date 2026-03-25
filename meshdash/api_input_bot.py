@@ -81,6 +81,19 @@ def _parse_string_list_payload(
     return None
 
 
+def _parse_text_payload(
+    value: object,
+    *,
+    max_chars: int,
+) -> Optional[str]:
+    if value is None:
+        return None
+    clean = str(value).strip()
+    if len(clean) > max_chars:
+        clean = clean[:max_chars].rstrip()
+    return clean
+
+
 @dataclass(frozen=True)
 class BotSettingsRequest:
     enabled: Optional[bool] = None
@@ -90,6 +103,7 @@ class BotSettingsRequest:
     command_settings: Optional[dict[str, bool]] = None
     hard_disabled_incoming_commands: Optional[list[str]] = None
     ping_triggers: Optional[list[str]] = None
+    ping_response_template: Optional[str] = None
     joke_triggers: Optional[list[str]] = None
     zork_triggers: Optional[list[str]] = None
     joke_lines: Optional[list[str]] = None
@@ -131,6 +145,10 @@ def parse_bot_settings_request(raw_body: bytes) -> BotSettingsRequest:
             split_commas=True,
             max_items=64,
             max_item_chars=160,
+        ),
+        ping_response_template=_parse_text_payload(
+            payload.get("ping_response_template", payload.get("pingResponseTemplate")),
+            max_chars=240,
         ),
         joke_triggers=_parse_string_list_payload(
             payload.get("joke_triggers", payload.get("jokeTriggers")),
