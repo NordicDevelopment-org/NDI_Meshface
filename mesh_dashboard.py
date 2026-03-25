@@ -134,7 +134,14 @@ def _build_render_html_fn_with_theme(
     return _render_html_with_theme
 
 
-def _build_make_http_handler_with_theme_settings(theme_settings: _ThemePresetSettings):
+def _build_make_http_handler_with_theme_settings(
+    theme_settings: _ThemePresetSettings,
+    *,
+    api_token: object = None,
+    private_mode: bool = False,
+):
+    clean_api_token = str(api_token or "").strip() or None
+
     def _make_http_handler_with_theme_settings(
         html_text: str,
         state_fn,
@@ -154,6 +161,8 @@ def _build_make_http_handler_with_theme_settings(theme_settings: _ThemePresetSet
             send_chat_fn=send_chat_fn,
             get_theme_settings_fn=theme_settings.get_settings_payload,
             set_theme_preset_fn=theme_settings.set_selected_preset,
+            api_token=clean_api_token,
+            private_mode=bool(private_mode),
             default_node_history_hours=default_node_history_hours,
             to_int_fn=to_int_fn,
         )
@@ -195,7 +204,11 @@ def run_dashboard(args: argparse.Namespace) -> None:
             args,
             theme_preset_settings=theme_preset_settings,
         ),
-        make_http_handler_fn=_build_make_http_handler_with_theme_settings(theme_preset_settings),
+        make_http_handler_fn=_build_make_http_handler_with_theme_settings(
+            theme_preset_settings,
+            api_token=getattr(args, "api_token", None),
+            private_mode=bool(getattr(args, "private_mode", False)),
+        ),
         default_node_history_hours=DEFAULT_NODE_HISTORY_HOURS,
         guess_lan_ipv4_fn=_guess_lan_ipv4_helper,
         default_chat_max_bytes=DEFAULT_CHAT_MAX_BYTES,
@@ -251,6 +264,8 @@ def main() -> None:
         env_theme_presets=os.environ.get("MESH_DASH_THEME_PRESETS"),
         env_theme_preset=os.environ.get("MESH_DASH_THEME_PRESET"),
         env_theme_settings_file=os.environ.get("MESH_DASH_THEME_SETTINGS_FILE"),
+        env_private_mode=os.environ.get("MESH_DASH_PRIVATE_MODE"),
+        env_api_token=os.environ.get("MESH_DASH_API_TOKEN"),
     )
     args = parser.parse_args()
     _apply_default_gateway_helper(args, default_mesh_port=DEFAULT_MESH_PORT)

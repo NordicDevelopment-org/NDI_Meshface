@@ -6,6 +6,7 @@ from .helpers import to_int
 from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_html_response, write_json_response, write_text_response
 from .http_route_contracts import (
+    ApiMetricsRecorder,
     DashboardGetRouteDependencies,
     GetThemeSettingsFn,
     NodeHistoryFn,
@@ -32,6 +33,8 @@ def build_get_route_dependencies(
     default_node_history_hours: int,
     summary_metrics_fn: SummaryMetricsHistoryFn | None = None,
     get_theme_settings_fn: GetThemeSettingsFn | None = None,
+    private_mode: bool = False,
+    api_metrics: ApiMetricsRecorder | None = None,
     to_int_fn: ToIntFn = to_int,
 ) -> DashboardGetRouteDependencies:
     return DashboardGetRouteDependencies(
@@ -51,6 +54,8 @@ def build_get_route_dependencies(
         write_json_response_fn=write_json_response,
         write_text_response_fn=write_text_response,
         get_theme_settings_fn=get_theme_settings_fn,
+        private_mode=bool(private_mode),
+        api_metrics=api_metrics,
     )
 
 

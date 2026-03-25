@@ -20,11 +20,13 @@ def _run_get(handler_cls, path: str):
     return sent, handler.wfile.getvalue()
 
 
-def _run_post(handler_cls, path: str, body: dict):
+def _run_post(handler_cls, path: str, body: dict, headers: dict | None = None):
     payload = json.dumps(body).encode("utf-8")
     handler = handler_cls.__new__(handler_cls)
     handler.path = path
     handler.headers = {"Content-Length": str(len(payload))}
+    if isinstance(headers, dict):
+        handler.headers.update(headers)
     handler.rfile = io.BytesIO(payload)
     handler.wfile = io.BytesIO()
     sent = {"status": None, "headers": []}
@@ -203,3 +205,106 @@ def test_http_api_theme_settings_get_and_post():
     assert sent["status"] == 200
     updated = json.loads(data.decode("utf-8"))
     assert updated["selected_preset"] == "forest"
+
+
+def test_http_api_version_health_metrics_and_private_mode():
+    def _state():
+        return {
+            "generated_at": "2026-03-24T12:00:00Z",
+            "summary": {
+                "uptime_seconds": 90,
+                "node_count": 4,
+                "live_packet_count": 12,
+                "revision": {"version": "0.1.0", "commit": "abc123"},
+                "radio_connection": {"state": "connected"},
+            },
+            "summary_error": None,
+            "tracker_error": None,
+            "traffic": {
+                "recent_packets": [
+                    {"rx_time_unix": 100},
+                    {"rx_time_unix": 101},
+                    {"rx_time_unix": 102},
+                ],
+                "recent_chat": [{"text": "secret"}],
+            },
+        }
+
+    handler_cls = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=_state,
+        send_chat_fn=lambda **kwargs: {"ok": True, "echo": kwargs.get("text", "")},
+        private_mode=True,
+    )
+
+    sent, data = _run_get(handler_cls, "/api/version")
+    assert sent["status"] == 200
+    version_payload = json.loads(data.decode("utf-8"))
+    assert version_payload["version"] == "0.1.0"
+    assert version_payload["commit"] == "abc123"
+
+    sent, data = _run_get(handler_cls, "/api/health")
+    assert sent["status"] == 200
+    health_payload = json.loads(data.decode("utf-8"))
+    assert health_payload["status"] == "ok"
+    assert health_payload["radio_link_up"] == 1
+
+    sent, data = _run_get(handler_cls, "/metrics")
+    assert sent["status"] == 200
+    metrics_text = data.decode("utf-8")
+    assert "meshdash_packet_rate_per_second" in metrics_text
+    assert "meshdash_node_count" in metrics_text
+    assert "meshdash_state_poll_errors_total" in metrics_text
+    assert "meshdash_radio_link_up" in metrics_text
+
+    sent, data = _run_get(handler_cls, "/api/history/search?q=hello")
+    assert sent["status"] == 403
+    assert "private mode" in json.loads(data.decode("utf-8"))["error"].lower()
+
+    sent, data = _run_get(handler_cls, "/api/chat/emoji-catalog")
+    assert sent["status"] == 404
+    assert data.decode("utf-8") == "Not Found"
+
+    sent, data = _run_get(handler_cls, "/api/state")
+    assert sent["status"] == 200
+    state_payload = json.loads(data.decode("utf-8"))
+    assert state_payload["traffic"]["recent_chat"] == []
+
+
+def test_http_api_token_auth_for_write_routes():
+    handler_cls = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=lambda: {"ok": True},
+        send_chat_fn=lambda **kwargs: {"ok": True, "echo": kwargs.get("text", "")},
+        set_theme_preset_fn=lambda preset_name: {"ok": True, "selected_preset": str(preset_name)},
+        api_token="abc123",
+    )
+
+    sent, data = _run_post(handler_cls, "/api/chat/send", {"text": "hello"})
+    assert sent["status"] == 401
+    assert "token required" in json.loads(data.decode("utf-8"))["error"].lower()
+
+    sent, data = _run_post(
+        handler_cls,
+        "/api/chat/send",
+        {"text": "hello"},
+        headers={"X-API-Token": "abc123"},
+    )
+    assert sent["status"] == 200
+    assert json.loads(data.decode("utf-8"))["echo"] == "hello"
+
+    sent, data = _run_post(
+        handler_cls,
+        "/api/settings/theme",
+        {"preset_name": "forest"},
+    )
+    assert sent["status"] == 401
+
+    sent, data = _run_post(
+        handler_cls,
+        "/api/settings/theme",
+        {"preset_name": "forest"},
+        headers={"Authorization": "Bearer abc123"},
+    )
+    assert sent["status"] == 200
+    assert json.loads(data.decode("utf-8"))["selected_preset"] == "forest"

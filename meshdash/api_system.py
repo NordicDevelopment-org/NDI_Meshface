@@ -32,6 +32,20 @@ def _lite_state_payload(payload: object) -> object:
     return out
 
 
+def _private_mode_state_payload(payload: object) -> object:
+    """Remove public chat/message slices for sensitive deployments."""
+    if not isinstance(payload, dict):
+        return payload
+    out = dict(payload)
+    out.pop("bot_requests", None)
+    traffic_raw = out.get("traffic")
+    if isinstance(traffic_raw, dict):
+        traffic = dict(traffic_raw)
+        traffic["recent_chat"] = []
+        out["traffic"] = traffic
+    return out
+
+
 def _resolve_bot_request_history_fn(*, state_fn: object, selected_fn: object) -> object:
     history_fn = getattr(selected_fn, "bot_request_history_fn", None)
     if callable(history_fn):
@@ -182,6 +196,7 @@ def handle_state_get(
     state_fn: StateFn,
     write_json_response_fn: WriteJsonResponseFn,
     query: str = "",
+    private_mode: bool = False,
 ) -> None:
     lite = _truthy_query_flag(query, "lite")
 
@@ -247,6 +262,8 @@ def handle_state_get(
         selected_fn=selected_fn,
         settings=bot_settings,
     )
+    if private_mode:
+        payload = _private_mode_state_payload(payload)
     if lite:
         payload = _lite_state_payload(payload)
     kwargs = {

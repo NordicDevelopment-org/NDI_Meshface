@@ -213,6 +213,23 @@ class WriteTextResponseFn(Protocol):
         ...
 
 
+class ApiMetricsRecorder(Protocol):
+    def record_state_poll_request(self) -> None:
+        ...
+
+    def record_state_poll_error(self) -> None:
+        ...
+
+    def record_write_auth_denied(self) -> None:
+        ...
+
+    def record_private_mode_block(self) -> None:
+        ...
+
+    def snapshot(self) -> dict[str, int]:
+        ...
+
+
 @dataclass(frozen=True)
 class DashboardGetRouteDependencies:
     html_text: str
@@ -231,6 +248,8 @@ class DashboardGetRouteDependencies:
     write_json_response_fn: WriteJsonResponseFn
     write_text_response_fn: WriteTextResponseFn
     get_theme_settings_fn: Optional[GetThemeSettingsFn] = None
+    private_mode: bool = False
+    api_metrics: Optional[ApiMetricsRecorder] = None
 
 
 @dataclass(frozen=True)
@@ -250,3 +269,6 @@ class DashboardPostRouteDependencies:
     parse_bot_settings_request_fn: Optional[ParseBotSettingsRequestFn] = None
     play_standalone_zork_fn: Optional[PlayStandaloneZorkFn] = None
     parse_standalone_zork_request_fn: Optional[ParseStandaloneZorkRequestFn] = None
+    api_token: Optional[str] = None
+    private_mode: bool = False
+    api_metrics: Optional[ApiMetricsRecorder] = None

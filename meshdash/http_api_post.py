@@ -11,6 +11,7 @@ from .helpers import to_int
 from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_json_response
 from .http_route_contracts import (
+    ApiMetricsRecorder,
     ApplyRadioSettingsFn,
     ApplyChannelSettingsFn,
     ApplyBotSettingsFn,
@@ -35,8 +36,12 @@ def build_post_route_dependencies(
     apply_channel_settings_fn: ApplyChannelSettingsFn | None = None,
     apply_bot_settings_fn: ApplyBotSettingsFn | None = None,
     play_standalone_zork_fn: PlayStandaloneZorkFn | None = None,
+    api_token: str | None = None,
+    private_mode: bool = False,
+    api_metrics: ApiMetricsRecorder | None = None,
     to_int_fn: ToIntFn = to_int,
 ) -> DashboardPostRouteDependencies:
+    clean_api_token = str(api_token or "").strip() or None
     return DashboardPostRouteDependencies(
         send_chat_fn=send_chat_fn,
         to_int_fn=to_int_fn,
@@ -53,6 +58,9 @@ def build_post_route_dependencies(
         parse_bot_settings_request_fn=parse_bot_settings_request,
         play_standalone_zork_fn=play_standalone_zork_fn,
         parse_standalone_zork_request_fn=parse_standalone_zork_request,
+        api_token=clean_api_token,
+        private_mode=bool(private_mode),
+        api_metrics=api_metrics,
     )
 
 

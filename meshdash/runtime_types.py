@@ -100,6 +100,8 @@ class MakeHttpHandlerFn(Protocol):
         online_activity_fn: OnlineActivityFn | None = None,
         summary_metrics_fn: SummaryMetricsHistoryFn | None = None,
         send_chat_fn: SendChatFn | None = None,
+        api_token: str | None = None,
+        private_mode: bool = False,
         default_node_history_hours: int = 72,
         to_int_fn: ToIntFn = ...,
     ) -> object:

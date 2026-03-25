@@ -1,5 +1,12 @@
 from urllib.parse import parse_qs
+from collections.abc import Mapping
 
+from .api_metrics import (
+    build_prometheus_metrics_text as _build_prometheus_metrics_text_helper,
+    derive_live_packet_count as _derive_live_packet_count_helper,
+    derive_node_count as _derive_node_count_helper,
+    derive_radio_link_up as _derive_radio_link_up_helper,
+)
 from .emoji_catalog import (
     load_chat_emoji_catalog_payload as _load_chat_emoji_catalog_payload_helper,
 )
@@ -17,6 +24,93 @@ from .api_theme import (
 from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardGetRouteDependencies
 from .offline_atlas import load_offline_atlas_payload as _load_offline_atlas_payload_helper
+from .helpers import to_int as _to_int_helper
+
+
+def _record_state_poll_request(deps: DashboardGetRouteDependencies) -> None:
+    metrics = deps.api_metrics
+    record_fn = getattr(metrics, "record_state_poll_request", None)
+    if callable(record_fn):
+        record_fn()
+
+
+def _record_state_poll_error(deps: DashboardGetRouteDependencies) -> None:
+    metrics = deps.api_metrics
+    record_fn = getattr(metrics, "record_state_poll_error", None)
+    if callable(record_fn):
+        record_fn()
+
+
+def _record_private_mode_block(deps: DashboardGetRouteDependencies) -> None:
+    metrics = deps.api_metrics
+    record_fn = getattr(metrics, "record_private_mode_block", None)
+    if callable(record_fn):
+        record_fn()
+
+
+def _state_snapshot_for_ops(state_fn: object) -> object:
+    lite_fn = getattr(state_fn, "lite", None)
+    if callable(lite_fn):
+        return lite_fn()
+    if callable(state_fn):
+        return state_fn()
+    return {}
+
+
+def _summary_from_state_payload(payload: object) -> Mapping[str, object]:
+    if not isinstance(payload, Mapping):
+        return {}
+    summary = payload.get("summary")
+    if isinstance(summary, Mapping):
+        return summary
+    return {}
+
+
+def _build_version_payload(state_payload: object) -> dict[str, object]:
+    summary = _summary_from_state_payload(state_payload)
+    revision = summary.get("revision") if isinstance(summary, Mapping) else None
+    revision_map = revision if isinstance(revision, Mapping) else {}
+    version = str(revision_map.get("version") or "0.0.0")
+    commit = str(revision_map.get("commit") or "nogit")
+    label = str(revision_map.get("label") or f"Rev: v{version} ({commit})")
+    title = str(
+        revision_map.get("title")
+        or f"Dashboard revision: version {version}, commit {commit}"
+    )
+    return {
+        "ok": True,
+        "version": version,
+        "commit": commit,
+        "label": label,
+        "title": title,
+    }
+
+
+def _build_health_payload(state_payload: object) -> dict[str, object]:
+    summary = _summary_from_state_payload(state_payload)
+    tracker_error = ""
+    summary_error = ""
+    generated_at = None
+    if isinstance(state_payload, Mapping):
+        tracker_error = str(state_payload.get("tracker_error") or "").strip()
+        summary_error = str(state_payload.get("summary_error") or "").strip()
+        generated_at = state_payload.get("generated_at")
+
+    status = "ok"
+    if tracker_error or summary_error:
+        status = "degraded"
+
+    return {
+        "ok": True,
+        "status": status,
+        "generated_at": generated_at,
+        "uptime_seconds": int(_to_int_helper(summary.get("uptime_seconds")) or 0),
+        "node_count": _derive_node_count_helper(state_payload),
+        "live_packet_count": _derive_live_packet_count_helper(state_payload),
+        "radio_link_up": _derive_radio_link_up_helper(state_payload),
+        "tracker_error": tracker_error or None,
+        "summary_error": summary_error or None,
+    }
 
 
 def handle_dashboard_get(
@@ -30,13 +124,75 @@ def handle_dashboard_get(
         deps.write_html_response_fn(handler, html_text=deps.html_text, no_store=True)
         return
 
-    if path == "/api/state":
-        _handle_state_get_helper(
-            handler,
-            query=query,
-            state_fn=deps.state_fn,
-            write_json_response_fn=deps.write_json_response_fn,
+    if path == "/api/version":
+        try:
+            state_payload = _state_snapshot_for_ops(deps.state_fn)
+            payload = _build_version_payload(state_payload)
+            deps.write_json_response_fn(handler, status_code=200, payload_obj=payload, no_store=True)
+        except Exception as exc:
+            deps.write_json_response_fn(
+                handler,
+                status_code=500,
+                payload_obj={"ok": False, "error": f"version check failed: {exc}"},
+                no_store=True,
+            )
+        return
+
+    if path == "/api/health":
+        try:
+            state_payload = _state_snapshot_for_ops(deps.state_fn)
+            payload = _build_health_payload(state_payload)
+            deps.write_json_response_fn(handler, status_code=200, payload_obj=payload, no_store=True)
+        except Exception as exc:
+            deps.write_json_response_fn(
+                handler,
+                status_code=503,
+                payload_obj={"ok": False, "status": "error", "error": f"health check failed: {exc}"},
+                no_store=True,
+            )
+        return
+
+    if path == "/metrics":
+        state_payload = {}
+        try:
+            state_payload = _state_snapshot_for_ops(deps.state_fn)
+        except Exception:
+            state_payload = {}
+        counter_snapshot = None
+        if deps.api_metrics is not None:
+            snapshot_fn = getattr(deps.api_metrics, "snapshot", None)
+            if callable(snapshot_fn):
+                counter_snapshot = snapshot_fn()
+        metrics_text = _build_prometheus_metrics_text_helper(
+            state_payload=state_payload,
+            counters=counter_snapshot,
         )
+        deps.write_text_response_fn(
+            handler,
+            status_code=200,
+            text=metrics_text,
+            extra_headers={"Cache-Control": "no-store"},
+        )
+        return
+
+    if path == "/api/state":
+        _record_state_poll_request(deps)
+        try:
+            _handle_state_get_helper(
+                handler,
+                query=query,
+                state_fn=deps.state_fn,
+                write_json_response_fn=deps.write_json_response_fn,
+                private_mode=deps.private_mode,
+            )
+        except Exception as exc:
+            _record_state_poll_error(deps)
+            deps.write_json_response_fn(
+                handler,
+                status_code=500,
+                payload_obj={"ok": False, "error": f"state poll failed: {exc}"},
+                no_store=True,
+            )
         return
 
     # Raw/debug payloads are fetched on-demand (Data view) so the primary
@@ -180,6 +336,15 @@ def handle_dashboard_get(
         return
 
     if path == "/api/history/search":
+        if deps.private_mode:
+            _record_private_mode_block(deps)
+            deps.write_json_response_fn(
+                handler,
+                status_code=403,
+                payload_obj={"ok": False, "error": "History search is disabled in private mode"},
+                no_store=True,
+            )
+            return
         query_obj = parse_qs(query or "")
         query_text = str(
             query_obj.get("q", [""])[0]
@@ -265,6 +430,10 @@ def handle_dashboard_get(
         return
 
     if path == "/api/chat/emoji-catalog":
+        if deps.private_mode:
+            _record_private_mode_block(deps)
+            deps.write_text_response_fn(handler, status_code=404, text="Not Found")
+            return
         deps.write_json_response_fn(
             handler,
             status_code=200,

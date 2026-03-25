@@ -9,6 +9,8 @@ def add_http_runtime_args(
     default_refresh_ms: int,
     default_packet_limit: int,
     default_reset_ticker_scale_on_restart: bool = True,
+    default_private_mode: bool = False,
+    default_api_token: str | None = None,
 ) -> None:
     parser.add_argument(
         "--http-host",
@@ -46,4 +48,21 @@ def add_http_runtime_args(
         "--show-secrets",
         action="store_true",
         help="Display sensitive config values (private keys/passwords/PSKs) in raw JSON panels.",
+    )
+    parser.add_argument(
+        "--private-mode",
+        action=argparse.BooleanOptionalAction,
+        default=default_private_mode,
+        help=(
+            "Disable public chat/message API surfaces for sensitive deployments "
+            f"(default: {default_private_mode})"
+        ),
+    )
+    parser.add_argument(
+        "--api-token",
+        default=default_api_token,
+        help=(
+            "Optional API token required on write endpoints via Authorization: Bearer <token> "
+            "or X-API-Token header."
+        ),
     )

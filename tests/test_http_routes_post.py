@@ -12,16 +12,18 @@ from meshdash.api_inputs import (
 from meshdash.http_route_contracts import DashboardPostRouteDependencies
 
 
-def _fake_handler(body=b"{}"):
+def _fake_handler(body=b"{}", headers=None):
     class _H:
         def __init__(self):
             self.rfile = io.BytesIO(body)
             self.headers = {"Content-Length": str(len(body))}
+            if isinstance(headers, dict):
+                self.headers.update(headers)
 
     return _H()
 
 
-def _build_post_deps(*, json_calls):
+def _build_post_deps(*, json_calls, api_token=None, private_mode=False, api_metrics=None):
     return DashboardPostRouteDependencies(
         send_chat_fn=lambda **_kwargs: {"ok": True},
         to_int_fn=lambda value: int(value) if value not in (None, "") else None,
@@ -45,6 +47,9 @@ def _build_post_deps(*, json_calls):
         parse_bot_settings_request_fn=lambda _raw: BotSettingsRequest(game_enabled=True),
         play_standalone_zork_fn=lambda **_kwargs: {"ok": True, "route": "zork"},
         parse_standalone_zork_request_fn=lambda _raw: StandaloneZorkRequest(text="zork", session_id="abc"),
+        api_token=api_token,
+        private_mode=private_mode,
+        api_metrics=api_metrics,
     )
 
 
@@ -231,3 +236,41 @@ def test_handle_dashboard_post_disabled_feature_paths_return_503():
     routes_post.handle_dashboard_post(handler, path="/api/games/zork", deps=deps_disabled_zork)
     assert json_calls[4]["status_code"] == 503
     assert "Standalone Zork is not enabled" in json_calls[4]["payload_obj"]["error"]
+
+
+def test_handle_dashboard_post_requires_api_token_for_write_endpoints(monkeypatch):
+    json_calls = []
+    helper_calls = {"chat": 0}
+
+    monkeypatch.setattr(
+        routes_post,
+        "_handle_chat_send_post_helper",
+        lambda *_args, **_kwargs: helper_calls.__setitem__("chat", helper_calls["chat"] + 1),
+    )
+
+    deps = _build_post_deps(json_calls=json_calls, api_token="secret-token")
+
+    routes_post.handle_dashboard_post(_fake_handler(), path="/api/chat/send", deps=deps)
+    assert json_calls[0]["status_code"] == 401
+    assert "token required" in json_calls[0]["payload_obj"]["error"].lower()
+    assert helper_calls["chat"] == 0
+
+    routes_post.handle_dashboard_post(
+        _fake_handler(headers={"Authorization": "Bearer secret-token"}),
+        path="/api/chat/send",
+        deps=deps,
+    )
+    assert helper_calls["chat"] == 1
+
+
+def test_handle_dashboard_post_private_mode_blocks_chat_and_zork():
+    json_calls = []
+    deps = _build_post_deps(json_calls=json_calls, private_mode=True)
+
+    routes_post.handle_dashboard_post(_fake_handler(), path="/api/chat/send", deps=deps)
+    routes_post.handle_dashboard_post(_fake_handler(), path="/api/games/zork", deps=deps)
+
+    assert json_calls[0]["status_code"] == 403
+    assert "private mode" in json_calls[0]["payload_obj"]["error"].lower()
+    assert json_calls[1]["status_code"] == 403
+    assert "private mode" in json_calls[1]["payload_obj"]["error"].lower()

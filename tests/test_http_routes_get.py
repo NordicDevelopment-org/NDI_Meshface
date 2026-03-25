@@ -3,7 +3,7 @@ from meshdash.api_inputs import NodeHistoryQuery, OnlineActivityQuery
 from meshdash.http_route_contracts import DashboardGetRouteDependencies
 
 
-def _build_get_deps(*, state_fn, json_calls, text_calls, html_calls):
+def _build_get_deps(*, state_fn, json_calls, text_calls, html_calls, private_mode=False, api_metrics=None):
     return DashboardGetRouteDependencies(
         html_text="<html></html>",
         state_fn=state_fn,
@@ -29,6 +29,8 @@ def _build_get_deps(*, state_fn, json_calls, text_calls, html_calls):
         write_json_response_fn=lambda _handler, **kwargs: json_calls.append(kwargs),
         write_text_response_fn=lambda _handler, **kwargs: text_calls.append(kwargs),
         get_theme_settings_fn=lambda: {"ok": True, "selected_preset": "default"},
+        private_mode=private_mode,
+        api_metrics=api_metrics,
     )
 
 
@@ -239,3 +241,130 @@ def test_handle_dashboard_get_environment_history_returns_error_payload_when_una
     assert json_calls[0]["status_code"] == 200
     assert json_calls[0]["payload_obj"]["ok"] is False
     assert "unavailable" in json_calls[0]["payload_obj"]["error"]
+
+
+def test_handle_dashboard_get_version_health_and_metrics_endpoints():
+    json_calls = []
+    text_calls = []
+    deps = _build_get_deps(
+        state_fn=lambda: {
+            "generated_at": "2026-03-24T12:00:00Z",
+            "summary": {
+                "uptime_seconds": 120,
+                "node_count": 3,
+                "live_packet_count": 11,
+                "revision": {
+                    "version": "0.1.0",
+                    "commit": "abc123",
+                    "label": "Rev: v0.1.0 (abc123)",
+                    "title": "Dashboard revision: version 0.1.0, commit abc123",
+                },
+                "radio_connection": {"state": "connected"},
+            },
+            "tracker_error": None,
+            "summary_error": None,
+            "traffic": {
+                "recent_packets": [{"rx_time_unix": 100}, {"rx_time_unix": 101}],
+                "recent_chat": [{"text": "hello"}],
+            },
+        },
+        json_calls=json_calls,
+        text_calls=text_calls,
+        html_calls=[],
+    )
+    handler = object()
+
+    routes_get.handle_dashboard_get(handler, path="/api/version", query="", deps=deps)
+    routes_get.handle_dashboard_get(handler, path="/api/health", query="", deps=deps)
+    routes_get.handle_dashboard_get(handler, path="/metrics", query="", deps=deps)
+
+    assert json_calls[0]["status_code"] == 200
+    assert json_calls[0]["payload_obj"]["version"] == "0.1.0"
+    assert json_calls[0]["payload_obj"]["commit"] == "abc123"
+
+    assert json_calls[1]["status_code"] == 200
+    assert json_calls[1]["payload_obj"]["status"] == "ok"
+    assert json_calls[1]["payload_obj"]["node_count"] == 3
+    assert json_calls[1]["payload_obj"]["radio_link_up"] == 1
+
+    assert text_calls[0]["status_code"] == 200
+    assert "meshdash_packet_rate_per_second" in text_calls[0]["text"]
+    assert "meshdash_node_count" in text_calls[0]["text"]
+    assert "meshdash_state_poll_errors_total" in text_calls[0]["text"]
+    assert "meshdash_radio_link_up" in text_calls[0]["text"]
+
+
+def test_handle_dashboard_get_private_mode_blocks_chat_message_routes():
+    json_calls = []
+    text_calls = []
+    deps = _build_get_deps(
+        state_fn=lambda: {"ok": True},
+        json_calls=json_calls,
+        text_calls=text_calls,
+        html_calls=[],
+        private_mode=True,
+    )
+    handler = object()
+
+    routes_get.handle_dashboard_get(
+        handler,
+        path="/api/history/search",
+        query="q=needle",
+        deps=deps,
+    )
+    routes_get.handle_dashboard_get(
+        handler,
+        path="/api/chat/emoji-catalog",
+        query="",
+        deps=deps,
+    )
+
+    assert json_calls[0]["status_code"] == 403
+    assert "private mode" in json_calls[0]["payload_obj"]["error"].lower()
+    assert text_calls[0]["status_code"] == 404
+
+
+def test_handle_dashboard_get_state_poll_error_writes_500_and_records_metric(monkeypatch):
+    json_calls = []
+
+    class _Metrics:
+        def __init__(self):
+            self.state_requests = 0
+            self.state_errors = 0
+
+        def record_state_poll_request(self):
+            self.state_requests += 1
+
+        def record_state_poll_error(self):
+            self.state_errors += 1
+
+        def record_write_auth_denied(self):
+            return None
+
+        def record_private_mode_block(self):
+            return None
+
+        def snapshot(self):
+            return {}
+
+    metrics = _Metrics()
+    deps = _build_get_deps(
+        state_fn=lambda: {"ok": True},
+        json_calls=json_calls,
+        text_calls=[],
+        html_calls=[],
+        api_metrics=metrics,
+    )
+
+    monkeypatch.setattr(
+        routes_get,
+        "_handle_state_get_helper",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("state blew up")),
+    )
+
+    routes_get.handle_dashboard_get(object(), path="/api/state", query="", deps=deps)
+
+    assert metrics.state_requests == 1
+    assert metrics.state_errors == 1
+    assert json_calls[0]["status_code"] == 500
+    assert "state poll failed" in json_calls[0]["payload_obj"]["error"]

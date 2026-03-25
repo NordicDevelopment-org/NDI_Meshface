@@ -58,6 +58,28 @@ def test_handle_state_get_accepts_typed_state_payload():
     assert calls["payload_obj"]["local_node_id"] == "local"
 
 
+def test_handle_state_get_private_mode_strips_recent_chat_and_bot_requests():
+    calls = {}
+
+    handle_state_get(
+        object(),
+        state_fn=lambda: {
+            "ok": True,
+            "bot_requests": [{"id": "r1"}],
+            "traffic": {
+                "recent_packets": [{"id": 1}],
+                "recent_chat": [{"text": "secret"}],
+            },
+        },
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+        private_mode=True,
+    )
+
+    assert calls["status_code"] == 200
+    assert "bot_requests" not in calls["payload_obj"]
+    assert calls["payload_obj"]["traffic"]["recent_chat"] == []
+
+
 def test_handle_state_get_prefers_lite_builder_when_available():
     calls = {}
     observed = {"full": 0, "lite": 0}

@@ -279,6 +279,39 @@ Important knobs:
 - Direct peer-to-peer text messages request mesh ACK and now show delivery state (`Pending`, `Delivered`, `Failed`, `Timed out`) in chat.
 - Failed direct sends can be retried from the message row using `Retry`.
 
+## API Ops and Security
+
+Optional write auth:
+
+- Set `MESH_DASH_API_TOKEN=<token>` (or pass `--api-token <token>`).
+- When set, write APIs require either:
+  - `Authorization: Bearer <token>`
+  - `X-API-Token: <token>`
+- Protected write endpoints:
+  - `/api/chat/send`
+  - `/api/settings/radio`
+  - `/api/settings/channels`
+  - `/api/settings/theme`
+  - `/api/settings/bot`
+
+Private mode:
+
+- Set `MESH_DASH_PRIVATE_MODE=1` (or `--private-mode`) to disable public chat/message API surfaces.
+- In private mode:
+  - chat send/game message routes are blocked
+  - chat search/catalog APIs are disabled
+  - `/api/state` omits `traffic.recent_chat`
+
+Ops endpoints:
+
+- `GET /api/version` returns runtime version + commit metadata.
+- `GET /api/health` returns lightweight runtime health.
+- `GET /metrics` returns Prometheus-style text metrics, including:
+  - packet rate
+  - node count
+  - `/api/state` poll errors
+  - radio link status
+
 ## Response Bot Basics
 
 The dashboard can now run a server-side chat responder bot (radio-wide behavior).

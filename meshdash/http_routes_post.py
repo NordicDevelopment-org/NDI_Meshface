@@ -1,3 +1,5 @@
+from hmac import compare_digest
+
 from .api_chat import (
     handle_chat_send_post as _handle_chat_send_post_helper,
 )
@@ -20,12 +22,102 @@ from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardPostRouteDependencies
 
 
+_TOKEN_PROTECTED_WRITE_PATHS = {
+    "/api/chat/send",
+    "/api/settings/radio",
+    "/api/settings/channels",
+    "/api/settings/theme",
+    "/api/settings/bot",
+}
+_PRIVATE_MODE_BLOCKED_POST_PATHS = {
+    "/api/chat/send",
+    "/api/games/zork",
+}
+
+
+def _header_value(headers: object, name: str) -> str:
+    if headers is None:
+        return ""
+    try:
+        direct = headers.get(name)  # type: ignore[attr-defined]
+    except Exception:
+        direct = None
+    if direct is not None:
+        return str(direct)
+    name_l = name.lower()
+    for key, value in getattr(headers, "items", lambda: [])():
+        try:
+            if str(key).lower() == name_l:
+                return str(value)
+        except Exception:
+            continue
+    return ""
+
+
+def _extract_request_api_token(handler: DashboardHttpHandler) -> str:
+    auth_header = _header_value(getattr(handler, "headers", None), "Authorization").strip()
+    if auth_header:
+        parts = auth_header.split(None, 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return str(parts[1]).strip()
+    return _header_value(getattr(handler, "headers", None), "X-API-Token").strip()
+
+
+def _record_write_auth_denied(deps: DashboardPostRouteDependencies) -> None:
+    metrics = deps.api_metrics
+    record_fn = getattr(metrics, "record_write_auth_denied", None)
+    if callable(record_fn):
+        record_fn()
+
+
+def _record_private_mode_block(deps: DashboardPostRouteDependencies) -> None:
+    metrics = deps.api_metrics
+    record_fn = getattr(metrics, "record_private_mode_block", None)
+    if callable(record_fn):
+        record_fn()
+
+
+def _write_request_is_authorized(
+    handler: DashboardHttpHandler,
+    *,
+    deps: DashboardPostRouteDependencies,
+) -> bool:
+    required_token = str(deps.api_token or "").strip()
+    if not required_token:
+        return True
+    supplied_token = _extract_request_api_token(handler)
+    if not supplied_token:
+        return False
+    return compare_digest(supplied_token, required_token)
+
+
 def handle_dashboard_post(
     handler: DashboardHttpHandler,
     *,
     path: str,
     deps: DashboardPostRouteDependencies,
 ) -> None:
+    if deps.private_mode and path in _PRIVATE_MODE_BLOCKED_POST_PATHS:
+        _record_private_mode_block(deps)
+        deps.write_json_response_fn(
+            handler,
+            status_code=403,
+            payload_obj={"ok": False, "error": "This endpoint is disabled in private mode"},
+            no_store=True,
+        )
+        return
+
+    if path in _TOKEN_PROTECTED_WRITE_PATHS and not _write_request_is_authorized(handler, deps=deps):
+        _record_write_auth_denied(deps)
+        deps.write_json_response_fn(
+            handler,
+            status_code=401,
+            payload_obj={"ok": False, "error": "API token required for write endpoint"},
+            no_store=True,
+            extra_headers={"WWW-Authenticate": "Bearer"},
+        )
+        return
+
     if path == "/api/chat/send":
         _handle_chat_send_post_helper(
             handler,
