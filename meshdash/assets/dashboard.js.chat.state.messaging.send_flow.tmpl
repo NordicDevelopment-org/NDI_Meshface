@@ -431,6 +431,7 @@
       if (!(output instanceof HTMLTextAreaElement)) return;
       const text = Array.isArray(lines) ? lines.join("\n") : "";
       output.value = text;
+      macrosRegenSourceLabel = String(sourceLabel || "");
       const previewLines = syncMacrosPreviewFromOutput(sourceLabel);
       setMacrosStatus(`Preview updated: ${{previewLines.length}} line${{previewLines.length === 1 ? "" : "s"}}.`);
     }}
@@ -516,6 +517,27 @@
       return encoded;
     }}
 
+    function buildMacrosSendLinesFromRawText(rawText, settings = null) {{
+      const sendSettings = (settings && typeof settings === "object")
+        ? settings
+        : macrosAsciiSettingsFromInputs();
+      const fillChar = macrosAsciiBackgroundFillChar(sendSettings && sendSettings.ramp);
+      const parsedLines = parseMacrosAsciiLines(rawText, {{
+        fillChar,
+        cropWhitespace: sendSettings && sendSettings.cropWhitespace,
+      }});
+      const sendLines = parsedLines.map((line) => encodeAsciiMacroLineForSend(line, {{
+        useBrailleEdgeGuards: sendSettings && sendSettings.useBrailleEdgeGuards,
+        useSpaceReplacement: sendSettings && sendSettings.useSpaceReplacement,
+        spaceReplacementChar: sendSettings && sendSettings.spaceReplacementChar,
+      }}));
+      return {{
+        parsedLines,
+        sendLines,
+        settings: sendSettings,
+      }};
+    }}
+
     function setMacrosSendBusy(isBusy) {{
       const sendBtn = document.getElementById("macros-send-lines-btn");
       if (!(sendBtn instanceof HTMLButtonElement)) return;
@@ -534,11 +556,13 @@
         return;
       }}
       const settings = macrosAsciiSettingsFromInputs();
-      const fillChar = macrosAsciiBackgroundFillChar(settings && settings.ramp);
-      const lines = parseMacrosAsciiLines(output.value, {{
-        fillChar,
-        cropWhitespace: settings && settings.cropWhitespace,
-      }});
+      const prepared = buildMacrosSendLinesFromRawText(output.value, settings);
+      const lines = prepared && Array.isArray(prepared.parsedLines)
+        ? prepared.parsedLines
+        : [];
+      const sendLines = prepared && Array.isArray(prepared.sendLines)
+        ? prepared.sendLines
+        : [];
       if (lines.length <= 0) {{
         setMacrosStatus("Generate or paste ASCII lines first.", true);
         return;
@@ -565,15 +589,12 @@
       setMacrosSendBusy(true);
       let sentCount = 0;
       try {{
-        for (const line of lines) {{
+        for (let lineIdx = 0; lineIdx < sendLines.length; lineIdx += 1) {{
+          const line = sendLines[lineIdx];
           setMacrosStatus(`Sending line ${{sentCount + 1}} / ${{lines.length}}...`);
           const payload = await sendChatPayload(
             {{
-              text: encodeAsciiMacroLineForSend(line, {{
-                useBrailleEdgeGuards: settings.useBrailleEdgeGuards,
-                useSpaceReplacement: settings.useSpaceReplacement,
-                spaceReplacementChar: settings.spaceReplacementChar,
-              }}),
+              text: line,
               destination,
               channel_index: sendCtx.sendIndex,
             }},
@@ -646,7 +667,7 @@
       );
 
       const refreshMacrosOutputForRampChange = async () => {{
-        const sourceLabel = String(macrosPreviewSourceLabel || "").toLowerCase();
+        const sourceLabel = String(macrosRegenSourceLabel || macrosPreviewSourceLabel || "").toLowerCase();
         if (sourceLabel.startsWith("image:") && macrosImageSourceElement instanceof HTMLImageElement) {{
           await generateMacrosAsciiFromImage();
           return true;
@@ -660,6 +681,12 @@
           return Array.isArray(lines) && lines.length > 0;
         }}
         return false;
+      }};
+
+      const refreshMacrosPreviewSendView = () => {{
+        if (!macrosOutputHasRows()) return 0;
+        const lines = syncMacrosPreviewFromOutput("edited");
+        return Array.isArray(lines) ? lines.length : 0;
       }};
 
       if (paletteSelect instanceof HTMLSelectElement) {{
@@ -713,10 +740,11 @@
 
       if (brailleBlankInput instanceof HTMLInputElement) {{
         brailleBlankInput.addEventListener("change", () => {{
+          const lineCount = refreshMacrosPreviewSendView();
           setMacrosStatus(
             brailleBlankInput.checked
-              ? "Braille edge-guard enabled for sends (preview remains unchanged)."
-              : "Braille edge-guard disabled; using NBSP send encoding.",
+              ? `Braille edge-guard enabled for send view (${lineCount} line${lineCount === 1 ? "" : "s"}).`
+              : `Braille edge-guard disabled; using NBSP send view (${lineCount} line${lineCount === 1 ? "" : "s"}).`,
           );
         }});
       }}
@@ -755,10 +783,11 @@
           const replacementChar = normalizeMacrosSpaceReplacementChar(
             spaceReplacementCharInput && spaceReplacementCharInput.value
           );
+          const lineCount = refreshMacrosPreviewSendView();
           setMacrosStatus(
             spaceReplacementEnabledInput.checked
-              ? `MSP-safe replacement enabled (spaces -> "${{replacementChar}}").`
-              : "MSP-safe replacement disabled.",
+              ? `MSP-safe replacement enabled (spaces -> "${{replacementChar}}") · send view refreshed (${lineCount} line${lineCount === 1 ? "" : "s"}).`
+              : `MSP-safe replacement disabled · send view refreshed (${lineCount} line${lineCount === 1 ? "" : "s"}).`,
           );
         }});
       }}
@@ -770,7 +799,10 @@
             spaceReplacementCharInput.value = normalizedChar;
           }}
           if (spaceReplacementEnabledInput instanceof HTMLInputElement && spaceReplacementEnabledInput.checked) {{
-            setMacrosStatus(`MSP-safe replacement char set to "${{normalizedChar}}".`);
+            const lineCount = refreshMacrosPreviewSendView();
+            setMacrosStatus(`MSP-safe replacement char set to "${{normalizedChar}}" · send view refreshed (${lineCount} line${lineCount === 1 ? "" : "s"}).`);
+          }} else {{
+            refreshMacrosPreviewSendView();
           }}
         }};
         spaceReplacementCharInput.addEventListener("input", syncReplacementCharValue);
@@ -787,6 +819,9 @@
             macrosImageSourceName = "";
             macrosImageSourceWidth = 0;
             macrosImageSourceHeight = 0;
+            if (String(macrosRegenSourceLabel || "").toLowerCase().startsWith("image:")) {{
+              macrosRegenSourceLabel = "";
+            }}
             updateMacrosImageMeta();
             setMacrosStatus("No image selected.", true);
             return;
@@ -807,6 +842,9 @@
             macrosImageSourceName = "";
             macrosImageSourceWidth = 0;
             macrosImageSourceHeight = 0;
+            if (String(macrosRegenSourceLabel || "").toLowerCase().startsWith("image:")) {{
+              macrosRegenSourceLabel = "";
+            }}
             updateMacrosImageMeta();
             setMacrosStatus(`Image load failed: ${{err && err.message ? err.message : err}}`, true);
           }}
@@ -850,6 +888,7 @@
 
       if (output instanceof HTMLTextAreaElement) {{
         output.addEventListener("input", () => {{
+          macrosRegenSourceLabel = "";
           syncMacrosPreviewFromOutput("edited");
         }});
       }}
@@ -859,6 +898,7 @@
           if (output instanceof HTMLTextAreaElement) {{
             output.value = "";
           }}
+          macrosRegenSourceLabel = "";
           applyMacrosPreviewLines([], "");
           setMacrosStatus("Cleared preview.");
         }});
@@ -866,13 +906,21 @@
 
       if (copyBtn instanceof HTMLButtonElement) {{
         copyBtn.addEventListener("click", async () => {{
-          if (!(output instanceof HTMLTextAreaElement) || !String(output.value || "").trim()) {{
+          if (!(output instanceof HTMLTextAreaElement) || !String(output.value || "").length) {{
             setMacrosStatus("Nothing to copy yet.", true);
             return;
           }}
           try {{
-            await navigator.clipboard.writeText(output.value);
-            setMacrosStatus("Copied ASCII output.");
+            const prepared = buildMacrosSendLinesFromRawText(output.value);
+            const sendLines = prepared && Array.isArray(prepared.sendLines)
+              ? prepared.sendLines
+              : [];
+            if (sendLines.length <= 0) {{
+              setMacrosStatus("Nothing to copy yet.", true);
+              return;
+            }}
+            await navigator.clipboard.writeText(sendLines.join("\n"));
+            setMacrosStatus(`Copied send-view ASCII (${sendLines.length} line${sendLines.length === 1 ? "" : "s"}).`);
           }} catch (err) {{
             setMacrosStatus(`Copy failed: ${{err && err.message ? err.message : err}}`, true);
           }}
