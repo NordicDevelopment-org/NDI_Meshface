@@ -47,6 +47,13 @@
     const MACROS_ASCII_SPACE_REPLACEMENT_FALLBACK = "·";
     const MACROS_ASCII_RAMP_FALLBACK = "@%#*+=-:. ";
     const MACROS_ASCII_PALETTE_CUSTOM_ID = "custom";
+    const MACROS_SEND_LINE_GAP_MIN_MS = 60;
+    const MACROS_SEND_LINE_GAP_MAX_MS = 1200;
+    const MACROS_SEND_LINE_GAP_FALLBACK_MS = 280;
+    const MACROS_SEND_BROADCAST_GAP_MULTIPLIER = 3.2;
+    const MACROS_SEND_DIRECT_GAP_MULTIPLIER = 0.8;
+    const MACROS_SEND_BROADCAST_BURST_SIZE = 2;
+    const MACROS_SEND_BROADCAST_BURST_EXTRA_GAP_MS = 900;
     const MACROS_ASCII_PALETTE_PRESETS = Object.freeze([
       Object.freeze({{
         id: "classic_10",
@@ -142,6 +149,57 @@
         return char;
       }}
       return MACROS_ASCII_SPACE_REPLACEMENT_FALLBACK;
+    }}
+
+    function clampMacrosLineSendGapMs(rawValue, fallbackMs = MACROS_SEND_LINE_GAP_FALLBACK_MS) {{
+      const numeric = Math.trunc(Number(rawValue));
+      if (!Number.isFinite(numeric)) return fallbackMs;
+      return Math.max(MACROS_SEND_LINE_GAP_MIN_MS, Math.min(MACROS_SEND_LINE_GAP_MAX_MS, numeric));
+    }}
+
+    function defaultMacrosLineSendGapMs() {{
+      const sharedGapMs = (typeof fileTransferInterFrameDelayMs !== "undefined")
+        ? Number(fileTransferInterFrameDelayMs)
+        : NaN;
+      return clampMacrosLineSendGapMs(
+        sharedGapMs || MACROS_SEND_LINE_GAP_FALLBACK_MS,
+        MACROS_SEND_LINE_GAP_FALLBACK_MS,
+      );
+    }}
+
+    function isMacrosBroadcastDestination(destinationId) {{
+      const clean = String(destinationId == null ? "" : destinationId).trim().toLowerCase();
+      return !clean || clean === "^all" || clean === "all" || clean === "broadcast";
+    }}
+
+    function macrosLineSendGapMsForDestination(destinationId) {{
+      const baseGapMs = defaultMacrosLineSendGapMs();
+      if (isMacrosBroadcastDestination(destinationId)) {{
+        const scaled = Math.round(baseGapMs * MACROS_SEND_BROADCAST_GAP_MULTIPLIER);
+        const floorMs = Math.max(420, Math.trunc(baseGapMs * 2));
+        return clampMacrosLineSendGapMs(scaled, floorMs);
+      }}
+      const normalizedDest = normalizeNodeId(destinationId || "");
+      if (!isCanonicalNodeId(normalizedDest)) {{
+        return baseGapMs;
+      }}
+      const scaled = Math.round(baseGapMs * MACROS_SEND_DIRECT_GAP_MULTIPLIER);
+      const floorMs = Math.max(MACROS_SEND_LINE_GAP_MIN_MS, Math.trunc(baseGapMs * 0.65));
+      return clampMacrosLineSendGapMs(
+        scaled,
+        floorMs,
+      );
+    }}
+
+    function waitMacrosLineSendGap(rawDelayMs = null) {{
+      const fallbackGapMs = defaultMacrosLineSendGapMs();
+      const delayMs = rawDelayMs == null
+        ? fallbackGapMs
+        : clampMacrosLineSendGapMs(rawDelayMs, fallbackGapMs);
+      if (delayMs <= 0) return Promise.resolve();
+      return new Promise((resolve) => {{
+        window.setTimeout(resolve, delayMs);
+      }});
     }}
 
     function macrosAsciiBackgroundFillChar(rawRamp) {{
@@ -562,6 +620,8 @@
         }}
       }}
       const sendCtx = meshChannelSendContext();
+      const isBroadcastSend = isMacrosBroadcastDestination(destination);
+      const lineGapMs = macrosLineSendGapMsForDestination(destination);
       macrosSendInFlight = true;
       setMacrosSendBusy(true);
       let sentCount = 0;
@@ -587,6 +647,17 @@
             throw new Error(`send failed at line ${{sentCount + 1}}`);
           }}
           sentCount += 1;
+          if ((lineIdx + 1) < sendLines.length) {{
+            let gapMs = lineGapMs;
+            if (
+              isBroadcastSend
+              && MACROS_SEND_BROADCAST_BURST_SIZE > 0
+              && ((lineIdx + 1) % MACROS_SEND_BROADCAST_BURST_SIZE) === 0
+            ) {{
+              gapMs += Math.max(0, Math.trunc(Number(MACROS_SEND_BROADCAST_BURST_EXTRA_GAP_MS) || 0));
+            }}
+            await waitMacrosLineSendGap(gapMs);
+          }}
         }}
         setMacrosStatus(`Sent ${{sentCount}} ASCII line${{sentCount === 1 ? "" : "s"}} on ${{sendCtx.sendLabel}}.`);
       }} catch (err) {{
