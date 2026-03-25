@@ -44,6 +44,9 @@
       return "Macros: /shrug, /tableflip (/flip), /unflip, /give, /lenny, /cheer · use /macros or /help";
     }}
 
+    const MACROS_ASCII_BLANK_ASCII = " ";
+    const MACROS_ASCII_BLANK_BRAILLE = "\u2800";
+    const MACROS_ASCII_SPACE_REPLACEMENT_FALLBACK = "·";
     const MACROS_ASCII_RAMP_FALLBACK = "@%#*+=-:. ";
     const MACROS_ASCII_PALETTE_CUSTOM_ID = "custom";
     const MACROS_ASCII_PALETTE_PRESETS = Object.freeze([
@@ -134,6 +137,15 @@
       return MACROS_ASCII_PALETTE_PRESETS.find((preset) => preset.id === id) || null;
     }}
 
+    function normalizeMacrosSpaceReplacementChar(rawValue) {{
+      const text = String(rawValue == null ? "" : rawValue);
+      for (const char of Array.from(text)) {{
+        if (!char.trim()) continue;
+        return char;
+      }}
+      return MACROS_ASCII_SPACE_REPLACEMENT_FALLBACK;
+    }}
+
     function parseMacrosAsciiLines(rawText) {{
       const normalized = String(rawText == null ? "" : rawText).replace(/\r\n?/g, "\n");
       const rows = normalized.split("\n").slice(0, 120).map((line) => String(line || "").slice(0, 280));
@@ -148,11 +160,25 @@
       const heightInput = document.getElementById("macros-ascii-height");
       const rampInput = document.getElementById("macros-ascii-ramp");
       const invertInput = document.getElementById("macros-ascii-invert");
+      const useBrailleEdgeGuardsInput = document.getElementById("macros-ascii-braille-blank");
+      const useSpaceReplacementInput = document.getElementById("macros-ascii-space-replace-enabled");
+      const spaceReplacementCharInput = document.getElementById("macros-ascii-space-replace-char");
       return {{
         width: clampMacrosAsciiDimension(widthInput && widthInput.value, 16, 8, 96),
         height: clampMacrosAsciiDimension(heightInput && heightInput.value, 16, 8, 96),
         ramp: normalizeMacrosAsciiRamp(rampInput && rampInput.value),
         invert: !!(invertInput && invertInput.checked),
+        useBrailleEdgeGuards: !!(
+          useBrailleEdgeGuardsInput
+          && useBrailleEdgeGuardsInput.checked
+        ),
+        useSpaceReplacement: !!(
+          useSpaceReplacementInput
+          && useSpaceReplacementInput.checked
+        ),
+        spaceReplacementChar: normalizeMacrosSpaceReplacementChar(
+          spaceReplacementCharInput && spaceReplacementCharInput.value
+        ),
       }};
     }}
 
@@ -346,7 +372,13 @@
         setMacrosStatus("Could not process image pixels.", true);
         return;
       }}
-      const lines = macrosImageDataToAsciiLines(imageData, settings.width, settings.height, settings.ramp, settings.invert);
+      const lines = macrosImageDataToAsciiLines(
+        imageData,
+        settings.width,
+        settings.height,
+        settings.ramp,
+        settings.invert,
+      );
       writeMacrosOutput(lines, `image:${{macrosImageSourceName || "image"}}`);
     }}
 
@@ -368,16 +400,46 @@
         setMacrosStatus("Could not render text to image data.", true);
         return [];
       }}
-      const lines = macrosImageDataToAsciiLines(imageData, settings.width, settings.height, settings.ramp, settings.invert);
+      const lines = macrosImageDataToAsciiLines(
+        imageData,
+        settings.width,
+        settings.height,
+        settings.ramp,
+        settings.invert,
+      );
       writeMacrosOutput(lines, `text:${{trimmed.slice(0, 36)}}`);
       return lines;
     }}
 
-    function encodeAsciiMacroLineForSend(line) {{
+    function encodeAsciiMacroLineForSend(line, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const useBrailleEdgeGuards = !!opts.useBrailleEdgeGuards;
+      const useSpaceReplacement = !!opts.useSpaceReplacement;
+      const spaceReplacementChar = normalizeMacrosSpaceReplacementChar(opts.spaceReplacementChar);
       const raw = String(line == null ? "" : line);
-      if (!raw) return "\u00A0";
+      if (!raw) {{
+        if (useSpaceReplacement) return spaceReplacementChar;
+        return useBrailleEdgeGuards ? MACROS_ASCII_BLANK_BRAILLE : "\u00A0";
+      }}
       const normalized = raw.replace(/\t/g, "  ").slice(0, 280);
-      return normalized.replace(/ /g, "\u00A0");
+      if (useSpaceReplacement) {{
+        return normalized.replace(/ /g, spaceReplacementChar);
+      }}
+      if (!useBrailleEdgeGuards) {{
+        return normalized.replace(/ /g, "\u00A0");
+      }}
+      let encoded = normalized.replace(/ /g, "\u00A0");
+      const leadingSpaces = normalized.match(/^ +/);
+      const trailingSpaces = normalized.match(/ +$/);
+      const leadCount = leadingSpaces ? leadingSpaces[0].length : 0;
+      const trailCount = trailingSpaces ? trailingSpaces[0].length : 0;
+      if (leadCount > 0) {{
+        encoded = `${{MACROS_ASCII_BLANK_BRAILLE.repeat(leadCount)}}${{encoded.slice(leadCount)}}`;
+      }}
+      if (trailCount > 0) {{
+        encoded = `${{encoded.slice(0, Math.max(0, encoded.length - trailCount))}}${{MACROS_ASCII_BLANK_BRAILLE.repeat(trailCount)}}`;
+      }}
+      return encoded;
     }}
 
     function setMacrosSendBusy(isBusy) {{
@@ -420,6 +482,7 @@
         }}
       }}
       const sendCtx = meshChannelSendContext();
+      const settings = macrosAsciiSettingsFromInputs();
       macrosSendInFlight = true;
       setMacrosSendBusy(true);
       let sentCount = 0;
@@ -428,7 +491,11 @@
           setMacrosStatus(`Sending line ${{sentCount + 1}} / ${{lines.length}}...`);
           const payload = await sendChatPayload(
             {{
-              text: encodeAsciiMacroLineForSend(line),
+              text: encodeAsciiMacroLineForSend(line, {{
+                useBrailleEdgeGuards: settings.useBrailleEdgeGuards,
+                useSpaceReplacement: settings.useSpaceReplacement,
+                spaceReplacementChar: settings.spaceReplacementChar,
+              }}),
               destination,
               channel_index: sendCtx.sendIndex,
             }},
@@ -470,6 +537,9 @@
       const sendBtn = document.getElementById("macros-send-lines-btn");
       const textInput = document.getElementById("macros-text-input");
       const rampInput = document.getElementById("macros-ascii-ramp");
+      const brailleBlankInput = document.getElementById("macros-ascii-braille-blank");
+      const spaceReplacementEnabledInput = document.getElementById("macros-ascii-space-replace-enabled");
+      const spaceReplacementCharInput = document.getElementById("macros-ascii-space-replace-char");
       const paletteSelect = document.getElementById("macros-ascii-palette");
       const paletteNote = document.getElementById("macros-ascii-palette-note");
 
@@ -526,6 +596,60 @@
           syncPalettePresetFromRamp();
         }});
       }}
+
+      if (brailleBlankInput instanceof HTMLInputElement) {{
+        brailleBlankInput.addEventListener("change", () => {{
+          setMacrosStatus(
+            brailleBlankInput.checked
+              ? "Braille edge-guard enabled for sends (preview remains unchanged)."
+              : "Braille edge-guard disabled; using NBSP send encoding.",
+          );
+        }});
+      }}
+
+      const syncSpaceReplacementControls = () => {{
+        if (!(spaceReplacementCharInput instanceof HTMLInputElement)) return;
+        const enabled = !!(
+          spaceReplacementEnabledInput
+          && spaceReplacementEnabledInput instanceof HTMLInputElement
+          && spaceReplacementEnabledInput.checked
+        );
+        spaceReplacementCharInput.disabled = !enabled;
+        const normalizedChar = normalizeMacrosSpaceReplacementChar(spaceReplacementCharInput.value);
+        if (spaceReplacementCharInput.value !== normalizedChar) {{
+          spaceReplacementCharInput.value = normalizedChar;
+        }}
+      }};
+
+      if (spaceReplacementEnabledInput instanceof HTMLInputElement) {{
+        spaceReplacementEnabledInput.addEventListener("change", () => {{
+          syncSpaceReplacementControls();
+          const replacementChar = normalizeMacrosSpaceReplacementChar(
+            spaceReplacementCharInput && spaceReplacementCharInput.value
+          );
+          setMacrosStatus(
+            spaceReplacementEnabledInput.checked
+              ? `MSP-safe replacement enabled (spaces -> "${{replacementChar}}").`
+              : "MSP-safe replacement disabled.",
+          );
+        }});
+      }}
+
+      if (spaceReplacementCharInput instanceof HTMLInputElement) {{
+        const syncReplacementCharValue = () => {{
+          const normalizedChar = normalizeMacrosSpaceReplacementChar(spaceReplacementCharInput.value);
+          if (spaceReplacementCharInput.value !== normalizedChar) {{
+            spaceReplacementCharInput.value = normalizedChar;
+          }}
+          if (spaceReplacementEnabledInput instanceof HTMLInputElement && spaceReplacementEnabledInput.checked) {{
+            setMacrosStatus(`MSP-safe replacement char set to "${{normalizedChar}}".`);
+          }}
+        }};
+        spaceReplacementCharInput.addEventListener("input", syncReplacementCharValue);
+        spaceReplacementCharInput.addEventListener("blur", syncReplacementCharValue);
+      }}
+
+      syncSpaceReplacementControls();
 
       if (imageInput instanceof HTMLInputElement) {{
         imageInput.addEventListener("change", async () => {{
@@ -772,8 +896,8 @@
         }}
         return;
       }}
-      const rawText = input.value.trim();
-      if (!rawText) {{
+      const rawText = String(input.value || "");
+      if (!rawText.trim()) {{
         setChatSendStatus("Enter a message before sending.", true);
         if (hadFocus) {{
           restoreChatInputFocus(input);

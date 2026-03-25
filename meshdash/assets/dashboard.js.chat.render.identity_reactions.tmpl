@@ -42,18 +42,52 @@
       const buildMacrosPreviewFeedItems = (previewLines) => {{
         const lines = Array.isArray(previewLines) ? previewLines.slice(0, 120) : [];
         if (lines.length <= 0) return [];
+        let renderedLines = lines;
+        let sendViewSuffix = " · send view";
+        if (typeof encodeAsciiMacroLineForSend === "function") {{
+          const sendSettings = (typeof macrosAsciiSettingsFromInputs === "function")
+            ? macrosAsciiSettingsFromInputs()
+            : null;
+          const useBrailleEdgeGuards = !!(
+            sendSettings
+            && typeof sendSettings === "object"
+            && sendSettings.useBrailleEdgeGuards
+          );
+          const useSpaceReplacement = !!(
+            sendSettings
+            && typeof sendSettings === "object"
+            && sendSettings.useSpaceReplacement
+          );
+          const replacementChar = (
+            sendSettings
+            && typeof sendSettings === "object"
+            && sendSettings.spaceReplacementChar != null
+          )
+            ? String(sendSettings.spaceReplacementChar)
+            : "";
+          renderedLines = lines.map((line) => encodeAsciiMacroLineForSend(line, {{
+            useBrailleEdgeGuards,
+            useSpaceReplacement,
+            spaceReplacementChar: replacementChar,
+          }}));
+          if (useSpaceReplacement && replacementChar) {{
+            sendViewSuffix = ` · send view: spaces→${{replacementChar}}`;
+          }} else if (useBrailleEdgeGuards) {{
+            sendViewSuffix = " · send view: braille-edge";
+          }}
+        }}
         const previewUnix = Number.isFinite(macrosPreviewUpdatedAtUnix) && macrosPreviewUpdatedAtUnix > 0
           ? Math.floor(macrosPreviewUpdatedAtUnix)
           : nowUnix;
         const previewRawTime = new Date(previewUnix * 1000).toISOString();
         const previewTimeText = formatLocalChatTime(previewUnix, previewRawTime, nowUnix);
         const previewTitle = macrosPreviewSourceLabel
-          ? `ASCII macro preview · ${{macrosPreviewSourceLabel}}`
-          : "ASCII macro preview";
+          ? `ASCII macro preview${{sendViewSuffix}} · ${{macrosPreviewSourceLabel}}`
+          : `ASCII macro preview${{sendViewSuffix}}`;
         const selfNodeId = resolveLocalNodeId(state);
         const senderShort = selfRadioProfileShortLabel(selfNodeId || "macr").slice(0, 4) || "macr";
         const senderShortHtml = escAttr(String(senderShort)).replace(/ /g, "&nbsp;");
-        return lines.map((line, idx) => {{
+        return renderedLines.map((line, idx) => {{
           const safeLine = String(line == null ? "" : line);
           const copyHtml = escAttr(safeLine)
             .replace(/\t/g, "&nbsp;&nbsp;")

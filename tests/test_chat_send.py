@@ -26,7 +26,7 @@ def test_prepare_chat_send_input_text_path_normalizes_destination_and_channel():
         to_int_fn=_to_int,
     )
 
-    assert prepared["text"] == "hello"
+    assert prepared["text"] == " hello "
     assert prepared["destination"] == "^all"
     assert prepared["channel_index"] == 0
     assert prepared["ack_requested"] is False

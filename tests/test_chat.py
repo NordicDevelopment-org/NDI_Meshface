@@ -50,6 +50,20 @@ def test_build_local_chat_entry_marks_error_when_ack_missing_message_id():
     assert "delivery_error" in entry
 
 
+def test_build_local_chat_entry_preserves_text_whitespace():
+    entry = build_local_chat_entry(
+        text="   *##      ########   %#####       ##*       .   ",
+        from_id="!local",
+        to_id="!peer",
+        message_id=777,
+        ack_requested=False,
+        now_text="2026-01-01 00:00:00Z",
+        now_unix=1000,
+    )
+    assert entry is not None
+    assert entry["text"] == "   *##      ########   %#####       ##*       .   "
+
+
 def test_build_local_chat_entry_supports_reaction_without_text():
     entry = build_local_chat_entry(
         text="",
