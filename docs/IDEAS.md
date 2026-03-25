@@ -2,15 +2,6 @@
 
 
 
-- MULTILINE MACROS!!!!!!!!!!
-- create macro screen with active preview window
-- acsii pallets to give the same coversion a differnt look
-[21:07:51][   ][MF] 9680 [in reply to 777P] Do not redeem
-[21:11:25][   ][MF]   🍁 [in reply to 852b] 4 hops cold spring
-[21:12:55][   ][MF] HOBO Jos?
-[21:15:42][   ][MF] 777P [in reply to 9680] 😩
-[21:19:49][   ][MF] SGMT [in reply to 777P] 🔥
-[21:26:51][   ][MF] c4f8 ¯\_(ツ)_/¯
 
 - allow public bot shutdown with opt in
 
@@ -26,8 +17,7 @@
 
 - make our chats look differant
 
-- zork in chat kicks off a PM with the firm prompt, do we have or need a timeout?
-
+- add node ID
 - Ability to send a direct message by manually entering a Node ID (when only the Node ID is known).
 - Ability to add a favorite by manually entering a Node ID.
 
