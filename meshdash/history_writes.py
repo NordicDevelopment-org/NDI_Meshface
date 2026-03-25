@@ -314,6 +314,21 @@ def _save_environment_metric_rollups(
             )
 
 
+def save_environment_metric_rollups(
+    conn: SqlConnection,
+    *,
+    summary: dict[str, object],
+    packet: dict[str, object] | None,
+    now_unix_fn: Callable[[], float] = time.time,
+) -> None:
+    _save_environment_metric_rollups(
+        conn,
+        summary=summary,
+        packet=packet,
+        now_unix_fn=now_unix_fn,
+    )
+
+
 def save_packet_event_and_rollups(
     conn: SqlConnection,
     summary: dict[str, object],

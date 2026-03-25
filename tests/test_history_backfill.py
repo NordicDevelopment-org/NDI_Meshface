@@ -1,6 +1,7 @@
 import sqlite3
 
 from meshdash.history_backfill import (
+    backfill_environment_metric_rollups,
     backfill_node_capabilities,
     backfill_node_hour_seen,
     backfill_node_saved_counts,
@@ -261,3 +262,65 @@ def test_backfill_node_hour_seen_populates_and_handles_failures():
             raise RuntimeError("insert fail")
 
     backfill_node_hour_seen(_InsertFailConn())
+
+
+def test_backfill_environment_metric_rollups_populates_from_saved_packets():
+    conn = sqlite3.connect(":memory:")
+    try:
+        initialize_history_schema(conn)
+        conn.execute(
+            """
+            INSERT INTO packets(created_unix, summary_json, packet_json)
+            VALUES(
+              120,
+              '{"from":"!a1b2c3d4","from_short_name":"alpha","rx_time_unix":120,"portnum":"TELEMETRY_APP"}',
+              '{"fromId":"!a1b2c3d4","rxTime":120,"decoded":{"portnum":"TELEMETRY_APP","telemetry":{"time":120,"environmentMetrics":{"temperature":21.5,"relativeHumidity":55.0}}}}'
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO packets(created_unix, summary_json, packet_json)
+            VALUES(
+              130,
+              '{"from":"!a1b2c3d4","from_short_name":"alpha","rx_time_unix":130,"portnum":"TELEMETRY_APP"}',
+              '{"fromId":"!a1b2c3d4","rxTime":130,"decoded":{"portnum":"TELEMETRY_APP","telemetry":{"time":130,"environmentMetrics":{"temperature":22.5}}}}'
+            )
+            """
+        )
+
+        result = backfill_environment_metric_rollups(conn, reset_existing=False)
+
+        assert result["scanned_packets"] == 2
+        assert result["usable_packets"] == 2
+        assert result["bad_rows"] == 0
+        row = conn.execute(
+            """
+            SELECT sample_count, value_sum, value_min, value_max, last_value
+            FROM environment_metrics_1m
+            WHERE bucket_unix = 120 AND node_id = '!a1b2c3d4' AND metric_key = 'temperature'
+            """
+        ).fetchone()
+        assert row == (2, 44.0, 21.5, 22.5, 22.5)
+    finally:
+        conn.close()
+
+
+def test_backfill_environment_metric_rollups_reset_clears_existing_rows():
+    conn = sqlite3.connect(":memory:")
+    try:
+        initialize_history_schema(conn)
+        conn.execute(
+            """
+            INSERT INTO environment_metrics_1m(
+              bucket_unix, node_id, node_label, metric_key, metric_label,
+              sample_count, value_sum, value_min, value_max, last_value, last_seen_unix
+            ) VALUES(0, '!a', 'alpha', 'temperature', 'Temperature',
+                     1, 1.0, 1.0, 1.0, 1.0, 0)
+            """
+        )
+        result = backfill_environment_metric_rollups(conn, reset_existing=True)
+        assert result["before_rows"] == 0
+        assert conn.execute("SELECT COUNT(*) FROM environment_metrics_1m").fetchone()[0] == 0
+    finally:
+        conn.close()

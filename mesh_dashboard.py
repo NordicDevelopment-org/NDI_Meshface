@@ -1,4 +1,5 @@
 import argparse
+import glob
 import os
 from typing import Optional
 
@@ -65,6 +66,12 @@ from meshdash.theme_presets import (
 from meshdash.theme_settings import ThemePresetSettings as _ThemePresetSettings
 from meshdash.cli import build_dashboard_parser as _build_dashboard_parser_helper
 from meshdash.dashboard_runtime import run_dashboard_runtime as _run_dashboard_runtime_helper
+from meshdash.history.db import (
+    open_and_initialize_history_connection as _open_and_initialize_history_connection_helper,
+)
+from meshdash.history_backfill import (
+    backfill_environment_metric_rollups as _backfill_environment_metric_rollups_helper,
+)
 from meshdash.history_store import HistoryStore
 from meshdash.revision import RevisionInfo
 from meshdash.tracker import DashboardTracker, seed_tracker_from_node_db as _seed_tracker_from_node_db_helper
@@ -170,6 +177,58 @@ def _build_make_http_handler_with_theme_settings(
     return _make_http_handler_with_theme_settings
 
 
+def _resolve_backfill_history_db_path(raw_history_db: object) -> tuple[str, list[str]]:
+    resolved = os.path.abspath(os.path.expanduser(str(raw_history_db or DEFAULT_HISTORY_DB)))
+    root, ext = os.path.splitext(resolved)
+    candidate_pattern = f"{root}.radio-*{ext}"
+    candidates = [path for path in glob.glob(candidate_pattern) if os.path.isfile(path)]
+    if not candidates:
+        return resolved, []
+    candidates.sort(key=lambda path: os.path.getmtime(path), reverse=True)
+    if os.path.isfile(resolved):
+        return resolved, candidates
+    return candidates[0], candidates
+
+
+def run_environment_rollup_backfill(args: argparse.Namespace) -> None:
+    selected_db_path, candidates = _resolve_backfill_history_db_path(getattr(args, "history_db", ""))
+    reset_existing = bool(getattr(args, "backfill_environment_rollups_reset", False))
+    if candidates:
+        print(
+            f"Backfill DB selected: {selected_db_path} "
+            f"(found {len(candidates)} profiled DB candidate(s))."
+        )
+    else:
+        print(f"Backfill DB selected: {selected_db_path}")
+    conn = _open_and_initialize_history_connection_helper(
+        db_path=selected_db_path,
+        retention_seconds=max(0, int(getattr(args, "history_retention_days", 0))) * 86400,
+        event_retention_seconds=max(0, int(getattr(args, "history_event_retention_days", 0))) * 86400,
+        rollup_retention_seconds=max(0, int(getattr(args, "history_rollup_retention_days", 0))) * 86400,
+        max_rows=max(100, int(getattr(args, "history_max_rows", 100))),
+        event_max_rows=max(1000, int(getattr(args, "history_event_max_rows", 1000))),
+    )
+    try:
+        result = _backfill_environment_metric_rollups_helper(
+            conn,
+            reset_existing=reset_existing,
+            commit_every=1000,
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    print(
+        "Environment rollup backfill complete: "
+        f"scanned={int(result.get('scanned_packets', 0))}, "
+        f"usable={int(result.get('usable_packets', 0))}, "
+        f"bad={int(result.get('bad_rows', 0))}, "
+        f"rows_before={int(result.get('before_rows', 0))}, "
+        f"rows_after={int(result.get('after_rows', 0))}, "
+        f"rows_delta={int(result.get('delta_rows', 0))}"
+    )
+
+
 def run_dashboard(args: argparse.Namespace) -> None:
     theme_preset_settings = _build_theme_preset_settings(args)
     _ensure_runtime_dependencies_helper(
@@ -268,6 +327,9 @@ def main() -> None:
         env_api_token=os.environ.get("MESH_DASH_API_TOKEN"),
     )
     args = parser.parse_args()
+    if bool(getattr(args, "backfill_environment_rollups", False)):
+        run_environment_rollup_backfill(args)
+        return
     _apply_default_gateway_helper(args, default_mesh_port=DEFAULT_MESH_PORT)
     run_dashboard(args)
 

@@ -110,3 +110,12 @@ def test_build_dashboard_parser_allows_disabling_ticker_scale_reset():
     parser = _build_parser()
     args = parser.parse_args(["--no-reset-ticker-scale-on-restart"])
     assert args.reset_ticker_scale_on_restart is False
+
+
+def test_build_dashboard_parser_accepts_environment_rollup_backfill_flags():
+    parser = _build_parser()
+    args = parser.parse_args(
+        ["--backfill-environment-rollups", "--backfill-environment-rollups-reset"]
+    )
+    assert args.backfill_environment_rollups is True
+    assert args.backfill_environment_rollups_reset is True
