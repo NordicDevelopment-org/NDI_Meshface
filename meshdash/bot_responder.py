@@ -378,6 +378,7 @@ def _render_ping_response_template(
         "hops": "n/a" if hops is None else str(hops),
         "hop_count": "n/a" if hops is None else str(hops),
         "hop_label": hop_label,
+        "location": city or "n/a",
         "city": city or "n/a",
         "distance": distance or "n/a",
     }
