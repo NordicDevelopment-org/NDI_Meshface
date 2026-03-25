@@ -72,12 +72,15 @@
         if (!isCanonicalNodeId(fromId) || fromId === localNodeId) continue;
         if (toId && toId !== localNodeId) continue;
         const dedupeKey = boardGameProtocolMessageKey(gameId, msg, parsed);
-        if (!rememberBoardGameNetworkMessage(gameId, dedupeKey)) continue;
+        if (refs.getSeenKeys().has(dedupeKey)) continue;
 
         if (parsed.type === "invite") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const hostColor = boardGameParseColor(parsed.parts[4], refs.defaultLocalColor);
-          if (!sessionId) continue;
+          if (!sessionId) {{
+            rememberBoardGameNetworkMessage(gameId, dedupeKey);
+            continue;
+          }}
           registerBoardGamePendingInvite(gameId, {{
             from_id: fromId,
             session_id: sessionId,
@@ -91,6 +94,7 @@
               `Invite available from ${{reversiNodeLabel(fromId, safeState)}}. Choose peer and click Accept Invite.`
             );
           }}
+          rememberBoardGameNetworkMessage(gameId, dedupeKey);
           continue;
         }}
 
@@ -109,6 +113,7 @@
             removeAllBoardGamePendingInvitesFromPeer(gameId, fromId);
             link.status = `Connected to ${{reversiNodeLabel(fromId, safeState)}}. You are ${{refs.playerLabel(link.local_color)}}.`;
           }}
+          rememberBoardGameNetworkMessage(gameId, dedupeKey);
           continue;
         }}
 
@@ -123,6 +128,7 @@
           ) {{
             boardGameResetNetworkLink(gameId, `Peer ${{reversiNodeLabel(fromId, safeState)}} ended the match.`, {{ keepPeer: true }});
           }}
+          rememberBoardGameNetworkMessage(gameId, dedupeKey);
           continue;
         }}
 
@@ -131,7 +137,10 @@
           const sentUnix = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));
           const chatText = String(parsed.parts[4] || "").trim();
           const link = refs.getLink();
-          if (!sessionId || !chatText) continue;
+          if (!sessionId || !chatText) {{
+            rememberBoardGameNetworkMessage(gameId, dedupeKey);
+            continue;
+          }}
           if (!boardGameIsNetworkLinked(gameId)) continue;
           if (link.session_id !== sessionId) continue;
           if (normalizeNodeId(link.peer_id) !== fromId) continue;
@@ -143,6 +152,7 @@
             text: chatText,
             unix: Math.max(reversiProtocolMessageUnix(msg), sentUnix),
           }}, safeState);
+          rememberBoardGameNetworkMessage(gameId, dedupeKey);
           continue;
         }}
 
@@ -153,24 +163,37 @@
           const fromCol = Math.trunc(Number(parsed.parts[5]) || -1);
           const toRow = Math.trunc(Number(parsed.parts[6]) || -1);
           const toCol = Math.trunc(Number(parsed.parts[7]) || -1);
-          if (!sessionId || seq <= 0) continue;
+          if (!sessionId || seq <= 0) {{
+            rememberBoardGameNetworkMessage(gameId, dedupeKey);
+            continue;
+          }}
           if (boardGameNormalizeId(gameId) === "chess") {{
-            if (!chessInBounds(fromRow, fromCol) || !chessInBounds(toRow, toCol)) continue;
+            if (!chessInBounds(fromRow, fromCol) || !chessInBounds(toRow, toCol)) {{
+              rememberBoardGameNetworkMessage(gameId, dedupeKey);
+              continue;
+            }}
           }} else if (!checkersInBounds(fromRow, fromCol) || !checkersInBounds(toRow, toCol)) {{
+            rememberBoardGameNetworkMessage(gameId, dedupeKey);
             continue;
           }}
           const link = refs.getLink();
           if (!boardGameIsNetworkLinked(gameId)) continue;
           if (link.session_id !== sessionId) continue;
           if (normalizeNodeId(link.peer_id) !== fromId) continue;
-          if (seq <= Math.max(0, Math.trunc(Number(link.remote_move_seq) || 0))) continue;
+          if (seq <= Math.max(0, Math.trunc(Number(link.remote_move_seq) || 0))) {{
+            rememberBoardGameNetworkMessage(gameId, dedupeKey);
+            continue;
+          }}
           const applied = boardGameNormalizeId(gameId) === "chess"
             ? applyChessMove(fromRow, fromCol, toRow, toCol, {{ source: "remote", suppress_outbound: true }})
             : applyCheckersMove(fromRow, fromCol, toRow, toCol, {{ source: "remote", suppress_outbound: true }});
           if (!applied) continue;
           link.remote_move_seq = seq;
           link.status = `${{reversiNodeLabel(fromId, safeState)}} played ${{boardGameMoveLabel(gameId, fromRow, fromCol, toRow, toCol)}}.`;
+          rememberBoardGameNetworkMessage(gameId, dedupeKey);
+          continue;
         }}
+        rememberBoardGameNetworkMessage(gameId, dedupeKey);
       }}
 
       const nowUnix = Math.floor(Date.now() / 1000);

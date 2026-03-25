@@ -86,12 +86,15 @@
         if (!isCanonicalNodeId(fromId) || fromId === localNodeId) continue;
         if (toId && toId !== localNodeId) continue;
         const dedupeKey = reversiProtocolMessageKey(msg, parsed);
-        if (!rememberReversiNetworkMessage(dedupeKey)) continue;
+        if (reversiSeenNetworkMessageKeys.has(dedupeKey)) continue;
 
         if (parsed.type === "invite") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const hostColor = parseReversiColor(parsed.parts[4], reversiPiece.black);
-          if (!sessionId) continue;
+          if (!sessionId) {{
+            rememberReversiNetworkMessage(dedupeKey);
+            continue;
+          }}
           registerReversiPendingInvite({{
             from_id: fromId,
             session_id: sessionId,
@@ -104,12 +107,16 @@
               `Invite available from ${{reversiNodeLabel(fromId, safeState)}}. Choose peer and click Accept Invite.`
             );
           }}
+          rememberReversiNetworkMessage(dedupeKey);
           continue;
         }}
 
         if (parsed.type === "accept") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
-          if (!sessionId) continue;
+          if (!sessionId) {{
+            rememberReversiNetworkMessage(dedupeKey);
+            continue;
+          }}
           if (
             reversiLink.mode === "pending_host"
             && reversiLink.role === "host"
@@ -121,15 +128,20 @@
             removeAllReversiPendingInvitesFromPeer(fromId);
             reversiLink.status = `Connected to ${{reversiNodeLabel(fromId, safeState)}}. You are ${{reversiPlayerLabel(reversiLink.local_color)}}.`;
           }}
+          rememberReversiNetworkMessage(dedupeKey);
           continue;
         }}
 
         if (parsed.type === "leave") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
-          if (!sessionId) continue;
+          if (!sessionId) {{
+            rememberReversiNetworkMessage(dedupeKey);
+            continue;
+          }}
           if (reversiIsNetworkLinked() && reversiLink.session_id === sessionId && normalizeNodeId(reversiLink.peer_id) === fromId) {{
             resetReversiNetworkLink(`Peer ${{reversiNodeLabel(fromId, safeState)}} ended the match.`, {{ keepPeer: true }});
           }}
+          rememberReversiNetworkMessage(dedupeKey);
           continue;
         }}
 
@@ -137,7 +149,10 @@
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const sentUnix = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));
           const chatText = String(parsed.parts[4] || "").trim();
-          if (!sessionId || !chatText) continue;
+          if (!sessionId || !chatText) {{
+            rememberReversiNetworkMessage(dedupeKey);
+            continue;
+          }}
           if (!reversiIsNetworkLinked()) continue;
           if (reversiLink.session_id !== sessionId) continue;
           if (normalizeNodeId(reversiLink.peer_id) !== fromId) continue;
@@ -149,6 +164,7 @@
             text: chatText,
             unix: Math.max(reversiProtocolMessageUnix(msg), sentUnix),
           }}, safeState);
+          rememberReversiNetworkMessage(dedupeKey);
           continue;
         }}
 
@@ -157,16 +173,25 @@
           const seq = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));
           const row = Math.trunc(Number(parsed.parts[4]) || -1);
           const col = Math.trunc(Number(parsed.parts[5]) || -1);
-          if (!sessionId || !inReversiBounds(row, col) || seq <= 0) continue;
+          if (!sessionId || !inReversiBounds(row, col) || seq <= 0) {{
+            rememberReversiNetworkMessage(dedupeKey);
+            continue;
+          }}
           if (!reversiIsNetworkLinked()) continue;
           if (reversiLink.session_id !== sessionId) continue;
           if (normalizeNodeId(reversiLink.peer_id) !== fromId) continue;
-          if (seq <= Math.max(0, Math.trunc(Number(reversiLink.remote_move_seq) || 0))) continue;
+          if (seq <= Math.max(0, Math.trunc(Number(reversiLink.remote_move_seq) || 0))) {{
+            rememberReversiNetworkMessage(dedupeKey);
+            continue;
+          }}
           const applied = applyReversiMove(row, col, {{ source: "remote", suppress_outbound: true }});
           if (!applied) continue;
           reversiLink.remote_move_seq = seq;
           reversiLink.status = `${{reversiNodeLabel(fromId, safeState)}} played ${{reversiCellLabel(row, col)}}.`;
+          rememberReversiNetworkMessage(dedupeKey);
+          continue;
         }}
+        rememberReversiNetworkMessage(dedupeKey);
       }}
       const nowUnix = Math.floor(Date.now() / 1000);
       reversiPendingInvites = (Array.isArray(reversiPendingInvites) ? reversiPendingInvites : [])
