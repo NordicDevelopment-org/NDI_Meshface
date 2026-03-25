@@ -10,6 +10,149 @@
         ROUTER: "#ff0019",
         LOST_AND_FOUND: "#C3A8E8",
       }};
+      const trendStopwords = new Set([
+        "about", "after", "again", "also", "and", "any", "are", "back", "been", "before", "being",
+        "but", "can", "cant", "did", "does", "dont", "each", "for", "from", "get", "got", "had",
+        "has", "have", "here", "how", "just", "like", "made", "make", "mesh", "more", "need",
+        "now", "only", "other", "our", "out", "over", "really", "same", "some", "still", "than",
+        "that", "the", "their", "them", "then", "there", "these", "they", "this", "those", "time",
+        "today", "too", "very", "want", "well", "were", "what", "when", "with", "would", "your",
+      ]);
+      const trendWordRegex = /[a-z0-9][a-z0-9_-]{2,}/ig;
+      const trendHashtagRegex = /#([a-z0-9][a-z0-9_-]{1,31})/ig;
+      const tokenizeTrendFallback = (rawText) => {{
+        const text = String(rawText || "").toLowerCase();
+        const tokens = [];
+        const seen = new Set();
+        let match = null;
+        while ((match = trendWordRegex.exec(text)) !== null) {{
+          const token = String(match[0] || "").trim().toLowerCase();
+          if (!token || token.length < 3) continue;
+          if (trendStopwords.has(token)) continue;
+          if (seen.has(token)) continue;
+          seen.add(token);
+          tokens.push(token);
+          if (tokens.length >= 8) break;
+        }}
+        trendWordRegex.lastIndex = 0;
+        return tokens;
+      }};
+      const extractHashtags = (rawText) => {{
+        const text = String(rawText || "").toLowerCase();
+        const tags = [];
+        const seen = new Set();
+        let match = null;
+        while ((match = trendHashtagRegex.exec(text)) !== null) {{
+          const token = String(match[1] || "").trim().toLowerCase();
+          if (!token) continue;
+          if (seen.has(token)) continue;
+          seen.add(token);
+          tags.push(token);
+          if (tags.length >= 6) break;
+        }}
+        trendHashtagRegex.lastIndex = 0;
+        return tags;
+      }};
+      const trendFeedItems = (() => {{
+        if (!chatTrendsViewEnabled || activeLayoutView !== "chat") return [];
+        const messageRows = Array.isArray(visibleMessages) ? visibleMessages : [];
+        if (messageRows.length <= 0) return [];
+        const metadataRows = [];
+        const tokenFrequency = new Map();
+        for (const msg of messageRows) {{
+          if (!(msg && typeof msg === "object")) continue;
+          if (isReactionMessage(msg)) continue;
+          const textRaw = String(msg.text || "").trim();
+          if (!textRaw) continue;
+          const hashtags = extractHashtags(textRaw);
+          const fallbackTokens = tokenizeTrendFallback(textRaw);
+          for (const token of fallbackTokens) {{
+            tokenFrequency.set(token, (tokenFrequency.get(token) || 0) + 1);
+          }}
+          metadataRows.push({{
+            msg,
+            textRaw,
+            hashtags,
+            fallbackTokens,
+          }});
+        }}
+        if (metadataRows.length <= 0) return [];
+
+        const buckets = new Map();
+        for (const row of metadataRows) {{
+          const hashtags = Array.isArray(row.hashtags) ? row.hashtags : [];
+          const fallbackTokens = Array.isArray(row.fallbackTokens) ? row.fallbackTokens : [];
+          const fallbackToken = fallbackTokens
+            .slice()
+            .sort((a, b) => {{
+              const aFreq = Number(tokenFrequency.get(a) || 0);
+              const bFreq = Number(tokenFrequency.get(b) || 0);
+              if (aFreq !== bFreq) return bFreq - aFreq;
+              return String(a).localeCompare(String(b));
+            }})
+            .find((token) => Number(tokenFrequency.get(token) || 0) >= 2)
+            || fallbackTokens[0]
+            || "";
+          const trendToken = hashtags[0] ? `#${{hashtags[0]}}` : (fallbackToken || "misc");
+          const trendKind = hashtags[0] ? "hashtag" : (fallbackToken ? "keyword" : "fallback");
+          const bucketKey = `${{trendKind}}:${{trendToken}}`;
+          let bucket = buckets.get(bucketKey);
+          if (!bucket) {{
+            bucket = {{
+              key: trendToken,
+              kind: trendKind,
+              count: 0,
+              latestUnix: 0,
+              latestTimeRaw: "",
+              latestText: "",
+              latestSender: "",
+              latestMessageId: "",
+            }};
+            buckets.set(bucketKey, bucket);
+          }}
+          bucket.count += 1;
+          const msg = row.msg;
+          const msgUnix = latestUnixTimestamp(msg.rx_time, msg.captured_at);
+          const rawTimeText = String(msg.rx_time || msg.captured_at || "").trim();
+          const endpoints = endpointsForMessage(msg);
+          const fromMeta = chatEndpointParts(endpoints.fromId, msgUnix);
+          const messageId = messageIdOf(msg);
+          if (!Number.isFinite(bucket.latestUnix) || msgUnix >= bucket.latestUnix) {{
+            bucket.latestUnix = Number.isFinite(msgUnix) ? msgUnix : 0;
+            bucket.latestTimeRaw = rawTimeText;
+            bucket.latestText = compactInlineMessage(row.textRaw, 96);
+            bucket.latestSender = String(fromMeta.label || endpoints.fromId || "Unknown node");
+            bucket.latestMessageId = Number.isInteger(messageId) && messageId > 0 ? String(messageId) : "";
+          }}
+        }}
+
+        return Array.from(buckets.values())
+          .sort((a, b) => (Number(b.latestUnix || 0) - Number(a.latestUnix || 0)) || (Number(b.count || 0) - Number(a.count || 0)))
+          .map((bucket) => {{
+            const latestUnix = Number(bucket.latestUnix || 0);
+            const timeText = formatLocalChatTime(latestUnix, bucket.latestTimeRaw || "n/a", nowUnix);
+            const countLabel = `${{bucket.count}} msg${{bucket.count === 1 ? "" : "s"}}`;
+            const kindLabel = bucket.kind === "hashtag"
+              ? "Hashtag trend"
+              : (bucket.kind === "keyword" ? "Keyword trend" : "Trend");
+            const preview = bucket.latestText || "(no text)";
+            const sender = bucket.latestSender || "Unknown node";
+            const title = `${{kindLabel}} · ${{bucket.key}} · ${{countLabel}} · latest from ${{sender}}`;
+            return `<div class="chat-feed-item chat-feed-item-trend" data-trend-key="${{escAttr(bucket.key)}}" data-trend-kind="${{escAttr(bucket.kind)}}" data-message-id="${{escAttr(bucket.latestMessageId)}}" title="${{escAttr(title)}}">
+              <div class="chat-feed-line">
+                <div class="chat-feed-summary">
+                  <span class="chat-trend-tag kind-${{escAttr(bucket.kind)}}">${{escAttr(bucket.key)}}</span>
+                  <span class="chat-trend-count">${{escAttr(countLabel)}}</span>
+                  <span class="chat-trend-by">${{escAttr(sender)}}:</span>
+                  <span class="chat-trend-preview">${{escAttr(preview)}}</span>
+                </div>
+                <span class="chat-feed-side">
+                  <span class="chat-feed-time" title="${{escAttr(title)}}">${{escAttr(timeText)}}</span>
+                </span>
+              </div>
+            </div>`;
+          }});
+      }})();
       const feedItems = visibleMessages.map((msg) => {{
         const endpoints = endpointsForMessage(msg);
         const sourceNode = endpoints.fromId;

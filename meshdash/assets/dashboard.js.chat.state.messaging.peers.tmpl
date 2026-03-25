@@ -8,6 +8,16 @@
       }});
     }}
 
+    function bindChatTrendsViewControl() {{
+      const btn = document.getElementById("chat-trends-view-btn");
+      if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      syncChatTrendsViewControl();
+      btn.addEventListener("click", () => {{
+        applyChatTrendsViewEnabled(!chatTrendsViewEnabled, true);
+      }});
+    }}
+
     // Meshtastic has its own notion of "channels" (0..N) which are distinct from this UI's
     // chat scopes (Everyone vs Peer-to-peer).
     //

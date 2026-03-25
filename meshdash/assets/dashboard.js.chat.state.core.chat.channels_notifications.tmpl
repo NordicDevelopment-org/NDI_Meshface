@@ -203,3 +203,48 @@
         renderChat(latestState);
       }}
     }}
+
+    function normalizeChatTrendsViewEnabled(value) {{
+      if (typeof value === "boolean") return value;
+      const clean = String(value || "").trim().toLowerCase();
+      return clean === "1" || clean === "true" || clean === "yes" || clean === "on";
+    }}
+
+    function syncChatTrendsViewControl() {{
+      const btn = document.getElementById("chat-trends-view-btn");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      btn.classList.toggle("is-active", !!chatTrendsViewEnabled);
+      btn.setAttribute("aria-pressed", chatTrendsViewEnabled ? "true" : "false");
+      btn.textContent = chatTrendsViewEnabled ? "Trends: On" : "Trends";
+      btn.title = chatTrendsViewEnabled
+        ? "Trends view is ON: grouped by hashtag first, then common keywords."
+        : "Trends view groups messages by hashtag first, then common keywords.";
+    }}
+
+    function applyChatTrendsViewEnabled(value, persist = true) {{
+      const enabled = normalizeChatTrendsViewEnabled(value);
+      const changed = chatTrendsViewEnabled !== enabled;
+      chatTrendsViewEnabled = enabled;
+      syncChatTrendsViewControl();
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(chatTrendsViewStorageKey, enabled ? "1" : "0");
+        }} catch (_err) {{
+        }}
+      }}
+      if (!changed) return;
+      if (latestState) {{
+        renderChat(latestState);
+      }}
+    }}
+
+    function loadChatTrendsViewPreference() {{
+      let enabled = false;
+      try {{
+        enabled = normalizeChatTrendsViewEnabled(
+          window.localStorage.getItem(chatTrendsViewStorageKey) || "0"
+        );
+      }} catch (_err) {{
+      }}
+      applyChatTrendsViewEnabled(enabled, false);
+    }}
