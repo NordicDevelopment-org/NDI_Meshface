@@ -227,3 +227,60 @@ def test_handle_bot_settings_post_uses_larger_content_length_cap_for_joke_lists(
     )
     assert calls["status_code"] == 200
     assert observed["max_bytes"] == 256 * 1024
+
+
+def test_handle_bot_settings_post_returns_400_on_invalid_request_size():
+    calls = {}
+
+    def _raise_size(*_args, **_kwargs):
+        raise ValueError("bad size")
+
+    handle_bot_settings_post(
+        _handler(body=b'{"game_enabled":true}'),
+        apply_bot_settings_fn=lambda _req: {"ok": True},
+        to_int_fn=lambda value: int(value) if value not in (None, "") else None,
+        validate_content_length_fn=_raise_size,
+        parse_bot_settings_request_fn=lambda _raw: BotSettingsRequest(game_enabled=True),
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 400
+    assert calls["payload_obj"]["error"] == "Invalid request size"
+
+
+def test_handle_bot_settings_post_returns_400_on_apply_value_error():
+    calls = {}
+
+    def _apply_raise(_req):
+        raise ValueError("bad patch")
+
+    handle_bot_settings_post(
+        _handler(body=b'{"game_enabled":true}'),
+        apply_bot_settings_fn=_apply_raise,
+        to_int_fn=lambda value: int(value) if value not in (None, "") else None,
+        validate_content_length_fn=lambda *_args, **_kwargs: len(b'{"game_enabled":true}'),
+        parse_bot_settings_request_fn=lambda _raw: BotSettingsRequest(game_enabled=True),
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 400
+    assert calls["payload_obj"]["error"] == "bad patch"
+
+
+def test_handle_bot_settings_post_returns_500_on_apply_exception():
+    calls = {}
+
+    def _apply_raise(_req):
+        raise RuntimeError("boom")
+
+    handle_bot_settings_post(
+        _handler(body=b'{"game_enabled":true}'),
+        apply_bot_settings_fn=_apply_raise,
+        to_int_fn=lambda value: int(value) if value not in (None, "") else None,
+        validate_content_length_fn=lambda *_args, **_kwargs: len(b'{"game_enabled":true}'),
+        parse_bot_settings_request_fn=lambda _raw: BotSettingsRequest(game_enabled=True),
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 500
+    assert calls["payload_obj"]["error"] == "Bot settings update failed: boom"
