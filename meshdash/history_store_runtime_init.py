@@ -16,6 +16,9 @@ from .history_store_runtime_contracts import (
 from .history_store_policy import (
     build_history_store_policy as _build_history_store_policy_helper,
 )
+from .history_profile import (
+    local_node_id_from_profiled_history_db_path as _local_node_id_from_profiled_history_db_path_helper,
+)
 
 
 def initialize_history_store_runtime(
@@ -40,6 +43,7 @@ def initialize_history_store_runtime(
         rollup_retention_days=rollup_retention_days,
     )
     store.db_path = db_path
+    store.local_node_id = _local_node_id_from_profiled_history_db_path_helper(db_path)
     store._policy = policy
     store.max_rows = policy.max_rows
     store.retention_seconds = policy.retention_seconds

@@ -145,6 +145,78 @@ def test_history_store_domain_modules_round_trip_packet_chat_and_connection(tmp_
         store.close()
 
 
+def test_history_store_save_packet_skips_local_admin_and_telemetry_noise(tmp_path):
+    db_path = tmp_path / "history_wrappers.radio-a1b2c3d4.sqlite3"
+    store = HistoryStore(
+        db_path=str(db_path),
+        max_rows=5000,
+        retention_days=7,
+        event_max_rows=200000,
+        event_retention_days=30,
+        rollup_retention_days=365,
+    )
+    try:
+        save_packet_domain(
+            store,
+            {
+                "summary": {
+                    "from": "!a1b2c3d4",
+                    "to": "^all",
+                    "rx_time_unix": 1_700_000_100,
+                    "portnum": "TELEMETRY_APP",
+                },
+                "packet": {
+                    "id": 1_700_000_100,
+                    "fromId": "!a1b2c3d4",
+                    "toId": "^all",
+                    "rxTime": 1_700_000_100,
+                },
+            },
+        )
+        assert load_recent_packets_domain(store, 10) == []
+        packet_events_count = int(
+            store._conn.execute("SELECT COUNT(*) FROM packet_events").fetchone()[0] or 0
+        )
+        assert packet_events_count == 0
+    finally:
+        store.close()
+
+
+def test_history_store_save_packet_keeps_non_local_telemetry_packets(tmp_path):
+    db_path = tmp_path / "history_wrappers.radio-a1b2c3d4.sqlite3"
+    store = HistoryStore(
+        db_path=str(db_path),
+        max_rows=5000,
+        retention_days=7,
+        event_max_rows=200000,
+        event_retention_days=30,
+        rollup_retention_days=365,
+    )
+    try:
+        save_packet_domain(
+            store,
+            {
+                "summary": {
+                    "from": "!11223344",
+                    "to": "^all",
+                    "rx_time_unix": 1_700_000_101,
+                    "portnum": "TELEMETRY_APP",
+                },
+                "packet": {
+                    "id": 1_700_000_101,
+                    "fromId": "!11223344",
+                    "toId": "^all",
+                    "rxTime": 1_700_000_101,
+                },
+            },
+        )
+        packets = load_recent_packets_domain(store, 10)
+        assert len(packets) == 1
+        assert packets[0]["summary"]["from"] == "!11223344"
+    finally:
+        store.close()
+
+
 def test_history_store_domain_node_modules_return_mapping_shapes(tmp_path):
     store = _make_store(tmp_path)
     try:

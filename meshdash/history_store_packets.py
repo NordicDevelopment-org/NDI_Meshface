@@ -36,6 +36,7 @@ _ENV_METRIC_ALIAS_MAP = {
     "channelutilization": "channel_utilization",
     "airutiltx": "air_util_tx",
 }
+_LOCAL_NOISE_PORTS = {"ADMIN_APP", "TELEMETRY_APP"}
 
 
 def _is_hex_text(value: str) -> bool:
@@ -120,6 +121,28 @@ def _canonical_node_id(value: object) -> str:
     if parsed_num is not None and 0 <= parsed_num <= 0xFFFFFFFF:
         return f"!{parsed_num:08x}"
     return text
+
+
+def _should_skip_local_noise_packet(
+    packet_entry: dict[str, object],
+    *,
+    local_node_id: object,
+) -> bool:
+    clean_local_node_id = _canonical_node_id(local_node_id)
+    if not (clean_local_node_id.startswith("!") and len(clean_local_node_id) == 9):
+        return False
+    summary = packet_entry.get("summary")
+    if not isinstance(summary, dict):
+        return False
+    from_id = _canonical_node_id(
+        summary.get("from")
+        or summary.get("from_id")
+        or summary.get("from_num")
+    )
+    if from_id != clean_local_node_id:
+        return False
+    portnum = str(summary.get("portnum") or "").strip().upper()
+    return bool(portnum) and portnum in _LOCAL_NOISE_PORTS
 
 
 def _extract_node_label(summary: dict[str, object], packet: dict[str, object], fallback: str) -> str:
@@ -602,6 +625,11 @@ def load_environment_metrics_history(
 
 
 def save_packet(store: HistoryStoreWriteState, packet_entry: dict[str, object]) -> None:
+    if _should_skip_local_noise_packet(
+        packet_entry,
+        local_node_id=getattr(store, "local_node_id", ""),
+    ):
+        return
     with store._lock:
         _save_packet_record_helper(
             store._conn,

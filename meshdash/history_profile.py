@@ -85,3 +85,29 @@ def build_profiled_history_db_path(history_db_path: str, *, profile_key: str) ->
     if root.endswith(suffix):
         return raw_path
     return f"{root}{suffix}{ext}"
+
+
+def local_node_id_from_profiled_history_db_path(history_db_path: str) -> str:
+    """Best-effort local node id extraction from a profiled DB path.
+
+    Paths are typically formatted as:
+      <base>.radio-<profile-key>.sqlite3
+
+    When <profile-key> is an 8-hex canonical node id slug, return "!<hex>".
+    Otherwise return "" (non-node profile keys such as target slugs).
+    """
+    raw_path = str(history_db_path or "").strip()
+    if not raw_path or _is_memory_or_uri_path(raw_path):
+        return ""
+
+    base_name = os.path.basename(raw_path)
+    root, _ext = os.path.splitext(base_name)
+    marker = ".radio-"
+    if marker not in root:
+        return ""
+    profile_key = root.rsplit(marker, 1)[-1].strip()
+    if not profile_key:
+        return ""
+    if re.fullmatch(r"[0-9a-fA-F]{8}", profile_key):
+        return f"!{profile_key.lower()}"
+    return ""

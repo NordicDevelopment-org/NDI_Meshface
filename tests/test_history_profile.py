@@ -1,5 +1,6 @@
 from meshdash.history_profile import (
     build_profiled_history_db_path,
+    local_node_id_from_profiled_history_db_path,
     resolve_history_profile_key,
 )
 
@@ -58,3 +59,18 @@ def test_build_profiled_history_db_path_skips_memory_and_uri_paths():
         == "file:/tmp/history.sqlite3"
     )
 
+
+def test_local_node_id_from_profiled_history_db_path_reads_radio_hex_suffix():
+    local_node_id = local_node_id_from_profiled_history_db_path(
+        "/tmp/mesh_dashboard_history.radio-A1B2C3D4.sqlite3"
+    )
+    assert local_node_id == "!a1b2c3d4"
+
+
+def test_local_node_id_from_profiled_history_db_path_ignores_non_node_profiles():
+    assert (
+        local_node_id_from_profiled_history_db_path(
+            "/tmp/mesh_dashboard_history.radio-192-168-1-10-4403-tcp.sqlite3"
+        )
+        == ""
+    )
