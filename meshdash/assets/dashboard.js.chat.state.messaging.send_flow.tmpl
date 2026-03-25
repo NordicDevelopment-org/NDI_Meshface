@@ -728,10 +728,8 @@
         macrosLeftViewMode = nextMode;
         syncMacrosLeftViewToggleUi();
         if (activeLayoutView === "macros" && typeof applyChatViewMode === "function") {{
-          applyChatViewMode(
-            nextMode === MACROS_LEFT_VIEW_MODE_LIVE ? "default" : "monitor",
-            false,
-          );
+          // Keep MACROS left-pane rendering WYSIWYG and consistent for both modes.
+          applyChatViewMode("monitor", false);
         }}
         if (persist) {{
           try {{
@@ -745,7 +743,7 @@
         if (announce) {{
           setMacrosStatus(
             nextMode === MACROS_LEFT_VIEW_MODE_LIVE
-              ? "Left panel mode: live chat."
+              ? "Left panel mode: live chat (macro style)."
               : "Left panel mode: macro preview."
           );
         }}
