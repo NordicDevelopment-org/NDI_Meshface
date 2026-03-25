@@ -56,14 +56,23 @@
       if (feed) {{
         feed.classList.toggle("chat-feed-view-monitor", chatViewMode === "monitor");
         feed.dataset.chatViewMode = chatViewMode === "monitor" ? "monitor" : "default";
+        const macrosViewMode = String(macrosLeftViewMode || "preview").trim().toLowerCase() === "live"
+          ? "live"
+          : "preview";
+        if (activeLayoutView === "macros") {{
+          feed.dataset.macrosFeedMode = macrosViewMode;
+        }} else {{
+          delete feed.dataset.macrosFeedMode;
+        }}
         const emptyText = (activeChatChannel === "direct" && !isCanonicalNodeId(directSelectedId))
           ? "Select a user to view peer-to-peer messages."
           : `No ${{channelLabel(activeChatChannel).toLowerCase()}} messages yet.`;
-        const macroPreviewRows = (activeLayoutView === "macros")
+        const showMacroPreview = activeLayoutView === "macros" && macrosViewMode === "preview";
+        const macroPreviewRows = showMacroPreview
           ? buildMacrosPreviewFeedItems(macrosPreviewLines)
           : [];
         closeReactionPopover(true);
-        if (activeLayoutView === "macros") {{
+        if (showMacroPreview) {{
           feed.innerHTML = macroPreviewRows.length > 0
             ? macroPreviewRows.join("")
             : '<div class="chat-feed-empty">Generate ASCII in MACROS Studio on the right to preview line-by-line output here.</div>';

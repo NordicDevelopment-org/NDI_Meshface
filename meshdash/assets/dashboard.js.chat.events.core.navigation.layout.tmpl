@@ -115,7 +115,9 @@
         }} catch (_err) {{
         }}
       }}
-      applyChatViewMode(next === "macros" ? "monitor" : "default", false);
+      const macrosLeftMode = String(macrosLeftViewMode || "preview").trim().toLowerCase();
+      const macrosUseLiveFeed = next === "macros" && macrosLeftMode === "live";
+      applyChatViewMode(next === "macros" ? (macrosUseLiveFeed ? "default" : "monitor") : "default", false);
       if (next === "macros" && typeof applyMacrosPanelSplitState === "function") {{
         applyMacrosPanelSplitState();
       }}

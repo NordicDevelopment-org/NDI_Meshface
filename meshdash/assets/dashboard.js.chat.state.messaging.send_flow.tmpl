@@ -47,6 +47,9 @@
     const MACROS_ASCII_SPACE_REPLACEMENT_FALLBACK = "·";
     const MACROS_ASCII_RAMP_FALLBACK = "@%#*+=-:. ";
     const MACROS_ASCII_PALETTE_CUSTOM_ID = "custom";
+    const MACROS_LEFT_VIEW_MODE_PREVIEW = "preview";
+    const MACROS_LEFT_VIEW_MODE_LIVE = "live";
+    const MACROS_LEFT_VIEW_MODE_STORAGE_KEY = "meshDashboardMacrosLeftViewModeV1";
     const MACROS_SEND_LINE_GAP_MIN_MS = 60;
     const MACROS_SEND_LINE_GAP_MAX_MS = 1200;
     const MACROS_SEND_LINE_GAP_FALLBACK_MS = 280;
@@ -149,6 +152,13 @@
         return char;
       }}
       return MACROS_ASCII_SPACE_REPLACEMENT_FALLBACK;
+    }}
+
+    function normalizeMacrosLeftViewMode(rawValue) {{
+      const mode = String(rawValue == null ? "" : rawValue).trim().toLowerCase();
+      return mode === MACROS_LEFT_VIEW_MODE_LIVE
+        ? MACROS_LEFT_VIEW_MODE_LIVE
+        : MACROS_LEFT_VIEW_MODE_PREVIEW;
     }}
 
     function clampMacrosLineSendGapMs(rawValue, fallbackMs = MACROS_SEND_LINE_GAP_FALLBACK_MS) {{
@@ -689,10 +699,56 @@
       const spaceReplacementCharInput = document.getElementById("macros-ascii-space-replace-char");
       const paletteSelect = document.getElementById("macros-ascii-palette");
       const paletteNote = document.getElementById("macros-ascii-palette-note");
+      const leftViewPreviewBtn = document.getElementById("macros-left-view-preview-btn");
+      const leftViewLiveBtn = document.getElementById("macros-left-view-live-btn");
 
       const setPaletteNote = (rawText) => {{
         if (!(paletteNote instanceof HTMLElement)) return;
         paletteNote.textContent = String(rawText == null ? "" : rawText).trim() || "Using custom ramp.";
+      }};
+
+      const syncMacrosLeftViewToggleUi = () => {{
+        const mode = normalizeMacrosLeftViewMode(macrosLeftViewMode);
+        macrosLeftViewMode = mode;
+        if (leftViewPreviewBtn instanceof HTMLButtonElement) {{
+          const isActive = mode === MACROS_LEFT_VIEW_MODE_PREVIEW;
+          leftViewPreviewBtn.classList.toggle("is-active", isActive);
+          leftViewPreviewBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
+        }}
+        if (leftViewLiveBtn instanceof HTMLButtonElement) {{
+          const isActive = mode === MACROS_LEFT_VIEW_MODE_LIVE;
+          leftViewLiveBtn.classList.toggle("is-active", isActive);
+          leftViewLiveBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
+        }}
+      }};
+
+      const applyMacrosLeftViewMode = (rawMode, persist = true, announce = false) => {{
+        const nextMode = normalizeMacrosLeftViewMode(rawMode);
+        const changed = macrosLeftViewMode !== nextMode;
+        macrosLeftViewMode = nextMode;
+        syncMacrosLeftViewToggleUi();
+        if (activeLayoutView === "macros" && typeof applyChatViewMode === "function") {{
+          applyChatViewMode(
+            nextMode === MACROS_LEFT_VIEW_MODE_LIVE ? "default" : "monitor",
+            false,
+          );
+        }}
+        if (persist) {{
+          try {{
+            window.localStorage.setItem(MACROS_LEFT_VIEW_MODE_STORAGE_KEY, nextMode);
+          }} catch (_err) {{
+          }}
+        }}
+        if (changed && latestState && typeof latestState === "object" && activeLayoutView === "macros") {{
+          renderChat(latestState);
+        }}
+        if (announce) {{
+          setMacrosStatus(
+            nextMode === MACROS_LEFT_VIEW_MODE_LIVE
+              ? "Left panel mode: live chat."
+              : "Left panel mode: macro preview."
+          );
+        }}
       }};
 
       let paletteSyncLocked = false;
@@ -782,6 +838,17 @@
               syncMacrosPreviewFromOutput("edited");
             }}
           }});
+        }});
+      }}
+
+      if (leftViewPreviewBtn instanceof HTMLButtonElement) {{
+        leftViewPreviewBtn.addEventListener("click", () => {{
+          applyMacrosLeftViewMode(MACROS_LEFT_VIEW_MODE_PREVIEW, true, true);
+        }});
+      }}
+      if (leftViewLiveBtn instanceof HTMLButtonElement) {{
+        leftViewLiveBtn.addEventListener("click", () => {{
+          applyMacrosLeftViewMode(MACROS_LEFT_VIEW_MODE_LIVE, true, true);
         }});
       }}
 
@@ -972,6 +1039,12 @@
       updateMacrosImageMeta();
       syncPalettePresetFromRamp();
       syncMacrosPreviewFromOutput("init");
+      let storedLeftViewMode = MACROS_LEFT_VIEW_MODE_PREVIEW;
+      try {{
+        storedLeftViewMode = window.localStorage.getItem(MACROS_LEFT_VIEW_MODE_STORAGE_KEY) || MACROS_LEFT_VIEW_MODE_PREVIEW;
+      }} catch (_err) {{
+      }}
+      applyMacrosLeftViewMode(storedLeftViewMode, false, false);
       setMacrosStatus("Load an image or type text to build a macro.");
     }}
 
