@@ -146,13 +146,80 @@
       return MACROS_ASCII_SPACE_REPLACEMENT_FALLBACK;
     }}
 
-    function parseMacrosAsciiLines(rawText) {{
+    function macrosAsciiBackgroundFillChar(rawRamp) {{
+      const normalizedRamp = normalizeMacrosAsciiRamp(rawRamp);
+      if (!normalizedRamp) return " ";
+      return normalizedRamp.charAt(Math.max(0, normalizedRamp.length - 1)) || " ";
+    }}
+
+    function isMacrosAsciiBlankChar(rawChar, fillChar = " ") {{
+      const char = String(rawChar == null ? "" : rawChar).slice(0, 1);
+      if (!char) return true;
+      if (char === " " || char === "\t" || char === "\u00A0" || char === "\u2800") {{
+        return true;
+      }}
+      const fill = String(fillChar == null ? "" : fillChar).slice(0, 1);
+      return !!fill && char === fill;
+    }}
+
+    function isMacrosAsciiBlankLine(rawLine, fillChar = " ") {{
+      const line = String(rawLine == null ? "" : rawLine);
+      if (!line) return true;
+      for (const char of line) {{
+        if (!isMacrosAsciiBlankChar(char, fillChar)) return false;
+      }}
+      return true;
+    }}
+
+    function cropMacrosAsciiHorizontalMargins(rawRows, fillChar = " ") {{
+      const rows = Array.isArray(rawRows)
+        ? rawRows.map((line) => String(line == null ? "" : line))
+        : [];
+      if (rows.length <= 0) return [];
+      let left = Number.POSITIVE_INFINITY;
+      let right = -1;
+      for (const row of rows) {{
+        for (let idx = 0; idx < row.length; idx += 1) {{
+          if (!isMacrosAsciiBlankChar(row.charAt(idx), fillChar)) {{
+            left = Math.min(left, idx);
+            break;
+          }}
+        }}
+        for (let idx = row.length - 1; idx >= 0; idx -= 1) {{
+          if (!isMacrosAsciiBlankChar(row.charAt(idx), fillChar)) {{
+            right = Math.max(right, idx);
+            break;
+          }}
+        }}
+      }}
+      if (!Number.isFinite(left) || right < left) {{
+        return [];
+      }}
+      return rows.map((row) => row.slice(left, right + 1));
+    }}
+
+    function parseMacrosAsciiLines(rawText, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const fillChar = String(opts.fillChar == null ? "" : opts.fillChar).slice(0, 1) || " ";
+      const cropWhitespace = opts.cropWhitespace !== false;
       const normalized = String(rawText == null ? "" : rawText).replace(/\r\n?/g, "\n");
       const rows = normalized.split("\n").slice(0, 120).map((line) => String(line || "").slice(0, 280));
-      while (rows.length > 0 && rows[rows.length - 1] === "") {{
-        rows.pop();
+      if (!cropWhitespace) {{
+        return rows;
       }}
-      return rows;
+      let start = 0;
+      let end = rows.length - 1;
+      while (start <= end && isMacrosAsciiBlankLine(rows[start], fillChar)) {{
+        start += 1;
+      }}
+      while (end >= start && isMacrosAsciiBlankLine(rows[end], fillChar)) {{
+        end -= 1;
+      }}
+      if (start > end) {{
+        return [];
+      }}
+      const verticallyTrimmedRows = rows.slice(start, end + 1);
+      return cropMacrosAsciiHorizontalMargins(verticallyTrimmedRows, fillChar);
     }}
 
     function macrosAsciiSettingsFromInputs() {{
@@ -160,6 +227,7 @@
       const heightInput = document.getElementById("macros-ascii-height");
       const rampInput = document.getElementById("macros-ascii-ramp");
       const invertInput = document.getElementById("macros-ascii-invert");
+      const cropWhitespaceInput = document.getElementById("macros-ascii-crop-whitespace");
       const useBrailleEdgeGuardsInput = document.getElementById("macros-ascii-braille-blank");
       const useSpaceReplacementInput = document.getElementById("macros-ascii-space-replace-enabled");
       const spaceReplacementCharInput = document.getElementById("macros-ascii-space-replace-char");
@@ -168,6 +236,7 @@
         height: clampMacrosAsciiDimension(heightInput && heightInput.value, 16, 8, 96),
         ramp: normalizeMacrosAsciiRamp(rampInput && rampInput.value),
         invert: !!(invertInput && invertInput.checked),
+        cropWhitespace: !cropWhitespaceInput || !!cropWhitespaceInput.checked,
         useBrailleEdgeGuards: !!(
           useBrailleEdgeGuardsInput
           && useBrailleEdgeGuardsInput.checked
@@ -215,7 +284,12 @@
         applyMacrosPreviewLines([], sourceLabel);
         return [];
       }}
-      const rows = parseMacrosAsciiLines(output.value);
+      const settings = macrosAsciiSettingsFromInputs();
+      const fillChar = macrosAsciiBackgroundFillChar(settings && settings.ramp);
+      const rows = parseMacrosAsciiLines(output.value, {{
+        fillChar,
+        cropWhitespace: settings && settings.cropWhitespace,
+      }});
       applyMacrosPreviewLines(rows, sourceLabel);
       return rows;
     }}
@@ -459,7 +533,12 @@
         setMacrosStatus("ASCII output box not found.", true);
         return;
       }}
-      const lines = parseMacrosAsciiLines(output.value);
+      const settings = macrosAsciiSettingsFromInputs();
+      const fillChar = macrosAsciiBackgroundFillChar(settings && settings.ramp);
+      const lines = parseMacrosAsciiLines(output.value, {{
+        fillChar,
+        cropWhitespace: settings && settings.cropWhitespace,
+      }});
       if (lines.length <= 0) {{
         setMacrosStatus("Generate or paste ASCII lines first.", true);
         return;
@@ -482,7 +561,6 @@
         }}
       }}
       const sendCtx = meshChannelSendContext();
-      const settings = macrosAsciiSettingsFromInputs();
       macrosSendInFlight = true;
       setMacrosSendBusy(true);
       let sentCount = 0;
@@ -537,6 +615,7 @@
       const sendBtn = document.getElementById("macros-send-lines-btn");
       const textInput = document.getElementById("macros-text-input");
       const rampInput = document.getElementById("macros-ascii-ramp");
+      const cropWhitespaceInput = document.getElementById("macros-ascii-crop-whitespace");
       const brailleBlankInput = document.getElementById("macros-ascii-braille-blank");
       const spaceReplacementEnabledInput = document.getElementById("macros-ascii-space-replace-enabled");
       const spaceReplacementCharInput = document.getElementById("macros-ascii-space-replace-char");
@@ -561,6 +640,28 @@
         setPaletteNote(preset ? preset.note : "Using custom ramp.");
       }};
 
+      const macrosOutputHasRows = () => (
+        output instanceof HTMLTextAreaElement
+        && String(output.value || "").length > 0
+      );
+
+      const refreshMacrosOutputForRampChange = async () => {{
+        const sourceLabel = String(macrosPreviewSourceLabel || "").toLowerCase();
+        if (sourceLabel.startsWith("image:") && macrosImageSourceElement instanceof HTMLImageElement) {{
+          await generateMacrosAsciiFromImage();
+          return true;
+        }}
+        if (sourceLabel.startsWith("text:")) {{
+          const textValue = textInput instanceof HTMLInputElement
+            ? String(textInput.value || "").trim()
+            : "";
+          if (!textValue) return false;
+          const lines = generateMacrosAsciiFromText();
+          return Array.isArray(lines) && lines.length > 0;
+        }}
+        return false;
+      }};
+
       if (paletteSelect instanceof HTMLSelectElement) {{
         paletteSelect.innerHTML = "";
         const customOption = document.createElement("option");
@@ -581,19 +682,32 @@
           const selected = findMacrosAsciiPalettePresetById(paletteSelect.value);
           if (!selected) {{
             setPaletteNote("Using custom ramp.");
+            if (macrosOutputHasRows()) {{
+              syncMacrosPreviewFromOutput("edited");
+            }}
             return;
           }}
           const normalized = normalizeMacrosAsciiRamp(selected.ramp);
           rampInput.value = normalized;
           setPaletteNote(selected.note);
-          if (output instanceof HTMLTextAreaElement && String(output.value || "").trim()) {{
-            syncMacrosPreviewFromOutput("edited");
+          if (macrosOutputHasRows()) {{
+            void refreshMacrosOutputForRampChange().then((didRegenerate) => {{
+              if (!didRegenerate) {{
+                syncMacrosPreviewFromOutput("edited");
+              }}
+            }});
           }}
         }});
 
         rampInput.addEventListener("input", () => {{
           if (paletteSyncLocked) return;
           syncPalettePresetFromRamp();
+          if (!macrosOutputHasRows()) return;
+          void refreshMacrosOutputForRampChange().then((didRegenerate) => {{
+            if (!didRegenerate) {{
+              syncMacrosPreviewFromOutput("edited");
+            }}
+          }});
         }});
       }}
 
@@ -603,6 +717,20 @@
             brailleBlankInput.checked
               ? "Braille edge-guard enabled for sends (preview remains unchanged)."
               : "Braille edge-guard disabled; using NBSP send encoding.",
+          );
+        }});
+      }}
+
+      if (cropWhitespaceInput instanceof HTMLInputElement) {{
+        cropWhitespaceInput.addEventListener("change", () => {{
+          const cropEnabled = !!cropWhitespaceInput.checked;
+          if (output instanceof HTMLTextAreaElement && String(output.value || "").length > 0) {{
+            syncMacrosPreviewFromOutput("edited");
+          }}
+          setMacrosStatus(
+            cropEnabled
+              ? "Whitespace crop enabled (top/bottom/left/right)."
+              : "Whitespace crop disabled (preserve exact bounds).",
           );
         }});
       }}
