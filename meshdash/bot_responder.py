@@ -374,7 +374,9 @@ def _render_ping_response_template(
     bot_id: str,
     hops: Optional[int],
     hop_label: str,
+    location: str,
     city: str,
+    state: str,
 ) -> str:
     clean_template = _normalize_ping_response_template(template)
     if not clean_template:
@@ -387,8 +389,9 @@ def _render_ping_response_template(
         "hops": "n/a" if hops is None else str(hops),
         "hop_count": "n/a" if hops is None else str(hops),
         "hop_label": hop_label,
-        "location": city or "n/a",
+        "location": location or "n/a",
         "city": city or "n/a",
+        "state": state or "n/a",
         "distance": "",
     }
     protected = clean_template.replace("$$", "\0")
@@ -580,6 +583,18 @@ def _bot_city_hint(local_node: Optional[dict[str, object]]) -> str:
         return _bot_nodes._bot_city_hint(local_node)
     finally:
         _bot_nodes._nearest_city_for_coords = previous_lookup
+
+
+def _split_city_state_tokens(location_hint: object) -> tuple[str, str]:
+    clean = str(location_hint or "").strip()
+    if not clean:
+        return "", ""
+    parts = [item.strip() for item in clean.split(",") if str(item or "").strip()]
+    if not parts:
+        return "", ""
+    city = parts[0]
+    state = parts[1] if len(parts) >= 2 else ""
+    return city, state
 
 
 class MeshResponseBot:
@@ -1505,6 +1520,7 @@ class MeshResponseBot:
             requester = _find_node_for_query(from_id, nodes)
             local_node = _find_node_for_query(local_node_id, nodes) if local_node_id else None
             bot_city_hint = _bot_city_hint(local_node)
+            bot_city_token, bot_state_token = _split_city_state_tokens(bot_city_hint)
             with self._lock:
                 ping_response_template = str(self._ping_response_template or "").strip()
             if ping_response_template:
@@ -1518,7 +1534,9 @@ class MeshResponseBot:
                     bot_id=bot_id,
                     hops=hops,
                     hop_label=hop_text,
-                    city=bot_city_hint,
+                    location=bot_city_hint,
+                    city=bot_city_token,
+                    state=bot_state_token,
                 )
                 if rendered_template:
                     return rendered_template

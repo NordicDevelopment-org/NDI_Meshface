@@ -323,7 +323,6 @@
   <div class="workspace-shell chat-panel-open">
     <aside class="teams-rail" aria-label="Dashboard views">
       <button class="rail-btn active" data-view="chat" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Teams-style chat workspace">Chat</button>
-      <button class="rail-btn" data-view="apps" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Apps workspace (Macros, Games, Files, BBS, Bots, Remote)">Apps</button>
       <button class="rail-btn" data-view="network" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Topology, nodes, and links">Network</button>
       <button class="rail-btn" data-view="saved" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Node details and saved nodes">Node</button>
       <button class="rail-btn" data-view="packets" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Recent packet stream">Packets</button>
@@ -331,6 +330,7 @@
       <button class="rail-btn" data-view="encription" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Encrypted packets and route activity">Encription</button>
       <button class="rail-btn" data-view="environment" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Historical sensor telemetry">Sensors</button>
       <button class="rail-btn" data-view="history" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Network and chat history">History</button>
+      <button class="rail-btn" data-view="apps" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Apps workspace (Macros, Games, Files, BBS, Bots, Remote)">Apps</button>
       <button class="rail-btn" data-view="console" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Realtime dashboard console">Console</button>
       <button class="rail-btn" data-view="settings" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Radio + dashboard settings">Settings</button>
     </aside>
@@ -1914,7 +1914,7 @@ Ready.
                         maxlength="240"
                         placeholder="Hey $sender, you are $hops hops away!"
                       />
-                      <div class="bots-setting-note">Leave blank for default reply. Tokens: <code>$sender</code>, <code>$sender_id</code>, <code>$hops</code>, <code>$hop_label</code>, <code>$bot</code>, <code>$bot_id</code>, <code>$location</code>, <code>$city</code>. <code>$location</code> is the bot's nearest offline-map city.</div>
+                      <div class="bots-setting-note">Leave blank for default reply. Tokens: <code>$sender</code>, <code>$sender_id</code>, <code>$hops</code>, <code>$hop_label</code>, <code>$bot</code>, <code>$bot_id</code>, <code>$location</code>, <code>$city</code>, <code>$state</code>. <code>$location</code> is the bot's nearest offline-map city+state, while <code>$city</code> and <code>$state</code> are split tokens.</div>
                       <div class="bots-command-config-actions">
                         <button id="bots-command-ping-save-btn" class="btn btn-secondary" type="button">Save Ping Settings</button>
                       </div>

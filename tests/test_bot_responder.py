@@ -662,6 +662,76 @@ def test_ping_response_template_supports_location_token_from_bot_city():
     assert str(sent[0]["text"]).strip() == "3 hops to Saint Paul, Minnesota"
 
 
+def test_ping_response_template_supports_city_and_state_split_tokens():
+    iface = _FakeIface()
+    iface.nodesByNum[0x02ED9B7C]["position"] = {
+        "latitude": 44.9537,
+        "longitude": -93.0900,
+    }
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        ping_response_template="$hops hops to $city, $state",
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    original_lookup = _bot_responder_module._nearest_city_for_coords
+    _bot_responder_module._nearest_city_for_coords = lambda _lat, _lon: {
+        "name": "Saint Paul",
+        "state": "Minnesota",
+        "country": "United States of America",
+        "distance_km": 2.2,
+    }
+    try:
+        bot.on_receive(_base_packet("ping 9b7c"), iface)
+    finally:
+        _bot_responder_module._nearest_city_for_coords = original_lookup
+
+    assert len(sent) == 1
+    assert str(sent[0]["text"]).strip() == "3 hops to Saint Paul, Minnesota"
+
+
+def test_ping_response_template_keeps_city_token_city_only():
+    iface = _FakeIface()
+    iface.nodesByNum[0x02ED9B7C]["position"] = {
+        "latitude": 44.9537,
+        "longitude": -93.0900,
+    }
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        ping_response_template="$city",
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    original_lookup = _bot_responder_module._nearest_city_for_coords
+    _bot_responder_module._nearest_city_for_coords = lambda _lat, _lon: {
+        "name": "Saint Paul",
+        "state": "Minnesota",
+        "country": "United States of America",
+        "distance_km": 2.2,
+    }
+    try:
+        bot.on_receive(_base_packet("ping 9b7c"), iface)
+    finally:
+        _bot_responder_module._nearest_city_for_coords = original_lookup
+
+    assert len(sent) == 1
+    assert str(sent[0]["text"]).strip() == "Saint Paul"
+
+
 def test_ping_response_template_strips_distance_token_from_reply_text():
     iface = _FakeIface()
     iface.nodesByNum[0x02ED9B7C]["position"] = {

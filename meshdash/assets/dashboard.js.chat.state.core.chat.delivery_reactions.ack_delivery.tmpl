@@ -62,6 +62,12 @@
       const cleanTemplate = normalizePingReplyTemplate(template);
       if (!cleanTemplate) return "";
       const hops = nonNegativeIntegerOrNull(tokens.hops);
+      const rawLocation = String(tokens.location || "").trim();
+      const locationParts = rawLocation
+        ? rawLocation.split(",").map((part) => String(part || "").trim()).filter(Boolean)
+        : [];
+      const cityValue = String(tokens.city || "").trim() || (locationParts[0] || "");
+      const stateValue = String(tokens.state || "").trim() || (locationParts[1] || "");
       const tokenValues = {{
         sender: String(tokens.sender || "").trim() || "unknown",
         sender_id: String(tokens.sender_id || "").trim() || "unknown",
@@ -70,8 +76,9 @@
         hops: hops == null ? "n/a" : String(hops),
         hop_count: hops == null ? "n/a" : String(hops),
         hop_label: String(tokens.hop_label || "").trim() || "hop count n/a",
-        location: String(tokens.location || "").trim() || "n/a",
-        city: String(tokens.city || "").trim() || "n/a",
+        location: rawLocation || "n/a",
+        city: cityValue || "n/a",
+        state: stateValue || "n/a",
         distance: "",
       }};
       const protectedTemplate = cleanTemplate.replace(/\$\$/g, "\0");
@@ -86,6 +93,18 @@
         }}
       );
       return rendered.replace(/\0/g, "$").trim();
+    }}
+
+    function locationPartsFromCityHint(value) {{
+      const clean = String(value || "").trim();
+      if (!clean) {{
+        return {{ city: "", state: "" }};
+      }}
+      const parts = clean.split(",").map((part) => String(part || "").trim()).filter(Boolean);
+      return {{
+        city: String(parts[0] || ""),
+        state: String(parts[1] || ""),
+      }};
     }}
 
     async function buildPongStyleAckReplyText(options = null, state = latestState) {{
@@ -112,6 +131,7 @@
         serverBotSettings && serverBotSettings.ping_response_template
       );
       if (pingResponseTemplate) {{
+        const locationParts = locationPartsFromCityHint(botCityHint);
         const rendered = renderPingReplyTemplate(pingResponseTemplate, {{
           sender: pingReplyNodeLabel(sourceNode, sourceId),
           sender_id: sourceId || "unknown",
@@ -120,7 +140,8 @@
           hops,
           hop_label: hopText,
           location: botCityHint,
-          city: botCityHint,
+          city: locationParts.city,
+          state: locationParts.state,
         }});
         if (rendered) {{
           return rendered;
