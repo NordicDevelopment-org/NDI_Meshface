@@ -46,6 +46,7 @@
       padTop: 16,
       padBottom: 38,
     }};
+    const envMetricsChartMaxSeries = 8;
     const envMetricsChartZoomMinPoints = 12;
     const envMetricsChartState = {{
       zoomStart: 0,
@@ -325,6 +326,54 @@
       return out;
     }}
 
+    function localNodeIdForEnvironmentMetrics() {{
+      if (typeof resolveLocalNodeId !== "function") return "";
+      try {{
+        return normalizeNodeId(resolveLocalNodeId(latestState) || "");
+      }} catch (_err) {{
+        return "";
+      }}
+    }}
+
+    function selectEnvironmentSeriesForAllNodes(seriesList, maxSeries = envMetricsChartMaxSeries) {{
+      const safeSeries = Array.isArray(seriesList) ? seriesList.slice() : [];
+      const cap = Math.max(1, Math.trunc(Number(maxSeries) || envMetricsChartMaxSeries));
+      if (safeSeries.length <= cap) return safeSeries;
+
+      const localNodeId = localNodeIdForEnvironmentMetrics();
+      const selected = [];
+      const seenNodeIds = new Set();
+
+      if (isCanonicalNodeId(localNodeId)) {{
+        const localSeries = safeSeries.find((series) => normalizeNodeId(series && series.nodeId) === localNodeId) || null;
+        if (localSeries) {{
+          selected.push(localSeries);
+          seenNodeIds.add(localNodeId);
+        }}
+      }}
+
+      const ranked = safeSeries
+        .slice()
+        .sort((a, b) => {{
+          const lastA = Number(a && a.lastUnix);
+          const lastB = Number(b && b.lastUnix);
+          if (lastA !== lastB) return lastB - lastA;
+          const pointsA = Array.isArray(a && a.points) ? a.points.length : 0;
+          const pointsB = Array.isArray(b && b.points) ? b.points.length : 0;
+          if (pointsA !== pointsB) return pointsB - pointsA;
+          return String((a && a.label) || "").localeCompare(String((b && b.label) || ""));
+        }});
+
+      for (const series of ranked) {{
+        const nodeId = normalizeNodeId(series && series.nodeId);
+        if (nodeId && seenNodeIds.has(nodeId)) continue;
+        selected.push(series);
+        if (nodeId) seenNodeIds.add(nodeId);
+        if (selected.length >= cap) break;
+      }}
+      return selected.slice(0, cap);
+    }}
+
     function clampEnvironmentMetricChartUnit(value) {{
       const num = Number(value);
       if (!Number.isFinite(num)) return 0;
@@ -592,10 +641,12 @@
           const sorted = series.points
             .slice()
             .sort((a, b) => Number(a.unix) - Number(b.unix));
+          const lastPoint = sorted.length ? sorted[sorted.length - 1] : null;
           return {{
             nodeId: series.nodeId,
             label: series.label,
             points: downsampleEnvironmentSeries(sorted),
+            lastUnix: Number(lastPoint && lastPoint.unix) || 0,
           }};
         }})
         .filter((series) => series.points.length > 0)
@@ -606,8 +657,8 @@
         return;
       }}
 
-      if (!nodeMeta && seriesList.length > 8) {{
-        seriesList = seriesList.slice(0, 8);
+      if (!nodeMeta && seriesList.length > envMetricsChartMaxSeries) {{
+        seriesList = selectEnvironmentSeriesForAllNodes(seriesList, envMetricsChartMaxSeries);
       }}
 
       const allPoints = seriesList.flatMap((series) => series.points);
