@@ -2584,13 +2584,13 @@
       overflow: auto;
     }}
     .layout.view-console {{
-      height: 100%;
+      height: calc(100dvh - var(--workspace-viewport-offset, 84px) - 16px);
       min-height: 0;
-      grid-template-rows: auto minmax(240px, 1fr);
+      grid-template-rows: minmax(0, 1fr);
     }}
     .layout.view-console .console {{
       grid-column: 1 / span 3;
-      grid-row: 2;
+      grid-row: 1;
       display: flex;
       flex-direction: column;
       min-height: 0;
@@ -2609,9 +2609,10 @@
     .layout.view-console .console-terminal-screen {{
       display: flex;
       flex-direction: column;
+      flex: 1 1 auto;
       min-height: 0;
       width: 100%;
-      height: auto;
+      height: 100%;
     }}
     .layout.view-console #live-console {{
       flex: 1 1 auto;
