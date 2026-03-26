@@ -1,6 +1,50 @@
+    function normalizeAppsLayoutView(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      if (
+        clean === "macros"
+        || clean === "games"
+        || clean === "files"
+        || clean === "bbs"
+        || clean === "bots"
+      ) {{
+        return clean;
+      }}
+      return "macros";
+    }}
+
+    function isAppsLayoutView(viewName) {{
+      const clean = String(viewName || "").trim().toLowerCase();
+      return (
+        clean === "macros"
+        || clean === "games"
+        || clean === "files"
+        || clean === "bbs"
+        || clean === "bots"
+      );
+    }}
+
+    function loadPreferredAppsLayoutView() {{
+      try {{
+        const raw = window.localStorage.getItem("meshDashboardAppsLayoutViewV1") || "macros";
+        return normalizeAppsLayoutView(raw);
+      }} catch (_err) {{
+        return "macros";
+      }}
+    }}
+
+    function persistPreferredAppsLayoutView(viewName) {{
+      if (!isAppsLayoutView(viewName)) return;
+      try {{
+        window.localStorage.setItem("meshDashboardAppsLayoutViewV1", normalizeAppsLayoutView(viewName));
+      }} catch (_err) {{
+      }}
+    }}
+
     function normalizeLayoutView(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
       if (clean === "data") return "settings";
+      if (clean === "apps") return loadPreferredAppsLayoutView();
+      if (isAppsLayoutView(clean)) return clean;
       return knownLayoutViews.has(clean) ? clean : "chat";
     }}
 
@@ -32,6 +76,49 @@
       }}
     }}
 
+    function syncAppsTabBar(viewName = activeLayoutView) {{
+      const normalized = normalizeLayoutView(viewName);
+      for (const btn of document.querySelectorAll(".apps-tab-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const rawTarget = String(btn.dataset.appView || "").trim().toLowerCase();
+        const btnView = normalizeLayoutView(rawTarget);
+        const isActive = btnView === normalized;
+        btn.classList.toggle("is-active", isActive);
+        btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+      }}
+    }}
+
+    function syncAppsTabBarVisibility(viewName = activeLayoutView) {{
+      const tabsBar = document.getElementById("apps-tabs-bar");
+      if (!(tabsBar instanceof HTMLElement)) return;
+      const next = normalizeLayoutView(viewName);
+      const showTabs = isAppsLayoutView(next);
+      tabsBar.hidden = !showTabs;
+      tabsBar.setAttribute("aria-hidden", showTabs ? "false" : "true");
+    }}
+
+    function resolveLayoutViewTargetFromEvent(ev) {{
+      const rawTarget = ev && ev.target;
+      const target = rawTarget instanceof Element
+        ? rawTarget
+        : ((rawTarget instanceof Node) ? rawTarget.parentElement : null);
+      if (!(target instanceof Element)) return "";
+
+      const railBtn = target.closest(".teams-rail .rail-btn");
+      if (railBtn instanceof HTMLButtonElement) {{
+        if (railBtn.disabled) return "";
+        return String(railBtn.dataset.view || "chat");
+      }}
+
+      const appsBtn = target.closest(".apps-tab-btn");
+      if (appsBtn instanceof HTMLButtonElement) {{
+        if (appsBtn.disabled) return "";
+        return String(appsBtn.dataset.appView || "chat");
+      }}
+
+      return "";
+    }}
+
     function applyLayoutView(viewName, persist = true) {{
       const layout = document.getElementById("dashboard-layout");
       if (!(layout instanceof HTMLElement)) return;
@@ -39,6 +126,7 @@
       const chatLeftPanel = document.getElementById("chat-left-panel");
       const next = normalizeLayoutView(viewName);
       activeLayoutView = next;
+      persistPreferredAppsLayoutView(next);
       for (const name of knownLayoutViews) {{
         layout.classList.remove(`view-${{name}}`);
       }}
@@ -47,7 +135,10 @@
       // Keep rail selection in sync even if any later view-specific setup throws.
       for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
         if (!(btn instanceof HTMLButtonElement)) continue;
-        const isActive = normalizeLayoutView(btn.dataset.view || "") === next;
+        const railView = String(btn.dataset.view || "").trim().toLowerCase();
+        const isActive = railView === "apps"
+          ? isAppsLayoutView(next)
+          : normalizeLayoutView(railView) === next;
         btn.classList.toggle("active", isActive);
         btn.setAttribute("aria-current", isActive ? "page" : "false");
       }}
@@ -56,6 +147,8 @@
         chatRailBtn.hidden = false;
         chatRailBtn.disabled = false;
       }}
+      syncAppsTabBarVisibility(next);
+      syncAppsTabBar(next);
 
       const chatViewActive = next === "chat" || next === "macros";
       if (shell instanceof HTMLElement) {{
@@ -267,6 +360,34 @@
       }}
     }}
 
+    function meshSelectLayoutView(viewName) {{
+      const next = normalizeLayoutView(viewName);
+      try {{
+        window.localStorage.setItem(layoutViewStorageKey, next);
+      }} catch (_err) {{
+      }}
+      try {{
+        applyLayoutView(next, true);
+        const layout = document.getElementById("dashboard-layout");
+        if (layout instanceof HTMLElement && layout.classList.contains(`view-${{next}}`)) {{
+          return false;
+        }}
+      }} catch (_err) {{
+      }}
+      try {{
+        window.location.reload();
+      }} catch (_err) {{
+      }}
+      return false;
+    }}
+
+    // Expose view switching globally so inline fallback handlers in HTML can
+    // always route navigation clicks even if delegated binding is interrupted.
+    if (typeof window !== "undefined") {{
+      window.applyLayoutView = applyLayoutView;
+      window.meshSelectLayoutView = meshSelectLayoutView;
+    }}
+
     function loadLayoutView() {{
       let rawPreferred = "chat";
       try {{
@@ -282,11 +403,15 @@
     }}
 
     function bindLayoutNav() {{
-      for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
-        if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") continue;
-        btn.dataset.bound = "1";
-        btn.addEventListener("click", () => {{
-          applyLayoutView(btn.dataset.view || "chat", true);
-        }});
-      }}
+      if (window.__meshLayoutNavDelegatedBound === true) return;
+      window.__meshLayoutNavDelegatedBound = true;
+      document.addEventListener("click", (ev) => {{
+        const targetView = resolveLayoutViewTargetFromEvent(ev);
+        if (!targetView) return;
+        applyLayoutView(targetView, true);
+      }}, true);
     }}
+
+    // Install layout navigation delegation as soon as this template loads so
+    // view switching still works even if later boot/setup code short-circuits.
+    bindLayoutNav();

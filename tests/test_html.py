@@ -35,6 +35,7 @@ def test_render_html_includes_chat_view_structure_tokens():
         revision_title="v0.1.0 / abc123",
     )
     assert 'data-view="chat"' in html
+    assert 'data-view="apps"' in html
     assert 'id="chat-left-panel"' in html
     assert 'id="chat-feed"' in html
     assert 'id="chat-input"' in html
@@ -57,7 +58,7 @@ def test_render_html_includes_files_view_structure_tokens():
         revision_label="Rev: v0.1.0 (abc123)",
         revision_title="v0.1.0 / abc123",
     )
-    assert 'data-view="files"' in html
+    assert 'class="card files"' in html
     assert 'id="files-destination-input"' in html
     assert 'id="files-use-selected-btn"' in html
     assert 'id="files-send-channel-select"' in html
@@ -68,6 +69,41 @@ def test_render_html_includes_files_view_structure_tokens():
     assert 'id="files-console-copy-btn"' in html
     assert 'id="files-console-clear-btn"' in html
     assert 'id="files-transfer-table"' in html
+
+
+def test_render_html_includes_apps_tabs_structure_tokens():
+    html = render_html(
+        refresh_ms=3000,
+        packet_limit=250,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=5000,
+        history_retention_days=7,
+        node_history_hours=72,
+        node_history_max_points=1440,
+        revision_label="Rev: v0.1.0 (abc123)",
+        revision_title="v0.1.0 / abc123",
+    )
+    assert 'id="apps-tabs-bar"' in html
+    assert 'class="apps-tabs-bar"' in html
+    assert 'data-app-view="macros"' in html
+    assert "onclick='return (window.meshSelectLayoutView" in html
+    assert 'data-app-view="games"' in html
+    assert 'data-app-view="files"' in html
+    assert 'data-app-view="bbs"' in html
+    assert 'data-app-view="bots"' in html
+    assert 'data-app-view="network"' not in html
+    assert 'data-app-view="saved"' not in html
+    assert 'data-app-view="remote"' not in html
+    assert 'data-app-view="packets"' not in html
+    assert 'data-app-view="channels"' not in html
+    assert 'data-app-view="encription"' not in html
+    assert 'data-app-view="environment"' not in html
+    assert 'data-app-view="history"' not in html
+    assert 'data-app-view="console"' not in html
+    assert 'data-app-view="settings"' not in html
+    assert 'data-app-view="chat"' not in html
+    assert 'data-apps-view=' not in html
 
 
 def test_render_html_includes_console_text_size_control():

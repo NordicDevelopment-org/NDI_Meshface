@@ -1105,6 +1105,13 @@
       min-height: 0;
       height: 100%;
       overflow: hidden;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 8px;
+    }}
+    .workspace-main > .layout {{
+      min-height: 0;
+      height: 100%;
     }}
     .teams-rail {{
       position: sticky;
@@ -3794,6 +3801,48 @@
       box-shadow: 0 0 0 1px rgba(47, 133, 90, 0.24);
     }}
     .settings-tab-btn:focus-visible {{
+      outline: 2px solid #2f855a;
+      outline-offset: 1px;
+    }}
+
+    .apps-tabs-bar {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid #d7e5d2;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+    }}
+    .apps-tabs-bar[hidden] {{
+      display: none !important;
+    }}
+    .apps-tab-btn {{
+      appearance: none;
+      border: 1px solid #cfe0cf;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #2a4d37;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: border-color .12s ease, background-color .12s ease, color .12s ease, box-shadow .12s ease;
+    }}
+    .apps-tab-btn:hover {{
+      border-color: #2f855a;
+      color: #1f5d3d;
+      background: #eef8f1;
+    }}
+    .apps-tab-btn.is-active {{
+      border-color: #2f855a;
+      background: #e6f5ec;
+      color: #1f5d3d;
+      box-shadow: 0 0 0 1px rgba(47, 133, 90, 0.24);
+    }}
+    .apps-tab-btn:focus-visible {{
       outline: 2px solid #2f855a;
       outline-offset: 1px;
     }}

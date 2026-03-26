@@ -17,6 +17,9 @@ def test_build_dashboard_css_includes_theme_tokens_and_core_selectors():
     assert "@keyframes topbarUpdateScroll" in css
     assert ".files-channel-row" in css
     assert '[data-theme="dark"] .card.files' in css
+    assert ".apps-tabs-bar" in css
+    assert ".apps-tab-btn" in css
+    assert '[data-theme="dark"] .apps-tabs-bar' in css
     assert "#history-chat-table td.history-node-clickable" in css
     assert "#history-chat-table tbody tr.history-node-selectable.selected-node td" in css
     assert ".bots-setting-note" in css
@@ -46,6 +49,7 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && key === \"e\") {" in js
     assert "Top matches" in js
     assert "const consoleSessionStorageKey = \"meshDashboardConsoleSessionV1\";" in js
+    assert "meshDashboardAppsLayoutViewV1" in js
     assert "const storage = window.sessionStorage;" in js
     assert "storage.getItem(consoleSessionStorageKey)" in js
     assert "storage.setItem(consoleSessionStorageKey" in js
@@ -82,6 +86,13 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "`from=${fromValue || \"n/a\"}`" in js
     assert "`ch=${channelLabel}`" in js
     assert "function bindSelfRadioMenuControls()" in js
+    assert "function normalizeAppsLayoutView(raw)" in js
+    assert "function syncAppsTabBar(viewName = activeLayoutView)" in js
+    assert "function syncAppsTabBarVisibility(viewName = activeLayoutView)" in js
+    assert "function resolveLayoutViewTargetFromEvent(ev)" in js
+    assert "window.applyLayoutView = applyLayoutView;" in js
+    assert "window.meshSelectLayoutView = meshSelectLayoutView;" in js
+    assert "railView === \"apps\"" in js
     assert "const copyBtn = document.getElementById(\"self-radio-copy-id-btn\");" in js
     assert "bindSelfRadioMenuControls();" in js
     assert "function formatConsolePromptInputLine(promptLabel, draftValue)" in js
@@ -123,6 +134,7 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "function appendFileTransferConsole(message, options = null)" in js
     assert "function copyFileTransferConsoleToClipboard()" in js
     assert "function bindFilesConsoleControls()" in js
+    assert "window.__meshLayoutNavDelegatedBound = true;" in js
     assert "function scheduleFileTransferMaintenance(state = latestState)" in js
     assert "function meshChannelSendSelectElements()" in js
     assert "files-send-channel-select" in js
