@@ -70,6 +70,8 @@
           hard_disabled_incoming_commands: [],
           ping_triggers: [],
           ping_response_template: "",
+          pull_reel_symbols: [],
+          pull_response_template: "",
           joke_triggers: [],
           zork_triggers: [],
           joke_lines: [],
@@ -121,6 +123,13 @@
         ping_response_template: String(
           raw.ping_response_template ?? raw.pingResponseTemplate ?? ""
         ).trim().slice(0, 240),
+        pull_reel_symbols: normalizeBotSettingsTextList(
+          raw.pull_reel_symbols ?? raw.pullReelSymbols,
+          {{ splitCommas: true }}
+        ),
+        pull_response_template: String(
+          raw.pull_response_template ?? raw.pullResponseTemplate ?? ""
+        ).trim().slice(0, 280),
         joke_triggers: normalizeBotSettingsTextList(
           raw.joke_triggers ?? raw.jokeTriggers,
           {{ splitCommas: true }}
@@ -212,6 +221,10 @@
       const pingTriggersInput = document.getElementById("bots-command-ping-triggers");
       const pingResponseTemplateInput = document.getElementById("bots-command-ping-response-template");
       const pingSaveBtn = document.getElementById("bots-command-ping-save-btn");
+      const pullConfigWrap = document.getElementById("bots-command-pull-config-wrap");
+      const pullReelSymbolsInput = document.getElementById("bots-command-pull-reel-symbols");
+      const pullResponseTemplateInput = document.getElementById("bots-command-pull-response-template");
+      const pullSaveBtn = document.getElementById("bots-command-pull-save-btn");
       const zorkConfigWrap = document.getElementById("bots-command-zork-config-wrap");
       const zorkTriggersInput = document.getElementById("bots-command-zork-triggers");
       const zorkSaveBtn = document.getElementById("bots-command-zork-save-btn");
@@ -241,12 +254,16 @@
         : null;
       const zorkEnabled = !!(zorkCommand && zorkCommand.enabled);
       const selectedIsPing = !!(selectedCommand && selectedCommand.name === "ping");
+      const selectedIsPull = !!(selectedCommand && selectedCommand.name === "pull");
       const selectedIsZork = !!(selectedCommand && selectedCommand.name === "zork");
       const selectedIsJoke = !!(selectedCommand && selectedCommand.name === "joke");
       const available = !!serverBotSettings.available;
       const hardDisableAll = hardDisableIncomingAutomationAndFileTransferEnabled();
       if (pingConfigWrap instanceof HTMLElement) {{
         pingConfigWrap.hidden = !selectedIsPing;
+      }}
+      if (pullConfigWrap instanceof HTMLElement) {{
+        pullConfigWrap.hidden = !selectedIsPull;
       }}
       if (zorkConfigWrap instanceof HTMLElement) {{
         zorkConfigWrap.hidden = !selectedIsZork;
@@ -354,6 +371,45 @@
       }}
       if (pingSaveBtn instanceof HTMLButtonElement) {{
         pingSaveBtn.disabled = !available || botSettingsSaveInFlight || !selectedIsPing;
+      }}
+      if (pullReelSymbolsInput instanceof HTMLInputElement) {{
+        const value = selectedIsPull && Array.isArray(serverBotSettings.pull_reel_symbols)
+          ? serverBotSettings.pull_reel_symbols.join(", ")
+          : "";
+        if (document.activeElement !== pullReelSymbolsInput || !selectedIsPull) {{
+          pullReelSymbolsInput.value = value;
+        }}
+        pullReelSymbolsInput.disabled = !available || botSettingsSaveInFlight || !selectedIsPull;
+        if (!available) {{
+          pullReelSymbolsInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsPull) {{
+          pullReelSymbolsInput.title = "Select the pull command to edit reel emojis.";
+        }} else if (botSettingsSaveInFlight) {{
+          pullReelSymbolsInput.title = "Saving pull settings...";
+        }} else {{
+          pullReelSymbolsInput.title = "Comma-delimited reel emoji list.";
+        }}
+      }}
+      if (pullResponseTemplateInput instanceof HTMLInputElement) {{
+        const value = selectedIsPull
+          ? String(serverBotSettings.pull_response_template || "")
+          : "";
+        if (document.activeElement !== pullResponseTemplateInput || !selectedIsPull) {{
+          pullResponseTemplateInput.value = value;
+        }}
+        pullResponseTemplateInput.disabled = !available || botSettingsSaveInFlight || !selectedIsPull;
+        if (!available) {{
+          pullResponseTemplateInput.title = "Backend bot settings endpoint unavailable on this node.";
+        }} else if (!selectedIsPull) {{
+          pullResponseTemplateInput.title = "Select the pull command to edit reply template.";
+        }} else if (botSettingsSaveInFlight) {{
+          pullResponseTemplateInput.title = "Saving pull settings...";
+        }} else {{
+          pullResponseTemplateInput.title = "Optional pull reply template. Use tokens like $reels, $reel1, $reel2, $reel3, $prize, $tier, and $result.";
+        }}
+      }}
+      if (pullSaveBtn instanceof HTMLButtonElement) {{
+        pullSaveBtn.disabled = !available || botSettingsSaveInFlight || !selectedIsPull;
       }}
       if (zorkTriggersInput instanceof HTMLTextAreaElement) {{
         const value = selectedIsZork && Array.isArray(serverBotSettings.zork_triggers)
@@ -587,6 +643,29 @@
       return true;
     }}
 
+    async function saveSelectedPullBotSettings() {{
+      const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
+      if (commandName !== "pull") return false;
+      const reelSymbolsInput = document.getElementById("bots-command-pull-reel-symbols");
+      const responseTemplateInput = document.getElementById("bots-command-pull-response-template");
+      const reelSymbols = normalizeBotSettingsTextList(
+        reelSymbolsInput instanceof HTMLInputElement ? reelSymbolsInput.value : "",
+        {{ splitCommas: true }}
+      );
+      const responseTemplate = String(
+        responseTemplateInput instanceof HTMLInputElement ? responseTemplateInput.value : ""
+      ).trim().slice(0, 280);
+      const ok = await saveServerBotSettingsPatch({{
+        pull_reel_symbols: reelSymbols,
+        pull_response_template: responseTemplate,
+      }});
+      if (!ok) {{
+        renderBotsView(latestState);
+        return false;
+      }}
+      return true;
+    }}
+
     async function saveSelectedZorkBotSettings() {{
       const commandName = String(activeBotCommandSettingsId || "").trim().toLowerCase();
       if (commandName !== "zork") return false;
@@ -720,6 +799,14 @@
         pingSaveBtn.dataset.bound = "1";
         pingSaveBtn.addEventListener("click", async () => {{
           await saveSelectedPingBotSettings();
+          syncChatWhoisQuickActionControls();
+        }});
+      }}
+      const pullSaveBtn = document.getElementById("bots-command-pull-save-btn");
+      if (pullSaveBtn instanceof HTMLButtonElement && pullSaveBtn.dataset.bound !== "1") {{
+        pullSaveBtn.dataset.bound = "1";
+        pullSaveBtn.addEventListener("click", async () => {{
+          await saveSelectedPullBotSettings();
           syncChatWhoisQuickActionControls();
         }});
       }}

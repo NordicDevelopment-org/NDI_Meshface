@@ -313,6 +313,8 @@ def build_dashboard_runtime_context(
                 ),
                 ping_triggers=getattr(request, "ping_triggers", None),
                 ping_response_template=getattr(request, "ping_response_template", None),
+                pull_reel_symbols=getattr(request, "pull_reel_symbols", None),
+                pull_response_template=getattr(request, "pull_response_template", None),
                 joke_triggers=getattr(request, "joke_triggers", None),
                 zork_triggers=getattr(request, "zork_triggers", None),
                 joke_lines=getattr(request, "joke_lines", None),

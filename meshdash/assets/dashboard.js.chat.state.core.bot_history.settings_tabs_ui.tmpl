@@ -10,6 +10,9 @@
       const pingConfigWrap = document.getElementById("bots-command-ping-config-wrap");
       const pingTriggersInput = document.getElementById("bots-command-ping-triggers");
       const pingResponseTemplateInput = document.getElementById("bots-command-ping-response-template");
+      const pullConfigWrap = document.getElementById("bots-command-pull-config-wrap");
+      const pullReelSymbolsInput = document.getElementById("bots-command-pull-reel-symbols");
+      const pullResponseTemplateInput = document.getElementById("bots-command-pull-response-template");
       const zorkConfigWrap = document.getElementById("bots-command-zork-config-wrap");
       const zorkTriggersInput = document.getElementById("bots-command-zork-triggers");
       const publicStartWrap = document.getElementById("bots-command-selected-public-start-wrap");
@@ -108,6 +111,7 @@
         selectedEnabledInput.checked = !!selectedCommand.enabled;
       }}
       const selectedIsPing = selectedName === "ping";
+      const selectedIsPull = selectedName === "pull";
       const selectedIsZork = selectedName === "zork";
       const selectedIsJoke = selectedName === "joke";
       if (pingConfigWrap instanceof HTMLElement) {{
@@ -127,6 +131,25 @@
           : "";
         if (document.activeElement !== pingResponseTemplateInput || !selectedIsPing) {{
           pingResponseTemplateInput.value = nextValue;
+        }}
+      }}
+      if (pullConfigWrap instanceof HTMLElement) {{
+        pullConfigWrap.hidden = !selectedIsPull;
+      }}
+      if (pullReelSymbolsInput instanceof HTMLInputElement) {{
+        const nextValue = selectedIsPull && Array.isArray(serverBotSettings.pull_reel_symbols)
+          ? serverBotSettings.pull_reel_symbols.join(", ")
+          : "";
+        if (document.activeElement !== pullReelSymbolsInput || !selectedIsPull) {{
+          pullReelSymbolsInput.value = nextValue;
+        }}
+      }}
+      if (pullResponseTemplateInput instanceof HTMLInputElement) {{
+        const nextValue = selectedIsPull
+          ? String(serverBotSettings.pull_response_template || "")
+          : "";
+        if (document.activeElement !== pullResponseTemplateInput || !selectedIsPull) {{
+          pullResponseTemplateInput.value = nextValue;
         }}
       }}
       if (zorkConfigWrap instanceof HTMLElement) {{

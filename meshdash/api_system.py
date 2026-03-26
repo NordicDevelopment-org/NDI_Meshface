@@ -115,6 +115,7 @@ def _bot_settings_etag_marker(settings: object) -> str:
         return "none"
     commands = settings.get("commands")
     ping_triggers = settings.get("ping_triggers")
+    pull_reel_symbols = settings.get("pull_reel_symbols")
     joke_triggers = settings.get("joke_triggers")
     zork_triggers = settings.get("zork_triggers")
     hard_disabled_incoming_commands = settings.get("hard_disabled_incoming_commands")
@@ -138,6 +139,8 @@ def _bot_settings_etag_marker(settings: object) -> str:
             "1" if bool(settings.get("joke_delay_punchline_enabled")) else "0",
             str(settings.get("active_game_sessions") or 0),
             str(len(ping_triggers) if isinstance(ping_triggers, list) else 0),
+            str(len(pull_reel_symbols) if isinstance(pull_reel_symbols, list) else 0),
+            str(len(str(settings.get("pull_response_template") or ""))),
             str(len(joke_triggers) if isinstance(joke_triggers, list) else 0),
             str(len(zork_triggers) if isinstance(zork_triggers, list) else 0),
             str(

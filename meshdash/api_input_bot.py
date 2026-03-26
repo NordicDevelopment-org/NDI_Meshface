@@ -104,6 +104,8 @@ class BotSettingsRequest:
     hard_disabled_incoming_commands: Optional[list[str]] = None
     ping_triggers: Optional[list[str]] = None
     ping_response_template: Optional[str] = None
+    pull_reel_symbols: Optional[list[str]] = None
+    pull_response_template: Optional[str] = None
     joke_triggers: Optional[list[str]] = None
     zork_triggers: Optional[list[str]] = None
     joke_lines: Optional[list[str]] = None
@@ -149,6 +151,16 @@ def parse_bot_settings_request(raw_body: bytes) -> BotSettingsRequest:
         ping_response_template=_parse_text_payload(
             payload.get("ping_response_template", payload.get("pingResponseTemplate")),
             max_chars=240,
+        ),
+        pull_reel_symbols=_parse_string_list_payload(
+            payload.get("pull_reel_symbols", payload.get("pullReelSymbols")),
+            split_commas=True,
+            max_items=24,
+            max_item_chars=16,
+        ),
+        pull_response_template=_parse_text_payload(
+            payload.get("pull_response_template", payload.get("pullResponseTemplate")),
+            max_chars=280,
         ),
         joke_triggers=_parse_string_list_payload(
             payload.get("joke_triggers", payload.get("jokeTriggers")),

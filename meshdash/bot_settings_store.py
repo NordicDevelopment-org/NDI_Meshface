@@ -137,6 +137,19 @@ def load_persisted_bot_settings(settings_path: Optional[str]) -> dict[str, objec
             payload.get("ping_response_template", payload.get("pingResponseTemplate")),
             max_chars=240,
         )
+    pull_reel_symbols = _parse_string_list(
+        payload.get("pull_reel_symbols", payload.get("pullReelSymbols")),
+        split_commas=True,
+        max_items=24,
+        max_item_chars=16,
+    )
+    if pull_reel_symbols is not None:
+        out["pull_reel_symbols"] = pull_reel_symbols
+    if "pull_response_template" in payload or "pullResponseTemplate" in payload:
+        out["pull_response_template"] = _parse_text_value(
+            payload.get("pull_response_template", payload.get("pullResponseTemplate")),
+            max_chars=280,
+        )
     joke_triggers = _parse_string_list(
         payload.get("joke_triggers", payload.get("jokeTriggers")),
         split_commas=True,
@@ -224,6 +237,18 @@ def save_persisted_bot_settings(
         "ping_response_template": _parse_text_value(
             settings.get("ping_response_template"),
             max_chars=240,
+        ),
+        "pull_reel_symbols": [
+            item
+            for item in (
+                str(value or "").strip()
+                for value in (settings.get("pull_reel_symbols") or [])
+            )
+            if item
+        ],
+        "pull_response_template": _parse_text_value(
+            settings.get("pull_response_template"),
+            max_chars=280,
         ),
         "joke_triggers": [
             item

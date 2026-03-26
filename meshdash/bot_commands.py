@@ -12,6 +12,7 @@ class BotCommandSpec:
 DEFAULT_ENABLED_MANAGED_BOT_COMMAND_NAMES = (
     "ping",
     "joke",
+    "pull",
     "zork",
 )
 
@@ -41,6 +42,11 @@ MANAGED_BOT_COMMAND_SPECS = (
         name="joke",
         usage="joke",
         description="tell a random joke",
+    ),
+    BotCommandSpec(
+        name="pull",
+        usage="/pull",
+        description="spin a 3-reel slot machine",
     ),
     BotCommandSpec(
         name="zork",

@@ -90,7 +90,28 @@ _PUBLIC_PING_LIMIT_REACTION = "❌"
 _PUBLIC_PING_DIRECT_HANDOFF_TEXT = (
     "ping: public limit reached (3). Continue testing with direct peer-to-peer messages for 1 hour."
 )
+_DEFAULT_PULL_REEL_SYMBOLS = ("🍒", "🍋", "🍉", "🔔", "⭐", "7️⃣")
+_DEFAULT_PULL_RESPONSE_TEMPLATE = ""
+_SLOT_TRIPLE_PAYOUTS = {
+    "7️⃣": 120,
+    "⭐": 60,
+    "🔔": 40,
+    "🍉": 24,
+    "🍋": 16,
+    "🍒": 10,
+}
+_SLOT_PAIR_PAYOUTS = {
+    "7️⃣": 12,
+    "⭐": 8,
+    "🔔": 6,
+    "🍉": 5,
+    "🍋": 4,
+    "🍒": 3,
+}
 _PING_TEMPLATE_TOKEN_RE = re.compile(
+    r"\$(?:\{(?P<braced>[a-zA-Z_][a-zA-Z0-9_]*)\}|(?P<plain>[a-zA-Z_][a-zA-Z0-9_]*))"
+)
+_PULL_TEMPLATE_TOKEN_RE = re.compile(
     r"\$(?:\{(?P<braced>[a-zA-Z_][a-zA-Z0-9_]*)\}|(?P<plain>[a-zA-Z_][a-zA-Z0-9_]*))"
 )
 _PING_TEMPLATE_DISTANCE_TOKEN_RE = re.compile(r"\$(?:\{distance\}|distance)\b", re.IGNORECASE)
@@ -350,6 +371,78 @@ def _normalize_ping_response_template(value: object) -> str:
     return clean
 
 
+def _normalize_pull_reel_symbols(value: object) -> list[str]:
+    if value is None:
+        return [str(symbol).strip() for symbol in _DEFAULT_PULL_REEL_SYMBOLS if str(symbol).strip()]
+    raw_items = _parse_phrase_items(value, split_commas=True)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_items:
+        clean = str(raw_item or "").strip()
+        if not clean:
+            continue
+        if len(clean) > 16:
+            clean = clean[:16].rstrip()
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        out.append(clean)
+        if len(out) >= 24:
+            break
+    if len(out) >= 3:
+        return out
+    return [str(symbol).strip() for symbol in _DEFAULT_PULL_REEL_SYMBOLS if str(symbol).strip()]
+
+
+def _normalize_pull_response_template(value: object) -> str:
+    if value is None:
+        return _DEFAULT_PULL_RESPONSE_TEMPLATE
+    clean = str(value).strip()
+    if len(clean) > 280:
+        clean = clean[:280].rstrip()
+    return clean
+
+
+def _render_pull_response_template(
+    template: object,
+    *,
+    reels: tuple[str, str, str],
+    payout: int,
+    tier: str,
+) -> str:
+    clean_template = _normalize_pull_response_template(template)
+    if not clean_template:
+        return ""
+    reel_text = " | ".join(reels)
+    won = payout > 0
+    top_prize = str(tier or "").strip().upper() == "JACKPOT"
+    token_values = {
+        "reel1": str(reels[0]),
+        "reel2": str(reels[1]),
+        "reel3": str(reels[2]),
+        "reels": reel_text,
+        "payout": str(max(0, int(payout))),
+        "prize": str(max(0, int(payout))),
+        "tier": str(tier or ""),
+        "win": "1" if won else "0",
+        "won": "1" if won else "0",
+        "result": "jackpot" if top_prize else ("win" if won else "lose"),
+        "jackpot": "1" if top_prize else "0",
+        "top_prize": "1" if top_prize else "0",
+        "headline": "JACKPOT! TOP PRIZE" if top_prize else ("WINNER" if won else "NO WIN"),
+    }
+    protected = clean_template.replace("$$", "\0")
+
+    def _replace(match: re.Match[str]) -> str:
+        key = str(match.group("braced") or match.group("plain") or "").strip().lower()
+        if key in token_values:
+            return str(token_values.get(key) or "")
+        return match.group(0)
+
+    rendered = _PULL_TEMPLATE_TOKEN_RE.sub(_replace, protected).replace("\0", "$")
+    return rendered.strip()
+
+
 def _fallback_node_label(node_id: object) -> str:
     clean_id = _normalize_node_id(node_id)
     if not clean_id:
@@ -597,6 +690,60 @@ def _split_city_state_tokens(location_hint: object) -> tuple[str, str]:
     return city, state
 
 
+def _spin_slot_reels(
+    rng: random.Random,
+    reel_symbols: object = None,
+) -> tuple[str, str, str]:
+    symbols = _normalize_pull_reel_symbols(reel_symbols)
+    pool = tuple(symbols) if len(symbols) >= 3 else _DEFAULT_PULL_REEL_SYMBOLS
+    return (
+        str(rng.choice(pool)),
+        str(rng.choice(pool)),
+        str(rng.choice(pool)),
+    )
+
+
+def _slot_pull_prize(reels: tuple[str, str, str]) -> tuple[int, str]:
+    counts: dict[str, int] = {}
+    for symbol in reels:
+        counts[symbol] = counts.get(symbol, 0) + 1
+    if len(counts) == 1:
+        symbol = reels[0]
+        payout = int(_SLOT_TRIPLE_PAYOUTS.get(symbol, 20))
+        tier = "JACKPOT" if symbol == "7️⃣" else "three of a kind"
+        return payout, tier
+    pair_symbol = next((symbol for symbol, total in counts.items() if total == 2), "")
+    if pair_symbol:
+        payout = int(_SLOT_PAIR_PAYOUTS.get(pair_symbol, 2))
+        tier = "double 7" if pair_symbol == "7️⃣" else "pair"
+        return payout, tier
+    return 0, "miss"
+
+
+def _build_slot_pull_reply(
+    rng: random.Random,
+    *,
+    reel_symbols: object = None,
+    response_template: object = None,
+) -> str:
+    reels = _spin_slot_reels(rng, reel_symbols)
+    payout, tier = _slot_pull_prize(reels)
+    rendered_template = _render_pull_response_template(
+        response_template,
+        reels=reels,
+        payout=payout,
+        tier=tier,
+    )
+    if rendered_template:
+        return rendered_template
+    reel_text = " | ".join(reels)
+    if str(tier or "").strip().upper() == "JACKPOT":
+        return f"🎰 {reel_text} -> JACKPOT! TOP PRIZE +{payout} credits."
+    if payout > 0:
+        return f"🎰 {reel_text} -> WIN +{payout} credits ({tier})."
+    return f"🎰 {reel_text} -> no win this pull."
+
+
 class MeshResponseBot:
     def __init__(
         self,
@@ -611,6 +758,8 @@ class MeshResponseBot:
         game_public_start_enabled: bool = False,
         ping_triggers: Optional[list[str]] = None,
         ping_response_template: Optional[str] = None,
+        pull_reel_symbols: Optional[list[str]] = None,
+        pull_response_template: Optional[str] = None,
         joke_triggers: Optional[list[str]] = None,
         zork_triggers: Optional[list[str]] = None,
         hard_disabled_incoming_commands: Optional[list[str]] = None,
@@ -646,6 +795,10 @@ class MeshResponseBot:
         self._ping_trigger_phrases = _normalize_ping_triggers(ping_triggers)
         self._ping_response_template = _normalize_ping_response_template(
             ping_response_template
+        )
+        self._pull_reel_symbols = _normalize_pull_reel_symbols(pull_reel_symbols)
+        self._pull_response_template = _normalize_pull_response_template(
+            pull_response_template
         )
         self._joke_trigger_phrases = _normalize_joke_triggers(joke_triggers)
         self._zork_trigger_phrases = _normalize_zork_triggers(zork_triggers)
@@ -832,6 +985,19 @@ class MeshResponseBot:
             self._ping_trigger_phrases = _normalize_ping_triggers(triggers)
         if response_template is not None:
             self._ping_response_template = _normalize_ping_response_template(
+                response_template
+            )
+
+    def _set_pull_settings_locked(
+        self,
+        *,
+        reel_symbols: Optional[list[str]] = None,
+        response_template: Optional[str] = None,
+    ) -> None:
+        if reel_symbols is not None:
+            self._pull_reel_symbols = _normalize_pull_reel_symbols(reel_symbols)
+        if response_template is not None:
+            self._pull_response_template = _normalize_pull_response_template(
                 response_template
             )
 
@@ -1178,6 +1344,8 @@ class MeshResponseBot:
             "game_public_start_enabled": bool(self._game_public_start_enabled),
             "ping_triggers": list(self._ping_trigger_phrases),
             "ping_response_template": str(self._ping_response_template or ""),
+            "pull_reel_symbols": list(self._pull_reel_symbols),
+            "pull_response_template": str(self._pull_response_template or ""),
             "joke_triggers": list(self._joke_trigger_phrases),
             "zork_triggers": list(self._zork_trigger_phrases),
             "hard_disabled_incoming_commands": sorted(self._hard_disabled_incoming_commands),
@@ -1197,6 +1365,8 @@ class MeshResponseBot:
             "game_public_start_enabled": bool(self._game_public_start_enabled),
             "ping_triggers": list(self._ping_trigger_phrases),
             "ping_response_template": str(self._ping_response_template or ""),
+            "pull_reel_symbols": list(self._pull_reel_symbols),
+            "pull_response_template": str(self._pull_response_template or ""),
             "joke_triggers": list(self._joke_trigger_phrases),
             "zork_triggers": list(self._zork_trigger_phrases),
             "hard_disabled_incoming_commands": sorted(self._hard_disabled_incoming_commands),
@@ -1221,6 +1391,8 @@ class MeshResponseBot:
         hard_disabled_incoming_commands: Optional[list[str]] = None,
         ping_triggers: Optional[list[str]] = None,
         ping_response_template: Optional[str] = None,
+        pull_reel_symbols: Optional[list[str]] = None,
+        pull_response_template: Optional[str] = None,
         joke_triggers: Optional[list[str]] = None,
         zork_triggers: Optional[list[str]] = None,
         joke_lines: Optional[list[str]] = None,
@@ -1246,6 +1418,11 @@ class MeshResponseBot:
                 self._set_ping_settings_locked(
                     triggers=ping_triggers,
                     response_template=ping_response_template,
+                )
+            if pull_reel_symbols is not None or pull_response_template is not None:
+                self._set_pull_settings_locked(
+                    reel_symbols=pull_reel_symbols,
+                    response_template=pull_response_template,
                 )
             if zork_triggers is not None:
                 self._set_zork_settings_locked(triggers=zork_triggers)
@@ -1474,6 +1651,14 @@ class MeshResponseBot:
         if command == "joke":
             with self._lock:
                 return self._next_joke_line_locked()
+
+        if command == "pull":
+            with self._lock:
+                return _build_slot_pull_reply(
+                    self._rng,
+                    reel_symbols=list(self._pull_reel_symbols),
+                    response_template=str(self._pull_response_template or ""),
+                )
 
         if command in ("whois", "whohas"):
             if not args:
@@ -2247,6 +2432,20 @@ def build_mesh_response_bot_from_env(
         ping_response_template = _normalize_ping_response_template(
             env_map.get("MESH_DASH_BOT_PING_RESPONSE_TEMPLATE")
         )
+    pull_reel_symbols = _normalize_pull_reel_symbols(
+        persisted.get("pull_reel_symbols")
+    )
+    if "MESH_DASH_BOT_PULL_REEL_SYMBOLS" in env_map:
+        pull_reel_symbols = _normalize_pull_reel_symbols(
+            env_map.get("MESH_DASH_BOT_PULL_REEL_SYMBOLS")
+        )
+    pull_response_template = _normalize_pull_response_template(
+        persisted.get("pull_response_template")
+    )
+    if "MESH_DASH_BOT_PULL_RESPONSE_TEMPLATE" in env_map:
+        pull_response_template = _normalize_pull_response_template(
+            env_map.get("MESH_DASH_BOT_PULL_RESPONSE_TEMPLATE")
+        )
     joke_triggers = _normalize_joke_triggers(persisted.get("joke_triggers"))
     if "MESH_DASH_BOT_JOKE_TRIGGERS" in env_map:
         joke_triggers = _normalize_joke_triggers(env_map.get("MESH_DASH_BOT_JOKE_TRIGGERS"))
@@ -2287,6 +2486,8 @@ def build_mesh_response_bot_from_env(
         game_public_start_enabled=game_public_start_enabled,
         ping_triggers=ping_triggers,
         ping_response_template=ping_response_template,
+        pull_reel_symbols=pull_reel_symbols,
+        pull_response_template=pull_response_template,
         joke_triggers=joke_triggers,
         zork_triggers=zork_triggers,
         hard_disabled_incoming_commands=hard_disabled_incoming_commands,

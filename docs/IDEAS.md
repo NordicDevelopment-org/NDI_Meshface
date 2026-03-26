@@ -1,6 +1,7 @@
 # Ideas Backlog
 
 
+- slot machine bot /pull
 - fix bug in games that causes a stand still
 
 

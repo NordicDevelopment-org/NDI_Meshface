@@ -1931,6 +1931,28 @@ Ready.
                         <button id="bots-command-ping-save-btn" class="btn btn-secondary" type="button">Save Ping Settings</button>
                       </div>
                     </div>
+                    <div id="bots-command-pull-config-wrap" class="bots-command-config-section" hidden>
+                      <label class="bots-command-config-label" for="bots-command-pull-reel-symbols">Pull reel emojis</label>
+                      <input
+                        id="bots-command-pull-reel-symbols"
+                        class="settings-input bots-command-config-input"
+                        type="text"
+                        placeholder="🍒, 🍋, 🍉, 🔔, ⭐, 7️⃣"
+                      />
+                      <div class="bots-setting-note">Comma-delimited symbol list (example: <code>🍒, 🍋, ⭐, 7️⃣</code>). At least 3 symbols are required; shorter lists fall back to defaults.</div>
+                      <label class="bots-command-config-label" for="bots-command-pull-response-template">Pull reply template (optional)</label>
+                      <input
+                        id="bots-command-pull-response-template"
+                        class="chat-input"
+                        type="text"
+                        maxlength="280"
+                        placeholder="$headline: $reels (+$prize)"
+                      />
+                      <div class="bots-setting-note">Leave blank for default slot output. Tokens: <code>$reel1</code>, <code>$reel2</code>, <code>$reel3</code>, <code>$reels</code>, <code>$payout</code>, <code>$prize</code>, <code>$tier</code>, <code>$win</code>, <code>$won</code>, <code>$result</code>, <code>$jackpot</code>, <code>$top_prize</code>, <code>$headline</code>.</div>
+                      <div class="bots-command-config-actions">
+                        <button id="bots-command-pull-save-btn" class="btn btn-secondary" type="button">Save Pull Settings</button>
+                      </div>
+                    </div>
                     <div id="bots-command-zork-config-wrap" class="bots-command-config-section" hidden>
                       <label class="bots-command-config-label" for="bots-command-zork-triggers">Zork start triggers</label>
                       <textarea

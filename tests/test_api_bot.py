@@ -182,6 +182,35 @@ def test_handle_bot_settings_post_accepts_ping_response_template_patch():
     assert captured["request"].ping_response_template == "Hey $sender, you are $hops hops away!"
 
 
+def test_handle_bot_settings_post_accepts_pull_settings_patch():
+    calls = {}
+    captured = {}
+    body = '{"pull_reel_symbols":["🍒","🍋","⭐","7️⃣"],"pull_response_template":"🎰 $reels => $result +$prize"}'.encode("utf-8")
+    handle_bot_settings_post(
+        _handler(body=body),
+        apply_bot_settings_fn=lambda req: (
+            captured.update({"request": req})
+            or {
+                "ok": True,
+                "pull_reel_symbols": ["🍒", "🍋", "⭐", "7️⃣"],
+                "pull_response_template": "🎰 $reels => $result +$prize",
+            }
+        ),
+        to_int_fn=lambda value: int(value) if value not in (None, "") else None,
+        validate_content_length_fn=lambda *_args, **_kwargs: len(body),
+        parse_bot_settings_request_fn=lambda _raw: BotSettingsRequest(
+            pull_reel_symbols=["🍒", "🍋", "⭐", "7️⃣"],
+            pull_response_template="🎰 $reels => $result +$prize",
+        ),
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+    assert calls["status_code"] == 200
+    assert calls["payload_obj"]["pull_reel_symbols"] == ["🍒", "🍋", "⭐", "7️⃣"]
+    assert calls["payload_obj"]["pull_response_template"] == "🎰 $reels => $result +$prize"
+    assert captured["request"].pull_reel_symbols == ["🍒", "🍋", "⭐", "7️⃣"]
+    assert captured["request"].pull_response_template == "🎰 $reels => $result +$prize"
+
+
 def test_handle_bot_settings_post_accepts_joke_delay_toggle_patch():
     calls = {}
     captured = {}

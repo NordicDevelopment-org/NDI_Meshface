@@ -64,6 +64,19 @@ def test_parse_bot_settings_request_parses_ping_response_template():
     assert parsed.ping_response_template == "Hey $sender, you are $hops hops away!"
 
 
+def test_parse_bot_settings_request_parses_pull_settings():
+    parsed = parse_bot_settings_request(
+        '{"pull_reel_symbols":"🍒; 🍋; ⭐; 7️⃣","pull_response_template":"🎰 $reels => $result ($prize)"}'.encode("utf-8")
+    )
+    assert parsed.pull_reel_symbols == ["🍒", "🍋", "⭐", "7️⃣"]
+    assert parsed.pull_response_template == "🎰 $reels => $result ($prize)"
+
+
+def test_parse_bot_settings_request_preserves_explicit_empty_pull_reel_symbols():
+    parsed = parse_bot_settings_request(b'{"pull_reel_symbols":[]}')
+    assert parsed.pull_reel_symbols == []
+
+
 def test_parse_bot_settings_request_preserves_empty_ping_response_template():
     parsed = parse_bot_settings_request(b'{"ping_response_template":""}')
     assert parsed.ping_response_template == ""

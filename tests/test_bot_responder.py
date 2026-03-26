@@ -242,6 +242,101 @@ def test_natural_joke_trigger_replies_with_random_joke_and_logs_as_joke():
     assert history[0]["command_head"] == "joke"
 
 
+def test_pull_command_spins_slots_and_reports_prize():
+    iface = _FakeIface()
+    sent = []
+    original_spin = getattr(_bot_responder_module, "_spin_slot_reels")
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    try:
+        _bot_responder_module._spin_slot_reels = lambda _rng, _symbols=None: ("7️⃣", "7️⃣", "7️⃣")
+        bot = MeshResponseBot(
+            send_chat_fn=_send_chat,
+            get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+            custom_commands={},
+            now_unix_fn=lambda: 1710001240.0,
+        )
+        bot.on_receive(_base_packet("/pull"), iface)
+    finally:
+        _bot_responder_module._spin_slot_reels = original_spin
+
+    assert len(sent) == 1
+    assert sent[0]["destination"] == "^all"
+    assert sent[0]["reply_id"] == 1001
+    text = str(sent[0]["text"])
+    assert "🎰" in text
+    assert "7️⃣ | 7️⃣ | 7️⃣" in text
+    assert "JACKPOT! TOP PRIZE +120 credits" in text
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["command_head"] == "pull"
+
+
+def test_pull_command_reports_loss_when_no_match():
+    iface = _FakeIface()
+    sent = []
+    original_spin = getattr(_bot_responder_module, "_spin_slot_reels")
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    try:
+        _bot_responder_module._spin_slot_reels = lambda _rng, _symbols=None: ("🍒", "🍋", "⭐")
+        bot = MeshResponseBot(
+            send_chat_fn=_send_chat,
+            get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+            custom_commands={},
+            now_unix_fn=lambda: 1710001240.0,
+        )
+        bot.on_receive(_base_packet("/pull"), iface)
+    finally:
+        _bot_responder_module._spin_slot_reels = original_spin
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"])
+    assert "🍒 | 🍋 | ⭐" in text
+    assert "no win this pull" in text
+
+
+def test_pull_command_supports_custom_symbols_and_template():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    saved = bot.configure(
+        pull_reel_symbols=["🛰️", "📡", "🧭", "🎯"],
+        pull_response_template="🎰 $reels => $result +$prize ($tier)",
+    )
+    assert saved["ok"] is True
+    assert saved["pull_reel_symbols"] == ["🛰️", "📡", "🧭", "🎯"]
+    assert saved["pull_response_template"] == "🎰 $reels => $result +$prize ($tier)"
+
+    original_spin = getattr(_bot_responder_module, "_spin_slot_reels")
+    try:
+        _bot_responder_module._spin_slot_reels = lambda _rng, _symbols=None: ("🛰️", "🛰️", "📡")
+        bot.on_receive(_base_packet("/pull"), iface)
+    finally:
+        _bot_responder_module._spin_slot_reels = original_spin
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"])
+    assert "🛰️ | 🛰️ | 📡" in text
+    assert "=> win +2 (pair)" in text
+
+
 def test_nodename_placeholder_triggers_match_with_and_without_prefix():
     iface = _FakeIface()
     sent = []
@@ -1441,7 +1536,7 @@ def test_build_bot_from_env_defaults_bot_responses_to_disabled():
     assert bot.game_enabled is True
     settings = bot.bot_settings()
     enabled_names = [row["name"] for row in settings["commands"] if row["enabled"]]
-    assert enabled_names == ["ping", "joke", "zork"]
+    assert enabled_names == ["ping", "joke", "pull", "zork"]
     assert settings["joke_delay_punchline_enabled"] is False
 
 
@@ -1501,11 +1596,13 @@ def test_bot_settings_expose_managed_command_catalog():
 
     assert "ping" in names
     assert "joke" in names
+    assert "pull" in names
     assert "zork" in names
     assert "status" in names
     assert commands[0]["name"] == "ping"
     assert commands[1]["name"] == "joke"
-    assert commands[2]["name"] == "zork"
+    assert commands[2]["name"] == "pull"
+    assert commands[3]["name"] == "zork"
     ping = next(row for row in commands if row["name"] == "ping")
     assert ping["enabled"] is True
 
@@ -2004,6 +2101,7 @@ def test_build_bot_from_env_empty_disabled_commands_enables_full_catalog():
     rows = {row["name"]: row for row in settings["commands"]}
     assert rows["ping"]["enabled"] is True
     assert rows["joke"]["enabled"] is True
+    assert rows["pull"]["enabled"] is True
     assert rows["zork"]["enabled"] is True
     assert rows["cmd"]["enabled"] is True
     assert rows["whois"]["enabled"] is True
@@ -2024,6 +2122,8 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
         game_enabled=False,
         command_settings={"whois": True},
         ping_response_template="Hey $sender, you are $hops hops away!",
+        pull_reel_symbols=["🍒", "🍋", "⭐", "7️⃣"],
+        pull_response_template="🎰 $reels => $result +$prize",
         zork_triggers=["{nodename} zork", "{nodename} play zork"],
         joke_triggers=["tell me a joke", "make me laugh"],
         joke_lines=["line 1", "line 2"],
@@ -2039,6 +2139,8 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert payload["joke_delay_punchline_enabled"] is False
     assert payload["hard_disabled_incoming_commands"] == []
     assert payload["ping_response_template"] == "Hey $sender, you are $hops hops away!"
+    assert payload["pull_reel_symbols"] == ["🍒", "🍋", "⭐", "7️⃣"]
+    assert payload["pull_response_template"] == "🎰 $reels => $result +$prize"
     assert payload["zork_triggers"] == ["{nodename} zork", "{nodename} play zork"]
     assert payload["joke_triggers"] == ["tell me a joke", "make me laugh"]
     assert payload["joke_lines"] == ["line 1", "line 2"]
@@ -2062,6 +2164,8 @@ def test_bot_settings_are_persisted_and_loaded_from_file(tmp_path):
     assert rows["cmd"]["enabled"] is False
     loaded_settings = loaded.bot_settings()
     assert loaded_settings["ping_response_template"] == "Hey $sender, you are $hops hops away!"
+    assert loaded_settings["pull_reel_symbols"] == ["🍒", "🍋", "⭐", "7️⃣"]
+    assert loaded_settings["pull_response_template"] == "🎰 $reels => $result +$prize"
     assert loaded_settings["zork_triggers"] == ["{nodename} zork", "{nodename} play zork"]
     assert loaded_settings["joke_triggers"] == ["tell me a joke", "make me laugh"]
     assert loaded_settings["joke_lines"] == ["line 1", "line 2"]
@@ -2140,6 +2244,38 @@ def test_configure_allows_explicit_empty_ping_response_template():
     assert bot.bot_settings()["ping_response_template"] == ""
 
 
+def test_configure_pull_reel_symbols_falls_back_to_defaults_when_too_short():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_ENABLED": "1"},
+    )
+    assert bot is not None
+
+    saved = bot.configure(pull_reel_symbols=["🍒", "🍋"])
+    assert saved["ok"] is True
+    assert saved["pull_reel_symbols"] == list(_bot_responder_module._DEFAULT_PULL_REEL_SYMBOLS)
+    assert bot.bot_settings()["pull_reel_symbols"] == list(_bot_responder_module._DEFAULT_PULL_REEL_SYMBOLS)
+
+
+def test_configure_allows_explicit_empty_pull_response_template():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_ENABLED": "1"},
+    )
+    assert bot is not None
+
+    saved = bot.configure(pull_response_template="🎰 $reels => $result")
+    assert saved["ok"] is True
+    assert saved["pull_response_template"] == "🎰 $reels => $result"
+
+    saved = bot.configure(pull_response_template="")
+    assert saved["ok"] is True
+    assert saved["pull_response_template"] == ""
+    assert bot.bot_settings()["pull_response_template"] == ""
+
+
 def test_configure_allows_explicit_empty_joke_triggers():
     iface = _FakeIface()
     sent = []
@@ -2211,6 +2347,30 @@ def test_empty_ping_triggers_persist_and_reload_without_default_fallback(tmp_pat
     )
     assert loaded is not None
     assert loaded.bot_settings()["ping_triggers"] == []
+
+
+def test_empty_pull_reel_symbols_persist_and_reload_to_defaults(tmp_path):
+    settings_path = tmp_path / "bot_settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "log_enabled": True,
+                "game_enabled": False,
+                "disabled_commands": [],
+                "pull_reel_symbols": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={"MESH_DASH_BOT_SETTINGS_FILE": str(settings_path)},
+    )
+    assert loaded is not None
+    assert loaded.bot_settings()["pull_reel_symbols"] == list(_bot_responder_module._DEFAULT_PULL_REEL_SYMBOLS)
 
 
 def test_empty_zork_triggers_persist_and_reload_without_default_fallback(tmp_path):
