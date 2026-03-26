@@ -44,6 +44,7 @@ def initialize_history_store_runtime(
     )
     store.db_path = db_path
     store.local_node_id = _local_node_id_from_profiled_history_db_path_helper(db_path)
+    store._last_local_telemetry_sample_unix = 0
     store._policy = policy
     store.max_rows = policy.max_rows
     store.retention_seconds = policy.retention_seconds

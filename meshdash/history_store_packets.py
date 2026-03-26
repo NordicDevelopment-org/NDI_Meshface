@@ -37,7 +37,8 @@ _ENV_METRIC_ALIAS_MAP = {
     "channelutilization": "channel_utilization",
     "airutiltx": "air_util_tx",
 }
-_LOCAL_NOISE_PORTS = {"ADMIN_APP", "TELEMETRY_APP"}
+_LOCAL_NOISE_PORTS = {"ADMIN_APP"}
+_LOCAL_TELEMETRY_PORT = "TELEMETRY_APP"
 
 
 def _is_hex_text(value: str) -> bool:
@@ -144,6 +145,64 @@ def _should_skip_local_noise_packet(
         return False
     portnum = str(summary.get("portnum") or "").strip().upper()
     return bool(portnum) and portnum in _LOCAL_NOISE_PORTS
+
+
+def _local_telemetry_sample_unix(
+    packet_entry: dict[str, object],
+    *,
+    local_node_id: object,
+) -> int | None:
+    clean_local_node_id = _canonical_node_id(local_node_id)
+    if not (clean_local_node_id.startswith("!") and len(clean_local_node_id) == 9):
+        return None
+    summary = packet_entry.get("summary")
+    if not isinstance(summary, dict):
+        return None
+    from_id = _canonical_node_id(
+        summary.get("from")
+        or summary.get("from_id")
+        or summary.get("from_num")
+    )
+    if from_id != clean_local_node_id:
+        return None
+    portnum = str(summary.get("portnum") or "").strip().upper()
+    if portnum != _LOCAL_TELEMETRY_PORT:
+        return None
+
+    packet = packet_entry.get("packet")
+    decoded = packet.get("decoded") if isinstance(packet, dict) else None
+    telemetry = decoded.get("telemetry") if isinstance(decoded, dict) else None
+    if isinstance(telemetry, dict):
+        telemetry_unix = _normalize_unix_seconds(telemetry.get("time"))
+        if telemetry_unix is not None and telemetry_unix > 0:
+            return telemetry_unix
+
+    sample_unix = _latest_unix(
+        summary.get("rx_time_unix"),
+        summary.get("time"),
+        summary.get("captured_at_unix"),
+        packet.get("rxTime") if isinstance(packet, dict) else None,
+        packet.get("rx_time") if isinstance(packet, dict) else None,
+    )
+    return sample_unix if sample_unix > 0 else None
+
+
+def _should_skip_local_telemetry_duplicate(
+    packet_entry: dict[str, object],
+    *,
+    local_node_id: object,
+    last_saved_sample_unix: object,
+) -> tuple[bool, int]:
+    sample_unix = _local_telemetry_sample_unix(
+        packet_entry,
+        local_node_id=local_node_id,
+    )
+    if sample_unix is None or sample_unix <= 0:
+        return False, 0
+    last_saved_unix = _normalize_unix_seconds(last_saved_sample_unix) or 0
+    if last_saved_unix > 0 and sample_unix <= last_saved_unix:
+        return True, sample_unix
+    return False, sample_unix
 
 
 def _extract_node_label(summary: dict[str, object], packet: dict[str, object], fallback: str) -> str:
@@ -893,17 +952,27 @@ def load_environment_metrics_history(
 
 
 def save_packet(store: HistoryStoreWriteState, packet_entry: dict[str, object]) -> None:
-    if _should_skip_local_noise_packet(
-        packet_entry,
-        local_node_id=getattr(store, "local_node_id", ""),
-    ):
-        return
     with store._lock:
+        local_node_id = getattr(store, "local_node_id", "")
+        if _should_skip_local_noise_packet(
+            packet_entry,
+            local_node_id=local_node_id,
+        ):
+            return
+        skip_local_telemetry, local_telemetry_sample_unix = _should_skip_local_telemetry_duplicate(
+            packet_entry,
+            local_node_id=local_node_id,
+            last_saved_sample_unix=getattr(store, "_last_local_telemetry_sample_unix", 0),
+        )
+        if skip_local_telemetry:
+            return
         _save_packet_record_helper(
             store._conn,
             packet_entry,
             now_unix_fn=time.time,
             save_packet_event_and_rollups_fn=_save_packet_event_and_rollups_helper,
         )
+        if local_telemetry_sample_unix > 0:
+            setattr(store, "_last_local_telemetry_sample_unix", int(local_telemetry_sample_unix))
         store._maybe_prune_unlocked()
         store._conn.commit()
