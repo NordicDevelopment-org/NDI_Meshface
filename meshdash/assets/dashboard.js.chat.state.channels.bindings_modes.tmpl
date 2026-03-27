@@ -124,19 +124,23 @@
     }}
 
     function bindMeshChannelMenuControl() {{
-      const panel = document.getElementById("mesh-channel-pill-strip");
-      if (!(panel instanceof HTMLElement) || panel.dataset.bound === "1") return;
-      panel.dataset.bound = "1";
-
-      panel.addEventListener("pointerdown", (ev) => {{
-        const target = ev.target;
-        if (!(target instanceof Element)) return;
-        const item = target.closest(".mesh-channel-pill");
-        if (!(item instanceof HTMLButtonElement)) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        applyMeshChannelIndex(item.dataset.meshChannelIndex || meshChannelAllIndex, true);
-      }});
+      const panelSet = new Set([
+        document.getElementById("mesh-channel-pill-strip"),
+        document.getElementById("chat-labs-channel-pill-strip"),
+      ]);
+      for (const panel of panelSet) {{
+        if (!(panel instanceof HTMLElement) || panel.dataset.bound === "1") continue;
+        panel.dataset.bound = "1";
+        panel.addEventListener("pointerdown", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const item = target.closest(".mesh-channel-pill");
+          if (!(item instanceof HTMLButtonElement)) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          applyMeshChannelIndex(item.dataset.meshChannelIndex || meshChannelAllIndex, true);
+        }});
+      }}
 
       syncMeshChannelViewControl();
       renderMeshChannelPills(meshChannelOptions);

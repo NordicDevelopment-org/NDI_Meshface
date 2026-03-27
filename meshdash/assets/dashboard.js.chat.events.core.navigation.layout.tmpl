@@ -3,12 +3,15 @@
       const feed = document.getElementById("chat-labs-feed");
       const countEl = document.getElementById("chat-labs-count");
       if (!(terminal instanceof HTMLElement) || !(feed instanceof HTMLElement)) return;
+      if (typeof renderMeshChannelPills === "function") {{
+        renderMeshChannelPills(meshChannelOptions);
+      }}
 
       const safeState = (state && typeof state === "object") ? state : null;
       const traffic = (safeState && safeState.traffic && typeof safeState.traffic === "object")
         ? safeState.traffic
         : {{}};
-      const rows = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const liveRows = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
       const nodes = Array.isArray(safeState && safeState.nodes) ? safeState.nodes : [];
       const nowUnix = Math.floor(Date.now() / 1000);
       const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState || latestState || {{}}));
@@ -27,6 +30,9 @@
 
       const wasNearBottom = (terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight) <= 28;
       const maxLines = 260;
+      const historyBackfillLimit = Math.max(320, maxLines * 2);
+      const fromIdKeys = ["from_id", "fromId", "from", "source_id", "sourceId", "source", "from_num", "fromNum"];
+      const toIdKeys = ["to_id", "toId", "to", "dest_id", "destId", "destination", "dest", "to_num", "toNum"];
       const resolveNodeIdFromMessage = (msg, keys) => {{
         for (const key of keys) {{
           const rawValue = msg && msg[key];
@@ -59,6 +65,138 @@
           return "";
         }}
       }};
+      const squeezeChatLabsWhitespace = (rawValue) => {{
+        const raw = String(rawValue == null ? "" : rawValue).replace(/\r\n?/g, "\n");
+        let normalized = raw;
+        try {{
+          normalized = normalized.replace(/\p{{Z}}+/gu, " ");
+        }} catch (_err) {{
+          normalized = normalized.replace(/[\u00A0\u1680\u180E\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+/g, " ");
+        }}
+        normalized = normalized
+          .replace(/[\u2800\u3164\u115F\u1160]+/g, " ")
+          .replace(/[\u200B-\u200D\u2060\uFEFF]+/g, " ")
+          .replace(/[\u0000-\u001F\u007F-\u009F]+/g, " ");
+        normalized = normalized
+          .replace(/[\t\f\v]+/g, " ")
+          .split("\n")
+          .map((line) => line.replace(/ +/g, " ").trim())
+          .join("\n")
+          .trim();
+        return normalized;
+      }};
+      const normalizeChatLabsText = (rawValue) => squeezeChatLabsWhitespace(rawValue).replace(/\s+/g, " ").trim();
+      const normalizeChatLabsLabel = (rawValue) => squeezeChatLabsWhitespace(rawValue).replace(/\n+/g, " ");
+      const historyBridge = (() => {{
+        if (typeof window === "undefined") return {{ loaded: false, loading: false, rows: [] }};
+        const existing = window.__meshChatLabsHistoryBridge;
+        if (existing && typeof existing === "object") return existing;
+        const created = {{
+          loaded: false,
+          loading: false,
+          rows: [],
+          loadedAtMs: 0,
+        }};
+        window.__meshChatLabsHistoryBridge = created;
+        return created;
+      }})();
+      const historyRows = Array.isArray(historyBridge.rows) ? historyBridge.rows : [];
+      const mergedRows = [];
+      const seenMergedKeys = new Set();
+      const mergedCandidates = historyRows.concat(liveRows);
+      const dedupeChatLabsRowKey = (msg) => {{
+        const packetId = messageIdOfChatPacket(msg);
+        if (Number.isInteger(packetId) && packetId > 0) {{
+          return `id:${{packetId}}`;
+        }}
+        const fromNode = normalizeNodeId(
+          (msg && (msg.from_id ?? msg.fromId ?? msg.from ?? msg.source_id ?? msg.sourceId ?? msg.source)) || ""
+        );
+        const toNode = normalizeNodeId(
+          (msg && (msg.to_id ?? msg.toId ?? msg.to ?? msg.dest_id ?? msg.destId ?? msg.destination ?? msg.dest)) || ""
+        );
+        const whenLabel = String(
+          (msg && (msg.rx_time || msg.captured_at || msg.time || msg.rxTime || msg.timestamp || "")) || ""
+        ).trim();
+        const textLabel = normalizeChatLabsText(
+          msg && (msg.decoded_text ?? msg.payload_text ?? msg.text ?? msg.message ?? msg.body ?? "")
+        );
+        return `row:${{fromNode}}|${{toNode}}|${{whenLabel}}|${{textLabel}}`;
+      }};
+      for (const msg of mergedCandidates) {{
+        if (!(msg && typeof msg === "object")) continue;
+        const dedupeKey = dedupeChatLabsRowKey(msg);
+        if (seenMergedKeys.has(dedupeKey)) continue;
+        seenMergedKeys.add(dedupeKey);
+        mergedRows.push(msg);
+      }}
+      const filteredRows = (typeof messageMatchesActiveMeshChannel === "function")
+        ? mergedRows.filter((msg) => messageMatchesActiveMeshChannel(msg))
+        : mergedRows;
+      if (
+        typeof fetchConsoleHistorySearch === "function"
+        && !historyBridge.loaded
+        && !historyBridge.loading
+      ) {{
+        historyBridge.loading = true;
+        void fetchConsoleHistorySearch({{
+          queryText: "from",
+          limit: historyBackfillLimit,
+          source: "chat",
+          scope: "summary",
+          scanLimit: Math.max(3000, historyBackfillLimit * 6),
+        }})
+          .then((payload) => {{
+            const entries = Array.isArray(payload && payload.entries) ? payload.entries : [];
+            const historyMessages = [];
+            for (const entry of entries) {{
+              if (!(entry && typeof entry === "object")) continue;
+              if (entry.separator === true) continue;
+              if (String(entry.source || "").trim().toLowerCase() !== "chat") continue;
+              const chat = (entry.chat && typeof entry.chat === "object") ? entry.chat : null;
+              if (!chat) continue;
+              historyMessages.push({{
+                from_id: chat.from,
+                from: chat.from,
+                to_id: chat.to,
+                to: chat.to,
+                channel: chat.channel,
+                channel_index: chat.channel,
+                decoded_text: chat.text,
+                text: chat.text,
+                message: chat.text,
+                body: chat.text,
+                rx_time: chat.rx_time || chat.captured_at || "",
+                captured_at: chat.captured_at || chat.rx_time || "",
+                time: chat.captured_at || chat.rx_time || "",
+                timestamp: chat.captured_at || chat.rx_time || "",
+                message_id: chat.message_id,
+                packet_id: chat.message_id,
+                reply_id: chat.reply_id,
+                portnum: chat.portnum,
+                rx_snr: chat.rx_snr,
+                rx_rssi: chat.rx_rssi,
+                hop_start: chat.hop_start,
+                hop_limit: chat.hop_limit,
+                hops: chat.hops,
+              }});
+            }}
+            historyBridge.rows = historyMessages.slice(-historyBackfillLimit);
+            historyBridge.loaded = true;
+            historyBridge.loadedAtMs = Date.now();
+          }})
+          .catch(() => {{
+            historyBridge.rows = [];
+            historyBridge.loaded = true;
+            historyBridge.loadedAtMs = Date.now();
+          }})
+          .finally(() => {{
+            historyBridge.loading = false;
+            if (activeLayoutView === "chatlabs") {{
+              renderChatLabsView(latestState);
+            }}
+          }});
+      }}
       const messageText = (msg) => {{
         const candidates = [
           msg && msg.decoded_text,
@@ -68,20 +206,107 @@
           msg && msg.body,
         ];
         for (const candidate of candidates) {{
-          const text = String(candidate == null ? "" : candidate).trim();
+          const text = normalizeChatLabsText(candidate);
           if (text) return text;
         }}
         const emoji = String(msg && msg.emoji ? msg.emoji : "").trim() || emojiFromCodepoint(msg && (msg.emoji_codepoint ?? msg.emojiCodepoint));
         if (emoji) {{
-          return `reaction ${{emoji}}`;
+          return emoji;
         }}
         if (msg && msg.is_reaction === true) {{
-          return "reaction";
+          return "Reaction";
         }}
         return "";
       }};
+      const reactionEmojiForMessage = (msg) => {{
+        const inline = String(msg && msg.emoji ? msg.emoji : "").trim();
+        if (inline) return inline;
+        return emojiFromCodepoint(msg && (msg.emoji_codepoint ?? msg.emojiCodepoint));
+      }};
+      const avatarTokenFromLabel = (label) => {{
+        const raw = String(label == null ? "" : label).trim();
+        if (!raw) return "?";
+        const cleaned = raw.replace(/[^A-Za-z0-9 ]+/g, " ").trim();
+        if (cleaned) {{
+          const words = cleaned.split(/\s+/).filter(Boolean);
+          if (words.length >= 2) {{
+            return `${{words[0][0] || ""}}${{words[1][0] || ""}}`.toUpperCase();
+          }}
+          return words[0].slice(0, 2).toUpperCase();
+        }}
+        const first = Array.from(raw).slice(0, 1).join("");
+        return first ? first.toUpperCase() : "?";
+      }};
+      const isEmojiCodePoint = (cp) => {{
+        if (!Number.isInteger(cp)) return false;
+        return (
+          (cp >= 0x1F000 && cp <= 0x1FAFF)
+          || (cp >= 0x2600 && cp <= 0x27BF)
+          || (cp >= 0x1F1E6 && cp <= 0x1F1FF)
+        );
+      }};
+      const isEmojiOnlyText = (rawText) => {{
+        const text = String(rawText == null ? "" : rawText).trim();
+        if (!text) return false;
+        const compact = text.replace(/\s+/g, "");
+        if (!compact) return false;
+        let sawEmoji = false;
+        for (const ch of compact) {{
+          const cp = ch.codePointAt(0);
+          if (!Number.isInteger(cp)) return false;
+          if (cp === 0x200D || cp === 0xFE0F || cp === 0x20E3) continue;
+          if (isEmojiCodePoint(cp)) {{
+            sawEmoji = true;
+            continue;
+          }}
+          return false;
+        }}
+        return sawEmoji;
+      }};
+      const reactionBucketsByMessage = new Map();
+      const baseRows = [];
+      for (const msg of filteredRows) {{
+        if (!(msg && typeof msg === "object")) continue;
+        const replyId = replyIdOfChatPacket(msg);
+        const reactionEmoji = reactionEmojiForMessage(msg);
+        const isReactionPacket = !!(
+          msg.is_reaction === true
+          || (Number.isInteger(replyId) && replyId > 0 && !!reactionEmoji)
+        );
+        if (isReactionPacket) {{
+          if (!Number.isInteger(replyId) || replyId <= 0 || !reactionEmoji) {{
+            continue;
+          }}
+          const messageKey = String(replyId);
+          let perMessage = reactionBucketsByMessage.get(messageKey);
+          if (!(perMessage instanceof Map)) {{
+            perMessage = new Map();
+            reactionBucketsByMessage.set(messageKey, perMessage);
+          }}
+          let bucket = perMessage.get(reactionEmoji);
+          if (!bucket) {{
+            bucket = {{
+              emoji: reactionEmoji,
+              count: 0,
+              reactors: new Set(),
+              names: [],
+            }};
+            perMessage.set(reactionEmoji, bucket);
+          }}
+          const reactorId = resolveNodeIdFromMessage(msg, fromIdKeys);
+          const reactorName = nodeLabel(reactorId, "Unknown node");
+          const dedupeKey = reactorId || `${{reactorName}}:${{msg.rx_time || msg.captured_at || bucket.count}}`;
+          if (!bucket.reactors.has(dedupeKey)) {{
+            bucket.reactors.add(dedupeKey);
+            bucket.count += 1;
+            bucket.names.push(reactorName);
+          }}
+          continue;
+        }}
+        baseRows.push(msg);
+      }}
 
-      const timeline = rows
+      const timeline = baseRows
         .map((msg, index) => {{
           const unix = latestUnixTimestamp(
             msg && msg.rx_time,
@@ -110,20 +335,28 @@
         .slice(-maxLines);
 
       if (!timeline.length) {{
-        feed.innerHTML = '<div class="chatlabs-empty">No chat traffic yet. Incoming messages will appear here.</div>';
+        const loadingHistory = !!(historyBridge && historyBridge.loading);
+        feed.innerHTML = loadingHistory
+          ? '<div class="chatlabs-empty">Loading saved chat history...</div>'
+          : '<div class="chatlabs-empty">No chat traffic yet. Incoming messages will appear here.</div>';
         if (countEl instanceof HTMLElement) {{
-          countEl.textContent = "0 lines";
+          countEl.textContent = loadingHistory ? "loading..." : "0 msgs";
+        }}
+        if (typeof bindChatReactionControls === "function") {{
+          bindChatReactionControls();
         }}
         return;
       }}
 
       const lineHtml = [];
-      for (const row of timeline) {{
+      for (let rowIndex = 0; rowIndex < timeline.length; rowIndex += 1) {{
+        const row = timeline[rowIndex];
         const msg = row.msg;
-        const fromId = resolveNodeIdFromMessage(msg, ["from_id", "fromId", "from", "source_id", "sourceId", "source", "from_num", "fromNum"]);
-        const toId = resolveNodeIdFromMessage(msg, ["to_id", "toId", "to", "dest_id", "destId", "destination", "dest", "to_num", "toNum"]);
-        const fromLabel = nodeLabel(fromId, "unknown");
-        const toLabel = nodeLabel(toId || "^all", "all");
+        const fromId = resolveNodeIdFromMessage(msg, fromIdKeys);
+        const toId = resolveNodeIdFromMessage(msg, toIdKeys);
+        const messageId = messageIdOfChatPacket(msg);
+        const fromLabel = normalizeChatLabsLabel(nodeLabel(fromId, "unknown")) || "unknown";
+        const toLabel = normalizeChatLabsLabel(nodeLabel(toId || "^all", "all")) || "all";
         const isDirect = !!(toId && toId !== "^all" && toId !== "all" && toId !== "local");
         const text = messageText(msg);
         const isReaction = !!(
@@ -138,23 +371,112 @@
         const timeLabel = Number.isFinite(row.unix) && row.unix > 0
           ? formatLocalChatTime(row.unix, rawTime || "n/a", nowUnix)
           : String(rawTime || "n/a");
-        const classes = ["chatlabs-line"];
-        if (isCanonicalNodeId(fromId) && isCanonicalNodeId(localNodeId) && fromId === localNodeId) {{
-          classes.push("chatlabs-line-self");
+        const isSelf = isCanonicalNodeId(fromId) && isCanonicalNodeId(localNodeId) && fromId === localNodeId;
+        let continuation = false;
+        if (rowIndex > 0) {{
+          const previous = timeline[rowIndex - 1];
+          const previousMsg = previous && previous.msg && typeof previous.msg === "object"
+            ? previous.msg
+            : null;
+          if (previousMsg) {{
+            const previousFromId = resolveNodeIdFromMessage(previousMsg, fromIdKeys);
+            const previousIsSelf = isCanonicalNodeId(previousFromId) && isCanonicalNodeId(localNodeId) && previousFromId === localNodeId;
+            const previousUnix = Number.isFinite(previous.unix) ? Math.floor(previous.unix) : null;
+            const maxGapSec = 5 * 60;
+            const withinWindow = (
+              Number.isFinite(row.unix)
+              && Number.isFinite(previousUnix)
+              && (Math.floor(row.unix) - previousUnix) >= 0
+              && (Math.floor(row.unix) - previousUnix) <= maxGapSec
+            );
+            continuation = previousFromId === fromId && previousIsSelf === isSelf && withinWindow;
+          }}
+        }}
+        const isEmojiOnly = isEmojiOnlyText(text);
+        const rowClasses = ["chatlabs-message-row"];
+        if (isSelf) {{
+          rowClasses.push("is-self");
+        }}
+        if (continuation) {{
+          rowClasses.push("is-continuation");
         }}
         if (isReaction) {{
-          classes.push("chatlabs-line-reaction");
+          rowClasses.push("is-reaction");
         }}
-        const directionLabel = isDirect ? `-> ${{toLabel}}` : "-> all";
+        const bubbleClasses = ["chatlabs-bubble"];
+        if (isSelf) {{
+          bubbleClasses.push("is-self");
+        }}
+        if (isReaction) {{
+          bubbleClasses.push("is-reaction");
+        }}
+        if (isEmojiOnly) {{
+          bubbleClasses.push("is-emoji-only");
+        }}
+        const directionLabel = isDirect ? `to ${{toLabel}}` : "to all";
         const bodyHtml = chatPlainTextToHtml(text || "(no text)", true);
+        const avatarLabel = avatarTokenFromLabel(fromLabel);
+        const senderLabel = isSelf ? "You" : (normalizeChatLabsLabel(fromLabel) || "unknown");
+        const messageReactions = messageId ? reactionBucketsByMessage.get(String(messageId)) : null;
+        const reactionGroups = messageReactions
+          ? Array.from(messageReactions.values())
+              .map((bucket) => ({{
+                emoji: String(bucket.emoji || "").trim(),
+                count: Math.max(0, Number(bucket.count || 0)),
+                names: Array.isArray(bucket.names)
+                  ? Array.from(new Set(bucket.names.map((name) => String(name || "").trim()).filter(Boolean))).slice(0, 40)
+                  : [],
+              }}))
+              .filter((bucket) => !!bucket.emoji && Number.isFinite(bucket.count) && bucket.count > 0)
+              .sort((a, b) => (b.count - a.count) || String(a.emoji).localeCompare(String(b.emoji)))
+          : [];
+        const reactionTotal = reactionGroups.reduce((sum, bucket) => sum + Math.max(0, Number(bucket.count || 0)), 0);
+        const reactionSummaryTitle = reactionGroups.map((bucket) => `${{bucket.emoji}} ${{bucket.count}}`).join(" • ");
+        const reactionSummaryIcons = reactionGroups
+          .slice(0, 4)
+          .map((bucket) => `<span class="chat-reaction-summary-emoji">${{escAttr(bucket.emoji)}}</span>`)
+          .join("");
+        const reactionSummary = reactionGroups.length > 0
+          ? `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}" title="${{escAttr(reactionSummaryTitle)}}">
+              <span class="chat-reaction-summary-icons">${{reactionSummaryIcons}}</span>
+              <span class="chat-reaction-summary-total">${{reactionTotal}}</span>
+            </button>`
+          : "";
+        const reactButton = messageId
+          ? `<button type="button" class="chat-react-btn chatlabs-react-meta${{reactionGroups.length > 0 ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
+          : "";
+        const tools = reactionSummary
+          ? `<div class="chatlabs-message-tools">${{reactionSummary}}</div>`
+          : "";
+        const avatarHtml = continuation
+          ? '<div class="chatlabs-avatar-gap" aria-hidden="true"></div>'
+          : `<div class="chatlabs-avatar" aria-hidden="true">${{escAttr(avatarLabel)}}</div>`;
+        const metaHtml = continuation
+          ? `<div class="chatlabs-meta chatlabs-meta-compact"><span class="chatlabs-meta-time">${{escAttr(timeLabel)}}</span>${{reactButton}}</div>`
+          : `<div class="chatlabs-meta">
+                <span class="chatlabs-meta-name">${{escAttr(senderLabel)}}</span>
+                <span class="chatlabs-meta-route" title="${{escAttr(directionLabel)}}">${{escAttr(directionLabel)}}</span>
+                <span class="chatlabs-meta-time">${{escAttr(timeLabel)}}</span>
+                ${{reactButton}}
+              </div>`;
         lineHtml.push(
-          `<div class="${{escAttr(classes.join(" "))}}"><span class="chatlabs-ts">[${{escAttr(timeLabel)}}]</span> <span class="chatlabs-node">${{escAttr(fromLabel)}}</span> <span class="chatlabs-route">${{escAttr(directionLabel)}}</span> <span class="chatlabs-body">${{bodyHtml || "&nbsp;"}}</span></div>`
+          `<article class="${{escAttr(rowClasses.join(" "))}}">
+            ${{avatarHtml}}
+            <div class="chatlabs-message-main">
+              ${{metaHtml}}
+              <div class="${{escAttr(bubbleClasses.join(" "))}}"><span class="chatlabs-bubble-text">${{bodyHtml || "&nbsp;"}}</span></div>
+              ${{tools}}
+            </div>
+          </article>`
         );
       }}
 
       feed.innerHTML = lineHtml.join("");
+      if (typeof bindChatReactionControls === "function") {{
+        bindChatReactionControls();
+      }}
       if (countEl instanceof HTMLElement) {{
-        countEl.textContent = `${{timeline.length}} lines`;
+        countEl.textContent = `${{timeline.length}} msgs`;
       }}
       if (wasNearBottom) {{
         window.requestAnimationFrame(() => {{

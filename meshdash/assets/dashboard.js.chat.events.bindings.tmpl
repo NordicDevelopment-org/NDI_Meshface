@@ -96,8 +96,10 @@
 
     function bindChatReactionControls() {{
       bindReactionPopover();
-      for (const btn of document.querySelectorAll("#chat-feed .chat-react-btn")) {{
+      for (const btn of document.querySelectorAll("#chat-feed .chat-react-btn, #chat-labs-feed .chat-react-btn")) {{
         if (!(btn instanceof HTMLButtonElement)) continue;
+        if (btn.dataset.reactionBound === "1") continue;
+        btn.dataset.reactionBound = "1";
         btn.addEventListener("click", (ev) => {{
           ev.preventDefault();
           ev.stopPropagation();
@@ -124,8 +126,10 @@
         }});
       }}
 
-      for (const summary of document.querySelectorAll("#chat-feed .chat-reaction-summary")) {{
+      for (const summary of document.querySelectorAll("#chat-feed .chat-reaction-summary, #chat-labs-feed .chat-reaction-summary")) {{
         if (!(summary instanceof HTMLButtonElement)) continue;
+        if (summary.dataset.reactionSummaryBound === "1") continue;
+        summary.dataset.reactionSummaryBound = "1";
         summary.addEventListener("pointerenter", () => {{
           clearReactionPopoverHideTimer();
           openReactionPopoverForSummary(summary);

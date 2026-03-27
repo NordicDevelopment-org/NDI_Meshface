@@ -1773,6 +1773,16 @@
       font-size: 0.8rem;
       color: #93c8ad;
     }}
+    .layout.view-chatlabs .chatlabs .chatlabs-filter-row {{
+      flex: 1 1 100%;
+      width: 100%;
+      margin-top: 8px;
+    }}
+    .layout.view-chatlabs .chatlabs .chatlabs-channel-pill-strip {{
+      width: 100%;
+      max-width: none;
+      gap: 7px;
+    }}
     .layout.view-chatlabs .chatlabs .chatlabs-count {{
       display: inline-flex;
       align-items: center;
@@ -1803,15 +1813,213 @@
       border: 1px solid #285741;
       background: #07100d;
       box-shadow: inset 0 0 0 1px rgba(67, 152, 111, 0.17);
-      font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
+      font-family: "Segoe UI", "Inter", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
       scrollbar-width: thin;
     }}
     .layout.view-chatlabs .chatlabs-feed {{
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 2px;
       min-height: 100%;
-      padding: 12px;
+      width: 100%;
+      margin: 0;
+      padding: 8px 8px 12px;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row {{
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      width: 100%;
+      max-width: 100%;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-continuation {{
+      margin-top: -3px;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-self {{
+      flex-direction: row-reverse;
+    }}
+    .layout.view-chatlabs .chatlabs-avatar {{
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid rgba(121, 198, 160, 0.5);
+      background: linear-gradient(180deg, rgba(43, 82, 64, 0.95), rgba(26, 52, 41, 0.95));
+      color: #d8ffe9;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+      font-size: 0.56rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      flex: 0 0 auto;
+      user-select: none;
+    }}
+    .layout.view-chatlabs .chatlabs-avatar-gap {{
+      width: 22px;
+      height: 22px;
+      flex: 0 0 auto;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-self .chatlabs-avatar {{
+      border-color: rgba(141, 207, 255, 0.5);
+      background: linear-gradient(180deg, rgba(33, 72, 102, 0.94), rgba(20, 46, 66, 0.94));
+      color: #d9f2ff;
+    }}
+    .layout.view-chatlabs .chatlabs-message-main {{
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      max-width: min(82%, 860px);
+      min-width: 0;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-self .chatlabs-message-main {{
+      align-items: flex-end;
+    }}
+    .layout.view-chatlabs .chatlabs-meta {{
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 3px;
+      font-size: 0.62rem;
+      line-height: 1.25;
+      color: #88b59f;
+    }}
+    .layout.view-chatlabs .chatlabs-meta.chatlabs-meta-compact {{
+      gap: 4px;
+      opacity: 0.72;
+      margin-bottom: -2px;
+    }}
+    .layout.view-chatlabs .chatlabs-meta-name {{
+      font-weight: 600;
+      color: #b6f5d3;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-self .chatlabs-meta-name {{
+      color: #c7e9ff;
+    }}
+    .layout.view-chatlabs .chatlabs-meta-route {{
+      display: none;
+    }}
+    .layout.view-chatlabs .chatlabs-meta-time {{
+      color: #719d89;
+      font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+      font-size: 0.6rem;
+      opacity: 0.82;
+    }}
+    .layout.view-chatlabs .chatlabs-react-meta {{
+      margin-left: 4px;
+      min-width: 16px;
+      min-height: 16px;
+      height: 16px;
+      padding: 0 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(97, 148, 122, 0.42);
+      background: rgba(20, 42, 32, 0.9);
+      color: #c8f5de;
+      font-size: 0.58rem;
+      line-height: 1;
+      opacity: 0.65;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row:hover .chatlabs-react-meta,
+    .layout.view-chatlabs .chatlabs-message-row:focus-within .chatlabs-react-meta {{
+      opacity: 1;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-continuation .chatlabs-react-meta {{
+      opacity: 0.45;
+    }}
+    .layout.view-chatlabs .chatlabs-react-meta:hover {{
+      border-color: rgba(146, 210, 175, 0.6);
+      background: rgba(32, 67, 50, 0.95);
+      color: #f5fffb;
+    }}
+    .layout.view-chatlabs .chatlabs-react-meta.has-reactions {{
+      border-color: rgba(168, 146, 92, 0.58);
+      background: rgba(59, 46, 19, 0.86);
+      color: #ffe5a9;
+      opacity: 0.9;
+    }}
+    .layout.view-chatlabs .chatlabs-react-meta.has-reactions:hover {{
+      border-color: rgba(214, 180, 103, 0.72);
+      background: rgba(80, 62, 25, 0.92);
+      color: #ffefc8;
+    }}
+    .layout.view-chatlabs .chatlabs-bubble {{
+      display: inline-block;
+      font-family: "Helvetica Neue", Arial, "Noto Sans", sans-serif !important;
+      letter-spacing: 0 !important;
+      word-spacing: normal !important;
+      font-kerning: normal;
+      font-variant-ligatures: normal;
+      font-feature-settings: normal;
+      font-variant-numeric: normal;
+      text-align: left;
+      color: #ddfff0;
+      font-size: 0.86rem;
+      line-height: 1.28;
+      white-space: normal !important;
+      word-break: break-word;
+      border: 1px solid rgba(62, 130, 97, 0.48);
+      border-radius: 14px 14px 14px 6px;
+      background: linear-gradient(180deg, rgba(15, 44, 33, 0.94), rgba(10, 28, 22, 0.94));
+      padding: 5px 9px;
+      box-shadow: inset 0 0 0 1px rgba(104, 184, 146, 0.12), 0 1px 5px rgba(0, 0, 0, 0.2);
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-self .chatlabs-bubble {{
+      border-color: rgba(86, 154, 199, 0.5);
+      border-radius: 14px 14px 6px 14px;
+      background: linear-gradient(180deg, rgba(30, 58, 83, 0.92), rgba(21, 43, 62, 0.92));
+      box-shadow: inset 0 0 0 1px rgba(132, 186, 225, 0.16), 0 3px 10px rgba(0, 0, 0, 0.22);
+    }}
+    .layout.view-chatlabs .chatlabs-bubble.is-reaction {{
+      border-color: rgba(181, 150, 84, 0.5);
+      color: #ffeab7;
+      background: linear-gradient(180deg, rgba(59, 46, 21, 0.9), rgba(38, 30, 14, 0.9));
+    }}
+    .layout.view-chatlabs .chatlabs-bubble.is-emoji-only {{
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+      font-size: 1.8rem;
+      line-height: 1.25;
+      padding: 8px 12px;
+      letter-spacing: 0.01em;
+    }}
+    .layout.view-chatlabs .chatlabs-bubble .chatlabs-bubble-text {{
+      display: inline;
+      text-align: left !important;
+      text-justify: auto !important;
+      white-space: normal !important;
+      letter-spacing: 0 !important;
+      word-spacing: normal !important;
+      font-family: "Helvetica Neue", Arial, "Noto Sans", sans-serif !important;
+      unicode-bidi: plaintext;
+    }}
+    .layout.view-chatlabs .chatlabs-bubble a {{
+      color: #9edcff;
+      text-decoration-color: rgba(158, 220, 255, 0.4);
+    }}
+    .layout.view-chatlabs .chatlabs-message-tools {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 0;
+      margin-top: 0;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-self .chatlabs-message-tools {{
+      justify-content: flex-end;
+    }}
+    .layout.view-chatlabs .chatlabs-message-tools .chat-reaction-summary {{
+      border-color: rgba(106, 160, 132, 0.44);
+      background: rgba(20, 46, 34, 0.9);
+      color: #d2ffea;
+    }}
+    .layout.view-chatlabs .chatlabs-message-tools .chat-reaction-summary:hover {{
+      border-color: rgba(139, 204, 171, 0.54);
+      background: rgba(29, 61, 46, 0.95);
+    }}
+    .layout.view-chatlabs .chatlabs-empty {{
+      color: #7ea994;
+      font-size: 0.82rem;
+      padding: 6px 2px;
     }}
     .layout.view-chatlabs .chatlabs-line {{
       color: #d8fbe9;
@@ -1819,32 +2027,6 @@
       line-height: 1.45;
       white-space: pre-wrap;
       word-break: break-word;
-    }}
-    .layout.view-chatlabs .chatlabs-line .chatlabs-ts {{
-      color: #89b89f;
-    }}
-    .layout.view-chatlabs .chatlabs-line .chatlabs-node {{
-      color: #6ee7ac;
-      font-weight: 600;
-    }}
-    .layout.view-chatlabs .chatlabs-line .chatlabs-route {{
-      color: #9ac9b2;
-      margin-left: 2px;
-    }}
-    .layout.view-chatlabs .chatlabs-line.chatlabs-line-self .chatlabs-node {{
-      color: #9fd7ff;
-    }}
-    .layout.view-chatlabs .chatlabs-line.chatlabs-line-reaction .chatlabs-body {{
-      color: #f6d98f;
-    }}
-    .layout.view-chatlabs .chatlabs-line .chatlabs-body a {{
-      color: #9dd9ff;
-      text-decoration-color: rgba(157, 217, 255, 0.42);
-    }}
-    .layout.view-chatlabs .chatlabs-empty {{
-      color: #7ea994;
-      font-size: 0.84rem;
-      padding: 2px 0;
     }}
     .layout.view-chat {{
       height: 100%;

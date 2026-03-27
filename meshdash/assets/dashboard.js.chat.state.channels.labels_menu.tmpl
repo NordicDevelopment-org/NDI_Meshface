@@ -154,8 +154,12 @@
     }}
 
     function renderMeshChannelPills(options) {{
-      const panel = document.getElementById("mesh-channel-pill-strip");
-      if (!(panel instanceof HTMLElement)) return;
+      const panelSet = new Set([
+        document.getElementById("mesh-channel-pill-strip"),
+        document.getElementById("chat-labs-channel-pill-strip"),
+      ]);
+      const panels = Array.from(panelSet).filter((panel) => panel instanceof HTMLElement);
+      if (!panels.length) return;
       const normalized = Array.isArray(options) ? options : [];
       const activeScope = normalizeChatChannel(activeChatChannel);
       const rows = [];
@@ -176,7 +180,7 @@
           unread: getChatMeshChannelUnread(activeScope, idx),
         }});
       }}
-      panel.innerHTML = rows.map((row) => {{
+      const pillsHtml = rows.map((row) => {{
         const active = normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }}) === row.index;
         const dotClass = row.all ? "channel-color-dot is-all" : "channel-color-dot";
         const unreadLabel = row.unread > 99 ? "99+" : String(row.unread || "");
@@ -199,6 +203,9 @@
           }}
         </button>`;
       }}).join("");
+      for (const panel of panels) {{
+        panel.innerHTML = pillsHtml;
+      }}
     }}
 
     function meshChannelLabelForIndex(rawIndex, {{ verbose = false, compact = false, allowAll = true }} = {{}}) {{
