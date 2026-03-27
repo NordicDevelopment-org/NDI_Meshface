@@ -2017,7 +2017,7 @@
       letter-spacing: 0.01em;
     }}
     .layout.view-chatlabs .chatlabs-bubble .chatlabs-bubble-text {{
-      display: inline;
+      display: block;
       text-align: left !important;
       text-justify: auto !important;
       white-space: normal !important;
@@ -2025,6 +2025,45 @@
       word-spacing: normal !important;
       font-family: "Helvetica Neue", Arial, "Noto Sans", sans-serif !important;
       unicode-bidi: plaintext;
+    }}
+    .layout.view-chatlabs .chatlabs-inline-header {{
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      max-width: 100%;
+      min-width: 0;
+      white-space: nowrap;
+      vertical-align: baseline;
+    }}
+    .layout.view-chatlabs .chatlabs-inline-name {{
+      display: inline-block;
+      max-width: 30ch;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 700;
+      color: #d7ffe9;
+      letter-spacing: 0;
+    }}
+    .layout.view-chatlabs .chatlabs-message-row.is-self .chatlabs-inline-name {{
+      color: #d8eeff;
+    }}
+    .layout.view-chatlabs .chatlabs-inline-time {{
+      color: #8fb6a5;
+      font-size: 0.67rem;
+      font-weight: 500;
+      opacity: 0.95;
+      white-space: nowrap;
+    }}
+    .layout.view-chatlabs .chatlabs-inline-sep {{
+      color: #9bc3b2;
+      opacity: 0.88;
+      padding: 0 2px 0 1px;
+      font-weight: 600;
+    }}
+    .layout.view-chatlabs .chatlabs-inline-body {{
+      display: inline;
     }}
     .layout.view-chatlabs .chatlabs-bubble a {{
       color: #9edcff;

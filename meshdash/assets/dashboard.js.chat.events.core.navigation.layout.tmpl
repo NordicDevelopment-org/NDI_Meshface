@@ -505,25 +505,24 @@
         const reactButton = messageId
           ? `<button type="button" class="chat-react-btn chatlabs-react-meta${{reactionGroups.length > 0 ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
           : "";
-        const tools = reactionSummary
-          ? `<div class="chatlabs-message-tools">${{reactionSummary}}</div>`
+        const tools = (reactionSummary || reactButton)
+          ? `<div class="chatlabs-message-tools">${{reactionSummary}}${{reactButton}}</div>`
           : "";
         const statusChip = `<span class="chatlabs-meta-status status-${{escAttr(senderStatusKey)}}" title="Sender status: ${{escAttr(senderStatusLabel)}}">${{escAttr(senderStatusLabel)}}</span>`;
         const routeChip = isDirect
           ? `<span class="chatlabs-meta-route" title="${{escAttr(directionLabel)}}">Direct</span>`
           : "";
-        const metaHtml = `<div class="chatlabs-meta${{continuation ? " chatlabs-meta-compact" : ""}}">
-              <span class="chatlabs-meta-name">${{escAttr(senderLabel)}}</span>
+        const inlinePrefix = `<span class="chatlabs-inline-header">
+              <span class="chatlabs-inline-name">${{escAttr(senderLabel)}}</span>
               ${{statusChip}}
               ${{routeChip}}
-              <span class="chatlabs-meta-time">${{escAttr(timeLabel)}}</span>
-              ${{reactButton}}
-            </div>`;
+              <span class="chatlabs-inline-time">${{escAttr(timeLabel)}}</span>
+            </span>`;
+        const bubbleBodyHtml = `${{inlinePrefix}}<span class="chatlabs-inline-sep">:</span> <span class="chatlabs-inline-body">${{bodyHtml || "&nbsp;"}}</span>`;
         lineHtml.push(
           `<article class="${{escAttr(rowClasses.join(" "))}}">
             <div class="chatlabs-message-main">
-              ${{metaHtml}}
-              <div class="${{escAttr(bubbleClasses.join(" "))}}"><span class="chatlabs-bubble-text">${{bodyHtml || "&nbsp;"}}</span></div>
+              <div class="${{escAttr(bubbleClasses.join(" "))}}"><span class="chatlabs-bubble-text">${{bubbleBodyHtml}}</span></div>
               ${{tools}}
             </div>
           </article>`
