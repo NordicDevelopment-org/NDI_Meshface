@@ -787,6 +787,9 @@
         mapResetBtn.hidden = next === "saved" || next === "history";
       }}
       updateMapPacketLinesControl();
+      if (typeof updateNetworkLegacyExplorerControl === "function") {{
+        updateNetworkLegacyExplorerControl();
+      }}
 
       const mapNodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
       try {{
@@ -842,6 +845,28 @@
       }}
       if (next === "network") {{
         fitDone = false;
+        window.setTimeout(() => {{
+          try {{
+            if (typeof requestMapResizeNow === "function") {{
+              requestMapResizeNow();
+            }} else if (typeof requestMapResize === "function") {{
+              requestMapResize();
+            }}
+          }} catch (_err) {{
+          }}
+          try {{
+            if (typeof requestMapResizeStabilized === "function") {{
+              requestMapResizeStabilized();
+            }}
+          }} catch (_err) {{
+          }}
+          try {{
+            if (mapBasemapMode !== "offline" && typeof applyMapTiles === "function" && typeof activeMapTileTheme === "function") {{
+              applyMapTiles(activeMapTileTheme());
+            }}
+          }} catch (_err) {{
+          }}
+        }}, 60);
       }}
       if (next === "network" && isSelectableNodeId(selectedNodeId)) {{
         pendingSelectionScroll = true;

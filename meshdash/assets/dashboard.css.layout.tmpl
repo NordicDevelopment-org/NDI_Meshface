@@ -2635,10 +2635,11 @@
       --network-pane-divider-border: #d1e0cb;
       --network-pane-divider-line: #b8cab9;
       --network-pane-divider-line-active: #2f855a;
-      height: 100%;
+      height: calc(100dvh - var(--workspace-viewport-offset, 84px) - 16px);
       min-height: 0;
       grid-template-columns: minmax(320px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
       grid-template-rows: auto minmax(0, 1fr);
+      align-content: stretch;
     }}
     .layout.view-network .summary {{
       display: block;
@@ -2646,6 +2647,10 @@
       grid-row: 1;
     }}
     .layout.view-network .nodes {{
+      display: none;
+    }}
+    .layout.view-network.network-legacy-explorer-visible .nodes {{
+      display: block;
       grid-column: 1;
       grid-row: 2;
       min-height: 0;
@@ -2656,10 +2661,14 @@
       background: var(--network-pane-head-bg);
     }}
     .layout.view-network .map {{
-      grid-column: 3;
+      grid-column: 1 / span 3;
       grid-row: 2;
+      height: 100%;
       min-height: 0;
       border-color: var(--network-pane-head-border);
+    }}
+    .layout.view-network.network-legacy-explorer-visible .map {{
+      grid-column: 3;
     }}
     .layout.view-network .nodes .body {{
       min-height: 0;
@@ -2694,6 +2703,10 @@
       padding: 0 !important;
     }}
     .layout.view-network .map .body {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(280px, 1fr);
+      height: 100%;
       min-height: 0;
       background: var(--network-pane-body-bg);
       padding-top: 0;
@@ -2707,7 +2720,10 @@
       display: none;
     }}
     .layout.view-network .map-frame {{
-      min-height: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 280px;
       border-color: var(--network-pane-head-border);
       border-top: 0;
       border-radius: 0 0 8px 8px;
@@ -2724,7 +2740,10 @@
       display: none !important;
     }}
     .layout.view-network .splitter {{
-      display: block;
+      display: none !important;
+    }}
+    .layout.view-network.network-legacy-explorer-visible .splitter {{
+      display: block !important;
       grid-row: 2;
       border-color: var(--network-pane-divider-border);
       background: var(--network-pane-divider-bg);
