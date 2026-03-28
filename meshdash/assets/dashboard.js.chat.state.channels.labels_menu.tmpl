@@ -180,8 +180,16 @@
           unread: getChatMeshChannelUnread(activeScope, idx),
         }});
       }}
+      const activeViewIdx = normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }});
+      const renderSignature = rows.map((row) => (
+        `${{row.index}}:${{String(row.label || "")}}:${{row.unread}}:${{row.all ? 1 : 0}}:${{row.meta && row.meta.fill ? row.meta.fill : ""}}`
+      )).join("|") + `|active:${{activeViewIdx}}|scope:${{activeScope}}`;
+      if (meshChannelPillsRenderSignature === renderSignature) {{
+        return;
+      }}
+      meshChannelPillsRenderSignature = renderSignature;
       const pillsHtml = rows.map((row) => {{
-        const active = normalizeMeshChannelIndex(activeMeshChannelIndex, {{ allowAll: true }}) === row.index;
+        const active = activeViewIdx === row.index;
         const dotClass = row.all ? "channel-color-dot is-all" : "channel-color-dot";
         const unreadLabel = row.unread > 99 ? "99+" : String(row.unread || "");
         const primaryBadge = row.all ? "" : meshChannelPrimaryBadgeHtml(row.index);
@@ -204,7 +212,12 @@
         </button>`;
       }}).join("");
       for (const panel of panels) {{
+        const previousMarkup = typeof panel.__meshLastInnerHtml_mesh_channel_pills === "string"
+          ? panel.__meshLastInnerHtml_mesh_channel_pills
+          : "";
+        if (previousMarkup === pillsHtml) continue;
         panel.innerHTML = pillsHtml;
+        panel.__meshLastInnerHtml_mesh_channel_pills = pillsHtml;
       }}
     }}
 

@@ -1121,17 +1121,42 @@
         const queryRaw = String(chatFeedSearchQuery == null ? "" : chatFeedSearchQuery);
         const queryLabel = queryRaw.trim();
         const query = queryLabel.toLowerCase();
-        const feedRows = Array.from(feed.querySelectorAll(".chat-feed-item"));
+        const cachedFeedRows = Array.isArray(feed.__meshChatFeedSearchRows)
+          ? feed.__meshChatFeedSearchRows
+          : [];
+        const needsRowRefresh = (
+          cachedFeedRows.length <= 0
+          || cachedFeedRows.some((row) => !(row instanceof HTMLElement) || !row.isConnected || row.parentElement == null)
+        );
+        const feedRows = needsRowRefresh
+          ? Array.from(feed.querySelectorAll(".chat-feed-item")).filter((row) => row instanceof HTMLElement)
+          : cachedFeedRows;
+        if (needsRowRefresh) {{
+          feed.__meshChatFeedSearchRows = feedRows;
+        }}
         let visibleRows = 0;
+        if (!query) {{
+          for (const row of feedRows) {{
+            if (!(row instanceof HTMLElement)) continue;
+            row.hidden = false;
+            row.classList.remove("chat-feed-search-hidden");
+            visibleRows += 1;
+          }}
+        }} else {{
         for (const row of feedRows) {{
           if (!(row instanceof HTMLElement)) continue;
-          const rowName = String(row.dataset.replyName || "");
-          const rowText = String(row.dataset.replyText || "");
-          const haystack = `${{rowName}} ${{rowText}} ${{row.textContent || ""}}`.toLowerCase();
+          let haystack = String(row.__meshSearchHaystack || "");
+          if (!haystack) {{
+            const rowName = String(row.dataset.replyName || "");
+            const rowText = String(row.dataset.replyText || "");
+            haystack = `${{rowName}} ${{rowText}} ${{row.textContent || ""}}`.toLowerCase();
+            row.__meshSearchHaystack = haystack;
+          }}
           const matches = !query || haystack.includes(query);
           row.hidden = !matches;
           row.classList.toggle("chat-feed-search-hidden", !matches);
           if (matches) visibleRows += 1;
+        }}
         }}
         let searchEmpty = feed.querySelector(".chat-feed-empty.chat-feed-search-empty");
         if (query && feedRows.length > 0 && visibleRows <= 0) {{
