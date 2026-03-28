@@ -2026,6 +2026,143 @@ def test_build_bot_from_env_can_override_segment_retry_controls():
     assert bot._segment_ack_wait_seconds == 1.25
 
 
+def test_build_bot_from_env_can_override_inbound_hardening_controls():
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=lambda **_kwargs: {"ok": True},
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_INCOMING_TEXT_MAX_BYTES": "88",
+            "MESH_DASH_BOT_INBOUND_RATE_WINDOW_SECONDS": "17",
+            "MESH_DASH_BOT_INBOUND_RATE_PER_SENDER": "4",
+            "MESH_DASH_BOT_INBOUND_RATE_GLOBAL": "9",
+            "MESH_DASH_BOT_ALLOWED_SENDERS": "!49b5dff0,!11b8d868",
+        },
+    )
+    assert bot is not None
+    settings = bot.bot_settings()
+    assert settings["incoming_text_max_bytes"] == 88
+    assert settings["inbound_rate_window_seconds"] == 17
+    assert settings["inbound_rate_per_sender"] == 4
+    assert settings["inbound_rate_global"] == 9
+    assert settings["allowed_sender_ids"] == ["!11b8d868", "!49b5dff0"]
+
+
+def test_sender_allowlist_blocks_unlisted_nodes():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_ALLOWED_SENDERS": "!11b8d868",
+        },
+    )
+    assert bot is not None
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3601), iface)
+    assert sent == []
+
+    allowed_packet = _base_packet("ping 9b7c", packet_id=3602)
+    allowed_packet["fromId"] = "!11b8d868"
+    allowed_packet["from"] = 0x11B8D868
+    bot.on_receive(allowed_packet, iface)
+    assert len(sent) == 1
+
+
+def test_inbound_rate_limit_per_sender_blocks_burst():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_INBOUND_RATE_WINDOW_SECONDS": "60",
+            "MESH_DASH_BOT_INBOUND_RATE_PER_SENDER": "1",
+            "MESH_DASH_BOT_INBOUND_RATE_GLOBAL": "100",
+        },
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    assert bot is not None
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3701), iface)
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3702), iface)
+
+    assert len(sent) == 1
+    history = bot.recent_requests()
+    assert len(history) == 1
+
+
+def test_inbound_rate_limit_global_blocks_multi_sender_flood():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_INBOUND_RATE_WINDOW_SECONDS": "60",
+            "MESH_DASH_BOT_INBOUND_RATE_PER_SENDER": "10",
+            "MESH_DASH_BOT_INBOUND_RATE_GLOBAL": "1",
+        },
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    assert bot is not None
+
+    first = _base_packet("ping 9b7c", packet_id=3751)
+    second = _base_packet("ping 9b7c", packet_id=3752)
+    second["fromId"] = "!11b8d868"
+    second["from"] = 0x11B8D868
+
+    bot.on_receive(first, iface)
+    bot.on_receive(second, iface)
+
+    assert len(sent) == 1
+    history = bot.recent_requests()
+    assert len(history) == 1
+
+
+def test_inbound_text_size_limit_blocks_oversized_messages():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = build_mesh_response_bot_from_env(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        env={
+            "MESH_DASH_BOT_ENABLED": "1",
+            "MESH_DASH_BOT_INCOMING_TEXT_MAX_BYTES": "4",
+        },
+    )
+    assert bot is not None
+
+    bot.on_receive(_base_packet("ping 9b7c", packet_id=3801), iface)
+
+    assert sent == []
+    assert bot.recent_requests() == []
+
+
 def test_build_bot_from_env_can_disable_specific_command():
     bot = build_mesh_response_bot_from_env(
         send_chat_fn=lambda **_kwargs: {"ok": True},

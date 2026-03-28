@@ -90,6 +90,10 @@ _PUBLIC_PING_LIMIT_REACTION = "❌"
 _PUBLIC_PING_DIRECT_HANDOFF_TEXT = (
     "ping: public limit reached (3). Continue testing with direct peer-to-peer messages for 1 hour."
 )
+_DEFAULT_INCOMING_TEXT_MAX_BYTES = 1024
+_DEFAULT_INBOUND_RATE_WINDOW_SECONDS = 60
+_DEFAULT_INBOUND_RATE_PER_SENDER = 30
+_DEFAULT_INBOUND_RATE_GLOBAL = 300
 _DEFAULT_PULL_REEL_SYMBOLS = ("🍒", "🍋", "🍉", "🔔", "⭐", "7️⃣")
 _DEFAULT_PULL_RESPONSE_TEMPLATE = ""
 _SLOT_TRIPLE_PAYOUTS = {
@@ -770,6 +774,11 @@ class MeshResponseBot:
         reply_broadcast: bool = False,
         settings_path: Optional[str] = None,
         chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
+        incoming_text_max_bytes: int = _DEFAULT_INCOMING_TEXT_MAX_BYTES,
+        inbound_rate_window_seconds: int = _DEFAULT_INBOUND_RATE_WINDOW_SECONDS,
+        inbound_rate_per_sender: int = _DEFAULT_INBOUND_RATE_PER_SENDER,
+        inbound_rate_global: int = _DEFAULT_INBOUND_RATE_GLOBAL,
+        allowed_sender_ids: Optional[list[str]] = None,
         segment_delay_seconds: float = 0.0,
         segment_retry_count: int = 0,
         segment_ack_wait_seconds: float = 0.0,
@@ -785,6 +794,11 @@ class MeshResponseBot:
         self._reply_broadcast = bool(reply_broadcast)
         self._settings_path = str(settings_path).strip() if settings_path else None
         self._chat_max_bytes = max(1, int(chat_max_bytes))
+        self._incoming_text_max_bytes = max(1, int(incoming_text_max_bytes))
+        self._inbound_rate_window_seconds = max(0, int(inbound_rate_window_seconds))
+        self._inbound_rate_per_sender = max(0, int(inbound_rate_per_sender))
+        self._inbound_rate_global = max(0, int(inbound_rate_global))
+        self._allowed_sender_ids = set(_normalize_allowed_sender_ids(allowed_sender_ids))
         self._segment_delay_seconds = _parse_nonnegative_float_token(segment_delay_seconds, 0.0)
         self._segment_retry_count = _parse_nonnegative_int_token(segment_retry_count, 0)
         self._segment_ack_wait_seconds = _parse_nonnegative_float_token(segment_ack_wait_seconds, 0.0)
@@ -868,6 +882,8 @@ class MeshResponseBot:
         self._request_seq = 0
         self._public_ping_state: dict[str, dict[str, int]] = {}
         self._last_known_hops_by_node: dict[str, int] = {}
+        self._recent_inbound_global_unix: list[int] = []
+        self._recent_inbound_by_sender_unix: dict[str, list[int]] = {}
         self._lock = threading.Lock()
 
     @property
@@ -1352,6 +1368,11 @@ class MeshResponseBot:
             "joke_lines": list(self._joke_lines),
             "joke_near_guess_lines": list(self._joke_near_guess_lines),
             "joke_delay_punchline_enabled": bool(self._joke_delay_punchline_enabled),
+            "incoming_text_max_bytes": int(self._incoming_text_max_bytes),
+            "inbound_rate_window_seconds": int(self._inbound_rate_window_seconds),
+            "inbound_rate_per_sender": int(self._inbound_rate_per_sender),
+            "inbound_rate_global": int(self._inbound_rate_global),
+            "allowed_sender_ids": sorted(self._allowed_sender_ids),
             "active_game_sessions": self._active_game_sessions_locked(),
             "disabled_commands": sorted(self._disabled_commands),
             "commands": self._managed_command_rows_locked(),
@@ -1373,6 +1394,11 @@ class MeshResponseBot:
             "joke_lines": list(self._joke_lines),
             "joke_near_guess_lines": list(self._joke_near_guess_lines),
             "joke_delay_punchline_enabled": bool(self._joke_delay_punchline_enabled),
+            "incoming_text_max_bytes": int(self._incoming_text_max_bytes),
+            "inbound_rate_window_seconds": int(self._inbound_rate_window_seconds),
+            "inbound_rate_per_sender": int(self._inbound_rate_per_sender),
+            "inbound_rate_global": int(self._inbound_rate_global),
+            "allowed_sender_ids": sorted(self._allowed_sender_ids),
             "disabled_commands": sorted(self._disabled_commands),
         }
 
@@ -1398,6 +1424,11 @@ class MeshResponseBot:
         joke_lines: Optional[list[str]] = None,
         joke_near_guess_lines: Optional[list[str]] = None,
         joke_delay_punchline_enabled: Optional[bool] = None,
+        incoming_text_max_bytes: Optional[int] = None,
+        inbound_rate_window_seconds: Optional[int] = None,
+        inbound_rate_per_sender: Optional[int] = None,
+        inbound_rate_global: Optional[int] = None,
+        allowed_sender_ids: Optional[list[str]] = None,
     ) -> dict[str, object]:
         with self._lock:
             if enabled is not None:
@@ -1438,6 +1469,23 @@ class MeshResponseBot:
                     near_guess_lines=joke_near_guess_lines,
                     delay_punchline_enabled=joke_delay_punchline_enabled,
                 )
+            rate_controls_changed = False
+            if incoming_text_max_bytes is not None:
+                self._incoming_text_max_bytes = max(1, int(incoming_text_max_bytes))
+            if inbound_rate_window_seconds is not None:
+                self._inbound_rate_window_seconds = max(0, int(inbound_rate_window_seconds))
+                rate_controls_changed = True
+            if inbound_rate_per_sender is not None:
+                self._inbound_rate_per_sender = max(0, int(inbound_rate_per_sender))
+                rate_controls_changed = True
+            if inbound_rate_global is not None:
+                self._inbound_rate_global = max(0, int(inbound_rate_global))
+                rate_controls_changed = True
+            if rate_controls_changed:
+                self._recent_inbound_global_unix.clear()
+                self._recent_inbound_by_sender_unix.clear()
+            if allowed_sender_ids is not None:
+                self._allowed_sender_ids = set(_normalize_allowed_sender_ids(allowed_sender_ids))
             out = self._bot_settings_locked()
             persist_payload = self._persistable_bot_settings_locked()
         persist_error = save_persisted_bot_settings(self._settings_path, persist_payload)
@@ -1557,6 +1605,56 @@ class MeshResponseBot:
         if cached is None or cached < 0:
             return None
         return cached
+
+    def _sender_allowed(self, from_id: str) -> bool:
+        clean_from_id = _normalize_node_id(from_id).lower()
+        with self._lock:
+            if not self._allowed_sender_ids:
+                return True
+            return clean_from_id in self._allowed_sender_ids
+
+    def _incoming_text_allowed(self, text: str) -> bool:
+        with self._lock:
+            limit = max(1, int(self._incoming_text_max_bytes))
+        return len(str(text or "").encode("utf-8")) <= limit
+
+    def _prune_inbound_rate_state_locked(self, now_unix: int) -> None:
+        window_seconds = max(0, int(self._inbound_rate_window_seconds))
+        if window_seconds <= 0:
+            self._recent_inbound_global_unix.clear()
+            self._recent_inbound_by_sender_unix.clear()
+            return
+        keep_after = int(now_unix) - window_seconds
+        self._recent_inbound_global_unix = [
+            ts for ts in self._recent_inbound_global_unix if int(ts) > keep_after
+        ]
+        for sender_id, rows in list(self._recent_inbound_by_sender_unix.items()):
+            kept = [ts for ts in rows if int(ts) > keep_after]
+            if kept:
+                self._recent_inbound_by_sender_unix[sender_id] = kept
+            else:
+                self._recent_inbound_by_sender_unix.pop(sender_id, None)
+
+    def _allow_inbound_message(self, from_id: str, *, now_unix: int) -> bool:
+        clean_from_id = _normalize_node_id(from_id).lower()
+        if not clean_from_id.startswith("!"):
+            return False
+        with self._lock:
+            self._prune_inbound_rate_state_locked(int(now_unix))
+            if self._inbound_rate_window_seconds <= 0:
+                return True
+            if (
+                self._inbound_rate_global > 0
+                and len(self._recent_inbound_global_unix) >= self._inbound_rate_global
+            ):
+                return False
+            sender_rows = self._recent_inbound_by_sender_unix.get(clean_from_id, [])
+            if self._inbound_rate_per_sender > 0 and len(sender_rows) >= self._inbound_rate_per_sender:
+                return False
+            self._recent_inbound_global_unix.append(int(now_unix))
+            sender_rows.append(int(now_unix))
+            self._recent_inbound_by_sender_unix[clean_from_id] = sender_rows
+        return True
 
     def _parse_command(
         self,
@@ -2070,8 +2168,15 @@ class MeshResponseBot:
         from_id = _resolve_packet_node_id(packet.get("fromId"), packet.get("from"), interface)
         if not from_id or from_id == "^all":
             return
+        if not self._sender_allowed(from_id):
+            return
+        if not self._incoming_text_allowed(text):
+            return
+        now_unix = int(self._now_unix_fn())
         packet_id = _to_int(packet.get("id"))
         if self._remember_packet_id(from_id, packet_id):
+            return
+        if not self._allow_inbound_message(from_id, now_unix=now_unix):
             return
         to_id = _resolve_packet_node_id(packet.get("toId"), packet.get("to"), interface) or "^all"
         local_node_id, local_aliases, nodes = self._local_node_context(interface)
@@ -2079,7 +2184,6 @@ class MeshResponseBot:
             return
 
         rx_unix = _to_int(packet.get("rxTime"))
-        now_unix = int(self._now_unix_fn())
         received_unix = rx_unix if rx_unix is not None and rx_unix > 0 else now_unix
         received_ms = received_unix * 1000
         channel_index = _to_int(packet.get("channel"))
@@ -2350,6 +2454,37 @@ def _default_disabled_commands() -> list[str]:
     ]
 
 
+def _normalize_allowed_sender_ids(value: object) -> list[str]:
+    raw_values: list[object] = []
+    if isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        text = str(value or "").strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                parsed = None
+            if isinstance(parsed, list):
+                raw_values = list(parsed)
+        if not raw_values:
+            raw_values = [part.strip() for part in text.replace(";", ",").split(",")]
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_values:
+        clean = _normalize_node_id(raw)
+        if not clean.startswith("!"):
+            continue
+        clean = clean.lower()
+        if clean in seen:
+            continue
+        seen.add(clean)
+        out.append(clean)
+    return sorted(out)
+
+
 def _resolve_bot_settings_path(env: Optional[dict[str, str]]) -> Optional[str]:
     if isinstance(env, dict):
         if "MESH_DASH_BOT_SETTINGS_FILE" in env:
@@ -2409,6 +2544,55 @@ def build_mesh_response_bot_from_env(
     if not respond_enabled and not log_enabled:
         return None
     reply_broadcast = _parse_bool_token(env_map.get("MESH_DASH_BOT_REPLY_BROADCAST"), False)
+    incoming_text_max_bytes = (
+        _parse_nonnegative_int_token(
+            env_map.get("MESH_DASH_BOT_INCOMING_TEXT_MAX_BYTES"),
+            _DEFAULT_INCOMING_TEXT_MAX_BYTES,
+        )
+        if "MESH_DASH_BOT_INCOMING_TEXT_MAX_BYTES" in env_map
+        else _parse_nonnegative_int_token(
+            persisted.get("incoming_text_max_bytes"),
+            _DEFAULT_INCOMING_TEXT_MAX_BYTES,
+        )
+    )
+    inbound_rate_window_seconds = (
+        _parse_nonnegative_int_token(
+            env_map.get("MESH_DASH_BOT_INBOUND_RATE_WINDOW_SECONDS"),
+            _DEFAULT_INBOUND_RATE_WINDOW_SECONDS,
+        )
+        if "MESH_DASH_BOT_INBOUND_RATE_WINDOW_SECONDS" in env_map
+        else _parse_nonnegative_int_token(
+            persisted.get("inbound_rate_window_seconds"),
+            _DEFAULT_INBOUND_RATE_WINDOW_SECONDS,
+        )
+    )
+    inbound_rate_per_sender = (
+        _parse_nonnegative_int_token(
+            env_map.get("MESH_DASH_BOT_INBOUND_RATE_PER_SENDER"),
+            _DEFAULT_INBOUND_RATE_PER_SENDER,
+        )
+        if "MESH_DASH_BOT_INBOUND_RATE_PER_SENDER" in env_map
+        else _parse_nonnegative_int_token(
+            persisted.get("inbound_rate_per_sender"),
+            _DEFAULT_INBOUND_RATE_PER_SENDER,
+        )
+    )
+    inbound_rate_global = (
+        _parse_nonnegative_int_token(
+            env_map.get("MESH_DASH_BOT_INBOUND_RATE_GLOBAL"),
+            _DEFAULT_INBOUND_RATE_GLOBAL,
+        )
+        if "MESH_DASH_BOT_INBOUND_RATE_GLOBAL" in env_map
+        else _parse_nonnegative_int_token(
+            persisted.get("inbound_rate_global"),
+            _DEFAULT_INBOUND_RATE_GLOBAL,
+        )
+    )
+    allowed_sender_ids = _normalize_allowed_sender_ids(persisted.get("allowed_sender_ids"))
+    if "MESH_DASH_BOT_ALLOWED_SENDERS" in env_map:
+        allowed_sender_ids = _normalize_allowed_sender_ids(
+            env_map.get("MESH_DASH_BOT_ALLOWED_SENDERS")
+        )
     segment_delay_ms = _parse_nonnegative_float_token(
         env_map.get("MESH_DASH_BOT_SEGMENT_DELAY_MS"),
         _DEFAULT_SEGMENT_DELAY_SECONDS * 1000.0,
@@ -2497,6 +2681,11 @@ def build_mesh_response_bot_from_env(
         reply_broadcast=reply_broadcast,
         settings_path=settings_path,
         chat_max_bytes=chat_max_bytes,
+        incoming_text_max_bytes=incoming_text_max_bytes,
+        inbound_rate_window_seconds=inbound_rate_window_seconds,
+        inbound_rate_per_sender=inbound_rate_per_sender,
+        inbound_rate_global=inbound_rate_global,
+        allowed_sender_ids=allowed_sender_ids,
         segment_delay_seconds=segment_delay_ms / 1000.0,
         segment_retry_count=segment_retries,
         segment_ack_wait_seconds=segment_ack_wait_ms / 1000.0,
