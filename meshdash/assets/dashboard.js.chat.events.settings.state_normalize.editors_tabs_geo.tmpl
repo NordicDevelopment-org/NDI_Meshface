@@ -215,6 +215,9 @@
         void loadRawMetadata().catch(() => {{}});
         void loadRawLocalState().catch(() => {{}});
         void loadRawNodesFull(0).catch(() => {{}});
+        if (latestState) {{
+          renderPackets(latestState);
+        }}
       }} else if (next === "security") {{
         syncChatWhoisQuickActionControls();
       }} else if (next === "tickers") {{

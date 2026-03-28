@@ -325,7 +325,6 @@
       <button class="rail-btn active" data-view="chat" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Teams-style chat workspace">Chat</button>
       <button class="rail-btn" data-view="network" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Topology, nodes, and links">Network</button>
       <button class="rail-btn" data-view="saved" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Node details and saved nodes">Node</button>
-      <button class="rail-btn" data-view="packets" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Recent packet stream">Packets</button>
       <button class="rail-btn" data-view="channels" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Inferred message channel activity">Channels</button>
       <button class="rail-btn" data-view="encription" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Encrypted packets and route activity">Encription</button>
       <button class="rail-btn" data-view="environment" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Historical sensor telemetry">Sensors</button>
@@ -1590,6 +1589,22 @@
               <details><summary>channels</summary><pre id="raw-channels"></pre></details>
               <details><summary>nodes_full</summary><pre id="raw-nodes-full"></pre></details>
             </div>
+            <h3>Recent Packets</h3>
+            <div class="settings-fields">
+              <div class="settings-help-note">
+                Recent decoded packet stream with RF diagnostics (SNR/RSSI) for troubleshooting.
+              </div>
+              <div class="scroll">
+                <table id="packets-table">
+                  <thead>
+                    <tr>
+                      <th>Captured</th><th>From</th><th>To</th><th>Port</th><th>SNR</th><th>RSSI</th><th>Text</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2788,20 +2803,6 @@ Ready.
     </section>
 
     <div class="hsplitter" data-target="mid" title="Drag to resize middle and lower panels"></div>
-
-    <section class="card packets">
-      <h2>Recent Packets</h2>
-      <div class="body scroll">
-        <table id="packets-table">
-          <thead>
-            <tr>
-              <th>Captured</th><th>From</th><th>To</th><th>Port</th><th>SNR</th><th>RSSI</th><th>Text</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
 
     <section class="card channels-view" aria-label="Inferred message channels">
       <h2>Channels</h2>

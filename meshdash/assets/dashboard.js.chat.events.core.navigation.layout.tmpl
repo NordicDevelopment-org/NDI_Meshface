@@ -664,6 +664,7 @@
     function normalizeLayoutView(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
       if (clean === "data") return "settings";
+      if (clean === "packets") return "settings";
       if (clean === "apps") return loadPreferredAppsLayoutView();
       if (isAppsLayoutView(clean)) return clean;
       return knownLayoutViews.has(clean) ? clean : "chat";
@@ -753,8 +754,12 @@
       if (!(layout instanceof HTMLElement)) return;
       const shell = document.querySelector(".workspace-shell");
       const chatLeftPanel = document.getElementById("chat-left-panel");
+      const requested = String(viewName || "").trim().toLowerCase();
       const next = normalizeLayoutView(viewName);
       activeLayoutView = next;
+      if (next === "settings" && (requested === "data" || requested === "packets")) {{
+        setActiveSettingsTab("data", true);
+      }}
       persistPreferredAppsLayoutView(next);
       for (const name of knownLayoutViews) {{
         layout.classList.remove(`view-${{name}}`);
@@ -942,9 +947,9 @@
             source: settingsPositionSourcePref,
             recenter: true,
           }});
-        }}
-        if (next === "packets") {{
-          renderPackets(latestState);
+          if (activeSettingsTab === "data") {{
+            renderPackets(latestState);
+          }}
         }}
         if (next === "channels") {{
           renderChannelsView(latestState);
@@ -1059,7 +1064,8 @@
       }} catch (_err) {{
       }}
       const preferred = normalizeLayoutView(rawPreferred);
-      const migratedDataView = String(rawPreferred || "").trim().toLowerCase() === "data";
+      const rawPreferredView = String(rawPreferred || "").trim().toLowerCase();
+      const migratedDataView = rawPreferredView === "data" || rawPreferredView === "packets";
       applyLayoutView(preferred, false);
       if (migratedDataView) {{
         setActiveSettingsTab("data", true);

@@ -287,10 +287,6 @@
           renderFavorites(state, cachedHistory, loadingId);
         }}
 
-        if (activeLayoutView === "packets") {{
-          renderPackets(state);
-        }}
-
         if (activeLayoutView === "channels") {{
           renderChannelsView(state);
         }}
@@ -305,6 +301,9 @@
 
         if (activeLayoutView === "settings") {{
           renderSettings(state);
+          if (activeSettingsTab === "data") {{
+            renderPackets(state);
+          }}
         }}
 
         if (activeLayoutView === "console") {{
