@@ -1695,21 +1695,17 @@
       border-color: #456957;
     }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
-      background: #2b4638;
       border-color: #5a8a72;
+      box-shadow:
+        inset 3px 0 0 #3fb950,
+        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
     }}
     [data-theme="dark"] .chat-feed-item.selected-node.channel-tinted,
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node.channel-tinted:hover {{
-      background:
-        linear-gradient(
-          90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.2),
-          rgba(var(--chat-feed-channel-rgb), 0.1) 30%,
-          rgba(var(--chat-feed-channel-rgb), 0.04) 56%,
-          rgba(var(--chat-feed-channel-rgb), 0) 100%
-        ),
-        #2b4638;
       border-color: #5a8a72;
+      box-shadow:
+        inset 3px 0 0 #3fb950,
+        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
     }}
     [data-theme="dark"] .chat-feed-meta,
     [data-theme="dark"] .chat-feed-time,
@@ -2088,8 +2084,10 @@
       color: #ecfff4;
     }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
-      background: #0f2518;
       border-color: #38af72;
+      box-shadow:
+        inset 3px 0 0 #3fb950,
+        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
     }}
     [data-theme="dark"] .teams-rail-title,
     [data-theme="dark"] .chat-left-title,
@@ -2400,14 +2398,28 @@
       border: 0;
     }}
     [data-theme="dark"] .card.chat .chat-feed-item {{
-      background: transparent;
+      --chat-feed-node-hue: 145;
+      --chat-feed-node-gradient: linear-gradient(
+        96deg,
+        hsl(var(--chat-feed-node-hue) 20% 26% / 0.46),
+        hsl(var(--chat-feed-node-hue) 16% 22% / 0.18) 34%,
+        rgba(7, 13, 7, 0) 76%
+      );
+      background: var(--chat-feed-node-gradient);
       border: 0;
       border-bottom: 1px solid #2f3b4b;
       border-radius: 0;
       color: var(--ui-text);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.self-authored {{
-      background: rgba(63, 185, 80, 0.035);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(63, 185, 80, 0.08),
+          rgba(63, 185, 80, 0.035) 56%,
+          rgba(63, 185, 80, 0.01) 100%
+        ),
+        var(--chat-feed-node-gradient);
       box-shadow: inset 2px 0 0 rgba(63, 185, 80, 0.18);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.self-authored.channel-tinted {{
@@ -2419,7 +2431,13 @@
           rgba(var(--chat-feed-channel-rgb), 0.025) 56%,
           rgba(var(--chat-feed-channel-rgb), 0.01) 100%
         ),
-        rgba(63, 185, 80, 0.035);
+        linear-gradient(
+          90deg,
+          rgba(63, 185, 80, 0.08),
+          rgba(63, 185, 80, 0.035) 56%,
+          rgba(63, 185, 80, 0.01) 100%
+        ),
+        var(--chat-feed-node-gradient);
       box-shadow:
         inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.84),
         inset 4px 0 0 rgba(63, 185, 80, 0.12);
@@ -2428,10 +2446,24 @@
       border-bottom: 0;
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable:hover:not(.channel-tinted) {{
-      background: #1f2d3a;
+      background:
+        linear-gradient(
+          90deg,
+          rgba(107, 136, 163, 0.16),
+          rgba(107, 136, 163, 0.06) 56%,
+          rgba(107, 136, 163, 0) 100%
+        ),
+        var(--chat-feed-node-gradient);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable.self-authored:hover:not(.channel-tinted) {{
-      background: rgba(63, 185, 80, 0.055);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(63, 185, 80, 0.12),
+          rgba(63, 185, 80, 0.055) 56%,
+          rgba(63, 185, 80, 0.02) 100%
+        ),
+        var(--chat-feed-node-gradient);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable.self-authored.channel-tinted:hover {{
       background:
@@ -2442,7 +2474,13 @@
           rgba(var(--chat-feed-channel-rgb), 0.035) 58%,
           rgba(var(--chat-feed-channel-rgb), 0.02) 100%
         ),
-        rgba(63, 185, 80, 0.055);
+        linear-gradient(
+          90deg,
+          rgba(63, 185, 80, 0.12),
+          rgba(63, 185, 80, 0.055) 56%,
+          rgba(63, 185, 80, 0.02) 100%
+        ),
+        var(--chat-feed-node-gradient);
     }}
     [data-theme="dark"] .card.chat .chat-compose-shell {{
       background:
@@ -2823,14 +2861,15 @@
       box-shadow: inset 0 0 0 1px rgba(63, 185, 80, 0.3);
     }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
-      background: #1b313f;
-      box-shadow: inset 2px 0 0 var(--ui-accent);
+      box-shadow:
+        inset 3px 0 0 #3fb950,
+        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
     }}
     [data-theme="dark"] .chat-member-item.selected-node {{
-      background: #1f3342 !important;
-      border-color: #4a6b87 !important;
-      color: #eef6ff !important;
-      box-shadow: inset 2px 0 0 #79c0ff;
+      background: hsl(var(--chat-member-node-hue, 205) 20% 24%) !important;
+      border-color: hsl(var(--chat-member-node-hue, 205) 20% 40%) !important;
+      color: hsl(var(--chat-member-node-hue, 205) 30% 92%) !important;
+      box-shadow: inset 2px 0 0 hsl(var(--chat-member-node-hue, 205) 48% 64%);
     }}
     [data-theme="dark"] .chat-member-dm-link {{
       color: #8fc8ff;
@@ -3012,6 +3051,16 @@
       border-color: var(--ui-border);
       background: var(--ui-panel-alt);
       color: var(--ui-text-soft);
+    }}
+    [data-theme="dark"] .chat-member-item {{
+      background: hsl(var(--chat-member-node-hue, 145) 16% 17%);
+      border-color: hsl(var(--chat-member-node-hue, 145) 14% 30%);
+      color: hsl(var(--chat-member-node-hue, 145) 24% 86%);
+    }}
+    [data-theme="dark"] .chat-member-item:hover {{
+      background: hsl(var(--chat-member-node-hue, 145) 18% 20%);
+      border-color: hsl(var(--chat-member-node-hue, 145) 16% 34%) !important;
+      color: hsl(var(--chat-member-node-hue, 145) 24% 90%) !important;
     }}
     [data-theme="dark"] .chat-peer-add-toggle-btn:hover,
     [data-theme="dark"] .chat-peer-add-btn:hover,
@@ -4394,25 +4443,19 @@
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node:hover,
     [data-theme="dark"] .chat-feed-item.selected-node.has-change-marker,
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node.has-change-marker:hover {{
-      background: #183528 !important;
       border-color: #3f7b5b !important;
-      box-shadow: inset 3px 0 0 #3fb950;
+      box-shadow:
+        inset 3px 0 0 #3fb950,
+        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
     }}
     [data-theme="dark"] .chat-feed-item.selected-node.channel-tinted,
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node.channel-tinted:hover,
     [data-theme="dark"] .chat-feed-item.selected-node.channel-tinted.has-change-marker,
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node.channel-tinted.has-change-marker:hover {{
-      background:
-        linear-gradient(
-          90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.2),
-          rgba(var(--chat-feed-channel-rgb), 0.1) 30%,
-          rgba(var(--chat-feed-channel-rgb), 0.04) 56%,
-          rgba(var(--chat-feed-channel-rgb), 0) 100%
-        ),
-        #183528 !important;
       border-color: #3f7b5b !important;
-      box-shadow: inset 3px 0 0 #3fb950;
+      box-shadow:
+        inset 3px 0 0 #3fb950,
+        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
     }}
     [data-theme="dark"] .chat-feed-new-pill {{
       background: #4d3b10;

@@ -89,6 +89,18 @@
       return raw;
     }}
 
+    function nodeTintHue(nodeId, fallbackHue = 145) {{
+      const fallback = Math.max(0, Math.min(359, Math.trunc(Number(fallbackHue) || 145)));
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean) return fallback;
+      let hash = 2166136261;
+      for (let idx = 0; idx < clean.length; idx += 1) {{
+        hash ^= clean.charCodeAt(idx);
+        hash = Math.imul(hash, 16777619);
+      }}
+      return (hash >>> 0) % 360;
+    }}
+
     function isCanonicalNodeId(nodeId) {{
       return /^![0-9a-f]{{8}}$/.test(normalizeNodeId(nodeId));
     }}

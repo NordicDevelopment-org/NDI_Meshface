@@ -202,9 +202,15 @@
         const meshIdx = messageMeshChannelIndex(msg);
         const hasMeshTint = Number.isInteger(meshIdx) && meshIdx >= 0;
         const meshTintClass = hasMeshTint ? " channel-tinted" : "";
-        const meshTintStyle = hasMeshTint
-          ? ` style="${{escAttr(meshChannelTintStyle(meshIdx, {{ allowAll: false }}))}}"`
-          : "";
+        const tintNodeId = normalizeNodeId(sourceNode || nodeId || "");
+        const nodeTintHueValue = (typeof nodeTintHue === "function")
+          ? nodeTintHue(tintNodeId, 145)
+          : 145;
+        const nodeTintStyle = `--chat-feed-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeTintHueValue) || 145)))}};`;
+        const combinedRowTintStyle = hasMeshTint
+          ? `${{meshChannelTintStyle(meshIdx, {{ allowAll: false }})}} ${{nodeTintStyle}}`
+          : nodeTintStyle;
+        const rowTintStyleAttr = ` style="${{escAttr(combinedRowTintStyle)}}"`;
         const hopStart = firstFiniteNestedNumber(
           [msg, packetSummary, packetRaw],
           [
@@ -501,7 +507,7 @@
         if (monitorMode) {{
           const monitorNetworkTag = `<span class="chat-monitor-network-tag">[ ][MF]</span>`;
           const monitorItemClass = `chat-feed-item chat-feed-item-monitor-exact ${{selectableClass}}${{selectedFeedClass}}${{monitorViewClass}}`;
-          return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="${{monitorItemClass.trim()}}" title="${{escAttr(messageTooltip)}}">
+          return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="${{monitorItemClass.trim()}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
             <span class="chat-entry-msg">
               ${{monitorPrefix}}
               ${{monitorNetworkTag}}
@@ -528,7 +534,7 @@
               <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
             </span>`;
         const extraRows = monitorMode ? "" : `${{reactionSummaryRow}}${{reactionRow}}`;
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}${{monitorViewClass}}"${{meshTintStyle}} title="${{escAttr(messageTooltip)}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}${{monitorViewClass}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
           <div class="chat-feed-line">
             <div class="chat-feed-summary">
               ${{changeBadge}}

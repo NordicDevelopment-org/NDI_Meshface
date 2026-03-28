@@ -992,12 +992,14 @@
                   : "";
                 const isSelectedMember = normalizeNodeId(selectedNodeId || "") === nodeId;
                 const canOpenPeerDm = isCanonicalNodeId(nodeId) && !isSelfNodeId(nodeId);
+                const nodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
+                const memberTintStyle = `--chat-member-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || 145)))}};`;
                 const memberQuickActionRow = (isSelectedMember && canOpenPeerDm)
                   ? `<span class="chat-member-action-row">
                       <button type="button" class="chat-member-dm-link" data-node-id="${{escAttr(nodeId)}}" title="Open peer message window with ${{escAttr(item.name)}}">Send message</button>
                     </span>`
                   : "";
-                return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(memberTitle)}}">
+                return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
                 <span class="chat-member-status status-${{item.status}}">●</span>
                 <span class="chat-member-main">
                   <span class="chat-member-name-row">
@@ -1018,6 +1020,8 @@
                 const fallbackId = normalizeNodeId(item && item.id);
                 const fallbackName = String((item && item.name) || fallbackId || "Unknown node");
                 const fallbackSelected = normalizeNodeId(selectedNodeId || "") === fallbackId;
+                const fallbackHue = (typeof nodeTintHue === "function") ? nodeTintHue(fallbackId || "unknown", 145) : 145;
+                const fallbackTintStyle = `--chat-member-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(fallbackHue) || 145)))}};`;
                 const fallbackQuickActionRow = (fallbackSelected && isCanonicalNodeId(fallbackId) && !isSelfNodeId(fallbackId))
                   ? `<span class="chat-member-action-row">
                       <button type="button" class="chat-member-dm-link" data-node-id="${{escAttr(fallbackId)}}" title="Open peer message window with ${{escAttr(fallbackName)}}">Send message</button>
@@ -1029,7 +1033,7 @@
                   }}
                 }} catch (_consoleErr) {{
                 }}
-                return `<div class="chat-member-item status-unknown${{selectedNodeId === fallbackId ? " selected-node" : ""}}" data-node-id="${{escAttr(fallbackId)}}" title="Node navigator fallback row">
+                return `<div class="chat-member-item status-unknown${{selectedNodeId === fallbackId ? " selected-node" : ""}}" data-node-id="${{escAttr(fallbackId)}}" style="${{escAttr(fallbackTintStyle)}}" title="Node navigator fallback row">
                 <span class="chat-member-status status-unknown">●</span>
                 <span class="chat-member-main">
                   <span class="chat-member-name-row">
