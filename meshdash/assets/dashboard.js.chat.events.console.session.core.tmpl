@@ -35,7 +35,7 @@
       const promptWithSeparator = `${{prompt}}${{separator}}`;
       const input = consoleCommandInputElement();
       const focused = input instanceof HTMLInputElement && document.activeElement === input;
-      if (!(activeLayoutView === "console" && focused && consoleCursorVisible)) {{
+      if (!(activeLayoutView === "console" && focused)) {{
         return escAttr(`${{promptWithSeparator}}${{draft}}`);
       }}
       const rawCaretIndex = input instanceof HTMLInputElement ? input.selectionStart : draft.length;
@@ -48,7 +48,8 @@
       );
       const beforeCaret = draft.slice(0, caretIndex);
       const afterCaret = draft.slice(caretIndex);
-      return `${{escAttr(`${{promptWithSeparator}}${{beforeCaret}}`)}}<span class="console-caret" aria-hidden="true"></span>${{escAttr(afterCaret)}}`;
+      const caretClass = consoleCursorVisible ? "console-caret" : "console-caret is-hidden";
+      return `${{escAttr(`${{promptWithSeparator}}${{beforeCaret}}`)}}<span class="${{caretClass}}" aria-hidden="true"></span>${{escAttr(afterCaret)}}`;
     }}
 
     function formatConsolePromptEchoLine(promptLabel, commandText) {{
@@ -64,10 +65,19 @@
       consoleCursorBlinkTimer = window.setInterval(() => {{
         consoleCursorVisible = !consoleCursorVisible;
         if (activeLayoutView === "console") {{
+          const input = consoleCommandInputElement();
+          const focused = input instanceof HTMLInputElement && document.activeElement === input;
           const pre = document.getElementById("live-console");
           if (pre instanceof HTMLElement && hasConsoleSelectionWithin(pre)) {{
             consoleRenderDeferred = true;
             return;
+          }}
+          if (focused && pre instanceof HTMLElement) {{
+            const caret = pre.querySelector(".console-caret");
+            if (caret instanceof HTMLElement) {{
+              caret.classList.toggle("is-hidden", !consoleCursorVisible);
+              return;
+            }}
           }}
           renderConsoleBuffer(false);
         }}
@@ -184,7 +194,7 @@
       }};
     }}
 
-    function renderConsoleBuffer(forceScroll = false) {{
+    function renderConsoleBufferNow(forceScroll = false) {{
       const pre = document.getElementById("live-console");
       if (!(pre instanceof HTMLElement)) return;
       const zorkWordWrapActive = isZorkConsoleInteractiveSession(consoleInteractiveSession);
@@ -207,6 +217,24 @@
         pre.scrollLeft = 0;
         pre.scrollTop = pre.scrollHeight;
       }}
+    }}
+
+    function renderConsoleBuffer(forceScroll = false) {{
+      const shouldForce = !!forceScroll;
+      consoleRenderPendingForceScroll = consoleRenderPendingForceScroll || shouldForce;
+      if (consoleRenderRaf !== null) return;
+      if (shouldForce) {{
+        const forceNow = !!consoleRenderPendingForceScroll;
+        consoleRenderPendingForceScroll = false;
+        renderConsoleBufferNow(forceNow);
+        return;
+      }}
+      consoleRenderRaf = window.requestAnimationFrame(() => {{
+        consoleRenderRaf = null;
+        const forceNext = !!consoleRenderPendingForceScroll;
+        consoleRenderPendingForceScroll = false;
+        renderConsoleBufferNow(forceNext);
+      }});
     }}
 
     function clearConsoleOutput({{ renderNow = true }} = {{}}) {{

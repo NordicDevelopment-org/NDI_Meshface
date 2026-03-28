@@ -7,6 +7,8 @@
     // can avoid rebuilding the list when only non-node state changes (e.g., packet counters).
     let nodesTableLastHash = 0;
     let nodesTableLastQuery = "";
+    let trafficPortsTableLastHash = 0;
+    let trafficLinksTableLastHash = 0;
     let latestState = null;
     let stateEtag = "";
     let forceStateReloadOnce = false;
@@ -58,6 +60,8 @@
     let consoleEventCounter = 0;
     let consoleGrepRunCounter = 0;
     let consoleRenderDeferred = false;
+    let consoleRenderRaf = null;
+    let consoleRenderPendingForceScroll = false;
     let fitDone = false;
     let mapBootstrapFocusDone = false;
     let pendingMapHistoryFocus = false;
