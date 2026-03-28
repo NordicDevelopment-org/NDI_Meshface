@@ -23,6 +23,8 @@
       source: "",
       scannedPackets: 0,
       cutoffUnix: 0,
+      hiddenLegendNodeIds: new Set(),
+      legendScopeKey: "",
     }};
 
     const envMetricsHistoryCache = new Map();
@@ -246,15 +248,77 @@
       }}
     }}
 
-    function renderEnvironmentNodeLegend(metricMeta, nodeMeta, nodes, filteredPoints, chartMeta) {{
+    function buildEnvironmentMetricsSelectionScopeKey(metricMeta, nodeMeta) {{
+      return [
+        normalizeEnvMetricKey(metricMeta && metricMeta.key ? metricMeta.key : ""),
+        normalizeNodeId(nodeMeta && nodeMeta.id ? nodeMeta.id : ""),
+        String(normalizeEnvHistoryHours(envMetricsViewState.selectedWindowHours || 72)),
+      ].join("|");
+    }}
+
+    function syncEnvironmentLegendScope(scopeKey) {{
+      const cleanScopeKey = String(scopeKey || "").trim();
+      if (!(envMetricsViewState.hiddenLegendNodeIds instanceof Set)) {{
+        envMetricsViewState.hiddenLegendNodeIds = new Set();
+      }}
+      if (String(envMetricsViewState.legendScopeKey || "") !== cleanScopeKey) {{
+        envMetricsViewState.legendScopeKey = cleanScopeKey;
+        envMetricsViewState.hiddenLegendNodeIds.clear();
+      }}
+      return envMetricsViewState.hiddenLegendNodeIds;
+    }}
+
+    function pruneEnvironmentLegendHiddenNodeIds(activeNodeIds) {{
+      const hidden = (envMetricsViewState.hiddenLegendNodeIds instanceof Set)
+        ? envMetricsViewState.hiddenLegendNodeIds
+        : new Set();
+      const safeActive = activeNodeIds instanceof Set ? activeNodeIds : new Set();
+      for (const nodeId of Array.from(hidden)) {{
+        if (!safeActive.has(normalizeNodeId(nodeId))) {{
+          hidden.delete(nodeId);
+        }}
+      }}
+    }}
+
+    function toggleEnvironmentLegendNodeVisibility(nodeId) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!cleanNodeId) return;
+      const hidden = syncEnvironmentLegendScope(envMetricsViewState.legendScopeKey || "");
+      if (hidden.has(cleanNodeId)) {{
+        hidden.delete(cleanNodeId);
+      }} else {{
+        hidden.add(cleanNodeId);
+      }}
+    }}
+
+    function bindEnvironmentNodeLegendToggle() {{
+      const host = document.getElementById("env-metrics-available");
+      if (!(host instanceof HTMLElement) || host.dataset.toggleBound === "1") return;
+      host.dataset.toggleBound = "1";
+      host.addEventListener("click", (event) => {{
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const hit = target.closest("[data-env-node-toggle='1']");
+        if (!(hit instanceof HTMLElement)) return;
+        const nodeId = normalizeNodeId(hit.getAttribute("data-node-id") || "");
+        if (!nodeId) return;
+        event.preventDefault();
+        toggleEnvironmentLegendNodeVisibility(nodeId);
+        renderEnvironmentMetricsSnapshot();
+      }});
+    }}
+
+    function renderEnvironmentNodeLegend(metricMeta, nodeMeta, nodes, filteredPoints, chartMeta, hiddenNodeIds) {{
       const host = document.getElementById("env-metrics-available");
       if (!(host instanceof HTMLElement)) return;
+      bindEnvironmentNodeLegendToggle();
       const safeNodes = Array.isArray(nodes) ? nodes : [];
       const safePoints = Array.isArray(filteredPoints) ? filteredPoints : [];
       const safeChartMeta = (chartMeta && typeof chartMeta === "object") ? chartMeta : {{}};
       const legendItems = Array.isArray(safeChartMeta.legendItems) ? safeChartMeta.legendItems : [];
       const totalSeries = Math.max(0, Math.trunc(Number(safeChartMeta.totalSeries) || 0));
       const visibleSeries = Math.max(0, Math.trunc(Number(safeChartMeta.visibleSeries) || 0));
+      const hiddenSet = hiddenNodeIds instanceof Set ? hiddenNodeIds : new Set();
       if (!safeNodes.length || !metricMeta || !metricMeta.key) {{
         host.textContent = "No sensor metric keys detected yet in saved telemetry history.";
         return;
@@ -267,10 +331,10 @@
       host.innerHTML = [
         `<span class="env-metric-chip">${{escAttr(selectionSummary)}} <span class="env-metric-chip-count">${{totalPoints}}</span></span>`,
         ...legendItems.map((item) => (
-          `<span class="env-metric-chip env-node-legend-item" style="--node-color:${{escAttr(item.color)}};" title="${{escAttr(formatEnvironmentNodeTooltipLabel(item.nodeId, item.label))}}">
+          `<button class="env-metric-chip env-node-legend-item env-node-legend-toggle${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? " is-hidden" : ""}}" type="button" data-env-node-toggle="1" data-node-id="${{escAttr(item.nodeId)}}" data-node-hidden="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "1" : "0"}}" aria-pressed="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "false" : "true"}}" style="--node-color:${{escAttr(item.color)}};" title="${{escAttr(`${{formatEnvironmentNodeTooltipLabel(item.nodeId, item.label)}} • click to ${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "show" : "hide"}}`)}}">
             ${{escAttr(item.label)}}
             <span class="env-metric-chip-count">${{Math.max(0, Math.trunc(Number(item.pointCount) || 0))}}</span>
-          </span>`
+          </button>`
         )),
         hiddenSeries > 0
           ? `<span class="env-metric-chip env-node-legend-more">+${{hiddenSeries}} more node${{hiddenSeries === 1 ? "" : "s"}} hidden (top ${{visibleSeries}} shown)</span>`
@@ -545,7 +609,7 @@
       }});
     }}
 
-    function renderEnvironmentMetricsChart(points, metricMeta, nodeMeta) {{
+    function renderEnvironmentMetricsChart(points, metricMeta, nodeMeta, hiddenNodeIds) {{
       const svg = document.getElementById("env-metrics-chart");
       const empty = document.getElementById("env-metrics-empty");
       if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) {{
@@ -576,11 +640,7 @@
         return clearChart(`No historical points for ${{metricMeta.label}}${{nodeMeta ? ` from ${{nodeMeta.label || nodeMeta.id}}` : ""}}.`);
       }}
 
-      const selectionScopeKey = [
-        normalizeEnvMetricKey(metricMeta.key),
-        normalizeNodeId(nodeMeta && nodeMeta.id ? nodeMeta.id : ""),
-        String(normalizeEnvHistoryHours(envMetricsViewState.selectedWindowHours || 72)),
-      ].join("|");
+      const selectionScopeKey = buildEnvironmentMetricsSelectionScopeKey(metricMeta, nodeMeta);
       if (envMetricsChartState.scopeKey !== selectionScopeKey) {{
         resetEnvironmentMetricsChartZoom(selectionScopeKey);
       }}
@@ -624,10 +684,45 @@
       if (!seriesList.length) {{
         return clearChart("No valid timestamped telemetry points in this selection.");
       }}
-      const totalSeries = seriesList.length;
-
       if (!nodeMeta && seriesList.length > envMetricsChartMaxSeries) {{
         seriesList = selectEnvironmentSeriesForAllNodes(seriesList, envMetricsChartMaxSeries);
+      }}
+      const plottedSeries = seriesList.slice();
+      const totalSeries = plottedSeries.length;
+      const hiddenSet = hiddenNodeIds instanceof Set ? hiddenNodeIds : new Set();
+      const legendItems = plottedSeries.map((series, idx) => {{
+        const color = envMetricColorPalette[idx % envMetricColorPalette.length];
+        const seriesNodeId = String(series.nodeId || "").trim();
+        return {{
+          nodeId: seriesNodeId,
+          label: resolveEnvironmentNodeDisplayName(seriesNodeId, series.label),
+          color,
+          pointCount: Array.isArray(series.points) ? series.points.length : 0,
+          hidden: hiddenSet.has(normalizeNodeId(seriesNodeId)),
+        }};
+      }});
+      const seriesColorByNodeId = new Map(
+        legendItems.map((item) => [normalizeNodeId(item.nodeId), String(item.color || "")])
+      );
+      seriesList = plottedSeries.filter((series) => {{
+        const seriesNodeId = normalizeNodeId(series && series.nodeId);
+        if (!seriesNodeId) return true;
+        return !hiddenSet.has(seriesNodeId);
+      }});
+      const visibleSeriesCount = seriesList.length;
+      if (!seriesList.length) {{
+        svg.innerHTML = "";
+        svg.dataset.zoomPointCount = "0";
+        svg.classList.remove("zoomed", "chart-dragging");
+        envMetricsChartState.pointerDrag = null;
+        setEnvironmentMetricsChartTitle(svg, metricLabel, false);
+        empty.textContent = "All plotted nodes are hidden. Use the legend to show one or more nodes.";
+        empty.hidden = false;
+        return {{
+          legendItems,
+          totalSeries,
+          visibleSeries: 0,
+        }};
       }}
 
       const allPoints = seriesList.flatMap((series) => series.points);
@@ -740,17 +835,10 @@
 
       const linePaths = [];
       const pointDots = [];
-      const legendItems = [];
       visibleSeriesList.forEach((series, idx) => {{
-        const color = envMetricColorPalette[idx % envMetricColorPalette.length];
         const seriesNodeId = String(series.nodeId || "").trim();
+        const color = seriesColorByNodeId.get(normalizeNodeId(seriesNodeId)) || envMetricColorPalette[idx % envMetricColorPalette.length];
         const seriesTitle = formatEnvironmentNodeTooltipLabel(seriesNodeId, series.label);
-        legendItems.push({{
-          nodeId: seriesNodeId,
-          label: resolveEnvironmentNodeDisplayName(seriesNodeId, series.label),
-          color,
-          pointCount: Array.isArray(series.points) ? series.points.length : 0,
-        }});
         const pathD = series.points.map((point, pointIdx) => {{
           const x = xForUnix(point.unix);
           const y = yForValue(point.value);
@@ -810,7 +898,7 @@
       return {{
         legendItems,
         totalSeries,
-        visibleSeries: visibleSeriesList.length,
+        visibleSeries: visibleSeriesCount,
       }};
     }}
 
@@ -824,8 +912,16 @@
       const metricMeta = resolveEnvironmentMetricMeta(metrics, selectedMetric);
       const nodeMeta = resolveEnvironmentNodeMeta(nodes, selectedNodeId);
       const filteredPoints = filterEnvironmentMetricPoints(points, selectedMetric, selectedNodeId);
-      const chartMeta = renderEnvironmentMetricsChart(filteredPoints, metricMeta, nodeMeta);
-      renderEnvironmentNodeLegend(metricMeta, nodeMeta, nodes, filteredPoints, chartMeta);
+      const selectionScopeKey = buildEnvironmentMetricsSelectionScopeKey(metricMeta, nodeMeta);
+      const hiddenNodeIds = syncEnvironmentLegendScope(selectionScopeKey);
+      const chartMeta = renderEnvironmentMetricsChart(filteredPoints, metricMeta, nodeMeta, hiddenNodeIds);
+      const activeLegendNodeIds = new Set(
+        (Array.isArray(chartMeta && chartMeta.legendItems) ? chartMeta.legendItems : [])
+          .map((item) => normalizeNodeId(item && item.nodeId))
+          .filter(Boolean)
+      );
+      pruneEnvironmentLegendHiddenNodeIds(activeLegendNodeIds);
+      renderEnvironmentNodeLegend(metricMeta, nodeMeta, nodes, filteredPoints, chartMeta, hiddenNodeIds);
       const renderedCount = Math.max(0, Math.trunc(Number(filteredPoints.length) || 0));
 
       if (!metrics.length || !nodes.length) {{

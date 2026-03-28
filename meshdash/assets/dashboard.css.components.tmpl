@@ -621,6 +621,24 @@
       position: relative;
       padding-left: 20px;
     }}
+    .env-node-legend-toggle {{
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      font: inherit;
+      line-height: inherit;
+    }}
+    .env-node-legend-toggle:hover {{
+      background: #eaf4eb;
+    }}
+    .env-node-legend-toggle:focus-visible {{
+      outline: 2px solid #2f855a;
+      outline-offset: 1px;
+    }}
+    .env-node-legend-toggle.is-hidden {{
+      opacity: 0.58;
+      border-style: dashed;
+    }}
     .env-node-legend-item::before {{
       content: "";
       position: absolute;
@@ -687,6 +705,12 @@
     }}
     [data-theme="dark"] .env-node-legend-item::before {{
       box-shadow: 0 0 0 1px rgba(225, 242, 232, 0.22);
+    }}
+    [data-theme="dark"] .env-node-legend-toggle:hover {{
+      background: #22372b;
+    }}
+    [data-theme="dark"] .env-node-legend-toggle:focus-visible {{
+      outline-color: #7ec9a1;
     }}
     .pill {{
       display: inline-block;
