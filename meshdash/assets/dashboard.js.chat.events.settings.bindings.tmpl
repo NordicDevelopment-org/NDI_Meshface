@@ -33,7 +33,7 @@
         ) {{
           cacheSettingsFixedInputsIfValid();
           if (
-            activeSettingsTab === "core"
+            activeSettingsTab === "location"
             && normalizeSettingsPositionSource(readSettingsPositionSourceSelection()) === "fixed"
             && ensureSettingsFixedMap()
           ) {{
@@ -79,7 +79,7 @@
         ) {{
           cacheSettingsFixedInputsIfValid();
           if (
-            activeSettingsTab === "core"
+            activeSettingsTab === "location"
             && normalizeSettingsPositionSource(readSettingsPositionSourceSelection()) === "fixed"
             && ensureSettingsFixedMap()
           ) {{
@@ -89,7 +89,7 @@
         if (target instanceof HTMLSelectElement && target.id === "settings-position-source") {{
           syncSettingsPositionSourceUi({{
             source: target.value,
-            recenter: activeLayoutView === "settings" && activeSettingsTab === "core",
+            recenter: activeLayoutView === "settings" && activeSettingsTab === "location",
           }});
         }}
         if (target instanceof HTMLInputElement && target.id === "settings-lora-use-preset") {{

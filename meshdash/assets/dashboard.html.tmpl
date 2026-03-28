@@ -415,6 +415,16 @@
             Connectivity
           </button>
           <button
+            id="settings-tab-location-btn"
+            class="settings-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-settings-tab="location"
+          >
+            Location
+          </button>
+          <button
             id="settings-tab-telemetry-btn"
             class="settings-tab-btn"
             type="button"
@@ -618,7 +628,77 @@
                 </div>
                 <div class="settings-help-note">Maps to device.led_heartbeat_disabled in Meshtastic config.</div>
               </label>
+            </div>
+          </div>
 
+          <div class="settings-panel" data-settings-tab-panel="core">
+            <h3>Advanced LoRa</h3>
+            <div class="settings-fields">
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Bandwidth (kHz)</span>
+                  <input id="settings-lora-bandwidth" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Spread factor</span>
+                  <input id="settings-lora-spread-factor" class="settings-input" type="number" min="7" max="12" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Coding rate (denom)</span>
+                  <input id="settings-lora-coding-rate" class="settings-input" type="number" min="5" max="8" step="1" />
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field">
+                  <span class="settings-label">Frequency offset (Hz)</span>
+                  <input id="settings-lora-frequency-offset" class="settings-input" type="number" min="0" step="1" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">Override frequency (MHz)</span>
+                  <input id="settings-lora-override-frequency" class="settings-input" type="number" min="0" step="0.001" />
+                </label>
+                <label class="settings-field">
+                  <span class="settings-label">FEM / LNA mode</span>
+                  <select id="settings-lora-fem-lna-mode" class="settings-select" autocomplete="off">
+                    <option value="DISABLED">DISABLED</option>
+                    <option value="ENABLED">ENABLED</option>
+                    <option value="NOT_PRESENT">NOT_PRESENT</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-ignore-mqtt" type="checkbox" />
+                  <span>Ignore MQTT</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-config-ok-to-mqtt" type="checkbox" />
+                  <span>OK to MQTT</span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-override-duty-cycle" type="checkbox" />
+                  <span>Override duty cycle limit</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-sx126x-rx-boosted-gain" type="checkbox" />
+                  <span>SX126x RX boosted gain</span>
+                </label>
+                <label class="settings-field settings-inline">
+                  <input id="settings-lora-pa-fan-disabled" type="checkbox" />
+                  <span>PA fan disabled</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-panel" data-settings-tab-panel="location" hidden>
+            <h3>Location + GPS</h3>
+            <div class="settings-fields">
               <label class="settings-field">
                 <span class="settings-label">Position Source</span>
                 <select id="settings-position-source" class="settings-select" autocomplete="off">
@@ -703,71 +783,6 @@
               <div class="settings-row">
                 <button id="settings-set-fixed-position" class="btn btn-secondary" type="button">Set Fixed Position</button>
                 <button id="settings-clear-fixed-position" class="btn btn-secondary" type="button">Clear Fixed Position</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-panel" data-settings-tab-panel="core">
-            <h3>Advanced LoRa</h3>
-            <div class="settings-fields">
-              <div class="settings-row">
-                <label class="settings-field">
-                  <span class="settings-label">Bandwidth (kHz)</span>
-                  <input id="settings-lora-bandwidth" class="settings-input" type="number" min="0" step="1" />
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Spread factor</span>
-                  <input id="settings-lora-spread-factor" class="settings-input" type="number" min="7" max="12" step="1" />
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Coding rate (denom)</span>
-                  <input id="settings-lora-coding-rate" class="settings-input" type="number" min="5" max="8" step="1" />
-                </label>
-              </div>
-
-              <div class="settings-row">
-                <label class="settings-field">
-                  <span class="settings-label">Frequency offset (Hz)</span>
-                  <input id="settings-lora-frequency-offset" class="settings-input" type="number" min="0" step="1" />
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Override frequency (MHz)</span>
-                  <input id="settings-lora-override-frequency" class="settings-input" type="number" min="0" step="0.001" />
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">FEM / LNA mode</span>
-                  <select id="settings-lora-fem-lna-mode" class="settings-select" autocomplete="off">
-                    <option value="DISABLED">DISABLED</option>
-                    <option value="ENABLED">ENABLED</option>
-                    <option value="NOT_PRESENT">NOT_PRESENT</option>
-                  </select>
-                </label>
-              </div>
-
-              <div class="settings-row">
-                <label class="settings-field settings-inline">
-                  <input id="settings-lora-ignore-mqtt" type="checkbox" />
-                  <span>Ignore MQTT</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-lora-config-ok-to-mqtt" type="checkbox" />
-                  <span>OK to MQTT</span>
-                </label>
-              </div>
-
-              <div class="settings-row">
-                <label class="settings-field settings-inline">
-                  <input id="settings-lora-override-duty-cycle" type="checkbox" />
-                  <span>Override duty cycle limit</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-lora-sx126x-rx-boosted-gain" type="checkbox" />
-                  <span>SX126x RX boosted gain</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-lora-pa-fan-disabled" type="checkbox" />
-                  <span>PA fan disabled</span>
-                </label>
               </div>
             </div>
           </div>
