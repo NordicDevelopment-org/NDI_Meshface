@@ -215,11 +215,7 @@
       Object.freeze({{ command: "score", expectAny: Object.freeze(["score/progress"]) }}),
       Object.freeze({{ command: "quit", expectAny: Object.freeze(["session ended"]) }}),
     ]);
-    const zorkRemoteAutoResponseScript = Object.freeze(
-      zorkE2EWinScript
-        .slice(1)
-        .filter((step) => String(step && step.command || "").trim().toLowerCase() !== "quit")
-    );
+    const zorkRemoteAutoResponseScript = Object.freeze(zorkE2EWinScript.slice(1));
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const botCityHintMaxDistanceKm = 120;
     const requesterPositionMaxAgeSeconds = 24 * 3600;
