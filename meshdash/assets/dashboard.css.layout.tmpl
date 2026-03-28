@@ -5492,31 +5492,24 @@
     .chat-feed-item.channel-tinted {{
       --chat-feed-channel-fill: #0072b2;
       --chat-feed-channel-rgb: 0, 114, 178;
-      border-left: 2px solid rgba(var(--chat-feed-channel-rgb), 0.82);
+      border-left: 2px dotted rgba(var(--chat-feed-channel-rgb), 0.82);
       background:
         linear-gradient(
           90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.075),
-          rgba(var(--chat-feed-channel-rgb), 0.032) 28%,
-          rgba(var(--chat-feed-channel-rgb), 0.012) 52%,
+          rgba(var(--chat-feed-channel-rgb), 0.11),
+          rgba(var(--chat-feed-channel-rgb), 0.052) 28%,
+          rgba(var(--chat-feed-channel-rgb), 0.018) 52%,
           rgba(var(--chat-feed-channel-rgb), 0) 100%
-        ),
-        var(--chat-feed-node-gradient);
+      ),
+      var(--chat-feed-node-gradient);
       box-shadow: inset 0 0 0 1px rgba(var(--chat-feed-channel-rgb), 0.16);
     }}
-    .chat-feed-item.channel-tinted.channel-edge-dashed {{
-      border-left-style: dashed;
-    }}
-    .chat-feed-item.channel-tinted.channel-edge-dotted {{
-      border-left-style: dotted;
-      border-left-width: 3px;
-    }}
-    .chat-feed-item.channel-tinted.channel-edge-double {{
-      border-left-style: double;
-      border-left-width: 3px;
-    }}
+    .chat-feed-item.channel-tinted.channel-edge-dashed,
+    .chat-feed-item.channel-tinted.channel-edge-dotted,
+    .chat-feed-item.channel-tinted.channel-edge-double,
     .chat-feed-item.channel-tinted.channel-edge-solid {{
-      border-left-style: solid;
+      border-left-style: dotted;
+      border-left-width: 2px;
     }}
     .chat-feed-item.self-authored {{
       background:
@@ -5561,19 +5554,21 @@
     }}
     .chat-feed-item.tagged-node.channel-tinted {{
       border-left-color: rgba(var(--chat-feed-channel-rgb), 0.92);
+      border-left-style: dotted;
+      border-left-width: 2px;
       background:
         linear-gradient(
           90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.075),
-          rgba(var(--chat-feed-channel-rgb), 0.032) 28%,
-          rgba(var(--chat-feed-channel-rgb), 0.012) 52%,
-          rgba(var(--chat-feed-channel-rgb), 0) 100%
+          hsl(var(--chat-feed-node-hue) 58% 82% / calc(0.04 + var(--node-tag-vibrance, 0.7) * 0.10)),
+          hsl(var(--chat-feed-node-hue) 54% 86% / calc(0.02 + var(--node-tag-vibrance, 0.7) * 0.055)) 34%,
+          hsl(var(--chat-feed-node-hue) 50% 90% / 0) 68%
         ),
         linear-gradient(
           90deg,
-          hsl(var(--chat-feed-node-hue) 58% 82% / calc(0.008 + var(--node-tag-vibrance, 0.7) * 0.020)),
-          hsl(var(--chat-feed-node-hue) 54% 86% / calc(0.004 + var(--node-tag-vibrance, 0.7) * 0.010)) 34%,
-          hsl(var(--chat-feed-node-hue) 50% 90% / 0) 68%
+          rgba(var(--chat-feed-channel-rgb), 0.028),
+          rgba(var(--chat-feed-channel-rgb), 0.012) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.004) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0) 100%
         ),
         var(--chat-feed-node-gradient);
       box-shadow: inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 32% 74% / 0.2);
@@ -5597,12 +5592,20 @@
     }}
     .chat-feed-item.tagged-node.self-authored.channel-tinted {{
       border-left-color: rgba(var(--chat-feed-channel-rgb), 0.92);
+      border-left-style: dotted;
+      border-left-width: 2px;
       background:
         linear-gradient(
           90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.08),
-          rgba(var(--chat-feed-channel-rgb), 0.038) 30%,
-          rgba(var(--chat-feed-channel-rgb), 0.014) 58%,
+          hsl(var(--chat-feed-node-hue) 58% 82% / calc(0.04 + var(--node-tag-vibrance, 0.7) * 0.10)),
+          hsl(var(--chat-feed-node-hue) 54% 86% / calc(0.02 + var(--node-tag-vibrance, 0.7) * 0.055)) 34%,
+          hsl(var(--chat-feed-node-hue) 50% 90% / 0) 68%
+        ),
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.028),
+          rgba(var(--chat-feed-channel-rgb), 0.012) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.004) 58%,
           rgba(var(--chat-feed-channel-rgb), 0) 100%
         ),
         linear-gradient(
@@ -5610,12 +5613,6 @@
           rgba(47, 133, 90, 0.055),
           rgba(47, 133, 90, 0.026) 58%,
           rgba(47, 133, 90, 0.009) 100%
-        ),
-        linear-gradient(
-          90deg,
-          hsl(var(--chat-feed-node-hue) 58% 82% / calc(0.008 + var(--node-tag-vibrance, 0.7) * 0.020)),
-          hsl(var(--chat-feed-node-hue) 54% 86% / calc(0.004 + var(--node-tag-vibrance, 0.7) * 0.010)) 34%,
-          hsl(var(--chat-feed-node-hue) 50% 90% / 0) 68%
         ),
         var(--chat-feed-node-gradient);
       box-shadow: inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 32% 74% / 0.2);
@@ -5705,15 +5702,6 @@
       box-shadow:
         inset 3px 0 0 var(--node-tag-color, #2aa85a),
         inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 28% 72% / 0.26);
-    }}
-    .chat-feed-item.tagged-node.selected-node.channel-tinted,
-    .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted:hover,
-    .chat-feed-item.tagged-node.selected-node.channel-tinted.has-change-marker,
-    .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted.has-change-marker:hover {{
-      border-left-color: rgba(var(--chat-feed-channel-rgb), 0.96);
-      box-shadow:
-        inset 3px 0 0 rgba(var(--chat-feed-channel-rgb), 0.9),
-        inset 0 0 0 1px rgba(var(--chat-feed-channel-rgb), 0.28);
     }}
     .chat-feed-item.has-change-marker {{
       background: #f9fcf8;

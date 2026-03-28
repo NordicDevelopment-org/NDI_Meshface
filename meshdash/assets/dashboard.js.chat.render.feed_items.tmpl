@@ -269,18 +269,23 @@
         const activeFilterMeshIdx = (typeof activeMeshChannelFilterIndex === "function")
           ? activeMeshChannelFilterIndex()
           : meshChannelAllIndex;
-        const meshIdx = (Number.isInteger(explicitMsgMeshIdx) && explicitMsgMeshIdx >= 0)
-          ? explicitMsgMeshIdx
-          : (
-              (Number.isInteger(packetMeshIdx) && packetMeshIdx >= 0)
-                ? packetMeshIdx
-                : (
-                    (Number.isInteger(activeFilterMeshIdx) && activeFilterMeshIdx !== meshChannelAllIndex)
-                      ? activeFilterMeshIdx
-                      : messageMeshChannelIndex(msg)
-                  )
-            );
-        const hasMeshTint = Number.isInteger(meshIdx) && meshIdx >= 0;
+        const meshIdx = (() => {{
+          const explicitValid = Number.isInteger(explicitMsgMeshIdx) && explicitMsgMeshIdx >= 0;
+          const packetValid = Number.isInteger(packetMeshIdx) && packetMeshIdx >= 0;
+          // Prefer packet-derived channel when it provides a non-default channel
+          // and chat-row channel is default/unknown.
+          if (packetValid && (!explicitValid || (explicitMsgMeshIdx === 0 && packetMeshIdx > 0))) {{
+            return packetMeshIdx;
+          }}
+          if (explicitValid) {{
+            return explicitMsgMeshIdx;
+          }}
+          if (Number.isInteger(activeFilterMeshIdx) && activeFilterMeshIdx > 0) {{
+            return activeFilterMeshIdx;
+          }}
+          return messageMeshChannelIndex(msg);
+        }})();
+        const hasMeshTint = Number.isInteger(meshIdx) && meshIdx > 0;
         const meshTintClass = hasMeshTint ? " channel-tinted" : "";
         const meshEdgeClass = (hasMeshTint && typeof meshChannelEdgeClass === "function")
           ? ` ${{meshChannelEdgeClass(meshIdx, {{ allowAll: false }})}}`

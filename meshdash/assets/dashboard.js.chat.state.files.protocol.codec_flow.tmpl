@@ -401,12 +401,74 @@
       return null;
     }}
 
+    function parseMessageMeshChannelIndexCandidate(raw) {{
+      if (raw == null) return null;
+      if (typeof raw === "object") {{
+        const fromIndex = parseMessageMeshChannelIndexCandidate(raw.index ?? raw.channel_index ?? raw.channelIndex);
+        if (Number.isInteger(fromIndex) && fromIndex >= 0) return fromIndex;
+      }}
+      const numeric = Number(raw);
+      if (Number.isInteger(numeric) && numeric >= 0) {{
+        return Math.trunc(numeric);
+      }}
+      const text = String(raw).trim();
+      if (!text) return null;
+
+      // Common forms: "1", "Ch 1", "Channel 1", "Ch 1 (test)".
+      const chMatch = /(?:^|[^a-z0-9])ch(?:annel)?\s*([0-9]+)\b/i.exec(text);
+      if (chMatch) {{
+        const idx = Number(chMatch[1]);
+        if (Number.isInteger(idx) && idx >= 0) return Math.trunc(idx);
+      }}
+      const leadingNumberMatch = /^\s*([0-9]+)\b/.exec(text);
+      if (leadingNumberMatch) {{
+        const idx = Number(leadingNumberMatch[1]);
+        if (Number.isInteger(idx) && idx >= 0) return Math.trunc(idx);
+      }}
+
+      // Name fallback (e.g. "test") against configured channel lists.
+      const lower = text.toLowerCase();
+      const sources = [];
+      if (Array.isArray(meshChannelOptions)) sources.push(meshChannelOptions);
+      if (Array.isArray(meshChannelSendOptions) && meshChannelSendOptions !== meshChannelOptions) {{
+        sources.push(meshChannelSendOptions);
+      }}
+      for (const list of sources) {{
+        for (const opt of list) {{
+          if (!(opt && typeof opt === "object")) continue;
+          const idx = Number(opt.index);
+          if (!Number.isInteger(idx) || idx < 0) continue;
+          const optName = String(opt.name || "").trim().toLowerCase();
+          if (optName && optName === lower) {{
+            return Math.trunc(idx);
+          }}
+        }}
+      }}
+      return null;
+    }}
+
     function explicitMessageMeshChannelIndex(msg) {{
       if (!msg || typeof msg !== "object") return null;
-      const raw = msg.channel_index ?? msg.channelIndex ?? msg.channel;
-      if (raw == null || raw === "") return null;
-      const num = Number(raw);
-      return Number.isInteger(num) && num >= 0 ? Math.trunc(num) : null;
+      const candidates = [
+        msg.channel_index,
+        msg.channelIndex,
+        msg.channel,
+        msg.mesh_channel,
+        msg.meshChannel,
+        msg.channel_name,
+        msg.channelName,
+        msg.summary && msg.summary.channel_index,
+        msg.summary && msg.summary.channelIndex,
+        msg.summary && msg.summary.channel,
+        msg.packet && msg.packet.channel_index,
+        msg.packet && msg.packet.channelIndex,
+        msg.packet && msg.packet.channel,
+      ];
+      for (const candidate of candidates) {{
+        const parsed = parseMessageMeshChannelIndexCandidate(candidate);
+        if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+      }}
+      return null;
     }}
 
     function messageMeshChannelIndex(msg) {{

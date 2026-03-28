@@ -1629,7 +1629,7 @@
       color: #d9ece1;
     }}
     [data-theme="dark"] .chat-feed-item.channel-tinted {{
-      border-left: 2px solid rgba(var(--chat-feed-channel-rgb), 0.96);
+      border-left: 2px dotted rgba(var(--chat-feed-channel-rgb), 0.96);
       background:
         linear-gradient(
           90deg,
@@ -1674,19 +1674,21 @@
     }}
     [data-theme="dark"] .chat-feed-item.tagged-node.channel-tinted {{
       border-left-color: rgba(var(--chat-feed-channel-rgb), 0.96);
+      border-left-style: dotted;
+      border-left-width: 2px;
       background:
         linear-gradient(
           90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.22),
-          rgba(var(--chat-feed-channel-rgb), 0.12) 28%,
-          rgba(var(--chat-feed-channel-rgb), 0.05) 56%,
-          rgba(var(--chat-feed-channel-rgb), 0.01) 100%
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
         ),
         linear-gradient(
           90deg,
-          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.03 + var(--node-tag-vibrance, 0.7) * 0.03)),
-          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.015 + var(--node-tag-vibrance, 0.7) * 0.02)) 36%,
-          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+          rgba(var(--chat-feed-channel-rgb), 0.08),
+          rgba(var(--chat-feed-channel-rgb), 0.042) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.016) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.004) 100%
         ),
         #1a2a21;
       border-color: #3e5a4c;
@@ -1712,25 +1714,27 @@
     }}
     [data-theme="dark"] .chat-feed-item.tagged-node.self-authored.channel-tinted {{
       border-left-color: rgba(var(--chat-feed-channel-rgb), 0.96);
+      border-left-style: dotted;
+      border-left-width: 2px;
       background:
         linear-gradient(
           90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.2),
-          rgba(var(--chat-feed-channel-rgb), 0.11) 28%,
-          rgba(var(--chat-feed-channel-rgb), 0.04) 56%,
-          rgba(var(--chat-feed-channel-rgb), 0.01) 100%
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.08),
+          rgba(var(--chat-feed-channel-rgb), 0.042) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.016) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.004) 100%
         ),
         linear-gradient(
           90deg,
           rgba(112, 196, 148, 0.14),
           rgba(112, 196, 148, 0.06) 44%,
           rgba(112, 196, 148, 0.02) 100%
-        ),
-        linear-gradient(
-          90deg,
-          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.03 + var(--node-tag-vibrance, 0.7) * 0.03)),
-          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.015 + var(--node-tag-vibrance, 0.7) * 0.02)) 36%,
-          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
         ),
         #20372c;
       border-color: #4b6c59;
@@ -1793,9 +1797,8 @@
     [data-theme="dark"] .chat-feed-item.tagged-node.selected-node.channel-tinted,
     [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted:hover {{
       border-left-color: rgba(var(--chat-feed-channel-rgb), 0.98);
-      box-shadow:
-        inset 3px 0 0 rgba(var(--chat-feed-channel-rgb), 0.92),
-        inset 0 0 0 1px rgba(var(--chat-feed-channel-rgb), 0.32);
+      border-left-style: dotted;
+      border-left-width: 2px;
     }}
     [data-theme="dark"] .chat-feed-meta,
     [data-theme="dark"] .chat-feed-time,
@@ -2497,31 +2500,24 @@
       box-shadow: inset 1px 0 0 hsl(var(--chat-feed-node-hue) 20% 46% / 0.1);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted {{
-      border-left: 2px solid rgba(var(--chat-feed-channel-rgb), 0.84);
+      border-left: 2px dotted rgba(var(--chat-feed-channel-rgb), 0.84);
       background:
         linear-gradient(
           90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.085),
-          rgba(var(--chat-feed-channel-rgb), 0.036) 30%,
-          rgba(var(--chat-feed-channel-rgb), 0.014) 58%,
-          rgba(var(--chat-feed-channel-rgb), 0.006) 100%
+          rgba(var(--chat-feed-channel-rgb), 0.12),
+          rgba(var(--chat-feed-channel-rgb), 0.056) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.022) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.008) 100%
         ),
         var(--chat-feed-node-gradient);
       box-shadow: inset 0 0 0 1px rgba(var(--chat-feed-channel-rgb), 0.2);
     }}
-    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-dashed {{
-      border-left-style: dashed;
-    }}
-    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-dotted {{
-      border-left-style: dotted;
-      border-left-width: 3px;
-    }}
-    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-double {{
-      border-left-style: double;
-      border-left-width: 3px;
-    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-dashed,
+    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-dotted,
+    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-double,
     [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-solid {{
-      border-left-style: solid;
+      border-left-style: dotted;
+      border-left-width: 2px;
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.tagged-node {{
       background:
@@ -2537,19 +2533,21 @@
       box-shadow: inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 45% 52% / 0.28);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.tagged-node.channel-tinted {{
+      border-left-style: dotted;
+      border-left-width: 2px;
       background:
         linear-gradient(
           90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.085),
-          rgba(var(--chat-feed-channel-rgb), 0.036) 30%,
-          rgba(var(--chat-feed-channel-rgb), 0.014) 58%,
-          rgba(var(--chat-feed-channel-rgb), 0.006) 100%
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
         ),
         linear-gradient(
           90deg,
-          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.02 + var(--node-tag-vibrance, 0.7) * 0.025)),
-          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.01 + var(--node-tag-vibrance, 0.7) * 0.015)) 36%,
-          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+          rgba(var(--chat-feed-channel-rgb), 0.03),
+          rgba(var(--chat-feed-channel-rgb), 0.015) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.006) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.002) 100%
         ),
         var(--chat-feed-node-gradient);
       border-left-color: rgba(var(--chat-feed-channel-rgb), 0.92);
@@ -2573,25 +2571,27 @@
       box-shadow: inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 45% 52% / 0.3);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.self-authored.tagged-node.channel-tinted {{
+      border-left-style: dotted;
+      border-left-width: 2px;
       background:
         linear-gradient(
           90deg,
-          rgba(var(--chat-feed-channel-rgb), 0.065),
-          rgba(var(--chat-feed-channel-rgb), 0.03) 30%,
-          rgba(var(--chat-feed-channel-rgb), 0.012) 58%,
-          rgba(var(--chat-feed-channel-rgb), 0.006) 100%
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.03),
+          rgba(var(--chat-feed-channel-rgb), 0.015) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.006) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.002) 100%
         ),
         linear-gradient(
           90deg,
           rgba(63, 185, 80, 0.04),
           rgba(63, 185, 80, 0.015) 28%,
           rgba(63, 185, 80, 0.006) 52%
-        ),
-        linear-gradient(
-          90deg,
-          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.02 + var(--node-tag-vibrance, 0.7) * 0.025)),
-          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.01 + var(--node-tag-vibrance, 0.7) * 0.015)) 36%,
-          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
         ),
         var(--chat-feed-node-gradient);
       border-left-color: rgba(var(--chat-feed-channel-rgb), 0.92);
@@ -4810,9 +4810,8 @@
     [data-theme="dark"] .chat-feed-item.tagged-node.selected-node.channel-tinted.has-change-marker,
     [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted.has-change-marker:hover {{
       border-left-color: rgba(var(--chat-feed-channel-rgb), 0.98);
-      box-shadow:
-        inset 3px 0 0 rgba(var(--chat-feed-channel-rgb), 0.92),
-        inset 0 0 0 1px rgba(var(--chat-feed-channel-rgb), 0.32);
+      border-left-style: dotted;
+      border-left-width: 2px;
     }}
     [data-theme="dark"] .chat-feed-new-pill {{
       background: #4d3b10;
