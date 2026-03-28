@@ -33,6 +33,8 @@ def make_http_handler(
     apply_radio_settings_fn = getattr(state_fn, "apply_radio_settings_fn", None)
     apply_channel_settings_fn = getattr(state_fn, "apply_channel_settings_fn", None)
     apply_bot_settings_fn = getattr(state_fn, "apply_bot_settings_fn", None)
+    get_custom_telemetry_settings_fn = getattr(state_fn, "get_custom_telemetry_settings_fn", None)
+    set_custom_telemetry_settings_fn = getattr(state_fn, "set_custom_telemetry_settings_fn", None)
     play_standalone_zork_fn = getattr(state_fn, "play_standalone_zork_fn", None)
     clean_api_token = str(api_token or "").strip() or None
     get_deps = build_get_route_dependencies(
@@ -42,6 +44,7 @@ def make_http_handler(
         online_activity_fn=online_activity_fn,
         summary_metrics_fn=summary_metrics_fn,
         get_theme_settings_fn=get_theme_settings_fn,
+        get_custom_telemetry_settings_fn=get_custom_telemetry_settings_fn,
         private_mode=bool(private_mode),
         api_metrics=api_metrics,
         default_node_history_hours=default_node_history_hours,
@@ -53,6 +56,7 @@ def make_http_handler(
         apply_radio_settings_fn=apply_radio_settings_fn,
         apply_channel_settings_fn=apply_channel_settings_fn,
         apply_bot_settings_fn=apply_bot_settings_fn,
+        set_custom_telemetry_settings_fn=set_custom_telemetry_settings_fn,
         play_standalone_zork_fn=play_standalone_zork_fn,
         api_token=clean_api_token,
         private_mode=bool(private_mode),

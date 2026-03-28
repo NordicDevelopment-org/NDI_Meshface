@@ -16,6 +16,10 @@ from .api_input_theme import (
     ThemeSettingsRequest,
     parse_theme_settings_request,
 )
+from .api_input_custom_telemetry import (
+    CustomTelemetrySettingsRequest,
+    parse_custom_telemetry_settings_request,
+)
 from .api_input_radio import (
     RadioSettingsRequest,
     parse_radio_settings_request,
@@ -45,6 +49,8 @@ __all__ = [
     "parse_online_activity_request",
     "ThemeSettingsRequest",
     "parse_theme_settings_request",
+    "CustomTelemetrySettingsRequest",
+    "parse_custom_telemetry_settings_request",
     "RadioSettingsRequest",
     "parse_radio_settings_request",
     "ChannelSettingsRequest",

@@ -899,6 +899,31 @@
                 </label>
               </div>
               <div class="settings-help-note">Set all telemetry toggles OFF and intervals to 0 to fully disable telemetry.</div>
+              <div class="settings-help-note">Custom telemetry rules can extract numeric values from decoded fields or JSON payloads and push them into the Sensors view.</div>
+              <label class="settings-field">
+                <span class="settings-label">Custom telemetry rules (JSON array)</span>
+                <textarea
+                  id="settings-custom-telemetry-rules"
+                  class="settings-input settings-textarea"
+                  spellcheck="false"
+                  placeholder='[
+  {
+    "enabled": true,
+    "metric_key": "soil_temp_c",
+    "source": "payload_json",
+    "path": "sensors.soil_temp_c",
+    "portnum": "TELEMETRY_APP",
+    "scale": 1,
+    "offset": 0
+  }
+]'
+                ></textarea>
+              </label>
+              <div class="settings-row">
+                <button id="settings-apply-custom-telemetry" class="btn btn-secondary" type="button">Apply Custom Telemetry</button>
+                <button id="settings-refresh-custom-telemetry" class="btn btn-secondary" type="button">Reload Custom Telemetry</button>
+              </div>
+              <div class="settings-help-note">Rule fields: <code>metric_key</code>, <code>source</code> (<code>decoded</code> or <code>payload_json</code>), optional <code>path</code>, optional <code>portnum</code>, optional <code>scale</code>/<code>offset</code>.</div>
             </div>
           </div>
 

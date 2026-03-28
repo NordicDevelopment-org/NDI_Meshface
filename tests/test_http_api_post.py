@@ -26,6 +26,7 @@ def test_build_post_route_dependencies_sets_expected_defaults():
     assert callable(deps.validate_content_length_fn)
     assert callable(deps.parse_chat_send_request_fn)
     assert callable(deps.parse_theme_settings_request_fn)
+    assert callable(deps.parse_custom_telemetry_settings_request_fn)
     assert callable(deps.parse_bot_settings_request_fn)
     assert callable(deps.parse_standalone_zork_request_fn)
     assert callable(deps.write_json_response_fn)

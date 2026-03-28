@@ -140,6 +140,13 @@ TABLE_SCHEMA_STATEMENTS = [
       PRIMARY KEY(bucket_unix, node_id, metric_key)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS dashboard_settings (
+      key TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL,
+      updated_unix INTEGER NOT NULL
+    )
+    """,
 
     # Fast per-node rollup of history storage totals.
     #

@@ -207,6 +207,55 @@ def test_http_api_theme_settings_get_and_post():
     assert updated["selected_preset"] == "forest"
 
 
+def test_http_api_custom_telemetry_settings_get_and_post():
+    holder = {"rules": []}
+
+    def _state():
+        return {"ok": True}
+
+    setattr(
+        _state,
+        "get_custom_telemetry_settings_fn",
+        lambda: {"ok": True, "rules": list(holder["rules"]), "updated_unix": 1},
+    )
+
+    def _set_custom_rules(rules):
+        holder["rules"] = list(rules or [])
+        return {"ok": True, "rules": list(holder["rules"]), "updated_unix": 2}
+
+    setattr(_state, "set_custom_telemetry_settings_fn", _set_custom_rules)
+
+    handler_cls = make_http_handler(
+        html_text="<html>ok</html>",
+        state_fn=_state,
+    )
+
+    sent, data = _run_get(handler_cls, "/api/settings/custom_telemetry")
+    assert sent["status"] == 200
+    body = json.loads(data.decode("utf-8"))
+    assert body["ok"] is True
+    assert body["rules"] == []
+
+    sent, data = _run_post(
+        handler_cls,
+        "/api/settings/custom_telemetry",
+        {
+            "rules": [
+                {
+                    "enabled": True,
+                    "metric_key": "soil_temp_c",
+                    "source": "payload_json",
+                    "path": "sensors.soil_temp_c",
+                }
+            ]
+        },
+    )
+    assert sent["status"] == 200
+    updated = json.loads(data.decode("utf-8"))
+    assert updated["ok"] is True
+    assert updated["rules"][0]["metric_key"] == "soil_temp_c"
+
+
 def test_http_api_version_health_metrics_and_private_mode():
     def _state():
         return {
@@ -285,6 +334,11 @@ def test_http_api_token_auth_for_write_routes():
             "active_session": True,
         },
     )
+    setattr(
+        _state,
+        "set_custom_telemetry_settings_fn",
+        lambda rules: {"ok": True, "rules": list(rules or []), "updated_unix": 1},
+    )
 
     handler_cls = make_http_handler(
         html_text="<html>ok</html>",
@@ -329,9 +383,23 @@ def test_http_api_token_auth_for_write_routes():
 
     sent, data = _run_post(
         handler_cls,
+        "/api/settings/custom_telemetry",
+        {"rules": []},
+    )
+    assert sent["status"] == 401
+
+    sent, data = _run_post(
+        handler_cls,
         "/api/settings/theme",
         {"preset_name": "forest"},
         headers={"Authorization": "Bearer abc123"},
     )
     assert sent["status"] == 200
     assert json.loads(data.decode("utf-8"))["selected_preset"] == "forest"
+    sent, data = _run_post(
+        handler_cls,
+        "/api/settings/custom_telemetry",
+        {"rules": []},
+        headers={"Authorization": "Bearer abc123"},
+    )
+    assert sent["status"] == 200

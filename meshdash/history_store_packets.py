@@ -176,6 +176,7 @@ def _build_environment_points(
     *,
     metric_filter: str,
     node_filter: str,
+    custom_telemetry_rules: object = None,
 ) -> tuple[list[dict[str, object]], dict[str, dict[str, object]], dict[str, dict[str, object]]]:
     points: list[dict[str, object]] = []
     metric_meta: dict[str, dict[str, object]] = {}
@@ -198,7 +199,12 @@ def _build_environment_points(
         if not isinstance(decoded, dict):
             decoded = {}
 
-        containers = _collect_environment_metric_containers(decoded)
+        containers = _collect_environment_metric_containers(
+            decoded,
+            summary=summary,
+            packet=packet,
+            custom_rules=custom_telemetry_rules,
+        )
         if not containers:
             continue
 
@@ -801,6 +807,7 @@ def load_environment_metrics_history(
                 packet_rows,
                 metric_filter=clean_metric,
                 node_filter=clean_node_id,
+                custom_telemetry_rules=getattr(store, "_custom_telemetry_rules", None),
             )
             if earliest_rollup_unix > 0:
                 packet_points = [
@@ -833,6 +840,7 @@ def load_environment_metrics_history(
             packet_rows,
             metric_filter=clean_metric,
             node_filter=clean_node_id,
+            custom_telemetry_rules=getattr(store, "_custom_telemetry_rules", None),
         )
         scanned_count = len(packet_rows)
         source_kind = "packet_scan"
@@ -903,6 +911,7 @@ def save_packet(store: HistoryStoreWriteState, packet_entry: dict[str, object]) 
             packet_entry,
             now_unix_fn=time.time,
             save_packet_event_and_rollups_fn=_save_packet_event_and_rollups_helper,
+            custom_telemetry_rules=getattr(store, "_custom_telemetry_rules", None),
         )
         if local_telemetry_sample_unix > 0:
             setattr(store, "_last_local_telemetry_sample_unix", int(local_telemetry_sample_unix))

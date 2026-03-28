@@ -39,7 +39,8 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "const nodeHistoryHours = 72;" in js
     assert "const nodeHistoryMaxPoints = 1440;" in js
     assert "const resetTickerScaleOnRestart = Number(1) === 1;" in js
-    assert "setInterval(pollOnce, refreshMs);" in js
+    assert "const hiddenRefreshMs = Math.max(refreshMs * 6, 15000);" in js
+    assert "}, refreshMs);" in js
     assert "/^[0-9a-f]{8}$/i.test(hex)" in js
     assert "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" in js
     assert "const chatEmojiQueryKeywordAliases = {" in js
@@ -113,7 +114,7 @@ def test_build_dashboard_js_injects_runtime_values():
     assert "const selectedPublicStartInput = document.getElementById(\"bots-command-selected-public-start-enabled\");" in js
     assert "game_public_start_enabled: !!selectedPublicStartInput.checked" in js
     assert "const receivedAtMs = Date.now();" in js
-    assert "receivedAtMs,\n            true" in js
+    assert "receivedAtMs,\n          true" in js
     assert "function setChannelsStatusText(message)" in js
     assert "const channelsFetchBtn = document.getElementById(\"channels-fetch-settings-btn\");" in js
     assert "const channelsExperimentalToggle = document.getElementById(\"settings-channels-experimental-toggle\");" in js

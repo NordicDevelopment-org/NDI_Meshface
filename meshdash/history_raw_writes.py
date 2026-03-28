@@ -18,6 +18,7 @@ class SavePacketEventAndRollupsFn(Protocol):
         *,
         packet: dict[str, object] | None = None,
         now_unix_fn: NowUnixFn,
+        custom_telemetry_rules: object = None,
     ) -> None:
         ...
 
@@ -28,6 +29,7 @@ def save_packet_record(
     *,
     now_unix_fn: NowUnixFn = time.time,
     save_packet_event_and_rollups_fn: Optional[SavePacketEventAndRollupsFn] = None,
+    custom_telemetry_rules: object = None,
 ) -> None:
     summary = packet_entry.get("summary")
     packet = packet_entry.get("packet")
@@ -44,6 +46,7 @@ def save_packet_record(
             summary,
             packet=packet if isinstance(packet, dict) else None,
             now_unix_fn=now_unix_fn,
+            custom_telemetry_rules=custom_telemetry_rules,
         )
 
 

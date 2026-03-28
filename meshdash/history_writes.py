@@ -173,13 +173,19 @@ def _save_environment_metric_rollups(
     summary: dict[str, object],
     packet: dict[str, object] | None,
     now_unix_fn: Callable[[], float],
+    custom_telemetry_rules: object = None,
 ) -> None:
     if not isinstance(packet, dict):
         return
     decoded = packet.get("decoded")
     if not isinstance(decoded, dict):
         return
-    containers = _collect_environment_metric_containers(decoded)
+    containers = _collect_environment_metric_containers(
+        decoded,
+        summary=summary,
+        packet=packet,
+        custom_rules=custom_telemetry_rules,
+    )
     if not containers:
         return
 
@@ -243,12 +249,14 @@ def save_environment_metric_rollups(
     summary: dict[str, object],
     packet: dict[str, object] | None,
     now_unix_fn: Callable[[], float] = time.time,
+    custom_telemetry_rules: object = None,
 ) -> None:
     _save_environment_metric_rollups(
         conn,
         summary=summary,
         packet=packet,
         now_unix_fn=now_unix_fn,
+        custom_telemetry_rules=custom_telemetry_rules,
     )
 
 
@@ -258,6 +266,7 @@ def save_packet_event_and_rollups(
     *,
     packet: dict[str, object] | None = None,
     now_unix_fn: Callable[[], float] = time.time,
+    custom_telemetry_rules: object = None,
 ) -> None:
     normalized = _normalize_packet_event_summary(summary, now_unix_fn=now_unix_fn)
     event_unix = normalized["event_unix"]
@@ -321,4 +330,5 @@ def save_packet_event_and_rollups(
         summary=summary,
         packet=packet,
         now_unix_fn=now_unix_fn,
+        custom_telemetry_rules=custom_telemetry_rules,
     )

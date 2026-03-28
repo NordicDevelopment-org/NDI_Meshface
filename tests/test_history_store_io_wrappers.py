@@ -582,6 +582,58 @@ def test_history_store_domain_environment_metrics_history_extracts_channel_utili
         store.close()
 
 
+def test_history_store_domain_environment_metrics_history_extracts_custom_payload_json_metric(tmp_path):
+    store = _make_store(tmp_path)
+    try:
+        saved = store.set_custom_telemetry_settings(
+            [
+                {
+                    "enabled": True,
+                    "metric_key": "soil_temp_c",
+                    "source": "payload_json",
+                    "path": "sensors.soil_temp_c",
+                    "portnum": "TELEMETRY_APP",
+                }
+            ]
+        )
+        assert saved["ok"] is True
+        assert saved["rules"][0]["metric_key"] == "soil_temp_c"
+
+        payload_hex = b'{"sensors":{"soil_temp_c":18.25}}'.hex()
+        save_packet_domain(
+            store,
+            {
+                "summary": {
+                    "from": "!01010101",
+                    "from_short_name": "soilnode",
+                    "rx_time_unix": 1_700_000_030,
+                    "portnum": "TELEMETRY_APP",
+                },
+                "packet": {
+                    "fromId": "!01010101",
+                    "rxTime": 1_700_000_030,
+                    "decoded": {
+                        "portnum": "TELEMETRY_APP",
+                        "payload": payload_hex,
+                    },
+                },
+            },
+        )
+        payload = load_environment_metrics_history_domain(
+            store,
+            window_hours=24,
+            metric="soil_temp_c",
+            node_id="!01010101",
+            limit=1000,
+        )
+        assert payload["ok"] is True
+        assert payload["points"]
+        assert payload["points"][0]["metric_key"] == "soil_temp_c"
+        assert payload["points"][0]["value"] == 18.25
+    finally:
+        store.close()
+
+
 def test_history_store_domain_environment_metrics_history_clamps_future_rollup_timestamps(tmp_path, monkeypatch):
     store = _make_store(tmp_path)
     try:

@@ -28,6 +28,9 @@
         "settings-apply-ext-notify",
         "settings-apply-position",
         "settings-apply-telemetry",
+        "settings-custom-telemetry-rules",
+        "settings-apply-custom-telemetry",
+        "settings-refresh-custom-telemetry",
         "settings-apply-led-heartbeat",
         "settings-set-fixed-position",
         "settings-clear-fixed-position",
@@ -62,7 +65,7 @@
         const el = document.getElementById(id);
         if (el instanceof HTMLButtonElement) {{
           el.disabled = !!disabled;
-        }} else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {{
+        }} else if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {{
           el.disabled = !!disabled;
         }}
       }}

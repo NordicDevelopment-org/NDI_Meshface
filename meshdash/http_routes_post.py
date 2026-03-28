@@ -6,6 +6,9 @@ from .api_chat import (
 from .api_theme import (
     handle_theme_settings_post as _handle_theme_settings_post_helper,
 )
+from .api_custom_telemetry import (
+    handle_custom_telemetry_settings_post as _handle_custom_telemetry_settings_post_helper,
+)
 from .api_radio import (
     handle_radio_settings_post as _handle_radio_settings_post_helper,
 )
@@ -28,6 +31,7 @@ _TOKEN_PROTECTED_WRITE_PATHS = {
     "/api/settings/radio",
     "/api/settings/channels",
     "/api/settings/theme",
+    "/api/settings/custom_telemetry",
     "/api/settings/bot",
 }
 _PRIVATE_MODE_BLOCKED_POST_PATHS = {
@@ -200,6 +204,25 @@ def handle_dashboard_post(
             to_int_fn=deps.to_int_fn,
             validate_content_length_fn=deps.validate_content_length_fn,
             parse_theme_settings_request_fn=parse_theme_settings_request_fn,
+            write_json_response_fn=deps.write_json_response_fn,
+        )
+        return
+
+    if path == "/api/settings/custom_telemetry":
+        parse_custom_telemetry_settings_request_fn = deps.parse_custom_telemetry_settings_request_fn
+        if parse_custom_telemetry_settings_request_fn is None:
+            deps.write_json_response_fn(
+                handler,
+                status_code=503,
+                payload_obj={"ok": False, "error": "Custom telemetry settings are not enabled on this dashboard instance"},
+            )
+            return
+        _handle_custom_telemetry_settings_post_helper(
+            handler,
+            set_custom_telemetry_settings_fn=deps.set_custom_telemetry_settings_fn,
+            to_int_fn=deps.to_int_fn,
+            validate_content_length_fn=deps.validate_content_length_fn,
+            parse_custom_telemetry_settings_request_fn=parse_custom_telemetry_settings_request_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )
         return

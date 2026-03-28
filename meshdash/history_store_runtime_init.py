@@ -1,6 +1,11 @@
 import threading
 from typing import Callable
 
+from .helpers import safe_json_loads as _safe_json_loads
+from .helpers import to_int as _to_int
+from .history_env_metrics import (
+    normalize_custom_telemetry_rules as _normalize_custom_telemetry_rules,
+)
 from .history.db import (
     open_and_initialize_history_connection as _open_and_initialize_history_connection_helper,
     open_and_initialize_history_connection_with_policy as _open_and_initialize_history_connection_with_policy_helper,
@@ -19,6 +24,27 @@ from .history_store_policy import (
 from .history_profile import (
     local_node_id_from_profiled_history_db_path as _local_node_id_from_profiled_history_db_path_helper,
 )
+
+
+def _load_custom_telemetry_settings_from_conn(conn: object) -> tuple[list[dict[str, object]], int]:
+    try:
+        row = conn.execute(
+            """
+            SELECT value_json, updated_unix
+            FROM dashboard_settings
+            WHERE key = ?
+            """,
+            ("custom_telemetry_rules_v1",),
+        ).fetchone()
+    except Exception:
+        row = None
+    if not row:
+        return [], 0
+    value_json = row[0] if len(row) > 0 else "[]"
+    updated_unix = int(_to_int(row[1]) or 0) if len(row) > 1 else 0
+    parsed = _safe_json_loads(value_json if isinstance(value_json, str) else "[]", [])
+    rules = _normalize_custom_telemetry_rules(parsed)
+    return rules, updated_unix
 
 
 def initialize_history_store_runtime(
@@ -77,6 +103,11 @@ def initialize_history_store_runtime(
             db_path=store.db_path,
             policy=policy,
         )
+    custom_rules, custom_rules_updated_unix = _load_custom_telemetry_settings_from_conn(
+        store._conn
+    )
+    store._custom_telemetry_rules = custom_rules
+    store._custom_telemetry_updated_unix = custom_rules_updated_unix
 
     # Only create a separate read connection when we're using the default
     # connection opener *and* the DB path is file-backed. In-memory SQLite

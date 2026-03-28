@@ -21,6 +21,9 @@ from .api_system import (
 from .api_theme import (
     handle_theme_settings_get as _handle_theme_settings_get_helper,
 )
+from .api_custom_telemetry import (
+    handle_custom_telemetry_settings_get as _handle_custom_telemetry_settings_get_helper,
+)
 from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardGetRouteDependencies
 from .offline_atlas import load_offline_atlas_payload as _load_offline_atlas_payload_helper
@@ -241,6 +244,14 @@ def handle_dashboard_get(
         _handle_theme_settings_get_helper(
             handler,
             get_theme_settings_fn=deps.get_theme_settings_fn,
+            write_json_response_fn=deps.write_json_response_fn,
+        )
+        return
+
+    if path == "/api/settings/custom_telemetry":
+        _handle_custom_telemetry_settings_get_helper(
+            handler,
+            get_custom_telemetry_settings_fn=deps.get_custom_telemetry_settings_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )
         return

@@ -33,6 +33,10 @@ from .history_store_summary import (
     load_summary_metrics as _load_summary_metrics_helper,
     save_summary_metrics as _save_summary_metrics_helper,
 )
+from .history_store_settings import (
+    load_custom_telemetry_settings as _load_custom_telemetry_settings_helper,
+    save_custom_telemetry_settings as _save_custom_telemetry_settings_helper,
+)
 
 
 class HistoryStore:
@@ -159,3 +163,9 @@ class HistoryStore:
 
     def save_summary_metrics(self, summary: dict[str, object]) -> None:
         _save_summary_metrics_helper(self, summary)
+
+    def get_custom_telemetry_settings(self) -> dict[str, object]:
+        return _load_custom_telemetry_settings_helper(self)
+
+    def set_custom_telemetry_settings(self, rules: object) -> dict[str, object]:
+        return _save_custom_telemetry_settings_helper(self, rules=rules)

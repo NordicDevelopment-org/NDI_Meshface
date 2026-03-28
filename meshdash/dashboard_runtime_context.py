@@ -236,6 +236,36 @@ def build_dashboard_runtime_context(
 
         setattr(loaders.state_fn, "apply_channel_settings_fn", _apply_channel_settings_fn)
 
+    # Optional: expose custom telemetry extraction rules persisted in history DB.
+    if history_store is not None:
+        get_custom_telemetry_settings_fn = getattr(history_store, "get_custom_telemetry_settings", None)
+        set_custom_telemetry_settings_fn = getattr(history_store, "set_custom_telemetry_settings", None)
+        if callable(get_custom_telemetry_settings_fn):
+            try:
+                setattr(loaders.state_fn, "get_custom_telemetry_settings_fn", get_custom_telemetry_settings_fn)
+            except Exception:
+                pass
+            state_lite_fn = getattr(loaders.state_fn, "lite", None)
+            if callable(state_lite_fn):
+                try:
+                    setattr(state_lite_fn, "get_custom_telemetry_settings_fn", get_custom_telemetry_settings_fn)
+                except Exception:
+                    pass
+        if callable(set_custom_telemetry_settings_fn):
+            def _set_custom_telemetry_settings(request):
+                return set_custom_telemetry_settings_fn(getattr(request, "rules", None))
+
+            try:
+                setattr(loaders.state_fn, "set_custom_telemetry_settings_fn", _set_custom_telemetry_settings)
+            except Exception:
+                pass
+            state_lite_fn = getattr(loaders.state_fn, "lite", None)
+            if callable(state_lite_fn):
+                try:
+                    setattr(state_lite_fn, "set_custom_telemetry_settings_fn", _set_custom_telemetry_settings)
+                except Exception:
+                    pass
+
     # Optional: attach chat response bot hook (server-side, radio-wide behavior).
     try:
         def _bot_delivery_state_lookup(message_id: int) -> Optional[str]:

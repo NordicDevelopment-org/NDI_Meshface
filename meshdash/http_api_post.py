@@ -6,6 +6,7 @@ from .api_input_radio import parse_radio_settings_request
 from .api_input_channels import parse_channel_settings_request
 from .api_input_bot import parse_bot_settings_request
 from .api_input_theme import parse_theme_settings_request
+from .api_input_custom_telemetry import parse_custom_telemetry_settings_request
 from .api_input_zork import parse_standalone_zork_request
 from .helpers import to_int
 from .http_handler_contracts import DashboardHttpHandler
@@ -18,6 +19,7 @@ from .http_route_contracts import (
     DashboardPostRouteDependencies,
     PlayStandaloneZorkFn,
     SendChatFn,
+    SetCustomTelemetrySettingsFn,
     SetThemePresetFn,
     ToIntFn,
 )
@@ -35,6 +37,7 @@ def build_post_route_dependencies(
     apply_radio_settings_fn: ApplyRadioSettingsFn | None = None,
     apply_channel_settings_fn: ApplyChannelSettingsFn | None = None,
     apply_bot_settings_fn: ApplyBotSettingsFn | None = None,
+    set_custom_telemetry_settings_fn: SetCustomTelemetrySettingsFn | None = None,
     play_standalone_zork_fn: PlayStandaloneZorkFn | None = None,
     api_token: str | None = None,
     private_mode: bool = False,
@@ -50,6 +53,8 @@ def build_post_route_dependencies(
         write_json_response_fn=write_json_response,
         set_theme_preset_fn=set_theme_preset_fn,
         parse_theme_settings_request_fn=parse_theme_settings_request,
+        set_custom_telemetry_settings_fn=set_custom_telemetry_settings_fn,
+        parse_custom_telemetry_settings_request_fn=parse_custom_telemetry_settings_request,
         apply_radio_settings_fn=apply_radio_settings_fn,
         parse_radio_settings_request_fn=parse_radio_settings_request,
         apply_channel_settings_fn=apply_channel_settings_fn,

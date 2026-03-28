@@ -4,6 +4,7 @@ from typing import Mapping, Optional, Protocol
 from .api_inputs import (
     BotSettingsRequest,
     ChatSendRequest,
+    CustomTelemetrySettingsRequest,
     NodeHistoryQuery,
     OnlineActivityQuery,
     RadioSettingsRequest,
@@ -62,6 +63,16 @@ class GetThemeSettingsFn(Protocol):
 
 class SetThemePresetFn(Protocol):
     def __call__(self, preset_name: object) -> dict[str, object]:
+        ...
+
+
+class GetCustomTelemetrySettingsFn(Protocol):
+    def __call__(self) -> dict[str, object]:
+        ...
+
+
+class SetCustomTelemetrySettingsFn(Protocol):
+    def __call__(self, rules: object) -> dict[str, object]:
         ...
 
 
@@ -128,6 +139,11 @@ class ParseChatSendRequestFn(Protocol):
 
 class ParseThemeSettingsRequestFn(Protocol):
     def __call__(self, raw_body: bytes) -> ThemeSettingsRequest:
+        ...
+
+
+class ParseCustomTelemetrySettingsRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> CustomTelemetrySettingsRequest:
         ...
 
 
@@ -248,6 +264,7 @@ class DashboardGetRouteDependencies:
     write_json_response_fn: WriteJsonResponseFn
     write_text_response_fn: WriteTextResponseFn
     get_theme_settings_fn: Optional[GetThemeSettingsFn] = None
+    get_custom_telemetry_settings_fn: Optional[GetCustomTelemetrySettingsFn] = None
     private_mode: bool = False
     api_metrics: Optional[ApiMetricsRecorder] = None
 
@@ -261,6 +278,8 @@ class DashboardPostRouteDependencies:
     write_json_response_fn: WriteJsonResponseFn
     set_theme_preset_fn: Optional[SetThemePresetFn] = None
     parse_theme_settings_request_fn: Optional[ParseThemeSettingsRequestFn] = None
+    set_custom_telemetry_settings_fn: Optional[SetCustomTelemetrySettingsFn] = None
+    parse_custom_telemetry_settings_request_fn: Optional[ParseCustomTelemetrySettingsRequestFn] = None
     apply_radio_settings_fn: Optional[ApplyRadioSettingsFn] = None
     parse_radio_settings_request_fn: Optional[ParseRadioSettingsRequestFn] = None
     apply_channel_settings_fn: Optional[ApplyChannelSettingsFn] = None

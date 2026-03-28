@@ -203,6 +203,18 @@
           void applyTelemetrySettings();
         }});
       }}
+      const applyCustomTelemetryBtn = document.getElementById("settings-apply-custom-telemetry");
+      if (applyCustomTelemetryBtn instanceof HTMLButtonElement) {{
+        applyCustomTelemetryBtn.addEventListener("click", () => {{
+          void applyCustomTelemetrySettings();
+        }});
+      }}
+      const refreshCustomTelemetryBtn = document.getElementById("settings-refresh-custom-telemetry");
+      if (refreshCustomTelemetryBtn instanceof HTMLButtonElement) {{
+        refreshCustomTelemetryBtn.addEventListener("click", () => {{
+          void fetchCustomTelemetrySettings();
+        }});
+      }}
       const applyLedHeartbeatBtn = document.getElementById("settings-apply-led-heartbeat");
       if (applyLedHeartbeatBtn instanceof HTMLButtonElement) {{
         applyLedHeartbeatBtn.addEventListener("click", () => {{
@@ -298,6 +310,9 @@
         channelsAdvToggle.addEventListener("change", () => {{
           setChannelsUiAdvanced(!!channelsAdvToggle.checked, true);
         }});
+      }}
+      if (!customTelemetrySettingsLoadedOnce) {{
+        void fetchCustomTelemetrySettings({{ silent: true }});
       }}
 
       const importUrlJoinBtn = document.getElementById("settings-channels-import-url-join-btn");

@@ -238,6 +238,144 @@
       }}
     }}
 
+    function parseCustomTelemetryRulesTextarea() {{
+      const textarea = document.getElementById("settings-custom-telemetry-rules");
+      if (!(textarea instanceof HTMLTextAreaElement)) {{
+        return {{ ok: false, error: "Custom telemetry rules editor is unavailable.", rules: [] }};
+      }}
+      const raw = String(textarea.value || "").trim();
+      if (!raw) {{
+        return {{ ok: true, error: "", rules: [] }};
+      }}
+      let parsed = null;
+      try {{
+        parsed = JSON.parse(raw);
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "invalid JSON");
+        return {{ ok: false, error: `Invalid custom telemetry JSON: ${{msg}}`, rules: [] }};
+      }}
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.rules)) {{
+        parsed = parsed.rules;
+      }}
+      if (!Array.isArray(parsed)) {{
+        return {{ ok: false, error: "Custom telemetry rules JSON must be an array.", rules: [] }};
+      }}
+      return {{ ok: true, error: "", rules: parsed }};
+    }}
+
+    function setCustomTelemetryRulesTextareaValue(rules) {{
+      const textarea = document.getElementById("settings-custom-telemetry-rules");
+      if (!(textarea instanceof HTMLTextAreaElement)) return;
+      const normalized = Array.isArray(rules) ? rules : [];
+      let pretty = "[]";
+      try {{
+        pretty = JSON.stringify(normalized, null, 2) || "[]";
+      }} catch (_err) {{
+        pretty = "[]";
+      }}
+      setFormValue(textarea, pretty);
+    }}
+
+    async function fetchCustomTelemetrySettings(options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const silent = !!opts.silent;
+      if (customTelemetrySettingsFetchInFlight) return false;
+      customTelemetrySettingsFetchInFlight = true;
+      if (!silent) {{
+        setSettingsStatusText("Loading custom telemetry rules…");
+      }}
+      try {{
+        const resp = await fetch(customTelemetrySettingsEndpoint, {{ cache: "no-store" }});
+        const rawText = await resp.text();
+        let payload = null;
+        try {{
+          payload = rawText ? JSON.parse(rawText) : null;
+        }} catch (_err) {{
+          payload = null;
+        }}
+        if (!resp.ok || !payload || typeof payload !== "object" || payload.ok === false) {{
+          const errMsg = payload && payload.error
+            ? String(payload.error)
+            : (rawText || `HTTP ${{resp.status}}`);
+          if (!silent) {{
+            setSettingsStatusText(`Custom telemetry load failed: ${{errMsg}}`);
+          }}
+          appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] custom telemetry load failed: ${{errMsg}}`);
+          return false;
+        }}
+        const rules = Array.isArray(payload.rules) ? payload.rules : [];
+        setCustomTelemetryRulesTextareaValue(rules);
+        customTelemetrySettingsLoadedOnce = true;
+        if (!silent) {{
+          setSettingsStatusText(`Loaded custom telemetry rules (${{rules.length}}).`);
+        }}
+        return true;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        if (!silent) {{
+          setSettingsStatusText(`Custom telemetry load error: ${{msg}}`);
+        }}
+        appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] custom telemetry load error: ${{msg}}`);
+        return false;
+      }} finally {{
+        customTelemetrySettingsFetchInFlight = false;
+      }}
+    }}
+
+    async function applyCustomTelemetrySettings() {{
+      if (settingsApplyInFlight) return;
+      const parsed = parseCustomTelemetryRulesTextarea();
+      if (!parsed.ok) {{
+        setSettingsStatusText(parsed.error || "Invalid custom telemetry rules.");
+        return;
+      }}
+
+      settingsApplyInFlight = true;
+      setSettingsButtonsDisabled(true);
+      setSettingsStatusText("Applying custom telemetry rules…");
+      try {{
+        const resp = await fetch(customTelemetrySettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{ rules: parsed.rules }}),
+        }});
+        const rawText = await resp.text();
+        let payload = null;
+        try {{
+          payload = rawText ? JSON.parse(rawText) : null;
+        }} catch (_err) {{
+          payload = null;
+        }}
+        if (!resp.ok || !payload || typeof payload !== "object" || payload.ok === false) {{
+          const errMsg = payload && payload.error
+            ? String(payload.error)
+            : (rawText || `HTTP ${{resp.status}}`);
+          setSettingsStatusText(`Custom telemetry apply failed: ${{errMsg}}`);
+          appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] custom telemetry apply failed: ${{errMsg}}`);
+          return false;
+        }}
+        const savedRules = Array.isArray(payload.rules) ? payload.rules : [];
+        setCustomTelemetryRulesTextareaValue(savedRules);
+        customTelemetrySettingsLoadedOnce = true;
+        clearSettingsDirty();
+        setSettingsStatusText(`Applied. Custom telemetry rules saved (${{savedRules.length}}).`);
+        appendConsoleLine(
+          `settings|${{Date.now()}}|ok`,
+          `[settings] custom telemetry rules saved (${{savedRules.length}}).`
+        );
+        invalidateStateSnapshotCache(20);
+        return true;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        setSettingsStatusText(`Custom telemetry apply error: ${{msg}}`);
+        appendConsoleLine(`settings|${{Date.now()}}|error`, `[settings] custom telemetry apply error: ${{msg}}`);
+        return false;
+      }} finally {{
+        settingsApplyInFlight = false;
+        setSettingsButtonsDisabled(false);
+      }}
+    }}
+
     async function applyLedHeartbeatSetting() {{
       if (settingsApplyInFlight) return;
       const ledHeartbeatEnabled = !!readCheckboxValue("settings-led-heartbeat-enabled");
@@ -259,4 +397,3 @@
         }}, 600);
       }}
     }}
-
