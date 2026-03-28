@@ -2072,7 +2072,7 @@ def test_single_direct_reply_does_not_require_acked_delivery_state():
     assert sent[0].get("retry_of") is None
 
 
-def test_segmented_direct_reply_aborts_when_ack_never_arrives():
+def test_segmented_direct_reply_continues_when_ack_never_arrives():
     sent = []
     next_message_id = 9200
 
@@ -2095,17 +2095,51 @@ def test_segmented_direct_reply_aborts_when_ack_never_arrives():
         now_unix_fn=lambda: 1710001240.0,
     )
 
+    segments, _payloads = bot._send_reply_text(
+        text="welcome " * 120,
+        destination="!49b5dff0",
+        channel_index=0,
+        reply_id=2803,
+    )
+
+    assert len(segments) >= 2
+    assert len(sent) == len(segments)
+
+
+def test_segmented_direct_reply_aborts_on_terminal_delivery_failure():
+    sent = []
+    next_message_id = 9300
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        chat_max_bytes=220,
+        segment_retry_count=0,
+        segment_ack_wait_seconds=0.0,
+        delivery_state_lookup_fn=lambda _message_id: "nak",
+        sleep_fn=lambda _seconds: None,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+
     raised = False
     try:
         bot._send_reply_text(
             text="welcome " * 120,
             destination="!49b5dff0",
             channel_index=0,
-            reply_id=2803,
+            reply_id=2804,
         )
     except RuntimeError as exc:
         raised = True
-        assert "not acknowledged" in str(exc).lower()
+        assert "delivery failed" in str(exc).lower()
 
     assert raised
     assert len(sent) == 1

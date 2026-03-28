@@ -2058,10 +2058,11 @@ class MeshResponseBot:
                 return payload
             if attempt + 1 >= max_attempts:
                 if require_acked and should_track_delivery:
-                    clean_state = state or "unknown"
-                    raise RuntimeError(
-                        f"Segment delivery not acknowledged before next send (state: {clean_state})."
-                    )
+                    if state in ("nak", "error"):
+                        clean_state = state or "unknown"
+                        raise RuntimeError(
+                            f"Segment delivery failed before next send (state: {clean_state})."
+                        )
                 return payload
             if self._segment_delay_seconds > 0:
                 self._sleep_fn(self._segment_delay_seconds)
