@@ -64,9 +64,19 @@
         }} else {{
           delete feed.dataset.macrosFeedMode;
         }}
-        const emptyText = (activeChatChannel === "direct" && !isCanonicalNodeId(directSelectedId))
+        const meshFilterIndex = (typeof activeMeshChannelFilterIndex === "function")
+          ? activeMeshChannelFilterIndex()
+          : meshChannelAllIndex;
+        const hasMeshFilter = meshFilterIndex !== meshChannelAllIndex;
+        const meshFilterLabel = (typeof meshChannelLabelForIndex === "function")
+          ? meshChannelLabelForIndex(meshFilterIndex, {{ allowAll: true }})
+          : (hasMeshFilter ? `Ch ${{meshFilterIndex}}` : "All channels");
+        let emptyText = (activeChatChannel === "direct" && !isCanonicalNodeId(directSelectedId))
           ? "Select a user to view peer-to-peer messages."
           : `No ${{channelLabel(activeChatChannel).toLowerCase()}} messages yet.`;
+        if (activeChatChannel !== "direct" && hasMeshFilter) {{
+          emptyText += ` Filtered to ${{String(meshFilterLabel || "").trim() || "selected channel"}}; switch to All channels to see everything.`;
+        }}
         const showMacroPreview = activeLayoutView === "macros" && macrosViewMode === "preview";
         const showTrendsView = activeLayoutView === "chat" && !!chatTrendsViewEnabled;
         const macroPreviewRows = showMacroPreview
