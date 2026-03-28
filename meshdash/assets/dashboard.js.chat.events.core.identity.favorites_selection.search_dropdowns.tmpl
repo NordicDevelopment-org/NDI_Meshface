@@ -77,6 +77,14 @@
         pushTerm(extra);
       }}
 
+      if (typeof nodeTagEntryForNode === "function") {{
+        const tagEntry = nodeTagEntryForNode(nodeId);
+        if (tagEntry && tagEntry.preset) {{
+          pushTerm(tagEntry.preset.name);
+          pushTerm(tagEntry.preset.id);
+        }}
+      }}
+
       const includeNotes = opts.includeNotes !== false;
       if (includeNotes) {{
         const noteEntry = (typeof nodeNoteEntry === "function")

@@ -178,8 +178,8 @@
       if (!isSelectableNodeId(nodeId)) {{
         host.dataset.nodeId = "";
         host.innerHTML = favoriteNodeIds.size === 0
-          ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Star nodes to build your Saved Nodes subsection.</div>'
-          : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from Saved Nodes.</div>';
+          ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Tag nodes to build your tagged subsection.</div>'
+          : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from tagged nodes.</div>';
         syncNodeHistoryDock();
         return;
       }}
@@ -540,6 +540,10 @@
         .map((nodeId) => {{
           const node = nodesById.get(nodeId);
           const caps = historyCapsById.get(nodeId);
+          const tagEntry = nodeTagEntryForNode(nodeId);
+          const tagName = tagEntry && tagEntry.preset
+            ? normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged")
+            : "Tagged";
           const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
           const freshness = resolveNodeFreshness(node, caps, null, latestChatTouchByNode.get(nodeId) || null);
           const status = freshnessStatus(freshness.unix, nowUnix);
@@ -574,6 +578,7 @@
             battery,
             hops,
             pos,
+            tagName,
             searchable,
           }};
         }})
@@ -591,15 +596,15 @@
       const warnCount = entries.filter((entry) => entry.status === "warn").length;
       const staleCount = entries.filter((entry) => entry.status === "stale").length;
       if (caption) {{
-        caption.textContent = `Saved subsection: ${{entries.length}} total (${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale)`;
+        caption.textContent = `Tagged subsection: ${{entries.length}} total (${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale)`;
       }}
 
       if (entries.length === 0) {{
-        list.innerHTML = '<div class="favorites-empty">No saved nodes yet. Click ☆ next to a node name to add it to this subsection.</div>';
+        list.innerHTML = '<div class="favorites-empty">No tagged nodes yet. Click a tag chip next to a node name to add it here.</div>';
         return;
       }}
       if (filtered.length === 0) {{
-        list.innerHTML = '<div class="favorites-empty">No saved nodes match this search.</div>';
+        list.innerHTML = '<div class="favorites-empty">No tagged nodes match this search.</div>';
         return;
       }}
 
@@ -611,6 +616,7 @@
               <span class="favorite-node-id">${{escAttr(entry.id)}}</span>
             </div>
             <div class="favorite-node-meta">
+              <span>Tag: ${{escAttr(entry.tagName)}}</span>
               <span>Last: ${{escAttr(entry.lastSeenText)}}</span>
               <span>Batt: ${{escAttr(entry.battery)}}</span>
               <span>Hops: ${{escAttr(entry.hops)}}</span>

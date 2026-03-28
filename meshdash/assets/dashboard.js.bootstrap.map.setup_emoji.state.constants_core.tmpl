@@ -22,7 +22,7 @@
       Object.freeze({{ id: "battery", label: "Battery", sortable: true, rosterMeta: true, rosterDefault: true }}),
       Object.freeze({{ id: "saved", label: "Saved", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "pos", label: "Pos", sortable: true, rosterMeta: true, rosterDefault: false }}),
-      Object.freeze({{ id: "favorite", label: "Favorite", sortable: false, rosterMeta: false, rosterDefault: false }}),
+      Object.freeze({{ id: "favorite", label: "Tag", sortable: false, rosterMeta: true, rosterDefault: false }}),
     ]);
     const nodeExplorerFieldDefById = new Map(
       nodeExplorerFieldDefs.map((def) => [String(def.id || ""), def])
@@ -38,6 +38,7 @@
       Object.freeze({{ id: "snr", label: "SNR" }}),
       Object.freeze({{ id: "hops", label: "Hops" }}),
       Object.freeze({{ id: "battery", label: "Battery" }}),
+      Object.freeze({{ id: "favorite", label: "Tagged" }}),
       Object.freeze({{ id: "saved", label: "Saved" }}),
       Object.freeze({{ id: "hardware", label: "HW" }}),
       Object.freeze({{ id: "id", label: "ID" }}),
@@ -106,7 +107,16 @@
       const posText = hasPosition
         ? `${{latRaw.toFixed(5)}}, ${{lonRaw.toFixed(5)}}`
         : "n/a";
-      const favorite = (typeof isFavoriteNode === "function") && !!isFavoriteNode(nodeId);
+      const tagEntry = (typeof nodeTagEntryForNode === "function")
+        ? nodeTagEntryForNode(nodeId)
+        : null;
+      const favorite = !!tagEntry;
+      const tagName = favorite
+        ? normalizeNodeTagPresetName(tagEntry.preset && tagEntry.preset.name, "Tagged")
+        : "n/a";
+      const tagTitle = favorite
+        ? `Tag: ${{tagName}}`
+        : "No tag";
       const status = (typeof freshnessStatus === "function")
         ? freshnessStatus(lastHeardUnix, nowUnix)
         : "unknown";
@@ -124,7 +134,7 @@
         battery: {{ sort: (batteryNum == null ? "" : batteryNum), text: (batteryNum == null ? "n/a" : String(batteryNum)), title: (batteryNum == null ? "n/a" : `${{batteryNum}}%`) }},
         saved: {{ sort: savedPackets, text: String(savedPackets), title: savedTitle }},
         pos: {{ sort: (hasPosition ? latRaw : ""), text: posText, title: posText }},
-        favorite: {{ sort: favorite ? 1 : 0, text: favorite ? "yes" : "no", title: favorite ? "Saved node" : "Not saved" }},
+        favorite: {{ sort: favorite ? 1 : 0, text: tagName, title: tagTitle }},
       }};
 
       return {{

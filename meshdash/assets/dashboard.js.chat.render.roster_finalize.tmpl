@@ -972,6 +972,21 @@
                 if (noteText) {{
                   tooltipLines.push(`Notes: ${{noteText}}`);
                 }}
+                const visibleMetaFieldIds = normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds, {{
+                  fallbackToDefaults: false,
+                }});
+                const showTagBadge = Array.isArray(visibleMetaFieldIds)
+                  && visibleMetaFieldIds.includes("favorite");
+                const tagEntry = (typeof nodeTagEntryForNode === "function")
+                  ? nodeTagEntryForNode(nodeId)
+                  : null;
+                const tagActive = !!(tagEntry && tagEntry.preset);
+                const tagLabel = tagActive
+                  ? normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged")
+                  : "";
+                if (tagLabel) {{
+                  tooltipLines.push(`Tag: ${{tagLabel}}`);
+                }}
                 const memberTitle = tooltipLines.join("\n");
                 const removeBtn = (activeChatChannel === "direct" && item.p2pPinned)
                   ? `<button type="button" class="chat-peer-remove-btn" data-node-id="${{escAttr(item.id)}}" title="Remove from peer-to-peer list" aria-label="Remove ${{escAttr(item.id)}} from peer-to-peer list">&times;</button>`
@@ -998,14 +1013,13 @@
                 }}
                 const memberMetaRowHtml = `<span class="chat-member-meta-row">${{idleRowHtml}}${{packetRowHtml}}</span>`;
                 const memberFieldsRowHtml = (() => {{
-                  const visibleFieldIds = normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds, {{
-                    fallbackToDefaults: false,
-                  }});
+                  const visibleFieldIds = Array.isArray(visibleMetaFieldIds) ? visibleMetaFieldIds : [];
                   if (!Array.isArray(visibleFieldIds) || visibleFieldIds.length <= 0) return "";
                   const chips = [];
                   for (const fieldIdRaw of visibleFieldIds) {{
                     const fieldId = normalizeNodeExplorerFieldId(fieldIdRaw);
                     if (!fieldId) continue;
+                    if (fieldId === "favorite") continue;
                     const def = nodeExplorerFieldDef(fieldId);
                     const field = nodeProjection && nodeProjection.fields
                       ? nodeProjection.fields[fieldId]
@@ -1035,18 +1049,24 @@
                   : "";
                 const canOpenPeerDm = isCanonicalNodeId(nodeId) && !isSelfNodeId(nodeId);
                 const nodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
-                const memberTintStyle = `--chat-member-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || 145)))}};`;
+                const tagStyleVars = tagActive ? nodeTagStyleVars(tagEntry) : "";
+                const memberTintStyle = `--chat-member-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || 145)))}};${{tagStyleVars}}`;
                 const memberQuickActionRow = (isSelectedMember && canOpenPeerDm)
                   ? `<span class="chat-member-action-row">
                       <button type="button" class="chat-member-dm-link" data-node-id="${{escAttr(nodeId)}}" title="Open peer message window with ${{escAttr(item.name)}}">Send message</button>
                     </span>`
                   : "";
-                return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}" data-node-id="${{escAttr(item.id)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
+                const tagClass = tagActive ? " tagged-node" : "";
+                const tagChipHtml = (showTagBadge && tagActive)
+                  ? `<span class="chat-member-tag-chip" style="${{escAttr(tagStyleVars)}}" title="Tag: ${{escAttr(tagLabel)}}">${{escAttr(tagLabel)}}</span>`
+                  : "";
+                return `<div class="chat-member-item status-${{item.status}}${{selectedNodeId === item.id ? " selected-node" : ""}}${{tagClass}}" data-node-id="${{escAttr(item.id)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
                 <span class="chat-member-status status-${{item.status}}">●</span>
                 <span class="chat-member-main">
                   <span class="chat-member-name-row">
                     <span class="chat-member-name-left">
                       <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
+                      ${{tagChipHtml}}
                     </span>
                     <span class="chat-member-actions">
                       ${{expandBtnHtml}}

@@ -3935,6 +3935,16 @@
         inset 2px 0 0 hsl(var(--chat-member-node-hue) 32% 52% / 0.46),
         inset 0 0 0 1px hsl(var(--chat-member-node-hue) 20% 72% / 0.22);
     }}
+    .chat-member-item.tagged-node {{
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 0 0 0 1px rgba(42, 168, 90, 0.18);
+    }}
+    .chat-member-item.tagged-node.selected-node {{
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 0 0 0 1px hsl(var(--chat-member-node-hue) 20% 72% / 0.24);
+    }}
     .chat-member-status {{
       width: 10px;
       text-align: center;
@@ -3970,7 +3980,9 @@
       width: 100%;
     }}
     .chat-member-name-left {{
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 5px;
       min-width: 0;
       flex: 1 1 auto;
       max-width: 100%;
@@ -4006,6 +4018,11 @@
       opacity: 0.76;
       transition: color 120ms ease, border-color 120ms ease, background 120ms ease, opacity 120ms ease;
     }}
+    .favorite-toggle-btn {{
+      --node-tag-color: #2aa85a;
+      --node-tag-vibrance: 0.7;
+      padding: 0 4px;
+    }}
     .favorite-toggle-btn:hover,
     .mute-toggle-btn:hover {{
       background: rgba(72, 110, 87, 0.08);
@@ -4014,9 +4031,9 @@
       opacity: 1;
     }}
     .favorite-toggle-btn.active {{
-      border-color: rgba(182, 153, 62, 0.82);
-      background: rgba(255, 241, 178, 0.4);
-      color: #6f5600;
+      border-color: rgba(63, 131, 94, 0.78);
+      background: rgba(58, 141, 97, 0.18);
+      color: #2e6549;
       opacity: 0.95;
     }}
     .mute-toggle-btn.active {{
@@ -4027,7 +4044,24 @@
     }}
     .favorite-toggle-icon {{
       line-height: 1;
-      transform: translateY(-0.5px);
+      transform: none;
+    }}
+    .favorite-toggle-icon.node-tag-dot {{
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(54, 85, 66, 0.35);
+      background: var(--node-tag-color, #2aa85a);
+      filter: saturate(calc(0.4 + (var(--node-tag-vibrance, 0.7) * 1.7)));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+      display: inline-block;
+    }}
+    .favorite-toggle-btn:not(.active) .favorite-toggle-icon.node-tag-dot {{
+      background: transparent;
+      border-style: dashed;
+      border-color: currentColor;
+      filter: none;
+      box-shadow: none;
     }}
     .mute-toggle-icon {{
       line-height: 1;
@@ -4142,11 +4176,32 @@
       justify-self: end;
     }}
     .chat-member-name {{
+      flex: 1 1 auto;
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       max-width: 100%;
       color: inherit;
+    }}
+    .chat-member-tag-chip {{
+      --node-tag-color: #2aa85a;
+      --node-tag-vibrance: 0.7;
+      flex: 0 0 auto;
+      border: 1px solid var(--node-tag-color, #2aa85a);
+      color: var(--node-tag-color, #2aa85a);
+      background: rgba(255, 255, 255, 0.72);
+      border-radius: 999px;
+      padding: 0 5px;
+      font-size: 8px;
+      line-height: 1.35;
+      letter-spacing: 0.14px;
+      text-transform: uppercase;
+      filter: saturate(calc(0.5 + (var(--node-tag-vibrance, 0.7) * 1.5)));
+      white-space: nowrap;
+      max-width: 96px;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }}
     .chat-member-name.status-warn {{
       color: #6d541d;
@@ -4749,6 +4804,112 @@
       align-items: center;
       gap: 6px;
       flex: 1 1 auto;
+    }}
+    .favorite-menu-selected-stack {{
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }}
+    .favorite-menu-tag-chip {{
+      --node-tag-color: #2aa85a;
+      --node-tag-vibrance: 0.7;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      border: 1px dashed rgba(99, 126, 112, 0.55);
+      background: transparent;
+      display: inline-block;
+      flex: 0 0 auto;
+    }}
+    .favorite-menu-tag-chip.is-tagged {{
+      border-style: solid;
+      border-color: rgba(62, 104, 81, 0.55);
+      background: var(--node-tag-color, #2aa85a);
+      filter: saturate(calc(0.4 + (var(--node-tag-vibrance, 0.7) * 1.7)));
+    }}
+    .favorite-menu-selected-chip {{
+      margin-right: 2px;
+    }}
+    .favorite-menu-tag-chip-preview {{
+      width: 12px;
+      height: 12px;
+      margin-left: auto;
+    }}
+    .favorite-menu-tag-editor {{
+      border: 1px solid #c5d9ca;
+      border-radius: 8px;
+      background: #f7fcf8;
+      padding: 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }}
+    .favorite-menu-tag-editor-row {{
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      min-width: 0;
+    }}
+    .favorite-menu-tag-editor-row-inline {{
+      grid-template-columns: auto auto auto minmax(0, 1fr) auto;
+      gap: 6px;
+    }}
+    .favorite-menu-tag-editor-label {{
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+      color: #4e6658;
+      white-space: nowrap;
+    }}
+    .favorite-menu-tag-preset-select,
+    .favorite-menu-tag-editor-input {{
+      width: 100%;
+      min-width: 0;
+      border: 1px solid #c7d8ca;
+      border-radius: 7px;
+      background: #ffffff;
+      color: #204332;
+      font-size: 11px;
+      padding: 4px 6px;
+    }}
+    .favorite-menu-tag-color-input {{
+      width: 28px;
+      min-width: 28px;
+      height: 22px;
+      border: 1px solid #c7d8ca;
+      border-radius: 6px;
+      background: #ffffff;
+      padding: 1px;
+    }}
+    .favorite-menu-tag-vibrance-input {{
+      width: 100%;
+      min-width: 0;
+      margin: 0;
+      accent-color: #2f855a;
+    }}
+    .favorite-menu-tag-vibrance-value {{
+      font-size: 10px;
+      color: #446151;
+      min-width: 38px;
+      text-align: right;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    }}
+    .favorite-menu-tag-editor-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }}
+    .favorite-menu-tag-editor-actions .btn {{
+      min-height: 0;
+      padding: 3px 8px;
+      font-size: 10px;
+    }}
+    .favorite-menu-tag-status {{
+      min-height: 13px;
+      font-size: 10px;
+      color: #496556;
+      line-height: 1.2;
     }}
     .favorite-menu-selected-prefix {{
       display: inline-block;

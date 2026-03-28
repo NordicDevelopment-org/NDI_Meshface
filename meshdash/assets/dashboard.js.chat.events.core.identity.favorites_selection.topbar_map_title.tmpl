@@ -160,25 +160,38 @@
         btn.dataset.nodeId = "";
         btn.classList.remove("active");
         btn.setAttribute("aria-pressed", "false");
+        btn.removeAttribute("style");
         const icon = btn.querySelector(".favorite-toggle-icon");
         if (icon instanceof HTMLElement) {{
-          icon.textContent = "☆";
+          icon.textContent = "";
         }}
-        btn.title = "Save node";
-        btn.setAttribute("aria-label", "Save node");
+        btn.title = "Tag node";
+        btn.setAttribute("aria-label", "Tag node");
         return;
       }}
 
-      const active = isFavoriteNode(nodeId);
+      const tagEntry = nodeTagEntryForNode(nodeId);
+      const active = !!tagEntry;
       btn.dataset.nodeId = nodeId;
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-pressed", active ? "true" : "false");
-      const title = active ? "Remove from saved nodes" : "Save node";
+      if (active) {{
+        btn.setAttribute("style", nodeTagStyleVars(tagEntry));
+      }} else {{
+        btn.removeAttribute("style");
+      }}
+      const activePreset = nodeTagPresetForId(activeNodeTagPresetId) || nodeTagPresetForId("tag-default");
+      const activePresetLabel = activePreset
+        ? normalizeNodeTagPresetName(activePreset.name, "Tagged")
+        : "tag";
+      const title = active
+        ? `Clear tag (${{normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged")}})`
+        : `Tag node with ${{activePresetLabel}}`;
       btn.title = title;
       btn.setAttribute("aria-label", title);
       const icon = btn.querySelector(".favorite-toggle-icon");
       if (icon instanceof HTMLElement) {{
-        icon.textContent = active ? "★" : "☆";
+        icon.textContent = "";
       }}
     }}
 

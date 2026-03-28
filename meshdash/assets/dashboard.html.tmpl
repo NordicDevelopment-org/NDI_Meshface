@@ -161,10 +161,10 @@
               </div>
             </div>
           </section>
-          <section class="favorite-menu-section" aria-label="Saved nodes">
-            <h3 class="favorite-menu-title">Saved nodes</h3>
-            <div id="favorite-menu-saved-list" class="favorite-menu-saved-list" role="list" aria-label="Saved nodes">
-              <div class="favorite-menu-saved-empty">No saved nodes yet.</div>
+          <section class="favorite-menu-section" aria-label="Tagged nodes">
+            <h3 class="favorite-menu-title">Tagged nodes</h3>
+            <div id="favorite-menu-saved-list" class="favorite-menu-saved-list" role="list" aria-label="Tagged nodes">
+              <div class="favorite-menu-saved-empty">No tagged nodes yet.</div>
             </div>
           </section>
         </div>
@@ -324,7 +324,7 @@
     <aside class="teams-rail" aria-label="Dashboard views">
       <button class="rail-btn active" data-view="chat" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Teams-style chat workspace">Chat</button>
       <button class="rail-btn" data-view="network" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Topology, nodes, and links">Network</button>
-      <button class="rail-btn" data-view="saved" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Node details and saved nodes">Node</button>
+      <button class="rail-btn" data-view="saved" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Node details and tagged nodes">Node</button>
       <button class="rail-btn" data-view="encription" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Encrypted packets and route activity">Encription</button>
       <button class="rail-btn" data-view="environment" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Historical sensor telemetry">Sensors</button>
       <button class="rail-btn" data-view="history" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Network and chat history">History</button>
@@ -1600,7 +1600,7 @@
               </label>
               <label id="settings-ticker-oneshot-node-online-favorites-only-wrap" class="settings-field settings-inline">
                 <input id="settings-ticker-oneshot-node-online-favorites-only" type="checkbox" />
-                <span>Only for favorite nodes</span>
+                <span>Only for tagged nodes</span>
               </label>
               <div class="settings-help-note">
                 Shows a temporary topbar ticker notice when a node transitions to online status.
@@ -2624,11 +2624,11 @@ Ready.
             id="map-card-title-favorite-btn"
             class="favorite-toggle-btn map-title-favorite-btn"
             type="button"
-            title="Save node"
-            aria-label="Save node"
+            title="Tag node"
+            aria-label="Tag node"
             aria-pressed="false"
             hidden
-          ><span class="favorite-toggle-icon">☆</span></button>
+          ><span class="favorite-toggle-icon node-tag-dot"></span></button>
           <span id="map-card-title-text">Network Map</span>
         </h2>
         <div id="saved-map-splitter-head" class="saved-map-splitter-head" title="Drag to resize node details and map"></div>
@@ -2727,7 +2727,7 @@ Ready.
                   <th>Battery<div class="col-resizer" data-col="6" aria-hidden="true"></div></th>
                   <th>Saved<div class="col-resizer" data-col="7" aria-hidden="true"></div></th>
                   <th>Pos<div class="col-resizer" data-col="8" aria-hidden="true"></div></th>
-                  <th>★<div class="col-resizer" data-col="9" aria-hidden="true"></div></th>
+                  <th>Tag<div class="col-resizer" data-col="9" aria-hidden="true"></div></th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -2740,14 +2740,14 @@ Ready.
     </section>
 
     <section class="card favorites">
-      <h2>Saved Nodes</h2>
+      <h2>Tagged Nodes</h2>
       <div class="body favorites-body">
         <div class="favorites-toolbar">
           <div class="favorites-search-wrap">
-            <input id="favorites-search-input" class="list-search-input" type="search" placeholder="Search saved by ID or name" autocomplete="off" />
+            <input id="favorites-search-input" class="list-search-input" type="search" placeholder="Search tagged by ID or name" autocomplete="off" />
           </div>
         </div>
-        <div id="favorites-caption" class="favorites-caption">No saved nodes yet.</div>
+        <div id="favorites-caption" class="favorites-caption">No tagged nodes yet.</div>
         <div id="favorites-list" class="scroll favorites-list"></div>
       </div>
     </section>

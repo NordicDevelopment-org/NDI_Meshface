@@ -314,7 +314,7 @@
           channel: "all",
           targetView: "saved",
           sender: displayName,
-          preview: `starred node is online (${{nodeId}}, seen ${{whenText}})`,
+          preview: `tagged node is online (${{nodeId}}, seen ${{whenText}})`,
           kind: "status",
           // Keep these visible even in "Self" notification scope.
           selfRelevant: true,
@@ -398,7 +398,7 @@
           ? savedDetailAge(lastSeenUnix, nowUnix)
           : "just now";
         const noticeKeyUnix = Number.isFinite(lastSeenUnix) ? Math.trunc(lastSeenUnix) : Math.trunc(nowUnix);
-        const scopeText = favoritesOnly ? "favorite node" : "node";
+        const scopeText = favoritesOnly ? "tagged node" : "node";
         publishTopbarUpdateTickerEvent(
           `${{displayName}} is online (${{scopeText}}, seen ${{whenText}})`,
           `oneshot:node_online:${{nodeId}}:${{noticeKeyUnix}}`,
@@ -549,7 +549,7 @@
             else if (freshness.key === "warn") warnCount += 1;
             else if (freshness.key === "stale") staleCount += 1;
           }}
-          caption.textContent = `Saved subsection: ${{favoriteNodeIds.size}} total (${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale)`;
+          caption.textContent = `Tagged subsection: ${{favoriteNodeIds.size}} total (${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale)`;
         }}
       }}
 
