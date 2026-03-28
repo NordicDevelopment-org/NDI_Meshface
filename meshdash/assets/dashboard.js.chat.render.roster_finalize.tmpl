@@ -383,6 +383,23 @@
           : '<div class="peer-dm-menu-empty">No peer-to-peer conversations yet.</div>';
       }}
       const peerDmHost = document.getElementById("peer-dm-popout-host");
+      const priorPopoutInput = document.getElementById("peer-dm-popout-input");
+      const priorPopoutWindow = document.querySelector("#peer-dm-popout-host .peer-dm-popout-window");
+      const priorPopoutPeerId = normalizeNodeId(
+        priorPopoutWindow instanceof HTMLElement
+          ? (priorPopoutWindow.dataset.peerNodeId || "")
+          : (peerDmActivePeerId || "")
+      );
+      const preservePopoutInputFocus = (
+        priorPopoutInput instanceof HTMLInputElement
+        && document.activeElement === priorPopoutInput
+      );
+      const priorPopoutSelectionStart = preservePopoutInputFocus
+        ? Number(priorPopoutInput.selectionStart)
+        : null;
+      const priorPopoutSelectionEnd = preservePopoutInputFocus
+        ? Number(priorPopoutInput.selectionEnd)
+        : null;
       let activePopoutPeerId = normalizeNodeId(peerDmActivePeerId || "");
       const activePopoutBucketRaw = directMessagesByPeer.get(activePopoutPeerId);
       const activePopoutHasMessages = (
@@ -721,6 +738,27 @@
               ev.preventDefault();
               void submitPopoutMessage();
             }});
+            if (preservePopoutInputFocus && priorPopoutPeerId === activePopoutPeerId) {{
+              const valueLen = String(popoutInput.value || "").length;
+              const nextSelectionStart = Number.isFinite(priorPopoutSelectionStart)
+                ? Math.max(0, Math.min(valueLen, Math.trunc(Number(priorPopoutSelectionStart))))
+                : valueLen;
+              const nextSelectionEnd = Number.isFinite(priorPopoutSelectionEnd)
+                ? Math.max(nextSelectionStart, Math.min(valueLen, Math.trunc(Number(priorPopoutSelectionEnd))))
+                : nextSelectionStart;
+              window.requestAnimationFrame(() => {{
+                if (popoutInput.disabled) return;
+                try {{
+                  popoutInput.focus({{ preventScroll: true }});
+                }} catch (_err) {{
+                  popoutInput.focus();
+                }}
+                try {{
+                  popoutInput.setSelectionRange(nextSelectionStart, nextSelectionEnd);
+                }} catch (_err) {{
+                }}
+              }});
+            }}
           }}
           if (popoutSendBtn instanceof HTMLButtonElement) {{
             popoutSendBtn.addEventListener("click", (ev) => {{
