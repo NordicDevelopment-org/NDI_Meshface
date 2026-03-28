@@ -12,6 +12,136 @@
       "encription-packets-table": {{ index: 0, dir: "desc" }},
       "encription-traffic-table": {{ index: 2, dir: "desc" }},
     }};
+    const nodeExplorerFieldDefs = Object.freeze([
+      Object.freeze({{ id: "last_heard", label: "Last Heard", sortable: true, rosterMeta: true, rosterDefault: true }}),
+      Object.freeze({{ id: "id", label: "ID", sortable: true, rosterMeta: true, rosterDefault: false }}),
+      Object.freeze({{ id: "name", label: "Name", sortable: true, rosterMeta: false, rosterDefault: false }}),
+      Object.freeze({{ id: "hardware", label: "HW", sortable: true, rosterMeta: true, rosterDefault: false }}),
+      Object.freeze({{ id: "snr", label: "SNR", sortable: true, rosterMeta: true, rosterDefault: true }}),
+      Object.freeze({{ id: "hops", label: "Hops", sortable: true, rosterMeta: true, rosterDefault: true }}),
+      Object.freeze({{ id: "battery", label: "Battery", sortable: true, rosterMeta: true, rosterDefault: true }}),
+      Object.freeze({{ id: "saved", label: "Saved", sortable: true, rosterMeta: true, rosterDefault: false }}),
+      Object.freeze({{ id: "pos", label: "Pos", sortable: true, rosterMeta: true, rosterDefault: false }}),
+      Object.freeze({{ id: "favorite", label: "Favorite", sortable: false, rosterMeta: false, rosterDefault: false }}),
+    ]);
+    const nodeExplorerFieldDefById = new Map(
+      nodeExplorerFieldDefs.map((def) => [String(def.id || ""), def])
+    );
+    const chatNodeNavigatorDefaultSortKey = "status";
+    const chatNodeNavigatorDefaultSortDir = "asc";
+    const chatNodeNavigatorSortDefs = Object.freeze([
+      Object.freeze({{ id: "status", label: "Status" }}),
+      Object.freeze({{ id: "activity", label: "Recent Message" }}),
+      Object.freeze({{ id: "last_heard", label: "Last Heard" }}),
+      Object.freeze({{ id: "name", label: "Name" }}),
+      Object.freeze({{ id: "snr", label: "SNR" }}),
+      Object.freeze({{ id: "hops", label: "Hops" }}),
+      Object.freeze({{ id: "battery", label: "Battery" }}),
+      Object.freeze({{ id: "saved", label: "Saved" }}),
+      Object.freeze({{ id: "hardware", label: "HW" }}),
+      Object.freeze({{ id: "id", label: "ID" }}),
+      Object.freeze({{ id: "pos", label: "Pos" }}),
+    ]);
+    const chatNodeNavigatorSortDefById = new Map(
+      chatNodeNavigatorSortDefs.map((def) => [String(def.id || ""), def])
+    );
+    function normalizeNodeExplorerFieldId(value) {{
+      const clean = String(value || "").trim().toLowerCase();
+      return nodeExplorerFieldDefById.has(clean) ? clean : "";
+    }}
+
+    function nodeExplorerFieldDef(fieldId) {{
+      const clean = normalizeNodeExplorerFieldId(fieldId);
+      return clean ? (nodeExplorerFieldDefById.get(clean) || null) : null;
+    }}
+
+    function nodeExplorerRosterMetadataFieldDefs() {{
+      return nodeExplorerFieldDefs.filter((def) => !!(def && def.rosterMeta));
+    }}
+
+    function nodeExplorerDefaultRosterMetadataFieldIds() {{
+      return nodeExplorerFieldDefs
+        .filter((def) => !!(def && def.rosterMeta && def.rosterDefault))
+        .map((def) => String(def.id || ""))
+        .filter((id) => !!id);
+    }}
+
+    function nodeExplorerBuildProjection(nodeInput, options = null) {{
+      const node = nodeInput && typeof nodeInput === "object" ? nodeInput : {{}};
+      const opts = options && typeof options === "object" ? options : {{}};
+      const nowUnix = Number.isFinite(Number(opts.nowUnix))
+        ? Math.trunc(Number(opts.nowUnix))
+        : Math.floor(Date.now() / 1000);
+      const nodeId = (typeof normalizeNodeId === "function")
+        ? normalizeNodeId(node && node.id)
+        : String((node && node.id) || "").trim();
+      const fallbackName = String((node && (node.long_name || node.short_name || node.id)) || "Unknown node").trim() || "Unknown node";
+      const name = (typeof nodeLabel === "function") ? nodeLabel(node) : fallbackName;
+
+      const lastHeardUnixRaw = Number(node && (node.last_heard_unix ?? node.last_heard_epoch ?? 0));
+      const lastHeardUnix = Number.isFinite(lastHeardUnixRaw) ? Math.trunc(lastHeardUnixRaw) : 0;
+      const lastHeardText = String(node && node.last_heard || "").trim() || "n/a";
+      const hardwareText = String((node && (node.hardware_model || node.hardware)) || "").trim() || "n/a";
+      const snrRaw = Number(node && node.snr);
+      const snrNum = Number.isFinite(snrRaw) ? snrRaw : null;
+      const hopsRaw = Number(node && node.hops_away);
+      const hopsNum = Number.isFinite(hopsRaw) ? Math.trunc(hopsRaw) : null;
+      const batteryRaw = Number(node && node.battery_level);
+      const batteryNum = Number.isFinite(batteryRaw) ? Math.max(0, Math.min(100, Math.round(batteryRaw))) : null;
+      const savedPacketsRaw = Number(node && node.saved_packets);
+      const savedPackets = Number.isFinite(savedPacketsRaw)
+        ? Math.max(0, Math.trunc(savedPacketsRaw))
+        : 0;
+      const savedPointsRaw = Number(node && node.saved_points);
+      const savedPoints = Number.isFinite(savedPointsRaw)
+        ? Math.max(0, Math.trunc(savedPointsRaw))
+        : 0;
+      const savedTitle = savedPoints > 0
+        ? `${{savedPackets}} packets across ${{savedPoints}} minute buckets`
+        : "No saved history yet";
+      const latRaw = Number(node && node.lat);
+      const lonRaw = Number(node && node.lon);
+      const hasPosition = Number.isFinite(latRaw) && Number.isFinite(lonRaw);
+      const posText = hasPosition
+        ? `${{latRaw.toFixed(5)}}, ${{lonRaw.toFixed(5)}}`
+        : "n/a";
+      const favorite = (typeof isFavoriteNode === "function") && !!isFavoriteNode(nodeId);
+      const status = (typeof freshnessStatus === "function")
+        ? freshnessStatus(lastHeardUnix, nowUnix)
+        : "unknown";
+      const statusSort = (typeof statusRank === "function")
+        ? statusRank(status)
+        : 99;
+
+      const fields = {{
+        last_heard: {{ sort: lastHeardUnix, text: lastHeardText, title: lastHeardText }},
+        id: {{ sort: nodeId, text: nodeId || "n/a", title: String((node && (node.id || nodeId)) || "n/a") }},
+        name: {{ sort: name, text: name, title: name }},
+        hardware: {{ sort: hardwareText, text: hardwareText, title: hardwareText }},
+        snr: {{ sort: (snrNum == null ? "" : snrNum), text: (snrNum == null ? "n/a" : String(snrNum)), title: (snrNum == null ? "n/a" : `${{snrNum}} dB`) }},
+        hops: {{ sort: (hopsNum == null ? "" : hopsNum), text: (hopsNum == null ? "n/a" : String(hopsNum)), title: (hopsNum == null ? "n/a" : String(hopsNum)) }},
+        battery: {{ sort: (batteryNum == null ? "" : batteryNum), text: (batteryNum == null ? "n/a" : String(batteryNum)), title: (batteryNum == null ? "n/a" : `${{batteryNum}}%`) }},
+        saved: {{ sort: savedPackets, text: String(savedPackets), title: savedTitle }},
+        pos: {{ sort: (hasPosition ? latRaw : ""), text: posText, title: posText }},
+        favorite: {{ sort: favorite ? 1 : 0, text: favorite ? "yes" : "no", title: favorite ? "Saved node" : "Not saved" }},
+      }};
+
+      return {{
+        node,
+        nodeId,
+        name,
+        status,
+        statusSort,
+        fields,
+      }};
+    }}
+
+    function nodeExplorerProjectionFrom(source, options = null) {{
+      if (source && typeof source === "object" && source.fields && source.node) {{
+        return source;
+      }}
+      return nodeExplorerBuildProjection(source, options);
+    }}
     const wheelActivationLeaseMs = 1400;
     function isChatWorkspaceLayoutView(viewName) {{
       const clean = String(viewName || "").trim().toLowerCase();

@@ -42,25 +42,24 @@
       h = hashMixStr(h, sortDir);
 
       for (const node of sourceNodes) {{
-        const nodeId = normalizeNodeId(node && node.id);
-        const name = nodeLabel(node);
+        const projection = nodeExplorerBuildProjection(node);
+        const nodeId = projection.nodeId;
+        const name = projection.name;
         if (!matchesIdOrNameQuery(nodeId, name, query, {{ node }})) continue;
 
-        entries.push({{ node, nodeId, name }});
+        entries.push({{ node, nodeId, name, projection }});
 
         h = hashMixStr(h, nodeId);
         h = hashMixStr(h, name);
-        h = hashMixStr(h, node && (node.hardware_model || ""));
-        h = hashMixInt(h, node && (node.last_heard_unix ?? node.last_heard_epoch ?? 0));
-        const snr = Number(node && node.snr);
-        h = hashMixInt(h, Number.isFinite(snr) ? Math.round(snr * 10) : 0);
-        h = hashMixInt(h, node && (node.hops_away ?? 0));
-        h = hashMixInt(h, node && (node.battery_level ?? 0));
-        h = hashMixInt(h, node && (node.saved_packets ?? 0));
-        const lat = Number(node && node.lat);
-        const lon = Number(node && node.lon);
-        h = hashMixInt(h, Number.isFinite(lat) ? Math.round(lat * 1e4) : 0);
-        h = hashMixInt(h, Number.isFinite(lon) ? Math.round(lon * 1e4) : 0);
+        h = hashMixStr(h, projection.fields.hardware.text);
+        h = hashMixInt(h, projection.fields.last_heard.sort);
+        const snrSort = Number(projection.fields.snr.sort);
+        h = hashMixInt(h, Number.isFinite(snrSort) ? Math.round(snrSort * 10) : 0);
+        h = hashMixInt(h, projection.fields.hops.sort);
+        h = hashMixInt(h, projection.fields.battery.sort);
+        h = hashMixInt(h, projection.fields.saved.sort);
+        const latSort = Number(projection.fields.pos.sort);
+        h = hashMixInt(h, Number.isFinite(latSort) ? Math.round(latSort * 1e4) : 0);
       }}
       h = hashMixInt(h, entries.length);
       return {{ entries, hash: h >>> 0 }};
@@ -73,32 +72,31 @@
 
     function nodesTableSortRaw(entry, colIndex) {{
       const node = (entry && typeof entry === "object" && entry.node) ? entry.node : entry;
-      if (!node) return "";
-      const nodeId = normalizeNodeId((entry && entry.nodeId) || node.id || "");
-      const name = (entry && typeof entry.name === "string") ? entry.name : nodeLabel(node);
+      const projection = (entry && typeof entry === "object" && entry.projection)
+        ? entry.projection
+        : nodeExplorerBuildProjection(node);
+      if (!projection) return "";
       switch (colIndex) {{
         case 0:
-          return Number(node.last_heard_unix ?? node.last_heard_epoch ?? 0) || 0;
+          return projection.fields.last_heard.sort;
         case 1:
-          return nodeId;
+          return projection.fields.id.sort;
         case 2:
-          return name;
+          return projection.fields.name.sort;
         case 3:
-          return String(node.hardware_model || "");
+          return projection.fields.hardware.sort;
         case 4:
-          return Number(node.snr);
+          return projection.fields.snr.sort;
         case 5:
-          return Number(node.hops_away);
+          return projection.fields.hops.sort;
         case 6:
-          return Number(node.battery_level);
+          return projection.fields.battery.sort;
         case 7:
-          return Number(node.saved_packets);
+          return projection.fields.saved.sort;
         case 8:
-          return (Number.isFinite(Number(node.lat)) && Number.isFinite(Number(node.lon)))
-            ? Number(node.lat)
-            : "";
+          return projection.fields.pos.sort;
         case 9:
-          return isFavoriteNode(nodeId) ? 1 : 0;
+          return projection.fields.favorite.sort;
         default:
           return "";
       }}
@@ -147,44 +145,40 @@
       const rows = [];
       for (const entry of filteredNodes) {{
           const node = entry.node;
-          const nodeId = entry.nodeId;
-          const name = entry.name;
+          const projection = entry.projection && typeof entry.projection === "object"
+            ? entry.projection
+            : nodeExplorerBuildProjection(node, {{ nowUnix }});
+          const nodeId = projection.nodeId;
+          const name = projection.name;
           const selectable = isSelectableNodeId(nodeId);
           const selectedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
-          const lastUnix = nodeLastHeardUnix(node);
-          const status = freshnessStatus(lastUnix, nowUnix);
+          const status = projection.status || "unknown";
           const statusClass = ` status-${{status || "unknown"}}`;
-          const pos = (typeof node.lat === "number" && typeof node.lon === "number")
-            ? `${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}`
-            : "n/a";
-          const savedPackets = Number.isFinite(Number(node.saved_packets))
-            ? Number(node.saved_packets)
-            : 0;
+          const pos = projection.fields.pos.text;
+          const savedPackets = Number(projection.fields.saved.sort) || 0;
           const savedPoints = Number.isFinite(Number(node.saved_points))
             ? Number(node.saved_points)
             : 0;
           const savedTitle = savedPoints > 0
             ? `${{savedPackets}} packets across ${{savedPoints}} minute buckets`
             : "No saved history yet";
-          const lastHeardText = node.last_heard ?? "n/a";
-          const lastSort = Number.isFinite(Number(node.last_heard_unix))
-            ? Number(node.last_heard_unix)
-            : (Number.isFinite(Number(lastUnix)) ? Number(lastUnix) : 0);
+          const lastHeardText = projection.fields.last_heard.text;
+          const lastSort = Number(projection.fields.last_heard.sort) || 0;
           rows.push(`<tr data-node-id="${{escAttr(nodeId)}}" class="${{selectable ? "node-selectable" : ""}}${{selectedClass}}${{statusClass}}">
           <td data-sort="${{escAttr(lastSort)}}" title="${{escAttr(lastHeardText)}}"><span class="node-status-dot status-${{escAttr(status || "unknown")}}">●</span>${{lastHeardText}}</td>
-          <td class="mono" data-sort="${{escAttr(nodeId)}}" title="${{escAttr(String(node.id || nodeId || ""))}}">${{nodeId || "n/a"}}</td>
+          <td class="mono" data-sort="${{escAttr(projection.fields.id.sort)}}" title="${{escAttr(projection.fields.id.title)}}">${{projection.fields.id.text || "n/a"}}</td>
           <td data-sort="${{escAttr(name)}}">
             <span class="node-name-row">
               <span class="node-name-label">${{name}}</span>
             </span>
           </td>
-          <td data-sort="${{escAttr(node.hardware_model ?? "")}}">${{node.hardware_model ?? "n/a"}}</td>
-          <td data-sort="${{escAttr(node.snr ?? "")}}">${{node.snr ?? "n/a"}}</td>
-          <td data-sort="${{escAttr(node.hops_away ?? "")}}">${{node.hops_away ?? "n/a"}}</td>
-          <td data-sort="${{escAttr(node.battery_level ?? "")}}">${{node.battery_level ?? "n/a"}}</td>
+          <td data-sort="${{escAttr(projection.fields.hardware.sort)}}">${{projection.fields.hardware.text}}</td>
+          <td data-sort="${{escAttr(projection.fields.snr.sort)}}">${{projection.fields.snr.text}}</td>
+          <td data-sort="${{escAttr(projection.fields.hops.sort)}}">${{projection.fields.hops.text}}</td>
+          <td data-sort="${{escAttr(projection.fields.battery.sort)}}">${{projection.fields.battery.text}}</td>
           <td data-sort="${{escAttr(savedPackets)}}" title="${{escAttr(savedTitle)}}">${{savedPackets}}</td>
-          <td data-sort="${{escAttr(pos)}}">${{pos}}</td>
-          <td data-sort="${{escAttr(isFavoriteNode(nodeId) ? 1 : 0)}}">${{favoriteToggleButtonHtml(nodeId, "node-favorite-btn")}}</td>
+          <td data-sort="${{escAttr(projection.fields.pos.sort)}}">${{pos}}</td>
+          <td data-sort="${{escAttr(projection.fields.favorite.sort)}}">${{favoriteToggleButtonHtml(nodeId, "node-favorite-btn")}}</td>
         </tr>`);
       }}
       if (rows.length === 0) {{

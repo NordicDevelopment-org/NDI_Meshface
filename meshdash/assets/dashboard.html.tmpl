@@ -345,7 +345,26 @@
       <div class="chat-left-section chat-users-section">
         <div class="chat-users-head">
           <div id="chat-users-title" class="chat-left-label">Users</div>
-          <button id="chat-peer-add-toggle-btn" class="chat-peer-add-toggle-btn" type="button" title="Add a peer-to-peer user" hidden>Add</button>
+          <div class="chat-users-head-actions">
+            <button
+              id="chat-node-navigator-menu-btn"
+              class="chat-peer-add-toggle-btn chat-node-navigator-menu-btn"
+              type="button"
+              title="Configure node navigator sort and metadata"
+              aria-expanded="false"
+              aria-controls="chat-node-navigator-menu"
+            >View</button>
+            <button id="chat-peer-add-toggle-btn" class="chat-peer-add-toggle-btn" type="button" title="Add a peer-to-peer user" hidden>Add</button>
+          </div>
+        </div>
+        <div id="chat-node-navigator-menu" class="chat-node-navigator-menu" hidden>
+          <div class="chat-node-navigator-row">
+            <label for="chat-node-navigator-sort-select" class="chat-node-navigator-label">Sort</label>
+            <select id="chat-node-navigator-sort-select" class="chat-peer-input chat-node-navigator-select" aria-label="Sort node navigator list"></select>
+            <button id="chat-node-navigator-sort-dir-btn" class="chat-peer-add-btn chat-node-navigator-sort-dir-btn" type="button" aria-label="Toggle sort direction">Asc</button>
+          </div>
+          <div class="chat-node-navigator-fields-head">Metadata</div>
+          <div id="chat-node-navigator-fields" class="chat-node-navigator-fields"></div>
         </div>
         <div id="chat-peer-add-panel" class="chat-peer-add-panel" hidden>
           <div class="chat-peer-add-row">

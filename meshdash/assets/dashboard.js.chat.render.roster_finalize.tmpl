@@ -116,8 +116,12 @@
 
       const rosterQuery = globalNodeSearchQuery();
       const roomList = document.getElementById("chat-room-list");
-      const rosterAll = Array.from(participants.values())
-        .sort((a, b) => {{
+      const rosterAll = (() => {{
+        const rows = Array.from(participants.values());
+        if (typeof sortChatNodeNavigatorParticipants === "function") {{
+          return sortChatNodeNavigatorParticipants(rows, nodesById, nowUnix);
+        }}
+        return rows.sort((a, b) => {{
           const pinDiff = Number(!!b.p2pPinned) - Number(!!a.p2pPinned);
           if (pinDiff !== 0) return pinDiff;
           const rankDiff = statusRank(a.status) - statusRank(b.status);
@@ -127,6 +131,7 @@
           if (aTime !== bTime) return bTime - aTime;
           return String(a.name || a.id).localeCompare(String(b.name || b.id));
         }});
+      }})();
       const roster = rosterAll;
       // Preserve the full (unfiltered) roster so tickFreshnessUI() can compute canonical
       // online/aging/stale counts even when the user is search-filtering the roster DOM.
@@ -851,6 +856,10 @@
                 const nodeId = normalizeNodeId(item.id);
                 const snapshot = resolveChatNodeFreshness(nodeId);
                 const node = nodesById.get(nodeId);
+                const nodeProjection = nodeExplorerBuildProjection(
+                  node || {{ id: nodeId, long_name: item.name }},
+                  {{ nowUnix }}
+                );
                 const caps = (
                   historyCapsById && typeof historyCapsById.get === "function"
                     ? historyCapsById.get(nodeId)
@@ -984,6 +993,29 @@
                 </span>`;
                 }}
                 const memberMetaRowHtml = `<span class="chat-member-meta-row">${{idleRowHtml}}${{packetRowHtml}}</span>`;
+                const memberFieldsRowHtml = (() => {{
+                  const visibleFieldIds = normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds);
+                  if (!Array.isArray(visibleFieldIds) || visibleFieldIds.length <= 0) return "";
+                  const chips = [];
+                  for (const fieldIdRaw of visibleFieldIds) {{
+                    const fieldId = normalizeNodeExplorerFieldId(fieldIdRaw);
+                    if (!fieldId) continue;
+                    const def = nodeExplorerFieldDef(fieldId);
+                    const field = nodeProjection && nodeProjection.fields
+                      ? nodeProjection.fields[fieldId]
+                      : null;
+                    if (!def || !field) continue;
+                    const chipLabel = String(def.label || fieldId).trim() || fieldId;
+                    const chipValue = String((field.text != null) ? field.text : "n/a").trim() || "n/a";
+                    const chipTitle = `${{chipLabel}}: ${{String((field.title != null) ? field.title : chipValue)}}`;
+                    chips.push(`<span class="chat-member-metadata-chip" title="${{escAttr(chipTitle)}}">
+                      <span class="chat-member-metadata-key">${{escAttr(chipLabel)}}</span>
+                      <span class="chat-member-metadata-value">${{escAttr(chipValue)}}</span>
+                    </span>`);
+                  }}
+                  if (chips.length <= 0) return "";
+                  return `<span class="chat-member-fields-row">${{chips.join("")}}</span>`;
+                }})();
                 const favoriteBtnHtml = (typeof favoriteToggleButtonHtml === "function")
                   ? favoriteToggleButtonHtml(item.id, "chat-favorite-btn")
                   : "";
@@ -1013,6 +1045,7 @@
                     </span>
                   </span>
                   ${{memberMetaRowHtml}}
+                  ${{memberFieldsRowHtml}}
                   ${{memberQuickActionRow}}
                 </span>
               </div>`;
