@@ -511,10 +511,6 @@
               : [],
             autoLastCommand: autoResponseEnabled ? "zork" : "",
             autoSending: false,
-            autoAwaitingSinceMs: autoResponseEnabled ? Date.now() : 0,
-            autoAwaitingDeadlineMs: autoResponseEnabled
-              ? (Date.now() + Math.max(1000, Math.trunc(Number(zorkRemoteAutoResponseStepTimeoutMs) || 45000)))
-              : 0,
           }};
           syncConsoleCommandInputState();
           requestImmediatePoll(80);
