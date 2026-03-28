@@ -452,48 +452,4 @@
           return lines;
         }},
       }});
-      registerConsoleCommand({{
-        name: "zork-remote",
-        usage: "zork-remote [node=!xxxxxxxx] [channel=<n>]",
-        description: "Start an interactive Zork session against a selected direct peer over the mesh.",
-        run: async (ctx) => {{
-          if (consoleInteractiveSession) {{
-            return "[zork-remote] another interactive session is already running. Press Ctrl+C to stop.";
-          }}
-          clearConsoleOutput({{ renderNow: false }});
-          const target = resolveConsoleGameTarget(ctx);
-          if (!target.ok) {{
-            return `[zork-remote] ${{target.error}}`;
-          }}
-          const body = {{
-            text: "zork",
-            destination: target.nodeId,
-            channel_index: target.channelIndex,
-          }};
-          const payload = await sendChatPayload(body, null);
-          if (!(payload && payload.ok)) {{
-            throw new Error("failed to start remote session");
-          }}
-          const seenKeys = new Set();
-          const messageId = messageIdOfChatPacket(payload || {{}});
-          if (messageId) {{
-            seenKeys.add(`id:${{messageId}}`);
-          }}
-          consoleInteractiveSession = {{
-            name: "zork-remote",
-            mode: "remote",
-            targetNodeId: target.nodeId,
-            targetLabel: target.targetLabel || target.nodeId,
-            channelIndex: target.channelIndex,
-            channelLabel: target.channelLabel,
-            seenKeys,
-          }};
-          syncConsoleCommandInputState();
-          requestImmediatePoll(80);
-          return [
-            `[zork-remote] started with ${{target.targetLabel || target.nodeId}} on ${{target.channelLabel}}.`,
-            "[zork-remote] type game commands directly here. Use /help for console commands. Press Ctrl+C to stop this console session.",
-          ];
-        }},
-      }});
     }}

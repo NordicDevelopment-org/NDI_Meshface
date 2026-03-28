@@ -10,28 +10,7 @@
           sessionId,
         }};
       }}
-      if (mode !== "remote") return null;
-      const targetNodeId = normalizeNodeId(payload.targetNodeId ?? payload.target_node_id ?? "");
-      if (!isCanonicalNodeId(targetNodeId)) return null;
-      const channelIndex = normalizeMeshChannelIndex(payload.channelIndex ?? payload.channel_index ?? 0);
-      const channelLabel = String(payload.channelLabel || payload.channel_label || "").trim()
-        || meshChannelLabelForIndex(channelIndex);
-      const seenKeysRaw = Array.isArray(payload.seenKeys) ? payload.seenKeys : [];
-      const seenKeys = new Set(
-        seenKeysRaw
-          .map((value) => String(value == null ? "" : value).trim())
-          .filter((value) => !!value)
-          .slice(-4000)
-      );
-      return {{
-        name: String(payload.name || "zork-remote").trim() || "zork-remote",
-        mode: "remote",
-        targetNodeId,
-        targetLabel: String(payload.targetLabel || payload.target_label || "").trim(),
-        channelIndex,
-        channelLabel,
-        seenKeys,
-      }};
+      return null;
     }}
 
     function persistConsoleSessionState() {{
@@ -48,19 +27,6 @@
                 name: "zork",
                 mode: "standalone",
                 sessionId,
-              }};
-            }}
-          }} else if (mode === "remote") {{
-            const targetNodeId = normalizeNodeId(consoleInteractiveSession.targetNodeId || "");
-            if (isCanonicalNodeId(targetNodeId)) {{
-              interactiveSession = {{
-                name: String(consoleInteractiveSession.name || "zork-remote").trim() || "zork-remote",
-                mode: "remote",
-                targetNodeId,
-                targetLabel: String(consoleInteractiveSession.targetLabel || "").trim(),
-                channelIndex: normalizeMeshChannelIndex(consoleInteractiveSession.channelIndex),
-                channelLabel: String(consoleInteractiveSession.channelLabel || "").trim(),
-                seenKeys: Array.from(consoleInteractiveSession.seenKeys || []).slice(-4000),
               }};
             }}
           }}
@@ -329,10 +295,7 @@
     function isZorkConsoleInteractiveSession(session = consoleInteractiveSession) {{
       if (!session || typeof session !== "object") return false;
       const mode = String(session.mode || "").trim().toLowerCase();
-      if (mode === "standalone") return true;
-      if (mode !== "remote") return false;
-      const name = String(session.name || "").trim().toLowerCase();
-      return name === "zork" || name === "zork-remote";
+      return mode === "standalone";
     }}
 
     function normalizeConsolePromptHostLabel(value) {{
@@ -370,4 +333,3 @@
       }}
       return normalizeConsolePromptHostLabel(selfId.replace(/^!+/, "") || "radio");
     }}
-

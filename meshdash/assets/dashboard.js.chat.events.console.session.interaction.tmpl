@@ -182,99 +182,6 @@
       return true;
     }}
 
-    function preferredConsoleTargetLabel(nodeId, state = latestState) {{
-      const clean = normalizeNodeId(nodeId || "");
-      if (!isSelectableNodeId(clean)) return "";
-      const nodes = Array.isArray(state && state.nodes) ? state.nodes : [];
-      const node = nodes.find((entry) => normalizeNodeId(entry && entry.id) === clean) || null;
-      return preferredNodeName(node) || nodeNameCache.get(clean) || clean;
-    }}
-
-    function resolveConsoleGameTarget(ctx = null) {{
-      const state = (ctx && ctx.state && typeof ctx.state === "object") ? ctx.state : latestState;
-      const options = (ctx && ctx.options && typeof ctx.options === "object") ? ctx.options : {{}};
-      const args = Array.isArray(ctx && ctx.args) ? ctx.args : [];
-      const rawTarget = String(options.node ?? options.id ?? options.peer ?? args[0] ?? "").trim();
-      let nodeId = normalizeNodeId(rawTarget || selectedNodeId || "");
-      if (!isSelectableNodeId(nodeId)) {{
-        return {{ ok: false, error: "Select a peer-to-peer user first or pass node=!xxxxxxxx." }};
-      }}
-      if (!isCanonicalNodeId(nodeId)) {{
-        return {{ ok: false, error: `Invalid peer target: ${{nodeId}}` }};
-      }}
-      if (isSelfNodeId(nodeId, state)) {{
-        return {{ ok: false, error: "Cannot start a console game session against your own radio." }};
-      }}
-      let channelIndex = activeMeshChannelSendIndex();
-      if (Object.prototype.hasOwnProperty.call(options, "channel")) {{
-        const parsedChannel = normalizeMeshChannelIndex(options.channel);
-        channelIndex = parsedChannel;
-      }}
-      const channelLabel = meshChannelLabelForIndex(channelIndex);
-      return {{
-        ok: true,
-        nodeId,
-        targetLabel: preferredConsoleTargetLabel(nodeId, state),
-        channelIndex,
-        channelLabel,
-      }};
-    }}
-
-    function consoleInteractiveChatKey(msg) {{
-      const base = chatMessageKey(msg);
-      if (base) return base;
-      return "";
-    }}
-
-    function consoleInteractiveChatTimestampMs(msg) {{
-      const unix = latestUnixTimestamp(
-        msg && (msg.rx_time ?? msg.rxTime),
-        msg && (msg.captured_at ?? msg.capturedAt),
-        msg && (msg.sent_at ?? msg.sentAt)
-      );
-      return Number.isFinite(unix) && unix > 0 ? unix * 1000 : Date.now();
-    }}
-
-    function consoleInteractiveChatText(msg) {{
-      return String(
-        (msg && (msg.text ?? msg.decoded_text ?? msg.payload_text)) || ""
-      ).replace(/\s+/g, " ").trim();
-    }}
-
-    function syncConsoleInteractiveSessionMessages(state = latestState) {{
-      const session = consoleInteractiveSession;
-      if (!session || !state || typeof state !== "object") return;
-      if (String(session.mode || "") !== "remote") return;
-      const traffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
-      const messages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
-      const localNodeId = resolveLocalNodeId(state);
-      const targetNodeId = normalizeNodeId(session.targetNodeId || "");
-      if (!isCanonicalNodeId(localNodeId) || !isCanonicalNodeId(targetNodeId)) return;
-      for (const msg of messages) {{
-        if (!msg || typeof msg !== "object") continue;
-        const text = consoleInteractiveChatText(msg);
-        if (!text) continue;
-        const fromId = normalizeNodeId(msg.from || "");
-        const toId = normalizeNodeId((msg.to || msg.destination || ""));
-        const isTranscriptMessage = (
-          (fromId === targetNodeId && toId === localNodeId)
-          || (fromId === localNodeId && toId === targetNodeId)
-        );
-        if (!isTranscriptMessage) continue;
-        const key = consoleInteractiveChatKey(msg);
-        if (!key || session.seenKeys.has(key)) continue;
-        session.seenKeys.add(key);
-        const fromLabel = fromId === localNodeId
-          ? "you"
-          : (preferredConsoleTargetLabel(fromId, state) || fromId || "peer");
-        appendConsoleLine(
-          `interactive|${{String(session.name || "session")}}|${{key}}`,
-          `${{fromLabel}}: ${{text}}`,
-          consoleInteractiveChatTimestampMs(msg)
-        );
-      }}
-    }}
-
     async function sendConsoleInteractiveSessionLine(rawLine) {{
       const session = consoleInteractiveSession;
       if (!session) {{
@@ -282,47 +189,33 @@
       }}
       const text = String(rawLine == null ? "" : rawLine).trim();
       if (!text) return "";
-      if (String(session.mode || "") === "standalone") {{
-        const payload = await postStandaloneZorkCommand(text, session.sessionId || "");
-        const nextSessionId = String(payload && payload.session_id ? payload.session_id : session.sessionId || "").trim();
-        if (nextSessionId) {{
-          session.sessionId = nextSessionId;
-          persistConsoleSessionState();
-        }}
-        const replyTextRaw = String(
-          payload && Object.prototype.hasOwnProperty.call(payload, "reply_text")
-            ? (payload.reply_text ?? "")
-            : ""
+      if (String(session.mode || "") !== "standalone") {{
+        stopConsoleInteractiveSession("unsupported mode", false);
+        return "[console] interactive session mode is no longer supported. Type \"zork\" to start a new local game.";
+      }}
+      const payload = await postStandaloneZorkCommand(text, session.sessionId || "");
+      const nextSessionId = String(payload && payload.session_id ? payload.session_id : session.sessionId || "").trim();
+      if (nextSessionId) {{
+        session.sessionId = nextSessionId;
+        persistConsoleSessionState();
+      }}
+      const replyTextRaw = String(
+        payload && Object.prototype.hasOwnProperty.call(payload, "reply_text")
+          ? (payload.reply_text ?? "")
+          : ""
+      );
+      const replyText = normalizeStandaloneZorkReplyText(replyTextRaw);
+      if (replyText.trim()) {{
+        const receivedAtMs = Date.now();
+        appendConsoleLine(
+          `interactive|standalone|${{String(session.sessionId || "session")}}|${{receivedAtMs}}`,
+          replyText,
+          receivedAtMs,
+          true
         );
-        const replyText = normalizeStandaloneZorkReplyText(replyTextRaw);
-        if (replyText.trim()) {{
-          const receivedAtMs = Date.now();
-          appendConsoleLine(
-            `interactive|standalone|${{String(session.sessionId || "session")}}|${{receivedAtMs}}`,
-            replyText,
-            receivedAtMs,
-            true
-          );
-        }}
-        if (payload && payload.active_session === false) {{
-          stopConsoleInteractiveSession("game ended", false);
-        }}
-        return "";
       }}
-      const body = {{
-        text,
-        destination: session.targetNodeId,
-        channel_index: session.channelIndex,
-      }};
-      const payload = await sendChatPayload(body, null);
-      if (!(payload && payload.ok)) {{
-        throw new Error("send failed");
+      if (payload && payload.active_session === false) {{
+        stopConsoleInteractiveSession("game ended", false);
       }}
-      const messageId = messageIdOfChatPacket(payload || {{}});
-      if (messageId) {{
-        session.seenKeys.add(`id:${{messageId}}`);
-      }}
-      requestImmediatePoll(80);
       return "";
     }}
-
