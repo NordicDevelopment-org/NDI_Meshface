@@ -8,7 +8,18 @@
       return clean === "desc" ? "desc" : "asc";
     }}
 
-    function normalizeChatNodeNavigatorMetaFieldIdsPref(rawIds) {{
+    function normalizeChatNodeNavigatorShowPacketDirectionPref(value) {{
+      if (typeof parseBoolToken === "function") {{
+        return parseBoolToken(value, true);
+      }}
+      if (value == null) return true;
+      const clean = String(value).trim().toLowerCase();
+      return !(clean === "0" || clean === "false" || clean === "off" || clean === "no");
+    }}
+
+    function normalizeChatNodeNavigatorMetaFieldIdsPref(rawIds, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const fallbackToDefaults = opts.fallbackToDefaults !== false;
       const defs = nodeExplorerRosterMetadataFieldDefs();
       const allowed = new Set(defs.map((def) => String(def && def.id || "")));
       const source = Array.isArray(rawIds)
@@ -21,7 +32,9 @@
         normalized.push(fieldId);
       }}
       if (normalized.length > 0) return normalized;
-      return nodeExplorerDefaultRosterMetadataFieldIds();
+      return fallbackToDefaults
+        ? nodeExplorerDefaultRosterMetadataFieldIds()
+        : [];
     }}
 
     function chatNodeNavigatorMetaFieldIdsEqual(a, b) {{
@@ -39,7 +52,10 @@
         const payload = {{
           sortKey: normalizeChatNodeNavigatorSortKeyPref(chatNodeNavigatorSortKey),
           sortDir: normalizeChatNodeNavigatorSortDirPref(chatNodeNavigatorSortDir),
-          metaFields: normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds),
+          showPacketDirection: normalizeChatNodeNavigatorShowPacketDirectionPref(chatNodeNavigatorShowPacketDirection),
+          metaFields: normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds, {{
+            fallbackToDefaults: false,
+          }}),
         }};
         window.localStorage.setItem(chatNodeNavigatorPrefsStorageKey, JSON.stringify(payload));
       }} catch (_err) {{
@@ -55,16 +71,22 @@
       const nextSortDir = normalizeChatNodeNavigatorSortDirPref(
         prefs.sortDir != null ? prefs.sortDir : chatNodeNavigatorSortDir
       );
+      const nextShowPacketDirection = normalizeChatNodeNavigatorShowPacketDirectionPref(
+        prefs.showPacketDirection != null ? prefs.showPacketDirection : chatNodeNavigatorShowPacketDirection
+      );
       const nextMetaFieldIds = normalizeChatNodeNavigatorMetaFieldIdsPref(
-        prefs.metaFields != null ? prefs.metaFields : chatNodeNavigatorMetaFieldIds
+        prefs.metaFields != null ? prefs.metaFields : chatNodeNavigatorMetaFieldIds,
+        {{ fallbackToDefaults: false }}
       );
       const changed = (
         nextSortKey !== chatNodeNavigatorSortKey
         || nextSortDir !== chatNodeNavigatorSortDir
+        || nextShowPacketDirection !== chatNodeNavigatorShowPacketDirection
         || !chatNodeNavigatorMetaFieldIdsEqual(nextMetaFieldIds, chatNodeNavigatorMetaFieldIds)
       );
       chatNodeNavigatorSortKey = nextSortKey;
       chatNodeNavigatorSortDir = nextSortDir;
+      chatNodeNavigatorShowPacketDirection = nextShowPacketDirection;
       chatNodeNavigatorMetaFieldIds = nextMetaFieldIds;
       if (opts.persist !== false) {{
         persistChatNodeNavigatorPreferences();
@@ -230,7 +252,12 @@
 
       if (fieldsHost instanceof HTMLElement) {{
         const selected = new Set(
-          normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds)
+          normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds, {{
+            fallbackToDefaults: false,
+          }})
+        );
+        const showPacketDirection = normalizeChatNodeNavigatorShowPacketDirectionPref(
+          chatNodeNavigatorShowPacketDirection
         );
         const fieldsHtml = nodeExplorerRosterMetadataFieldDefs().map((def) => {{
           const fieldId = normalizeNodeExplorerFieldId(def && def.id);
@@ -240,7 +267,11 @@
             <input type="checkbox" data-meta-field-id="${{escAttr(fieldId)}}"${{checked}} />
             <span>${{escAttr(def.label || fieldId)}}</span>
           </label>`;
-        }}).join("");
+        }}).join("")
+          + `<label class="chat-node-navigator-field-option">
+            <input type="checkbox" data-nav-toggle-id="packet-direction"${{showPacketDirection ? " checked" : ""}} />
+            <span>TX/RX + Plot</span>
+          </label>`;
         if (fieldsHost.__meshFieldsHtml !== fieldsHtml) {{
           fieldsHost.innerHTML = fieldsHtml;
           fieldsHost.__meshFieldsHtml = fieldsHtml;
@@ -249,6 +280,13 @@
             if (!(input instanceof HTMLInputElement)) continue;
             const fieldId = normalizeNodeExplorerFieldId(input.dataset.metaFieldId || "");
             input.checked = selected.has(fieldId);
+          }}
+          for (const input of fieldsHost.querySelectorAll('input[type="checkbox"][data-nav-toggle-id]')) {{
+            if (!(input instanceof HTMLInputElement)) continue;
+            const toggleId = String(input.dataset.navToggleId || "").trim().toLowerCase();
+            if (toggleId === "packet-direction") {{
+              input.checked = showPacketDirection;
+            }}
           }}
         }}
       }}
@@ -302,6 +340,16 @@
           const target = ev.target;
           if (!(target instanceof HTMLInputElement)) return;
           if (target.type !== "checkbox") return;
+          const toggleId = String(target.dataset.navToggleId || "").trim().toLowerCase();
+          if (toggleId === "packet-direction") {{
+            applyChatNodeNavigatorPreferences({{
+              showPacketDirection: !!target.checked,
+            }}, {{
+              persist: true,
+              rerender: true,
+            }});
+            return;
+          }}
           const nextFields = [];
           for (const input of fieldsHost.querySelectorAll('input[type="checkbox"][data-meta-field-id]')) {{
             if (!(input instanceof HTMLInputElement) || !input.checked) continue;

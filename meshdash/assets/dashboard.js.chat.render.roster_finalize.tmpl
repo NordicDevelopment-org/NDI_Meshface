@@ -904,6 +904,10 @@
                   ? formatIdleAge(snapshot.lastSeenUnix, nowUnix)
                   : "n/a";
                 const showPacketTrend = nodeNavigatorPacketTrendEnabled();
+                const showPacketDirection = (typeof normalizeChatNodeNavigatorShowPacketDirectionPref === "function")
+                  ? normalizeChatNodeNavigatorShowPacketDirectionPref(chatNodeNavigatorShowPacketDirection)
+                  : !!chatNodeNavigatorShowPacketDirection;
+                const showPacketTrendRow = showPacketTrend && showPacketDirection;
                 const packetTicker = (
                   packetTickerByNode instanceof Map
                     ? (packetTickerByNode.get(nodeId) || null)
@@ -962,7 +966,7 @@
                   `GPS: ${{gpsText}}`,
                   `Saved P2P: ${{item.p2pPinned ? "yes" : "no"}}`,
                 ];
-                if (showPacketTrend) {{
+                if (showPacketTrendRow) {{
                   tooltipLines.splice(4, 0, packetTickerDetail);
                 }}
                 if (noteText) {{
@@ -977,7 +981,7 @@
                   : "Last seen n/a";
                 const idleRowHtml = `<span class="chat-member-idle-time" title="${{escAttr(idleRowTitle)}}">Idle: ${{escAttr(idleText)}}</span>`;
                 let packetRowHtml = "";
-                if (showPacketTrend) {{
+                if (showPacketTrendRow) {{
                   const packetSparklinePath = buildNodePacketSparklinePath(packetSparklineBuckets, 56, 12);
                   const packetSparklineTrend = classifyNodePacketSparklineTrend(packetSparklineBuckets);
                   const packetRowTitle = packetTotal > 0
@@ -994,7 +998,9 @@
                 }}
                 const memberMetaRowHtml = `<span class="chat-member-meta-row">${{idleRowHtml}}${{packetRowHtml}}</span>`;
                 const memberFieldsRowHtml = (() => {{
-                  const visibleFieldIds = normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds);
+                  const visibleFieldIds = normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds, {{
+                    fallbackToDefaults: false,
+                  }});
                   if (!Array.isArray(visibleFieldIds) || visibleFieldIds.length <= 0) return "";
                   const chips = [];
                   for (const fieldIdRaw of visibleFieldIds) {{
