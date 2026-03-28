@@ -291,8 +291,10 @@
         activeSession.autoResponseEnabled = false;
         activeSession.autoAwaitingReply = false;
         activeSession.autoExpectedAny = [];
-        appendConsoleEventLine("[zork-remote][auto] script complete.");
-        stopConsoleInteractiveSession("auto script complete", true);
+        activeSession.autoAwaitingSinceMs = 0;
+        activeSession.autoAwaitingDeadlineMs = 0;
+        appendConsoleEventLine("[zork-remote][auto] script complete. Session is still active; keep typing commands.");
+        persistConsoleSessionState();
         return;
       }}
 
