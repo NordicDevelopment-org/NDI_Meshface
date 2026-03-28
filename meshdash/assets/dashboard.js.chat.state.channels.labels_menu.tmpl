@@ -83,6 +83,15 @@
         }};
       }}
       const configuredName = meshChannelConfiguredName(idx, sourceOptions);
+      if (idx === 0) {{
+        const channelBaseLabel = configuredName || "Ch 0 • Primary channel";
+        return {{
+          key: "channel-0-white",
+          name: "white",
+          fill: "#FFFFFF",
+          title: `${{channelBaseLabel}} • White channel`,
+        }};
+      }}
       const palette = meshChannelColorPalette[idx % meshChannelColorPalette.length] || meshChannelColorPalette[0];
       const colorName = String(palette && palette.name || "channel").trim() || "channel";
       const fill = String(palette && palette.fill || "#8DA3B1").trim() || "#8DA3B1";
