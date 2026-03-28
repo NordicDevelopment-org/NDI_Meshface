@@ -2404,6 +2404,18 @@
       color: var(--ui-text);
       box-shadow: inset 1px 0 0 hsl(var(--chat-feed-node-hue) 20% 46% / 0.1);
     }}
+    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.085),
+          rgba(var(--chat-feed-channel-rgb), 0.036) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.014) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.006) 100%
+        ),
+        var(--chat-feed-node-gradient);
+      box-shadow: inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.48);
+    }}
     [data-theme="dark"] .card.chat .chat-feed-item.self-authored {{
       background:
         linear-gradient(
@@ -2455,6 +2467,17 @@
           rgba(63, 185, 80, 0.07),
           rgba(63, 185, 80, 0.032) 56%,
           rgba(63, 185, 80, 0.012) 100%
+        ),
+        var(--chat-feed-node-gradient);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable.channel-tinted:hover {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.11),
+          rgba(var(--chat-feed-channel-rgb), 0.05) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.02) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.01) 100%
         ),
         var(--chat-feed-node-gradient);
     }}
