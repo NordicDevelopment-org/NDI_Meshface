@@ -492,6 +492,10 @@
       syncSavedNodeDetailsDock(false);
       const cachedHistory = cachedNodeHistory(selectedId);
       renderSavedNodeDetails(safeState, cachedHistory);
+      if (opts.fetchHistory !== false) {{
+        // Even on the Details tab we want the network map trail ready when the drawer opens.
+        void refreshSelectedNodeHistory(false);
+      }}
 
       if (activeTab === "history") {{
         setMapDataMode("node");
@@ -501,9 +505,6 @@
           renderNodeHistory(cachedHistory, nodes);
         }} else {{
           renderNodeHistoryLoading(selectedId);
-        }}
-        if (opts.fetchHistory !== false) {{
-          void refreshSelectedNodeHistory(false);
         }}
       }} else {{
         syncNodeHistoryDock();
