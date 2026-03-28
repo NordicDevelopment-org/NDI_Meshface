@@ -285,6 +285,7 @@
           consoleSeen.delete(oldKey);
         }}
       }}
+      markConsoleLinesDirty();
       persistConsoleSessionState();
       if (renderNow) {{
         renderConsoleBuffer();
@@ -352,4 +353,3 @@
       }}
       await executeConsoleCommand(parsed, line);
     }}
-

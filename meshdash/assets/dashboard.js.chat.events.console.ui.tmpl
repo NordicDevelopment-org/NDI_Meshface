@@ -118,18 +118,18 @@
         input.dataset.bound = "1";
         input.addEventListener("focus", () => {{
           consoleCursorVisible = true;
-          renderConsoleBuffer(false);
+          renderConsolePromptBuffer(false);
         }});
         input.addEventListener("blur", () => {{
           consoleCursorVisible = false;
-          renderConsoleBuffer(false);
+          renderConsolePromptBuffer(false);
         }});
         input.addEventListener("input", () => {{
-          renderConsoleBuffer(false);
+          renderConsolePromptBuffer(false);
         }});
         const rerenderForCaretMove = () => {{
           if (document.activeElement === input) {{
-            renderConsoleBuffer(false);
+            renderConsolePromptBuffer(false);
           }}
         }};
         input.addEventListener("select", rerenderForCaretMove);
@@ -161,7 +161,7 @@
               input.value = "";
               consoleCommandHistoryCursor = -1;
               consoleCommandDraft = "";
-              renderConsoleBuffer(false);
+              renderConsolePromptBuffer(false);
             }}
             return;
           }}
@@ -171,7 +171,7 @@
             input.value = "";
             consoleCommandHistoryCursor = -1;
             consoleCommandDraft = "";
-            renderConsoleBuffer(false);
+            renderConsolePromptBuffer(false);
             void runConsoleCommandLine(cmdLine);
             focusConsoleCommandInput(false);
             return;

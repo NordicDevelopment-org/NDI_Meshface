@@ -79,7 +79,7 @@
               return;
             }}
           }}
-          renderConsoleBuffer(false);
+          renderConsolePromptBuffer(false);
         }}
       }}, 530);
     }}
@@ -194,6 +194,111 @@
       }};
     }}
 
+    function markConsoleLinesDirty() {{
+      const nextVersion = Math.trunc(Number(consoleLinesVersion) || 0) + 1;
+      consoleLinesVersion = nextVersion > 2147483600 ? 1 : nextVersion;
+      consoleFilteredLinesCacheKey = "";
+      consoleFilteredLinesCacheResult = null;
+      consoleRenderedLogCacheKey = "";
+      consoleRenderedLogCacheHtml = "";
+      consoleRenderedFrameCacheKey = "";
+    }}
+
+    function resolveConsoleFilterExpression(rawFilterText = consoleFilterText) {{
+      const raw = String(rawFilterText == null ? "" : rawFilterText);
+      if (raw === consoleFilterExprCacheRaw && consoleFilterExprCacheParsed && typeof consoleFilterExprCacheParsed === "object") {{
+        return consoleFilterExprCacheParsed;
+      }}
+      const parsed = parseConsoleFilterExpression(raw);
+      consoleFilterExprCacheRaw = raw;
+      consoleFilterExprCacheParsed = parsed;
+      return parsed;
+    }}
+
+    function resolveFilteredConsoleLines(filterExpr = null) {{
+      const parsed = (filterExpr && typeof filterExpr === "object")
+        ? filterExpr
+        : resolveConsoleFilterExpression(consoleFilterText);
+      const needle = String(parsed.needle == null ? "" : parsed.needle).trim().toLowerCase();
+      const before = Math.max(0, Math.trunc(Number(parsed.before) || 0));
+      const after = Math.max(0, Math.trunc(Number(parsed.after) || 0));
+      const cacheKey = `${{consoleLinesVersion}}|${{needle}}|${{before}}|${{after}}`;
+      if (cacheKey === consoleFilteredLinesCacheKey && consoleFilteredLinesCacheResult) {{
+        return {{
+          result: consoleFilteredLinesCacheResult,
+          cacheKey,
+        }};
+      }}
+      const filtered = filterConsoleLinesWithContext(consoleLines, {{
+        needle,
+        before,
+        after,
+      }});
+      consoleFilteredLinesCacheKey = cacheKey;
+      consoleFilteredLinesCacheResult = filtered;
+      return {{
+        result: filtered,
+        cacheKey,
+      }};
+    }}
+
+    function resolveConsoleRenderedLogHtml(filteredResult, baseCacheKey = "") {{
+      const filtered = (filteredResult && typeof filteredResult === "object")
+        ? filteredResult
+        : {{
+          lines: [],
+          active: false,
+          needle: "",
+        }};
+      const needle = String(filtered.needle == null ? "" : filtered.needle);
+      const visibleLines = Array.isArray(filtered.lines) ? filtered.lines : [];
+      const logCacheKey = `${{baseCacheKey}}|${{filtered.active ? 1 : 0}}|${{needle}}|${{visibleLines.length}}`;
+      if (logCacheKey === consoleRenderedLogCacheKey) {{
+        return consoleRenderedLogCacheHtml;
+      }}
+      const rendered = visibleLines.map((line) => escAttr(String(line == null ? "" : line)));
+      if (filtered.active && visibleLines.length < 1) {{
+        rendered.push(escAttr(`[filter] no matches for "${{needle}}"`));
+      }}
+      const joined = rendered.join("\n");
+      const html = joined ? `${{joined}}\n` : "";
+      consoleRenderedLogCacheKey = logCacheKey;
+      consoleRenderedLogCacheHtml = html;
+      return html;
+    }}
+
+    function applyConsoleAutoscroll(pre, forceScroll = false) {{
+      if (!(pre instanceof HTMLElement)) return;
+      if (consoleAutoscroll || forceScroll) {{
+        pre.scrollLeft = 0;
+        pre.scrollTop = pre.scrollHeight;
+      }}
+    }}
+
+    function renderConsolePromptBuffer(forceScroll = false) {{
+      const pre = document.getElementById("live-console");
+      if (!(pre instanceof HTMLElement)) return;
+      const zorkWordWrapActive = isZorkConsoleInteractiveSession(consoleInteractiveSession);
+      pre.classList.toggle("zork-word-wrap", zorkWordWrapActive);
+      if (!forceScroll && hasConsoleSelectionWithin(pre)) {{
+        consoleRenderDeferred = true;
+        return;
+      }}
+      consoleRenderDeferred = false;
+      const promptEl = document.getElementById("live-console-prompt-line");
+      if (!(promptEl instanceof HTMLElement) || !pre.contains(promptEl)) {{
+        renderConsoleBuffer(forceScroll);
+        return;
+      }}
+      const promptHtml = formatConsolePromptInputLine(consolePromptLabel, consoleCommandInputValue());
+      if (consoleRenderedPromptHtml !== promptHtml || promptEl.innerHTML !== promptHtml) {{
+        promptEl.innerHTML = promptHtml;
+        consoleRenderedPromptHtml = promptHtml;
+        consoleRenderedFrameCacheKey = "";
+      }}
+      applyConsoleAutoscroll(pre, forceScroll);
+    }}
+
     function renderConsoleBufferNow(forceScroll = false) {{
       const pre = document.getElementById("live-console");
       if (!(pre instanceof HTMLElement)) return;
@@ -204,19 +309,19 @@
         return;
       }}
       consoleRenderDeferred = false;
-      const filterExpr = parseConsoleFilterExpression(consoleFilterText);
-      const filtered = filterConsoleLinesWithContext(consoleLines, filterExpr);
-      const visibleLines = filtered.lines;
-      const rendered = visibleLines.map((line) => escAttr(String(line == null ? "" : line)));
-      if (filtered.active && visibleLines.length < 1) {{
-        rendered.push(escAttr(`[filter] no matches for "${{filtered.needle}}"`));
+      const filterExpr = resolveConsoleFilterExpression(consoleFilterText);
+      const filteredPayload = resolveFilteredConsoleLines(filterExpr);
+      const logHtml = resolveConsoleRenderedLogHtml(filteredPayload.result, filteredPayload.cacheKey);
+      const promptHtml = formatConsolePromptInputLine(consolePromptLabel, consoleCommandInputValue());
+      const frameCacheKey = `${{consoleRenderedLogCacheKey}}|${{promptHtml}}`;
+      const promptEl = document.getElementById("live-console-prompt-line");
+      const hasPromptSpan = promptEl instanceof HTMLElement && pre.contains(promptEl);
+      if (frameCacheKey !== consoleRenderedFrameCacheKey || !hasPromptSpan) {{
+        pre.innerHTML = `${{logHtml}}<span id="live-console-prompt-line">${{promptHtml}}</span>`;
+        consoleRenderedFrameCacheKey = frameCacheKey;
       }}
-      rendered.push(formatConsolePromptInputLine(consolePromptLabel, consoleCommandInputValue()));
-      pre.innerHTML = rendered.join("\n");
-      if (consoleAutoscroll || forceScroll) {{
-        pre.scrollLeft = 0;
-        pre.scrollTop = pre.scrollHeight;
-      }}
+      consoleRenderedPromptHtml = promptHtml;
+      applyConsoleAutoscroll(pre, forceScroll);
     }}
 
     function renderConsoleBuffer(forceScroll = false) {{
@@ -241,6 +346,7 @@
       consoleLines.length = 0;
       consoleKeyQueue.length = 0;
       consoleSeen.clear();
+      markConsoleLinesDirty();
       persistConsoleSessionState();
       if (renderNow) {{
         renderConsoleBuffer(true);

@@ -97,6 +97,7 @@
           consoleKeyQueue.push(key);
           consoleSeen.add(key);
         }});
+        markConsoleLinesDirty();
         consoleCommandHistory = Array.isArray(payload.commandHistory)
           ? payload.commandHistory
             .map((value) => String(value == null ? "" : value).trim())
@@ -310,7 +311,7 @@
           consoleCommandHistoryCursor = -1;
           inputEl.value = consoleCommandDraft;
           inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
-          renderConsoleBuffer(false);
+          renderConsolePromptBuffer(false);
           return;
         }}
       }}
@@ -318,7 +319,7 @@
       const nextValue = String(consoleCommandHistory[consoleCommandHistoryCursor] || "");
       inputEl.value = nextValue;
       inputEl.setSelectionRange(nextValue.length, nextValue.length);
-      renderConsoleBuffer(false);
+      renderConsolePromptBuffer(false);
     }}
 
     function isZorkConsoleInteractiveSession(session = consoleInteractiveSession) {{

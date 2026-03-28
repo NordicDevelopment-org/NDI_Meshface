@@ -24,7 +24,7 @@
         input.placeholder = placeholder;
         input.setAttribute("title", placeholder);
       }}
-      renderConsoleBuffer(false);
+      renderConsolePromptBuffer(false);
       persistConsoleSessionState();
     }}
 
@@ -43,7 +43,7 @@
         input.setSelectionRange(len, len);
       }}
       consoleCursorVisible = true;
-      renderConsoleBuffer(false);
+      renderConsolePromptBuffer(false);
     }}
 
     function insertTextIntoConsoleCommandInput(text, inputEl = null) {{
@@ -64,12 +64,12 @@
       input.value = `${{current.slice(0, start)}}${{normalizedText}}${{current.slice(end)}}`;
       const nextCaret = start + normalizedText.length;
       try {{
-        input.setSelectionRange(nextCaret, nextCaret);
+      input.setSelectionRange(nextCaret, nextCaret);
       }} catch (_err) {{
       }}
       consoleCommandHistoryCursor = -1;
       consoleCommandDraft = "";
-      renderConsoleBuffer(false);
+      renderConsolePromptBuffer(false);
       return true;
     }}
 

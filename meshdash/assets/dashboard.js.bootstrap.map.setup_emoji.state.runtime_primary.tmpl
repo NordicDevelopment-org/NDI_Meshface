@@ -62,6 +62,15 @@
     let consoleRenderDeferred = false;
     let consoleRenderRaf = null;
     let consoleRenderPendingForceScroll = false;
+    let consoleLinesVersion = 0;
+    let consoleFilterExprCacheRaw = "";
+    let consoleFilterExprCacheParsed = null;
+    let consoleFilteredLinesCacheKey = "";
+    let consoleFilteredLinesCacheResult = null;
+    let consoleRenderedLogCacheKey = "";
+    let consoleRenderedLogCacheHtml = "";
+    let consoleRenderedPromptHtml = "";
+    let consoleRenderedFrameCacheKey = "";
     let consoleSessionPersistTimer = null;
     let consoleSessionPersistLastSerialized = "";
     let summaryMiniPanelHashById = new Map();
