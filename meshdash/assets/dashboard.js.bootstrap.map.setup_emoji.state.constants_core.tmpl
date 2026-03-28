@@ -227,6 +227,13 @@
       Object.freeze({{ command: "attack troll with sword", expectAny: Object.freeze(["troll collapses", "already down"]) }}),
       Object.freeze({{ command: "north", expectAny: Object.freeze(["east-west passage"]) }}),
       Object.freeze({{ command: "score", expectAny: Object.freeze(["score/progress"]) }}),
+      Object.freeze({{ command: "west", expectAny: Object.freeze(["troll room"]) }}),
+      Object.freeze({{ command: "west", expectAny: Object.freeze(["cellar"]) }}),
+      Object.freeze({{ command: "up", expectAny: Object.freeze(["living room"]) }}),
+      Object.freeze({{ command: "east", expectAny: Object.freeze(["kitchen"]) }}),
+      Object.freeze({{ command: "east", expectAny: Object.freeze(["behind house"]) }}),
+      Object.freeze({{ command: "south", expectAny: Object.freeze(["south of house"]) }}),
+      Object.freeze({{ command: "west", expectAny: Object.freeze(["west of house"]) }}),
       Object.freeze({{ command: "quit", expectAny: Object.freeze(["session ended"]) }}),
     ]);
     const zorkRemoteAutoResponseScript = Object.freeze(
@@ -234,19 +241,6 @@
         .slice(1)
         .filter((step) => String(step && step.command || "").trim().toLowerCase() !== "quit")
     );
-    const zorkRemoteAutoResponseFreeRunCommands = Object.freeze([
-      "look",
-      "inventory",
-      "north",
-      "east",
-      "south",
-      "west",
-      "up",
-      "down",
-      "take all",
-      "attack troll with sword",
-      "score",
-    ]);
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const botCityHintMaxDistanceKm = 120;
     const requesterPositionMaxAgeSeconds = 24 * 3600;
