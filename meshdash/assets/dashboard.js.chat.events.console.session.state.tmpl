@@ -41,6 +41,14 @@
             .slice(0, 24)
           : [],
         autoLastCommand: String(payload.autoLastCommand ?? payload.auto_last_command ?? "").trim(),
+        autoAwaitingSinceMs: Math.max(
+          0,
+          Math.trunc(Number(payload.autoAwaitingSinceMs ?? payload.auto_awaiting_since_ms) || 0)
+        ),
+        autoAwaitingDeadlineMs: Math.max(
+          0,
+          Math.trunc(Number(payload.autoAwaitingDeadlineMs ?? payload.auto_awaiting_deadline_ms) || 0)
+        ),
         autoSending: false,
       }};
     }}
@@ -82,6 +90,14 @@
                     .slice(0, 24)
                   : [],
                 autoLastCommand: String(consoleInteractiveSession.autoLastCommand || "").trim(),
+                autoAwaitingSinceMs: Math.max(
+                  0,
+                  Math.trunc(Number(consoleInteractiveSession.autoAwaitingSinceMs) || 0)
+                ),
+                autoAwaitingDeadlineMs: Math.max(
+                  0,
+                  Math.trunc(Number(consoleInteractiveSession.autoAwaitingDeadlineMs) || 0)
+                ),
               }};
             }}
           }}

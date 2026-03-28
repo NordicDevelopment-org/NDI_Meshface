@@ -259,19 +259,30 @@
       if (!activeSession.autoResponseEnabled) return;
       if (activeSession.autoSending) return;
 
-      const replyText = String(inboundText || "").trim();
+      const nowMs = Date.now();
       if (activeSession.autoAwaitingReply) {{
-        const matched = consoleRemoteAutoScriptExpectMatch(replyText, activeSession.autoExpectedAny);
-        if (!matched) {{
+        const deadlineMs = Math.max(0, Math.trunc(Number(activeSession.autoAwaitingDeadlineMs) || 0));
+        if (deadlineMs > 0 && nowMs > deadlineMs) {{
           activeSession.autoResponseEnabled = false;
           activeSession.autoAwaitingReply = false;
           activeSession.autoExpectedAny = [];
           appendConsoleEventLine(
-            `[zork-remote][auto] checkpoint failed after "${{String(activeSession.autoLastCommand || "zork")}}".`
+            `[zork-remote][auto] timeout waiting for reply after "${{String(activeSession.autoLastCommand || "zork")}}".`
           );
           return;
         }}
+      }}
+
+      const replyText = String(inboundText || "").trim();
+      if (activeSession.autoAwaitingReply) {{
+        const matched = consoleRemoteAutoScriptExpectMatch(replyText, activeSession.autoExpectedAny);
+        if (!matched) {{
+          // Stay in wait mode; mesh replies can be segmented/noisy and may arrive over multiple lines.
+          return;
+        }}
         activeSession.autoAwaitingReply = false;
+        activeSession.autoAwaitingSinceMs = 0;
+        activeSession.autoAwaitingDeadlineMs = 0;
       }}
 
       const script = Array.isArray(zorkRemoteAutoResponseScript) ? zorkRemoteAutoResponseScript : [];
@@ -296,6 +307,11 @@
       activeSession.autoExpectedAny = Array.isArray(step.expectAny) ? step.expectAny : [];
       activeSession.autoAwaitingReply = true;
       activeSession.autoSending = true;
+      activeSession.autoAwaitingSinceMs = nowMs;
+      activeSession.autoAwaitingDeadlineMs = nowMs + Math.max(
+        1000,
+        Math.trunc(Number(zorkRemoteAutoResponseStepTimeoutMs) || 45000)
+      );
       const delayMs = Math.max(0, Math.trunc(Number(zorkE2EWinScriptDelayMs) || 0));
       window.setTimeout(() => {{
         void (async () => {{
@@ -307,6 +323,8 @@
             activeSession.autoResponseEnabled = false;
             activeSession.autoAwaitingReply = false;
             activeSession.autoExpectedAny = [];
+            activeSession.autoAwaitingSinceMs = 0;
+            activeSession.autoAwaitingDeadlineMs = 0;
             appendConsoleEventLine(`[zork-remote][auto] send failed: ${{msg}}`);
           }} finally {{
             activeSession.autoSending = false;
@@ -319,6 +337,10 @@
       const session = consoleInteractiveSession;
       if (!session || !state || typeof state !== "object") return;
       if (String(session.mode || "") !== "remote") return;
+      if (session.autoResponseEnabled && session.autoAwaitingReply) {{
+        // Tick timeout handling even when no new matching transcript line arrives.
+        maybeAdvanceConsoleRemoteAutoResponse(session, "");
+      }}
       const traffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
       const messages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
       const localNodeId = resolveLocalNodeId(state);
