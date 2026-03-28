@@ -382,6 +382,53 @@
           </div>
         </div>
         <div id="chat-room-list" class="chat-member-list"></div>
+        <section id="chat-node-details-drawer" class="chat-node-details-drawer" hidden>
+          <div class="chat-node-details-head">
+            <div id="chat-node-details-title" class="chat-node-details-title">Node Details</div>
+            <button
+              id="chat-node-details-close-btn"
+              class="chat-node-details-close-btn"
+              type="button"
+              title="Collapse node details"
+              aria-label="Collapse node details"
+            >Collapse</button>
+          </div>
+          <div class="chat-node-details-tabs" role="tablist" aria-label="Selected node detail tabs">
+            <button
+              id="chat-node-details-tab-details"
+              class="chat-node-details-tab-btn is-active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              data-drawer-tab="details"
+            >Details</button>
+            <button
+              id="chat-node-details-tab-history"
+              class="chat-node-details-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-drawer-tab="history"
+            >History</button>
+          </div>
+          <div
+            id="chat-node-details-panel-details"
+            class="chat-node-details-panel"
+            role="tabpanel"
+            aria-labelledby="chat-node-details-tab-details"
+          >
+            <div id="chat-node-details-content-host" class="chat-node-details-content-host"></div>
+          </div>
+          <div
+            id="chat-node-details-panel-history"
+            class="chat-node-details-panel"
+            role="tabpanel"
+            aria-labelledby="chat-node-details-tab-history"
+            hidden
+          >
+            <div id="chat-node-details-history-host" class="chat-node-details-history-host"></div>
+          </div>
+        </section>
       </div>
     </aside>
     <div id="chat-panel-splitter" class="chat-panel-splitter" title="Drag to resize chat workspace and node navigator" aria-hidden="true"></div>

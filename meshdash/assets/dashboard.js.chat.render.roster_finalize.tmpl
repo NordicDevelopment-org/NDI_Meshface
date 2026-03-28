@@ -1029,6 +1029,10 @@
                   ? muteToggleButtonHtml(item.id, "chat-favorite-btn chat-mute-btn")
                   : "";
                 const isSelectedMember = normalizeNodeId(selectedNodeId || "") === nodeId;
+                const memberDetailsExpanded = isSelectedMember && !!chatNodeDetailsDrawerExpanded;
+                const expandBtnHtml = isSelectableNodeId(nodeId)
+                  ? `<button type="button" class="chat-member-expand-btn" data-node-id="${{escAttr(nodeId)}}" aria-expanded="${{memberDetailsExpanded ? "true" : "false"}}" title="${{memberDetailsExpanded ? "Collapse node details" : "Expand node details"}}">${{memberDetailsExpanded ? "▾" : "▸"}}</button>`
+                  : "";
                 const canOpenPeerDm = isCanonicalNodeId(nodeId) && !isSelfNodeId(nodeId);
                 const nodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
                 const memberTintStyle = `--chat-member-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || 145)))}};`;
@@ -1045,6 +1049,7 @@
                       <span class="chat-member-name status-${{item.status}}">${{escAttr(item.name)}}</span>
                     </span>
                     <span class="chat-member-actions">
+                      ${{expandBtnHtml}}
                       ${{favoriteBtnHtml}}
                       ${{muteBtnHtml}}
                       ${{removeBtn}}
@@ -1066,6 +1071,10 @@
                       <button type="button" class="chat-member-dm-link" data-node-id="${{escAttr(fallbackId)}}" title="Open peer message window with ${{escAttr(fallbackName)}}">Send message</button>
                     </span>`
                   : "";
+                const fallbackDetailsExpanded = fallbackSelected && !!chatNodeDetailsDrawerExpanded;
+                const fallbackExpandBtn = isSelectableNodeId(fallbackId)
+                  ? `<button type="button" class="chat-member-expand-btn" data-node-id="${{escAttr(fallbackId)}}" aria-expanded="${{fallbackDetailsExpanded ? "true" : "false"}}" title="${{fallbackDetailsExpanded ? "Collapse node details" : "Expand node details"}}">${{fallbackDetailsExpanded ? "▾" : "▸"}}</button>`
+                  : "";
                 try {{
                   if (typeof console !== "undefined" && typeof console.error === "function") {{
                     console.error("Node navigator row render failed", fallbackId || item, err);
@@ -1079,7 +1088,7 @@
                     <span class="chat-member-name-left">
                       <span class="chat-member-name status-unknown">${{escAttr(fallbackName)}}</span>
                     </span>
-                    <span class="chat-member-actions"></span>
+                    <span class="chat-member-actions">${{fallbackExpandBtn}}</span>
                   </span>
                   <span class="chat-member-idle-time">Idle: n/a</span>
                   ${{fallbackQuickActionRow}}
@@ -1122,6 +1131,13 @@
               }}
               return;
             }}
+            const expandBtn = target.closest(".chat-member-expand-btn");
+            if (expandBtn instanceof HTMLButtonElement) {{
+              ev.preventDefault();
+              ev.stopPropagation();
+              toggleChatNodeDetailsDrawerForNode(expandBtn.dataset.nodeId || "");
+              return;
+            }}
             if (target.closest("button")) return;
             const member = target.closest(".chat-member-item");
             if (!(member instanceof HTMLElement) || !roomList.contains(member)) return;
@@ -1143,6 +1159,9 @@
       syncChatChangeAutoDismiss();
       renderChatPeerAddPanel(state);
       highlightNodeSelection();
+      syncChatNodeDetailsDrawer(state, {{
+        fetchHistory: false,
+      }});
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
       }} else if (chatScroller instanceof HTMLElement && shouldStickBottom) {{

@@ -679,13 +679,21 @@
       const mapDataBody = document.getElementById("map-data-body");
       const networkHost = document.getElementById("network-node-history-host");
       const savedHost = document.getElementById("saved-node-history-host");
+      const drawerHistoryHost = document.getElementById("chat-node-details-history-host");
       const nodesTitle = document.getElementById("nodes-card-title");
       if (!(nodeHistoryPanel instanceof HTMLElement)) return;
       if (!(mapDataBody instanceof HTMLElement)) return;
       if (!(networkHost instanceof HTMLElement)) return;
 
-      const dockInSaved = activeLayoutView === "saved" && (savedHost instanceof HTMLElement);
-      const target = dockInSaved ? savedHost : mapDataBody;
+      const dockInDrawer = (
+        typeof isChatNodeDetailsHistoryActive === "function"
+        && isChatNodeDetailsHistoryActive()
+        && (drawerHistoryHost instanceof HTMLElement)
+      );
+      const dockInSaved = !dockInDrawer && activeLayoutView === "saved" && (savedHost instanceof HTMLElement);
+      const target = dockInDrawer
+        ? drawerHistoryHost
+        : (dockInSaved ? savedHost : mapDataBody);
       if (nodeHistoryPanel.parentElement !== target) {{
         target.appendChild(nodeHistoryPanel);
       }}
@@ -987,6 +995,11 @@
       }}
       renderSavedNodeSearchDropdown(latestState);
       renderFavoriteMenuNodeSearchDropdown(latestState);
+      if (typeof syncChatNodeDetailsDrawer === "function") {{
+        syncChatNodeDetailsDrawer(latestState, {{
+          fetchHistory: false,
+        }});
+      }}
       // Ensure node history loads immediately when switching into the map views.
       void refreshSelectedNodeHistory(false);
       if (next === "chat" || next === "macros" || next === "chatlabs" || next === "files" || next === "bbs" || next === "bots" || next === "games" || next === "remote" || next === "history" || next === "network" || next === "saved" || next === "channels" || next === "environment") {{

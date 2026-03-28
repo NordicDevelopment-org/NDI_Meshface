@@ -3747,6 +3747,138 @@
       flex-direction: column;
       gap: 3px;
     }}
+    .chat-node-details-drawer {{
+      border: 1px solid #d2e1d0;
+      border-radius: 8px;
+      background: #f6fbf5;
+      display: flex;
+      flex-direction: column;
+      min-height: 220px;
+      height: clamp(220px, 42vh, 560px);
+      max-height: 68vh;
+      overflow: hidden;
+      flex: 0 0 auto;
+      margin-top: 2px;
+    }}
+    .chat-node-details-drawer[hidden] {{
+      display: none !important;
+    }}
+    .chat-node-details-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 7px 8px 6px 8px;
+      border-bottom: 1px solid #d2e1d0;
+      background: #edf6ec;
+    }}
+    .chat-node-details-title {{
+      min-width: 0;
+      font-size: 11px;
+      font-weight: 700;
+      color: #264734;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }}
+    .chat-node-details-close-btn {{
+      border: 1px solid #bfd5c3;
+      background: #f5fbf6;
+      color: #244b37;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 10px;
+      line-height: 1.2;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .chat-node-details-close-btn:hover {{
+      background: #e8f3eb;
+    }}
+    .chat-node-details-tabs {{
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 8px 4px 8px;
+      border-bottom: 1px solid #d8e6d5;
+      background: #f2faf3;
+    }}
+    .chat-node-details-tab-btn {{
+      border: 1px solid #c3d8c7;
+      background: #f8fdf8;
+      color: #2a4b3b;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .chat-node-details-tab-btn.is-active {{
+      background: #dff1e6;
+      border-color: #89b89a;
+      color: #18442f;
+    }}
+    .chat-node-details-panel {{
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }}
+    .chat-node-details-panel[hidden] {{
+      display: none !important;
+    }}
+    .chat-node-details-content-host,
+    .chat-node-details-history-host {{
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 6px 7px 7px 7px;
+      gap: 6px;
+    }}
+    .chat-node-details-drawer .saved-node-details {{
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
+      border-color: #d2e1d0;
+      border-radius: 8px;
+      background: #f9fdf9;
+      padding: 8px;
+      overflow: hidden;
+    }}
+    .chat-node-details-drawer .saved-node-stack {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .chat-node-details-drawer .saved-node-main-scroll {{
+      min-height: 0;
+    }}
+    .chat-node-details-drawer .saved-node-history-splitter,
+    .chat-node-details-drawer .saved-node-history-host {{
+      display: none !important;
+    }}
+    .chat-node-details-history-host #map-data-node {{
+      display: flex !important;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+    }}
+    .chat-node-details-history-host #tab-panel-signal,
+    .chat-node-details-history-host #tab-panel-online,
+    .chat-node-details-history-host #tab-panel-overview {{
+      min-height: 0;
+      overflow: auto;
+    }}
+    .chat-node-details-history-host #signal-chart-wrap,
+    .chat-node-details-history-host #node-online-chart-wrap {{
+      min-height: 220px;
+    }}
     .chat-member-item {{
       --chat-member-node-hue: 145;
       --chat-member-node-bg: #ecf5ef;
@@ -3922,6 +4054,34 @@
       gap: 4px;
       margin-left: auto;
       flex: 0 0 auto;
+    }}
+    .chat-member-expand-btn {{
+      border: 1px solid rgba(103, 132, 115, 0.45);
+      background: transparent;
+      color: #5f7869;
+      border-radius: 999px;
+      min-width: 15px;
+      height: 15px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 9px;
+      line-height: 1;
+      opacity: 0.82;
+    }}
+    .chat-member-expand-btn:hover {{
+      background: rgba(73, 122, 95, 0.12);
+      border-color: rgba(63, 103, 80, 0.56);
+      color: #2a5a42;
+      opacity: 1;
+    }}
+    .chat-member-expand-btn[aria-expanded="true"] {{
+      background: rgba(73, 122, 95, 0.16);
+      border-color: rgba(63, 103, 80, 0.62);
+      color: #214b37;
+      opacity: 1;
     }}
     .chat-member-action-row {{
       display: flex;

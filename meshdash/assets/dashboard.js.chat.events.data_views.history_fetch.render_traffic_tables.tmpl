@@ -15,8 +15,22 @@
     }}
 
     function renderTraffic(traffic, nodes, nodeHistory) {{
-      if (mapDataFocus === "activity") {{
+      const drawerHistoryActive = (
+        typeof isChatNodeDetailsHistoryActive === "function"
+        && isChatNodeDetailsHistoryActive()
+      );
+      const drawerNodeId = normalizeNodeId(selectedNodeId || "");
+      if (mapDataFocus === "activity" && !drawerHistoryActive) {{
         setMapDataMode("activity");
+        return;
+      }}
+
+      if (drawerHistoryActive && isSelectableNodeId(drawerNodeId)) {{
+        if (nodeHistory && normalizeNodeId(nodeHistory.node_id) === drawerNodeId) {{
+          renderNodeHistory(nodeHistory, nodes);
+        }} else {{
+          renderNodeHistoryLoading(drawerNodeId);
+        }}
         return;
       }}
 

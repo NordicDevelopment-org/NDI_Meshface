@@ -97,6 +97,14 @@
       const nodes = state.nodes || [];
       const traffic = (state.traffic || {{}});
       const edges = traffic.edges || [];
+      const drawerExpanded = (
+        typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+      );
+      const drawerHistoryActive = (
+        typeof isChatNodeDetailsHistoryActive === "function"
+        && isChatNodeDetailsHistoryActive()
+      );
 
       if (activeLayoutView === "saved" || activeLayoutView === "network") {{
         renderMap(nodes, edges, nodeHistory);
@@ -116,8 +124,14 @@
         renderTraffic(traffic, nodes, nodeHistory);
       }}
 
-      if (activeLayoutView === "saved") {{
+      if (activeLayoutView === "saved" || drawerExpanded) {{
         renderSavedNodeDetails(state, nodeHistory);
+      }}
+
+      if (drawerHistoryActive) {{
+        setMapDataMode("node");
+        syncNodeHistoryDock();
+        renderNodeHistory(nodeHistory, nodes);
       }}
     }}
 
@@ -125,16 +139,24 @@
       const nodeId = activeLayoutView === "saved"
         ? resolveSavedViewNodeId(latestState)
         : normalizeNodeId(selectedNodeId || "");
+      const drawerExpanded = (
+        typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+      );
+      const drawerHistoryActive = (
+        typeof isChatNodeDetailsHistoryActive === "function"
+        && isChatNodeDetailsHistoryActive()
+      );
       if (!isSelectableNodeId(nodeId)) {{
         abortNodeHistoryFetch();
         return null;
       }}
-      if (!(activeLayoutView === "saved" || activeLayoutView === "network")) {{
+      if (!(activeLayoutView === "saved" || activeLayoutView === "network" || drawerExpanded)) {{
         // No need to load node history unless the map views that can use it are visible.
         abortNodeHistoryFetch();
         return null;
       }}
-      if (mapDataFocus === "activity") {{
+      if (mapDataFocus === "activity" && !drawerExpanded) {{
         // When showing online activity, keep node history idle.
         abortNodeHistoryFetch();
         return null;
@@ -164,7 +186,7 @@
       nodeHistoryFetchAbort = new AbortController();
       const signal = nodeHistoryFetchAbort.signal;
 
-      if (!cachedData && activeLayoutView === "saved") {{
+      if (!cachedData && (activeLayoutView === "saved" || drawerHistoryActive)) {{
         renderNodeHistoryLoading(nodeId);
       }}
 
@@ -175,8 +197,12 @@
           ? resolveSavedViewNodeId(latestState)
           : normalizeNodeId(selectedNodeId || "");
         if (activeNodeId !== nodeId) return null;
-        if (!(activeLayoutView === "saved" || activeLayoutView === "network")) return null;
-        if (mapDataFocus === "activity") return null;
+        const drawerExpandedNow = (
+          typeof isChatNodeDetailsDrawerExpanded === "function"
+          && isChatNodeDetailsDrawerExpanded()
+        );
+        if (!(activeLayoutView === "saved" || activeLayoutView === "network" || drawerExpandedNow)) return null;
+        if (mapDataFocus === "activity" && !drawerExpandedNow) return null;
         applyNodeHistoryToView(data);
         return data;
       }} catch (err) {{
@@ -184,7 +210,7 @@
         if (seq !== nodeHistoryFetchSeq) return null;
         const msg = err instanceof Error ? err.message : String(err || "unknown error");
         const caption = document.getElementById("node-history-caption");
-        if (caption && activeLayoutView === "saved") {{
+        if (caption && (activeLayoutView === "saved" || drawerHistoryActive)) {{
           caption.textContent = `History error for ${{nodeId}}: ${{msg}}`;
         }}
         return null;

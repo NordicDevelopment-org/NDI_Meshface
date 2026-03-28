@@ -46,11 +46,15 @@
           const hidden304 = (typeof document !== "undefined") && !!document.hidden;
           const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network";
           const trafficVisible304 = mapVisible304 || activeLayoutView === "history";
+          const drawerHistoryVisible304 = (
+            typeof isChatNodeDetailsDrawerExpanded === "function"
+            && isChatNodeDetailsDrawerExpanded()
+          );
           const historyTargetId304 = activeLayoutView === "saved"
             ? resolveSavedViewNodeId(latestState)
             : normalizeNodeId(selectedNodeId || "");
-          const historyRelevant304 = (activeLayoutView === "saved" || activeLayoutView === "network")
-            && mapDataFocus !== "activity"
+          const historyRelevant304 = (activeLayoutView === "saved" || activeLayoutView === "network" || drawerHistoryVisible304)
+            && (mapDataFocus !== "activity" || drawerHistoryVisible304)
             && isSelectableNodeId(historyTargetId304);
           const cachedHistory304 = historyRelevant304 ? cachedNodeHistory(historyTargetId304) : null;
           const nodes304 = Array.isArray(latestState.nodes) ? latestState.nodes : [];
@@ -111,9 +115,16 @@
           if (shouldHydrateNodeNavigatorRoster(latestState)) {{
             renderChat(latestState);
           }}
-          if ((activeLayoutView === "saved" || activeLayoutView === "network")
-            && mapDataFocus !== "activity"
-            && isSelectableNodeId(historyTargetId304)) {{
+          if (
+            typeof syncChatNodeDetailsDrawer === "function"
+            && typeof isChatNodeDetailsDrawerExpanded === "function"
+            && isChatNodeDetailsDrawerExpanded()
+          ) {{
+            syncChatNodeDetailsDrawer(latestState, {{
+              fetchHistory: false,
+            }});
+          }}
+          if (historyRelevant304) {{
             const cached = nodeHistoryCache.get(historyTargetId304);
             const nowMs = Date.now();
             const ttlMs = Math.max(refreshMs * 2, 8000);
@@ -167,11 +178,15 @@
 
         const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network";
         const trafficVisible = mapVisible || activeLayoutView === "history";
+        const drawerHistoryVisible = (
+          typeof isChatNodeDetailsDrawerExpanded === "function"
+          && isChatNodeDetailsDrawerExpanded()
+        );
         const historyTargetId = activeLayoutView === "saved"
           ? resolveSavedViewNodeId(state)
           : normalizeNodeId(selectedNodeId || "");
-        const historyRelevant = (activeLayoutView === "saved" || activeLayoutView === "network")
-          && mapDataFocus !== "activity"
+        const historyRelevant = (activeLayoutView === "saved" || activeLayoutView === "network" || drawerHistoryVisible)
+          && (mapDataFocus !== "activity" || drawerHistoryVisible)
           && isSelectableNodeId(historyTargetId);
         const cachedHistory = historyRelevant ? cachedNodeHistory(historyTargetId) : null;
 
@@ -254,6 +269,15 @@
           syncChatUnreadFromState(state, {{ clearActiveWhenInChat: false }});
           renderChatChangeSummary();
           bindChatChangeSummaryControls();
+        }}
+        if (
+          typeof syncChatNodeDetailsDrawer === "function"
+          && typeof isChatNodeDetailsDrawerExpanded === "function"
+          && isChatNodeDetailsDrawerExpanded()
+        ) {{
+          syncChatNodeDetailsDrawer(state, {{
+            fetchHistory: false,
+          }});
         }}
 
         if (activeLayoutView === "saved") {{

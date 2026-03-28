@@ -382,6 +382,219 @@
       renderChatNodeNavigatorMenuControls();
     }}
 
+    function normalizeChatNodeDetailsDrawerTab(value) {{
+      const clean = String(value || "").trim().toLowerCase();
+      return clean === "history" ? "history" : "details";
+    }}
+
+    function chatNodeDetailsDrawerTargetNodeId(rawNodeId = selectedNodeId) {{
+      const clean = normalizeNodeId(rawNodeId || "");
+      return isSelectableNodeId(clean) ? clean : "";
+    }}
+
+    function chatNodeDetailsDrawerExpandedForNode(rawNodeId = selectedNodeId) {{
+      const nodeId = chatNodeDetailsDrawerTargetNodeId(rawNodeId);
+      return !!chatNodeDetailsDrawerExpanded && isSelectableNodeId(nodeId);
+    }}
+
+    function isChatNodeDetailsDrawerExpanded() {{
+      return chatNodeDetailsDrawerExpandedForNode(selectedNodeId);
+    }}
+
+    function isChatNodeDetailsHistoryActive() {{
+      return isChatNodeDetailsDrawerExpanded()
+        && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "history";
+    }}
+
+    function syncChatNodeDetailsExpandButtons() {{
+      const roomList = document.getElementById("chat-room-list");
+      if (!(roomList instanceof HTMLElement)) return;
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      const drawerExpanded = isChatNodeDetailsDrawerExpanded();
+      for (const btn of roomList.querySelectorAll(".chat-member-expand-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const nodeId = normalizeNodeId(btn.dataset.nodeId || "");
+        const expandedForNode = drawerExpanded && isSelectableNodeId(selectedId) && nodeId === selectedId;
+        btn.setAttribute("aria-expanded", expandedForNode ? "true" : "false");
+        btn.textContent = expandedForNode ? "▾" : "▸";
+      }}
+    }}
+
+    function syncSavedNodeDetailsDock(forceToSaved = false) {{
+      const detailsHost = document.getElementById("saved-node-details");
+      if (!(detailsHost instanceof HTMLElement)) return;
+      const savedPane = document.querySelector(".saved-node-pane");
+      const drawerHost = document.getElementById("chat-node-details-content-host");
+      const useDrawerHost = !forceToSaved
+        && isChatNodeDetailsDrawerExpanded()
+        && (drawerHost instanceof HTMLElement);
+      const target = useDrawerHost ? drawerHost : savedPane;
+      if (!(target instanceof HTMLElement)) return;
+      if (detailsHost.parentElement !== target) {{
+        target.appendChild(detailsHost);
+      }}
+    }}
+
+    function syncChatNodeDetailsDrawer(state = latestState, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const drawer = document.getElementById("chat-node-details-drawer");
+      const titleEl = document.getElementById("chat-node-details-title");
+      const closeBtn = document.getElementById("chat-node-details-close-btn");
+      const detailsTabBtn = document.getElementById("chat-node-details-tab-details");
+      const historyTabBtn = document.getElementById("chat-node-details-tab-history");
+      const detailsPanel = document.getElementById("chat-node-details-panel-details");
+      const historyPanel = document.getElementById("chat-node-details-panel-history");
+      if (!(drawer instanceof HTMLElement)) return;
+
+      const safeState = (state && typeof state === "object") ? state : (latestState || {{}});
+      const selectedId = chatNodeDetailsDrawerTargetNodeId(selectedNodeId);
+      const expanded = !!chatNodeDetailsDrawerExpanded && isSelectableNodeId(selectedId);
+      chatNodeDetailsDrawerTab = normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab);
+
+      drawer.hidden = !expanded;
+      if (closeBtn instanceof HTMLButtonElement) {{
+        closeBtn.disabled = !expanded;
+      }}
+      if (!expanded) {{
+        syncSavedNodeDetailsDock(true);
+        syncNodeHistoryDock();
+        syncChatNodeDetailsExpandButtons();
+        return;
+      }}
+
+      const activeTab = normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab);
+      if (detailsTabBtn instanceof HTMLButtonElement) {{
+        const isActive = activeTab === "details";
+        detailsTabBtn.classList.toggle("is-active", isActive);
+        detailsTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
+      }}
+      if (historyTabBtn instanceof HTMLButtonElement) {{
+        const isActive = activeTab === "history";
+        historyTabBtn.classList.toggle("is-active", isActive);
+        historyTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
+      }}
+      if (detailsPanel instanceof HTMLElement) {{
+        detailsPanel.hidden = activeTab !== "details";
+      }}
+      if (historyPanel instanceof HTMLElement) {{
+        historyPanel.hidden = activeTab !== "history";
+      }}
+
+      if (titleEl instanceof HTMLElement) {{
+        const resolvedName = (typeof resolveSavedViewNodeName === "function")
+          ? resolveSavedViewNodeName(safeState, selectedId)
+          : "";
+        const fallbackName = nodeNameCache.get(selectedId) || selectedId;
+        const titleName = String(resolvedName || fallbackName || selectedId);
+        titleEl.textContent = `${{titleName}} (${selectedId})`;
+      }}
+
+      syncSavedNodeDetailsDock(false);
+      const cachedHistory = cachedNodeHistory(selectedId);
+      renderSavedNodeDetails(safeState, cachedHistory);
+
+      if (activeTab === "history") {{
+        setMapDataMode("node");
+        syncNodeHistoryDock();
+        if (cachedHistory) {{
+          const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+          renderNodeHistory(cachedHistory, nodes);
+        }} else {{
+          renderNodeHistoryLoading(selectedId);
+        }}
+        if (opts.fetchHistory !== false) {{
+          void refreshSelectedNodeHistory(false);
+        }}
+      }} else {{
+        syncNodeHistoryDock();
+      }}
+      syncChatNodeDetailsExpandButtons();
+    }}
+
+    function setChatNodeDetailsDrawerExpanded(expanded, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const nextExpanded = !!expanded;
+      const nextTab = normalizeChatNodeDetailsDrawerTab(
+        opts.tab != null ? opts.tab : chatNodeDetailsDrawerTab
+      );
+      const currentExpanded = !!chatNodeDetailsDrawerExpanded;
+      const currentTab = normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab);
+      if (nextExpanded && !isSelectableNodeId(chatNodeDetailsDrawerTargetNodeId(selectedNodeId))) {{
+        chatNodeDetailsDrawerExpanded = false;
+        chatNodeDetailsDrawerTab = nextTab;
+        syncChatNodeDetailsDrawer(latestState, {{
+          fetchHistory: false,
+        }});
+        return false;
+      }}
+      const changed = currentExpanded !== nextExpanded || currentTab !== nextTab;
+      chatNodeDetailsDrawerExpanded = nextExpanded;
+      chatNodeDetailsDrawerTab = nextTab;
+      const shouldRerender = opts.rerender === true;
+      if (shouldRerender && latestState) {{
+        renderChat(latestState);
+      }} else {{
+        syncChatNodeDetailsDrawer(latestState, {{
+          fetchHistory: opts.fetchHistory !== false,
+        }});
+      }}
+      return changed;
+    }}
+
+    function setChatNodeDetailsDrawerTab(tab, options = null) {{
+      const nextTab = normalizeChatNodeDetailsDrawerTab(tab);
+      const opts = options && typeof options === "object" ? options : {{}};
+      chatNodeDetailsDrawerTab = nextTab;
+      syncChatNodeDetailsDrawer(latestState, {{
+        fetchHistory: opts.fetchHistory !== false,
+      }});
+      return nextTab;
+    }}
+
+    function toggleChatNodeDetailsDrawerForNode(rawNodeId) {{
+      const nodeId = chatNodeDetailsDrawerTargetNodeId(rawNodeId);
+      if (!isSelectableNodeId(nodeId)) return false;
+      const selectedId = chatNodeDetailsDrawerTargetNodeId(selectedNodeId);
+      const sameNode = selectedId === nodeId;
+      const expandedForNode = sameNode && isChatNodeDetailsDrawerExpanded();
+      if (!sameNode) {{
+        selectNode(nodeId, true, false);
+      }}
+      setChatNodeDetailsDrawerExpanded(!expandedForNode, {{
+        fetchHistory: !expandedForNode,
+        rerender: false,
+      }});
+      return true;
+    }}
+
+    function bindChatNodeDetailsDrawerControls() {{
+      const closeBtn = document.getElementById("chat-node-details-close-btn");
+      const drawer = document.getElementById("chat-node-details-drawer");
+      if (closeBtn instanceof HTMLButtonElement && closeBtn.dataset.bound !== "1") {{
+        closeBtn.dataset.bound = "1";
+        closeBtn.addEventListener("click", () => {{
+          setChatNodeDetailsDrawerExpanded(false, {{
+            fetchHistory: false,
+            rerender: false,
+          }});
+        }});
+      }}
+      if (drawer instanceof HTMLElement) {{
+        for (const tabBtn of drawer.querySelectorAll(".chat-node-details-tab-btn")) {{
+          if (!(tabBtn instanceof HTMLButtonElement) || tabBtn.dataset.bound === "1") continue;
+          tabBtn.dataset.bound = "1";
+          tabBtn.addEventListener("click", () => {{
+            setChatNodeDetailsDrawerTab(tabBtn.dataset.drawerTab || "details", {{
+              fetchHistory: true,
+            }});
+          }});
+        }}
+      }}
+      syncChatNodeDetailsDrawer(latestState, {{
+        fetchHistory: false,
+      }});
+    }}
+
     function bindChatNotificationScopeControl() {{
       const select = document.getElementById("chat-change-scope");
       if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") return;

@@ -9,7 +9,14 @@
       }}
       for (const member of document.querySelectorAll("#chat-room-list .chat-member-item")) {{
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
-        member.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+        const isSelected = !!selectedNodeId && nodeId === selectedNodeId;
+        member.classList.toggle("selected-node", isSelected);
+        const expandBtn = member.querySelector(".chat-member-expand-btn");
+        if (expandBtn instanceof HTMLButtonElement) {{
+          const expanded = isSelected && !!chatNodeDetailsDrawerExpanded;
+          expandBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+          expandBtn.textContent = expanded ? "▾" : "▸";
+        }}
       }}
       for (const item of document.querySelectorAll("#favorites-list .favorite-node-item")) {{
         const nodeId = normalizeNodeId(item.dataset.nodeId || "");
@@ -388,6 +395,11 @@
         pendingMapHistoryFocus = false;
         // Chat-only selection should not trigger map/history work.
         applyChatChannel(activeChatChannel, false);
+        if (typeof syncChatNodeDetailsDrawer === "function") {{
+          syncChatNodeDetailsDrawer(latestState, {{
+            fetchHistory: true,
+          }});
+        }}
         return;
       }}
       highlightNodeSelection();
@@ -423,6 +435,11 @@
       // Kick an immediate history refresh so the signal plot/trail doesn't wait for the next poll.
       void refreshSelectedNodeHistory(false);
       applyChatChannel(activeChatChannel, false);
+      if (typeof syncChatNodeDetailsDrawer === "function") {{
+        syncChatNodeDetailsDrawer(latestState, {{
+          fetchHistory: false,
+        }});
+      }}
     }}
 
     function clearNodeSelection() {{
@@ -437,6 +454,11 @@
       renderSavedNodeSearchDropdown(latestState);
       if (isChatWorkspaceLayoutView(activeLayoutView)) {{
         applyChatChannel(activeChatChannel, false);
+        if (typeof syncChatNodeDetailsDrawer === "function") {{
+          syncChatNodeDetailsDrawer(latestState, {{
+            fetchHistory: false,
+          }});
+        }}
         return;
       }}
       highlightNodeSelection();
@@ -459,6 +481,11 @@
         renderSavedNodeDetails({{}}, null);
       }}
       applyChatChannel(activeChatChannel, false);
+      if (typeof syncChatNodeDetailsDrawer === "function") {{
+        syncChatNodeDetailsDrawer(latestState, {{
+          fetchHistory: false,
+        }});
+      }}
     }}
 
     function bindNodeRowClicks() {{
