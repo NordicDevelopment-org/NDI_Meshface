@@ -37,7 +37,9 @@ def _private_mode_state_payload(payload: object) -> object:
     if not isinstance(payload, dict):
         return payload
     out = dict(payload)
+    out.pop("faults", None)
     out.pop("bot_requests", None)
+    out.pop("bot_faults", None)
     traffic_raw = out.get("traffic")
     if isinstance(traffic_raw, dict):
         traffic = dict(traffic_raw)
@@ -56,6 +58,26 @@ def _resolve_bot_request_history_fn(*, state_fn: object, selected_fn: object) ->
     return None
 
 
+def _resolve_fault_history_fn(*, state_fn: object, selected_fn: object) -> object:
+    history_fn = getattr(selected_fn, "fault_history_fn", None)
+    if callable(history_fn):
+        return history_fn
+    history_fn = getattr(state_fn, "fault_history_fn", None)
+    if callable(history_fn):
+        return history_fn
+    return None
+
+
+def _resolve_bot_fault_history_fn(*, state_fn: object, selected_fn: object) -> object:
+    history_fn = getattr(selected_fn, "bot_fault_history_fn", None)
+    if callable(history_fn):
+        return history_fn
+    history_fn = getattr(state_fn, "bot_fault_history_fn", None)
+    if callable(history_fn):
+        return history_fn
+    return None
+
+
 def _resolve_bot_settings_fn(*, state_fn: object, selected_fn: object) -> object:
     settings_fn = getattr(selected_fn, "bot_settings_fn", None)
     if callable(settings_fn):
@@ -67,6 +89,30 @@ def _resolve_bot_settings_fn(*, state_fn: object, selected_fn: object) -> object
 
 
 def _read_bot_request_rows(*, history_fn: object) -> object:
+    if not callable(history_fn):
+        return None
+    try:
+        rows = history_fn()
+    except Exception:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return rows
+
+
+def _read_fault_rows(*, history_fn: object) -> object:
+    if not callable(history_fn):
+        return None
+    try:
+        rows = history_fn()
+    except Exception:
+        return None
+    if not isinstance(rows, list):
+        return None
+    return rows
+
+
+def _read_bot_fault_rows(*, history_fn: object) -> object:
     if not callable(history_fn):
         return None
     try:
@@ -108,6 +154,59 @@ def _bot_request_etag_marker(rows: object) -> str:
     marker_parts = [str(len(rows))]
     marker_parts.extend("|".join(part) for part in sample)
     return ";".join(marker_parts)
+
+
+def _fault_etag_marker(rows: object) -> str:
+    if not isinstance(rows, list):
+        return "0"
+    sample = []
+    for row in rows[:20]:
+        if not isinstance(row, dict):
+            continue
+        sample.append(
+            (
+                str(row.get("id") or ""),
+                str(row.get("created_unix") or ""),
+                str(row.get("source") or ""),
+                str(row.get("code") or ""),
+            )
+        )
+    marker_parts = [str(len(rows))]
+    marker_parts.extend("|".join(part) for part in sample)
+    return ";".join(marker_parts)
+
+
+def _bot_fault_etag_marker(rows: object) -> str:
+    if not isinstance(rows, list):
+        return "0"
+    sample = []
+    for row in rows[:20]:
+        if not isinstance(row, dict):
+            continue
+        sample.append(
+            (
+                str(row.get("id") or ""),
+                str(row.get("created_unix") or ""),
+                str(row.get("code") or ""),
+            )
+        )
+    marker_parts = [str(len(rows))]
+    marker_parts.extend("|".join(part) for part in sample)
+    return ";".join(marker_parts)
+
+
+def _filter_bot_fault_rows(rows: object) -> list[dict[str, object]]:
+    if not isinstance(rows, list):
+        return []
+    out: list[dict[str, object]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        source = str(row.get("source") or "").strip().lower()
+        if source != "bot":
+            continue
+        out.append(row)
+    return out
 
 
 def _bot_settings_etag_marker(settings: object) -> str:
@@ -174,6 +273,47 @@ def _inject_bot_requests(
     return out
 
 
+def _inject_faults(
+    payload: object,
+    *,
+    state_fn: object,
+    selected_fn: object,
+    rows: object = None,
+) -> object:
+    if not isinstance(payload, dict):
+        return payload
+    if rows is None:
+        history_fn = _resolve_fault_history_fn(state_fn=state_fn, selected_fn=selected_fn)
+        rows = _read_fault_rows(history_fn=history_fn)
+    if not isinstance(rows, list) or len(rows) <= 0:
+        return payload
+    out = dict(payload)
+    out["faults"] = rows
+    return out
+
+
+def _inject_bot_faults(
+    payload: object,
+    *,
+    state_fn: object,
+    selected_fn: object,
+    rows: object = None,
+    fallback_rows: object = None,
+) -> object:
+    if not isinstance(payload, dict):
+        return payload
+    if rows is None:
+        history_fn = _resolve_bot_fault_history_fn(state_fn=state_fn, selected_fn=selected_fn)
+        rows = _read_bot_fault_rows(history_fn=history_fn)
+    if not isinstance(rows, list):
+        rows = _filter_bot_fault_rows(fallback_rows)
+    if not isinstance(rows, list) or len(rows) <= 0:
+        return payload
+    out = dict(payload)
+    out["bot_faults"] = rows
+    return out
+
+
 def _inject_bot_settings(
     payload: object,
     *,
@@ -218,12 +358,24 @@ def handle_state_get(
             etag = str(etag_fn())
         except Exception:
             etag = None
+    fault_history_fn = _resolve_fault_history_fn(state_fn=state_fn, selected_fn=selected_fn)
+    fault_rows = _read_fault_rows(history_fn=fault_history_fn)
     history_fn = _resolve_bot_request_history_fn(state_fn=state_fn, selected_fn=selected_fn)
     bot_rows = _read_bot_request_rows(history_fn=history_fn)
+    bot_fault_history_fn = _resolve_bot_fault_history_fn(state_fn=state_fn, selected_fn=selected_fn)
+    bot_fault_rows = _read_bot_fault_rows(history_fn=bot_fault_history_fn)
+    if not isinstance(bot_fault_rows, list) and isinstance(fault_rows, list) and len(fault_rows) > 0:
+        filtered_bot_fault_rows = _filter_bot_fault_rows(fault_rows)
+        if len(filtered_bot_fault_rows) > 0:
+            bot_fault_rows = filtered_bot_fault_rows
     settings_fn = _resolve_bot_settings_fn(state_fn=state_fn, selected_fn=selected_fn)
     bot_settings = _read_bot_settings(settings_fn=settings_fn)
+    if etag and isinstance(fault_rows, list) and len(fault_rows) > 0:
+        etag = f"{etag}|fault:{_fault_etag_marker(fault_rows)}"
     if etag and isinstance(bot_rows, list):
         etag = f"{etag}|bot:{_bot_request_etag_marker(bot_rows)}"
+    if etag and isinstance(bot_fault_rows, list) and len(bot_fault_rows) > 0:
+        etag = f"{etag}|botfault:{_bot_fault_etag_marker(bot_fault_rows)}"
     if etag and isinstance(bot_settings, dict):
         etag = f"{etag}|botcfg:{_bot_settings_etag_marker(bot_settings)}"
 
@@ -253,11 +405,24 @@ def handle_state_get(
 
     payload_raw = selected_fn()
     payload = normalize_state_payload_for_api(payload_raw)
+    payload = _inject_faults(
+        payload,
+        state_fn=state_fn,
+        selected_fn=selected_fn,
+        rows=fault_rows,
+    )
     payload = _inject_bot_requests(
         payload,
         state_fn=state_fn,
         selected_fn=selected_fn,
         rows=bot_rows,
+    )
+    payload = _inject_bot_faults(
+        payload,
+        state_fn=state_fn,
+        selected_fn=selected_fn,
+        rows=bot_fault_rows,
+        fallback_rows=fault_rows,
     )
     payload = _inject_bot_settings(
         payload,

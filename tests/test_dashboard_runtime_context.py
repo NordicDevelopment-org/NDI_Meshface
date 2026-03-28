@@ -458,7 +458,9 @@ def test_build_dashboard_runtime_context_passes_chat_limit_to_bot_builder(monkey
     assert calls["build_bot"]["send_chat_fn"] is send_chat
     assert callable(calls["build_bot"]["get_local_node_id_fn"])
     assert calls["build_bot"]["chat_max_bytes"] == 220
+    assert callable(calls["build_bot"]["record_fault_fn"])
     assert getattr(context.state_fn, "bot_responder") is fake_bot
+    assert callable(getattr(context.state_fn, "fault_history_fn"))
 
 
 def test_build_dashboard_runtime_context_attaches_standalone_zork_service(monkeypatch):

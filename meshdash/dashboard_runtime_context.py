@@ -58,6 +58,7 @@ from .history_profile import (
     build_profiled_history_db_path,
     resolve_history_profile_key,
 )
+from .fault_recorder import FaultRecorder
 from .bot_responder import (
     build_mesh_response_bot_from_env as _build_mesh_response_bot_from_env,
 )
@@ -199,6 +200,32 @@ def build_dashboard_runtime_context(
             dependencies=loader_dependencies
         )
 
+    fault_recorder = FaultRecorder(now_unix_fn=now_unix_fn)
+    fault_history_fn = fault_recorder.recent_faults
+    bot_fault_history_fn = lambda: fault_recorder.recent_faults(source="bot")
+    try:
+        setattr(loaders.state_fn, "fault_history_fn", fault_history_fn)
+    except Exception:
+        pass
+    try:
+        setattr(loaders.state_fn, "record_fault_fn", fault_recorder.record_fault)
+    except Exception:
+        pass
+    try:
+        setattr(loaders.state_fn, "bot_fault_history_fn", bot_fault_history_fn)
+    except Exception:
+        pass
+    state_lite_fn = getattr(loaders.state_fn, "lite", None)
+    if callable(state_lite_fn):
+        try:
+            setattr(state_lite_fn, "fault_history_fn", fault_history_fn)
+        except Exception:
+            pass
+        try:
+            setattr(state_lite_fn, "bot_fault_history_fn", bot_fault_history_fn)
+        except Exception:
+            pass
+
     # Optional: attach radio settings application hook.
     # We hang this off state_fn to avoid threading new dependencies through the
     # entire server wiring. (Same trick as state_fn.lite.)
@@ -315,6 +342,7 @@ def build_dashboard_runtime_context(
             get_local_node_id_fn=get_local_node_id_fn,
             chat_max_bytes=default_chat_max_bytes,
             delivery_state_lookup_fn=_bot_delivery_state_lookup,
+            record_fault_fn=fault_recorder.record_fault,
         )
     except Exception:
         response_bot = None

@@ -887,7 +887,7 @@ def test_ping_falls_back_to_known_node_hops_when_packet_hops_missing():
     assert "hop count n/a" not in text
 
 
-def test_ping_keeps_hops_na_when_packet_and_node_hops_are_unavailable():
+def test_ping_suppresses_reply_and_logs_fault_when_hops_are_unavailable():
     iface = _FakeIface()
     sent = []
 
@@ -908,9 +908,95 @@ def test_ping_keeps_hops_na_when_packet_and_node_hops_are_unavailable():
     packet.pop("hopLimit", None)
     bot.on_receive(packet, iface)
 
-    assert len(sent) == 1
-    text = str(sent[0]["text"]).lower()
-    assert "hop count n/a" in text
+    assert sent == []
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["responded"] is False
+    assert history[0]["fault_code"] == "PING_HOPS_UNAVAILABLE"
+    assert "PING_HOPS_UNAVAILABLE" in str(history[0]["response_error"])
+    faults = bot.recent_faults()
+    assert len(faults) == 1
+    fault = faults[0]
+    assert fault["code"] == "PING_HOPS_UNAVAILABLE"
+    assert fault["from_id"] == "!deadbeef"
+    assert fault["packet_hop_start"] is None
+    assert fault["packet_hop_limit"] is None
+    assert fault["packet_hops"] is None
+
+
+def test_ping_suppresses_reply_and_logs_fault_when_hop_limit_is_missing():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet["fromId"] = "!deadbeef"
+    packet["from"] = 0xDEADBEEF
+    packet["hopStart"] = 5
+    packet.pop("hopLimit", None)
+    bot.on_receive(packet, iface)
+
+    assert sent == []
+    history = bot.recent_requests()
+    assert len(history) == 1
+    assert history[0]["responded"] is False
+    assert history[0]["fault_code"] == "PING_HOPS_UNAVAILABLE"
+    faults = bot.recent_faults()
+    assert len(faults) == 1
+    fault = faults[0]
+    assert fault["code"] == "PING_HOPS_UNAVAILABLE"
+    assert fault["packet_hop_start"] == 5
+    assert fault["packet_hop_limit"] is None
+    assert "hopStart present but hopLimit missing" in str(fault["message"])
+
+
+def test_ping_fault_is_forwarded_to_shared_fault_recorder_callback():
+    iface = _FakeIface()
+    sent = []
+    shared_faults = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    def _record_fault(entry):
+        row = dict(entry or {})
+        row.setdefault("id", "shared-fault-1")
+        row.setdefault("created_unix", 1710001240)
+        row.setdefault("created_at", "2024-03-09 00:00:40")
+        shared_faults.append(dict(row))
+        return row
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        record_fault_fn=_record_fault,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    packet = _base_packet("ping 9b7c")
+    packet["fromId"] = "!deadbeef"
+    packet["from"] = 0xDEADBEEF
+    packet.pop("hopStart", None)
+    packet.pop("hopLimit", None)
+    bot.on_receive(packet, iface)
+
+    assert sent == []
+    assert len(shared_faults) == 1
+    assert shared_faults[0]["code"] == "PING_HOPS_UNAVAILABLE"
+    local_faults = bot.recent_faults()
+    assert len(local_faults) == 1
+    assert local_faults[0]["id"] == "shared-fault-1"
+    assert local_faults[0]["code"] == "PING_HOPS_UNAVAILABLE"
 
 
 def test_ping_uses_last_known_hops_when_future_packet_loses_hop_fields():

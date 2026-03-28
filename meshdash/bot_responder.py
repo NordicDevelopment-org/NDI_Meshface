@@ -22,6 +22,7 @@ from .bot_responder_nodes import (
     _format_hop_count_label,
     _iter_known_nodes,
     _is_text_message_packet,
+    _node_hops_away,
     _node_suffix,
     _normalize_node_id,
     _packet_hops,
@@ -96,6 +97,7 @@ _DEFAULT_INBOUND_RATE_PER_SENDER = 30
 _DEFAULT_INBOUND_RATE_GLOBAL = 300
 _DEFAULT_PULL_REEL_SYMBOLS = ("🍒", "🍋", "🍉", "🔔", "⭐", "7️⃣")
 _DEFAULT_PULL_RESPONSE_TEMPLATE = ""
+_PING_HOPS_UNAVAILABLE_FAULT_CODE = "PING_HOPS_UNAVAILABLE"
 _SLOT_TRIPLE_PAYOUTS = {
     "7️⃣": 120,
     "⭐": 60,
@@ -783,6 +785,7 @@ class MeshResponseBot:
         segment_retry_count: int = 0,
         segment_ack_wait_seconds: float = 0.0,
         delivery_state_lookup_fn: Optional[Callable[[int], Optional[str]]] = None,
+        record_fault_fn: Optional[Callable[[dict[str, object]], dict[str, object]]] = None,
         sleep_fn: Callable[[float], None] = time.sleep,
         now_unix_fn: Callable[[], float] = time.time,
         timer_factory: Optional[Callable[[float, Callable[[], None]], object]] = None,
@@ -803,6 +806,7 @@ class MeshResponseBot:
         self._segment_retry_count = _parse_nonnegative_int_token(segment_retry_count, 0)
         self._segment_ack_wait_seconds = _parse_nonnegative_float_token(segment_ack_wait_seconds, 0.0)
         self._delivery_state_lookup_fn = delivery_state_lookup_fn
+        self._record_fault_fn = record_fault_fn
         self._sleep_fn = sleep_fn
         self._now_unix_fn = now_unix_fn
         self._game_public_start_enabled = bool(game_public_start_enabled)
@@ -880,6 +884,8 @@ class MeshResponseBot:
         self._recent_packet_ids: dict[str, int] = {}
         self._request_log: list[dict[str, object]] = []
         self._request_seq = 0
+        self._fault_log: list[dict[str, object]] = []
+        self._fault_seq = 0
         self._public_ping_state: dict[str, dict[str, int]] = {}
         self._last_known_hops_by_node: dict[str, int] = {}
         self._recent_inbound_global_unix: list[int] = []
@@ -1555,6 +1561,121 @@ class MeshResponseBot:
             clean = {k: v for k, v in row.items() if not str(k).startswith("_")}
             out.append(clean)
         return out
+
+    def _record_fault(self, entry: dict[str, object]) -> dict[str, object]:
+        emitted_row = None
+        if callable(self._record_fault_fn):
+            try:
+                emitted_raw = self._record_fault_fn(dict(entry if isinstance(entry, dict) else {}))
+            except Exception:
+                emitted_raw = None
+            if isinstance(emitted_raw, dict):
+                emitted_row = dict(emitted_raw)
+
+        now_unix = int(self._now_unix_fn())
+        with self._lock:
+            self._fault_seq += 1
+            seq = self._fault_seq
+            row = dict(emitted_row if isinstance(emitted_row, dict) else entry)
+            row.setdefault("created_unix", now_unix)
+            row.setdefault("created_at", _safe_strftime(now_unix))
+            row.setdefault("id", f"fault-{now_unix}-{seq}")
+            row["_seq"] = seq
+            self._fault_log.append(row)
+            if len(self._fault_log) > _RECENT_PACKET_MAX:
+                self._fault_log = self._fault_log[-_RECENT_PACKET_MAX:]
+        return {k: v for k, v in row.items() if not str(k).startswith("_")}
+
+    def recent_faults(self, limit: int = 200) -> list[dict[str, object]]:
+        max_rows = max(1, min(1000, int(limit)))
+        with self._lock:
+            rows = list(self._fault_log)
+        rows.sort(
+            key=lambda row: (
+                _to_int(row.get("created_unix")) or 0,
+                _to_int(row.get("_seq")) or 0,
+            ),
+            reverse=True,
+        )
+        out: list[dict[str, object]] = []
+        for row in rows[:max_rows]:
+            clean = {k: v for k, v in row.items() if not str(k).startswith("_")}
+            out.append(clean)
+        return out
+
+    def _capture_ping_hops_unavailable_fault(
+        self,
+        *,
+        request_id: str,
+        command_text: str,
+        from_id: str,
+        to_id: str,
+        local_node_id: str,
+        channel_index: int,
+        packet_id: Optional[int],
+        packet: dict[str, object],
+        nodes: list[dict[str, object]],
+    ) -> dict[str, object]:
+        decoded = packet.get("decoded")
+        requester = _find_node_for_query(from_id, nodes)
+        requester_hops = _node_hops_away(requester)
+        packet_hops = _packet_hops(packet)
+        packet_hop_start = _to_int(packet.get("hopStart"))
+        if packet_hop_start is None:
+            packet_hop_start = _to_int(packet.get("hop_start"))
+        packet_hop_limit = _to_int(packet.get("hopLimit"))
+        if packet_hop_limit is None:
+            packet_hop_limit = _to_int(packet.get("hop_limit"))
+        decoded_hop_start = (
+            _to_int(decoded.get("hopStart") or decoded.get("hop_start"))
+            if isinstance(decoded, dict)
+            else None
+        )
+        decoded_hop_limit = (
+            _to_int(decoded.get("hopLimit") or decoded.get("hop_limit"))
+            if isinstance(decoded, dict)
+            else None
+        )
+        clean_from_id = _normalize_node_id(from_id).lower()
+        cached_hops = None
+        if clean_from_id:
+            with self._lock:
+                cached_hops = _to_int(self._last_known_hops_by_node.get(clean_from_id))
+
+        reason_parts: list[str] = []
+        if packet_hop_start is not None and packet_hop_limit is None:
+            reason_parts.append("packet hopStart present but hopLimit missing")
+        if packet_hop_start is None and packet_hop_limit is None:
+            reason_parts.append("packet missing hopStart/hopLimit")
+        if requester_hops is None:
+            reason_parts.append("requester node has no hops_away")
+        if cached_hops is None:
+            reason_parts.append("no cached last-known hops")
+        if not reason_parts:
+            reason_parts.append("unable to derive hops from packet or node state")
+
+        return self._record_fault(
+            {
+                "source": "bot",
+                "code": _PING_HOPS_UNAVAILABLE_FAULT_CODE,
+                "message": "; ".join(reason_parts),
+                "request_id": request_id,
+                "command": str(command_text or "").strip(),
+                "from_id": _normalize_node_id(from_id),
+                "to_id": _normalize_node_id(to_id) or "^all",
+                "local_node_id": _normalize_node_id(local_node_id),
+                "channel_index": int(channel_index),
+                "packet_id": _to_int(packet_id),
+                "packet_text": _packet_text(decoded),
+                "packet_hops": packet_hops,
+                "packet_hop_start": packet_hop_start,
+                "packet_hop_limit": packet_hop_limit,
+                "decoded_hop_start": decoded_hop_start,
+                "decoded_hop_limit": decoded_hop_limit,
+                "requester_hops_away": requester_hops,
+                "cached_last_known_hops": cached_hops,
+            }
+        )
 
     def _local_node_context(self, interface: object) -> tuple[str, set[str], list[dict[str, object]]]:
         local_node_id = ""
@@ -2343,6 +2464,8 @@ class MeshResponseBot:
             "response_to": "",
             "response_text": "",
             "response_error": "",
+            "fault_id": "",
+            "fault_code": "",
         }
         self._record_request(request_entry)
 
@@ -2353,6 +2476,29 @@ class MeshResponseBot:
             return
 
         if not reply_text:
+            return
+
+        if command == "ping" and _to_int(request_entry.get("hops")) is None:
+            fault = self._capture_ping_hops_unavailable_fault(
+                request_id=request_id,
+                command_text=text,
+                from_id=from_id,
+                to_id=to_id,
+                local_node_id=local_node_id,
+                channel_index=channel_index,
+                packet_id=packet_id,
+                packet=packet,
+                nodes=nodes,
+            )
+            fault_code = str(fault.get("code") or _PING_HOPS_UNAVAILABLE_FAULT_CODE)
+            fault_message = str(fault.get("message") or "ping suppressed due to unknown hops")
+            self._update_request(
+                request_id,
+                responded=False,
+                response_error=f"{fault_code}: {fault_message}",
+                fault_id=str(fault.get("id") or ""),
+                fault_code=fault_code,
+            )
             return
 
         reply_id = packet_id if packet_id is not None and packet_id > 0 else None
@@ -2543,6 +2689,7 @@ def build_mesh_response_bot_from_env(
     env: Optional[dict[str, str]] = None,
     chat_max_bytes: int = DEFAULT_CHAT_MAX_BYTES,
     delivery_state_lookup_fn: Optional[Callable[[int], Optional[str]]] = None,
+    record_fault_fn: Optional[Callable[[dict[str, object]], dict[str, object]]] = None,
     sleep_fn: Callable[[float], None] = time.sleep,
     now_unix_fn: Callable[[], float] = time.time,
 ) -> Optional[MeshResponseBot]:
@@ -2731,6 +2878,7 @@ def build_mesh_response_bot_from_env(
         segment_retry_count=segment_retries,
         segment_ack_wait_seconds=segment_ack_wait_ms / 1000.0,
         delivery_state_lookup_fn=delivery_state_lookup_fn,
+        record_fault_fn=record_fault_fn,
         sleep_fn=sleep_fn,
         now_unix_fn=now_unix_fn,
     )

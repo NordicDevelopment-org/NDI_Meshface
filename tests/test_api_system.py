@@ -58,14 +58,16 @@ def test_handle_state_get_accepts_typed_state_payload():
     assert calls["payload_obj"]["local_node_id"] == "local"
 
 
-def test_handle_state_get_private_mode_strips_recent_chat_and_bot_requests():
+def test_handle_state_get_private_mode_strips_recent_chat_and_bot_logs():
     calls = {}
 
     handle_state_get(
         object(),
         state_fn=lambda: {
             "ok": True,
+            "faults": [{"id": "f0"}],
             "bot_requests": [{"id": "r1"}],
+            "bot_faults": [{"id": "f1"}],
             "traffic": {
                 "recent_packets": [{"id": 1}],
                 "recent_chat": [{"text": "secret"}],
@@ -76,7 +78,9 @@ def test_handle_state_get_private_mode_strips_recent_chat_and_bot_requests():
     )
 
     assert calls["status_code"] == 200
+    assert "faults" not in calls["payload_obj"]
     assert "bot_requests" not in calls["payload_obj"]
+    assert "bot_faults" not in calls["payload_obj"]
     assert calls["payload_obj"]["traffic"]["recent_chat"] == []
 
 
@@ -279,6 +283,83 @@ def test_handle_state_get_injects_backend_bot_requests_when_available():
     assert calls["payload_obj"]["ok"] is True
     assert isinstance(calls["payload_obj"]["bot_requests"], list)
     assert calls["payload_obj"]["bot_requests"][0]["id"] == "mesh-1"
+
+
+def test_handle_state_get_injects_backend_faults_when_available():
+    calls = {}
+
+    def _state_fn():
+        return {"ok": True}
+
+    setattr(
+        _state_fn,
+        "fault_history_fn",
+        lambda: [{"id": "fault-1", "source": "system", "code": "TEST_FAULT"}],
+    )
+
+    handle_state_get(
+        object(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 200
+    assert calls["payload_obj"]["ok"] is True
+    assert isinstance(calls["payload_obj"]["faults"], list)
+    assert calls["payload_obj"]["faults"][0]["id"] == "fault-1"
+
+
+def test_handle_state_get_injects_backend_bot_faults_when_available():
+    calls = {}
+
+    def _state_fn():
+        return {"ok": True}
+
+    setattr(
+        _state_fn,
+        "bot_fault_history_fn",
+        lambda: [{"id": "fault-1", "code": "PING_HOPS_UNAVAILABLE"}],
+    )
+
+    handle_state_get(
+        object(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 200
+    assert calls["payload_obj"]["ok"] is True
+    assert isinstance(calls["payload_obj"]["bot_faults"], list)
+    assert calls["payload_obj"]["bot_faults"][0]["id"] == "fault-1"
+
+
+def test_handle_state_get_derives_bot_faults_from_shared_fault_stream():
+    calls = {}
+
+    def _state_fn():
+        return {"ok": True}
+
+    setattr(
+        _state_fn,
+        "fault_history_fn",
+        lambda: [
+            {"id": "fault-bot-1", "source": "bot", "code": "PING_HOPS_UNAVAILABLE"},
+            {"id": "fault-rf-1", "source": "radio", "code": "LINK_DROP"},
+        ],
+    )
+
+    handle_state_get(
+        object(),
+        state_fn=_state_fn,
+        write_json_response_fn=lambda _handler, **kwargs: calls.update(kwargs),
+    )
+
+    assert calls["status_code"] == 200
+    assert isinstance(calls["payload_obj"]["faults"], list)
+    assert len(calls["payload_obj"]["faults"]) == 2
+    assert isinstance(calls["payload_obj"]["bot_faults"], list)
+    assert len(calls["payload_obj"]["bot_faults"]) == 1
+    assert calls["payload_obj"]["bot_faults"][0]["id"] == "fault-bot-1"
 
 
 def test_handle_state_get_injects_backend_bot_settings_when_available():
