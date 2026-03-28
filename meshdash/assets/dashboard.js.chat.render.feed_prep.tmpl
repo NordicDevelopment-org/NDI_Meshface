@@ -505,8 +505,29 @@
       );
       chatDirectActivePeerId = isCanonicalNodeId(directSelectedId) ? directSelectedId : "";
       updateChatInputPlaceholder();
+      const mergedAllAndDirectMessages = (() => {{
+        const publicRows = Array.isArray(channelMessages.all) ? channelMessages.all : [];
+        const directRows = Array.isArray(channelMessages.direct) ? channelMessages.direct : [];
+        if (directRows.length <= 0) return publicRows;
+        if (publicRows.length <= 0) return directRows;
+        // In chat-main mode, show peer-to-peer rows inline so the feed is never
+        // blank while direct traffic is active.
+        if (chatMainDirectModeEnabled) return publicRows;
+        return publicRows
+          .concat(directRows)
+          .slice()
+          .sort((a, b) => {{
+            const aUnix = latestUnixTimestamp(a && a.rx_time, a && a.captured_at);
+            const bUnix = latestUnixTimestamp(b && b.rx_time, b && b.captured_at);
+            if (aUnix !== bUnix) return aUnix - bUnix;
+            const aId = messageIdOf(a) || 0;
+            const bId = messageIdOf(b) || 0;
+            if (aId !== bId) return aId - bId;
+            return 0;
+          }});
+      }})();
       const activeChannelMessages = (
-        activeChatChannel === "direct" ? channelMessages.direct : channelMessages.all
+        activeChatChannel === "direct" ? channelMessages.direct : mergedAllAndDirectMessages
       );
       const messages = (() => {{
         if (activeChatChannel !== "direct") {{
