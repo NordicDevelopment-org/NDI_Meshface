@@ -31,6 +31,17 @@
         channelIndex,
         channelLabel,
         seenKeys,
+        autoResponseEnabled: payload.autoResponseEnabled === true || payload.auto_response_enabled === true,
+        autoAwaitingReply: payload.autoAwaitingReply === true || payload.auto_awaiting_reply === true,
+        autoScriptIndex: Math.max(0, Math.trunc(Number(payload.autoScriptIndex ?? payload.auto_script_index) || 0)),
+        autoExpectedAny: Array.isArray(payload.autoExpectedAny ?? payload.auto_expected_any)
+          ? (payload.autoExpectedAny ?? payload.auto_expected_any)
+            .map((value) => String(value == null ? "" : value).trim())
+            .filter((value) => !!value)
+            .slice(0, 24)
+          : [],
+        autoLastCommand: String(payload.autoLastCommand ?? payload.auto_last_command ?? "").trim(),
+        autoSending: false,
       }};
     }}
 
@@ -61,6 +72,16 @@
                 channelIndex: normalizeMeshChannelIndex(consoleInteractiveSession.channelIndex),
                 channelLabel: String(consoleInteractiveSession.channelLabel || "").trim(),
                 seenKeys: Array.from(consoleInteractiveSession.seenKeys || []).slice(-4000),
+                autoResponseEnabled: consoleInteractiveSession.autoResponseEnabled === true,
+                autoAwaitingReply: consoleInteractiveSession.autoAwaitingReply === true,
+                autoScriptIndex: Math.max(0, Math.trunc(Number(consoleInteractiveSession.autoScriptIndex) || 0)),
+                autoExpectedAny: Array.isArray(consoleInteractiveSession.autoExpectedAny)
+                  ? consoleInteractiveSession.autoExpectedAny
+                    .map((value) => String(value == null ? "" : value).trim())
+                    .filter((value) => !!value)
+                    .slice(0, 24)
+                  : [],
+                autoLastCommand: String(consoleInteractiveSession.autoLastCommand || "").trim(),
               }};
             }}
           }}
@@ -370,4 +391,3 @@
       }}
       return normalizeConsolePromptHostLabel(selfId.replace(/^!+/, "") || "radio");
     }}
-

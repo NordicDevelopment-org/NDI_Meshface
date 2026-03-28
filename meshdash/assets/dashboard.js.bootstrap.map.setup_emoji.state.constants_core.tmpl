@@ -190,6 +190,7 @@
     const bbsMaxMotdChars = 120;
     const bbsMaxPostChars = 220;
     const zorkE2EDebugStorageKey = "meshDashboardZorkE2EDebugEnabledV1";
+    const consoleZorkRemoteAutoStorageKey = "meshDashboardConsoleZorkRemoteAutoV1";
     const zorkE2EWinScriptDelayMs = 110;
     const zorkE2EWinScript = Object.freeze([
       Object.freeze({{ command: "zork", expectAny: Object.freeze(["session started", "west of house"]) }}),
@@ -213,6 +214,7 @@
       Object.freeze({{ command: "score", expectAny: Object.freeze(["score/progress"]) }}),
       Object.freeze({{ command: "quit", expectAny: Object.freeze(["session ended"]) }}),
     ]);
+    const zorkRemoteAutoResponseScript = Object.freeze(zorkE2EWinScript.slice(1));
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const botCityHintMaxDistanceKm = 120;
     const requesterPositionMaxAgeSeconds = 24 * 3600;
