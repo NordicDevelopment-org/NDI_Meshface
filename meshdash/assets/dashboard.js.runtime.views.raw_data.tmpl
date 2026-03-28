@@ -40,7 +40,7 @@
     ];
     const envMetricsChartLayout = {{
       width: 900,
-      height: 260,
+      height: 320,
       padLeft: 56,
       padRight: 12,
       padTop: 16,
@@ -246,69 +246,37 @@
       }}
     }}
 
-    function renderEnvironmentMetricLegend(metrics, nodes, metricMeta, nodeMeta, filteredPoints) {{
+    function renderEnvironmentNodeLegend(metricMeta, nodeMeta, nodes, filteredPoints, chartMeta) {{
       const host = document.getElementById("env-metrics-available");
       if (!(host instanceof HTMLElement)) return;
-      const safeMetrics = Array.isArray(metrics) ? metrics : [];
       const safeNodes = Array.isArray(nodes) ? nodes : [];
-      if (!safeMetrics.length || !safeNodes.length) {{
+      const safePoints = Array.isArray(filteredPoints) ? filteredPoints : [];
+      const safeChartMeta = (chartMeta && typeof chartMeta === "object") ? chartMeta : {{}};
+      const legendItems = Array.isArray(safeChartMeta.legendItems) ? safeChartMeta.legendItems : [];
+      const totalSeries = Math.max(0, Math.trunc(Number(safeChartMeta.totalSeries) || 0));
+      const visibleSeries = Math.max(0, Math.trunc(Number(safeChartMeta.visibleSeries) || 0));
+      if (!safeNodes.length || !metricMeta || !metricMeta.key) {{
         host.textContent = "No sensor metric keys detected yet in saved telemetry history.";
         return;
       }}
-      const totalPoints = Math.max(0, Math.trunc(Number((Array.isArray(filteredPoints) ? filteredPoints.length : 0)) || 0));
+      const totalPoints = Math.max(0, Math.trunc(Number(safePoints.length) || 0));
       const selectionSummary = metricMeta
         ? `${{metricMeta.label}}${{nodeMeta ? ` @ ${{nodeMeta.label || nodeMeta.id}}` : " @ all nodes"}}`
         : "No metric selected";
+      const hiddenSeries = Math.max(0, totalSeries - visibleSeries);
       host.innerHTML = [
         `<span class="env-metric-chip">${{escAttr(selectionSummary)}} <span class="env-metric-chip-count">${{totalPoints}}</span></span>`,
-        ...safeMetrics.slice(0, 10).map((meta) => (
-          `<span class="env-metric-chip">${{escAttr(meta.label)}} <span class="env-metric-chip-count">${{Math.max(0, Math.trunc(Number(meta.count) || 0))}}</span></span>`
+        ...legendItems.map((item) => (
+          `<span class="env-metric-chip env-node-legend-item" style="--node-color:${{escAttr(item.color)}};" title="${{escAttr(formatEnvironmentNodeTooltipLabel(item.nodeId, item.label))}}">
+            ${{escAttr(item.label)}}
+            <span class="env-metric-chip-count">${{Math.max(0, Math.trunc(Number(item.pointCount) || 0))}}</span>
+          </span>`
         )),
-        safeMetrics.length > 10
-          ? `<span class="env-metric-chip">+${{safeMetrics.length - 10}} more metrics</span>`
+        hiddenSeries > 0
+          ? `<span class="env-metric-chip env-node-legend-more">+${{hiddenSeries}} more node${{hiddenSeries === 1 ? "" : "s"}} hidden (top ${{visibleSeries}} shown)</span>`
           : "",
         `<span class="env-metric-chip">Nodes <span class="env-metric-chip-count">${{safeNodes.length}}</span></span>`,
       ].filter(Boolean).join("");
-    }}
-
-    function renderEnvironmentMetricsTable(points, metricMeta, nodeMeta) {{
-      const valueHeader = document.getElementById("env-metrics-value-col");
-      if (valueHeader instanceof HTMLElement) {{
-        valueHeader.textContent = metricMeta && metricMeta.label ? metricMeta.label : "Value";
-      }}
-      if (!metricMeta || !metricMeta.key) {{
-        fillTable("env-metrics-table", ['<tr><td colspan="5">No sensor metrics available yet.</td></tr>']);
-        return 0;
-      }}
-      const safePoints = (Array.isArray(points) ? points : [])
-        .slice()
-        .sort((a, b) => Number(b && b.unix) - Number(a && a.unix));
-      if (!safePoints.length) {{
-        const nodeLabel = nodeMeta ? ` for ${{nodeMeta.label || nodeMeta.id}}` : "";
-        fillTable("env-metrics-table", [`<tr><td colspan="5">No saved points for ${{escAttr(metricMeta.label)}}${{escAttr(nodeLabel)}}.</td></tr>`]);
-        return 0;
-      }}
-      const capped = safePoints.slice(0, 800);
-      const rows = capped.map((point) => {{
-        const pointUnix = Number(point && point.unix);
-        const timeText = formatEnvHistoryTime(pointUnix);
-        const nodeLabel = String((point && point.node_label) || (point && point.node_id) || "unknown");
-        const nodeId = String((point && point.node_id) || "n/a");
-        const metricLabel = String((point && point.metric_label) || metricMeta.label || "Metric");
-        const numericValue = envMetricFiniteNumber(point && point.value);
-        return `<tr>
-          <td data-sort="${{escAttr(pointUnix)}}">${{escAttr(timeText)}}</td>
-          <td data-sort="${{escAttr(nodeLabel)}}">${{escAttr(nodeLabel)}}</td>
-          <td class="mono" data-sort="${{escAttr(nodeId)}}">${{escAttr(nodeId)}}</td>
-          <td data-sort="${{escAttr(numericValue)}}">${{escAttr(envMetricValueText(numericValue))}}</td>
-          <td data-sort="${{escAttr(metricLabel)}}">${{escAttr(metricLabel)}}</td>
-        </tr>`;
-      }});
-      if (safePoints.length > capped.length) {{
-        rows.push(`<tr><td colspan="5">Showing newest ${{capped.length}} of ${{safePoints.length}} points.</td></tr>`);
-      }}
-      fillTable("env-metrics-table", rows);
-      return safePoints.length;
     }}
 
     function downsampleEnvironmentSeries(points, maxPoints = 260) {{
@@ -580,7 +548,9 @@
     function renderEnvironmentMetricsChart(points, metricMeta, nodeMeta) {{
       const svg = document.getElementById("env-metrics-chart");
       const empty = document.getElementById("env-metrics-empty");
-      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) {{
+        return {{ legendItems: [], totalSeries: 0, visibleSeries: 0 }};
+      }}
       bindEnvironmentMetricsChartZoom();
 
       const metricLabel = String(metricMeta && metricMeta.label ? metricMeta.label : "Sensor history chart").trim() || "Sensor history chart";
@@ -594,17 +564,16 @@
           empty.textContent = String(emptyText || "").trim();
           empty.hidden = false;
         }}
+        return {{ legendItems: [], totalSeries: 0, visibleSeries: 0 }};
       }};
 
       if (!metricMeta || !metricMeta.key) {{
-        clearChart("No historical sensor metrics found yet.");
-        return;
+        return clearChart("No historical sensor metrics found yet.");
       }}
 
       const safePoints = Array.isArray(points) ? points : [];
       if (!safePoints.length) {{
-        clearChart(`No historical points for ${{metricMeta.label}}${{nodeMeta ? ` from ${{nodeMeta.label || nodeMeta.id}}` : ""}}.`);
-        return;
+        return clearChart(`No historical points for ${{metricMeta.label}}${{nodeMeta ? ` from ${{nodeMeta.label || nodeMeta.id}}` : ""}}.`);
       }}
 
       const selectionScopeKey = [
@@ -653,9 +622,9 @@
         .sort((a, b) => (b.points.length - a.points.length) || String(a.label).localeCompare(String(b.label)));
 
       if (!seriesList.length) {{
-        clearChart("No valid timestamped telemetry points in this selection.");
-        return;
+        return clearChart("No valid timestamped telemetry points in this selection.");
       }}
+      const totalSeries = seriesList.length;
 
       if (!nodeMeta && seriesList.length > envMetricsChartMaxSeries) {{
         seriesList = selectEnvironmentSeriesForAllNodes(seriesList, envMetricsChartMaxSeries);
@@ -707,8 +676,7 @@
       let maxValue = Math.max(...visiblePoints.map((point) => Number(point.value)));
 
       if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {{
-        clearChart("No numeric values in this selection.");
-        return;
+        return clearChart("No numeric values in this selection.");
       }}
 
       if (Math.abs(maxValue - minValue) < 1e-9) {{
@@ -772,10 +740,17 @@
 
       const linePaths = [];
       const pointDots = [];
+      const legendItems = [];
       visibleSeriesList.forEach((series, idx) => {{
         const color = envMetricColorPalette[idx % envMetricColorPalette.length];
         const seriesNodeId = String(series.nodeId || "").trim();
         const seriesTitle = formatEnvironmentNodeTooltipLabel(seriesNodeId, series.label);
+        legendItems.push({{
+          nodeId: seriesNodeId,
+          label: resolveEnvironmentNodeDisplayName(seriesNodeId, series.label),
+          color,
+          pointCount: Array.isArray(series.points) ? series.points.length : 0,
+        }});
         const pathD = series.points.map((point, pointIdx) => {{
           const x = xForUnix(point.unix);
           const y = yForValue(point.value);
@@ -832,6 +807,11 @@
       }}
       setEnvironmentMetricsChartTitle(svg, metricMeta.label || "Sensor history chart", zoomed);
       empty.hidden = true;
+      return {{
+        legendItems,
+        totalSeries,
+        visibleSeries: visibleSeriesList.length,
+      }};
     }}
 
     function renderEnvironmentMetricsSnapshot() {{
@@ -844,9 +824,9 @@
       const metricMeta = resolveEnvironmentMetricMeta(metrics, selectedMetric);
       const nodeMeta = resolveEnvironmentNodeMeta(nodes, selectedNodeId);
       const filteredPoints = filterEnvironmentMetricPoints(points, selectedMetric, selectedNodeId);
-      renderEnvironmentMetricLegend(metrics, nodes, metricMeta, nodeMeta, filteredPoints);
-      const renderedCount = renderEnvironmentMetricsTable(filteredPoints, metricMeta, nodeMeta);
-      renderEnvironmentMetricsChart(filteredPoints, metricMeta, nodeMeta);
+      const chartMeta = renderEnvironmentMetricsChart(filteredPoints, metricMeta, nodeMeta);
+      renderEnvironmentNodeLegend(metricMeta, nodeMeta, nodes, filteredPoints, chartMeta);
+      const renderedCount = Math.max(0, Math.trunc(Number(filteredPoints.length) || 0));
 
       if (!metrics.length || !nodes.length) {{
         setEnvironmentMetricsStatus("No historical sensor telemetry has been saved yet.", "warn");

@@ -557,18 +557,8 @@
       background: #eaf4eb;
     }}
     .env-metrics-grid {{
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 8px;
+      display: block;
       min-height: 0;
-    }}
-    .env-metrics-table-wrap.scroll {{
-      max-height: 320px;
-      min-height: 200px;
-      border: 1px solid #cedfce;
-      border-radius: 8px;
-      background: #f7fbf7;
-      padding: 2px;
     }}
     #env-metrics-chart-wrap {{
       position: relative;
@@ -576,11 +566,11 @@
       border-radius: 8px;
       background: #f7fbf7;
       padding: 6px;
-      min-height: 220px;
+      min-height: 300px;
     }}
     #env-metrics-chart {{
       width: 100%;
-      height: 220px;
+      height: clamp(260px, 46vh, 420px);
       display: block;
       cursor: zoom-in;
       touch-action: none;
@@ -627,6 +617,25 @@
       padding: 0 4px;
       line-height: 1.4;
     }}
+    .env-node-legend-item {{
+      position: relative;
+      padding-left: 20px;
+    }}
+    .env-node-legend-item::before {{
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 50%;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--node-color, #2f855a);
+      transform: translateY(-50%);
+      box-shadow: 0 0 0 1px rgba(15, 35, 25, 0.15);
+    }}
+    .env-node-legend-more {{
+      opacity: 0.86;
+    }}
     [data-theme="dark"] .env-metrics-explorer {{
       border-color: #355344;
       background: #132118;
@@ -659,10 +668,6 @@
     [data-theme="dark"] .env-metrics-refresh-btn:hover {{
       background: #22372b;
     }}
-    [data-theme="dark"] .env-metrics-table-wrap.scroll {{
-      border-color: #355244;
-      background: #111b15;
-    }}
     [data-theme="dark"] #env-metrics-chart-wrap {{
       border-color: #355244;
       background: #111b15;
@@ -679,6 +684,9 @@
       border-color: #517a65;
       background: #284336;
       color: #ddf2e6;
+    }}
+    [data-theme="dark"] .env-node-legend-item::before {{
+      box-shadow: 0 0 0 1px rgba(225, 242, 232, 0.22);
     }}
     .pill {{
       display: inline-block;
