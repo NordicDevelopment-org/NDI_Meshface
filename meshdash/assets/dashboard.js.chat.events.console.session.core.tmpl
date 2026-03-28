@@ -187,6 +187,8 @@
     function renderConsoleBuffer(forceScroll = false) {{
       const pre = document.getElementById("live-console");
       if (!(pre instanceof HTMLElement)) return;
+      const zorkWordWrapActive = isZorkConsoleInteractiveSession(consoleInteractiveSession);
+      pre.classList.toggle("zork-word-wrap", zorkWordWrapActive);
       if (!forceScroll && hasConsoleSelectionWithin(pre)) {{
         consoleRenderDeferred = true;
         return;
@@ -256,4 +258,3 @@
       }}
       consoleFontSize = key;
     }}
-
