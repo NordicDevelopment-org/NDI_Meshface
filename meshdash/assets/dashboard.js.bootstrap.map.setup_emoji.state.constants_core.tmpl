@@ -189,30 +189,6 @@
     const bbsMaxTitleChars = 42;
     const bbsMaxMotdChars = 120;
     const bbsMaxPostChars = 220;
-    const zorkE2EDebugStorageKey = "meshDashboardZorkE2EDebugEnabledV1";
-    const zorkE2EWinScriptDelayMs = 110;
-    const zorkE2EWinScript = Object.freeze([
-      Object.freeze({{ command: "zork", expectAny: Object.freeze(["session started", "west of house"]) }}),
-      Object.freeze({{ command: "open mailbox", expectAny: Object.freeze(["leaflet"]) }}),
-      Object.freeze({{ command: "take leaflet", expectAny: Object.freeze(["taken"]) }}),
-      Object.freeze({{ command: "read leaflet", expectAny: Object.freeze(["welcome to dungeon"]) }}),
-      Object.freeze({{ command: "north", expectAny: Object.freeze(["north of house"]) }}),
-      Object.freeze({{ command: "east", expectAny: Object.freeze(["behind house"]) }}),
-      Object.freeze({{ command: "open window", expectAny: Object.freeze(["open the window"]) }}),
-      Object.freeze({{ command: "enter window", expectAny: Object.freeze(["kitchen"]) }}),
-      Object.freeze({{ command: "west", expectAny: Object.freeze(["living room"]) }}),
-      Object.freeze({{ command: "take lamp", expectAny: Object.freeze(["taken"]) }}),
-      Object.freeze({{ command: "turn on lamp", expectAny: Object.freeze(["glows to life", "lantern glows"]) }}),
-      Object.freeze({{ command: "take sword", expectAny: Object.freeze(["taken"]) }}),
-      Object.freeze({{ command: "move rug", expectAny: Object.freeze(["trap door"]) }}),
-      Object.freeze({{ command: "open trap door", expectAny: Object.freeze(["staircase descending", "trap door"]) }}),
-      Object.freeze({{ command: "down", expectAny: Object.freeze(["cellar"]) }}),
-      Object.freeze({{ command: "east", expectAny: Object.freeze(["troll room"]) }}),
-      Object.freeze({{ command: "attack troll with sword", expectAny: Object.freeze(["troll collapses", "already down"]) }}),
-      Object.freeze({{ command: "north", expectAny: Object.freeze(["east-west passage"]) }}),
-      Object.freeze({{ command: "score", expectAny: Object.freeze(["score/progress"]) }}),
-      Object.freeze({{ command: "quit", expectAny: Object.freeze(["session ended"]) }}),
-    ]);
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const botCityHintMaxDistanceKm = 120;
     const requesterPositionMaxAgeSeconds = 24 * 3600;
