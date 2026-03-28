@@ -62,6 +62,9 @@
     let consoleRenderDeferred = false;
     let consoleRenderRaf = null;
     let consoleRenderPendingForceScroll = false;
+    let consoleSessionPersistTimer = null;
+    let consoleSessionPersistLastSerialized = "";
+    let summaryMiniPanelHashById = new Map();
     let fitDone = false;
     let mapBootstrapFocusDone = false;
     let pendingMapHistoryFocus = false;

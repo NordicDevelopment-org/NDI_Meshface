@@ -13,36 +13,64 @@
       return null;
     }}
 
-    function persistConsoleSessionState() {{
+    function buildPersistableConsoleSessionPayload() {{
+      let interactiveSession = null;
+      if (consoleInteractiveSession && typeof consoleInteractiveSession === "object") {{
+        const mode = String(consoleInteractiveSession.mode || "").trim().toLowerCase();
+        if (mode === "standalone") {{
+          const sessionId = String(consoleInteractiveSession.sessionId || "").trim();
+          if (sessionId) {{
+            interactiveSession = {{
+              name: "zork",
+              mode: "standalone",
+              sessionId,
+            }};
+          }}
+        }}
+      }}
+      return {{
+        lines: consoleLines.slice(-consoleMaxLines),
+        commandHistory: consoleCommandHistory.slice(-consoleCommandHistoryMax),
+        autoscroll: !!consoleAutoscroll,
+        timestamps: !!consoleShowTimestamps,
+        filterText: String(consoleFilterText || "").slice(0, 120),
+        interactiveSession,
+        eventCounter: Math.max(0, Math.trunc(Number(consoleEventCounter) || 0)),
+      }};
+    }}
+
+    function flushConsoleSessionStatePersist() {{
       try {{
         const storage = window.sessionStorage;
         if (!storage) return;
-        let interactiveSession = null;
-        if (consoleInteractiveSession && typeof consoleInteractiveSession === "object") {{
-          const mode = String(consoleInteractiveSession.mode || "").trim().toLowerCase();
-          if (mode === "standalone") {{
-            const sessionId = String(consoleInteractiveSession.sessionId || "").trim();
-            if (sessionId) {{
-              interactiveSession = {{
-                name: "zork",
-                mode: "standalone",
-                sessionId,
-              }};
-            }}
-          }}
+        const payload = buildPersistableConsoleSessionPayload();
+        const serialized = JSON.stringify(payload);
+        if (!serialized || serialized === consoleSessionPersistLastSerialized) {{
+          return;
         }}
-        const payload = {{
-          lines: consoleLines.slice(-consoleMaxLines),
-          commandHistory: consoleCommandHistory.slice(-consoleCommandHistoryMax),
-          autoscroll: !!consoleAutoscroll,
-          timestamps: !!consoleShowTimestamps,
-          filterText: String(consoleFilterText || "").slice(0, 120),
-          interactiveSession,
-          eventCounter: Math.max(0, Math.trunc(Number(consoleEventCounter) || 0)),
-        }};
-        storage.setItem(consoleSessionStorageKey, JSON.stringify(payload));
+        storage.setItem(consoleSessionStorageKey, serialized);
+        consoleSessionPersistLastSerialized = serialized;
       }} catch (_err) {{
       }}
+    }}
+
+    function persistConsoleSessionState(options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const immediate = opts.immediate === true;
+      if (immediate) {{
+        if (consoleSessionPersistTimer !== null) {{
+          window.clearTimeout(consoleSessionPersistTimer);
+          consoleSessionPersistTimer = null;
+        }}
+        flushConsoleSessionStatePersist();
+        return;
+      }}
+      const delayMs = Math.max(80, Math.min(1000, Math.trunc(Number(opts.delayMs) || 260)));
+      if (consoleSessionPersistTimer !== null) return;
+      consoleSessionPersistTimer = window.setTimeout(() => {{
+        consoleSessionPersistTimer = null;
+        flushConsoleSessionStatePersist();
+      }}, delayMs);
     }}
 
     function loadConsoleSessionState() {{
@@ -51,6 +79,7 @@
         if (!storage) return;
         const raw = storage.getItem(consoleSessionStorageKey);
         if (!raw) return;
+        consoleSessionPersistLastSerialized = String(raw);
         const parsed = JSON.parse(raw);
         const payload = (parsed && typeof parsed === "object") ? parsed : {{}};
         const lines = Array.isArray(payload.lines)

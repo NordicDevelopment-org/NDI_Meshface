@@ -1308,6 +1308,57 @@
       topbarUpdateTickerScheduleSpawnPump(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl);
     }}
 
+    function summaryMiniPanelHashMixInt(hash, value) {{
+      const v = (Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0) | 0;
+      hash ^= v;
+      hash = Math.imul(hash, 16777619);
+      return hash >>> 0;
+    }}
+
+    function summaryMiniPanelHashMixStr(hash, value) {{
+      const text = String(value == null ? "" : value);
+      for (let i = 0; i < text.length; i += 1) {{
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }}
+      return hash >>> 0;
+    }}
+
+    function updateSummaryMiniPanel(panelKey, element, options = null) {{
+      if (!(element instanceof HTMLElement)) return false;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const mode = String(opts.mode || "text").toLowerCase() === "html" ? "html" : "text";
+      const body = mode === "html"
+        ? String(opts.html == null ? "" : opts.html)
+        : String(opts.text == null ? "" : opts.text);
+      const title = String(opts.title == null ? "" : opts.title);
+      let hash = 2166136261;
+      hash = summaryMiniPanelHashMixStr(hash, panelKey);
+      hash = summaryMiniPanelHashMixStr(hash, mode);
+      hash = summaryMiniPanelHashMixInt(hash, body.length);
+      hash = summaryMiniPanelHashMixStr(hash, body);
+      hash = summaryMiniPanelHashMixInt(hash, title.length);
+      hash = summaryMiniPanelHashMixStr(hash, title);
+      const normalizedHash = hash >>> 0;
+      if (summaryMiniPanelHashById.get(panelKey) === normalizedHash) {{
+        return false;
+      }}
+      if (mode === "html") {{
+        if (element.innerHTML !== body) {{
+          element.innerHTML = body;
+        }}
+      }} else {{
+        if (element.textContent !== body) {{
+          element.textContent = body;
+        }}
+      }}
+      if (element.title !== title) {{
+        element.title = title;
+      }}
+      summaryMiniPanelHashById.set(panelKey, normalizedHash);
+      return true;
+    }}
+
     function renderSummary(state) {{
       syncTopbarChatContext(state);
       const s = state.summary || {{}};
@@ -1493,12 +1544,22 @@
         if (nodeTickerItem instanceof HTMLElement) {{
           nodeTickerItem.classList.toggle("has-extra-rows", hasRows);
         }}
+        const nodeTickerTitle = nodeTicker && nodeTicker.title
+          ? String(nodeTicker.title)
+          : "Node summary unavailable";
         if (rowsHtml) {{
-          nodeTickerEl.innerHTML = rowsHtml;
+          updateSummaryMiniPanel("m-node-ticker", nodeTickerEl, {{
+            mode: "html",
+            html: rowsHtml,
+            title: nodeTickerTitle,
+          }});
         }} else {{
-          nodeTickerEl.textContent = nodeTicker && nodeTicker.text ? String(nodeTicker.text) : "n/a";
+          updateSummaryMiniPanel("m-node-ticker", nodeTickerEl, {{
+            mode: "text",
+            text: nodeTicker && nodeTicker.text ? String(nodeTicker.text) : "n/a",
+            title: nodeTickerTitle,
+          }});
         }}
-        nodeTickerEl.title = nodeTicker.title || "Node summary unavailable";
       }} else if (nodeTickerItem instanceof HTMLElement) {{
         nodeTickerItem.classList.remove("has-extra-rows");
       }}
@@ -1538,10 +1599,15 @@
           {{ key: "View", value: currentMeshChannelViewLabel() }},
           {{ key: "Send", value: currentMeshChannelSendLabel() }},
         ];
-        chatChannelsTickerEl.innerHTML = rows
+        const rowsHtml = rows
           .map((row) => `<div class="node-ticker-row"><span class="node-ticker-key">${{escAttr(row.key)}}:</span><span class="node-ticker-val">${{escAttr(row.value)}}</span></div>`)
           .join("");
-        chatChannelsTickerEl.title = rows.map((row) => `${{row.key}}: ${{row.value}}`).join(" | ");
+        const rowsTitle = rows.map((row) => `${{row.key}}: ${{row.value}}`).join(" | ");
+        updateSummaryMiniPanel("m-chat-channels", chatChannelsTickerEl, {{
+          mode: "html",
+          html: rowsHtml,
+          title: rowsTitle,
+        }});
       }}
       const chatRosterTickerEl = document.getElementById("m-chat-roster");
       if (chatRosterTickerEl instanceof HTMLElement) {{
@@ -1574,43 +1640,72 @@
           {{ key: "Aging", value: String(counts.warn) }},
           {{ key: "Stale", value: String(counts.stale) }},
         ];
-        chatRosterTickerEl.innerHTML = rows
+        const rowsHtml = rows
           .map((row) => `<div class="node-ticker-row"><span class="node-ticker-key">${{escAttr(row.key)}}:</span><span class="node-ticker-val">${{escAttr(row.value)}}</span></div>`)
           .join("");
-        chatRosterTickerEl.title = rows.map((row) => `${{row.key}}: ${{row.value}}`).join(" | ");
+        const rowsTitle = rows.map((row) => `${{row.key}}: ${{row.value}}`).join(" | ");
+        updateSummaryMiniPanel("m-chat-roster", chatRosterTickerEl, {{
+          mode: "html",
+          html: rowsHtml,
+          title: rowsTitle,
+        }});
       }}
       const gpsTicker = buildGpsTickerSummary(state);
       const gpsTickerEl = document.getElementById("m-gps-ticker");
       if (gpsTickerEl instanceof HTMLElement) {{
         const rowsHtml = String(gpsTicker && gpsTicker.rows_html ? gpsTicker.rows_html : "");
+        const gpsTitle = gpsTicker && gpsTicker.title ? String(gpsTicker.title) : "GPS summary unavailable";
         if (rowsHtml) {{
-          gpsTickerEl.innerHTML = rowsHtml;
+          updateSummaryMiniPanel("m-gps-ticker", gpsTickerEl, {{
+            mode: "html",
+            html: rowsHtml,
+            title: gpsTitle,
+          }});
         }} else {{
-          gpsTickerEl.textContent = gpsTicker && gpsTicker.text ? String(gpsTicker.text) : "n/a";
+          updateSummaryMiniPanel("m-gps-ticker", gpsTickerEl, {{
+            mode: "text",
+            text: gpsTicker && gpsTicker.text ? String(gpsTicker.text) : "n/a",
+            title: gpsTitle,
+          }});
         }}
-        gpsTickerEl.title = gpsTicker && gpsTicker.title ? String(gpsTicker.title) : "GPS summary unavailable";
       }}
       const systemTicker = buildSystemTickerSummary(state);
       const systemTickerEl = document.getElementById("m-system-ticker");
       if (systemTickerEl instanceof HTMLElement) {{
         const rowsHtml = String(systemTicker && systemTicker.rows_html ? systemTicker.rows_html : "");
+        const systemTitle = systemTicker && systemTicker.title ? String(systemTicker.title) : "System summary unavailable";
         if (rowsHtml) {{
-          systemTickerEl.innerHTML = rowsHtml;
+          updateSummaryMiniPanel("m-system-ticker", systemTickerEl, {{
+            mode: "html",
+            html: rowsHtml,
+            title: systemTitle,
+          }});
         }} else {{
-          systemTickerEl.textContent = systemTicker && systemTicker.text ? String(systemTicker.text) : "n/a";
+          updateSummaryMiniPanel("m-system-ticker", systemTickerEl, {{
+            mode: "text",
+            text: systemTicker && systemTicker.text ? String(systemTicker.text) : "n/a",
+            title: systemTitle,
+          }});
         }}
-        systemTickerEl.title = systemTicker && systemTicker.title ? String(systemTicker.title) : "System summary unavailable";
       }}
       const wifiTicker = buildWifiTickerSummary(state);
       const wifiTickerEl = document.getElementById("m-wifi-ticker");
       if (wifiTickerEl instanceof HTMLElement) {{
         const rowsHtml = String(wifiTicker && wifiTicker.rows_html ? wifiTicker.rows_html : "");
+        const wifiTitle = wifiTicker && wifiTicker.title ? String(wifiTicker.title) : "Wi-Fi summary unavailable";
         if (rowsHtml) {{
-          wifiTickerEl.innerHTML = rowsHtml;
+          updateSummaryMiniPanel("m-wifi-ticker", wifiTickerEl, {{
+            mode: "html",
+            html: rowsHtml,
+            title: wifiTitle,
+          }});
         }} else {{
-          wifiTickerEl.textContent = wifiTicker && wifiTicker.text ? String(wifiTicker.text) : "n/a";
+          updateSummaryMiniPanel("m-wifi-ticker", wifiTickerEl, {{
+            mode: "text",
+            text: wifiTicker && wifiTicker.text ? String(wifiTicker.text) : "n/a",
+            title: wifiTitle,
+          }});
         }}
-        wifiTickerEl.title = wifiTicker && wifiTicker.title ? String(wifiTicker.title) : "Wi-Fi summary unavailable";
       }}
       const wifiRssiValue = wifiTicker ? wifiTicker.rssi_dbm : null;
       const wifiRssiRaw = (wifiRssiValue == null || wifiRssiValue === "") ? NaN : Number(wifiRssiValue);

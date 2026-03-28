@@ -155,6 +155,7 @@
         tabHasFocus = false;
         chatChangeCatchupArmed = true;
         clearAllChatChangeAutoDismissTimers();
+        persistConsoleSessionState({{ immediate: true }});
         return;
       }}
       tabHasFocus = (typeof document.hasFocus === "function") ? !!document.hasFocus() : true;
@@ -164,6 +165,7 @@
       tabHasFocus = false;
       chatChangeCatchupArmed = true;
       clearAllChatChangeAutoDismissTimers();
+      persistConsoleSessionState({{ immediate: true }});
     }});
     window.addEventListener("focus", () => {{
       tabHasFocus = true;
