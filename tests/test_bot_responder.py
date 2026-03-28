@@ -1466,6 +1466,48 @@ def test_ping_targeted_to_other_suffix_is_ignored():
     assert sent == []
 
 
+def test_unknown_command_direct_to_local_returns_invalid_command_reply():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("flarble", packet_id=1467, to_id="!02ed9b7c"), iface)
+
+    assert len(sent) == 1
+    text = str(sent[0]["text"]).lower()
+    assert "invalid command" in text
+    assert "flarble" in text
+
+
+def test_unknown_command_public_broadcast_is_ignored():
+    iface = _FakeIface()
+    sent = []
+
+    def _send_chat(**kwargs):
+        sent.append(kwargs)
+        return {"ok": True}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        now_unix_fn=lambda: 1710001240.0,
+    )
+    bot.on_receive(_base_packet("flarble", packet_id=1468, to_id="^all"), iface)
+
+    assert sent == []
+    assert bot.recent_requests() == []
+
+
 def test_whois_unknown_replies_with_unknown():
     iface = _FakeIface()
     sent = []
@@ -1950,6 +1992,84 @@ def test_segmented_direct_reply_retries_unacked_parts():
     duplicated_segments = [text for text, count in segment_text_counts.items() if count >= 2]
     assert duplicated_segments
     assert sent[0].get("reply_id") == 2701
+
+
+def test_segmented_direct_reply_waits_for_acked_before_next_segment():
+    sent = []
+    next_message_id = 9000
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    def _delivery_state_lookup(message_id: int) -> str:
+        if message_id == 9001:
+            return "sent"
+        return "acked"
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        chat_max_bytes=220,
+        segment_delay_seconds=0.0,
+        segment_retry_count=1,
+        segment_ack_wait_seconds=0.0,
+        delivery_state_lookup_fn=_delivery_state_lookup,
+        sleep_fn=lambda _seconds: None,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+
+    segments, _payloads = bot._send_reply_text(
+        text="welcome " * 120,
+        destination="!49b5dff0",
+        channel_index=0,
+        reply_id=2801,
+    )
+
+    assert len(segments) >= 2
+    assert len(sent) >= len(segments) + 1
+    assert sent[0].get("text") == segments[0]
+    assert sent[1].get("text") == segments[0]
+    assert sent[1].get("retry_of") == 9001
+    assert sent[2].get("text") == segments[1]
+
+
+def test_single_direct_reply_does_not_require_acked_delivery_state():
+    sent = []
+    next_message_id = 9100
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        segment_retry_count=2,
+        segment_ack_wait_seconds=0.0,
+        delivery_state_lookup_fn=lambda _message_id: "sent",
+        sleep_fn=lambda _seconds: None,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+
+    segments, _payloads = bot._send_reply_text(
+        text="short reply",
+        destination="!49b5dff0",
+        channel_index=0,
+        reply_id=2802,
+    )
+
+    assert segments == ["short reply"]
+    assert len(sent) == 1
+    assert sent[0].get("retry_of") is None
 
 
 def test_zork_game_disabled_still_logs_direct_start_requests():

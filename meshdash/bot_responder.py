@@ -1933,6 +1933,11 @@ class MeshResponseBot:
         if reply_id is not None and reply_id > 0:
             effective_limit = max(1, effective_limit - _REPLY_PACKET_TEXT_RESERVE_BYTES)
         proactive_segments = _segment_reply_text(clean_text, effective_limit)
+        enforce_ordered_ack = (
+            destination.startswith("!")
+            and len(proactive_segments) > 1
+            and self._delivery_state_lookup_fn is not None
+        )
         if proactive_segments != [clean_text]:
             payloads: list[dict[str, object]] = []
             for index, segment in enumerate(proactive_segments):
@@ -1943,6 +1948,7 @@ class MeshResponseBot:
                     destination=destination,
                     channel_index=channel_index,
                     reply_id=reply_id if index == 0 else None,
+                    require_acked=enforce_ordered_ack,
                 )
                 payloads.append(payload)
             return (proactive_segments, payloads)
@@ -1952,6 +1958,7 @@ class MeshResponseBot:
                 destination=destination,
                 channel_index=channel_index,
                 reply_id=reply_id,
+                require_acked=False,
             )
             return ([clean_text], [payload])
         except Exception as exc:
@@ -1961,6 +1968,11 @@ class MeshResponseBot:
         segments = _segment_reply_text(clean_text, limit)
         if not segments:
             raise ValueError("Reply could not be segmented into non-empty messages")
+        enforce_ordered_ack = (
+            destination.startswith("!")
+            and len(segments) > 1
+            and self._delivery_state_lookup_fn is not None
+        )
         payloads: list[dict[str, object]] = []
         for index, segment in enumerate(segments):
             if index > 0 and self._segment_delay_seconds > 0:
@@ -1970,6 +1982,7 @@ class MeshResponseBot:
                 destination=destination,
                 channel_index=channel_index,
                 reply_id=reply_id if index == 0 else None,
+                require_acked=enforce_ordered_ack,
             )
             payloads.append(payload)
         return (segments, payloads)
@@ -1982,9 +1995,11 @@ class MeshResponseBot:
         except Exception:
             return ""
 
-    def _wait_for_delivery_state(self, message_id: int) -> str:
+    def _wait_for_delivery_state(self, message_id: int, *, require_acked: bool = False) -> str:
+        success_states = ("acked",) if require_acked else ("acked", "sent")
+        terminal_states = success_states + ("nak", "timeout", "error")
         state = self._lookup_delivery_state(message_id)
-        if state in ("acked", "sent", "nak", "timeout", "error"):
+        if state in terminal_states:
             return state
         timeout_seconds = max(0.0, float(self._segment_ack_wait_seconds))
         if timeout_seconds <= 0:
@@ -1997,7 +2012,7 @@ class MeshResponseBot:
             current = self._lookup_delivery_state(message_id)
             if current:
                 state = current
-            if current in ("acked", "sent", "nak", "timeout", "error"):
+            if current in terminal_states:
                 return current
         return state
 
@@ -2008,6 +2023,7 @@ class MeshResponseBot:
         destination: str,
         channel_index: int,
         reply_id: Optional[int],
+        require_acked: bool = False,
     ) -> dict[str, object]:
         should_track_delivery = bool(
             destination.startswith("!")
@@ -2033,8 +2049,11 @@ class MeshResponseBot:
             if message_id is None or message_id <= 0:
                 return payload
             previous_message_id = message_id
-            state = self._wait_for_delivery_state(message_id)
-            if state in ("acked", "sent"):
+            state = self._wait_for_delivery_state(
+                message_id,
+                require_acked=require_acked and should_track_delivery,
+            )
+            if state == "acked" or (not require_acked and state == "sent"):
                 return payload
             if attempt + 1 >= max_attempts:
                 return payload
@@ -2260,23 +2279,38 @@ class MeshResponseBot:
             if parsed is None:
                 return
             command, args = parsed
-            if command not in STANDARD_BOT_COMMANDS and command not in self._custom_commands:
-                return
-            with self._lock:
-                command_enabled = self._command_enabled_locked(command)
             reply_text = None
-            if command_enabled:
-                reply_text = self._build_reply(
-                    command=command,
-                    args=args,
-                    from_id=from_id,
-                    to_id=to_id,
-                    local_node_id=local_node_id,
-                    local_aliases=local_aliases,
-                    nodes=nodes,
-                    packet=packet,
-                    received_ms=received_ms,
-                )
+            if command not in STANDARD_BOT_COMMANDS and command not in self._custom_commands:
+                with self._lock:
+                    if command in self._managed_command_names_locked():
+                        return
+                command_enabled = True
+                if (
+                    to_id.startswith("!")
+                    and local_node_id.startswith("!")
+                    and to_id.lower() == local_node_id.lower()
+                ):
+                    reply_text = (
+                        f'invalid command: "{command}". '
+                        'Try "cmd" for bot commands or "help" for the active game.'
+                    )
+                else:
+                    return
+            else:
+                with self._lock:
+                    command_enabled = self._command_enabled_locked(command)
+                if command_enabled:
+                    reply_text = self._build_reply(
+                        command=command,
+                        args=args,
+                        from_id=from_id,
+                        to_id=to_id,
+                        local_node_id=local_node_id,
+                        local_aliases=local_aliases,
+                        nodes=nodes,
+                        packet=packet,
+                        received_ms=received_ms,
+                    )
         request_id = f"mesh-{_normalize_node_id(from_id) or 'unknown'}-{packet_id if packet_id is not None else received_unix}-{command}"
         request_entry = {
             "id": request_id,
