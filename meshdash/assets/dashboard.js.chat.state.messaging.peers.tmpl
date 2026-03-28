@@ -101,12 +101,15 @@
       return String(left == null ? "" : left).localeCompare(String(right == null ? "" : right));
     }}
 
-    function chatNodeNavigatorSortValue(item, projection, sortKeyRaw) {{
+    function chatNodeNavigatorSortValue(item, projection, sortKeyRaw, nowUnixRaw = null) {{
       const sortKey = normalizeChatNodeNavigatorSortKeyPref(sortKeyRaw);
       const safeItem = item && typeof item === "object" ? item : {{}};
       const safeProjection = projection && typeof projection === "object"
         ? projection
         : nodeExplorerBuildProjection(null);
+      const nowUnix = Number.isFinite(Number(nowUnixRaw))
+        ? Math.trunc(Number(nowUnixRaw))
+        : Math.floor(Date.now() / 1000);
       if (sortKey === "status") {{
         return Number.isFinite(Number(safeProjection.statusSort))
           ? Number(safeProjection.statusSort)
@@ -114,6 +117,24 @@
       }}
       if (sortKey === "activity") {{
         return Number(safeItem.lastMessageUnix) || 0;
+      }}
+      if (sortKey === "idle") {{
+        const lastSeenFromRoster = Number(safeItem && safeItem.lastSeenUnix);
+        const lastSeenFromProjection = Number(
+          safeProjection
+          && safeProjection.fields
+          && safeProjection.fields.last_heard
+          && safeProjection.fields.last_heard.sort
+        );
+        const lastSeenUnix = Number.isFinite(lastSeenFromRoster) && lastSeenFromRoster > 0
+          ? Math.trunc(lastSeenFromRoster)
+          : (Number.isFinite(lastSeenFromProjection) && lastSeenFromProjection > 0
+            ? Math.trunc(lastSeenFromProjection)
+            : 0);
+        if (!Number.isFinite(lastSeenUnix) || lastSeenUnix <= 0) {{
+          return Number.MAX_SAFE_INTEGER;
+        }}
+        return Math.max(0, nowUnix - lastSeenUnix);
       }}
       const fieldId = normalizeNodeExplorerFieldId(sortKey);
       const field = fieldId && safeProjection.fields
@@ -147,8 +168,8 @@
 
         const aProjection = projectionFor(a);
         const bProjection = projectionFor(b);
-        const aValue = chatNodeNavigatorSortValue(a, aProjection, sortKey);
-        const bValue = chatNodeNavigatorSortValue(b, bProjection, sortKey);
+        const aValue = chatNodeNavigatorSortValue(a, aProjection, sortKey, nowUnix);
+        const bValue = chatNodeNavigatorSortValue(b, bProjection, sortKey, nowUnix);
         const cmp = chatNodeNavigatorCompareSortValues(aValue, bValue);
         if (cmp !== 0) {{
           return sortDir === "desc" ? -cmp : cmp;
