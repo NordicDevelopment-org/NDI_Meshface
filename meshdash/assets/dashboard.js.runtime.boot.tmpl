@@ -171,7 +171,16 @@
     }});
 
     void pollOnce();
-    setInterval(pollOnce, refreshMs);
+    const hiddenRefreshMs = Math.max(refreshMs * 6, 15000);
+    let lastScheduledPollMs = 0;
+    setInterval(() => {{
+      const nowMs = Date.now();
+      if (document.hidden && (nowMs - lastScheduledPollMs) < hiddenRefreshMs) {{
+        return;
+      }}
+      lastScheduledPollMs = nowMs;
+      void pollOnce();
+    }}, refreshMs);
     setInterval(() => {{
       if (!hasActiveFileTransferSessions()) return;
       scheduleFileTransferMaintenance(latestState);

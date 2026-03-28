@@ -43,6 +43,7 @@
           lastPollError = "";
           lastPollErrorUnix = 0;
           renderSelfRadioPill(latestState);
+          const hidden304 = (typeof document !== "undefined") && !!document.hidden;
           const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network";
           const trafficVisible304 = mapVisible304 || activeLayoutView === "history";
           const historyTargetId304 = activeLayoutView === "saved"
@@ -56,13 +57,10 @@
           const traffic304 = (latestState.traffic && typeof latestState.traffic === "object")
             ? latestState.traffic
             : {{}};
-          applyServerBotSettingsFromState(latestState);
-          syncBackendBotRequestHistory(latestState);
-          syncBotRequestHistoryWithMessages(traffic304.recent_chat || [], latestState);
-          syncReversiNetworkState(latestState);
-          syncBoardGameNetworkState("checkers", latestState);
-          syncBoardGameNetworkState("chess", latestState);
-          syncBbsNetworkState(latestState);
+          if (hidden304) {{
+            scheduleFileTransferMaintenance(latestState);
+            return;
+          }}
           renderSummary(latestState);
           if (mapVisible304) {{
             renderMap(nodes304, traffic304.edges || [], cachedHistory304);
