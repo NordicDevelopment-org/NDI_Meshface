@@ -356,23 +356,17 @@
       return replyText.includes("session started") || replyText.includes("tip: type help for list of commands");
     }}
 
-    function consoleRemoteAutoReplyLooksLikeOutOfGame(replyTextRaw) {{
-      const replyText = String(replyTextRaw || "").trim().toLowerCase();
-      if (!replyText) return false;
-      if (replyText.includes("invalid command:")) return true;
-      if (replyText.includes("try \"cmd\" for bot commands")) return true;
-      if (replyText.includes("send 'zork' to start again")) return true;
-      if (replyText.includes("session ended")) return true;
-      return false;
+    function consoleRemoteAutoSessionMode(activeSession) {{
+      return String(activeSession && activeSession.autoMode || "script").trim().toLowerCase() === "free-run"
+        ? "free-run"
+        : "script";
     }}
 
-    function resyncConsoleRemoteAutoToCheckpointStart(activeSession, nowMs, reasonText = "") {{
+    function resyncConsoleRemoteAutoToCheckpointStart(activeSession, reasonText = "") {{
       if (!activeSession || typeof activeSession !== "object") return;
       activeSession.autoMode = "script";
       activeSession.autoScriptIndex = 0;
       activeSession.autoFreeRunIndex = 0;
-      activeSession.autoResponseEnabled = true;
-      activeSession.autoSending = false;
       activeSession.autoAwaitingReply = false;
       activeSession.autoExpectedAny = [];
       activeSession.autoAwaitingSinceMs = 0;
@@ -383,15 +377,8 @@
       const suffix = String(reasonText || "").trim();
       appendConsoleEventLine(
         suffix
-          ? `[zork-remote][auto] resyncing script from start (${{suffix}}).`
-          : "[zork-remote][auto] resyncing script from start."
-      );
-      queueConsoleRemoteAutoCommand(
-        activeSession,
-        "zork",
-        ["session started", "west of house"],
-        nowMs,
-        false
+          ? `[zork-remote][auto] session reset detected (${{suffix}}); resyncing checkpoints from start.`
+          : "[zork-remote][auto] session reset detected; resyncing checkpoints from start."
       );
     }}
 
@@ -476,12 +463,23 @@
           return;
         }}
         if (deadlineMs > 0 && nowMs > deadlineMs) {{
-          resyncConsoleRemoteAutoToCheckpointStart(
-            activeSession,
-            nowMs,
-            `timeout after "${{String(lastCommand || "zork")}}"`
-          );
-          return;
+          activeSession.autoAwaitingReply = false;
+          activeSession.autoExpectedAny = [];
+          activeSession.autoAwaitingSinceMs = 0;
+          activeSession.autoAwaitingDeadlineMs = 0;
+          activeSession.autoNextRetryMs = 0;
+          activeSession.autoRetryCount = 0;
+          resetConsoleRemoteAutoSegmentState(activeSession);
+          if (consoleRemoteAutoSessionMode(activeSession) !== "free-run") {{
+            activeSession.autoMode = "free-run";
+            appendConsoleEventLine(
+              `[zork-remote][auto] timeout waiting for reply after "${{String(lastCommand || "zork")}}"; switching to continuous mode.`
+            );
+          }} else {{
+            appendConsoleEventLine(
+              `[zork-remote][auto] timeout waiting for reply after "${{String(lastCommand || "zork")}}"; continuing with next command.`
+            );
+          }}
         }}
       }}
 
@@ -510,31 +508,29 @@
         if (!replyText) {{
           return;
         }}
-        const lastCommand = String(activeSession.autoLastCommand || "").trim();
-        if (consoleRemoteAutoReplyLooksLikeOutOfGame(replyText)) {{
-          resyncConsoleRemoteAutoToCheckpointStart(
-            activeSession,
-            nowMs,
-            `out-of-game reply while waiting for "${{String(lastCommand || "zork")}}"`
-          );
-          return;
+        if (
+          consoleRemoteAutoSessionMode(activeSession) === "free-run"
+          && consoleRemoteAutoReplyLooksLikeSessionRestart(replyText)
+        ) {{
+          resyncConsoleRemoteAutoToCheckpointStart(activeSession, "during continuous mode");
         }}
         const matched = consoleRemoteAutoScriptExpectMatch(replyText, activeSession.autoExpectedAny);
         if (!matched) {{
+          const lastCommand = String(activeSession.autoLastCommand || "").trim();
+          let continueWithNextStep = false;
           if (
             lastCommand
             && consoleRemoteAutoReplyLooksLikeSessionRestart(replyText)
           ) {{
-            resyncConsoleRemoteAutoToCheckpointStart(
-              activeSession,
-              nowMs,
-              `session reset while waiting for "${{lastCommand}}"`
-            );
-            return;
+            // A reset means prior world-state assumptions are invalid; restart scripted checkpoints.
+            resyncConsoleRemoteAutoToCheckpointStart(activeSession, `while waiting for "${{lastCommand}}"`);
+            continueWithNextStep = true;
           }}
           // Ignore non-matching lines and keep waiting; delayed/out-of-order mesh
           // replies are common. Retry scheduling is handled by the retry deadline.
-          return;
+          if (!continueWithNextStep) {{
+            return;
+          }}
         }}
         activeSession.autoAwaitingReply = false;
         activeSession.autoAwaitingSinceMs = 0;
@@ -546,16 +542,42 @@
 
       let command = "";
       let expectedAny = [];
-      const script = Array.isArray(zorkRemoteAutoResponseScript) ? zorkRemoteAutoResponseScript : [];
-      const idx = Math.max(0, Math.trunc(Number(activeSession.autoScriptIndex) || 0));
-      if (idx < script.length) {{
-        const step = script[idx] && typeof script[idx] === "object" ? script[idx] : {{}};
-        command = String(step.command || "").trim();
-        expectedAny = Array.isArray(step.expectAny) ? step.expectAny : [];
-        activeSession.autoScriptIndex = idx + 1;
-      }} else {{
-        resyncConsoleRemoteAutoToCheckpointStart(activeSession, nowMs, "checkpoint script complete");
-        return;
+      const currentMode = consoleRemoteAutoSessionMode(activeSession);
+      if (currentMode !== "free-run") {{
+        const script = Array.isArray(zorkRemoteAutoResponseScript) ? zorkRemoteAutoResponseScript : [];
+        const idx = Math.max(0, Math.trunc(Number(activeSession.autoScriptIndex) || 0));
+        if (idx < script.length) {{
+          const step = script[idx] && typeof script[idx] === "object" ? script[idx] : {{}};
+          command = String(step.command || "").trim();
+          expectedAny = Array.isArray(step.expectAny) ? step.expectAny : [];
+          activeSession.autoScriptIndex = idx + 1;
+        }} else {{
+          activeSession.autoMode = "free-run";
+          activeSession.autoFreeRunIndex = Math.max(0, Math.trunc(Number(activeSession.autoFreeRunIndex) || 0));
+          appendConsoleEventLine("[zork-remote][auto] checkpoints complete. Entering continuous mode.");
+        }}
+      }}
+      if (!command) {{
+        const freeRun = Array.isArray(zorkRemoteAutoResponseFreeRunCommands)
+          ? zorkRemoteAutoResponseFreeRunCommands
+          : [];
+        if (freeRun.length <= 0) {{
+          activeSession.autoResponseEnabled = false;
+          activeSession.autoAwaitingReply = false;
+          activeSession.autoExpectedAny = [];
+          activeSession.autoAwaitingSinceMs = 0;
+          activeSession.autoAwaitingDeadlineMs = 0;
+          activeSession.autoNextRetryMs = 0;
+          activeSession.autoRetryCount = 0;
+          resetConsoleRemoteAutoSegmentState(activeSession);
+          appendConsoleEventLine("[zork-remote][auto] no continuous commands configured.");
+          persistConsoleSessionState();
+          return;
+        }}
+        const freeIdx = Math.max(0, Math.trunc(Number(activeSession.autoFreeRunIndex) || 0));
+        command = String(freeRun[freeIdx % freeRun.length] || "").trim();
+        expectedAny = [];
+        activeSession.autoFreeRunIndex = freeIdx + 1;
       }}
       if (!command) {{
         return;
