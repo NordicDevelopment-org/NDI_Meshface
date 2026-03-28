@@ -2032,6 +2032,7 @@ class MeshResponseBot:
         max_attempts = 1 + (self._segment_retry_count if should_track_delivery else 0)
         previous_message_id: Optional[int] = None
         payload: dict[str, object] = {}
+        state = ""
         for attempt in range(max_attempts):
             send_kwargs: dict[str, object] = {
                 "text": text,
@@ -2056,6 +2057,11 @@ class MeshResponseBot:
             if state == "acked" or (not require_acked and state == "sent"):
                 return payload
             if attempt + 1 >= max_attempts:
+                if require_acked and should_track_delivery:
+                    clean_state = state or "unknown"
+                    raise RuntimeError(
+                        f"Segment delivery not acknowledged before next send (state: {clean_state})."
+                    )
                 return payload
             if self._segment_delay_seconds > 0:
                 self._sleep_fn(self._segment_delay_seconds)

@@ -2072,6 +2072,45 @@ def test_single_direct_reply_does_not_require_acked_delivery_state():
     assert sent[0].get("retry_of") is None
 
 
+def test_segmented_direct_reply_aborts_when_ack_never_arrives():
+    sent = []
+    next_message_id = 9200
+
+    def _send_chat(**kwargs):
+        nonlocal next_message_id
+        next_message_id += 1
+        sent.append(kwargs)
+        return {"ok": True, "message_id": next_message_id}
+
+    bot = MeshResponseBot(
+        send_chat_fn=_send_chat,
+        get_local_node_id_fn=lambda _iface: "!02ed9b7c",
+        custom_commands={},
+        game_enabled=True,
+        chat_max_bytes=220,
+        segment_retry_count=0,
+        segment_ack_wait_seconds=0.0,
+        delivery_state_lookup_fn=lambda _message_id: "sent",
+        sleep_fn=lambda _seconds: None,
+        now_unix_fn=lambda: 1710001240.0,
+    )
+
+    raised = False
+    try:
+        bot._send_reply_text(
+            text="welcome " * 120,
+            destination="!49b5dff0",
+            channel_index=0,
+            reply_id=2803,
+        )
+    except RuntimeError as exc:
+        raised = True
+        assert "not acknowledged" in str(exc).lower()
+
+    assert raised
+    assert len(sent) == 1
+
+
 def test_zork_game_disabled_still_logs_direct_start_requests():
     iface = _FakeIface()
     sent = []
