@@ -454,8 +454,8 @@
       }});
       registerConsoleCommand({{
         name: "zork-remote",
-        usage: "zork-remote [node=!xxxxxxxx] [channel=<n>] [auto=0|1]",
-        description: "Start an interactive Zork session against a selected direct peer over the mesh (optional auto-response script).",
+        usage: "zork-remote [node=!xxxxxxxx] [channel=<n>]",
+        description: "Start an interactive Zork session against a selected direct peer over the mesh.",
         run: async (ctx) => {{
           if (consoleInteractiveSession) {{
             return "[zork-remote] another interactive session is already running. Press Ctrl+C to stop.";
@@ -465,22 +465,6 @@
           if (!target.ok) {{
             return `[zork-remote] ${{target.error}}`;
           }}
-          const autoOptionRaw = Object.prototype.hasOwnProperty.call(ctx.options || {{}}, "auto")
-            ? ctx.options.auto
-            : null;
-          const autoResponseEnabled = (() => {{
-            if (autoOptionRaw === null || autoOptionRaw === undefined || autoOptionRaw === "") {{
-              return !!consoleZorkRemoteAutoResponse;
-            }}
-            if (typeof autoOptionRaw === "boolean") {{
-              return autoOptionRaw;
-            }}
-            const clean = String(autoOptionRaw || "").trim().toLowerCase();
-            if (!clean) return !!consoleZorkRemoteAutoResponse;
-            if (["1", "true", "yes", "on", "enable", "enabled"].includes(clean)) return true;
-            if (["0", "false", "no", "off", "disable", "disabled"].includes(clean)) return false;
-            return !!consoleZorkRemoteAutoResponse;
-          }})();
           const body = {{
             text: "zork",
             destination: target.nodeId,
@@ -503,25 +487,13 @@
             channelIndex: target.channelIndex,
             channelLabel: target.channelLabel,
             seenKeys,
-            autoResponseEnabled,
-            autoAwaitingReply: !!autoResponseEnabled,
-            autoScriptIndex: 0,
-            autoExpectedAny: autoResponseEnabled
-              ? ["session started", "west of house"]
-              : [],
-            autoLastCommand: autoResponseEnabled ? "zork" : "",
-            autoSending: false,
           }};
           syncConsoleCommandInputState();
           requestImmediatePoll(80);
-          const lines = [
+          return [
             `[zork-remote] started with ${{target.targetLabel || target.nodeId}} on ${{target.channelLabel}}.`,
             "[zork-remote] type game commands directly here. Use /help for console commands. Press Ctrl+C to stop this console session.",
           ];
-          if (autoResponseEnabled) {{
-            lines.push("[zork-remote] auto-response script enabled.");
-          }}
-          return lines;
         }},
       }});
     }}

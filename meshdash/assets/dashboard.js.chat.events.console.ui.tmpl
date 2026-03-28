@@ -1,26 +1,5 @@
-    function loadConsoleZorkRemoteAutoPreference() {{
-      let enabled = false;
-      try {{
-        const raw = String(window.localStorage.getItem(consoleZorkRemoteAutoStorageKey) || "").trim().toLowerCase();
-        enabled = raw === "1" || raw === "true" || raw === "yes" || raw === "on";
-      }} catch (_err) {{
-      }}
-      consoleZorkRemoteAutoResponse = !!enabled;
-    }}
-
-    function persistConsoleZorkRemoteAutoPreference() {{
-      try {{
-        window.localStorage.setItem(
-          consoleZorkRemoteAutoStorageKey,
-          consoleZorkRemoteAutoResponse ? "1" : "0"
-        );
-      }} catch (_err) {{
-      }}
-    }}
-
     function bindConsoleControls() {{
       ensureConsoleCommandsRegistered();
-      loadConsoleZorkRemoteAutoPreference();
       const clearBtn = document.getElementById("console-clear-btn");
       if (clearBtn instanceof HTMLButtonElement && clearBtn.dataset.bound !== "1") {{
         clearBtn.dataset.bound = "1";
@@ -50,20 +29,6 @@
             consoleShowTimestamps = !!timestamps.checked;
             persistConsoleSessionState();
             renderConsoleBuffer(false);
-          }});
-        }}
-      }}
-      const zorkAuto = document.getElementById("console-zork-remote-auto-response");
-      if (zorkAuto instanceof HTMLInputElement) {{
-        zorkAuto.checked = !!consoleZorkRemoteAutoResponse;
-        if (zorkAuto.dataset.bound !== "1") {{
-          zorkAuto.dataset.bound = "1";
-          zorkAuto.addEventListener("change", () => {{
-            consoleZorkRemoteAutoResponse = !!zorkAuto.checked;
-            persistConsoleZorkRemoteAutoPreference();
-            appendConsoleEventLine(
-              `[zork-remote] auto-response ${{consoleZorkRemoteAutoResponse ? "enabled" : "disabled"}}.`
-            );
           }});
         }}
       }}
@@ -252,3 +217,4 @@
       syncConsoleInteractiveSessionMessages(latestState);
       renderConsoleBuffer();
     }}
+

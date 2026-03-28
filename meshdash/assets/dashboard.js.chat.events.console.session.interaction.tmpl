@@ -241,80 +241,6 @@
       ).replace(/\s+/g, " ").trim();
     }}
 
-    function consoleRemoteAutoScriptExpectMatch(replyTextRaw, expectedAnyRaw) {{
-      const replyText = String(replyTextRaw || "").trim().toLowerCase();
-      const expectedAny = Array.isArray(expectedAnyRaw) ? expectedAnyRaw : [];
-      if (expectedAny.length <= 0) return true;
-      if (!replyText) return false;
-      return expectedAny.some((needle) => {{
-        const token = String(needle || "").trim().toLowerCase();
-        return !!token && replyText.includes(token);
-      }});
-    }}
-
-    function maybeAdvanceConsoleRemoteAutoResponse(session, inboundText) {{
-      const activeSession = (session && typeof session === "object") ? session : null;
-      if (!activeSession) return;
-      if (String(activeSession.mode || "") !== "remote") return;
-      if (!activeSession.autoResponseEnabled) return;
-      if (activeSession.autoSending) return;
-
-      const replyText = String(inboundText || "").trim();
-      if (activeSession.autoAwaitingReply) {{
-        const matched = consoleRemoteAutoScriptExpectMatch(replyText, activeSession.autoExpectedAny);
-        if (!matched) {{
-          activeSession.autoResponseEnabled = false;
-          activeSession.autoAwaitingReply = false;
-          activeSession.autoExpectedAny = [];
-          appendConsoleEventLine(
-            `[zork-remote][auto] checkpoint failed after "${{String(activeSession.autoLastCommand || "zork")}}".`
-          );
-          return;
-        }}
-        activeSession.autoAwaitingReply = false;
-      }}
-
-      const script = Array.isArray(zorkRemoteAutoResponseScript) ? zorkRemoteAutoResponseScript : [];
-      const idx = Math.max(0, Math.trunc(Number(activeSession.autoScriptIndex) || 0));
-      if (idx >= script.length) {{
-        activeSession.autoResponseEnabled = false;
-        activeSession.autoAwaitingReply = false;
-        activeSession.autoExpectedAny = [];
-        appendConsoleEventLine("[zork-remote][auto] script complete.");
-        stopConsoleInteractiveSession("auto script complete", true);
-        return;
-      }}
-
-      const step = script[idx] && typeof script[idx] === "object" ? script[idx] : {{}};
-      const command = String(step.command || "").trim();
-      if (!command) {{
-        activeSession.autoScriptIndex = idx + 1;
-        return;
-      }}
-      activeSession.autoScriptIndex = idx + 1;
-      activeSession.autoLastCommand = command;
-      activeSession.autoExpectedAny = Array.isArray(step.expectAny) ? step.expectAny : [];
-      activeSession.autoAwaitingReply = true;
-      activeSession.autoSending = true;
-      const delayMs = Math.max(0, Math.trunc(Number(zorkE2EWinScriptDelayMs) || 0));
-      window.setTimeout(() => {{
-        void (async () => {{
-          try {{
-            appendConsoleEventLine(`> ${{command}}`);
-            await sendConsoleInteractiveSessionLine(command);
-          }} catch (err) {{
-            const msg = err instanceof Error ? err.message : String(err || "unknown error");
-            activeSession.autoResponseEnabled = false;
-            activeSession.autoAwaitingReply = false;
-            activeSession.autoExpectedAny = [];
-            appendConsoleEventLine(`[zork-remote][auto] send failed: ${{msg}}`);
-          }} finally {{
-            activeSession.autoSending = false;
-          }}
-        }})();
-      }}, delayMs);
-    }}
-
     function syncConsoleInteractiveSessionMessages(state = latestState) {{
       const session = consoleInteractiveSession;
       if (!session || !state || typeof state !== "object") return;
@@ -346,9 +272,6 @@
           `${{fromLabel}}: ${{text}}`,
           consoleInteractiveChatTimestampMs(msg)
         );
-        if (fromId === targetNodeId && toId === localNodeId) {{
-          maybeAdvanceConsoleRemoteAutoResponse(session, text);
-        }}
       }}
     }}
 
@@ -402,3 +325,4 @@
       requestImmediatePoll(80);
       return "";
     }}
+
