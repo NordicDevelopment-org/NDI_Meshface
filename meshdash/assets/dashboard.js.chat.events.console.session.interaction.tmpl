@@ -321,33 +321,25 @@
       }}
       const expectedTotal = Math.max(0, Math.trunc(Number(activeSession.autoSegmentTotal) || 0));
       const expectedPart = Math.max(1, Math.trunc(Number(activeSession.autoSegmentNextPart) || 1));
-      if (parts.part > 1 && expectedTotal < 1) {{
-        // Ignore orphan tail segments (e.g., a late "2/2 tip..." with no matching 1/2).
-        return {{ ready: false, sawProgress: false, replyText: "" }};
-      }}
-      if (parts.part === 1 && (expectedTotal !== parts.total || expectedPart !== 1)) {{
+      const sameSequence = expectedTotal === parts.total && expectedPart === parts.part;
+      if (!sameSequence || parts.part === 1) {{
         activeSession.autoSegmentTotal = parts.total;
         activeSession.autoSegmentNextPart = 1;
         activeSession.autoSegmentBuffer = "";
       }}
-      const currentTotal = Math.max(0, Math.trunc(Number(activeSession.autoSegmentTotal) || 0));
       const currentPart = Math.max(1, Math.trunc(Number(activeSession.autoSegmentNextPart) || 1));
-      if (currentTotal !== parts.total) {{
-        return {{ ready: false, sawProgress: false, replyText: "" }};
+      if (parts.part === currentPart) {{
+        const prior = String(activeSession.autoSegmentBuffer || "").trim();
+        const next = String(parts.body || "").trim();
+        activeSession.autoSegmentBuffer = prior && next ? `${{prior}} ${{next}}` : (next || prior);
+        activeSession.autoSegmentNextPart = currentPart + 1;
+      }} else {{
+        activeSession.autoSegmentBuffer = String(parts.body || "").trim();
+        activeSession.autoSegmentNextPart = parts.part + 1;
+        activeSession.autoSegmentTotal = parts.total;
       }}
-      if (parts.part !== currentPart) {{
-        // Ignore duplicates/out-of-order segments; wait for the expected next chunk.
-        return {{ ready: false, sawProgress: false, replyText: "" }};
-      }}
-      const prior = String(activeSession.autoSegmentBuffer || "").trim();
-      const next = String(parts.body || "").trim();
-      activeSession.autoSegmentBuffer = prior && next ? `${{prior}} ${{next}}` : (next || prior);
-      activeSession.autoSegmentNextPart = currentPart + 1;
       if (!parts.finalPart) {{
         return {{ ready: false, sawProgress: true, replyText: "" }};
-      }}
-      if (parts.part !== currentTotal) {{
-        return {{ ready: false, sawProgress: false, replyText: "" }};
       }}
       const replyText = String(activeSession.autoSegmentBuffer || parts.body || parts.text).trim();
       resetConsoleRemoteAutoSegmentState(activeSession);
@@ -361,11 +353,7 @@
     function consoleRemoteAutoReplyLooksLikeSessionRestart(replyTextRaw) {{
       const replyText = String(replyTextRaw || "").trim().toLowerCase();
       if (!replyText) return false;
-      if (replyText.includes("session started")) return true;
-      if (replyText.includes("west of house") && replyText.includes("tip: type help for list of commands")) {{
-        return true;
-      }}
-      return false;
+      return replyText.includes("session started") || replyText.includes("tip: type help for list of commands");
     }}
 
     function consoleRemoteAutoReplyLooksLikeOutOfGame(replyTextRaw) {{
