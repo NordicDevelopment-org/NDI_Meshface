@@ -52,6 +52,16 @@
           touchNodeById(nodeId);
         }});
       }}
+      const setElementHtmlIfChanged = (element, markup, cacheKey = "default") => {{
+        if (!(element instanceof HTMLElement)) return false;
+        const nextMarkup = String(markup == null ? "" : markup);
+        const propName = `__meshLastInnerHtml_${{cacheKey}}`;
+        const previousMarkup = (typeof element[propName] === "string") ? element[propName] : null;
+        if (previousMarkup === nextMarkup) return false;
+        element.innerHTML = nextMarkup;
+        element[propName] = nextMarkup;
+        return true;
+      }};
       const feed = document.getElementById("chat-feed");
       if (feed) {{
         feed.classList.toggle("chat-feed-view-monitor", chatViewMode === "monitor");
@@ -86,19 +96,21 @@
           ? (Array.isArray(trendFeedItems) ? trendFeedItems : [])
           : [];
         closeReactionPopover(true);
+        let nextFeedHtml = "";
         if (showMacroPreview) {{
-          feed.innerHTML = macroPreviewRows.length > 0
+          nextFeedHtml = macroPreviewRows.length > 0
             ? macroPreviewRows.join("")
             : '<div class="chat-feed-empty">Generate ASCII in MACROS Studio on the right to preview line-by-line output here.</div>';
         }} else if (showTrendsView) {{
-          feed.innerHTML = trendRows.length > 0
+          nextFeedHtml = trendRows.length > 0
             ? trendRows.join("")
             : '<div class="chat-feed-empty">No trends yet. Add hashtags like #events, #repair, or #weather to seed trends.</div>';
         }} else {{
-          feed.innerHTML = feedItems.length > 0
+          nextFeedHtml = feedItems.length > 0
             ? feedItems.join("")
             : `<div class="chat-feed-empty">${{emptyText}}</div>`;
         }}
+        setElementHtmlIfChanged(feed, nextFeedHtml, "chat-feed");
       }}
       renderChatChangeSummary(nowUnix);
 
@@ -370,7 +382,7 @@
       updatePeerDmBadge(directUnreadTotal);
       const peerDmMenuList = document.getElementById("peer-dm-menu-list");
       if (peerDmMenuList instanceof HTMLElement) {{
-        peerDmMenuList.innerHTML = directConversationRows.length > 0
+        const nextPeerDmMenuHtml = directConversationRows.length > 0
           ? directConversationRows.map((row) => {{
               const lastSeenText = row.lastUnix > 0
                 ? formatLocalChatTime(row.lastUnix, row.lastRaw || "n/a", nowUnix)
@@ -391,6 +403,7 @@
               </button>`;
             }}).join("")
           : '<div class="peer-dm-menu-empty">No peer-to-peer conversations yet.</div>';
+        setElementHtmlIfChanged(peerDmMenuList, nextPeerDmMenuHtml, "peer-dm-menu-list");
       }}
       const peerDmHost = document.getElementById("peer-dm-popout-host");
       const priorPopoutInput = document.getElementById("peer-dm-popout-input");
@@ -830,8 +843,8 @@
           }}
         }}
       }}
-      if (roomList) {{
-        roomList.innerHTML = rosterFiltered.length > 0
+      if (roomList instanceof HTMLElement) {{
+        const nextRoomListHtml = rosterFiltered.length > 0
           ? rosterFiltered.map((item) => (
               (() => {{
                 try {{
@@ -1035,36 +1048,41 @@
           : (rosterQuery
               ? '<div class="chat-member-empty">No users match this search.</div>'
               : '<div class="chat-member-empty">No users discovered yet.</div>');
-        for (const member of roomList.querySelectorAll(".chat-member-item")) {{
-          member.addEventListener("click", () => {{
-            selectNode(member.dataset.nodeId || "", true);
-          }});
-        }}
-        for (const removeBtn of roomList.querySelectorAll(".chat-peer-remove-btn")) {{
-          if (!(removeBtn instanceof HTMLButtonElement)) continue;
-          removeBtn.addEventListener("click", (ev) => {{
-            ev.preventDefault();
-            ev.stopPropagation();
-            const nodeId = normalizeNodeId(removeBtn.dataset.nodeId || "");
-            if (!isCanonicalNodeId(nodeId)) return;
-            const removed = removeManualDirectPeer(nodeId);
-            if (!removed) return;
-            setChatSendStatus(`Peer ${{nodeId}} removed from peer-to-peer list.`);
-            renderChatPeerAddPanel(latestState);
-          }});
-        }}
-        for (const dmBtn of roomList.querySelectorAll(".chat-member-dm-link")) {{
-          if (!(dmBtn instanceof HTMLButtonElement)) continue;
-          dmBtn.addEventListener("click", (ev) => {{
-            ev.preventDefault();
-            ev.stopPropagation();
-            const nodeId = normalizeNodeId(dmBtn.dataset.nodeId || "");
-            if (!isCanonicalNodeId(nodeId) || isSelfNodeId(nodeId)) return;
-            peerDmActivePeerId = nodeId;
-            setPeerDmMenuOpen(false);
-            if (latestState) {{
-              renderChat(latestState);
+        setElementHtmlIfChanged(roomList, nextRoomListHtml, "chat-room-list");
+        if (roomList.dataset.memberClickBound !== "1") {{
+          roomList.dataset.memberClickBound = "1";
+          roomList.addEventListener("click", (ev) => {{
+            const target = ev.target;
+            if (!(target instanceof Element)) return;
+            const removeBtn = target.closest(".chat-peer-remove-btn");
+            if (removeBtn instanceof HTMLButtonElement) {{
+              ev.preventDefault();
+              ev.stopPropagation();
+              const nodeId = normalizeNodeId(removeBtn.dataset.nodeId || "");
+              if (!isCanonicalNodeId(nodeId)) return;
+              const removed = removeManualDirectPeer(nodeId);
+              if (!removed) return;
+              setChatSendStatus(`Peer ${{nodeId}} removed from peer-to-peer list.`);
+              renderChatPeerAddPanel(latestState);
+              return;
             }}
+            const dmBtn = target.closest(".chat-member-dm-link");
+            if (dmBtn instanceof HTMLButtonElement) {{
+              ev.preventDefault();
+              ev.stopPropagation();
+              const nodeId = normalizeNodeId(dmBtn.dataset.nodeId || "");
+              if (!isCanonicalNodeId(nodeId) || isSelfNodeId(nodeId)) return;
+              peerDmActivePeerId = nodeId;
+              setPeerDmMenuOpen(false);
+              if (latestState) {{
+                renderChat(latestState);
+              }}
+              return;
+            }}
+            if (target.closest("button")) return;
+            const member = target.closest(".chat-member-item");
+            if (!(member instanceof HTMLElement) || !roomList.contains(member)) return;
+            selectNode(member.dataset.nodeId || "", true);
           }});
         }}
       }}

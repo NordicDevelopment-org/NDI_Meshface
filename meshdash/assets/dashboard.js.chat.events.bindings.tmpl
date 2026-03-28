@@ -1,97 +1,114 @@
     function bindChatFeedClicks() {{
-      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item")) {{
-        if (!(item instanceof HTMLElement)) continue;
-        item.addEventListener("click", (ev) => {{
-          const target = ev.target;
-          if (!(target instanceof Element)) return;
+      const feed = document.getElementById("chat-feed");
+      if (!(feed instanceof HTMLElement) || feed.dataset.feedClickBound === "1") return;
+      feed.dataset.feedClickBound = "1";
+      feed.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest(".chat-feed-item");
+        if (!(item instanceof HTMLElement) || !feed.contains(item)) return;
 
-            const whoisBtn = target.closest(".chat-whois-btn");
-            if (whoisBtn) {{
-              ev.preventDefault();
-              ev.stopPropagation();
-              if (!chatBotCommandsEnabled) {{
-                setChatSendStatus("Whois quick action is unavailable.", true);
-                return;
-              }}
-              const whoisTargetId = normalizeNodeId(
-                whoisBtn instanceof HTMLElement
-                  ? (whoisBtn.dataset.whoisTargetId || item.dataset.fromNodeId || "")
-                  : (item.dataset.fromNodeId || "")
-              );
-              const whoisSuffix = nodeIdSuffixForWhois(whoisTargetId);
-              if (!isCanonicalNodeId(whoisTargetId) || !whoisSuffix) {{
-                setChatSendStatus("Cannot build Whois command: sender ID is unavailable.", true);
-                return;
-              }}
-              const command = buildWhoisCommandForNode(whoisTargetId);
-              const input = document.getElementById("chat-input");
-              if (!(input instanceof HTMLInputElement)) {{
-                setChatSendStatus("Cannot prepare Whois command: chat input is unavailable.", true);
-                return;
-              }}
-              if (chatWhoisQuickActionThreadReply) {{
-                const replyId = Number(item.dataset.messageId || "");
-                if (Number.isInteger(replyId) && replyId > 0) {{
-                  const replyName = item.dataset.replyName || "Unknown node";
-                  const replyText = item.dataset.replyText || "";
-                  setChatReplyTarget(replyId, replyName, replyText);
-                }} else {{
-                  clearChatReplyTarget();
-                }}
-              }} else {{
-                clearChatReplyTarget();
-              }}
-              input.value = command;
-              input.focus();
-              input.setSelectionRange(command.length, command.length);
-              input.dispatchEvent(new Event("input", {{ bubbles: true }}));
-              setChatSendStatus(
-                `Prepared ${{command}} for ${{whoisTargetId}}${{chatWhoisQuickActionThreadReply ? " (reply attached)" : ""}}.`
-              );
-              return;
-            }}
+        const retryBtn = target.closest(".chat-retry-btn");
+        if (retryBtn instanceof HTMLButtonElement) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (chatSendInFlight) return;
+          retryChatMessage({{
+            text: retryBtn.dataset.retryText || "",
+            destination: retryBtn.dataset.retryDestination || "^all",
+            channel_index: Number(retryBtn.dataset.retryChannel || "0"),
+            reply_id: Number(retryBtn.dataset.retryReplyId || ""),
+            retry_of: Number(retryBtn.dataset.retryOf || ""),
+          }});
+          return;
+        }}
 
-          const replyBtn = target.closest(".chat-reply-btn");
-          if (replyBtn) {{
-            ev.preventDefault();
-            ev.stopPropagation();
+        const whoisBtn = target.closest(".chat-whois-btn");
+        if (whoisBtn) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (!chatBotCommandsEnabled) {{
+            setChatSendStatus("Whois quick action is unavailable.", true);
+            return;
+          }}
+          const whoisTargetId = normalizeNodeId(
+            whoisBtn instanceof HTMLElement
+              ? (whoisBtn.dataset.whoisTargetId || item.dataset.fromNodeId || "")
+              : (item.dataset.fromNodeId || "")
+          );
+          const whoisSuffix = nodeIdSuffixForWhois(whoisTargetId);
+          if (!isCanonicalNodeId(whoisTargetId) || !whoisSuffix) {{
+            setChatSendStatus("Cannot build Whois command: sender ID is unavailable.", true);
+            return;
+          }}
+          const command = buildWhoisCommandForNode(whoisTargetId);
+          const input = document.getElementById("chat-input");
+          if (!(input instanceof HTMLInputElement)) {{
+            setChatSendStatus("Cannot prepare Whois command: chat input is unavailable.", true);
+            return;
+          }}
+          if (chatWhoisQuickActionThreadReply) {{
             const replyId = Number(item.dataset.messageId || "");
-            const replyName = item.dataset.replyName || "Unknown node";
-            const replyText = item.dataset.replyText || "";
-            if (chatMainDirectModeEnabled && activeChatChannel === "direct" && item.classList.contains("chat-selectable")) {{
-              selectNode(item.dataset.nodeId || "", false, false);
+            if (Number.isInteger(replyId) && replyId > 0) {{
+              const replyName = item.dataset.replyName || "Unknown node";
+              const replyText = item.dataset.replyText || "";
+              setChatReplyTarget(replyId, replyName, replyText);
+            }} else {{
+              clearChatReplyTarget();
             }}
-            setChatReplyTarget(replyId, replyName, replyText);
-            return;
+          }} else {{
+            clearChatReplyTarget();
           }}
+          input.value = command;
+          input.focus();
+          input.setSelectionRange(command.length, command.length);
+          input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+          setChatSendStatus(
+            `Prepared ${{command}} for ${{whoisTargetId}}${{chatWhoisQuickActionThreadReply ? " (reply attached)" : ""}}.`
+          );
+          return;
+        }}
 
-          const ackBtn = target.closest(".chat-ack-btn");
-          if (ackBtn) {{
-            ev.preventDefault();
-            ev.stopPropagation();
-            const ackOptions = chatAckOptionsFromButton(
-              ackBtn instanceof HTMLElement ? ackBtn : null
-            );
-            if (ackOptions) {{
-              void sendChatAck(ackOptions);
-            }}
-            return;
+        const replyBtn = target.closest(".chat-reply-btn");
+        if (replyBtn) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const replyId = Number(item.dataset.messageId || "");
+          const replyName = item.dataset.replyName || "Unknown node";
+          const replyText = item.dataset.replyText || "";
+          if (chatMainDirectModeEnabled && activeChatChannel === "direct" && item.classList.contains("chat-selectable")) {{
+            selectNode(item.dataset.nodeId || "", false, false);
           }}
+          setChatReplyTarget(replyId, replyName, replyText);
+          return;
+        }}
 
-          if (target.closest("a.chat-link")) {{
-            // Let browser open the link (target=_blank) without selecting/replying.
-            return;
+        const ackBtn = target.closest(".chat-ack-btn");
+        if (ackBtn) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const ackOptions = chatAckOptionsFromButton(
+            ackBtn instanceof HTMLElement ? ackBtn : null
+          );
+          if (ackOptions) {{
+            void sendChatAck(ackOptions);
           }}
+          return;
+        }}
 
-          if (target.closest("button")) {{
-            return;
-          }}
+        if (target.closest("a.chat-link")) {{
+          // Let browser open the link (target=_blank) without selecting/replying.
+          return;
+        }}
 
-          if (item.classList.contains("chat-selectable")) {{
-            selectNode(item.dataset.nodeId || "", true);
-          }}
-        }});
-      }}
+        if (target.closest("button")) {{
+          return;
+        }}
+
+        if (item.classList.contains("chat-selectable")) {{
+          selectNode(item.dataset.nodeId || "", true);
+        }}
+      }});
     }}
 
     function bindChatReactionControls() {{
@@ -163,21 +180,7 @@
     }}
 
     function bindChatRetryControls() {{
-      for (const btn of document.querySelectorAll("#chat-feed .chat-retry-btn")) {{
-        if (!(btn instanceof HTMLButtonElement)) continue;
-        btn.addEventListener("click", (ev) => {{
-          ev.preventDefault();
-          ev.stopPropagation();
-          if (chatSendInFlight) return;
-          retryChatMessage({{
-            text: btn.dataset.retryText || "",
-            destination: btn.dataset.retryDestination || "^all",
-            channel_index: Number(btn.dataset.retryChannel || "0"),
-            reply_id: Number(btn.dataset.retryReplyId || ""),
-            retry_of: Number(btn.dataset.retryOf || ""),
-          }});
-        }});
-      }}
+      // Retry clicks are handled via delegated `#chat-feed` listener in bindChatFeedClicks().
     }}
 
     function bindFavoriteMenuControls() {{
