@@ -113,70 +113,116 @@
 
     function bindChatReactionControls() {{
       bindReactionPopover();
-      for (const btn of document.querySelectorAll("#chat-feed .chat-react-btn, #chat-labs-feed .chat-react-btn")) {{
-        if (!(btn instanceof HTMLButtonElement)) continue;
-        if (btn.dataset.reactionBound === "1") continue;
-        btn.dataset.reactionBound = "1";
-        btn.addEventListener("click", (ev) => {{
+      const bindFeedReactionDelegates = (feedId) => {{
+        const feed = document.getElementById(feedId);
+        if (!(feed instanceof HTMLElement)) return;
+        if (feed.dataset.reactionDelegatedBound === "1") return;
+        feed.dataset.reactionDelegatedBound = "1";
+
+        const reactButtonFromTarget = (target) => {{
+          if (!(target instanceof Element)) return null;
+          const btn = target.closest(".chat-react-btn");
+          if (!(btn instanceof HTMLButtonElement)) return null;
+          if (!feed.contains(btn)) return null;
+          return btn;
+        }};
+        const summaryButtonFromTarget = (target) => {{
+          if (!(target instanceof Element)) return null;
+          const summary = target.closest(".chat-reaction-summary");
+          if (!(summary instanceof HTMLButtonElement)) return null;
+          if (!feed.contains(summary)) return null;
+          return summary;
+        }};
+
+        feed.addEventListener("click", (ev) => {{
+          const reactBtn = reactButtonFromTarget(ev.target);
+          if (reactBtn) {{
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (chatSendInFlight) return;
+            const panel = document.getElementById("chat-emoji-panel");
+            const replyId = Number(reactBtn.dataset.replyId || "");
+            if (!Number.isInteger(replyId) || replyId <= 0) {{
+              setChatSendStatus("Cannot react: target message id is missing.", true);
+              return;
+            }}
+            const panelOpenForSameTarget = (
+              panel instanceof HTMLElement
+              && !panel.hidden
+              && chatEmojiMode === "react"
+              && Number.isInteger(chatReactionTargetId)
+              && chatReactionTargetId === replyId
+              && chatEmojiAnchorElement === reactBtn
+            );
+            if (panelOpenForSameTarget) {{
+              closeChatEmojiPanel();
+              return;
+            }}
+            openChatEmojiPanel("react", replyId, reactBtn);
+            return;
+          }}
+
+          const summary = summaryButtonFromTarget(ev.target);
+          if (!(summary instanceof HTMLButtonElement)) return;
           ev.preventDefault();
           ev.stopPropagation();
-          if (chatSendInFlight) return;
-          const panel = document.getElementById("chat-emoji-panel");
-          const replyId = Number(btn.dataset.replyId || "");
-          if (!Number.isInteger(replyId) || replyId <= 0) {{
-            setChatSendStatus("Cannot react: target message id is missing.", true);
-            return;
-          }}
-          const panelOpenForSameTarget = (
-            panel instanceof HTMLElement
-            && !panel.hidden
-            && chatEmojiMode === "react"
-            && Number.isInteger(chatReactionTargetId)
-            && chatReactionTargetId === replyId
-            && chatEmojiAnchorElement === btn
-          );
-          if (panelOpenForSameTarget) {{
-            closeChatEmojiPanel();
-            return;
-          }}
-          openChatEmojiPanel("react", replyId, btn);
-        }});
-      }}
-
-      for (const summary of document.querySelectorAll("#chat-feed .chat-reaction-summary, #chat-labs-feed .chat-reaction-summary")) {{
-        if (!(summary instanceof HTMLButtonElement)) continue;
-        if (summary.dataset.reactionSummaryBound === "1") continue;
-        summary.dataset.reactionSummaryBound = "1";
-        summary.addEventListener("pointerenter", () => {{
           clearReactionPopoverHideTimer();
           openReactionPopoverForSummary(summary);
         }});
-        summary.addEventListener("pointerleave", (ev) => {{
+
+        feed.addEventListener("pointerover", (ev) => {{
+          const summary = summaryButtonFromTarget(ev.target);
+          if (!(summary instanceof HTMLButtonElement)) return;
+          const related = ev.relatedTarget;
+          if (related instanceof Node && summary.contains(related)) {{
+            return;
+          }}
+          clearReactionPopoverHideTimer();
+          openReactionPopoverForSummary(summary);
+        }});
+
+        feed.addEventListener("pointerout", (ev) => {{
+          const summary = summaryButtonFromTarget(ev.target);
+          if (!(summary instanceof HTMLButtonElement)) return;
           const related = ev.relatedTarget;
           const popover = reactionPopoverElement();
-          if (
-            related instanceof Node
-            && popover instanceof HTMLElement
-            && popover.contains(related)
-          ) {{
-            return;
+          if (related instanceof Node) {{
+            if (summary.contains(related)) {{
+              return;
+            }}
+            if (popover instanceof HTMLElement && popover.contains(related)) {{
+              return;
+            }}
           }}
           scheduleReactionPopoverHide(120);
         }});
-        summary.addEventListener("focus", () => {{
+
+        feed.addEventListener("focusin", (ev) => {{
+          const summary = summaryButtonFromTarget(ev.target);
+          if (!(summary instanceof HTMLButtonElement)) return;
           clearReactionPopoverHideTimer();
           openReactionPopoverForSummary(summary);
         }});
-        summary.addEventListener("blur", () => {{
+
+        feed.addEventListener("focusout", (ev) => {{
+          const summary = summaryButtonFromTarget(ev.target);
+          if (!(summary instanceof HTMLButtonElement)) return;
+          const related = ev.relatedTarget;
+          const popover = reactionPopoverElement();
+          if (related instanceof Node) {{
+            if (summary.contains(related)) {{
+              return;
+            }}
+            if (popover instanceof HTMLElement && popover.contains(related)) {{
+              return;
+            }}
+          }}
           scheduleReactionPopoverHide(80);
         }});
-        summary.addEventListener("click", (ev) => {{
-          ev.preventDefault();
-          ev.stopPropagation();
-          clearReactionPopoverHideTimer();
-          openReactionPopoverForSummary(summary);
-        }});
-      }}
+      }};
+
+      bindFeedReactionDelegates("chat-feed");
+      bindFeedReactionDelegates("chat-labs-feed");
     }}
 
     function bindChatRetryControls() {{

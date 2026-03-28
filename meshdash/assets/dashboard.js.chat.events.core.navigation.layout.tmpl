@@ -29,6 +29,16 @@
       }}
 
       const wasNearBottom = (terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight) <= 28;
+      const setElementHtmlIfChanged = (element, markup, cacheKey = "default") => {{
+        if (!(element instanceof HTMLElement)) return false;
+        const nextMarkup = String(markup == null ? "" : markup);
+        const propName = `__meshLastInnerHtml_${{cacheKey}}`;
+        const previousMarkup = (typeof element[propName] === "string") ? element[propName] : null;
+        if (previousMarkup === nextMarkup) return false;
+        element.innerHTML = nextMarkup;
+        element[propName] = nextMarkup;
+        return true;
+      }};
       const maxLines = 260;
       const historyBackfillLimit = Math.max(320, maxLines * 2);
       const fromIdKeys = ["from_id", "fromId", "from", "source_id", "sourceId", "source", "from_num", "fromNum"];
@@ -101,6 +111,42 @@
         return created;
       }})();
       const historyRows = Array.isArray(historyBridge.rows) ? historyBridge.rows : [];
+      const activeMeshFilterIndex = (typeof activeMeshChannelFilterIndex === "function")
+        ? activeMeshChannelFilterIndex()
+        : meshChannelAllIndex;
+      const renderMinuteBucket = Math.floor(nowUnix / 60);
+      const cachedRender = (chatLabsRenderCache && typeof chatLabsRenderCache === "object")
+        ? chatLabsRenderCache
+        : null;
+      if (
+        cachedRender
+        && cachedRender.liveRowsRef === liveRows
+        && cachedRender.nodesRef === nodes
+        && cachedRender.historyRowsRef === historyRows
+        && cachedRender.meshFilterIndex === activeMeshFilterIndex
+        && cachedRender.minuteBucket === renderMinuteBucket
+        && cachedRender.historyLoaded === !!historyBridge.loaded
+        && cachedRender.historyLoading === !!historyBridge.loading
+      ) {{
+        if (typeof cachedRender.feedHtml === "string") {{
+          setElementHtmlIfChanged(feed, cachedRender.feedHtml, "chat-labs-feed");
+        }}
+        if (countEl instanceof HTMLElement) {{
+          const countText = String(cachedRender.countText || "");
+          if (countEl.textContent !== countText) {{
+            countEl.textContent = countText;
+          }}
+        }}
+        if (typeof bindChatReactionControls === "function") {{
+          bindChatReactionControls();
+        }}
+        if (wasNearBottom) {{
+          window.requestAnimationFrame(() => {{
+            terminal.scrollTop = terminal.scrollHeight;
+          }});
+        }}
+        return;
+      }}
       const mergedRows = [];
       const seenMergedKeys = new Set();
       const mergedCandidates = liveRows.concat(historyRows);
@@ -382,12 +428,27 @@
 
       if (!timeline.length) {{
         const loadingHistory = !!(historyBridge && historyBridge.loading);
-        feed.innerHTML = loadingHistory
+        const nextFeedHtml = loadingHistory
           ? '<div class="chatlabs-empty">Loading saved chat history...</div>'
           : '<div class="chatlabs-empty">No chat traffic yet. Incoming messages will appear here.</div>';
+        setElementHtmlIfChanged(feed, nextFeedHtml, "chat-labs-feed");
+        const countText = loadingHistory ? "loading..." : "0 msgs";
         if (countEl instanceof HTMLElement) {{
-          countEl.textContent = loadingHistory ? "loading..." : "0 msgs";
+          if (countEl.textContent !== countText) {{
+            countEl.textContent = countText;
+          }}
         }}
+        chatLabsRenderCache = {{
+          liveRowsRef: liveRows,
+          nodesRef: nodes,
+          historyRowsRef: historyRows,
+          meshFilterIndex: activeMeshFilterIndex,
+          minuteBucket: renderMinuteBucket,
+          historyLoaded: !!historyBridge.loaded,
+          historyLoading: !!historyBridge.loading,
+          feedHtml: nextFeedHtml,
+          countText,
+        }};
         if (typeof bindChatReactionControls === "function") {{
           bindChatReactionControls();
         }}
@@ -529,13 +590,28 @@
         );
       }}
 
-      feed.innerHTML = lineHtml.join("");
+      const nextFeedHtml = lineHtml.join("");
+      setElementHtmlIfChanged(feed, nextFeedHtml, "chat-labs-feed");
       if (typeof bindChatReactionControls === "function") {{
         bindChatReactionControls();
       }}
+      const countText = `${{timeline.length}} msgs`;
       if (countEl instanceof HTMLElement) {{
-        countEl.textContent = `${{timeline.length}} msgs`;
+        if (countEl.textContent !== countText) {{
+          countEl.textContent = countText;
+        }}
       }}
+      chatLabsRenderCache = {{
+        liveRowsRef: liveRows,
+        nodesRef: nodes,
+        historyRowsRef: historyRows,
+        meshFilterIndex: activeMeshFilterIndex,
+        minuteBucket: renderMinuteBucket,
+        historyLoaded: !!historyBridge.loaded,
+        historyLoading: !!historyBridge.loading,
+        feedHtml: nextFeedHtml,
+        countText,
+      }};
       if (wasNearBottom) {{
         window.requestAnimationFrame(() => {{
           terminal.scrollTop = terminal.scrollHeight;
