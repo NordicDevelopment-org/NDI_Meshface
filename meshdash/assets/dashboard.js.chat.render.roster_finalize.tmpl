@@ -1048,7 +1048,10 @@
                   ? `<button type="button" class="chat-member-expand-btn" data-node-id="${{escAttr(nodeId)}}" aria-expanded="${{memberDetailsExpanded ? "true" : "false"}}" title="${{memberDetailsExpanded ? "Collapse node details" : "Expand node details"}}">${{memberDetailsExpanded ? "▾" : "▸"}}</button>`
                   : "";
                 const canOpenPeerDm = isCanonicalNodeId(nodeId) && !isSelfNodeId(nodeId);
-                const nodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
+                const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
+                const nodeHue = tagActive
+                  ? nodeTagTintHue(tagEntry, autoNodeHue)
+                  : autoNodeHue;
                 const tagStyleVars = tagActive ? nodeTagStyleVars(tagEntry) : "";
                 const memberTintStyle = `--chat-member-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || 145)))}};${{tagStyleVars}}`;
                 const memberQuickActionRow = (isSelectedMember && canOpenPeerDm)

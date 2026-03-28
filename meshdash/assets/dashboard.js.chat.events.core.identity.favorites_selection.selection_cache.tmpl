@@ -325,6 +325,7 @@
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
         const tagEntry = nodeTagEntryForNode(nodeId);
         const active = !!tagEntry;
+        const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
         member.classList.toggle("tagged-node", active);
         const nameLeft = member.querySelector(".chat-member-name-left");
         const existingChip = nameLeft instanceof HTMLElement
@@ -333,8 +334,10 @@
         if (active && tagEntry && tagEntry.preset) {{
           const color = normalizeNodeTagColor(tagEntry.preset.color, "#2aa85a");
           const vibranceRatio = (clampNodeTagVibrance(tagEntry.preset.vibrance, 70) / 100).toFixed(3);
+          const tintHue = nodeTagTintHue(tagEntry, autoNodeHue);
           const tagLabel = normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged");
           const tagStyleVars = nodeTagStyleVars(tagEntry);
+          member.style.setProperty("--chat-member-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(tintHue) || autoNodeHue)))));
           member.style.setProperty("--node-tag-color", color);
           member.style.setProperty("--node-tag-vibrance", vibranceRatio);
           if (showTagBadge) {{
@@ -360,11 +363,52 @@
             existingChip.remove();
           }}
         }} else {{
+          member.style.setProperty("--chat-member-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(autoNodeHue) || 145)))));
           member.style.removeProperty("--node-tag-color");
           member.style.removeProperty("--node-tag-vibrance");
           if (existingChip instanceof HTMLElement) {{
             existingChip.remove();
           }}
+        }}
+      }}
+      for (const row of document.querySelectorAll("#chat-feed .chat-feed-item")) {{
+        if (!(row instanceof HTMLElement)) continue;
+        const rowCandidates = [
+          row.dataset.fromNodeId,
+          row.dataset.nodeId,
+          row.dataset.replyName,
+        ];
+        let rowNodeId = "";
+        let tagEntry = null;
+        for (const candidate of rowCandidates) {{
+          const clean = normalizeNodeId(candidate || "");
+          if (!isSelectableNodeId(clean)) continue;
+          const entry = nodeTagEntryForNode(clean);
+          if (entry && entry.preset) {{
+            rowNodeId = clean;
+            tagEntry = entry;
+            break;
+          }}
+          if (!rowNodeId) {{
+            rowNodeId = clean;
+          }}
+        }}
+        if (!isSelectableNodeId(rowNodeId)) continue;
+        const active = !!(tagEntry && tagEntry.preset);
+        const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(rowNodeId, 210) : 210;
+        const nodeHue = active
+          ? nodeTagTintHue(tagEntry, autoNodeHue)
+          : autoNodeHue;
+        row.classList.toggle("tagged-node", active);
+        row.style.setProperty("--chat-feed-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || autoNodeHue)))));
+        if (active && tagEntry && tagEntry.preset) {{
+          const color = normalizeNodeTagColor(tagEntry.preset.color, "#2aa85a");
+          const vibranceRatio = (clampNodeTagVibrance(tagEntry.preset.vibrance, 70) / 100).toFixed(3);
+          row.style.setProperty("--node-tag-color", color);
+          row.style.setProperty("--node-tag-vibrance", vibranceRatio);
+        }} else {{
+          row.style.removeProperty("--node-tag-color");
+          row.style.removeProperty("--node-tag-vibrance");
         }}
       }}
       syncMapTitleFavoriteToggle();

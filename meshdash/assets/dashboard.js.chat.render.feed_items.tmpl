@@ -153,10 +153,71 @@
             </div>`;
           }});
       }})();
+      const nodeIdByLabel = new Map();
+      const normalizeNodeLabelLookupKey = (value) => String(value == null ? "" : value).trim().toLowerCase();
+      const rememberNodeLabelId = (labelValue, nodeId) => {{
+        const key = normalizeNodeLabelLookupKey(labelValue);
+        if (!key) return;
+        if (!isCanonicalNodeId(nodeId)) return;
+        if (!nodeIdByLabel.has(key)) {{
+          nodeIdByLabel.set(key, nodeId);
+        }}
+      }};
+      for (const node of nodes) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (!isCanonicalNodeId(nodeId)) continue;
+        rememberNodeLabelId(preferredNodeName(node), nodeId);
+        rememberNodeLabelId(node && node.long_name, nodeId);
+        rememberNodeLabelId(node && node.longName, nodeId);
+        rememberNodeLabelId(node && node.short_name, nodeId);
+        rememberNodeLabelId(node && node.shortName, nodeId);
+        rememberNodeLabelId(node && node.user && node.user.long_name, nodeId);
+        rememberNodeLabelId(node && node.user && node.user.short_name, nodeId);
+        rememberNodeLabelId(nodeNameCache.get(nodeId), nodeId);
+      }}
+      const resolveChatFeedNodeId = (value) => {{
+        const clean = normalizeNodeId(value);
+        if (!clean) return "";
+        if (isCanonicalNodeId(clean)) return clean;
+        if (clean === "^all" || clean === "local" || clean === "Unknown" || clean === "n/a") {{
+          return clean;
+        }}
+        const nodeNum = parseNodeNum(value);
+        if (Number.isInteger(nodeNum) && nodeIdByNum.has(nodeNum)) {{
+          const resolvedByNum = normalizeNodeId(nodeIdByNum.get(nodeNum));
+          if (isCanonicalNodeId(resolvedByNum)) {{
+            return resolvedByNum;
+          }}
+        }}
+        const resolvedByLabel = normalizeNodeId(nodeIdByLabel.get(normalizeNodeLabelLookupKey(clean)) || "");
+        if (isCanonicalNodeId(resolvedByLabel)) {{
+          return resolvedByLabel;
+        }}
+        return clean;
+      }};
+      const resolveNodeTagEntryForCandidates = (candidates) => {{
+        if (typeof nodeTagEntryForNode !== "function") {{
+          return {{ entry: null, matchedNodeId: "" }};
+        }}
+        const source = Array.isArray(candidates) ? candidates : [];
+        for (const candidate of source) {{
+          const clean = normalizeNodeId(candidate);
+          if (!isSelectableNodeId(clean)) continue;
+          const entry = nodeTagEntryForNode(clean);
+          if (entry && entry.preset) {{
+            return {{ entry, matchedNodeId: clean }};
+          }}
+        }}
+        return {{ entry: null, matchedNodeId: "" }};
+      }};
       const feedItems = visibleMessages.map((msg) => {{
         const endpoints = endpointsForMessage(msg);
-        const sourceNode = endpoints.fromId;
-        const fallbackNode = endpoints.toId;
+        const sourceNodeRaw = endpoints.fromId;
+        const fallbackNodeRaw = endpoints.toId;
+        const sourceNodeResolved = resolveChatFeedNodeId(sourceNodeRaw);
+        const fallbackNodeResolved = resolveChatFeedNodeId(fallbackNodeRaw);
+        const sourceNode = sourceNodeResolved || sourceNodeRaw;
+        const fallbackNode = fallbackNodeResolved || fallbackNodeRaw;
         if (typeof isMutedNode === "function" && isMutedNode(sourceNode)) {{
           return "";
         }}
@@ -199,17 +260,66 @@
           ?? hopCountOfChatPacket(packetRaw)
         );
         const hasHop = hopNum != null;
-        const meshIdx = messageMeshChannelIndex(msg);
+        const explicitMsgMeshIdx = (typeof explicitMessageMeshChannelIndex === "function")
+          ? explicitMessageMeshChannelIndex(msg)
+          : null;
+        const packetMeshIdx = (typeof explicitPacketChannelIndex === "function")
+          ? explicitPacketChannelIndex(packetEntry)
+          : null;
+        const activeFilterMeshIdx = (typeof activeMeshChannelFilterIndex === "function")
+          ? activeMeshChannelFilterIndex()
+          : meshChannelAllIndex;
+        const meshIdx = (Number.isInteger(explicitMsgMeshIdx) && explicitMsgMeshIdx >= 0)
+          ? explicitMsgMeshIdx
+          : (
+              (Number.isInteger(packetMeshIdx) && packetMeshIdx >= 0)
+                ? packetMeshIdx
+                : (
+                    (Number.isInteger(activeFilterMeshIdx) && activeFilterMeshIdx !== meshChannelAllIndex)
+                      ? activeFilterMeshIdx
+                      : messageMeshChannelIndex(msg)
+                  )
+            );
         const hasMeshTint = Number.isInteger(meshIdx) && meshIdx >= 0;
         const meshTintClass = hasMeshTint ? " channel-tinted" : "";
-        const tintNodeId = normalizeNodeId(sourceNode || nodeId || "");
-        const nodeTintHueValue = (typeof nodeTintHue === "function")
+        const meshEdgeClass = (hasMeshTint && typeof meshChannelEdgeClass === "function")
+          ? ` ${{meshChannelEdgeClass(meshIdx, {{ allowAll: false }})}}`
+          : "";
+        const tagMatch = resolveNodeTagEntryForCandidates([
+          sourceNodeRaw,
+          sourceNodeResolved,
+          sourceNode,
+          nodeId,
+          fromMeta && fromMeta.idTag,
+          fromMeta && fromMeta.label,
+          fallbackNodeRaw,
+          fallbackNodeResolved,
+          fallbackNode,
+        ]);
+        const tintTagEntry = tagMatch.entry;
+        const tintNodeId = normalizeNodeId(tagMatch.matchedNodeId || sourceNode || nodeId || sourceNodeRaw || "");
+        const tagActive = !!(tintTagEntry && tintTagEntry.preset);
+        const tagStyleVars = (tagActive && typeof nodeTagStyleVars === "function")
+          ? nodeTagStyleVars(tintTagEntry)
+          : "";
+        const autoNodeTintHue = (typeof nodeTintHue === "function")
           ? nodeTintHue(tintNodeId, 210)
           : 210;
+        const nodeTintHueValue = (tintTagEntry && typeof nodeTagTintHue === "function")
+          ? nodeTagTintHue(tintTagEntry, autoNodeTintHue)
+          : autoNodeTintHue;
         const nodeTintStyle = `--chat-feed-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeTintHueValue) || 210)))}};`;
-        const combinedRowTintStyle = hasMeshTint
-          ? `${{meshChannelTintStyle(meshIdx, {{ allowAll: false }})}} ${{nodeTintStyle}}`
-          : nodeTintStyle;
+        const rowTintStyleParts = [];
+        if (hasMeshTint) {{
+          rowTintStyleParts.push(meshChannelTintStyle(meshIdx, {{ allowAll: false }}));
+        }}
+        rowTintStyleParts.push(nodeTintStyle);
+        if (tagStyleVars) {{
+          rowTintStyleParts.push(tagStyleVars);
+        }}
+        const combinedRowTintStyle = rowTintStyleParts
+          .filter((value) => !!value)
+          .join(" ");
         const rowTintStyleAttr = ` style="${{escAttr(combinedRowTintStyle)}}"`;
         const hopStart = firstFiniteNestedNumber(
           [msg, packetSummary, packetRaw],
@@ -425,6 +535,7 @@
           ? `<div class="chat-reaction-row">${{reactionRowParts.join("")}}</div>`
           : "";
         const selectedFeedClass = (selectedNodeId && nodeId === selectedNodeId) ? " selected-node" : "";
+        const tagClass = tagActive ? " tagged-node" : "";
         const messageKey = chatMessageKey(msg);
         const hasChangeMarker = !!messageKey && activeChangeFocusKeys.has(messageKey);
         const changeClass = hasChangeMarker ? " has-change-marker" : "";
@@ -506,7 +617,7 @@
         const monitorViewClass = monitorMode ? " chat-view-monitor" : "";
         if (monitorMode) {{
           const monitorNetworkTag = `<span class="chat-monitor-network-tag">[ ][MF]</span>`;
-          const monitorItemClass = `chat-feed-item chat-feed-item-monitor-exact ${{selectableClass}}${{selectedFeedClass}}${{monitorViewClass}}`;
+          const monitorItemClass = `chat-feed-item chat-feed-item-monitor-exact ${{selectableClass}}${{selectedFeedClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}`;
           return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="${{monitorItemClass.trim()}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
             <span class="chat-entry-msg">
               ${{monitorPrefix}}
@@ -534,7 +645,7 @@
               <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
             </span>`;
         const extraRows = monitorMode ? "" : `${{reactionSummaryRow}}${{reactionRow}}`;
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{meshTintClass}}${{monitorViewClass}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
           <div class="chat-feed-line">
             <div class="chat-feed-summary">
               ${{changeBadge}}

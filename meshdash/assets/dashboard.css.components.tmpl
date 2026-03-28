@@ -1629,6 +1629,7 @@
       color: #d9ece1;
     }}
     [data-theme="dark"] .chat-feed-item.channel-tinted {{
+      border-left-color: rgba(var(--chat-feed-channel-rgb), 0.96);
       background:
         linear-gradient(
           90deg,
@@ -1659,6 +1660,89 @@
       box-shadow:
         inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.84),
         inset 4px 0 0 rgba(112, 196, 148, 0.34);
+    }}
+    [data-theme="dark"] .chat-feed-item.tagged-node {{
+      background:
+        linear-gradient(
+          90deg,
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        #1a2a21;
+      border-color: #3e5a4c;
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 45% 52% / 0.28);
+    }}
+    [data-theme="dark"] .chat-feed-item.tagged-node.channel-tinted {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.22),
+          rgba(var(--chat-feed-channel-rgb), 0.12) 28%,
+          rgba(var(--chat-feed-channel-rgb), 0.05) 56%,
+          rgba(var(--chat-feed-channel-rgb), 0.01) 100%
+        ),
+        linear-gradient(
+          90deg,
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        #1a2a21;
+      border-color: #3e5a4c;
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 4px 0 0 rgba(var(--chat-feed-channel-rgb), 0.78);
+    }}
+    [data-theme="dark"] .chat-feed-item.tagged-node.self-authored {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(112, 196, 148, 0.12),
+          rgba(112, 196, 148, 0.05) 40%,
+          rgba(112, 196, 148, 0.015) 100%
+        ),
+        linear-gradient(
+          90deg,
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        #20372c;
+      border-color: #4b6c59;
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 4px 0 0 rgba(112, 196, 148, 0.28);
+    }}
+    [data-theme="dark"] .chat-feed-item.tagged-node.self-authored.channel-tinted {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.2),
+          rgba(var(--chat-feed-channel-rgb), 0.11) 28%,
+          rgba(var(--chat-feed-channel-rgb), 0.04) 56%,
+          rgba(var(--chat-feed-channel-rgb), 0.01) 100%
+        ),
+        linear-gradient(
+          90deg,
+          rgba(112, 196, 148, 0.14),
+          rgba(112, 196, 148, 0.06) 44%,
+          rgba(112, 196, 148, 0.02) 100%
+        ),
+        linear-gradient(
+          90deg,
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        #20372c;
+      border-color: #4b6c59;
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 4px 0 0 rgba(var(--chat-feed-channel-rgb), 0.72),
+        inset 6px 0 0 rgba(112, 196, 148, 0.22);
     }}
     [data-theme="dark"] .chat-feed-item.chat-selectable:hover {{
       background: #24392f;
@@ -1704,6 +1788,15 @@
       box-shadow:
         inset 3px 0 0 #3fb950,
         inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+    }}
+    [data-theme="dark"] .chat-feed-item.tagged-node.selected-node,
+    [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node:hover,
+    [data-theme="dark"] .chat-feed-item.tagged-node.selected-node.channel-tinted,
+    [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted:hover {{
+      border-color: #5a8a72;
+      box-shadow:
+        inset 3px 0 0 var(--node-tag-color, #2aa85a),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 44% 56% / 0.34);
     }}
     [data-theme="dark"] .chat-feed-meta,
     [data-theme="dark"] .chat-feed-time,
@@ -2405,6 +2498,7 @@
       box-shadow: inset 1px 0 0 hsl(var(--chat-feed-node-hue) 20% 46% / 0.1);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted {{
+      border-left: 2px solid rgba(var(--chat-feed-channel-rgb), 0.84);
       background:
         linear-gradient(
           90deg,
@@ -2415,6 +2509,100 @@
         ),
         var(--chat-feed-node-gradient);
       box-shadow: inset 2px 0 0 rgba(var(--chat-feed-channel-rgb), 0.48);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-dashed {{
+      border-left-style: dashed;
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-dotted {{
+      border-left-style: dotted;
+      border-left-width: 3px;
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-double {{
+      border-left-style: double;
+      border-left-width: 3px;
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted.channel-edge-solid {{
+      border-left-style: solid;
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.tagged-node {{
+      background:
+        linear-gradient(
+          90deg,
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        var(--chat-feed-node-gradient);
+      border-color: hsl(var(--chat-feed-node-hue) 18% 28% / 0.38);
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 45% 52% / 0.28);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.tagged-node.channel-tinted {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.085),
+          rgba(var(--chat-feed-channel-rgb), 0.036) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.014) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.006) 100%
+        ),
+        linear-gradient(
+          90deg,
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        var(--chat-feed-node-gradient);
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 4px 0 0 rgba(var(--chat-feed-channel-rgb), 0.58);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.self-authored.tagged-node {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(63, 185, 80, 0.04),
+          rgba(63, 185, 80, 0.015) 28%,
+          rgba(63, 185, 80, 0.006) 52%
+        ),
+        linear-gradient(
+          90deg,
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        var(--chat-feed-node-gradient);
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 4px 0 0 rgba(63, 185, 80, 0.11);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.self-authored.tagged-node.channel-tinted {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-feed-channel-rgb), 0.065),
+          rgba(var(--chat-feed-channel-rgb), 0.03) 30%,
+          rgba(var(--chat-feed-channel-rgb), 0.012) 58%,
+          rgba(var(--chat-feed-channel-rgb), 0.006) 100%
+        ),
+        linear-gradient(
+          90deg,
+          rgba(63, 185, 80, 0.04),
+          rgba(63, 185, 80, 0.015) 28%,
+          rgba(63, 185, 80, 0.006) 52%
+        ),
+        linear-gradient(
+          90deg,
+          hsl(var(--chat-feed-node-hue) 76% 34% / calc(0.16 + var(--node-tag-vibrance, 0.7) * 0.16)),
+          hsl(var(--chat-feed-node-hue) 66% 28% / calc(0.08 + var(--node-tag-vibrance, 0.7) * 0.11)) 36%,
+          hsl(var(--chat-feed-node-hue) 62% 24% / 0) 70%
+        ),
+        var(--chat-feed-node-gradient);
+      box-shadow:
+        inset 2px 0 0 var(--node-tag-color, #2aa85a),
+        inset 4px 0 0 rgba(var(--chat-feed-channel-rgb), 0.44),
+        inset 6px 0 0 rgba(63, 185, 80, 0.08);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.self-authored {{
       background:
@@ -4612,6 +4800,19 @@
       box-shadow:
         inset 3px 0 0 #3fb950,
         inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+    }}
+    [data-theme="dark"] .chat-feed-item.tagged-node.selected-node,
+    [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node:hover,
+    [data-theme="dark"] .chat-feed-item.tagged-node.selected-node.has-change-marker,
+    [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.has-change-marker:hover,
+    [data-theme="dark"] .chat-feed-item.tagged-node.selected-node.channel-tinted,
+    [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted:hover,
+    [data-theme="dark"] .chat-feed-item.tagged-node.selected-node.channel-tinted.has-change-marker,
+    [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted.has-change-marker:hover {{
+      border-color: #3f7b5b !important;
+      box-shadow:
+        inset 3px 0 0 var(--node-tag-color, #2aa85a),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 44% 56% / 0.34);
     }}
     [data-theme="dark"] .chat-feed-new-pill {{
       background: #4d3b10;
