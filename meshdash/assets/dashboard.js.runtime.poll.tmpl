@@ -149,6 +149,15 @@
         syncBoardGameNetworkState("chess", state);
         syncBbsNetworkState(state);
         renderSelfRadioPill(state);
+        const hiddenStatePoll = (typeof document !== "undefined") && !!document.hidden;
+        if (hiddenStatePoll) {{
+          // Keep background bookkeeping current without paying the full render cost
+          // while the tab is not visible.
+          chatChangeCatchupArmed = true;
+          syncChatUnreadFromState(state, {{ clearActiveWhenInChat: false }});
+          scheduleFileTransferMaintenance(state);
+          return;
+        }}
         if (!summaryMetricsHydrated && !summaryMetricsHydrateInFlight) {{
           summaryMetricsHydrateInFlight = hydrateSummaryMetricTickers()
             .finally(() => {{
