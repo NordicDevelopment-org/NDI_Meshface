@@ -406,20 +406,6 @@
         && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "history";
     }}
 
-    function syncChatNodeDetailsExpandButtons() {{
-      const roomList = document.getElementById("chat-room-list");
-      if (!(roomList instanceof HTMLElement)) return;
-      const selectedId = normalizeNodeId(selectedNodeId || "");
-      const drawerExpanded = isChatNodeDetailsDrawerExpanded();
-      for (const btn of roomList.querySelectorAll(".chat-member-expand-btn")) {{
-        if (!(btn instanceof HTMLButtonElement)) continue;
-        const nodeId = normalizeNodeId(btn.dataset.nodeId || "");
-        const expandedForNode = drawerExpanded && isSelectableNodeId(selectedId) && nodeId === selectedId;
-        btn.setAttribute("aria-expanded", expandedForNode ? "true" : "false");
-        btn.textContent = expandedForNode ? "▾" : "▸";
-      }}
-    }}
-
     function syncSavedNodeDetailsDock(forceToSaved = false) {{
       const detailsHost = document.getElementById("saved-node-details");
       if (!(detailsHost instanceof HTMLElement)) return;
@@ -440,6 +426,7 @@
       const drawer = document.getElementById("chat-node-details-drawer");
       const titleEl = document.getElementById("chat-node-details-title");
       const closeBtn = document.getElementById("chat-node-details-close-btn");
+      const dmBtn = document.getElementById("chat-node-details-dm-btn");
       const detailsTabBtn = document.getElementById("chat-node-details-tab-details");
       const historyTabBtn = document.getElementById("chat-node-details-tab-history");
       const detailsPanel = document.getElementById("chat-node-details-panel-details");
@@ -455,10 +442,14 @@
       if (closeBtn instanceof HTMLButtonElement) {{
         closeBtn.disabled = !expanded;
       }}
+      if (dmBtn instanceof HTMLButtonElement) {{
+        dmBtn.hidden = true;
+        dmBtn.disabled = true;
+        dmBtn.dataset.nodeId = "";
+      }}
       if (!expanded) {{
         syncSavedNodeDetailsDock(true);
         syncNodeHistoryDock();
-        syncChatNodeDetailsExpandButtons();
         return;
       }}
 
@@ -480,13 +471,22 @@
         historyPanel.hidden = activeTab !== "history";
       }}
 
+      const resolvedName = (typeof resolveSavedViewNodeName === "function")
+        ? resolveSavedViewNodeName(safeState, selectedId)
+        : "";
+      const fallbackName = nodeNameCache.get(selectedId) || selectedId;
+      const titleName = String(resolvedName || fallbackName || selectedId);
       if (titleEl instanceof HTMLElement) {{
-        const resolvedName = (typeof resolveSavedViewNodeName === "function")
-          ? resolveSavedViewNodeName(safeState, selectedId)
-          : "";
-        const fallbackName = nodeNameCache.get(selectedId) || selectedId;
-        const titleName = String(resolvedName || fallbackName || selectedId);
         titleEl.textContent = `${{titleName}} (${selectedId})`;
+      }}
+      if (dmBtn instanceof HTMLButtonElement) {{
+        const canOpenPeerDm = isCanonicalNodeId(selectedId) && !isSelfNodeId(selectedId);
+        dmBtn.hidden = !canOpenPeerDm;
+        dmBtn.disabled = !canOpenPeerDm;
+        dmBtn.dataset.nodeId = canOpenPeerDm ? selectedId : "";
+        dmBtn.title = canOpenPeerDm
+          ? `Open peer message window with ${{titleName}}`
+          : "Send message unavailable for this node";
       }}
 
       syncSavedNodeDetailsDock(false);
@@ -509,7 +509,6 @@
       }} else {{
         syncNodeHistoryDock();
       }}
-      syncChatNodeDetailsExpandButtons();
     }}
 
     function setChatNodeDetailsDrawerExpanded(expanded, options = null) {{
@@ -571,6 +570,7 @@
     function bindChatNodeDetailsDrawerControls() {{
       const closeBtn = document.getElementById("chat-node-details-close-btn");
       const drawer = document.getElementById("chat-node-details-drawer");
+      const dmBtn = document.getElementById("chat-node-details-dm-btn");
       if (closeBtn instanceof HTMLButtonElement && closeBtn.dataset.bound !== "1") {{
         closeBtn.dataset.bound = "1";
         closeBtn.addEventListener("click", () => {{
@@ -578,6 +578,18 @@
             fetchHistory: false,
             rerender: false,
           }});
+        }});
+      }}
+      if (dmBtn instanceof HTMLButtonElement && dmBtn.dataset.bound !== "1") {{
+        dmBtn.dataset.bound = "1";
+        dmBtn.addEventListener("click", () => {{
+          const nodeId = normalizeNodeId(dmBtn.dataset.nodeId || "");
+          if (!isCanonicalNodeId(nodeId) || isSelfNodeId(nodeId)) return;
+          peerDmActivePeerId = nodeId;
+          setPeerDmMenuOpen(false);
+          if (latestState) {{
+            renderChat(latestState);
+          }}
         }});
       }}
       if (drawer instanceof HTMLElement) {{

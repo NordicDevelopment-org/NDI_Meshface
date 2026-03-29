@@ -11,12 +11,6 @@
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
         const isSelected = !!selectedNodeId && nodeId === selectedNodeId;
         member.classList.toggle("selected-node", isSelected);
-        const expandBtn = member.querySelector(".chat-member-expand-btn");
-        if (expandBtn instanceof HTMLButtonElement) {{
-          const expanded = isSelected && !!chatNodeDetailsDrawerExpanded;
-          expandBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
-          expandBtn.textContent = expanded ? "▾" : "▸";
-        }}
       }}
       for (const item of document.querySelectorAll("#favorites-list .favorite-node-item")) {{
         const nodeId = normalizeNodeId(item.dataset.nodeId || "");
