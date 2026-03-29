@@ -767,11 +767,49 @@
       }}
 
       const visiblePoints = visibleSeriesList.flatMap((series) => series.points);
-      let minValue = Math.min(...visiblePoints.map((point) => Number(point.value)));
-      let maxValue = Math.max(...visiblePoints.map((point) => Number(point.value)));
+      const visibleValues = visiblePoints
+        .map((point) => Number(point && point.value))
+        .filter((value) => Number.isFinite(value));
+      const rawMinValue = visibleValues.length ? Math.min(...visibleValues) : NaN;
+      const rawMaxValue = visibleValues.length ? Math.max(...visibleValues) : NaN;
 
-      if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {{
+      if (!Number.isFinite(rawMinValue) || !Number.isFinite(rawMaxValue)) {{
         return clearChart("No numeric values in this selection.");
+      }}
+
+      const percentile = (sortedValues, ratio) => {{
+        const values = Array.isArray(sortedValues) ? sortedValues : [];
+        if (!values.length) return NaN;
+        const idx = Math.max(0, Math.min(values.length - 1, ratio * (values.length - 1)));
+        const low = Math.floor(idx);
+        const high = Math.ceil(idx);
+        if (low === high) return values[low];
+        const mix = idx - low;
+        return values[low] + ((values[high] - values[low]) * mix);
+      }};
+
+      let minValue = rawMinValue;
+      let maxValue = rawMaxValue;
+      if (visibleValues.length >= 14 && rawMaxValue > rawMinValue) {{
+        const sortedValues = visibleValues.slice().sort((a, b) => a - b);
+        const p10 = percentile(sortedValues, 0.10);
+        const p90 = percentile(sortedValues, 0.90);
+        const coreSpan = Number(p90) - Number(p10);
+        const rawSpan = rawMaxValue - rawMinValue;
+        const outlierHeavy = Number.isFinite(coreSpan)
+          && coreSpan > 0
+          && rawSpan > 0
+          && (coreSpan / rawSpan) < 0.62;
+        if (outlierHeavy) {{
+          const corePad = coreSpan * 0.22;
+          minValue = p10 - corePad;
+          maxValue = p90 + corePad;
+        }}
+      }}
+
+      if (!(Number.isFinite(minValue) && Number.isFinite(maxValue) && maxValue > minValue)) {{
+        minValue = rawMinValue;
+        maxValue = rawMaxValue;
       }}
 
       if (Math.abs(maxValue - minValue) < 1e-9) {{
@@ -782,6 +820,9 @@
         minValue -= pad;
         maxValue += pad;
       }}
+      const clippedPointCount = visibleValues.reduce((count, value) => (
+        count + ((value < minValue || value > maxValue) ? 1 : 0)
+      ), 0);
 
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const palette = darkTheme
@@ -798,8 +839,14 @@
           pointStroke: "rgba(15, 35, 25, 0.38)",
         }};
 
-      const width = envMetricsChartLayout.width;
-      const height = envMetricsChartLayout.height;
+      const measuredWidth = Number(svg.clientWidth);
+      const measuredHeight = Number(svg.clientHeight);
+      const width = Number.isFinite(measuredWidth) && measuredWidth > 10
+        ? Math.max(480, Math.round(measuredWidth))
+        : envMetricsChartLayout.width;
+      const height = Number.isFinite(measuredHeight) && measuredHeight > 10
+        ? Math.max(240, Math.round(measuredHeight))
+        : envMetricsChartLayout.height;
       const padLeft = envMetricsChartLayout.padLeft;
       const padRight = envMetricsChartLayout.padRight;
       const padTop = envMetricsChartLayout.padTop;
@@ -809,7 +856,10 @@
       const unixSpan = Math.max(1, visibleMaxUnix - visibleMinUnix);
       const valueSpan = Math.max(1e-9, maxValue - minValue);
       const xForUnix = (unix) => padLeft + (((Number(unix) - visibleMinUnix) / unixSpan) * chartWidth);
-      const yForValue = (value) => padTop + (((maxValue - Number(value)) / valueSpan) * chartHeight);
+      const yForValue = (value) => {{
+        const y = padTop + (((maxValue - Number(value)) / valueSpan) * chartHeight);
+        return Math.max(padTop, Math.min(padTop + chartHeight, y));
+      }};
 
       const yTicks = 5;
       const yGrid = [];
@@ -861,7 +911,14 @@
       const baseSubtitle = nodeMeta
         ? `${{metricMeta.label}} for ${{nodeMeta.label || nodeMeta.id}}`
         : `${{metricMeta.label}} across ${{visibleSeriesList.length}} node${{visibleSeriesList.length === 1 ? "" : "s"}}`;
-      const subtitle = zoomed ? `${{baseSubtitle}} (zoomed)` : baseSubtitle;
+      const clippedSubtitle = clippedPointCount > 0
+        ? `${{baseSubtitle}}${{zoomed ? " (zoomed)" : ""}} • focused range (${{
+            clippedPointCount
+          }} outlier${{clippedPointCount === 1 ? "" : "s"}} clipped)`
+        : baseSubtitle;
+      const subtitle = zoomed && clippedPointCount <= 0
+        ? `${{baseSubtitle}} (zoomed)`
+        : clippedSubtitle;
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `

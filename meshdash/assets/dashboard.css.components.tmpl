@@ -486,10 +486,11 @@
       border-radius: 8px;
       background: #edf6ec;
       padding: 9px;
-      margin-bottom: 10px;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
     }}
     .env-metrics-head {{
       display: flex;
@@ -557,7 +558,8 @@
       background: #eaf4eb;
     }}
     .env-metrics-grid {{
-      display: block;
+      display: flex;
+      flex: 1 1 auto;
       min-height: 0;
     }}
     #env-metrics-chart-wrap {{
@@ -566,11 +568,16 @@
       border-radius: 8px;
       background: #f7fbf7;
       padding: 6px;
-      min-height: 300px;
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 220px;
+      width: 100%;
+      overflow: hidden;
     }}
     #env-metrics-chart {{
       width: 100%;
-      height: clamp(260px, 46vh, 420px);
+      height: 100%;
+      min-height: 0;
       display: block;
       cursor: zoom-in;
       touch-action: none;
