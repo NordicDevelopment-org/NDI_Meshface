@@ -1,11 +1,17 @@
 # Ideas Backlog
 
 
-
+- ask if we can make github issues and use them?
 - replace star with custom node colors (node tag)
 - put mute in dropdown, pick new dropdown icon
-
 - makw channel highlight dotted?
+
+
+- move tag config to node dropdown tab. its a +tag, when none is assigned, and then if assigned it shows the tag name and clicking iot shows the edit
+
+
+- sort out click selection
+
 
 
 - all bots are plugins
