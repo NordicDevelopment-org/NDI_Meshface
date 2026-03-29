@@ -1780,17 +1780,17 @@
       border-color: #456957;
     }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
-      border-color: #5a8a72;
+      border-color: hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)));
       box-shadow:
-        inset 3px 0 0 #3fb950,
-        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+        inset 3px 0 0 hsl(var(--chat-feed-node-outline-hue, 30) calc(46% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(58% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.92),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.34);
     }}
     [data-theme="dark"] .chat-feed-item.selected-node.channel-tinted,
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node.channel-tinted:hover {{
-      border-color: #5a8a72;
+      border-color: hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)));
       box-shadow:
-        inset 3px 0 0 #3fb950,
-        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+        inset 3px 0 0 hsl(var(--chat-feed-node-outline-hue, 30) calc(46% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(58% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.92),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.34);
     }}
     [data-theme="dark"] .chat-feed-item.tagged-node.selected-node,
     [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node:hover,
@@ -2180,10 +2180,10 @@
       color: #ecfff4;
     }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
-      border-color: #38af72;
+      border-color: hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)));
       box-shadow:
-        inset 3px 0 0 #3fb950,
-        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+        inset 3px 0 0 hsl(var(--chat-feed-node-outline-hue, 30) calc(46% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(58% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.92),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.34);
     }}
     [data-theme="dark"] .teams-rail-title,
     [data-theme="dark"] .chat-left-title,
@@ -2493,17 +2493,24 @@
     }}
     [data-theme="dark"] .card.chat .chat-feed-item {{
       --chat-feed-node-hue: 210;
+      --chat-feed-node-tint-start-hue: 210;
+      --chat-feed-node-tint-end-hue: 246;
+      --chat-feed-node-outline-hue: 30;
+      --chat-feed-node-outline-dark-sat-mult: 1.1;
+      --chat-feed-node-outline-dark-light-shift: 4%;
       --chat-feed-node-dark-sat-mult: 1;
       --chat-feed-node-dark-light-shift: 0%;
       --chat-feed-node-gradient: linear-gradient(
         96deg,
-        hsl(var(--chat-feed-node-hue) calc(22% * var(--chat-feed-node-dark-sat-mult, 1)) calc(42% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.24),
-        hsl(var(--chat-feed-node-hue) calc(16% * var(--chat-feed-node-dark-sat-mult, 1)) calc(32% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.085) 28%,
-        rgba(13, 17, 23, 0) 58%
+        hsl(var(--chat-feed-node-tint-start-hue, 210) calc(34% * var(--chat-feed-node-dark-sat-mult, 1)) calc(46% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.30) 0%,
+        hsl(var(--chat-feed-node-tint-start-hue, 210) calc(28% * var(--chat-feed-node-dark-sat-mult, 1)) calc(40% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.20) 34%,
+        hsl(var(--chat-feed-node-tint-end-hue, 246) calc(28% * var(--chat-feed-node-dark-sat-mult, 1)) calc(38% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.18) 70%,
+        hsl(var(--chat-feed-node-tint-end-hue, 246) calc(20% * var(--chat-feed-node-dark-sat-mult, 1)) calc(32% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.06) 92%,
+        rgba(13, 17, 23, 0) 100%
       );
       background: var(--chat-feed-node-gradient);
       border: 0;
-      border-bottom: 1px solid hsl(var(--chat-feed-node-hue) calc(12% * var(--chat-feed-node-dark-sat-mult, 1)) calc(26% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.3);
+      border-bottom: 1px solid hsl(var(--chat-feed-node-outline-hue, 30) calc(12% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(30% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.38);
       border-radius: 0;
       color: var(--ui-text);
       box-shadow: inset 1px 0 0 hsl(var(--chat-feed-node-hue) calc(20% * var(--chat-feed-node-dark-sat-mult, 1)) calc(46% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.1);
@@ -3137,8 +3144,8 @@
     }}
     [data-theme="dark"] .chat-feed-item.selected-node {{
       box-shadow:
-        inset 3px 0 0 #3fb950,
-        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+        inset 3px 0 0 hsl(var(--chat-feed-node-outline-hue, 30) calc(46% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(58% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.92),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.34);
     }}
     [data-theme="dark"] .chat-member-item.selected-node {{
       border-color: hsl(var(--chat-member-node-outline-hue, 325) calc(24% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-member-node-outline-dark-light-shift, 0%))) !important;
@@ -4816,19 +4823,19 @@
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node:hover,
     [data-theme="dark"] .chat-feed-item.selected-node.has-change-marker,
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node.has-change-marker:hover {{
-      border-color: #3f7b5b !important;
+      border-color: hsl(var(--chat-feed-node-outline-hue, 30) calc(26% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(42% + var(--chat-feed-node-outline-dark-light-shift, 0%))) !important;
       box-shadow:
-        inset 3px 0 0 #3fb950,
-        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+        inset 3px 0 0 hsl(var(--chat-feed-node-outline-hue, 30) calc(46% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(58% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.92),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.34);
     }}
     [data-theme="dark"] .chat-feed-item.selected-node.channel-tinted,
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node.channel-tinted:hover,
     [data-theme="dark"] .chat-feed-item.selected-node.channel-tinted.has-change-marker,
     [data-theme="dark"] .chat-feed-item.chat-selectable.selected-node.channel-tinted.has-change-marker:hover {{
-      border-color: #3f7b5b !important;
+      border-color: hsl(var(--chat-feed-node-outline-hue, 30) calc(26% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(42% + var(--chat-feed-node-outline-dark-light-shift, 0%))) !important;
       box-shadow:
-        inset 3px 0 0 #3fb950,
-        inset 0 0 0 1px rgba(63, 185, 80, 0.3);
+        inset 3px 0 0 hsl(var(--chat-feed-node-outline-hue, 30) calc(46% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(58% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.92),
+        inset 0 0 0 1px hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.34);
     }}
     [data-theme="dark"] .chat-feed-item.tagged-node.selected-node,
     [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node:hover,
@@ -4838,10 +4845,10 @@
     [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted:hover,
     [data-theme="dark"] .chat-feed-item.tagged-node.selected-node.channel-tinted.has-change-marker,
     [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted.has-change-marker:hover {{
-      border-color: #3f7b5b !important;
+      border-color: hsl(var(--chat-feed-node-outline-hue, 30) calc(26% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(42% + var(--chat-feed-node-outline-dark-light-shift, 0%))) !important;
       box-shadow:
         inset 3px 0 0 var(--node-tag-color, #2aa85a),
-        inset 0 0 0 1px hsl(var(--chat-feed-node-hue) 44% 56% / 0.34);
+        inset 0 0 0 1px hsl(var(--chat-feed-node-hue) calc(44% * var(--chat-feed-node-dark-sat-mult, 1)) calc(56% + var(--chat-feed-node-dark-light-shift, 0%)) / 0.34);
     }}
     [data-theme="dark"] .chat-feed-item.tagged-node.selected-node.channel-tinted,
     [data-theme="dark"] .chat-feed-item.chat-selectable.tagged-node.selected-node.channel-tinted:hover,

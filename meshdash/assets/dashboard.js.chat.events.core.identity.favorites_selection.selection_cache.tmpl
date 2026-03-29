@@ -436,6 +436,15 @@
           }}
         }}
         if (!isSelectableNodeId(rowNodeId)) continue;
+        const tintOutlineSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(row.dataset.nodeTintOutlineSeed, rowNodeId || "unknown")
+          : String(row.dataset.nodeTintOutlineSeed || rowNodeId || "unknown").trim();
+        const tintStartSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(row.dataset.nodeTintStartSeed, tintOutlineSeed)
+          : String(row.dataset.nodeTintStartSeed || tintOutlineSeed).trim();
+        const tintEndSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(row.dataset.nodeTintEndSeed, tintStartSeed || tintOutlineSeed)
+          : String(row.dataset.nodeTintEndSeed || tintStartSeed || tintOutlineSeed).trim();
         const active = !!(tagEntry && tagEntry.preset);
         const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(rowNodeId, 210) : 210;
         const nodeHue = active
@@ -443,11 +452,20 @@
           : autoNodeHue;
         row.classList.toggle("tagged-node", active);
         if (typeof applyNodeTintStyleVars === "function") {{
-          applyNodeTintStyleVars(row, rowNodeId, {{
+          const feedTintOptions = {{
             scope: "feed",
             fallbackHue: 210,
             hue: nodeHue,
-          }});
+            outlineSeed: tintOutlineSeed,
+            tintStartSeed,
+            tintEndSeed,
+          }};
+          if (active) {{
+            feedTintOptions.tintStartHue = nodeHue;
+            feedTintOptions.tintEndHue = nodeHue;
+            feedTintOptions.outlineHue = nodeHue;
+          }}
+          applyNodeTintStyleVars(row, rowNodeId, feedTintOptions);
         }} else {{
           row.style.setProperty("--chat-feed-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || autoNodeHue)))));
         }}

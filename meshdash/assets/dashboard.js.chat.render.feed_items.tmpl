@@ -307,18 +307,51 @@
         const tagStyleVars = (tagActive && typeof nodeTagStyleVars === "function")
           ? nodeTagStyleVars(tintTagEntry)
           : "";
+        const tintSeedNode = (
+          nodesById.get(normalizeNodeId(tintNodeId))
+          || nodesById.get(normalizeNodeId(sourceNode))
+          || nodesById.get(normalizeNodeId(nodeId))
+          || null
+        );
+        const feedShortNameSeedRaw = String(
+          (tintSeedNode && (tintSeedNode.short_name || tintSeedNode.shortName || (tintSeedNode.user && (tintSeedNode.user.short_name || tintSeedNode.user.shortName))))
+          || ""
+        ).trim();
+        const feedLongNameSeedRaw = String(
+          (tintSeedNode && (tintSeedNode.long_name || tintSeedNode.longName || (tintSeedNode.user && (tintSeedNode.user.long_name || tintSeedNode.user.longName))))
+          || fromMeta.label
+          || ""
+        ).trim();
+        const tintOutlineSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(tintNodeId || sourceNode || nodeId || "", nodeId || sourceNode || "unknown")
+          : String(tintNodeId || sourceNode || nodeId || "unknown").trim();
+        const tintStartSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(feedShortNameSeedRaw, tintOutlineSeed)
+          : String(feedShortNameSeedRaw || tintOutlineSeed).trim();
+        const tintEndSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(feedLongNameSeedRaw, fromMeta.label || tintStartSeed || tintOutlineSeed)
+          : String(feedLongNameSeedRaw || fromMeta.label || tintStartSeed || tintOutlineSeed).trim();
         const autoNodeTintHue = (typeof nodeTintHue === "function")
           ? nodeTintHue(tintNodeId, 210)
           : 210;
         const nodeTintHueValue = (tintTagEntry && typeof nodeTagTintHue === "function")
           ? nodeTagTintHue(tintTagEntry, autoNodeTintHue)
           : autoNodeTintHue;
+        const nodeTintOptions = {{
+          scope: "feed",
+          fallbackHue: 210,
+          hue: nodeTintHueValue,
+          outlineSeed: tintOutlineSeed,
+          tintStartSeed,
+          tintEndSeed,
+        }};
+        if (tagActive) {{
+          nodeTintOptions.tintStartHue = nodeTintHueValue;
+          nodeTintOptions.tintEndHue = nodeTintHueValue;
+          nodeTintOptions.outlineHue = nodeTintHueValue;
+        }}
         const nodeTintStyle = (typeof nodeTintStyleVars === "function")
-          ? nodeTintStyleVars(tintNodeId, {{
-            scope: "feed",
-            fallbackHue: 210,
-            hue: nodeTintHueValue,
-          }})
+          ? nodeTintStyleVars(tintNodeId, nodeTintOptions)
           : `--chat-feed-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeTintHueValue) || 210)))}};`;
         const rowTintStyleParts = [];
         if (hasMeshTint) {{
@@ -629,7 +662,7 @@
         if (monitorMode) {{
           const monitorNetworkTag = `<span class="chat-monitor-network-tag">[ ][MF]</span>`;
           const monitorItemClass = `chat-feed-item chat-feed-item-monitor-exact ${{selectableClass}}${{selectedFeedClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}`;
-          return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="${{monitorItemClass.trim()}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
+          return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="${{monitorItemClass.trim()}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
             <span class="chat-entry-msg">
               ${{monitorPrefix}}
               ${{monitorNetworkTag}}
@@ -656,7 +689,7 @@
               <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
             </span>`;
         const extraRows = monitorMode ? "" : `${{reactionSummaryRow}}${{reactionRow}}`;
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
           <div class="chat-feed-line">
             <div class="chat-feed-summary">
               ${{changeBadge}}
