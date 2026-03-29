@@ -371,6 +371,22 @@
       color: #446551;
       line-height: 1.25;
     }}
+    .chat-macro-preview {{
+      min-height: 0;
+      font-size: 10px;
+      line-height: 1.25;
+      color: #2f5c44;
+      border: 1px dashed rgba(var(--chat-send-channel-rgb), 0.42);
+      background: rgba(var(--chat-send-channel-rgb), 0.08);
+      border-radius: 7px;
+      padding: 4px 7px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    .chat-macro-preview[hidden] {{
+      display: none !important;
+    }}
     .chat-channel-mismatch-warning {{
       min-height: 0;
       font-size: 10px;
@@ -3299,6 +3315,11 @@
     }}
     [data-theme="dark"] .chat-channel-mismatch-warning {{
       color: #f1c979;
+    }}
+    [data-theme="dark"] .chat-macro-preview {{
+      color: var(--ui-text-soft);
+      border-color: rgba(var(--chat-send-channel-rgb), 0.56);
+      background: rgba(var(--chat-send-channel-rgb), 0.16);
     }}
     [data-theme="dark"] #chat-input {{
       border-color: rgba(var(--chat-send-channel-rgb), 0.4);

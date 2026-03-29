@@ -10,12 +10,20 @@
       const input = document.getElementById("chat-input");
       if (input instanceof HTMLInputElement && input.dataset.bound !== "1") {{
         input.dataset.bound = "1";
+        input.addEventListener("input", () => {{
+          if (typeof renderChatTextMacroPreview === "function") {{
+            renderChatTextMacroPreview(input.value);
+          }}
+        }});
         input.addEventListener("keydown", (ev) => {{
           if (ev.key === "Enter" && !ev.shiftKey) {{
             ev.preventDefault();
             sendChatMessage({{ preserveFocus: true }});
           }}
         }});
+        if (typeof renderChatTextMacroPreview === "function") {{
+          renderChatTextMacroPreview(input.value);
+        }}
       }}
 
       const replyClearBtn = document.getElementById("chat-reply-clear-btn");

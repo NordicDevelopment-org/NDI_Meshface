@@ -19,6 +19,29 @@
       "/lenny": "( ͡° ͜ʖ ͡°)",
       "/cheer": "ᕕ( ᐛ )ᕗ",
     }});
+    const chatLeetSpeakMap = Object.freeze({{
+      a: "4",
+      b: "8",
+      e: "3",
+      g: "6",
+      i: "1",
+      l: "1",
+      o: "0",
+      s: "5",
+      t: "7",
+      z: "2",
+    }});
+
+    function toLeetSpeak(rawText) {{
+      const value = String(rawText == null ? "" : rawText);
+      if (!value) return "";
+      let transformed = "";
+      for (const ch of value) {{
+        const mapped = chatLeetSpeakMap[String(ch || "").toLowerCase()];
+        transformed += mapped || ch;
+      }}
+      return transformed;
+    }}
 
     function parseChatTextMacro(rawText) {{
       const text = String(rawText == null ? "" : rawText).trim();
@@ -32,16 +55,47 @@
         }};
       }}
       const mapped = chatTextMacroMap[lowered];
-      if (!mapped) return null;
+      if (mapped) {{
+        return {{
+          kind: "replace",
+          text: mapped,
+          source: lowered,
+        }};
+      }}
+      const leetMatch = text.match(/^\/1337(?:\s+(.+))?$/i);
+      if (!leetMatch) return null;
+      const payload = String(leetMatch[1] == null ? "" : leetMatch[1]);
       return {{
-        kind: "replace",
-        text: mapped,
-        source: lowered,
+        kind: "transform",
+        text: toLeetSpeak(payload),
+        source: "/1337",
+        inputText: payload,
       }};
     }}
 
     function chatMacroHelpText() {{
-      return "Macros: /shrug, /tableflip (/flip), /unflip, /give, /lenny, /cheer · use /macros or /help";
+      return "Macros: /shrug, /tableflip (/flip), /unflip, /give, /lenny, /cheer, /1337 <text> · use /macros or /help";
+    }}
+
+    function renderChatTextMacroPreview(rawText) {{
+      const previewEl = document.getElementById("chat-macro-preview");
+      if (!(previewEl instanceof HTMLElement)) return null;
+      const macro = parseChatTextMacro(rawText);
+      if (!macro || macro.kind === "help") {{
+        previewEl.hidden = true;
+        previewEl.textContent = "";
+        return null;
+      }}
+      const source = String(macro.source || "macro");
+      const text = String(macro.text || "");
+      if (!text && macro.kind === "transform") {{
+        previewEl.textContent = "Preview /1337 -> type text after the command";
+        previewEl.hidden = false;
+        return macro;
+      }}
+      previewEl.textContent = `Preview ${{source}} -> ${{text}}`;
+      previewEl.hidden = false;
+      return macro;
     }}
 
     const MACROS_ASCII_SPACE_REPLACEMENT_FALLBACK = "·";
@@ -1183,12 +1237,20 @@
       if (macro && macro.kind === "help") {{
         appendLocalInfoChatRow(chatMacroHelpText());
         input.value = "";
+        renderChatTextMacroPreview("");
         if (hadFocus) {{
           restoreChatInputFocus(input);
         }}
         return;
       }}
-      const text = (macro && macro.kind === "replace")
+      if (macro && macro.kind === "transform" && !String(macro.text || "").trim()) {{
+        setChatSendStatus("Type text after /1337 before sending.", true);
+        if (hadFocus) {{
+          restoreChatInputFocus(input);
+        }}
+        return;
+      }}
+      const text = (macro && (macro.kind === "replace" || macro.kind === "transform"))
         ? macro.text
         : rawText;
       let destination = "^all";
@@ -1227,9 +1289,10 @@
       if (payload && payload.ok) {{
         recordBotRequestHistoryFromSend(requestBody, payload);
         input.value = "";
+        renderChatTextMacroPreview("");
         const replied = Number.isInteger(replyId) && replyId > 0;
         clearChatReplyTarget();
-        if (macro && macro.kind === "replace") {{
+        if (macro && (macro.kind === "replace" || macro.kind === "transform")) {{
           if (destination === "^all") {{
             setChatSendStatus(`Sent macro ${{macro.source}} on ${{sendCtx.sendLabel}} at ${{payload.sent_at || "now"}}`);
           }} else {{
