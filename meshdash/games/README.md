@@ -8,6 +8,9 @@ If you want to make your own game:
 1. Copy the `zork/` folder.
 2. Rename the class/command metadata in your copied `engine.py`.
 3. Change the room map and rules there.
-4. Register your copied app in `meshdash/bot_apps/registry.py`.
+4. Add a plugin module under `meshdash/bot_plugins/` that returns your app from
+   `build_bot_apps()` (or exports `BOT_APPS`).
+5. (Optional) Load plugin modules from outside the package with
+   `MESH_DASH_BOT_PLUGIN_MODULES`.
 
 The goal is to keep the app code separate from the transport, logging, and bot settings code.

@@ -330,6 +330,11 @@ Built-in commands:
 - `whohas <id|name>`
 - `lheard`
 
+Internal game app:
+
+- `zork` remains a core internal app (console + standalone API integration).
+- Other bot apps can be loaded as plugins without changing core bot responder code.
+
 Environment controls:
 
 - `MESH_DASH_BOT_ENABLED=0|1` (default: `0`)
@@ -349,6 +354,14 @@ export MESH_DASH_BOT_CUSTOM_COMMANDS='{"status":"status local={local_id} from={f
 
 Custom template fields:
 `{command}`, `{args}`, `{from_id}`, `{to_id}`, `{local_id}`, `{hops}`, `{rx_time}`.
+
+- `MESH_DASH_BOT_PLUGIN_MODULES`
+  - optional comma/semicolon/newline-delimited Python module list
+  - each module should expose either `build_bot_apps()` or `BOT_APPS`
+  - these modules are loaded in addition to `meshdash.bot_plugins.*`
+- `MESH_DASH_BOT_PLUGIN_STRICT=0|1` (default: `0`)
+  - when `1`, plugin import/build errors raise and fail bot startup
+  - when `0`, bad plugins are skipped and startup continues
 
 Bots panel notes:
 

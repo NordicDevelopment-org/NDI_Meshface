@@ -30,7 +30,10 @@ To make your own game, the fastest path is:
 2. Rename the class and `SPEC` metadata in `engine.py`.
 3. Rewrite `world.py` to match your map.
 4. Adjust `engine.py` for any new verbs, puzzles, or win conditions.
-5. Register your copied app in `meshdash/bot_apps/registry.py`.
+5. Add a plugin module under `meshdash/bot_plugins/` that returns your app from
+   `build_bot_apps()` (or exports `BOT_APPS`).
+6. (Optional) Load plugin modules from outside the package with
+   `MESH_DASH_BOT_PLUGIN_MODULES`.
 
 The bot only provides message routing, settings, and request logging. The app logic stays here.
 
