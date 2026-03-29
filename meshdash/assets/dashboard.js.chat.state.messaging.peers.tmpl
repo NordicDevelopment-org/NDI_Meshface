@@ -426,6 +426,7 @@
       const drawer = document.getElementById("chat-node-details-drawer");
       const titleEl = document.getElementById("chat-node-details-title");
       const closeBtn = document.getElementById("chat-node-details-close-btn");
+      const muteBtn = document.getElementById("chat-node-details-mute-btn");
       const dmBtn = document.getElementById("chat-node-details-dm-btn");
       const detailsTabBtn = document.getElementById("chat-node-details-tab-details");
       const historyTabBtn = document.getElementById("chat-node-details-tab-history");
@@ -441,6 +442,17 @@
       drawer.hidden = !expanded;
       if (closeBtn instanceof HTMLButtonElement) {{
         closeBtn.disabled = !expanded;
+      }}
+      if (muteBtn instanceof HTMLButtonElement) {{
+        muteBtn.hidden = true;
+        muteBtn.disabled = true;
+        muteBtn.dataset.nodeId = "";
+        muteBtn.classList.remove("active");
+        muteBtn.setAttribute("aria-pressed", "false");
+        const muteLabel = muteBtn.querySelector(".chat-node-details-mute-label");
+        if (muteLabel instanceof HTMLElement) {{
+          muteLabel.textContent = "Mute";
+        }}
       }}
       if (dmBtn instanceof HTMLButtonElement) {{
         dmBtn.hidden = true;
@@ -487,6 +499,22 @@
         dmBtn.title = canOpenPeerDm
           ? `Open peer message window with ${{titleName}}`
           : "Send message unavailable for this node";
+      }}
+      if (muteBtn instanceof HTMLButtonElement) {{
+        const canMute = isCanonicalNodeId(selectedId) && !isSelfNodeId(selectedId);
+        const active = canMute && isMutedNode(selectedId);
+        muteBtn.hidden = !canMute;
+        muteBtn.disabled = !canMute;
+        muteBtn.dataset.nodeId = canMute ? selectedId : "";
+        muteBtn.classList.toggle("active", active);
+        muteBtn.setAttribute("aria-pressed", active ? "true" : "false");
+        muteBtn.title = canMute
+          ? (active ? "Unmute this user in chat feed" : "Mute this user in chat feed")
+          : "Mute unavailable for this node";
+        const muteLabel = muteBtn.querySelector(".chat-node-details-mute-label");
+        if (muteLabel instanceof HTMLElement) {{
+          muteLabel.textContent = active ? "Muted" : "Mute";
+        }}
       }}
 
       syncSavedNodeDetailsDock(false);

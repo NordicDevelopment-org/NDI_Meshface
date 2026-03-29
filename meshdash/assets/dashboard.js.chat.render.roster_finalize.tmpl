@@ -1039,9 +1039,6 @@
                 const favoriteBtnHtml = (typeof favoriteToggleButtonHtml === "function")
                   ? favoriteToggleButtonHtml(item.id, "chat-favorite-btn")
                   : "";
-                const muteBtnHtml = (typeof muteToggleButtonHtml === "function")
-                  ? muteToggleButtonHtml(item.id, "chat-favorite-btn chat-mute-btn")
-                  : "";
                 const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
                 const nodeHue = tagActive
                   ? nodeTagTintHue(tagEntry, autoNodeHue)
@@ -1062,7 +1059,6 @@
                     </span>
                     <span class="chat-member-actions">
                       ${{favoriteBtnHtml}}
-                      ${{muteBtnHtml}}
                       ${{removeBtn}}
                     </span>
                   </span>
