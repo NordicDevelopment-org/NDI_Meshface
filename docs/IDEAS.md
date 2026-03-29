@@ -3,22 +3,17 @@
 - sort out click selection, map non map
 
 
-- ask if we can make github issues and use them?
 
-- all bots are plugins
 - bot activity show as (1)
+
+- ask if we can make github issues and use them?
 
 - theme settings tab
 
-
-- at the base level, report to other users the version of meshyface
-- fix deselected channel notifaction
 - put channels in tabs w/ notifaction totalss (N)
 
 - make our chats look differant
-
-- add node ID
-
+- at the base level, report to other users the version of meshyface
 
 
 ## PotatoMesh Learnings
