@@ -666,6 +666,7 @@
       if (clean === "data") return "settings";
       if (clean === "packets") return "settings";
       if (clean === "channels") return "settings";
+      if (clean === "saved") return "network";
       if (clean === "apps") return loadPreferredAppsLayoutView();
       if (isAppsLayoutView(clean)) return clean;
       return knownLayoutViews.has(clean) ? clean : "chat";
@@ -756,6 +757,7 @@
       const shell = document.querySelector(".workspace-shell");
       const chatLeftPanel = document.getElementById("chat-left-panel");
       const requested = String(viewName || "").trim().toLowerCase();
+      const requestedSavedAlias = requested === "saved";
       const next = normalizeLayoutView(viewName);
       activeLayoutView = next;
       if (next === "settings") {{
@@ -1004,6 +1006,17 @@
       if (typeof syncChatNodeDetailsDrawer === "function") {{
         syncChatNodeDetailsDrawer(latestState, {{
           fetchHistory: false,
+        }});
+      }}
+      if (
+        requestedSavedAlias
+        && next === "network"
+        && isSelectableNodeId(normalizeNodeId(selectedNodeId || ""))
+        && typeof setChatNodeDetailsDrawerExpanded === "function"
+      ) {{
+        setChatNodeDetailsDrawerExpanded(true, {{
+          fetchHistory: false,
+          rerender: false,
         }});
       }}
       // Ensure node history loads immediately when switching into the map views.

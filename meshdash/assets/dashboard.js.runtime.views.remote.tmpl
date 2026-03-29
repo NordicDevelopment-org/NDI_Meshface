@@ -261,12 +261,18 @@
         openNodeBtn.addEventListener("click", () => {{
           const nodeId = remoteViewSelectedNodeId();
           if (!isCanonicalNodeId(nodeId)) {{
-            setRemoteActionStatus("Select a node before opening the node view.", true);
+            setRemoteActionStatus("Select a node before opening node details.", true);
             return;
           }}
           selectNode(nodeId, true, false);
-          setRemoteActionStatus(`Opened Node view for ${{nodeId}}.`, false);
-          applyLayoutView("saved", true);
+          setRemoteActionStatus(`Opened node details for ${{nodeId}}.`, false);
+          applyLayoutView("network", true);
+          if (typeof setChatNodeDetailsDrawerExpanded === "function") {{
+            setChatNodeDetailsDrawerExpanded(true, {{
+              fetchHistory: false,
+              rerender: false,
+            }});
+          }}
         }});
       }}
 
