@@ -324,7 +324,6 @@
     <aside class="teams-rail" aria-label="Dashboard views">
       <button class="rail-btn active" data-view="chat" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Teams-style chat workspace">Chat</button>
       <button class="rail-btn" data-view="network" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Topology, nodes, and links">Network</button>
-      <button class="rail-btn" data-view="encription" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Encrypted packets and route activity">Encription</button>
       <button class="rail-btn" data-view="environment" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Historical sensor telemetry">Sensors</button>
       <button class="rail-btn" data-view="history" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Network and chat history">History</button>
       <button class="rail-btn" data-view="apps" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Apps workspace (Macros, Games, Files, BBS, Remote)">Apps</button>
@@ -2898,6 +2897,13 @@ Ready.
               <div id="weekly-summary-timeline" class="signal-timeline" aria-label="Weekly trend timeline"></div>
               <div id="weekly-summary-overview" class="overview-grid"></div>
             </div>
+            <section class="history-activity-encryption-trend">
+              <div class="history-caption">Encrypted packet trend from the recent packet buffer.</div>
+              <div id="encription-trend-chart-wrap">
+                <svg id="encription-trend-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Encrypted traffic over time"></svg>
+                <div id="encription-trend-empty" class="signal-empty">No encrypted packet timestamps in recent buffer.</div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -2927,52 +2933,41 @@ Ready.
             <div id="history-notification-list" class="history-notification-list" aria-live="polite"></div>
           </div>
         </div>
+        <section class="history-encription-section">
+          <div id="encription-caption" class="history-caption">Packets that could not be decoded by this node.</div>
+          <div class="history-encription-panels">
+            <section class="history-encription-panel">
+              <h3>Encrypted packets</h3>
+              <div class="scroll">
+                <table id="encription-packets-table">
+                  <thead>
+                    <tr>
+                      <th>Captured</th><th>From</th><th>To</th><th>Hops</th><th>RSSI</th><th>SNR</th><th>Payload</th><th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </section>
+            <section class="history-encription-panel">
+              <h3>Encrypted route activity</h3>
+              <div class="scroll">
+                <table id="encription-traffic-table">
+                  <thead>
+                    <tr>
+                      <th>From</th><th>To</th><th>Packets</th><th>Avg hops</th><th>Latest</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
       </div>
     </section>
 
     <div class="hsplitter" data-target="mid" title="Drag to resize middle and lower panels"></div>
-
-    <section class="card encription">
-      <h2>Encrypted Traffic</h2>
-      <div class="body">
-        <div id="encription-caption" class="history-caption">Packets that could not be decoded by this node.</div>
-        <div class="encription-panels">
-          <section class="encription-panel">
-            <h3>Recent encrypted packets</h3>
-            <div class="scroll">
-              <table id="encription-packets-table">
-                <thead>
-                  <tr>
-                    <th>Captured</th><th>From</th><th>To</th><th>Hops</th><th>RSSI</th><th>SNR</th><th>Payload</th><th>Reason</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </section>
-          <section class="encription-panel">
-            <h3>Encrypted route activity</h3>
-            <div class="scroll">
-              <table id="encription-traffic-table">
-                <thead>
-                  <tr>
-                    <th>From</th><th>To</th><th>Packets</th><th>Avg hops</th><th>Latest</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </section>
-          <section class="encription-panel encription-panel-wide">
-            <h3>Encrypted traffic over time</h3>
-            <div id="encription-trend-chart-wrap">
-              <svg id="encription-trend-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Encrypted traffic over time"></svg>
-              <div id="encription-trend-empty" class="signal-empty">No encrypted packet timestamps in recent buffer.</div>
-            </div>
-          </section>
-        </div>
-      </div>
-    </section>
 
     <div class="splitter" data-row="8" title="Drag to resize side panels"></div>
 

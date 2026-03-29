@@ -666,6 +666,7 @@
       if (clean === "data") return "settings";
       if (clean === "packets") return "settings";
       if (clean === "channels") return "settings";
+      if (clean === "encription") return "history";
       if (clean === "saved") return "network";
       if (clean === "apps") return loadPreferredAppsLayoutView();
       if (isAppsLayoutView(clean)) return clean;
@@ -940,6 +941,7 @@
         }}
         if (next === "history") {{
           renderHistoryChat(latestState.traffic || {{}});
+          renderEncription(latestState.traffic || {{}});
           setMapDataMode("activity");
           void refreshHistoryPanels(false);
         }}
@@ -961,9 +963,6 @@
             void ensureChannelsViewLocalStateHydrated(false);
           }}
         }}
-        if (next === "encription") {{
-          renderEncription(latestState.traffic || {{}});
-        }}
         if (next === "environment") {{
           void renderEnvironmentMetricsView(false);
         }}
@@ -976,6 +975,7 @@
         setMapDataMode("activity");
         renderWeeklySummaryLoading();
         renderHistoryChat({{}});
+        renderEncription({{}});
       }} else if (next === "chatlabs") {{
         renderChatLabsView(latestState);
       }} else if (next === "files") {{
@@ -988,8 +988,6 @@
         renderGamesView(latestState);
       }} else if (next === "remote") {{
         renderRemoteView(latestState);
-      }} else if (next === "encription") {{
-        renderEncription({{}});
       }} else if (next === "environment") {{
         void renderEnvironmentMetricsView(false);
       }}

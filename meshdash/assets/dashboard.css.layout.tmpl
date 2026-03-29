@@ -529,7 +529,7 @@
       flex-direction: column;
       flex: 1 1 auto;
       min-height: 0;
-      gap: 0;
+      gap: 10px;
     }}
     .history-activity-main-scroll {{
       display: flex;
@@ -576,6 +576,13 @@
       min-height: 0;
       overflow: auto;
       padding-right: 2px;
+    }}
+    .history-activity-encryption-trend {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
     }}
     .map-data-live[hidden], .map-data-node[hidden], .map-data-activity[hidden] {{
       display: none !important;
@@ -629,13 +636,21 @@
       height: 100%;
     }}
     .layout.view-history #map-data-activity .history-activity-weekly-panel {{
-      flex: 1 1 auto;
+      flex: 2 1 auto;
       overflow: auto;
+    }}
+    .layout.view-history #map-data-activity .history-activity-encryption-trend {{
+      flex: 1 1 auto;
+      min-height: 0;
     }}
     .layout.view-history #map-data-activity #weekly-summary-chart-wrap {{
       flex: 1 1 auto;
       min-height: 300px;
       height: auto;
+    }}
+    .layout.view-history #map-data-activity #encription-trend-chart-wrap {{
+      min-height: 220px;
+      height: 220px;
     }}
     .layout.view-history #map-data-activity #weekly-summary-overview {{
       flex: 0 0 auto;
@@ -1015,6 +1030,40 @@
       font-size: 10px;
       color: #5d7666;
       line-height: 1.25;
+    }}
+    .history-encription-section {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+      border-top: 1px solid #d7e5d2;
+      padding-top: 8px;
+    }}
+    .history-encription-panels {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .history-encription-panel {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .history-encription-panel h3 {{
+      margin: 0 0 6px 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      opacity: 0.82;
+    }}
+    .history-encription-panel .scroll {{
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
     }}
     .nodes {{
       grid-column: 1 / span 3;
@@ -1603,46 +1652,6 @@
       border-color: #d5aaaa;
       background: #faecec;
       color: #7a2f2f;
-    }}
-    .encription {{
-      display: none;
-      flex-direction: column;
-      min-height: 0;
-    }}
-    .encription .body {{
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      min-height: 0;
-      overflow: hidden;
-    }}
-    .encription-panels {{
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      flex: 1 1 auto;
-      min-height: 0;
-    }}
-    .encription-panel {{
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }}
-    .encription-panel.encription-panel-wide {{
-      grid-column: 1 / -1;
-    }}
-    .encription-panel h3 {{
-      margin: 0 0 6px 0;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      opacity: 0.82;
-    }}
-    .encription-panel .scroll {{
-      flex: 1 1 auto;
-      min-height: 0;
-      max-height: none;
     }}
     #encription-trend-chart-wrap {{
       position: relative;
@@ -2944,33 +2953,6 @@
     .layout.view-channels .hsplitter[data-target="top"],
     .layout.view-channels .hsplitter[data-target="mid"],
     .layout.view-channels .hsplitter[data-target="low"] {{
-      display: none !important;
-    }}
-
-    .layout.view-encription {{
-      height: 100%;
-      min-height: 0;
-      grid-template-rows: minmax(0, 1fr);
-    }}
-    .layout.view-encription .encription {{
-      grid-column: 1 / span 3;
-      grid-row: 1;
-      display: flex;
-      min-height: 0;
-    }}
-    .layout.view-encription .chat,
-    .layout.view-encription .bots,
-    .layout.view-encription .nodes,
-    .layout.view-encription .map,
-    .layout.view-encription .map-data,
-    .layout.view-encription .summary,
-    .layout.view-encription .packets,
-    .layout.view-encription .raw,
-    .layout.view-encription .console,
-    .layout.view-encription .splitter,
-    .layout.view-encription .hsplitter[data-target="top"],
-    .layout.view-encription .hsplitter[data-target="mid"],
-    .layout.view-encription .hsplitter[data-target="low"] {{
       display: none !important;
     }}
 

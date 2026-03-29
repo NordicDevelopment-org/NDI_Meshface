@@ -83,13 +83,11 @@
           }}
           if (activeLayoutView === "history") {{
             renderHistoryChat(traffic304);
+            renderEncription(traffic304);
             void refreshHistoryPanels(false);
           }}
           if (activeLayoutView === "settings" && activeSettingsTab === "channels") {{
             renderChannelsView(latestState);
-          }}
-          if (activeLayoutView === "encription") {{
-            renderEncription(traffic304);
           }}
           if (activeLayoutView === "environment") {{
             void renderEnvironmentMetricsView(false);
@@ -236,6 +234,7 @@
         }}
         if (activeLayoutView === "history") {{
           renderHistoryChat(state.traffic || {{}});
+          renderEncription(state.traffic || {{}});
           if (weeklySummary && !weeklySummary.error) {{
             renderWeeklySummary(weeklySummary);
           }} else if (weeklySummary && weeklySummary.error) {{
@@ -285,10 +284,6 @@
             ? historyTargetId
             : null;
           renderFavorites(state, cachedHistory, loadingId);
-        }}
-
-        if (activeLayoutView === "encription") {{
-          renderEncription(state.traffic || {{}});
         }}
 
         if (activeLayoutView === "environment") {{
