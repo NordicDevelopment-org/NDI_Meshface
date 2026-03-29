@@ -25,6 +25,29 @@
           renderChatTextMacroPreview(input.value);
         }}
       }}
+      const macroPreview = document.getElementById("chat-macro-preview");
+      if (macroPreview instanceof HTMLElement && macroPreview.dataset.bound !== "1") {{
+        macroPreview.dataset.bound = "1";
+        macroPreview.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const btn = target.closest(".chat-macro-help-btn");
+          if (!(btn instanceof HTMLButtonElement)) return;
+          const command = String(btn.dataset.macroCommand || "").trim();
+          if (!command) return;
+          if (!(input instanceof HTMLInputElement)) return;
+          if (input.disabled) return;
+          const needsArg = String(btn.dataset.macroNeedsArg || "") === "1";
+          const nextValue = needsArg ? `${{command}} ` : command;
+          input.value = nextValue;
+          input.focus({{ preventScroll: true }});
+          const tail = input.value.length;
+          input.setSelectionRange(tail, tail);
+          if (typeof renderChatTextMacroPreview === "function") {{
+            renderChatTextMacroPreview(input.value);
+          }}
+        }});
+      }}
 
       const replyClearBtn = document.getElementById("chat-reply-clear-btn");
       if (replyClearBtn instanceof HTMLButtonElement && replyClearBtn.dataset.bound !== "1") {{
