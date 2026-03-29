@@ -113,7 +113,19 @@
           const listRect = chatRoomList.getBoundingClientRect();
           const rowRect = selectedMember.getBoundingClientRect();
           const topSafe = listRect.top + 3;
-          const bottomSafe = listRect.bottom - 3;
+          let bottomSafe = listRect.bottom - 3;
+          const detailsDrawer = document.getElementById("chat-node-details-drawer");
+          if (
+            detailsDrawer instanceof HTMLElement
+            && !detailsDrawer.hidden
+            && isVisibleForSelectionScroll(detailsDrawer)
+          ) {{
+            const drawerRect = detailsDrawer.getBoundingClientRect();
+            bottomSafe = Math.min(bottomSafe, drawerRect.top - 3);
+          }}
+          if (bottomSafe <= topSafe + 8) {{
+            bottomSafe = topSafe + 8;
+          }}
           if (rowRect.top < topSafe) {{
             const delta = rowRect.top - topSafe;
             chatRoomList.scrollTo({{ top: chatRoomList.scrollTop + delta, behavior: "smooth" }});
@@ -402,14 +414,19 @@
       renderSavedNodeSearchDropdown(latestState);
       if (isChatWorkspaceLayoutView(activeLayoutView)) {{
         pendingMapHistoryFocus = false;
-        // Chat-only selection should not trigger map/history work.
-        applyChatChannel(activeChatChannel, false);
-        if (shouldFocus && typeof setChatNodeDetailsDrawerExpanded === "function") {{
+        const shouldOpenDrawer = (
+          shouldFocus
+          && typeof setChatNodeDetailsDrawerExpanded === "function"
+        );
+        if (shouldOpenDrawer) {{
           setChatNodeDetailsDrawerExpanded(true, {{
             fetchHistory: true,
             rerender: false,
           }});
-        }} else if (typeof syncChatNodeDetailsDrawer === "function") {{
+        }}
+        // Chat-only selection should not trigger map/history work.
+        applyChatChannel(activeChatChannel, false);
+        if (!shouldOpenDrawer && typeof syncChatNodeDetailsDrawer === "function") {{
           syncChatNodeDetailsDrawer(latestState, {{
             fetchHistory: true,
           }});
