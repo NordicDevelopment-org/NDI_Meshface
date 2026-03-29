@@ -31,6 +31,74 @@
       t: "7",
       z: "2",
     }});
+    const chatUpsideDownMap = Object.freeze({{
+      a: "ɐ",
+      b: "q",
+      c: "ɔ",
+      d: "p",
+      e: "ǝ",
+      f: "ɟ",
+      g: "ƃ",
+      h: "ɥ",
+      i: "ᴉ",
+      j: "ɾ",
+      k: "ʞ",
+      l: "l",
+      m: "ɯ",
+      n: "u",
+      o: "o",
+      p: "d",
+      q: "b",
+      r: "ɹ",
+      s: "s",
+      t: "ʇ",
+      u: "n",
+      v: "ʌ",
+      w: "ʍ",
+      x: "x",
+      y: "ʎ",
+      z: "z",
+      A: "∀",
+      B: "ꓭ",
+      C: "Ɔ",
+      D: "◖",
+      E: "Ǝ",
+      F: "Ⅎ",
+      G: "⅁",
+      J: "ſ",
+      L: "˥",
+      M: "W",
+      P: "Ԁ",
+      R: "ᴚ",
+      T: "┴",
+      U: "∩",
+      V: "Ʌ",
+      Y: "⅄",
+      1: "Ɩ",
+      2: "ᄅ",
+      3: "Ɛ",
+      4: "ㄣ",
+      5: "ϛ",
+      6: "9",
+      7: "ㄥ",
+      8: "8",
+      9: "6",
+      ".": "˙",
+      ",": "'",
+      "'": ",",
+      "\"": "„",
+      "!": "¡",
+      "?": "¿",
+      "(": ")",
+      ")": "(",
+      "[": "]",
+      "]": "[",
+      "{": "}",
+      "}": "{",
+      "<": ">",
+      ">": "<",
+      "_": "‾",
+    }});
 
     function toLeetSpeak(rawText) {{
       const value = String(rawText == null ? "" : rawText);
@@ -39,6 +107,72 @@
       for (const ch of value) {{
         const mapped = chatLeetSpeakMap[String(ch || "").toLowerCase()];
         transformed += mapped || ch;
+      }}
+      return transformed;
+    }}
+
+    function toBackwards(rawText) {{
+      return Array.from(String(rawText == null ? "" : rawText)).reverse().join("");
+    }}
+
+    function hashText32(rawText) {{
+      let hash = 2166136261 >>> 0;
+      for (const ch of String(rawText == null ? "" : rawText)) {{
+        hash ^= Number(ch.codePointAt(0) || 0);
+        hash = Math.imul(hash, 16777619);
+      }}
+      return hash >>> 0;
+    }}
+
+    function seededShuffleChars(rawChars, rawSeed = 1) {{
+      const chars = Array.isArray(rawChars) ? rawChars.slice() : [];
+      let seed = Number(rawSeed) >>> 0;
+      if (seed === 0) seed = 1;
+      for (let idx = chars.length - 1; idx > 0; idx -= 1) {{
+        seed ^= seed << 13;
+        seed ^= seed >>> 17;
+        seed ^= seed << 5;
+        seed >>>= 0;
+        const swapIdx = seed % (idx + 1);
+        const tmp = chars[idx];
+        chars[idx] = chars[swapIdx];
+        chars[swapIdx] = tmp;
+      }}
+      return chars;
+    }}
+
+    function scrambleWordDeterministic(word, wordIndex = 0) {{
+      const letters = Array.from(String(word == null ? "" : word));
+      if (letters.length <= 3) return letters.join("");
+      const first = letters[0];
+      const last = letters[letters.length - 1];
+      const middle = letters.slice(1, -1);
+      const seed = hashText32(`${{letters.join("")}}:${{wordIndex}}`);
+      const shuffled = seededShuffleChars(middle, seed);
+      if (shuffled.length > 1 && shuffled.join("") === middle.join("")) {{
+        shuffled.push(shuffled.shift());
+      }}
+      return `${{first}}${{shuffled.join("")}}${{last}}`;
+    }}
+
+    function toScrambled(rawText) {{
+      const value = String(rawText == null ? "" : rawText);
+      if (!value) return "";
+      let wordIndex = 0;
+      return value.replace(/[A-Za-z]{4,}/g, (word) => {{
+        const next = scrambleWordDeterministic(word, wordIndex);
+        wordIndex += 1;
+        return next;
+      }});
+    }}
+
+    function toUpsideDown(rawText) {{
+      const value = Array.from(String(rawText == null ? "" : rawText));
+      if (value.length <= 0) return "";
+      let transformed = "";
+      for (let idx = value.length - 1; idx >= 0; idx -= 1) {{
+        const ch = value[idx];
+        transformed += chatUpsideDownMap[ch] || chatUpsideDownMap[String(ch).toLowerCase()] || ch;
       }}
       return transformed;
     }}
@@ -62,19 +196,31 @@
           source: lowered,
         }};
       }}
-      const leetMatch = text.match(/^\/1337(?:\s+(.+))?$/i);
-      if (!leetMatch) return null;
-      const payload = String(leetMatch[1] == null ? "" : leetMatch[1]);
+      const transformMatch = text.match(/^\/(1337|backwards|scrambled|upsidedown)(?:\s+([\s\S]+))?$/i);
+      if (!transformMatch) return null;
+      const transformId = String(transformMatch[1] || "").toLowerCase();
+      const payload = String(transformMatch[2] == null ? "" : transformMatch[2]);
+      let transformedText = payload;
+      if (transformId === "1337") {{
+        transformedText = toLeetSpeak(payload);
+      }} else if (transformId === "backwards") {{
+        transformedText = toBackwards(payload);
+      }} else if (transformId === "scrambled") {{
+        transformedText = toScrambled(payload);
+      }} else if (transformId === "upsidedown") {{
+        transformedText = toUpsideDown(payload);
+      }}
       return {{
         kind: "transform",
-        text: toLeetSpeak(payload),
-        source: "/1337",
+        text: transformedText,
+        source: `/${{transformId}}`,
         inputText: payload,
+        transform: transformId,
       }};
     }}
 
     function chatMacroHelpText() {{
-      return "Macros: /shrug, /tableflip (/flip), /unflip, /give, /lenny, /cheer, /1337 <text> · use /macros or /help";
+      return "Macros: /shrug, /tableflip (/flip), /unflip, /give, /lenny, /cheer, /1337 <text>, /backwards <text>, /scrambled <text>, /upsidedown <text> · use /macros or /help";
     }}
 
     function renderChatTextMacroPreview(rawText) {{
@@ -89,7 +235,7 @@
       const source = String(macro.source || "macro");
       const text = String(macro.text || "");
       if (!text && macro.kind === "transform") {{
-        previewEl.textContent = "Preview /1337 -> type text after the command";
+        previewEl.textContent = `Preview ${{source}} -> type text after the command`;
         previewEl.hidden = false;
         return macro;
       }}
@@ -1244,7 +1390,7 @@
         return;
       }}
       if (macro && macro.kind === "transform" && !String(macro.text || "").trim()) {{
-        setChatSendStatus("Type text after /1337 before sending.", true);
+        setChatSendStatus(`Type text after ${{macro.source || "transform command"}} before sending.`, true);
         if (hadFocus) {{
           restoreChatInputFocus(input);
         }}
