@@ -18,10 +18,7 @@
 - make our chats look differant
 
 - add node ID
-- Ability to send a direct message by manually entering a Node ID (when only the Node ID is known).
-- Ability to add a favorite by manually entering a Node ID.
-- what are directed links and can we show more about them?
-- can we inject our own metrics?
+
 
 
 ## PotatoMesh Learnings
