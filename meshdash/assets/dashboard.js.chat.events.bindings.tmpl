@@ -560,3 +560,19 @@
       }}
       clearNodeSelection();
     }});
+
+    map.on("popupopen", () => {{
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (!isSelectableNodeId(selectedId)) return;
+      if (normalizeNodeId(networkNodeInfoCollapsedNodeId || "") === selectedId) {{
+        networkNodeInfoCollapsedNodeId = "";
+      }}
+    }});
+
+    map.on("popupclose", () => {{
+      if ((Number(networkNodeInfoPopupProgrammaticDepth) || 0) > 0) return;
+      if (activeLayoutView !== "network") return;
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (!isSelectableNodeId(selectedId)) return;
+      networkNodeInfoCollapsedNodeId = selectedId;
+    }});

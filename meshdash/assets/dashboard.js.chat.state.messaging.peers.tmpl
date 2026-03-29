@@ -609,6 +609,16 @@
       const changed = currentExpanded !== nextExpanded || currentTab !== nextTab;
       chatNodeDetailsDrawerExpanded = nextExpanded;
       chatNodeDetailsDrawerTab = nextTab;
+      if (activeLayoutView === "network") {{
+        const selectedId = chatNodeDetailsDrawerTargetNodeId(selectedNodeId);
+        if (isSelectableNodeId(selectedId)) {{
+          if (nextExpanded) {{
+            networkNodeInfoCollapsedNodeId = "";
+          }} else {{
+            networkNodeInfoCollapsedNodeId = selectedId;
+          }}
+        }}
+      }}
       const shouldRerender = opts.rerender === true;
       if (shouldRerender && latestState) {{
         renderChat(latestState);
