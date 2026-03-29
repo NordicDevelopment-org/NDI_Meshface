@@ -173,24 +173,21 @@
     <div class="topbar-main-row">
       <div class="topbar-brand">
         <h1 class="topbar-heading">
-          <span class="topbar-heading-app">{app_heading}</span>
+          <span id="topbar-heading-app" class="topbar-heading-app">{app_heading}</span>
         </h1>
         <span id="revision-text" class="sub-text revision-text" title="{revision_title}">{revision_label}</span>
       </div>
-      <span id="topbar-chat-context" class="topbar-chat-context" title="Connected local radio: unavailable">n/a</span>
-      <span class="topbar-main-spacer" aria-hidden="true"></span>
-    </div>
-    <div class="sub">
-      <div class="sub-main">
-        <div id="topbar-update-ticker" class="topbar-update-ticker" role="status" aria-live="polite" aria-label="Live update ticker" hidden>
-          <div id="topbar-update-viewport" class="topbar-update-viewport">
-            <div id="topbar-update-track" class="topbar-update-track">
-              <span id="topbar-update-text-primary" class="topbar-update-text"></span>
-              <span id="topbar-update-text-secondary" class="topbar-update-text" aria-hidden="true"></span>
-            </div>
+      <div id="topbar-update-ticker" class="topbar-update-ticker topbar-update-ticker-main" role="status" aria-live="polite" aria-label="Live update ticker" hidden>
+        <div id="topbar-update-viewport" class="topbar-update-viewport">
+          <div id="topbar-update-track" class="topbar-update-track">
+            <span id="topbar-update-text-primary" class="topbar-update-text"></span>
+            <span id="topbar-update-text-secondary" class="topbar-update-text" aria-hidden="true"></span>
           </div>
         </div>
       </div>
+      <span class="topbar-main-spacer" aria-hidden="true"></span>
+    </div>
+    <div class="sub">
       <div class="summary-ticker-row" aria-label="Summary tickers">
         <div class="summary-ticker-item summary-ticker-item-target" id="summary-ticker-target" data-ticker-id="target">
           <div class="label" data-ticker-label>Target</div>

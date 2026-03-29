@@ -87,12 +87,24 @@
 
     function syncTopbarChatContext(state = latestState) {{
       const labelEl = document.getElementById("topbar-chat-context");
-      if (!(labelEl instanceof HTMLElement)) return;
+      const headingEl = document.getElementById("topbar-heading-app");
+      if (headingEl instanceof HTMLElement && !headingEl.dataset.defaultHeading) {{
+        headingEl.dataset.defaultHeading = String(headingEl.textContent || "").trim() || "Meshyface";
+      }}
+      const defaultHeading = (headingEl instanceof HTMLElement)
+        ? (String(headingEl.dataset.defaultHeading || "").trim() || "Meshyface")
+        : "Meshyface";
       const safeState = (state && typeof state === "object") ? state : {{}};
       const selfId = resolveLocalNodeId(safeState);
       if (!isCanonicalNodeId(selfId)) {{
-        labelEl.textContent = "n/a";
-        labelEl.title = "Connected local radio: unavailable";
+        if (labelEl instanceof HTMLElement) {{
+          labelEl.textContent = "n/a";
+          labelEl.title = "Connected local radio: unavailable";
+        }}
+        if (headingEl instanceof HTMLElement) {{
+          headingEl.textContent = defaultHeading;
+          headingEl.title = "Connected local radio: unavailable";
+        }}
         return;
       }}
       const owner = localNodeUserFromState(safeState);
@@ -108,19 +120,20 @@
         || (selfNode && selfNode.short_name)
         || ""
       ).trim();
-      let display = "";
-      if (longName) {{
-        display = longName;
-      }} else if (shortName) {{
-        display = shortName;
-      }} else {{
-        display = nodeNameCache.get(selfId) || selfId;
+      const display = longName || shortName || (nodeNameCache.get(selfId) || selfId);
+      if (labelEl instanceof HTMLElement) {{
+        labelEl.textContent = display;
       }}
-      labelEl.textContent = display;
       const titleIdentity = display && display !== selfId
         ? `${{display}} (${{selfId}})`
         : selfId;
-      labelEl.title = `Connected local radio: ${{titleIdentity}}`;
+      if (labelEl instanceof HTMLElement) {{
+        labelEl.title = `Connected local radio: ${{titleIdentity}}`;
+      }}
+      if (headingEl instanceof HTMLElement) {{
+        headingEl.textContent = display;
+        headingEl.title = `Connected local radio: ${{titleIdentity}}`;
+      }}
     }}
 
     function formatSavedViewMapTitle(state = latestState) {{
