@@ -1,18 +1,15 @@
 # Ideas Backlog
 
-
-move the scrollbar uptop whwre the name is, between the version and icons. replace Maeashface with the full radio name
-
-
 - sort out click selection, map non map
 
 
 - ask if we can make github issues and use them?
 
-- theme settings tab
-
 - all bots are plugins
 - bot activity show as (1)
+
+- theme settings tab
+
 
 - at the base level, report to other users the version of meshyface
 - fix deselected channel notifaction
