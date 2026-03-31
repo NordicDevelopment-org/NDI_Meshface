@@ -2980,9 +2980,11 @@
       overflow: auto;
     }}
     .layout.view-console {{
-      height: calc(100dvh - var(--workspace-viewport-offset, 84px) - 16px);
+      height: 100%;
+      max-height: 100%;
       min-height: 0;
       grid-template-rows: minmax(0, 1fr);
+      overflow: hidden;
     }}
     .layout.view-console .console {{
       grid-column: 1 / span 3;

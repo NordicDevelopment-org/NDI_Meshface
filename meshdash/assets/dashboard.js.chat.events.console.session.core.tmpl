@@ -269,9 +269,53 @@
 
     function applyConsoleAutoscroll(pre, forceScroll = false) {{
       if (!(pre instanceof HTMLElement)) return;
+      const input = consoleCommandInputElement();
+      const typingFocused = input instanceof HTMLInputElement && document.activeElement === input;
       if (consoleAutoscroll || forceScroll) {{
         pre.scrollLeft = 0;
         pre.scrollTop = pre.scrollHeight;
+      }}
+      if (consoleAutoscroll || forceScroll || typingFocused) {{
+        ensureConsolePromptVisible(pre, 0);
+      }}
+    }}
+
+    function ensureConsolePromptVisible(pre, reservePx = 0) {{
+      if (!(pre instanceof HTMLElement)) return;
+      const promptEl = document.getElementById("live-console-prompt-line");
+      if (!(promptEl instanceof HTMLElement) || !pre.contains(promptEl)) return;
+      const preRect = pre.getBoundingClientRect();
+      const promptRect = promptEl.getBoundingClientRect();
+      if (!(preRect.height > 0) || !(promptRect.height > 0)) return;
+      let paddingBottom = 0;
+      try {{
+        const styles = window.getComputedStyle(pre);
+        paddingBottom = Math.max(0, Number.parseFloat(styles.paddingBottom) || 0);
+      }} catch (_err) {{
+      }}
+      const requestedReserve = Math.max(0, Number(reservePx) || 0);
+      const promptReserve = Math.ceil(paddingBottom + 3);
+      const reserve = Math.max(requestedReserve, promptReserve);
+      const visibleBottom = preRect.bottom - reserve;
+      if (promptRect.bottom > visibleBottom) {{
+        const deltaDown = Math.ceil(promptRect.bottom - visibleBottom);
+        pre.scrollTop = Math.max(0, pre.scrollTop + deltaDown);
+        return;
+      }}
+      const visibleTop = preRect.top + 2;
+      if (promptRect.top < visibleTop) {{
+        const deltaUp = Math.ceil(visibleTop - promptRect.top);
+        pre.scrollTop = Math.max(0, pre.scrollTop - deltaUp);
+      }}
+    }}
+
+    function applyConsoleBottomAnchor(pre) {{
+      if (!(pre instanceof HTMLElement)) return;
+      const baseTopPadding = 12;
+      pre.style.setProperty("--console-pad-top", `${{baseTopPadding}}px`);
+      const slack = Math.floor(pre.clientHeight - pre.scrollHeight);
+      if (slack > 0) {{
+        pre.style.setProperty("--console-pad-top", `${{baseTopPadding + slack}}px`);
       }}
     }}
 
@@ -296,6 +340,7 @@
         consoleRenderedPromptHtml = promptHtml;
         consoleRenderedFrameCacheKey = "";
       }}
+      applyConsoleBottomAnchor(pre);
       applyConsoleAutoscroll(pre, forceScroll);
     }}
 
@@ -317,10 +362,11 @@
       const promptEl = document.getElementById("live-console-prompt-line");
       const hasPromptSpan = promptEl instanceof HTMLElement && pre.contains(promptEl);
       if (frameCacheKey !== consoleRenderedFrameCacheKey || !hasPromptSpan) {{
-        pre.innerHTML = `${{logHtml}}<span id="live-console-prompt-line">${{promptHtml}}</span>`;
+        pre.innerHTML = `${{logHtml}}<span id="live-console-prompt-line">${{promptHtml}}</span><span class="console-tail-spacer" aria-hidden="true"></span>`;
         consoleRenderedFrameCacheKey = frameCacheKey;
       }}
       consoleRenderedPromptHtml = promptHtml;
+      applyConsoleBottomAnchor(pre);
       applyConsoleAutoscroll(pre, forceScroll);
     }}
 

@@ -997,7 +997,7 @@
       border: none;
       color: #17482d;
       border-radius: 0;
-      padding: 12px;
+      padding: var(--console-pad-top, 12px) 12px 8px 12px;
       min-height: 0;
       max-height: none;
       flex: 1 1 auto;
@@ -1015,6 +1015,16 @@
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       word-break: break-word;
+    }}
+    #live-console-prompt-line {{
+      white-space: inherit;
+    }}
+    .console-tail-spacer {{
+      display: block;
+      width: 1px;
+      height: calc(0.45em + 2px);
+      pointer-events: none;
+      user-select: none;
     }}
     .console-caret {{
       display: inline-block;
