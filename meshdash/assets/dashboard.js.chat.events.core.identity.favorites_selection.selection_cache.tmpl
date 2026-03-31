@@ -358,6 +358,7 @@
             applyNodeTintStyleVars(member, nodeId, {{
               scope: "member",
               fallbackHue: 145,
+              tagActive: true,
               hue: tintHue,
               tintStartHue: tintHue,
               tintEndHue: tintHue,
@@ -398,13 +399,18 @@
             applyNodeTintStyleVars(member, nodeId, {{
               scope: "member",
               fallbackHue: 145,
+              tagActive: false,
               hue: autoNodeHue,
               outlineSeed: tintOutlineSeed,
               tintStartSeed,
               tintEndSeed,
             }});
           }} else {{
-            member.style.setProperty("--chat-member-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(autoNodeHue) || 145)))));
+            if (typeof shouldUseUniqueNodeColors !== "function" || shouldUseUniqueNodeColors(false)) {{
+              member.style.setProperty("--chat-member-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(autoNodeHue) || 145)))));
+            }} else {{
+              member.style.removeProperty("--chat-member-node-hue");
+            }}
           }}
           member.style.removeProperty("--node-tag-color");
           member.style.removeProperty("--node-tag-vibrance");
@@ -455,6 +461,7 @@
           const feedTintOptions = {{
             scope: "feed",
             fallbackHue: 210,
+            tagActive: active,
             hue: nodeHue,
             outlineSeed: tintOutlineSeed,
             tintStartSeed,
@@ -467,7 +474,11 @@
           }}
           applyNodeTintStyleVars(row, rowNodeId, feedTintOptions);
         }} else {{
-          row.style.setProperty("--chat-feed-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || autoNodeHue)))));
+          if (typeof shouldUseUniqueNodeColors !== "function" || shouldUseUniqueNodeColors(active)) {{
+            row.style.setProperty("--chat-feed-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || autoNodeHue)))));
+          }} else {{
+            row.style.removeProperty("--chat-feed-node-hue");
+          }}
         }}
         if (active && tagEntry && tagEntry.preset) {{
           const color = normalizeNodeTagColor(tagEntry.preset.color, "#2aa85a");

@@ -30,6 +30,63 @@
       }}
     }}
 
+    function shouldUseUniqueNodeColors(tagActive = false) {{
+      if (tagActive) return true;
+      return !!settingsUniqueNodeColorsEnabled;
+    }}
+
+    function loadSettingsAppearancePreferences() {{
+      settingsUniqueNodeColorsEnabled = true;
+      try {{
+        settingsUniqueNodeColorsEnabled = parseBoolToken(
+          window.localStorage.getItem(settingsUniqueNodeColorsStorageKey),
+          true
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistSettingsAppearancePreferences() {{
+      try {{
+        window.localStorage.setItem(
+          settingsUniqueNodeColorsStorageKey,
+          settingsUniqueNodeColorsEnabled ? "1" : "0"
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function syncSettingsAppearanceControls() {{
+      const toggle = document.getElementById("settings-appearance-unique-node-colors");
+      if (toggle instanceof HTMLInputElement) {{
+        toggle.checked = !!settingsUniqueNodeColorsEnabled;
+      }}
+    }}
+
+    function setSettingsUniqueNodeColorsEnabled(enabled, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const normalized = !!enabled;
+      const changed = settingsUniqueNodeColorsEnabled !== normalized;
+      settingsUniqueNodeColorsEnabled = normalized;
+      if (opts.persist !== false) {{
+        persistSettingsAppearancePreferences();
+      }}
+      syncSettingsAppearanceControls();
+      if (opts.announce && typeof setSettingsStatusText === "function") {{
+        setSettingsStatusText(
+          settingsUniqueNodeColorsEnabled
+            ? "Unique node colors enabled for chat + node list."
+            : "Unique node colors disabled. Untagged nodes use neutral tint."
+        );
+      }}
+      if (changed && opts.rerender !== false && latestState) {{
+        renderChat(latestState);
+        if (activeLayoutView === "chatlabs") {{
+          renderChatLabsView(latestState);
+        }}
+      }}
+    }}
+
     function normalizeSettingsTimeSyncTimezone(value) {{
       const clean = String(value || "").trim();
       if (!clean) return "local";

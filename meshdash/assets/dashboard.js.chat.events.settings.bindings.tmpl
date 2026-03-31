@@ -5,6 +5,7 @@
       const isRuntimeOnlySettingsControl = (controlId) => (
         controlId === "settings-time-sync-enabled"
         || controlId === "settings-time-sync-timezone"
+        || controlId === "settings-appearance-unique-node-colors"
       );
 
       for (const tabBtn of settingsCard.querySelectorAll(".settings-tab-btn[data-settings-tab]")) {{
@@ -69,6 +70,13 @@
               : `Time sync timezone set to ${{settingsTimeSyncTimezonePref}}.`
           );
         }}
+        if (target instanceof HTMLInputElement && target.id === "settings-appearance-unique-node-colors") {{
+          setSettingsUniqueNodeColorsEnabled(!!target.checked, {{
+            persist: true,
+            rerender: true,
+            announce: true,
+          }});
+        }}
         if (
           target instanceof HTMLInputElement
           && (
@@ -117,6 +125,7 @@
         }});
       }}
       syncSettingsTimeSyncControls();
+      syncSettingsAppearanceControls();
 
       const applyOwnerBtn = document.getElementById("settings-apply-owner");
       if (applyOwnerBtn instanceof HTMLButtonElement) {{

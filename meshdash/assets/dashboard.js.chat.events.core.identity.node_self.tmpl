@@ -402,14 +402,62 @@
       return {{ scope, profile, hue, tintStartHue, tintEndHue, outlineHue }};
     }}
 
+    function nodeTintStyleScopeFromOptions(options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      return String(opts.scope || "feed").trim().toLowerCase() === "member"
+        ? "member"
+        : "feed";
+    }}
+
+    function shouldApplyNodeTintStyle(options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const tagActive = !!opts.tagActive;
+      if (typeof shouldUseUniqueNodeColors === "function") {{
+        return shouldUseUniqueNodeColors(tagActive);
+      }}
+      return true;
+    }}
+
+    function clearNodeTintStyleVars(target, scope = "feed") {{
+      if (!(target instanceof HTMLElement)) return;
+      const cleanScope = String(scope || "feed").trim().toLowerCase() === "member"
+        ? "member"
+        : "feed";
+      const prefix = cleanScope === "member" ? "--chat-member-node-" : "--chat-feed-node-";
+      for (const suffix of [
+        "hue",
+        "tint-start-hue",
+        "tint-end-hue",
+        "sat-mult",
+        "light-shift",
+        "dark-sat-mult",
+        "dark-light-shift",
+        "outline-hue",
+        "outline-sat-mult",
+        "outline-light-shift",
+        "outline-dark-sat-mult",
+        "outline-dark-light-shift",
+      ]) {{
+        target.style.removeProperty(`${{prefix}}${{suffix}}`);
+      }}
+    }}
+
     function nodeTintStyleVars(nodeIdOrProfile, options = null) {{
+      if (!shouldApplyNodeTintStyle(options)) {{
+        return "";
+      }}
       const resolved = resolveNodeTintStyleState(nodeIdOrProfile, options);
       const scopePrefix = resolved.scope === "member" ? "--chat-member-node-" : "--chat-feed-node-";
       return `${{scopePrefix}}hue:${{resolved.hue}};${{scopePrefix}}tint-start-hue:${{resolved.tintStartHue}};${{scopePrefix}}tint-end-hue:${{resolved.tintEndHue}};${{scopePrefix}}sat-mult:${{resolved.profile.satMult.toFixed(3)}};${{scopePrefix}}light-shift:${{resolved.profile.lightShift.toFixed(2)}}%;${{scopePrefix}}dark-sat-mult:${{resolved.profile.darkSatMult.toFixed(3)}};${{scopePrefix}}dark-light-shift:${{resolved.profile.darkLightShift.toFixed(2)}}%;${{scopePrefix}}outline-hue:${{resolved.outlineHue}};${{scopePrefix}}outline-sat-mult:${{resolved.profile.outlineSatMult.toFixed(3)}};${{scopePrefix}}outline-light-shift:${{resolved.profile.outlineLightShift.toFixed(2)}}%;${{scopePrefix}}outline-dark-sat-mult:${{resolved.profile.outlineDarkSatMult.toFixed(3)}};${{scopePrefix}}outline-dark-light-shift:${{resolved.profile.outlineDarkLightShift.toFixed(2)}}%;`;
     }}
 
     function applyNodeTintStyleVars(target, nodeIdOrProfile, options = null) {{
-      if (!(target instanceof HTMLElement)) return;
+      if (!(target instanceof HTMLElement)) return false;
+      const scope = nodeTintStyleScopeFromOptions(options);
+      if (!shouldApplyNodeTintStyle(options)) {{
+        clearNodeTintStyleVars(target, scope);
+        return false;
+      }}
       const resolved = resolveNodeTintStyleState(nodeIdOrProfile, options);
       const prefix = resolved.scope === "member" ? "--chat-member-node-" : "--chat-feed-node-";
       target.style.setProperty(`${{prefix}}hue`, String(resolved.hue));
@@ -424,9 +472,13 @@
       target.style.setProperty(`${{prefix}}outline-light-shift`, `${{resolved.profile.outlineLightShift.toFixed(2)}}%`);
       target.style.setProperty(`${{prefix}}outline-dark-sat-mult`, resolved.profile.outlineDarkSatMult.toFixed(3));
       target.style.setProperty(`${{prefix}}outline-dark-light-shift`, `${{resolved.profile.outlineDarkLightShift.toFixed(2)}}%`);
+      return true;
     }}
 
     function nodeTintHue(nodeId, fallbackHue = 145) {{
+      if (typeof shouldUseUniqueNodeColors === "function" && !shouldUseUniqueNodeColors(false)) {{
+        return normalizeNodeTintHue(fallbackHue, 145);
+      }}
       return nodeTintProfile(nodeId, fallbackHue).hue;
     }}
 

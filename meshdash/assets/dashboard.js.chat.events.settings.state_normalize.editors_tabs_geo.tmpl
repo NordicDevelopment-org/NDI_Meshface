@@ -154,6 +154,7 @@
         || key === "channels"
         || key === "data"
         || key === "tickers"
+        || key === "appearance"
       ) return key;
       return "core";
     }}
@@ -228,6 +229,8 @@
         syncChatWhoisQuickActionControls();
       }} else if (next === "tickers") {{
         renderTickerSettingsUi();
+      }} else if (next === "appearance") {{
+        syncSettingsAppearanceControls();
       }}
     }}
 
