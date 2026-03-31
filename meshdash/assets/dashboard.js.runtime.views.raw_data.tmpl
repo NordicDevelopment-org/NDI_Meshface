@@ -180,6 +180,62 @@
       return nextNodeId;
     }}
 
+    function deriveEnvironmentNodeMetaFromPoints(points) {{
+      const safePoints = Array.isArray(points) ? points : [];
+      const perNode = new Map();
+      for (const point of safePoints) {{
+        const nodeId = normalizeNodeId(point && point.node_id);
+        if (!nodeId) continue;
+        const fallbackLabel = String((point && point.node_label) || nodeId);
+        const metricKey = normalizeEnvMetricKey(point && point.metric_key);
+        const sampleCount = Math.max(1, Math.trunc(Number(point && point.sample_count) || 1));
+        const sampleUnix = Math.max(0, Math.trunc(Number(point && point.unix) || 0));
+        if (!perNode.has(nodeId)) {{
+          perNode.set(nodeId, {{
+            id: nodeId,
+            label: resolveEnvironmentNodeDisplayName(nodeId, fallbackLabel) || fallbackLabel || nodeId,
+            count: 0,
+            metricKeys: new Set(),
+            last_unix: sampleUnix,
+          }});
+        }}
+        const nodeState = perNode.get(nodeId);
+        nodeState.count += sampleCount;
+        if (metricKey) nodeState.metricKeys.add(metricKey);
+        nodeState.last_unix = Math.max(
+          Math.max(0, Math.trunc(Number(nodeState.last_unix) || 0)),
+          sampleUnix,
+        );
+        if (nodeState.label === "" || normalizeNodeId(nodeState.label) === nodeId) {{
+          nodeState.label = resolveEnvironmentNodeDisplayName(nodeId, fallbackLabel) || fallbackLabel || nodeId;
+        }}
+      }}
+      const rows = Array.from(perNode.values()).map((row) => {{
+        const lastUnix = Math.max(0, Math.trunc(Number(row && row.last_unix) || 0));
+        const metricKeys = (row && row.metricKeys instanceof Set) ? row.metricKeys : new Set();
+        return {{
+          id: String((row && row.id) || "").trim(),
+          label: String((row && row.label) || (row && row.id) || "node"),
+          count: Math.max(0, Math.trunc(Number(row && row.count) || 0)),
+          metrics: metricKeys.size,
+          last_unix: lastUnix,
+          last_seen: lastUnix > 0 ? formatEnvHistoryTime(lastUnix) : "n/a",
+        }};
+      }}).filter((row) => normalizeNodeId(row.id));
+      rows.sort((a, b) => (
+        (Number(b && b.count) || 0) - (Number(a && a.count) || 0)
+      ) || String((a && a.label) || "").localeCompare(String((b && b.label) || "")));
+      return rows;
+    }}
+
+    function resolveEnvironmentNodeOptions(nodes, points) {{
+      const safeNodes = Array.isArray(nodes)
+        ? nodes.filter((meta) => normalizeNodeId(meta && meta.id))
+        : [];
+      if (safeNodes.length) return safeNodes;
+      return deriveEnvironmentNodeMetaFromPoints(points);
+    }}
+
     function resolveEnvironmentMetricMeta(metrics, metricKey) {{
       const safeMetrics = Array.isArray(metrics) ? metrics : [];
       const key = normalizeEnvMetricKey(metricKey);
@@ -319,10 +375,14 @@
       const totalSeries = Math.max(0, Math.trunc(Number(safeChartMeta.totalSeries) || 0));
       const visibleSeries = Math.max(0, Math.trunc(Number(safeChartMeta.visibleSeries) || 0));
       const hiddenSet = hiddenNodeIds instanceof Set ? hiddenNodeIds : new Set();
-      if (!safeNodes.length || !metricMeta || !metricMeta.key) {{
+      if (!metricMeta || !metricMeta.key) {{
         host.textContent = "No sensor metric keys detected yet in saved telemetry history.";
         return;
       }}
+      const nodeCount = Math.max(
+        safeNodes.length,
+        new Set(legendItems.map((item) => normalizeNodeId(item && item.nodeId)).filter(Boolean)).size
+      );
       const totalPoints = Math.max(0, Math.trunc(Number(safePoints.length) || 0));
       const selectionSummary = metricMeta
         ? `${{metricMeta.label}}${{nodeMeta ? ` @ ${{nodeMeta.label || nodeMeta.id}}` : " @ all nodes"}}`
@@ -339,7 +399,7 @@
         hiddenSeries > 0
           ? `<span class="env-metric-chip env-node-legend-more">+${{hiddenSeries}} more node${{hiddenSeries === 1 ? "" : "s"}} hidden (top ${{visibleSeries}} shown)</span>`
           : "",
-        `<span class="env-metric-chip">Nodes <span class="env-metric-chip-count">${{safeNodes.length}}</span></span>`,
+        `<span class="env-metric-chip">Nodes <span class="env-metric-chip-count">${{nodeCount}}</span></span>`,
       ].filter(Boolean).join("");
     }}
 
@@ -777,36 +837,8 @@
         return clearChart("No numeric values in this selection.");
       }}
 
-      const percentile = (sortedValues, ratio) => {{
-        const values = Array.isArray(sortedValues) ? sortedValues : [];
-        if (!values.length) return NaN;
-        const idx = Math.max(0, Math.min(values.length - 1, ratio * (values.length - 1)));
-        const low = Math.floor(idx);
-        const high = Math.ceil(idx);
-        if (low === high) return values[low];
-        const mix = idx - low;
-        return values[low] + ((values[high] - values[low]) * mix);
-      }};
-
       let minValue = rawMinValue;
       let maxValue = rawMaxValue;
-      if (visibleValues.length >= 14 && rawMaxValue > rawMinValue) {{
-        const sortedValues = visibleValues.slice().sort((a, b) => a - b);
-        const p10 = percentile(sortedValues, 0.10);
-        const p90 = percentile(sortedValues, 0.90);
-        const coreSpan = Number(p90) - Number(p10);
-        const rawSpan = rawMaxValue - rawMinValue;
-        const outlierHeavy = Number.isFinite(coreSpan)
-          && coreSpan > 0
-          && rawSpan > 0
-          && (coreSpan / rawSpan) < 0.62;
-        if (outlierHeavy) {{
-          const corePad = coreSpan * 0.22;
-          minValue = p10 - corePad;
-          maxValue = p90 + corePad;
-        }}
-      }}
-
       if (!(Number.isFinite(minValue) && Number.isFinite(maxValue) && maxValue > minValue)) {{
         minValue = rawMinValue;
         maxValue = rawMaxValue;
@@ -820,9 +852,7 @@
         minValue -= pad;
         maxValue += pad;
       }}
-      const clippedPointCount = visibleValues.reduce((count, value) => (
-        count + ((value < minValue || value > maxValue) ? 1 : 0)
-      ), 0);
+      const clippedPointCount = 0;
 
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const palette = darkTheme
@@ -962,7 +992,7 @@
     function renderEnvironmentMetricsSnapshot() {{
       const points = Array.isArray(envMetricsViewState.points) ? envMetricsViewState.points : [];
       const metrics = Array.isArray(envMetricsViewState.metrics) ? envMetricsViewState.metrics : [];
-      const nodes = Array.isArray(envMetricsViewState.nodes) ? envMetricsViewState.nodes : [];
+      const nodes = resolveEnvironmentNodeOptions(envMetricsViewState.nodes, points);
       const windowHours = syncEnvironmentWindowPicker();
       const selectedMetric = syncEnvironmentMetricPicker(metrics);
       const selectedNodeId = syncEnvironmentNodePicker(nodes);
@@ -1015,7 +1045,11 @@
         envMetricsViewState.selectedMetric = firstMetric ? normalizeEnvMetricKey(firstMetric.key) : "";
       }}
       const cleanSelectedNode = normalizeNodeId(envMetricsViewState.selectedNodeId || "");
-      if (cleanSelectedNode && !envMetricsViewState.nodes.some((node) => normalizeNodeId(node.id) === cleanSelectedNode)) {{
+      const selectableNodes = resolveEnvironmentNodeOptions(
+        envMetricsViewState.nodes,
+        envMetricsViewState.points,
+      );
+      if (cleanSelectedNode && !selectableNodes.some((node) => normalizeNodeId(node.id) === cleanSelectedNode)) {{
         envMetricsViewState.selectedNodeId = "";
       }}
     }}

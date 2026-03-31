@@ -888,7 +888,9 @@
       gap: 0;
     }}
     .history-chat-main-scroll {{
+      flex: 1 1 auto;
       min-height: 0;
+      overflow: auto;
     }}
     .history-chat-splitter {{
       display: none;
@@ -1680,7 +1682,8 @@
       flex-direction: column;
       flex: 1 1 auto;
       min-height: 0;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
     }}
     .raw {{ grid-column: 3; grid-row: 8; }}
     .console {{ grid-column: 1 / span 3; grid-row: 10; }}
@@ -2745,7 +2748,7 @@
       display: block;
       width: 100%;
       height: 100%;
-      min-height: 280px;
+      min-height: 0;
       border-color: var(--network-pane-head-border);
       border-top: 0;
       border-radius: 0 0 8px 8px;
@@ -2786,7 +2789,7 @@
       --history-pane-divider-border: #d1e0cb;
       --history-pane-divider-line: #b8cab9;
       --history-pane-divider-line-active: #2f855a;
-      height: 100%;
+      height: calc(100dvh - var(--workspace-viewport-offset, 84px) - 16px);
       min-height: 0;
       grid-template-columns: minmax(320px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
       grid-template-rows: auto minmax(0, 1fr);
@@ -2809,6 +2812,7 @@
     .layout.view-history .map-data .body {{
       min-height: 0;
       background: var(--history-pane-body-bg);
+      overflow: auto;
     }}
     .layout.view-history .history-activity-splitter {{
       display: block;
@@ -2840,6 +2844,7 @@
     .layout.view-history .history-chat .body {{
       min-height: 0;
       background: var(--history-pane-body-bg);
+      overflow: auto;
     }}
     .layout.view-history .splitter {{
       display: block;
@@ -3026,7 +3031,7 @@
     }}
 
     .layout.view-environment {{
-      height: calc(100dvh - var(--workspace-viewport-offset, 84px) - 16px);
+      height: 100%;
       min-height: 0;
       grid-template-rows: minmax(0, 1fr);
     }}
