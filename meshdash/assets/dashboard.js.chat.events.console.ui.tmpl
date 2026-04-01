@@ -173,9 +173,36 @@
       }}
       if (terminalScreen instanceof HTMLElement && terminalScreen.dataset.fillBound !== "1") {{
         terminalScreen.dataset.fillBound = "1";
+        const scheduleConsoleFillOnResume = () => {{
+          if (activeLayoutView !== "console") return;
+          scheduleConsoleTerminalScreenFillHeight();
+          if (typeof window.requestAnimationFrame === "function") {{
+            window.requestAnimationFrame(() => {{
+              scheduleConsoleTerminalScreenFillHeight();
+              window.setTimeout(() => {{
+                if (activeLayoutView === "console") {{
+                  scheduleConsoleTerminalScreenFillHeight();
+                }}
+              }}, 80);
+            }});
+          }} else {{
+            window.setTimeout(() => {{
+              if (activeLayoutView === "console") {{
+                scheduleConsoleTerminalScreenFillHeight();
+              }}
+            }}, 80);
+          }}
+        }};
         window.addEventListener("resize", () => {{
           scheduleConsoleTerminalScreenFillHeight();
         }}, {{ passive: true }});
+        window.addEventListener("focus", scheduleConsoleFillOnResume, {{ passive: true }});
+        window.addEventListener("pageshow", scheduleConsoleFillOnResume, {{ passive: true }});
+        document.addEventListener("visibilitychange", () => {{
+          if (!document.hidden) {{
+            scheduleConsoleFillOnResume();
+          }}
+        }});
         if (window.visualViewport && typeof window.visualViewport.addEventListener === "function") {{
           window.visualViewport.addEventListener("resize", () => {{
             scheduleConsoleTerminalScreenFillHeight();
