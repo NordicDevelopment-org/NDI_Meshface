@@ -312,11 +312,66 @@
     function applyConsoleBottomAnchor(pre) {{
       if (!(pre instanceof HTMLElement)) return;
       const baseTopPadding = 12;
+      const baseBottomPadding = 10;
       pre.style.setProperty("--console-pad-top", `${{baseTopPadding}}px`);
-      const slack = Math.floor(pre.clientHeight - pre.scrollHeight);
-      if (slack > 0) {{
-        pre.style.setProperty("--console-pad-top", `${{baseTopPadding + slack}}px`);
+      pre.style.setProperty("--console-pad-bottom", `${{baseBottomPadding}}px`);
+      const viewportHeight = Math.max(0, pre.clientHeight || 0);
+      if (viewportHeight < 1) return;
+      const logEl = document.getElementById("live-console-log-lines");
+      const promptEl = document.getElementById("live-console-prompt-line");
+      const tailEl = pre.querySelector(".console-tail-spacer");
+      let contentHeight = 0;
+      if (logEl instanceof HTMLElement && pre.contains(logEl)) {{
+        contentHeight += Math.max(0, Math.ceil(logEl.scrollHeight || logEl.offsetHeight || 0));
       }}
+      if (promptEl instanceof HTMLElement && pre.contains(promptEl)) {{
+        contentHeight += Math.max(0, Math.ceil(promptEl.scrollHeight || promptEl.offsetHeight || 0));
+      }}
+      if (tailEl instanceof HTMLElement && pre.contains(tailEl)) {{
+        contentHeight += Math.max(0, Math.ceil(tailEl.scrollHeight || tailEl.offsetHeight || 0));
+      }}
+      if (contentHeight < 1) {{
+        let lineHeight = 13;
+        try {{
+          const styles = window.getComputedStyle(pre);
+          const parsedLineHeight = Number.parseFloat(styles.lineHeight);
+          if (Number.isFinite(parsedLineHeight) && parsedLineHeight > 0) {{
+            lineHeight = parsedLineHeight;
+          }} else {{
+            const parsedFontSize = Number.parseFloat(styles.fontSize);
+            if (Number.isFinite(parsedFontSize) && parsedFontSize > 0) {{
+              lineHeight = parsedFontSize * 1.3;
+            }}
+          }}
+        }} catch (_err) {{
+        }}
+        const fallbackText = String(pre.textContent || "");
+        const fallbackLineCount = Math.max(1, fallbackText.split("\n").length);
+        contentHeight = Math.ceil(fallbackLineCount * lineHeight);
+      }}
+      const anchoredTopPadding = Math.max(
+        baseTopPadding,
+        Math.floor(viewportHeight - baseBottomPadding - contentHeight)
+      );
+      if (anchoredTopPadding !== baseTopPadding) {{
+        pre.style.setProperty("--console-pad-top", `${{anchoredTopPadding}}px`);
+      }}
+    }}
+
+    function scheduleConsoleAnchorRefresh(pre, forceScroll = false) {{
+      if (!(pre instanceof HTMLElement)) return;
+      if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") return;
+      if (consoleAnchorRefreshRaf !== null) {{
+        try {{
+          window.cancelAnimationFrame(consoleAnchorRefreshRaf);
+        }} catch (_err) {{
+        }}
+      }}
+      consoleAnchorRefreshRaf = window.requestAnimationFrame(() => {{
+        consoleAnchorRefreshRaf = null;
+        applyConsoleBottomAnchor(pre);
+        applyConsoleAutoscroll(pre, forceScroll);
+      }});
     }}
 
     function renderConsolePromptBuffer(forceScroll = false) {{
@@ -342,6 +397,10 @@
       }}
       applyConsoleBottomAnchor(pre);
       applyConsoleAutoscroll(pre, forceScroll);
+      if (typeof scheduleConsoleTerminalScreenFillHeight === "function") {{
+        scheduleConsoleTerminalScreenFillHeight();
+      }}
+      scheduleConsoleAnchorRefresh(pre, forceScroll);
     }}
 
     function renderConsoleBufferNow(forceScroll = false) {{
@@ -362,12 +421,16 @@
       const promptEl = document.getElementById("live-console-prompt-line");
       const hasPromptSpan = promptEl instanceof HTMLElement && pre.contains(promptEl);
       if (frameCacheKey !== consoleRenderedFrameCacheKey || !hasPromptSpan) {{
-        pre.innerHTML = `${{logHtml}}<span id="live-console-prompt-line">${{promptHtml}}</span><span class="console-tail-spacer" aria-hidden="true"></span>`;
+        pre.innerHTML = `<span id="live-console-log-lines">${{logHtml}}</span><span id="live-console-prompt-line">${{promptHtml}}</span><span class="console-tail-spacer" aria-hidden="true"></span>`;
         consoleRenderedFrameCacheKey = frameCacheKey;
       }}
       consoleRenderedPromptHtml = promptHtml;
       applyConsoleBottomAnchor(pre);
       applyConsoleAutoscroll(pre, forceScroll);
+      if (typeof scheduleConsoleTerminalScreenFillHeight === "function") {{
+        scheduleConsoleTerminalScreenFillHeight();
+      }}
+      scheduleConsoleAnchorRefresh(pre, forceScroll);
     }}
 
     function renderConsoleBuffer(forceScroll = false) {{

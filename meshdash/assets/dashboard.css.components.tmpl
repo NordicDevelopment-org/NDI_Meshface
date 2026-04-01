@@ -997,10 +997,13 @@
       border: none;
       color: #17482d;
       border-radius: 0;
-      padding: var(--console-pad-top, 12px) 12px 8px 12px;
+      padding: var(--console-pad-top, 12px) 12px var(--console-pad-bottom, 10px) 12px;
+      box-sizing: border-box;
       min-height: 0;
       max-height: none;
+      height: 100%;
       flex: 1 1 auto;
+      display: block;
       overflow-y: auto;
       overflow-x: auto;
       font-size: 10px;
@@ -1016,7 +1019,12 @@
       overflow-wrap: anywhere;
       word-break: break-word;
     }}
+    #live-console-log-lines {{
+      display: block;
+      white-space: inherit;
+    }}
     #live-console-prompt-line {{
+      display: block;
       white-space: inherit;
     }}
     .console-tail-spacer {{

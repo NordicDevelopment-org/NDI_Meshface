@@ -993,7 +993,14 @@
       }}
       if (next === "console") {{
         window.requestAnimationFrame(() => {{
+          if (typeof scheduleConsoleTerminalScreenFillHeight === "function") {{
+            scheduleConsoleTerminalScreenFillHeight();
+          }}
           focusConsoleCommandInput(false);
+        }});
+      }} else if (typeof scheduleConsoleTerminalScreenFillHeight === "function") {{
+        window.requestAnimationFrame(() => {{
+          scheduleConsoleTerminalScreenFillHeight();
         }});
       }}
       if (next !== "saved") {{

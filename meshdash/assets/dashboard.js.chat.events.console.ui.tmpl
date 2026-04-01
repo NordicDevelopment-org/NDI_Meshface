@@ -1,3 +1,49 @@
+    function syncConsoleTerminalScreenFillHeight() {{
+      const terminalScreen = document.getElementById("console-terminal-screen");
+      if (!(terminalScreen instanceof HTMLElement)) return;
+      if (activeLayoutView !== "console") {{
+        terminalScreen.style.removeProperty("height");
+        terminalScreen.style.removeProperty("min-height");
+        terminalScreen.style.removeProperty("max-height");
+        return;
+      }}
+      const container = terminalScreen.parentElement;
+      if (!(container instanceof HTMLElement)) return;
+      const rect = terminalScreen.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const top = Number(rect && rect.top);
+      const bottom = Number(containerRect && containerRect.bottom);
+      if (!Number.isFinite(top) || !Number.isFinite(bottom)) return;
+      let bottomInset = 0;
+      try {{
+        const styles = window.getComputedStyle(container);
+        bottomInset = Math.max(0, Number.parseFloat(styles.paddingBottom) || 0);
+      }} catch (_err) {{
+      }}
+      const nextHeight = Math.max(140, Math.floor(bottom - top - bottomInset));
+      terminalScreen.style.height = `${{nextHeight}}px`;
+      terminalScreen.style.removeProperty("min-height");
+      terminalScreen.style.removeProperty("max-height");
+    }}
+
+    function scheduleConsoleTerminalScreenFillHeight() {{
+      if (typeof window === "undefined") return;
+      if (consoleFrameFillRaf !== null && typeof window.cancelAnimationFrame === "function") {{
+        try {{
+          window.cancelAnimationFrame(consoleFrameFillRaf);
+        }} catch (_err) {{
+        }}
+      }}
+      if (typeof window.requestAnimationFrame !== "function") {{
+        syncConsoleTerminalScreenFillHeight();
+        return;
+      }}
+      consoleFrameFillRaf = window.requestAnimationFrame(() => {{
+        consoleFrameFillRaf = null;
+        syncConsoleTerminalScreenFillHeight();
+      }});
+    }}
+
     function bindConsoleControls() {{
       ensureConsoleCommandsRegistered();
       const clearBtn = document.getElementById("console-clear-btn");
@@ -93,6 +139,19 @@
           }}
         }});
       }}
+      if (
+        pre instanceof HTMLElement
+        && !consoleResizeObserver
+        && typeof ResizeObserver !== "undefined"
+      ) {{
+        consoleResizeObserver = new ResizeObserver(() => {{
+          if (activeLayoutView !== "console") return;
+          applyConsoleBottomAnchor(pre);
+          applyConsoleAutoscroll(pre, false);
+          scheduleConsoleAnchorRefresh(pre, false);
+        }});
+        consoleResizeObserver.observe(pre);
+      }}
       const terminalScreen = document.getElementById("console-terminal-screen");
       if (terminalScreen instanceof HTMLElement && terminalScreen.dataset.bound !== "1") {{
         terminalScreen.dataset.bound = "1";
@@ -112,7 +171,19 @@
           handleConsolePasteEvent(ev);
         }});
       }}
+      if (terminalScreen instanceof HTMLElement && terminalScreen.dataset.fillBound !== "1") {{
+        terminalScreen.dataset.fillBound = "1";
+        window.addEventListener("resize", () => {{
+          scheduleConsoleTerminalScreenFillHeight();
+        }}, {{ passive: true }});
+        if (window.visualViewport && typeof window.visualViewport.addEventListener === "function") {{
+          window.visualViewport.addEventListener("resize", () => {{
+            scheduleConsoleTerminalScreenFillHeight();
+          }}, {{ passive: true }});
+        }}
+      }}
       applyConsoleFontSizePreference();
+      scheduleConsoleTerminalScreenFillHeight();
       const input = consoleCommandInputElement();
       if (input instanceof HTMLInputElement && input.dataset.bound !== "1") {{
         input.dataset.bound = "1";

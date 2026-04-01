@@ -2983,26 +2983,34 @@
       height: 100%;
       max-height: 100%;
       min-height: 0;
-      grid-template-rows: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) !important;
+      grid-template-rows: minmax(0, 1fr) !important;
+      gap: 0;
       overflow: hidden;
     }}
     .layout.view-console .console {{
-      grid-column: 1 / span 3;
-      grid-row: 1;
+      grid-column: 1 / -1 !important;
+      grid-row: 1 / -1 !important;
       display: flex;
       flex-direction: column;
       min-height: 0;
       height: 100%;
+      max-height: 100%;
       overflow: hidden;
+      align-self: stretch;
+      justify-self: stretch;
     }}
     .layout.view-console .console .body {{
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
+      display: flex;
+      flex-direction: column;
       min-height: 0;
       width: 100%;
       flex: 1 1 auto;
       height: 100%;
       overflow: hidden;
+    }}
+    .layout.view-console .console-controls {{
+      flex: 0 0 auto;
     }}
     .layout.view-console .console-terminal-screen {{
       display: flex;
@@ -3011,6 +3019,7 @@
       min-height: 0;
       width: 100%;
       height: 100%;
+      max-height: none;
     }}
     .layout.view-console #live-console {{
       flex: 1 1 auto;
