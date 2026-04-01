@@ -44,8 +44,49 @@
       }});
     }}
 
+    function isConsoleHotkeyTextEntryTarget(target) {{
+      if (!(target instanceof Element)) return false;
+      if (target instanceof HTMLTextAreaElement) return true;
+      if (target instanceof HTMLSelectElement) return true;
+      if (target instanceof HTMLInputElement) {{
+        return target.id !== "console-command-input";
+      }}
+      if (target instanceof HTMLElement && target.isContentEditable) {{
+        return true;
+      }}
+      const editableHost = target.closest("[contenteditable=''], [contenteditable='true'], [contenteditable='plaintext-only']");
+      return editableHost instanceof HTMLElement;
+    }}
+
+    function bindConsoleDropdownHotkey() {{
+      if (document.body.dataset.consoleHotkeyBound === "1") return;
+      document.body.dataset.consoleHotkeyBound = "1";
+      document.addEventListener("keydown", (ev) => {{
+        if (!ev || ev.defaultPrevented) return;
+        if (ev.isComposing || ev.repeat) return;
+        if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+        const key = String(ev.key || "");
+        const code = String(ev.code || "");
+        if (!(code === "Backquote" || key === "`" || key === "~")) return;
+        const target = ev.target;
+        if (
+          activeLayoutView !== "console"
+          && isConsoleHotkeyTextEntryTarget(target instanceof Element ? target : null)
+        ) {{
+          return;
+        }}
+        const remembered = normalizeLayoutView(consoleHotkeyReturnLayoutView || "chat");
+        const nextView = activeLayoutView === "console"
+          ? (remembered === "console" ? "chat" : remembered)
+          : "console";
+        ev.preventDefault();
+        applyLayoutView(nextView, true);
+      }});
+    }}
+
     function bindConsoleControls() {{
       ensureConsoleCommandsRegistered();
+      bindConsoleDropdownHotkey();
       const clearBtn = document.getElementById("console-clear-btn");
       if (clearBtn instanceof HTMLButtonElement && clearBtn.dataset.bound !== "1") {{
         clearBtn.dataset.bound = "1";

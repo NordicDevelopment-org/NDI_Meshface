@@ -760,6 +760,14 @@
       const requested = String(viewName || "").trim().toLowerCase();
       const requestedSavedAlias = requested === "saved";
       const next = normalizeLayoutView(viewName);
+      const previous = normalizeLayoutView(activeLayoutView);
+      if (next === "console") {{
+        if (previous !== "console") {{
+          consoleHotkeyReturnLayoutView = previous;
+        }}
+      }} else {{
+        consoleHotkeyReturnLayoutView = next;
+      }}
       activeLayoutView = next;
       if (next === "settings") {{
         if (requested === "data" || requested === "packets") {{
