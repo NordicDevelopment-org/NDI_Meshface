@@ -19,6 +19,7 @@ BOOTSTRAP_PUBLIC=0
 DRY_RUN=0
 
 WORKTREE_DIRS=()
+LAST_WORKTREE_DIR=""
 
 usage() {
   cat <<'EOF'
@@ -173,7 +174,7 @@ add_worktree_for_branch() {
   git -C "${ROOT_DIR}" rev-parse --verify "${branch}^{commit}" >/dev/null 2>&1 \
     || { echo "branch not found: ${branch}" >&2; exit 1; }
   git -C "${ROOT_DIR}" worktree add --quiet --detach "${wt}" "${branch}"
-  printf '%s\n' "${wt}"
+  LAST_WORKTREE_DIR="${wt}"
 }
 
 render_cmd() {
@@ -219,7 +220,8 @@ deploy_one() {
   fi
 
   local wt
-  wt="$(add_worktree_for_branch "${branch}")"
+  add_worktree_for_branch "${branch}"
+  wt="${LAST_WORKTREE_DIR}"
   (
     cd "${wt}"
     "${cmd[@]}"
