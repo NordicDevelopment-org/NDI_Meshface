@@ -18,6 +18,7 @@ def render_html(
     revision_label: str,
     revision_title: str,
     reset_ticker_scale_on_restart: bool = True,
+    ui_profile: str | None = None,
     light_theme_vars: dict | None = None,
     dark_theme_vars: dict | None = None,
 ) -> str:
@@ -35,6 +36,7 @@ def render_html(
         node_history_hours=node_history_hours,
         node_history_max_points=node_history_max_points,
         reset_ticker_scale_on_restart=reset_ticker_scale_on_restart,
+        ui_profile=ui_profile,
     )
     return _build_html_shell_helper(
         app_title=_APP_TITLE,

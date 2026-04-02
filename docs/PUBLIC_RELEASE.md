@@ -70,6 +70,12 @@ Allowlist rules:
 - blank lines and `# comments` are ignored
 - keep list explicit and minimal
 
+Regenerate the `core-ui` allowlist after runtime/import refactors:
+
+```bash
+./scripts/generate_core_ui_allowlist.py --validate
+```
+
 ## Sync + publish flow
 
 Sync staging branch from `main`:
