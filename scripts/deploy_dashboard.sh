@@ -21,6 +21,7 @@ Examples:
 Options:
   --target <user@host>     SSH deploy target.
   --bootstrap              Prepare a fresh host (venv, deps, service, env file).
+  --clean-app-dir          Remove stale managed app code in APP_DIR before copy.
   --mesh-host <ip_or_dns>  Radio host for dashboard.env MESH_HOST.
   --mesh-port <port>       Radio TCP port (default: 4403).
   --dash-host <ip_or_dns>  Dashboard bind host (default: 0.0.0.0).
@@ -44,6 +45,7 @@ Env overrides:
   MESH_DASH_DEPLOY_REMOTE_VENV
   MESH_DASH_DEPLOY_REMOTE_PYTHON
   MESH_DASH_DEPLOY_SERVICE
+  MESH_DASH_DEPLOY_CLEAN_APP_DIR
   MESH_DASH_DEPLOY_MESH_HOST
   MESH_DASH_DEPLOY_MESH_PORT
   MESH_DASH_DEPLOY_DASH_HOST
@@ -73,6 +75,7 @@ REMOTE_PYTHON="${MESH_DASH_DEPLOY_REMOTE_PYTHON:-${REMOTE_VENV}/bin/python}"
 SERVICE_NAME="${MESH_DASH_DEPLOY_SERVICE:-meshtastic-dashboard}"
 
 BOOTSTRAP=0
+CLEAN_APP_DIR="${MESH_DASH_DEPLOY_CLEAN_APP_DIR:-0}"
 MESH_HOST="${MESH_DASH_DEPLOY_MESH_HOST:-}"
 MESH_PORT="${MESH_DASH_DEPLOY_MESH_PORT:-4403}"
 DASH_HOST="${MESH_DASH_DEPLOY_DASH_HOST:-0.0.0.0}"
@@ -108,6 +111,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --bootstrap)
       BOOTSTRAP=1
+      shift
+      ;;
+    --clean-app-dir)
+      CLEAN_APP_DIR=1
       shift
       ;;
     --mesh-host)
@@ -238,12 +245,24 @@ fi
 
 echo "[deploy] target=${TARGET}"
 echo "[deploy] app_dir=${APP_DIR} config_dir=${CONFIG_DIR} logs_dir=${LOG_DIR}"
-echo "[deploy] service=${SERVICE_NAME} bootstrap=${BOOTSTRAP}"
+echo "[deploy] service=${SERVICE_NAME} bootstrap=${BOOTSTRAP} clean_app_dir=${CLEAN_APP_DIR}"
 if [[ -n "${MESH_HOST}" ]]; then
   echo "[deploy] mesh=${MESH_HOST}:${MESH_PORT} dash=${DASH_HOST}:${DASH_PORT} refresh_ms=${REFRESH_MS}"
 fi
 
 ssh_cmd "${TARGET}" "mkdir -p '${REMOTE_ROOT}' '${APP_DIR}' '${CONFIG_DIR}' '${LOG_DIR}'"
+
+if [[ "${CLEAN_APP_DIR}" -eq 1 ]]; then
+  if [[ -z "${APP_DIR}" || "${APP_DIR}" == "/" ]]; then
+    echo "refusing to clean unsafe APP_DIR='${APP_DIR}'" >&2
+    exit 1
+  fi
+  echo "[deploy] cleaning managed app paths in ${APP_DIR} (preserving databases/config/logs)"
+  ssh_cmd "${TARGET}" "\
+rm -rf '${APP_DIR}/meshdash' '${APP_DIR}/__pycache__' && \
+rm -f '${APP_DIR}/mesh_dashboard.py' '${APP_DIR}/mesh_connection.py' && \
+find '${APP_DIR}' -maxdepth 1 -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete"
+fi
 
 scp_cmd \
   "${ROOT_DIR}/mesh_dashboard.py" \
