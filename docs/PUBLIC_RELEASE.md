@@ -87,10 +87,29 @@ git push origin release/public-v0
 git checkout main
 ```
 
+Preflight public drift guard (recommended before publish):
+
+```bash
+./scripts/check_public_branch_drift.sh \
+  --base-branch main \
+  --public-branch release/public-v0 \
+  --allowlist .public-release/allowlists/public-v0-drift.allowlist
+```
+
+`scripts/release_public.sh` now runs this guard automatically when source branch
+is `release/public-v0`. It will fail if public-only drift spreads beyond the
+approved file list.
+
 Dry-run publish:
 
 ```bash
 ./scripts/release_public.sh --source-branch release/public-v0 --dry-run
+```
+
+Bypass drift guard only for emergencies:
+
+```bash
+./scripts/release_public.sh --source-branch release/public-v0 --skip-drift-check --dry-run
 ```
 
 Publish:
