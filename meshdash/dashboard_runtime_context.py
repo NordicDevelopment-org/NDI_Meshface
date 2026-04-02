@@ -59,12 +59,20 @@ from .history_profile import (
     resolve_history_profile_key,
 )
 from .fault_recorder import FaultRecorder
-from .bot_responder import (
-    build_mesh_response_bot_from_env as _build_mesh_response_bot_from_env,
-)
-from .services_standalone_zork import (
-    build_standalone_zork_service as _build_standalone_zork_service,
-)
+
+
+def _build_mesh_response_bot_from_env(**kwargs):
+    # Lazy import so slim public builds can omit bot modules.
+    from .bot_responder import build_mesh_response_bot_from_env as _impl
+
+    return _impl(**kwargs)
+
+
+def _build_standalone_zork_service():
+    # Lazy import so slim public builds can omit game modules.
+    from .services_standalone_zork import build_standalone_zork_service as _impl
+
+    return _impl()
 
 
 @dataclass(frozen=True)

@@ -27,6 +27,7 @@ Options:
   --dash-host <ip_or_dns>  Dashboard bind host (default: 0.0.0.0).
   --dash-port <port>       Dashboard bind port (default: 8877).
   --refresh-ms <ms>        Poll interval in ms (default: 3000).
+  --ui-profile <name>      Dashboard UI profile (example: full, core-ui).
   --history-db <path>      History DB path on target host.
   --service <name>         Systemd service name (default: meshtastic-dashboard).
   --app-dir <path>         App directory on target host.
@@ -51,6 +52,7 @@ Env overrides:
   MESH_DASH_DEPLOY_DASH_HOST
   MESH_DASH_DEPLOY_DASH_PORT
   MESH_DASH_DEPLOY_REFRESH_MS
+  MESH_DASH_DEPLOY_UI_PROFILE
   MESH_DASH_DEPLOY_HISTORY_DB
   MESH_DASH_DEPLOY_PYTHON_UNBUFFERED
 EOF
@@ -81,6 +83,7 @@ MESH_PORT="${MESH_DASH_DEPLOY_MESH_PORT:-4403}"
 DASH_HOST="${MESH_DASH_DEPLOY_DASH_HOST:-0.0.0.0}"
 DASH_PORT="${MESH_DASH_DEPLOY_DASH_PORT:-8877}"
 REFRESH_MS="${MESH_DASH_DEPLOY_REFRESH_MS:-3000}"
+UI_PROFILE="${MESH_DASH_DEPLOY_UI_PROFILE:-}"
 HISTORY_DB="${MESH_DASH_DEPLOY_HISTORY_DB:-${REMOTE_ROOT}/mesh_dashboard_history.sqlite3}"
 PYTHON_UNBUFFERED="${MESH_DASH_DEPLOY_PYTHON_UNBUFFERED:-1}"
 SSH_OPTS=(-F /dev/null)
@@ -140,6 +143,11 @@ while [[ $# -gt 0 ]]; do
     --refresh-ms)
       require_arg "$1" "${2:-}"
       REFRESH_MS="$2"
+      shift 2
+      ;;
+    --ui-profile)
+      require_arg "$1" "${2:-}"
+      UI_PROFILE="$2"
       shift 2
       ;;
     --history-db)
@@ -249,6 +257,9 @@ echo "[deploy] service=${SERVICE_NAME} bootstrap=${BOOTSTRAP} clean_app_dir=${CL
 if [[ -n "${MESH_HOST}" ]]; then
   echo "[deploy] mesh=${MESH_HOST}:${MESH_PORT} dash=${DASH_HOST}:${DASH_PORT} refresh_ms=${REFRESH_MS}"
 fi
+if [[ -n "${UI_PROFILE}" ]]; then
+  echo "[deploy] ui_profile=${UI_PROFILE}"
+fi
 
 ssh_cmd "${TARGET}" "mkdir -p '${REMOTE_ROOT}' '${APP_DIR}' '${CONFIG_DIR}' '${LOG_DIR}'"
 
@@ -312,6 +323,7 @@ MESH_PORT=${MESH_PORT}
 DASH_HOST=${DASH_HOST}
 DASH_PORT=${DASH_PORT}
 REFRESH_MS=${REFRESH_MS}
+MESH_DASH_UI_PROFILE=${UI_PROFILE}
 MESH_DASH_HISTORY_DB=${HISTORY_DB}
 PYTHONUNBUFFERED=${PYTHON_UNBUFFERED}
 EOF"

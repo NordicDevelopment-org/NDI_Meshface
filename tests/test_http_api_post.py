@@ -1,3 +1,5 @@
+import pytest
+
 from meshdash.http_api_post import (
     build_post_route_dependencies,
     dispatch_post_request,
@@ -67,3 +69,26 @@ def test_make_post_dispatch_uses_dispatch_helper(monkeypatch):
 
     assert calls["handler"] is handler
     assert calls["deps"] is deps
+
+
+def test_build_post_route_dependencies_handles_missing_optional_parsers(monkeypatch):
+    monkeypatch.setattr("meshdash.http_api_post.parse_chat_send_request", None)
+    monkeypatch.setattr("meshdash.http_api_post.validate_content_length", None)
+    monkeypatch.setattr("meshdash.http_api_post.parse_theme_settings_request", None)
+    monkeypatch.setattr("meshdash.http_api_post.parse_custom_telemetry_settings_request", None)
+    monkeypatch.setattr("meshdash.http_api_post.parse_bot_settings_request", None)
+    monkeypatch.setattr("meshdash.http_api_post.parse_standalone_zork_request", None)
+
+    deps = build_post_route_dependencies(send_chat_fn=None)
+
+    assert callable(deps.validate_content_length_fn)
+    assert callable(deps.parse_chat_send_request_fn)
+    assert deps.parse_theme_settings_request_fn is None
+    assert deps.parse_custom_telemetry_settings_request_fn is None
+    assert deps.parse_bot_settings_request_fn is None
+    assert deps.parse_standalone_zork_request_fn is None
+
+    with pytest.raises(ValueError, match="not enabled"):
+        deps.validate_content_length_fn({}, to_int_fn=lambda value: value)
+    with pytest.raises(ValueError, match="not enabled"):
+        deps.parse_chat_send_request_fn(b"{}", to_int_fn=lambda value: value)

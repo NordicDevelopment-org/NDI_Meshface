@@ -31,6 +31,7 @@ from meshdash.config import (
     DEFAULT_PACKET_LIMIT,
     DEFAULT_REFRESH_MS,
     DEFAULT_RESET_TICKER_SCALE_ON_RESTART,
+    DEFAULT_UI_PROFILE,
     SENSITIVE_FIELD_NAMES,
     UNKNOWN_GIT_COMMIT,
 )
@@ -129,11 +130,13 @@ def _build_render_html_fn_with_theme(
     theme_preset_settings: _ThemePresetSettings | None = None,
 ):
     settings = theme_preset_settings or _build_theme_preset_settings(args)
+    ui_profile = str(getattr(args, "ui_profile", "") or DEFAULT_UI_PROFILE).strip()
 
     def _render_html_with_theme(**kwargs):
         selected = settings.selected_preset_tokens()
         return _render_html_helper(
             **kwargs,
+            ui_profile=ui_profile,
             light_theme_vars=selected.get("light"),
             dark_theme_vars=selected.get("dark"),
         )

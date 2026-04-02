@@ -1,13 +1,7 @@
+from importlib import import_module
 from typing import Callable, Protocol
 from urllib.parse import urlparse
 
-from .api_input_chat import parse_chat_send_request, validate_content_length
-from .api_input_radio import parse_radio_settings_request
-from .api_input_channels import parse_channel_settings_request
-from .api_input_bot import parse_bot_settings_request
-from .api_input_theme import parse_theme_settings_request
-from .api_input_custom_telemetry import parse_custom_telemetry_settings_request
-from .api_input_zork import parse_standalone_zork_request
 from .helpers import to_int
 from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_json_response
@@ -30,6 +24,38 @@ class ParsedUrl(Protocol):
     path: str
 
 
+def _load_optional_callable(module_path: str, attr_name: str):
+    try:
+        module = import_module(module_path, package=__package__)
+    except Exception:
+        return None
+    value = getattr(module, attr_name, None)
+    if callable(value):
+        return value
+    return None
+
+
+def _validate_content_length_unavailable(*_args, **_kwargs) -> int:
+    raise ValueError("Chat send is not enabled on this dashboard instance")
+
+
+def _parse_chat_send_request_unavailable(*_args, **_kwargs):
+    raise ValueError("Chat send is not enabled on this dashboard instance")
+
+
+validate_content_length = _load_optional_callable(".api_input_chat", "validate_content_length")
+parse_chat_send_request = _load_optional_callable(".api_input_chat", "parse_chat_send_request")
+parse_radio_settings_request = _load_optional_callable(".api_input_radio", "parse_radio_settings_request")
+parse_channel_settings_request = _load_optional_callable(".api_input_channels", "parse_channel_settings_request")
+parse_bot_settings_request = _load_optional_callable(".api_input_bot", "parse_bot_settings_request")
+parse_theme_settings_request = _load_optional_callable(".api_input_theme", "parse_theme_settings_request")
+parse_custom_telemetry_settings_request = _load_optional_callable(
+    ".api_input_custom_telemetry",
+    "parse_custom_telemetry_settings_request",
+)
+parse_standalone_zork_request = _load_optional_callable(".api_input_zork", "parse_standalone_zork_request")
+
+
 def build_post_route_dependencies(
     *,
     send_chat_fn: SendChatFn | None,
@@ -48,8 +74,12 @@ def build_post_route_dependencies(
     return DashboardPostRouteDependencies(
         send_chat_fn=send_chat_fn,
         to_int_fn=to_int_fn,
-        validate_content_length_fn=validate_content_length,
-        parse_chat_send_request_fn=parse_chat_send_request,
+        validate_content_length_fn=(
+            validate_content_length or _validate_content_length_unavailable
+        ),
+        parse_chat_send_request_fn=(
+            parse_chat_send_request or _parse_chat_send_request_unavailable
+        ),
         write_json_response_fn=write_json_response,
         set_theme_preset_fn=set_theme_preset_fn,
         parse_theme_settings_request_fn=parse_theme_settings_request,

@@ -1,17 +1,25 @@
 from dataclasses import dataclass
-from typing import Mapping, Optional, Protocol
+from typing import TYPE_CHECKING, Mapping, Optional, Protocol
 
-from .api_inputs import (
-    BotSettingsRequest,
-    ChatSendRequest,
-    CustomTelemetrySettingsRequest,
-    NodeHistoryQuery,
-    OnlineActivityQuery,
-    RadioSettingsRequest,
-    ChannelSettingsRequest,
-    ThemeSettingsRequest,
-    StandaloneZorkRequest,
-)
+if TYPE_CHECKING:
+    from .api_input_bot import BotSettingsRequest
+    from .api_input_channels import ChannelSettingsRequest
+    from .api_input_chat import ChatSendRequest
+    from .api_input_custom_telemetry import CustomTelemetrySettingsRequest
+    from .api_input_history import NodeHistoryQuery, OnlineActivityQuery
+    from .api_input_radio import RadioSettingsRequest
+    from .api_input_theme import ThemeSettingsRequest
+    from .api_input_zork import StandaloneZorkRequest
+else:
+    BotSettingsRequest = object
+    ChannelSettingsRequest = object
+    ChatSendRequest = object
+    CustomTelemetrySettingsRequest = object
+    NodeHistoryQuery = object
+    OnlineActivityQuery = object
+    RadioSettingsRequest = object
+    ThemeSettingsRequest = object
+    StandaloneZorkRequest = object
 from .http_handler_contracts import DashboardHttpHandler
 from .state_payload_contracts import DashboardStatePayload
 

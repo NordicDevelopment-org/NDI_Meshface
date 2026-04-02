@@ -1,5 +1,6 @@
-from urllib.parse import parse_qs
 from collections.abc import Mapping
+from importlib import import_module
+from urllib.parse import parse_qs
 
 from .api_metrics import (
     build_prometheus_metrics_text as _build_prometheus_metrics_text_helper,
@@ -21,13 +22,27 @@ from .api_system import (
 from .api_theme import (
     handle_theme_settings_get as _handle_theme_settings_get_helper,
 )
-from .api_custom_telemetry import (
-    handle_custom_telemetry_settings_get as _handle_custom_telemetry_settings_get_helper,
-)
 from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardGetRouteDependencies
 from .offline_atlas import load_offline_atlas_payload as _load_offline_atlas_payload_helper
 from .helpers import to_int as _to_int_helper
+
+
+def _load_optional_handler(module_path: str, attr_name: str):
+    try:
+        module = import_module(module_path, package=__package__)
+    except Exception:
+        return None
+    value = getattr(module, attr_name, None)
+    if callable(value):
+        return value
+    return None
+
+
+_handle_custom_telemetry_settings_get_helper = _load_optional_handler(
+    ".api_custom_telemetry",
+    "handle_custom_telemetry_settings_get",
+)
 
 
 def _record_state_poll_request(deps: DashboardGetRouteDependencies) -> None:
@@ -249,6 +264,16 @@ def handle_dashboard_get(
         return
 
     if path == "/api/settings/custom_telemetry":
+        if not callable(_handle_custom_telemetry_settings_get_helper):
+            deps.write_json_response_fn(
+                handler,
+                status_code=503,
+                payload_obj={
+                    "ok": False,
+                    "error": "Custom telemetry settings are not enabled on this dashboard instance",
+                },
+            )
+            return
         _handle_custom_telemetry_settings_get_helper(
             handler,
             get_custom_telemetry_settings_fn=deps.get_custom_telemetry_settings_fn,
