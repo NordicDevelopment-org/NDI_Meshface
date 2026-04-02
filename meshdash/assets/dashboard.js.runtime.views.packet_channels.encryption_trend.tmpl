@@ -294,7 +294,7 @@
       }});
     }}
 
-    function renderEncriptionRouteChart(routes) {{
+    function renderEncriptionRouteChart(routes, describeNode = null) {{
       const svg = document.getElementById("encription-route-chart");
       const empty = document.getElementById("encription-route-empty");
       if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
@@ -304,9 +304,27 @@
           const count = Math.max(0, Math.trunc(Number(item && item.count)));
           const fromId = String(item && item.fromId ? item.fromId : "n/a");
           const toId = String(item && item.toId ? item.toId : "n/a");
+          const fromNodeId = normalizeNodeId(fromId);
+          const toNodeId = normalizeNodeId(toId);
+          const fromIdentity = typeof describeNode === "function"
+            ? describeNode(fromNodeId || fromId || "")
+            : null;
+          const toIdentity = typeof describeNode === "function"
+            ? describeNode(toNodeId || toId || "")
+            : null;
+          const fromLabel = String(
+            (fromIdentity && fromIdentity.primary)
+            || fromId
+            || "n/a"
+          ).trim() || "n/a";
+          const toLabel = String(
+            (toIdentity && toIdentity.primary)
+            || toId
+            || "n/a"
+          ).trim() || "n/a";
           return {{
             count,
-            label: `${{fromId}} -> ${{toId}}`,
+            label: `${{fromLabel}} -> ${{toLabel}}`,
           }};
         }})
         .filter((item) => item.count > 0)
