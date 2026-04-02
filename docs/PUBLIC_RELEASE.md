@@ -43,6 +43,10 @@ PUBLIC_RELEASE_BRANCH=release-candidate
 PUBLIC_RELEASE_PROFILE=core-ui
 ```
 
+Runtime UI profile for deployed dashboards is independent from file allowlists.
+Use `MESH_DASH_UI_PROFILE=core-ui` on public hosts to trim game/file/bot-heavy
+frontend modules while keeping private `main` at `full`.
+
 ## Curate what can go public
 
 Profile allowlists live in:

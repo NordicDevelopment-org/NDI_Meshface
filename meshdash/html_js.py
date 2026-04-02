@@ -1,4 +1,5 @@
 from .html_assets import render_asset_template as _render_asset_template_helper
+from .config import DEFAULT_UI_PROFILE as _DEFAULT_UI_PROFILE
 
 _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.bootstrap.map.setup_emoji.base.tmpl",
@@ -166,13 +167,64 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
 )
 
 
+_CORE_UI_EXCLUDED_TEMPLATE_PREFIXES = (
+    "dashboard.js.chat.state.files.",
+    "dashboard.js.chat.state.games.",
+    "dashboard.js.chat.state.core.bot_history.",
+)
+_CORE_UI_EXCLUDED_TEMPLATE_NAMES = {
+    "dashboard.js.chat.state.core.bot_controls.tmpl",
+}
+_CORE_UI_STUB_TEMPLATE = "dashboard.js.profile.core_ui.noop_feature_hooks.tmpl"
+_RUNTIME_BOOT_TEMPLATE = "dashboard.js.runtime.boot.tmpl"
+
+
+def _normalize_ui_profile(raw_profile: object = None) -> str:
+    token = str(raw_profile or "").strip().lower().replace("_", "-")
+    if not token:
+        token = str(_DEFAULT_UI_PROFILE or "").strip().lower().replace("_", "-")
+    if token in {"core", "coreui", "core-ui"}:
+        return "core-ui"
+    return "full"
+
+
+def _core_ui_part_excluded(template_name: str) -> bool:
+    if template_name in _CORE_UI_EXCLUDED_TEMPLATE_NAMES:
+        return True
+    return any(
+        template_name.startswith(prefix)
+        for prefix in _CORE_UI_EXCLUDED_TEMPLATE_PREFIXES
+    )
+
+
+def _template_parts_for_profile(raw_profile: object = None) -> tuple[str, ...]:
+    profile = _normalize_ui_profile(raw_profile)
+    if profile == "full":
+        return _DASHBOARD_JS_TEMPLATE_PARTS
+
+    selected = [
+        template_name
+        for template_name in _DASHBOARD_JS_TEMPLATE_PARTS
+        if not _core_ui_part_excluded(template_name)
+    ]
+    if _CORE_UI_STUB_TEMPLATE not in selected:
+        try:
+            runtime_boot_idx = selected.index(_RUNTIME_BOOT_TEMPLATE)
+        except ValueError:
+            runtime_boot_idx = len(selected)
+        selected.insert(runtime_boot_idx, _CORE_UI_STUB_TEMPLATE)
+    return tuple(selected)
+
+
 def build_dashboard_js(
     *,
     refresh_ms: int,
     node_history_hours: int,
     node_history_max_points: int,
     reset_ticker_scale_on_restart: bool = True,
+    ui_profile: str | None = None,
 ) -> str:
+    selected_parts = _template_parts_for_profile(ui_profile)
     values = {
         "refresh_ms": refresh_ms,
         "node_history_hours": node_history_hours,
@@ -183,5 +235,5 @@ def build_dashboard_js(
     }
     return "".join(
         _render_asset_template_helper(template_name, **values)
-        for template_name in _DASHBOARD_JS_TEMPLATE_PARTS
+        for template_name in selected_parts
     )

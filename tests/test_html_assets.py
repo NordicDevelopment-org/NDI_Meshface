@@ -184,3 +184,32 @@ def test_dashboard_js_template_order_guards_known_unsafe_splice_points():
     # The shared UI helpers must stay on a safe boundary that we validated.
     bindings_idx = parts.index("dashboard.js.chat.events.bindings.tmpl")
     assert parts[bindings_idx + 1] == "dashboard.js.ui.shared_controls.tmpl"
+
+
+def test_build_dashboard_js_core_ui_profile_omits_games_files_and_bot_history():
+    js = build_dashboard_js(
+        refresh_ms=3000,
+        node_history_hours=72,
+        node_history_max_points=1440,
+        reset_ticker_scale_on_restart=True,
+        ui_profile="core-ui",
+    )
+    assert "Core UI profile no-op stubs for omitted game/file/bot modules." in js
+    assert "function buildFileTransferMetaFrame(" not in js
+    assert "const gameIds = [\"reversi\", \"checkers\", \"chess\", \"poker\"];" not in js
+    assert "function normalizeBotRequestHistoryEntry(raw)" not in js
+    assert "No tracked bot requests yet. Send a <code>whois</code>" not in js
+    assert "function scheduleFileTransferMaintenance(_state = latestState)" in js
+    assert "function renderGamesView(_state = latestState)" in js
+    assert "function renderBotsView(_state = latestState)" in js
+
+
+def test_build_dashboard_js_unknown_profile_falls_back_to_full_bundle():
+    js = build_dashboard_js(
+        refresh_ms=3000,
+        node_history_hours=72,
+        node_history_max_points=1440,
+        reset_ticker_scale_on_restart=True,
+        ui_profile="unknown-profile",
+    )
+    assert "const fileTransferProtocolPrefix = \"MF_FILE_V1\";" in js

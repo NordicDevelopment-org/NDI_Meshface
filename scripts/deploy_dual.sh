@@ -10,6 +10,8 @@ MAIN_TARGET="j@192.168.1.241"
 PUBLIC_TARGET="j@192.168.1.29"
 MAIN_MESH_HOST="192.168.1.69"
 PUBLIC_MESH_HOST="192.168.1.211"
+MAIN_UI_PROFILE=""
+PUBLIC_UI_PROFILE="core-ui"
 
 DEPLOY_MAIN=1
 DEPLOY_PUBLIC=1
@@ -34,6 +36,7 @@ Defaults:
     branch: release/public-v0
     target: j@192.168.1.29
     radio : 192.168.1.211
+    ui    : core-ui
   Cleanup mode:
     --clean-app-dir is enabled by default for both deploys.
 
@@ -49,6 +52,8 @@ Options:
   --public-target <user@ip> Override public deploy target.
   --main-mesh-host <ip>    Override private radio host.
   --public-mesh-host <ip>  Override public radio host.
+  --main-ui-profile <name> Override private dashboard UI profile.
+  --public-ui-profile <name> Override public dashboard UI profile.
   --bootstrap-main         Bootstrap private target before deploy.
   --bootstrap-public       Bootstrap public target before deploy.
   --bootstrap-all          Bootstrap both targets before deploy.
@@ -117,6 +122,16 @@ while [[ $# -gt 0 ]]; do
     --public-mesh-host)
       require_arg "$1" "${2:-}"
       PUBLIC_MESH_HOST="$2"
+      shift 2
+      ;;
+    --main-ui-profile)
+      require_arg "$1" "${2:-}"
+      MAIN_UI_PROFILE="$2"
+      shift 2
+      ;;
+    --public-ui-profile)
+      require_arg "$1" "${2:-}"
+      PUBLIC_UI_PROFILE="$2"
       shift 2
       ;;
     --bootstrap-main)
@@ -197,13 +212,17 @@ deploy_one() {
   local branch="$2"
   local target="$3"
   local mesh_host="$4"
-  local bootstrap="$5"
+  local ui_profile="$5"
+  local bootstrap="$6"
   local -a cmd
 
   git -C "${ROOT_DIR}" rev-parse --verify "${branch}^{commit}" >/dev/null 2>&1 \
     || { echo "branch not found: ${branch}" >&2; exit 1; }
 
   cmd=("./scripts/deploy_dashboard.sh" "--target" "${target}" "--mesh-host" "${mesh_host}")
+  if [[ -n "${ui_profile}" ]]; then
+    cmd+=("--ui-profile" "${ui_profile}")
+  fi
   if [[ "${CLEAN_APP_DIR}" -eq 1 ]]; then
     cmd+=("--clean-app-dir")
   fi
@@ -212,7 +231,7 @@ deploy_one() {
   fi
 
   echo "[dual-deploy] ${label}"
-  echo "[dual-deploy] branch=${branch} target=${target} mesh=${mesh_host} clean=${CLEAN_APP_DIR} bootstrap=${bootstrap}"
+  echo "[dual-deploy] branch=${branch} target=${target} mesh=${mesh_host} ui_profile=${ui_profile:-full} clean=${CLEAN_APP_DIR} bootstrap=${bootstrap}"
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     echo "[dual-deploy] dry-run command: deploy branch '${branch}' then run: $(render_cmd "${cmd[@]}")"
@@ -229,11 +248,11 @@ deploy_one() {
 }
 
 if [[ "${DEPLOY_MAIN}" -eq 1 ]]; then
-  deploy_one "private" "${MAIN_BRANCH}" "${MAIN_TARGET}" "${MAIN_MESH_HOST}" "${BOOTSTRAP_MAIN}"
+  deploy_one "private" "${MAIN_BRANCH}" "${MAIN_TARGET}" "${MAIN_MESH_HOST}" "${MAIN_UI_PROFILE}" "${BOOTSTRAP_MAIN}"
 fi
 
 if [[ "${DEPLOY_PUBLIC}" -eq 1 ]]; then
-  deploy_one "public" "${PUBLIC_BRANCH}" "${PUBLIC_TARGET}" "${PUBLIC_MESH_HOST}" "${BOOTSTRAP_PUBLIC}"
+  deploy_one "public" "${PUBLIC_BRANCH}" "${PUBLIC_TARGET}" "${PUBLIC_MESH_HOST}" "${PUBLIC_UI_PROFILE}" "${BOOTSTRAP_PUBLIC}"
 fi
 
 echo "[dual-deploy] complete"
