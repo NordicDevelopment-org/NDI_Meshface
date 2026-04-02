@@ -338,3 +338,15 @@ def test_handle_dashboard_post_private_mode_blocks_chat_and_zork():
     assert "private mode" in json_calls[0]["payload_obj"]["error"].lower()
     assert json_calls[1]["status_code"] == 403
     assert "private mode" in json_calls[1]["payload_obj"]["error"].lower()
+
+
+def test_handle_dashboard_post_returns_503_when_route_helper_is_missing(monkeypatch):
+    json_calls = []
+    deps = _build_post_deps(json_calls=json_calls)
+    handler = _fake_handler()
+
+    monkeypatch.setattr(routes_post, "_handle_bot_settings_post_helper", None)
+    routes_post.handle_dashboard_post(handler, path="/api/settings/bot", deps=deps)
+
+    assert json_calls[0]["status_code"] == 503
+    assert "bot settings are not enabled" in json_calls[0]["payload_obj"]["error"].lower()

@@ -287,6 +287,26 @@ def test_handle_dashboard_get_custom_telemetry_settings_returns_error_when_unava
     assert "custom telemetry settings are not enabled" in json_calls[0]["payload_obj"]["error"].lower()
 
 
+def test_handle_dashboard_get_custom_telemetry_returns_503_when_helper_missing(monkeypatch):
+    json_calls = []
+    deps = _build_get_deps(
+        state_fn=lambda: {"ok": True},
+        json_calls=json_calls,
+        text_calls=[],
+        html_calls=[],
+    )
+    handler = object()
+    monkeypatch.setattr(routes_get, "_handle_custom_telemetry_settings_get_helper", None)
+    routes_get.handle_dashboard_get(
+        handler,
+        path="/api/settings/custom_telemetry",
+        query="",
+        deps=deps,
+    )
+    assert json_calls[0]["status_code"] == 503
+    assert "custom telemetry settings are not enabled" in json_calls[0]["payload_obj"]["error"].lower()
+
+
 def test_handle_dashboard_get_version_health_and_metrics_endpoints():
     json_calls = []
     text_calls = []

@@ -1,26 +1,6 @@
+from importlib import import_module
 from hmac import compare_digest
 
-from .api_chat import (
-    handle_chat_send_post as _handle_chat_send_post_helper,
-)
-from .api_theme import (
-    handle_theme_settings_post as _handle_theme_settings_post_helper,
-)
-from .api_custom_telemetry import (
-    handle_custom_telemetry_settings_post as _handle_custom_telemetry_settings_post_helper,
-)
-from .api_radio import (
-    handle_radio_settings_post as _handle_radio_settings_post_helper,
-)
-from .api_channels import (
-    handle_channel_settings_post as _handle_channel_settings_post_helper,
-)
-from .api_bot import (
-    handle_bot_settings_post as _handle_bot_settings_post_helper,
-)
-from .api_zork import (
-    handle_standalone_zork_post as _handle_standalone_zork_post_helper,
-)
 from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import DashboardPostRouteDependencies
 
@@ -38,6 +18,38 @@ _PRIVATE_MODE_BLOCKED_POST_PATHS = {
     "/api/chat/send",
     "/api/games/zork",
 }
+
+
+def _load_optional_handler(module_path: str, attr_name: str):
+    try:
+        module = import_module(module_path, package=__package__)
+    except Exception:
+        return None
+    value = getattr(module, attr_name, None)
+    if callable(value):
+        return value
+    return None
+
+
+_handle_chat_send_post_helper = _load_optional_handler(".api_chat", "handle_chat_send_post")
+_handle_theme_settings_post_helper = _load_optional_handler(
+    ".api_theme",
+    "handle_theme_settings_post",
+)
+_handle_custom_telemetry_settings_post_helper = _load_optional_handler(
+    ".api_custom_telemetry",
+    "handle_custom_telemetry_settings_post",
+)
+_handle_radio_settings_post_helper = _load_optional_handler(".api_radio", "handle_radio_settings_post")
+_handle_channel_settings_post_helper = _load_optional_handler(
+    ".api_channels",
+    "handle_channel_settings_post",
+)
+_handle_bot_settings_post_helper = _load_optional_handler(".api_bot", "handle_bot_settings_post")
+_handle_standalone_zork_post_helper = _load_optional_handler(
+    ".api_zork",
+    "handle_standalone_zork_post",
+)
 
 
 def _header_value(headers: object, name: str) -> str:
@@ -124,6 +136,13 @@ def handle_dashboard_post(
         return
 
     if path == "/api/chat/send":
+        if not callable(_handle_chat_send_post_helper):
+            deps.write_json_response_fn(
+                handler,
+                status_code=503,
+                payload_obj={"ok": False, "error": "Chat send is not enabled on this dashboard instance"},
+            )
+            return
         _handle_chat_send_post_helper(
             handler,
             send_chat_fn=deps.send_chat_fn,
@@ -135,6 +154,13 @@ def handle_dashboard_post(
         return
 
     if path == "/api/games/zork":
+        if not callable(_handle_standalone_zork_post_helper):
+            deps.write_json_response_fn(
+                handler,
+                status_code=503,
+                payload_obj={"ok": False, "error": "Standalone Zork is not enabled on this dashboard instance"},
+            )
+            return
         _handle_standalone_zork_post_helper(
             handler,
             play_standalone_zork_fn=deps.play_standalone_zork_fn,
@@ -147,7 +173,7 @@ def handle_dashboard_post(
 
     if path == "/api/settings/radio":
         parse_radio_settings_request_fn = deps.parse_radio_settings_request_fn
-        if parse_radio_settings_request_fn is None:
+        if parse_radio_settings_request_fn is None or not callable(_handle_radio_settings_post_helper):
             deps.write_json_response_fn(
                 handler,
                 status_code=503,
@@ -169,7 +195,7 @@ def handle_dashboard_post(
 
     if path == "/api/settings/channels":
         parse_channel_settings_request_fn = deps.parse_channel_settings_request_fn
-        if parse_channel_settings_request_fn is None:
+        if parse_channel_settings_request_fn is None or not callable(_handle_channel_settings_post_helper):
             deps.write_json_response_fn(
                 handler,
                 status_code=503,
@@ -191,7 +217,7 @@ def handle_dashboard_post(
 
     if path == "/api/settings/theme":
         parse_theme_settings_request_fn = deps.parse_theme_settings_request_fn
-        if parse_theme_settings_request_fn is None:
+        if parse_theme_settings_request_fn is None or not callable(_handle_theme_settings_post_helper):
             deps.write_json_response_fn(
                 handler,
                 status_code=503,
@@ -210,7 +236,10 @@ def handle_dashboard_post(
 
     if path == "/api/settings/custom_telemetry":
         parse_custom_telemetry_settings_request_fn = deps.parse_custom_telemetry_settings_request_fn
-        if parse_custom_telemetry_settings_request_fn is None:
+        if (
+            parse_custom_telemetry_settings_request_fn is None
+            or not callable(_handle_custom_telemetry_settings_post_helper)
+        ):
             deps.write_json_response_fn(
                 handler,
                 status_code=503,
@@ -229,7 +258,7 @@ def handle_dashboard_post(
 
     if path == "/api/settings/bot":
         parse_bot_settings_request_fn = deps.parse_bot_settings_request_fn
-        if parse_bot_settings_request_fn is None:
+        if parse_bot_settings_request_fn is None or not callable(_handle_bot_settings_post_helper):
             deps.write_json_response_fn(
                 handler,
                 status_code=503,
