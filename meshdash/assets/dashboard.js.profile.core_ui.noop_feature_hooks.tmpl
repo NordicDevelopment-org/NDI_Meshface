@@ -74,3 +74,306 @@
     function syncBackendBotRequestHistory(_state = latestState) {{
       return;
     }}
+
+    function syncBotRequestHistoryWithMessages(_messages = [], _state = latestState) {{
+      return;
+    }}
+
+    function parseCoreUiMeshChannelIndexCandidate(raw) {{
+      if (raw == null) return null;
+      if (typeof raw === "object") {{
+        const nested = parseCoreUiMeshChannelIndexCandidate(
+          raw.index ?? raw.channel_index ?? raw.channelIndex
+        );
+        if (Number.isInteger(nested) && nested >= 0) {{
+          return Math.trunc(nested);
+        }}
+      }}
+      const numeric = Number(raw);
+      if (Number.isInteger(numeric) && numeric >= 0) {{
+        return Math.trunc(numeric);
+      }}
+      const text = String(raw || "").trim();
+      if (!text) return null;
+      const chMatch = /(?:^|[^a-z0-9])ch(?:annel)?\s*([0-9]+)\b/i.exec(text);
+      if (chMatch) {{
+        const idx = Number(chMatch[1]);
+        if (Number.isInteger(idx) && idx >= 0) return Math.trunc(idx);
+      }}
+      const leading = /^\s*([0-9]+)\b/.exec(text);
+      if (leading) {{
+        const idx = Number(leading[1]);
+        if (Number.isInteger(idx) && idx >= 0) return Math.trunc(idx);
+      }}
+      const lower = text.toLowerCase();
+      const sources = [];
+      if (Array.isArray(meshChannelOptions)) sources.push(meshChannelOptions);
+      if (Array.isArray(meshChannelSendOptions) && meshChannelSendOptions !== meshChannelOptions) {{
+        sources.push(meshChannelSendOptions);
+      }}
+      for (const list of sources) {{
+        for (const opt of list) {{
+          if (!(opt && typeof opt === "object")) continue;
+          const idx = Number(opt.index);
+          if (!Number.isInteger(idx) || idx < 0) continue;
+          const name = String(opt.name || "").trim().toLowerCase();
+          if (name && name === lower) {{
+            return Math.trunc(idx);
+          }}
+        }}
+      }}
+      return null;
+    }}
+
+    function explicitMessageMeshChannelIndex(msg) {{
+      if (!msg || typeof msg !== "object") return null;
+      const candidates = [
+        msg.channel_index,
+        msg.channelIndex,
+        msg.channel,
+        msg.mesh_channel,
+        msg.meshChannel,
+        msg.channel_name,
+        msg.channelName,
+        msg.summary && msg.summary.channel_index,
+        msg.summary && msg.summary.channelIndex,
+        msg.summary && msg.summary.channel,
+        msg.packet && msg.packet.channel_index,
+        msg.packet && msg.packet.channelIndex,
+        msg.packet && msg.packet.channel,
+      ];
+      for (const candidate of candidates) {{
+        const parsed = parseCoreUiMeshChannelIndexCandidate(candidate);
+        if (Number.isInteger(parsed) && parsed >= 0) {{
+          return Math.trunc(parsed);
+        }}
+      }}
+      return null;
+    }}
+
+    function messageMeshChannelIndex(msg) {{
+      const explicit = explicitMessageMeshChannelIndex(msg);
+      return Number.isInteger(explicit) && explicit >= 0 ? explicit : 0;
+    }}
+
+    function messageMatchesActiveMeshChannel(msg) {{
+      const activeIdx = (typeof activeMeshChannelFilterIndex === "function")
+        ? activeMeshChannelFilterIndex()
+        : meshChannelAllIndex;
+      if (activeIdx === meshChannelAllIndex) return true;
+      return messageMeshChannelIndex(msg) === activeIdx;
+    }}
+
+    function normalizeFileTransferName(rawName) {{
+      const compact = String(rawName == null ? "" : rawName)
+        .replace(/\r\n/g, " ")
+        .replace(/\r/g, " ")
+        .replace(/\n/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!compact) return "mesh-file.bin";
+      const maxChars = 64;
+      return compact.length > maxChars ? compact.slice(0, maxChars) : compact;
+    }}
+
+    function isFileTransferProtocolMessage(_msg) {{
+      return false;
+    }}
+
+    function setChatSendStatus(message, isError = false) {{
+      const el = document.getElementById("chat-send-status");
+      if (!(el instanceof HTMLElement)) return;
+      el.textContent = message ? String(message) : "";
+      el.classList.toggle("error", !!isError);
+    }}
+
+    function setChatSendBusy(isBusy) {{
+      chatSendInFlight = !!isBusy;
+      const btn = document.getElementById("chat-send-btn");
+      const input = document.getElementById("chat-input");
+      if (btn instanceof HTMLButtonElement) {{
+        btn.disabled = chatSendInFlight;
+        btn.textContent = chatSendInFlight ? "Sending..." : "Send";
+      }}
+      if (input instanceof HTMLInputElement) {{
+        input.disabled = chatSendInFlight;
+      }}
+    }}
+
+    function setFileTransferStatus(message, isError = false) {{
+      const el = document.getElementById("files-send-status");
+      if (!(el instanceof HTMLElement)) return;
+      el.textContent = message ? String(message) : "";
+      el.classList.toggle("error", !!isError);
+    }}
+
+    function setFileTransferDestination(rawDestination, options = null) {{
+      const persist = !(options && options.persist === false);
+      const clean = normalizeNodeId(rawDestination || "");
+      fileTransferDestinationId = isCanonicalNodeId(clean) ? clean : "";
+      const input = document.getElementById("files-destination-input");
+      if (input instanceof HTMLInputElement) {{
+        input.value = fileTransferDestinationId;
+      }}
+      if (!persist) return;
+      const storageKey = (typeof fileTransferDestinationStorageKey === "string")
+        ? String(fileTransferDestinationStorageKey || "")
+        : "";
+      if (!storageKey) return;
+      try {{
+        if (fileTransferDestinationId) {{
+          window.localStorage.setItem(storageKey, fileTransferDestinationId);
+        }} else {{
+          window.localStorage.removeItem(storageKey);
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function summarizePeerDmFileTransferState(peerIdRaw) {{
+      const peerId = normalizeNodeId(peerIdRaw || "");
+      if (!isCanonicalNodeId(peerId)) return null;
+      if (peerDmFileTransferUiByPeer && typeof peerDmFileTransferUiByPeer.get === "function") {{
+        const row = peerDmFileTransferUiByPeer.get(peerId);
+        if (row && typeof row === "object") {{
+          return row;
+        }}
+      }}
+      return null;
+    }}
+
+    async function sendFileTransferToDestination(_fileCandidate, _destinationRaw, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const statusFn = typeof opts.statusFn === "function" ? opts.statusFn : null;
+      if (statusFn) {{
+        statusFn("File transfer is not enabled in this UI profile.", true);
+      }}
+      return {{
+        ok: false,
+        error: "File transfer is not enabled in this UI profile.",
+      }};
+    }}
+
+    function recordBotRequestHistoryFromSend(_requestBody, _payload) {{
+      return;
+    }}
+
+    function renderManagedBotCommandList() {{
+      return;
+    }}
+
+    function reversiNodeLabel(nodeId, state = latestState) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean) return "Unknown";
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      for (const node of nodes) {{
+        const candidate = normalizeNodeId(node && node.id);
+        if (candidate !== clean) continue;
+        const label = preferredNodeName(node);
+        if (label) return label;
+      }}
+      return clean;
+    }}
+
+    function renderChatCoreUiFallback(state = latestState, renderError = null) {{
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const safeTraffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const recentChat = Array.isArray(safeTraffic.recent_chat) ? safeTraffic.recent_chat : [];
+      const nowUnix = Math.floor(Date.now() / 1000);
+
+      const feed = document.getElementById("chat-feed");
+      if (feed instanceof HTMLElement) {{
+        const rows = recentChat.slice(-Math.max(1, chatFeedMaxEntries || 120)).map((msg) => {{
+          const fromRaw = normalizeNodeId(
+            (msg && (msg.from || msg.from_id || msg.fromId || msg.source || msg.source_id || msg.sourceId)) || ""
+          ) || "unknown";
+          const toRaw = normalizeNodeId(
+            (msg && (msg.to || msg.to_id || msg.toId || msg.destination || msg.dest || msg.dest_id || msg.destId)) || ""
+          ) || "^all";
+          const textRaw = String((msg && (msg.text || msg.payload || msg.message)) || "").trim();
+          const rawTime = String((msg && (msg.rx_time || msg.captured_at || msg.time)) || "").trim();
+          const unix = latestUnixTimestamp(msg && msg.rx_time, msg && msg.captured_at, msg && msg.time);
+          const timeText = (typeof formatLocalChatTime === "function")
+            ? formatLocalChatTime(unix, rawTime || "n/a", nowUnix)
+            : (rawTime || "n/a");
+          return `<div class="chat-feed-item chat-feed-item-monitor-exact"><span class="chat-entry-msg"><span class="chat-monitor-prefix">[${{escAttr(timeText)}}]</span><span class="chat-monitor-network-tag">[${{escAttr(fromRaw)}}→${{escAttr(toRaw)}}]</span><span class="chat-entry-copy chat-monitor-text">${{escAttr(textRaw || "(no text)")}}</span></span></div>`;
+        }});
+        feed.innerHTML = rows.length > 0
+          ? rows.join("")
+          : '<div class="chat-feed-empty">No chat messages available yet.</div>';
+      }}
+
+      const roomList = document.getElementById("chat-room-list");
+      if (roomList instanceof HTMLElement) {{
+        const roster = nodes
+          .map((node) => {{
+            const id = normalizeNodeId(node && node.id);
+            if (!isSelectableNodeId(id)) return null;
+            const name = preferredNodeName(node) || id;
+            const lastSeenUnix = latestUnixTimestamp(
+              node && node.last_heard_unix,
+              node && node.last_heard_epoch
+            );
+            return {{
+              id,
+              name,
+              status: freshnessStatus(lastSeenUnix, nowUnix),
+              lastSeenUnix,
+              lastMessageUnix: null,
+            }};
+          }})
+          .filter((row) => !!row);
+        roster.sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
+        chatRosterModel = roster;
+        roomList.innerHTML = roster.length > 0
+          ? roster.map((item) => (
+              `<button type="button" class="chat-member-item status-${{escAttr(normalizeFreshnessKey(item.status) || "unknown")}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(item.id)}}"><span class="chat-member-name">${{escAttr(item.name)}}</span><span class="chat-member-id">${{escAttr(item.id)}}</span></button>`
+            )).join("")
+          : '<div class="chat-member-empty">No nodes available.</div>';
+      }}
+
+      if (typeof renderChatChangeSummary === "function") {{
+        renderChatChangeSummary(nowUnix);
+      }}
+      if (typeof bindChatChangeSummaryControls === "function") {{
+        bindChatChangeSummaryControls();
+      }}
+      if (typeof tickFreshnessUI === "function") {{
+        tickFreshnessUI(safeState);
+      }}
+
+      const message = renderError instanceof Error
+        ? renderError.message
+        : String(renderError || "").trim();
+      if (message) {{
+        if (typeof appendConsoleLine === "function") {{
+          appendConsoleLine(`core-ui-renderChat-fallback|${{Date.now()}}|${{message}}`, `[core-ui fallback] renderChat failed: ${{message}}`);
+        }}
+        if (typeof console !== "undefined" && console && typeof console.error === "function") {{
+          console.error("[core-ui fallback] renderChat failed:", renderError);
+        }}
+      }}
+    }}
+
+    function installCoreUiRenderChatGuard() {{
+      if (typeof renderChat !== "function") return;
+      if (renderChat && renderChat.__coreUiGuarded === true) return;
+      const originalRenderChat = renderChat;
+      const guardedRenderChat = function(state = latestState) {{
+        try {{
+          return originalRenderChat(state);
+        }} catch (err) {{
+          renderChatCoreUiFallback(state, err);
+          return;
+        }}
+      }};
+      guardedRenderChat.__coreUiGuarded = true;
+      guardedRenderChat.__coreUiOriginal = originalRenderChat;
+      renderChat = guardedRenderChat;
+    }}
+
+    installCoreUiRenderChatGuard();
