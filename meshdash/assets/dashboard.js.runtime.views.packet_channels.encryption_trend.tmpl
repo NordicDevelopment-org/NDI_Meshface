@@ -12,7 +12,18 @@
       );
     }}
 
-    function formatEncryptedTrendTimeLabel(unixTs, includeDate = false) {{
+    function historyChatEntryUnix(entry) {{
+      const message = (entry && typeof entry === "object") ? entry : {{}};
+      return latestUnixTimestamp(
+        message.captured_at,
+        message.rx_time,
+        message.time,
+        message.received_at,
+        message.created_at,
+      );
+    }}
+
+    function formatHistoryTrendTimeLabel(unixTs, includeDate = false) {{
       const ts = Number(unixTs);
       if (!Number.isFinite(ts) || ts <= 0) return "n/a";
       const date = new Date(ts * 1000);
@@ -27,16 +38,12 @@
       return `${{month}} ${{day}} ${{hh}}:${{mm}}`;
     }}
 
-    function buildEncryptedTrendSeries(entries) {{
-      const encryptedEntries = Array.isArray(entries) ? entries : [];
-      const timestamps = [];
-      for (const entry of encryptedEntries) {{
-        const packetUnix = encryptedPacketUnix(entry);
-        if (Number.isFinite(packetUnix) && packetUnix > 0) {{
-          timestamps.push(Math.floor(packetUnix));
-        }}
-      }}
-      if (!timestamps.length) {{
+    function buildCountTrendSeriesFromUnix(timestamps) {{
+      const unixRows = Array.isArray(timestamps) ? timestamps : [];
+      const cleanTimestamps = unixRows
+        .map((value) => Math.floor(Number(value)))
+        .filter((unix) => Number.isFinite(unix) && unix > 0);
+      if (!cleanTimestamps.length) {{
         return {{
           points: [],
           bucketSeconds: 300,
@@ -46,9 +53,9 @@
         }};
       }}
 
-      let minUnix = timestamps[0];
-      let maxUnix = timestamps[0];
-      for (const ts of timestamps) {{
+      let minUnix = cleanTimestamps[0];
+      let maxUnix = cleanTimestamps[0];
+      for (const ts of cleanTimestamps) {{
         if (ts < minUnix) minUnix = ts;
         if (ts > maxUnix) maxUnix = ts;
       }}
@@ -72,7 +79,7 @@
       const bucketStart = Math.floor(minUnix / bucketSeconds) * bucketSeconds;
       const bucketEnd = Math.floor(maxUnix / bucketSeconds) * bucketSeconds;
       const countsByBucket = new Map();
-      for (const ts of timestamps) {{
+      for (const ts of cleanTimestamps) {{
         const bucketUnix = Math.floor(ts / bucketSeconds) * bucketSeconds;
         countsByBucket.set(bucketUnix, (countsByBucket.get(bucketUnix) || 0) + 1);
       }}
@@ -94,7 +101,31 @@
       }};
     }}
 
-    function formatEncryptedTrendBucketLabel(bucketSeconds) {{
+    function buildEncryptedTrendSeries(entries) {{
+      const encryptedEntries = Array.isArray(entries) ? entries : [];
+      const timestamps = [];
+      for (const entry of encryptedEntries) {{
+        const packetUnix = encryptedPacketUnix(entry);
+        if (Number.isFinite(packetUnix) && packetUnix > 0) {{
+          timestamps.push(packetUnix);
+        }}
+      }}
+      return buildCountTrendSeriesFromUnix(timestamps);
+    }}
+
+    function buildHistoryChatTrendSeries(entries) {{
+      const messageEntries = Array.isArray(entries) ? entries : [];
+      const timestamps = [];
+      for (const entry of messageEntries) {{
+        const messageUnix = historyChatEntryUnix(entry);
+        if (Number.isFinite(messageUnix) && messageUnix > 0) {{
+          timestamps.push(messageUnix);
+        }}
+      }}
+      return buildCountTrendSeriesFromUnix(timestamps);
+    }}
+
+    function formatHistoryTrendBucketLabel(bucketSeconds) {{
       const sec = Math.max(1, Math.trunc(Number(bucketSeconds) || 0));
       if (sec % 3600 === 0) {{
         return `${{Math.max(1, sec / 3600)}}h`;
@@ -105,23 +136,27 @@
       return `${{sec}}s`;
     }}
 
-    function renderEncriptionTrendChart(entries) {{
-      const svg = document.getElementById("encription-trend-chart");
-      const empty = document.getElementById("encription-trend-empty");
-      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
-
-      const trend = buildEncryptedTrendSeries(entries);
-      const points = trend.points;
-      if (!points.length || trend.maxCount <= 0) {{
-        svg.innerHTML = "";
-        empty.textContent = "No encrypted packet timestamps in recent buffer.";
-        empty.hidden = false;
-        return;
+    function historyTrendPalette(paletteKey, darkTheme) {{
+      if (paletteKey === "chat") {{
+        return darkTheme
+          ? {{
+            grid: "rgba(170, 196, 220, 0.22)",
+            line: "#4ed1a0",
+            fill: "rgba(78, 209, 160, 0.24)",
+            point: "#93ffe0",
+            latest: "#3ad18f",
+            text: "#b7cde3",
+          }}
+          : {{
+            grid: "rgba(59, 96, 76, 0.2)",
+            line: "#1f8f63",
+            fill: "rgba(55, 179, 127, 0.2)",
+            point: "#1d9f67",
+            latest: "#136f4a",
+            text: "#3a5a47",
+          }};
       }}
-      empty.hidden = true;
-
-      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
-      const palette = darkTheme
+      return darkTheme
         ? {{
           grid: "rgba(170, 196, 220, 0.22)",
           line: "#f59f47",
@@ -138,6 +173,27 @@
           latest: "#c05621",
           text: "#3a5a47",
         }};
+    }}
+
+    function renderHistoryCountTrendChart(svgId, emptyId, trend, options = null) {{
+      const svg = document.getElementById(svgId);
+      const empty = document.getElementById(emptyId);
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+
+      const config = (options && typeof options === "object") ? options : {{}};
+      const points = Array.isArray(trend && trend.points) ? trend.points : [];
+      const maxCount = Number(trend && trend.maxCount);
+      const emptyText = String(config.emptyText || "No timestamps in recent history.");
+      if (!points.length || !(Number.isFinite(maxCount) && maxCount > 0)) {{
+        svg.innerHTML = "";
+        empty.textContent = emptyText;
+        empty.hidden = false;
+        return;
+      }}
+      empty.hidden = true;
+
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const palette = historyTrendPalette(String(config.palette || "encrypted"), darkTheme);
 
       const width = 900;
       const height = 220;
@@ -148,7 +204,7 @@
       const chartWidth = width - padLeft - padRight;
       const chartHeight = height - padTop - padBottom;
       const pointCount = points.length;
-      const yMax = Math.max(1, trend.maxCount);
+      const yMax = Math.max(1, Number.isFinite(maxCount) ? maxCount : 1);
       const xForIndex = (idx) => (
         pointCount <= 1
           ? (padLeft + (chartWidth / 2))
@@ -194,14 +250,15 @@
       }}).join("");
       const xLabels = xTickIndexes.map((idx) => {{
         const x = xForIndex(idx);
-        const label = formatEncryptedTrendTimeLabel(points[idx].unix, includeDate);
+        const label = formatHistoryTrendTimeLabel(points[idx].unix, includeDate);
         return `<text x="${{x.toFixed(2)}}" y="${{(height - 8).toFixed(2)}}" text-anchor="middle" fill="${{palette.text}}" font-size="10">${{escAttr(label)}}</text>`;
       }}).join("");
 
       const latestPoint = points[points.length - 1];
       const latestX = xForIndex(points.length - 1);
       const latestY = yForCount(latestPoint.count);
-      const bucketLabel = formatEncryptedTrendBucketLabel(trend.bucketSeconds);
+      const bucketLabel = formatHistoryTrendBucketLabel(trend.bucketSeconds);
+      const yLabelPrefix = String(config.yLabelPrefix || "Items per");
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `
@@ -214,8 +271,124 @@
           <circle cx="${{latestX.toFixed(2)}}" cy="${{latestY.toFixed(2)}}" r="3.8" fill="${{palette.latest}}" stroke="${{palette.point}}" stroke-width="1.2"></circle>
           ${{yLabels}}
           ${{xLabels}}
-          <text x="${{(padLeft + 8).toFixed(2)}}" y="${{(padTop + 14).toFixed(2)}}" fill="${{palette.text}}" font-size="11">Packets per ${{bucketLabel}}</text>
+          <text x="${{(padLeft + 8).toFixed(2)}}" y="${{(padTop + 14).toFixed(2)}}" fill="${{palette.text}}" font-size="11">${{escAttr(yLabelPrefix)}} ${{bucketLabel}}</text>
         </g>
       `;
     }}
 
+    function renderEncriptionTrendChart(entries) {{
+      const trend = buildEncryptedTrendSeries(entries);
+      renderHistoryCountTrendChart("encription-trend-chart", "encription-trend-empty", trend, {{
+        emptyText: "No encrypted packet timestamps in recent buffer.",
+        yLabelPrefix: "Packets per",
+        palette: "encrypted",
+      }});
+    }}
+
+    function renderHistoryChatTrendChart(entries) {{
+      const trend = buildHistoryChatTrendSeries(entries);
+      renderHistoryCountTrendChart("history-chat-trend-chart", "history-chat-trend-empty", trend, {{
+        emptyText: "No chat timestamps in recent history.",
+        yLabelPrefix: "Messages per",
+        palette: "chat",
+      }});
+    }}
+
+    function renderEncriptionRouteChart(routes) {{
+      const svg = document.getElementById("encription-route-chart");
+      const empty = document.getElementById("encription-route-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+
+      const rows = (Array.isArray(routes) ? routes : [])
+        .map((item) => {{
+          const count = Math.max(0, Math.trunc(Number(item && item.count)));
+          const fromId = String(item && item.fromId ? item.fromId : "n/a");
+          const toId = String(item && item.toId ? item.toId : "n/a");
+          return {{
+            count,
+            label: `${{fromId}} -> ${{toId}}`,
+          }};
+        }})
+        .filter((item) => item.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
+
+      if (!rows.length) {{
+        svg.innerHTML = "";
+        empty.textContent = "No encrypted routes in recent buffer.";
+        empty.hidden = false;
+        return;
+      }}
+      empty.hidden = true;
+
+      const trimLabel = (text, maxLen = 30) => {{
+        const value = String(text || "").trim();
+        if (value.length <= maxLen) return value;
+        return `${{value.slice(0, Math.max(0, maxLen - 3))}}...`;
+      }};
+
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const palette = darkTheme
+        ? {{
+          grid: "rgba(170, 196, 220, 0.18)",
+          bar: "#7cb8ff",
+          barAlt: "#4c87c8",
+          text: "#c3d8ed",
+          count: "#d7ebff",
+        }}
+        : {{
+          grid: "rgba(59, 96, 76, 0.16)",
+          bar: "#2f73b7",
+          barAlt: "#4f93d1",
+          text: "#36566f",
+          count: "#1f4260",
+        }};
+
+      const width = 900;
+      const height = 220;
+      const padLeft = 228;
+      const padRight = 16;
+      const padTop = 18;
+      const padBottom = 18;
+      const chartWidth = width - padLeft - padRight;
+      const chartHeight = height - padTop - padBottom;
+      const maxCount = Math.max(1, ...rows.map((row) => row.count));
+      const rowHeight = chartHeight / rows.length;
+      const barHeight = Math.min(20, Math.max(10, rowHeight * 0.62));
+
+      const xTicks = [0, Math.round(maxCount / 2), maxCount]
+        .filter((value, idx, arr) => arr.indexOf(value) === idx)
+        .sort((a, b) => a - b);
+      const xGrid = xTicks.map((tick) => {{
+        const x = padLeft + ((tick / maxCount) * chartWidth);
+        return `<line x1="${{x.toFixed(2)}}" y1="${{padTop}}" x2="${{x.toFixed(2)}}" y2="${{(padTop + chartHeight).toFixed(2)}}" stroke="${{palette.grid}}" stroke-width="1"></line>`;
+      }}).join("");
+      const xLabels = xTicks.map((tick) => {{
+        const x = padLeft + ((tick / maxCount) * chartWidth);
+        return `<text x="${{x.toFixed(2)}}" y="${{(height - 5).toFixed(2)}}" text-anchor="middle" fill="${{palette.text}}" font-size="10">${{tick}}</text>`;
+      }}).join("");
+
+      const bars = rows.map((row, idx) => {{
+        const yCenter = padTop + (idx * rowHeight) + (rowHeight / 2);
+        const y = yCenter - (barHeight / 2);
+        const barWidth = Math.max(2, (row.count / maxCount) * chartWidth);
+        const barColor = idx % 2 === 0 ? palette.bar : palette.barAlt;
+        const label = trimLabel(row.label);
+        return `
+          <text x="${{(padLeft - 8).toFixed(2)}}" y="${{(yCenter + 4).toFixed(2)}}" text-anchor="end" fill="${{palette.text}}" font-size="10">${{escAttr(label)}}</text>
+          <rect x="${{padLeft.toFixed(2)}}" y="${{y.toFixed(2)}}" width="${{barWidth.toFixed(2)}}" height="${{barHeight.toFixed(2)}}" rx="3" ry="3" fill="${{barColor}}"></rect>
+          <text x="${{(padLeft + barWidth + 6).toFixed(2)}}" y="${{(yCenter + 4).toFixed(2)}}" text-anchor="start" fill="${{palette.count}}" font-size="10">${{row.count}}</text>
+        `;
+      }}).join("");
+
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.innerHTML = `
+        <g>
+          <rect x="${{padLeft}}" y="${{padTop}}" width="${{chartWidth}}" height="${{chartHeight}}" fill="none" stroke="${{palette.grid}}" stroke-width="1"></rect>
+          ${{xGrid}}
+          ${{bars}}
+          ${{xLabels}}
+          <text x="${{(padLeft + 8).toFixed(2)}}" y="${{(padTop - 4).toFixed(2)}}" fill="${{palette.text}}" font-size="11">Top encrypted routes by packet count</text>
+        </g>
+      `;
+    }}

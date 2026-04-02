@@ -78,13 +78,15 @@
         routes.set(key, existing);
       }}
 
-      const trafficRows = Array.from(routes.values())
+      const sortedRoutes = Array.from(routes.values())
         .sort((a, b) => (
           (b.count - a.count)
           || String(b.lastSeen || "").localeCompare(String(a.lastSeen || ""))
           || String(a.fromId || "").localeCompare(String(b.fromId || ""))
           || String(a.toId || "").localeCompare(String(b.toId || ""))
-        ))
+        ));
+
+      const trafficRows = sortedRoutes
         .map((item) => {{
           const fromNodeId = normalizeNodeId(item.fromId || "");
           const toNodeId = normalizeNodeId(item.toId || "");
@@ -117,6 +119,7 @@
         emptyColspan: 5,
       }});
       renderEncriptionTrendChart(encrypted);
+      renderEncriptionRouteChart(sortedRoutes);
 
       const caption = document.getElementById("encription-caption");
       if (caption instanceof HTMLElement) {{
@@ -127,4 +130,3 @@
           : "No encrypted packets detected in recent buffer.";
       }}
     }}
-
