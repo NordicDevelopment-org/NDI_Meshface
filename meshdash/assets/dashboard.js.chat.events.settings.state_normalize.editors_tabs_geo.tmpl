@@ -148,9 +148,7 @@
         || key === "device"
         || key === "connectivity"
         || key === "location"
-        || key === "advanced"
         || key === "channels"
-        || key === "data"
         || key === "tickers"
         || key === "appearance"
       ) return key;
@@ -214,15 +212,6 @@
           renderChannelsView(latestState);
         }}
         void ensureChannelsViewLocalStateHydrated(false);
-      }} else if (next === "data") {{
-        // Keep raw diagnostics current when the Data tab is opened.
-        void loadRawMyInfo().catch(() => {{}});
-        void loadRawMetadata().catch(() => {{}});
-        void loadRawLocalState().catch(() => {{}});
-        void loadRawNodesFull(0).catch(() => {{}});
-        if (latestState) {{
-          renderPackets(latestState);
-        }}
       }} else if (next === "tickers") {{
         renderTickerSettingsUi();
       }} else if (next === "appearance") {{

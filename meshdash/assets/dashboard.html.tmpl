@@ -492,16 +492,6 @@
             Location
           </button>
           <button
-            id="settings-tab-advanced-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="advanced"
-          >
-            Advanced
-          </button>
-          <button
             id="settings-tab-channels-btn"
             class="settings-tab-btn"
             type="button"
@@ -530,16 +520,6 @@
             data-settings-tab="appearance"
           >
             Appearance
-          </button>
-          <button
-            id="settings-tab-data-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="data"
-          >
-            Data
           </button>
         </div>
 
@@ -1260,60 +1240,6 @@
             </div>
           </div>
 
-          <div class="settings-panel settings-panel-wide" data-settings-tab-panel="advanced" hidden>
-            <h3>Advanced Config</h3>
-            <div class="settings-fields">
-              <div class="settings-help-note">
-                Channel configuration has moved to <strong>Channels</strong> so local channel controls, activity, and tools live in one place.
-              </div>
-              <label class="settings-field">
-                <span class="settings-label">Local config section</span>
-                <div class="settings-row">
-                  <select id="settings-local-section" class="settings-select" autocomplete="off">
-                    <option value="">Select local section</option>
-                  </select>
-                  <button id="settings-apply-local" class="btn btn-secondary" type="button">Apply local section</button>
-                </div>
-              </label>
-              <label class="settings-field">
-                <span class="settings-label">Local section JSON</span>
-                <textarea
-                  id="settings-local-json"
-                  class="settings-input settings-textarea"
-                  rows="6"
-                  spellcheck="false"
-                  placeholder='{"field_name": "value"}'
-                ></textarea>
-              </label>
-
-              <label class="settings-field">
-                <span class="settings-label">Module config section</span>
-                <div class="settings-row">
-                  <select id="settings-module-section" class="settings-select" autocomplete="off">
-                    <option value="">Select module section</option>
-                  </select>
-                  <button id="settings-apply-module" class="btn btn-secondary" type="button">Apply module section</button>
-                </div>
-              </label>
-              <label class="settings-field">
-                <span class="settings-label">Module section JSON</span>
-                <textarea
-                  id="settings-module-json"
-                  class="settings-input settings-textarea"
-                  rows="6"
-                  spellcheck="false"
-                  placeholder='{"field_name": "value"}'
-                ></textarea>
-              </label>
-
-              <div class="settings-row settings-row-danger">
-                <button id="settings-reset-nodedb" class="btn btn-danger" type="button">Reset Radio NodeDB</button>
-                <button id="settings-reset-dashboard-db" class="btn btn-danger" type="button">Reset Dashboard DB</button>
-                <button id="settings-regenerate-node-id" class="btn btn-danger" type="button">Regenerate Node ID</button>
-                <span class="settings-danger-note">Danger zone: resets radio discovery, clears dashboard history, or full-resets the radio to regenerate node ID.</span>
-              </div>
-            </div>
-          </div>
 
           <div class="settings-panel settings-panel-wide" data-settings-tab-panel="channels" hidden>
             <h3>Message Channels</h3>
@@ -1487,36 +1413,6 @@
             </div>
           </div>
 
-          <div class="settings-panel settings-panel-wide" data-settings-tab-panel="data" hidden>
-            <h3>Raw Data</h3>
-            <div class="settings-fields">
-              <div class="settings-help-note">
-                Live raw API responses for diagnostics and debugging.
-              </div>
-              <details><summary>my_info</summary><pre id="raw-my-info"></pre></details>
-              <details><summary>metadata</summary><pre id="raw-metadata"></pre></details>
-              <details><summary>local_config</summary><pre id="raw-local-config"></pre></details>
-              <details><summary>module_config</summary><pre id="raw-module-config"></pre></details>
-              <details><summary>channels</summary><pre id="raw-channels"></pre></details>
-              <details><summary>nodes_full</summary><pre id="raw-nodes-full"></pre></details>
-            </div>
-            <h3>Recent Packets</h3>
-            <div class="settings-fields">
-              <div class="settings-help-note">
-                Recent decoded packet stream with RF diagnostics (SNR/RSSI) for troubleshooting.
-              </div>
-              <div class="scroll">
-                <table id="packets-table">
-                  <thead>
-                    <tr>
-                      <th>Captured</th><th>From</th><th>To</th><th>Port</th><th>SNR</th><th>RSSI</th><th>Text</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div class="settings-actions">
