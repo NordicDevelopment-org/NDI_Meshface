@@ -29,9 +29,7 @@ BASE_ALLOWLIST_PATHS = (
     "README.md",
     "mesh_dashboard.py",
     "mesh_connection.py",
-    "pyproject.toml",
-    "requirements-dev.txt",
-    "docs/CHANNELS.md",
+    "meshtastic-dashboard.service",
 )
 STATIC_ASSET_PATHS = (
     "meshdash/assets/dashboard.html.tmpl",
