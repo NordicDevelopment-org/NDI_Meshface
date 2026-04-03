@@ -26,25 +26,6 @@
           saveTickerPreferences();
         }});
       }}
-      const nodePacketTrendToggle = document.getElementById("settings-ticker-node-packet-trend-enabled");
-      if (nodePacketTrendToggle instanceof HTMLInputElement && nodePacketTrendToggle.dataset.bound !== "1") {{
-        nodePacketTrendToggle.dataset.bound = "1";
-        nodePacketTrendToggle.addEventListener("change", () => {{
-          const prefs = currentTickerPreferences();
-          prefs.node_packet_trend = !!nodePacketTrendToggle.checked;
-          saveTickerPreferences({{
-            rerenderSummary: false,
-            rerenderSettings: true,
-            status: nodePacketTrendToggle.checked
-              ? "Node navigator packet trend enabled locally."
-              : "Node navigator packet trend hidden locally.",
-          }});
-          chatDerivedCache = null;
-          if (latestState) {{
-            renderChat(latestState);
-          }}
-        }});
-      }}
       const nodeOnlineOneShotToggle = document.getElementById("settings-ticker-oneshot-node-online-enabled");
       if (nodeOnlineOneShotToggle instanceof HTMLInputElement && nodeOnlineOneShotToggle.dataset.bound !== "1") {{
         nodeOnlineOneShotToggle.dataset.bound = "1";
