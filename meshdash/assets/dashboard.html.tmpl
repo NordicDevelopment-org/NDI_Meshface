@@ -95,16 +95,6 @@
           </svg>
         </button>
         <div id="chat-settings-menu" class="chat-settings-menu" hidden>
-          <section class="chat-settings-section chat-settings-theme-section" aria-label="Theme">
-            <h3 class="chat-settings-section-title">Theme</h3>
-            <button id="theme-toggle-btn" class="theme-btn chat-settings-theme-btn" type="button" title="Toggle theme between dark and light">Theme: Dark</button>
-            <label for="theme-preset-select" class="theme-preset-wrap chat-settings-theme-preset-wrap" title="Runtime color preset">
-              <span class="theme-preset-label">Preset</span>
-              <select id="theme-preset-select" class="theme-preset-select" aria-label="Theme preset">
-                <option value="default">default</option>
-              </select>
-            </label>
-          </section>
           <section class="chat-settings-section" aria-label="Runtime">
             <h3 class="chat-settings-section-title">Runtime</h3>
             <div class="chat-settings-meta-list">
@@ -1671,6 +1661,21 @@
           <div class="settings-panel settings-panel-wide" data-settings-tab-panel="appearance" hidden>
             <h3>Appearance</h3>
             <div class="settings-fields">
+              <label class="settings-field">
+                <span class="settings-label">Theme</span>
+                <button
+                  id="theme-toggle-btn"
+                  class="btn btn-secondary"
+                  type="button"
+                  title="Toggle theme between dark and light"
+                >Theme: Dark</button>
+              </label>
+              <label class="settings-field" for="theme-preset-select">
+                <span class="settings-label">Preset</span>
+                <select id="theme-preset-select" class="settings-select" aria-label="Theme preset">
+                  <option value="default">default</option>
+                </select>
+              </label>
               <div class="settings-help-note">
                 Control node color styling for chat rows and the node list.
               </div>
