@@ -222,6 +222,7 @@
       const marker = nodeMarkers.get(selectedNodeId);
       if (!marker) {{
         let usedHistory = false;
+        let usedOverviewFallback = false;
         if (focusView && typeof L !== "undefined" && map && typeof map.getZoom === "function" && trailPts.length > 0) {{
           if (trailPts.length > 1) {{
             const trailBounds = L.latLngBounds(trailPts);
@@ -243,19 +244,39 @@
           requestMapResize();
         }}
 
-        if (!openPopup || selectedNetworkNodeInfoCollapsed(selectedNodeId)) return usedHistory;
+        if (focusView && !usedHistory && trailPts.length === 0 && activeLayoutView === "network") {{
+          const nodesForOverview = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
+          map.closePopup();
+          const didFitOverview = fitMapToMostNodes(nodesForOverview, {{ pad: 0.18, maxZoom: 13 }});
+          if (didFitOverview) {{
+            usedOverviewFallback = true;
+          }} else {{
+            requestMapResize();
+          }}
+        }}
+
+        if (
+          !openPopup
+          || selectedNetworkNodeInfoCollapsed(selectedNodeId)
+          || (usedOverviewFallback && trailPts.length === 0)
+        ) {{
+          return usedHistory || usedOverviewFallback;
+        }}
         if (activeLayoutView === "network" && typeof L !== "undefined" && map && typeof map.getCenter === "function") {{
           const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
           const selectedNode = nodes.find((node) => (
             normalizeNodeId(node && node.id) === selectedNodeId
           ));
-          const popupAnchor = trailPts.length > 0
-            ? trailPts[trailPts.length - 1]
-            : map.getCenter();
           if (selectedNode) {{
             const lat = Number(selectedNode.lat);
             const lon = Number(selectedNode.lon);
             const hasGps = isValidMapCoord(lat, lon);
+            if (!hasGps && trailPts.length === 0) {{
+              return usedHistory || usedOverviewFallback;
+            }}
+            const popupAnchor = trailPts.length > 0
+              ? trailPts[trailPts.length - 1]
+              : [lat, lon];
             const posLabel = hasGps
               ? `${{lat.toFixed(5)}}, ${{lon.toFixed(5)}}`
               : "No GPS fix";
@@ -292,7 +313,7 @@
             requestMapResize();
           }}
         }}
-        return usedHistory;
+        return usedHistory || usedOverviewFallback;
       }}
       const markerLatLng = marker.getLatLng();
       let usedHistory = false;
