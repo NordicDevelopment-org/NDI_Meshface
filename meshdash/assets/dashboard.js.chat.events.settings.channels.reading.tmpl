@@ -172,8 +172,8 @@
       );
       const settings = readChannelRowSettings(row) || {{}};
 
-      if (isDisabledRole && !settings.name && !channelsExperimentalEnabled) {{
-        setChannelsStatusText("Channel name is required to add a channel unless Experimental is enabled.");
+      if (isDisabledRole && !settings.name) {{
+        setChannelsStatusText("Channel name is required to add a channel.");
         return;
       }}
 
@@ -181,7 +181,6 @@
         action: "upsert",
         channel_index: idx,
         settings,
-        allow_experimental: !!channelsExperimentalEnabled,
       }};
 
       if (isDisabledRole) {{

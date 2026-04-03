@@ -241,18 +241,6 @@
       applyChannelsUiMode();
     }}
 
-    function setChannelsExperimentalEnabled(enabled, persist = true) {{
-      channelsExperimentalEnabled = !!enabled;
-      if (persist) {{
-        try {{
-          window.localStorage.setItem(
-            channelsExperimentalStorageKey,
-            channelsExperimentalEnabled ? "1" : "0"
-          );
-        }} catch (_err) {{}}
-      }}
-    }}
-
     function applyChannelsAppRoutingExpanded() {{
       const section = document.querySelector(".channels-app-routing");
       if (section instanceof HTMLElement) {{
@@ -295,14 +283,6 @@
         stored = normalizeChannelsUiMode(window.localStorage.getItem(channelsUiModeStorageKey) || "simple");
       }} catch (_err) {{}}
       channelsUiAdvanced = stored === "advanced";
-    }}
-
-    function loadChannelsExperimentalPreference() {{
-      let stored = false;
-      try {{
-        stored = parseBoolToken(window.localStorage.getItem(channelsExperimentalStorageKey), false);
-      }} catch (_err) {{}}
-      channelsExperimentalEnabled = !!stored;
     }}
 
     function loadChannelsAppRoutingExpandedPreference() {{
