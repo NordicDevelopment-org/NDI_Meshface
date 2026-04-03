@@ -29,7 +29,7 @@
       const sent = await sendBoardGameProtocolMessage(
         gameId,
         "invite",
-        [sessionId, normalizeNodeId(resolveLocalNodeId(latestState) || ""), hostColor],
+        [sessionId, normalizeNodeId(resolveLocalNodeId(latestState) || ""), hostColor, sessionChannel],
         {{ destination_id: peerId, channel_index: sessionChannel }}
       );
       if (!sent) {{

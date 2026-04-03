@@ -30,7 +30,7 @@
       removeAllReversiPendingInvitesFromPeer(peerId);
       const sent = await sendReversiProtocolMessage(
         "invite",
-        [sessionId, normalizeNodeId(resolveLocalNodeId(latestState) || ""), reversiColorToken(hostColor)],
+        [sessionId, normalizeNodeId(resolveLocalNodeId(latestState) || ""), reversiColorToken(hostColor), sessionChannel],
         {{ destination_id: peerId, channel_index: sessionChannel }}
       );
       if (!sent) {{

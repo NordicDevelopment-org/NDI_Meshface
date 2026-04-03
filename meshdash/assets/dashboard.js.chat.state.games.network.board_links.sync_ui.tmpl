@@ -77,6 +77,10 @@
         if (parsed.type === "invite") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const hostColor = boardGameParseColor(parsed.parts[4], refs.defaultLocalColor);
+          const inviteChannelRaw = Number(parsed.parts[5]);
+          const inviteChannel = Number.isInteger(inviteChannelRaw) && inviteChannelRaw >= 0
+            ? inviteChannelRaw
+            : messageMeshChannelIndex(msg);
           if (!sessionId) {{
             rememberBoardGameNetworkMessage(gameId, dedupeKey);
             continue;
@@ -86,7 +90,7 @@
             session_id: sessionId,
             received_unix: reversiProtocolMessageUnix(msg),
             host_color: hostColor,
-            channel_index: messageMeshChannelIndex(msg),
+            channel_index: inviteChannel,
           }});
           if (!boardGameIsNetworkLinked(gameId)) {{
             boardGameUpdateLinkStatus(
@@ -108,7 +112,10 @@
             && link.session_id === sessionId
             && normalizeNodeId(link.peer_id) === fromId
           ) {{
-            link.channel_index = messageMeshChannelIndex(msg);
+            const existingChannelRaw = Number(link.channel_index);
+            link.channel_index = Number.isInteger(existingChannelRaw) && existingChannelRaw >= 0
+              ? existingChannelRaw
+              : messageMeshChannelIndex(msg);
             link.mode = "connected";
             removeAllBoardGamePendingInvitesFromPeer(gameId, fromId);
             link.status = `Connected to ${{reversiNodeLabel(fromId, safeState)}}. You are ${{refs.playerLabel(link.local_color)}}.`;

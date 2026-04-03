@@ -91,6 +91,10 @@
         if (parsed.type === "invite") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const hostColor = parseReversiColor(parsed.parts[4], reversiPiece.black);
+          const inviteChannelRaw = Number(parsed.parts[5]);
+          const inviteChannel = Number.isInteger(inviteChannelRaw) && inviteChannelRaw >= 0
+            ? inviteChannelRaw
+            : messageMeshChannelIndex(msg);
           if (!sessionId) {{
             rememberReversiNetworkMessage(dedupeKey);
             continue;
@@ -100,7 +104,7 @@
             session_id: sessionId,
             received_unix: reversiProtocolMessageUnix(msg),
             host_color: hostColor,
-            channel_index: messageMeshChannelIndex(msg),
+            channel_index: inviteChannel,
           }});
           if (!reversiIsNetworkLinked()) {{
             updateReversiLinkStatus(
@@ -123,7 +127,10 @@
             && reversiLink.session_id === sessionId
             && normalizeNodeId(reversiLink.peer_id) === fromId
           ) {{
-            reversiLink.channel_index = messageMeshChannelIndex(msg);
+            const existingChannelRaw = Number(reversiLink.channel_index);
+            reversiLink.channel_index = Number.isInteger(existingChannelRaw) && existingChannelRaw >= 0
+              ? existingChannelRaw
+              : messageMeshChannelIndex(msg);
             reversiLink.mode = "connected";
             removeAllReversiPendingInvitesFromPeer(fromId);
             reversiLink.status = `Connected to ${{reversiNodeLabel(fromId, safeState)}}. You are ${{reversiPlayerLabel(reversiLink.local_color)}}.`;
