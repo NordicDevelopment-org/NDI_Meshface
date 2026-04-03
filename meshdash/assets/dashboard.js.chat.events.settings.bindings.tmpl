@@ -176,12 +176,6 @@
           void applyBluetoothSettings();
         }});
       }}
-      const applySecurityBtn = document.getElementById("settings-apply-security");
-      if (applySecurityBtn instanceof HTMLButtonElement) {{
-        applySecurityBtn.addEventListener("click", () => {{
-          void applySecuritySettings();
-        }});
-      }}
       const applyMqttBtn = document.getElementById("settings-apply-mqtt");
       if (applyMqttBtn instanceof HTMLButtonElement) {{
         applyMqttBtn.addEventListener("click", () => {{
@@ -204,24 +198,6 @@
       if (applyPositionBtn instanceof HTMLButtonElement) {{
         applyPositionBtn.addEventListener("click", () => {{
           void applyPositionConfigSettings();
-        }});
-      }}
-      const applyTelemetryBtn = document.getElementById("settings-apply-telemetry");
-      if (applyTelemetryBtn instanceof HTMLButtonElement) {{
-        applyTelemetryBtn.addEventListener("click", () => {{
-          void applyTelemetrySettings();
-        }});
-      }}
-      const applyCustomTelemetryBtn = document.getElementById("settings-apply-custom-telemetry");
-      if (applyCustomTelemetryBtn instanceof HTMLButtonElement) {{
-        applyCustomTelemetryBtn.addEventListener("click", () => {{
-          void applyCustomTelemetrySettings();
-        }});
-      }}
-      const refreshCustomTelemetryBtn = document.getElementById("settings-refresh-custom-telemetry");
-      if (refreshCustomTelemetryBtn instanceof HTMLButtonElement) {{
-        refreshCustomTelemetryBtn.addEventListener("click", () => {{
-          void fetchCustomTelemetrySettings();
         }});
       }}
       const applyLedHeartbeatBtn = document.getElementById("settings-apply-led-heartbeat");
@@ -306,42 +282,11 @@
         }});
       }}
 
-      const exportUrlBtn = document.getElementById("settings-export-channel-url");
-      if (exportUrlBtn instanceof HTMLButtonElement) {{
-        exportUrlBtn.addEventListener("click", () => {{
-          void handleChannelExportUrl();
-        }});
-      }}
-
       const channelsAdvToggle = document.getElementById("settings-channels-advanced-toggle");
       if (channelsAdvToggle instanceof HTMLInputElement) {{
         channelsAdvToggle.checked = !!channelsUiAdvanced;
         channelsAdvToggle.addEventListener("change", () => {{
           setChannelsUiAdvanced(!!channelsAdvToggle.checked, true);
-        }});
-      }}
-      if (!customTelemetrySettingsLoadedOnce) {{
-        void fetchCustomTelemetrySettings({{ silent: true }});
-      }}
-
-      const importUrlJoinBtn = document.getElementById("settings-channels-import-url-join-btn");
-      if (importUrlJoinBtn instanceof HTMLButtonElement) {{
-        importUrlJoinBtn.addEventListener("click", () => {{
-          void handleChannelImportUrl(false);
-        }});
-      }}
-
-      const importUrlAddBtn = document.getElementById("settings-channels-import-url-add-btn");
-      if (importUrlAddBtn instanceof HTMLButtonElement) {{
-        importUrlAddBtn.addEventListener("click", () => {{
-          void handleChannelImportUrl(true);
-        }});
-      }}
-
-      const createPrivateBtn = document.getElementById("settings-channels-create-private-btn");
-      if (createPrivateBtn instanceof HTMLButtonElement) {{
-        createPrivateBtn.addEventListener("click", () => {{
-          void handleCreatePrivateChannel();
         }});
       }}
 

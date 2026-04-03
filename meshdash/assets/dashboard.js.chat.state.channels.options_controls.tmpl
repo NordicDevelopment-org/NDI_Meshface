@@ -52,12 +52,12 @@
         filesSelect.value = String(filesSendCtx.sendIndex);
         filesSelect.disabled = !!fileTransferSendInFlight || filesFixed;
         filesSelect.title = filesFixed
-          ? `Outgoing file transfer channel is fixed to ${{filesSendCtx.sendLabel}} (set in Channels -> App Channels).`
+          ? `Outgoing file transfer channel is fixed to ${{filesSendCtx.sendLabel}}.`
           : `Outgoing file transfer channel: ${{filesSendCtx.sendLabel}}`;
       }}
       if (filesHint instanceof HTMLElement) {{
         filesHint.textContent = filesFixed
-          ? `Files are locked to ${{filesSendCtx.sendLabel}} (Channels -> App Channels). Message channels are encryption groups, not frequency slots.`
+          ? `Files are locked to ${{filesSendCtx.sendLabel}}. Message channels are encryption groups, not frequency slots.`
           : `Files follow global send on ${{filesSendCtx.sendLabel}}. Message channels are encryption groups, not frequency slots.`;
       }}
       const btn = document.getElementById("chat-send-channel-menu-btn");
