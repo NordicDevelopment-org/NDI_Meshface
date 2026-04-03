@@ -4261,7 +4261,7 @@
     }}
     .games-shell {{
       display: grid;
-      grid-template-columns: minmax(220px, 290px) minmax(0, 1fr);
+      grid-template-columns: minmax(220px, 290px) minmax(0, 1fr) minmax(220px, 290px);
       gap: 12px;
       min-height: 0;
       height: 100%;
@@ -4277,6 +4277,18 @@
       gap: 10px;
       min-height: 0;
       overflow: auto;
+    }}
+    .games-status-sidebar {{
+      overflow: auto;
+    }}
+    .games-status-panel {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }}
+    .games-status-panel[hidden] {{
+      display: none !important;
     }}
     .games-library-label {{
       font-size: 10px;
@@ -4481,20 +4493,31 @@
       background: #f8fcf7;
       min-height: 0;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: auto;
+      align-items: stretch;
+      justify-content: stretch;
+      overflow: hidden;
       padding: 10px;
     }}
     .games-main-panel {{
       width: 100%;
       height: 100%;
       min-height: 0;
+      min-width: 0;
       display: flex;
       align-items: stretch;
       justify-content: center;
-      gap: 10px;
-      flex-direction: column;
+    }}
+    .games-board-wrap {{
+      width: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+      border: 1px solid #2d6b4c;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #15452f, #113726);
+      padding: 10px;
     }}
     .games-main-panel[hidden] {{
       display: none !important;
@@ -4601,6 +4624,19 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }}
+    @media (max-width: 1560px) {{
+      .games-shell {{
+        grid-template-columns: minmax(205px, 260px) minmax(0, 1fr) minmax(205px, 250px);
+      }}
+    }}
+    @media (max-width: 1180px) {{
+      .games-shell {{
+        grid-template-columns: minmax(190px, 235px) minmax(0, 1fr);
+      }}
+      .games-status-sidebar {{
+        grid-column: 1 / -1;
+      }}
+    }}
     .reversi-score-card {{
       border: 1px solid #d7e5d2;
       border-radius: 8px;
@@ -4625,25 +4661,25 @@
       font-variant-numeric: tabular-nums;
     }}
     .reversi-board {{
-      --reversi-cell-size: clamp(38px, 5.8vw, 64px);
+      --reversi-cell-size: clamp(30px, 4.8vw, 64px);
       display: grid;
       grid-template-columns: repeat(8, var(--reversi-cell-size));
       grid-template-rows: repeat(8, var(--reversi-cell-size));
-      gap: 6px;
-      border: 1px solid #166145;
+      border: 1px solid #1f6e4d;
       border-radius: 12px;
-      background: linear-gradient(180deg, #115137, #0f4631);
-      padding: 8px;
-      box-shadow: inset 0 0 0 1px rgba(10, 33, 22, 0.28);
+      overflow: hidden;
+      background: #1d5b41;
+      box-shadow: inset 0 0 0 1px rgba(10, 33, 22, 0.34);
     }}
     .reversi-cell {{
       position: relative;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #2e7a59;
-      border-radius: 8px;
+      border: 0;
+      border-radius: 0;
       background: #2f855a;
+      box-shadow: inset 0 0 0 1px rgba(36, 105, 75, 0.92);
       cursor: pointer;
       margin: 0;
       padding: 0;
@@ -4652,7 +4688,7 @@
     }}
     .reversi-cell:hover {{
       background: #378f63;
-      border-color: #3e9569;
+      box-shadow: inset 0 0 0 1px rgba(72, 150, 110, 0.95);
     }}
     .reversi-cell:disabled {{
       cursor: default;
@@ -4660,7 +4696,8 @@
     }}
     .reversi-cell:focus-visible {{
       outline: 2px solid #b9f1d1;
-      outline-offset: 1px;
+      outline-offset: -2px;
+      z-index: 2;
     }}
     .reversi-cell.is-last {{
       box-shadow: inset 0 0 0 2px rgba(255, 224, 121, 0.88);
@@ -4699,7 +4736,7 @@
       box-shadow: 0 0 0 1px rgba(23, 74, 50, 0.24);
     }}
     .checkers-board {{
-      --checkers-cell-size: clamp(38px, 5.8vw, 64px);
+      --checkers-cell-size: clamp(30px, 4.8vw, 64px);
       display: grid;
       grid-template-columns: repeat(8, var(--checkers-cell-size));
       grid-template-rows: repeat(8, var(--checkers-cell-size));
@@ -4757,7 +4794,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: clamp(11px, 1.7vw, 15px);
+      font-size: clamp(10px, 1.4vw, 15px);
       font-weight: 800;
       line-height: 1;
       box-shadow: inset 0 -2px 8px rgba(0, 0, 0, 0.3);
@@ -4785,7 +4822,7 @@
       box-shadow: 0 0 0 1px rgba(32, 64, 43, 0.33);
     }}
     .chess-board {{
-      --chess-cell-size: clamp(38px, 5.8vw, 64px);
+      --chess-cell-size: clamp(30px, 4.8vw, 64px);
       display: grid;
       grid-template-columns: repeat(8, var(--chess-cell-size));
       grid-template-rows: repeat(8, var(--chess-cell-size));
@@ -4841,7 +4878,7 @@
       box-shadow: inset 0 0 0 3px rgba(227, 85, 85, 0.84);
     }}
     .chess-piece {{
-      font-size: clamp(20px, 3.2vw, 34px);
+      font-size: clamp(16px, 2.6vw, 34px);
       line-height: 1;
       font-weight: 800;
       letter-spacing: -0.02em;
@@ -4862,6 +4899,26 @@
       background: rgba(196, 236, 202, 0.94);
       border: 1px solid rgba(127, 183, 141, 0.9);
       box-shadow: 0 0 0 1px rgba(32, 64, 43, 0.33);
+    }}
+    @supports (width: 1cqi) {{
+      .games-main {{
+        container-type: inline-size;
+      }}
+      .reversi-board {{
+        --reversi-cell-size: clamp(28px, 10.6cqi, 64px);
+      }}
+      .checkers-board {{
+        --checkers-cell-size: clamp(28px, 10.6cqi, 64px);
+      }}
+      .chess-board {{
+        --chess-cell-size: clamp(28px, 10.6cqi, 64px);
+      }}
+      .checkers-disc {{
+        font-size: clamp(10px, 2.5cqi, 15px);
+      }}
+      .chess-piece {{
+        font-size: clamp(16px, 5.2cqi, 34px);
+      }}
     }}
     .poker-action-row {{
       grid-template-columns: repeat(2, minmax(0, 1fr));

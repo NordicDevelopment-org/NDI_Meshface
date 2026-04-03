@@ -27,6 +27,11 @@
           mainPanel.hidden = !isActive;
           mainPanel.classList.toggle("is-active", isActive);
         }}
+        const statusPanel = document.getElementById(`games-status-${{gameId}}`);
+        if (statusPanel instanceof HTMLElement) {{
+          statusPanel.hidden = !isActive;
+          statusPanel.classList.toggle("is-active", isActive);
+        }}
       }}
     }}
 
