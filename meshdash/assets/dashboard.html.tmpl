@@ -492,26 +492,6 @@
             Location
           </button>
           <button
-            id="settings-tab-telemetry-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="telemetry"
-          >
-            Telemetry
-          </button>
-          <button
-            id="settings-tab-security-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="security"
-          >
-            Security
-          </button>
-          <button
             id="settings-tab-advanced-btn"
             class="settings-tab-btn"
             type="button"
@@ -871,146 +851,6 @@
                 <button id="settings-set-fixed-position" class="btn btn-secondary" type="button">Set Fixed Position</button>
                 <button id="settings-clear-fixed-position" class="btn btn-secondary" type="button">Clear Fixed Position</button>
               </div>
-            </div>
-          </div>
-
-          <div class="settings-panel" data-settings-tab-panel="telemetry" hidden>
-            <h3>Telemetry</h3>
-            <div class="settings-fields">
-              <div class="settings-help-note">Manage periodic radio telemetry publishing and on-device telemetry screens.</div>
-              <div class="settings-row">
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-device-enabled" type="checkbox" />
-                  <span>Device telemetry enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-environment-enabled" type="checkbox" />
-                  <span>Environment telemetry enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-air-quality-enabled" type="checkbox" />
-                  <span>Air quality telemetry enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-power-enabled" type="checkbox" />
-                  <span>Power telemetry enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-health-enabled" type="checkbox" />
-                  <span>Health telemetry enabled</span>
-                </label>
-              </div>
-              <div class="settings-row">
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-environment-screen-enabled" type="checkbox" />
-                  <span>Environment screen enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-environment-fahrenheit" type="checkbox" />
-                  <span>Environment display Fahrenheit</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-power-screen-enabled" type="checkbox" />
-                  <span>Power screen enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-health-screen-enabled" type="checkbox" />
-                  <span>Health screen enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-telemetry-air-quality-screen-enabled" type="checkbox" />
-                  <span>Air quality screen enabled</span>
-                </label>
-              </div>
-              <div class="settings-row">
-                <label class="settings-field">
-                  <span class="settings-label">Device interval (sec)</span>
-                  <input
-                    id="settings-telemetry-device-interval-secs"
-                    class="settings-input"
-                    type="number"
-                    min="0"
-                    step="60"
-                    placeholder="0 = disabled"
-                  />
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Environment interval (sec)</span>
-                  <input
-                    id="settings-telemetry-environment-interval-secs"
-                    class="settings-input"
-                    type="number"
-                    min="0"
-                    step="60"
-                    placeholder="0 = disabled"
-                  />
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Air quality interval (sec)</span>
-                  <input
-                    id="settings-telemetry-air-quality-interval-secs"
-                    class="settings-input"
-                    type="number"
-                    min="0"
-                    step="60"
-                    placeholder="0 = disabled"
-                  />
-                </label>
-              </div>
-              <div class="settings-row">
-                <label class="settings-field">
-                  <span class="settings-label">Power interval (sec)</span>
-                  <input
-                    id="settings-telemetry-power-interval-secs"
-                    class="settings-input"
-                    type="number"
-                    min="0"
-                    step="60"
-                    placeholder="0 = disabled"
-                  />
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Health interval (sec)</span>
-                  <input
-                    id="settings-telemetry-health-interval-secs"
-                    class="settings-input"
-                    type="number"
-                    min="0"
-                    step="60"
-                    placeholder="0 = disabled"
-                  />
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Telemetry settings</span>
-                  <button id="settings-apply-telemetry" class="btn btn-secondary" type="button">Apply Telemetry</button>
-                </label>
-              </div>
-              <div class="settings-help-note">Set all telemetry toggles OFF and intervals to 0 to fully disable telemetry.</div>
-              <div class="settings-help-note">Custom telemetry rules can extract numeric values from decoded fields or JSON payloads and push them into the Sensors view.</div>
-              <label class="settings-field">
-                <span class="settings-label">Custom telemetry rules (JSON array)</span>
-                <textarea
-                  id="settings-custom-telemetry-rules"
-                  class="settings-input settings-textarea"
-                  spellcheck="false"
-                  placeholder='[
-  {
-    "enabled": true,
-    "metric_key": "soil_temp_c",
-    "source": "payload_json",
-    "path": "sensors.soil_temp_c",
-    "portnum": "TELEMETRY_APP",
-    "scale": 1,
-    "offset": 0
-  }
-]'
-                ></textarea>
-              </label>
-              <div class="settings-row">
-                <button id="settings-apply-custom-telemetry" class="btn btn-secondary" type="button">Apply Custom Telemetry</button>
-                <button id="settings-refresh-custom-telemetry" class="btn btn-secondary" type="button">Reload Custom Telemetry</button>
-              </div>
-              <div class="settings-help-note">Rule fields: <code>metric_key</code>, <code>source</code> (<code>decoded</code> or <code>payload_json</code>), optional <code>path</code>, optional <code>portnum</code>, optional <code>scale</code>/<code>offset</code>.</div>
             </div>
           </div>
 
@@ -1420,40 +1260,6 @@
             </div>
           </div>
 
-          <div class="settings-panel" data-settings-tab-panel="security" hidden>
-            <h3>Security</h3>
-            <div class="settings-fields">
-              <div class="settings-help-note">Radio firmware security controls and dashboard inbound protocol lock.</div>
-              <div class="settings-row">
-                <label class="settings-field settings-inline">
-                  <input id="settings-security-serial-enabled" type="checkbox" />
-                  <span>Security serial enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-security-debug-log-api-enabled" type="checkbox" />
-                  <span>Debug log API enabled</span>
-                </label>
-                <label class="settings-field settings-inline">
-                  <input id="settings-security-admin-channel-enabled" type="checkbox" />
-                  <span>Admin channel enabled</span>
-                </label>
-                <label class="settings-field">
-                  <span class="settings-label">Radio security settings</span>
-                  <button id="settings-apply-security" class="btn btn-secondary" type="button">Apply Radio Security</button>
-                </label>
-              </div>
-              <div class="settings-row">
-                <label class="chat-bot-toggle-wrap bots-master-toggle settings-bot-hard-disable-toggle" for="bots-command-hard-disable-all" title="Hard-disable all incoming bot command handling and incoming file-transfer protocol handling. Outgoing file sends are not blocked.">
-                  <input id="bots-command-hard-disable-all" type="checkbox" />
-                  <span>Hard Disable Incoming Bot Commands + File Transfer Commands</span>
-                </label>
-              </div>
-              <div class="settings-help-note">
-                When enabled, this node ignores incoming bot command triggers and incoming file-transfer protocol frames. Outgoing file sends are still allowed.
-              </div>
-            </div>
-          </div>
-
           <div class="settings-panel settings-panel-wide" data-settings-tab-panel="advanced" hidden>
             <h3>Advanced Config</h3>
             <div class="settings-fields">
@@ -1531,24 +1337,6 @@
                   </div>
                 </div>
                 <div id="channels-overview" class="overview-grid"></div>
-                <section class="channels-app-routing" aria-label="App channel routing">
-                  <div class="channels-app-routing-head">
-                    <div class="channels-app-routing-head-main">
-                      <h4>App Channels</h4>
-                      <button
-                        id="channels-app-routing-toggle-btn"
-                        class="btn btn-secondary channels-app-routing-toggle"
-                        type="button"
-                        aria-expanded="false"
-                      >Expand</button>
-                    </div>
-                    <div id="channels-app-routing-summary" class="channels-app-routing-summary">Loading app routing summary...</div>
-                    <div id="channels-app-routing-copy" class="channels-app-routing-copy" hidden>Choose whether Files, Games, and BBS follow global send or stay locked to a fixed channel.</div>
-                  </div>
-                  <div id="channels-app-routing-grid" class="channels-app-routing-grid" hidden>
-                    <div class="channels-app-route-placeholder">Loading app channel routing controls...</div>
-                  </div>
-                </section>
                 <div class="channels-summary-footer">
                   <div class="settings-help-note channels-current-note">
                     Blank <strong>PSK</strong> keeps the current key. <strong>Ch 0</strong> may be active with no name.
@@ -1999,7 +1787,7 @@
                 <select id="files-send-channel-select" class="files-input files-channel-select" aria-label="Outgoing file transfer channel">
                   <option value="0">Ch 0</option>
                 </select>
-                <span id="files-send-channel-hint" class="files-channel-hint">Files follow global send by default. You can lock Files to a fixed channel in Channels → App Channels.</span>
+                <span id="files-send-channel-hint" class="files-channel-hint">Files follow global send by default.</span>
               </div>
             </label>
             <label class="files-field">
