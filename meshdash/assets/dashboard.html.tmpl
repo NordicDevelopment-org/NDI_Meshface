@@ -80,43 +80,6 @@
           </div>
         </div>
       </div>
-      <div class="chat-settings-menu-wrap topbar-chat-settings-menu-wrap">
-        <button
-          id="chat-settings-toggle-btn"
-          class="chat-settings-toggle-btn"
-          type="button"
-          title="Dashboard settings"
-          aria-label="Dashboard settings"
-          aria-haspopup="menu"
-          aria-expanded="false"
-        >
-          <svg class="chat-settings-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M19.14 12.94a7.92 7.92 0 0 0 .06-.94 7.92 7.92 0 0 0-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.63l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.38 7.38 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.43h-3.84a.5.5 0 0 0-.5.43l-.36 2.54a7.38 7.38 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.85a.5.5 0 0 0 .12.63l2.03 1.58a7.92 7.92 0 0 0-.06.94 7.92 7.92 0 0 0 .06.94l-2.03 1.58a.5.5 0 0 0-.12.63l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.71 1.63.94l.36 2.54a.5.5 0 0 0 .5.43h3.84a.5.5 0 0 0 .5-.43l.36-2.54c.58-.23 1.13-.55 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.63l-2.03-1.58ZM12 15.2A3.2 3.2 0 1 1 12 8.8a3.2 3.2 0 0 1 0 6.4Z"/>
-          </svg>
-        </button>
-        <div id="chat-settings-menu" class="chat-settings-menu" hidden>
-          <section class="chat-settings-section" aria-label="Runtime">
-            <h3 class="chat-settings-section-title">Runtime</h3>
-            <div class="chat-settings-meta-list">
-              <div class="chat-settings-meta-item">{safety_label}</div>
-              <div class="chat-settings-meta-item">Packet buffer: {packet_limit}</div>
-              <div class="chat-settings-meta-item">{history_label}</div>
-              <div class="chat-settings-meta-item">Refresh: {refresh_ms} ms</div>
-            </div>
-            <span id="disk-meter" class="disk-meter" title="Disk free on dashboard host">
-              <span id="disk-label" class="disk-label">Disk free: n/a</span>
-              <span class="disk-track"><span id="disk-fill" class="disk-fill"></span></span>
-            </span>
-          </section>
-          <section class="chat-settings-section" aria-label="Notifications">
-            <h3 class="chat-settings-section-title">Notifications</h3>
-            <div class="chat-settings-meta-list" title="Notification behavior">
-              <div class="chat-settings-meta-item">Chat counter: all inbound chat activity</div>
-              <div class="chat-settings-meta-item">Bell: inbound to you, replies to you, and reactions to you</div>
-            </div>
-          </section>
-        </div>
-      </div>
     </div>
     <div class="topbar-main-row">
       <div class="topbar-brand">
@@ -535,6 +498,16 @@
             data-settings-tab="data"
           >
             Data
+          </button>
+          <button
+            id="settings-tab-system-btn"
+            class="settings-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            data-settings-tab="system"
+          >
+            System Information
           </button>
         </div>
 
@@ -1717,6 +1690,25 @@
                   <tbody></tbody>
                 </table>
               </div>
+            </div>
+          </div>
+
+          <div class="settings-panel settings-panel-wide" data-settings-tab-panel="system" hidden>
+            <h3>System Information</h3>
+            <div class="settings-fields">
+              <div class="settings-help-note">
+                Runtime status for this dashboard process.
+              </div>
+              <div class="chat-settings-meta-list">
+                <div class="chat-settings-meta-item">{safety_label}</div>
+                <div class="chat-settings-meta-item">Packet buffer: {packet_limit}</div>
+                <div class="chat-settings-meta-item">{history_label}</div>
+                <div class="chat-settings-meta-item">Refresh: {refresh_ms} ms</div>
+              </div>
+              <span id="disk-meter" class="disk-meter settings-system-disk-meter" title="Disk free on dashboard host">
+                <span id="disk-label" class="disk-label">Disk free: n/a</span>
+                <span class="disk-track"><span id="disk-fill" class="disk-fill"></span></span>
+              </span>
             </div>
           </div>
         </div>
