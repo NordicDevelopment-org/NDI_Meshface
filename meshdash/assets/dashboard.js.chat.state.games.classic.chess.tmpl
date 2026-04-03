@@ -359,6 +359,11 @@
       const col = Math.trunc(Number(colRaw) || 0);
       if (!chessInBounds(row, col)) return;
       if (chessState.game_over) return;
+      if (chessLink.mode === "pending_host") {{
+        boardGameUpdateLinkStatus("chess", "Waiting for invite acceptance before first move.");
+        if (activeLayoutView === "games") renderGamesView(latestState);
+        return;
+      }}
       if (boardGameIsNetworkLinked("chess") && chessState.turn !== boardGameLocalColor("chess")) {{
         boardGameUpdateLinkStatus(
           "chess",
@@ -399,9 +404,12 @@
       if (!chessState || typeof chessState !== "object") {{
         startNewChessGame();
       }}
+      const linkMode = String(chessLink && chessLink.mode || "local").trim().toLowerCase();
+      const pendingHost = linkMode === "pending_host";
       const board = cloneChessBoard(chessState && chessState.board);
       const selected = (
-        Array.isArray(chessSelectedCell)
+        !pendingHost
+        && Array.isArray(chessSelectedCell)
         && chessSelectedCell.length >= 2
       ) ? [Number(chessSelectedCell[0]), Number(chessSelectedCell[1])] : null;
       const selectedMoves = selected ? chessMovesFromCell(selected[0], selected[1]) : [];
@@ -409,7 +417,7 @@
         const to = Array.isArray(move && move.to) ? move.to : [0, 0];
         return `${{Number(to[0])}},${{Number(to[1])}}`;
       }}));
-      const movers = new Set((Array.isArray(chessLegalMoves) ? chessLegalMoves : []).map((move) => {{
+      const movers = new Set((pendingHost ? [] : (Array.isArray(chessLegalMoves) ? chessLegalMoves : [])).map((move) => {{
         const from = Array.isArray(move && move.from) ? move.from : [0, 0];
         return `${{Number(from[0])}},${{Number(from[1])}}`;
       }}));
@@ -439,8 +447,9 @@
             pieceHtml = '<span class="chess-hint" aria-hidden="true"></span>';
           }}
           const label = owner ? `${{chessPlayerLabel(owner)}} piece` : "empty";
+          const disabledAttr = pendingHost ? " disabled" : "";
           html.push(
-            `<button class="${{escAttr(classes.join(" "))}}" type="button" data-row="${{row}}" data-col="${{col}}" title="${{escAttr(`${{chessCellLabel(row, col)}} • ${{label}}`)}}">${{pieceHtml}}</button>`
+            `<button class="${{escAttr(classes.join(" "))}}" type="button" data-row="${{row}}" data-col="${{col}}" title="${{escAttr(`${{chessCellLabel(row, col)}} • ${{label}}`)}}"${{disabledAttr}}>${{pieceHtml}}</button>`
           );
         }}
       }}
@@ -457,6 +466,7 @@
       const localColor = boardGameLocalColor("chess");
       const localName = boardGameLocalParticipantName("chess", latestState);
       const remoteName = boardGameRemoteParticipantName("chess", latestState);
+      const linkMode = String(chessLink && chessLink.mode || "local").trim().toLowerCase();
       let whiteCount = 0;
       let blackCount = 0;
       for (let row = 0; row < chessBoardSize; row += 1) {{
@@ -467,7 +477,10 @@
         }}
       }}
       if (statusEl instanceof HTMLElement) {{
-        statusEl.textContent = String(chessState.notice || `${{chessPlayerLabel(chessState.turn)}} to move.`);
+        const statusText = String(chessState.notice || `${{chessPlayerLabel(chessState.turn)}} to move.`);
+        statusEl.textContent = linkMode === "pending_host"
+          ? `${{statusText}} Awaiting invite acceptance.`
+          : statusText;
       }}
       if (whitePill instanceof HTMLElement) {{
         whitePill.classList.remove("is-active", "is-over");
@@ -486,14 +499,17 @@
         }}
       }}
       if (whiteNameEl instanceof HTMLElement) {{
-        whiteNameEl.textContent = localColor === "white" ? localName : remoteName;
+        whiteNameEl.textContent = boardGameIsNetworkLinked("chess")
+          ? (localColor === "white" ? localName : remoteName)
+          : "White";
       }}
       if (blackNameEl instanceof HTMLElement) {{
-        blackNameEl.textContent = localColor === "black" ? localName : remoteName;
+        blackNameEl.textContent = boardGameIsNetworkLinked("chess")
+          ? (localColor === "black" ? localName : remoteName)
+          : "Black";
       }}
       setText("chess-white-count", whiteCount);
       setText("chess-black-count", blackCount);
       setText("chess-move-count", Math.max(0, Math.trunc(Number(chessState.move_count) || 0)));
       setText("chess-legal-count", chessState.game_over ? 0 : (Array.isArray(chessLegalMoves) ? chessLegalMoves.length : 0));
     }}
-

@@ -61,6 +61,29 @@ from .history_profile import (
 from .fault_recorder import FaultRecorder
 
 
+_GAME_PROTOCOL_PREFIXES = ("rv1|", "ck1|", "ch1|")
+
+
+def _packet_decoded_text(packet: object) -> str:
+    if not isinstance(packet, dict):
+        return ""
+    decoded = packet.get("decoded")
+    if not isinstance(decoded, dict):
+        return ""
+    raw_text = decoded.get("text")
+    if isinstance(raw_text, bytes):
+        try:
+            return raw_text.decode("utf-8", errors="ignore").strip()
+        except Exception:
+            return ""
+    return str(raw_text or "").strip()
+
+
+def _is_game_protocol_packet(packet: object) -> bool:
+    text = _packet_decoded_text(packet).lower()
+    return bool(text) and text.startswith(_GAME_PROTOCOL_PREFIXES)
+
+
 def _build_mesh_response_bot_from_env(**kwargs):
     # Lazy import so slim public builds can omit bot modules.
     from .bot_responder import build_mesh_response_bot_from_env as _impl
@@ -356,7 +379,15 @@ def build_dashboard_runtime_context(
         response_bot = None
 
     if response_bot is not None:
-        subscribe_fn(response_bot.on_receive, "meshtastic.receive")
+        def _response_bot_on_receive(packet: object, interface: object, *args: object, **kwargs: object) -> None:
+            # Game invites/moves travel as text payloads over mesh chat. Keep those
+            # out of bot command parsing so they don't generate "invalid command"
+            # replies when public/main exchange game protocol traffic.
+            if _is_game_protocol_packet(packet):
+                return
+            response_bot.on_receive(packet, interface, *args, **kwargs)
+
+        subscribe_fn(_response_bot_on_receive, "meshtastic.receive")
         try:
             setattr(loaders.state_fn, "bot_responder", response_bot)
         except Exception:

@@ -1,11 +1,12 @@
     async function hostBoardGameMatch(gameId) {{
       const refs = boardGameRefs(gameId);
-      const peerId = normalizeNodeId(refs.getPeerId());
+      const peerId = gamesInviteSeedPeerId(latestState);
       if (!isCanonicalNodeId(peerId)) {{
-        boardGameUpdateLinkStatus(gameId, "Select a peer before hosting.");
+        boardGameUpdateLinkStatus(gameId, "Select a node in the main list before hosting.");
         if (activeLayoutView === "games") renderGamesView(latestState);
         return;
       }}
+      refs.setPeerId(peerId);
       const hostColor = boardGameParseColor(refs.getHostColorPreference(), refs.defaultLocalColor);
       const guestColor = refs.opponent(hostColor);
       const sessionChannel = meshChannelEffectiveSendIndexForApp("games");

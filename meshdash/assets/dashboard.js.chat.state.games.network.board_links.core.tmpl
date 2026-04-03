@@ -13,6 +13,29 @@
       return String(fallback || "").trim().toLowerCase() === "white" ? "white" : "black";
     }}
 
+    function gamesInviteSeedPeerId(state = latestState) {{
+      const safeState = state && typeof state === "object" ? state : latestState;
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (!isCanonicalNodeId(selectedId)) return "";
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState || {{}}) || "");
+      if (isCanonicalNodeId(localNodeId) && selectedId === localNodeId) return "";
+      return selectedId;
+    }}
+
+    function gamesInviteSeedPeerLabel(state = latestState) {{
+      const safeState = state && typeof state === "object" ? state : latestState;
+      const peerId = gamesInviteSeedPeerId(safeState);
+      if (!isCanonicalNodeId(peerId)) return "";
+      const nodes = Array.isArray(safeState && safeState.nodes) ? safeState.nodes : [];
+      for (const node of nodes) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (nodeId !== peerId) continue;
+        const label = preferredNodeName(node) || nodeNameCache.get(peerId) || peerId;
+        return String(label || peerId);
+      }}
+      return String(nodeNameCache.get(peerId) || peerId);
+    }}
+
     function boardGameRefs(gameId) {{
       const id = boardGameNormalizeId(gameId);
       if (id === "chess") {{

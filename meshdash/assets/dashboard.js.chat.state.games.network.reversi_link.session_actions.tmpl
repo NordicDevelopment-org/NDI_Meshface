@@ -1,10 +1,11 @@
     async function hostReversiMatch() {{
-      const peerId = normalizeNodeId(reversiPeerId);
+      const peerId = gamesInviteSeedPeerId(latestState);
       if (!isCanonicalNodeId(peerId)) {{
-        updateReversiLinkStatus("Select a peer before hosting.");
+        updateReversiLinkStatus("Select a node in the main list before hosting.");
         if (activeLayoutView === "games") renderGamesView(latestState);
         return;
       }}
+      reversiPeerId = peerId;
       const hostColor = Number(reversiHostColorPreference) === reversiPiece.white
         ? reversiPiece.white
         : reversiPiece.black;

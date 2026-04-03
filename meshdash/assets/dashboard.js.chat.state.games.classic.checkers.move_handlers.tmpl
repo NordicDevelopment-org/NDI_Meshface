@@ -108,6 +108,11 @@
       const col = Math.trunc(Number(colRaw) || 0);
       if (!checkersInBounds(row, col) || !checkersIsDarkSquare(row, col)) return;
       if (checkersState.game_over) return;
+      if (checkersLink.mode === "pending_host") {{
+        boardGameUpdateLinkStatus("checkers", "Waiting for invite acceptance before first move.");
+        if (activeLayoutView === "games") renderGamesView(latestState);
+        return;
+      }}
       if (boardGameIsNetworkLinked("checkers") && checkersState.turn !== boardGameLocalColor("checkers")) {{
         checkersState.notice = `Waiting for ${{reversiNodeLabel(checkersLink.peer_id)}} to move.`;
         boardGameUpdateLinkStatus(
@@ -197,4 +202,3 @@
       checkersState.notice = `Selected ${{checkersCellLabel(row, col)}}. Move to ${{targetText}}.`;
       if (activeLayoutView === "games") renderGamesView(latestState);
     }}
-

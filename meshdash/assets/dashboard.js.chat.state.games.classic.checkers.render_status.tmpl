@@ -4,9 +4,12 @@
       if (!checkersState || typeof checkersState !== "object") {{
         startNewCheckersGame();
       }}
+      const linkMode = String(checkersLink && checkersLink.mode || "local").trim().toLowerCase();
+      const pendingHost = linkMode === "pending_host";
       const board = cloneCheckersBoard(checkersState && checkersState.board);
       const selected = (
-        Array.isArray(checkersSelectedCell)
+        !pendingHost
+        && Array.isArray(checkersSelectedCell)
         && checkersSelectedCell.length >= 2
       ) ? [Number(checkersSelectedCell[0]), Number(checkersSelectedCell[1])] : null;
       const selectedMoves = selected ? checkersMovesFromCell(selected[0], selected[1]) : [];
@@ -14,7 +17,7 @@
         const to = Array.isArray(move && move.to) ? move.to : [0, 0];
         return `${{Number(to[0])}},${{Number(to[1])}}`;
       }}));
-      const movers = new Set((Array.isArray(checkersLegalMoves) ? checkersLegalMoves : []).map((move) => {{
+      const movers = new Set((pendingHost ? [] : (Array.isArray(checkersLegalMoves) ? checkersLegalMoves : [])).map((move) => {{
         const from = Array.isArray(move && move.from) ? move.from : [0, 0];
         return `${{Number(from[0])}},${{Number(from[1])}}`;
       }}));
@@ -50,8 +53,9 @@
             pieceHtml = '<span class="checkers-hint" aria-hidden="true"></span>';
           }}
           const ownerLabel = owner ? `${{checkersPlayerLabel(owner)}}${{isKing ? " king" : " piece"}}` : "empty";
+          const disabledAttr = pendingHost ? " disabled" : "";
           html.push(
-            `<button class="${{escAttr(classes.join(" "))}}" type="button" data-row="${{row}}" data-col="${{col}}" title="${{escAttr(`${{checkersCellLabel(row, col)}} • ${{ownerLabel}}`)}}">${{pieceHtml}}</button>`
+            `<button class="${{escAttr(classes.join(" "))}}" type="button" data-row="${{row}}" data-col="${{col}}" title="${{escAttr(`${{checkersCellLabel(row, col)}} • ${{ownerLabel}}`)}}"${{disabledAttr}}>${{pieceHtml}}</button>`
           );
         }}
       }}
@@ -68,6 +72,7 @@
       const localColor = boardGameLocalColor("checkers");
       const localName = boardGameLocalParticipantName("checkers", latestState);
       const remoteName = boardGameRemoteParticipantName("checkers", latestState);
+      const linkMode = String(checkersLink && checkersLink.mode || "local").trim().toLowerCase();
       let blackCount = 0;
       let whiteCount = 0;
       for (let row = 0; row < checkersBoardSize; row += 1) {{
@@ -78,7 +83,10 @@
         }}
       }}
       if (statusEl instanceof HTMLElement) {{
-        statusEl.textContent = String(checkersState.notice || `${{checkersPlayerLabel(checkersState.turn)}} to move.`);
+        const statusText = String(checkersState.notice || `${{checkersPlayerLabel(checkersState.turn)}} to move.`);
+        statusEl.textContent = linkMode === "pending_host"
+          ? `${{statusText}} Awaiting invite acceptance.`
+          : statusText;
       }}
       if (blackPill instanceof HTMLElement) {{
         blackPill.classList.remove("is-active", "is-over");
@@ -111,4 +119,3 @@
       setText("checkers-move-count", Math.max(0, Math.trunc(Number(checkersState.move_count) || 0)));
       setText("checkers-legal-count", checkersState.game_over ? 0 : (Array.isArray(checkersLegalMoves) ? checkersLegalMoves.length : 0));
     }}
-
