@@ -267,22 +267,14 @@
       const channelIndex = Number.isInteger(channelIndexRaw) && channelIndexRaw >= 0 ? channelIndexRaw : 0;
       const targetKey = boardGameInviteKey(fromId, sessionId);
       const nextRows = [];
-      let replaced = false;
       for (const row of refs.getPendingInvites()) {{
         if (!row || typeof row !== "object") continue;
         const rowFrom = normalizeNodeId(row.from_id || row.fromId || "");
         const rowSession = String(row.session_id || row.sessionId || "").trim().toLowerCase();
         if (!isCanonicalNodeId(rowFrom) || !rowSession) continue;
-        const rowKey = boardGameInviteKey(rowFrom, rowSession);
-        if (rowKey === targetKey) {{
-          nextRows.push({{
-            from_id: fromId,
-            session_id: sessionId,
-            received_unix: Math.max(0, Math.trunc(Number(received_unix) || 0)),
-            host_color: hostColor,
-            channel_index: channelIndex,
-          }});
-          replaced = true;
+        if (rowFrom === fromId) {{
+          // Keep only the newest invite per peer so reconnect attempts don't
+          // accidentally target stale sessions.
           continue;
         }}
         nextRows.push({{
@@ -295,15 +287,13 @@
             : 0,
         }});
       }}
-      if (!replaced) {{
-        nextRows.push({{
-          from_id: fromId,
-          session_id: sessionId,
-          received_unix: Math.max(0, Math.trunc(Number(received_unix) || 0)),
-          host_color: hostColor,
-          channel_index: channelIndex,
-        }});
-      }}
+      nextRows.push({{
+        from_id: fromId,
+        session_id: sessionId,
+        received_unix: Math.max(0, Math.trunc(Number(received_unix) || 0)),
+        host_color: hostColor,
+        channel_index: channelIndex,
+      }});
       const nowUnix = Math.floor(Date.now() / 1000);
       nextRows.sort((a, b) => (Number(b.received_unix) || 0) - (Number(a.received_unix) || 0));
       const filtered = nextRows
@@ -313,9 +303,7 @@
       if (!isCanonicalNodeId(refs.getPeerId())) {{
         refs.setPeerId(fromId);
       }}
-      if (!refs.getSelectedInviteKey()) {{
-        refs.setSelectedInviteKey(targetKey);
-      }}
+      refs.setSelectedInviteKey(targetKey);
     }}
 
     function removeBoardGamePendingInvite(gameId, fromId, sessionId = "") {{
