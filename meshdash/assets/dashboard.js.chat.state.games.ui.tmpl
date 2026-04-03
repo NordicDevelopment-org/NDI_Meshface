@@ -14,6 +14,8 @@
         if (selectBtn instanceof HTMLButtonElement) {{
           selectBtn.classList.toggle("is-active", isActive);
           selectBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
+          selectBtn.setAttribute("aria-selected", isActive ? "true" : "false");
+          selectBtn.tabIndex = isActive ? 0 : -1;
         }}
         const sidePanel = document.getElementById(`games-side-${{gameId}}`);
         if (sidePanel instanceof HTMLElement) {{
@@ -55,6 +57,28 @@
       return true;
     }}
 
+    function gamesQuickChatGameLabel(gameId = "") {{
+      const normalized = normalizeActiveGameId(gameId);
+      if (normalized === "checkers") return "Checkers";
+      if (normalized === "chess") return "Chess";
+      return "Reversi";
+    }}
+
+    function publishGamesQuickChatTopbarRow(row = {{}}) {{
+      if (typeof publishTopbarUpdateTickerEvent !== "function") return;
+      const keySeed = String(row && row.key ? row.key : "").trim();
+      const sender = String(row && row.sender ? row.sender : "").trim() || "Player";
+      const text = gamesQuickChatTrimText(row && row.text ? row.text : "", 120);
+      if (!text) return;
+      const gameLabel = gamesQuickChatGameLabel(row && row.game_id ? row.game_id : "");
+      const safeKeySeed = keySeed.replace(/[^a-z0-9:_-]/gi, "").slice(0, 96) || `${{Date.now().toString(36)}}`;
+      publishTopbarUpdateTickerEvent(
+        `${{gameLabel}} chat • ${{sender}}: ${{text}}`,
+        `oneshot:public:games:${{safeKeySeed}}`,
+        {{ mode: "oneshot" }}
+      );
+    }}
+
     function gamesQuickChatPushRow(row = {{}}, state = latestState) {{
       const safeState = state && typeof state === "object" ? state : latestState;
       const fromId = normalizeNodeId(row.from_id || row.fromId || "");
@@ -75,6 +99,10 @@
       }});
       if (gamesQuickChatRows.length > 24) {{
         gamesQuickChatRows = gamesQuickChatRows.slice(-24);
+      }}
+      const latestRow = gamesQuickChatRows[gamesQuickChatRows.length - 1] || null;
+      if (latestRow) {{
+        publishGamesQuickChatTopbarRow(latestRow);
       }}
     }}
 
@@ -180,7 +208,6 @@
       const nextSessionKey = ctx.enabled ? String(ctx.sessionKey || "").trim() : "";
       if (nextSessionKey !== String(gamesQuickChatSessionKey || "").trim()) {{
         gamesQuickChatResetRows(nextSessionKey);
-        gamesQuickChatComposeOpen = false;
         gamesQuickChatDraft = "";
       }}
       return ctx;
@@ -211,28 +238,12 @@
 
     function renderGamesQuickChatHeader(state = latestState) {{
       const ctx = gamesQuickChatEnsureSessionContext(state);
-      const bannerEl = document.getElementById("games-chat-banner");
-      const tickerEl = document.getElementById("games-chat-ticker");
-      const trackEl = document.getElementById("games-chat-ticker-track");
       const composeEl = document.getElementById("games-chat-compose");
       const inputEl = document.getElementById("games-chat-input");
+      const emojiBtn = document.getElementById("games-emoji-btn");
       const sendBtn = document.getElementById("games-chat-send-btn");
-      if (!(bannerEl instanceof HTMLElement)) return;
-      const composeOpen = !!(ctx.enabled && gamesQuickChatComposeOpen);
-      bannerEl.classList.toggle("is-disabled", !ctx.enabled);
-      bannerEl.classList.toggle("is-compose-open", composeOpen);
-      bannerEl.setAttribute("aria-disabled", ctx.enabled ? "false" : "true");
-      bannerEl.setAttribute(
-        "aria-label",
-        ctx.enabled
-          ? `Game table chat with ${{ctx.peerLabel}}`
-          : ctx.disabledText
-      );
-      if (tickerEl instanceof HTMLElement) {{
-        tickerEl.hidden = composeOpen;
-      }}
       if (composeEl instanceof HTMLElement) {{
-        composeEl.hidden = !composeOpen;
+        composeEl.setAttribute("aria-disabled", ctx.enabled ? "false" : "true");
       }}
       if (inputEl instanceof HTMLInputElement) {{
         if (document.activeElement !== inputEl && inputEl.value !== String(gamesQuickChatDraft || "")) {{
@@ -246,21 +257,11 @@
       if (sendBtn instanceof HTMLButtonElement) {{
         sendBtn.disabled = !ctx.enabled || !gamesQuickChatTrimText(gamesQuickChatDraft, 120);
       }}
-      if (trackEl instanceof HTMLElement) {{
-        const recentRows = (Array.isArray(gamesQuickChatRows) ? gamesQuickChatRows : []).slice(-5);
-        const tickerText = recentRows.length
-          ? recentRows.map((row) => `${{row.sender}}: ${{row.text}}`).join("   •   ")
-          : (ctx.enabled
-            ? `Table chat with ${{ctx.peerLabel}}. Click here to reply.`
-            : ctx.disabledText);
-        const animatedText = `${{tickerText}}   •   `;
-        trackEl.textContent = animatedText;
-        const staticTicker = animatedText.length < 44;
-        if (tickerEl instanceof HTMLElement) {{
-          tickerEl.classList.toggle("is-static", staticTicker);
+      if (emojiBtn instanceof HTMLButtonElement) {{
+        emojiBtn.disabled = !ctx.enabled;
+        if (!ctx.enabled) {{
+          emojiBtn.setAttribute("aria-expanded", "false");
         }}
-        const durationSec = Math.max(10, Math.min(90, Math.round(animatedText.length / 2.4)));
-        trackEl.style.setProperty("--games-chat-duration", `${{durationSec}}s`);
       }}
     }}
 
@@ -293,7 +294,6 @@
         unix: sentUnix,
       }}, state);
       gamesQuickChatDraft = "";
-      gamesQuickChatComposeOpen = false;
       if (activeLayoutView === "games") {{
         renderGamesView(latestState);
       }}
@@ -356,42 +356,6 @@
           }}
         }});
       }}
-      const gamesChatBanner = document.getElementById("games-chat-banner");
-      if (gamesChatBanner instanceof HTMLElement && gamesChatBanner.dataset.bound !== "1") {{
-        gamesChatBanner.dataset.bound = "1";
-        gamesChatBanner.addEventListener("click", (event) => {{
-          const target = event.target;
-          if (target instanceof Element && target.closest("#games-chat-send-btn")) return;
-          const ctx = gamesQuickChatEnsureSessionContext(latestState);
-          if (!ctx.enabled) return;
-          gamesQuickChatComposeOpen = true;
-          renderGamesQuickChatHeader(latestState);
-          const inputEl = document.getElementById("games-chat-input");
-          if (inputEl instanceof HTMLInputElement) {{
-            requestAnimationFrame(() => {{
-              inputEl.focus({{ preventScroll: true }});
-              const end = inputEl.value.length;
-              inputEl.setSelectionRange(end, end);
-            }});
-          }}
-        }});
-        gamesChatBanner.addEventListener("keydown", (event) => {{
-          if (event.key !== "Enter" && event.key !== " ") return;
-          const ctx = gamesQuickChatEnsureSessionContext(latestState);
-          if (!ctx.enabled) return;
-          event.preventDefault();
-          gamesQuickChatComposeOpen = true;
-          renderGamesQuickChatHeader(latestState);
-          const inputEl = document.getElementById("games-chat-input");
-          if (inputEl instanceof HTMLInputElement) {{
-            requestAnimationFrame(() => {{
-              inputEl.focus({{ preventScroll: true }});
-              const end = inputEl.value.length;
-              inputEl.setSelectionRange(end, end);
-            }});
-          }}
-        }});
-      }}
       const gamesChatInput = document.getElementById("games-chat-input");
       if (gamesChatInput instanceof HTMLInputElement && gamesChatInput.dataset.bound !== "1") {{
         gamesChatInput.dataset.bound = "1";
@@ -402,7 +366,8 @@
         gamesChatInput.addEventListener("keydown", (event) => {{
           if (event.key === "Escape") {{
             event.preventDefault();
-            gamesQuickChatComposeOpen = false;
+            gamesQuickChatDraft = "";
+            gamesChatInput.value = "";
             renderGamesQuickChatHeader(latestState);
             return;
           }}
@@ -417,14 +382,6 @@
         gamesChatSendBtn.dataset.bound = "1";
         gamesChatSendBtn.addEventListener("click", () => {{
           void sendGamesQuickChatMessage(latestState);
-        }});
-      }}
-      const peerSelect = document.getElementById("reversi-peer-select");
-      if (peerSelect instanceof HTMLSelectElement && peerSelect.dataset.bound !== "1") {{
-        peerSelect.dataset.bound = "1";
-        peerSelect.addEventListener("change", () => {{
-          reversiPeerId = normalizeNodeId(peerSelect.value || "");
-          if (activeLayoutView === "games") renderGamesView(latestState);
         }});
       }}
       const hostColorSelect = document.getElementById("reversi-host-color-select");
@@ -465,14 +422,6 @@
       }}
       for (const gameId of ["checkers", "chess"]) {{
         const refs = boardGameRefs(gameId);
-        const peerSelectEl = document.getElementById(`${{refs.id}}-peer-select`);
-        if (peerSelectEl instanceof HTMLSelectElement && peerSelectEl.dataset.bound !== "1") {{
-          peerSelectEl.dataset.bound = "1";
-          peerSelectEl.addEventListener("change", () => {{
-            refs.setPeerId(normalizeNodeId(peerSelectEl.value || ""));
-            if (activeLayoutView === "games") renderGamesView(latestState);
-          }});
-        }}
         const colorSelectEl = document.getElementById(`${{refs.id}}-host-color-select`);
         if (colorSelectEl instanceof HTMLSelectElement && colorSelectEl.dataset.bound !== "1") {{
           colorSelectEl.dataset.bound = "1";

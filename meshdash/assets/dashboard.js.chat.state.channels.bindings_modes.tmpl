@@ -52,7 +52,7 @@
         select.value = String(activeMeshSendChannelIndex);
       }}
       syncMeshChannelSendControl();
-      renderMeshChannelSendMenu(meshChannelSendOptions, {{ preserveCurrent: true }});
+      renderMeshChannelSendMenus(meshChannelSendOptions, {{ preserveCurrent: true }});
 
       if (persist) {{
         try {{
@@ -115,7 +115,7 @@
       renderMeshChannelSelect(fallback);
       renderMeshChannelPills(fallback);
       renderMeshChannelSendSelect(sendFallback, {{ preserveCurrent: true }});
-      renderMeshChannelSendMenu(sendFallback, {{ preserveCurrent: true }});
+      renderMeshChannelSendMenus(sendFallback, {{ preserveCurrent: true }});
       select.value = String(activeMeshChannelIndex);
       syncMeshChannelViewControl();
       syncMeshChannelSendControl();
@@ -147,45 +147,63 @@
     }}
 
     function bindMeshChannelSendMenuControl() {{
-      const btn = document.getElementById("chat-send-channel-menu-btn");
-      const panel = document.getElementById("chat-send-channel-menu");
-      if (!(btn instanceof HTMLButtonElement) || !(panel instanceof HTMLElement) || btn.dataset.bound === "1") return;
-      btn.dataset.bound = "1";
+      const targets = ["chat", "games"];
+      for (const targetId of targets) {{
+        const config = meshChannelSendMenuConfigFromId(targetId);
+        const btn = document.getElementById(config.btnId);
+        const panel = document.getElementById(config.panelId);
+        if (!(btn instanceof HTMLButtonElement) || !(panel instanceof HTMLElement) || btn.dataset.bound === "1") {{
+          continue;
+        }}
+        btn.dataset.bound = "1";
 
-      btn.addEventListener("click", (ev) => {{
-        ev.preventDefault();
-        if (btn.disabled) return;
-        setMeshChannelSendMenuOpen(!meshChannelSendMenuOpen);
-      }});
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          if (btn.disabled) return;
+          const willOpen = !meshChannelSendMenuIsOpen(config.id);
+          closeAllMeshChannelSendMenus();
+          setMeshChannelSendMenuOpen(willOpen, config.id);
+        }});
 
-      panel.addEventListener("pointerdown", (ev) => {{
-        const target = ev.target;
-        if (!(target instanceof Element)) return;
-        const item = target.closest(".mesh-channel-menu-item");
-        if (!(item instanceof HTMLButtonElement)) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        applyMeshSendChannelIndex(item.dataset.meshSendChannelIndex || 0, true);
-        setMeshChannelSendMenuOpen(false);
-      }});
+        panel.addEventListener("pointerdown", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const item = target.closest(".mesh-channel-menu-item");
+          if (!(item instanceof HTMLButtonElement)) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          const nextIndex = item.dataset.meshSendChannelIndex || 0;
+          if (config.id === "games" && meshChannelAppUsesFixedChannel("games")) {{
+            setMeshChannelAppSendIndex("games", nextIndex, true);
+          }} else {{
+            applyMeshSendChannelIndex(nextIndex, true);
+          }}
+          setMeshChannelSendMenuOpen(false, config.id);
+        }});
+      }}
 
       if (document.body.dataset.meshChannelSendMenuBound !== "1") {{
         document.body.dataset.meshChannelSendMenuBound = "1";
         document.addEventListener("pointerdown", (ev) => {{
           const target = ev.target;
           if (!(target instanceof Element)) return;
-          if (target.closest("#chat-send-channel-menu-btn") || target.closest("#chat-send-channel-menu")) return;
-          setMeshChannelSendMenuOpen(false);
+          if (
+            target.closest("#chat-send-channel-menu-btn")
+            || target.closest("#chat-send-channel-menu")
+            || target.closest("#games-send-channel-menu-btn")
+            || target.closest("#games-send-channel-menu")
+          ) return;
+          closeAllMeshChannelSendMenus();
         }});
         document.addEventListener("keydown", (ev) => {{
           if (ev.key === "Escape") {{
-            setMeshChannelSendMenuOpen(false);
+            closeAllMeshChannelSendMenus();
           }}
         }});
       }}
 
       syncMeshChannelSendControl();
-      renderMeshChannelSendMenu(meshChannelSendOptions, {{ preserveCurrent: true }});
+      renderMeshChannelSendMenus(meshChannelSendOptions, {{ preserveCurrent: true }});
     }}
 
     function bindMeshChannelSendControl() {{
@@ -199,6 +217,10 @@
             setMeshChannelAppSendIndex("files", select.value, true);
             return;
           }}
+          if (select.id === "games-send-channel-select" && meshChannelAppUsesFixedChannel("games")) {{
+            setMeshChannelAppSendIndex("games", select.value, true);
+            return;
+          }}
           applyMeshSendChannelIndex(select.value, true);
         }});
       }}
@@ -207,7 +229,7 @@
         meshChannelSendOptions.length ? meshChannelSendOptions : buildMeshChannelSendOptionsFromLocalState(null),
         {{ preserveCurrent: true }},
       );
-      renderMeshChannelSendMenu(
+      renderMeshChannelSendMenus(
         meshChannelSendOptions.length ? meshChannelSendOptions : buildMeshChannelSendOptionsFromLocalState(null),
         {{ preserveCurrent: true }},
       );

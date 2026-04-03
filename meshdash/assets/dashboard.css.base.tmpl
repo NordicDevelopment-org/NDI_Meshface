@@ -1680,7 +1680,7 @@
       border-bottom: 1px solid #d2e1d0;
       background: #edf6ec;
     }}
-    .games-chat-banner {{
+    .games-toolbar {{
       margin: 0;
       padding: 6px 10px;
       min-height: 32px;
@@ -1689,38 +1689,43 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      cursor: text;
-      user-select: none;
-      text-transform: none;
-      letter-spacing: 0.1px;
     }}
-    .games-chat-banner:focus-visible {{
-      outline: 2px solid #5da77f;
-      outline-offset: -2px;
-    }}
-    .games-chat-banner.is-disabled {{
-      cursor: default;
-    }}
-    .games-chat-ticker {{
-      display: block;
+    .games-tabs {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
       width: 100%;
       min-width: 0;
-      overflow: hidden;
-      line-height: 1.2;
+      overflow-x: auto;
+      scrollbar-width: thin;
     }}
-    .games-chat-ticker-track {{
-      display: inline-block;
-      white-space: nowrap;
-      color: #274935;
-      font-size: 11px;
+    .games-tab-btn {{
+      border: 1px solid #bfd4c3;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #254837;
+      padding: 6px 10px;
+      text-align: left;
+      font-size: 12px;
       font-weight: 700;
-      letter-spacing: 0.1px;
-      padding-right: 28px;
-      animation: gamesChatTickerScroll var(--games-chat-duration, 26s) linear infinite;
+      cursor: pointer;
+      white-space: nowrap;
+      flex: 0 0 auto;
     }}
-    .games-chat-ticker.is-static .games-chat-ticker-track {{
-      animation: none;
-      transform: translateX(0);
+    .games-tab-btn.is-active {{
+      border-color: #2f855a;
+      background: #ecf8f0;
+      color: #1f5c3d;
+    }}
+    .games-chat-compose-wrap {{
+      margin-top: 10px;
+      border: 1px solid #d7e5d2;
+      border-radius: 10px;
+      background: #f8fcf7;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }}
     .games-chat-compose {{
       display: inline-flex;
@@ -1754,14 +1759,6 @@
       padding: 5px 10px;
       height: 27px;
       line-height: 1;
-    }}
-    @keyframes gamesChatTickerScroll {{
-      from {{
-        transform: translateX(100%);
-      }}
-      to {{
-        transform: translateX(calc(-100% - 28px));
-      }}
     }}
     .map-card-head {{
       margin: 0;
@@ -4288,36 +4285,6 @@
       text-transform: uppercase;
       letter-spacing: 0.2px;
     }}
-    .games-library-list {{
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }}
-    .games-library-btn {{
-      border: 1px solid #bfd4c3;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #254837;
-      padding: 7px 9px;
-      text-align: left;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-    }}
-    .games-library-btn.is-active {{
-      border-color: #2f855a;
-      background: #ecf8f0;
-      color: #1f5c3d;
-    }}
-    .games-mode-note {{
-      font-size: 11px;
-      line-height: 1.35;
-      color: #4f6758;
-      border: 1px solid #d7e5d2;
-      border-radius: 8px;
-      background: #ffffff;
-      padding: 7px 8px;
-    }}
     .games-peer-wrap {{
       display: flex;
       flex-direction: column;
@@ -4338,6 +4305,18 @@
       outline: 2px solid #3ea269;
       outline-offset: 1px;
       border-color: #4c8f67;
+    }}
+    .games-peer-selected-display {{
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .games-peer-selected-display.is-empty {{
+      color: #5a7464;
+      font-style: italic;
     }}
     .games-side-panel {{
       display: flex;
@@ -4367,10 +4346,58 @@
       line-height: 1.35;
       padding: 7px 8px;
       min-height: 36px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 6px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .games-link-mode-badge {{
+      display: inline-block;
+      margin: 0 6px 0 0;
+      padding: 1px 7px;
+      border-radius: 999px;
+      border: 1px solid #bfd3c5;
+      background: #f2fbf5;
+      color: #2f5a43;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      vertical-align: baseline;
+    }}
+    .games-link-mode-badge.is-connected {{
+      border-color: #61a982;
+      background: #e5f7ec;
+      color: #1f5f3a;
+    }}
+    .games-link-mode-badge.is-pending {{
+      border-color: #c49b55;
+      background: #fff4df;
+      color: #7a4f12;
+    }}
+    .games-link-mode-badge.is-local {{
+      border-color: #a7bfcb;
+      background: #edf4f8;
+      color: #2e4f5d;
+    }}
+    .reversi-link-status .games-link-status-text {{
+      min-width: 0;
+      flex: 1 1 140px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .reversi-link-status .games-link-status-sep {{
+      color: #6a8572;
+      font-size: 10px;
+      line-height: 1;
+      flex: 0 0 auto;
     }}
     .reversi-link-status .games-link-channel-badge {{
-      vertical-align: baseline;
-      margin: 0 1px;
+      vertical-align: middle;
+      margin: 0;
+      flex: 0 0 auto;
     }}
     .reversi-invite-wrap {{
       display: flex;

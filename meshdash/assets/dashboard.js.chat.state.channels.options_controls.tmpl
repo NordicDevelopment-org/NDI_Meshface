@@ -1,5 +1,5 @@
     function meshChannelSendSelectElements() {{
-      const ids = ["chat-send-channel-select", "files-send-channel-select"];
+      const ids = ["chat-send-channel-select", "games-send-channel-select", "files-send-channel-select"];
       const out = [];
       for (const id of ids) {{
         const el = document.getElementById(id);
@@ -10,17 +10,59 @@
       return out;
     }}
 
+    function meshChannelSendMenuConfigFromId(rawId = "") {{
+      const id = String(rawId || "").trim().toLowerCase();
+      if (id === "games") {{
+        return {{
+          id: "games",
+          appId: "games",
+          btnId: "games-send-channel-menu-btn",
+          panelId: "games-send-channel-menu",
+          selectId: "games-send-channel-select",
+          menuOpenKey: "games",
+        }};
+      }}
+      return {{
+        id: "chat",
+        appId: "",
+        btnId: "chat-send-channel-menu-btn",
+        panelId: "chat-send-channel-menu",
+        selectId: "chat-send-channel-select",
+        menuOpenKey: "chat",
+      }};
+    }}
+
+    function meshChannelSendMenuIsOpen(rawId = "chat") {{
+      const config = meshChannelSendMenuConfigFromId(rawId);
+      return config.id === "games"
+        ? !!meshChannelSendMenuGamesOpen
+        : !!meshChannelSendMenuOpen;
+    }}
+
+    function closeAllMeshChannelSendMenus() {{
+      setMeshChannelSendMenuOpen(false, "chat");
+      setMeshChannelSendMenuOpen(false, "games");
+    }}
+
     function syncMeshChannelSendControl() {{
       const dot = document.getElementById("chat-send-channel-dot");
       const wrap = document.querySelector(".chat-send-channel-wrap");
       const composeShell = document.querySelector(".chat-compose-shell");
       const input = document.getElementById("chat-input");
+      const gamesDot = document.getElementById("games-send-channel-dot");
+      const gamesWrap = document.querySelector(".games-send-channel-wrap");
+      const gamesInput = document.getElementById("games-chat-input");
+      const gamesSelect = document.getElementById("games-send-channel-select");
       const filesDot = document.getElementById("files-send-channel-dot");
       const filesSelect = document.getElementById("files-send-channel-select");
       const filesHint = document.getElementById("files-send-channel-hint");
       const globalMeta = meshChannelColorMeta(activeMeshSendChannelIndex, {{ allowAll: false }});
       const globalRgb = hexColorRgbTriplet(globalMeta.fill);
       const sendLabel = currentMeshChannelSendLabel();
+      const gamesSendCtx = meshChannelSendContext({{ appId: "games" }});
+      const gamesMeta = meshChannelColorMeta(gamesSendCtx.sendIndex, {{ allowAll: false }});
+      const gamesRgb = hexColorRgbTriplet(gamesMeta.fill);
+      const gamesFixed = gamesSendCtx.sendMode === "fixed";
       const filesSendCtx = meshChannelSendContext({{ appId: "files" }});
       const filesMeta = meshChannelColorMeta(filesSendCtx.sendIndex, {{ allowAll: false }});
       const filesFixed = filesSendCtx.sendMode === "fixed";
@@ -36,17 +78,38 @@
         input.style.setProperty("--chat-send-channel-fill", globalMeta.fill);
         input.style.setProperty("--chat-send-channel-rgb", globalRgb);
       }}
+      if (gamesWrap instanceof HTMLElement) {{
+        gamesWrap.style.setProperty("--games-send-channel-fill", gamesMeta.fill);
+        gamesWrap.style.setProperty("--games-send-channel-rgb", gamesRgb);
+      }}
+      if (gamesInput instanceof HTMLElement) {{
+        gamesInput.style.setProperty("--games-send-channel-fill", gamesMeta.fill);
+        gamesInput.style.setProperty("--games-send-channel-rgb", gamesRgb);
+      }}
       if (dot instanceof HTMLElement) {{
         dot.classList.remove("is-all");
         dot.style.setProperty("--channel-dot-fill", globalMeta.fill);
         dot.title = globalMeta.title;
         dot.setAttribute("aria-label", globalMeta.title);
       }}
+      if (gamesDot instanceof HTMLElement) {{
+        gamesDot.classList.remove("is-all");
+        gamesDot.style.setProperty("--channel-dot-fill", gamesMeta.fill);
+        gamesDot.title = gamesMeta.title;
+        gamesDot.setAttribute("aria-label", gamesMeta.title);
+      }}
       if (filesDot instanceof HTMLElement) {{
         filesDot.classList.remove("is-all");
         filesDot.style.setProperty("--channel-dot-fill", filesMeta.fill);
         filesDot.title = filesMeta.title;
         filesDot.setAttribute("aria-label", filesMeta.title);
+      }}
+      if (gamesSelect instanceof HTMLSelectElement) {{
+        gamesSelect.value = String(gamesSendCtx.sendIndex);
+        gamesSelect.disabled = gamesFixed;
+        gamesSelect.title = gamesFixed
+          ? `Outgoing game chat channel is fixed to ${{gamesSendCtx.sendLabel}}.`
+          : `Outgoing game chat channel: ${{gamesSendCtx.sendLabel}}`;
       }}
       if (filesSelect instanceof HTMLSelectElement) {{
         filesSelect.value = String(filesSendCtx.sendIndex);
@@ -69,18 +132,32 @@
         btn.disabled = disabled;
         btn.setAttribute("aria-disabled", disabled ? "true" : "false");
       }}
+      const gamesBtn = document.getElementById("games-send-channel-menu-btn");
+      if (gamesBtn instanceof HTMLButtonElement) {{
+        gamesBtn.innerHTML = `${{meshChannelPrimaryBadgeHtml(gamesSendCtx.sendIndex)}}<span class="mesh-channel-menu-btn-label">${{escAttr(gamesSendCtx.sendLabel)}}</span>`;
+        gamesBtn.title = gamesMeta.title === gamesSendCtx.sendLabel ? gamesMeta.title : `${{gamesMeta.title}} • ${{gamesSendCtx.sendLabel}}`;
+        const disabled = gamesSelect instanceof HTMLSelectElement ? !!gamesSelect.disabled : false;
+        gamesBtn.disabled = disabled;
+        gamesBtn.setAttribute("aria-disabled", disabled ? "true" : "false");
+      }}
       syncMeshChannelMismatchWarning();
     }}
 
-    function setMeshChannelSendMenuOpen(open) {{
-      meshChannelSendMenuOpen = !!open;
-      const panel = document.getElementById("chat-send-channel-menu");
-      if (panel instanceof HTMLElement) {{
-        panel.hidden = !meshChannelSendMenuOpen;
+    function setMeshChannelSendMenuOpen(open, target = "chat") {{
+      const config = meshChannelSendMenuConfigFromId(target);
+      if (config.id === "games") {{
+        meshChannelSendMenuGamesOpen = !!open;
+      }} else {{
+        meshChannelSendMenuOpen = !!open;
       }}
-      const btn = document.getElementById("chat-send-channel-menu-btn");
+      const isOpen = meshChannelSendMenuIsOpen(config.id);
+      const panel = document.getElementById(config.panelId);
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = !isOpen;
+      }}
+      const btn = document.getElementById(config.btnId);
       if (btn instanceof HTMLButtonElement) {{
-        btn.setAttribute("aria-expanded", meshChannelSendMenuOpen ? "true" : "false");
+        btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
       }}
     }}
 
@@ -232,9 +309,13 @@
 
       const normalized = Array.isArray(options) ? options.slice() : [];
       const desiredIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      const gamesDesiredIndex = normalizeMeshChannelIndex(meshChannelEffectiveSendIndexForApp("games"));
       const filesDesiredIndex = normalizeMeshChannelIndex(meshChannelEffectiveSendIndexForApp("files"));
       if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === desiredIndex)) {{
         normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
+      }}
+      if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === gamesDesiredIndex)) {{
+        normalized.unshift({{ index: gamesDesiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
       }}
       if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === filesDesiredIndex)) {{
         normalized.unshift({{ index: filesDesiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
@@ -278,16 +359,24 @@
           select.value = pickEnabledValue(select, filesDesired);
           continue;
         }}
+        if (select.id === "games-send-channel-select") {{
+          const gamesDesired = String(normalizeMeshChannelIndex(meshChannelEffectiveSendIndexForApp("games")));
+          select.value = pickEnabledValue(select, gamesDesired);
+          continue;
+        }}
         select.value = pickEnabledValue(select, resolvedValue);
       }}
     }}
 
-    function renderMeshChannelSendMenu(options, {{ preserveCurrent = false }} = {{}}) {{
-      const panel = document.getElementById("chat-send-channel-menu");
+    function renderMeshChannelSendMenu(options, {{ preserveCurrent = false, target = "chat" }} = {{}}) {{
+      const config = meshChannelSendMenuConfigFromId(target);
+      const panel = document.getElementById(config.panelId);
       if (!(panel instanceof HTMLElement)) return;
 
       const normalized = Array.isArray(options) ? options.slice() : [];
-      const desiredIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
+      const desiredIndex = config.id === "games"
+        ? normalizeMeshChannelIndex(meshChannelEffectiveSendIndexForApp("games"))
+        : normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       if (preserveCurrent && !normalized.some((opt) => normalizeMeshChannelIndex(opt && opt.index) === desiredIndex)) {{
         normalized.unshift({{ index: desiredIndex, name: "", role: "", disabled: false, hasPsk: false }});
       }}
@@ -312,6 +401,11 @@
           </span>
         </button>`;
       }}).join("");
+    }}
+
+    function renderMeshChannelSendMenus(options, {{ preserveCurrent = false }} = {{}}) {{
+      renderMeshChannelSendMenu(options, {{ preserveCurrent, target: "chat" }});
+      renderMeshChannelSendMenu(options, {{ preserveCurrent, target: "games" }});
     }}
 
     function renderMeshChannelAppRoutingSummary() {{
@@ -492,7 +586,7 @@
       renderMeshChannelSelect(options);
       renderMeshChannelPills(options);
       renderMeshChannelSendSelect(sendOptions, {{ preserveCurrent: true }});
-      renderMeshChannelSendMenu(sendOptions, {{ preserveCurrent: true }});
+      renderMeshChannelSendMenus(sendOptions, {{ preserveCurrent: true }});
       renderMeshChannelAppRoutingControls(sendOptions);
       syncMeshChannelSendControl();
       return options;

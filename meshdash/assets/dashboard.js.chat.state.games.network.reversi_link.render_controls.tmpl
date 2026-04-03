@@ -8,6 +8,8 @@
       ) ? reversiState.board : createInitialReversiBoard();
       const lastMove = Array.isArray(reversiState && reversiState.last_move) ? reversiState.last_move : null;
       const gameOver = !!(reversiState && reversiState.game_over);
+      const linkMode = String(reversiLink && reversiLink.mode || "local").trim().toLowerCase();
+      const pendingHost = linkMode === "pending_host";
       const currentPlayer = Number(reversiState && reversiState.current_player) === reversiPiece.white
         ? reversiPiece.white
         : reversiPiece.black;
@@ -20,7 +22,7 @@
         for (let col = 0; col < reversiBoardSize; col += 1) {{
           const value = Number(board[row] && board[row][col]) || reversiPiece.empty;
           const moveKey = `${{row}},${{col}}`;
-          const isLegal = !gameOver && reversiLegalMoveMap.has(moveKey);
+          const isLegal = !gameOver && !pendingHost && reversiLegalMoveMap.has(moveKey);
           const isLastMove = !!(lastMove && Number(lastMove[0]) === row && Number(lastMove[1]) === col);
           const classes = ["reversi-cell"];
           if (isLastMove) classes.push("is-last");
@@ -61,8 +63,13 @@
       const currentPlayer = Number(state.current_player) === reversiPiece.white ? reversiPiece.white : reversiPiece.black;
       const localPlayerColor = reversiLocalColor();
       const remotePlayerColor = reversiRemoteColor();
+      const linkMode = String(reversiLink && reversiLink.mode || "local").trim().toLowerCase();
+      const connected = linkMode === "connected";
       const localPlayerName = reversiLocalParticipantName(latestState);
       const remotePlayerName = reversiRemoteParticipantName(latestState);
+      const remoteDisplayName = connected
+        ? remotePlayerName
+        : (linkMode === "pending_host" ? "Awaiting Accept" : "Remote Player");
       if (statusEl instanceof HTMLElement) {{
         const fallback = isOver
           ? (
@@ -77,7 +84,7 @@
         localPlayerNameEl.textContent = localPlayerName;
       }}
       if (remotePlayerNameEl instanceof HTMLElement) {{
-        remotePlayerNameEl.textContent = remotePlayerName;
+        remotePlayerNameEl.textContent = remoteDisplayName;
       }}
       if (localPlayerPillEl instanceof HTMLElement) {{
         localPlayerPillEl.classList.remove("is-black", "is-white", "is-active", "is-over");
@@ -105,46 +112,18 @@
       if (legalEl instanceof HTMLElement) legalEl.textContent = String(isOver ? 0 : reversiLegalMoves.length);
     }}
 
-    function reversiPeerOptions(state = latestState) {{
-      const safeState = state && typeof state === "object" ? state : {{}};
-      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
-      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
-      const seen = new Set();
-      const rows = [];
-      for (const node of nodes) {{
-        const nodeId = normalizeNodeId(node && node.id);
-        if (!isCanonicalNodeId(nodeId)) continue;
-        if (nodeId === localNodeId) continue;
-        if (seen.has(nodeId)) continue;
-        seen.add(nodeId);
-        const label = preferredNodeName(node) || nodeNameCache.get(nodeId) || nodeId;
-        rows.push({{
-          id: nodeId,
-          label,
-        }});
+    function renderReversiInviteSeedDisplay(state = latestState) {{
+      const host = document.getElementById("reversi-peer-selected-display");
+      if (!(host instanceof HTMLElement)) return;
+      const peerId = gamesInviteSeedPeerId(state);
+      if (!isCanonicalNodeId(peerId)) {{
+        host.textContent = "Select a node in the list to choose an invite target.";
+        host.classList.add("is-empty");
+        return;
       }}
-      rows.sort((a, b) => String(a.label || "").localeCompare(String(b.label || "")));
-      return rows;
-    }}
-
-    function renderReversiPeerSelect(state = latestState) {{
-      const select = document.getElementById("reversi-peer-select");
-      if (!(select instanceof HTMLSelectElement)) return;
-      const options = reversiPeerOptions(state);
-      const current = isCanonicalNodeId(reversiPeerId) ? reversiPeerId : "";
-      const next = ['<option value="">Select peer…</option>'];
-      for (const row of options) {{
-        const selectedAttr = row.id === current ? " selected" : "";
-        next.push(
-          `<option value="${{escAttr(row.id)}}"${{selectedAttr}}>${{escAttr(row.label)}} (${{escAttr(row.id)}})</option>`
-        );
-      }}
-      select.innerHTML = next.join("");
-      if (current && options.some((row) => row.id === current)) {{
-        select.value = current;
-      }} else if (!current) {{
-        select.value = "";
-      }}
+      const label = gamesInviteSeedPeerLabel(state);
+      host.textContent = `${{label || peerId}} (${{peerId}})`;
+      host.classList.remove("is-empty");
     }}
 
     function renderReversiInviteList(state = latestState) {{
@@ -196,7 +175,7 @@
     }}
 
     function renderReversiLinkUi(state = latestState) {{
-      renderReversiPeerSelect(state);
+      renderReversiInviteSeedDisplay(state);
       renderReversiInviteList(state);
       const hostColorSelect = document.getElementById("reversi-host-color-select");
       if (hostColorSelect instanceof HTMLSelectElement) {{
@@ -204,27 +183,24 @@
       }}
       const statusEl = document.getElementById("reversi-link-status");
       if (statusEl instanceof HTMLElement) {{
-        const sendCtx = meshChannelSendContext({{ appId: "games" }});
-        const channelBadge = meshChannelBadgeHtml(
-          sendCtx.sendIndex,
-          sendCtx.sendLabel,
-          {{
-            allowAll: false,
-            extraClass: "games-link-channel-badge",
-            title: meshChannelLabelForIndex(sendCtx.sendIndex, {{ verbose: true, allowAll: false }}),
-          }}
-        );
+        const linkMode = String(reversiLink && reversiLink.mode || "local").trim().toLowerCase();
+        const modeLabel = linkMode === "connected"
+          ? "Connected"
+          : (linkMode === "pending_host" ? "Pending Invite" : "Local");
+        const modeClass = linkMode === "connected"
+          ? "is-connected"
+          : (linkMode === "pending_host" ? "is-pending" : "is-local");
         const statusText = String(reversiLink && reversiLink.status || "Local hotseat mode.");
-        statusEl.innerHTML = `${{escAttr(statusText)}} • ${{channelBadge}}`;
+        statusEl.innerHTML = `<span class="games-link-mode-badge ${{modeClass}}">${{escAttr(modeLabel)}}</span><span class="games-link-status-text">${{escAttr(statusText)}}</span>`;
       }}
       const hostBtn = document.getElementById("reversi-host-btn");
       const acceptBtn = document.getElementById("reversi-accept-btn");
       const declineBtn = document.getElementById("reversi-decline-btn");
       const disconnectBtn = document.getElementById("reversi-disconnect-btn");
-      const peerReady = isCanonicalNodeId(reversiPeerId);
+      const inviteSeedReady = isCanonicalNodeId(gamesInviteSeedPeerId(state));
       const pendingInvite = reversiPendingInviteChoice();
       if (hostBtn instanceof HTMLButtonElement) {{
-        hostBtn.disabled = !peerReady || reversiLink.mode === "connected" || reversiLink.mode === "pending_host";
+        hostBtn.disabled = !inviteSeedReady || reversiLink.mode === "connected" || reversiLink.mode === "pending_host";
       }}
       if (acceptBtn instanceof HTMLButtonElement) {{
         acceptBtn.disabled = !(pendingInvite && isCanonicalNodeId(pendingInvite.from_id));

@@ -112,6 +112,132 @@
       min-width: max(100%, 180px);
       z-index: 70;
     }}
+    .games-chat-compose {{
+      display: flex;
+      align-items: stretch;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 0;
+    }}
+    .games-send-channel-wrap {{
+      --games-send-channel-fill: #0072b2;
+      --games-send-channel-rgb: 0, 114, 178;
+      flex: 0 1 156px;
+      min-width: 96px;
+      max-width: 196px;
+      height: 27px;
+      z-index: 48;
+      padding-left: 7px;
+      gap: 4px;
+      border-radius: 8px;
+      background: #e3f4ea;
+      border: 1px solid #9cc9ad;
+    }}
+    .games-send-channel-wrap:hover {{
+      background: #d7ecdf;
+    }}
+    .games-send-channel-select {{
+      display: none;
+    }}
+    .games-send-channel-menu-btn {{
+      min-width: 0;
+      width: 100%;
+      justify-content: flex-start;
+      text-align: left;
+      padding-left: 4px;
+    }}
+    .games-send-channel-menu {{
+      top: auto;
+      bottom: calc(100% + 6px);
+      left: 0;
+      right: auto;
+      min-width: max(100%, 180px);
+      z-index: 70;
+    }}
+    #games-chat-input {{
+      --games-send-channel-fill: #0072b2;
+      --games-send-channel-rgb: 0, 114, 178;
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
+      border-color: rgba(var(--games-send-channel-rgb), 0.34);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--games-send-channel-rgb), 0.08),
+          rgba(var(--games-send-channel-rgb), 0.03) 38%,
+          rgba(249, 253, 249, 0.98) 100%
+        );
+      box-shadow: none;
+    }}
+    #games-chat-input:hover {{
+      border-color: rgba(var(--games-send-channel-rgb), 0.42);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--games-send-channel-rgb), 0.09),
+          rgba(var(--games-send-channel-rgb), 0.035) 38%,
+          rgba(250, 254, 250, 0.98) 100%
+        );
+    }}
+    #games-chat-input:focus {{
+      outline: 2px solid rgba(var(--games-send-channel-rgb), 0.28);
+      outline-offset: 0;
+      border-color: rgba(var(--games-send-channel-rgb), 0.48);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--games-send-channel-rgb), 0.1),
+          rgba(var(--games-send-channel-rgb), 0.04) 38%,
+          rgba(255, 255, 255, 0.99) 100%
+        );
+      box-shadow: none;
+    }}
+    #games-chat-send-btn {{
+      border: 1px solid #9cc9ad;
+      background: #e3f4ea;
+      color: #184a32;
+      border-radius: 8px;
+      height: 27px;
+      padding: 0 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      min-width: 56px;
+    }}
+    #games-chat-send-btn:hover {{
+      background: #d7ecdf;
+    }}
+    #games-chat-send-btn:disabled {{
+      opacity: 0.6;
+      cursor: default;
+    }}
+    #games-emoji-btn {{
+      border: 1px solid #9cc9ad;
+      background: #f1f9f4;
+      color: #184a32;
+      border-radius: 8px;
+      height: 27px;
+      padding: 0 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    #games-emoji-btn:hover {{
+      background: #e6f2ea;
+    }}
+    #games-emoji-btn:disabled {{
+      opacity: 0.6;
+      cursor: default;
+    }}
     .chat-mesh-channel-wrap {{
       width: 100%;
       border: 0;
@@ -4488,12 +4614,33 @@
       background: #13241b;
       border-color: #2a4638;
     }}
-    [data-theme="dark"] .games-chat-banner {{
+    [data-theme="dark"] .games-toolbar {{
       background: #1a2b22;
       border-bottom-color: #355042;
     }}
-    [data-theme="dark"] .games-chat-ticker-track {{
-      color: #9fbead;
+    [data-theme="dark"] .games-tab-btn {{
+      border-color: #3b5b4a;
+      background: #0f1d16;
+      color: #c8e8d6;
+    }}
+    [data-theme="dark"] .games-tab-btn.is-active {{
+      border-color: #2f855a;
+      background: #173526;
+      color: #9ce3ba;
+    }}
+    [data-theme="dark"] .games-chat-compose-wrap {{
+      background: #13241b;
+      border-color: #2a4638;
+    }}
+    [data-theme="dark"] .games-send-channel-wrap {{
+      background: #173526;
+      border-color: #2f855a;
+    }}
+    [data-theme="dark"] .games-send-channel-wrap:hover {{
+      background: #1d3f2d;
+    }}
+    [data-theme="dark"] .games-send-channel-menu-btn {{
+      color: #d8f3e4;
     }}
     [data-theme="dark"] .games-chat-input {{
       border-color: #2a4638;
@@ -4508,20 +4655,19 @@
       outline-color: #5abf8a;
       background: #13241b;
     }}
+    [data-theme="dark"] #games-chat-send-btn,
+    [data-theme="dark"] #games-emoji-btn {{
+      background: #173526;
+      border-color: #2f855a;
+      color: #9ce3ba;
+    }}
+    [data-theme="dark"] #games-chat-send-btn:hover,
+    [data-theme="dark"] #games-emoji-btn:hover {{
+      background: #1d3f2d;
+    }}
     [data-theme="dark"] .games-library-label {{
       color: #93b8a6;
     }}
-    [data-theme="dark"] .games-library-btn {{
-      border-color: #3b5b4a;
-      background: #0f1d16;
-      color: #c8e8d6;
-    }}
-    [data-theme="dark"] .games-library-btn.is-active {{
-      border-color: #2f855a;
-      background: #173526;
-      color: #9ce3ba;
-    }}
-    [data-theme="dark"] .games-mode-note,
     [data-theme="dark"] .reversi-status-text,
     [data-theme="dark"] .games-coming-soon,
     [data-theme="dark"] .reversi-score-card,
@@ -4530,6 +4676,9 @@
       background: #0f1d16;
       border-color: #2a4638;
       color: #c5e2d2;
+    }}
+    [data-theme="dark"] .reversi-link-status .games-link-status-sep {{
+      color: #93b8a6;
     }}
     [data-theme="dark"] .games-coming-soon-card {{
       background: #0f1d16;
@@ -4545,6 +4694,29 @@
       border-color: #2a4638;
       background: #0f1d16;
       color: #d8f3e4;
+    }}
+    [data-theme="dark"] .games-peer-selected-display.is-empty {{
+      color: #93b8a6;
+    }}
+    [data-theme="dark"] .games-link-mode-badge {{
+      border-color: #355343;
+      background: #13241b;
+      color: #b9d9c8;
+    }}
+    [data-theme="dark"] .games-link-mode-badge.is-connected {{
+      border-color: #4a8d68;
+      background: #163124;
+      color: #9fe7be;
+    }}
+    [data-theme="dark"] .games-link-mode-badge.is-pending {{
+      border-color: #8d6f43;
+      background: #30210f;
+      color: #f2c98b;
+    }}
+    [data-theme="dark"] .games-link-mode-badge.is-local {{
+      border-color: #46606d;
+      background: #132733;
+      color: #aed2e7;
     }}
     [data-theme="dark"] .games-peer-select:focus-visible {{
       border-color: #5ba67a;

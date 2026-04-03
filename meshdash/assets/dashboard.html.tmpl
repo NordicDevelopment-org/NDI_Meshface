@@ -1953,57 +1953,45 @@ Ready.
     </section>
 
     <section class="card games" aria-label="Games">
-      <h2 id="games-chat-banner" class="games-chat-banner" role="button" tabindex="0" aria-label="Game table chat ticker">
-        <span id="games-chat-ticker" class="games-chat-ticker" aria-live="polite">
-          <span id="games-chat-ticker-track" class="games-chat-ticker-track">Game table chat. Connect to a peer and click here to reply.</span>
-        </span>
-        <span id="games-chat-compose" class="games-chat-compose" hidden>
-          <input
-            id="games-chat-input"
-            class="games-chat-input"
-            type="text"
-            maxlength="120"
-            placeholder="Type table message..."
-            autocomplete="off"
-          />
-          <button id="games-chat-send-btn" class="btn games-chat-send-btn" type="button">Send</button>
-        </span>
-      </h2>
+      <div class="games-toolbar">
+        <div class="games-tabs" role="tablist" aria-label="Game library">
+          <button
+            id="games-select-reversi-btn"
+            class="games-tab-btn is-active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            title="Reversi (also known as Othello)"
+            data-game-id="reversi"
+          >Reversi</button>
+          <button
+            id="games-select-checkers-btn"
+            class="games-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            title="Checkers"
+            data-game-id="checkers"
+          >Checkers</button>
+          <button
+            id="games-select-chess-btn"
+            class="games-tab-btn"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            title="Chess"
+            data-game-id="chess"
+          >Chess</button>
+        </div>
+      </div>
       <div class="body">
         <div class="games-shell">
           <aside class="games-sidebar">
-            <div class="games-library-label">Library</div>
-            <div class="games-library-list" role="tablist" aria-label="Game library">
-              <button
-                id="games-select-reversi-btn"
-                class="games-library-btn is-active"
-                type="button"
-                title="Reversi (also known as Othello)"
-                data-game-id="reversi"
-              >Reversi</button>
-              <button
-                id="games-select-checkers-btn"
-                class="games-library-btn"
-                type="button"
-                title="Checkers"
-                data-game-id="checkers"
-              >Checkers</button>
-              <button
-                id="games-select-chess-btn"
-                class="games-library-btn"
-                type="button"
-                title="Chess"
-                data-game-id="chess"
-              >Chess</button>
-            </div>
             <div id="games-side-reversi" class="games-side-panel is-active" data-game-id="reversi">
-              <div class="games-mode-note">Mode: local hotseat for now. Matchmaking can be layered in next.</div>
-              <label class="games-peer-wrap" for="reversi-peer-select">
-                <span class="games-library-label">Peer</span>
-                <select id="reversi-peer-select" class="games-peer-select" aria-label="Reversi peer">
-                  <option value="">Select peer…</option>
-                </select>
-              </label>
+              <div class="games-peer-wrap">
+                <span class="games-library-label">Invite Target</span>
+                <div id="reversi-peer-selected-display" class="games-peer-select games-peer-selected-display is-empty" aria-live="polite">Select a node in the list to choose an invite target.</div>
+              </div>
               <label class="games-peer-wrap" for="reversi-host-color-select">
                 <span class="games-library-label">Host Color</span>
                 <select id="reversi-host-color-select" class="games-peer-select" aria-label="Reversi host color">
@@ -2054,13 +2042,10 @@ Ready.
               </div>
             </div>
             <div id="games-side-chess" class="games-side-panel" data-game-id="chess" hidden>
-              <div class="games-mode-note">Mode: local hotseat + peer invite. Moves sync over bot chat payloads between peers.</div>
-              <label class="games-peer-wrap" for="chess-peer-select">
-                <span class="games-library-label">Peer</span>
-                <select id="chess-peer-select" class="games-peer-select" aria-label="Chess peer">
-                  <option value="">Select peer…</option>
-                </select>
-              </label>
+              <div class="games-peer-wrap">
+                <span class="games-library-label">Invite Target</span>
+                <div id="chess-peer-selected-display" class="games-peer-select games-peer-selected-display is-empty" aria-live="polite">Select a node in the list to choose an invite target.</div>
+              </div>
               <label class="games-peer-wrap" for="chess-host-color-select">
                 <span class="games-library-label">Host Color</span>
                 <select id="chess-host-color-select" class="games-peer-select" aria-label="Chess host color">
@@ -2111,13 +2096,10 @@ Ready.
               </div>
             </div>
             <div id="games-side-checkers" class="games-side-panel" data-game-id="checkers" hidden>
-              <div class="games-mode-note">Mode: local hotseat + peer invite. Captures are forced and multi-jumps are synced.</div>
-              <label class="games-peer-wrap" for="checkers-peer-select">
-                <span class="games-library-label">Peer</span>
-                <select id="checkers-peer-select" class="games-peer-select" aria-label="Checkers peer">
-                  <option value="">Select peer…</option>
-                </select>
-              </label>
+              <div class="games-peer-wrap">
+                <span class="games-library-label">Invite Target</span>
+                <div id="checkers-peer-selected-display" class="games-peer-select games-peer-selected-display is-empty" aria-live="polite">Select a node in the list to choose an invite target.</div>
+              </div>
               <label class="games-peer-wrap" for="checkers-host-color-select">
                 <span class="games-library-label">Host Color</span>
                 <select id="checkers-host-color-select" class="games-peer-select" aria-label="Checkers host color">
@@ -2178,6 +2160,33 @@ Ready.
             <div id="games-main-chess" class="games-main-panel" data-game-id="chess" hidden>
               <div id="chess-board" class="chess-board" role="grid" aria-label="Chess board"></div>
             </div>
+          </div>
+        </div>
+        <div class="games-chat-compose-wrap">
+          <div id="games-chat-compose" class="games-chat-compose">
+            <div
+              class="mesh-channel-wrap games-send-channel-wrap"
+              title="Choose which configured message channel to use for outgoing game chat. This sets the encryption group used for sends and does NOT change your LoRa frequency slot."
+            >
+              <span id="games-send-channel-dot" class="channel-color-dot mesh-channel-view-dot" aria-hidden="true"></span>
+              <button id="games-send-channel-menu-btn" class="mesh-channel-menu-btn games-send-channel-menu-btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Outgoing game chat channel">
+                Ch 0
+              </button>
+              <select id="games-send-channel-select" class="games-send-channel-select" aria-label="Outgoing game chat channel" hidden>
+                <option value="0">Ch 0</option>
+              </select>
+              <div id="games-send-channel-menu" class="mesh-channel-menu games-send-channel-menu" role="listbox" hidden></div>
+            </div>
+            <input
+              id="games-chat-input"
+              class="games-chat-input"
+              type="text"
+              maxlength="120"
+              placeholder="Connect to a peer to enable table chat."
+              autocomplete="off"
+            />
+            <button id="games-emoji-btn" type="button" title="Insert emoji" aria-label="Insert emoji" aria-expanded="false">🙂</button>
+            <button id="games-chat-send-btn" class="btn games-chat-send-btn" type="button">Send</button>
           </div>
         </div>
       </div>

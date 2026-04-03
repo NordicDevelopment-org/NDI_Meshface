@@ -23,6 +23,24 @@
       return panel;
     }}
 
+    function chatEmojiComposeButtons() {{
+      const out = [];
+      const chatBtn = document.getElementById("chat-emoji-btn");
+      const gamesBtn = document.getElementById("games-emoji-btn");
+      if (chatBtn instanceof HTMLButtonElement) out.push(chatBtn);
+      if (gamesBtn instanceof HTMLButtonElement) out.push(gamesBtn);
+      return out;
+    }}
+
+    function setChatEmojiButtonsExpanded(expanded, anchor = null) {{
+      const activeAnchor = anchor instanceof HTMLButtonElement ? anchor : null;
+      for (const btn of chatEmojiComposeButtons()) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const isExpanded = !!expanded && !!activeAnchor && btn === activeAnchor;
+        btn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+      }}
+    }}
+
     function clearChatEmojiTopDragState(topGrid) {{
       chatEmojiTopDragEmoji = "";
       const panel = chatEmojiPanelElement();
@@ -356,8 +374,14 @@
       if (chatEmojiAnchorElement instanceof HTMLElement && document.contains(chatEmojiAnchorElement)) {{
         return chatEmojiAnchorElement;
       }}
+      if (activeLayoutView === "games") {{
+        const gamesBtn = document.getElementById("games-emoji-btn");
+        if (gamesBtn instanceof HTMLElement) return gamesBtn;
+      }}
       const composeBtn = document.getElementById("chat-emoji-btn");
-      return composeBtn instanceof HTMLElement ? composeBtn : null;
+      if (composeBtn instanceof HTMLElement) return composeBtn;
+      const gamesBtn = document.getElementById("games-emoji-btn");
+      return gamesBtn instanceof HTMLElement ? gamesBtn : null;
     }}
 
     function positionChatEmojiPanel() {{
@@ -422,7 +446,7 @@
 
     function openChatEmojiPanel(mode = "compose", reactionTargetId = null, anchorEl = null) {{
       const panel = chatEmojiPanelElement();
-      const btn = document.getElementById("chat-emoji-btn");
+      const chatBtn = document.getElementById("chat-emoji-btn");
       if (!(panel instanceof HTMLElement)) return;
       chatEmojiMode = mode === "react" ? "react" : "compose";
       chatReactionPickerExpanded = chatEmojiMode !== "react";
@@ -432,16 +456,15 @@
       ) ? parsedTarget : null;
       chatEmojiAnchorElement = anchorEl instanceof HTMLElement
         ? anchorEl
-        : (btn instanceof HTMLElement ? btn : null);
+        : (chatBtn instanceof HTMLElement ? chatBtn : null);
       renderChatEmojiPickerPanel();
       panel.hidden = false;
       positionChatEmojiPanel();
       if (!(chatEmojiMode === "react" && !chatReactionPickerExpanded)) {{
         focusChatEmojiSearchInput();
       }}
-      if (btn instanceof HTMLButtonElement) {{
-        btn.setAttribute("aria-expanded", "true");
-      }}
+      const expandedAnchor = chatEmojiAnchorElement instanceof HTMLButtonElement ? chatEmojiAnchorElement : null;
+      setChatEmojiButtonsExpanded(true, expandedAnchor);
       if (!chatEmojiCatalogLoaded) {{
         void ensureChatEmojiCatalogLoaded(true).then((loaded) => {{
           if (!loaded || panel.hidden) return;
@@ -456,7 +479,6 @@
 
     function closeChatEmojiPanel() {{
       const panel = chatEmojiPanelElement();
-      const btn = document.getElementById("chat-emoji-btn");
       chatEmojiMode = "compose";
       chatReactionTargetId = null;
       chatReactionPickerExpanded = false;
@@ -475,13 +497,25 @@
       if (searchInput instanceof HTMLInputElement) {{
         searchInput.value = "";
       }}
-      if (btn instanceof HTMLButtonElement) {{
-        btn.setAttribute("aria-expanded", "false");
-      }}
+      setChatEmojiButtonsExpanded(false, null);
     }}
 
     function insertEmojiAtCursor(emoji) {{
-      const input = document.getElementById("chat-input");
+      const chatInput = document.getElementById("chat-input");
+      const gamesInput = document.getElementById("games-chat-input");
+      const focused = document.activeElement;
+      let input = null;
+      if (focused instanceof HTMLInputElement && focused.id === "games-chat-input") {{
+        input = focused;
+      }} else if (focused instanceof HTMLInputElement && focused.id === "chat-input") {{
+        input = focused;
+      }} else if (activeLayoutView === "games" && gamesInput instanceof HTMLInputElement) {{
+        input = gamesInput;
+      }} else if (chatInput instanceof HTMLInputElement) {{
+        input = chatInput;
+      }} else if (gamesInput instanceof HTMLInputElement) {{
+        input = gamesInput;
+      }}
       if (!(input instanceof HTMLInputElement)) return;
       const value = input.value || "";
       const start = Number.isFinite(input.selectionStart) ? input.selectionStart : value.length;
@@ -494,8 +528,8 @@
 
     function bindEmojiPicker() {{
       const panel = chatEmojiPanelElement();
-      const btn = document.getElementById("chat-emoji-btn");
-      if (!(panel instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
+      const composeButtons = chatEmojiComposeButtons();
+      if (!(panel instanceof HTMLElement) || !composeButtons.length) return;
 
       if (panel.dataset.init !== "1") {{
         const groupOptions = '<option value="all">All groups (loading...)</option>';
@@ -562,11 +596,12 @@
         }});
       }}
 
-      if (btn.dataset.emojiBound !== "1") {{
+      for (const btn of composeButtons) {{
+        if (!(btn instanceof HTMLButtonElement) || btn.dataset.emojiBound === "1") continue;
         btn.dataset.emojiBound = "1";
         btn.addEventListener("click", (ev) => {{
           ev.preventDefault();
-          if (chatSendInFlight) return;
+          if (btn.id === "chat-emoji-btn" && chatSendInFlight) return;
           if (panel.hidden) {{
             openChatEmojiPanel("compose", null, btn);
           }} else {{
@@ -623,7 +658,12 @@
         document.addEventListener("pointerdown", (ev) => {{
           const target = ev.target;
           if (!(target instanceof Element)) return;
-          if (!target.closest("#chat-emoji-panel") && !target.closest("#chat-emoji-btn") && !target.closest(".chat-react-btn")) {{
+          if (
+            !target.closest("#chat-emoji-panel")
+            && !target.closest("#chat-emoji-btn")
+            && !target.closest("#games-emoji-btn")
+            && !target.closest(".chat-react-btn")
+          ) {{
             closeChatEmojiPanel();
           }}
         }});
@@ -635,9 +675,16 @@
           const key = String(ev.key || "").toLowerCase();
           if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && key === "e") {{
             ev.preventDefault();
+            const preferredBtn = activeLayoutView === "games"
+              ? document.getElementById("games-emoji-btn")
+              : document.getElementById("chat-emoji-btn");
+            const fallbackBtn = document.getElementById("chat-emoji-btn");
+            const targetBtn = preferredBtn instanceof HTMLButtonElement
+              ? preferredBtn
+              : (fallbackBtn instanceof HTMLButtonElement ? fallbackBtn : null);
             if (panel.hidden) {{
-              if (chatSendInFlight) return;
-              openChatEmojiPanel("compose", null, btn);
+              if (targetBtn instanceof HTMLButtonElement && targetBtn.id === "chat-emoji-btn" && chatSendInFlight) return;
+              openChatEmojiPanel("compose", null, targetBtn);
               return;
             }}
             focusChatEmojiSearchInput();
