@@ -4735,16 +4735,25 @@
       border-color: rgba(168, 188, 205, 0.9);
       box-shadow: 0 0 0 1px rgba(23, 74, 50, 0.24);
     }}
+    .checkers-board,
+    .chess-board {{
+      --classic-board-root: var(--accent, #2f855a);
+      --classic-board-frame: color-mix(in srgb, var(--classic-board-root) 58%, #000000);
+      --classic-board-frame-inner: color-mix(in srgb, var(--classic-board-root) 48%, #000000);
+      --classic-board-cell-light: color-mix(in srgb, var(--classic-board-root) 26%, #ffffff);
+      --classic-board-cell-dark: color-mix(in srgb, var(--classic-board-root) 72%, #000000);
+      --classic-board-cell-dark-hover: color-mix(in srgb, var(--classic-board-cell-dark) 88%, #ffffff);
+    }}
     .checkers-board {{
       --checkers-cell-size: clamp(30px, 4.8vw, 64px);
       display: grid;
       grid-template-columns: repeat(8, var(--checkers-cell-size));
       grid-template-rows: repeat(8, var(--checkers-cell-size));
-      border: 1px solid #5a3d2b;
+      border: 1px solid var(--classic-board-frame);
       border-radius: 12px;
       overflow: hidden;
-      background: #5a3d2b;
-      box-shadow: inset 0 0 0 1px rgba(40, 25, 17, 0.34);
+      background: var(--classic-board-frame-inner);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--classic-board-root) 34%, #000000);
     }}
     .checkers-cell {{
       width: var(--checkers-cell-size);
@@ -4759,14 +4768,14 @@
       position: relative;
     }}
     .checkers-cell.is-light {{
-      background: #e6d9c8;
+      background: var(--classic-board-cell-light);
     }}
     button.checkers-cell.is-dark {{
-      background: #6c4630;
+      background: var(--classic-board-cell-dark);
       cursor: pointer;
     }}
     button.checkers-cell.is-dark:hover {{
-      background: #7a5138;
+      background: var(--classic-board-cell-dark-hover);
     }}
     button.checkers-cell:focus-visible {{
       outline: 2px solid #d9efc1;
@@ -4826,11 +4835,11 @@
       display: grid;
       grid-template-columns: repeat(8, var(--chess-cell-size));
       grid-template-rows: repeat(8, var(--chess-cell-size));
-      border: 1px solid #3f4f5d;
+      border: 1px solid var(--classic-board-frame);
       border-radius: 12px;
       overflow: hidden;
-      background: #3f4f5d;
-      box-shadow: inset 0 0 0 1px rgba(18, 28, 35, 0.35);
+      background: var(--classic-board-frame-inner);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--classic-board-root) 34%, #000000);
     }}
     .chess-cell {{
       width: var(--chess-cell-size);
@@ -4847,10 +4856,10 @@
       user-select: none;
     }}
     .chess-cell.is-light {{
-      background: #e7ddcb;
+      background: var(--classic-board-cell-light);
     }}
     .chess-cell.is-dark {{
-      background: #9a7a5d;
+      background: var(--classic-board-cell-dark);
     }}
     .chess-cell:hover {{
       filter: brightness(1.04);

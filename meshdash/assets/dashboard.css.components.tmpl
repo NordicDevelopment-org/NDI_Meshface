@@ -4806,19 +4806,28 @@
       border-color: rgba(168, 188, 205, 0.92);
       box-shadow: 0 0 0 1px rgba(11, 38, 26, 0.5);
     }}
+    [data-theme="dark"] .checkers-board,
+    [data-theme="dark"] .chess-board {{
+      --classic-board-root: var(--accent, var(--ui-accent-soft, var(--ui-accent, #2ea043)));
+      --classic-board-frame: color-mix(in srgb, var(--classic-board-root) 46%, #000000);
+      --classic-board-frame-inner: color-mix(in srgb, var(--classic-board-root) 36%, #000000);
+      --classic-board-cell-light: color-mix(in srgb, var(--classic-board-root) 23%, #ffffff);
+      --classic-board-cell-dark: color-mix(in srgb, var(--classic-board-root) 67%, #000000);
+      --classic-board-cell-dark-hover: color-mix(in srgb, var(--classic-board-cell-dark) 90%, #ffffff);
+    }}
     [data-theme="dark"] .checkers-board {{
-      border-color: #4d3527;
-      background: #4d3527;
-      box-shadow: inset 0 0 0 1px rgba(13, 9, 7, 0.44);
+      border-color: var(--classic-board-frame);
+      background: var(--classic-board-frame-inner);
+      box-shadow: inset 0 0 0 1px rgba(2, 10, 7, 0.42);
     }}
     [data-theme="dark"] .checkers-cell.is-light {{
-      background: #c8baa7;
+      background: var(--classic-board-cell-light);
     }}
     [data-theme="dark"] button.checkers-cell.is-dark {{
-      background: #553826;
+      background: var(--classic-board-cell-dark);
     }}
     [data-theme="dark"] button.checkers-cell.is-dark:hover {{
-      background: #63432f;
+      background: var(--classic-board-cell-dark-hover);
     }}
     [data-theme="dark"] .checkers-disc.disc-black {{
       background: radial-gradient(circle at 30% 24%, #6c7b86 0%, #374752 54%, #263039 100%);
@@ -4835,15 +4844,15 @@
       box-shadow: 0 0 0 1px rgba(5, 18, 11, 0.48);
     }}
     [data-theme="dark"] .chess-board {{
-      border-color: #2c3a45;
-      background: #2c3a45;
-      box-shadow: inset 0 0 0 1px rgba(5, 10, 14, 0.48);
+      border-color: var(--classic-board-frame);
+      background: var(--classic-board-frame-inner);
+      box-shadow: inset 0 0 0 1px rgba(2, 10, 7, 0.42);
     }}
     [data-theme="dark"] .chess-cell.is-light {{
-      background: #dac9b1;
+      background: var(--classic-board-cell-light);
     }}
     [data-theme="dark"] .chess-cell.is-dark {{
-      background: #87684d;
+      background: var(--classic-board-cell-dark);
     }}
     [data-theme="dark"] .chess-piece.piece-white {{
       color: #f6fbff;
