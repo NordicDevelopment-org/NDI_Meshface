@@ -401,14 +401,7 @@
     }}
 
     function topbarOneshotNodeOnlineEnabled() {{
-      const prefs = currentTickerPreferences();
-      const oneShots = prefs && prefs.oneshots && typeof prefs.oneshots === "object"
-        ? prefs.oneshots
-        : {{}};
-      const nodeOnline = oneShots.node_online && typeof oneShots.node_online === "object"
-        ? oneShots.node_online
-        : {{}};
-      return parseBoolToken(nodeOnline.enabled, false);
+      return false;
     }}
 
     function topbarOneshotNodeOnlineFavoritesOnly() {{
