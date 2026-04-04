@@ -362,10 +362,13 @@
         }}
         return;
       }}
-      const parsed = parseConsoleCommandLine(line);
+      const normalizedLine = line.startsWith("/")
+        ? String(line.slice(1) || "").trim()
+        : line;
+      const parsed = parseConsoleCommandLine(normalizedLine);
       if (parsed.error) {{
         appendConsoleEventLine(`[console] parse error: ${{parsed.error}}`);
         return;
       }}
-      await executeConsoleCommand(parsed, line);
+      await executeConsoleCommand(parsed, normalizedLine || line);
     }}

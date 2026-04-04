@@ -29,6 +29,27 @@
         }},
       }});
       registerConsoleCommand({{
+        name: "download",
+        usage: "download|/download [name=<filename.txt>]",
+        description: "Download the current visible console snapshot as a text file.",
+        supportsVerbosity: false,
+        run: (ctx) => {{
+          const args = Array.isArray(ctx && ctx.args) ? ctx.args : [];
+          const options = (ctx && ctx.options && typeof ctx.options === "object")
+            ? ctx.options
+            : {{}};
+          const rawName = String(options.name ?? args.join(" ") ?? "").trim();
+          const result = downloadVisibleConsoleSnapshot(rawName);
+          if (!(result && result.ok)) {{
+            const msg = String((result && result.error) || "download failed");
+            return `[download] ${{msg}}.`;
+          }}
+          const lineCount = Math.max(0, Math.trunc(Number(result.lineCount) || 0));
+          const lineLabel = `${{lineCount}} line${{lineCount === 1 ? "" : "s"}}`;
+          return `[download] saved visible console snapshot to ${{result.filename}} (${{lineLabel}}).`;
+        }},
+      }});
+      registerConsoleCommand({{
         name: "live",
         usage: "live [-v|-vv|-vvv|-vvvv] [-l1] [-l2] [-l3] [--layer=1,2,3]",
         description: "Stream live packet lines until Ctrl+C with optional verbosity and layer filters.",
