@@ -370,8 +370,12 @@
       const linkAvgHops = linkStats.hopsWeight > 0
         ? formatMetricValue(linkStats.hopsWeighted / linkStats.hopsWeight, 2)
         : "n/a";
+      const nodeDisplayName = node
+        ? nodeLabel(node)
+        : (nodeNameCache.get(nodeId) || nodeId || "n/a");
 
       const nodeSection = savedDetailSectionHtml("Node", [
+        ["Display Name", nodeDisplayName],
         ["Node ID", nodeId],
         ["Node Num", node && node.num != null ? String(node.num) : "n/a"],
         ["Hardware", (node && node.hardware_model) || "n/a"],

@@ -465,7 +465,7 @@
     }}
 
     function setHistoryTab(tabName) {{
-      activeHistoryTab = (tabName === "overview" || tabName === "online")
+      activeHistoryTab = (tabName === "online")
         ? tabName
         : "signal";
       for (const btn of document.querySelectorAll(".history-tab-btn")) {{
@@ -474,10 +474,8 @@
       }}
       const signalPanel = document.getElementById("tab-panel-signal");
       const onlinePanel = document.getElementById("tab-panel-online");
-      const overviewPanel = document.getElementById("tab-panel-overview");
       if (signalPanel) signalPanel.hidden = activeHistoryTab !== "signal";
       if (onlinePanel) onlinePanel.hidden = activeHistoryTab !== "online";
-      if (overviewPanel) overviewPanel.hidden = activeHistoryTab !== "overview";
     }}
 
     function bindHistoryTabs() {{
@@ -498,10 +496,6 @@
       const caption = document.getElementById("node-history-caption");
       if (caption) {{
         caption.textContent = `Loading history for ${{nodeId}}...`;
-      }}
-      const overview = document.getElementById("node-history-overview");
-      if (overview) {{
-        overview.innerHTML = "";
       }}
       const svg = document.getElementById("signal-chart");
       if (svg) {{

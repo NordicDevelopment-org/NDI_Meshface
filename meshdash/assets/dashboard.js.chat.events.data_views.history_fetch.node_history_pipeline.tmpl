@@ -1,27 +1,3 @@
-    function renderNodeHistoryOverview(history, node) {{
-      const summary = history.summary || {{}};
-      const target = document.getElementById("node-history-overview");
-      if (!target) return;
-      const historyNodeId = normalizeNodeId(history.node_id || "");
-      const fallbackNodeId = resolveSavedViewNodeId(latestState);
-      const label = node ? nodeLabel(node) : (historyNodeId || fallbackNodeId || "node");
-      const items = [
-        ["Node", `${{label}}`],
-        ["Node ID", `${{historyNodeId || fallbackNodeId || "n/a"}}`],
-        ["Points", `${{summary.points ?? (history.points || []).length ?? 0}}`],
-        ["Trail Points", `${{summary.trail_points ?? (history.positions || []).length ?? 0}}`],
-        ["Packets", `${{summary.total_packets ?? 0}}`],
-        ["Window", `${{history.window_hours ?? nodeHistoryHours}}h`],
-        ["Last Seen", `${{summary.last_seen || "n/a"}}`],
-        ["Trail Range", `${{summary.trail_start || "n/a"}} to ${{summary.trail_end || "n/a"}}`],
-        ["SNR Range", `${{formatMetricValue(summary.snr_min, 1)}} to ${{formatMetricValue(summary.snr_max, 1)}} dB`],
-        ["RSSI Range", `${{formatMetricValue(summary.rssi_min, 0)}} to ${{formatMetricValue(summary.rssi_max, 0)}} dBm`],
-      ];
-      target.innerHTML = items.map(([k, v]) => (
-        `<div class="overview-item"><div class="k">${{k}}</div><div class="v">${{v}}</div></div>`
-      )).join("");
-    }}
-
     function renderNodeHistory(history, nodes) {{
       setMapDataMode("node");
       const historyNodeId = normalizeNodeId(history.node_id || "");
@@ -46,7 +22,6 @@
         history.window_hours,
         Array.isArray(history.packet_timestamps) ? history.packet_timestamps : []
       );
-      renderNodeHistoryOverview(history, node);
       setHistoryTab(activeHistoryTab);
     }}
 
