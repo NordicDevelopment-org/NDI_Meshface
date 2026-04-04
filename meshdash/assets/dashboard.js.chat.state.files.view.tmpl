@@ -179,6 +179,11 @@
         fileName: row.fileName,
       }});
       if (decision === "declined") {{
+        setFileTransferInboundFlowStateByKey(key, "", {{
+          transferId: row.transferId,
+          senderId: row.fromId,
+          receiverId: row.toId,
+        }});
         fileTransferChunkCacheByKey.delete(key);
         clearFileTransferBlobStateForKey(key);
         fileTransferAckSentState.delete(key);
@@ -186,6 +191,7 @@
         fileTransferAckProbeCursorByKey.delete(key);
         fileTransferAckProbeStateByKey.delete(key);
         fileTransferAckMissingChannelWarnByKey.delete(key);
+        fileTransferFlowSignalSentByKey.delete(key);
         const actionLabel = asCancel ? "Canceled" : "Declined";
         setFileTransferStatus(`${{actionLabel}} inbound transfer "${{row.fileName || "mesh-file.bin"}}".`);
         appendFileTransferConsole(
@@ -196,6 +202,63 @@
         setFileTransferStatus(`Accepted inbound transfer "${{row.fileName || "mesh-file.bin"}}".`);
         appendFileTransferConsole(
           `Accepted inbound transfer ${{fileTransferShortTransferId(row.transferId)}} from ${{row.peerId || "unknown sender"}}.`
+        );
+      }}
+      renderFilesView(latestState);
+      scheduleFileTransferMaintenance(latestState);
+      requestImmediatePoll(40);
+      void poll();
+    }}
+
+    function setInboundFileTransferPausedAction(transferKey, pausedRaw) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return;
+      const paused = !!pausedRaw;
+      const row = fileTransferRowByKey(key);
+      if (!(row && typeof row === "object")) {{
+        setFileTransferStatus("Transfer row is no longer available.", true);
+        return;
+      }}
+      if (String(row.directionClass || "").trim().toLowerCase() !== "inbound") {{
+        setFileTransferStatus("Only inbound transfers can be paused or resumed.", true);
+        return;
+      }}
+      if (!row.requiresInboundAccept || !row.inboundAccepted || row.inboundDeclined || row.delivered) {{
+        setFileTransferStatus("This inbound transfer cannot be paused.", true);
+        return;
+      }}
+      setFileTransferInboundFlowStateByKey(
+        key,
+        paused ? "paused" : "",
+        {{
+          transferId: row.transferId,
+          senderId: row.fromId,
+          receiverId: row.toId,
+        }}
+      );
+      if (paused) {{
+        fileTransferFlowSignalSentByKey.delete(key);
+      }} else {{
+        // Force one explicit resume signal on the next maintenance tick.
+        fileTransferFlowSignalSentByKey.set(key, {{
+          action: "pause",
+          lastSentAtMs: 0,
+          updatedAtMs: Date.now(),
+          lastErrorAtMs: 0,
+        }});
+      }}
+      const fileName = normalizeFileTransferName(row.fileName || "mesh-file.bin");
+      if (paused) {{
+        setFileTransferStatus(`Paused inbound transfer "${{fileName}}".`);
+        appendFileTransferConsole(
+          `Paused inbound transfer ${{fileTransferShortTransferId(row.transferId)}} from ${{row.peerId || "unknown sender"}}.`,
+          {{ level: "warn" }}
+        );
+      }} else {{
+        setFileTransferStatus(`Resumed inbound transfer "${{fileName}}".`);
+        appendFileTransferConsole(
+          `Resumed inbound transfer ${{fileTransferShortTransferId(row.transferId)}} from ${{row.peerId || "unknown sender"}}.`,
+          {{ level: "warn" }}
         );
       }}
       renderFilesView(latestState);
@@ -388,6 +451,14 @@
           setFileTransferInboundDecisionAction(transferKey, "declined", {{ mode: "cancel" }});
           return;
         }}
+        if (action === "pause-inbound") {{
+          setInboundFileTransferPausedAction(transferKey, true);
+          return;
+        }}
+        if (action === "resume-inbound") {{
+          setInboundFileTransferPausedAction(transferKey, false);
+          return;
+        }}
         if (action === "restart") {{
           restartOutgoingFileTransferAction(transferKey);
           return;
@@ -554,7 +625,7 @@
               >${{escAttr(declineLabel)}}</button>
             </span>`;
         }} else {{
-          const inboundCanCancel = !!(
+          const inboundCanPauseResume = !!(
             row
             && String(row.directionClass || "").trim().toLowerCase() === "inbound"
             && row.requiresInboundAccept
@@ -563,28 +634,52 @@
             && !row.canDownload
             && !row.delivered
           );
+          const inboundPaused = !!(row && row.inboundPaused);
+          const inboundPauseAction = inboundPaused ? "resume-inbound" : "pause-inbound";
+          const inboundPauseLabel = inboundPaused ? "Resume" : "Pause";
+          const inboundPauseTitle = inboundPaused
+            ? "Resume inbound transfer and continue ACK updates."
+            : "Pause inbound transfer and notify sender.";
           const outgoingCanRestart = !!(row && row.outgoingCanRestart);
           const outgoingCanceled = !!(row && row.outgoingCanceled);
+          const outgoingPausedRemote = !!(row && row.outgoingPausedRemote);
           const outgoingCanPause = !!(row && row.outgoingCanPause);
           const outgoingCanResume = !!(row && row.outgoingCanResume);
           const outgoingCanCancel = !!(row && row.outgoingCanCancel);
-          if (inboundCanCancel) {{
+          if (inboundCanPauseResume) {{
             actionSort = 2;
-            actionHtml = `<button
-                type="button"
-                class="files-transfer-action decline"
-                data-action="cancel-inbound"
-                data-transfer-key="${{escAttr(row.key || "")}}"
-                title="Cancel inbound transfer and stop local ACKs."
-              >Cancel</button>`;
+            actionHtml = `<span class="files-transfer-action-group">
+                <button
+                  type="button"
+                  class="files-transfer-action"
+                  data-action="${{escAttr(inboundPauseAction)}}"
+                  data-transfer-key="${{escAttr(row.key || "")}}"
+                  title="${{escAttr(inboundPauseTitle)}}"
+                >${{escAttr(inboundPauseLabel)}}</button>
+                <button
+                  type="button"
+                  class="files-transfer-action decline"
+                  data-action="cancel-inbound"
+                  data-transfer-key="${{escAttr(row.key || "")}}"
+                  title="Cancel inbound transfer and stop local ACKs."
+                >Cancel</button>
+              </span>`;
           }} else if ((outgoingCanPause || outgoingCanResume || outgoingCanCancel) && !(row && row.canDownload)) {{
             actionSort = 2;
             const pauseAction = outgoingCanResume ? "resume" : "pause";
-            const pauseLabel = outgoingCanResume ? "Resume" : "Pause";
-            const pauseTitle = outgoingCanResume
-              ? "Resume outbound transfer."
-              : "Pause outbound transfer without resetting progress.";
-            const pauseDisabled = (outgoingCanPause || outgoingCanResume) ? "" : " disabled";
+            const pauseLabel = outgoingPausedRemote
+              ? "Paused by RX"
+              : (outgoingCanResume ? "Resume" : "Pause");
+            const pauseTitle = outgoingPausedRemote
+              ? "Receiver paused this transfer; waiting for receiver resume."
+              : (
+                outgoingCanResume
+                  ? "Resume outbound transfer."
+                  : "Pause outbound transfer without resetting progress."
+              );
+            const pauseDisabled = outgoingPausedRemote
+              ? " disabled"
+              : ((outgoingCanPause || outgoingCanResume) ? "" : " disabled");
             const cancelDisabled = outgoingCanCancel ? "" : " disabled";
             actionHtml = `<span class="files-transfer-action-group">
                 <button

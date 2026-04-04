@@ -14,6 +14,7 @@
       const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
       const transfers = new Map();
       const ackByTransferKey = new Map();
+      const flowByTransferKey = new Map();
       const fileTransferMessages = [];
 
       for (const msg of recentChat) {{
@@ -90,6 +91,23 @@
           const prev = ackByTransferKey.get(transferKey);
           if (!prev || Number(ack.latestUnix || 0) >= Number(prev.latestUnix || 0)) {{
             ackByTransferKey.set(transferKey, ack);
+          }}
+          continue;
+        }}
+        if (frame.kind === "flow") {{
+          const transferKey = fileTransferKeyOf(toId, fromId, frame.transferId);
+          const flow = {{
+            transferKey,
+            transferId: frame.transferId,
+            action: String(frame.action || "").trim().toLowerCase(),
+            senderId: fromId,
+            receiverId: toId,
+            channelIndex: explicitChannelIndex,
+            latestUnix: msgUnix || 0,
+          }};
+          const prev = flowByTransferKey.get(transferKey);
+          if (!prev || Number(flow.latestUnix || 0) >= Number(prev.latestUnix || 0)) {{
+            flowByTransferKey.set(transferKey, flow);
           }}
           continue;
         }}
@@ -273,6 +291,7 @@
         }});
       }}
       pruneFileTransferInboundDecisionState(activeTransferKeys, nowMs);
+      pruneFileTransferInboundFlowState(activeTransferKeys, nowMs);
       const staleChunkCutoffMs = nowMs - (45 * 60 * 1000);
       for (const [key, cacheRaw] of fileTransferChunkCacheByKey.entries()) {{
         if (activeTransferKeys.has(key)) continue;
@@ -285,6 +304,7 @@
       return {{
         transfers,
         ackByTransferKey,
+        flowByTransferKey,
         nodesById,
         localNodeId,
       }};

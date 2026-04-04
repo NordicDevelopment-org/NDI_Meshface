@@ -78,6 +78,8 @@
         fileTransferAckProbeCursorByKey.delete(alias);
         fileTransferAckProbeStateByKey.delete(alias);
         fileTransferAckMissingChannelWarnByKey.delete(alias);
+        fileTransferFlowSignalSentByKey.delete(alias);
+        fileTransferInboundFlowByKey.delete(alias);
       }}
 
       const row = fileTransferRows.find((entry) => entry && entry.key === key) || null;
@@ -271,6 +273,13 @@
         const outgoingSession = outgoing
           ? findOutgoingFileTransferSession(transfer.transferId, transfer.toId, transfer.channelIndex)
           : null;
+        const inboundPaused = !!(
+          !outgoing
+          && inboundAccepted
+          && !inboundDeclined
+          && !complete
+          && fileTransferInboundFlowStateForKey(transferKey) === "paused"
+        );
         const outgoingCanRestart = !!(
           outgoingSession
           && !outgoingSession.delivered
@@ -281,6 +290,12 @@
         const outgoingPausedManual = !!(
           outgoingSession
           && outgoingSession.userPaused
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
+        );
+        const outgoingPausedRemote = !!(
+          outgoingSession
+          && outgoingSession.pausedByReceiver
           && !outgoingSession.delivered
           && !outgoingSession.failed
         );
@@ -297,6 +312,7 @@
         const outgoingCanPause = !!(
           outgoingSession
           && !outgoingSession.userPaused
+          && !outgoingSession.pausedByReceiver
           && !outgoingSession.delivered
           && !outgoingSession.failed
         );
@@ -341,6 +357,11 @@
             progressSort = 9;
             progressPercent = deliveryPct;
             progressState = "error";
+          }} else if (outgoingPausedRemote && !delivered) {{
+            progressLabel = "Paused (receiver)";
+            progressSort = 16;
+            progressPercent = deliveryPct;
+            progressState = "pending";
           }} else if (outgoingPausedManual && !delivered) {{
             progressLabel = "Paused (manual)";
             progressSort = 17;
@@ -412,6 +433,11 @@
             progressSort = 6;
             progressPercent = 0;
             progressState = "pending";
+          }} else if (inboundPaused) {{
+            progressLabel = "Paused by receiver";
+            progressSort = 13;
+            progressPercent = percent;
+            progressState = "pending";
           }} else {{
             progressLabel = complete
               ? "Complete"
@@ -474,10 +500,12 @@
           inboundAccepted,
           inboundPending,
           inboundDeclined,
+          inboundPaused,
           outgoingWaitingForAccept: !!(outgoingSession && outgoingSession.waitingForAccept),
           outgoingRetrying,
           outgoingCanceled,
           outgoingPausedManual,
+          outgoingPausedRemote,
           outgoingPausedOffline,
           outgoingSessionMissing,
           outgoingFailed: !!(outgoingSession && outgoingSession.failed && !delivered),
@@ -533,6 +561,12 @@
           && !outgoingSession.delivered
           && !outgoingSession.failed
         );
+        const outgoingPausedRemote = !!(
+          outgoingSession
+          && outgoingSession.pausedByReceiver
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
+        );
         const outgoingCanceled = !!(
           outgoingSession
           && outgoingSession.canceled
@@ -546,6 +580,7 @@
         const outgoingCanPause = !!(
           outgoingSession
           && !outgoingSession.userPaused
+          && !outgoingSession.pausedByReceiver
           && !outgoingSession.delivered
           && !outgoingSession.failed
         );
@@ -597,6 +632,10 @@
           progressLabel = `Canceled (${{ackedChunks}}/${{totalChunks}} acked)`;
           progressSort = 9;
           progressState = "error";
+        }} else if (!delivered && outgoingPausedRemote) {{
+          progressLabel = `Paused (receiver) • ${{deliveryPct}}% delivered (${{ackedChunks}}/${{totalChunks}} acked)`;
+          progressSort = 16;
+          progressState = "pending";
         }} else if (!delivered && outgoingPausedManual) {{
           progressLabel = `Paused (manual) • ${{deliveryPct}}% delivered (${{ackedChunks}}/${{totalChunks}} acked)`;
           progressSort = 17;
@@ -647,10 +686,12 @@
           inboundAccepted: true,
           inboundPending: false,
           inboundDeclined: false,
+          inboundPaused: false,
           outgoingWaitingForAccept,
           outgoingRetrying,
           outgoingCanceled,
           outgoingPausedManual,
+          outgoingPausedRemote,
           outgoingPausedOffline,
           outgoingSessionMissing,
           outgoingFailed,

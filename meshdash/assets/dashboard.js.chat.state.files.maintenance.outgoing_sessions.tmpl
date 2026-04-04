@@ -3,6 +3,7 @@
       if (fileTransferOutgoingByToken.size <= 0) return;
       const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: false }});
       const ackByTransferKey = frameState.ackByTransferKey;
+      const flowByTransferKey = frameState.flowByTransferKey instanceof Map ? frameState.flowByTransferKey : new Map();
       const localNodeId = normalizeNodeId(frameState.localNodeId || "");
       const nodesById = frameState.nodesById instanceof Map ? frameState.nodesById : new Map();
       const summary = (state.summary && typeof state.summary === "object") ? state.summary : {{}};
@@ -80,14 +81,46 @@
         session.lastAutoRestartAtMs = Math.max(0, Math.trunc(Number(session.lastAutoRestartAtMs) || 0));
         session.pausedForPeerOffline = !!session.pausedForPeerOffline;
         session.userPaused = !!session.userPaused;
+        session.pausedByReceiver = !!session.pausedByReceiver;
         session.pausedAtMs = Math.max(0, Math.trunc(Number(session.pausedAtMs) || 0));
         session.lastPauseLogAtMs = Math.max(0, Math.trunc(Number(session.lastPauseLogAtMs) || 0));
         session.lastPeerFreshness = String(session.lastPeerFreshness || "").trim().toLowerCase();
         session.lastPeerSeenUnix = Math.max(0, Math.trunc(Number(session.lastPeerSeenUnix) || 0));
+        session.receiverPausedAtMs = Math.max(0, Math.trunc(Number(session.receiverPausedAtMs) || 0));
+        session.lastReceiverFlowUnix = Math.max(0, Math.trunc(Number(session.lastReceiverFlowUnix) || 0));
         session.canceled = !!session.canceled;
         let ackProgressThisTick = false;
         const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
         const destinationId = normalizeNodeId(session.destination || "");
+        const senderId = normalizeNodeId(session.senderId || localNodeId || "");
+        const transferKey = fileTransferKeyOf(senderId, destinationId, session.transferId);
+        const flow = flowByTransferKey.get(transferKey) || null;
+        const flowAction = flow && typeof flow === "object"
+          ? String(flow.action || "").trim().toLowerCase()
+          : "";
+        const flowUnix = Math.max(0, Math.trunc(Number(flow && flow.latestUnix) || 0));
+        if (flowAction && flowUnix > session.lastReceiverFlowUnix) {{
+          session.lastReceiverFlowUnix = flowUnix;
+          if (flowAction === "pause") {{
+            if (!session.pausedByReceiver) {{
+              appendFileTransferConsole(
+                `Receiver ${{session.destination}} paused ${{fileTransferShortTransferId(session.transferId)}}. Sender is waiting for resume.`,
+                {{ level: "warn" }}
+              );
+            }}
+            session.pausedByReceiver = true;
+            session.receiverPausedAtMs = nowMs;
+          }} else if (flowAction === "resume") {{
+            if (session.pausedByReceiver) {{
+              appendFileTransferConsole(
+                `Receiver ${{session.destination}} resumed ${{fileTransferShortTransferId(session.transferId)}}. Continuing transfer.`,
+                {{ level: "warn" }}
+              );
+            }}
+            session.pausedByReceiver = false;
+            session.receiverPausedAtMs = 0;
+          }}
+        }}
         const destinationNode = nodesById.get(destinationId) || null;
         const peerLastSeenUnix = Number(nodeLastHeardUnix(destinationNode));
         const peerFreshnessKey = normalizeFreshnessKey(freshnessStatus(peerLastSeenUnix, nowUnix));
@@ -118,6 +151,9 @@
           && (nowMs - createdAtMs) <= Math.max(0, Math.trunc(Number(fileTransferPeerUnknownGraceMs) || 0))
         );
         const peerLikelyOnline = ackSuggestsOnline || peerFreshnessKey === "online" || peerFreshnessKey === "warn" || unknownWithinGrace;
+        if (session.pausedByReceiver) {{
+          continue;
+        }}
         if (fileTransferPeerOfflinePauseEnabled && !peerLikelyOnline) {{
           if (!session.pausedForPeerOffline) {{
             session.pausedForPeerOffline = true;

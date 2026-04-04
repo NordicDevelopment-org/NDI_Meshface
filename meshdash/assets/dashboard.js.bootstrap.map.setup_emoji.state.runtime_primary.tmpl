@@ -109,13 +109,16 @@
     const fileTransferChunkCacheByKey = new Map();
     const fileTransferOutgoingByToken = new Map();
     const fileTransferInboundDecisionByKey = new Map();
+    const fileTransferInboundFlowByKey = new Map();
     const fileTransferInboundDecisionPromptByKey = new Map();
     let fileTransferInboundDecisionLoaded = false;
+    let fileTransferInboundFlowLoaded = false;
     const fileTransferAckSentState = new Map();
     const fileTransferAckMissingChannelWarnByKey = new Map();
     const fileTransferAckProbeCursorByKey = new Map();
     const fileTransferAckProbeStateByKey = new Map();
     const fileTransferAckObservedChunksByKey = new Map();
+    const fileTransferFlowSignalSentByKey = new Map();
     const fileTransferDismissedTransferKeys = new Set();
     let fileTransferDismissedLoaded = false;
     const fileTransferConsoleLines = [];

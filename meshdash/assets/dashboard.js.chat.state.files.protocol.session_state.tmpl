@@ -80,6 +80,11 @@
       return "";
     }}
 
+    function normalizeFileTransferInboundFlowState(rawState) {{
+      const clean = String(rawState || "").trim().toLowerCase();
+      return clean === "paused" ? "paused" : "";
+    }}
+
     function ensureFileTransferInboundDecisionStateLoaded() {{
       if (fileTransferInboundDecisionLoaded) return;
       fileTransferInboundDecisionLoaded = true;
@@ -154,6 +159,110 @@
         );
       }} catch (_err) {{
       }}
+    }}
+
+    function ensureFileTransferInboundFlowStateLoaded() {{
+      if (fileTransferInboundFlowLoaded) return;
+      fileTransferInboundFlowLoaded = true;
+      try {{
+        const raw = String(window.localStorage.getItem(fileTransferInboundFlowStorageKey) || "");
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        const nowMs = Date.now();
+        const staleFlowMs = 90 * 60 * 1000;
+        for (const item of parsed) {{
+          if (!(item && typeof item === "object")) continue;
+          const transferKey = String(item.transferKey || "").trim();
+          if (!transferKey) continue;
+          const state = normalizeFileTransferInboundFlowState(item.state);
+          if (!state) continue;
+          const updatedAtMs = Math.max(0, Math.trunc(Number(item.updatedAtMs) || 0));
+          if (updatedAtMs > 0 && (nowMs - updatedAtMs) > staleFlowMs) {{
+            continue;
+          }}
+          fileTransferInboundFlowByKey.set(transferKey, {{
+            transferKey,
+            state,
+            transferId: String(item.transferId || "").trim().toLowerCase(),
+            senderId: normalizeNodeId(item.senderId || ""),
+            receiverId: normalizeNodeId(item.receiverId || ""),
+            updatedAtMs,
+          }});
+          if (fileTransferInboundFlowByKey.size >= 1200) {{
+            break;
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistFileTransferInboundFlowState() {{
+      try {{
+        if (fileTransferInboundFlowByKey.size <= 0) {{
+          window.localStorage.removeItem(fileTransferInboundFlowStorageKey);
+          return;
+        }}
+        const payload = [];
+        for (const entry of fileTransferInboundFlowByKey.values()) {{
+          if (!(entry && typeof entry === "object")) continue;
+          const transferKey = String(entry.transferKey || "").trim();
+          if (!transferKey) continue;
+          const state = normalizeFileTransferInboundFlowState(entry.state);
+          if (!state) continue;
+          payload.push({{
+            transferKey,
+            state,
+            transferId: String(entry.transferId || "").trim().toLowerCase(),
+            senderId: normalizeNodeId(entry.senderId || ""),
+            receiverId: normalizeNodeId(entry.receiverId || ""),
+            updatedAtMs: Math.max(0, Math.trunc(Number(entry.updatedAtMs) || Date.now())),
+          }});
+          if (payload.length >= 1200) break;
+        }}
+        if (payload.length <= 0) {{
+          window.localStorage.removeItem(fileTransferInboundFlowStorageKey);
+          return;
+        }}
+        window.localStorage.setItem(fileTransferInboundFlowStorageKey, JSON.stringify(payload.slice(-1200)));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function fileTransferInboundFlowStateForKey(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return "";
+      ensureFileTransferInboundFlowStateLoaded();
+      const entry = fileTransferInboundFlowByKey.get(key);
+      if (!(entry && typeof entry === "object")) return "";
+      return normalizeFileTransferInboundFlowState(entry.state);
+    }}
+
+    function setFileTransferInboundFlowStateByKey(transferKey, stateRaw, context = null) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return null;
+      ensureFileTransferInboundFlowStateLoaded();
+      const state = normalizeFileTransferInboundFlowState(stateRaw);
+      if (!state) {{
+        const had = fileTransferInboundFlowByKey.delete(key);
+        fileTransferFlowSignalSentByKey.delete(key);
+        if (had) persistFileTransferInboundFlowState();
+        return null;
+      }}
+      const ctx = (context && typeof context === "object") ? context : {{}};
+      const prior = fileTransferInboundFlowByKey.get(key);
+      const nowMs = Date.now();
+      const entry = {{
+        transferKey: key,
+        state,
+        transferId: String(ctx.transferId || (prior && prior.transferId) || "").trim().toLowerCase(),
+        senderId: normalizeNodeId(ctx.senderId || (prior && prior.senderId) || ""),
+        receiverId: normalizeNodeId(ctx.receiverId || (prior && prior.receiverId) || ""),
+        updatedAtMs: nowMs,
+      }};
+      fileTransferInboundFlowByKey.set(key, entry);
+      persistFileTransferInboundFlowState();
+      return entry;
     }}
 
     function fileTransferInboundTransferNeedsAccept(fromId, toId, localNodeId) {{
@@ -284,6 +393,25 @@
       }}
     }}
 
+    function pruneFileTransferInboundFlowState(activeTransferKeys = null, nowMs = Date.now()) {{
+      ensureFileTransferInboundFlowStateLoaded();
+      const active = activeTransferKeys instanceof Set ? activeTransferKeys : null;
+      const staleFlowMs = 90 * 60 * 1000;
+      let changed = false;
+      for (const [key, entry] of fileTransferInboundFlowByKey.entries()) {{
+        if (active && active.has(key)) continue;
+        const updatedAtMs = Math.max(0, Math.trunc(Number(entry && entry.updatedAtMs) || 0));
+        if (updatedAtMs <= 0 || (nowMs - updatedAtMs) > staleFlowMs) {{
+          fileTransferInboundFlowByKey.delete(key);
+          fileTransferFlowSignalSentByKey.delete(key);
+          changed = true;
+        }}
+      }}
+      if (changed) {{
+        persistFileTransferInboundFlowState();
+      }}
+    }}
+
     function findOutgoingFileTransferSession(transferId, destination, channelIndex = null) {{
       const id = String(transferId || "").trim().toLowerCase();
       const to = normalizeNodeId(destination || "");
@@ -371,10 +499,13 @@
         lastAutoRestartAtMs: Math.max(0, Math.trunc(Number(session.lastAutoRestartAtMs) || 0)),
         pausedForPeerOffline: !!session.pausedForPeerOffline,
         userPaused: !!session.userPaused,
+        pausedByReceiver: !!session.pausedByReceiver,
         pausedAtMs: Math.max(0, Math.trunc(Number(session.pausedAtMs) || 0)),
         lastPauseLogAtMs: Math.max(0, Math.trunc(Number(session.lastPauseLogAtMs) || 0)),
         lastPeerFreshness: String(session.lastPeerFreshness || "").trim().toLowerCase(),
         lastPeerSeenUnix: Math.max(0, Math.trunc(Number(session.lastPeerSeenUnix) || 0)),
+        receiverPausedAtMs: Math.max(0, Math.trunc(Number(session.receiverPausedAtMs) || 0)),
+        lastReceiverFlowUnix: Math.max(0, Math.trunc(Number(session.lastReceiverFlowUnix) || 0)),
         delivered: false,
         failed: false,
         canceled: false,
@@ -488,10 +619,13 @@
       );
       record.pausedForPeerOffline = false;
       record.userPaused = false;
+      record.pausedByReceiver = false;
       record.pausedAtMs = 0;
       record.lastPauseLogAtMs = 0;
       record.lastPeerFreshness = "";
       record.lastPeerSeenUnix = 0;
+      record.receiverPausedAtMs = 0;
+      record.lastReceiverFlowUnix = 0;
       record.delivered = false;
       record.failed = false;
       record.canceled = false;
@@ -577,8 +711,11 @@
       record.lastRetryErrorAtMs = 0;
       record.pausedForPeerOffline = false;
       record.userPaused = false;
+      record.pausedByReceiver = false;
       record.pausedAtMs = 0;
       record.lastPauseLogAtMs = 0;
+      record.receiverPausedAtMs = 0;
+      record.lastReceiverFlowUnix = 0;
       if (opts.clearAckState !== false) {{
         record.ackedChunks = 0;
         record.lastAckUnix = null;

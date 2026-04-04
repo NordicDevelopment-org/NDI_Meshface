@@ -147,6 +147,14 @@
       return `${{fileTransferProtocolPrefix}}|A|${{cleanId}}|${{received}}|${{total}}|${{bitmap}}`;
     }}
 
+    function buildFileTransferFlowFrame(transferId, actionRaw) {{
+      const cleanId = String(transferId || "").trim().toLowerCase();
+      const action = String(actionRaw || "").trim().toLowerCase();
+      const code = action === "resume" ? "R" : (action === "pause" ? "P" : "");
+      if (!code) return "";
+      return `${{fileTransferProtocolPrefix}}|F|${{cleanId}}|${{code}}`;
+    }}
+
     function safeDecodeUriComponent(rawValue) {{
       const text = String(rawValue == null ? "" : rawValue);
       if (!text) return "";
@@ -215,6 +223,19 @@
           receivedCount: Math.min(receivedCount, totalChunks),
           totalChunks,
           bitmap,
+        }};
+      }}
+      if (frameType === "F") {{
+        if (parts.length < 4) return null;
+        const actionCode = String(parts[3] || "").trim().toUpperCase();
+        const action = actionCode === "P"
+          ? "pause"
+          : (actionCode === "R" ? "resume" : "");
+        if (!action) return null;
+        return {{
+          kind: "flow",
+          transferId,
+          action,
         }};
       }}
       return null;

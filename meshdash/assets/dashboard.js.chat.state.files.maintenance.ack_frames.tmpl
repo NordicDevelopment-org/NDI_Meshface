@@ -4,6 +4,66 @@
       if (!isCanonicalNodeId(localNodeId)) return;
       const nowMs = Date.now();
       const nowUnix = Math.trunc(nowMs / 1000);
+      const maybeSendInboundFlowSignal = async (transfer, transferKey, senderId, actionRaw, force = false) => {{
+        const action = String(actionRaw || "").trim().toLowerCase();
+        if (action !== "pause" && action !== "resume") return false;
+        const prior = fileTransferFlowSignalSentByKey.get(transferKey) || null;
+        const changed = !prior || String(prior.action || "") !== action;
+        if (!changed && !force) {{
+          const minRefreshMs = action === "pause" ? 30 * 1000 : Number.POSITIVE_INFINITY;
+          const lastSentAtMs = Math.max(0, Math.trunc(Number(prior && prior.lastSentAtMs) || 0));
+          if ((nowMs - lastSentAtMs) < minRefreshMs) {{
+            return false;
+          }}
+        }}
+        const frame = buildFileTransferFlowFrame(transfer && transfer.transferId, action);
+        if (!frame) return false;
+        if (utf8ByteLength(frame) > fileTransferChatMaxBytes) return false;
+        const channels = candidateAckChannelIndexes(transfer);
+        if (!channels.length) return false;
+        let sentChannel = null;
+        let lastError = "";
+        for (const channelIndex of channels) {{
+          try {{
+            await sendFileTransferFrameText(frame, senderId, channelIndex);
+            sentChannel = channelIndex;
+            break;
+          }} catch (err) {{
+            lastError = err instanceof Error ? err.message : String(err || "send failed");
+          }}
+        }}
+        if (sentChannel == null) {{
+          const lastErrorAtMs = Math.max(0, Math.trunc(Number(prior && prior.lastErrorAtMs) || 0));
+          if ((nowMs - lastErrorAtMs) >= 10 * 1000) {{
+            appendFileTransferConsole(
+              `Flow signal send failed for ${{fileTransferShortTransferId(transfer && transfer.transferId)}} to ${{senderId}}: ${{lastError || "no usable channel"}}`,
+              {{ level: "warn" }}
+            );
+          }}
+          fileTransferFlowSignalSentByKey.set(transferKey, {{
+            action: String(prior && prior.action || ""),
+            lastSentAtMs: Math.max(0, Math.trunc(Number(prior && prior.lastSentAtMs) || 0)),
+            updatedAtMs: nowMs,
+            lastErrorAtMs: nowMs,
+          }});
+          return false;
+        }}
+        const sentAtMs = Date.now();
+        fileTransferFlowSignalSentByKey.set(transferKey, {{
+          action,
+          lastSentAtMs: sentAtMs,
+          updatedAtMs: sentAtMs,
+          lastErrorAtMs: 0,
+        }});
+        if (changed) {{
+          const channelLabel = meshChannelLabelForIndex(sentChannel, {{ allowAll: false }});
+          appendFileTransferConsole(
+            `${{action === "pause" ? "Pause" : "Resume"}} signal sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer && transfer.transferId)}} on ${{channelLabel}}.`,
+            {{ level: "warn" }}
+          );
+        }}
+        return true;
+      }};
       const activeAckTransferKeys = new Set();
       for (const transfer of frameState.transfers.values()) {{
         if (!transfer || typeof transfer !== "object") continue;
@@ -39,6 +99,7 @@
             fileTransferAckProbeCursorByKey.delete(transferKey);
             fileTransferAckProbeStateByKey.delete(transferKey);
             fileTransferAckMissingChannelWarnByKey.delete(transferKey);
+            fileTransferFlowSignalSentByKey.delete(transferKey);
             const lastPromptAtMs = Number(fileTransferInboundDecisionPromptByKey.get(transferKey) || 0);
             const promptIntervalMs = 30 * 1000;
             if ((nowMs - lastPromptAtMs) >= promptIntervalMs) {{
@@ -53,6 +114,20 @@
           }}
         }}
         activeAckTransferKeys.add(transferKey);
+        const inboundFlowState = fileTransferInboundFlowStateForKey(transferKey);
+        const inboundPaused = inboundFlowState === "paused";
+        if (inboundPaused) {{
+          fileTransferAckSentState.delete(transferKey);
+          fileTransferAckProbeCursorByKey.delete(transferKey);
+          fileTransferAckProbeStateByKey.delete(transferKey);
+          fileTransferAckMissingChannelWarnByKey.delete(transferKey);
+          await maybeSendInboundFlowSignal(transfer, transferKey, senderId, "pause", false);
+          continue;
+        }}
+        const priorFlowSignal = fileTransferFlowSignalSentByKey.get(transferKey) || null;
+        if (priorFlowSignal && String(priorFlowSignal.action || "") === "pause") {{
+          await maybeSendInboundFlowSignal(transfer, transferKey, senderId, "resume", true);
+        }}
         const receivedIndexes = Array.from(transfer.chunks.keys())
           .map((idx) => Math.trunc(Number(idx)))
           .filter((idx) => Number.isFinite(idx) && idx >= 0 && idx < totalChunks)
@@ -293,6 +368,13 @@
       for (const key of Array.from(fileTransferAckProbeCursorByKey.keys())) {{
         if (!activeAckTransferKeys.has(key) && !fileTransferAckProbeStateByKey.has(key)) {{
           fileTransferAckProbeCursorByKey.delete(key);
+        }}
+      }}
+      for (const [key, value] of fileTransferFlowSignalSentByKey.entries()) {{
+        if (activeAckTransferKeys.has(key)) continue;
+        const updatedAtMs = Math.max(0, Math.trunc(Number(value && value.updatedAtMs) || 0));
+        if (updatedAtMs <= 0 || updatedAtMs < staleCutoffMs) {{
+          fileTransferFlowSignalSentByKey.delete(key);
         }}
       }}
     }}
