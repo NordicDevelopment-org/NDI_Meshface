@@ -88,12 +88,8 @@
           emptyText += ` Filtered to ${{String(meshFilterLabel || "").trim() || "selected channel"}}; switch to All channels to see everything.`;
         }}
         const showMacroPreview = activeLayoutView === "macros" && macrosViewMode === "preview";
-        const showTrendsView = activeLayoutView === "chat" && !!chatTrendsViewEnabled;
         const macroPreviewRows = showMacroPreview
           ? buildMacrosPreviewFeedItems(macrosPreviewLines)
-          : [];
-        const trendRows = showTrendsView
-          ? (Array.isArray(trendFeedItems) ? trendFeedItems : [])
           : [];
         closeReactionPopover(true);
         let nextFeedHtml = "";
@@ -101,10 +97,6 @@
           nextFeedHtml = macroPreviewRows.length > 0
             ? macroPreviewRows.join("")
             : '<div class="chat-feed-empty">Generate ASCII in MACROS Studio on the right to preview line-by-line output here.</div>';
-        }} else if (showTrendsView) {{
-          nextFeedHtml = trendRows.length > 0
-            ? trendRows.join("")
-            : '<div class="chat-feed-empty">No trends yet. Add hashtags like #events, #repair, or #weather to seed trends.</div>';
         }} else {{
           nextFeedHtml = feedItems.length > 0
             ? feedItems.join("")
