@@ -86,7 +86,7 @@ def build_dashboard_parser(
     env_private_mode: Optional[str] = None,
     env_api_token: Optional[str] = None,
     default_file_transfer_enable: bool = False,
-    default_file_transfer_max_bytes: int = 12 * 1024,
+    default_file_transfer_max_bytes: int = 64 * 1024,
     env_file_transfer_enable: Optional[str] = None,
     env_file_transfer_max_bytes: Optional[str] = None,
     env_accept_file_transfer_traffic_disclaimer: Optional[str] = None,

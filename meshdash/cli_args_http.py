@@ -12,7 +12,7 @@ def add_http_runtime_args(
     default_private_mode: bool = False,
     default_api_token: str | None = None,
     default_file_transfer_enable: bool = False,
-    default_file_transfer_max_bytes: int = 12 * 1024,
+    default_file_transfer_max_bytes: int = 64 * 1024,
     default_accept_file_transfer_traffic_disclaimer: bool = False,
 ) -> None:
     parser.add_argument(
