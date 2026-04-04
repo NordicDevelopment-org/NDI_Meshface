@@ -2789,23 +2789,29 @@ Ready.
               <div id="env-metrics-status" class="env-metrics-status">Waiting for saved sensor history...</div>
             </div>
             <div class="env-metrics-controls">
-              <label for="env-window-select">Window</label>
-              <select id="env-window-select" class="env-metric-select" aria-label="Sensor history window">
-                <option value="6">6h</option>
-                <option value="12">12h</option>
-                <option value="24">24h</option>
-                <option value="72" selected>72h</option>
-                <option value="168">7d</option>
-                <option value="336">14d</option>
-              </select>
-              <label for="env-metric-select">Metric</label>
-              <select id="env-metric-select" class="env-metric-select" aria-label="Sensor metric selector">
-                <option value="">No environment metrics</option>
-              </select>
-              <label for="env-node-select">Node</label>
-              <select id="env-node-select" class="env-metric-select" aria-label="Sensor node selector">
-                <option value="">All nodes</option>
-              </select>
+              <div class="history-metric-wrap env-metrics-control-group">
+                <label for="env-window-select">Window</label>
+                <select id="env-window-select" class="env-metric-select" aria-label="Sensor history window">
+                  <option value="6">6h</option>
+                  <option value="12">12h</option>
+                  <option value="24">24h</option>
+                  <option value="72" selected>72h</option>
+                  <option value="168">7d</option>
+                  <option value="336">14d</option>
+                </select>
+              </div>
+              <div class="history-metric-wrap env-metrics-control-group">
+                <label for="env-metric-select">Metric</label>
+                <select id="env-metric-select" class="env-metric-select" aria-label="Sensor metric selector">
+                  <option value="">No environment metrics</option>
+                </select>
+              </div>
+              <div class="history-metric-wrap env-metrics-control-group">
+                <label for="env-node-select">Node</label>
+                <select id="env-node-select" class="env-metric-select" aria-label="Sensor node selector">
+                  <option value="">All nodes</option>
+                </select>
+              </div>
               <button id="env-metrics-refresh-btn" class="env-metrics-refresh-btn" type="button">Refresh</button>
             </div>
             <div class="env-metrics-grid">
