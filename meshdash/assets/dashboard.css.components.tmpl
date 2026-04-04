@@ -1133,6 +1133,42 @@
       margin: 0;
       pointer-events: none;
     }}
+    .console-scroll-status {{
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 10px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 4px 10px;
+      border: 1px solid rgba(122, 177, 138, 0.46);
+      border-radius: 7px;
+      background:
+        linear-gradient(180deg, rgba(231, 246, 236, 0.96) 0%, rgba(214, 236, 221, 0.96) 100%);
+      box-shadow:
+        0 6px 16px rgba(41, 71, 53, 0.14),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+      color: #24543a;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 10px;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+      user-select: none;
+    }}
+    .console-scroll-status[hidden] {{
+      display: none !important;
+    }}
+    .console-scroll-status-line {{
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
     #live-console {{
       margin: 0;
       background: transparent;
@@ -2503,6 +2539,15 @@
     }}
     [data-theme="dark"] .console-terminal-screen::before {{
       opacity: 0.45;
+    }}
+    [data-theme="dark"] .console-scroll-status {{
+      border-color: rgba(45, 143, 93, 0.82);
+      background:
+        linear-gradient(180deg, rgba(8, 24, 15, 0.96) 0%, rgba(5, 18, 11, 0.96) 100%);
+      box-shadow:
+        0 10px 22px rgba(0, 0, 0, 0.46),
+        inset 0 0 0 1px rgba(127, 255, 177, 0.08);
+      color: #cbffe0;
     }}
     [data-theme="dark"] .console-controls button {{
       background: #07140d;

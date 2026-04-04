@@ -118,18 +118,6 @@
     function bindConsoleControls() {{
       ensureConsoleCommandsRegistered();
       bindConsoleDropdownHotkey();
-      const auto = document.getElementById("console-autoscroll");
-      if (auto instanceof HTMLInputElement && auto.dataset.bound !== "1") {{
-        auto.dataset.bound = "1";
-        auto.checked = !!consoleAutoscroll;
-        auto.addEventListener("change", () => {{
-          consoleAutoscroll = auto.checked;
-          persistConsoleSessionState();
-          if (consoleAutoscroll) {{
-            renderConsoleBuffer(true);
-          }}
-        }});
-      }}
       const pre = document.getElementById("live-console");
       if (pre instanceof HTMLElement && pre.dataset.scrollBound !== "1") {{
         pre.dataset.scrollBound = "1";
@@ -140,9 +128,8 @@
           if (consoleAutoscroll !== atBottom) {{
             consoleAutoscroll = atBottom;
           }}
-          const autoBox = document.getElementById("console-autoscroll");
-          if (autoBox instanceof HTMLInputElement && autoBox.checked !== consoleAutoscroll) {{
-            autoBox.checked = consoleAutoscroll;
+          if (typeof syncConsoleScrollStatus === "function") {{
+            syncConsoleScrollStatus(pre);
           }}
         }});
         pre.addEventListener("mouseup", () => {{
