@@ -339,6 +339,8 @@
     function bindFavoritesControls() {{
       bindSearchTextInput("favorites-search-input", {{
         value: globalNodeSearchQuery(),
+        clearable: true,
+        clearLabel: "Clear tagged node search",
         normalize: normalizeSearchQuery,
         onInput: (query) => {{
           const changed = setGlobalNodeSearchQuery(query, {{
@@ -400,7 +402,15 @@
           }}, 120);
         }});
       }}
+      if (typeof ensureSearchTextInputClearButton === "function") {{
+        ensureSearchTextInputClearButton(input, {{
+          clearLabel: "Clear favorite menu node search",
+        }});
+      }}
       input.value = globalNodeSearchQuery();
+      if (typeof syncSearchTextInputClearButton === "function") {{
+        syncSearchTextInputClearButton(input);
+      }}
 
       if (dropdown.dataset.bound !== "1") {{
         dropdown.dataset.bound = "1";
@@ -489,7 +499,15 @@
           }}, 120);
         }});
       }}
+      if (typeof ensureSearchTextInputClearButton === "function") {{
+        ensureSearchTextInputClearButton(input, {{
+          clearLabel: "Clear saved node search",
+        }});
+      }}
       input.value = globalNodeSearchQuery();
+      if (typeof syncSearchTextInputClearButton === "function") {{
+        syncSearchTextInputClearButton(input);
+      }}
 
       if (dropdown.dataset.bound !== "1") {{
         dropdown.dataset.bound = "1";
@@ -530,6 +548,8 @@
     function bindNodeListSearchControls() {{
       bindSearchTextInput("nodes-search-input", {{
         value: globalNodeSearchQuery(),
+        clearable: true,
+        clearLabel: "Clear node search",
         normalize: normalizeSearchQuery,
         onInput: (query) => {{
           const changed = setGlobalNodeSearchQuery(query, {{
@@ -544,6 +564,8 @@
 
       bindSearchTextInput("chat-user-search-input", {{
         value: globalNodeSearchQuery(),
+        clearable: true,
+        clearLabel: "Clear node search",
         normalize: normalizeSearchQuery,
         onInput: (query) => {{
           const changed = setGlobalNodeSearchQuery(query, {{

@@ -1,3 +1,86 @@
+    function syncSearchTextInputClearButton(inputOrId) {{
+      const input = typeof inputOrId === "string"
+        ? document.getElementById(inputOrId)
+        : inputOrId;
+      if (!(input instanceof HTMLInputElement)) return null;
+      const host = input.parentElement;
+      if (!(host instanceof HTMLElement)) return null;
+      const buttonId = String(input.dataset.clearButtonId || "").trim();
+      const button = buttonId ? document.getElementById(buttonId) : null;
+      const hasValue = String(input.value == null ? "" : input.value).length > 0;
+      host.classList.toggle("search-input-clear-host", !!button);
+      host.classList.toggle("has-value", !!button && hasValue);
+      if (button instanceof HTMLButtonElement) {{
+        button.hidden = !hasValue;
+        button.disabled = !hasValue;
+        button.setAttribute("aria-hidden", hasValue ? "false" : "true");
+      }}
+      return button instanceof HTMLButtonElement ? button : null;
+    }}
+
+    function ensureSearchTextInputClearButton(inputOrId, options = {{}}) {{
+      const input = typeof inputOrId === "string"
+        ? document.getElementById(inputOrId)
+        : inputOrId;
+      if (!(input instanceof HTMLInputElement)) return null;
+      const host = input.parentElement;
+      if (!(host instanceof HTMLElement)) return null;
+
+      const opts = options && typeof options === "object" ? options : {{}};
+      const label = String(opts.label || input.getAttribute("aria-label") || input.placeholder || "search").trim();
+      const clearLabel = String(opts.clearLabel || `Clear ${{label}}`).trim() || "Clear search";
+      const clearTitle = String(opts.clearTitle || clearLabel).trim() || clearLabel;
+      const buttonId = input.dataset.clearButtonId
+        || `${{input.id || "search-input"}}-clear-btn`;
+      input.dataset.clearButtonId = buttonId;
+      host.classList.add("search-input-clear-host");
+      input.classList.add("has-search-clear-button");
+
+      let button = document.getElementById(buttonId);
+      if (!(button instanceof HTMLButtonElement)) {{
+        button = document.createElement("button");
+        button.type = "button";
+        button.id = buttonId;
+        button.className = "search-input-clear-btn";
+        button.setAttribute("aria-label", clearLabel);
+        button.setAttribute("title", clearTitle);
+        button.innerHTML = '<span aria-hidden="true">&times;</span>';
+        host.appendChild(button);
+      }}
+
+      if (button.dataset.bound !== "1") {{
+        button.dataset.bound = "1";
+        button.addEventListener("mousedown", (ev) => {{
+          ev.preventDefault();
+        }});
+        button.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (input.disabled || input.readOnly) return;
+          if (String(input.value == null ? "" : input.value) !== "") {{
+            input.value = "";
+            syncSearchTextInputClearButton(input);
+            input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+          }}
+          try {{
+            input.focus({{ preventScroll: true }});
+          }} catch (_err) {{
+            input.focus();
+          }}
+        }});
+      }}
+
+      if (input.dataset.clearButtonStateBound !== "1") {{
+        input.dataset.clearButtonStateBound = "1";
+        input.addEventListener("input", () => {{
+          syncSearchTextInputClearButton(input);
+        }});
+      }}
+
+      syncSearchTextInputClearButton(input);
+      return button;
+    }}
+
     function bindSearchTextInput(inputId, options = {{}}) {{
       const input = document.getElementById(inputId);
       if (!(input instanceof HTMLInputElement)) return null;
@@ -24,6 +107,12 @@
         if (input.value !== valueText) {{
           input.value = valueText;
         }}
+      }}
+
+      if (options.clearable === true) {{
+        ensureSearchTextInputClearButton(input, options);
+      }} else {{
+        syncSearchTextInputClearButton(input);
       }}
 
       return input;
