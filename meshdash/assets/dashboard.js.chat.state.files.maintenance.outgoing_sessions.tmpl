@@ -20,12 +20,86 @@
       }};
       const nowMs = Date.now();
       const nowUnix = Math.floor(nowMs / 1000);
+      const maybeSendOutgoingFlowSignal = async (session, token, actionRaw, force = false) => {{
+        const action = String(actionRaw || "").trim().toLowerCase();
+        if (action !== "pause" && action !== "resume") return false;
+        const prior = fileTransferOutgoingFlowSignalByToken.get(token) || null;
+        const changed = !prior || String(prior.action || "") !== action;
+        if (!changed && !force) {{
+          const minRefreshMs = action === "pause" ? 30 * 1000 : Number.POSITIVE_INFINITY;
+          const lastSentAtMs = Math.max(0, Math.trunc(Number(prior && prior.lastSentAtMs) || 0));
+          if ((nowMs - lastSentAtMs) < minRefreshMs) {{
+            return false;
+          }}
+        }}
+        const frame = buildFileTransferFlowFrame(session && session.transferId, action);
+        if (!frame) return false;
+        if (utf8ByteLength(frame) > fileTransferChatMaxBytes) return false;
+        const destination = normalizeNodeId(session && session.destination || "");
+        if (!isCanonicalNodeId(destination)) return false;
+        const channels = [];
+        const primaryChannel = normalizeMeshChannelIndex(session && session.channelIndex);
+        if (Number.isInteger(primaryChannel) && primaryChannel >= 0) {{
+          channels.push(primaryChannel);
+        }}
+        const fallbackChannel = meshChannelEffectiveSendIndexForApp("files");
+        if (Number.isInteger(fallbackChannel) && fallbackChannel >= 0 && !channels.includes(fallbackChannel)) {{
+          channels.push(fallbackChannel);
+        }}
+        if (!channels.length) {{
+          channels.push(0);
+        }}
+        let sentChannel = null;
+        let lastError = "";
+        for (const channelIndex of channels) {{
+          try {{
+            await sendFileTransferFrameText(frame, destination, channelIndex);
+            sentChannel = channelIndex;
+            break;
+          }} catch (err) {{
+            lastError = err instanceof Error ? err.message : String(err || "send failed");
+          }}
+        }}
+        if (sentChannel == null) {{
+          const lastErrorAtMs = Math.max(0, Math.trunc(Number(prior && prior.lastErrorAtMs) || 0));
+          if ((nowMs - lastErrorAtMs) >= 10 * 1000) {{
+            appendFileTransferConsole(
+              `Flow signal send failed for ${{fileTransferShortTransferId(session && session.transferId)}} to ${{destination}}: ${{lastError || "no usable channel"}}`,
+              {{ level: "warn" }}
+            );
+          }}
+          fileTransferOutgoingFlowSignalByToken.set(token, {{
+            action: String(prior && prior.action || ""),
+            lastSentAtMs: Math.max(0, Math.trunc(Number(prior && prior.lastSentAtMs) || 0)),
+            updatedAtMs: nowMs,
+            lastErrorAtMs: nowMs,
+          }});
+          return false;
+        }}
+        const sentAtMs = Date.now();
+        fileTransferOutgoingFlowSignalByToken.set(token, {{
+          action,
+          lastSentAtMs: sentAtMs,
+          updatedAtMs: sentAtMs,
+          lastErrorAtMs: 0,
+        }});
+        if (changed) {{
+          const channelLabel = meshChannelLabelForIndex(sentChannel, {{ allowAll: false }});
+          appendFileTransferConsole(
+            `${{action === "pause" ? "Pause" : "Resume"}} signal sent to ${{destination}} for ${{fileTransferShortTransferId(session && session.transferId)}} on ${{channelLabel}}.`,
+            {{ level: "warn" }}
+          );
+        }}
+        return true;
+      }};
       for (const [token, session] of fileTransferOutgoingByToken.entries()) {{
         if (!session || typeof session !== "object") {{
           fileTransferOutgoingByToken.delete(token);
+          fileTransferOutgoingFlowSignalByToken.delete(token);
           continue;
         }}
         if (session.delivered) {{
+          fileTransferOutgoingFlowSignalByToken.delete(token);
           continue;
         }}
         let retryIntervalMultiplier = 1;
@@ -89,6 +163,13 @@
         session.receiverPausedAtMs = Math.max(0, Math.trunc(Number(session.receiverPausedAtMs) || 0));
         session.lastReceiverFlowUnix = Math.max(0, Math.trunc(Number(session.lastReceiverFlowUnix) || 0));
         session.canceled = !!session.canceled;
+        const priorOutgoingFlow = fileTransferOutgoingFlowSignalByToken.get(token) || null;
+        const desiredOutgoingFlow = session.userPaused
+          ? "pause"
+          : ((priorOutgoingFlow && String(priorOutgoingFlow.action || "") === "pause") ? "resume" : "");
+        if (desiredOutgoingFlow) {{
+          await maybeSendOutgoingFlowSignal(session, token, desiredOutgoingFlow, false);
+        }}
         let ackProgressThisTick = false;
         const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
         const destinationId = normalizeNodeId(session.destination || "");
@@ -99,7 +180,7 @@
           ? String(flow.action || "").trim().toLowerCase()
           : "";
         const flowUnix = Math.max(0, Math.trunc(Number(flow && flow.latestUnix) || 0));
-        if (flowAction && flowUnix > session.lastReceiverFlowUnix) {{
+        if (flowAction && flowUnix > session.lastReceiverFlowUnix && normalizeNodeId(flow.senderId || "") === destinationId) {{
           session.lastReceiverFlowUnix = flowUnix;
           if (flowAction === "pause") {{
             if (!session.pausedByReceiver) {{
@@ -182,6 +263,9 @@
           );
         }}
         if (session.failed) {{
+          if (session.canceled) {{
+            fileTransferOutgoingFlowSignalByToken.delete(token);
+          }}
           if (session.canceled) {{
             continue;
           }}
@@ -800,4 +884,12 @@
         }}
       }}
       pruneOutgoingFileTransferSessions(nowMs);
+      const staleFlowCutoffMs = nowMs - (30 * 60 * 1000);
+      for (const [token, value] of fileTransferOutgoingFlowSignalByToken.entries()) {{
+        if (fileTransferOutgoingByToken.has(token)) continue;
+        const updatedAtMs = Math.max(0, Math.trunc(Number(value && value.updatedAtMs) || 0));
+        if (updatedAtMs <= 0 || updatedAtMs < staleFlowCutoffMs) {{
+          fileTransferOutgoingFlowSignalByToken.delete(token);
+        }}
+      }}
     }}

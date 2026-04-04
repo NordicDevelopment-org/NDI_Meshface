@@ -634,12 +634,20 @@
             && !row.canDownload
             && !row.delivered
           );
-          const inboundPaused = !!(row && row.inboundPaused);
-          const inboundPauseAction = inboundPaused ? "resume-inbound" : "pause-inbound";
-          const inboundPauseLabel = inboundPaused ? "Resume" : "Pause";
-          const inboundPauseTitle = inboundPaused
-            ? "Resume inbound transfer and continue ACK updates."
-            : "Pause inbound transfer and notify sender.";
+          const inboundPausedBySender = !!(row && row.inboundPausedBySender);
+          const inboundPausedByReceiver = !!(row && row.inboundPausedByReceiver);
+          const inboundPauseAction = inboundPausedByReceiver ? "resume-inbound" : "pause-inbound";
+          const inboundPauseLabel = inboundPausedBySender
+            ? "Paused by TX"
+            : (inboundPausedByReceiver ? "Resume" : "Pause");
+          const inboundPauseTitle = inboundPausedBySender
+            ? "Sender paused this transfer; waiting for sender resume."
+            : (
+              inboundPausedByReceiver
+                ? "Resume inbound transfer and continue ACK updates."
+                : "Pause inbound transfer and notify sender."
+            );
+          const inboundPauseDisabled = inboundPausedBySender ? " disabled" : "";
           const outgoingCanRestart = !!(row && row.outgoingCanRestart);
           const outgoingCanceled = !!(row && row.outgoingCanceled);
           const outgoingPausedRemote = !!(row && row.outgoingPausedRemote);
@@ -655,6 +663,7 @@
                   data-action="${{escAttr(inboundPauseAction)}}"
                   data-transfer-key="${{escAttr(row.key || "")}}"
                   title="${{escAttr(inboundPauseTitle)}}"
+                  ${{inboundPauseDisabled}}
                 >${{escAttr(inboundPauseLabel)}}</button>
                 <button
                   type="button"

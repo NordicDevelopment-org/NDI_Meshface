@@ -95,19 +95,23 @@
           continue;
         }}
         if (frame.kind === "flow") {{
-          const transferKey = fileTransferKeyOf(toId, fromId, frame.transferId);
-          const flow = {{
-            transferKey,
-            transferId: frame.transferId,
-            action: String(frame.action || "").trim().toLowerCase(),
-            senderId: fromId,
-            receiverId: toId,
-            channelIndex: explicitChannelIndex,
-            latestUnix: msgUnix || 0,
-          }};
-          const prev = flowByTransferKey.get(transferKey);
-          if (!prev || Number(flow.latestUnix || 0) >= Number(prev.latestUnix || 0)) {{
-            flowByTransferKey.set(transferKey, flow);
+          const keyA = fileTransferKeyOf(fromId, toId, frame.transferId);
+          const keyB = fileTransferKeyOf(toId, fromId, frame.transferId);
+          const keys = keyA === keyB ? [keyA] : [keyA, keyB];
+          for (const transferKey of keys) {{
+            const flow = {{
+              transferKey,
+              transferId: frame.transferId,
+              action: String(frame.action || "").trim().toLowerCase(),
+              senderId: fromId,
+              receiverId: toId,
+              channelIndex: explicitChannelIndex,
+              latestUnix: msgUnix || 0,
+            }};
+            const prev = flowByTransferKey.get(transferKey);
+            if (!prev || Number(flow.latestUnix || 0) >= Number(prev.latestUnix || 0)) {{
+              flowByTransferKey.set(transferKey, flow);
+            }}
           }}
           continue;
         }}

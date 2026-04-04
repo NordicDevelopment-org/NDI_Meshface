@@ -159,6 +159,9 @@
       const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: true }});
       const transfers = frameState.transfers;
       const ackByTransferKey = frameState.ackByTransferKey;
+      const flowByTransferKey = frameState.flowByTransferKey instanceof Map
+        ? frameState.flowByTransferKey
+        : new Map();
       const nodesById = frameState.nodesById;
       const localNodeId = frameState.localNodeId;
       const rows = [];
@@ -273,13 +276,38 @@
         const outgoingSession = outgoing
           ? findOutgoingFileTransferSession(transfer.transferId, transfer.toId, transfer.channelIndex)
           : null;
-        const inboundPaused = !!(
+        const latestFlow = flowByTransferKey.get(transferKey) || null;
+        const latestFlowAction = latestFlow
+          ? String(latestFlow.action || "").trim().toLowerCase()
+          : "";
+        const latestFlowSenderId = normalizeNodeId(latestFlow && latestFlow.senderId || "");
+        const latestFlowReceiverId = normalizeNodeId(latestFlow && latestFlow.receiverId || "");
+        const transferFromId = normalizeNodeId(transfer.fromId || "");
+        const transferToId = normalizeNodeId(transfer.toId || "");
+        const inboundPausedBySender = !!(
           !outgoing
           && inboundAccepted
           && !inboundDeclined
           && !complete
-          && fileTransferInboundFlowStateForKey(transferKey) === "paused"
+          && latestFlowAction === "pause"
+          && latestFlowSenderId === transferFromId
+          && latestFlowReceiverId === transferToId
         );
+        const inboundPausedByReceiver = !!(
+          !outgoing
+          && inboundAccepted
+          && !inboundDeclined
+          && !complete
+          && (
+            fileTransferInboundFlowStateForKey(transferKey) === "paused"
+            || (
+              latestFlowAction === "pause"
+              && latestFlowSenderId === transferToId
+              && latestFlowReceiverId === transferFromId
+            )
+          )
+        );
+        const inboundPaused = !!(inboundPausedBySender || inboundPausedByReceiver);
         const outgoingCanRestart = !!(
           outgoingSession
           && !outgoingSession.delivered
@@ -433,7 +461,12 @@
             progressSort = 6;
             progressPercent = 0;
             progressState = "pending";
-          }} else if (inboundPaused) {{
+          }} else if (inboundPausedBySender) {{
+            progressLabel = "Paused by sender";
+            progressSort = 12;
+            progressPercent = percent;
+            progressState = "pending";
+          }} else if (inboundPausedByReceiver) {{
             progressLabel = "Paused by receiver";
             progressSort = 13;
             progressPercent = percent;
@@ -501,6 +534,8 @@
           inboundPending,
           inboundDeclined,
           inboundPaused,
+          inboundPausedBySender,
+          inboundPausedByReceiver,
           outgoingWaitingForAccept: !!(outgoingSession && outgoingSession.waitingForAccept),
           outgoingRetrying,
           outgoingCanceled,
