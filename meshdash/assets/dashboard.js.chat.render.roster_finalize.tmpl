@@ -1159,84 +1159,16 @@
       ) ? Math.max(0, window.performance.now() - chatRenderStartMs) : 0;
       recordChatPerfSample(chatRenderElapsedMs, feedItems.length, rosterFiltered.length);
 
-      const applyChatFeedSearchFilter = () => {{
-        if (!(feed instanceof HTMLElement)) return;
-        const queryRaw = String(chatFeedSearchQuery == null ? "" : chatFeedSearchQuery);
-        const queryLabel = queryRaw.trim();
-        const query = queryLabel.toLowerCase();
-        const cachedFeedRows = Array.isArray(feed.__meshChatFeedSearchRows)
-          ? feed.__meshChatFeedSearchRows
-          : [];
-        const needsRowRefresh = (
-          cachedFeedRows.length <= 0
-          || cachedFeedRows.some((row) => !(row instanceof HTMLElement) || !row.isConnected || row.parentElement == null)
-        );
-        const feedRows = needsRowRefresh
-          ? Array.from(feed.querySelectorAll(".chat-feed-item")).filter((row) => row instanceof HTMLElement)
-          : cachedFeedRows;
-        if (needsRowRefresh) {{
-          feed.__meshChatFeedSearchRows = feedRows;
-        }}
-        let visibleRows = 0;
-        if (!query) {{
-          for (const row of feedRows) {{
-            if (!(row instanceof HTMLElement)) continue;
-            row.hidden = false;
-            row.classList.remove("chat-feed-search-hidden");
-            visibleRows += 1;
-          }}
-        }} else {{
+      if (feed instanceof HTMLElement) {{
+        const feedRows = Array.from(feed.querySelectorAll(".chat-feed-item")).filter((row) => row instanceof HTMLElement);
         for (const row of feedRows) {{
           if (!(row instanceof HTMLElement)) continue;
-          let haystack = String(row.__meshSearchHaystack || "");
-          if (!haystack) {{
-            const rowName = String(row.dataset.replyName || "");
-            const rowText = String(row.dataset.replyText || "");
-            haystack = `${{rowName}} ${{rowText}} ${{row.textContent || ""}}`.toLowerCase();
-            row.__meshSearchHaystack = haystack;
-          }}
-          const matches = !query || haystack.includes(query);
-          row.hidden = !matches;
-          row.classList.toggle("chat-feed-search-hidden", !matches);
-          if (matches) visibleRows += 1;
+          row.hidden = false;
+          row.classList.remove("chat-feed-search-hidden");
         }}
-        }}
-        let searchEmpty = feed.querySelector(".chat-feed-empty.chat-feed-search-empty");
-        if (query && feedRows.length > 0 && visibleRows <= 0) {{
-          if (!(searchEmpty instanceof HTMLElement)) {{
-            searchEmpty = document.createElement("div");
-            searchEmpty.className = "chat-feed-empty chat-feed-search-empty";
-            feed.appendChild(searchEmpty);
-          }}
-          searchEmpty.textContent = `No messages match "${{queryLabel}}".`;
-        }} else if (searchEmpty instanceof HTMLElement) {{
+        const searchEmpty = feed.querySelector(".chat-feed-empty.chat-feed-search-empty");
+        if (searchEmpty instanceof HTMLElement) {{
           searchEmpty.remove();
-        }}
-      }};
-
-      const caption = document.getElementById("chat-caption");
-      let searchInput = document.getElementById("chat-feed-search-input");
-      if (!(searchInput instanceof HTMLInputElement) && caption instanceof HTMLElement) {{
-        searchInput = caption.querySelector("#chat-feed-search-input");
-      }}
-      if (searchInput instanceof HTMLInputElement) {{
-        if (document.activeElement !== searchInput && searchInput.value !== String(chatFeedSearchQuery || "")) {{
-          searchInput.value = String(chatFeedSearchQuery || "");
-        }}
-        if (searchInput.dataset.bound !== "1") {{
-          searchInput.dataset.bound = "1";
-          searchInput.addEventListener("input", () => {{
-            chatFeedSearchQuery = String(searchInput.value || "").slice(0, 120);
-            applyChatFeedSearchFilter();
-          }});
-        }}
-      }}
-      applyChatFeedSearchFilter();
-      if (caption instanceof HTMLElement) {{
-        if (chatPerfEnabled) {{
-          caption.title = `Chat render avg ${{chatPerfStats.avgMs.toFixed(1)}}ms, max ${{chatPerfStats.maxMs.toFixed(1)}}ms, samples ${{chatPerfStats.samples}}`;
-        }} else {{
-          caption.removeAttribute("title");
         }}
       }}
     }}
