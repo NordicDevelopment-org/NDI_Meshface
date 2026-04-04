@@ -294,6 +294,16 @@
 
     async function runConsoleCommandLine(rawLine) {{
       const line = String(rawLine == null ? "" : rawLine).trim();
+      const searchMode = typeof parseConsoleSearchCommand === "function"
+        ? parseConsoleSearchCommand(line)
+        : null;
+      if (searchMode) {{
+        if (typeof syncConsoleSearchFromDraft === "function") {{
+          syncConsoleSearchFromDraft(rawLine);
+        }}
+        renderConsoleBuffer(false);
+        return;
+      }}
       const zorkPromptInput = isZorkConsoleInteractiveSession(consoleInteractiveSession) && !line.startsWith("/");
       const promptLabel = zorkPromptInput ? ">" : consolePromptLabel;
       const renderedInput = formatConsolePromptEchoLine(promptLabel, line);

@@ -118,14 +118,6 @@
     function bindConsoleControls() {{
       ensureConsoleCommandsRegistered();
       bindConsoleDropdownHotkey();
-      const clearBtn = document.getElementById("console-clear-btn");
-      if (clearBtn instanceof HTMLButtonElement && clearBtn.dataset.bound !== "1") {{
-        clearBtn.dataset.bound = "1";
-        clearBtn.addEventListener("click", () => {{
-          clearConsoleOutput();
-        }});
-      }}
-
       const auto = document.getElementById("console-autoscroll");
       if (auto instanceof HTMLInputElement && auto.dataset.bound !== "1") {{
         auto.dataset.bound = "1";
@@ -147,31 +139,6 @@
             consoleShowTimestamps = !!timestamps.checked;
             persistConsoleSessionState();
             renderConsoleBuffer(false);
-          }});
-        }}
-      }}
-      const filterInput = document.getElementById("console-filter-input");
-      if (filterInput instanceof HTMLInputElement) {{
-        filterInput.value = String(consoleFilterText || "");
-        if (filterInput.dataset.bound !== "1") {{
-          filterInput.dataset.bound = "1";
-          filterInput.addEventListener("input", () => {{
-            consoleFilterText = String(filterInput.value || "").slice(0, 120);
-            if (filterInput.value !== consoleFilterText) {{
-              filterInput.value = consoleFilterText;
-            }}
-            persistConsoleSessionState();
-            renderConsoleBuffer(false);
-          }});
-          filterInput.addEventListener("keydown", (ev) => {{
-            if (ev.key === "Escape" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
-              if (!filterInput.value) return;
-              ev.preventDefault();
-              filterInput.value = "";
-              consoleFilterText = "";
-              persistConsoleSessionState();
-              renderConsoleBuffer(false);
-            }}
           }});
         }}
       }}
@@ -279,6 +246,13 @@
           renderConsolePromptBuffer(false);
         }});
         input.addEventListener("input", () => {{
+          const searchState = (typeof syncConsoleSearchFromDraft === "function")
+            ? syncConsoleSearchFromDraft(input.value)
+            : {{ active: false, changed: false }};
+          if (searchState.active || searchState.changed) {{
+            renderConsoleBuffer(false);
+            return;
+          }}
           renderConsolePromptBuffer(false);
         }});
         const rerenderForCaretMove = () => {{
@@ -321,6 +295,14 @@
           }}
           if (ev.key === "Enter" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
             ev.preventDefault();
+            const searchState = (typeof syncConsoleSearchFromDraft === "function")
+              ? syncConsoleSearchFromDraft(input.value)
+              : {{ active: false }};
+            if (searchState.active) {{
+              renderConsoleBuffer(false);
+              focusConsoleCommandInput(false);
+              return;
+            }}
             const cmdLine = input.value;
             input.value = "";
             consoleCommandHistoryCursor = -1;

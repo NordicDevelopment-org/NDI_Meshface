@@ -129,6 +129,31 @@
       }};
     }}
 
+    function parseConsoleSearchCommand(rawText) {{
+      const value = String(rawText == null ? "" : rawText);
+      const trimmedStart = value.replace(/^\s+/, "");
+      const match = trimmedStart.match(/^\/search(?:\s+([\s\S]*))?$/i);
+      if (!match) return null;
+      return {{
+        query: String(match[1] == null ? "" : match[1]).slice(0, 120).trim(),
+      }};
+    }}
+
+    function syncConsoleSearchFromDraft(rawText) {{
+      const parsed = parseConsoleSearchCommand(rawText);
+      const nextFilterText = parsed ? String(parsed.query || "") : "";
+      const changed = nextFilterText !== consoleFilterText;
+      if (changed) {{
+        consoleFilterText = nextFilterText;
+        persistConsoleSessionState();
+      }}
+      return {{
+        active: !!parsed,
+        changed,
+        query: nextFilterText,
+      }};
+    }}
+
     function filterConsoleLinesWithContext(lines, filterExpr) {{
       const source = Array.isArray(lines) ? lines : [];
       const parsed = (filterExpr && typeof filterExpr === "object") ? filterExpr : {{
@@ -271,11 +296,14 @@
       if (!(pre instanceof HTMLElement)) return;
       const input = consoleCommandInputElement();
       const typingFocused = input instanceof HTMLInputElement && document.activeElement === input;
+      const maxTop = Math.max(0, pre.scrollHeight - pre.clientHeight);
+      const remaining = Math.max(0, maxTop - pre.scrollTop);
+      const promptPinned = remaining <= 3;
       if (consoleAutoscroll || forceScroll) {{
         pre.scrollLeft = 0;
         pre.scrollTop = pre.scrollHeight;
       }}
-      if (consoleAutoscroll || forceScroll || typingFocused) {{
+      if (consoleAutoscroll || forceScroll || (typingFocused && promptPinned)) {{
         ensureConsolePromptVisible(pre, 0);
       }}
     }}
