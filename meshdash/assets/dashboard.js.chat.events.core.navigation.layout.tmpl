@@ -690,7 +690,8 @@
 
     function normalizeNetworkSubview(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
-      return clean === "overview" || clean === "details" ? clean : "map";
+      if (clean === "details") return "sensors";
+      return clean === "overview" || clean === "sensors" ? clean : "map";
     }}
 
     function loadPreferredNetworkSubview() {{
@@ -735,6 +736,23 @@
       );
     }}
 
+    function syncEnvironmentMetricsDock(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
+      const explorer = document.querySelector(".env-metrics-explorer");
+      const homeHost = document.getElementById("environment-metrics-home");
+      const networkHost = document.getElementById("network-sensors-host");
+      if (!(explorer instanceof HTMLElement)) return;
+      if (!(homeHost instanceof HTMLElement)) return;
+      if (!(networkHost instanceof HTMLElement)) return;
+
+      const normalizedView = normalizeLayoutView(viewName);
+      const normalizedSubview = normalizeNetworkSubview(subviewName);
+      const dockInNetwork = normalizedView === "network" && normalizedSubview === "sensors";
+      const targetHost = dockInNetwork ? networkHost : homeHost;
+      if (explorer.parentElement !== targetHost) {{
+        targetHost.appendChild(explorer);
+      }}
+    }}
+
     function setActiveNetworkSubview(subviewName, options = {{}}) {{
       const next = normalizeNetworkSubview(subviewName);
       const persist = options && options.persist !== false;
@@ -766,6 +784,7 @@
       }}
 
       syncMapControlsDock(activeLayoutView, next);
+      syncEnvironmentMetricsDock(activeLayoutView, next);
 
       try {{
         if (typeof setMapWheelZoomActive === "function") {{
@@ -781,6 +800,11 @@
       if (normalizedView === "network" && next === "overview") {{
         if (typeof refreshNetworkOverviewPanels === "function") {{
           void refreshNetworkOverviewPanels(false);
+        }}
+      }}
+      if (normalizedView === "network" && next === "sensors") {{
+        if (typeof renderEnvironmentMetricsView === "function") {{
+          void renderEnvironmentMetricsView(false);
         }}
       }}
 
@@ -1053,6 +1077,7 @@
         }});
       }}
       syncNodeHistoryDock();
+      syncEnvironmentMetricsDock(next, activeNetworkSubview);
       if (latestState) {{
         let cachedNodeHistory = null;
         const viewHistoryNodeId = next === "saved"

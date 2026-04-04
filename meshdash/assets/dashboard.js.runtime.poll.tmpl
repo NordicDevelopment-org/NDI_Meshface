@@ -89,7 +89,10 @@
           if (activeLayoutView === "settings" && activeSettingsTab === "channels") {{
             renderChannelsView(latestState);
           }}
-          if (activeLayoutView === "environment") {{
+          if (
+            activeLayoutView === "environment"
+            || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
+          ) {{
             void renderEnvironmentMetricsView(false);
           }}
           if (activeLayoutView === "bots") {{
@@ -293,7 +296,10 @@
           renderFavorites(state, cachedHistory, loadingId);
         }}
 
-        if (activeLayoutView === "environment") {{
+        if (
+          activeLayoutView === "environment"
+          || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
+        ) {{
           void renderEnvironmentMetricsView(false);
         }}
 

@@ -2265,9 +2265,9 @@ Ready.
                   type="button"
                   role="tab"
                   aria-selected="false"
-                  aria-controls="network-map-panel-details"
-                  data-network-subview="details"
-                >Details</button>
+                  aria-controls="network-map-panel-sensors"
+                  data-network-subview="sensors"
+                >Sensors</button>
               </div>
               <div id="network-map-controls-host" class="network-map-controls-host" aria-hidden="true"></div>
             </div>
@@ -2434,16 +2434,14 @@ Ready.
               </div>
             </div>
             <div
-              id="network-map-panel-details"
+              id="network-map-panel-sensors"
               class="network-map-subview-panel"
               role="tabpanel"
-              data-network-subview-panel="details"
+              data-network-subview-panel="sensors"
               hidden
             >
-              <div class="network-map-placeholder">
-                <span class="network-map-placeholder-eyebrow">Subview staging</span>
-                <h3 class="network-map-placeholder-title">Details is ready for deeper drill-down panels.</h3>
-                <p class="network-map-placeholder-copy">This tab gives us a stable slot for denser diagnostics, route notes, or packet-focused context in the next pass.</p>
+              <div class="network-overview-panel network-sensors-panel">
+                <div id="network-sensors-host" class="environment-metrics-home network-sensors-host"></div>
               </div>
             </div>
           </div>
@@ -2784,39 +2782,41 @@ Ready.
     <section class="card environment">
       <h2>Sensors</h2>
       <div class="body">
-        <section class="env-metrics-explorer" aria-label="Sensor metrics explorer">
-          <div class="env-metrics-head">
-            <h3>Historical Sensor Metrics</h3>
-            <div id="env-metrics-status" class="env-metrics-status">Waiting for saved sensor history...</div>
-          </div>
-          <div class="env-metrics-controls">
-            <label for="env-window-select">Window</label>
-            <select id="env-window-select" class="env-metric-select" aria-label="Sensor history window">
-              <option value="6">6h</option>
-              <option value="12">12h</option>
-              <option value="24">24h</option>
-              <option value="72" selected>72h</option>
-              <option value="168">7d</option>
-              <option value="336">14d</option>
-            </select>
-            <label for="env-metric-select">Metric</label>
-            <select id="env-metric-select" class="env-metric-select" aria-label="Sensor metric selector">
-              <option value="">No environment metrics</option>
-            </select>
-            <label for="env-node-select">Node</label>
-            <select id="env-node-select" class="env-metric-select" aria-label="Sensor node selector">
-              <option value="">All nodes</option>
-            </select>
-            <button id="env-metrics-refresh-btn" class="env-metrics-refresh-btn" type="button">Refresh</button>
-          </div>
-          <div class="env-metrics-grid">
-            <div id="env-metrics-chart-wrap">
-              <svg id="env-metrics-chart" viewBox="0 0 900 320" preserveAspectRatio="none" aria-label="Sensor metrics over time chart"></svg>
-              <div id="env-metrics-empty" class="signal-empty">No historical sensor metrics found yet.</div>
+        <div id="environment-metrics-home" class="environment-metrics-home">
+          <section class="env-metrics-explorer" aria-label="Sensor metrics explorer">
+            <div class="env-metrics-head">
+              <h3>Historical Sensor Metrics</h3>
+              <div id="env-metrics-status" class="env-metrics-status">Waiting for saved sensor history...</div>
             </div>
-          </div>
-          <div id="env-metrics-available" class="env-metrics-available"></div>
-        </section>
+            <div class="env-metrics-controls">
+              <label for="env-window-select">Window</label>
+              <select id="env-window-select" class="env-metric-select" aria-label="Sensor history window">
+                <option value="6">6h</option>
+                <option value="12">12h</option>
+                <option value="24">24h</option>
+                <option value="72" selected>72h</option>
+                <option value="168">7d</option>
+                <option value="336">14d</option>
+              </select>
+              <label for="env-metric-select">Metric</label>
+              <select id="env-metric-select" class="env-metric-select" aria-label="Sensor metric selector">
+                <option value="">No environment metrics</option>
+              </select>
+              <label for="env-node-select">Node</label>
+              <select id="env-node-select" class="env-metric-select" aria-label="Sensor node selector">
+                <option value="">All nodes</option>
+              </select>
+              <button id="env-metrics-refresh-btn" class="env-metrics-refresh-btn" type="button">Refresh</button>
+            </div>
+            <div class="env-metrics-grid">
+              <div id="env-metrics-chart-wrap">
+                <svg id="env-metrics-chart" viewBox="0 0 900 320" preserveAspectRatio="none" aria-label="Sensor metrics over time chart"></svg>
+                <div id="env-metrics-empty" class="signal-empty">No historical sensor metrics found yet.</div>
+              </div>
+            </div>
+            <div id="env-metrics-available" class="env-metrics-available"></div>
+          </section>
+        </div>
       </div>
     </section>
 
