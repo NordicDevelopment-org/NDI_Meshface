@@ -363,7 +363,7 @@ fi"
 
   tmp_service="/tmp/${SERVICE_NAME}.service"
   scp_cmd "${ROOT_DIR}/meshtastic-dashboard.service" "${TARGET}:${tmp_service}"
-  ssh_cmd -t "${TARGET}" "\
+  ssh_cmd -tt "${TARGET}" "\
 sudo install -m 0644 '${tmp_service}' '/etc/systemd/system/${SERVICE_NAME}.service' && \
 rm -f '${tmp_service}' && \
 sudo systemctl daemon-reload"
@@ -392,7 +392,7 @@ if ! ssh_cmd "${TARGET}" "test -x '${REMOTE_PYTHON}'"; then
 fi
 
 if [[ "${BOOTSTRAP}" -eq 1 ]]; then
-  ssh_cmd -t "${TARGET}" "\
+  ssh_cmd -tt "${TARGET}" "\
 '${REMOTE_PYTHON}' -m compileall -q '${APP_DIR}' && \
 sudo systemctl enable --now '${SERVICE_NAME}' && \
 SYSTEMD_PAGER=cat sudo systemctl --no-pager -l status '${SERVICE_NAME}'"
@@ -401,7 +401,7 @@ else
     echo "service ${SERVICE_NAME}.service is not installed on target; rerun with --bootstrap" >&2
     exit 1
   fi
-  ssh_cmd -t "${TARGET}" "\
+  ssh_cmd -tt "${TARGET}" "\
 '${REMOTE_PYTHON}' -m compileall -q '${APP_DIR}' && \
 sudo systemctl restart '${SERVICE_NAME}' && \
 SYSTEMD_PAGER=cat sudo systemctl --no-pager -l status '${SERVICE_NAME}'"
