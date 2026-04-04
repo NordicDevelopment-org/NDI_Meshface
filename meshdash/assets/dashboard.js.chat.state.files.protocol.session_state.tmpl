@@ -363,6 +363,17 @@
         retryChunkCursor: Math.max(0, Math.trunc(Number(session.retryChunkCursor) || 0)),
         lastRetryErrorAtMs: 0,
         maxRetries: Math.max(1, Math.trunc(Number(session.maxRetries) || fileTransferOutgoingMaxRetries)),
+        autoRestartCount: Math.max(0, Math.trunc(Number(session.autoRestartCount) || 0)),
+        maxAutoRestarts: Math.max(
+          0,
+          Math.trunc(Number(session.maxAutoRestarts) || fileTransferAutoRestartMaxCount)
+        ),
+        lastAutoRestartAtMs: Math.max(0, Math.trunc(Number(session.lastAutoRestartAtMs) || 0)),
+        pausedForPeerOffline: !!session.pausedForPeerOffline,
+        pausedAtMs: Math.max(0, Math.trunc(Number(session.pausedAtMs) || 0)),
+        lastPauseLogAtMs: Math.max(0, Math.trunc(Number(session.lastPauseLogAtMs) || 0)),
+        lastPeerFreshness: String(session.lastPeerFreshness || "").trim().toLowerCase(),
+        lastPeerSeenUnix: Math.max(0, Math.trunc(Number(session.lastPeerSeenUnix) || 0)),
         delivered: false,
         failed: false,
         deliveredAtMs: 0,
@@ -449,6 +460,35 @@
         1,
         Math.trunc(Number(record.maxRetries) || fileTransferOutgoingMaxRetries)
       );
+      record.autoRestartCount = Math.max(
+        0,
+        Math.trunc(
+          Number(
+            opts.autoRestartCount != null
+              ? opts.autoRestartCount
+              : record.autoRestartCount
+          ) || 0
+        )
+      );
+      record.maxAutoRestarts = Math.max(
+        0,
+        Math.trunc(Number(record.maxAutoRestarts) || fileTransferAutoRestartMaxCount)
+      );
+      record.lastAutoRestartAtMs = Math.max(
+        0,
+        Math.trunc(
+          Number(
+            opts.lastAutoRestartAtMs != null
+              ? opts.lastAutoRestartAtMs
+              : record.lastAutoRestartAtMs
+          ) || 0
+        )
+      );
+      record.pausedForPeerOffline = false;
+      record.pausedAtMs = 0;
+      record.lastPauseLogAtMs = 0;
+      record.lastPeerFreshness = "";
+      record.lastPeerSeenUnix = 0;
       record.delivered = false;
       record.failed = false;
       record.deliveredAtMs = 0;

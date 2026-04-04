@@ -435,11 +435,27 @@
           }} else {{
             const actionLabel = row && row.canDownload
               ? "Download"
-              : (row && row.outgoingRetrying ? "Retrying" : "Waiting");
+              : (
+                row && row.outgoingSessionMissing
+                  ? "Session lost"
+                  : (
+                    row && row.outgoingPausedOffline
+                      ? "Paused"
+                      : (row && row.outgoingRetrying ? "Retrying" : "Waiting")
+                  )
+              );
             const actionDisabled = row && row.canDownload ? "" : " disabled";
             const actionTitle = row && row.canDownload
               ? `Download ${{row.downloadName || row.fileName || "file"}}`
-              : (row && row.outgoingWaitingForAccept ? "Waiting for receiver accept" : "Waiting for all chunks");
+              : (
+                row && row.outgoingSessionMissing
+                  ? "Sender session state was lost (likely after dashboard restart). Re-send the file to start a fresh session."
+                  : (
+                    row && row.outgoingPausedOffline
+                      ? "Transfer is auto-paused while peer appears offline."
+                      : (row && row.outgoingWaitingForAccept ? "Waiting for receiver accept" : "Waiting for all chunks")
+                  )
+              );
             actionSort = row && row.canDownload ? 3 : 0;
             actionHtml = `<button
                 type="button"
