@@ -303,13 +303,13 @@
         clearFinishedBtn.addEventListener("click", () => {{
           const cleared = Number(clearFinishedFileTransferRows()) || 0;
           if (cleared <= 0) {{
-            setFileTransferStatus("No finished transfers to clear.");
+            setFileTransferStatus("No stale or finished transfers to clear.");
             return;
           }}
           const suffix = cleared === 1 ? "" : "s";
-          setFileTransferStatus(`Cleared ${{cleared}} finished transfer${{suffix}}.`);
+          setFileTransferStatus(`Cleared ${{cleared}} stale/finished transfer${{suffix}}.`);
           appendFileTransferConsole(
-            `Cleared ${{cleared}} finished transfer${{suffix}} from the Files table.`
+            `Cleared ${{cleared}} stale/finished transfer${{suffix}} from the Files table.`
           );
         }});
       }}

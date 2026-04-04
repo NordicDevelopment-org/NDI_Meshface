@@ -40,13 +40,27 @@
     function clearFinishedFileTransferRows() {{
       ensureFileTransferDismissedStateLoaded();
       let cleared = 0;
+      const nowUnix = Math.floor(Date.now() / 1000);
       for (const row of (Array.isArray(fileTransferRows) ? fileTransferRows : [])) {{
         if (!(row && typeof row === "object")) continue;
         const key = String(row.key || "").trim();
         if (!key) continue;
         const progressState = String(row.progressState || "").trim().toLowerCase();
+        const rowUnix = Math.max(0, Math.trunc(Number(row.sortUnix || row.unix) || 0));
+        const rowAgeSec = rowUnix > 0 ? Math.max(0, nowUnix - rowUnix) : 0;
+        const stalePending = (
+          !row.delivered
+          && !row.inboundDeclined
+          && rowAgeSec >= Math.max(60, Number(fileTransferStalePendingClearSec) || 0)
+          && (
+            !!row.inboundPending
+            || !!row.outgoingWaitingForAccept
+            || progressState === "pending"
+            || progressState === "active"
+          )
+        );
         const finished = !!row.delivered || progressState === "error" || !!row.inboundDeclined;
-        if (!finished) continue;
+        if (!finished && !stalePending) continue;
         if (fileTransferDismissedTransferKeys.has(key)) continue;
         fileTransferDismissedTransferKeys.add(key);
         fileTransferChunkCacheByKey.delete(key);
