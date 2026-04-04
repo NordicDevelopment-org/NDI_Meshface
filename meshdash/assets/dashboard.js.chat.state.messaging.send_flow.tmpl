@@ -20,6 +20,7 @@
       "/cheer": "ᕕ( ᐛ )ᕗ",
     }});
     const CHAT_MACRO_HELP_COMMANDS = Object.freeze([
+      Object.freeze({{ label: "/search <text>", command: "/search", needsArg: true }}),
       Object.freeze({{ label: "/shrug", command: "/shrug", needsArg: false }}),
       Object.freeze({{ label: "/tableflip", command: "/tableflip", needsArg: false }}),
       Object.freeze({{ label: "/flip", command: "/flip", needsArg: false }}),
@@ -270,6 +271,82 @@
       previewEl.appendChild(line);
     }}
 
+    function parseChatFeedSearchCommand(rawText) {{
+      const value = String(rawText == null ? "" : rawText);
+      const trimmedStart = value.replace(/^\s+/, "");
+      const match = trimmedStart.match(/^\/search(?:\s+([\s\S]*))?$/i);
+      if (!match) return null;
+      return {{
+        kind: "search",
+        source: "/search",
+        text: "",
+        query: String(match[1] == null ? "" : match[1]).trim(),
+      }};
+    }}
+
+    function applyChatFeedSearchFilter() {{
+      const feed = document.getElementById("chat-feed");
+      if (!(feed instanceof HTMLElement)) return;
+      const queryRaw = String(chatFeedSearchQuery == null ? "" : chatFeedSearchQuery);
+      const queryLabel = queryRaw.trim();
+      const query = queryLabel.toLowerCase();
+      const cachedFeedRows = Array.isArray(feed.__meshChatFeedSearchRows)
+        ? feed.__meshChatFeedSearchRows
+        : [];
+      const needsRowRefresh = (
+        cachedFeedRows.length <= 0
+        || cachedFeedRows.some((row) => !(row instanceof HTMLElement) || !row.isConnected || row.parentElement == null)
+      );
+      const feedRows = needsRowRefresh
+        ? Array.from(feed.querySelectorAll(".chat-feed-item")).filter((row) => row instanceof HTMLElement)
+        : cachedFeedRows;
+      if (needsRowRefresh) {{
+        feed.__meshChatFeedSearchRows = feedRows;
+      }}
+      let visibleRows = 0;
+      if (!query) {{
+        for (const row of feedRows) {{
+          if (!(row instanceof HTMLElement)) continue;
+          row.hidden = false;
+          row.classList.remove("chat-feed-search-hidden");
+          visibleRows += 1;
+        }}
+      }} else {{
+        for (const row of feedRows) {{
+          if (!(row instanceof HTMLElement)) continue;
+          let haystack = String(row.__meshSearchHaystack || "");
+          if (!haystack) {{
+            const rowName = String(row.dataset.replyName || "");
+            const rowText = String(row.dataset.replyText || "");
+            haystack = `${{rowName}} ${{rowText}} ${{row.textContent || ""}}`.toLowerCase();
+            row.__meshSearchHaystack = haystack;
+          }}
+          const matches = haystack.includes(query);
+          row.hidden = !matches;
+          row.classList.toggle("chat-feed-search-hidden", !matches);
+          if (matches) visibleRows += 1;
+        }}
+      }}
+      let searchEmpty = feed.querySelector(".chat-feed-empty.chat-feed-search-empty");
+      if (query && feedRows.length > 0 && visibleRows <= 0) {{
+        if (!(searchEmpty instanceof HTMLElement)) {{
+          searchEmpty = document.createElement("div");
+          searchEmpty.className = "chat-feed-empty chat-feed-search-empty";
+          feed.appendChild(searchEmpty);
+        }}
+        searchEmpty.textContent = `No messages match "${{queryLabel}}".`;
+      }} else if (searchEmpty instanceof HTMLElement) {{
+        searchEmpty.remove();
+      }}
+    }}
+
+    function syncChatFeedSearchFilter(rawText) {{
+      const parsedSearch = parseChatFeedSearchCommand(rawText);
+      chatFeedSearchQuery = parsedSearch ? String(parsedSearch.query || "") : "";
+      applyChatFeedSearchFilter();
+      return parsedSearch;
+    }}
+
     function renderChatMacroHelpPreview(previewEl, source = "/help", rawFilter = "") {{
       if (!(previewEl instanceof HTMLElement)) return;
       previewEl.textContent = "";
@@ -328,6 +405,10 @@
     function parseChatTextMacro(rawText) {{
       const text = String(rawText == null ? "" : rawText).trim();
       if (!text) return null;
+      const searchCommand = parseChatFeedSearchCommand(rawText);
+      if (searchCommand) {{
+        return searchCommand;
+      }}
       const lowered = text.toLowerCase();
       if (lowered === "/macros" || lowered === "/help") {{
         return {{
@@ -381,7 +462,18 @@
       if (!(previewEl instanceof HTMLElement)) return null;
       const raw = String(rawText == null ? "" : rawText);
       const trimmed = raw.trim();
+      const searchCommand = syncChatFeedSearchFilter(raw);
       const macro = parseChatTextMacro(raw);
+      if (searchCommand || (macro && macro.kind === "search")) {{
+        const query = String((searchCommand && searchCommand.query) || (macro && macro.query) || "");
+        if (query) {{
+          setChatMacroPreviewText(previewEl, `Filtering visible chat for "${{query}}"`);
+        }} else {{
+          setChatMacroPreviewText(previewEl, "Chat search mode: type text after /search");
+        }}
+        previewEl.hidden = false;
+        return macro || searchCommand;
+      }}
       if (!macro) {{
         if (trimmed.startsWith("/")) {{
           renderChatMacroHelpPreview(previewEl, "/", trimmed);
@@ -1543,6 +1635,13 @@
         return;
       }}
       const macro = parseChatTextMacro(rawText);
+      if (macro && macro.kind === "search") {{
+        setChatSendStatus("Chat search is active. Remove /search to send a message.");
+        if (hadFocus) {{
+          restoreChatInputFocus(input);
+        }}
+        return;
+      }}
       if (macro && macro.kind === "help") {{
         appendLocalInfoChatRow(chatMacroHelpText());
         input.value = "";

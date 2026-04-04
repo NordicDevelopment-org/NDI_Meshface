@@ -1159,16 +1159,7 @@
       ) ? Math.max(0, window.performance.now() - chatRenderStartMs) : 0;
       recordChatPerfSample(chatRenderElapsedMs, feedItems.length, rosterFiltered.length);
 
-      if (feed instanceof HTMLElement) {{
-        const feedRows = Array.from(feed.querySelectorAll(".chat-feed-item")).filter((row) => row instanceof HTMLElement);
-        for (const row of feedRows) {{
-          if (!(row instanceof HTMLElement)) continue;
-          row.hidden = false;
-          row.classList.remove("chat-feed-search-hidden");
-        }}
-        const searchEmpty = feed.querySelector(".chat-feed-empty.chat-feed-search-empty");
-        if (searchEmpty instanceof HTMLElement) {{
-          searchEmpty.remove();
-        }}
+      if (typeof applyChatFeedSearchFilter === "function") {{
+        applyChatFeedSearchFilter();
       }}
     }}
