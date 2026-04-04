@@ -333,6 +333,15 @@
           }}
         }}
       }}
+      if (target && target.key === "network-overview") {{
+        const hiddenOverviewKeys = new Set(["Metric", "Window", "Range"]);
+        overview.innerHTML = items
+          .filter(([key]) => !hiddenOverviewKeys.has(String(key || "").trim()))
+          .map(([k, v]) => (
+            `<div class="overview-item"><div class="k">${{k}}</div><div class="v">${{v}}</div></div>`
+          )).join("");
+        return;
+      }}
       overview.innerHTML = items.map(([k, v]) => (
         `<div class="overview-item"><div class="k">${{k}}</div><div class="v">${{v}}</div></div>`
       )).join("");
