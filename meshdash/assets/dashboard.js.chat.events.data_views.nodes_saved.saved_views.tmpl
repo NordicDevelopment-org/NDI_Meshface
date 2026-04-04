@@ -209,6 +209,11 @@
       const historyPoints = Array.isArray(history && history.points) ? history.points : [];
       const historyPositions = Array.isArray(history && history.positions) ? history.positions : [];
       const historyNameEntries = Array.isArray(history && history.name_history) ? history.name_history : [];
+      const historyPacketEntries = Array.isArray(history && history.packet_history) ? history.packet_history : [];
+      const historyPacketTotalRaw = Number(historySummary.packet_history_total);
+      const historyPacketTotal = Number.isFinite(historyPacketTotalRaw) && historyPacketTotalRaw >= 0
+        ? Math.trunc(historyPacketTotalRaw)
+        : historyPacketEntries.length;
       const historyLoading = loadingId === nodeId && !history;
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
       const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
@@ -396,6 +401,11 @@
       const nameHistorySection = savedDetailNameHistorySectionHtml(historyNameEntries, {{
         loading: historyLoading,
       }});
+      const packetHistorySection = savedDetailPacketHistorySectionHtml(historyPacketEntries, {{
+        loading: historyLoading,
+        totalCount: historyPacketTotal,
+        maxRows: 18,
+      }});
 
       const historySection = savedDetailSectionHtml("History", [
         ["Window", historyWindowText],
@@ -457,6 +467,7 @@
               ${{notesSection}}
               ${{nameHistorySection}}
               ${{historySection}}
+              ${{packetHistorySection}}
               ${{locationSection}}
               ${{chatSection}}
               ${{linksSection}}

@@ -32,6 +32,8 @@ def empty_node_history(node_id: str) -> dict[str, object]:
         "points": [],
         "positions": [],
         "name_history": [],
+        "packet_timestamps": [],
+        "packet_history": [],
         "summary": {},
     }
 

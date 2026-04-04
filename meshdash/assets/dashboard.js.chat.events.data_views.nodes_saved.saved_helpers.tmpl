@@ -93,6 +93,79 @@
       </section>`;
     }}
 
+    function savedDetailPacketHistorySectionHtml(entries, {{
+      loading = false,
+      totalCount = null,
+      maxRows = 16,
+    }} = {{}}) {{
+      const safeEntries = Array.isArray(entries) ? entries : [];
+      const safeMaxRows = Math.max(1, Math.trunc(Number(maxRows) || 16));
+      const totalRaw = Number(totalCount);
+      const knownTotal = Number.isFinite(totalRaw) && totalRaw >= 0
+        ? Math.trunc(totalRaw)
+        : safeEntries.length;
+      const shown = safeEntries.slice(0, safeMaxRows);
+
+      let bodyHtml = "";
+      if (loading && safeEntries.length === 0) {{
+        bodyHtml = '<div class="saved-node-packet-history-empty">Packet history is loading...</div>';
+      }} else if (safeEntries.length === 0) {{
+        bodyHtml = '<div class="saved-node-packet-history-empty">No packet history in this window yet.</div>';
+      }} else {{
+        bodyHtml = `<ul class="saved-node-packet-history-list">${{shown.map((entry) => {{
+          const rawDirection = String((entry && entry.direction) || "").trim().toLowerCase();
+          const direction = rawDirection === "sent"
+            ? "SENT"
+            : (rawDirection === "recv" ? "RECV" : "OTHER");
+          const directionClass = rawDirection === "sent"
+            ? "is-sent"
+            : (rawDirection === "recv" ? "is-recv" : "is-other");
+          const time = savedDetailText(entry && entry.time);
+          const port = savedDetailText(entry && entry.portnum);
+          const fromId = savedDetailText(entry && entry.from_id);
+          const toId = savedDetailText(entry && entry.to_id);
+          const packetIdRaw = Number(entry && entry.packet_id);
+          const packetIdText = Number.isFinite(packetIdRaw) && packetIdRaw > 0
+            ? String(Math.trunc(packetIdRaw))
+            : "n/a";
+          const hopsRaw = Number(entry && entry.hops);
+          const hopsText = Number.isFinite(hopsRaw) && hopsRaw >= 0
+            ? String(Math.trunc(hopsRaw))
+            : "n/a";
+          const channel = savedDetailText(entry && entry.channel);
+          const rssiRaw = Number(entry && entry.rx_rssi);
+          const snrRaw = Number(entry && entry.rx_snr);
+          const signalParts = [];
+          if (Number.isFinite(rssiRaw)) signalParts.push(`${{Math.round(rssiRaw)}} dBm`);
+          if (Number.isFinite(snrRaw)) signalParts.push(`${{snrRaw.toFixed(1)}} dB`);
+          const signalText = signalParts.length ? signalParts.join(" / ") : "n/a";
+          const route = `${{fromId}} -> ${{toId}}`;
+          const meta = `${{route}} | hops ${{hopsText}} | ${{channel}} | ${{signalText}} | id ${{packetIdText}}`;
+          const textPreview = String((entry && entry.text) || "").trim();
+          return `<li class="saved-node-packet-history-item">
+            <div class="saved-node-packet-history-head">
+              <span class="saved-node-packet-history-time">${{escAttr(time)}}</span>
+              <span class="saved-node-packet-history-dir ${{directionClass}}">${{escAttr(direction)}}</span>
+              <span class="saved-node-packet-history-port">${{escAttr(port)}}</span>
+            </div>
+            <div class="saved-node-packet-history-meta">${{escAttr(meta)}}</div>
+            ${{textPreview ? `<div class="saved-node-packet-history-text">${{escAttr(textPreview)}}</div>` : ""}}
+          </li>`;
+        }}).join("")}}</ul>`;
+      }}
+
+      const note = knownTotal > shown.length
+        ? `Showing newest ${{shown.length}} of ${{knownTotal}} packets in this history window.`
+        : (knownTotal > 0
+          ? "Newest first."
+          : "Packet events are derived from locally saved packet history.");
+      return `<section class="saved-node-section">
+        <h3 class="saved-node-section-title">Packet History</h3>
+        ${{bodyHtml}}
+        <div class="saved-node-note">${{escAttr(note)}}</div>
+      </section>`;
+    }}
+
     function computeSavedChatStats(nodeId, messages) {{
       const stats = {{
         touches: 0,
@@ -296,4 +369,3 @@
       }}
       return stats;
     }}
-
