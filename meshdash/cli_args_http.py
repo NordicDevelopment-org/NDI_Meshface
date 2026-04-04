@@ -11,6 +11,8 @@ def add_http_runtime_args(
     default_reset_ticker_scale_on_restart: bool = True,
     default_private_mode: bool = False,
     default_api_token: str | None = None,
+    default_file_transfer_enable: bool = False,
+    default_file_transfer_max_bytes: int = 12 * 1024,
 ) -> None:
     parser.add_argument(
         "--http-host",
@@ -64,5 +66,31 @@ def add_http_runtime_args(
         help=(
             "Optional API token required on write endpoints via Authorization: Bearer <token> "
             "or X-API-Token header."
+        ),
+    )
+    parser.add_argument(
+        "--file-transfer-enable",
+        action=argparse.BooleanOptionalAction,
+        default=default_file_transfer_enable,
+        help=(
+            "Enable Meshyface peer-to-peer file transfer UI and send workflow "
+            f"(default: {default_file_transfer_enable})"
+        ),
+    )
+    parser.add_argument(
+        "--file-transfer-max-bytes",
+        type=int,
+        default=default_file_transfer_max_bytes,
+        help=(
+            "Maximum file size allowed by the dashboard file transfer UI in bytes "
+            f"(default: {default_file_transfer_max_bytes})"
+        ),
+    )
+    parser.add_argument(
+        "--accept-file-transfer-traffic-disclaimer",
+        action="store_true",
+        help=(
+            "Acknowledge that enabling file transfer can significantly increase "
+            "mesh airtime and congestion."
         ),
     )

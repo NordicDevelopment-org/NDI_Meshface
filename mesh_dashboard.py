@@ -15,6 +15,8 @@ except Exception:
 from meshdash.config import (
     DEFAULT_APP_VERSION_FALLBACK,
     DEFAULT_CHAT_MAX_BYTES,
+    DEFAULT_FILE_TRANSFER_ENABLED,
+    DEFAULT_FILE_TRANSFER_MAX_BYTES,
     DEFAULT_GATEWAY_HOST,
     DEFAULT_GATEWAY_PORT,
     DEFAULT_HISTORY_DB,
@@ -32,6 +34,8 @@ from meshdash.config import (
     DEFAULT_REFRESH_MS,
     DEFAULT_RESET_TICKER_SCALE_ON_RESTART,
     DEFAULT_UI_PROFILE,
+    MAX_FILE_TRANSFER_MAX_BYTES,
+    MIN_FILE_TRANSFER_MAX_BYTES,
     SENSITIVE_FIELD_NAMES,
     UNKNOWN_GIT_COMMIT,
 )
@@ -97,6 +101,48 @@ except Exception:
 DEFAULT_APP_VERSION = _package_version or DEFAULT_APP_VERSION_FALLBACK
 
 
+def _normalize_file_transfer_max_bytes(raw_value: object) -> int:
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        parsed = int(DEFAULT_FILE_TRANSFER_MAX_BYTES)
+    return max(
+        int(MIN_FILE_TRANSFER_MAX_BYTES),
+        min(int(MAX_FILE_TRANSFER_MAX_BYTES), parsed),
+    )
+
+
+def _validate_file_transfer_startup_args(
+    args: argparse.Namespace,
+    *,
+    parser: argparse.ArgumentParser,
+) -> None:
+    enabled = bool(getattr(args, "file_transfer_enable", False))
+    normalized_max_bytes = _normalize_file_transfer_max_bytes(
+        getattr(args, "file_transfer_max_bytes", DEFAULT_FILE_TRANSFER_MAX_BYTES)
+    )
+    setattr(args, "file_transfer_max_bytes", normalized_max_bytes)
+    if not enabled:
+        return
+    accepted = bool(
+        getattr(args, "accept_file_transfer_traffic_disclaimer", False)
+    )
+    if not accepted:
+        parser.error(
+            "File transfer remains disabled until you acknowledge mesh traffic risk. "
+            "Re-run with both --file-transfer-enable and "
+            "--accept-file-transfer-traffic-disclaimer."
+        )
+    print(
+        "Warning: file transfer is enabled. Large transfers can consume significant "
+        "mesh airtime and degrade network responsiveness."
+    )
+    print(
+        f"File transfer size cap: {normalized_max_bytes} bytes "
+        f"(clamped to {MIN_FILE_TRANSFER_MAX_BYTES}-{MAX_FILE_TRANSFER_MAX_BYTES})."
+    )
+
+
 def _detect_git_commit() -> Optional[str]:
     return _detect_git_commit_from_env_helper(
         script_file=__file__,
@@ -131,6 +177,10 @@ def _build_render_html_fn_with_theme(
 ):
     settings = theme_preset_settings or _build_theme_preset_settings(args)
     ui_profile = str(getattr(args, "ui_profile", "") or DEFAULT_UI_PROFILE).strip()
+    file_transfer_enabled = bool(getattr(args, "file_transfer_enable", False))
+    file_transfer_max_bytes = _normalize_file_transfer_max_bytes(
+        getattr(args, "file_transfer_max_bytes", DEFAULT_FILE_TRANSFER_MAX_BYTES)
+    )
 
     def _render_html_with_theme(**kwargs):
         selected = settings.selected_preset_tokens()
@@ -139,6 +189,8 @@ def _build_render_html_fn_with_theme(
             ui_profile=ui_profile,
             light_theme_vars=selected.get("light"),
             dark_theme_vars=selected.get("dark"),
+            file_transfer_enabled=file_transfer_enabled,
+            file_transfer_max_bytes=file_transfer_max_bytes,
         )
 
     return _render_html_with_theme
@@ -328,8 +380,13 @@ def main() -> None:
         env_theme_settings_file=os.environ.get("MESH_DASH_THEME_SETTINGS_FILE"),
         env_private_mode=os.environ.get("MESH_DASH_PRIVATE_MODE"),
         env_api_token=os.environ.get("MESH_DASH_API_TOKEN"),
+        default_file_transfer_enable=DEFAULT_FILE_TRANSFER_ENABLED,
+        default_file_transfer_max_bytes=DEFAULT_FILE_TRANSFER_MAX_BYTES,
+        env_file_transfer_enable=os.environ.get("MESH_DASH_FILE_TRANSFER_ENABLE"),
+        env_file_transfer_max_bytes=os.environ.get("MESH_DASH_FILE_TRANSFER_MAX_BYTES"),
     )
     args = parser.parse_args()
+    _validate_file_transfer_startup_args(args, parser=parser)
     if bool(getattr(args, "backfill_environment_rollups", False)):
         run_environment_rollup_backfill(args)
         return

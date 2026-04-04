@@ -13,6 +13,8 @@ def build_html_shell(
     packet_limit: int,
     history_label: str,
     refresh_ms: int,
+    file_transfer_files_tab_hidden_attrs: str = "",
+    file_transfer_section_hidden_attrs: str = "",
 ) -> str:
     return _render_asset_template_helper(
         "dashboard.html.tmpl",
@@ -26,4 +28,6 @@ def build_html_shell(
         packet_limit=packet_limit,
         history_label=history_label,
         refresh_ms=refresh_ms,
+        file_transfer_files_tab_hidden_attrs=file_transfer_files_tab_hidden_attrs,
+        file_transfer_section_hidden_attrs=file_transfer_section_hidden_attrs,
     )

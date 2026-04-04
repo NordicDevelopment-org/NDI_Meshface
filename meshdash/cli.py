@@ -40,6 +40,24 @@ def parse_env_bool(raw_value: Optional[str], fallback: bool = False) -> bool:
     return bool(fallback)
 
 
+def parse_env_int(
+    raw_value: Optional[str],
+    fallback: int,
+    *,
+    min_value: int | None = None,
+    max_value: int | None = None,
+) -> int:
+    try:
+        parsed = int(raw_value) if raw_value not in (None, "") else int(fallback)
+    except (TypeError, ValueError):
+        parsed = int(fallback)
+    if min_value is not None:
+        parsed = max(int(min_value), parsed)
+    if max_value is not None:
+        parsed = min(int(max_value), parsed)
+    return parsed
+
+
 def build_dashboard_parser(
     *,
     add_mesh_connection_args_fn: AddMeshConnectionArgsFn,
@@ -67,6 +85,10 @@ def build_dashboard_parser(
     env_theme_settings_file: Optional[str],
     env_private_mode: Optional[str] = None,
     env_api_token: Optional[str] = None,
+    default_file_transfer_enable: bool = False,
+    default_file_transfer_max_bytes: int = 12 * 1024,
+    env_file_transfer_enable: Optional[str] = None,
+    env_file_transfer_max_bytes: Optional[str] = None,
 ) -> argparse.ArgumentParser:
     resolved_gateway_port = resolve_default_gateway_port(env_gateway_port, default_gateway_port)
     resolved_gateway_host = str(env_gateway_host or default_gateway_host)
@@ -76,6 +98,14 @@ def build_dashboard_parser(
     resolved_theme_settings_file = str(env_theme_settings_file or "mesh_dashboard_theme_settings.json")
     resolved_private_mode = parse_env_bool(env_private_mode, False)
     resolved_api_token = str(env_api_token or "").strip() or None
+    resolved_file_transfer_enable = parse_env_bool(
+        env_file_transfer_enable,
+        default_file_transfer_enable,
+    )
+    resolved_file_transfer_max_bytes = parse_env_int(
+        env_file_transfer_max_bytes,
+        default_file_transfer_max_bytes,
+    )
 
     parser = argparse.ArgumentParser(
         description="Serve a high-detail Meshtastic dashboard with map, node tables, configs, and packet logs."
@@ -95,6 +125,8 @@ def build_dashboard_parser(
         default_reset_ticker_scale_on_restart=default_reset_ticker_scale_on_restart,
         default_private_mode=resolved_private_mode,
         default_api_token=resolved_api_token,
+        default_file_transfer_enable=resolved_file_transfer_enable,
+        default_file_transfer_max_bytes=resolved_file_transfer_max_bytes,
     )
     _add_history_args_helper(
         parser,

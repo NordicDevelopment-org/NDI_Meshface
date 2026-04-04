@@ -1,5 +1,10 @@
 from .html_assets import render_asset_template as _render_asset_template_helper
-from .config import DEFAULT_UI_PROFILE as _DEFAULT_UI_PROFILE
+from .config import (
+    DEFAULT_FILE_TRANSFER_MAX_BYTES as _DEFAULT_FILE_TRANSFER_MAX_BYTES,
+    DEFAULT_UI_PROFILE as _DEFAULT_UI_PROFILE,
+    MAX_FILE_TRANSFER_MAX_BYTES as _MAX_FILE_TRANSFER_MAX_BYTES,
+    MIN_FILE_TRANSFER_MAX_BYTES as _MIN_FILE_TRANSFER_MAX_BYTES,
+)
 
 _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.bootstrap.map.setup_emoji.base.tmpl",
@@ -222,8 +227,18 @@ def build_dashboard_js(
     node_history_max_points: int,
     reset_ticker_scale_on_restart: bool = True,
     ui_profile: str | None = None,
+    file_transfer_enabled: bool = False,
+    file_transfer_max_bytes: int = _DEFAULT_FILE_TRANSFER_MAX_BYTES,
 ) -> str:
     selected_parts = _template_parts_for_profile(ui_profile)
+    try:
+        parsed_file_transfer_max_bytes = int(file_transfer_max_bytes)
+    except (TypeError, ValueError):
+        parsed_file_transfer_max_bytes = int(_DEFAULT_FILE_TRANSFER_MAX_BYTES)
+    normalized_file_transfer_max_bytes = max(
+        int(_MIN_FILE_TRANSFER_MAX_BYTES),
+        min(int(_MAX_FILE_TRANSFER_MAX_BYTES), parsed_file_transfer_max_bytes),
+    )
     values = {
         "refresh_ms": refresh_ms,
         "node_history_hours": node_history_hours,
@@ -231,6 +246,8 @@ def build_dashboard_js(
         "reset_ticker_scale_on_restart": (
             1 if bool(reset_ticker_scale_on_restart) else 0
         ),
+        "file_transfer_enabled": 1 if bool(file_transfer_enabled) else 0,
+        "file_transfer_max_bytes": normalized_file_transfer_max_bytes,
     }
     return "".join(
         _render_asset_template_helper(template_name, **values)

@@ -271,9 +271,10 @@
       "zork",
     ];
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+    const fileTransferFeatureEnabled = !!Number({file_transfer_enabled});
     const fileTransferProtocolPrefix = "MF_FILE_V1";
     const fileTransferChatMaxBytes = 220;
-    const fileTransferMaxFileBytes = 12 * 1024;
+    const fileTransferMaxFileBytes = Math.max(1024, Math.trunc(Number({file_transfer_max_bytes}) || 0));
     const fileTransferChunkBytes = 64;
     const fileTransferCompressionCodecRaw = "raw";
     const fileTransferCompressionCodecLzss = "lzss";
