@@ -55,10 +55,26 @@
       chartState.pointerDrag = null;
     }}
 
-    function getHistoryTrendAxisBounds(svg) {{
+    function resolveHistoryTrendChartLayout(chartState) {{
+      const candidate = chartState && typeof chartState === "object"
+        ? chartState.layout
+        : null;
+      if (
+        candidate
+        && Number.isFinite(Number(candidate.width))
+        && Number.isFinite(Number(candidate.padLeft))
+        && Number.isFinite(Number(candidate.padRight))
+      ) {{
+        return candidate;
+      }}
+      return historyTrendChartLayout;
+    }}
+
+    function getHistoryTrendAxisBounds(svg, chartState = null) {{
+      const layout = resolveHistoryTrendChartLayout(chartState);
       const rect = svg.getBoundingClientRect();
-      const axisStartPx = rect.left + ((historyTrendChartLayout.padLeft / historyTrendChartLayout.width) * rect.width);
-      const axisEndPx = rect.left + (((historyTrendChartLayout.width - historyTrendChartLayout.padRight) / historyTrendChartLayout.width) * rect.width);
+      const axisStartPx = rect.left + ((layout.padLeft / layout.width) * rect.width);
+      const axisEndPx = rect.left + (((layout.width - layout.padRight) / layout.width) * rect.width);
       const axisWidthPx = Math.max(1, axisEndPx - axisStartPx);
       return {{ axisStartPx, axisEndPx, axisWidthPx }};
     }}
@@ -103,7 +119,7 @@
       svg.addEventListener("wheel", (ev) => {{
         const total = Array.isArray(chartState.points) ? chartState.points.length : 0;
         if (total < 3) return;
-        const {{ axisStartPx, axisEndPx, axisWidthPx }} = getHistoryTrendAxisBounds(svg);
+        const {{ axisStartPx, axisEndPx, axisWidthPx }} = getHistoryTrendAxisBounds(svg, chartState);
         if (ev.clientX < axisStartPx || ev.clientX > axisEndPx) return;
         ev.preventDefault();
         const anchorRatio = clampUnit((ev.clientX - axisStartPx) / axisWidthPx);
@@ -128,7 +144,7 @@
 
       svg.addEventListener("pointerdown", (ev) => {{
         if (ev.button !== 0 || (chartState.points || []).length < 3) return;
-        const {{ axisStartPx, axisEndPx }} = getHistoryTrendAxisBounds(svg);
+        const {{ axisStartPx, axisEndPx }} = getHistoryTrendAxisBounds(svg, chartState);
         if (ev.clientX < axisStartPx || ev.clientX > axisEndPx) return;
         chartState.pointerDrag = {{
           pointerId: ev.pointerId,
@@ -148,7 +164,7 @@
         if (!chartState.pointerDrag || chartState.pointerDrag.pointerId !== ev.pointerId) return;
         const total = (chartState.points || []).length;
         if (total < 3) return;
-        const {{ axisWidthPx }} = getHistoryTrendAxisBounds(svg);
+        const {{ axisWidthPx }} = getHistoryTrendAxisBounds(svg, chartState);
         const deltaRatio = (ev.clientX - chartState.pointerDrag.startClientX) / axisWidthPx;
         const dragSpan = chartState.pointerDrag.startZoomEnd - chartState.pointerDrag.startZoomStart;
         const nextStart = chartState.pointerDrag.startZoomStart - (deltaRatio * dragSpan);
@@ -196,4 +212,3 @@
           : `${{chartLabel}}. Wheel to zoom, drag to pan, double-click or Esc to reset.`
       );
     }}
-

@@ -494,8 +494,30 @@
 
     function renderNodeHistoryLoading(nodeId) {{
       setMapDataMode("node");
-      resetSignalChartZoom(nodeId || "");
+      const normalizedNodeId = normalizeNodeId(nodeId || "");
+      resetSignalChartZoom(normalizedNodeId);
       signalChartPoints = [];
+      const nodeOnlineState = historyTrendCharts.nodeOnline;
+      if (nodeOnlineState) {{
+        if (normalizedNodeId !== String(nodeOnlineState.nodeId || "")) {{
+          resetHistoryTrendZoom(nodeOnlineState);
+        }}
+        nodeOnlineState.nodeId = normalizedNodeId;
+        nodeOnlineState.points = [];
+        nodeOnlineState.sourcePoints = [];
+        nodeOnlineState.sourceWindowHours = null;
+        nodeOnlineState.sourcePacketTimestamps = [];
+      }}
+      const nodePacketsState = historyTrendCharts.nodePackets;
+      if (nodePacketsState) {{
+        if (normalizedNodeId !== String(nodePacketsState.nodeId || "")) {{
+          resetHistoryTrendZoom(nodePacketsState);
+        }}
+        nodePacketsState.nodeId = normalizedNodeId;
+        nodePacketsState.points = [];
+        nodePacketsState.sourcePoints = [];
+        nodePacketsState.sourceWindowHours = null;
+      }}
       const caption = document.getElementById("node-history-caption");
       if (caption) {{
         caption.textContent = `Loading history for ${{nodeId}}...`;
@@ -503,6 +525,7 @@
       const svg = document.getElementById("signal-chart");
       if (svg) {{
         svg.innerHTML = "";
+        svg.classList.remove("zoomed", "chart-dragging");
       }}
       const empty = document.getElementById("signal-empty");
       if (empty) {{
@@ -513,6 +536,7 @@
       const onlineSvg = document.getElementById("node-online-chart");
       if (onlineSvg) {{
         onlineSvg.innerHTML = "";
+        onlineSvg.classList.remove("zoomed", "chart-dragging");
       }}
       const onlineEmpty = document.getElementById("node-online-empty");
       if (onlineEmpty) {{
@@ -523,6 +547,7 @@
       const packetSvg = document.getElementById("node-packets-chart");
       if (packetSvg) {{
         packetSvg.innerHTML = "";
+        packetSvg.classList.remove("zoomed", "chart-dragging");
       }}
       const packetEmpty = document.getElementById("node-packets-empty");
       if (packetEmpty) {{

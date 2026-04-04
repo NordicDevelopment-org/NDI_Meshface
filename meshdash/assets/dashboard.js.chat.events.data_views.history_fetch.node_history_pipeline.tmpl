@@ -20,11 +20,13 @@
       renderNodeOnlineChart(
         history.points || [],
         history.window_hours,
-        Array.isArray(history.packet_timestamps) ? history.packet_timestamps : []
+        Array.isArray(history.packet_timestamps) ? history.packet_timestamps : [],
+        historyNodeId
       );
       renderNodePacketsChart(
         history.points || [],
-        history.window_hours
+        history.window_hours,
+        historyNodeId
       );
       setHistoryTab(activeHistoryTab);
     }}

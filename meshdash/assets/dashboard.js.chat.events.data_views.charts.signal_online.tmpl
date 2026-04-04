@@ -121,10 +121,39 @@
       setTimelineMessage("node-packets-timeline", message);
     }}
 
-    function renderNodeOnlineChart(points, windowHours = null, packetTimestamps = null) {{
+    function rerenderNodeOnlineChartFromCache() {{
+      const chartState = historyTrendCharts.nodeOnline;
+      const sourcePoints = chartState && Array.isArray(chartState.sourcePoints)
+        ? chartState.sourcePoints
+        : [];
+      const sourcePackets = chartState && Array.isArray(chartState.sourcePacketTimestamps)
+        ? chartState.sourcePacketTimestamps
+        : [];
+      const sourceWindowHours = chartState ? chartState.sourceWindowHours : null;
+      const sourceNodeId = chartState ? chartState.nodeId : "";
+      renderNodeOnlineChart(sourcePoints, sourceWindowHours, sourcePackets, sourceNodeId);
+    }}
+
+    function rerenderNodePacketsChartFromCache() {{
+      const chartState = historyTrendCharts.nodePackets;
+      const sourcePoints = chartState && Array.isArray(chartState.sourcePoints)
+        ? chartState.sourcePoints
+        : [];
+      const sourceWindowHours = chartState ? chartState.sourceWindowHours : null;
+      const sourceNodeId = chartState ? chartState.nodeId : "";
+      renderNodePacketsChart(sourcePoints, sourceWindowHours, sourceNodeId);
+    }}
+
+    function renderNodeOnlineChart(points, windowHours = null, packetTimestamps = null, nodeId = null) {{
       const svg = document.getElementById("node-online-chart");
       const empty = document.getElementById("node-online-empty");
       if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+      const chartState = historyTrendCharts.nodeOnline;
+      bindHistoryTrendChartZoom(
+        chartState,
+        () => rerenderNodeOnlineChartFromCache(),
+        "Node online history chart"
+      );
 
       const normalizeUnixSeconds = (raw) => {{
         const numeric = Number(raw);
@@ -143,6 +172,14 @@
       const resolvedWindowHours = Number.isFinite(windowHoursRaw) && windowHoursRaw > 0
         ? windowHoursRaw
         : (Number.isFinite(defaultWindowHours) && defaultWindowHours > 0 ? defaultWindowHours : 72);
+      const currentNodeId = normalizeNodeId(nodeId || selectedNodeId || "");
+      if (currentNodeId !== String(chartState.nodeId || "")) {{
+        resetHistoryTrendZoom(chartState);
+      }}
+      chartState.nodeId = currentNodeId;
+      chartState.sourcePoints = rows;
+      chartState.sourceWindowHours = resolvedWindowHours;
+      chartState.sourcePacketTimestamps = timestampRows;
       const windowSeconds = Math.max(60, Math.round(resolvedWindowHours * 3600));
       const endUnix = Math.floor(Date.now() / 1000);
       const startUnix = endUnix - windowSeconds;
@@ -202,11 +239,6 @@
         }}
       }}
 
-      const xFromUnix = (unixTs) => {{
-        const ratio = Math.max(0, Math.min(1, (Number(unixTs) - startUnix) / windowSeconds));
-        return padLeft + (ratio * plotW);
-      }};
-
       const timelinePoints = new Set([startUnix, endUnix]);
       for (const bucket of eventBuckets) {{
         if (bucket >= startUnix && bucket <= endUnix) {{
@@ -217,12 +249,16 @@
         timelinePoints.add(interval.start_unix);
         timelinePoints.add(interval.end_unix);
       }}
-      const plotRows = Array.from(timelinePoints)
+      const allPlotRows = Array.from(timelinePoints)
         .filter((unixTs) => Number.isFinite(unixTs))
         .sort((a, b) => a - b)
         .map((unixTs) => ({{ bucket_unix: Math.trunc(unixTs) }}));
+      chartState.points = allPlotRows;
+      const visible = getVisibleHistoryTrendRows(chartState, allPlotRows);
+      const plotRows = visible.rows;
+      setHistoryTrendChartTitle(svg, "Node online history chart", visible.zoomed);
 
-      if (plotRows.length === 0) {{
+      if (allPlotRows.length === 0 || plotRows.length === 0) {{
         svg.innerHTML = "";
         empty.hidden = false;
         empty.textContent = "No historical online points yet for this node.";
@@ -236,12 +272,38 @@
         );
         return;
       }}
-      empty.hidden = intervals.length > 0;
 
-      let path = `M ${{xFromUnix(startUnix).toFixed(2)}} ${{yOffline.toFixed(2)}}`;
+      let viewStartUnix = Number(plotRows[0] && plotRows[0].bucket_unix);
+      let viewEndUnix = Number(plotRows[plotRows.length - 1] && plotRows[plotRows.length - 1].bucket_unix);
+      if (!Number.isFinite(viewStartUnix)) viewStartUnix = startUnix;
+      if (!Number.isFinite(viewEndUnix)) viewEndUnix = endUnix;
+      viewStartUnix = Math.max(startUnix, Math.trunc(viewStartUnix));
+      viewEndUnix = Math.min(endUnix, Math.trunc(viewEndUnix));
+      if (!(viewEndUnix > viewStartUnix)) {{
+        viewStartUnix = startUnix;
+        viewEndUnix = endUnix;
+      }}
+      const viewWindowSeconds = Math.max(60, viewEndUnix - viewStartUnix);
+      const xFromUnix = (unixTs) => {{
+        const ratio = Math.max(0, Math.min(1, (Number(unixTs) - viewStartUnix) / viewWindowSeconds));
+        return padLeft + (ratio * plotW);
+      }};
+      const clippedIntervals = [];
+      for (const interval of intervals) {{
+        const clippedStart = Math.max(viewStartUnix, Number(interval.start_unix));
+        const clippedEnd = Math.min(viewEndUnix, Number(interval.end_unix));
+        if (!(clippedEnd > clippedStart)) continue;
+        clippedIntervals.push({{
+          start_unix: clippedStart,
+          end_unix: clippedEnd,
+        }});
+      }}
+      empty.hidden = clippedIntervals.length > 0;
+
+      let path = `M ${{xFromUnix(viewStartUnix).toFixed(2)}} ${{yOffline.toFixed(2)}}`;
       const onlineRects = [];
       let onlineDuration = 0;
-      for (const interval of intervals) {{
+      for (const interval of clippedIntervals) {{
         const startX = xFromUnix(interval.start_unix);
         const endX = xFromUnix(interval.end_unix);
         path += ` L ${{startX.toFixed(2)}} ${{yOffline.toFixed(2)}}`;
@@ -254,13 +316,13 @@
         );
         onlineDuration += Math.max(0, Number(interval.end_unix) - Number(interval.start_unix));
       }}
-      path += ` L ${{xFromUnix(endUnix).toFixed(2)}} ${{yOffline.toFixed(2)}}`;
+      path += ` L ${{xFromUnix(viewEndUnix).toFixed(2)}} ${{yOffline.toFixed(2)}}`;
 
-      const onlinePercent = windowSeconds > 0 ? (onlineDuration / windowSeconds) * 100 : 0;
+      const onlinePercent = viewWindowSeconds > 0 ? (onlineDuration / viewWindowSeconds) * 100 : 0;
       const onlinePercentText = onlinePercent < 1
         ? onlinePercent.toFixed(1)
         : String(Math.round(onlinePercent));
-      if (intervals.length === 0) {{
+      if (clippedIntervals.length === 0) {{
         empty.textContent = "No online packets observed in selected window.";
       }}
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
@@ -299,10 +361,16 @@
       );
     }}
 
-    function renderNodePacketsChart(points, windowHours = null) {{
+    function renderNodePacketsChart(points, windowHours = null, nodeId = null) {{
       const svg = document.getElementById("node-packets-chart");
       const empty = document.getElementById("node-packets-empty");
       if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+      const chartState = historyTrendCharts.nodePackets;
+      bindHistoryTrendChartZoom(
+        chartState,
+        () => rerenderNodePacketsChartFromCache(),
+        "Node packets history chart"
+      );
 
       const normalizeUnixSeconds = (raw) => {{
         const numeric = Number(raw);
@@ -319,11 +387,18 @@
       const resolvedWindowHours = Number.isFinite(windowHoursRaw) && windowHoursRaw > 0
         ? windowHoursRaw
         : (Number.isFinite(defaultWindowHours) && defaultWindowHours > 0 ? defaultWindowHours : 72);
+      const currentNodeId = normalizeNodeId(nodeId || selectedNodeId || "");
+      if (currentNodeId !== String(chartState.nodeId || "")) {{
+        resetHistoryTrendZoom(chartState);
+      }}
+      chartState.nodeId = currentNodeId;
+      chartState.sourcePoints = rows;
+      chartState.sourceWindowHours = resolvedWindowHours;
       const windowSeconds = Math.max(60, Math.round(resolvedWindowHours * 3600));
       const endUnix = Math.floor(Date.now() / 1000);
       const startUnix = endUnix - windowSeconds;
 
-      const plotRows = rows
+      const allPlotRows = rows
         .map((row) => {{
           const bucketUnix = normalizeUnixSeconds(row && row.bucket_unix);
           const packetCountRaw = Number(row && row.packet_count);
@@ -337,6 +412,10 @@
         .filter((row) => !!row)
         .filter((row) => row.bucket_unix >= startUnix && row.bucket_unix <= endUnix)
         .sort((a, b) => a.bucket_unix - b.bucket_unix);
+      chartState.points = allPlotRows;
+      const visible = getVisibleHistoryTrendRows(chartState, allPlotRows);
+      const plotRows = visible.rows;
+      setHistoryTrendChartTitle(svg, "Node packets history chart", visible.zoomed);
 
       const width = signalChartLayout.width;
       const height = signalChartLayout.height;
@@ -347,7 +426,7 @@
       const plotW = width - padLeft - padRight;
       const plotH = height - padTop - padBottom;
 
-      if (plotRows.length === 0) {{
+      if (allPlotRows.length === 0 || plotRows.length === 0) {{
         svg.innerHTML = "";
         empty.hidden = false;
         empty.textContent = "No packet-rate history yet for this node.";
@@ -368,9 +447,20 @@
       const avgPackets = counts.length
         ? (counts.reduce((sum, value) => sum + value, 0) / counts.length)
         : 0;
+      let viewStartUnix = Number(plotRows[0] && plotRows[0].bucket_unix);
+      let viewEndUnix = Number(plotRows[plotRows.length - 1] && plotRows[plotRows.length - 1].bucket_unix);
+      if (!Number.isFinite(viewStartUnix)) viewStartUnix = startUnix;
+      if (!Number.isFinite(viewEndUnix)) viewEndUnix = endUnix;
+      viewStartUnix = Math.max(startUnix, Math.trunc(viewStartUnix));
+      viewEndUnix = Math.min(endUnix, Math.trunc(viewEndUnix));
+      if (!(viewEndUnix > viewStartUnix)) {{
+        viewStartUnix = startUnix;
+        viewEndUnix = endUnix;
+      }}
+      const viewWindowSeconds = Math.max(60, viewEndUnix - viewStartUnix);
 
       const xFromUnix = (unixTs) => {{
-        const ratio = Math.max(0, Math.min(1, (Number(unixTs) - startUnix) / windowSeconds));
+        const ratio = Math.max(0, Math.min(1, (Number(unixTs) - viewStartUnix) / viewWindowSeconds));
         return padLeft + (ratio * plotW);
       }};
       const yFromCount = (count) => (
