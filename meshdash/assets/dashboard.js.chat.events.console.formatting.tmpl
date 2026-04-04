@@ -247,11 +247,15 @@
       return lines;
     }}
 
-    function formatConsoleTimestamp(msValue) {{
+    function formatConsoleTimestamp(msValue, mode = "time") {{
       const ms = Number(msValue);
       const dt = Number.isFinite(ms) ? new Date(ms) : new Date();
       if (!Number.isFinite(dt.getTime())) {{
         return "n/a";
+      }}
+      if (mode === "grep") {{
+        const unix = Math.floor(dt.getTime() / 1000);
+        return formatLocalChatTime(unix, "n/a");
       }}
       const pad2 = (value) => String(Math.trunc(Math.max(0, Number(value) || 0))).padStart(2, "0");
       const hour = pad2(dt.getHours());
@@ -260,7 +264,7 @@
       return `${{hour}}:${{minute}}:${{second}}`;
     }}
 
-    function formatConsoleRenderedLine(line, loggedAtMs = Date.now()) {{
+    function formatConsoleRenderedLine(line, loggedAtMs = Date.now(), options = null) {{
       const body = String(line == null ? "" : line);
       if (isZorkConsoleInteractiveSession(consoleInteractiveSession)) {{
         return body;
@@ -268,15 +272,17 @@
       if (!consoleShowTimestamps) {{
         return body;
       }}
-      const timestamp = formatConsoleTimestamp(loggedAtMs);
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const timestampMode = String(opts.timestampMode || "").trim().toLowerCase() || "time";
+      const timestamp = formatConsoleTimestamp(loggedAtMs, timestampMode);
       return `[${{timestamp}}] ${{body}}`;
     }}
 
-    function appendConsoleLine(key, line, loggedAtMs = Date.now(), renderNow = false) {{
+    function appendConsoleLine(key, line, loggedAtMs = Date.now(), renderNow = false, options = null) {{
       if (!key || consoleSeen.has(key)) return;
       consoleSeen.add(key);
       consoleKeyQueue.push(key);
-      consoleLines.push(formatConsoleRenderedLine(line, loggedAtMs));
+      consoleLines.push(formatConsoleRenderedLine(line, loggedAtMs, options));
 
       while (consoleLines.length > consoleMaxLines) {{
         consoleLines.shift();
