@@ -168,7 +168,6 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
 
 
 _CORE_UI_EXCLUDED_TEMPLATE_PREFIXES = (
-    "dashboard.js.chat.state.files.",
     "dashboard.js.chat.state.games.classic.poker.",
     "dashboard.js.chat.state.core.bot_history.",
 )
