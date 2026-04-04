@@ -22,6 +22,10 @@
         history.window_hours,
         Array.isArray(history.packet_timestamps) ? history.packet_timestamps : []
       );
+      renderNodePacketsChart(
+        history.points || [],
+        history.window_hours
+      );
       setHistoryTab(activeHistoryTab);
     }}
 

@@ -117,6 +117,10 @@
       setTimelineMessage("node-online-timeline", message);
     }}
 
+    function setNodePacketsTimelineMessage(message) {{
+      setTimelineMessage("node-packets-timeline", message);
+    }}
+
     function renderNodeOnlineChart(points, windowHours = null, packetTimestamps = null) {{
       const svg = document.getElementById("node-online-chart");
       const empty = document.getElementById("node-online-empty");
@@ -287,6 +291,135 @@
 
       renderTimeline(
         "node-online-timeline",
+        plotRows,
+        padLeft,
+        padRight,
+        width,
+        (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
+      );
+    }}
+
+    function renderNodePacketsChart(points, windowHours = null) {{
+      const svg = document.getElementById("node-packets-chart");
+      const empty = document.getElementById("node-packets-empty");
+      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+
+      const normalizeUnixSeconds = (raw) => {{
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric) || numeric <= 0) return null;
+        if (numeric > 100000000000) {{
+          return Math.floor(numeric / 1000);
+        }}
+        return Math.floor(numeric);
+      }};
+
+      const rows = Array.isArray(points) ? points : [];
+      const windowHoursRaw = Number(windowHours);
+      const defaultWindowHours = Number(nodeHistoryHours);
+      const resolvedWindowHours = Number.isFinite(windowHoursRaw) && windowHoursRaw > 0
+        ? windowHoursRaw
+        : (Number.isFinite(defaultWindowHours) && defaultWindowHours > 0 ? defaultWindowHours : 72);
+      const windowSeconds = Math.max(60, Math.round(resolvedWindowHours * 3600));
+      const endUnix = Math.floor(Date.now() / 1000);
+      const startUnix = endUnix - windowSeconds;
+
+      const plotRows = rows
+        .map((row) => {{
+          const bucketUnix = normalizeUnixSeconds(row && row.bucket_unix);
+          const packetCountRaw = Number(row && row.packet_count);
+          const packetCount = Number.isFinite(packetCountRaw)
+            ? Math.max(0, Math.trunc(packetCountRaw))
+            : 0;
+          return bucketUnix
+            ? {{ bucket_unix: bucketUnix, packet_count: packetCount }}
+            : null;
+        }})
+        .filter((row) => !!row)
+        .filter((row) => row.bucket_unix >= startUnix && row.bucket_unix <= endUnix)
+        .sort((a, b) => a.bucket_unix - b.bucket_unix);
+
+      const width = signalChartLayout.width;
+      const height = signalChartLayout.height;
+      const padLeft = signalChartLayout.padLeft;
+      const padRight = signalChartLayout.padRight;
+      const padTop = signalChartLayout.padTop;
+      const padBottom = signalChartLayout.padBottom;
+      const plotW = width - padLeft - padRight;
+      const plotH = height - padTop - padBottom;
+
+      if (plotRows.length === 0) {{
+        svg.innerHTML = "";
+        empty.hidden = false;
+        empty.textContent = "No packet-rate history yet for this node.";
+        renderTimeline(
+          "node-packets-timeline",
+          plotRows,
+          padLeft,
+          padRight,
+          width,
+          (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
+        );
+        return;
+      }}
+      empty.hidden = true;
+
+      const counts = plotRows.map((row) => Number(row.packet_count) || 0);
+      const maxPackets = Math.max(1, ...counts);
+      const avgPackets = counts.length
+        ? (counts.reduce((sum, value) => sum + value, 0) / counts.length)
+        : 0;
+
+      const xFromUnix = (unixTs) => {{
+        const ratio = Math.max(0, Math.min(1, (Number(unixTs) - startUnix) / windowSeconds));
+        return padLeft + (ratio * plotW);
+      }};
+      const yFromCount = (count) => (
+        padTop + ((maxPackets - Math.max(0, Number(count) || 0)) / maxPackets) * plotH
+      );
+
+      let path = "";
+      const bars = [];
+      const minBarWidth = 1.5;
+      const approxWidth = Math.max(minBarWidth, plotW / Math.max(25, plotRows.length));
+      for (let i = 0; i < plotRows.length; i += 1) {{
+        const row = plotRows[i];
+        const x = xFromUnix(row.bucket_unix);
+        const y = yFromCount(row.packet_count);
+        path += `${{i === 0 ? "M" : " L"}} ${{x.toFixed(2)}} ${{y.toFixed(2)}}`;
+        const barHeight = Math.max(1, (padTop + plotH) - y);
+        bars.push(
+          `<rect x="${{(x - (approxWidth / 2)).toFixed(2)}}" y="${{y.toFixed(2)}}" width="${{approxWidth.toFixed(2)}}" height="${{barHeight.toFixed(2)}}" fill="currentColor" opacity="0.22"></rect>`
+        );
+      }}
+
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const chartPalette = darkTheme
+        ? {{
+            grid: "#324152",
+            line: "#7cc7ff",
+            label: "#a4d0ff",
+          }}
+        : {{
+            grid: "#dce8df",
+            line: "#2f6f9a",
+            label: "#2f6f9a",
+          }};
+
+      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
+      svg.innerHTML = `
+        <rect x="0" y="0" width="${{width}}" height="${{height}}" fill="none"></rect>
+        <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{padTop + plotH}}" x2="${{width - padRight}}" y2="${{padTop + plotH}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{width - padRight}}" y2="${{padTop}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
+        <g style="color:${{chartPalette.line}}">${{bars.join("")}}</g>
+        <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
+        <text x="${{padLeft - 4}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(maxPackets, 0)}}</text>
+        <text x="${{padLeft - 4}}" y="${{(padTop + plotH + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">0</text>
+        <text x="${{width - padRight + 4}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">avg ${{formatMetricValue(avgPackets, 1)}}/min</text>
+      `;
+
+      renderTimeline(
+        "node-packets-timeline",
         plotRows,
         padLeft,
         padRight,
