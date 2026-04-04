@@ -175,7 +175,23 @@
         const destinationId = normalizeNodeId(session.destination || "");
         const senderId = normalizeNodeId(session.senderId || localNodeId || "");
         const transferKey = fileTransferKeyOf(senderId, destinationId, session.transferId);
-        const flow = flowByTransferKey.get(transferKey) || null;
+        let flow = flowByTransferKey.get(transferKey) || null;
+        if (!(flow && typeof flow === "object")) {{
+          let latestFallbackFlow = null;
+          for (const candidate of flowByTransferKey.values()) {{
+            if (!(candidate && typeof candidate === "object")) continue;
+            if (String(candidate.transferId || "").trim().toLowerCase() !== String(session.transferId || "").trim().toLowerCase()) {{
+              continue;
+            }}
+            if (normalizeNodeId(candidate.senderId || "") !== destinationId) continue;
+            const candidateUnix = Math.max(0, Math.trunc(Number(candidate.latestUnix) || 0));
+            const latestUnix = Math.max(0, Math.trunc(Number(latestFallbackFlow && latestFallbackFlow.latestUnix) || 0));
+            if (!latestFallbackFlow || candidateUnix >= latestUnix) {{
+              latestFallbackFlow = candidate;
+            }}
+          }}
+          flow = latestFallbackFlow;
+        }}
         const flowAction = flow && typeof flow === "object"
           ? String(flow.action || "").trim().toLowerCase()
           : "";

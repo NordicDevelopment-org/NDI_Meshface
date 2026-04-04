@@ -276,7 +276,22 @@
         const outgoingSession = outgoing
           ? findOutgoingFileTransferSession(transfer.transferId, transfer.toId, transfer.channelIndex)
           : null;
-        const latestFlow = flowByTransferKey.get(transferKey) || null;
+        let latestFlow = flowByTransferKey.get(transferKey) || null;
+        if (!(latestFlow && typeof latestFlow === "object")) {{
+          let latestFallbackFlow = null;
+          for (const candidate of flowByTransferKey.values()) {{
+            if (!(candidate && typeof candidate === "object")) continue;
+            if (String(candidate.transferId || "").trim().toLowerCase() !== String(transfer.transferId || "").trim().toLowerCase()) {{
+              continue;
+            }}
+            const candidateUnix = Math.max(0, Math.trunc(Number(candidate.latestUnix) || 0));
+            const latestUnix = Math.max(0, Math.trunc(Number(latestFallbackFlow && latestFallbackFlow.latestUnix) || 0));
+            if (!latestFallbackFlow || candidateUnix >= latestUnix) {{
+              latestFallbackFlow = candidate;
+            }}
+          }}
+          latestFlow = latestFallbackFlow;
+        }}
         const latestFlowAction = latestFlow
           ? String(latestFlow.action || "").trim().toLowerCase()
           : "";
@@ -291,7 +306,7 @@
           && !complete
           && latestFlowAction === "pause"
           && latestFlowSenderId === transferFromId
-          && latestFlowReceiverId === transferToId
+          && (!latestFlowReceiverId || latestFlowReceiverId === transferToId)
         );
         const inboundPausedByReceiver = !!(
           !outgoing
@@ -303,7 +318,7 @@
             || (
               latestFlowAction === "pause"
               && latestFlowSenderId === transferToId
-              && latestFlowReceiverId === transferFromId
+              && (!latestFlowReceiverId || latestFlowReceiverId === transferFromId)
             )
           )
         );
