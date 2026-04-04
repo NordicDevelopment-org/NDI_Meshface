@@ -2734,11 +2734,13 @@
       --network-pane-divider-border: #d1e0cb;
       --network-pane-divider-line: #b8cab9;
       --network-pane-divider-line-active: #2f855a;
-      height: calc(100dvh - var(--workspace-viewport-offset, 84px) - 16px);
+      height: var(--layout-available-height, 100%);
+      max-height: 100%;
       min-height: 0;
       grid-template-columns: minmax(320px, var(--split-left-pct)) var(--splitter-size) minmax(320px, 1fr);
       grid-template-rows: auto minmax(0, 1fr);
       align-content: stretch;
+      overflow: hidden;
     }}
     .layout.view-network .summary {{
       display: block;
@@ -2795,17 +2797,15 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: minmax(280px, 1fr);
-      height: 100%;
+      flex: 1 1 auto;
+      height: auto;
       min-height: 0;
       background: var(--network-pane-body-bg);
-      padding-top: 0;
+      padding: 8px 10px;
+      box-sizing: border-box;
+      overflow: hidden;
     }}
     .layout.view-network .map-card-head {{
-      justify-content: flex-end;
-      border-bottom-color: var(--network-pane-head-border);
-      background: var(--network-pane-head-bg);
-    }}
-    .layout.view-network .map-card-head .pane-head-title {{
       display: none;
     }}
     .layout.view-network .map-frame {{
@@ -2814,8 +2814,14 @@
       height: 100%;
       min-height: 0;
       border-color: var(--network-pane-head-border);
-      border-top: 0;
-      border-radius: 0 0 8px 8px;
+      border-top: 1px solid var(--network-pane-head-border);
+      border-radius: 8px;
+      background: #08110d;
+      padding: 1px;
+      box-sizing: border-box;
+    }}
+    .layout.view-network .network-map-chrome {{
+      display: flex;
     }}
     .layout.view-network .map-data,
     .layout.view-network .chat,

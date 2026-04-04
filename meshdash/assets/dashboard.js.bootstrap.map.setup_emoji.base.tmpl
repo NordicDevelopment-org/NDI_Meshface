@@ -39,6 +39,10 @@
     }}
 
     const map = createDashboardLeafletMap("map");
+    if (map && map.zoomControl) {{
+      map.zoomControl.remove();
+      L.control.zoom({{ position: "bottomleft" }}).addTo(map);
+    }}
 
     // Leaflet.heat (via simpleheat) uses a fixed shadow offset of 200px when
     // generating its blurred circle stamp.
@@ -248,6 +252,7 @@
     const chatPanelSplitStorageKey = "meshDashboardChatPanelWidthPx";
     const macrosPanelSplitStorageKey = "meshDashboardMacrosPanelWidthPx";
     const layoutViewStorageKey = "meshDashboardLayoutView";
+    const networkSubviewStorageKey = "meshDashboardNetworkSubviewV1";
     const chatChannelStorageKey = "meshDashboardChatChannel";
     const chatNotificationScopeStorageKey = "meshDashboardChatNotificationScopeV1";
     const chatTrendsViewStorageKey = "meshDashboardChatTrendsViewEnabledV1";

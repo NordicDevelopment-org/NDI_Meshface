@@ -1853,6 +1853,14 @@
       flex-wrap: wrap;
       justify-content: flex-end;
     }}
+    .map-controls-dock {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: 100%;
+    }}
     .map-reset-view-btn {{
       border: 1px solid #bfd4c3;
       background: #f7fcf7;
@@ -3376,6 +3384,7 @@
       min-height: 0;
     }}
     .map-frame {{
+      position: relative;
       flex: 1 1 auto;
       width: 100%;
       max-width: none;
@@ -3389,6 +3398,135 @@
     .map-frame.map-wheel-active {{
       border-color: #8ab79b;
       box-shadow: inset 0 0 0 2px rgba(138, 183, 155, 0.55);
+    }}
+    .network-map-subviews {{
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      border-radius: inherit;
+      overflow: hidden;
+    }}
+    .network-map-chrome {{
+      display: none;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      z-index: 450;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }}
+    .network-map-subview-tabs {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      max-width: 100%;
+      padding: 4px;
+      border: 1px solid rgba(124, 151, 133, 0.6);
+      border-radius: 999px;
+      background: rgba(248, 252, 247, 0.9);
+      box-shadow: 0 10px 26px rgba(19, 35, 24, 0.2);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }}
+    .network-map-subview-tab {{
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: transparent;
+      color: #2a4a38;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12px;
+      line-height: 1.2;
+      padding: 5px 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+    }}
+    .network-map-subview-tab:hover {{
+      background: rgba(221, 240, 228, 0.92);
+      border-color: rgba(122, 171, 143, 0.75);
+      color: #163b28;
+    }}
+    .network-map-subview-tab.is-active,
+    .network-map-subview-tab[aria-selected="true"] {{
+      background: #dff1e6;
+      border-color: #8ab79b;
+      color: #13412c;
+      box-shadow: 0 3px 10px rgba(47, 133, 90, 0.16);
+    }}
+    .network-map-subview-tab:focus-visible {{
+      outline: 2px solid rgba(76, 143, 103, 0.55);
+      outline-offset: 1px;
+    }}
+    .network-map-controls-host {{
+      display: flex;
+      flex: 1 1 auto;
+      min-width: 0;
+      justify-content: flex-end;
+      pointer-events: auto;
+    }}
+    .network-map-controls-host.is-hidden {{
+      display: none;
+    }}
+    .network-map-subview-panel {{
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }}
+    .network-map-subview-panel[hidden] {{
+      display: none !important;
+    }}
+    .network-map-placeholder {{
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      padding: 82px 28px 28px;
+      box-sizing: border-box;
+      background:
+        radial-gradient(circle at top left, rgba(91, 181, 127, 0.16), transparent 36%),
+        radial-gradient(circle at bottom right, rgba(47, 133, 90, 0.18), transparent 32%),
+        linear-gradient(180deg, rgba(248, 252, 247, 0.96), rgba(232, 243, 235, 0.94));
+      color: #183926;
+    }}
+    .network-map-placeholder-eyebrow {{
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid rgba(129, 168, 145, 0.7);
+      border-radius: 999px;
+      background: rgba(244, 250, 243, 0.92);
+      color: #41624f;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.16px;
+      line-height: 1.2;
+      padding: 4px 8px;
+      text-transform: uppercase;
+    }}
+    .network-map-placeholder-title {{
+      margin: 0;
+      max-width: 460px;
+      font-size: clamp(19px, 2vw, 24px);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }}
+    .network-map-placeholder-copy {{
+      margin: 0;
+      max-width: 520px;
+      color: #456557;
+      font-size: 13px;
+      line-height: 1.45;
     }}
     .saved-node-details {{
       display: none;

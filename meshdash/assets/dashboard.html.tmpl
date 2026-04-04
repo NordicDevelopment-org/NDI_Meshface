@@ -2196,31 +2196,33 @@ Ready.
           <span id="map-card-title-text">Network Map</span>
         </h2>
         <div id="saved-map-splitter-head" class="saved-map-splitter-head" title="Drag to resize node details and map"></div>
-        <div class="map-card-actions pane-head-actions">
-          <button id="map-reset-view-btn" class="map-reset-view-btn" type="button" title="Reset map view">Reset view</button>
-          <button
-            type="button"
-            id="map-basemap-status"
-            class="map-basemap-status status-loading"
-            title="Checking map tile availability"
-            aria-label="Toggle map basemap offline mode"
-            aria-pressed="false"
-          >Basemap: checking...</button>
-          <label id="map-heatmap-wrap" class="map-heatmap-wrap" title="Overlay realtime signal heatmap">
-            <input id="map-heatmap-toggle" type="checkbox" checked />
-            <span>Signal Heatmap</span>
-          </label>
-          <label id="map-lines-wrap" class="map-heatmap-wrap" title="Show packet lines between nodes">
-            <input id="map-lines-toggle" type="checkbox" checked />
-            <span>Packet Lines</span>
-          </label>
-          <label id="map-heatmap-mode-wrap" class="map-heatmap-mode-wrap" title="Choose heatmap recency behavior">
-            <span>Mode</span>
-            <select id="map-heatmap-mode" class="map-heatmap-mode">
-              <option value="live">Live only</option>
-              <option value="coverage">Coverage</option>
-            </select>
-          </label>
+        <div id="map-card-actions-host" class="map-card-actions pane-head-actions">
+          <div id="map-controls-dock" class="map-controls-dock">
+            <button id="map-reset-view-btn" class="map-reset-view-btn" type="button" title="Reset map view">Reset view</button>
+            <button
+              type="button"
+              id="map-basemap-status"
+              class="map-basemap-status status-loading"
+              title="Checking map tile availability"
+              aria-label="Toggle map basemap offline mode"
+              aria-pressed="false"
+            >Basemap: checking...</button>
+            <label id="map-heatmap-wrap" class="map-heatmap-wrap" title="Overlay realtime signal heatmap">
+              <input id="map-heatmap-toggle" type="checkbox" checked />
+              <span>Signal Heatmap</span>
+            </label>
+            <label id="map-lines-wrap" class="map-heatmap-wrap" title="Show packet lines between nodes">
+              <input id="map-lines-toggle" type="checkbox" checked />
+              <span>Packet Lines</span>
+            </label>
+            <label id="map-heatmap-mode-wrap" class="map-heatmap-mode-wrap" title="Choose heatmap recency behavior">
+              <span>Mode</span>
+              <select id="map-heatmap-mode" class="map-heatmap-mode">
+                <option value="live">Live only</option>
+                <option value="coverage">Coverage</option>
+              </select>
+            </label>
+          </div>
         </div>
       </div>
       <div class="body">
@@ -2239,7 +2241,71 @@ Ready.
         </div>
         <div id="saved-map-splitter" class="saved-map-splitter" title="Drag to resize node details and map"></div>
         <div class="map-frame">
-          <div id="map"></div>
+          <div id="network-map-subviews" class="network-map-subviews" data-active-subview="map">
+            <div id="network-map-chrome" class="network-map-chrome" aria-hidden="true">
+              <div class="network-map-subview-tabs" role="tablist" aria-label="Network subviews">
+                <button
+                  class="network-map-subview-tab is-active"
+                  type="button"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="network-map-panel-map"
+                  data-network-subview="map"
+                >Map</button>
+                <button
+                  class="network-map-subview-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="network-map-panel-overview"
+                  data-network-subview="overview"
+                >Overview</button>
+                <button
+                  class="network-map-subview-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="network-map-panel-details"
+                  data-network-subview="details"
+                >Details</button>
+              </div>
+              <div id="network-map-controls-host" class="network-map-controls-host" aria-hidden="true"></div>
+            </div>
+            <div
+              id="network-map-panel-map"
+              class="network-map-subview-panel is-active"
+              role="tabpanel"
+              data-network-subview-panel="map"
+            >
+              <div id="map"></div>
+            </div>
+            <div
+              id="network-map-panel-overview"
+              class="network-map-subview-panel"
+              role="tabpanel"
+              data-network-subview-panel="overview"
+              hidden
+            >
+              <div class="network-map-placeholder">
+                <span class="network-map-placeholder-eyebrow">Subview staging</span>
+                <h3 class="network-map-placeholder-title">Overview is ready for richer network summaries.</h3>
+                <p class="network-map-placeholder-copy">We can expand this tab with rollups and cross-node context once the new in-map layout is settled.</p>
+              </div>
+            </div>
+            <div
+              id="network-map-panel-details"
+              class="network-map-subview-panel"
+              role="tabpanel"
+              data-network-subview-panel="details"
+              hidden
+            >
+              <div class="network-map-placeholder">
+                <span class="network-map-placeholder-eyebrow">Subview staging</span>
+                <h3 class="network-map-placeholder-title">Details is ready for deeper drill-down panels.</h3>
+                <p class="network-map-placeholder-copy">This tab gives us a stable slot for denser diagnostics, route notes, or packet-focused context in the next pass.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

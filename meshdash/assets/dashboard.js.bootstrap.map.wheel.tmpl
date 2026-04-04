@@ -56,7 +56,7 @@
         return;
       }}
       mapFrameElement.dataset.wheelMapBound = "1";
-      setMapWheelZoomActive(activeLayoutView === "network" || activeLayoutView === "saved");
+      setMapWheelZoomActive(isMapVisibleLayoutView(activeLayoutView));
 
       mapFrameElement.addEventListener("pointerdown", (ev) => {{
         if (!isMapWheelGuardEnabled()) {{

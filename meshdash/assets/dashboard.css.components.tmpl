@@ -3909,6 +3909,44 @@
     [data-theme="dark"] .map-frame.map-basemap-offline {{
       border-color: #5f7ea7;
     }}
+    [data-theme="dark"] .network-map-subview-tabs {{
+      border-color: rgba(71, 105, 86, 0.78);
+      background: rgba(7, 13, 7, 0.84);
+      box-shadow: 0 12px 28px rgba(2, 6, 4, 0.5);
+    }}
+    [data-theme="dark"] .network-map-subview-tab {{
+      color: #b8d6c4;
+    }}
+    [data-theme="dark"] .network-map-subview-tab:hover {{
+      background: rgba(26, 48, 34, 0.92);
+      border-color: rgba(67, 116, 87, 0.88);
+      color: #e0f7e7;
+    }}
+    [data-theme="dark"] .network-map-subview-tab.is-active,
+    [data-theme="dark"] .network-map-subview-tab[aria-selected="true"] {{
+      background: #173126;
+      border-color: #3f8f68;
+      color: #8ce7b4;
+      box-shadow: 0 6px 16px rgba(4, 14, 8, 0.42);
+    }}
+    [data-theme="dark"] .network-map-subview-tab:focus-visible {{
+      outline-color: rgba(137, 176, 230, 0.65);
+    }}
+    [data-theme="dark"] .network-map-placeholder {{
+      background:
+        radial-gradient(circle at top left, rgba(63, 143, 104, 0.18), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(121, 192, 255, 0.16), transparent 30%),
+        linear-gradient(180deg, rgba(7, 13, 7, 0.96), rgba(22, 39, 58, 0.94));
+      color: #e2eef8;
+    }}
+    [data-theme="dark"] .network-map-placeholder-eyebrow {{
+      border-color: rgba(61, 89, 115, 0.88);
+      background: rgba(17, 28, 41, 0.88);
+      color: #b9d4ef;
+    }}
+    [data-theme="dark"] .network-map-placeholder-copy {{
+      color: #a8bed2;
+    }}
     [data-theme="dark"] .offline-landmark-icon span {{
       border-color: rgba(116, 147, 191, 0.62);
       background: rgba(14, 22, 34, 0.84);
@@ -5326,6 +5364,27 @@
       .layout.view-saved .saved-node-details {{
         border-top: 1px solid var(--saved-pane-head-border);
         border-radius: 8px;
+      }}
+      .network-map-chrome {{
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }}
+      .network-map-subview-tabs {{
+        width: fit-content;
+        max-width: 100%;
+      }}
+      .network-map-controls-host {{
+        justify-content: flex-start;
+      }}
+      .map-controls-dock {{
+        justify-content: flex-start;
+      }}
+      .network-map-placeholder {{
+        padding: 108px 18px 22px;
       }}
       .saved-map-splitter,
       .saved-map-splitter-head {{

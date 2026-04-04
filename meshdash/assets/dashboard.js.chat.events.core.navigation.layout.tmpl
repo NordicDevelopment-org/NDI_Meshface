@@ -685,7 +685,119 @@
 
     function isMapVisibleLayoutView(viewName) {{
       const view = normalizeLayoutView(viewName);
-      return view === "network" || view === "saved";
+      return view === "saved" || (view === "network" && activeNetworkSubview === "map");
+    }}
+
+    function normalizeNetworkSubview(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      return clean === "overview" || clean === "details" ? clean : "map";
+    }}
+
+    function loadPreferredNetworkSubview() {{
+      try {{
+        const raw = window.localStorage.getItem(networkSubviewStorageKey) || "map";
+        return normalizeNetworkSubview(raw);
+      }} catch (_err) {{
+        return "map";
+      }}
+    }}
+
+    function persistPreferredNetworkSubview(subviewName) {{
+      const next = normalizeNetworkSubview(subviewName);
+      try {{
+        window.localStorage.setItem(networkSubviewStorageKey, next);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function syncMapControlsDock(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
+      const dock = document.getElementById("map-controls-dock");
+      const headerHost = document.getElementById("map-card-actions-host");
+      const overlayHost = document.getElementById("network-map-controls-host");
+      if (!(dock instanceof HTMLElement)) return;
+      if (!(headerHost instanceof HTMLElement)) return;
+      if (!(overlayHost instanceof HTMLElement)) return;
+
+      const normalizedView = normalizeLayoutView(viewName);
+      const normalizedSubview = normalizeNetworkSubview(subviewName);
+      const useOverlayDock = normalizedView === "network";
+      const targetHost = useOverlayDock ? overlayHost : headerHost;
+      if (dock.parentElement !== targetHost) {{
+        targetHost.appendChild(dock);
+      }}
+
+      headerHost.hidden = useOverlayDock;
+      headerHost.setAttribute("aria-hidden", useOverlayDock ? "true" : "false");
+      overlayHost.classList.toggle("is-hidden", !useOverlayDock || normalizedSubview !== "map");
+      overlayHost.setAttribute(
+        "aria-hidden",
+        (!useOverlayDock || normalizedSubview !== "map") ? "true" : "false"
+      );
+    }}
+
+    function setActiveNetworkSubview(subviewName, options = {{}}) {{
+      const next = normalizeNetworkSubview(subviewName);
+      const persist = options && options.persist !== false;
+      activeNetworkSubview = next;
+
+      const normalizedView = normalizeLayoutView(activeLayoutView);
+      const showTabbedSubview = normalizedView === "network";
+      const showMapPanel = !showTabbedSubview || next === "map";
+      const root = document.getElementById("network-map-subviews");
+      if (root instanceof HTMLElement) {{
+        root.dataset.activeSubview = next;
+      }}
+
+      for (const btn of document.querySelectorAll(".network-map-subview-tab")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const tabName = normalizeNetworkSubview(btn.dataset.networkSubview || "map");
+        const isActive = tabName === next;
+        btn.classList.toggle("is-active", isActive);
+        btn.setAttribute("aria-selected", isActive ? "true" : "false");
+        btn.tabIndex = isActive ? 0 : -1;
+      }}
+
+      for (const panel of document.querySelectorAll(".network-map-subview-panel")) {{
+        if (!(panel instanceof HTMLElement)) continue;
+        const panelName = normalizeNetworkSubview(panel.dataset.networkSubviewPanel || "map");
+        const isActive = showTabbedSubview ? panelName === next : panelName === "map";
+        panel.hidden = !isActive;
+        panel.classList.toggle("is-active", isActive);
+      }}
+
+      syncMapControlsDock(activeLayoutView, next);
+
+      try {{
+        if (typeof setMapWheelZoomActive === "function") {{
+          setMapWheelZoomActive(isMapVisibleLayoutView(activeLayoutView));
+        }}
+      }} catch (_err) {{
+      }}
+
+      if (persist) {{
+        persistPreferredNetworkSubview(next);
+      }}
+
+      if (showMapPanel && (normalizedView === "network" || normalizedView === "saved")) {{
+        if (typeof requestMapResizeNow === "function") {{
+          requestMapResizeNow();
+        }}
+        if (typeof requestMapResizeStabilized === "function") {{
+          requestMapResizeStabilized();
+        }} else if (typeof requestMapResize === "function") {{
+          requestMapResize();
+        }}
+      }}
+    }}
+
+    function bindNetworkSubviewTabs() {{
+      for (const btn of document.querySelectorAll(".network-map-subview-tab")) {{
+        if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") continue;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => {{
+          setActiveNetworkSubview(btn.dataset.networkSubview || "map", {{ persist: true }});
+        }});
+      }}
     }}
 
     function syncNodeHistoryDock() {{
@@ -825,6 +937,10 @@
       syncFileTransferFeatureVisibility();
       syncAppsTabBarVisibility(next);
       syncAppsTabBar(next);
+      if (typeof requestTopbarLayoutMetricsSync === "function") {{
+        requestTopbarLayoutMetricsSync();
+      }}
+      setActiveNetworkSubview(activeNetworkSubview, {{ persist: false }});
 
       const chatViewActive = isChatWorkspaceLayoutView(next);
       if (shell instanceof HTMLElement) {{
@@ -852,7 +968,7 @@
       }} catch (_err) {{
       }}
       try {{
-        setMapWheelZoomActive(next === "network" || next === "saved");
+        setMapWheelZoomActive(isMapVisibleLayoutView(next));
       }} catch (_err) {{
       }}
       if (isMapVisibleLayoutView(next)) {{
@@ -1106,6 +1222,7 @@
     if (typeof window !== "undefined") {{
       window.applyLayoutView = applyLayoutView;
       window.meshSelectLayoutView = meshSelectLayoutView;
+      window.setActiveNetworkSubview = setActiveNetworkSubview;
     }}
 
     function loadLayoutView() {{
@@ -1114,6 +1231,8 @@
         rawPreferred = String(window.localStorage.getItem(layoutViewStorageKey) || "chat");
       }} catch (_err) {{
       }}
+      activeNetworkSubview = loadPreferredNetworkSubview();
+      setActiveNetworkSubview(activeNetworkSubview, {{ persist: false }});
       const preferred = normalizeLayoutView(rawPreferred);
       const rawPreferredView = String(rawPreferred || "").trim().toLowerCase();
       const migratedDataView = rawPreferredView === "data" || rawPreferredView === "packets";
@@ -1139,3 +1258,4 @@
     // Install layout navigation delegation as soon as this template loads so
     // view switching still works even if later boot/setup code short-circuits.
     bindLayoutNav();
+    bindNetworkSubviewTabs();
