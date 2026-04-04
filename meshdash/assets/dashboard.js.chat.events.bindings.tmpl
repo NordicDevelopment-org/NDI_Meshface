@@ -318,7 +318,11 @@
     function rerenderNodeSearchDependents(state = latestState) {{
       const safeState = state && typeof state === "object" ? state : null;
       if (!safeState) return;
-      renderChat(safeState);
+      if (isChatWorkspaceLayoutView(activeLayoutView)) {{
+        renderChat(safeState);
+      }} else if (typeof renderChatNodeNavigatorList === "function") {{
+        renderChatNodeNavigatorList(safeState);
+      }}
       if (activeLayoutView === "network") {{
         renderNodes(safeState.nodes || []);
       }}

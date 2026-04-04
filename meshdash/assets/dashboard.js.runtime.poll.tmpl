@@ -8,6 +8,13 @@
       if (query) return false;
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       if (nodes.length <= 0) return false;
+      const roomList = (typeof document !== "undefined")
+        ? document.getElementById("chat-room-list")
+        : null;
+      const visibleRosterCount = roomList instanceof HTMLElement
+        ? roomList.querySelectorAll(".chat-member-item[data-node-id]").length
+        : 0;
+      if (visibleRosterCount <= 0) return true;
       const rosterModel = Array.isArray(chatRosterModel) ? chatRosterModel : [];
       if (rosterModel.length <= 0) return true;
       return activeChatChannel === "all" && nodes.length > rosterModel.length;
@@ -64,6 +71,13 @@
           if (hidden304) {{
             scheduleFileTransferMaintenance(latestState);
             return;
+          }}
+          if (
+            activeLayoutView === "network"
+            && activeNetworkSubview !== "map"
+            && typeof renderChatNodeNavigatorList === "function"
+          ) {{
+            renderChatNodeNavigatorList(latestState);
           }}
           renderSummary(latestState);
           if (mapVisible304) {{
@@ -176,6 +190,13 @@
               summaryMetricsHydrateInFlight = null;
             }});
         }}
+        if (
+          activeLayoutView === "network"
+          && activeNetworkSubview !== "map"
+          && typeof renderChatNodeNavigatorList === "function"
+        ) {{
+          renderChatNodeNavigatorList(state);
+        }}
 
         const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network";
         const trafficVisible = mapVisible || activeLayoutView === "history";
@@ -254,8 +275,15 @@
           }}
         }}
 
-        if (!isChatWorkspaceLayoutView(activeLayoutView) && shouldHydrateNodeNavigatorRoster(state)) {{
-          renderChat(state);
+        if (
+          !isChatWorkspaceLayoutView(activeLayoutView)
+          && shouldHydrateNodeNavigatorRoster(state)
+        ) {{
+          if (typeof renderChatNodeNavigatorList === "function") {{
+            renderChatNodeNavigatorList(state);
+          }} else {{
+            renderChat(state);
+          }}
         }}
 
         if (isChatWorkspaceLayoutView(activeLayoutView)) {{

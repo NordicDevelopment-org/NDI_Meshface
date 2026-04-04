@@ -797,6 +797,15 @@
         persistPreferredNetworkSubview(next);
       }}
 
+      if (
+        normalizedView === "network"
+        && next !== "map"
+        && latestState
+        && typeof renderChatNodeNavigatorList === "function"
+      ) {{
+        renderChatNodeNavigatorList(latestState);
+      }}
+
       if (normalizedView === "network" && next === "overview") {{
         if (typeof refreshNetworkOverviewPanels === "function") {{
           void refreshNetworkOverviewPanels(false);
@@ -1092,6 +1101,13 @@
         // Render visible UI from cached state immediately on view switches.
         // This prevents "blank" panes when the server legitimately returns 304s.
         renderSummary(latestState);
+        if (
+          next === "network"
+          && activeNetworkSubview !== "map"
+          && typeof renderChatNodeNavigatorList === "function"
+        ) {{
+          renderChatNodeNavigatorList(latestState);
+        }}
         if (next === "saved" || next === "network") {{
           renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedNodeHistory);
         }}
@@ -1099,6 +1115,16 @@
           renderNodes(latestState.nodes || []);
         }}
         renderTraffic(latestState.traffic || {{}}, latestState.nodes || [], cachedNodeHistory);
+        if (
+          !isChatWorkspaceLayoutView(next)
+          && shouldHydrateNodeNavigatorRoster(latestState)
+        ) {{
+          if (typeof renderChatNodeNavigatorList === "function") {{
+            renderChatNodeNavigatorList(latestState);
+          }} else {{
+            renderChat(latestState);
+          }}
+        }}
         if (isChatWorkspaceLayoutView(next)) {{
           renderChat(latestState);
           if (next === "chatlabs") {{

@@ -93,7 +93,11 @@
       }}
       renderChatNodeNavigatorMenuControls();
       if (changed && opts.rerender !== false && latestState) {{
-        renderChat(latestState);
+        if (isChatWorkspaceLayoutView(activeLayoutView)) {{
+          renderChat(latestState);
+        }} else if (typeof renderChatNodeNavigatorList === "function") {{
+          renderChatNodeNavigatorList(latestState);
+        }}
       }}
       return changed;
     }}
@@ -211,6 +215,774 @@
         return String((a && a.id) || "").localeCompare(String((b && b.id) || ""));
       }});
       return rows;
+    }}
+
+    function buildChatNodeNavigatorPacketSparklinePath(bucketValuesRaw, width = 56, height = 12) {{
+      const buckets = Array.isArray(bucketValuesRaw)
+        ? bucketValuesRaw.map((value) => Math.max(0, Number(value) || 0))
+        : [];
+      const plotWidth = Math.max(12, Number(width) || 56);
+      const plotHeight = Math.max(8, Number(height) || 12);
+      const baselineY = Math.max(1, plotHeight - 1);
+      if (buckets.length <= 0) {{
+        return `M 0 ${{baselineY.toFixed(2)}} L ${{plotWidth.toFixed(2)}} ${{baselineY.toFixed(2)}}`;
+      }}
+      const maxValue = Math.max(0, ...buckets);
+      const padY = 1;
+      const usableHeight = Math.max(2, plotHeight - (padY * 2));
+      const points = buckets.map((value, idx) => {{
+        const x = buckets.length <= 1
+          ? (plotWidth / 2)
+          : ((idx / Math.max(1, buckets.length - 1)) * plotWidth);
+        const y = maxValue > 0
+          ? (padY + ((maxValue - value) / maxValue) * usableHeight)
+          : baselineY;
+        return {{ x, y }};
+      }});
+      if (typeof buildSmoothSvgPath === "function") {{
+        const smoothPath = buildSmoothSvgPath(points, 0.2);
+        if (smoothPath) {{
+          return smoothPath;
+        }}
+      }}
+      return points.map((point, idx) => (
+        `${{idx === 0 ? "M" : "L"}} ${{point.x.toFixed(2)}} ${{point.y.toFixed(2)}}`
+      )).join(" ");
+    }}
+
+    function classifyChatNodeNavigatorPacketSparklineTrend(bucketValuesRaw) {{
+      const buckets = Array.isArray(bucketValuesRaw)
+        ? bucketValuesRaw.map((value) => Math.max(0, Number(value) || 0))
+        : [];
+      if (buckets.length <= 1) return "trend-flat";
+      const segmentSize = Math.max(1, Math.trunc(buckets.length / 3));
+      const startSlice = buckets.slice(0, segmentSize);
+      const endSlice = buckets.slice(-segmentSize);
+      const avg = (rows) => {{
+        const list = Array.isArray(rows) ? rows : [];
+        if (list.length === 0) return 0;
+        const total = list.reduce((sum, value) => sum + (Number(value) || 0), 0);
+        return total / Math.max(1, list.length);
+      }};
+      const startAvg = avg(startSlice);
+      const endAvg = avg(endSlice);
+      const delta = endAvg - startAvg;
+      const threshold = Math.max(0.5, Math.max(...buckets, 0) * 0.15);
+      if (delta > threshold) return "trend-up";
+      if (delta < -threshold) return "trend-down";
+      return "trend-flat";
+    }}
+
+    function buildChatNodeNavigatorPacketTrendMaps(
+      rawPackets = [],
+      localNodeId = "",
+      nowUnix = Math.floor(Date.now() / 1000)
+    ) {{
+      const packetTickerByNode = new Map();
+      const packetSparklineByNode = new Map();
+      if (!nodeNavigatorPacketTrendEnabled()) {{
+        return {{ packetTickerByNode, packetSparklineByNode }};
+      }}
+
+      const packetSparklineWindowSec = 60 * 60;
+      const packetSparklineBucketCount = 24;
+      const packetSparklineBucketSpanSec = packetSparklineWindowSec / packetSparklineBucketCount;
+
+      const ensurePacketBucket = (nodeId) => {{
+        if (!isSelectableNodeId(nodeId)) return null;
+        let bucket = packetTickerByNode.get(nodeId);
+        if (!bucket) {{
+          bucket = {{
+            total: 0,
+            recent5m: 0,
+            txTotal: 0,
+            txRecent5m: 0,
+            rxTotal: 0,
+            rxRecent5m: 0,
+            lastPacketUnix: null,
+            lastTxUnix: null,
+            lastRxUnix: null,
+          }};
+          packetTickerByNode.set(nodeId, bucket);
+        }}
+        return bucket;
+      }};
+
+      const ensureSparklineBucket = (nodeId) => {{
+        if (!isSelectableNodeId(nodeId)) return null;
+        let spark = packetSparklineByNode.get(nodeId);
+        if (!spark) {{
+          spark = {{
+            buckets: new Array(packetSparklineBucketCount).fill(0),
+            windowSec: packetSparklineWindowSec,
+            bucketCount: packetSparklineBucketCount,
+          }};
+          packetSparklineByNode.set(nodeId, spark);
+        }}
+        return spark;
+      }};
+
+      const touchPacketDirection = (nodeId, direction, packetUnix, inRecent5m) => {{
+        const bucket = ensurePacketBucket(nodeId);
+        if (!bucket) return;
+        if (direction === "tx") {{
+          bucket.txTotal += 1;
+          bucket.lastTxUnix = latestUnixTimestamp(bucket.lastTxUnix, packetUnix);
+          if (inRecent5m) bucket.txRecent5m += 1;
+        }} else if (direction === "rx") {{
+          bucket.rxTotal += 1;
+          bucket.lastRxUnix = latestUnixTimestamp(bucket.lastRxUnix, packetUnix);
+          if (inRecent5m) bucket.rxRecent5m += 1;
+        }}
+        bucket.total = Math.max(
+          0,
+          Math.trunc(Number(bucket.txTotal) || 0) + Math.trunc(Number(bucket.rxTotal) || 0)
+        );
+        bucket.recent5m = Math.max(
+          0,
+          Math.trunc(Number(bucket.txRecent5m) || 0) + Math.trunc(Number(bucket.rxRecent5m) || 0)
+        );
+        bucket.lastPacketUnix = latestUnixTimestamp(bucket.lastTxUnix, bucket.lastRxUnix, packetUnix);
+      }};
+
+      const touchSparkline = (nodeId, packetUnix) => {{
+        if (!Number.isFinite(packetUnix) || packetUnix <= 0) return;
+        const spark = ensureSparklineBucket(nodeId);
+        if (!spark) return;
+        const ageSec = nowUnix - packetUnix;
+        if (ageSec < 0 || ageSec > packetSparklineWindowSec) return;
+        let bucketIndex = Math.floor((packetSparklineWindowSec - ageSec) / packetSparklineBucketSpanSec);
+        if (!Number.isFinite(bucketIndex)) {{
+          bucketIndex = packetSparklineBucketCount - 1;
+        }}
+        bucketIndex = Math.max(0, Math.min(packetSparklineBucketCount - 1, Math.trunc(bucketIndex)));
+        spark.buckets[bucketIndex] = Math.max(
+          0,
+          Math.trunc(Number(spark.buckets[bucketIndex]) || 0) + 1
+        );
+      }};
+
+      for (const packetEntry of (Array.isArray(rawPackets) ? rawPackets : [])) {{
+        const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+          ? packetEntry.summary
+          : {{}};
+        const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
+          ? packetEntry.packet
+          : {{}};
+        const isRadioPacket = (typeof isMeshRadioActivityPacket === "function")
+          ? isMeshRadioActivityPacket(packetEntry, localNodeId)
+          : true;
+        if (!isRadioPacket) continue;
+        const fromId = normalizeNodeId(
+          summary.from_id
+          ?? summary.fromId
+          ?? summary.from
+          ?? packet.from_id
+          ?? packet.fromId
+          ?? packet.from
+        );
+        const toId = normalizeNodeId(
+          summary.to_id
+          ?? summary.toId
+          ?? summary.to
+          ?? packet.to_id
+          ?? packet.toId
+          ?? packet.to
+          ?? packet.destination
+        );
+        const packetUnix = latestUnixTimestamp(
+          summary.rx_time_unix,
+          summary.captured_at,
+          summary.rx_time,
+          summary.time,
+          packetEntry && (packetEntry.captured_at || packetEntry.rx_time || packetEntry.time),
+          packet.rxTime,
+        );
+        const inRecent5m = (
+          Number.isFinite(packetUnix)
+          && packetUnix > 0
+          && (nowUnix - packetUnix) <= 300
+        );
+        touchPacketDirection(fromId, "tx", packetUnix, inRecent5m);
+        touchPacketDirection(toId, "rx", packetUnix, inRecent5m);
+        touchSparkline(fromId, packetUnix);
+        touchSparkline(toId, packetUnix);
+      }}
+
+      return {{ packetTickerByNode, packetSparklineByNode }};
+    }}
+
+    function bindChatNodeNavigatorListInteractions(roomList = null) {{
+      const targetList = roomList instanceof HTMLElement
+        ? roomList
+        : document.getElementById("chat-room-list");
+      if (!(targetList instanceof HTMLElement) || targetList.dataset.memberClickBound === "1") return;
+      targetList.dataset.memberClickBound = "1";
+      targetList.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const removeBtn = target.closest(".chat-peer-remove-btn");
+        if (removeBtn instanceof HTMLButtonElement) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const nodeId = normalizeNodeId(removeBtn.dataset.nodeId || "");
+          if (!isCanonicalNodeId(nodeId)) return;
+          const removed = removeManualDirectPeer(nodeId);
+          if (!removed) return;
+          setChatSendStatus(`Peer ${{nodeId}} removed from peer-to-peer list.`);
+          renderChatPeerAddPanel(latestState);
+          if (typeof renderChatNodeNavigatorList === "function" && latestState) {{
+            renderChatNodeNavigatorList(latestState);
+          }}
+          return;
+        }}
+        if (target.closest("button")) return;
+        const member = target.closest(".chat-member-item");
+        if (!(member instanceof HTMLElement) || !targetList.contains(member)) return;
+        const nodeId = normalizeNodeId(member.dataset.nodeId || "");
+        if (!isSelectableNodeId(nodeId)) {{
+          selectNode(nodeId, true);
+          return;
+        }}
+        selectNode(nodeId, true);
+      }});
+    }}
+
+    function buildChatNodeNavigatorDefaultRoster(
+      state,
+      nodesById,
+      historyCapsById,
+      resolveChatNodeFreshnessFn,
+      nowUnix = Math.floor(Date.now() / 1000)
+    ) {{
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const latestChatTouchByNode = (typeof mapLatestChatTouchInfo === "function")
+        ? mapLatestChatTouchInfo(recentChat)
+        : new Map();
+      const participants = new Map();
+
+      const touchNodeById = (rawNodeId, options = null) => {{
+        const nodeId = normalizeNodeId(rawNodeId || "");
+        if (!isSelectableNodeId(nodeId)) return;
+        const opts = options && typeof options === "object" ? options : {{}};
+        const node = nodesById instanceof Map ? (nodesById.get(nodeId) || null) : null;
+        const snapshot = (typeof resolveChatNodeFreshnessFn === "function")
+          ? resolveChatNodeFreshnessFn(nodeId)
+          : {{
+              id: nodeId,
+              node,
+              historyCaps: historyCapsById instanceof Map ? (historyCapsById.get(nodeId) || null) : null,
+              lastSeenUnix: null,
+              status: "unknown",
+            }};
+        const chatTouch = latestChatTouchByNode instanceof Map
+          ? (latestChatTouchByNode.get(nodeId) || null)
+          : null;
+        const name = String(
+          opts.name
+          || preferredNodeName(node)
+          || nodeNameCache.get(nodeId)
+          || nodeId
+        ).trim() || nodeId;
+        const messageUnix = Number.isFinite(Number(opts.lastMessageUnix))
+          ? Math.trunc(Number(opts.lastMessageUnix))
+          : (Number(chatTouch && chatTouch.unix) || 0);
+        const existing = participants.get(nodeId);
+        if (!existing) {{
+          participants.set(nodeId, {{
+            id: nodeId,
+            name,
+            status: normalizeFreshnessKey(snapshot && snapshot.status),
+            lastSeenUnix: Number.isFinite(Number(snapshot && snapshot.lastSeenUnix))
+              ? Math.trunc(Number(snapshot.lastSeenUnix))
+              : null,
+            lastMessageUnix: messageUnix > 0 ? messageUnix : null,
+            p2pPinned: !!opts.p2pPinned,
+          }});
+          return;
+        }}
+        if (name && name !== "Unknown node") {{
+          existing.name = name;
+        }}
+        existing.status = normalizeFreshnessKey(snapshot && snapshot.status);
+        existing.lastSeenUnix = latestUnixTimestamp(existing.lastSeenUnix, snapshot && snapshot.lastSeenUnix);
+        if (messageUnix > 0) {{
+          existing.lastMessageUnix = latestUnixTimestamp(existing.lastMessageUnix, messageUnix);
+        }}
+        if (opts.p2pPinned) {{
+          existing.p2pPinned = true;
+        }}
+      }};
+
+      if (activeChatChannel === "direct") {{
+        for (const peerId of manualDirectPeerIds) {{
+          if (!isCanonicalNodeId(peerId)) continue;
+          touchNodeById(peerId, {{ p2pPinned: true }});
+        }}
+        if (isCanonicalNodeId(chatDirectActivePeerId)) {{
+          touchNodeById(chatDirectActivePeerId, {{
+            p2pPinned: manualDirectPeerIds.has(normalizeNodeId(chatDirectActivePeerId)),
+          }});
+        }}
+      }}
+      if (activeChatChannel === "direct" && isCanonicalNodeId(selectedNodeId)) {{
+        touchNodeById(selectedNodeId, {{
+          p2pPinned: manualDirectPeerIds.has(normalizeNodeId(selectedNodeId)),
+        }});
+      }}
+
+      if (nodesById instanceof Map) {{
+        for (const nodeId of nodesById.keys()) {{
+          touchNodeById(nodeId, {{
+            p2pPinned: manualDirectPeerIds.has(normalizeNodeId(nodeId)),
+          }});
+        }}
+      }}
+      if (historyCapsById instanceof Map) {{
+        for (const nodeId of historyCapsById.keys()) {{
+          touchNodeById(nodeId, {{
+            p2pPinned: manualDirectPeerIds.has(normalizeNodeId(nodeId)),
+          }});
+        }}
+      }}
+      if (favoriteNodeIds && typeof favoriteNodeIds.forEach === "function") {{
+        favoriteNodeIds.forEach((nodeId) => {{
+          touchNodeById(nodeId, {{
+            p2pPinned: manualDirectPeerIds.has(normalizeNodeId(nodeId)),
+          }});
+        }});
+      }}
+      if (nodeNotesById && typeof nodeNotesById.forEach === "function") {{
+        nodeNotesById.forEach((_entry, nodeId) => {{
+          touchNodeById(nodeId, {{
+            p2pPinned: manualDirectPeerIds.has(normalizeNodeId(nodeId)),
+          }});
+        }});
+      }}
+
+      const rows = Array.from(participants.values());
+      if (typeof sortChatNodeNavigatorParticipants === "function") {{
+        return sortChatNodeNavigatorParticipants(rows, nodesById, nowUnix);
+      }}
+      return rows.sort((a, b) => String((a && (a.name || a.id)) || "").localeCompare(String((b && (b.name || b.id)) || "")));
+    }}
+
+    function buildChatNodeNavigatorMemberHtml(item, context) {{
+      try {{
+        const ctx = context && typeof context === "object" ? context : {{}};
+        const nowUnix = Number.isFinite(Number(ctx.nowUnix))
+          ? Math.trunc(Number(ctx.nowUnix))
+          : Math.floor(Date.now() / 1000);
+        const nodesById = ctx.nodesById instanceof Map ? ctx.nodesById : new Map();
+        const historyCapsById = ctx.historyCapsById instanceof Map ? ctx.historyCapsById : new Map();
+        const packetTickerByNode = ctx.packetTickerByNode instanceof Map ? ctx.packetTickerByNode : new Map();
+        const packetSparklineByNode = ctx.packetSparklineByNode instanceof Map ? ctx.packetSparklineByNode : new Map();
+        const resolveChatNodeFreshnessFn = (typeof ctx.resolveChatNodeFreshnessFn === "function")
+          ? ctx.resolveChatNodeFreshnessFn
+          : (() => ({{ id: normalizeNodeId(item && item.id), lastSeenUnix: null, status: "unknown" }}));
+        const nodeId = normalizeNodeId(item && item.id);
+        const snapshot = resolveChatNodeFreshnessFn(nodeId);
+        const node = nodesById.get(nodeId) || null;
+        const nodeProjection = nodeExplorerBuildProjection(
+          node || {{ id: nodeId, long_name: (item && item.name) || nodeId }},
+          {{ nowUnix }}
+        );
+        const caps = historyCapsById.get(nodeId) || null;
+        const statusKey = normalizeFreshnessKey(item && item.status);
+        const statusLabel = statusKey === "online"
+          ? "Online"
+          : (statusKey === "warn" ? "Aging" : (statusKey === "stale" ? "Stale" : "Unknown"));
+        const lastSeenText = Number.isFinite(Number(snapshot && snapshot.lastSeenUnix))
+          ? `${{formatLocalChatTime(snapshot.lastSeenUnix, "n/a", nowUnix)}} (${{formatIdleAge(snapshot.lastSeenUnix, nowUnix)}})`
+          : "n/a";
+        const roleText = String((node && node.role) || "").trim() || "n/a";
+        const hardwareText = String((node && (node.hardware_model || node.hardware)) || "").trim() || "n/a";
+        const batteryRaw = Number(
+          (node && node.battery_level != null)
+            ? node.battery_level
+            : (caps && caps.battery_level)
+        );
+        const batteryText = Number.isFinite(batteryRaw)
+          ? `${{Math.max(0, Math.min(100, Math.round(batteryRaw)))}}%`
+          : "n/a";
+        const hopsRaw = Number(
+          (node && node.hops_away != null)
+            ? node.hops_away
+            : (caps && caps.last_hops)
+        );
+        const hopsText = Number.isFinite(hopsRaw) && hopsRaw >= 0
+          ? String(Math.trunc(hopsRaw))
+          : "n/a";
+        const hasLivePosition = (
+          node
+          && Number.isFinite(Number(node.lat))
+          && Number.isFinite(Number(node.lon))
+        );
+        const gpsText = hasLivePosition
+          ? `${{Number(node.lat).toFixed(5)}}, ${{Number(node.lon).toFixed(5)}}`
+          : ((caps && caps.has_position === true) ? "history only" : "n/a");
+        const noteEntry = (typeof nodeNoteEntry === "function") ? nodeNoteEntry(nodeId) : null;
+        const noteText = String((noteEntry && noteEntry.note) || "").trim();
+        const idleText = Number.isFinite(Number(snapshot && snapshot.lastSeenUnix))
+          ? formatIdleAge(snapshot.lastSeenUnix, nowUnix)
+          : "n/a";
+        const showPacketTrend = nodeNavigatorPacketTrendEnabled();
+        const showPacketDirection = (typeof normalizeChatNodeNavigatorShowPacketDirectionPref === "function")
+          ? normalizeChatNodeNavigatorShowPacketDirectionPref(chatNodeNavigatorShowPacketDirection)
+          : !!chatNodeNavigatorShowPacketDirection;
+        const showPacketTrendRow = showPacketTrend && showPacketDirection;
+        const packetTicker = packetTickerByNode.get(nodeId) || null;
+        const packetSparkline = packetSparklineByNode.get(nodeId) || null;
+        const packetSparklineBuckets = Array.isArray(packetSparkline && packetSparkline.buckets)
+          ? packetSparkline.buckets
+          : [];
+        const packetSparklineWindowSec = Math.max(
+          60,
+          Math.trunc(Number(packetSparkline && packetSparkline.windowSec) || 3600)
+        );
+        const packetSparklineWindowMin = Math.max(1, Math.round(packetSparklineWindowSec / 60));
+        const packetTotal = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.total) || 0));
+        const packetTxTotal = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.txTotal) || 0));
+        const packetTxRecent5m = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.txRecent5m) || 0));
+        const packetRxTotal = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.rxTotal) || 0));
+        const packetRxRecent5m = Math.max(0, Math.trunc(Number(packetTicker && packetTicker.rxRecent5m) || 0));
+        const packetLastUnix = Number(packetTicker && packetTicker.lastPacketUnix);
+        const packetLastTxUnix = Number(packetTicker && packetTicker.lastTxUnix);
+        const packetLastRxUnix = Number(packetTicker && packetTicker.lastRxUnix);
+        const packetLastText = (
+          Number.isFinite(packetLastUnix) && packetLastUnix > 0
+            ? `${{formatLocalChatTime(packetLastUnix, "n/a", nowUnix)}} (${{formatIdleAge(packetLastUnix, nowUnix)}})`
+            : "n/a"
+        );
+        const packetLastTxText = (
+          Number.isFinite(packetLastTxUnix) && packetLastTxUnix > 0
+            ? `${{formatLocalChatTime(packetLastTxUnix, "n/a", nowUnix)}} (${{formatIdleAge(packetLastTxUnix, nowUnix)}})`
+            : "n/a"
+        );
+        const packetLastRxText = (
+          Number.isFinite(packetLastRxUnix) && packetLastRxUnix > 0
+            ? `${{formatLocalChatTime(packetLastRxUnix, "n/a", nowUnix)}} (${{formatIdleAge(packetLastRxUnix, nowUnix)}})`
+            : "n/a"
+        );
+        const packetTickerDetail = packetTotal > 0
+          ? `Radio packets: RX ${{packetRxRecent5m}} / TX ${{packetTxRecent5m}} in 5m, RX ${{packetRxTotal}} / TX ${{packetTxTotal}} total, last any ${{packetLastText}}, last RX ${{packetLastRxText}}, last TX ${{packetLastTxText}}. Trend window: ${{packetSparklineWindowMin}}m`
+          : "Radio packets: none in current packet buffer";
+        const tooltipLines = [
+          `${{(item && item.name) || nodeId}} (${{(item && item.id) || nodeId}})`,
+          `Status: ${{statusLabel}}`,
+          `Last seen: ${{lastSeenText}}`,
+          `Idle: ${{idleText}}`,
+          `Role: ${{roleText}}`,
+          `Hardware: ${{hardwareText}}`,
+          `Battery: ${{batteryText}}`,
+          `Hops: ${{hopsText}}`,
+          `GPS: ${{gpsText}}`,
+          `Saved P2P: ${{item && item.p2pPinned ? "yes" : "no"}}`,
+        ];
+        if (showPacketTrendRow) {{
+          tooltipLines.splice(4, 0, packetTickerDetail);
+        }}
+        if (noteText) {{
+          tooltipLines.push(`Notes: ${{noteText}}`);
+        }}
+        const visibleMetaFieldIds = normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds, {{
+          fallbackToDefaults: false,
+        }});
+        const showTagBadge = Array.isArray(visibleMetaFieldIds)
+          && visibleMetaFieldIds.includes("favorite");
+        const tagEntry = (typeof nodeTagEntryForNode === "function")
+          ? nodeTagEntryForNode(nodeId)
+          : null;
+        const tagActive = !!(tagEntry && tagEntry.preset);
+        const tagLabel = tagActive
+          ? normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged")
+          : "";
+        if (tagLabel) {{
+          tooltipLines.push(`Tag: ${{tagLabel}}`);
+        }}
+        const memberTitle = tooltipLines.join("\n");
+        const removeBtn = (activeChatChannel === "direct" && item && item.p2pPinned)
+          ? `<button type="button" class="chat-peer-remove-btn" data-node-id="${{escAttr((item && item.id) || nodeId)}}" title="Remove from peer-to-peer list" aria-label="Remove ${{escAttr((item && item.id) || nodeId)}} from peer-to-peer list">&times;</button>`
+          : "";
+        const idleRowTitle = Number.isFinite(Number(snapshot && snapshot.lastSeenUnix))
+          ? `Last seen ${{formatLocalChatTime(snapshot.lastSeenUnix, "n/a", nowUnix)}}`
+          : "Last seen n/a";
+        const idleRowHtml = `<span class="chat-member-idle-time" title="${{escAttr(idleRowTitle)}}">Idle: ${{escAttr(idleText)}}</span>`;
+        let packetDirectionHtml = "";
+        let packetSparkWrapHtml = "";
+        if (showPacketTrendRow) {{
+          const packetSparklinePath = buildChatNodeNavigatorPacketSparklinePath(packetSparklineBuckets, 56, 12);
+          const packetSparklineTrend = classifyChatNodeNavigatorPacketSparklineTrend(packetSparklineBuckets);
+          const packetRowTitle = packetTotal > 0
+            ? `Packet trend: last ${{packetSparklineWindowMin}}m. RX ${{packetRxRecent5m}} / TX ${{packetTxRecent5m}} in last 5m, RX ${{packetRxTotal}} / TX ${{packetTxTotal}} total. Last any ${{packetLastText}}. Last RX ${{packetLastRxText}}. Last TX ${{packetLastTxText}}`
+            : `No packets from this node in the current packet buffer. Trend window: ${{packetSparklineWindowMin}}m`;
+          packetDirectionHtml = `<span class="chat-member-packet-direction" title="Per-node radio packet direction in last 5 minutes">RX ${{packetRxRecent5m}} · TX ${{packetTxRecent5m}}</span>`;
+          packetSparkWrapHtml = `<span class="chat-member-packet-spark-wrap">
+            <span class="chat-member-packet-trend metric-ticker ${{packetSparklineTrend}}" title="${{escAttr(packetRowTitle)}}">
+              <svg class="metric-ticker-chart chat-member-packet-sparkline" viewBox="0 0 56 12" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                <path d="${{escAttr(packetSparklinePath)}}" />
+              </svg>
+            </span>
+          </span>`;
+        }}
+        const memberMetaRowHtml = `<span class="chat-member-meta-row">${{idleRowHtml}}${{packetDirectionHtml}}</span>`;
+        const memberFieldsRowHtml = (() => {{
+          const visibleFieldIds = Array.isArray(visibleMetaFieldIds) ? visibleMetaFieldIds : [];
+          if (visibleFieldIds.length <= 0) return "";
+          const chips = [];
+          for (const fieldIdRaw of visibleFieldIds) {{
+            const fieldId = normalizeNodeExplorerFieldId(fieldIdRaw);
+            if (!fieldId || fieldId === "favorite") continue;
+            const def = nodeExplorerFieldDef(fieldId);
+            const field = nodeProjection && nodeProjection.fields ? nodeProjection.fields[fieldId] : null;
+            if (!def || !field) continue;
+            const chipLabel = String(def.label || fieldId).trim() || fieldId;
+            const chipValue = String((field.text != null) ? field.text : "n/a").trim() || "n/a";
+            const chipTitle = `${{chipLabel}}: ${{String((field.title != null) ? field.title : chipValue)}}`;
+            chips.push(`<span class="chat-member-metadata-chip" title="${{escAttr(chipTitle)}}">
+              <span class="chat-member-metadata-key">${{escAttr(chipLabel)}}</span>
+              <span class="chat-member-metadata-value">${{escAttr(chipValue)}}</span>
+            </span>`);
+          }}
+          if (chips.length <= 0) return "";
+          return `<span class="chat-member-fields-row">${{chips.join("")}}</span>`;
+        }})();
+        const shortNameSeedRaw = String(
+          (node && (node.short_name || node.shortName || (node.user && (node.user.short_name || node.user.shortName))))
+          || (nodeProjection && nodeProjection.node && (nodeProjection.node.short_name || nodeProjection.node.shortName || (nodeProjection.node.user && (nodeProjection.node.user.short_name || nodeProjection.node.user.shortName))))
+          || ""
+        ).trim();
+        const longNameSeedRaw = String(
+          (node && (node.long_name || node.longName || (node.user && (node.user.long_name || node.user.longName))))
+          || (nodeProjection && nodeProjection.node && (nodeProjection.node.long_name || nodeProjection.node.longName || (nodeProjection.node.user && (nodeProjection.node.user.long_name || nodeProjection.node.user.longName))))
+          || (nodeProjection && nodeProjection.name)
+          || (item && item.name)
+          || ""
+        ).trim();
+        const tintOutlineSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(nodeId || (item && item.id) || "", (item && item.id) || nodeId || "unknown")
+          : String(nodeId || (item && item.id) || "unknown").trim();
+        const tintStartSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(shortNameSeedRaw, tintOutlineSeed)
+          : String(shortNameSeedRaw || tintOutlineSeed).trim();
+        const tintEndSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(longNameSeedRaw, (item && item.name) || tintStartSeed || tintOutlineSeed)
+          : String(longNameSeedRaw || (item && item.name) || tintStartSeed || tintOutlineSeed).trim();
+        const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
+        const nodeHue = tagActive ? nodeTagTintHue(tagEntry, autoNodeHue) : autoNodeHue;
+        const tagStyleVars = tagActive ? nodeTagStyleVars(tagEntry) : "";
+        const memberTintOptions = {{
+          scope: "member",
+          fallbackHue: 145,
+          tagActive,
+          hue: nodeHue,
+          outlineSeed: tintOutlineSeed,
+          tintStartSeed,
+          tintEndSeed,
+        }};
+        if (tagActive) {{
+          memberTintOptions.tintStartHue = nodeHue;
+          memberTintOptions.tintEndHue = nodeHue;
+          memberTintOptions.outlineHue = nodeHue;
+        }}
+        const memberTintStyle = (typeof nodeTintStyleVars === "function")
+          ? `${{nodeTintStyleVars(nodeId, memberTintOptions)}}${{tagStyleVars}}`
+          : `--chat-member-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || 145)))}};${{tagStyleVars}}`;
+        const tagClass = tagActive ? " tagged-node" : "";
+        const tagChipHtml = (showTagBadge && tagActive)
+          ? `<span class="chat-member-tag-chip" style="${{escAttr(tagStyleVars)}}" title="Tag: ${{escAttr(tagLabel)}}">${{escAttr(tagLabel)}}</span>`
+          : "";
+        const packetSparkClass = packetSparkWrapHtml ? " has-packet-spark" : "";
+        const actionRowHtml = removeBtn
+          ? `<span class="chat-member-actions">${{removeBtn}}</span>`
+          : '<span class="chat-member-actions"></span>';
+        return `<div class="chat-member-item status-${{statusKey}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{packetSparkClass}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
+          <span class="chat-member-status status-${{statusKey}}">●</span>
+          <span class="chat-member-main">
+            <span class="chat-member-name-row">
+              <span class="chat-member-name-left">
+                <span class="chat-member-name status-${{statusKey}}">${{escAttr((item && item.name) || nodeId || "Unknown node")}}</span>
+                ${{tagChipHtml}}
+              </span>
+              ${{actionRowHtml}}
+            </span>
+            ${{memberMetaRowHtml}}
+            ${{memberFieldsRowHtml}}
+          </span>
+          ${{packetSparkWrapHtml}}
+        </div>`;
+      }} catch (err) {{
+        const fallbackId = normalizeNodeId(item && item.id);
+        const fallbackName = String((item && item.name) || fallbackId || "Unknown node");
+        const fallbackHue = (typeof nodeTintHue === "function") ? nodeTintHue(fallbackId || "unknown", 145) : 145;
+        const fallbackOutlineSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(fallbackId || "unknown", "unknown")
+          : String(fallbackId || "unknown").trim();
+        const fallbackStartSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText("", fallbackOutlineSeed)
+          : fallbackOutlineSeed;
+        const fallbackEndSeed = (typeof normalizeNodeTintSeedText === "function")
+          ? normalizeNodeTintSeedText(fallbackName, fallbackStartSeed || fallbackOutlineSeed)
+          : String(fallbackName || fallbackStartSeed || fallbackOutlineSeed).trim();
+        const fallbackTintStyle = (typeof nodeTintStyleVars === "function")
+          ? nodeTintStyleVars(fallbackId || "unknown", {{
+            scope: "member",
+            fallbackHue: 145,
+            tagActive: false,
+            hue: fallbackHue,
+            outlineSeed: fallbackOutlineSeed,
+            tintStartSeed: fallbackStartSeed,
+            tintEndSeed: fallbackEndSeed,
+          }})
+          : `--chat-member-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(fallbackHue) || 145)))}};`;
+        try {{
+          if (typeof console !== "undefined" && typeof console.error === "function") {{
+            console.error("Node navigator row render failed", fallbackId || item, err);
+          }}
+        }} catch (_consoleErr) {{
+        }}
+        return `<div class="chat-member-item status-unknown${{selectedNodeId === fallbackId ? " selected-node" : ""}}" data-node-id="${{escAttr(fallbackId)}}" data-node-tint-outline-seed="${{escAttr(fallbackOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(fallbackStartSeed)}}" data-node-tint-end-seed="${{escAttr(fallbackEndSeed)}}" style="${{escAttr(fallbackTintStyle)}}" title="Node navigator fallback row">
+          <span class="chat-member-status status-unknown">●</span>
+          <span class="chat-member-main">
+            <span class="chat-member-name-row">
+              <span class="chat-member-name-left">
+                <span class="chat-member-name status-unknown">${{escAttr(fallbackName)}}</span>
+              </span>
+              <span class="chat-member-actions"></span>
+            </span>
+            <span class="chat-member-idle-time">Idle: n/a</span>
+          </span>
+        </div>`;
+      }}
+    }}
+
+    function renderChatNodeNavigatorList(state = latestState, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const safeState = state && typeof state === "object" ? state : (latestState || {{}});
+      const roomList = document.getElementById("chat-room-list");
+      if (!(roomList instanceof HTMLElement)) return null;
+      const usersTitle = document.getElementById("chat-users-title");
+      if (usersTitle instanceof HTMLElement) {{
+        usersTitle.textContent = activeChatChannel === "direct"
+          ? "Users (Peer-to-peer)"
+          : "Users (Everyone)";
+      }}
+      const nowUnix = Number.isFinite(Number(opts.nowUnix))
+        ? Math.trunc(Number(opts.nowUnix))
+        : Math.floor(Date.now() / 1000);
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const nodesById = opts.nodesById instanceof Map
+        ? opts.nodesById
+        : new Map(nodes.map((node) => [normalizeNodeId(node && node.id), node]));
+      const historyCapsObj = (safeState && safeState.history_caps && typeof safeState.history_caps === "object")
+        ? safeState.history_caps
+        : null;
+      const historyCapsById = opts.historyCapsById instanceof Map
+        ? opts.historyCapsById
+        : new Map(
+            Object.entries(historyCapsObj || {{}})
+              .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+              .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+          );
+      const recentChat = Array.isArray((safeState.traffic || {{}}).recent_chat)
+        ? (safeState.traffic || {{}}).recent_chat
+        : [];
+      const latestChatTouchByNode = (typeof mapLatestChatTouchInfo === "function")
+        ? mapLatestChatTouchInfo(recentChat)
+        : new Map();
+      const resolveChatNodeFreshnessFn = (typeof opts.resolveChatNodeFreshnessFn === "function")
+        ? opts.resolveChatNodeFreshnessFn
+        : ((rawNodeId) => {{
+            const nodeId = normalizeNodeId(rawNodeId || "");
+            const node = nodesById.get(nodeId) || null;
+            const caps = historyCapsById.get(nodeId) || null;
+            const chatTouch = latestChatTouchByNode.get(nodeId) || null;
+            const lastSeenUnix = computeNodeFreshnessUnix(node, caps, chatTouch);
+            return {{
+              id: nodeId,
+              node,
+              historyCaps: caps,
+              lastSeenUnix,
+              status: freshnessStatus(lastSeenUnix, nowUnix),
+            }};
+          }});
+      const packetMaps = (
+        opts.packetTickerByNode instanceof Map
+        && opts.packetSparklineByNode instanceof Map
+      )
+        ? {{
+            packetTickerByNode: opts.packetTickerByNode,
+            packetSparklineByNode: opts.packetSparklineByNode,
+          }}
+        : buildChatNodeNavigatorPacketTrendMaps(
+            Array.isArray((safeState.traffic || {{}}).recent_packets)
+              ? (safeState.traffic || {{}}).recent_packets
+              : [],
+            resolveLocalNodeId(safeState),
+            nowUnix
+          );
+      const rosterAll = Array.isArray(opts.rosterAll)
+        ? (
+            typeof sortChatNodeNavigatorParticipants === "function"
+              ? sortChatNodeNavigatorParticipants(opts.rosterAll.slice(), nodesById, nowUnix)
+              : opts.rosterAll.slice()
+          )
+        : buildChatNodeNavigatorDefaultRoster(
+            safeState,
+            nodesById,
+            historyCapsById,
+            resolveChatNodeFreshnessFn,
+            nowUnix
+          );
+      const rosterQuery = globalNodeSearchQuery();
+      const rosterFiltered = rosterAll.filter((item) => (
+        matchesIdOrNameQuery(item && item.id, item && item.name, rosterQuery, {{
+          node: nodesById.get(normalizeNodeId(item && item.id)),
+        }})
+      ));
+      chatRosterModel = rosterAll;
+      const nextRoomListHtml = rosterFiltered.length > 0
+        ? rosterFiltered.map((item) => buildChatNodeNavigatorMemberHtml(item, {{
+            nowUnix,
+            nodesById,
+            historyCapsById,
+            packetTickerByNode: packetMaps.packetTickerByNode,
+            packetSparklineByNode: packetMaps.packetSparklineByNode,
+            resolveChatNodeFreshnessFn,
+          }})).join("")
+        : (rosterQuery
+            ? '<div class="chat-member-empty">No users match this search.</div>'
+            : '<div class="chat-member-empty">No users discovered yet.</div>');
+      const nextMarkup = String(nextRoomListHtml == null ? "" : nextRoomListHtml);
+      const previousMarkup = (typeof roomList.__meshLastInnerHtml_chat_room_list === "string")
+        ? roomList.__meshLastInnerHtml_chat_room_list
+        : null;
+      if (previousMarkup !== nextMarkup) {{
+        roomList.innerHTML = nextMarkup;
+        roomList.__meshLastInnerHtml_chat_room_list = nextMarkup;
+      }}
+      bindChatNodeNavigatorListInteractions(roomList);
+
+      const onlineCount = rosterAll.filter((item) => normalizeFreshnessKey(item && item.status) === "online").length;
+      const warnCount = rosterAll.filter((item) => normalizeFreshnessKey(item && item.status) === "warn").length;
+      const staleCount = rosterAll.filter((item) => normalizeFreshnessKey(item && item.status) === "stale").length;
+      const leftSub = document.getElementById("chat-left-sub");
+      if (leftSub) {{
+        leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • View Ch: ${{currentMeshChannelViewLabel()}} • Send Ch: ${{currentMeshChannelSendLabel()}} • ${{onlineCount}} online, ${{warnCount}} aging, ${{staleCount}} stale`;
+      }}
+      return {{
+        rosterAll,
+        rosterFiltered,
+        nodesById,
+        historyCapsById,
+        packetTickerByNode: packetMaps.packetTickerByNode,
+        packetSparklineByNode: packetMaps.packetSparklineByNode,
+        resolveChatNodeFreshnessFn,
+      }};
     }}
 
     function renderChatNodeNavigatorMenuControls() {{

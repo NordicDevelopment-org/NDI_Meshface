@@ -367,6 +367,7 @@
     function renderEnvironmentNodeLegend(metricMeta, nodeMeta, nodes, filteredPoints, chartMeta, hiddenNodeIds) {{
       const host = document.getElementById("env-metrics-available");
       if (!(host instanceof HTMLElement)) return;
+      host.hidden = false;
       bindEnvironmentNodeLegendToggle();
       const safeChartMeta = (chartMeta && typeof chartMeta === "object") ? chartMeta : {{}};
       const legendItems = Array.isArray(safeChartMeta.legendItems) ? safeChartMeta.legendItems : [];
@@ -872,6 +873,7 @@
       }}
       const plottedSeries = seriesList.slice();
       const totalSeries = plottedSeries.length;
+      const dockedInNetwork = !!svg.closest(".network-sensors-panel");
       const hiddenSet = hiddenNodeIds instanceof Set ? hiddenNodeIds : new Set();
       const legendItems = plottedSeries.map((series, idx) => {{
         const color = envMetricColorPalette[idx % envMetricColorPalette.length];
@@ -983,19 +985,41 @@
       const clippedPointCount = Math.max(0, Math.trunc(Number(bounds && bounds.clippedCount) || 0));
 
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
-      const palette = darkTheme
-        ? {{
-          grid: "#324152",
-          guide: "rgba(83, 110, 135, 0.32)",
-          text: "#b8cfde",
-          axis: "#84a7bf",
-        }}
-        : {{
-          grid: "rgba(76, 102, 126, 0.24)",
-          guide: "rgba(106, 132, 156, 0.2)",
-          text: "#557189",
-          axis: "#395369",
-        }};
+      const palette = dockedInNetwork
+        ? (
+          darkTheme
+            ? {{
+              grid: "#324152",
+              guide: "#324152",
+              guideOpacity: "0.45",
+              text: "#9ce7b8",
+              axis: "#9ce7b8",
+            }}
+            : {{
+              grid: "#dce8df",
+              guide: "#dce8df",
+              guideOpacity: "0.65",
+              text: "#1f6f53",
+              axis: "#1f6f53",
+            }}
+        )
+        : (
+          darkTheme
+            ? {{
+              grid: "#324152",
+              guide: "rgba(83, 110, 135, 0.32)",
+              guideOpacity: "1",
+              text: "#b8cfde",
+              axis: "#84a7bf",
+            }}
+            : {{
+              grid: "rgba(76, 102, 126, 0.24)",
+              guide: "rgba(106, 132, 156, 0.2)",
+              guideOpacity: "1",
+              text: "#557189",
+              axis: "#395369",
+            }}
+        );
 
       const measuredWidth = Number(svg.clientWidth);
       const measuredHeight = Number(svg.clientHeight);
@@ -1029,17 +1053,39 @@
         yLabels.push(`<text x="${{(padLeft - 4).toFixed(2)}}" y="${{(y + 4).toFixed(2)}}" text-anchor="end" fill="${{palette.axis}}" font-size="10">${{escAttr(envMetricValueText(value))}}</text>`);
       }}
 
-      const xTicks = 6;
       const xGrid = [];
-      for (let idx = 0; idx < xTicks; idx += 1) {{
-        const ratio = xTicks <= 1 ? 0 : (idx / (xTicks - 1));
-        const unix = Math.round(visibleMinUnix + (ratio * unixSpan));
-        const x = xForUnix(unix);
-        xGrid.push(`<line x1="${{x.toFixed(2)}}" y1="${{padTop}}" x2="${{x.toFixed(2)}}" y2="${{(padTop + chartHeight).toFixed(2)}}" stroke="${{palette.guide}}" stroke-width="1" stroke-dasharray="3 5"></line>`);
-      }}
-
       const linePaths = [];
       const timelineRows = buildEnvironmentTimelineRows(visiblePoints);
+      if (dockedInNetwork) {{
+        const dayBoundaries = [];
+        let lastDayKey = "";
+        for (const row of timelineRows) {{
+          const unix = Number(row && row.unix);
+          const dayKey = timelineDayKey(unix);
+          if (!dayKey) continue;
+          if (!lastDayKey) {{
+            lastDayKey = dayKey;
+            continue;
+          }}
+          if (dayKey !== lastDayKey) {{
+            dayBoundaries.push(unix);
+            lastDayKey = dayKey;
+          }}
+        }}
+        for (const unix of dayBoundaries) {{
+          const x = xForUnix(unix);
+          xGrid.push(`<line x1="${{x.toFixed(2)}}" y1="${{padTop}}" x2="${{x.toFixed(2)}}" y2="${{(padTop + chartHeight).toFixed(2)}}" stroke="${{palette.guide}}" stroke-width="1" stroke-dasharray="2 3" stroke-opacity="${{palette.guideOpacity}}"></line>`);
+        }}
+      }} else {{
+        const xTicks = 6;
+        for (let idx = 0; idx < xTicks; idx += 1) {{
+          const ratio = xTicks <= 1 ? 0 : (idx / (xTicks - 1));
+          const unix = Math.round(visibleMinUnix + (ratio * unixSpan));
+          const x = xForUnix(unix);
+          xGrid.push(`<line x1="${{x.toFixed(2)}}" y1="${{padTop}}" x2="${{x.toFixed(2)}}" y2="${{(padTop + chartHeight).toFixed(2)}}" stroke="${{palette.guide}}" stroke-width="1" stroke-dasharray="3 5"></line>`);
+        }}
+      }}
+
       visibleSeriesList.forEach((series, idx) => {{
         const seriesNodeId = String(series.nodeId || "").trim();
         const color = seriesColorByNodeId.get(normalizeNodeId(seriesNodeId)) || envMetricColorPalette[idx % envMetricColorPalette.length];
@@ -1068,8 +1114,15 @@
         const trendPath = buildSmoothSvgPath(trendScreenPoints, 0.22) || trendLinearPath;
         const hitPath = trendPath || rawPath;
         if (!hitPath) return;
-        linePaths.push(`<path d="${{rawPath}}" fill="none" stroke="${{color}}" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.24"></path>`);
-        linePaths.push(`<path d="${{trendPath}}" fill="none" stroke="${{color}}" stroke-width="2.35" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.98" data-node-id="${{escAttr(seriesNodeId)}}" style="cursor:pointer;"><title>${{escAttr(`${{seriesTitle}} - click to focus node`)}}</title></path>`);
+        const rawStrokeWidth = dockedInNetwork ? 1.2 : 1.1;
+        const rawStrokeOpacity = dockedInNetwork ? 0.26 : 0.24;
+        const trendStrokeWidth = dockedInNetwork ? 2.65 : 2.35;
+        const trendStrokeOpacity = dockedInNetwork ? 1 : 0.98;
+        if (dockedInNetwork && trendPath) {{
+          linePaths.push(`<path d="${{trendPath}}" fill="none" stroke="${{color}}" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.14"></path>`);
+        }}
+        linePaths.push(`<path d="${{rawPath}}" fill="none" stroke="${{color}}" stroke-width="${{rawStrokeWidth.toFixed(2)}}" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{rawStrokeOpacity.toFixed(2)}}"></path>`);
+        linePaths.push(`<path d="${{trendPath}}" fill="none" stroke="${{color}}" stroke-width="${{trendStrokeWidth.toFixed(2)}}" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{trendStrokeOpacity.toFixed(2)}}" data-node-id="${{escAttr(seriesNodeId)}}" style="cursor:pointer;"><title>${{escAttr(`${{seriesTitle}} - click to focus node`)}}</title></path>`);
         linePaths.push(`<path d="${{hitPath}}" fill="none" stroke="transparent" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" pointer-events="stroke" data-node-id="${{escAttr(seriesNodeId)}}" style="cursor:pointer;"><title>${{escAttr(`${{seriesTitle}} - click to focus node`)}}</title></path>`);
       }});
 

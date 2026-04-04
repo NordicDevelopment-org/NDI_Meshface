@@ -36,6 +36,13 @@
       return;
     }}
 
+    function renderNodeNavigatorFallback(state = latestState) {{
+      if (typeof renderChatNodeNavigatorList === "function") {{
+        return renderChatNodeNavigatorList(state);
+      }}
+      return false;
+    }}
+
     function renderChatCoreUiFallback(state = latestState, renderError = null) {{
       const safeState = state && typeof state === "object" ? state : {{}};
       const safeTraffic = (safeState.traffic && typeof safeState.traffic === "object")
@@ -67,34 +74,7 @@
           : '<div class="chat-feed-empty">No chat messages available yet.</div>';
       }}
 
-      const roomList = document.getElementById("chat-room-list");
-      if (roomList instanceof HTMLElement) {{
-        const roster = nodes
-          .map((node) => {{
-            const id = normalizeNodeId(node && node.id);
-            if (!isSelectableNodeId(id)) return null;
-            const name = preferredNodeName(node) || id;
-            const lastSeenUnix = latestUnixTimestamp(
-              node && node.last_heard_unix,
-              node && node.last_heard_epoch
-            );
-            return {{
-              id,
-              name,
-              status: freshnessStatus(lastSeenUnix, nowUnix),
-              lastSeenUnix,
-              lastMessageUnix: null,
-            }};
-          }})
-          .filter((row) => !!row);
-        roster.sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id)));
-        chatRosterModel = roster;
-        roomList.innerHTML = roster.length > 0
-          ? roster.map((item) => (
-              `<button type="button" class="chat-member-item status-${{escAttr(normalizeFreshnessKey(item.status) || "unknown")}}" data-node-id="${{escAttr(item.id)}}" title="${{escAttr(item.id)}}"><span class="chat-member-name">${{escAttr(item.name)}}</span><span class="chat-member-id">${{escAttr(item.id)}}</span></button>`
-            )).join("")
-          : '<div class="chat-member-empty">No nodes available.</div>';
-      }}
+      renderNodeNavigatorFallback(safeState);
 
       if (typeof renderChatChangeSummary === "function") {{
         renderChatChangeSummary(nowUnix);
