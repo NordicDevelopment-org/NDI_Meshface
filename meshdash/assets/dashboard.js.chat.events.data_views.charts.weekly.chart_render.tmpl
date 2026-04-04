@@ -1,14 +1,19 @@
-    function renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage) {{
-      const svg = document.getElementById("weekly-summary-chart");
-      const empty = document.getElementById("weekly-summary-empty");
+    function renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage, options = {{}}) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const target = resolveWeeklySummaryRenderTarget(opts.targetKey || "history");
+      const svg = document.getElementById(target.svgId);
+      const empty = document.getElementById(target.emptyId);
+      const chartState = target && target.chartState;
+      if (!(chartState && typeof chartState === "object")) {{
+        return false;
+      }}
       if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) {{
         return false;
       }}
 
-      const chartState = historyTrendCharts.weekly;
       bindHistoryTrendChartZoom(
         chartState,
-        () => rerenderWeeklySummaryChartFromCache(),
+        () => rerenderWeeklySummaryChartFromCache(target.key),
         "Weekly trend chart"
       );
 
@@ -311,4 +316,3 @@
       );
       return true;
     }}
-

@@ -1,48 +1,90 @@
-    function renderWeeklySummaryLoading() {{
-      historyTrendCharts.weekly.points = [];
-      historyTrendCharts.weekly.pointerDrag = null;
-      const caption = document.getElementById("weekly-summary-caption");
-      if (caption) {{
-        caption.textContent = "Loading weekly summary metrics...";
+    function resolveWeeklySummaryRenderTarget(targetKey = "history") {{
+      const clean = String(targetKey || "").trim().toLowerCase();
+      if (clean === "network-overview") {{
+        return {{
+          key: "network-overview",
+          chartState: historyTrendCharts.weeklyNetworkOverview,
+          captionId: "network-overview-caption",
+          overviewId: "network-overview-overview",
+          svgId: "network-overview-chart",
+          emptyId: "network-overview-empty",
+          timelineId: "network-overview-timeline",
+          captionPrefix: "Network trend for",
+          loadingCaption: "Loading network overview trends...",
+          loadingEmpty: "Loading network overview trends...",
+          errorPrefix: "Network overview trend error",
+          errorEmpty: "Unable to load network overview trends.",
+        }};
       }}
-      const overview = document.getElementById("weekly-summary-overview");
+      return {{
+        key: "history",
+        chartState: historyTrendCharts.weekly,
+        captionId: "weekly-summary-caption",
+        overviewId: "weekly-summary-overview",
+        svgId: "weekly-summary-chart",
+        emptyId: "weekly-summary-empty",
+        timelineId: "weekly-summary-timeline",
+        captionPrefix: "Weekly trend for",
+        loadingCaption: "Loading weekly summary metrics...",
+        loadingEmpty: "Loading weekly summary metrics...",
+        errorPrefix: "Weekly summary error",
+        errorEmpty: "Unable to load weekly summary metrics.",
+      }};
+    }}
+
+    function clearWeeklySummaryRenderTarget(targetKey = "history", options = {{}}) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const target = resolveWeeklySummaryRenderTarget(targetKey);
+      const chartState = target && target.chartState;
+      if (chartState && typeof chartState === "object") {{
+        chartState.points = [];
+        chartState.pointerDrag = null;
+        if (opts.resetZoom) {{
+          resetHistoryTrendZoom(chartState);
+        }}
+      }}
+      const caption = document.getElementById(target.captionId);
+      if (caption) {{
+        caption.textContent = String(opts.captionText || target.loadingCaption || "").trim();
+      }}
+      const overview = document.getElementById(target.overviewId);
       if (overview) {{
         overview.innerHTML = "";
       }}
-      const svg = document.getElementById("weekly-summary-chart");
+      const svg = document.getElementById(target.svgId);
       if (svg instanceof SVGElement) {{
         svg.innerHTML = "";
         svg.classList.remove("zoomed", "chart-dragging");
       }}
-      const empty = document.getElementById("weekly-summary-empty");
+      const empty = document.getElementById(target.emptyId);
       if (empty) {{
         empty.hidden = false;
-        empty.textContent = "Loading weekly summary metrics...";
+        empty.textContent = String(opts.emptyText || target.loadingEmpty || "").trim();
       }}
-      setTimelineMessage("weekly-summary-timeline", "Loading timeline...");
+      setTimelineMessage(
+        target.timelineId,
+        String(opts.timelineText || "Loading timeline...").trim()
+      );
     }}
 
-    function renderWeeklySummaryError(message) {{
-      historyTrendCharts.weekly.points = [];
-      resetHistoryTrendZoom(historyTrendCharts.weekly);
-      const caption = document.getElementById("weekly-summary-caption");
-      if (caption) {{
-        caption.textContent = `Weekly summary error: ${{message || "unknown error"}}`;
-      }}
-      const overview = document.getElementById("weekly-summary-overview");
-      if (overview) {{
-        overview.innerHTML = "";
-      }}
-      const svg = document.getElementById("weekly-summary-chart");
-      if (svg instanceof SVGElement) {{
-        svg.innerHTML = "";
-        svg.classList.remove("zoomed", "chart-dragging");
-      }}
-      const empty = document.getElementById("weekly-summary-empty");
-      if (empty) {{
-        empty.hidden = false;
-        empty.textContent = "Unable to load weekly summary metrics.";
-      }}
-      setTimelineMessage("weekly-summary-timeline", "Timeline unavailable due to weekly summary error.");
+    function renderWeeklySummaryLoading(targetKey = "history") {{
+      clearWeeklySummaryRenderTarget(targetKey);
     }}
 
+    function renderNetworkOverviewSummaryLoading() {{
+      renderWeeklySummaryLoading("network-overview");
+    }}
+
+    function renderWeeklySummaryError(message, targetKey = "history") {{
+      const target = resolveWeeklySummaryRenderTarget(targetKey);
+      clearWeeklySummaryRenderTarget(target.key, {{
+        resetZoom: true,
+        captionText: `${{target.errorPrefix || "Weekly summary error"}}: ${{message || "unknown error"}}`,
+        emptyText: target.errorEmpty || "Unable to load weekly summary metrics.",
+        timelineText: "Timeline unavailable due to weekly summary error.",
+      }});
+    }}
+
+    function renderNetworkOverviewSummaryError(message) {{
+      renderWeeklySummaryError(message, "network-overview");
+    }}

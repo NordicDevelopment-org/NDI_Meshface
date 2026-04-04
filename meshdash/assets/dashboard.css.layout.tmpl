@@ -642,6 +642,7 @@
     #node-packets-chart-wrap,
     #online-activity-chart-wrap,
     #weekly-summary-chart-wrap,
+    #network-overview-chart-wrap,
     #history-chat-trend-chart-wrap,
     #encription-trend-chart-wrap,
     #encription-route-chart-wrap {{
@@ -659,6 +660,7 @@
     #node-packets-chart,
     #online-activity-chart,
     #weekly-summary-chart,
+    #network-overview-chart,
     #history-chat-trend-chart,
     #encription-trend-chart,
     #encription-route-chart {{
@@ -782,16 +784,19 @@
       cursor: grabbing;
     }}
     #online-activity-chart,
-    #weekly-summary-chart {{
+    #weekly-summary-chart,
+    #network-overview-chart {{
       cursor: zoom-in;
       touch-action: none;
     }}
     #online-activity-chart.zoomed,
-    #weekly-summary-chart.zoomed {{
+    #weekly-summary-chart.zoomed,
+    #network-overview-chart.zoomed {{
       cursor: grab;
     }}
     #online-activity-chart.chart-dragging,
-    #weekly-summary-chart.chart-dragging {{
+    #weekly-summary-chart.chart-dragging,
+    #network-overview-chart.chart-dragging {{
       cursor: grabbing;
     }}
     .signal-empty {{
@@ -2822,6 +2827,13 @@
     }}
     .layout.view-network .network-map-chrome {{
       display: flex;
+    }}
+    .layout.view-network #network-overview-chart-wrap {{
+      min-height: clamp(260px, 44vh, 420px);
+      height: clamp(260px, 44vh, 420px);
+    }}
+    .layout.view-network .network-overview-card .overview-grid {{
+      margin-top: 2px;
     }}
     .layout.view-network .map-data,
     .layout.view-network .chat,

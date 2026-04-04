@@ -524,15 +524,21 @@
       renderOnlineActivityChart(points);
     }}
 
-    function rerenderWeeklySummaryChartFromCache() {{
-      const chartState = historyTrendCharts.weekly;
+    function rerenderWeeklySummaryChartFromCache(targetKey = "history") {{
+      const target = resolveWeeklySummaryRenderTarget(targetKey);
+      const chartState = target && target.chartState;
       const rows = chartState && Array.isArray(chartState.points) ? chartState.points : [];
-      const metricKey = normalizeWeeklySummaryMetric(weeklySummaryMetric);
-      const metricMeta = resolveWeeklySummaryMetricMeta(metricKey, weeklySummaryNodeSeriesEnabled);
+      const metricKey = target && target.key === "network-overview"
+        ? normalizeWeeklySummaryMetric(networkOverviewMetric)
+        : normalizeWeeklySummaryMetric(weeklySummaryMetric);
+      const nodeSeries = target && target.key === "network-overview"
+        ? networkOverviewNodeSeriesEnabled
+        : weeklySummaryNodeSeriesEnabled;
+      const metricMeta = resolveWeeklySummaryMetricMeta(metricKey, nodeSeries);
       const emptyMessage = metricKey === "packets"
         ? "Need at least two saved samples to estimate packets/min."
         : "No weekly summary history yet.";
-      renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage);
+      renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage, {{ targetKey: target.key }});
     }}
 
     function renderOnlineActivityLoading() {{

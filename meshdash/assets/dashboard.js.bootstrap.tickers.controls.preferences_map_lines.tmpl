@@ -36,6 +36,44 @@
       updateWeeklySummaryNodeSeriesControls(weeklySummaryMetric);
     }}
 
+    function bindNetworkOverviewMetricControl() {{
+      const select = document.getElementById("network-overview-metric");
+      if (!(select instanceof HTMLSelectElement)) return;
+      if (select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+      select.value = normalizeWeeklySummaryMetric(networkOverviewMetric);
+      updateNetworkOverviewNodeSeriesControls(networkOverviewMetric);
+      select.addEventListener("change", () => {{
+        applyNetworkOverviewMetric(select.value || "nodes", true);
+        if (activeLayoutView === "network") {{
+          void refreshNetworkOverviewPanels(false);
+        }}
+      }});
+    }}
+
+    function bindNetworkOverviewNodeSeriesControls() {{
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        const toggleId = networkOverviewNodeSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        if (toggle.dataset.bound === "1") continue;
+        toggle.dataset.bound = "1";
+        toggle.checked = !!networkOverviewNodeSeriesEnabled[key];
+        toggle.addEventListener("change", () => {{
+          const nextSeries = {{}};
+          for (const innerKey of weeklySummaryNodeSeriesOrder) {{
+            const innerToggleId = networkOverviewNodeSeriesControlIds[innerKey];
+            const innerToggle = document.getElementById(innerToggleId);
+            if (innerToggle instanceof HTMLInputElement) {{
+              nextSeries[innerKey] = innerToggle.checked;
+            }}
+          }}
+          applyNetworkOverviewNodeSeries(nextSeries, true);
+        }});
+      }}
+      updateNetworkOverviewNodeSeriesControls(networkOverviewMetric);
+    }}
+
     function loadThemePreference() {{
       let stored = "auto";
       try {{
@@ -97,6 +135,37 @@
           position_nodes: false,
         }}, false);
       }}
+    }}
+
+    function loadNetworkOverviewMetricPreference() {{
+      let stored = "nodes";
+      try {{
+        stored = window.localStorage.getItem(networkOverviewMetricStorageKey) || "nodes";
+      }} catch (_err) {{
+      }}
+      applyNetworkOverviewMetric(stored, false);
+    }}
+
+    function loadNetworkOverviewNodeSeriesPreference() {{
+      let storedJson = "";
+      try {{
+        storedJson = window.localStorage.getItem(networkOverviewNodeSeriesStorageKey) || "";
+      }} catch (_err) {{
+      }}
+      if (storedJson) {{
+        try {{
+          const parsed = JSON.parse(storedJson);
+          applyNetworkOverviewNodeSeries(parsed, false);
+          return;
+        }} catch (_err) {{
+        }}
+      }}
+      applyNetworkOverviewNodeSeries({{
+        online_nodes: true,
+        known_nodes: true,
+        saved_nodes: true,
+        position_nodes: true,
+      }}, false);
     }}
 
     function updateMapPacketLinesControl() {{

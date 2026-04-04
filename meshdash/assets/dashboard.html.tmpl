@@ -2286,10 +2286,67 @@ Ready.
               data-network-subview-panel="overview"
               hidden
             >
-              <div class="network-map-placeholder">
-                <span class="network-map-placeholder-eyebrow">Subview staging</span>
-                <h3 class="network-map-placeholder-title">Overview is ready for richer network summaries.</h3>
-                <p class="network-map-placeholder-copy">We can expand this tab with rollups and cross-node context once the new in-map layout is settled.</p>
+              <div class="network-overview-panel">
+                <section class="network-overview-card">
+                  <div class="network-overview-card-header">
+                    <div id="network-overview-caption" class="history-caption">Network trends from saved snapshots.</div>
+                  </div>
+                  <div class="history-metric-controls network-overview-controls">
+                    <div class="history-metric-wrap">
+                      <label for="network-overview-metric" class="history-metric-label">Metric</label>
+                      <select id="network-overview-metric" class="history-metric-select" aria-label="Network overview metric">
+                        <option value="nodes">Nodes</option>
+                        <option value="packets">Packets</option>
+                        <option value="links">Links</option>
+                      </select>
+                    </div>
+                    <div id="network-overview-node-lines-wrap" class="history-metric-wrap history-metric-wrap-lines" hidden>
+                      <span class="history-metric-label">Node Lines</span>
+                      <label class="history-metric-inline" for="network-overview-node-line-online">
+                        <input
+                          id="network-overview-node-line-online"
+                          class="history-metric-toggle"
+                          type="checkbox"
+                          aria-label="Show online nodes line"
+                        />
+                        <span>Online</span>
+                      </label>
+                      <label class="history-metric-inline" for="network-overview-node-line-known">
+                        <input
+                          id="network-overview-node-line-known"
+                          class="history-metric-toggle"
+                          type="checkbox"
+                          aria-label="Show known nodes radio line"
+                        />
+                        <span>Known</span>
+                      </label>
+                      <label class="history-metric-inline" for="network-overview-node-line-saved">
+                        <input
+                          id="network-overview-node-line-saved"
+                          class="history-metric-toggle"
+                          type="checkbox"
+                          aria-label="Show saved nodes database line"
+                        />
+                        <span>Saved</span>
+                      </label>
+                      <label class="history-metric-inline" for="network-overview-node-line-position">
+                        <input
+                          id="network-overview-node-line-position"
+                          class="history-metric-toggle"
+                          type="checkbox"
+                          aria-label="Show nodes with position line"
+                        />
+                        <span>Position</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div id="network-overview-chart-wrap">
+                    <svg id="network-overview-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Network overview trend"></svg>
+                    <div id="network-overview-empty" class="signal-empty" hidden>No weekly summary history yet.</div>
+                  </div>
+                  <div id="network-overview-timeline" class="signal-timeline" aria-label="Network overview trend timeline"></div>
+                  <div id="network-overview-overview" class="overview-grid"></div>
+                </section>
               </div>
             </div>
             <div

@@ -778,6 +778,12 @@
         persistPreferredNetworkSubview(next);
       }}
 
+      if (normalizedView === "network" && next === "overview") {{
+        if (typeof refreshNetworkOverviewPanels === "function") {{
+          void refreshNetworkOverviewPanels(false);
+        }}
+      }}
+
       if (showMapPanel && (normalizedView === "network" || normalizedView === "saved")) {{
         if (typeof requestMapResizeNow === "function") {{
           requestMapResizeNow();

@@ -145,6 +145,64 @@
       }}
     }}
 
+    function updateNetworkOverviewNodeSeriesControls(metricKey = networkOverviewMetric) {{
+      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const showLines = metric === "nodes";
+      const wrap = document.getElementById("network-overview-node-lines-wrap");
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !showLines;
+      }}
+      for (const key of weeklySummaryNodeSeriesOrder) {{
+        const toggleId = networkOverviewNodeSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        const seriesColor = weeklySummaryNodeSeriesPaletteColor(key);
+        if (seriesColor) {{
+          toggle.style.accentColor = seriesColor;
+        }} else {{
+          toggle.style.removeProperty("accent-color");
+        }}
+        toggle.checked = !!networkOverviewNodeSeriesEnabled[key];
+        toggle.disabled = !showLines;
+      }}
+    }}
+
+    function applyNetworkOverviewMetric(metricKey, persist = true) {{
+      const normalized = normalizeWeeklySummaryMetric(metricKey);
+      networkOverviewMetric = normalized;
+      const select = document.getElementById("network-overview-metric");
+      if (select instanceof HTMLSelectElement && select.value !== normalized) {{
+        select.value = normalized;
+      }}
+      updateNetworkOverviewNodeSeriesControls(normalized);
+      const cached = summaryMetricsCache.get(String(weeklySummaryHours));
+      if (cached && cached.data) {{
+        renderNetworkOverviewSummary(cached.data);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(networkOverviewMetricStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function applyNetworkOverviewNodeSeries(nextSeries, persist = true) {{
+      networkOverviewNodeSeriesEnabled = normalizeWeeklySummaryNodeSeries(nextSeries);
+      updateNetworkOverviewNodeSeriesControls(networkOverviewMetric);
+      const cached = summaryMetricsCache.get(String(weeklySummaryHours));
+      if (cached && cached.data) {{
+        renderNetworkOverviewSummary(cached.data);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(
+          networkOverviewNodeSeriesStorageKey,
+          JSON.stringify(networkOverviewNodeSeriesEnabled)
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
     function applyTickerDensity(mode, persist = true) {{
       const normalized = normalizeTickerDensityMode(mode);
       tickerDensity = normalized;
@@ -526,10 +584,13 @@
           renderSignalChart(cached.data.points);
         }}
       }}
-      if (activeMapDataMode === "activity") {{
-        const cachedWeekly = summaryMetricsCache.get(String(weeklySummaryHours));
-        if (cachedWeekly && cachedWeekly.data && Array.isArray(cachedWeekly.data.points)) {{
+      const cachedWeekly = summaryMetricsCache.get(String(weeklySummaryHours));
+      if (cachedWeekly && cachedWeekly.data && Array.isArray(cachedWeekly.data.points)) {{
+        if (activeMapDataMode === "activity") {{
           renderWeeklySummary(cachedWeekly.data);
+        }}
+        if (activeLayoutView === "network") {{
+          renderNetworkOverviewSummary(cachedWeekly.data);
         }}
       }}
 

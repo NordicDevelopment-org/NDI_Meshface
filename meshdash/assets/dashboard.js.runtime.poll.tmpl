@@ -203,7 +203,7 @@
         }}
 
         let weeklySummary = null;
-        if (activeLayoutView === "history") {{
+        if (activeLayoutView === "history" || activeLayoutView === "network") {{
           try {{
             weeklySummary = await fetchSummaryMetrics(weeklySummaryHours);
           }} catch (summaryErr) {{
@@ -224,6 +224,13 @@
 
         if (activeLayoutView === "network") {{
           renderNodes(state.nodes || []);
+          if (weeklySummary && !weeklySummary.error) {{
+            renderNetworkOverviewSummary(weeklySummary);
+          }} else if (weeklySummary && weeklySummary.error) {{
+            renderNetworkOverviewSummaryError(weeklySummary.error);
+          }} else {{
+            renderNetworkOverviewSummaryLoading();
+          }}
         }}
 
         if (trafficVisible) {{
