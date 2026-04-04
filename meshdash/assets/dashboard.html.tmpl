@@ -2333,8 +2333,8 @@ Ready.
           <div id="node-history-caption" class="history-caption">Select a node to view historical data.</div>
           <div class="history-tabs">
             <button class="history-tab-btn active" id="tab-btn-signal" data-tab="signal" type="button">Signal</button>
-            <button class="history-tab-btn" id="tab-btn-online" data-tab="online" type="button">Online</button>
             <button class="history-tab-btn" id="tab-btn-packets" data-tab="packets" type="button">Packets</button>
+            <button class="history-tab-btn" id="tab-btn-online" data-tab="online" type="button">Online</button>
           </div>
           <div id="tab-panel-signal" class="history-panel">
             <div id="signal-chart-wrap">
@@ -2347,6 +2347,16 @@ Ready.
               <span class="legend-chip" style="color:#265d7b;">Avg RSSI (dBm)</span>
             </div>
           </div>
+          <div id="tab-panel-packets" class="history-panel" hidden>
+            <div id="node-packets-chart-wrap">
+              <svg id="node-packets-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Node packet rate history"></svg>
+              <div id="node-packets-empty" class="signal-empty" hidden>No packet-rate history yet for this node.</div>
+            </div>
+            <div id="node-packets-timeline" class="signal-timeline" aria-label="Node packets timeline"></div>
+            <div class="signal-legend">
+              <span class="legend-chip" style="color:#265d7b;">Packets per minute (history buckets)</span>
+            </div>
+          </div>
           <div id="tab-panel-online" class="history-panel" hidden>
             <div id="node-online-chart-wrap">
               <svg id="node-online-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Node online history"></svg>
@@ -2355,16 +2365,6 @@ Ready.
             <div id="node-online-timeline" class="signal-timeline" aria-label="Node online timeline"></div>
             <div class="signal-legend">
               <span class="legend-chip activity-legend-nodes">Online (recent packet timestamps)</span>
-            </div>
-          </div>
-          <div id="tab-panel-packets" class="history-panel" hidden>
-            <div id="node-packets-chart-wrap">
-              <svg id="node-packets-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Node packet rate history"></svg>
-              <div id="node-packets-empty" class="signal-empty" hidden>No packet-rate history yet for this node.</div>
-            </div>
-            <div id="node-packets-timeline" class="signal-timeline" aria-label="Node packets timeline"></div>
-            <div class="signal-legend">
-              <span class="legend-chip" style="color:#2f6f9a;">Packets per minute (history buckets)</span>
             </div>
           </div>
         </div>
