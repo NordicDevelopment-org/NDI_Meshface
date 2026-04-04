@@ -337,6 +337,8 @@
 
     function registerOutgoingFileTransferSession(payload) {{
       const session = (payload && typeof payload === "object") ? payload : {{}};
+      const nowMs = Date.now();
+      const nowUnix = Math.floor(nowMs / 1000);
       const token = fileTransferOutgoingTokenFor(
         session.transferId,
         session.destination,
@@ -353,8 +355,8 @@
         metaFrame: String(session.metaFrame || "").trim(),
         chunkFrames: Array.isArray(session.chunkFrames) ? session.chunkFrames.slice() : [],
         totalChunks,
-        createdAtMs: Date.now(),
-        lastSendAtMs: Date.now(),
+        createdAtMs: nowMs,
+        lastSendAtMs: nowMs,
         lastRetryAtMs: 0,
         retryAttempts: 0,
         retriesSinceProgress: 0,
@@ -410,9 +412,79 @@
         lastAckUnix: null,
         lastAckChannelIndex: null,
         lastAckReceivedIndexes: [],
+        ackWatermarkUnix: Math.max(0, Math.trunc(Number(session.ackWatermarkUnix) || nowUnix)),
       }};
       fileTransferOutgoingByToken.set(token, normalized);
       return normalized;
+    }}
+
+    function restartOutgoingFileTransferSession(session, options = null) {{
+      const record = (session && typeof session === "object") ? session : null;
+      if (!record) return null;
+      const transferId = String(record.transferId || "").trim().toLowerCase();
+      const destination = normalizeNodeId(record.destination || "");
+      const metaFrame = String(record.metaFrame || "").trim();
+      const chunkFrames = Array.isArray(record.chunkFrames) ? record.chunkFrames : [];
+      if (!transferId || !isCanonicalNodeId(destination) || !metaFrame || chunkFrames.length <= 0) {{
+        return null;
+      }}
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const totalChunks = Math.max(
+        1,
+        Math.trunc(Number(record.totalChunks) || chunkFrames.length || 1)
+      );
+      const nowMs = Date.now();
+      const nowUnix = Math.floor(nowMs / 1000);
+      const waitForAccept = opts.forceWaitForAccept !== false;
+      record.totalChunks = totalChunks;
+      record.chunkFrames = chunkFrames.slice();
+      record.createdAtMs = nowMs;
+      record.lastSendAtMs = 0;
+      record.lastRetryAtMs = 0;
+      record.retryAttempts = 0;
+      record.retriesSinceProgress = 0;
+      record.retryChunkCursor = 0;
+      record.lastRetryErrorAtMs = 0;
+      record.maxRetries = Math.max(
+        1,
+        Math.trunc(Number(record.maxRetries) || fileTransferOutgoingMaxRetries)
+      );
+      record.delivered = false;
+      record.failed = false;
+      record.deliveredAtMs = 0;
+      record.failedAtMs = 0;
+      record.waitingForAccept = !!waitForAccept;
+      record.acceptedAtMs = waitForAccept ? 0 : nowMs;
+      record.acceptProbeAttempts = 0;
+      record.lastAcceptProbeAtMs = 0;
+      record.sentChunks = 0;
+      record.ackedChunks = 0;
+      record.srttMs = 0;
+      record.rttvarMs = 0;
+      record.rtoMs = Math.max(fileTransferRtoMinMs, Math.trunc(Number(fileTransferRtoInitialMs) || 0));
+      record.cwndChunks = Math.max(fileTransferCwndMinChunks, Number(fileTransferCwndInitialChunks) || fileTransferCwndMinChunks);
+      record.ssthreshChunks = Math.max(
+        fileTransferCwndMinChunks,
+        Math.trunc(Number(fileTransferSsthreshInitialChunks) || fileTransferCwndInitialChunks || fileTransferCwndMinChunks)
+      );
+      record.frameGapMs = Math.max(
+        fileTransferInterFrameDelayMinMs,
+        Math.min(
+          fileTransferInterFrameDelayMaxMs,
+          Math.trunc(Number(fileTransferInterFrameDelayMs) || fileTransferInterFrameDelayMinMs)
+        )
+      );
+      record.lastWindowSendAtMs = 0;
+      record.lastCongestionBackoffAtMs = 0;
+      record.lastAckProgressAtMs = 0;
+      record.lastAckUnix = null;
+      record.lastAckChannelIndex = null;
+      record.lastAckReceivedIndexes = [];
+      record.ackWatermarkUnix = Math.max(
+        0,
+        Math.trunc(Number(opts.ackWatermarkUnix) || nowUnix)
+      );
+      return record;
     }}
 
     function pruneOutgoingFileTransferSessions(nowMs = Date.now()) {{

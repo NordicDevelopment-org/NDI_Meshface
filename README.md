@@ -231,7 +231,7 @@ Deploy helper example (service mode, file transfer enabled):
 
 Note: `scripts/deploy_dashboard.sh` preserves existing file-transfer env values from the target `dashboard.env` unless you explicitly pass file-transfer flags/env overrides.
 
-In the Files panel, use `Clear stale` (next to console `Copy`/`Clear`) to remove stale pending rows and completed/failed transfer rows from the current dashboard session.
+In the Files panel, use `Clear stale` (next to console `Copy`/`Clear`) to remove stale pending rows and completed/failed transfer rows from the current dashboard session. For outbound rows that are stuck pending/failed after a peer drop, use `Restart` in the row action column to reset local sender progress and resend metadata/chunks when the receiver comes back online.
 
 ## Configuration Reference
 

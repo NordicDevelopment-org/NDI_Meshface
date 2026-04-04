@@ -192,6 +192,67 @@
       void poll();
     }}
 
+    function restartOutgoingFileTransferAction(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return;
+      const row = fileTransferRowByKey(key);
+      if (!(row && typeof row === "object")) {{
+        setFileTransferStatus("Transfer row is no longer available.", true);
+        return;
+      }}
+      if (String(row.directionClass || "").trim().toLowerCase() !== "outbound") {{
+        setFileTransferStatus("Only outbound transfers can be restarted.", true);
+        return;
+      }}
+      const transferId = String(row.transferId || "").trim().toLowerCase();
+      const destination = normalizeNodeId(row.toId || row.peerId || "");
+      if (!transferId || !isCanonicalNodeId(destination)) {{
+        setFileTransferStatus("Cannot resolve transfer destination for restart.", true);
+        return;
+      }}
+      const session = findOutgoingFileTransferSession(transferId, destination, row.channelIndex);
+      if (!(session && typeof session === "object")) {{
+        setFileTransferStatus("This outbound session is no longer in memory.", true);
+        appendFileTransferConsole(
+          `Restart skipped for ${{fileTransferShortTransferId(transferId)}}: local session is unavailable.`,
+          {{ level: "warn" }}
+        );
+        return;
+      }}
+      if (
+        !String(session.metaFrame || "").trim()
+        || !(Array.isArray(session.chunkFrames))
+        || session.chunkFrames.length <= 0
+      ) {{
+        setFileTransferStatus("Cannot restart: local transfer frames are unavailable.", true);
+        appendFileTransferConsole(
+          `Restart skipped for ${{fileTransferShortTransferId(transferId)}}: missing local frames.`,
+          {{ level: "warn" }}
+        );
+        return;
+      }}
+      const fileName = normalizeFileTransferName(row.fileName || session.fileName || "mesh-file.bin");
+      const shortId = fileTransferShortTransferId(transferId);
+      const confirmText = `Restart transfer "${{fileName}}" (${{shortId}}) to ${{destination}}?\n\nThis resets local ACK progress and resends metadata/chunks.`;
+      if (typeof window.confirm === "function" && !window.confirm(confirmText)) {{
+        return;
+      }}
+      const restarted = restartOutgoingFileTransferSession(session, {{ forceWaitForAccept: true }});
+      if (!(restarted && typeof restarted === "object")) {{
+        setFileTransferStatus("Could not restart this transfer.", true);
+        return;
+      }}
+      setFileTransferStatus(`Restarted transfer "${{fileName}}" to ${{destination}}.`);
+      appendFileTransferConsole(
+        `Manual restart for ${{shortId}} to ${{destination}}: progress reset, awaiting receiver accept.`,
+        {{ level: "warn" }}
+      );
+      renderFilesView(latestState);
+      scheduleFileTransferMaintenance(latestState);
+      requestImmediatePoll(40);
+      void poll();
+    }}
+
     function bindFilesTransferTableControls() {{
       const table = document.getElementById("files-transfer-table");
       if (!(table instanceof HTMLTableElement) || table.dataset.bound === "1") {{
@@ -208,6 +269,10 @@
         const action = String(button.dataset.action || "download").trim().toLowerCase();
         if (action === "accept" || action === "decline") {{
           setFileTransferInboundDecisionAction(transferKey, action === "accept" ? "accepted" : "declined");
+          return;
+        }}
+        if (action === "restart") {{
+          restartOutgoingFileTransferAction(transferKey);
           return;
         }}
         downloadFileTransferByKey(transferKey);
@@ -350,22 +415,41 @@
               >${{escAttr(declineLabel)}}</button>
             </span>`;
         }} else {{
-          const actionLabel = row && row.canDownload
-            ? "Download"
-            : (row && row.outgoingRetrying ? "Retrying" : "Waiting");
-          const actionDisabled = row && row.canDownload ? "" : " disabled";
-          const actionTitle = row && row.canDownload
-            ? `Download ${{row.downloadName || row.fileName || "file"}}`
-            : (row && row.outgoingWaitingForAccept ? "Waiting for receiver accept" : "Waiting for all chunks");
-          actionSort = row && row.canDownload ? 3 : 0;
-          actionHtml = `<button
-              type="button"
-              class="files-transfer-action"
-              data-action="download"
-              data-transfer-key="${{escAttr(row.key || "")}}"
-              title="${{escAttr(actionTitle)}}"
-              ${{actionDisabled}}
-            >${{escAttr(actionLabel)}}</button>`;
+          const outgoingCanRestart = !!(row && row.outgoingCanRestart);
+          if (outgoingCanRestart && !(row && row.canDownload)) {{
+            const restartTitle = row && row.outgoingFailed
+              ? "Restart failed outbound transfer from metadata/chunk 0."
+              : (
+                row && row.outgoingWaitingForAccept
+                  ? "Restart outbound transfer and request receiver acceptance again."
+                  : "Restart outbound transfer from metadata/chunk 0."
+              );
+            actionSort = 2;
+            actionHtml = `<button
+                type="button"
+                class="files-transfer-action restart"
+                data-action="restart"
+                data-transfer-key="${{escAttr(row.key || "")}}"
+                title="${{escAttr(restartTitle)}}"
+              >Restart</button>`;
+          }} else {{
+            const actionLabel = row && row.canDownload
+              ? "Download"
+              : (row && row.outgoingRetrying ? "Retrying" : "Waiting");
+            const actionDisabled = row && row.canDownload ? "" : " disabled";
+            const actionTitle = row && row.canDownload
+              ? `Download ${{row.downloadName || row.fileName || "file"}}`
+              : (row && row.outgoingWaitingForAccept ? "Waiting for receiver accept" : "Waiting for all chunks");
+            actionSort = row && row.canDownload ? 3 : 0;
+            actionHtml = `<button
+                type="button"
+                class="files-transfer-action"
+                data-action="download"
+                data-transfer-key="${{escAttr(row.key || "")}}"
+                title="${{escAttr(actionTitle)}}"
+                ${{actionDisabled}}
+              >${{escAttr(actionLabel)}}</button>`;
+          }}
         }}
         return `<tr>
           <td data-sort="${{escAttr(unix)}}">${{escAttr(when)}}</td>

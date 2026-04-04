@@ -219,6 +219,13 @@
         const outgoingSession = outgoing
           ? findOutgoingFileTransferSession(transfer.transferId, transfer.toId, transfer.channelIndex)
           : null;
+        const outgoingCanRestart = !!(
+          outgoingSession
+          && !outgoingSession.delivered
+          && String(outgoingSession.metaFrame || "").trim()
+          && Array.isArray(outgoingSession.chunkFrames)
+          && outgoingSession.chunkFrames.length > 0
+        );
         const transferChannelIndex = fileTransferExplicitChannelIndex(transfer.channelIndex);
         const sessionChannelIndex = fileTransferExplicitChannelIndex(outgoingSession && outgoingSession.channelIndex);
         const resolvedChannelIndex = transferChannelIndex != null ? transferChannelIndex : sessionChannelIndex;
@@ -362,6 +369,8 @@
           inboundDeclined,
           outgoingWaitingForAccept: !!(outgoingSession && outgoingSession.waitingForAccept),
           outgoingRetrying,
+          outgoingFailed: !!(outgoingSession && outgoingSession.failed && !delivered),
+          outgoingCanRestart,
           canDownload: inboundAccepted && complete && assembled instanceof Uint8Array,
           bytes: assembled,
         }});
@@ -432,6 +441,8 @@
           inboundDeclined: false,
           outgoingWaitingForAccept: false,
           outgoingRetrying: false,
+          outgoingFailed: false,
+          outgoingCanRestart: false,
           canDownload: false,
           bytes: null,
         }});
