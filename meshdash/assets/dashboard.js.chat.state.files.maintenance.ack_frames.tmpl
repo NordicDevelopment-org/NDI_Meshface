@@ -11,9 +11,17 @@
         const action = String(actionRaw || "").trim().toLowerCase();
         if (action !== "pause" && action !== "resume" && action !== "cancel") return false;
         const prior = fileTransferFlowSignalSentByKey.get(transferKey) || null;
+        const priorSendCount = Math.max(0, Math.trunc(Number(prior && prior.sendCount) || 0));
+        const cancelSignalMaxAttempts = 6;
+        const cancelSignalRefreshMs = 8 * 1000;
+        if (action === "cancel" && priorSendCount >= cancelSignalMaxAttempts && String(prior && prior.action || "") === "cancel") {{
+          return false;
+        }}
         const changed = !prior || String(prior.action || "") !== action;
         if (!changed && !force) {{
-          const minRefreshMs = action === "pause" ? 30 * 1000 : Number.POSITIVE_INFINITY;
+          const minRefreshMs = action === "pause"
+            ? 30 * 1000
+            : (action === "cancel" ? cancelSignalRefreshMs : Number.POSITIVE_INFINITY);
           const lastSentAtMs = Math.max(0, Math.trunc(Number(prior && prior.lastSentAtMs) || 0));
           if ((nowMs - lastSentAtMs) < minRefreshMs) {{
             return false;
@@ -48,15 +56,18 @@
             lastSentAtMs: Math.max(0, Math.trunc(Number(prior && prior.lastSentAtMs) || 0)),
             updatedAtMs: nowMs,
             lastErrorAtMs: nowMs,
+            sendCount: priorSendCount,
           }});
           return false;
         }}
         const sentAtMs = Date.now();
+        const sendCount = changed ? 1 : (priorSendCount + 1);
         fileTransferFlowSignalSentByKey.set(transferKey, {{
           action,
           lastSentAtMs: sentAtMs,
           updatedAtMs: sentAtMs,
           lastErrorAtMs: 0,
+          sendCount,
         }});
         if (changed) {{
           const channelLabel = meshChannelLabelForIndex(sentChannel, {{ allowAll: false }});
@@ -65,6 +76,11 @@
             : (action === "resume" ? "Resume" : "Cancel");
           appendFileTransferConsole(
             `${{actionLabel}} signal sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer && transfer.transferId)}} on ${{channelLabel}}.`,
+            {{ level: "warn" }}
+          );
+        }} else if (action === "cancel" && sendCount === cancelSignalMaxAttempts) {{
+          appendFileTransferConsole(
+            `Final cancel signal attempt sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer && transfer.transferId)}}.`,
             {{ level: "warn" }}
           );
         }}
