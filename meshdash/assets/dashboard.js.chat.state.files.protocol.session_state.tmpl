@@ -80,6 +80,82 @@
       return "";
     }}
 
+    function ensureFileTransferInboundDecisionStateLoaded() {{
+      if (fileTransferInboundDecisionLoaded) return;
+      fileTransferInboundDecisionLoaded = true;
+      try {{
+        const raw = String(window.localStorage.getItem(fileTransferInboundDecisionStorageKey) || "");
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        const nowMs = Date.now();
+        const staleDecisionMs = 75 * 60 * 1000;
+        for (const item of parsed) {{
+          if (!(item && typeof item === "object")) continue;
+          const transferKey = String(item.transferKey || "").trim();
+          if (!transferKey) continue;
+          const decision = normalizeFileTransferInboundDecision(item.decision);
+          if (!decision) continue;
+          const updatedAtMs = Math.max(0, Math.trunc(Number(item.updatedAtMs) || 0));
+          if (updatedAtMs > 0 && (nowMs - updatedAtMs) > staleDecisionMs) {{
+            continue;
+          }}
+          fileTransferInboundDecisionByKey.set(transferKey, {{
+            transferKey,
+            decision,
+            transferId: String(item.transferId || "").trim().toLowerCase(),
+            senderId: normalizeNodeId(item.senderId || ""),
+            receiverId: normalizeNodeId(item.receiverId || ""),
+            fileName: normalizeFileTransferName(item.fileName || "mesh-file.bin"),
+            totalChunks: Math.max(0, Math.trunc(Number(item.totalChunks) || 0)),
+            decidedAtMs: Math.max(0, Math.trunc(Number(item.decidedAtMs) || updatedAtMs || nowMs)),
+            updatedAtMs,
+          }});
+          if (fileTransferInboundDecisionByKey.size >= 1200) {{
+            break;
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistFileTransferInboundDecisionState() {{
+      try {{
+        if (fileTransferInboundDecisionByKey.size <= 0) {{
+          window.localStorage.removeItem(fileTransferInboundDecisionStorageKey);
+          return;
+        }}
+        const payload = [];
+        for (const entry of fileTransferInboundDecisionByKey.values()) {{
+          if (!(entry && typeof entry === "object")) continue;
+          const transferKey = String(entry.transferKey || "").trim();
+          if (!transferKey) continue;
+          const decision = normalizeFileTransferInboundDecision(entry.decision);
+          if (!decision) continue;
+          payload.push({{
+            transferKey,
+            decision,
+            transferId: String(entry.transferId || "").trim().toLowerCase(),
+            senderId: normalizeNodeId(entry.senderId || ""),
+            receiverId: normalizeNodeId(entry.receiverId || ""),
+            fileName: normalizeFileTransferName(entry.fileName || "mesh-file.bin"),
+            totalChunks: Math.max(0, Math.trunc(Number(entry.totalChunks) || 0)),
+            decidedAtMs: Math.max(0, Math.trunc(Number(entry.decidedAtMs) || 0)),
+            updatedAtMs: Math.max(0, Math.trunc(Number(entry.updatedAtMs) || 0)),
+          }});
+        }}
+        if (payload.length <= 0) {{
+          window.localStorage.removeItem(fileTransferInboundDecisionStorageKey);
+          return;
+        }}
+        window.localStorage.setItem(
+          fileTransferInboundDecisionStorageKey,
+          JSON.stringify(payload.slice(-1200))
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
     function fileTransferInboundTransferNeedsAccept(fromId, toId, localNodeId) {{
       const sender = normalizeNodeId(fromId || "");
       const receiver = normalizeNodeId(toId || "");
@@ -91,6 +167,7 @@
     }}
 
     function fileTransferInboundDecisionForKey(transferKey) {{
+      ensureFileTransferInboundDecisionStateLoaded();
       const key = String(transferKey || "").trim();
       if (!key) return "";
       const entry = fileTransferInboundDecisionByKey.get(key);
@@ -98,18 +175,21 @@
       const decision = normalizeFileTransferInboundDecision(entry.decision);
       if (!decision) {{
         fileTransferInboundDecisionByKey.delete(key);
+        persistFileTransferInboundDecisionState();
         return "";
       }}
       return decision;
     }}
 
     function setFileTransferInboundDecisionByKey(transferKey, decisionRaw, details = null) {{
+      ensureFileTransferInboundDecisionStateLoaded();
       const key = String(transferKey || "").trim();
       if (!key) return null;
       const decision = normalizeFileTransferInboundDecision(decisionRaw);
       if (!decision) {{
         fileTransferInboundDecisionByKey.delete(key);
         fileTransferInboundDecisionPromptByKey.delete(key);
+        persistFileTransferInboundDecisionState();
         return null;
       }}
       const info = (details && typeof details === "object") ? details : {{}};
@@ -160,6 +240,7 @@
       if (decision === "accepted") {{
         fileTransferInboundDecisionPromptByKey.delete(key);
       }}
+      persistFileTransferInboundDecisionState();
       return entry;
     }}
 
@@ -177,15 +258,18 @@
     }}
 
     function pruneFileTransferInboundDecisionState(activeTransferKeys = null, nowMs = Date.now()) {{
+      ensureFileTransferInboundDecisionStateLoaded();
       const active = activeTransferKeys instanceof Set ? activeTransferKeys : null;
       const staleDecisionMs = 75 * 60 * 1000;
       const stalePromptMs = 20 * 60 * 1000;
+      let changed = false;
       for (const [key, entry] of fileTransferInboundDecisionByKey.entries()) {{
         if (active && active.has(key)) continue;
         const updatedAtMs = Math.max(0, Math.trunc(Number(entry && entry.updatedAtMs) || 0));
         if (updatedAtMs <= 0 || (nowMs - updatedAtMs) > staleDecisionMs) {{
           fileTransferInboundDecisionByKey.delete(key);
           fileTransferInboundDecisionPromptByKey.delete(key);
+          changed = true;
         }}
       }}
       for (const [key, promptAtMsRaw] of fileTransferInboundDecisionPromptByKey.entries()) {{
@@ -194,6 +278,9 @@
         if (promptAtMs <= 0 || (nowMs - promptAtMs) > stalePromptMs) {{
           fileTransferInboundDecisionPromptByKey.delete(key);
         }}
+      }}
+      if (changed) {{
+        persistFileTransferInboundDecisionState();
       }}
     }}
 
