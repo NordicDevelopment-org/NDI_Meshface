@@ -380,13 +380,12 @@
       const hiddenSeries = Math.max(0, totalSeries - visibleSeries);
       host.innerHTML = [
         ...legendItems.map((item) => (
-          `<button class="env-metric-chip env-node-legend-item env-node-legend-toggle${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? " is-hidden" : ""}}" type="button" data-env-node-toggle="1" data-node-id="${{escAttr(item.nodeId)}}" data-node-hidden="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "1" : "0"}}" aria-pressed="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "false" : "true"}}" style="--node-color:${{escAttr(item.color)}};" title="${{escAttr(`${{formatEnvironmentNodeTooltipLabel(item.nodeId, item.label)}} • click to ${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "show" : "hide"}}`)}}">
-            ${{escAttr(item.label)}}
-            <span class="env-metric-chip-count">${{Math.max(0, Math.trunc(Number(item.pointCount) || 0))}}</span>
+          `<button class="overview-item env-node-legend-card env-node-legend-item env-node-legend-toggle${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? " is-hidden" : ""}}" type="button" data-env-node-toggle="1" data-node-id="${{escAttr(item.nodeId)}}" data-node-hidden="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "1" : "0"}}" aria-pressed="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "false" : "true"}}" style="--node-color:${{escAttr(item.color)}};" title="${{escAttr(`${{formatEnvironmentNodeTooltipLabel(item.nodeId, item.label)}} • click to ${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "show" : "hide"}}`)}}">
+            <span class="v">${{escAttr(item.label)}}</span>
           </button>`
         )),
         hiddenSeries > 0
-          ? `<span class="env-metric-chip env-node-legend-more">+${{hiddenSeries}} more node${{hiddenSeries === 1 ? "" : "s"}} hidden (top ${{visibleSeries}} shown)</span>`
+          ? `<span class="overview-item env-node-legend-card env-node-legend-more"><span class="k">Hidden nodes</span><span class="v">+${{hiddenSeries}} more</span></span>`
           : "",
       ].filter(Boolean).join("");
     }}
@@ -453,6 +452,82 @@
           .filter((unix) => Number.isFinite(unix) && unix > 0)
       )).sort((a, b) => a - b);
       return uniqueUnix.map((unix) => ({{ unix }}));
+    }}
+
+    function sortedEnvironmentMetricValues(values) {{
+      return (Array.isArray(values) ? values : [])
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value))
+        .sort((a, b) => a - b);
+    }}
+
+    function environmentMetricQuantile(sortedValues, ratio) {{
+      const values = Array.isArray(sortedValues) ? sortedValues : [];
+      if (!values.length) return NaN;
+      if (values.length === 1) return Number(values[0]);
+      const clampedRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
+      const position = clampedRatio * (values.length - 1);
+      const lowerIndex = Math.floor(position);
+      const upperIndex = Math.ceil(position);
+      if (lowerIndex === upperIndex) {{
+        return Number(values[lowerIndex]);
+      }}
+      const lowerValue = Number(values[lowerIndex]);
+      const upperValue = Number(values[upperIndex]);
+      const mix = position - lowerIndex;
+      return lowerValue + ((upperValue - lowerValue) * mix);
+    }}
+
+    function resolveEnvironmentMetricValueBounds(values) {{
+      const sortedValues = sortedEnvironmentMetricValues(values);
+      if (!sortedValues.length) {{
+        return {{
+          minValue: NaN,
+          maxValue: NaN,
+          clippedCount: 0,
+        }};
+      }}
+      const rawMinValue = Number(sortedValues[0]);
+      const rawMaxValue = Number(sortedValues[sortedValues.length - 1]);
+      if (!(Number.isFinite(rawMinValue) && Number.isFinite(rawMaxValue))) {{
+        return {{
+          minValue: NaN,
+          maxValue: NaN,
+          clippedCount: 0,
+        }};
+      }}
+      let clippedCount = 0;
+      let minValue = rawMinValue;
+      let maxValue = rawMaxValue;
+      if (sortedValues.length >= 6) {{
+        const q1 = environmentMetricQuantile(sortedValues, 0.25);
+        const q3 = environmentMetricQuantile(sortedValues, 0.75);
+        const iqr = q3 - q1;
+        if (Number.isFinite(iqr) && iqr > 1e-6) {{
+          const lowerFence = q1 - (iqr * 1.5);
+          const upperFence = q3 + (iqr * 1.5);
+          const bounded = sortedValues.filter((value) => value >= lowerFence && value <= upperFence);
+          if (bounded.length >= Math.max(4, Math.round(sortedValues.length * 0.55))) {{
+            const boundedMin = Number(bounded[0]);
+            const boundedMax = Number(bounded[bounded.length - 1]);
+            if (
+              Number.isFinite(boundedMin)
+              && Number.isFinite(boundedMax)
+              && boundedMax >= boundedMin
+              && (boundedMin > rawMinValue || boundedMax < rawMaxValue)
+            ) {{
+              minValue = boundedMin;
+              maxValue = boundedMax;
+              clippedCount = sortedValues.length - bounded.length;
+            }}
+          }}
+        }}
+      }}
+      return {{
+        minValue,
+        maxValue,
+        clippedCount,
+      }};
     }}
 
     function localNodeIdForEnvironmentMetrics() {{
@@ -882,8 +957,9 @@
       const visibleValues = visiblePoints
         .map((point) => Number(point && point.value))
         .filter((value) => Number.isFinite(value));
-      const rawMinValue = visibleValues.length ? Math.min(...visibleValues) : NaN;
-      const rawMaxValue = visibleValues.length ? Math.max(...visibleValues) : NaN;
+      const bounds = resolveEnvironmentMetricValueBounds(visibleValues);
+      const rawMinValue = Number(bounds && bounds.minValue);
+      const rawMaxValue = Number(bounds && bounds.maxValue);
 
       if (!Number.isFinite(rawMinValue) || !Number.isFinite(rawMaxValue)) {{
         return clearChart("No numeric values in this selection.");
@@ -904,7 +980,7 @@
         minValue -= pad;
         maxValue += pad;
       }}
-      const clippedPointCount = 0;
+      const clippedPointCount = Math.max(0, Math.trunc(Number(bounds && bounds.clippedCount) || 0));
 
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const palette = darkTheme
@@ -1001,18 +1077,6 @@
         envMetricsChartState.zoomStart > 1e-6
         || envMetricsChartState.zoomEnd < (1 - 1e-6)
       );
-      const baseSubtitle = nodeMeta
-        ? `${{metricMeta.label}} for ${{nodeMeta.label || nodeMeta.id}}`
-        : `${{metricMeta.label}} across ${{visibleSeriesList.length}} node${{visibleSeriesList.length === 1 ? "" : "s"}}`;
-      const clippedSubtitle = clippedPointCount > 0
-        ? `${{baseSubtitle}}${{zoomed ? " (zoomed)" : ""}} • focused range (${{
-            clippedPointCount
-          }} outlier${{clippedPointCount === 1 ? "" : "s"}} clipped)`
-        : baseSubtitle;
-      const subtitle = zoomed && clippedPointCount <= 0
-        ? `${{baseSubtitle}} (zoomed)`
-        : clippedSubtitle;
-
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `
         <g>
@@ -1021,7 +1085,6 @@
           ${{xGrid.join("")}}
           ${{linePaths.join("")}}
           ${{yLabels.join("")}}
-          <text x="${{(padLeft + 8).toFixed(2)}}" y="${{(padTop + 12).toFixed(2)}}" fill="${{palette.text}}" font-size="10">${{escAttr(subtitle)}}</text>
         </g>
       `;
       renderTimeline(
