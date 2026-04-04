@@ -357,10 +357,6 @@
         setFileTransferStatus("Could not cancel this transfer.", true);
         return;
       }}
-      const fileInput = document.getElementById("files-input");
-      if (fileInput instanceof HTMLInputElement) {{
-        fileInput.value = "";
-      }}
       setFileTransferStatus(`Canceled transfer "${{fileName}}" to ${{destination}}.`);
       appendFileTransferConsole(
         `Canceled outbound transfer ${{shortId}} to ${{destination}}.`,
