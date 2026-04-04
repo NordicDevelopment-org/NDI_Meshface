@@ -89,6 +89,7 @@ def build_dashboard_parser(
     default_file_transfer_max_bytes: int = 12 * 1024,
     env_file_transfer_enable: Optional[str] = None,
     env_file_transfer_max_bytes: Optional[str] = None,
+    env_accept_file_transfer_traffic_disclaimer: Optional[str] = None,
 ) -> argparse.ArgumentParser:
     resolved_gateway_port = resolve_default_gateway_port(env_gateway_port, default_gateway_port)
     resolved_gateway_host = str(env_gateway_host or default_gateway_host)
@@ -105,6 +106,10 @@ def build_dashboard_parser(
     resolved_file_transfer_max_bytes = parse_env_int(
         env_file_transfer_max_bytes,
         default_file_transfer_max_bytes,
+    )
+    resolved_accept_file_transfer_traffic_disclaimer = parse_env_bool(
+        env_accept_file_transfer_traffic_disclaimer,
+        False,
     )
 
     parser = argparse.ArgumentParser(
@@ -127,6 +132,7 @@ def build_dashboard_parser(
         default_api_token=resolved_api_token,
         default_file_transfer_enable=resolved_file_transfer_enable,
         default_file_transfer_max_bytes=resolved_file_transfer_max_bytes,
+        default_accept_file_transfer_traffic_disclaimer=resolved_accept_file_transfer_traffic_disclaimer,
     )
     _add_history_args_helper(
         parser,

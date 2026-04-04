@@ -13,6 +13,7 @@ def add_http_runtime_args(
     default_api_token: str | None = None,
     default_file_transfer_enable: bool = False,
     default_file_transfer_max_bytes: int = 12 * 1024,
+    default_accept_file_transfer_traffic_disclaimer: bool = False,
 ) -> None:
     parser.add_argument(
         "--http-host",
@@ -88,9 +89,11 @@ def add_http_runtime_args(
     )
     parser.add_argument(
         "--accept-file-transfer-traffic-disclaimer",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=default_accept_file_transfer_traffic_disclaimer,
         help=(
             "Acknowledge that enabling file transfer can significantly increase "
-            "mesh airtime and congestion."
+            "mesh airtime and congestion. "
+            f"(default: {default_accept_file_transfer_traffic_disclaimer})"
         ),
     )

@@ -161,6 +161,9 @@ DASH_PORT=8877
 REFRESH_MS=3000
 MESH_DASH_UI_PROFILE=core-ui
 MESH_DASH_HISTORY_DB=/home/j/mesh/mesh_dashboard_history.sqlite3
+MESH_DASH_FILE_TRANSFER_ENABLE=0
+MESH_DASH_FILE_TRANSFER_MAX_BYTES=12288
+MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=0
 PYTHONUNBUFFERED=1
 EOF_ENV
 ```
@@ -201,6 +204,31 @@ sudo systemctl restart meshtastic-dashboard
 
 Also ensure service user can access serial device (usually `dialout` group).
 
+### File transfer safety gate (CLI + service)
+
+File transfer is hidden/disabled by default. To enable it you must set both:
+
+- `--file-transfer-enable` (or `MESH_DASH_FILE_TRANSFER_ENABLE=1`)
+- disclaimer acceptance:
+  `--accept-file-transfer-traffic-disclaimer` (or `MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=1`)
+
+Optional size cap:
+
+- `--file-transfer-max-bytes <bytes>` (or `MESH_DASH_FILE_TRANSFER_MAX_BYTES=<bytes>`)
+- Valid range is clamped to `1024` .. `512000` bytes.
+
+Deploy helper example (service mode, file transfer enabled):
+
+```bash
+./scripts/deploy_dashboard.sh \
+  --target j@192.168.1.241 \
+  --mesh-host 192.168.1.69 \
+  --file-transfer-enable \
+  --file-transfer-max-bytes 512000 \
+  --accept-file-transfer-traffic-disclaimer \
+  --clean-app-dir
+```
+
 ## Configuration Reference
 
 Primary runtime flags:
@@ -215,6 +243,9 @@ Primary runtime flags:
 - `--no-history`: memory-only mode
 - `--private-mode`: hide/disable public chat surfaces
 - `--api-token <token>`: require token for write APIs
+- `--file-transfer-enable/--no-file-transfer-enable`: toggle file transfer feature
+- `--file-transfer-max-bytes <bytes>`: file transfer upload cap
+- `--accept-file-transfer-traffic-disclaimer`: required when enabling file transfer
 
 Environment variables commonly used in service mode:
 
@@ -227,6 +258,9 @@ Environment variables commonly used in service mode:
 - `MESH_DASH_HISTORY_DB`
 - `PYTHONUNBUFFERED`
 - Optional: `MESH_DASH_PRIVATE_MODE`, `MESH_DASH_API_TOKEN`
+- Optional: `MESH_DASH_FILE_TRANSFER_ENABLE`
+- Optional: `MESH_DASH_FILE_TRANSFER_MAX_BYTES`
+- Optional: `MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER`
 
 ## Public Branch Workflow Notes
 

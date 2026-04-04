@@ -555,11 +555,6 @@
             <div class="peer-dm-popout-composer">
               <input id="peer-dm-popout-input" class="peer-dm-popout-input" type="text" autocomplete="off" placeholder="Direct message to ${{escAttr(activePopoutPeerId)}}..." value="${{escAttr(popoutDraft)}}" />
               <button type="button" id="peer-dm-popout-send-btn" class="peer-dm-popout-send-btn"${{chatSendInFlight ? " disabled" : ""}}>Send</button>
-              <div class="peer-dm-popout-file-row">
-                <input id="peer-dm-popout-file-input" class="peer-dm-popout-file-input" type="file" hidden />
-                <button type="button" id="peer-dm-popout-file-attach-btn" class="peer-dm-popout-file-btn"${{fileTransferSendInFlight ? " disabled" : ""}}>Attach file</button>
-                <button type="button" id="peer-dm-popout-file-manage-btn" class="peer-dm-popout-file-manage-btn" title="Open the full Files workspace">Open Files</button>
-              </div>
               <div
                 id="peer-dm-popout-file-progress"
                 class="peer-dm-popout-file-progress${{popoutFileState && popoutFileState.isError ? " is-error" : ""}}${{popoutFilePhase === "delivered" ? " is-success" : ""}}"
@@ -599,9 +594,6 @@
           }}
           const popoutInput = document.getElementById("peer-dm-popout-input");
           const popoutSendBtn = document.getElementById("peer-dm-popout-send-btn");
-          const popoutFileInput = document.getElementById("peer-dm-popout-file-input");
-          const popoutFileAttachBtn = document.getElementById("peer-dm-popout-file-attach-btn");
-          const popoutFileManageBtn = document.getElementById("peer-dm-popout-file-manage-btn");
           const popoutFileProgress = document.getElementById("peer-dm-popout-file-progress");
           const popoutFileProgressText = document.getElementById("peer-dm-popout-file-progress-text");
           const popoutFileProgressPct = document.getElementById("peer-dm-popout-file-progress-pct");
@@ -792,54 +784,6 @@
             popoutSendBtn.addEventListener("click", (ev) => {{
               ev.preventDefault();
               void submitPopoutMessage();
-            }});
-          }}
-          if (popoutFileAttachBtn instanceof HTMLButtonElement) {{
-            popoutFileAttachBtn.addEventListener("click", (ev) => {{
-              ev.preventDefault();
-              if (fileTransferSendInFlight) return;
-              if (!(popoutFileInput instanceof HTMLInputElement)) return;
-              popoutFileInput.click();
-            }});
-          }}
-          if (popoutFileInput instanceof HTMLInputElement) {{
-            popoutFileInput.addEventListener("change", () => {{
-              if (!isCanonicalNodeId(activePopoutPeerId)) {{
-                popoutFileInput.value = "";
-                return;
-              }}
-              const file = popoutFileInput.files && popoutFileInput.files[0]
-                ? popoutFileInput.files[0]
-                : null;
-              if (!file) return;
-              void (async () => {{
-                const result = await sendFileTransferToDestination(file, activePopoutPeerId, {{
-                  statusFn: () => {{}},
-                  progressFn: () => {{
-                    renderPopoutFileTransferState();
-                  }},
-                  manageBusy: true,
-                  persistDestination: true,
-                  peerId: activePopoutPeerId,
-                }});
-                popoutFileInput.value = "";
-                renderPopoutFileTransferState();
-                if (result && result.ok) {{
-                  setPopoutStatus(`File transfer started on ${{result.sendLabel}}.`);
-                }}
-              }})();
-            }});
-          }}
-          if (popoutFileManageBtn instanceof HTMLButtonElement) {{
-            popoutFileManageBtn.addEventListener("click", (ev) => {{
-              ev.preventDefault();
-              if (!isCanonicalNodeId(activePopoutPeerId)) return;
-              setFileTransferDestination(activePopoutPeerId);
-              applyLayoutView("files", true);
-              setFileTransferStatus(`Destination set to ${{activePopoutPeerId}}`);
-              if (latestState) {{
-                renderFilesView(latestState);
-              }}
             }});
           }}
           const popoutBody = document.getElementById("peer-dm-popout-body");

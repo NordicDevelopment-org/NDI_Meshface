@@ -131,7 +131,8 @@ def _validate_file_transfer_startup_args(
         parser.error(
             "File transfer remains disabled until you acknowledge mesh traffic risk. "
             "Re-run with both --file-transfer-enable and "
-            "--accept-file-transfer-traffic-disclaimer."
+            "--accept-file-transfer-traffic-disclaimer, or set "
+            "MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=1."
         )
     print(
         "Warning: file transfer is enabled. Large transfers can consume significant "
@@ -384,6 +385,9 @@ def main() -> None:
         default_file_transfer_max_bytes=DEFAULT_FILE_TRANSFER_MAX_BYTES,
         env_file_transfer_enable=os.environ.get("MESH_DASH_FILE_TRANSFER_ENABLE"),
         env_file_transfer_max_bytes=os.environ.get("MESH_DASH_FILE_TRANSFER_MAX_BYTES"),
+        env_accept_file_transfer_traffic_disclaimer=os.environ.get(
+            "MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER"
+        ),
     )
     args = parser.parse_args()
     _validate_file_transfer_startup_args(args, parser=parser)

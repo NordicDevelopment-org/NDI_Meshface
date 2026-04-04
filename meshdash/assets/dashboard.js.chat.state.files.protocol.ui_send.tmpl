@@ -307,8 +307,6 @@
       const destinationInput = document.getElementById("files-destination-input");
       const useSelectedBtn = document.getElementById("files-use-selected-btn");
       const sendChannelSelect = document.getElementById("files-send-channel-select");
-      const peerAttachBtn = document.getElementById("peer-dm-popout-file-attach-btn");
-      const peerFileInput = document.getElementById("peer-dm-popout-file-input");
       if (sendBtn instanceof HTMLButtonElement) {{
         sendBtn.disabled = fileTransferSendInFlight;
         sendBtn.textContent = fileTransferSendInFlight ? "Sending..." : "Send file";
@@ -324,13 +322,6 @@
       }}
       if (sendChannelSelect instanceof HTMLSelectElement) {{
         sendChannelSelect.disabled = fileTransferSendInFlight || meshChannelAppUsesFixedChannel("files");
-      }}
-      if (peerAttachBtn instanceof HTMLButtonElement) {{
-        peerAttachBtn.disabled = fileTransferSendInFlight;
-        peerAttachBtn.textContent = fileTransferSendInFlight ? "Sending..." : "Attach file";
-      }}
-      if (peerFileInput instanceof HTMLInputElement) {{
-        peerFileInput.disabled = fileTransferSendInFlight;
       }}
     }}
 

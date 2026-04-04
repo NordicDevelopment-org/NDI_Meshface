@@ -29,6 +29,14 @@ Options:
   --refresh-ms <ms>        Poll interval in ms (default: 3000).
   --ui-profile <name>      Dashboard UI profile (example: full, core-ui).
   --history-db <path>      History DB path on target host.
+  --file-transfer-enable   Enable file transfer in dashboard.env.
+  --no-file-transfer-enable Disable file transfer in dashboard.env.
+  --file-transfer-max-bytes <bytes>
+                           Max file transfer size written to dashboard.env.
+  --accept-file-transfer-traffic-disclaimer
+                           Acknowledge mesh airtime/congestion risk when enabling transfers.
+  --no-accept-file-transfer-traffic-disclaimer
+                           Clear disclaimer acceptance in dashboard.env.
   --service <name>         Systemd service name (default: meshtastic-dashboard).
   --app-dir <path>         App directory on target host.
   --config-dir <path>      Config directory on target host.
@@ -55,6 +63,9 @@ Env overrides:
   MESH_DASH_DEPLOY_UI_PROFILE
   MESH_DASH_DEPLOY_HISTORY_DB
   MESH_DASH_DEPLOY_PYTHON_UNBUFFERED
+  MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE
+  MESH_DASH_DEPLOY_FILE_TRANSFER_MAX_BYTES
+  MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER
 EOF
 }
 
@@ -65,6 +76,12 @@ require_arg() {
     echo "${flag} requires a value" >&2
     exit 2
   fi
+}
+
+is_truthy() {
+  local value
+  value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  [[ "${value}" == "1" || "${value}" == "true" || "${value}" == "yes" || "${value}" == "on" ]]
 }
 
 TARGET="${MESH_DASH_DEPLOY_TARGET:-}"
@@ -86,6 +103,9 @@ REFRESH_MS="${MESH_DASH_DEPLOY_REFRESH_MS:-3000}"
 UI_PROFILE="${MESH_DASH_DEPLOY_UI_PROFILE:-core-ui}"
 HISTORY_DB="${MESH_DASH_DEPLOY_HISTORY_DB:-${REMOTE_ROOT}/mesh_dashboard_history.sqlite3}"
 PYTHON_UNBUFFERED="${MESH_DASH_DEPLOY_PYTHON_UNBUFFERED:-1}"
+FILE_TRANSFER_ENABLE="${MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE:-0}"
+FILE_TRANSFER_MAX_BYTES="${MESH_DASH_DEPLOY_FILE_TRANSFER_MAX_BYTES:-12288}"
+ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER="${MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER:-0}"
 SSH_OPTS=(-F /dev/null)
 SCP_OPTS=(-F /dev/null)
 if [[ -n "${USER:-}" ]]; then
@@ -154,6 +174,27 @@ while [[ $# -gt 0 ]]; do
       require_arg "$1" "${2:-}"
       HISTORY_DB="$2"
       shift 2
+      ;;
+    --file-transfer-enable)
+      FILE_TRANSFER_ENABLE=1
+      shift
+      ;;
+    --no-file-transfer-enable)
+      FILE_TRANSFER_ENABLE=0
+      shift
+      ;;
+    --file-transfer-max-bytes)
+      require_arg "$1" "${2:-}"
+      FILE_TRANSFER_MAX_BYTES="$2"
+      shift 2
+      ;;
+    --accept-file-transfer-traffic-disclaimer)
+      ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=1
+      shift
+      ;;
+    --no-accept-file-transfer-traffic-disclaimer)
+      ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=0
+      shift
       ;;
     --service)
       require_arg "$1" "${2:-}"
@@ -251,6 +292,18 @@ if [[ "${BOOTSTRAP}" -eq 1 && -z "${MESH_HOST}" ]]; then
   exit 1
 fi
 
+if ! [[ "${FILE_TRANSFER_MAX_BYTES}" =~ ^[0-9]+$ ]]; then
+  echo "--file-transfer-max-bytes must be an integer" >&2
+  exit 2
+fi
+
+if is_truthy "${FILE_TRANSFER_ENABLE}" && ! is_truthy "${ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER}"; then
+  echo "file transfer enablement requires disclaimer acceptance." >&2
+  echo "Re-run with --accept-file-transfer-traffic-disclaimer or set" >&2
+  echo "MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=1." >&2
+  exit 2
+fi
+
 echo "[deploy] target=${TARGET}"
 echo "[deploy] app_dir=${APP_DIR} config_dir=${CONFIG_DIR} logs_dir=${LOG_DIR}"
 echo "[deploy] service=${SERVICE_NAME} bootstrap=${BOOTSTRAP} clean_app_dir=${CLEAN_APP_DIR}"
@@ -260,6 +313,7 @@ fi
 if [[ -n "${UI_PROFILE}" ]]; then
   echo "[deploy] ui_profile=${UI_PROFILE}"
 fi
+echo "[deploy] file_transfer_enable=${FILE_TRANSFER_ENABLE} file_transfer_max_bytes=${FILE_TRANSFER_MAX_BYTES}"
 
 ssh_cmd "${TARGET}" "mkdir -p '${REMOTE_ROOT}' '${APP_DIR}' '${CONFIG_DIR}' '${LOG_DIR}'"
 
@@ -325,6 +379,9 @@ DASH_PORT=${DASH_PORT}
 REFRESH_MS=${REFRESH_MS}
 MESH_DASH_UI_PROFILE=${UI_PROFILE}
 MESH_DASH_HISTORY_DB=${HISTORY_DB}
+MESH_DASH_FILE_TRANSFER_ENABLE=${FILE_TRANSFER_ENABLE}
+MESH_DASH_FILE_TRANSFER_MAX_BYTES=${FILE_TRANSFER_MAX_BYTES}
+MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=${ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER}
 PYTHONUNBUFFERED=${PYTHON_UNBUFFERED}
 EOF"
 fi
