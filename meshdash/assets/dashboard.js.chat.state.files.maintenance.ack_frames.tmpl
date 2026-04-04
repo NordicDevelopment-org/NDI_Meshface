@@ -1,12 +1,15 @@
     async function maybeSendFileTransferAckFrames(state = latestState) {{
       const frameState = collectFileTransferFrames(state, {{ respectActiveChannel: false }});
+      const flowByTransferKey = frameState.flowByTransferKey instanceof Map
+        ? frameState.flowByTransferKey
+        : new Map();
       const localNodeId = normalizeNodeId(frameState.localNodeId || "");
       if (!isCanonicalNodeId(localNodeId)) return;
       const nowMs = Date.now();
       const nowUnix = Math.trunc(nowMs / 1000);
       const maybeSendInboundFlowSignal = async (transfer, transferKey, senderId, actionRaw, force = false) => {{
         const action = String(actionRaw || "").trim().toLowerCase();
-        if (action !== "pause" && action !== "resume") return false;
+        if (action !== "pause" && action !== "resume" && action !== "cancel") return false;
         const prior = fileTransferFlowSignalSentByKey.get(transferKey) || null;
         const changed = !prior || String(prior.action || "") !== action;
         if (!changed && !force) {{
@@ -57,8 +60,11 @@
         }});
         if (changed) {{
           const channelLabel = meshChannelLabelForIndex(sentChannel, {{ allowAll: false }});
+          const actionLabel = action === "pause"
+            ? "Pause"
+            : (action === "resume" ? "Resume" : "Cancel");
           appendFileTransferConsole(
-            `${{action === "pause" ? "Pause" : "Resume"}} signal sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer && transfer.transferId)}} on ${{channelLabel}}.`,
+            `${{actionLabel}} signal sent to ${{senderId}} for ${{fileTransferShortTransferId(transfer && transfer.transferId)}} on ${{channelLabel}}.`,
             {{ level: "warn" }}
           );
         }}
@@ -86,29 +92,107 @@
         const totalChunks = totalChunksRaw;
         const transferKey = String(transfer.key || "").trim();
         if (!transferKey) continue;
+        let latestFlow = flowByTransferKey.get(transferKey) || null;
+        if (!(latestFlow && typeof latestFlow === "object")) {{
+          let latestFallbackFlow = null;
+          for (const candidate of flowByTransferKey.values()) {{
+            if (!(candidate && typeof candidate === "object")) continue;
+            if (String(candidate.transferId || "").trim().toLowerCase() !== String(transfer.transferId || "").trim().toLowerCase()) {{
+              continue;
+            }}
+            if (normalizeNodeId(candidate.senderId || "") !== senderId) continue;
+            const candidateUnix = Math.max(0, Math.trunc(Number(candidate.latestUnix) || 0));
+            const latestUnix = Math.max(0, Math.trunc(Number(latestFallbackFlow && latestFallbackFlow.latestUnix) || 0));
+            if (!latestFallbackFlow || candidateUnix >= latestUnix) {{
+              latestFallbackFlow = candidate;
+            }}
+          }}
+          latestFlow = latestFallbackFlow;
+        }}
+        const flowAction = latestFlow && typeof latestFlow === "object"
+          ? String(latestFlow.action || "").trim().toLowerCase()
+          : "";
+        const flowSenderId = normalizeNodeId(latestFlow && latestFlow.senderId || "");
+        const flowReceiverId = normalizeNodeId(latestFlow && latestFlow.receiverId || "");
+        const cancelFromSender = !!(
+          flowAction === "cancel"
+          && flowSenderId === senderId
+          && (!flowReceiverId || flowReceiverId === receiverId)
+        );
         const requiresInboundAccept = fileTransferInboundTransferNeedsAccept(
           senderId,
           receiverId,
           localNodeId
         );
+        if (cancelFromSender && requiresInboundAccept) {{
+          const priorDecision = fileTransferInboundDecisionForKey(transferKey);
+          const priorFlowState = fileTransferInboundFlowStateForKey(transferKey);
+          if (priorFlowState !== "canceled-by-sender") {{
+            setFileTransferInboundFlowStateByKey(transferKey, "canceled-by-sender", {{
+              transferId: transfer.transferId,
+              senderId,
+              receiverId,
+            }});
+          }}
+          if (priorDecision !== "declined") {{
+            setFileTransferInboundDecisionByKey(transferKey, "declined", {{
+              transferId: transfer.transferId,
+              senderId,
+              receiverId,
+              fileName: transfer.fileName,
+              totalChunks: transfer.totalChunks,
+            }});
+          }}
+          fileTransferChunkCacheByKey.delete(transferKey);
+          fileTransferBlobByKey.delete(transferKey);
+          const staleUrl = fileTransferDownloadUrlByKey.get(transferKey);
+          if (staleUrl) {{
+            try {{
+              URL.revokeObjectURL(staleUrl);
+            }} catch (_err) {{
+            }}
+          }}
+          fileTransferDownloadUrlByKey.delete(transferKey);
+          fileTransferAckSentState.delete(transferKey);
+          fileTransferAckObservedChunksByKey.delete(transferKey);
+          fileTransferAckProbeCursorByKey.delete(transferKey);
+          fileTransferAckProbeStateByKey.delete(transferKey);
+          fileTransferAckMissingChannelWarnByKey.delete(transferKey);
+          if (priorDecision !== "declined" || priorFlowState !== "canceled-by-sender") {{
+            appendFileTransferConsole(
+              `Sender ${{senderId}} canceled inbound transfer ${{fileTransferShortTransferId(transfer.transferId)}}. Receive side stopped.`,
+              {{ level: "warn" }}
+            );
+          }}
+          continue;
+        }}
         if (requiresInboundAccept) {{
           const inboundDecision = fileTransferInboundDecisionForKey(transferKey);
+          const inboundFlowState = fileTransferInboundFlowStateForKey(transferKey);
+          const inboundCanceledByReceiver = inboundFlowState === "canceled-by-receiver";
+          const inboundCanceledBySender = inboundFlowState === "canceled-by-sender";
           if (inboundDecision !== "accepted") {{
             fileTransferAckSentState.delete(transferKey);
             fileTransferAckObservedChunksByKey.delete(transferKey);
             fileTransferAckProbeCursorByKey.delete(transferKey);
             fileTransferAckProbeStateByKey.delete(transferKey);
             fileTransferAckMissingChannelWarnByKey.delete(transferKey);
-            fileTransferFlowSignalSentByKey.delete(transferKey);
-            const lastPromptAtMs = Number(fileTransferInboundDecisionPromptByKey.get(transferKey) || 0);
-            const promptIntervalMs = 30 * 1000;
-            if ((nowMs - lastPromptAtMs) >= promptIntervalMs) {{
-              fileTransferInboundDecisionPromptByKey.set(transferKey, nowMs);
-              const actionLabel = inboundDecision === "declined" ? "declined" : "pending acceptance";
-              appendFileTransferConsole(
-                `Inbound transfer ${{fileTransferShortTransferId(transfer.transferId)}} from ${{senderId}} is ${{actionLabel}}. ACKs paused until you accept it.`,
-                {{ level: "warn" }}
-              );
+            if (inboundCanceledByReceiver) {{
+              await maybeSendInboundFlowSignal(transfer, transferKey, senderId, "cancel", false);
+            }} else {{
+              fileTransferFlowSignalSentByKey.delete(transferKey);
+              if (!inboundCanceledBySender) {{
+                const lastPromptAtMs = Number(fileTransferInboundDecisionPromptByKey.get(transferKey) || 0);
+                const promptIntervalMs = 30 * 1000;
+                if ((nowMs - lastPromptAtMs) >= promptIntervalMs) {{
+                  fileTransferInboundDecisionPromptByKey.set(transferKey, nowMs);
+                  const actionLabel = inboundDecision === "declined" ? "declined" : "pending acceptance";
+                  appendFileTransferConsole(
+                    `Inbound transfer ${{fileTransferShortTransferId(transfer.transferId)}} from ${{senderId}} is ${{actionLabel}}. ACKs paused until you accept it.`,
+                    {{ level: "warn" }}
+                  );
+                }}
+              }}
             }}
             continue;
           }}

@@ -82,7 +82,10 @@
 
     function normalizeFileTransferInboundFlowState(rawState) {{
       const clean = String(rawState || "").trim().toLowerCase();
-      return clean === "paused" ? "paused" : "";
+      if (clean === "paused") return "paused";
+      if (clean === "canceled-by-sender") return "canceled-by-sender";
+      if (clean === "canceled-by-receiver") return "canceled-by-receiver";
+      return "";
     }}
 
     function ensureFileTransferInboundDecisionStateLoaded() {{
@@ -509,6 +512,7 @@
         delivered: false,
         failed: false,
         canceled: false,
+        canceledByReceiver: false,
         deliveredAtMs: 0,
         failedAtMs: 0,
         waitingForAccept: !!session.waitingForAccept,
@@ -629,6 +633,7 @@
       record.delivered = false;
       record.failed = false;
       record.canceled = false;
+      record.canceledByReceiver = false;
       record.deliveredAtMs = 0;
       record.failedAtMs = 0;
       record.waitingForAccept = !!waitForAccept;
@@ -699,6 +704,7 @@
       const nowMs = Date.now();
       record.failed = true;
       record.canceled = true;
+      record.canceledByReceiver = !!opts.canceledByPeer;
       record.failedAtMs = nowMs;
       record.delivered = false;
       record.deliveredAtMs = 0;

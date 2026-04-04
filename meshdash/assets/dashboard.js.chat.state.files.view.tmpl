@@ -179,7 +179,7 @@
         fileName: row.fileName,
       }});
       if (decision === "declined") {{
-        setFileTransferInboundFlowStateByKey(key, "", {{
+        setFileTransferInboundFlowStateByKey(key, asCancel ? "canceled-by-receiver" : "", {{
           transferId: row.transferId,
           senderId: row.fromId,
           receiverId: row.toId,
@@ -356,6 +356,10 @@
       if (!(canceled && typeof canceled === "object")) {{
         setFileTransferStatus("Could not cancel this transfer.", true);
         return;
+      }}
+      const fileInput = document.getElementById("files-input");
+      if (fileInput instanceof HTMLInputElement) {{
+        fileInput.value = "";
       }}
       setFileTransferStatus(`Canceled transfer "${{fileName}}" to ${{destination}}.`);
       appendFileTransferConsole(
@@ -599,7 +603,20 @@
           : `<span class="mesh-channel-badge compact" style="${{escAttr(meshChannelBadgeStyle(meshChannelAllIndex, {{ allowAll: true }}))}}" title="Channel unavailable from packet metadata">Unknown</span>`;
         let actionSort = 0;
         let actionHtml = "";
-        if (requiresInboundAccept && !inboundAccepted) {{
+        const inboundCanceled = !!(row && row.inboundCanceled);
+        const inboundCanceledBySender = !!(row && row.inboundCanceledBySender);
+        const inboundCanceledByReceiver = !!(row && row.inboundCanceledByReceiver);
+        if (inboundCanceled) {{
+          const cancelActorLabel = inboundCanceledBySender ? "sender" : (inboundCanceledByReceiver ? "receiver" : "peer");
+          actionSort = 1;
+          actionHtml = `<button
+              type="button"
+              class="files-transfer-action"
+              data-action="clear"
+              data-transfer-key="${{escAttr(row.key || "")}}"
+              title="${{escAttr(`Remove this canceled transfer row (canceled by ${{cancelActorLabel}}).`)}}"
+            >Clear</button>`;
+        }} else if (requiresInboundAccept && !inboundAccepted) {{
           const acceptTitle = `Accept inbound transfer ${{row.fileName || "file"}}`;
           const declineTitle = inboundDeclined
             ? "Transfer is declined"
@@ -631,6 +648,7 @@
             && row.requiresInboundAccept
             && row.inboundAccepted
             && !row.inboundDeclined
+            && !row.inboundCanceled
             && !row.canDownload
             && !row.delivered
           );
@@ -673,6 +691,15 @@
                   title="Cancel inbound transfer and stop local ACKs."
                 >Cancel</button>
               </span>`;
+          }} else if (outgoingCanceled && !(row && row.canDownload)) {{
+            actionSort = 1;
+            actionHtml = `<button
+                type="button"
+                class="files-transfer-action"
+                data-action="clear"
+                data-transfer-key="${{escAttr(row.key || "")}}"
+                title="Remove this canceled transfer row."
+              >Clear</button>`;
           }} else if ((outgoingCanPause || outgoingCanResume || outgoingCanCancel) && !(row && row.canDownload)) {{
             actionSort = 2;
             const pauseAction = outgoingCanResume ? "resume" : "pause";

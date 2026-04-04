@@ -150,7 +150,13 @@
     function buildFileTransferFlowFrame(transferId, actionRaw) {{
       const cleanId = String(transferId || "").trim().toLowerCase();
       const action = String(actionRaw || "").trim().toLowerCase();
-      const code = action === "resume" ? "R" : (action === "pause" ? "P" : "");
+      const code = action === "resume"
+        ? "R"
+        : (
+          action === "pause"
+            ? "P"
+            : (action === "cancel" ? "X" : "")
+        );
       if (!code) return "";
       return `${{fileTransferProtocolPrefix}}|F|${{cleanId}}|${{code}}`;
     }}
@@ -230,7 +236,11 @@
         const actionCode = String(parts[3] || "").trim().toUpperCase();
         const action = actionCode === "P"
           ? "pause"
-          : (actionCode === "R" ? "resume" : "");
+          : (
+            actionCode === "R"
+              ? "resume"
+              : (actionCode === "X" ? "cancel" : "")
+          );
         if (!action) return null;
         return {{
           kind: "flow",

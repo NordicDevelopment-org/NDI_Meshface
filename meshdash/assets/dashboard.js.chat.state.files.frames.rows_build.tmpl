@@ -322,10 +322,38 @@
             )
           )
         );
+        const inboundFlowState = fileTransferInboundFlowStateForKey(transferKey);
+        const inboundCanceledBySender = !!(
+          !outgoing
+          && !complete
+          && (
+            inboundFlowState === "canceled-by-sender"
+            || (
+              latestFlowAction === "cancel"
+              && latestFlowSenderId === transferFromId
+              && (!latestFlowReceiverId || latestFlowReceiverId === transferToId)
+            )
+          )
+        );
+        const inboundCanceledByReceiver = !!(
+          !outgoing
+          && !complete
+          && (
+            inboundFlowState === "canceled-by-receiver"
+            || (
+              latestFlowAction === "cancel"
+              && latestFlowSenderId === transferToId
+              && (!latestFlowReceiverId || latestFlowReceiverId === transferFromId)
+            )
+          )
+        );
+        const inboundCanceled = !!(inboundCanceledBySender || inboundCanceledByReceiver);
         const inboundPaused = !!(inboundPausedBySender || inboundPausedByReceiver);
         const outgoingCanRestart = !!(
           outgoingSession
           && !outgoingSession.delivered
+          && !outgoingSession.failed
+          && !outgoingSession.canceled
           && String(outgoingSession.metaFrame || "").trim()
           && Array.isArray(outgoingSession.chunkFrames)
           && outgoingSession.chunkFrames.length > 0
@@ -346,6 +374,11 @@
           outgoingSession
           && outgoingSession.canceled
           && !outgoingSession.delivered
+        );
+        const outgoingCanceledByReceiver = !!(
+          outgoingCanceled
+          && outgoingSession
+          && outgoingSession.canceledByReceiver
         );
         const outgoingPausedOffline = !!(
           outgoingSession
@@ -396,7 +429,8 @@
             : 0;
           const sentPct = Math.max(0, Math.min(100, Math.round((sentChunksVisual / Math.max(expectedChunks, 1)) * 100)));
           if (outgoingCanceled && !delivered) {{
-            progressLabel = `Canceled (${{ackedChunks}}/${{expectedChunks}} acked)`;
+            const canceledByLabel = outgoingCanceledByReceiver ? "receiver" : "sender";
+            progressLabel = `Canceled by ${{canceledByLabel}} (${{ackedChunks}}/${{expectedChunks}} acked)`;
             progressSort = 9;
             progressPercent = deliveryPct;
             progressState = "error";
@@ -466,7 +500,17 @@
             }}
           }}
         }} else {{
-          if (inboundPending) {{
+          if (inboundCanceledBySender) {{
+            progressLabel = "Canceled by sender";
+            progressSort = 5;
+            progressPercent = percent;
+            progressState = "error";
+          }} else if (inboundCanceledByReceiver) {{
+            progressLabel = "Canceled by receiver";
+            progressSort = 5;
+            progressPercent = percent;
+            progressState = "error";
+          }} else if (inboundPending) {{
             progressLabel = "Awaiting acceptance";
             progressSort = 14;
             progressPercent = 0;
@@ -548,12 +592,16 @@
           inboundAccepted,
           inboundPending,
           inboundDeclined,
+          inboundCanceled,
+          inboundCanceledBySender,
+          inboundCanceledByReceiver,
           inboundPaused,
           inboundPausedBySender,
           inboundPausedByReceiver,
           outgoingWaitingForAccept: !!(outgoingSession && outgoingSession.waitingForAccept),
           outgoingRetrying,
           outgoingCanceled,
+          outgoingCanceledByReceiver,
           outgoingPausedManual,
           outgoingPausedRemote,
           outgoingPausedOffline,
@@ -601,6 +649,8 @@
         const outgoingCanRestart = !!(
           outgoingSession
           && !outgoingSession.delivered
+          && !outgoingSession.failed
+          && !outgoingSession.canceled
           && String(outgoingSession.metaFrame || "").trim()
           && Array.isArray(outgoingSession.chunkFrames)
           && outgoingSession.chunkFrames.length > 0
@@ -621,6 +671,11 @@
           outgoingSession
           && outgoingSession.canceled
           && !outgoingSession.delivered
+        );
+        const outgoingCanceledByReceiver = !!(
+          outgoingCanceled
+          && outgoingSession
+          && outgoingSession.canceledByReceiver
         );
         const outgoingPausedOffline = !!(
           outgoingSession
@@ -679,7 +734,8 @@
         let progressSort = delivered ? 220 : (100 + deliveryPct);
         let progressState = delivered ? "success" : "active";
         if (!delivered && outgoingCanceled) {{
-          progressLabel = `Canceled (${{ackedChunks}}/${{totalChunks}} acked)`;
+          const canceledByLabel = outgoingCanceledByReceiver ? "receiver" : "sender";
+          progressLabel = `Canceled by ${{canceledByLabel}} (${{ackedChunks}}/${{totalChunks}} acked)`;
           progressSort = 9;
           progressState = "error";
         }} else if (!delivered && outgoingPausedRemote) {{
@@ -740,6 +796,7 @@
           outgoingWaitingForAccept,
           outgoingRetrying,
           outgoingCanceled,
+          outgoingCanceledByReceiver,
           outgoingPausedManual,
           outgoingPausedRemote,
           outgoingPausedOffline,

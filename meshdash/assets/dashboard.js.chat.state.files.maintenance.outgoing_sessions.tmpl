@@ -22,7 +22,7 @@
       const nowUnix = Math.floor(nowMs / 1000);
       const maybeSendOutgoingFlowSignal = async (session, token, actionRaw, force = false) => {{
         const action = String(actionRaw || "").trim().toLowerCase();
-        if (action !== "pause" && action !== "resume") return false;
+        if (action !== "pause" && action !== "resume" && action !== "cancel") return false;
         const prior = fileTransferOutgoingFlowSignalByToken.get(token) || null;
         const changed = !prior || String(prior.action || "") !== action;
         if (!changed && !force) {{
@@ -85,8 +85,11 @@
         }});
         if (changed) {{
           const channelLabel = meshChannelLabelForIndex(sentChannel, {{ allowAll: false }});
+          const actionLabel = action === "pause"
+            ? "Pause"
+            : (action === "resume" ? "Resume" : "Cancel");
           appendFileTransferConsole(
-            `${{action === "pause" ? "Pause" : "Resume"}} signal sent to ${{destination}} for ${{fileTransferShortTransferId(session && session.transferId)}} on ${{channelLabel}}.`,
+            `${{actionLabel}} signal sent to ${{destination}} for ${{fileTransferShortTransferId(session && session.transferId)}} on ${{channelLabel}}.`,
             {{ level: "warn" }}
           );
         }}
@@ -163,10 +166,17 @@
         session.receiverPausedAtMs = Math.max(0, Math.trunc(Number(session.receiverPausedAtMs) || 0));
         session.lastReceiverFlowUnix = Math.max(0, Math.trunc(Number(session.lastReceiverFlowUnix) || 0));
         session.canceled = !!session.canceled;
+        session.canceledByReceiver = !!session.canceledByReceiver;
         const priorOutgoingFlow = fileTransferOutgoingFlowSignalByToken.get(token) || null;
-        const desiredOutgoingFlow = session.userPaused
-          ? "pause"
-          : ((priorOutgoingFlow && String(priorOutgoingFlow.action || "") === "pause") ? "resume" : "");
+        const desiredOutgoingFlow = (
+          session.canceled && !session.canceledByReceiver
+            ? "cancel"
+            : (
+              session.userPaused
+                ? "pause"
+                : ((priorOutgoingFlow && String(priorOutgoingFlow.action || "") === "pause") ? "resume" : "")
+            )
+        );
         if (desiredOutgoingFlow) {{
           await maybeSendOutgoingFlowSignal(session, token, desiredOutgoingFlow, false);
         }}
@@ -216,6 +226,18 @@
             }}
             session.pausedByReceiver = false;
             session.receiverPausedAtMs = 0;
+          }} else if (flowAction === "cancel") {{
+            const alreadyRemoteCanceled = !!(session.canceled && session.canceledByReceiver);
+            cancelOutgoingFileTransferSession(session, {{
+              clearAckState: false,
+              canceledByPeer: true,
+            }});
+            if (!alreadyRemoteCanceled) {{
+              appendFileTransferConsole(
+                `Receiver ${{session.destination}} canceled ${{fileTransferShortTransferId(session.transferId)}}. Transfer is stopped.`,
+                {{ level: "warn" }}
+              );
+            }}
           }}
         }}
         const destinationNode = nodesById.get(destinationId) || null;
@@ -279,7 +301,7 @@
           );
         }}
         if (session.failed) {{
-          if (session.canceled) {{
+          if (session.canceled && session.canceledByReceiver) {{
             fileTransferOutgoingFlowSignalByToken.delete(token);
           }}
           if (session.canceled) {{
