@@ -368,8 +368,6 @@
       const host = document.getElementById("env-metrics-available");
       if (!(host instanceof HTMLElement)) return;
       bindEnvironmentNodeLegendToggle();
-      const safeNodes = Array.isArray(nodes) ? nodes : [];
-      const safePoints = Array.isArray(filteredPoints) ? filteredPoints : [];
       const safeChartMeta = (chartMeta && typeof chartMeta === "object") ? chartMeta : {{}};
       const legendItems = Array.isArray(safeChartMeta.legendItems) ? safeChartMeta.legendItems : [];
       const totalSeries = Math.max(0, Math.trunc(Number(safeChartMeta.totalSeries) || 0));
@@ -379,17 +377,8 @@
         host.textContent = "No sensor metric keys detected yet in saved telemetry history.";
         return;
       }}
-      const nodeCount = Math.max(
-        safeNodes.length,
-        new Set(legendItems.map((item) => normalizeNodeId(item && item.nodeId)).filter(Boolean)).size
-      );
-      const totalPoints = Math.max(0, Math.trunc(Number(safePoints.length) || 0));
-      const selectionSummary = metricMeta
-        ? `${{metricMeta.label}}${{nodeMeta ? ` @ ${{nodeMeta.label || nodeMeta.id}}` : " @ all nodes"}}`
-        : "No metric selected";
       const hiddenSeries = Math.max(0, totalSeries - visibleSeries);
       host.innerHTML = [
-        `<span class="env-metric-chip">${{escAttr(selectionSummary)}} <span class="env-metric-chip-count">${{totalPoints}}</span></span>`,
         ...legendItems.map((item) => (
           `<button class="env-metric-chip env-node-legend-item env-node-legend-toggle${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? " is-hidden" : ""}}" type="button" data-env-node-toggle="1" data-node-id="${{escAttr(item.nodeId)}}" data-node-hidden="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "1" : "0"}}" aria-pressed="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "false" : "true"}}" style="--node-color:${{escAttr(item.color)}};" title="${{escAttr(`${{formatEnvironmentNodeTooltipLabel(item.nodeId, item.label)}} • click to ${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "show" : "hide"}}`)}}">
             ${{escAttr(item.label)}}
@@ -399,7 +388,6 @@
         hiddenSeries > 0
           ? `<span class="env-metric-chip env-node-legend-more">+${{hiddenSeries}} more node${{hiddenSeries === 1 ? "" : "s"}} hidden (top ${{visibleSeries}} shown)</span>`
           : "",
-        `<span class="env-metric-chip">Nodes <span class="env-metric-chip-count">${{nodeCount}}</span></span>`,
       ].filter(Boolean).join("");
     }}
 
