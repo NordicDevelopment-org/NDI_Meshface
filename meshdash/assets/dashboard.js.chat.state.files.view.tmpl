@@ -192,6 +192,107 @@
       void poll();
     }}
 
+    function setOutgoingFileTransferPausedAction(transferKey, paused) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return;
+      const row = fileTransferRowByKey(key);
+      if (!(row && typeof row === "object")) {{
+        setFileTransferStatus("Transfer row is no longer available.", true);
+        return;
+      }}
+      if (String(row.directionClass || "").trim().toLowerCase() !== "outbound") {{
+        setFileTransferStatus("Only outbound transfers can be paused or resumed.", true);
+        return;
+      }}
+      const transferId = String(row.transferId || "").trim().toLowerCase();
+      const destination = normalizeNodeId(row.toId || row.peerId || "");
+      if (!transferId || !isCanonicalNodeId(destination)) {{
+        setFileTransferStatus("Cannot resolve transfer destination.", true);
+        return;
+      }}
+      const session = findOutgoingFileTransferSession(transferId, destination, row.channelIndex);
+      if (!(session && typeof session === "object")) {{
+        setFileTransferStatus("This outbound session is no longer in memory.", true);
+        appendFileTransferConsole(
+          `Pause/resume skipped for ${{fileTransferShortTransferId(transferId)}}: local session is unavailable.`,
+          {{ level: "warn" }}
+        );
+        return;
+      }}
+      const updated = setOutgoingFileTransferPaused(session, !!paused);
+      if (!(updated && typeof updated === "object")) {{
+        setFileTransferStatus("Could not update transfer pause state.", true);
+        return;
+      }}
+      const fileName = normalizeFileTransferName(row.fileName || session.fileName || "mesh-file.bin");
+      if (paused) {{
+        setFileTransferStatus(`Paused transfer "${{fileName}}" to ${{destination}}.`);
+        appendFileTransferConsole(
+          `Paused outbound transfer ${{fileTransferShortTransferId(transferId)}} to ${{destination}}.`,
+          {{ level: "warn" }}
+        );
+      }} else {{
+        setFileTransferStatus(`Resumed transfer "${{fileName}}" to ${{destination}}.`);
+        appendFileTransferConsole(
+          `Resumed outbound transfer ${{fileTransferShortTransferId(transferId)}} to ${{destination}}.`,
+          {{ level: "warn" }}
+        );
+      }}
+      renderFilesView(latestState);
+      scheduleFileTransferMaintenance(latestState);
+      requestImmediatePoll(40);
+      void poll();
+    }}
+
+    function cancelOutgoingFileTransferAction(transferKey) {{
+      const key = String(transferKey || "").trim();
+      if (!key) return;
+      const row = fileTransferRowByKey(key);
+      if (!(row && typeof row === "object")) {{
+        setFileTransferStatus("Transfer row is no longer available.", true);
+        return;
+      }}
+      if (String(row.directionClass || "").trim().toLowerCase() !== "outbound") {{
+        setFileTransferStatus("Only outbound transfers can be canceled.", true);
+        return;
+      }}
+      const transferId = String(row.transferId || "").trim().toLowerCase();
+      const destination = normalizeNodeId(row.toId || row.peerId || "");
+      if (!transferId || !isCanonicalNodeId(destination)) {{
+        setFileTransferStatus("Cannot resolve transfer destination for cancel.", true);
+        return;
+      }}
+      const session = findOutgoingFileTransferSession(transferId, destination, row.channelIndex);
+      if (!(session && typeof session === "object")) {{
+        setFileTransferStatus("This outbound session is no longer in memory.", true);
+        appendFileTransferConsole(
+          `Cancel skipped for ${{fileTransferShortTransferId(transferId)}}: local session is unavailable.`,
+          {{ level: "warn" }}
+        );
+        return;
+      }}
+      const fileName = normalizeFileTransferName(row.fileName || session.fileName || "mesh-file.bin");
+      const shortId = fileTransferShortTransferId(transferId);
+      const confirmText = `Cancel transfer "${{fileName}}" (${{shortId}}) to ${{destination}}?\n\nThis stops retries and marks the outbound session canceled.`;
+      if (typeof window.confirm === "function" && !window.confirm(confirmText)) {{
+        return;
+      }}
+      const canceled = cancelOutgoingFileTransferSession(session, {{ clearAckState: false }});
+      if (!(canceled && typeof canceled === "object")) {{
+        setFileTransferStatus("Could not cancel this transfer.", true);
+        return;
+      }}
+      setFileTransferStatus(`Canceled transfer "${{fileName}}" to ${{destination}}.`);
+      appendFileTransferConsole(
+        `Canceled outbound transfer ${{shortId}} to ${{destination}}.`,
+        {{ level: "warn" }}
+      );
+      renderFilesView(latestState);
+      scheduleFileTransferMaintenance(latestState);
+      requestImmediatePoll(40);
+      void poll();
+    }}
+
     function restartOutgoingFileTransferAction(transferKey) {{
       const key = String(transferKey || "").trim();
       if (!key) return;
@@ -273,6 +374,18 @@
         }}
         if (action === "restart") {{
           restartOutgoingFileTransferAction(transferKey);
+          return;
+        }}
+        if (action === "pause") {{
+          setOutgoingFileTransferPausedAction(transferKey, true);
+          return;
+        }}
+        if (action === "resume") {{
+          setOutgoingFileTransferPausedAction(transferKey, false);
+          return;
+        }}
+        if (action === "cancel") {{
+          cancelOutgoingFileTransferAction(transferKey);
           return;
         }}
         if (action === "clear") {{
@@ -426,14 +539,47 @@
             </span>`;
         }} else {{
           const outgoingCanRestart = !!(row && row.outgoingCanRestart);
-          if (outgoingCanRestart && !(row && row.canDownload)) {{
-            const restartTitle = row && row.outgoingFailed
+          const outgoingCanceled = !!(row && row.outgoingCanceled);
+          const outgoingCanPause = !!(row && row.outgoingCanPause);
+          const outgoingCanResume = !!(row && row.outgoingCanResume);
+          const outgoingCanCancel = !!(row && row.outgoingCanCancel);
+          if ((outgoingCanPause || outgoingCanResume || outgoingCanCancel) && !(row && row.canDownload)) {{
+            actionSort = 2;
+            const pauseAction = outgoingCanResume ? "resume" : "pause";
+            const pauseLabel = outgoingCanResume ? "Resume" : "Pause";
+            const pauseTitle = outgoingCanResume
+              ? "Resume outbound transfer."
+              : "Pause outbound transfer without resetting progress.";
+            const pauseDisabled = (outgoingCanPause || outgoingCanResume) ? "" : " disabled";
+            const cancelDisabled = outgoingCanCancel ? "" : " disabled";
+            actionHtml = `<span class="files-transfer-action-group">
+                <button
+                  type="button"
+                  class="files-transfer-action"
+                  data-action="${{escAttr(pauseAction)}}"
+                  data-transfer-key="${{escAttr(row.key || "")}}"
+                  title="${{escAttr(pauseTitle)}}"
+                  ${{pauseDisabled}}
+                >${{escAttr(pauseLabel)}}</button>
+                <button
+                  type="button"
+                  class="files-transfer-action decline"
+                  data-action="cancel"
+                  data-transfer-key="${{escAttr(row.key || "")}}"
+                  title="Cancel outbound transfer and stop retries."
+                  ${{cancelDisabled}}
+                >Cancel</button>
+              </span>`;
+          }} else if (outgoingCanRestart && !(row && row.canDownload)) {{
+            const restartTitle = outgoingCanceled
+              ? "Restart canceled outbound transfer from metadata/chunk 0."
+              : (row && row.outgoingFailed
               ? "Restart failed outbound transfer from metadata/chunk 0."
               : (
                 row && row.outgoingWaitingForAccept
                   ? "Restart outbound transfer and request receiver acceptance again."
                   : "Restart outbound transfer from metadata/chunk 0."
-              );
+              ));
             actionSort = 2;
             actionHtml = `<button
                 type="button"

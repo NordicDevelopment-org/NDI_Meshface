@@ -278,10 +278,38 @@
           && Array.isArray(outgoingSession.chunkFrames)
           && outgoingSession.chunkFrames.length > 0
         );
+        const outgoingPausedManual = !!(
+          outgoingSession
+          && outgoingSession.userPaused
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
+        );
+        const outgoingCanceled = !!(
+          outgoingSession
+          && outgoingSession.canceled
+          && !outgoingSession.delivered
+        );
         const outgoingPausedOffline = !!(
           outgoingSession
           && outgoingSession.pausedForPeerOffline
           && !outgoingSession.delivered
+        );
+        const outgoingCanPause = !!(
+          outgoingSession
+          && !outgoingSession.userPaused
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
+        );
+        const outgoingCanResume = !!(
+          outgoingSession
+          && outgoingSession.userPaused
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
+        );
+        const outgoingCanCancel = !!(
+          outgoingSession
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
         );
         const transferChannelIndex = fileTransferExplicitChannelIndex(transfer.channelIndex);
         const sessionChannelIndex = fileTransferExplicitChannelIndex(outgoingSession && outgoingSession.channelIndex);
@@ -308,7 +336,17 @@
             )
             : 0;
           const sentPct = Math.max(0, Math.min(100, Math.round((sentChunksVisual / Math.max(expectedChunks, 1)) * 100)));
-          if (outgoingPausedOffline && !delivered) {{
+          if (outgoingCanceled && !delivered) {{
+            progressLabel = `Canceled (${{ackedChunks}}/${{expectedChunks}} acked)`;
+            progressSort = 9;
+            progressPercent = deliveryPct;
+            progressState = "error";
+          }} else if (outgoingPausedManual && !delivered) {{
+            progressLabel = "Paused (manual)";
+            progressSort = 17;
+            progressPercent = deliveryPct;
+            progressState = "pending";
+          }} else if (outgoingPausedOffline && !delivered) {{
             progressLabel = "Paused (peer offline)";
             progressSort = 18;
             progressPercent = deliveryPct;
@@ -438,10 +476,15 @@
           inboundDeclined,
           outgoingWaitingForAccept: !!(outgoingSession && outgoingSession.waitingForAccept),
           outgoingRetrying,
+          outgoingCanceled,
+          outgoingPausedManual,
           outgoingPausedOffline,
           outgoingSessionMissing,
           outgoingFailed: !!(outgoingSession && outgoingSession.failed && !delivered),
           outgoingCanRestart,
+          outgoingCanPause,
+          outgoingCanResume,
+          outgoingCanCancel,
           canDownload: inboundAccepted && complete && assembled instanceof Uint8Array,
           bytes: assembled,
         }});
@@ -484,10 +527,38 @@
           && Array.isArray(outgoingSession.chunkFrames)
           && outgoingSession.chunkFrames.length > 0
         );
+        const outgoingPausedManual = !!(
+          outgoingSession
+          && outgoingSession.userPaused
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
+        );
+        const outgoingCanceled = !!(
+          outgoingSession
+          && outgoingSession.canceled
+          && !outgoingSession.delivered
+        );
         const outgoingPausedOffline = !!(
           outgoingSession
           && outgoingSession.pausedForPeerOffline
           && !outgoingSession.delivered
+        );
+        const outgoingCanPause = !!(
+          outgoingSession
+          && !outgoingSession.userPaused
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
+        );
+        const outgoingCanResume = !!(
+          outgoingSession
+          && outgoingSession.userPaused
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
+        );
+        const outgoingCanCancel = !!(
+          outgoingSession
+          && !outgoingSession.delivered
+          && !outgoingSession.failed
         );
         const outgoingWaitingForAccept = !!(
           outgoingSession
@@ -522,7 +593,15 @@
           : `${{deliveryPct}}% delivered (${{ackedChunks}}/${{totalChunks}} acked)`;
         let progressSort = delivered ? 220 : (100 + deliveryPct);
         let progressState = delivered ? "success" : "active";
-        if (!delivered && outgoingPausedOffline) {{
+        if (!delivered && outgoingCanceled) {{
+          progressLabel = `Canceled (${{ackedChunks}}/${{totalChunks}} acked)`;
+          progressSort = 9;
+          progressState = "error";
+        }} else if (!delivered && outgoingPausedManual) {{
+          progressLabel = `Paused (manual) • ${{deliveryPct}}% delivered (${{ackedChunks}}/${{totalChunks}} acked)`;
+          progressSort = 17;
+          progressState = "pending";
+        }} else if (!delivered && outgoingPausedOffline) {{
           progressLabel = `Paused (peer offline) • ${{deliveryPct}}% delivered (${{ackedChunks}}/${{totalChunks}} acked)`;
           progressSort = 18;
           progressState = "pending";
@@ -570,10 +649,15 @@
           inboundDeclined: false,
           outgoingWaitingForAccept,
           outgoingRetrying,
+          outgoingCanceled,
+          outgoingPausedManual,
           outgoingPausedOffline,
           outgoingSessionMissing,
           outgoingFailed,
           outgoingCanRestart,
+          outgoingCanPause,
+          outgoingCanResume,
+          outgoingCanCancel,
           canDownload: false,
           bytes: null,
         }});

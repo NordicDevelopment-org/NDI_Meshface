@@ -79,10 +79,12 @@
         );
         session.lastAutoRestartAtMs = Math.max(0, Math.trunc(Number(session.lastAutoRestartAtMs) || 0));
         session.pausedForPeerOffline = !!session.pausedForPeerOffline;
+        session.userPaused = !!session.userPaused;
         session.pausedAtMs = Math.max(0, Math.trunc(Number(session.pausedAtMs) || 0));
         session.lastPauseLogAtMs = Math.max(0, Math.trunc(Number(session.lastPauseLogAtMs) || 0));
         session.lastPeerFreshness = String(session.lastPeerFreshness || "").trim().toLowerCase();
         session.lastPeerSeenUnix = Math.max(0, Math.trunc(Number(session.lastPeerSeenUnix) || 0));
+        session.canceled = !!session.canceled;
         let ackProgressThisTick = false;
         const ack = findAckForOutgoingSession(session, ackByTransferKey, localNodeId);
         const destinationId = normalizeNodeId(session.destination || "");
@@ -144,6 +146,9 @@
           );
         }}
         if (session.failed) {{
+          if (session.canceled) {{
+            continue;
+          }}
           const autoRestartAllowed = !!fileTransferAutoRestartEnabled;
           const restartBudgetOk = session.autoRestartCount < session.maxAutoRestarts;
           const restartCooldownOk = session.lastAutoRestartAtMs <= 0
@@ -286,6 +291,9 @@
           appendFileTransferConsole(
             `Receiver accepted ${{fileTransferShortTransferId(session.transferId)}} at ${{session.destination}}. Starting chunk transfer.`
           );
+        }}
+        if (session.userPaused) {{
+          continue;
         }}
         if (session.waitingForAccept) {{
           const createdAtMs = Math.max(0, Math.trunc(Number(session.createdAtMs) || 0));

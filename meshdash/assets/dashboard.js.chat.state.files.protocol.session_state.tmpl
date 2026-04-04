@@ -370,12 +370,14 @@
         ),
         lastAutoRestartAtMs: Math.max(0, Math.trunc(Number(session.lastAutoRestartAtMs) || 0)),
         pausedForPeerOffline: !!session.pausedForPeerOffline,
+        userPaused: !!session.userPaused,
         pausedAtMs: Math.max(0, Math.trunc(Number(session.pausedAtMs) || 0)),
         lastPauseLogAtMs: Math.max(0, Math.trunc(Number(session.lastPauseLogAtMs) || 0)),
         lastPeerFreshness: String(session.lastPeerFreshness || "").trim().toLowerCase(),
         lastPeerSeenUnix: Math.max(0, Math.trunc(Number(session.lastPeerSeenUnix) || 0)),
         delivered: false,
         failed: false,
+        canceled: false,
         deliveredAtMs: 0,
         failedAtMs: 0,
         waitingForAccept: !!session.waitingForAccept,
@@ -485,12 +487,14 @@
         )
       );
       record.pausedForPeerOffline = false;
+      record.userPaused = false;
       record.pausedAtMs = 0;
       record.lastPauseLogAtMs = 0;
       record.lastPeerFreshness = "";
       record.lastPeerSeenUnix = 0;
       record.delivered = false;
       record.failed = false;
+      record.canceled = false;
       record.deliveredAtMs = 0;
       record.failedAtMs = 0;
       record.waitingForAccept = !!waitForAccept;
@@ -524,6 +528,64 @@
         0,
         Math.trunc(Number(opts.ackWatermarkUnix) || nowUnix)
       );
+      return record;
+    }}
+
+    function setOutgoingFileTransferPaused(session, pausedRaw) {{
+      const record = (session && typeof session === "object") ? session : null;
+      if (!record) return null;
+      const transferId = String(record.transferId || "").trim().toLowerCase();
+      const destination = normalizeNodeId(record.destination || "");
+      if (!transferId || !isCanonicalNodeId(destination)) {{
+        return null;
+      }}
+      const paused = !!pausedRaw;
+      const nowMs = Date.now();
+      record.userPaused = paused;
+      if (paused) {{
+        record.pausedForPeerOffline = false;
+        record.pausedAtMs = nowMs;
+        record.lastPauseLogAtMs = nowMs;
+      }} else {{
+        record.pausedAtMs = 0;
+        record.lastPauseLogAtMs = 0;
+      }}
+      return record;
+    }}
+
+    function cancelOutgoingFileTransferSession(session, options = null) {{
+      const record = (session && typeof session === "object") ? session : null;
+      if (!record) return null;
+      const transferId = String(record.transferId || "").trim().toLowerCase();
+      const destination = normalizeNodeId(record.destination || "");
+      if (!transferId || !isCanonicalNodeId(destination)) {{
+        return null;
+      }}
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const nowMs = Date.now();
+      record.failed = true;
+      record.canceled = true;
+      record.failedAtMs = nowMs;
+      record.delivered = false;
+      record.deliveredAtMs = 0;
+      record.waitingForAccept = false;
+      record.acceptProbeAttempts = 0;
+      record.lastAcceptProbeAtMs = 0;
+      record.retryAttempts = 0;
+      record.retriesSinceProgress = 0;
+      record.lastRetryAtMs = 0;
+      record.lastRetryErrorAtMs = 0;
+      record.pausedForPeerOffline = false;
+      record.userPaused = false;
+      record.pausedAtMs = 0;
+      record.lastPauseLogAtMs = 0;
+      if (opts.clearAckState !== false) {{
+        record.ackedChunks = 0;
+        record.lastAckUnix = null;
+        record.lastAckChannelIndex = null;
+        record.lastAckReceivedIndexes = [];
+        record.lastAckProgressAtMs = 0;
+      }}
       return record;
     }}
 
