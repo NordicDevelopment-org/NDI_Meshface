@@ -1,7 +1,6 @@
 from .html_assets import render_asset_template as _render_asset_template_helper
 from .config import (
     DEFAULT_FILE_TRANSFER_MAX_BYTES as _DEFAULT_FILE_TRANSFER_MAX_BYTES,
-    DEFAULT_UI_PROFILE as _DEFAULT_UI_PROFILE,
     MAX_FILE_TRANSFER_MAX_BYTES as _MAX_FILE_TRANSFER_MAX_BYTES,
     MIN_FILE_TRANSFER_MAX_BYTES as _MIN_FILE_TRANSFER_MAX_BYTES,
 )
@@ -39,13 +38,6 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.chat.state.core.chat.delivery_reactions.reaction_popover.tmpl",
     "dashboard.js.chat.state.core.chat.channels_notifications.tmpl",
     "dashboard.js.chat.state.core.chat.bot_quick_actions.tmpl",
-    "dashboard.js.chat.state.core.bot_history.sniffer_ingest.tmpl",
-    "dashboard.js.chat.state.core.bot_history.history_store.tmpl",
-    "dashboard.js.chat.state.core.bot_history.history_response_sync.tmpl",
-    "dashboard.js.chat.state.core.bot_history.settings_tabs_ui.tmpl",
-    "dashboard.js.chat.state.core.bot_history.sniffer_tab.tmpl",
-    "dashboard.js.chat.state.core.bot_history.tmpl",
-    "dashboard.js.chat.state.core.bot_controls.tmpl",
     "dashboard.js.chat.state.channels.labels_menu.tmpl",
     "dashboard.js.chat.state.channels.options_controls.tmpl",
     "dashboard.js.chat.state.channels.bindings_modes.tmpl",
@@ -58,13 +50,6 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.chat.state.games.classic.checkers.render_status.tmpl",
     "dashboard.js.chat.state.games.classic.checkers.tmpl",
     "dashboard.js.chat.state.games.classic.chess.tmpl",
-    "dashboard.js.chat.state.games.classic.poker.setup.tmpl",
-    "dashboard.js.chat.state.games.classic.poker.flow.round_setup.tmpl",
-    "dashboard.js.chat.state.games.classic.poker.flow.hand_eval_showdown.tmpl",
-    "dashboard.js.chat.state.games.classic.poker.flow.actions_draw.tmpl",
-    "dashboard.js.chat.state.games.classic.poker.flow.lifecycle_controls.tmpl",
-    "dashboard.js.chat.state.games.classic.poker.flow.tmpl",
-    "dashboard.js.chat.state.games.classic.poker.render.tmpl",
     "dashboard.js.chat.state.games.network.board_links.core.tmpl",
     "dashboard.js.chat.state.games.network.board_links.sync_ui.tmpl",
     "dashboard.js.chat.state.games.network.board_links.actions.tmpl",
@@ -172,45 +157,19 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
 )
 
 
-_CORE_UI_EXCLUDED_TEMPLATE_PREFIXES = (
-    "dashboard.js.chat.state.games.classic.poker.",
-    "dashboard.js.chat.state.core.bot_history.",
-)
-_CORE_UI_EXCLUDED_TEMPLATE_NAMES = {
-    "dashboard.js.chat.state.core.bot_controls.tmpl",
-}
 _CORE_UI_STUB_TEMPLATE = "dashboard.js.profile.core_ui.noop_feature_hooks.tmpl"
 _RUNTIME_BOOT_TEMPLATE = "dashboard.js.runtime.boot.tmpl"
 
 
 def _normalize_ui_profile(raw_profile: object = None) -> str:
-    token = str(raw_profile or "").strip().lower().replace("_", "-")
-    if not token:
-        token = str(_DEFAULT_UI_PROFILE or "").strip().lower().replace("_", "-")
-    if token in {"core", "coreui", "core-ui"}:
-        return "core-ui"
-    return "full"
-
-
-def _core_ui_part_excluded(template_name: str) -> bool:
-    if template_name in _CORE_UI_EXCLUDED_TEMPLATE_NAMES:
-        return True
-    return any(
-        template_name.startswith(prefix)
-        for prefix in _CORE_UI_EXCLUDED_TEMPLATE_PREFIXES
-    )
+    # The public branch only ships the curated core-ui asset set, so every
+    # profile token resolves to core-ui here.
+    return "core-ui"
 
 
 def _template_parts_for_profile(raw_profile: object = None) -> tuple[str, ...]:
-    profile = _normalize_ui_profile(raw_profile)
-    if profile == "full":
-        return _DASHBOARD_JS_TEMPLATE_PARTS
-
-    selected = [
-        template_name
-        for template_name in _DASHBOARD_JS_TEMPLATE_PARTS
-        if not _core_ui_part_excluded(template_name)
-    ]
+    _normalize_ui_profile(raw_profile)
+    selected = list(_DASHBOARD_JS_TEMPLATE_PARTS)
     if _CORE_UI_STUB_TEMPLATE not in selected:
         try:
             runtime_boot_idx = selected.index(_RUNTIME_BOOT_TEMPLATE)

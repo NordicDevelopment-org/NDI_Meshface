@@ -1,5 +1,4 @@
 import argparse
-import os
 
 try:
     import meshtastic.serial_interface as _meshtastic_serial_interface
@@ -8,11 +7,8 @@ except Exception:
     _meshtastic_serial_interface = None
     _meshtastic_tcp_interface = None
 
+from meshdash.config import DEFAULT_MESH_PORT
 
-DEFAULT_MESH_PORT = os.environ.get(
-    "MESH_DASH_MESH_PORT",
-    "COM3" if os.name == "nt" else "/dev/ttyACM0",
-)
 DEFAULT_MESH_TCP_PORT = 4403
 
 

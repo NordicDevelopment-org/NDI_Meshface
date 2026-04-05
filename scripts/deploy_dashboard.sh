@@ -27,7 +27,7 @@ Options:
   --dash-host <ip_or_dns>  Dashboard bind host (default: 0.0.0.0).
   --dash-port <port>       Dashboard bind port (default: 8877).
   --refresh-ms <ms>        Poll interval in ms (default: 3000).
-  --ui-profile <name>      Dashboard UI profile (example: full, core-ui).
+  --ui-profile <name>      Dashboard UI profile (public branch supports core-ui only).
   --history-db <path>      History DB path on target host.
   --file-transfer-enable   Enable file transfer in dashboard.env.
   --no-file-transfer-enable Disable file transfer in dashboard.env.
@@ -67,6 +67,21 @@ Env overrides:
   MESH_DASH_DEPLOY_FILE_TRANSFER_MAX_BYTES
   MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER
 EOF
+}
+
+normalize_ui_profile() {
+  local raw="${1:-}"
+  local token="${raw,,}"
+  token="${token//_/-}"
+  case "${token}" in
+    ""|core|coreui|core-ui)
+      printf 'core-ui\n'
+      ;;
+    *)
+      echo "unsupported --ui-profile '${raw}' for release/public-v0; use core-ui" >&2
+      exit 2
+      ;;
+  esac
 }
 
 require_arg() {
@@ -313,6 +328,8 @@ if [[ "${BOOTSTRAP}" -eq 1 && -z "${MESH_HOST}" ]]; then
   echo "--bootstrap requires --mesh-host (or an existing ${CONFIG_DIR}/dashboard.env on target)" >&2
   exit 1
 fi
+
+UI_PROFILE="$(normalize_ui_profile "${UI_PROFILE}")"
 
 if [[ "${FILE_TRANSFER_ENABLE_SET}" -eq 0 ]]; then
   existing_file_transfer_enable="$(read_existing_dashboard_env_value "MESH_DASH_FILE_TRANSFER_ENABLE")"

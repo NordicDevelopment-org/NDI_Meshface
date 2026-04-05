@@ -4,6 +4,10 @@ Meshyface is a chat-first Meshtastic web dashboard for LAN-hosted operation.
 
 This branch (`release/public-v0`) is the curated public surface. It is focused on stable daily use and intentionally omits several experimental/private modules.
 
+This public branch serves only the `core-ui` profile. If `MESH_DASH_UI_PROFILE`
+or the deploy helper is given another profile token, the runtime normalizes it
+back to `core-ui`.
+
 ## What Public Includes
 
 Public `core-ui` includes:

@@ -38,3 +38,37 @@ def test_dashboard_js_defaults_unique_node_colors_to_off() -> None:
         r"settingsUniqueNodeColorsEnabled = parseBoolToken\(\s*window\.localStorage\.getItem\(settingsUniqueNodeColorsStorageKey\),\s*false\s*\);",
         js,
     )
+
+
+def test_dashboard_js_normalizes_full_profile_to_core_ui() -> None:
+    core_js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        ui_profile="core-ui",
+    )
+    full_js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        ui_profile="full",
+    )
+
+    assert full_js == core_js
+
+
+def test_dashboard_js_normalizes_unknown_profile_to_core_ui() -> None:
+    core_js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        ui_profile="core-ui",
+    )
+    unknown_js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        ui_profile="labs-preview",
+    )
+
+    assert unknown_js == core_js
