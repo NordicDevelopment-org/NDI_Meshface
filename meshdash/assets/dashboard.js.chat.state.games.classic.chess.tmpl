@@ -458,6 +458,10 @@
 
     function renderChessStatus() {{
       if (!chessState || typeof chessState !== "object") return;
+      setGamesBoardTurnAccent(
+        "chess",
+        chessState.game_over ? "" : (chessState.turn === "black" ? "black" : "white")
+      );
       const statusEl = document.getElementById("chess-status-text");
       const whitePill = document.getElementById("chess-player-white-pill");
       const blackPill = document.getElementById("chess-player-black-pill");

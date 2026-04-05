@@ -61,6 +61,10 @@
       const counts = countReversiPieces(state.board);
       const isOver = !!state.game_over;
       const currentPlayer = Number(state.current_player) === reversiPiece.white ? reversiPiece.white : reversiPiece.black;
+      setGamesBoardTurnAccent(
+        "reversi",
+        isOver ? "" : (currentPlayer === reversiPiece.white ? "white" : "black")
+      );
       const localPlayerColor = reversiLocalColor();
       const remotePlayerColor = reversiRemoteColor();
       const linkMode = String(reversiLink && reversiLink.mode || "local").trim().toLowerCase();

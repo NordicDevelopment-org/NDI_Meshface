@@ -64,6 +64,10 @@
 
     function renderCheckersStatus() {{
       if (!checkersState || typeof checkersState !== "object") return;
+      setGamesBoardTurnAccent(
+        "checkers",
+        checkersState.game_over ? "" : (checkersState.turn === "white" ? "white" : "black")
+      );
       const statusEl = document.getElementById("checkers-status-text");
       const blackPill = document.getElementById("checkers-player-black-pill");
       const whitePill = document.getElementById("checkers-player-white-pill");

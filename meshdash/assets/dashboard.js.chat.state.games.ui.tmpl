@@ -35,6 +35,27 @@
       }}
     }}
 
+    function normalizeGamesBoardTurn(value) {{
+      const token = String(value || "").trim().toLowerCase();
+      if (token === "black") return "black";
+      if (token === "white") return "white";
+      return "";
+    }}
+
+    function setGamesBoardTurnAccent(gameId, turn) {{
+      const normalizedGameId = normalizeActiveGameId(gameId);
+      const panelEl = document.getElementById(`games-main-${{normalizedGameId}}`);
+      if (!(panelEl instanceof HTMLElement)) return;
+      const wrapEl = panelEl.querySelector(".games-board-wrap");
+      if (!(wrapEl instanceof HTMLElement)) return;
+      const turnToken = normalizeGamesBoardTurn(turn);
+      if (turnToken) {{
+        wrapEl.dataset.turn = turnToken;
+        return;
+      }}
+      delete wrapEl.dataset.turn;
+    }}
+
     function gamesQuickChatTrimText(value, maxLen = 120) {{
       const text = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
       return text.slice(0, Math.max(1, Math.trunc(Number(maxLen) || 120)));
