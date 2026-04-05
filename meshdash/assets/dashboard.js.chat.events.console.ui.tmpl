@@ -115,6 +115,143 @@
       }});
     }}
 
+    function consoleContextMenuElement() {{
+      const menu = document.getElementById("console-context-menu");
+      return menu instanceof HTMLElement ? menu : null;
+    }}
+
+    function canUseConsoleMenuScriptPaste() {{
+      return !!(
+        window.isSecureContext
+        && navigator.clipboard
+        && typeof navigator.clipboard.readText === "function"
+      );
+    }}
+
+    function resolveConsoleContextMenuSelectionText() {{
+      const pre = document.getElementById("live-console");
+      return selectionTextWithin(pre instanceof HTMLElement ? pre : null);
+    }}
+
+    function selectAllConsoleText() {{
+      const pre = document.getElementById("live-console");
+      const selection = window.getSelection ? window.getSelection() : null;
+      if (!(pre instanceof HTMLElement) || !selection || typeof selection.removeAllRanges !== "function") {{
+        return false;
+      }}
+      try {{
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        consoleContextMenuSelectionText = String(selection.toString() || "");
+        return consoleContextMenuSelectionText.trim().length > 0;
+      }} catch (_err) {{
+        return false;
+      }}
+    }}
+
+    function syncConsoleContextMenuActionState(menuEl = null) {{
+      const menu = menuEl instanceof HTMLElement ? menuEl : consoleContextMenuElement();
+      if (!(menu instanceof HTMLElement)) return;
+      const pasteBtn = document.getElementById("console-context-menu-paste");
+      const pasteLabel = document.getElementById("console-context-menu-paste-label");
+      const pasteHint = document.getElementById("console-context-menu-paste-hint");
+      const copyBtn = document.getElementById("console-context-menu-copy");
+      const selectAllBtn = document.getElementById("console-context-menu-select-all");
+      const selectionText = consoleContextMenuSelectionText || resolveConsoleContextMenuSelectionText();
+      const pre = document.getElementById("live-console");
+      const hasConsoleText = pre instanceof HTMLElement && String(pre.textContent || "").trim().length > 0;
+      const supportsScriptPaste = canUseConsoleMenuScriptPaste();
+      if (pasteLabel instanceof HTMLElement) {{
+        pasteLabel.textContent = supportsScriptPaste ? "Paste" : "Use Ctrl+V";
+      }}
+      if (pasteHint instanceof HTMLElement) {{
+        pasteHint.textContent = supportsScriptPaste ? "Ctrl+V" : "HTTP";
+      }}
+      if (pasteBtn instanceof HTMLButtonElement) {{
+        pasteBtn.disabled = false;
+        pasteBtn.title = supportsScriptPaste
+          ? "Paste clipboard into the console"
+          : "This HTTP page cannot read the clipboard directly. Click here to focus the console, then press Ctrl+V.";
+      }}
+      if (copyBtn instanceof HTMLButtonElement) {{
+        copyBtn.disabled = selectionText.trim().length < 1;
+        copyBtn.title = copyBtn.disabled
+          ? "Select console text to copy"
+          : "Copy the current console selection";
+      }}
+      if (selectAllBtn instanceof HTMLButtonElement) {{
+        selectAllBtn.disabled = !hasConsoleText;
+        selectAllBtn.title = hasConsoleText
+          ? "Select the full console output"
+          : "No console text to select";
+      }}
+    }}
+
+    function setConsoleContextMenuOpen(open, options = null) {{
+      const menu = consoleContextMenuElement();
+      if (!(menu instanceof HTMLElement)) {{
+        consoleContextMenuOpen = false;
+        consoleContextMenuSelectionText = "";
+        return;
+      }}
+      consoleContextMenuOpen = !!open;
+      if (!consoleContextMenuOpen) {{
+        consoleContextMenuSelectionText = "";
+        menu.hidden = true;
+        menu.style.removeProperty("left");
+        menu.style.removeProperty("top");
+        menu.style.removeProperty("visibility");
+        return;
+      }}
+      const terminalScreen = document.getElementById("console-terminal-screen");
+      if (!(terminalScreen instanceof HTMLElement)) {{
+        consoleContextMenuOpen = false;
+        menu.hidden = true;
+        return;
+      }}
+      consoleContextMenuSelectionText = resolveConsoleContextMenuSelectionText();
+      menu.hidden = false;
+      menu.style.visibility = "hidden";
+      syncConsoleContextMenuActionState(menu);
+      const terminalRect = terminalScreen.getBoundingClientRect();
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const rawClientX = Number(opts.clientX);
+      const rawClientY = Number(opts.clientY);
+      const clientX = Number.isFinite(rawClientX) && rawClientX > 0
+        ? rawClientX
+        : (terminalRect.left + 16);
+      const clientY = Number.isFinite(rawClientY) && rawClientY > 0
+        ? rawClientY
+        : (terminalRect.top + 16);
+      const menuRect = menu.getBoundingClientRect();
+      const maxLeft = Math.max(8, terminalRect.width - menuRect.width - 8);
+      const maxTop = Math.max(8, terminalRect.height - menuRect.height - 8);
+      const nextLeft = Math.max(8, Math.min(maxLeft, clientX - terminalRect.left));
+      const nextTop = Math.max(8, Math.min(maxTop, clientY - terminalRect.top));
+      menu.style.left = `${{Math.round(nextLeft)}}px`;
+      menu.style.top = `${{Math.round(nextTop)}}px`;
+      menu.style.visibility = "";
+    }}
+
+    async function pasteConsoleFromContextMenu() {{
+      focusConsoleCommandInput(false);
+      const input = consoleCommandInputElement();
+      if (!(input instanceof HTMLInputElement)) return false;
+      if (!canUseConsoleMenuScriptPaste()) {{
+        return false;
+      }}
+      try {{
+        const pastedText = String(await navigator.clipboard.readText() || "");
+        if (insertTextIntoConsoleCommandInput(pastedText, input)) {{
+          return true;
+        }}
+      }} catch (_err) {{
+      }}
+      return false;
+    }}
+
     function bindConsoleControls() {{
       ensureConsoleCommandsRegistered();
       bindConsoleDropdownHotkey();
@@ -170,6 +307,14 @@
         terminalScreen.addEventListener("paste", (ev) => {{
           handleConsolePasteEvent(ev);
         }});
+        terminalScreen.addEventListener("contextmenu", (ev) => {{
+          if (activeLayoutView !== "console") return;
+          ev.preventDefault();
+          setConsoleContextMenuOpen(true, {{
+            clientX: ev.clientX,
+            clientY: ev.clientY,
+          }});
+        }});
       }}
       if (terminalScreen instanceof HTMLElement && terminalScreen.dataset.fillBound !== "1") {{
         terminalScreen.dataset.fillBound = "1";
@@ -178,6 +323,9 @@
           scheduleConsoleTerminalScreenFillHeight();
         }};
         window.addEventListener("resize", () => {{
+          if (consoleContextMenuOpen) {{
+            setConsoleContextMenuOpen(false);
+          }}
           scheduleConsoleTerminalScreenFillHeight();
         }}, {{ passive: true }});
         window.addEventListener("focus", scheduleConsoleFillOnResume, {{ passive: true }});
@@ -281,6 +429,77 @@
           if (ev.key === "ArrowDown" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
             ev.preventDefault();
             navigateConsoleHistory(1, input);
+          }}
+        }});
+      }}
+      const contextMenu = consoleContextMenuElement();
+      if (contextMenu instanceof HTMLElement && contextMenu.dataset.bound !== "1") {{
+        contextMenu.dataset.bound = "1";
+        contextMenu.addEventListener("mousedown", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          if (target.closest(".console-context-menu-item")) {{
+            ev.preventDefault();
+          }}
+        }});
+        contextMenu.addEventListener("contextmenu", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+        }});
+        contextMenu.addEventListener("click", async (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const item = target.closest(".console-context-menu-item");
+          if (!(item instanceof HTMLButtonElement)) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          const action = String(item.dataset.consoleAction || "").trim().toLowerCase();
+          const selectionText = consoleContextMenuSelectionText || resolveConsoleContextMenuSelectionText();
+          setConsoleContextMenuOpen(false);
+          if (action === "paste") {{
+            await pasteConsoleFromContextMenu();
+            return;
+          }}
+          if (action === "copy") {{
+            if (selectionText.trim() && typeof copyTextToClipboard === "function") {{
+              await copyTextToClipboard(selectionText);
+            }}
+            return;
+          }}
+          if (action === "select-all") {{
+            selectAllConsoleText();
+          }}
+        }});
+      }}
+      if (document.body.dataset.consoleContextMenuDocBound !== "1") {{
+        document.body.dataset.consoleContextMenuDocBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          if (!consoleContextMenuOpen) return;
+          const target = ev.target;
+          if (target instanceof Element && target.closest("#console-context-menu")) {{
+            return;
+          }}
+          if (
+            target instanceof Element
+            && target.closest("#console-terminal-screen")
+            && Number(ev.button) === 2
+          ) {{
+            return;
+          }}
+          setConsoleContextMenuOpen(false);
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key !== "Escape" || !consoleContextMenuOpen) return;
+          setConsoleContextMenuOpen(false);
+        }});
+        document.addEventListener("scroll", () => {{
+          if (consoleContextMenuOpen) {{
+            setConsoleContextMenuOpen(false);
+          }}
+        }}, true);
+        window.addEventListener("blur", () => {{
+          if (consoleContextMenuOpen) {{
+            setConsoleContextMenuOpen(false);
           }}
         }});
       }}

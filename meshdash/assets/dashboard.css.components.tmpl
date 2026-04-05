@@ -1133,6 +1133,69 @@
       margin: 0;
       pointer-events: none;
     }}
+    .console-context-menu {{
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: min(192px, calc(100% - 16px));
+      padding: 6px;
+      border: 1px solid rgba(90, 122, 102, 0.5);
+      border-radius: 10px;
+      background: rgba(247, 252, 248, 0.96);
+      backdrop-filter: blur(10px) saturate(140%);
+      -webkit-backdrop-filter: blur(10px) saturate(140%);
+      box-shadow: 0 12px 30px rgba(33, 57, 41, 0.22);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 4;
+    }}
+    .console-context-menu[hidden] {{
+      display: none !important;
+    }}
+    .console-context-menu-item {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid rgba(123, 168, 138, 0.36);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #20412d;
+      font-size: 11px;
+      line-height: 1.2;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+    }}
+    .console-context-menu-item:hover {{
+      border-color: rgba(73, 143, 102, 0.62);
+      background: rgba(236, 247, 239, 0.96);
+      color: #163421;
+    }}
+    .console-context-menu-item:focus-visible {{
+      outline: 2px solid #3ea269;
+      outline-offset: 2px;
+    }}
+    .console-context-menu-item:disabled {{
+      cursor: not-allowed;
+      opacity: 0.62;
+      border-color: rgba(170, 191, 177, 0.36);
+      background: rgba(244, 248, 245, 0.94);
+      color: #5c7567;
+    }}
+    .console-context-menu-item-label {{
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }}
+    .console-context-menu-item-hint {{
+      color: rgba(55, 87, 66, 0.78);
+      font-size: 10px;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }}
     .console-scroll-status {{
       position: absolute;
       left: 50%;
@@ -2554,6 +2617,29 @@
     }}
     [data-theme="dark"] .console-terminal-screen::before {{
       opacity: 0.45;
+    }}
+    [data-theme="dark"] .console-context-menu {{
+      border-color: rgba(57, 175, 114, 0.52);
+      background: rgba(4, 18, 11, 0.96);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+    }}
+    [data-theme="dark"] .console-context-menu-item {{
+      border-color: rgba(57, 175, 114, 0.28);
+      background: rgba(7, 23, 14, 0.88);
+      color: #d5ffdf;
+    }}
+    [data-theme="dark"] .console-context-menu-item:hover {{
+      border-color: rgba(68, 197, 129, 0.58);
+      background: rgba(11, 33, 20, 0.94);
+      color: #f0fff5;
+    }}
+    [data-theme="dark"] .console-context-menu-item:disabled {{
+      border-color: rgba(58, 96, 72, 0.4);
+      background: rgba(7, 18, 12, 0.76);
+      color: rgba(171, 211, 184, 0.72);
+    }}
+    [data-theme="dark"] .console-context-menu-item-hint {{
+      color: rgba(177, 255, 204, 0.72);
     }}
     [data-theme="dark"] .console-scroll-status {{
       background: rgba(3, 14, 9, 0.42);

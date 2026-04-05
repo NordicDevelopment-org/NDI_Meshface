@@ -101,7 +101,7 @@
     }}
 
     function handleConsolePasteEvent(ev) {{
-      if (!ev || activeLayoutView !== "console") return false;
+      if (!ev || ev.defaultPrevented || activeLayoutView !== "console") return false;
       const target = ev.target;
       if (target instanceof HTMLTextAreaElement) return false;
       if (
@@ -120,6 +120,7 @@
       const input = consoleCommandInputElement();
       if (!(input instanceof HTMLInputElement)) return false;
       ev.preventDefault();
+      ev.stopPropagation();
       return insertTextIntoConsoleCommandInput(pastedText, input);
     }}
 
@@ -139,26 +140,25 @@
       return false;
     }}
 
-    function hasConsoleSelectionWithin(element) {{
-      if (!(element instanceof HTMLElement)) return false;
+    function selectionTextWithin(element) {{
+      if (!(element instanceof HTMLElement)) return "";
       const selection = window.getSelection ? window.getSelection() : null;
-      if (!selectionIntersectsElement(selection, element)) return false;
-      const text = String(selection ? selection.toString() : "");
-      return text.length > 0;
+      if (!selectionIntersectsElement(selection, element)) return "";
+      return String(selection ? selection.toString() : "");
+    }}
+
+    function hasConsoleSelectionWithin(element) {{
+      return selectionTextWithin(element).trim().length > 0;
     }}
 
     async function copySelectionToClipboardWithin(element) {{
-      if (!(element instanceof HTMLElement)) return false;
-      const selection = window.getSelection ? window.getSelection() : null;
-      if (!selectionIntersectsElement(selection, element)) return false;
-      const text = String(selection ? selection.toString() : "").trim();
-      if (!text) return false;
+      const text = selectionTextWithin(element);
+      if (!text.trim()) return false;
       try {{
-        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {{
+        if (typeof copyTextToClipboard !== "function") {{
           return false;
         }}
-        await navigator.clipboard.writeText(text);
-        return true;
+        return await copyTextToClipboard(text);
       }} catch (_err) {{
         return false;
       }}
