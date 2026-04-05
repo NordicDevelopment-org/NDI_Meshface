@@ -31,6 +31,32 @@ def test_render_html_includes_node_history_names_and_overview_tabs() -> None:
     assert 'id="node-history-overview-host"' in html
 
 
+def test_render_html_places_overview_first_in_history_tabs() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    overview_index = html.index('id="tab-btn-overview"')
+    signal_index = html.index('id="tab-btn-signal"')
+    packets_index = html.index('id="tab-btn-packets"')
+    online_index = html.index('id="tab-btn-online"')
+    names_index = html.index('id="tab-btn-names"')
+
+    assert overview_index < signal_index < packets_index < online_index < names_index
+    assert 'class="history-tab-btn active" id="tab-btn-overview"' in html
+    assert 'id="tab-panel-overview" class="history-panel"' in html
+    assert 'id="tab-panel-signal" class="history-panel" hidden' in html
+
+
 def test_dashboard_js_renders_name_history_and_overview_under_history_tab() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
@@ -38,7 +64,9 @@ def test_dashboard_js_renders_name_history_and_overview_under_history_tab() -> N
         node_history_max_points=240,
     )
 
+    assert 'let activeHistoryTab = "overview";' in js
     assert 'nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview"' in js
+    assert ': "overview";' in js
     assert 'const namesPanel = document.getElementById("tab-panel-names");' in js
     assert 'const overviewPanel = document.getElementById("tab-panel-overview");' in js
     assert 'renderNodeNameHistoryPanel(nameHistoryEntries);' in js

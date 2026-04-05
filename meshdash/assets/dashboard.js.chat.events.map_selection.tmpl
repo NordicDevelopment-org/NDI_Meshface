@@ -471,7 +471,7 @@
       const nextTab = String(tabName || "").trim().toLowerCase();
       activeHistoryTab = (nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview")
         ? nextTab
-        : "signal";
+        : "overview";
       for (const btn of document.querySelectorAll(".history-tab-btn")) {{
         const isActive = btn.dataset.tab === activeHistoryTab;
         btn.classList.toggle("active", isActive);

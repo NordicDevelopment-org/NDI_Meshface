@@ -2609,13 +2609,16 @@ Ready.
         <div id="map-data-node" class="map-data-node" hidden>
           <div id="node-history-caption" class="history-caption">Select a node to view historical data.</div>
           <div class="history-tabs">
-            <button class="history-tab-btn active" id="tab-btn-signal" data-tab="signal" type="button">Signal</button>
+            <button class="history-tab-btn active" id="tab-btn-overview" data-tab="overview" type="button">Overview</button>
+            <button class="history-tab-btn" id="tab-btn-signal" data-tab="signal" type="button">Signal</button>
             <button class="history-tab-btn" id="tab-btn-packets" data-tab="packets" type="button">Packets</button>
             <button class="history-tab-btn" id="tab-btn-online" data-tab="online" type="button">Online</button>
             <button class="history-tab-btn" id="tab-btn-names" data-tab="names" type="button">Names</button>
-            <button class="history-tab-btn" id="tab-btn-overview" data-tab="overview" type="button">Overview</button>
           </div>
-          <div id="tab-panel-signal" class="history-panel">
+          <div id="tab-panel-overview" class="history-panel">
+            <div id="node-history-overview-host" class="node-history-overview-host" aria-label="Node history overview"></div>
+          </div>
+          <div id="tab-panel-signal" class="history-panel" hidden>
             <div id="signal-chart-wrap">
               <svg id="signal-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Node signal history"></svg>
               <div id="signal-empty" class="signal-empty" hidden>No historical signal points yet for this node.</div>
@@ -2648,9 +2651,6 @@ Ready.
           </div>
           <div id="tab-panel-names" class="history-panel" hidden>
             <div id="node-name-history-host" class="node-name-history-host" aria-label="Node name history"></div>
-          </div>
-          <div id="tab-panel-overview" class="history-panel" hidden>
-            <div id="node-history-overview-host" class="node-history-overview-host" aria-label="Node history overview"></div>
           </div>
         </div>
         <div id="map-data-activity" class="map-data-activity" hidden>
