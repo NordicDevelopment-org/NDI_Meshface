@@ -1,0 +1,106 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from meshdash.html_js import build_dashboard_js
+from meshdash.html_template import render_html
+
+
+def test_dashboard_js_labels_saved_history_field_as_total_packets() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'id: "saved", label: "Total Packets", sortable: true, rosterMeta: true' in js
+    assert 'id: "saved", label: "Total Packets"' in js
+
+
+def test_render_html_uses_packets_header_for_nodes_table() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert '<th>Packets<div class="col-resizer" data-col="7" aria-hidden="true"></div></th>' in html
+
+
+def test_render_html_disables_roster_scroll_anchoring() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert ".chat-member-list {" in html
+    assert "overflow-anchor: none;" in html
+
+
+def test_dashboard_js_only_applies_saved_peer_pin_sorting_in_direct_mode() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'const pinDiff = activeChatChannel === "direct"' in js
+    assert '? (Number(!!(b && b.p2pPinned)) - Number(!!(a && a.p2pPinned)))' in js
+    assert '? (Number(!!b.p2pPinned) - Number(!!a.p2pPinned))' in js
+
+
+def test_dashboard_js_resets_roster_scroll_when_sort_changes() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const sortChanged = (" in js
+    assert "pendingSelectionScroll = false;" in js
+    assert "chatNodeNavigatorSelectionScrollLocked = true;" in js
+    assert "function resetChatNodeNavigatorViewport()" in js
+    assert 'const roomList = document.getElementById("chat-room-list");' in js
+    assert "roomList.scrollTop = 0;" in js
+
+
+def test_dashboard_js_temporarily_suppresses_selected_node_autoscroll_after_sort() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const suppressChatRosterSelectionScroll = (" in js
+    assert "!!chatNodeNavigatorSelectionScrollLocked" in js
+    assert "function clearChatNodeNavigatorSelectionScrollLock()" in js
+    assert 'targetList.addEventListener("scroll"' in js
+
+
+def test_dashboard_js_prefers_numeric_roster_sort_for_numeric_like_values() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const leftNum = Number(left);" in js
+    assert "const rightNum = Number(right);" in js
+    assert "if (leftHasNum && rightHasNum) {" in js
+    assert "return leftNum - rightNum;" in js

@@ -101,7 +101,10 @@
       }}
 
       const chatRoomList = document.getElementById("chat-room-list");
-      if (isVisibleForSelectionScroll(chatRoomList)) {{
+      const suppressChatRosterSelectionScroll = (
+        !!chatNodeNavigatorSelectionScrollLocked
+      );
+      if (isVisibleForSelectionScroll(chatRoomList) && !suppressChatRosterSelectionScroll) {{
         let selectedMember = null;
         for (const member of chatRoomList.querySelectorAll(".chat-member-item")) {{
           if (normalizeNodeId(member.dataset.nodeId || "") === selectedNodeId) {{
@@ -592,6 +595,9 @@
         return;
       }}
       selectedNodeId = normalized;
+      if (typeof clearChatNodeNavigatorSelectionScrollLock === "function") {{
+        clearChatNodeNavigatorSelectionScrollLock();
+      }}
       // Keep History view pinned to trend mode; node selection should not yank
       // the left pane into live Map Data tables.
       mapDataFocus = activeLayoutView === "history" ? "activity" : "auto";

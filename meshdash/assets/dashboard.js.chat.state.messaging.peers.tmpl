@@ -84,6 +84,10 @@
         || nextShowPacketDirection !== chatNodeNavigatorShowPacketDirection
         || !chatNodeNavigatorMetaFieldIdsEqual(nextMetaFieldIds, chatNodeNavigatorMetaFieldIds)
       );
+      const sortChanged = (
+        nextSortKey !== chatNodeNavigatorSortKey
+        || nextSortDir !== chatNodeNavigatorSortDir
+      );
       chatNodeNavigatorSortKey = nextSortKey;
       chatNodeNavigatorSortDir = nextSortDir;
       chatNodeNavigatorShowPacketDirection = nextShowPacketDirection;
@@ -93,10 +97,17 @@
       }}
       renderChatNodeNavigatorMenuControls();
       if (changed && opts.rerender !== false && latestState) {{
+        if (sortChanged) {{
+          pendingSelectionScroll = false;
+          chatNodeNavigatorSelectionScrollLocked = true;
+        }}
         if (isChatWorkspaceLayoutView(activeLayoutView)) {{
           renderChat(latestState);
         }} else if (typeof renderChatNodeNavigatorList === "function") {{
           renderChatNodeNavigatorList(latestState);
+        }}
+        if (sortChanged) {{
+          resetChatNodeNavigatorViewport();
         }}
       }}
       return changed;
@@ -116,15 +127,49 @@
     }}
 
     function chatNodeNavigatorCompareSortValues(left, right) {{
-      if (typeof normalizeSortValue === "function" && typeof compareSortValues === "function") {{
-        return compareSortValues(normalizeSortValue(left), normalizeSortValue(right));
-      }}
       const leftNum = Number(left);
       const rightNum = Number(right);
       const leftHasNum = Number.isFinite(leftNum);
       const rightHasNum = Number.isFinite(rightNum);
-      if (leftHasNum && rightHasNum) return leftNum - rightNum;
+      if (leftHasNum && rightHasNum) {{
+        return leftNum - rightNum;
+      }}
+      if (typeof normalizeSortValue === "function" && typeof compareSortValues === "function") {{
+        return compareSortValues(normalizeSortValue(left), normalizeSortValue(right));
+      }}
       return String(left == null ? "" : left).localeCompare(String(right == null ? "" : right));
+    }}
+
+    function noteChatNodeNavigatorProgrammaticScrollReset(durationMs = 700) {{
+      const duration = Number.isFinite(Number(durationMs))
+        ? Math.max(120, Math.trunc(Number(durationMs)))
+        : 700;
+      chatNodeNavigatorProgrammaticScrollResetUntilMs = Date.now() + duration;
+    }}
+
+    function clearChatNodeNavigatorSelectionScrollLock() {{
+      chatNodeNavigatorSelectionScrollLocked = false;
+      chatNodeNavigatorProgrammaticScrollResetUntilMs = 0;
+    }}
+
+    function resetChatNodeNavigatorViewport() {{
+      const roomList = document.getElementById("chat-room-list");
+      if (!(roomList instanceof HTMLElement)) return;
+      const applyReset = () => {{
+        noteChatNodeNavigatorProgrammaticScrollReset();
+        roomList.scrollTop = 0;
+        const parentPane = roomList.closest(".chat-member-pane");
+        if (parentPane instanceof HTMLElement) {{
+          parentPane.scrollTop = 0;
+        }}
+      }};
+      applyReset();
+      requestAnimationFrame(() => {{
+        applyReset();
+        requestAnimationFrame(() => {{
+          applyReset();
+        }});
+      }});
     }}
 
     function chatNodeNavigatorSortValue(item, projection, sortKeyRaw, nowUnixRaw = null) {{
@@ -189,7 +234,9 @@
         return projection;
       }};
       rows.sort((a, b) => {{
-        const pinDiff = Number(!!(b && b.p2pPinned)) - Number(!!(a && a.p2pPinned));
+        const pinDiff = activeChatChannel === "direct"
+          ? (Number(!!(b && b.p2pPinned)) - Number(!!(a && a.p2pPinned)))
+          : 0;
         if (pinDiff !== 0) return pinDiff;
 
         const aProjection = projectionFor(a);
@@ -418,6 +465,11 @@
         : document.getElementById("chat-room-list");
       if (!(targetList instanceof HTMLElement) || targetList.dataset.memberClickBound === "1") return;
       targetList.dataset.memberClickBound = "1";
+      targetList.addEventListener("scroll", () => {{
+        if (!chatNodeNavigatorSelectionScrollLocked) return;
+        if (Date.now() <= Number(chatNodeNavigatorProgrammaticScrollResetUntilMs || 0)) return;
+        clearChatNodeNavigatorSelectionScrollLock();
+      }}, {{ passive: true }});
       targetList.addEventListener("click", (ev) => {{
         const target = ev.target;
         if (!(target instanceof Element)) return;
@@ -966,6 +1018,9 @@
         roomList.__meshLastInnerHtml_chat_room_list = nextMarkup;
       }}
       bindChatNodeNavigatorListInteractions(roomList);
+      if (chatNodeNavigatorSelectionScrollLocked) {{
+        resetChatNodeNavigatorViewport();
+      }}
 
       const onlineCount = rosterAll.filter((item) => normalizeFreshnessKey(item && item.status) === "online").length;
       const warnCount = rosterAll.filter((item) => normalizeFreshnessKey(item && item.status) === "warn").length;

@@ -114,7 +114,9 @@
           return sortChatNodeNavigatorParticipants(rows, nodesById, nowUnix);
         }}
         return rows.sort((a, b) => {{
-          const pinDiff = Number(!!b.p2pPinned) - Number(!!a.p2pPinned);
+          const pinDiff = activeChatChannel === "direct"
+            ? (Number(!!b.p2pPinned) - Number(!!a.p2pPinned))
+            : 0;
           if (pinDiff !== 0) return pinDiff;
           const rankDiff = statusRank(a.status) - statusRank(b.status);
           if (rankDiff !== 0) return rankDiff;
