@@ -1,8 +1,88 @@
+    function reportHistoryViewRenderFailure(label, err) {{
+      if (typeof console !== "undefined" && console && typeof console.error === "function") {{
+        console.error("Node history render failed:", label || "unknown step", err);
+      }}
+    }}
+
+    function runHistoryViewRenderStep(label, renderFn) {{
+      try {{
+        return {{
+          ok: true,
+          result: typeof renderFn === "function" ? renderFn() : undefined,
+          error: null,
+        }};
+      }} catch (err) {{
+        reportHistoryViewRenderFailure(label, err);
+        return {{
+          ok: false,
+          result: null,
+          error: err,
+        }};
+      }}
+    }}
+
+    function resetNodeHistoryChartState(svgId, emptyId, emptyMessage, timelineId, timelineMessage) {{
+      const svg = document.getElementById(String(svgId || "").trim());
+      if (svg instanceof SVGElement) {{
+        svg.innerHTML = "";
+        svg.classList.remove("zoomed", "chart-dragging");
+      }}
+      const empty = document.getElementById(String(emptyId || "").trim());
+      if (empty instanceof HTMLElement) {{
+        empty.hidden = false;
+        empty.textContent = String(emptyMessage || "").trim();
+      }}
+      if (timelineId) {{
+        setTimelineMessage(
+          timelineId,
+          String(timelineMessage || "Timeline unavailable while re-rendering history.").trim()
+        );
+      }}
+    }}
+
+    function renderNodeHistoryUnavailable(nodeId, reason = "") {{
+      setMapDataMode("node");
+      syncNodeHistoryDock();
+      const normalizedNodeId = normalizeNodeId(nodeId || "");
+      const caption = document.getElementById("node-history-caption");
+      if (caption) {{
+        const suffix = String(reason || "").trim();
+        caption.textContent = suffix
+          ? `Unable to render history for ${{normalizedNodeId || "this node"}} right now. ${{suffix}}`
+          : `Unable to render history for ${{normalizedNodeId || "this node"}} right now.`;
+      }}
+      resetNodeHistoryChartState(
+        "signal-chart",
+        "signal-empty",
+        "Signal history is temporarily unavailable for this node.",
+        "signal-timeline",
+        "Timeline unavailable while re-rendering signal history."
+      );
+      resetNodeHistoryChartState(
+        "node-online-chart",
+        "node-online-empty",
+        "Online history is temporarily unavailable for this node.",
+        "node-online-timeline",
+        "Timeline unavailable while re-rendering online history."
+      );
+      resetNodeHistoryChartState(
+        "node-packets-chart",
+        "node-packets-empty",
+        "Packet history is temporarily unavailable for this node.",
+        "node-packets-timeline",
+        "Timeline unavailable while re-rendering packet history."
+      );
+    }}
+
     function renderNodeHistory(history, nodes) {{
       setMapDataMode("node");
       const historyNodeId = normalizeNodeId(history.node_id || "");
       const node = (nodes || []).find((entry) => normalizeNodeId(entry && entry.id) === historyNodeId)
         || savedViewNodeFrom(nodes, latestState);
+      const signalSource = String(history && history.signal_source ? history.signal_source : "").trim().toLowerCase();
+      const signalPoints = Array.isArray(history && history.signal_points)
+        ? history.signal_points
+        : (history.points || []);
       const caption = document.getElementById("node-history-caption");
       if (caption) {{
         const fallbackNodeId = resolveSavedViewNodeId(latestState);
@@ -14,21 +94,58 @@
         const loc = (node && typeof node.lat === "number" && typeof node.lon === "number")
           ? `Current location: ${{node.lat.toFixed(5)}}, ${{node.lon.toFixed(5)}}.`
           : "No current location available from live node state.";
-        caption.textContent = `${{name}} (${{historyNodeId || fallbackNodeId || "n/a"}}). ${{loc}} History window: ${{history.window_hours || nodeHistoryHours}}h, packets: ${{span.total_packets ?? 0}}, trail points: ${{trailPoints}}.`;
+        const signalNote = signalSource === "local-radio"
+          ? " Signal plot uses packets heard by this radio."
+          : "";
+        caption.textContent = `${{name}} (${{historyNodeId || fallbackNodeId || "n/a"}}). ${{loc}} History window: ${{history.window_hours || nodeHistoryHours}}h, packets: ${{span.total_packets ?? 0}}, trail points: ${{trailPoints}}.${{signalNote}}`;
       }}
-      renderSignalChart(history.points || []);
-      renderNodeOnlineChart(
-        history.points || [],
-        history.window_hours,
-        Array.isArray(history.packet_timestamps) ? history.packet_timestamps : [],
-        historyNodeId
-      );
-      renderNodePacketsChart(
-        history.points || [],
-        history.window_hours,
-        historyNodeId
-      );
+      const signalRendered = runHistoryViewRenderStep("signal chart", () => {{
+        renderSignalChart(signalPoints);
+      }});
+      if (!signalRendered.ok) {{
+        resetNodeHistoryChartState(
+          "signal-chart",
+          "signal-empty",
+          "Signal history is temporarily unavailable for this node.",
+          "signal-timeline",
+          "Timeline unavailable while re-rendering signal history."
+        );
+      }}
+      const onlineRendered = runHistoryViewRenderStep("online chart", () => {{
+        renderNodeOnlineChart(
+          history.points || [],
+          history.window_hours,
+          Array.isArray(history.packet_timestamps) ? history.packet_timestamps : [],
+          historyNodeId
+        );
+      }});
+      if (!onlineRendered.ok) {{
+        resetNodeHistoryChartState(
+          "node-online-chart",
+          "node-online-empty",
+          "Online history is temporarily unavailable for this node.",
+          "node-online-timeline",
+          "Timeline unavailable while re-rendering online history."
+        );
+      }}
+      const packetsRendered = runHistoryViewRenderStep("packets chart", () => {{
+        renderNodePacketsChart(
+          history.points || [],
+          history.window_hours,
+          historyNodeId
+        );
+      }});
+      if (!packetsRendered.ok) {{
+        resetNodeHistoryChartState(
+          "node-packets-chart",
+          "node-packets-empty",
+          "Packet history is temporarily unavailable for this node.",
+          "node-packets-timeline",
+          "Timeline unavailable while re-rendering packet history."
+        );
+      }}
       setHistoryTab(activeHistoryTab);
+      return signalRendered.ok || onlineRendered.ok || packetsRendered.ok;
     }}
 
     async function fetchNodeHistory(nodeId, opts = null) {{
@@ -86,33 +203,54 @@
         typeof isChatNodeDetailsHistoryActive === "function"
         && isChatNodeDetailsHistoryActive()
       );
+      const shouldShowNodeHistoryPanel = activeLayoutView === "saved" || drawerHistoryActive;
+      let historyPanelRendered = false;
 
       if (activeLayoutView === "saved" || activeLayoutView === "network") {{
-        renderMap(nodes, edges, nodeHistory);
+        runHistoryViewRenderStep("map render", () => {{
+          renderMap(nodes, edges, nodeHistory);
+        }});
       }}
 
       if (activeLayoutView === "network" && pendingMapHistoryFocus) {{
-        const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
-        const selectionId = normalizeNodeId(selectedNodeId || "");
-        if (historyNodeId && selectionId && historyNodeId === selectionId) {{
-          focusSelectedNodeOnMap(nodeHistory);
-          pendingMapHistoryFocus = false;
-        }}
+        runHistoryViewRenderStep("map focus", () => {{
+          const historyNodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || "");
+          const selectionId = normalizeNodeId(selectedNodeId || "");
+          if (historyNodeId && selectionId && historyNodeId === selectionId) {{
+            focusSelectedNodeOnMap(nodeHistory);
+            pendingMapHistoryFocus = false;
+          }}
+        }});
       }}
 
       // The signal plot lives in the map-data panel, rendered by renderTraffic.
       if (activeLayoutView === "saved" || activeLayoutView === "network") {{
-        renderTraffic(traffic, nodes, nodeHistory);
+        const trafficRender = runHistoryViewRenderStep("map data panel", () => (
+          renderTraffic(traffic, nodes, nodeHistory)
+        ));
+        if (shouldShowNodeHistoryPanel && trafficRender.ok) {{
+          historyPanelRendered = !!trafficRender.result || historyPanelRendered;
+        }}
       }}
 
       if (activeLayoutView === "saved" || drawerExpanded) {{
-        renderSavedNodeDetails(state, nodeHistory);
+        runHistoryViewRenderStep("saved node details", () => {{
+          renderSavedNodeDetails(state, nodeHistory);
+        }});
       }}
 
       if (drawerHistoryActive) {{
-        setMapDataMode("node");
-        syncNodeHistoryDock();
-        renderNodeHistory(nodeHistory, nodes);
+        const drawerRender = runHistoryViewRenderStep("drawer node history", () => {{
+          setMapDataMode("node");
+          syncNodeHistoryDock();
+          return renderNodeHistory(nodeHistory, nodes);
+        }});
+        historyPanelRendered = !!drawerRender.result || historyPanelRendered;
+      }}
+
+      if (shouldShowNodeHistoryPanel && !historyPanelRendered) {{
+        const nodeId = normalizeNodeId((nodeHistory && nodeHistory.node_id) || selectedNodeId || "");
+        renderNodeHistoryUnavailable(nodeId, "Reselect the node to retry.");
       }}
     }}
 

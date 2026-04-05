@@ -441,8 +441,13 @@
             || field.type === "tel"
             || field.type === "password"
           ) {{
-            const start = Number.isFinite(focusedFieldState.selectionStart) ? focusedFieldState.selectionStart : field.value.length;
-            const end = Number.isFinite(focusedFieldState.selectionEnd) ? focusedFieldState.selectionEnd : start;
+            const valueLen = String(field.value || "").length;
+            const start = Number.isFinite(focusedFieldState.selectionStart)
+              ? Math.max(0, Math.min(valueLen, Math.trunc(focusedFieldState.selectionStart)))
+              : valueLen;
+            const end = Number.isFinite(focusedFieldState.selectionEnd)
+              ? Math.max(start, Math.min(valueLen, Math.trunc(focusedFieldState.selectionEnd)))
+              : start;
             field.setSelectionRange(start, end);
           }}
         }};

@@ -195,6 +195,47 @@ def fetch_node_history_rows(
     return metric_rows, position_rows, packet_rows
 
 
+def fetch_local_signal_history_rows(
+    conn: SqlConnection,
+    *,
+    cutoff: int,
+    limit: int,
+) -> SqlRows:
+    return conn.execute(
+        """
+        SELECT bucket_unix,
+               COUNT(*) AS packet_count,
+               COALESCE(SUM(rx_snr), 0.0) AS snr_sum,
+               SUM(CASE WHEN rx_snr IS NOT NULL THEN 1 ELSE 0 END) AS snr_count,
+               MIN(rx_snr) AS snr_min,
+               MAX(rx_snr) AS snr_max,
+               COALESCE(SUM(rx_rssi), 0.0) AS rssi_sum,
+               SUM(CASE WHEN rx_rssi IS NOT NULL THEN 1 ELSE 0 END) AS rssi_count,
+               MIN(rx_rssi) AS rssi_min,
+               MAX(rx_rssi) AS rssi_max,
+               COALESCE(SUM(hops), 0.0) AS hops_sum,
+               SUM(CASE WHEN hops IS NOT NULL THEN 1 ELSE 0 END) AS hops_count,
+               MIN(hops) AS hops_min,
+               MAX(hops) AS hops_max,
+               MAX(created_unix) AS last_seen_unix
+        FROM (
+          SELECT (created_unix - (created_unix % 60)) AS bucket_unix,
+                 rx_snr,
+                 rx_rssi,
+                 hops,
+                 created_unix
+          FROM packet_events
+          WHERE created_unix >= ?
+            AND (rx_snr IS NOT NULL OR rx_rssi IS NOT NULL)
+        )
+        GROUP BY bucket_unix
+        ORDER BY bucket_unix DESC
+        LIMIT ?
+        """,
+        (cutoff, limit),
+    ).fetchall()
+
+
 def fetch_online_activity_rows(conn: SqlConnection, cutoff: int) -> tuple[SqlRows, int]:
     # node_hour_seen is a compact per-node-per-hour presence table maintained
     # via triggers on node_metrics_1m. It's dramatically smaller than the
