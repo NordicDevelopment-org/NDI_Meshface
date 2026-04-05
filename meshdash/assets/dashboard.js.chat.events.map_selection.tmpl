@@ -756,6 +756,107 @@
       }});
     }}
 
+    function isNodeDirectionalKeyTargetEditable(target) {{
+      if (target instanceof HTMLTextAreaElement) return true;
+      if (target instanceof HTMLSelectElement) return true;
+      if (
+        target instanceof HTMLInputElement
+        && target.type !== "button"
+        && target.type !== "checkbox"
+        && target.type !== "radio"
+        && target.type !== "range"
+      ) {{
+        return true;
+      }}
+      if (target instanceof HTMLElement && target.isContentEditable) return true;
+      if (target instanceof Element) {{
+        const editableAncestor = target.closest("[contenteditable=\"true\"]");
+        if (editableAncestor instanceof HTMLElement) return true;
+      }}
+      return false;
+    }}
+
+    function visibleNodeDirectionalEntriesFrom(containerSelector, itemSelector) {{
+      const container = document.querySelector(containerSelector);
+      if (!(container instanceof HTMLElement) || !isVisibleForSelectionScroll(container)) return [];
+      const entries = [];
+      for (const item of container.querySelectorAll(itemSelector)) {{
+        if (!(item instanceof HTMLElement) || !isVisibleForSelectionScroll(item)) continue;
+        const nodeId = normalizeNodeId(item.dataset.nodeId || "");
+        if (!isSelectableNodeId(nodeId)) continue;
+        entries.push({{
+          id: nodeId,
+          element: item,
+        }});
+      }}
+      return entries;
+    }}
+
+    function resolveDirectionalNodeEntries() {{
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      const defs = isChatWorkspaceLayoutView(activeLayoutView)
+        ? [
+            ["#chat-room-list", ".chat-member-item[data-node-id]"],
+            ["#favorites-list", ".favorite-node-item[data-node-id]"],
+            ["#nodes-table", "tbody tr.node-selectable[data-node-id]"],
+          ]
+        : (activeLayoutView === "saved"
+          ? [
+              ["#favorites-list", ".favorite-node-item[data-node-id]"],
+              ["#nodes-table", "tbody tr.node-selectable[data-node-id]"],
+              ["#chat-room-list", ".chat-member-item[data-node-id]"],
+            ]
+          : [
+              ["#nodes-table", "tbody tr.node-selectable[data-node-id]"],
+              ["#favorites-list", ".favorite-node-item[data-node-id]"],
+              ["#chat-room-list", ".chat-member-item[data-node-id]"],
+            ]);
+      let fallback = [];
+      for (const [containerSelector, itemSelector] of defs) {{
+        const entries = visibleNodeDirectionalEntriesFrom(containerSelector, itemSelector);
+        if (!entries.length) continue;
+        if (!fallback.length) {{
+          fallback = entries;
+        }}
+        if (entries.some((entry) => entry.id === selectedId)) {{
+          return entries;
+        }}
+      }}
+      return fallback;
+    }}
+
+    function moveSelectedNodeByDirection(step) {{
+      const delta = Number(step);
+      if (!Number.isFinite(delta) || delta === 0) return false;
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (!isSelectableNodeId(selectedId)) return false;
+      const entries = resolveDirectionalNodeEntries();
+      if (!entries.length) return false;
+      const currentIndex = entries.findIndex((entry) => entry.id === selectedId);
+      if (currentIndex < 0) return false;
+      const nextIndex = Math.max(0, Math.min(entries.length - 1, currentIndex + (delta < 0 ? -1 : 1)));
+      if (nextIndex !== currentIndex) {{
+        selectNode(entries[nextIndex].id, true, false);
+      }}
+      return true;
+    }}
+
+    function bindNodeDirectionalKeys() {{
+      if (document.body.dataset.nodeDirectionalKeysBound === "1") return;
+      document.body.dataset.nodeDirectionalKeysBound = "1";
+      document.addEventListener("keydown", (ev) => {{
+        if (ev.defaultPrevented) return;
+        if (ev.key !== "ArrowUp" && ev.key !== "ArrowDown") return;
+        if (ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+        const target = ev.target;
+        if (isNodeDirectionalKeyTargetEditable(target)) return;
+        const handled = moveSelectedNodeByDirection(ev.key === "ArrowUp" ? -1 : 1);
+        if (!handled) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+      }});
+    }}
+
     function selectNodeFromDirectionalRow(row, targetCell, fromColIndex, toColIndex) {{
       if (!(row instanceof HTMLTableRowElement)) return "";
       const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
