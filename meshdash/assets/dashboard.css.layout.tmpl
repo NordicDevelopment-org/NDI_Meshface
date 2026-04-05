@@ -5317,6 +5317,7 @@
       pointer-events: auto;
       width: min(400px, calc(100vw - 24px));
       max-width: calc(100vw - 24px);
+      max-height: min(520px, calc(100vh - 24px));
       border: 1px solid rgba(var(--peer-dm-channel-rgb), 0.44);
       border-radius: 12px;
       background:
@@ -5328,8 +5329,8 @@
         ),
         #f6fcf7;
       box-shadow: 0 16px 34px rgba(21, 47, 33, 0.3);
-      display: grid;
-      grid-template-rows: auto minmax(120px, 300px) auto;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
     }}
     .peer-dm-popout-head {{
@@ -5410,6 +5411,8 @@
       border-color: #94b7a0;
     }}
     .peer-dm-popout-body {{
+      flex: 0 1 auto;
+      max-height: min(300px, calc(100vh - 180px));
       padding: 7px 8px;
       overflow: auto;
       background:
@@ -5479,16 +5482,12 @@
       padding: 7px 8px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas:
-        "input send"
-        "file file"
-        "fileprogress fileprogress"
-        "status status";
       gap: 7px;
       align-items: center;
     }}
     .peer-dm-popout-input {{
-      grid-area: input;
+      grid-column: 1;
+      grid-row: 1;
       border: 1px solid rgba(var(--peer-dm-channel-rgb), 0.46);
       border-radius: 999px;
       background: #ffffff;
@@ -5504,7 +5503,8 @@
       outline-offset: 1px;
     }}
     .peer-dm-popout-send-btn {{
-      grid-area: send;
+      grid-column: 2;
+      grid-row: 1;
       border: 1px solid #4b9a6d;
       background: #2f7f58;
       color: #ecfff4;
@@ -5521,7 +5521,7 @@
       border-color: #3f8e63;
     }}
     .peer-dm-popout-file-progress {{
-      grid-area: fileprogress;
+      grid-column: 1 / -1;
       border: 1px solid rgba(var(--peer-dm-channel-rgb), 0.34);
       border-radius: 8px;
       background: rgba(var(--peer-dm-channel-rgb), 0.08);
@@ -5591,8 +5591,8 @@
       background: #ecf8ef;
     }}
     .peer-dm-popout-status {{
-      grid-area: status;
-      min-height: 12px;
+      grid-column: 1 / -1;
+      min-height: 0;
       font-size: 10px;
       line-height: 1.2;
       color: #4f6f5d;

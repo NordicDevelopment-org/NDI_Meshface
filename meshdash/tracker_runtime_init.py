@@ -40,6 +40,7 @@ def initialize_dashboard_tracker_runtime(
 
     delivery_callbacks: TrackerDeliveryCallbacks = build_tracker_delivery_callbacks_fn(
         tracker.recent_chat,
+        history_store=tracker._history_store,
         get_timeout_seconds_fn=lambda: tracker._chat_delivery_timeout_seconds,
         to_int_fn=to_int_fn,
         parse_utc_text_to_unix_fn=parse_utc_text_to_unix_fn,

@@ -2,6 +2,7 @@ import json
 import time
 from typing import Optional, Protocol
 
+from .helpers import to_int
 from .sql_contracts import SqlConnection
 
 
@@ -61,3 +62,41 @@ def save_chat_record(
         "INSERT INTO chat(created_unix, message_json) VALUES(?, ?)",
         (int(now_unix_fn()), message_json),
     )
+
+
+def update_chat_record(
+    conn: SqlConnection,
+    chat_entry: dict[str, object],
+) -> bool:
+    message_id = to_int(
+        chat_entry.get("message_id")
+        or chat_entry.get("messageId")
+        or chat_entry.get("packet_id")
+        or chat_entry.get("packetId")
+    )
+    if message_id is None or message_id <= 0:
+        return False
+    message_json = json.dumps(chat_entry, separators=(",", ":"))
+    cursor = conn.execute(
+        """
+        UPDATE chat
+        SET message_json = ?
+        WHERE id = (
+          SELECT id
+          FROM chat
+          WHERE json_extract(message_json, '$.local_echo') = 1
+            AND CAST(
+              COALESCE(
+                json_extract(message_json, '$.message_id'),
+                json_extract(message_json, '$.messageId'),
+                json_extract(message_json, '$.packet_id'),
+                json_extract(message_json, '$.packetId')
+              ) AS INTEGER
+            ) = ?
+          ORDER BY id DESC
+          LIMIT 1
+        )
+        """,
+        (message_json, int(message_id)),
+    )
+    return int(getattr(cursor, "rowcount", 0) or 0) > 0

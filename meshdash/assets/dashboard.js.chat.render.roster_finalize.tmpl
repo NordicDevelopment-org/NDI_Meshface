@@ -440,6 +440,9 @@
       }}
       if (peerDmHost instanceof HTMLElement) {{
         if (!isCanonicalNodeId(activePopoutPeerId)) {{
+          if (typeof setPeerDmPopoutStatusDisplay === "function") {{
+            setPeerDmPopoutStatusDisplay(priorPopoutPeerId || peerDmActivePeerId || "", "");
+          }}
           peerDmHost.innerHTML = "";
         }} else {{
           const popoutNode = nodesById.get(activePopoutPeerId);
@@ -578,6 +581,9 @@
           if (closeBtn instanceof HTMLButtonElement) {{
             closeBtn.addEventListener("click", (ev) => {{
               ev.preventDefault();
+              if (typeof setPeerDmPopoutStatusDisplay === "function") {{
+                setPeerDmPopoutStatusDisplay(activePopoutPeerId, "");
+              }}
               peerDmActivePeerId = "";
               if (peerDmHost instanceof HTMLElement) {{
                 peerDmHost.innerHTML = "";
@@ -591,7 +597,37 @@
           const popoutFileProgressPct = document.getElementById("peer-dm-popout-file-progress-pct");
           const popoutFileProgressFill = document.getElementById("peer-dm-popout-file-progress-fill");
           const popoutStatus = document.getElementById("peer-dm-popout-status");
-          const setPopoutStatus = (text, isError = false) => {{
+          const popoutStatusMaxAgeSecForState = (state) => {{
+            const clean = normalizeDeliveryState(state);
+            if (clean === "sent") return 12;
+            if (clean === "acked") return 20;
+            if (clean === "nak" || clean === "timeout" || clean === "error") return 30;
+            return null;
+          }};
+          const popoutStatusStateStillFresh = (state, updateUnix) => {{
+            const ttlSec = popoutStatusMaxAgeSecForState(state);
+            if (!Number.isFinite(Number(ttlSec)) || ttlSec == null) return true;
+            const stamp = Number(updateUnix);
+            if (!Number.isFinite(stamp) || stamp <= 0) return false;
+            return (nowUnix - stamp) <= ttlSec;
+          }};
+          const popoutStatusRemainingMs = (state, updateUnix) => {{
+            const ttlSec = popoutStatusMaxAgeSecForState(state);
+            if (!Number.isFinite(Number(ttlSec)) || ttlSec == null) return null;
+            const stamp = Number(updateUnix);
+            if (!Number.isFinite(stamp) || stamp <= 0) return 0;
+            return Math.max(0, Math.round((ttlSec - Math.max(0, nowUnix - stamp)) * 1000));
+          }};
+          const setPopoutStatus = (text, isError = false, options = null) => {{
+            const opts = options && typeof options === "object" ? options : {{}};
+            if (typeof setPeerDmPopoutStatusDisplay === "function") {{
+              const handled = setPeerDmPopoutStatusDisplay(activePopoutPeerId, text, {{
+                isError,
+                ttlMs: opts.ttlMs,
+                statusToken: opts.statusToken,
+              }});
+              if (handled) return;
+            }}
             if (!(popoutStatus instanceof HTMLElement)) return;
             const label = String(text || "").trim();
             if (!label) {{
@@ -677,16 +713,29 @@
             const updateTime = formatLocalChatTime(updateUnix, updateRawTime || "n/a", nowUnix);
             if (deliveryState === "pending") {{
               setPopoutStatus(`Awaiting ACK · ${{updateTime}}`);
-            }} else if (deliveryState === "acked") {{
-              setPopoutStatus(`Delivered · ${{updateTime}}`);
-            }} else if (deliveryState === "nak" || deliveryState === "timeout" || deliveryState === "error") {{
+            }} else if (deliveryState === "acked" && popoutStatusStateStillFresh(deliveryState, updateUnix)) {{
+              setPopoutStatus(`Delivered · ${{updateTime}}`, false, {{
+                ttlMs: popoutStatusRemainingMs(deliveryState, updateUnix),
+                statusToken: `acked:${{updateUnix}}`,
+              }});
+            }} else if (
+              (deliveryState === "nak" || deliveryState === "timeout" || deliveryState === "error")
+              && popoutStatusStateStillFresh(deliveryState, updateUnix)
+            ) {{
               const base = deliveryState === "timeout" ? "Delivery timeout" : "Delivery failed";
               setPopoutStatus(
                 deliveryError ? `${{base}} · ${{deliveryError}}` : base,
-                true
+                true,
+                {{
+                  ttlMs: popoutStatusRemainingMs(deliveryState, updateUnix),
+                  statusToken: `${{deliveryState}}:${{updateUnix}}:${{deliveryError}}`,
+                }}
               );
-            }} else if (deliveryState === "sent") {{
-              setPopoutStatus(`Sent · ${{updateTime}}`);
+            }} else if (deliveryState === "sent" && popoutStatusStateStillFresh(deliveryState, updateUnix)) {{
+              setPopoutStatus(`Sent · ${{updateTime}}`, false, {{
+                ttlMs: popoutStatusRemainingMs(deliveryState, updateUnix),
+                statusToken: `sent:${{updateUnix}}`,
+              }});
             }} else {{
               setPopoutStatus("");
             }}

@@ -5,6 +5,7 @@ from .history_queries import (
 )
 from .history_raw_writes import (
     save_chat_record as _save_chat_record_helper,
+    update_chat_record as _update_chat_record_helper,
 )
 from .history_read_api import (
     load_recent_chat_data as _load_recent_chat_data_helper,
@@ -39,3 +40,11 @@ def save_chat(store: HistoryStoreWriteState, chat_entry: dict[str, object]) -> N
         _save_chat_record_helper(store._conn, chat_entry, now_unix_fn=time.time)
         store._maybe_prune_unlocked()
         store._conn.commit()
+
+
+def update_chat(store: HistoryStoreWriteState, chat_entry: dict[str, object]) -> bool:
+    with store._lock:
+        updated = _update_chat_record_helper(store._conn, chat_entry)
+        if updated:
+            store._conn.commit()
+        return updated

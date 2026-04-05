@@ -12,6 +12,7 @@ from .runtime_types import (
     ToIntFn,
     UtcNowFn,
 )
+from .tracker_storage_contracts import TrackerHistoryWriter
 from .tracker_delivery_state import (
     expire_tracker_pending_deliveries as _expire_tracker_pending_deliveries_helper,
     extract_tracker_delivery_update as _extract_tracker_delivery_update_helper,
@@ -29,12 +30,21 @@ class TrackerDeliveryCallbacks:
 def build_tracker_delivery_callbacks(
     recent_chat: Reversible[object],
     *,
+    history_store: TrackerHistoryWriter | None = None,
     get_timeout_seconds_fn: GetTimeoutSecondsFn,
     to_int_fn: ToIntFn,
     parse_utc_text_to_unix_fn: ParseUtcTextToUnixFn,
     utc_now_fn: UtcNowFn,
     now_unix_fn: NowUnixFn = time.time,
 ) -> TrackerDeliveryCallbacks:
+    def _persist_delivery_update(entry: dict[str, object]) -> None:
+        if history_store is None or not isinstance(entry, dict):
+            return
+        try:
+            history_store.update_chat(entry)
+        except Exception:
+            return
+
     def _set_delivery_state(message_id: object, state: str, error: Optional[str] = None) -> bool:
         return _set_tracker_delivery_state_helper(
             recent_chat,
@@ -44,6 +54,7 @@ def build_tracker_delivery_callbacks(
             to_int_fn=to_int_fn,
             utc_now_fn=utc_now_fn,
             now_unix_fn=now_unix_fn,
+            on_update_fn=_persist_delivery_update,
         )
 
     def _extract_delivery_update(decoded: object) -> Optional[dict[str, object]]:
@@ -57,6 +68,7 @@ def build_tracker_delivery_callbacks(
             parse_utc_text_to_unix_fn=parse_utc_text_to_unix_fn,
             utc_now_fn=utc_now_fn,
             now_unix_fn=now_unix_fn,
+            on_expire_fn=_persist_delivery_update,
         )
 
     return TrackerDeliveryCallbacks(

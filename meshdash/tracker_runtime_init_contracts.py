@@ -14,7 +14,7 @@ from .tracker_bootstrap import TrackerHistoryBootstrap
 from .tracker_callbacks import TrackerDeliveryCallbacks
 from .tracker_snapshot_build_contracts import EdgeKey, EdgeRow, ExpirePendingDeliveriesFn, PortCounter
 from .tracker_runtime_types import TrackerRuntimeHistoryStore
-from .tracker_storage_contracts import RecentChatBuffer, RecentPacketBuffer
+from .tracker_storage_contracts import RecentChatBuffer, RecentPacketBuffer, TrackerHistoryWriter
 
 
 class TrackerBuffersLike(Protocol):
@@ -49,6 +49,7 @@ class BuildTrackerDeliveryCallbacksFn(Protocol):
         self,
         recent_chat: RecentChatBuffer,
         *,
+        history_store: TrackerHistoryWriter | None,
         get_timeout_seconds_fn: GetTimeoutSecondsFn,
         to_int_fn: ToIntFn,
         parse_utc_text_to_unix_fn: ParseUtcTextToUnixFn,

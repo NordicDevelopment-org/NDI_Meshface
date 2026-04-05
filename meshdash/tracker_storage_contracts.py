@@ -35,3 +35,6 @@ class TrackerHistoryWriter(Protocol):
 
     def save_chat(self, entry: dict[str, object]) -> None:
         ...
+
+    def update_chat(self, entry: dict[str, object]) -> bool:
+        ...

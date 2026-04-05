@@ -18,6 +18,7 @@ def set_tracker_delivery_state(
     to_int_fn: Callable[[object], Optional[int]],
     utc_now_fn: Callable[[], str],
     now_unix_fn: Callable[[], float] = time.time,
+    on_update_fn: Optional[Callable[[dict[str, object]], None]] = None,
 ) -> bool:
     return _set_delivery_state_helper(
         recent_chat,
@@ -27,6 +28,7 @@ def set_tracker_delivery_state(
         to_int_fn=to_int_fn,
         now_text_fn=utc_now_fn,
         now_unix_fn=lambda: int(now_unix_fn()),
+        on_update_fn=on_update_fn,
     )
 
 
@@ -46,6 +48,7 @@ def expire_tracker_pending_deliveries(
     parse_utc_text_to_unix_fn: Callable[[object], Optional[float]],
     utc_now_fn: Callable[[], str],
     now_unix_fn: Callable[[], float] = time.time,
+    on_expire_fn: Optional[Callable[[dict[str, object]], None]] = None,
 ) -> None:
     _expire_pending_deliveries_helper(
         recent_chat,
@@ -54,4 +57,5 @@ def expire_tracker_pending_deliveries(
         parse_utc_text_to_unix_fn=parse_utc_text_to_unix_fn,
         now_unix_fn=lambda: int(now_unix_fn()),
         now_text_fn=utc_now_fn,
+        on_expire_fn=on_expire_fn,
     )

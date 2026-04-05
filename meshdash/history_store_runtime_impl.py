@@ -12,6 +12,7 @@ from .history_store_runtime_maintenance import (
 from .history_store_chat import (
     load_recent_chat as _load_recent_chat_helper,
     save_chat as _save_chat_helper,
+    update_chat as _update_chat_helper,
 )
 from .history_store_connections import (
     load_connections as _load_connections_helper,
@@ -160,6 +161,9 @@ class HistoryStore:
 
     def save_chat(self, chat_entry: dict[str, object]) -> None:
         _save_chat_helper(self, chat_entry)
+
+    def update_chat(self, chat_entry: dict[str, object]) -> bool:
+        return _update_chat_helper(self, chat_entry)
 
     def save_summary_metrics(self, summary: dict[str, object]) -> None:
         _save_summary_metrics_helper(self, summary)

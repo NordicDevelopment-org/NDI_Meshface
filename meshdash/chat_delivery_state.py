@@ -30,6 +30,7 @@ def set_delivery_state(
     to_int_fn: Callable[[object], Optional[int]] = to_int,
     now_text_fn: Callable[[], str] = utc_now,
     now_unix_fn: Callable[[], int] = lambda: int(time.time()),
+    on_update_fn: Optional[Callable[[dict[str, object]], None]] = None,
 ) -> bool:
     clean_message_id = to_int_fn(message_id)
     if clean_message_id is None or clean_message_id <= 0:
@@ -56,4 +57,6 @@ def set_delivery_state(
         target["delivery_error"] = str(error)
     else:
         target.pop("delivery_error", None)
+    if callable(on_update_fn):
+        on_update_fn(target)
     return True

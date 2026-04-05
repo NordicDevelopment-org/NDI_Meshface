@@ -2,7 +2,7 @@ import time
 from collections.abc import Iterable
 from typing import Callable, Optional
 
-from .helpers import to_int
+from .helpers import format_epoch, to_int
 from .nodes import parse_utc_text_to_unix, utc_now
 
 
@@ -14,6 +14,8 @@ def expire_pending_deliveries(
     parse_utc_text_to_unix_fn: Callable[[object], Optional[int]] = parse_utc_text_to_unix,
     now_unix_fn: Callable[[], int] = lambda: int(time.time()),
     now_text_fn: Callable[[], str] = utc_now,
+    format_epoch_fn: Callable[[object], Optional[str]] = format_epoch,
+    on_expire_fn: Optional[Callable[[dict[str, object]], None]] = None,
 ) -> None:
     now_unix = now_unix_fn()
     timeout = max(1, int(timeout_seconds))
@@ -41,7 +43,10 @@ def expire_pending_deliveries(
         if now_unix - pending_since < timeout:
             continue
 
+        expired_unix = min(now_unix, pending_since + timeout)
         entry["delivery_state"] = "timeout"
         entry["delivery_error"] = "No ACK received before timeout"
-        entry["delivery_updated_unix"] = now_unix
-        entry["delivery_updated_at"] = now_text_fn()
+        entry["delivery_updated_unix"] = expired_unix
+        entry["delivery_updated_at"] = format_epoch_fn(expired_unix) or now_text_fn()
+        if callable(on_expire_fn):
+            on_expire_fn(entry)
