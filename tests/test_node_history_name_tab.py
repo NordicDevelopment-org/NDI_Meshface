@@ -65,7 +65,7 @@ def test_dashboard_js_renders_name_history_and_overview_under_history_tab() -> N
     )
 
     assert 'let activeHistoryTab = "overview";' in js
-    assert 'nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview"' in js
+    assert 'nextTab === "signal" || nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview"' in js
     assert ': "overview";' in js
     assert 'const namesPanel = document.getElementById("tab-panel-names");' in js
     assert 'const overviewPanel = document.getElementById("tab-panel-overview");' in js
@@ -76,3 +76,21 @@ def test_dashboard_js_renders_name_history_and_overview_under_history_tab() -> N
     assert 'renderNodeHistoryOverviewPanel(history, {' in js
     assert 'savedNodeHistoryOverviewSectionHtml(history, {' in js
     assert 'const historySection = savedDetailSectionHtml("History",' not in js
+
+
+def test_render_html_hides_history_caption_inside_drawer_history_view() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert '.chat-node-details-history-host #node-history-caption {' in html
+    assert 'display: none !important;' in html
