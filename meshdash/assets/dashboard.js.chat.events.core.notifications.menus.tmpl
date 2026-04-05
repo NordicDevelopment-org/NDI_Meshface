@@ -52,7 +52,7 @@
     function setPeerDmMenuOpen(open) {{
       peerDmMenuOpen = !!open;
       if (peerDmMenuOpen) {{
-        // Keep DM notifications independent from system notifications (bell).
+        // Keep DM notifications independent from inbound alerts (bell).
         markChatChangeAlertsAcknowledged("direct");
         setSelfRadioMenuOpen(false);
         setChatChangeMenuOpen(false);
@@ -105,13 +105,13 @@
         btn.classList.toggle("has-unread", safeCount > 0);
         const countLabel = safeCount > 99 ? "99+" : String(safeCount);
         btn.title = safeCount > 0
-          ? `${{countLabel}} inbound system notification${{safeCount === 1 ? "" : "s"}}`
-          : "No inbound system notifications";
+          ? `${{countLabel}} inbound alert${{safeCount === 1 ? "" : "s"}}`
+          : "No inbound alerts";
         btn.setAttribute(
           "aria-label",
           safeCount > 0
-            ? `System notifications (${{countLabel}})`
-            : "System notifications"
+            ? `Inbound alerts (${{countLabel}})`
+            : "Inbound alerts"
         );
       }}
       const badge = document.getElementById("chat-change-badge");
@@ -162,7 +162,7 @@
       const alertCount = notices.filter((notice) => notice && notice.seen !== true).length;
       updateChatChangeBadge(alertCount);
       if (!notices.length) {{
-        panel.innerHTML = '<div class="chat-change-empty">No inbound system notifications while you were away.</div>';
+        panel.innerHTML = '<div class="chat-change-empty">No inbound alerts while you were away.</div>';
         panel.hidden = !chatChangeMenuOpen;
         return;
       }}
@@ -194,10 +194,10 @@
           <span class="chat-change-item-age">${{escAttr(when)}}</span>
         </button>`;
       }}).join("");
-      const headline = `${{count}} inbound system notification${{count === 1 ? "" : "s"}}`;
+      const headline = `${{count}} inbound alert${{count === 1 ? "" : "s"}}`;
       panel.innerHTML = `<div class="chat-change-head">
         <div class="chat-change-title">${{escAttr(headline)}}</div>
-        <button type="button" id="chat-change-clear-btn" class="chat-change-clear-btn" title="Clear inbound system notifications">Clear</button>
+        <button type="button" id="chat-change-clear-btn" class="chat-change-clear-btn" title="Clear inbound alerts">Clear</button>
       </div>
       <div class="chat-change-list">${{rows}}</div>`;
       panel.hidden = !chatChangeMenuOpen;

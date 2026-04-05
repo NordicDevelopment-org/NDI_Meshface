@@ -14,7 +14,6 @@
     function collectChatMessageEntries(state) {{
       const safeState = state && typeof state === "object" ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
-      const botRequests = Array.isArray(safeState.bot_requests) ? safeState.bot_requests : [];
       const traffic = safeState.traffic && typeof safeState.traffic === "object"
         ? safeState.traffic
         : {{}};
@@ -24,7 +23,6 @@
         ? activeMeshChannelFilterIndex()
         : meshChannelAllIndex;
       const nodesLength = nodes.length;
-      const botRequestsLength = botRequests.length;
       const recentChatLength = recentChat.length;
       const recentChatTailKey = recentChatLength > 0
         ? String(chatMessageKey(recentChat[recentChatLength - 1]) || "")
@@ -35,12 +33,10 @@
       if (
         cachedEntries
         && cachedEntries.nodesRef === nodes
-        && cachedEntries.botRequestsRef === botRequests
         && cachedEntries.recentChatRef === recentChat
         && cachedEntries.localNodeId === localNodeId
         && cachedEntries.meshFilterIndex === activeMeshIdx
         && cachedEntries.nodesLength === nodesLength
-        && cachedEntries.botRequestsLength === botRequestsLength
         && cachedEntries.recentChatLength === recentChatLength
         && cachedEntries.recentChatTailKey === recentChatTailKey
         && Array.isArray(cachedEntries.entries)
@@ -51,23 +47,6 @@
       const nodesById = new Map(
         nodes.map((node) => [normalizeNodeId(node && node.id ? node.id : ""), node])
       );
-      const meshBotRequestByMessageId = new Map();
-      const meshBotResponseByMessageId = new Map();
-      for (const rawRow of botRequests) {{
-        if (!rawRow || typeof rawRow !== "object") continue;
-        const source = String(rawRow.source || "").trim().toLowerCase();
-        if (source !== "mesh") continue;
-        const requestMessageId = parsePositiveMessageId(rawRow.message_id ?? rawRow.messageId);
-        const responseMessageId = parsePositiveMessageId(
-          rawRow.response_message_id ?? rawRow.responseMessageId
-        );
-        if (requestMessageId) {{
-          meshBotRequestByMessageId.set(String(requestMessageId), rawRow);
-        }}
-        if (responseMessageId) {{
-          meshBotResponseByMessageId.set(String(responseMessageId), rawRow);
-        }}
-      }}
       const messageSenderById = new Map();
       for (const msg of recentChat) {{
         if (!msg || typeof msg !== "object") continue;
@@ -107,47 +86,16 @@
         const replyTargetSenderId = replyId != null
           ? normalizeNodeId(messageSenderById.get(String(replyId)) || "")
           : "";
-        const botRequestRow = msgId != null
-          ? meshBotRequestByMessageId.get(String(msgId)) || null
-          : null;
-        const botResponseRow = msgId != null
-          ? meshBotResponseByMessageId.get(String(msgId)) || null
-          : null;
-        const botRequestFromId = normalizeNodeId(
-          (botRequestRow && (botRequestRow.from_id ?? botRequestRow.fromId))
-            ? (botRequestRow.from_id ?? botRequestRow.fromId)
-            : ""
-        );
-        const botRequestToId = normalizeNodeId(
-          (botRequestRow && (botRequestRow.to_id ?? botRequestRow.toId))
-            ? (botRequestRow.to_id ?? botRequestRow.toId)
-            : ""
-        );
-        const botResponseToId = normalizeNodeId(
-          (botResponseRow && (botResponseRow.response_to ?? botResponseRow.responseTo ?? botResponseRow.to_id ?? botResponseRow.toId))
-            ? (botResponseRow.response_to ?? botResponseRow.responseTo ?? botResponseRow.to_id ?? botResponseRow.toId)
-            : ""
-        );
         const senderIsSelf = hasLocalNodeId && fromId === localNodeId;
         const directToSelf = hasLocalNodeId && channel === "direct" && toId === localNodeId;
         const referencesSelfMessage = hasLocalNodeId && !!replyId && replyTargetSenderId === localNodeId;
-        const botPeerNodeId = normalizeNodeId(
-          (botResponseRow && (botResponseRow.from_id ?? botResponseRow.fromId ?? botResponseRow.response_from ?? botResponseRow.responseFrom))
-          || (botRequestRow && (botRequestRow.from_id ?? botRequestRow.fromId))
-          || ""
-        );
-        const botInteractionRelevantToLocal = hasLocalNodeId && (
-          (botRequestRow && (botRequestFromId === localNodeId || botRequestToId === localNodeId))
-          || (botResponseRow && botResponseToId === localNodeId)
-        );
-        const systemRelevant = hasLocalNodeId && (
-          (!senderIsSelf && (directToSelf || referencesSelfMessage))
-          || botInteractionRelevantToLocal
-        );
+        const systemRelevant = hasLocalNodeId
+          && !senderIsSelf
+          && (directToSelf || referencesSelfMessage);
         const peerNodeId = channel === "direct"
           ? normalizeNodeId(
             senderIsSelf
-              ? (toId || botPeerNodeId || fromId || "")
+              ? (toId || fromId || "")
               : (fromId || toId || "")
           )
           : "";
@@ -169,12 +117,10 @@
       }}
       chatMessageEntriesCache = {{
         nodesRef: nodes,
-        botRequestsRef: botRequests,
         recentChatRef: recentChat,
         localNodeId,
         meshFilterIndex: activeMeshIdx,
         nodesLength,
-        botRequestsLength,
         recentChatLength,
         recentChatTailKey,
         entries,

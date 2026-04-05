@@ -7,7 +7,6 @@
       ) ? window.performance.now() : 0;
       const traffic = state.traffic || {{}};
       const s = state.summary || {{}};
-      const botRequests = Array.isArray(state.bot_requests) ? state.bot_requests : [];
       const chatScroller = getChatScroller();
       const shouldStickBottom = !!(chatScroller && (chatStickToBottom || isNearBottom(chatScroller)));
       const nodes = Array.isArray(state.nodes) ? state.nodes : [];

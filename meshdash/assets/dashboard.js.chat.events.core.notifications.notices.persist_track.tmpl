@@ -12,7 +12,7 @@
         }};
       }};
       const payload = {{
-        version: 1,
+        version: 2,
         channels: {{
           all: encodeChannel("all"),
           direct: encodeChannel("direct"),
@@ -32,7 +32,13 @@
       }} catch (_err) {{
         payload = null;
       }}
-      const channels = (payload && typeof payload === "object" && payload.channels && typeof payload.channels === "object")
+      const channels = (
+        payload
+        && typeof payload === "object"
+        && Number(payload.version) === 2
+        && payload.channels
+        && typeof payload.channels === "object"
+      )
         ? payload.channels
         : null;
       const hydrateChannel = (channelKey) => {{
@@ -105,4 +111,3 @@
       syncDocumentUnreadTitle(chatUnreadCount);
       renderHistoryNotificationLog();
     }}
-
