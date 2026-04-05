@@ -60,6 +60,8 @@
       if (!(clearBtn instanceof HTMLButtonElement)) return;
       if (!(statusEl instanceof HTMLElement)) return;
       if (normalizeNodeId(noteInput.dataset.nodeId || "") !== cleanNodeId) return;
+      if (noteInput.dataset.noteEditorBound === "1") return;
+      noteInput.dataset.noteEditorBound = "1";
 
       let baselineText = normalizeNodeNoteText(noteInput.dataset.savedNote || "");
       let baselineUpdatedUnix = Number(noteInput.dataset.savedUpdatedUnix);
@@ -133,6 +135,16 @@
     function renderSavedNodeDetails(state, nodeHistory = null, loadingNodeId = "") {{
       const host = document.getElementById("saved-node-details");
       if (!(host instanceof HTMLElement)) return;
+      const setElementHtmlIfChanged = (element, markup, cacheKey = "default") => {{
+        if (!(element instanceof HTMLElement)) return false;
+        const nextMarkup = String(markup == null ? "" : markup);
+        const propName = `__meshLastInnerHtml_${{cacheKey}}`;
+        const previousMarkup = (typeof element[propName] === "string") ? element[propName] : null;
+        if (previousMarkup === nextMarkup) return false;
+        element.innerHTML = nextMarkup;
+        element[propName] = nextMarkup;
+        return true;
+      }};
       const previousMainScroll = host.querySelector(".saved-node-main-scroll");
       const notesHost = document.getElementById("chat-node-details-notes-host");
       const previousNoteInput = document.getElementById("saved-node-note-input");
@@ -183,12 +195,11 @@
 
       if (!isSelectableNodeId(nodeId)) {{
         host.dataset.nodeId = "";
-        host.innerHTML = favoriteNodeIds.size === 0
+        const emptyDetailsHtml = favoriteNodeIds.size === 0
           ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Tag nodes to build your tagged subsection.</div>'
           : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from tagged nodes.</div>';
-        if (notesHost instanceof HTMLElement) {{
-          notesHost.innerHTML = "";
-        }}
+        setElementHtmlIfChanged(host, emptyDetailsHtml, "saved-node-details");
+        setElementHtmlIfChanged(notesHost, "", "chat-node-details-notes");
         syncNodeHistoryDock();
         return;
       }}
@@ -454,7 +465,7 @@
         ["Seen Ports", linkStats.ports.size > 0 ? Array.from(linkStats.ports).slice(0, 10).join(", ") : "n/a"],
       ]);
 
-      host.innerHTML = `
+      const nextDetailsHtml = `
         <div class="saved-node-stack">
           <div class="saved-node-main-scroll">
             <div class="saved-node-sections">
@@ -470,14 +481,16 @@
           <div id="saved-node-history-host" class="saved-node-history-host"></div>
         </div>
       `;
+      const detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsHtml, "saved-node-details");
       host.dataset.nodeId = nodeId;
-      if (notesHost instanceof HTMLElement) {{
-        notesHost.innerHTML = renderNotesInDrawer ? notesSection : "";
+      const nextNotesHtml = renderNotesInDrawer ? notesSection : "";
+      const notesMarkupChanged = setElementHtmlIfChanged(notesHost, nextNotesHtml, "chat-node-details-notes");
+      if (detailsMarkupChanged || notesMarkupChanged) {{
+        bindSavedNodeNotesEditor(nodeId);
       }}
-      bindSavedNodeNotesEditor(nodeId);
       bindSavedNodeHistorySplitter();
       syncNodeHistoryDock();
-      if (previousNodeId === nodeId) {{
+      if ((detailsMarkupChanged || notesMarkupChanged) && previousNodeId === nodeId) {{
         const restoreNoteFocus = () => {{
           if (!previousNoteFocused) return;
           const nextNoteInput = document.getElementById("saved-node-note-input");
@@ -505,24 +518,34 @@
           if (!(nextMainScroll instanceof HTMLElement)) return;
           const prevMax = Math.max(0, previousScrollHeight - previousClientHeight);
           const nextMax = Math.max(0, nextMainScroll.scrollHeight - nextMainScroll.clientHeight);
+          const currentTop = Math.max(0, Number(nextMainScroll.scrollTop) || 0);
           if (prevMax <= 0) {{
-            nextMainScroll.scrollTop = 0;
+            if (currentTop > 1) {{
+              nextMainScroll.scrollTop = 0;
+            }}
             return;
           }}
           const nearBottom = (prevMax - previousScrollTop) <= 2;
+          const targetTop = nearBottom
+            ? nextMax
+            : Math.max(0, Math.min(nextMax, Math.round((previousScrollTop / prevMax) * nextMax)));
+          if (Math.abs(targetTop - currentTop) <= 1) return;
           if (nearBottom) {{
-            nextMainScroll.scrollTop = nextMax;
+            nextMainScroll.scrollTop = targetTop;
             return;
           }}
-          const ratio = previousScrollTop / prevMax;
-          nextMainScroll.scrollTop = Math.max(0, Math.min(nextMax, Math.round(ratio * nextMax)));
+          nextMainScroll.scrollTop = targetTop;
         }};
         // Run once immediately, then once after layout settles (history dock + flex sizing).
-        restoreMainScroll();
+        if (detailsMarkupChanged) {{
+          restoreMainScroll();
+        }}
         restoreNoteFocus();
         window.requestAnimationFrame(() => {{
           if (normalizeNodeId(host.dataset.nodeId || "") !== nodeId) return;
-          restoreMainScroll();
+          if (detailsMarkupChanged) {{
+            restoreMainScroll();
+          }}
           restoreNoteFocus();
         }});
       }}

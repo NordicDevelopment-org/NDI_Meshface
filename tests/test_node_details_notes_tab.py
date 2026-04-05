@@ -60,4 +60,18 @@ def test_dashboard_js_routes_notes_into_the_drawer_panel() -> None:
     assert 'const notesPanel = document.getElementById("chat-node-details-panel-notes");' in js
     assert 'const notesHost = document.getElementById("chat-node-details-notes-host");' in js
     assert 'const renderNotesInDrawer = (' in js
-    assert 'notesHost.innerHTML = renderNotesInDrawer ? notesSection : "";' in js
+    assert 'const nextNotesHtml = renderNotesInDrawer ? notesSection : "";' in js
+
+
+def test_dashboard_js_avoids_rebuilding_saved_node_details_on_unchanged_polls() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'noteInput.dataset.noteEditorBound === "1"' in js
+    assert 'const detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsHtml, "saved-node-details");' in js
+    assert 'const notesMarkupChanged = setElementHtmlIfChanged(notesHost, nextNotesHtml, "chat-node-details-notes");' in js
+    assert 'if (detailsMarkupChanged || notesMarkupChanged) {' in js
+    assert 'if ((detailsMarkupChanged || notesMarkupChanged) && previousNodeId === nodeId) {' in js
