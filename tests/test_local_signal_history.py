@@ -64,3 +64,18 @@ def test_dashboard_js_uses_signal_points_when_available() -> None:
 
     assert "history.signal_points" in js
     assert "Signal plot uses packets heard by this radio." in js
+
+
+def test_dashboard_js_smooths_node_signal_chart_paths() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const smoothingWindow = normalizeSmoothingWindow(" in js
+    assert "smoothSeriesPointsWithBreaks(sourcePoints, smoothingWindow)" in js
+    assert "aggregatePointsByXPixels(sourcePoints.map((point) => toScreenPoint(point)), 1.05)" in js
+    assert "aggregatePointsByXPixels(trendPoints.map((point) => toScreenPoint(point)), 3.2)" in js
+    assert 'const smoothPath = buildSmoothSvgPath(trendPlotPoints, 0.2);' in js
+    assert 'stroke-opacity="${chartPalette.rawOpacity.toFixed(2)}"' in js

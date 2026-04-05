@@ -62,23 +62,70 @@
         padTop + ((maxVal - value) / (maxVal - minVal)) * plotH
       );
 
-      const buildPath = (metricKey, minVal, maxVal) => {{
-        const n = plotRows.length;
-        let d = "";
-        let started = false;
-        for (let i = 0; i < n; i += 1) {{
-          const raw = Number(plotRows[i][metricKey]);
-          if (!Number.isFinite(raw)) continue;
-          const x = xAt(i, n);
-          const y = yFrom(raw, minVal, maxVal);
-          d += `${{started ? " L " : "M "}}${{x.toFixed(2)}} ${{y.toFixed(2)}}`;
-          started = true;
-        }}
-        return d;
+      const buildLinearPath = (points) => {{
+        const source = Array.isArray(points) ? points : [];
+        if (!source.length) return "";
+        return source.map((point, idx) => (
+          `${{idx === 0 || point.breakBefore ? "M" : "L"}} ${{point.x.toFixed(2)}} ${{point.y.toFixed(2)}}`
+        )).join(" ");
       }};
 
-      const snrPath = buildPath("avg_snr", snrMin, snrMax);
-      const rssiPath = buildPath("avg_rssi", rssiMin, rssiMax);
+      const buildPaths = (metricKey, minVal, maxVal) => {{
+        const n = plotRows.length;
+        const sourcePoints = [];
+        let previousWasFinite = false;
+        for (let i = 0; i < n; i += 1) {{
+          const raw = Number(plotRows[i][metricKey]);
+          if (!Number.isFinite(raw)) {{
+            previousWasFinite = false;
+            continue;
+          }}
+          sourcePoints.push({{
+            value: raw,
+            x: xAt(i, n),
+            breakBefore: !previousWasFinite && sourcePoints.length > 0,
+          }});
+          previousWasFinite = true;
+        }}
+        if (!sourcePoints.length) {{
+          return {{
+            rawPath: "",
+            trendPath: "",
+          }};
+        }}
+        const smoothingWindow = normalizeSmoothingWindow(
+          Math.max(5, Math.min(15, Math.round(sourcePoints.length / 18))),
+          sourcePoints.length
+        );
+        const trendPoints = (typeof smoothSeriesPointsWithBreaks === "function")
+          ? smoothSeriesPointsWithBreaks(sourcePoints, smoothingWindow)
+          : sourcePoints.map((point) => ({{ ...point }}));
+        const toScreenPoint = (point) => ({{
+          x: Number(point.x),
+          y: yFrom(Number(point.value), minVal, maxVal),
+          breakBefore: !!point.breakBefore,
+        }});
+        const rawPlotPoints = (typeof aggregatePointsByXPixels === "function")
+          ? aggregatePointsByXPixels(sourcePoints.map((point) => toScreenPoint(point)), 1.05)
+          : sourcePoints.map((point) => toScreenPoint(point));
+        const trendPlotPoints = (typeof aggregatePointsByXPixels === "function")
+          ? aggregatePointsByXPixels(trendPoints.map((point) => toScreenPoint(point)), 3.2)
+          : trendPoints.map((point) => toScreenPoint(point));
+        const rawPath = buildLinearPath(rawPlotPoints);
+        const trendLinearPath = buildLinearPath(trendPlotPoints);
+        let trendPath = trendLinearPath;
+        if (typeof buildSmoothSvgPath === "function") {{
+          const smoothPath = buildSmoothSvgPath(trendPlotPoints, 0.2);
+          if (smoothPath) trendPath = smoothPath;
+        }}
+        return {{
+          rawPath,
+          trendPath,
+        }};
+      }};
+
+      const snrPaths = buildPaths("avg_snr", snrMin, snrMax);
+      const rssiPaths = buildPaths("avg_rssi", rssiMin, rssiMax);
       const midY = padTop + (plotH / 2);
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const chartPalette = darkTheme
@@ -88,6 +135,7 @@
             rssi: "#79c0ff",
             snrLabel: "#88e8a5",
             rssiLabel: "#a4d0ff",
+            rawOpacity: 0.32,
           }}
         : {{
             grid: "#dce8df",
@@ -95,6 +143,7 @@
             rssi: "#265d7b",
             snrLabel: "#1f6f53",
             rssiLabel: "#265d7b",
+            rawOpacity: 0.24,
           }};
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
@@ -103,8 +152,10 @@
         <line x1="${{padLeft}}" y1="${{midY.toFixed(2)}}" x2="${{width - padRight}}" y2="${{midY.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
         <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
         <line x1="${{width - padRight}}" y1="${{padTop}}" x2="${{width - padRight}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
-        ${{snrPath ? `<path d="${{snrPath}}" fill="none" stroke="${{chartPalette.snr}}" stroke-width="2"></path>` : ""}}
-        ${{rssiPath ? `<path d="${{rssiPath}}" fill="none" stroke="${{chartPalette.rssi}}" stroke-width="2"></path>` : ""}}
+        ${{snrPaths.rawPath ? `<path d="${{snrPaths.rawPath}}" fill="none" stroke="${{chartPalette.snr}}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{chartPalette.rawOpacity.toFixed(2)}}"></path>` : ""}}
+        ${{rssiPaths.rawPath ? `<path d="${{rssiPaths.rawPath}}" fill="none" stroke="${{chartPalette.rssi}}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{chartPalette.rawOpacity.toFixed(2)}}"></path>` : ""}}
+        ${{snrPaths.trendPath ? `<path d="${{snrPaths.trendPath}}" fill="none" stroke="${{chartPalette.snr}}" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"></path>` : ""}}
+        ${{rssiPaths.trendPath ? `<path d="${{rssiPaths.trendPath}}" fill="none" stroke="${{chartPalette.rssi}}" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"></path>` : ""}}
         <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMax, 1)}}</text>
         <text x="${{padLeft - 4}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMin, 1)}}</text>
         <text x="${{width - padRight + 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="start" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMax, 0)}}</text>
