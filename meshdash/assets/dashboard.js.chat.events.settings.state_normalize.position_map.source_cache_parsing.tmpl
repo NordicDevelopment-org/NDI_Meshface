@@ -36,11 +36,11 @@
     }}
 
     function loadSettingsAppearancePreferences() {{
-      settingsUniqueNodeColorsEnabled = true;
+      settingsUniqueNodeColorsEnabled = false;
       try {{
         settingsUniqueNodeColorsEnabled = parseBoolToken(
           window.localStorage.getItem(settingsUniqueNodeColorsStorageKey),
-          true
+          false
         );
       }} catch (_err) {{
       }}
