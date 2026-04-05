@@ -1259,17 +1259,25 @@
         window.localStorage.setItem(layoutViewStorageKey, next);
       }} catch (_err) {{
       }}
+      let applied = false;
       try {{
         applyLayoutView(next, true);
         const layout = document.getElementById("dashboard-layout");
-        if (layout instanceof HTMLElement && layout.classList.contains(`view-${{next}}`)) {{
-          return false;
-        }}
+        applied = layout instanceof HTMLElement && layout.classList.contains(`view-${{next}}`);
       }} catch (_err) {{
       }}
-      try {{
-        window.location.reload();
-      }} catch (_err) {{
+      if (applied) {{
+        return false;
+      }}
+      // Never hard-reload the page on a view switch miss. A transient layout race
+      // should not wipe the selected node drawer or other in-memory UI state.
+      if (typeof window.requestAnimationFrame === "function") {{
+        window.requestAnimationFrame(() => {{
+          try {{
+            applyLayoutView(next, true);
+          }} catch (_err) {{
+          }}
+        }});
       }}
       return false;
     }}
