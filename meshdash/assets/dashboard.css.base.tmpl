@@ -4906,10 +4906,14 @@
       justify-content: center;
     }}
     .games-board-wrap {{
-      --games-turn-black-rgb: 20, 28, 34;
-      --games-turn-black-accent-rgb: 75, 91, 103;
+      --games-turn-black-rgb: 15, 27, 20;
+      --games-turn-black-accent-rgb: 49, 67, 57;
       --games-turn-white-rgb: 255, 255, 255;
       --games-turn-white-accent-rgb: 214, 224, 233;
+      --games-board-default-background:
+        radial-gradient(circle at 50% 0%, rgba(136, 195, 162, 0.09), transparent 44%),
+        linear-gradient(180deg, #15452f, #113726);
+      --games-board-active-background: var(--games-board-default-background);
       width: 100%;
       min-height: 0;
       display: flex;
@@ -4920,12 +4924,10 @@
       isolation: isolate;
       border: 1px solid #2d6b4c;
       border-radius: 12px;
-      background:
-        radial-gradient(circle at 50% 0%, rgba(136, 195, 162, 0.09), transparent 44%),
-        linear-gradient(180deg, #15452f, #113726);
+      background: var(--games-board-active-background);
       box-shadow: inset 0 0 0 1px rgba(8, 24, 17, 0.12);
       padding: 10px;
-      transition: border-color 240ms ease, box-shadow 280ms ease;
+      transition: background 300ms ease, border-color 240ms ease, box-shadow 280ms ease;
     }}
     .games-board-wrap::before,
     .games-board-wrap::after {{
@@ -4940,17 +4942,21 @@
     }}
     .games-board-wrap::before {{
       background:
-        linear-gradient(180deg, rgba(var(--games-turn-black-rgb), 0.24), rgba(var(--games-turn-black-rgb), 0.16)),
-        radial-gradient(circle at 50% 46%, rgba(var(--games-turn-black-accent-rgb), 0.1) 0%, rgba(var(--games-turn-black-rgb), 0.06) 60%, transparent 100%);
+        linear-gradient(180deg, rgba(var(--games-turn-black-rgb), 0.88) 0%, rgba(var(--games-turn-black-rgb), 0.48) 12%, rgba(var(--games-turn-black-rgb), 0.14) 24%, transparent 38%),
+        linear-gradient(0deg, rgba(var(--games-turn-black-rgb), 0.76) 0%, rgba(var(--games-turn-black-rgb), 0.4) 12%, rgba(var(--games-turn-black-rgb), 0.12) 24%, transparent 38%),
+        linear-gradient(90deg, rgba(var(--games-turn-black-rgb), 0.82) 0%, rgba(var(--games-turn-black-rgb), 0.42) 9%, rgba(var(--games-turn-black-rgb), 0.12) 18%, transparent 30%),
+        linear-gradient(270deg, rgba(var(--games-turn-black-rgb), 0.82) 0%, rgba(var(--games-turn-black-rgb), 0.42) 9%, rgba(var(--games-turn-black-rgb), 0.12) 18%, transparent 30%);
     }}
     .games-board-wrap::after {{
       background:
-        linear-gradient(180deg, rgba(var(--games-turn-white-rgb), 0.12), rgba(var(--games-turn-white-accent-rgb), 0.14)),
-        radial-gradient(circle at 50% 46%, rgba(var(--games-turn-white-rgb), 0.1) 0%, rgba(var(--games-turn-white-accent-rgb), 0.08) 60%, transparent 100%);
+        linear-gradient(180deg, rgba(var(--games-turn-white-rgb), 0.18) 0%, rgba(var(--games-turn-white-accent-rgb), 0.1) 18%, transparent 44%),
+        linear-gradient(0deg, rgba(var(--games-turn-white-accent-rgb), 0.16) 0%, rgba(var(--games-turn-white-accent-rgb), 0.08) 18%, transparent 44%),
+        linear-gradient(90deg, rgba(var(--games-turn-white-rgb), 0.18) 0%, rgba(var(--games-turn-white-accent-rgb), 0.08) 14%, transparent 34%),
+        linear-gradient(270deg, rgba(var(--games-turn-white-rgb), 0.18) 0%, rgba(var(--games-turn-white-accent-rgb), 0.08) 14%, transparent 34%);
     }}
     .games-board-wrap[data-turn="black"] {{
-      border-color: rgba(var(--games-turn-black-accent-rgb), 0.72);
-      box-shadow: inset 0 0 0 1px rgba(var(--games-turn-black-rgb), 0.18), 0 0 0 1px rgba(var(--games-turn-black-rgb), 0.24);
+      border-color: rgba(var(--games-turn-black-accent-rgb), 0.92);
+      box-shadow: inset 0 0 0 1px rgba(var(--games-turn-black-rgb), 0.46), 0 0 0 1px rgba(0, 0, 0, 0.34);
     }}
     .games-board-wrap[data-turn="white"] {{
       border-color: rgba(var(--games-turn-white-accent-rgb), 0.86);
@@ -4961,20 +4967,20 @@
       opacity: 1;
     }}
     #games-main-reversi .games-board-wrap {{
-      --games-turn-black-rgb: 20, 28, 34;
-      --games-turn-black-accent-rgb: 75, 91, 103;
+      --games-turn-black-rgb: 15, 27, 20;
+      --games-turn-black-accent-rgb: 49, 67, 57;
       --games-turn-white-rgb: 255, 255, 255;
       --games-turn-white-accent-rgb: 214, 224, 233;
     }}
     #games-main-checkers .games-board-wrap {{
-      --games-turn-black-rgb: 32, 43, 51;
-      --games-turn-black-accent-rgb: 82, 97, 107;
+      --games-turn-black-rgb: 15, 27, 20;
+      --games-turn-black-accent-rgb: 49, 67, 57;
       --games-turn-white-rgb: 255, 255, 255;
       --games-turn-white-accent-rgb: 214, 224, 232;
     }}
     #games-main-chess .games-board-wrap {{
-      --games-turn-black-rgb: 30, 42, 49;
-      --games-turn-black-accent-rgb: 72, 89, 100;
+      --games-turn-black-rgb: 15, 27, 20;
+      --games-turn-black-accent-rgb: 49, 67, 57;
       --games-turn-white-rgb: 248, 253, 255;
       --games-turn-white-accent-rgb: 228, 239, 246;
     }}

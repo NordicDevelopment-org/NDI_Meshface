@@ -4807,8 +4807,14 @@
       border-color: #2a4638;
     }}
     [data-theme="dark"] .games-board-wrap {{
-      background: linear-gradient(180deg, #173526, #122a1f);
+      --games-board-default-background: linear-gradient(180deg, #173526, #122a1f);
       border-color: #2f5f48;
+    }}
+    [data-theme="dark"] .games-board-wrap[data-turn="black"] {{
+      border-color: rgba(var(--games-turn-black-accent-rgb), 0.92);
+    }}
+    [data-theme="dark"] .games-board-wrap[data-turn="white"] {{
+      border-color: rgba(var(--games-turn-white-accent-rgb), 0.86);
     }}
     [data-theme="dark"] .games-toolbar {{
       background: #1a2b22;
