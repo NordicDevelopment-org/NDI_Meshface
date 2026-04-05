@@ -15,7 +15,7 @@ from meshdash.html_js import build_dashboard_js
 def test_load_node_history_uses_local_radio_signal_points_for_self_node() -> None:
     conn = sqlite3.connect(":memory:")
     initialize_history_schema(conn)
-    now = int(time.time())
+    now = int(time.time() // 60 * 60)
     bucket_a = now - 120
     bucket_b = now - 30
     conn.executemany(

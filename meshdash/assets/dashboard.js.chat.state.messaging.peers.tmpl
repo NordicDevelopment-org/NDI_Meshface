@@ -1157,6 +1157,7 @@
     function normalizeChatNodeDetailsDrawerTab(value) {{
       const clean = String(value || "").trim().toLowerCase();
       if (clean === "history") return "history";
+      if (clean === "notes") return "notes";
       if (clean === "tag") return "tag";
       return "details";
     }}
@@ -1204,13 +1205,16 @@
       const muteBtn = document.getElementById("chat-node-details-mute-btn");
       const dmBtn = document.getElementById("chat-node-details-dm-btn");
       const detailsTabBtn = document.getElementById("chat-node-details-tab-details");
+      const notesTabBtn = document.getElementById("chat-node-details-tab-notes");
       const historyTabBtn = document.getElementById("chat-node-details-tab-history");
       const tagTabBtn = document.getElementById("chat-node-details-tab-tag");
       const tagTabLabel = document.getElementById("chat-node-details-tab-tag-label");
       const tagTabChip = document.getElementById("chat-node-details-tab-tag-chip");
       const detailsPanel = document.getElementById("chat-node-details-panel-details");
+      const notesPanel = document.getElementById("chat-node-details-panel-notes");
       const historyPanel = document.getElementById("chat-node-details-panel-history");
       const tagPanel = document.getElementById("chat-node-details-panel-tag");
+      const notesHost = document.getElementById("chat-node-details-notes-host");
       const tagHost = document.getElementById("chat-node-details-tag-host");
       if (!(drawer instanceof HTMLElement)) return;
 
@@ -1250,6 +1254,9 @@
         dmBtn.dataset.nodeId = "";
       }}
       if (!expanded) {{
+        if (notesHost instanceof HTMLElement) {{
+          notesHost.innerHTML = "";
+        }}
         syncSavedNodeDetailsDock(true);
         syncNodeHistoryDock();
         return;
@@ -1260,6 +1267,11 @@
         const isActive = activeTab === "details";
         detailsTabBtn.classList.toggle("is-active", isActive);
         detailsTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
+      }}
+      if (notesTabBtn instanceof HTMLButtonElement) {{
+        const isActive = activeTab === "notes";
+        notesTabBtn.classList.toggle("is-active", isActive);
+        notesTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
       }}
       if (historyTabBtn instanceof HTMLButtonElement) {{
         const isActive = activeTab === "history";
@@ -1273,6 +1285,9 @@
       }}
       if (detailsPanel instanceof HTMLElement) {{
         detailsPanel.hidden = activeTab !== "details";
+      }}
+      if (notesPanel instanceof HTMLElement) {{
+        notesPanel.hidden = activeTab !== "notes";
       }}
       if (historyPanel instanceof HTMLElement) {{
         historyPanel.hidden = activeTab !== "history";
@@ -1354,6 +1369,9 @@
       syncSavedNodeDetailsDock(false);
       const cachedHistory = cachedNodeHistory(selectedId);
       renderSavedNodeDetails(safeState, cachedHistory);
+      if (notesHost instanceof HTMLElement && !notesHost.querySelector("#saved-node-note-input")) {{
+        notesHost.innerHTML = "";
+      }}
       if (opts.fetchHistory !== false) {{
         // Even on the Details tab we want the network map trail ready when the drawer opens.
         void refreshSelectedNodeHistory(false);

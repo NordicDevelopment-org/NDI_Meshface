@@ -134,7 +134,8 @@
       const host = document.getElementById("saved-node-details");
       if (!(host instanceof HTMLElement)) return;
       const previousMainScroll = host.querySelector(".saved-node-main-scroll");
-      const previousNoteInput = host.querySelector("#saved-node-note-input");
+      const notesHost = document.getElementById("chat-node-details-notes-host");
+      const previousNoteInput = document.getElementById("saved-node-note-input");
       const previousNoteFocused = (
         previousNoteInput instanceof HTMLTextAreaElement
         && document.activeElement === previousNoteInput
@@ -174,12 +175,20 @@
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nodeId = resolveSavedViewNodeId(safeState);
       const loadingId = normalizeNodeId(loadingNodeId || "");
+      const renderNotesInDrawer = (
+        notesHost instanceof HTMLElement
+        && typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+      );
 
       if (!isSelectableNodeId(nodeId)) {{
         host.dataset.nodeId = "";
         host.innerHTML = favoriteNodeIds.size === 0
           ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Tag nodes to build your tagged subsection.</div>'
           : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from tagged nodes.</div>';
+        if (notesHost instanceof HTMLElement) {{
+          notesHost.innerHTML = "";
+        }}
         syncNodeHistoryDock();
         return;
       }}
@@ -454,7 +463,7 @@
           <div class="saved-node-main-scroll">
             <div class="saved-node-sections">
               ${{nodeSection}}
-              ${{notesSection}}
+              ${{renderNotesInDrawer ? "" : notesSection}}
               ${{nameHistorySection}}
               ${{historySection}}
               ${{locationSection}}
@@ -467,15 +476,19 @@
         </div>
       `;
       host.dataset.nodeId = nodeId;
+      if (notesHost instanceof HTMLElement) {{
+        notesHost.innerHTML = renderNotesInDrawer ? notesSection : "";
+      }}
       bindSavedNodeNotesEditor(nodeId);
       bindSavedNodeHistorySplitter();
       syncNodeHistoryDock();
       if (previousNodeId === nodeId) {{
         const restoreNoteFocus = () => {{
           if (!previousNoteFocused) return;
-          const nextNoteInput = host.querySelector("#saved-node-note-input");
+          const nextNoteInput = document.getElementById("saved-node-note-input");
           if (!(nextNoteInput instanceof HTMLTextAreaElement)) return;
           if (normalizeNodeId(nextNoteInput.dataset.nodeId || "") !== nodeId) return;
+          if (nextNoteInput.closest("[hidden]")) return;
           const selectionStart = Number.isFinite(previousNoteSelectionStart)
             ? Math.max(0, Math.min(nextNoteInput.value.length, Math.trunc(previousNoteSelectionStart)))
             : nextNoteInput.value.length;
