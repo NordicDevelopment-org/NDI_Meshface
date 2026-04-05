@@ -104,3 +104,24 @@ def test_dashboard_js_prefers_numeric_roster_sort_for_numeric_like_values() -> N
     assert "const rightNum = Number(right);" in js
     assert "if (leftHasNum && rightHasNum) {" in js
     assert "return leftNum - rightNum;" in js
+
+
+def test_dashboard_js_supports_idle_toggle_in_node_navigator() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "let chatNodeNavigatorShowIdle = true;" in js
+    assert "function normalizeChatNodeNavigatorShowIdlePref(value) {" in js
+    assert 'showIdle: normalizeChatNodeNavigatorShowIdlePref(chatNodeNavigatorShowIdle),' in js
+    assert 'const nextShowIdle = normalizeChatNodeNavigatorShowIdlePref(' in js
+    assert 'chatNodeNavigatorShowIdle = nextShowIdle;' in js
+    assert '<input type="checkbox" data-nav-toggle-id="idle"' in js
+    assert '<span>Idle</span>' in js
+    assert 'if (toggleId === "idle") {' in js
+    assert 'showIdle: !!target.checked,' in js
+    assert 'const idleRowHtml = showIdle' in js
+    assert 'const memberMetaRowParts = [];' in js
+    assert 'const memberMetaRowHtml = memberMetaRowParts.length > 0' in js
