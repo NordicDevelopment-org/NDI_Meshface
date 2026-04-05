@@ -406,7 +406,40 @@
     ];
     const tickerCatalogById = new Map(tickerCatalog.map((entry) => [entry.id, entry]));
     const tickerMetricIds = new Set(tickerCatalog.filter((entry) => entry.metric).map((entry) => entry.id));
-    const tickerDefaultOrder = tickerCatalog.map((entry) => entry.id);
+    const tickerDefaultOrder = [
+      "target",
+      "node",
+      "known_nodes",
+      "online_nodes",
+      "packets_per_min",
+      "channel_util",
+      "battery",
+      "wifi",
+      "gps",
+      "system",
+      "chat_channels",
+      "chat_roster",
+      "time",
+    ].filter((id) => tickerCatalogById.has(id));
+    for (const entry of tickerCatalog) {{
+      if (tickerDefaultOrder.includes(entry.id)) continue;
+      tickerDefaultOrder.push(entry.id);
+    }}
+    const tickerDefaultEnabled = Object.fromEntries(
+      tickerCatalog.map((entry) => [entry.id, false])
+    );
+    for (const id of [
+      "target",
+      "node",
+      "known_nodes",
+      "online_nodes",
+      "packets_per_min",
+      "channel_util",
+      "battery",
+    ]) {{
+      if (!tickerCatalogById.has(id)) continue;
+      tickerDefaultEnabled[id] = true;
+    }}
     const tickerDefaultTrendVisibility = Object.fromEntries(
       tickerCatalog.map((entry) => [entry.id, !!entry.metric])
     );

@@ -337,14 +337,9 @@
     }}
 
     function defaultTickerPreferences() {{
-      const defaultEnabled = Object.fromEntries(
-        tickerDefaultOrder.map((id) => [id, true])
-      );
-      defaultEnabled.chat_channels = false;
-      defaultEnabled.chat_roster = false;
       return {{
         order: [...tickerDefaultOrder],
-        enabled: defaultEnabled,
+        enabled: {{ ...tickerDefaultEnabled }},
         labels: {{}},
         trend: {{ ...tickerDefaultTrendVisibility }},
         battery_window_hours: tickerDefaultBatteryWindowHours,
@@ -636,18 +631,19 @@
     function resetTickerPreferencesForId(tickerId) {{
       const id = normalizeTickerId(tickerId);
       if (!id) return;
+      const defaults = defaultTickerPreferences();
       const prefs = currentTickerPreferences();
       if (!prefs.enabled || typeof prefs.enabled !== "object") prefs.enabled = {{}};
       if (!prefs.labels || typeof prefs.labels !== "object") prefs.labels = {{}};
       if (!prefs.trend || typeof prefs.trend !== "object") prefs.trend = {{}};
-      prefs.enabled[id] = true;
+      prefs.enabled[id] = !!defaults.enabled[id];
       delete prefs.labels[id];
-      prefs.trend[id] = !!tickerDefaultTrendVisibility[id];
+      prefs.trend[id] = !!defaults.trend[id];
       if (id === "battery") {{
-        prefs.battery_window_hours = tickerDefaultBatteryWindowHours;
+        prefs.battery_window_hours = defaults.battery_window_hours;
       }}
       if (id === "node") {{
-        prefs.node_rows = {{ ...nodeTickerDefaultRows }};
+        prefs.node_rows = {{ ...defaults.node_rows }};
       }}
     }}
 
