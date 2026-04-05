@@ -27,6 +27,25 @@ def test_render_html_includes_chat_node_details_notes_tab() -> None:
     assert 'id="chat-node-details-notes-host"' in html
 
 
+def test_render_html_uses_icon_only_close_button_for_node_details_drawer() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert 'id="chat-node-details-close-btn"' in html
+    assert ">&times;</button>" in html
+    assert ">Collapse</button>" not in html
+
+
 def test_render_html_includes_chat_node_details_location_chat_and_links_tabs() -> None:
     html = render_html(
         refresh_ms=1000,
