@@ -82,6 +82,7 @@
       const source = Array.isArray(points) ? points : [];
       if (!source.length) return "";
       const tension = Math.max(0, Math.min(0.5, Number(rawTension) || 0.18));
+      const clampBetween = (value, min, max) => Math.max(min, Math.min(max, value));
       const linearPath = (segment) => segment.map((pt, idx) => (
         `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
       )).join(" ");
@@ -95,16 +96,35 @@
           path += `${{path ? " " : ""}}${{linearPath(segment)}}`;
           return;
         }}
+        for (let idx = 1; idx < segment.length; idx += 1) {{
+          if (!(Number(segment[idx].x) > Number(segment[idx - 1].x))) {{
+            path += `${{path ? " " : ""}}${{linearPath(segment)}}`;
+            return;
+          }}
+        }}
         path += `${{path ? " " : ""}}M ${{segment[0].x.toFixed(2)}} ${{segment[0].y.toFixed(2)}}`;
         for (let i = 0; i < segment.length - 1; i += 1) {{
           const p0 = i > 0 ? segment[i - 1] : segment[i];
           const p1 = segment[i];
           const p2 = segment[i + 1];
           const p3 = (i + 2 < segment.length) ? segment[i + 2] : p2;
-          const cp1x = p1.x + ((p2.x - p0.x) * tension);
+          const minX = Math.min(p1.x, p2.x);
+          const maxX = Math.max(p1.x, p2.x);
+          if ((maxX - minX) < 1.5) {{
+            path += ` L ${{p2.x.toFixed(2)}} ${{p2.y.toFixed(2)}}`;
+            continue;
+          }}
+          let cp1x = p1.x + ((p2.x - p0.x) * tension);
           const cp1y = p1.y + ((p2.y - p0.y) * tension);
-          const cp2x = p2.x - ((p3.x - p1.x) * tension);
+          let cp2x = p2.x - ((p3.x - p1.x) * tension);
           const cp2y = p2.y - ((p3.y - p1.y) * tension);
+          cp1x = clampBetween(cp1x, minX, maxX);
+          cp2x = clampBetween(cp2x, minX, maxX);
+          if (cp2x < cp1x) {{
+            const midX = (minX + maxX) / 2;
+            cp1x = midX;
+            cp2x = midX;
+          }}
           path += ` C ${{cp1x.toFixed(2)}} ${{cp1y.toFixed(2)}} ${{cp2x.toFixed(2)}} ${{cp2y.toFixed(2)}} ${{p2.x.toFixed(2)}} ${{p2.y.toFixed(2)}}`;
         }}
       }};
