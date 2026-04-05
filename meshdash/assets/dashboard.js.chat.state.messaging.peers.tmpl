@@ -1212,6 +1212,9 @@
     function normalizeChatNodeDetailsDrawerTab(value) {{
       const clean = String(value || "").trim().toLowerCase();
       if (clean === "history") return "history";
+      if (clean === "location") return "location";
+      if (clean === "chat") return "chat";
+      if (clean === "links") return "links";
       if (clean === "notes") return "notes";
       if (clean === "tag") return "tag";
       return "details";
@@ -1260,15 +1263,24 @@
       const muteBtn = document.getElementById("chat-node-details-mute-btn");
       const dmBtn = document.getElementById("chat-node-details-dm-btn");
       const detailsTabBtn = document.getElementById("chat-node-details-tab-details");
+      const locationTabBtn = document.getElementById("chat-node-details-tab-location");
+      const chatTabBtn = document.getElementById("chat-node-details-tab-chat");
+      const linksTabBtn = document.getElementById("chat-node-details-tab-links");
       const notesTabBtn = document.getElementById("chat-node-details-tab-notes");
       const historyTabBtn = document.getElementById("chat-node-details-tab-history");
       const tagTabBtn = document.getElementById("chat-node-details-tab-tag");
       const tagTabLabel = document.getElementById("chat-node-details-tab-tag-label");
       const tagTabChip = document.getElementById("chat-node-details-tab-tag-chip");
       const detailsPanel = document.getElementById("chat-node-details-panel-details");
+      const locationPanel = document.getElementById("chat-node-details-panel-location");
+      const chatPanel = document.getElementById("chat-node-details-panel-chat");
+      const linksPanel = document.getElementById("chat-node-details-panel-links");
       const notesPanel = document.getElementById("chat-node-details-panel-notes");
       const historyPanel = document.getElementById("chat-node-details-panel-history");
       const tagPanel = document.getElementById("chat-node-details-panel-tag");
+      const locationHost = document.getElementById("chat-node-details-location-host");
+      const chatHost = document.getElementById("chat-node-details-chat-host");
+      const linksHost = document.getElementById("chat-node-details-links-host");
       const notesHost = document.getElementById("chat-node-details-notes-host");
       const tagHost = document.getElementById("chat-node-details-tag-host");
       if (!(drawer instanceof HTMLElement)) return;
@@ -1309,6 +1321,15 @@
         dmBtn.dataset.nodeId = "";
       }}
       if (!expanded) {{
+        if (locationHost instanceof HTMLElement) {{
+          locationHost.innerHTML = "";
+        }}
+        if (chatHost instanceof HTMLElement) {{
+          chatHost.innerHTML = "";
+        }}
+        if (linksHost instanceof HTMLElement) {{
+          linksHost.innerHTML = "";
+        }}
         if (notesHost instanceof HTMLElement) {{
           notesHost.innerHTML = "";
         }}
@@ -1322,6 +1343,21 @@
         const isActive = activeTab === "details";
         detailsTabBtn.classList.toggle("is-active", isActive);
         detailsTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
+      }}
+      if (locationTabBtn instanceof HTMLButtonElement) {{
+        const isActive = activeTab === "location";
+        locationTabBtn.classList.toggle("is-active", isActive);
+        locationTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
+      }}
+      if (chatTabBtn instanceof HTMLButtonElement) {{
+        const isActive = activeTab === "chat";
+        chatTabBtn.classList.toggle("is-active", isActive);
+        chatTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
+      }}
+      if (linksTabBtn instanceof HTMLButtonElement) {{
+        const isActive = activeTab === "links";
+        linksTabBtn.classList.toggle("is-active", isActive);
+        linksTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
       }}
       if (notesTabBtn instanceof HTMLButtonElement) {{
         const isActive = activeTab === "notes";
@@ -1340,6 +1376,15 @@
       }}
       if (detailsPanel instanceof HTMLElement) {{
         detailsPanel.hidden = activeTab !== "details";
+      }}
+      if (locationPanel instanceof HTMLElement) {{
+        locationPanel.hidden = activeTab !== "location";
+      }}
+      if (chatPanel instanceof HTMLElement) {{
+        chatPanel.hidden = activeTab !== "chat";
+      }}
+      if (linksPanel instanceof HTMLElement) {{
+        linksPanel.hidden = activeTab !== "links";
       }}
       if (notesPanel instanceof HTMLElement) {{
         notesPanel.hidden = activeTab !== "notes";

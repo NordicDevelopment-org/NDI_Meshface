@@ -146,6 +146,9 @@
         return true;
       }};
       const previousMainScroll = host.querySelector(".saved-node-main-scroll");
+      const locationHost = document.getElementById("chat-node-details-location-host");
+      const chatHost = document.getElementById("chat-node-details-chat-host");
+      const linksHost = document.getElementById("chat-node-details-links-host");
       const notesHost = document.getElementById("chat-node-details-notes-host");
       const previousNoteInput = document.getElementById("saved-node-note-input");
       const previousNoteFocused = (
@@ -192,6 +195,21 @@
         && typeof isChatNodeDetailsDrawerExpanded === "function"
         && isChatNodeDetailsDrawerExpanded()
       );
+      const renderLocationInDrawer = (
+        locationHost instanceof HTMLElement
+        && typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+      );
+      const renderChatInDrawer = (
+        chatHost instanceof HTMLElement
+        && typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+      );
+      const renderLinksInDrawer = (
+        linksHost instanceof HTMLElement
+        && typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+      );
 
       if (!isSelectableNodeId(nodeId)) {{
         host.dataset.nodeId = "";
@@ -199,6 +217,9 @@
           ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Tag nodes to build your tagged subsection.</div>'
           : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from tagged nodes.</div>';
         setElementHtmlIfChanged(host, emptyDetailsHtml, "saved-node-details");
+        setElementHtmlIfChanged(locationHost, "", "chat-node-details-location");
+        setElementHtmlIfChanged(chatHost, "", "chat-node-details-chat");
+        setElementHtmlIfChanged(linksHost, "", "chat-node-details-links");
         setElementHtmlIfChanged(notesHost, "", "chat-node-details-notes");
         syncNodeHistoryDock();
         return;
@@ -396,9 +417,9 @@
             <div class="saved-node-sections">
               ${{nodeSection}}
               ${{renderNotesInDrawer ? "" : notesSection}}
-              ${{locationSection}}
-              ${{chatSection}}
-              ${{linksSection}}
+              ${{renderLocationInDrawer ? "" : locationSection}}
+              ${{renderChatInDrawer ? "" : chatSection}}
+              ${{renderLinksInDrawer ? "" : linksSection}}
             </div>
           </div>
           <div id="saved-node-history-splitter" class="saved-node-history-splitter" title="Drag to resize node info and history panels"></div>
@@ -407,7 +428,13 @@
       `;
       const detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsHtml, "saved-node-details");
       host.dataset.nodeId = nodeId;
+      const nextLocationHtml = renderLocationInDrawer ? locationSection : "";
+      const nextChatHtml = renderChatInDrawer ? chatSection : "";
+      const nextLinksHtml = renderLinksInDrawer ? linksSection : "";
       const nextNotesHtml = renderNotesInDrawer ? notesSection : "";
+      setElementHtmlIfChanged(locationHost, nextLocationHtml, "chat-node-details-location");
+      setElementHtmlIfChanged(chatHost, nextChatHtml, "chat-node-details-chat");
+      setElementHtmlIfChanged(linksHost, nextLinksHtml, "chat-node-details-links");
       const notesMarkupChanged = setElementHtmlIfChanged(notesHost, nextNotesHtml, "chat-node-details-notes");
       if (detailsMarkupChanged || notesMarkupChanged) {{
         bindSavedNodeNotesEditor(nodeId);
