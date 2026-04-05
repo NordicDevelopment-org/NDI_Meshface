@@ -4214,22 +4214,25 @@
       background:
         linear-gradient(
           90deg,
-          rgba(119, 130, 126, 0.22),
-          rgba(119, 130, 126, 0.12) 58%,
-          rgba(119, 130, 126, 0.05) 100%
+          rgba(215, 102, 102, 0.20),
+          rgba(215, 102, 102, 0.11) 58%,
+          rgba(215, 102, 102, 0.04) 100%
         ),
         var(--chat-member-node-gradient),
         var(--chat-member-node-bg);
-      border-color: rgba(114, 126, 120, 0.68);
-    }}
-    .chat-member-item.muted-node .chat-member-status {{
-      color: #7f8d86;
+      border-color: rgba(162, 70, 70, 0.62);
     }}
     .chat-member-item.muted-node .chat-member-name,
     .chat-member-item.muted-node .chat-member-meta-row,
     .chat-member-item.muted-node .chat-member-fields-row,
     .chat-member-item.muted-node .chat-member-tag-chip {{
-      opacity: 0.7;
+      opacity: 0.72;
+    }}
+    .chat-member-item.muted-node.selected-node {{
+      border-color: rgba(162, 70, 70, 0.82);
+      box-shadow:
+        inset 2px 0 0 rgba(215, 102, 102, 0.52),
+        inset 0 0 0 1px rgba(162, 70, 70, 0.42);
     }}
     .chat-member-item.selected-node {{
       border-color: var(--chat-member-node-selected-border);
@@ -4254,6 +4257,10 @@
       font-weight: 700;
       line-height: 1;
       color: #2aa85a;
+    }}
+    .chat-member-status.is-muted {{
+      font-size: 11px;
+      letter-spacing: -0.5px;
     }}
     .chat-member-status.status-online {{
       color: #2aa85a;

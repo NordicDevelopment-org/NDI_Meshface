@@ -152,4 +152,8 @@ def test_dashboard_js_marks_muted_nodes_in_navigator_rows() -> None:
     assert 'const muted = (typeof isMutedNode === "function") && isMutedNode(nodeId);' in js
     assert 'const mutedClass = muted ? " muted-node" : "";' in js
     assert '`Muted: ${muted ? "yes" : "no"}`' in js
+    assert 'const statusGlyph = muted ? "‖" : "●";' in js
+    assert 'const statusGlyphClass = muted ? " is-muted" : "";' in js
+    assert '${statusGlyphClass}' in js
+    assert '${statusGlyph}' in js
     assert '${mutedClass}' in js

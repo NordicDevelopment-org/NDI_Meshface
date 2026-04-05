@@ -888,11 +888,13 @@
           ? `<span class="chat-member-tag-chip" style="${{escAttr(tagStyleVars)}}" title="Tag: ${{escAttr(tagLabel)}}">${{escAttr(tagLabel)}}</span>`
           : "";
         const packetSparkClass = packetSparkWrapHtml ? " has-packet-spark" : "";
+        const statusGlyph = muted ? "‖" : "●";
+        const statusGlyphClass = muted ? " is-muted" : "";
         const actionRowHtml = removeBtn
           ? `<span class="chat-member-actions">${{removeBtn}}</span>`
           : '<span class="chat-member-actions"></span>';
         return `<div class="chat-member-item status-${{statusKey}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{mutedClass}}${{packetSparkClass}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
-          <span class="chat-member-status status-${{statusKey}}">●</span>
+          <span class="chat-member-status status-${{statusKey}}${{statusGlyphClass}}">${{statusGlyph}}</span>
           <span class="chat-member-main">
             <span class="chat-member-name-row">
               <span class="chat-member-name-left">
