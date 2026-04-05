@@ -4906,6 +4906,10 @@
       justify-content: center;
     }}
     .games-board-wrap {{
+      --games-turn-black-rgb: 20, 28, 34;
+      --games-turn-black-accent-rgb: 75, 91, 103;
+      --games-turn-white-rgb: 255, 255, 255;
+      --games-turn-white-accent-rgb: 214, 224, 233;
       width: 100%;
       min-height: 0;
       display: flex;
@@ -4931,32 +4935,48 @@
       border-radius: inherit;
       pointer-events: none;
       opacity: 0;
-      transform: scale(0.94);
-      transition: opacity 360ms ease, transform 520ms ease;
+      transition: opacity 360ms ease;
       z-index: 0;
     }}
     .games-board-wrap::before {{
       background:
-        radial-gradient(circle at 50% 44%, rgba(110, 135, 156, 0.26) 0%, rgba(46, 61, 73, 0.34) 34%, rgba(12, 18, 24, 0.08) 62%, transparent 76%),
-        radial-gradient(circle at 50% 50%, rgba(17, 23, 29, 0.26) 0%, transparent 72%);
+        linear-gradient(180deg, rgba(var(--games-turn-black-rgb), 0.24), rgba(var(--games-turn-black-rgb), 0.16)),
+        radial-gradient(circle at 50% 46%, rgba(var(--games-turn-black-accent-rgb), 0.1) 0%, rgba(var(--games-turn-black-rgb), 0.06) 60%, transparent 100%);
     }}
     .games-board-wrap::after {{
       background:
-        radial-gradient(circle at 50% 44%, rgba(236, 245, 255, 0.26) 0%, rgba(172, 197, 219, 0.18) 36%, rgba(93, 141, 170, 0.08) 64%, transparent 78%),
-        radial-gradient(circle at 50% 50%, rgba(214, 235, 248, 0.12) 0%, transparent 70%);
+        linear-gradient(180deg, rgba(var(--games-turn-white-rgb), 0.12), rgba(var(--games-turn-white-accent-rgb), 0.14)),
+        radial-gradient(circle at 50% 46%, rgba(var(--games-turn-white-rgb), 0.1) 0%, rgba(var(--games-turn-white-accent-rgb), 0.08) 60%, transparent 100%);
     }}
     .games-board-wrap[data-turn="black"] {{
-      border-color: #4a6276;
-      box-shadow: inset 0 0 0 1px rgba(137, 170, 194, 0.14), 0 0 0 1px rgba(12, 20, 28, 0.18);
+      border-color: rgba(var(--games-turn-black-accent-rgb), 0.72);
+      box-shadow: inset 0 0 0 1px rgba(var(--games-turn-black-rgb), 0.18), 0 0 0 1px rgba(var(--games-turn-black-rgb), 0.24);
     }}
     .games-board-wrap[data-turn="white"] {{
-      border-color: #a8c4d8;
-      box-shadow: inset 0 0 0 1px rgba(244, 249, 255, 0.18), 0 0 0 1px rgba(18, 36, 27, 0.12);
+      border-color: rgba(var(--games-turn-white-accent-rgb), 0.86);
+      box-shadow: inset 0 0 0 1px rgba(var(--games-turn-white-rgb), 0.16), 0 0 0 1px rgba(var(--games-turn-white-accent-rgb), 0.24);
     }}
     .games-board-wrap[data-turn="black"]::before,
     .games-board-wrap[data-turn="white"]::after {{
       opacity: 1;
-      transform: scale(1);
+    }}
+    #games-main-reversi .games-board-wrap {{
+      --games-turn-black-rgb: 20, 28, 34;
+      --games-turn-black-accent-rgb: 75, 91, 103;
+      --games-turn-white-rgb: 255, 255, 255;
+      --games-turn-white-accent-rgb: 214, 224, 233;
+    }}
+    #games-main-checkers .games-board-wrap {{
+      --games-turn-black-rgb: 32, 43, 51;
+      --games-turn-black-accent-rgb: 82, 97, 107;
+      --games-turn-white-rgb: 255, 255, 255;
+      --games-turn-white-accent-rgb: 214, 224, 232;
+    }}
+    #games-main-chess .games-board-wrap {{
+      --games-turn-black-rgb: 30, 42, 49;
+      --games-turn-black-accent-rgb: 72, 89, 100;
+      --games-turn-white-rgb: 248, 253, 255;
+      --games-turn-white-accent-rgb: 228, 239, 246;
     }}
     .games-board-wrap > * {{
       position: relative;
