@@ -360,54 +360,10 @@
         const deliveryChip = (isLocalEcho && deliveryLabel)
           ? `<span class="chat-delivery-pill state-${{escAttr(deliveryState)}}" title="${{escAttr(deliveryTitle)}}">${{escAttr(deliveryLabel)}}</span>`
           : "";
-        const rxSnrRaw = Number(
-          packetSummary.rx_snr
-          ?? packetSummary.rxSnr
-          ?? packetSummary.snr
-          ?? msg.rx_snr
-          ?? msg.rxSnr
-          ?? msg.snr
-        );
-        const rxSnr = Number.isFinite(rxSnrRaw) ? rxSnrRaw : null;
-        const rxRssiRaw = Number(
-          packetSummary.rx_rssi
-          ?? packetSummary.rxRssi
-          ?? packetSummary.rssi
-          ?? msg.rx_rssi
-          ?? msg.rxRssi
-          ?? msg.rssi
-        );
-        const rxRssi = Number.isFinite(rxRssiRaw) ? rxRssiRaw : null;
         const portnumText = String(msg.portnum ?? packetSummary.portnum ?? "").trim() || "n/a";
-        const ackText = `${{formatHopCountLabel(hopNum, "hop count n/a")}}.`;
-        const ackHopCount = hasHop ? Math.trunc(hopNum) : "";
-        const ackHopStart = Number.isFinite(hopStart) ? Math.trunc(hopStart) : "";
-        const ackHopLimit = Number.isFinite(hopLimit) ? Math.trunc(hopLimit) : "";
-        const ackReceivedUnix = (Number.isFinite(msgTimeUnix) && msgTimeUnix > 0)
-          ? Math.floor(msgTimeUnix)
-          : "";
-        const ackDestination = (() => {{
-          const normalizedTo = normalizeNodeId(fallbackNode);
-          if (!normalizedTo || normalizedTo === "^all") return "^all";
-          const normalizedFrom = normalizeNodeId(sourceNode);
-          if (isCanonicalNodeId(normalizedFrom) && !isSelfNodeId(normalizedFrom)) {{
-            return normalizedFrom;
-          }}
-          if (isCanonicalNodeId(normalizedTo) && !isSelfNodeId(normalizedTo)) {{
-            return normalizedTo;
-          }}
-          return "^all";
-        }})();
-        const ackTargetLabel = ackDestination === "^all"
-          ? "Everyone"
-          : (fromMeta.label || ackDestination);
         const retryReplyId = Number.isInteger(replyToId) && replyToId > 0 ? replyToId : "";
         const replyButton = canReply
           ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message">Reply</button>`
-          : "";
-        const canAck = canReply && !isStatusMessage && !isLocalEcho && !isSelfNodeId(sourceNode);
-        const ackButton = canAck
-          ? `<button type="button" class="chat-ack-btn" data-ack-reply-id="${{escAttr(messageId)}}" data-ack-text="${{escAttr(ackText)}}" data-ack-text-mode="pong" data-ack-destination="${{escAttr(ackDestination)}}" data-ack-channel="${{escAttr(meshIdx)}}" data-ack-target-label="${{escAttr(ackTargetLabel)}}" data-ack-source-id="${{escAttr(sourceNode)}}" data-ack-source-label="${{escAttr(fromMeta.label || "")}}" data-ack-received-unix="${{escAttr(ackReceivedUnix)}}" data-ack-hop-count="${{escAttr(ackHopCount)}}" data-ack-hop-start="${{escAttr(ackHopStart)}}" data-ack-hop-limit="${{escAttr(ackHopLimit)}}" data-ack-rx-snr="${{escAttr(rxSnr == null ? "" : rxSnr)}}" data-ack-rx-rssi="${{escAttr(rxRssi == null ? "" : rxRssi)}}" title="Quick ACK reply (ping-style): ${{escAttr(ackText)}}">Ack</button>`
           : "";
         const whoisButton = "";
         const hasReactions = reactionGroups.length > 0;
@@ -424,7 +380,6 @@
         const reactionRowParts = [];
         if (reactButton) reactionRowParts.push(reactButton);
         if (replyButton) reactionRowParts.push(replyButton);
-        if (ackButton) reactionRowParts.push(ackButton);
         const tailButtons = [];
         if (whoisButton) tailButtons.push(whoisButton);
         if (tailButtons.length > 0) {{

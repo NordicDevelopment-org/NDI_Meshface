@@ -83,19 +83,6 @@
           return;
         }}
 
-        const ackBtn = target.closest(".chat-ack-btn");
-        if (ackBtn) {{
-          ev.preventDefault();
-          ev.stopPropagation();
-          const ackOptions = chatAckOptionsFromButton(
-            ackBtn instanceof HTMLElement ? ackBtn : null
-          );
-          if (ackOptions) {{
-            void sendChatAck(ackOptions);
-          }}
-          return;
-        }}
-
         if (target.closest("a.chat-link")) {{
           // Let browser open the link (target=_blank) without selecting/replying.
           return;
