@@ -47,3 +47,17 @@ def test_dashboard_js_registers_console_traceroute_commands() -> None:
     assert 'usage: "--traceroute <id|name|num>' in js
     assert "resolveConsoleNodeTarget" in js
     assert "postNetworkToolCommand" in js
+
+
+def test_dashboard_js_includes_console_tab_autocomplete() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "let consoleAutocompleteState = null;" in js
+    assert "function parseConsoleTokenRanges(line)" in js
+    assert "function handleConsoleTabAutocomplete(inputEl, state = latestState, reverse = false)" in js
+    assert "resolveConsoleAutocompleteCandidates(context, state)" in js
+    assert 'if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey && !ev.altKey)' in js

@@ -96,7 +96,212 @@
       }}
       consoleCommandHistoryCursor = -1;
       consoleCommandDraft = "";
+      consoleAutocompleteState = null;
       renderConsolePromptBuffer(false);
+      return true;
+    }}
+
+    function resetConsoleAutocompleteState() {{
+      consoleAutocompleteState = null;
+    }}
+
+    function syncConsoleCommandDraftRender(rawValue) {{
+      const value = String(rawValue == null ? "" : rawValue);
+      const searchState = (typeof syncConsoleSearchFromDraft === "function")
+        ? syncConsoleSearchFromDraft(value)
+        : {{ active: false, changed: false }};
+      if (searchState.active || searchState.changed) {{
+        renderConsoleBuffer(false);
+      }} else {{
+        renderConsolePromptBuffer(false);
+      }}
+    }}
+
+    function resolveConsoleAutocompleteContext(inputEl) {{
+      if (!(inputEl instanceof HTMLInputElement)) return null;
+      const draft = String(inputEl.value || "");
+      const rawStart = Number(inputEl.selectionStart);
+      const rawEnd = Number(inputEl.selectionEnd);
+      const caret = Number.isFinite(rawStart)
+        ? Math.max(0, Math.min(draft.length, Math.trunc(rawStart)))
+        : draft.length;
+      const selectionEnd = Number.isFinite(rawEnd)
+        ? Math.max(0, Math.min(draft.length, Math.trunc(rawEnd)))
+        : caret;
+      if (caret !== selectionEnd) return null;
+
+      const tokens = parseConsoleTokenRanges(draft);
+      let tokenIndex = tokens.length;
+      let token = {{
+        text: "",
+        rawStart: caret,
+        rawEnd: caret,
+        quote: "",
+        unterminated: false,
+      }};
+      for (let i = 0; i < tokens.length; i += 1) {{
+        const candidate = tokens[i];
+        if (caret < candidate.rawStart) {{
+          tokenIndex = i;
+          break;
+        }}
+        if (caret >= candidate.rawStart && caret <= candidate.rawEnd) {{
+          tokenIndex = i;
+          token = candidate;
+          break;
+        }}
+      }}
+
+      const rawToken = draft.slice(token.rawStart, token.rawEnd);
+      const commandToken = tokenIndex === 0
+        ? token.text
+        : String(tokens[0] && tokens[0].text ? tokens[0].text : "");
+      const commandRaw = tokenIndex === 0
+        ? rawToken
+        : (
+          tokens[0]
+            ? draft.slice(tokens[0].rawStart, tokens[0].rawEnd)
+            : ""
+        );
+
+      return {{
+        draft,
+        caret,
+        tokenIndex,
+        tokenText: String(token.text || ""),
+        rawToken,
+        rawStart: token.rawStart,
+        rawEnd: token.rawEnd,
+        prefixRaw: draft.slice(0, token.rawStart),
+        suffixRaw: draft.slice(token.rawEnd),
+        leadingSlash: commandRaw.startsWith("/"),
+        commandName: String(commandToken || "").replace(/^\/+/, "").trim().toLowerCase(),
+      }};
+    }}
+
+    function applyConsoleAutocompleteCandidate(inputEl, context, candidate, options = null) {{
+      if (!(inputEl instanceof HTMLInputElement)) return null;
+      const ctx = (context && typeof context === "object") ? context : null;
+      if (!ctx) return null;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      let replacement = String(candidate == null ? "" : candidate);
+      if (!replacement) return null;
+      const canAppendSpace = opts.appendSpace === true
+        && !replacement.endsWith(" ")
+        && !/^\s/.test(String(ctx.suffixRaw || ""));
+      if (canAppendSpace) {{
+        replacement += " ";
+      }}
+      const nextValue = `${{String(ctx.prefixRaw || "")}}${{replacement}}${{String(ctx.suffixRaw || "")}}`;
+      const nextCaret = String(ctx.prefixRaw || "").length + replacement.length;
+      inputEl.value = nextValue;
+      try {{
+        inputEl.setSelectionRange(nextCaret, nextCaret);
+      }} catch (_err) {{
+      }}
+      syncConsoleCommandDraftRender(nextValue);
+      return {{
+        value: nextValue,
+        caret: nextCaret,
+      }};
+    }}
+
+    function handleConsoleTabAutocomplete(inputEl, state = latestState, reverse = false) {{
+      if (!(inputEl instanceof HTMLInputElement)) return false;
+      const activeSession = (consoleAutocompleteState && typeof consoleAutocompleteState === "object")
+        ? consoleAutocompleteState
+        : null;
+      const currentValue = String(inputEl.value || "");
+      const currentCaret = Math.max(0, Math.trunc(Number(inputEl.selectionStart) || 0));
+      const currentSelectionEnd = Math.max(0, Math.trunc(Number(inputEl.selectionEnd) || 0));
+      if (currentCaret !== currentSelectionEnd) {{
+        resetConsoleAutocompleteState();
+        return false;
+      }}
+
+      if (
+        activeSession
+        && Array.isArray(activeSession.candidates)
+        && activeSession.candidates.length > 1
+        && currentValue === String(activeSession.appliedDraft || "")
+        && currentCaret === Math.max(0, Math.trunc(Number(activeSession.caret) || 0))
+      ) {{
+        const count = activeSession.candidates.length;
+        const nextIndex = reverse
+          ? (activeSession.index + count - 1) % count
+          : (activeSession.index + 1) % count;
+        const nextDraft = applyConsoleAutocompleteCandidate(
+          inputEl,
+          {{
+            prefixRaw: activeSession.prefixRaw,
+            suffixRaw: activeSession.suffixRaw,
+          }},
+          activeSession.candidates[nextIndex],
+          {{ appendSpace: false }},
+        );
+        if (!nextDraft) {{
+          resetConsoleAutocompleteState();
+          return false;
+        }}
+        consoleAutocompleteState = {{
+          ...activeSession,
+          index: nextIndex,
+          appliedDraft: nextDraft.value,
+          caret: nextDraft.caret,
+        }};
+        return true;
+      }}
+
+      const context = resolveConsoleAutocompleteContext(inputEl);
+      if (!context) {{
+        resetConsoleAutocompleteState();
+        return false;
+      }}
+      const candidates = resolveConsoleAutocompleteCandidates(context, state)
+        .map((value) => String(value == null ? "" : value))
+        .filter((value) => !!value);
+      if (!candidates.length) {{
+        resetConsoleAutocompleteState();
+        return false;
+      }}
+
+      let candidateIndex = 0;
+      if (candidates.length > 1) {{
+        const existingIndex = candidates.findIndex((candidate) => (
+          candidate === context.rawToken || candidate === context.tokenText
+        ));
+        if (existingIndex >= 0) {{
+          candidateIndex = reverse
+            ? (existingIndex + candidates.length - 1) % candidates.length
+            : (existingIndex + 1) % candidates.length;
+        }} else {{
+          candidateIndex = reverse ? (candidates.length - 1) : 0;
+        }}
+      }}
+
+      const nextDraft = applyConsoleAutocompleteCandidate(
+        inputEl,
+        context,
+        candidates[candidateIndex],
+        {{ appendSpace: candidates.length === 1 }},
+      );
+      if (!nextDraft) {{
+        resetConsoleAutocompleteState();
+        return false;
+      }}
+
+      if (candidates.length > 1) {{
+        consoleAutocompleteState = {{
+          candidates,
+          index: candidateIndex,
+          prefixRaw: context.prefixRaw,
+          suffixRaw: context.suffixRaw,
+          appliedDraft: nextDraft.value,
+          caret: nextDraft.caret,
+        }};
+      }} else {{
+        resetConsoleAutocompleteState();
+      }}
       return true;
     }}
 

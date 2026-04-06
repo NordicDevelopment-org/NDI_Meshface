@@ -352,9 +352,11 @@
         }});
         input.addEventListener("blur", () => {{
           consoleCursorVisible = false;
+          resetConsoleAutocompleteState();
           renderConsolePromptBuffer(false);
         }});
         input.addEventListener("input", () => {{
+          resetConsoleAutocompleteState();
           const searchState = (typeof syncConsoleSearchFromDraft === "function")
             ? syncConsoleSearchFromDraft(input.value)
             : {{ active: false, changed: false }};
@@ -398,8 +400,14 @@
               input.value = "";
               consoleCommandHistoryCursor = -1;
               consoleCommandDraft = "";
+              resetConsoleAutocompleteState();
               renderConsolePromptBuffer(false);
             }}
+            return;
+          }}
+          if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
+            ev.preventDefault();
+            handleConsoleTabAutocomplete(input, latestState, ev.shiftKey);
             return;
           }}
           if (ev.key === "Enter" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
@@ -416,6 +424,7 @@
             input.value = "";
             consoleCommandHistoryCursor = -1;
             consoleCommandDraft = "";
+            resetConsoleAutocompleteState();
             renderConsolePromptBuffer(false);
             void runConsoleCommandLine(cmdLine);
             focusConsoleCommandInput(false);
@@ -423,11 +432,13 @@
           }}
           if (ev.key === "ArrowUp" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
             ev.preventDefault();
+            resetConsoleAutocompleteState();
             navigateConsoleHistory(-1, input);
             return;
           }}
           if (ev.key === "ArrowDown" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
             ev.preventDefault();
+            resetConsoleAutocompleteState();
             navigateConsoleHistory(1, input);
           }}
         }});

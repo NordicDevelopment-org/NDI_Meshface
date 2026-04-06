@@ -93,6 +93,130 @@
       }});
     }}
 
+    const consoleNodeTargetAutocompleteCommands = new Set([
+      "lookup",
+      "node",
+      "traceroute",
+      "--traceroute",
+    ]);
+
+    function escapeConsoleCompletionToken(value) {{
+      const clean = String(value == null ? "" : value).trim();
+      if (!clean) return "";
+      if (!/[\s"'\\]/.test(clean)) {{
+        return clean;
+      }}
+      return `"${{clean
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')}}"`
+    }}
+
+    function resolveConsoleCommandCompletionCandidates(rawPrefix, options = null) {{
+      ensureConsoleCommandsRegistered();
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const allowSearch = opts.allowSearch === true;
+      const leadingSlash = opts.leadingSlash === true;
+      const prefix = String(rawPrefix == null ? "" : rawPrefix).trim().toLowerCase();
+      const names = Array.from(consoleCommandRegistry.keys())
+        .map((name) => String(name == null ? "" : name).trim().toLowerCase())
+        .filter((name) => !!name);
+      if (allowSearch) {{
+        names.push("search");
+      }}
+      const unique = Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+      if (!prefix) return [];
+      return unique
+        .filter((name) => name.startsWith(prefix))
+        .map((name) => leadingSlash ? `/${{name}}` : name);
+    }}
+
+    function resolveConsoleNodeCompletionCandidates(rawPrefix, state = latestState) {{
+      const prefix = String(rawPrefix == null ? "" : rawPrefix).trim();
+      if (!prefix) return [];
+      const clean = prefix.toLowerCase();
+      const rows = collectConsoleNodeRows(state);
+      const seen = new Set();
+      const out = [];
+      const push = (value) => {{
+        const cleanValue = String(value == null ? "" : value).trim();
+        if (!cleanValue) return;
+        const insertText = escapeConsoleCompletionToken(cleanValue);
+        const dedupeKey = insertText.toLowerCase();
+        if (seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+        out.push(insertText);
+      }};
+      const matchId = (value) => {{
+        const nodeId = String(value == null ? "" : value).trim().toLowerCase();
+        if (!nodeId) return false;
+        if (nodeId.startsWith(clean)) return true;
+        if (!clean.startsWith("!")) {{
+          return nodeId.replace(/^!/, "").startsWith(clean);
+        }}
+        return false;
+      }};
+      const matchNum = (row) => {{
+        const nodeNum = consoleNodeRowNum(row);
+        if (!Number.isInteger(nodeNum) || nodeNum < 0) return false;
+        return String(nodeNum).startsWith(prefix);
+      }};
+      const matchName = (value) => String(value == null ? "" : value).trim().toLowerCase().startsWith(clean);
+
+      if (/^\d+$/.test(prefix)) {{
+        for (const row of rows) {{
+          if (matchNum(row)) {{
+            push(String(consoleNodeRowNum(row)));
+          }}
+        }}
+      }}
+      if (clean.startsWith("!")) {{
+        for (const row of rows) {{
+          if (matchId(row && row.id)) {{
+            push(row.id);
+          }}
+        }}
+      }}
+      for (const row of rows) {{
+        for (const value of collectConsoleNodeLookupNameVariants(row)) {{
+          if (matchName(value)) {{
+            push(value);
+          }}
+        }}
+      }}
+      for (const row of rows) {{
+        if (matchId(row && row.id)) {{
+          push(row.id);
+        }}
+      }}
+      if (!clean.startsWith("!") && !/^\d+$/.test(prefix)) {{
+        for (const row of rows) {{
+          if (matchNum(row)) {{
+            push(String(consoleNodeRowNum(row)));
+          }}
+        }}
+      }}
+      return out;
+    }}
+
+    function resolveConsoleAutocompleteCandidates(context, state = latestState) {{
+      const ctx = (context && typeof context === "object") ? context : {{}};
+      const tokenIndex = Math.max(0, Math.trunc(Number(ctx.tokenIndex) || 0));
+      const rawToken = String(ctx.tokenText == null ? "" : ctx.tokenText);
+      const commandName = String(ctx.commandName == null ? "" : ctx.commandName).trim().toLowerCase();
+      const leadingSlash = ctx.leadingSlash === true;
+      if (tokenIndex === 0) {{
+        const prefix = leadingSlash ? rawToken.replace(/^\//, "") : rawToken;
+        return resolveConsoleCommandCompletionCandidates(prefix, {{
+          allowSearch: leadingSlash,
+          leadingSlash,
+        }});
+      }}
+      if (tokenIndex === 1 && consoleNodeTargetAutocompleteCommands.has(commandName)) {{
+        return resolveConsoleNodeCompletionCandidates(rawToken, state);
+      }}
+      return [];
+    }}
+
     function formatConsoleListTime(unixSeconds) {{
       const ts = Number(unixSeconds);
       if (!Number.isFinite(ts) || ts <= 0) return "n/a";

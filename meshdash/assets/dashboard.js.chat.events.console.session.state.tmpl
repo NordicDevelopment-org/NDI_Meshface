@@ -202,6 +202,82 @@
       return {{ tokens, error: "" }};
     }}
 
+    function parseConsoleTokenRanges(line) {{
+      const input = String(line == null ? "" : line);
+      const tokens = [];
+      let buf = "";
+      let quote = "";
+      let escaped = false;
+      let tokenStart = -1;
+      let tokenQuote = "";
+      const pushToken = (rawEnd) => {{
+        if (tokenStart < 0) return;
+        tokens.push({{
+          text: buf,
+          rawStart: tokenStart,
+          rawEnd,
+          quote: tokenQuote,
+          unterminated: !!quote,
+        }});
+        buf = "";
+        quote = "";
+        escaped = false;
+        tokenStart = -1;
+        tokenQuote = "";
+      }};
+      for (let i = 0; i < input.length; i += 1) {{
+        const ch = input[i];
+        if (tokenStart < 0) {{
+          if (/\s/.test(ch)) {{
+            continue;
+          }}
+          tokenStart = i;
+          tokenQuote = "";
+          if (ch === "'" || ch === "\"") {{
+            quote = ch;
+            tokenQuote = ch;
+            continue;
+          }}
+          buf += ch;
+          continue;
+        }}
+        if (escaped) {{
+          buf += ch;
+          escaped = false;
+          continue;
+        }}
+        if (ch === "\\") {{
+          escaped = true;
+          continue;
+        }}
+        if (quote) {{
+          if (ch === quote) {{
+            quote = "";
+          }} else {{
+            buf += ch;
+          }}
+          continue;
+        }}
+        if (ch === "'" || ch === "\"") {{
+          quote = ch;
+          if (!tokenQuote && !buf) {{
+            tokenQuote = ch;
+          }}
+          continue;
+        }}
+        if (/\s/.test(ch)) {{
+          pushToken(i);
+          continue;
+        }}
+        buf += ch;
+      }}
+      if (escaped) buf += "\\";
+      if (tokenStart >= 0) {{
+        pushToken(input.length);
+      }}
+      return tokens;
+    }}
+
     function parseConsoleCommandLine(line) {{
       const parsedTokens = parseConsoleTokens(line);
       if (parsedTokens.error) {{
@@ -284,6 +360,7 @@
       }}
       consoleCommandHistoryCursor = -1;
       consoleCommandDraft = "";
+      consoleAutocompleteState = null;
       persistConsoleSessionState();
     }}
 
@@ -307,6 +384,7 @@
           consoleCommandHistoryCursor = -1;
           inputEl.value = consoleCommandDraft;
           inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+          consoleAutocompleteState = null;
           const searchState = (typeof syncConsoleSearchFromDraft === "function")
             ? syncConsoleSearchFromDraft(inputEl.value)
             : {{ active: false, changed: false }};
@@ -322,6 +400,7 @@
       const nextValue = String(consoleCommandHistory[consoleCommandHistoryCursor] || "");
       inputEl.value = nextValue;
       inputEl.setSelectionRange(nextValue.length, nextValue.length);
+      consoleAutocompleteState = null;
       const searchState = (typeof syncConsoleSearchFromDraft === "function")
         ? syncConsoleSearchFromDraft(nextValue)
         : {{ active: false, changed: false }};
