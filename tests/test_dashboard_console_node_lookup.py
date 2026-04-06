@@ -18,3 +18,17 @@ def test_dashboard_js_registers_console_node_lookup_commands() -> None:
     assert 'name: "lookup"' in js
     assert 'usage: "lookup <id|name>"' in js
     assert 'resolveConsoleNodeLookupMatches' in js
+
+
+def test_dashboard_js_registers_console_nodes_aliases() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'name: "nodes"' in js
+    assert 'usage: "nodes [pattern]' in js
+    assert 'name: "--nodes"' in js
+    assert 'usage: "--nodes [pattern]' in js
+    assert "runConsoleNodeListCommand" in js

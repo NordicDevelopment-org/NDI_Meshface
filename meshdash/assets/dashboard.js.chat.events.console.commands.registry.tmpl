@@ -312,137 +312,21 @@
         usage: "list [-v|-vv|-vvv|-vvvv] [pattern] [name=<wildcard>] [id=<wildcard>] [status=<wildcard>] [port=<wildcard>] [gps=<yes|no>] [hops=<n>] [hops>n] [hops<n] [limit=<n>]",
         description: "List nodes from current state with wildcard filters.",
         supportsVerbosity: true,
-        run: (ctx) => {{
-          const options = (ctx && ctx.options && typeof ctx.options === "object")
-            ? ctx.options
-            : {{}};
-          const verbosity = Math.max(0, Math.min(4, Number(ctx && ctx.verbosity) || 0));
-          const comparisons = Array.isArray(ctx && ctx.comparisons) ? ctx.comparisons : [];
-          const rawArgs = Array.isArray(ctx && ctx.args) ? ctx.args : [];
-          const idPattern = normalizeWildcardPattern(options.id || "");
-          const namePattern = normalizeWildcardPattern(options.name || "");
-          const statusPattern = normalizeWildcardPattern(options.status || "");
-          const portPattern = normalizeWildcardPattern(options.port ?? options.p ?? "");
-          const parseBoolFilter = (rawValue) => {{
-            if (typeof rawValue === "boolean") return rawValue;
-            const clean = String(rawValue == null ? "" : rawValue).trim().toLowerCase();
-            if (!clean) return null;
-            if (["1", "true", "yes", "y", "on", "gps", "with"].includes(clean)) return true;
-            if (["0", "false", "no", "n", "off", "none", "without", "nogps", "no-gps"].includes(clean)) return false;
-            return null;
-          }};
-          let gpsFilter = null;
-          if (Object.prototype.hasOwnProperty.call(options, "gps")) {{
-            gpsFilter = parseBoolFilter(options.gps);
-            if (gpsFilter == null) {{
-              return `[list] invalid gps value: ${{String(options.gps)}}`;
-            }}
-          }}
-          const args = [];
-          for (const arg of rawArgs) {{
-            const clean = String(arg || "").trim().toLowerCase();
-            if (!Object.prototype.hasOwnProperty.call(options, "gps")) {{
-              if (clean === "gps") {{
-                gpsFilter = true;
-                continue;
-              }}
-              if (clean === "nogps" || clean === "no-gps") {{
-                gpsFilter = false;
-                continue;
-              }}
-            }}
-            args.push(arg);
-          }}
-          const freePattern = normalizeWildcardPattern(args[0] || "");
-          const hopsComparators = [];
-          const pushHopsComparator = (op, rawValue) => {{
-            const numeric = Number(rawValue);
-            if (!Number.isFinite(numeric)) {{
-              return false;
-            }}
-            hopsComparators.push({{ op: String(op || "="), value: numeric }});
-            return true;
-          }};
-          if (Object.prototype.hasOwnProperty.call(options, "hops")) {{
-            if (!pushHopsComparator("=", options.hops)) {{
-              return `[list] invalid hops value: ${{String(options.hops)}}`;
-            }}
-          }}
-          for (const cmp of comparisons) {{
-            if (!cmp || typeof cmp !== "object") continue;
-            const cmpKey = String(cmp.key || "").trim().toLowerCase();
-            if (cmpKey !== "hops" && cmpKey !== "hop") continue;
-            const cmpOp = String(cmp.op || "").trim();
-            if (!["<", ">", "<=", ">="].includes(cmpOp)) continue;
-            if (!pushHopsComparator(cmpOp, cmp.value)) {{
-              return `[list] invalid hops comparator: ${{cmpKey}}${{cmpOp}}${{String(cmp.value || "")}}`;
-            }}
-          }}
-          const limitRaw = Number(options.limit ?? options.n ?? 50);
-          const limit = Math.min(500, Math.max(1, Math.floor(Number.isFinite(limitRaw) ? limitRaw : 50)));
-          const rows = collectConsoleNodeRows(ctx && ctx.state);
-          const filtered = rows.filter((row) => {{
-            if (freePattern) {{
-              const freeHit = wildcardMatches(freePattern, row.id) || wildcardMatches(freePattern, row.name);
-              if (!freeHit) return false;
-            }}
-            if (idPattern && !wildcardMatches(idPattern, row.id)) return false;
-            if (namePattern && !wildcardMatches(namePattern, row.name)) return false;
-            if (statusPattern && !wildcardMatches(statusPattern, row.status)) return false;
-            if (portPattern) {{
-              const hasPortMatch = Array.isArray(row.ports)
-                && row.ports.some((portValue) => wildcardMatches(portPattern, portValue));
-              if (!hasPortMatch) return false;
-            }}
-            if (gpsFilter != null && Boolean(row.hasGps) !== gpsFilter) return false;
-            if (hopsComparators.length) {{
-              const hopsValue = Number(row.hops);
-              if (!Number.isFinite(hopsValue)) return false;
-              for (const cmp of hopsComparators) {{
-                const target = Number(cmp.value);
-                if (cmp.op === ">" && !(hopsValue > target)) return false;
-                if (cmp.op === "<" && !(hopsValue < target)) return false;
-                if (cmp.op === ">=" && !(hopsValue >= target)) return false;
-                if (cmp.op === "<=" && !(hopsValue <= target)) return false;
-                if (cmp.op === "=" && !(hopsValue === target)) return false;
-              }}
-            }}
-            return true;
-          }});
-          const show = filtered.slice(0, limit);
-          const lines = [
-            `[list] matched ${{filtered.length}} node(s); showing ${{show.length}}.`,
-          ];
-          for (const row of show) {{
-            const hopsLabel = row.hops == null ? "n/a" : String(row.hops);
-            const portsLabel = formatConsolePortSummary(row.ports, 3);
-            const gpsLabel = row.hasGps ? "yes" : "no";
-            const lat = Number(row && row.raw && row.raw.lat);
-            const lon = Number(row && row.raw && row.raw.lon);
-            const posLabel = row.hasGps
-              ? `${{lat.toFixed(5)}},${{lon.toFixed(5)}}`
-              : "n/a";
-            lines.push(
-              `${{row.id}} | ${{row.name}} | status=${{row.status}} | gps=${{gpsLabel}} | hops=${{hopsLabel}} | ports=${{portsLabel}} | last=${{formatConsoleListTime(row.lastSeenUnix)}}${{verbosity > 0 ? ` | pos=${{posLabel}}` : ""}}`
-            );
-            if (verbosity >= 2) {{
-              const altitude = Number(row && row.raw && row.raw.altitude);
-              const battery = Number(row && row.raw && row.raw.battery_level);
-              const detail = [];
-              if (Number.isFinite(altitude)) detail.push(`alt=${{Math.trunc(altitude)}}m`);
-              if (Number.isFinite(battery)) detail.push(`batt=${{Math.round(battery)}}%`);
-              if (detail.length) {{
-                lines.push(`  details: ${{detail.join(" | ")}}`);
-              }}
-            }}
-          }}
-          if (!show.length) {{
-            lines.push("[list] no matches. Try list * or list name=*pattern*");
-          }} else if (filtered.length > show.length) {{
-            lines.push(`[list] truncated. Use limit=<n> up to 500.`);
-          }}
-          return lines;
-        }},
+        run: (ctx) => runConsoleNodeListCommand(ctx, "list"),
+      }});
+      registerConsoleCommand({{
+        name: "nodes",
+        usage: "nodes [pattern] [name=<wildcard>] [id=<wildcard>] [status=<wildcard>] [port=<wildcard>] [gps=<yes|no>] [hops=<n>] [hops>n] [hops<n] [limit=<n>]",
+        description: "Meshtastic-style alias for list.",
+        supportsVerbosity: true,
+        run: (ctx) => runConsoleNodeListCommand(ctx, "nodes"),
+      }});
+      registerConsoleCommand({{
+        name: "--nodes",
+        usage: "--nodes [pattern] [name=<wildcard>] [id=<wildcard>] [status=<wildcard>] [port=<wildcard>] [gps=<yes|no>] [hops=<n>] [hops>n] [hops<n] [limit=<n>]",
+        description: "Meshtastic-style alias for list.",
+        supportsVerbosity: true,
+        run: (ctx) => runConsoleNodeListCommand(ctx, "nodes"),
       }});
       const runNodeLookupCommand = (ctx) => {{
         const args = Array.isArray(ctx && ctx.args) ? ctx.args : [];
