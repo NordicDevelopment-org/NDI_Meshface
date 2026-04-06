@@ -58,6 +58,10 @@ def test_dashboard_js_includes_console_tab_autocomplete() -> None:
 
     assert "let consoleAutocompleteState = null;" in js
     assert "function parseConsoleTokenRanges(line)" in js
+    assert "function normalizeConsoleAutocompleteCandidate(candidate)" in js
     assert "function handleConsoleTabAutocomplete(inputEl, state = latestState, reverse = false)" in js
+    assert "function resolveConsoleAutocompleteGhostSuffix(inputEl, state = latestState)" in js
+    assert "function resolveConsoleAutocompleteGhostRemainder(rawToken, candidate)" in js
     assert "resolveConsoleAutocompleteCandidates(context, state)" in js
     assert 'if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey && !ev.altKey)' in js
+    assert 'class="console-completion-ghost"' in js

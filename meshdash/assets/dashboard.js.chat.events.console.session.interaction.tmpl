@@ -184,7 +184,14 @@
       const ctx = (context && typeof context === "object") ? context : null;
       if (!ctx) return null;
       const opts = (options && typeof options === "object") ? options : {{}};
-      let replacement = String(candidate == null ? "" : candidate);
+      const normalizedCandidate = (typeof normalizeConsoleAutocompleteCandidate === "function")
+        ? normalizeConsoleAutocompleteCandidate(candidate)
+        : null;
+      let replacement = String(
+        normalizedCandidate && normalizedCandidate.insertText
+          ? normalizedCandidate.insertText
+          : (candidate == null ? "" : candidate)
+      );
       if (!replacement) return null;
       const canAppendSpace = opts.appendSpace === true
         && !replacement.endsWith(" ")
@@ -258,8 +265,12 @@
         return false;
       }}
       const candidates = resolveConsoleAutocompleteCandidates(context, state)
-        .map((value) => String(value == null ? "" : value))
-        .filter((value) => !!value);
+        .map((candidate) => (
+          typeof normalizeConsoleAutocompleteCandidate === "function"
+            ? normalizeConsoleAutocompleteCandidate(candidate)
+            : null
+        ))
+        .filter((candidate) => !!(candidate && candidate.insertText));
       if (!candidates.length) {{
         resetConsoleAutocompleteState();
         return false;
@@ -268,7 +279,10 @@
       let candidateIndex = 0;
       if (candidates.length > 1) {{
         const existingIndex = candidates.findIndex((candidate) => (
-          candidate === context.rawToken || candidate === context.tokenText
+          String(candidate.insertText || "") === context.rawToken
+          || String(candidate.insertText || "") === context.tokenText
+          || String(candidate.displayText || "") === context.rawToken
+          || String(candidate.displayText || "") === context.tokenText
         ));
         if (existingIndex >= 0) {{
           candidateIndex = reverse
@@ -303,6 +317,53 @@
         resetConsoleAutocompleteState();
       }}
       return true;
+    }}
+
+    function resolveConsoleAutocompleteGhostRemainder(rawToken, candidate) {{
+      const token = String(rawToken == null ? "" : rawToken);
+      if (!token) return "";
+      const normalizedCandidate = (typeof normalizeConsoleAutocompleteCandidate === "function")
+        ? normalizeConsoleAutocompleteCandidate(candidate)
+        : null;
+      if (!normalizedCandidate) return "";
+      const tokenLower = token.toLowerCase();
+      const variants = [
+        String(normalizedCandidate.displayText || ""),
+        String(normalizedCandidate.insertText || ""),
+      ];
+      for (const variant of variants) {{
+        if (!variant) continue;
+        if (variant === token) return "";
+        if (variant.toLowerCase().startsWith(tokenLower)) {{
+          return variant.slice(token.length);
+        }}
+      }}
+      return "";
+    }}
+
+    function resolveConsoleAutocompleteGhostSuffix(inputEl, state = latestState) {{
+      if (!(inputEl instanceof HTMLInputElement)) return "";
+      const draft = String(inputEl.value || "");
+      if (!draft) return "";
+      const caret = Math.max(0, Math.trunc(Number(inputEl.selectionStart) || 0));
+      const selectionEnd = Math.max(0, Math.trunc(Number(inputEl.selectionEnd) || 0));
+      if (caret !== selectionEnd || caret !== draft.length) return "";
+
+      const context = resolveConsoleAutocompleteContext(inputEl);
+      if (!context) return "";
+      const rawToken = String(context.rawToken || "");
+      if (!rawToken) return "";
+
+      const candidates = resolveConsoleAutocompleteCandidates(context, state)
+        .map((candidate) => (
+          typeof normalizeConsoleAutocompleteCandidate === "function"
+            ? normalizeConsoleAutocompleteCandidate(candidate)
+            : null
+        ))
+        .filter((candidate) => !!(candidate && candidate.insertText));
+      if (!candidates.length) return "";
+
+      return resolveConsoleAutocompleteGhostRemainder(rawToken, candidates[0]);
     }}
 
     function handleConsolePasteEvent(ev) {{
