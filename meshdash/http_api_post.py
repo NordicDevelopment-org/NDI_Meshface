@@ -12,6 +12,7 @@ from .http_route_contracts import (
     ApplyBotSettingsFn,
     DashboardPostRouteDependencies,
     PlayStandaloneZorkFn,
+    RunNetworkToolFn,
     SendChatFn,
     SetCustomTelemetrySettingsFn,
     SetThemePresetFn,
@@ -54,6 +55,10 @@ parse_custom_telemetry_settings_request = _load_optional_callable(
     "parse_custom_telemetry_settings_request",
 )
 parse_standalone_zork_request = _load_optional_callable(".api_input_zork", "parse_standalone_zork_request")
+parse_network_tool_request = _load_optional_callable(
+    ".api_input_network_tools",
+    "parse_network_tool_request",
+)
 
 
 def build_post_route_dependencies(
@@ -65,6 +70,7 @@ def build_post_route_dependencies(
     apply_bot_settings_fn: ApplyBotSettingsFn | None = None,
     set_custom_telemetry_settings_fn: SetCustomTelemetrySettingsFn | None = None,
     play_standalone_zork_fn: PlayStandaloneZorkFn | None = None,
+    run_network_tool_fn: RunNetworkToolFn | None = None,
     api_token: str | None = None,
     private_mode: bool = False,
     api_metrics: ApiMetricsRecorder | None = None,
@@ -93,6 +99,8 @@ def build_post_route_dependencies(
         parse_bot_settings_request_fn=parse_bot_settings_request,
         play_standalone_zork_fn=play_standalone_zork_fn,
         parse_standalone_zork_request_fn=parse_standalone_zork_request,
+        run_network_tool_fn=run_network_tool_fn,
+        parse_network_tool_request_fn=parse_network_tool_request,
         api_token=clean_api_token,
         private_mode=bool(private_mode),
         api_metrics=api_metrics,

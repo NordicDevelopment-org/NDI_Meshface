@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from .api_input_chat import ChatSendRequest
     from .api_input_custom_telemetry import CustomTelemetrySettingsRequest
     from .api_input_history import NodeHistoryQuery, OnlineActivityQuery
+    from .api_input_network_tools import NetworkToolRequest
     from .api_input_radio import RadioSettingsRequest
     from .api_input_theme import ThemeSettingsRequest
     from .api_input_zork import StandaloneZorkRequest
@@ -16,6 +17,7 @@ else:
     ChatSendRequest = object
     CustomTelemetrySettingsRequest = object
     NodeHistoryQuery = object
+    NetworkToolRequest = object
     OnlineActivityQuery = object
     RadioSettingsRequest = object
     ThemeSettingsRequest = object
@@ -170,6 +172,16 @@ class ParseBotSettingsRequestFn(Protocol):
         ...
 
 
+class ParseNetworkToolRequestFn(Protocol):
+    def __call__(
+        self,
+        raw_body: bytes,
+        *,
+        to_int_fn: ToIntFn,
+    ) -> NetworkToolRequest:
+        ...
+
+
 class ApplyRadioSettingsFn(Protocol):
     def __call__(self, request: RadioSettingsRequest) -> dict[str, object]:
         ...
@@ -197,6 +209,11 @@ class PlayStandaloneZorkFn(Protocol):
         text: object,
         session_id: object = None,
     ) -> dict[str, object]:
+        ...
+
+
+class RunNetworkToolFn(Protocol):
+    def __call__(self, request: NetworkToolRequest) -> dict[str, object]:
         ...
 
 
@@ -296,6 +313,8 @@ class DashboardPostRouteDependencies:
     parse_bot_settings_request_fn: Optional[ParseBotSettingsRequestFn] = None
     play_standalone_zork_fn: Optional[PlayStandaloneZorkFn] = None
     parse_standalone_zork_request_fn: Optional[ParseStandaloneZorkRequestFn] = None
+    run_network_tool_fn: Optional[RunNetworkToolFn] = None
+    parse_network_tool_request_fn: Optional[ParseNetworkToolRequestFn] = None
     api_token: Optional[str] = None
     private_mode: bool = False
     api_metrics: Optional[ApiMetricsRecorder] = None

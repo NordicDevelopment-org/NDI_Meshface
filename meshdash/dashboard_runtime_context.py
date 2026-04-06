@@ -294,6 +294,23 @@ def build_dashboard_runtime_context(
 
         setattr(loaders.state_fn, "apply_channel_settings_fn", _apply_channel_settings_fn)
 
+    # Optional: attach network tools service hook.
+    try:
+        from .services_network_tools import run_network_tool as _run_network_tool
+    except Exception:
+        _run_network_tool = None
+
+    if _run_network_tool is not None:
+        def _run_network_tool_fn(request):  # type: ignore[no-redef]
+            return _run_network_tool(
+                request,
+                iface=iface,
+                send_lock=send_lock,
+                to_int_fn=to_int_fn,
+            )
+
+        setattr(loaders.state_fn, "run_network_tool_fn", _run_network_tool_fn)
+
     # Optional: expose custom telemetry extraction rules persisted in history DB.
     if history_store is not None:
         get_custom_telemetry_settings_fn = getattr(history_store, "get_custom_telemetry_settings", None)
