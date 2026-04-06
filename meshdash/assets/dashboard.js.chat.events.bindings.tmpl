@@ -1,3 +1,29 @@
+    function chatFeedHasExpandedSelection(container = null) {{
+      const selection = window.getSelection ? window.getSelection() : null;
+      if (!selection || selection.rangeCount <= 0 || selection.isCollapsed) {{
+        return false;
+      }}
+      const scope = container instanceof HTMLElement ? container : null;
+      for (let idx = 0; idx < selection.rangeCount; idx += 1) {{
+        let range = null;
+        try {{
+          range = selection.getRangeAt(idx);
+        }} catch (_err) {{
+          continue;
+        }}
+        if (!range) continue;
+        const common = range.commonAncestorContainer;
+        const node = common instanceof Element
+          ? common
+          : (common && common.parentElement ? common.parentElement : null);
+        if (!node) continue;
+        if (!(scope instanceof HTMLElement) || scope.contains(node)) {{
+          return true;
+        }}
+      }}
+      return false;
+    }}
+
     function bindChatFeedClicks() {{
       const feed = document.getElementById("chat-feed");
       if (!(feed instanceof HTMLElement) || feed.dataset.feedClickBound === "1") return;
@@ -89,6 +115,10 @@
         }}
 
         if (target.closest("button")) {{
+          return;
+        }}
+
+        if (chatFeedHasExpandedSelection(item)) {{
           return;
         }}
 
