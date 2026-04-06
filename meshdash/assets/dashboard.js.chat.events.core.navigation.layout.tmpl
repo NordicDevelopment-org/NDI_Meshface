@@ -558,7 +558,7 @@
           .map((bucket) => `<span class="chat-reaction-summary-emoji">${{escAttr(bucket.emoji)}}</span>`)
           .join("");
         const reactionSummary = reactionGroups.length > 0
-          ? `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}" title="${{escAttr(reactionSummaryTitle)}}">
+          ? `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" data-reply-id="${{escAttr(messageId)}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}" title="${{escAttr(`${{reactionSummaryTitle}} • React to this message`)}}">
               <span class="chat-reaction-summary-icons">${{reactionSummaryIcons}}</span>
               <span class="chat-reaction-summary-total">${{reactionTotal}}</span>
             </button>`

@@ -82,6 +82,62 @@
       }}
     }}
 
+    function reactionSummaryTargetId(button) {{
+      if (!(button instanceof HTMLButtonElement)) return null;
+      const parsed = Number(button.dataset.replyId || button.dataset.messageId || "");
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    }}
+
+    function reactionQuickChoices(groups = []) {{
+      const out = [];
+      const used = new Set();
+      const pushChoice = (value) => {{
+        const emoji = String(value || "").trim();
+        if (!emoji || used.has(emoji)) return;
+        if (typeof isReactionCompatibleEmoji === "function" && !isReactionCompatibleEmoji(emoji)) {{
+          return;
+        }}
+        used.add(emoji);
+        out.push(emoji);
+      }};
+
+      for (const group of (Array.isArray(groups) ? groups : [])) {{
+        pushChoice(group && group.emoji);
+      }}
+
+      if (typeof chatEmojiTopChoices === "function") {{
+        try {{
+          const preferred = chatEmojiTopChoices();
+          for (const emoji of (Array.isArray(preferred) ? preferred : [])) {{
+            pushChoice(emoji);
+          }}
+        }} catch (_err) {{
+        }}
+      }}
+
+      for (const emoji of ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "✅"]) {{
+        pushChoice(emoji);
+      }}
+
+      return out.slice(0, 6);
+    }}
+
+    function buildReactionQuickRowHtml(targetMessageId, groups) {{
+      const replyId = Number(targetMessageId);
+      if (!Number.isInteger(replyId) || replyId <= 0) return "";
+      const quickChoices = reactionQuickChoices(groups);
+      const quickButtons = quickChoices.map((emoji) => (
+        `<button type="button" class="chat-reaction-popover-quick-btn" data-reply-id="${{escAttr(replyId)}}" data-emoji="${{escAttr(emoji)}}" aria-label="${{escAttr(`React ${{emoji}}`)}}" title="${{escAttr(`React ${{emoji}}`)}}">${{escAttr(emoji)}}</button>`
+      )).join("");
+      return `<div class="chat-reaction-popover-quick-shell">
+        <div class="chat-reaction-popover-section-label">Quick react</div>
+        <div class="chat-reaction-popover-quick-row">
+          ${{quickButtons}}
+          <button type="button" class="chat-reaction-popover-more-btn" data-reply-id="${{escAttr(replyId)}}" aria-label="Open full reaction picker" title="More reactions">More</button>
+        </div>
+      </div>`;
+    }}
+
     function positionReactionPopover(anchor, popover) {{
       if (!(anchor instanceof HTMLElement) || !(popover instanceof HTMLElement) || popover.hidden) {{
         return;
@@ -150,7 +206,8 @@
       if (!(popover instanceof HTMLElement)) return;
 
       const groups = parseReactionSummaryGroups(button);
-      if (!groups.length) return;
+      const targetMessageId = reactionSummaryTargetId(button);
+      const quickRow = buildReactionQuickRowHtml(targetMessageId, groups);
       const total = groups.reduce((sum, group) => sum + Math.max(0, Number(group.count || 0)), 0);
       const listRows = groups.map((group) => {{
         const shownNames = group.names.slice(0, 4);
@@ -165,12 +222,14 @@
 
       popover.innerHTML = `
         <div class="chat-reaction-popover-head">
-          <span>Reactions</span>
-          <span class="chat-reaction-popover-count">${{total}}</span>
+          <span>${{groups.length ? "React to message" : "Add reaction"}}</span>
+          ${{groups.length ? `<span class="chat-reaction-popover-count">${{total}}</span>` : ""}}
         </div>
-        <div class="chat-reaction-popover-list">
-          ${{listRows}}
-        </div>
+        ${{quickRow}}
+        ${{groups.length
+          ? `<div class="chat-reaction-popover-section-label">Current reactions</div>
+             <div class="chat-reaction-popover-list">${{listRows}}</div>`
+          : '<div class="chat-reaction-popover-empty">No reactions yet. Use a quick reaction above or open the full picker.</div>'}}
       `;
       popover.hidden = false;
       chatReactionPopoverAnchor = button;
@@ -197,6 +256,38 @@
       }});
       popover.addEventListener("pointerleave", () => {{
         scheduleReactionPopoverHide(120);
+      }});
+      popover.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const quickBtn = target.closest(".chat-reaction-popover-quick-btn");
+        if (quickBtn instanceof HTMLButtonElement && popover.contains(quickBtn)) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const replyId = Number(quickBtn.dataset.replyId || "");
+          const emoji = String(quickBtn.dataset.emoji || "").trim();
+          if (typeof noteChatEmojiUsage === "function") {{
+            noteChatEmojiUsage(emoji);
+          }}
+          closeReactionPopover(true);
+          if (typeof sendChatReaction === "function") {{
+            void sendChatReaction(replyId, emoji);
+          }}
+          return;
+        }}
+        const moreBtn = target.closest(".chat-reaction-popover-more-btn");
+        if (moreBtn instanceof HTMLButtonElement && popover.contains(moreBtn)) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const replyId = Number(moreBtn.dataset.replyId || "");
+          const anchor = chatReactionPopoverAnchor instanceof HTMLElement
+            ? chatReactionPopoverAnchor
+            : moreBtn;
+          closeReactionPopover(true);
+          if (typeof openChatEmojiPanel === "function") {{
+            openChatEmojiPanel("react", replyId, anchor);
+          }}
+        }}
       }});
 
       document.addEventListener("pointerdown", (ev) => {{

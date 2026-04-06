@@ -6249,7 +6249,6 @@
       transform: translateY(-1px) scale(0.93);
       filter: saturate(0.5);
     }}
-    .chat-reply-btn,
     .chat-ack-btn {{
       border: 1px solid #bfd6c3;
       background: #f4fbf6;
@@ -6261,10 +6260,41 @@
       cursor: pointer;
       white-space: nowrap;
     }}
-    .chat-reply-btn:hover,
     .chat-ack-btn:hover {{
       background: #e6f2e9;
       border-color: #9dc3a7;
+    }}
+    .chat-reply-btn {{
+      border: 1px solid transparent;
+      background: transparent;
+      color: #5d7667;
+      border-radius: 999px;
+      padding: 0 2px;
+      font-size: 10px;
+      line-height: 1.3;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: color 140ms ease, background-color 140ms ease, opacity 140ms ease;
+    }}
+    .chat-reply-btn:hover {{
+      background: rgba(78, 116, 93, 0.08);
+      color: #214734;
+    }}
+    .chat-reply-btn:focus-visible {{
+      outline: 2px solid rgba(90, 135, 108, 0.34);
+      outline-offset: 1px;
+    }}
+    .chat-reply-btn-icon {{
+      font-size: 12px;
+      line-height: 1;
+    }}
+    .chat-reply-btn-text {{
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
     }}
     .chat-whois-btn {{
       border: 1px solid #bccddd;
@@ -6386,15 +6416,15 @@
       flex: 1 0 100%;
       min-width: 0;
       margin-bottom: 1px;
-      padding-left: 8px;
-      border-left: 2px solid rgba(112, 147, 126, 0.55);
-      color: #5d7667;
+      padding-left: 7px;
+      border-left: 2px solid rgba(112, 147, 126, 0.34);
+      color: #62796c;
       font-size: 10px;
       line-height: 1.2;
       display: inline-flex;
       align-items: baseline;
       gap: 6px;
-      opacity: 0.92;
+      opacity: 0.78;
     }}
     .chat-reply-inline .chat-reply-inline-label {{
       color: #6a8778;
@@ -6433,11 +6463,18 @@
       color: #75817d;
     }}
     .chat-reaction-row {{
-      margin-top: 5px;
+      margin-top: 4px;
       display: flex;
       flex-wrap: wrap;
-      gap: 5px;
+      gap: 8px;
       align-items: center;
+      opacity: 0.7;
+      transition: opacity 140ms ease;
+    }}
+    .chat-feed-item:hover .chat-reaction-row,
+    .chat-feed-item:focus-within .chat-reaction-row,
+    .chat-feed-item.selected-node .chat-reaction-row {{
+      opacity: 1;
     }}
     .chat-reaction-summary-row {{
       margin-top: 5px;
@@ -6445,26 +6482,38 @@
       align-items: center;
     }}
     .chat-reaction-summary {{
-      border: 1px solid #b9d2bf;
-      background: #ecf7ef;
-      color: #1f4e35;
+      border: 1px solid rgba(123, 160, 135, 0.4);
+      background: rgba(236, 247, 239, 0.62);
+      color: #2a523d;
       border-radius: 999px;
-      padding: 2px 9px 2px 6px;
+      padding: 1px 8px 1px 5px;
       font-size: 11px;
       line-height: 1.3;
       cursor: pointer;
       white-space: nowrap;
       display: inline-flex;
       align-items: center;
-      gap: 7px;
+      gap: 6px;
     }}
     .chat-reaction-summary:hover {{
-      background: #dff0e4;
-      border-color: #94bd9f;
+      background: rgba(223, 240, 228, 0.92);
+      border-color: rgba(108, 151, 122, 0.56);
     }}
     .chat-reaction-summary:focus-visible {{
       outline: 2px solid #8fbca0;
       outline-offset: 1px;
+    }}
+    .chat-reaction-summary.is-empty {{
+      background: transparent;
+      border-style: dashed;
+      border-color: rgba(123, 160, 135, 0.32);
+      color: #587162;
+      padding-right: 9px;
+    }}
+    .chat-reaction-summary.is-empty:hover {{
+      background: rgba(232, 244, 235, 0.55);
+      border-color: rgba(108, 151, 122, 0.46);
+      color: #214734;
     }}
     .chat-reaction-summary-icons {{
       display: inline-flex;
@@ -6476,14 +6525,19 @@
       height: 16px;
       margin-left: -5px;
       border-radius: 999px;
-      border: 1px solid #c6d7cb;
-      background: #f7fbf8;
+      border: 1px solid rgba(113, 142, 124, 0.58);
+      background: transparent;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font-size: 11px;
       line-height: 1;
       box-sizing: border-box;
+    }}
+    .chat-reaction-summary-emoji-placeholder {{
+      color: currentColor;
+      font-size: 10px;
+      font-weight: 700;
     }}
     .chat-reaction-summary-emoji:first-child {{
       margin-left: 0;
@@ -6492,6 +6546,11 @@
       font-size: 10px;
       font-weight: 700;
       color: #355f48;
+    }}
+    .chat-reaction-summary-label {{
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
     }}
     .chat-reply-tail {{
       margin-left: auto;
@@ -6592,6 +6651,58 @@
       margin-bottom: 6px;
       padding-bottom: 6px;
       border-bottom: 1px solid #deebe1;
+    }}
+    .chat-reaction-popover-section-label {{
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #63806f;
+      margin: 6px 2px 4px;
+    }}
+    .chat-reaction-popover-quick-shell {{
+      margin-bottom: 2px;
+    }}
+    .chat-reaction-popover-quick-row {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }}
+    .chat-reaction-popover-quick-btn,
+    .chat-reaction-popover-more-btn {{
+      border: 1px solid #c8dacf;
+      background: #f4fbf6;
+      color: #1f4e35;
+      border-radius: 999px;
+      min-width: 30px;
+      height: 28px;
+      padding: 0 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }}
+    .chat-reaction-popover-quick-btn {{
+      font-size: 15px;
+      line-height: 1;
+    }}
+    .chat-reaction-popover-more-btn {{
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }}
+    .chat-reaction-popover-quick-btn:hover,
+    .chat-reaction-popover-more-btn:hover {{
+      background: #e6f2e9;
+      border-color: #9dc3a7;
+      color: #123523;
+    }}
+    .chat-reaction-popover-empty {{
+      font-size: 11px;
+      line-height: 1.45;
+      color: #688274;
+      padding: 4px 2px 2px;
     }}
     .chat-reaction-popover-emoji {{
       font-size: 15px;

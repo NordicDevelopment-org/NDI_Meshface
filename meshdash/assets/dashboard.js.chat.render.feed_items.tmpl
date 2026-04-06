@@ -336,11 +336,22 @@
           .slice(0, 4)
           .map((bucket) => `<span class="chat-reaction-summary-emoji">${{escAttr(bucket.emoji)}}</span>`)
           .join("");
-        const reactionSummary = reactionGroups.length > 0
-          ? `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}" title="${{escAttr(reactionSummaryTitle)}}">
-              <span class="chat-reaction-summary-icons">${{reactionSummaryIcons}}</span>
-              <span class="chat-reaction-summary-total">${{reactionTotal}}</span>
-            </button>`
+        const hasReactions = reactionGroups.length > 0;
+        const reactionSummary = messageId
+          ? (() => {{
+              const summaryTitle = hasReactions
+                ? `${{reactionSummaryTitle}} • React to this message`
+                : "Add reaction";
+              const summaryAria = hasReactions
+                ? `Reactions: ${{reactionSummaryTitle}}`
+                : "Add reaction";
+              return `<button type="button" class="chat-reaction-summary${{hasReactions ? "" : " is-empty"}}" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" data-reply-id="${{escAttr(messageId)}}" aria-label="${{escAttr(summaryAria)}}" title="${{escAttr(summaryTitle)}}">
+                <span class="chat-reaction-summary-icons">${{hasReactions ? reactionSummaryIcons : '<span class="chat-reaction-summary-emoji chat-reaction-summary-emoji-placeholder">&#9786;&#65038;</span>'}}</span>
+                ${{hasReactions
+                  ? `<span class="chat-reaction-summary-total">${{reactionTotal}}</span>`
+                  : '<span class="chat-reaction-summary-label">React</span>'}}
+              </button>`;
+            }})()
           : "";
         const isLocalEcho = msg.local_echo === true || msg.localEcho === true;
         const deliveryState = normalizeDeliveryState(msg.delivery_state ?? msg.deliveryState);
@@ -363,13 +374,9 @@
         const portnumText = String(msg.portnum ?? packetSummary.portnum ?? "").trim() || "n/a";
         const retryReplyId = Number.isInteger(replyToId) && replyToId > 0 ? replyToId : "";
         const replyButton = canReply
-          ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message">Reply</button>`
+          ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message" aria-label="Reply to this message"><span class="chat-reply-btn-icon" aria-hidden="true">↩</span><span class="chat-reply-btn-text">Reply</span></button>`
           : "";
         const whoisButton = "";
-        const hasReactions = reactionGroups.length > 0;
-        const reactButton = messageId
-          ? `<button type="button" class="chat-react-btn${{hasReactions ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
-          : "";
         const retryButton = (
           isLocalEcho
           && isRetryableDeliveryState(deliveryState)
@@ -378,16 +385,14 @@
           ? `<button type="button" class="chat-retry-btn" data-retry-text="${{escAttr(String(msg.text || ""))}}" data-retry-destination="${{escAttr(String(msg.to || "^all"))}}" data-retry-channel="${{escAttr(msg.channel ?? 0)}}" data-retry-reply-id="${{escAttr(retryReplyId)}}" data-retry-of="${{escAttr(messageId || "")}}" title="Retry this message">Retry</button>`
           : "";
         const reactionRowParts = [];
-        if (reactButton) reactionRowParts.push(reactButton);
+        if (reactionSummary) reactionRowParts.push(reactionSummary);
         if (replyButton) reactionRowParts.push(replyButton);
+        if (retryButton) reactionRowParts.push(retryButton);
         const tailButtons = [];
         if (whoisButton) tailButtons.push(whoisButton);
         if (tailButtons.length > 0) {{
           reactionRowParts.push(`<span class="chat-reply-tail">${{tailButtons.join("")}}</span>`);
         }}
-        const reactionSummaryRow = reactionSummary
-          ? `<div class="chat-reaction-summary-row">${{reactionSummary}}</div>`
-          : "";
         const reactionRow = reactionRowParts.length > 0
           ? `<div class="chat-reaction-row">${{reactionRowParts.join("")}}</div>`
           : "";
@@ -501,7 +506,7 @@
               ${{deliveryChip}}
               <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
             </span>`;
-        const extraRows = monitorMode ? "" : `${{reactionSummaryRow}}${{reactionRow}}`;
+        const extraRows = monitorMode ? "" : reactionRow;
         return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
           <div class="chat-feed-line">
             <div class="chat-feed-summary">
