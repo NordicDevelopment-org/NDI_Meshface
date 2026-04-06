@@ -28,9 +28,10 @@ def test_dashboard_js_registers_console_nodes_aliases() -> None:
     )
 
     assert 'name: "nodes"' in js
-    assert 'usage: "nodes [pattern]' in js
+    assert 'usage: "nodes [-v|-vv|-vvv|-vvvv] [pattern]' in js
     assert 'name: "--nodes"' in js
-    assert 'usage: "--nodes [pattern]' in js
+    assert 'usage: "--nodes [-v|-vv|-vvv|-vvvv] [pattern]' in js
+    assert 'name: "list"' not in js
     assert "runConsoleNodeListCommand" in js
 
 

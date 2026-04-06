@@ -308,23 +308,16 @@
         }},
       }});
       registerConsoleCommand({{
-        name: "list",
-        usage: "list [-v|-vv|-vvv|-vvvv] [pattern] [name=<wildcard>] [id=<wildcard>] [status=<wildcard>] [port=<wildcard>] [gps=<yes|no>] [hops=<n>] [hops>n] [hops<n] [limit=<n>]",
-        description: "List nodes from current state with wildcard filters.",
-        supportsVerbosity: true,
-        run: (ctx) => runConsoleNodeListCommand(ctx, "list"),
-      }});
-      registerConsoleCommand({{
         name: "nodes",
-        usage: "nodes [pattern] [name=<wildcard>] [id=<wildcard>] [status=<wildcard>] [port=<wildcard>] [gps=<yes|no>] [hops=<n>] [hops>n] [hops<n] [limit=<n>]",
-        description: "Meshtastic-style alias for list.",
+        usage: "nodes [-v|-vv|-vvv|-vvvv] [pattern] [name=<wildcard>] [id=<wildcard>] [status=<wildcard>] [port=<wildcard>] [gps=<yes|no>] [hops=<n>] [hops>n] [hops<n] [limit=<n>]",
+        description: "List nodes from current state with wildcard filters.",
         supportsVerbosity: true,
         run: (ctx) => runConsoleNodeListCommand(ctx, "nodes"),
       }});
       registerConsoleCommand({{
         name: "--nodes",
-        usage: "--nodes [pattern] [name=<wildcard>] [id=<wildcard>] [status=<wildcard>] [port=<wildcard>] [gps=<yes|no>] [hops=<n>] [hops>n] [hops<n] [limit=<n>]",
-        description: "Meshtastic-style alias for list.",
+        usage: "--nodes [-v|-vv|-vvv|-vvvv] [pattern] [name=<wildcard>] [id=<wildcard>] [status=<wildcard>] [port=<wildcard>] [gps=<yes|no>] [hops=<n>] [hops>n] [hops<n] [limit=<n>]",
+        description: "Meshtastic-style alias for nodes.",
         supportsVerbosity: true,
         run: (ctx) => runConsoleNodeListCommand(ctx, "nodes"),
       }});
@@ -341,7 +334,7 @@
         if (matches.length < 1) {{
           return [
             `[node] no matches for "${{target}}".`,
-            `[node] try: list ${{quotedTarget}}`,
+            `[node] try: nodes ${{quotedTarget}}`,
           ];
         }}
         if (matches.length > 1) {{
@@ -355,7 +348,7 @@
           if (matches.length > show.length) {{
             lines.push(`  ... ${{matches.length - show.length}} more match(es).`);
           }}
-          lines.push(`[node] retry with a more specific id or name, or use: list ${{quotedTarget}}`);
+          lines.push(`[node] retry with a more specific id or name, or use: nodes ${{quotedTarget}}`);
           return lines;
         }}
         return [
