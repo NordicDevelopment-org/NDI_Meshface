@@ -399,6 +399,437 @@
       }}
     }}
 
+    function normalizeNodeVisibilityListIds(rawValue) {{
+      const entries = Array.isArray(rawValue)
+        ? rawValue
+        : (rawValue == null ? [] : [rawValue]);
+      const seen = new Set();
+      const out = [];
+      for (const entry of entries) {{
+        const nodeId = normalizeNodeId(entry);
+        if (!isSelectableNodeId(nodeId) || seen.has(nodeId)) continue;
+        seen.add(nodeId);
+        out.push(nodeId);
+      }}
+      out.sort((a, b) => a.localeCompare(b));
+      return out;
+    }}
+
+    function loadNodeVisibilityLists() {{
+      nodeVisibilityWhitelistIds.clear();
+      nodeVisibilityBlacklistIds.clear();
+      try {{
+        const raw = window.localStorage.getItem(nodeVisibilityWhitelistStorageKey);
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          for (const nodeId of normalizeNodeVisibilityListIds(parsed)) {{
+            nodeVisibilityWhitelistIds.add(nodeId);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      try {{
+        const raw = window.localStorage.getItem(nodeVisibilityBlacklistStorageKey);
+        if (raw) {{
+          const parsed = JSON.parse(raw);
+          for (const nodeId of normalizeNodeVisibilityListIds(parsed)) {{
+            nodeVisibilityBlacklistIds.add(nodeId);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistNodeVisibilityLists() {{
+      try {{
+        window.localStorage.setItem(
+          nodeVisibilityWhitelistStorageKey,
+          JSON.stringify(normalizeNodeVisibilityListIds(Array.from(nodeVisibilityWhitelistIds)).slice(0, 2000))
+        );
+      }} catch (_err) {{
+      }}
+      try {{
+        window.localStorage.setItem(
+          nodeVisibilityBlacklistStorageKey,
+          JSON.stringify(normalizeNodeVisibilityListIds(Array.from(nodeVisibilityBlacklistIds)).slice(0, 2000))
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function nodeVisibilityListsActive() {{
+      return nodeVisibilityWhitelistIds.size > 0 || nodeVisibilityBlacklistIds.size > 0;
+    }}
+
+    function isNodeVisibleByLists(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean || clean === "^all" || clean === "^local") return true;
+      if (!isSelectableNodeId(clean) && !isCanonicalNodeId(clean)) return true;
+      if (nodeVisibilityBlacklistIds.has(clean)) return false;
+      if (nodeVisibilityWhitelistIds.size > 0) {{
+        return nodeVisibilityWhitelistIds.has(clean);
+      }}
+      return true;
+    }}
+
+    function visibleFavoriteNodeIds() {{
+      return Array.from(favoriteNodeIds).filter((nodeId) => isNodeVisibleByLists(nodeId));
+    }}
+
+    function countVisibleOnlineNodes(nodes, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const entries = Array.isArray(nodes) ? nodes : [];
+      let count = 0;
+      for (const node of entries) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (!isSelectableNodeId(nodeId) || !isNodeVisibleByLists(nodeId)) continue;
+        const lastHeardUnix = nodeLastHeardUnix(node);
+        if (!Number.isFinite(lastHeardUnix) || lastHeardUnix <= 0) continue;
+        if ((nowUnix - lastHeardUnix) <= (2 * 60 * 60)) {{
+          count += 1;
+        }}
+      }}
+      return count;
+    }}
+
+    function nodeVisibilityMessagePasses(msg) {{
+      if (!nodeVisibilityListsActive()) return true;
+      const fromId = normalizeNodeId(
+        (msg && (msg.from || msg.from_id || msg.fromId || msg.source || msg.source_id || msg.sourceId)) || ""
+      );
+      const toId = normalizeNodeId(
+        (msg && (msg.to || msg.to_id || msg.toId || msg.destination || msg.dest || msg.dest_id || msg.destId)) || ""
+      );
+      if ((isSelectableNodeId(fromId) || isCanonicalNodeId(fromId)) && !isNodeVisibleByLists(fromId)) {{
+        return false;
+      }}
+      if ((isSelectableNodeId(toId) || isCanonicalNodeId(toId)) && !isNodeVisibleByLists(toId)) {{
+        return false;
+      }}
+      return true;
+    }}
+
+    function nodeVisibilityPacketPasses(packetEntry) {{
+      if (!nodeVisibilityListsActive()) return true;
+      const summary = (packetEntry && typeof packetEntry.summary === "object") ? packetEntry.summary : packetEntry;
+      const packet = (packetEntry && typeof packetEntry.packet === "object") ? packetEntry.packet : packetEntry;
+      const fromId = normalizeNodeId(
+        (summary && (summary.from_id ?? summary.fromId ?? summary.from))
+        ?? (packet && (packet.from_id ?? packet.fromId ?? packet.from))
+        ?? ""
+      );
+      const toId = normalizeNodeId(
+        (summary && (summary.to_id ?? summary.toId ?? summary.to))
+        ?? (packet && (packet.to_id ?? packet.toId ?? packet.to ?? packet.destination))
+        ?? ""
+      );
+      if ((isSelectableNodeId(fromId) || isCanonicalNodeId(fromId)) && !isNodeVisibleByLists(fromId)) {{
+        return false;
+      }}
+      if ((isSelectableNodeId(toId) || isCanonicalNodeId(toId)) && !isNodeVisibleByLists(toId)) {{
+        return false;
+      }}
+      return true;
+    }}
+
+    function applyNodeVisibilityFiltersToState(rawState) {{
+      const safeState = rawState && typeof rawState === "object" ? rawState : {{}};
+      if (!nodeVisibilityListsActive()) return safeState;
+
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const filteredNodes = nodes.filter((node) => isNodeVisibleByLists(node && node.id));
+      const historyCapsRaw = (safeState.history_caps && typeof safeState.history_caps === "object")
+        ? safeState.history_caps
+        : {{}};
+      const filteredHistoryCaps = Object.fromEntries(
+        Object.entries(historyCapsRaw).filter(([nodeId]) => isNodeVisibleByLists(nodeId))
+      );
+      const trafficRaw = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const filteredEdges = Array.isArray(trafficRaw.edges)
+        ? trafficRaw.edges.filter((edge) => (
+          isNodeVisibleByLists(edge && edge.from) && isNodeVisibleByLists(edge && edge.to)
+        ))
+        : [];
+      const filteredRecentChat = Array.isArray(trafficRaw.recent_chat)
+        ? trafficRaw.recent_chat.filter((entry) => nodeVisibilityMessagePasses(entry))
+        : [];
+      const filteredRecentPackets = Array.isArray(trafficRaw.recent_packets)
+        ? trafficRaw.recent_packets.filter((entry) => nodeVisibilityPacketPasses(entry))
+        : [];
+      const summaryRaw = (safeState.summary && typeof safeState.summary === "object")
+        ? safeState.summary
+        : {{}};
+      const nodesWithPosition = filteredNodes.filter((node) => (
+        Number.isFinite(Number(node && node.lat)) && Number.isFinite(Number(node && node.lon))
+      )).length;
+      const realEdgeCount = filteredEdges.filter((edge) => !!(edge && edge.is_real)).length;
+      const filteredSummary = {{
+        ...summaryRaw,
+        node_count: filteredNodes.length,
+        online_node_count: countVisibleOnlineNodes(filteredNodes),
+        nodes_with_position: nodesWithPosition,
+        edge_count: filteredEdges.length,
+        real_edge_count: realEdgeCount,
+      }};
+
+      return {{
+        ...safeState,
+        summary: filteredSummary,
+        nodes: filteredNodes,
+        history_caps: filteredHistoryCaps,
+        traffic: {{
+          ...trafficRaw,
+          edges: filteredEdges,
+          recent_chat: filteredRecentChat,
+          recent_packets: filteredRecentPackets,
+        }},
+      }};
+    }}
+
+    function syncSelectedNodeWithVisibilityFilters() {{
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (!isSelectableNodeId(selectedId)) return false;
+      if (isNodeVisibleByLists(selectedId)) return false;
+      if (typeof clearNodeSelection === "function") {{
+        clearNodeSelection();
+        return true;
+      }}
+      selectedNodeId = null;
+      return true;
+    }}
+
+    function resolveNodeVisibilityEntryName(nodeId, nodesById = null) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) return clean;
+      const map = nodesById instanceof Map ? nodesById : new Map();
+      const node = map.get(clean) || null;
+      return preferredNodeName(node) || nodeNameCache.get(clean) || clean;
+    }}
+
+    function nodeVisibilityRuleLabel(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) return "Unlisted";
+      if (nodeVisibilityBlacklistIds.has(clean)) return "Blocked";
+      if (nodeVisibilityWhitelistIds.size > 0) {{
+        return nodeVisibilityWhitelistIds.has(clean) ? "Allowed" : "Hidden";
+      }}
+      return "Visible";
+    }}
+
+    function applyNodeVisibilityListChange(statusText = "") {{
+      persistNodeVisibilityLists();
+      if (latestRawState && typeof latestRawState === "object") {{
+        latestState = applyNodeVisibilityFiltersToState(latestRawState);
+      }} else if (latestState && typeof latestState === "object") {{
+        latestState = applyNodeVisibilityFiltersToState(latestState);
+      }}
+      syncSelectedNodeWithVisibilityFilters();
+      renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
+      if (typeof renderSelectionStatus === "function") {{
+        renderSelectionStatus();
+      }}
+      if (statusText && typeof setSettingsStatusText === "function") {{
+        setSettingsStatusText(statusText);
+      }}
+      if (typeof requestImmediatePoll === "function") {{
+        requestImmediatePoll(0);
+      }}
+    }}
+
+    function addNodeVisibilityWhitelistId(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) return;
+      nodeVisibilityBlacklistIds.delete(clean);
+      nodeVisibilityWhitelistIds.add(clean);
+      applyNodeVisibilityListChange(`Allowed ${{clean}} in frontend lists.`);
+    }}
+
+    function addNodeVisibilityBlacklistId(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) return;
+      nodeVisibilityWhitelistIds.delete(clean);
+      nodeVisibilityBlacklistIds.add(clean);
+      applyNodeVisibilityListChange(`Blocked ${{clean}} from frontend lists.`);
+    }}
+
+    function removeNodeVisibilityWhitelistId(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean) || !nodeVisibilityWhitelistIds.delete(clean)) return;
+      applyNodeVisibilityListChange(`Removed ${{clean}} from frontend whitelist.`);
+    }}
+
+    function removeNodeVisibilityBlacklistId(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean) || !nodeVisibilityBlacklistIds.delete(clean)) return;
+      applyNodeVisibilityListChange(`Removed ${{clean}} from frontend blacklist.`);
+    }}
+
+    function clearNodeVisibilityWhitelist() {{
+      if (nodeVisibilityWhitelistIds.size <= 0) return;
+      nodeVisibilityWhitelistIds.clear();
+      applyNodeVisibilityListChange("Cleared frontend whitelist.");
+    }}
+
+    function clearNodeVisibilityBlacklist() {{
+      if (nodeVisibilityBlacklistIds.size <= 0) return;
+      nodeVisibilityBlacklistIds.clear();
+      applyNodeVisibilityListChange("Cleared frontend blacklist.");
+    }}
+
+    function renderNodeVisibilityListsUi(state = latestRawState || latestState) {{
+      const selectedHost = document.getElementById("settings-node-visibility-selected");
+      const searchInput = document.getElementById("settings-lists-node-search-input");
+      const resultsHost = document.getElementById("settings-lists-search-results");
+      const whitelistHost = document.getElementById("settings-whitelist-list");
+      const blacklistHost = document.getElementById("settings-blacklist-list");
+      if (!(selectedHost instanceof HTMLElement)) return;
+      if (!(resultsHost instanceof HTMLElement)) return;
+      if (!(whitelistHost instanceof HTMLElement)) return;
+      if (!(blacklistHost instanceof HTMLElement)) return;
+      if (searchInput instanceof HTMLInputElement && searchInput.value !== nodeVisibilitySettingsSearchQuery) {{
+        searchInput.value = nodeVisibilitySettingsSearchQuery;
+      }}
+
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const nodesById = new Map(
+        nodes
+          .map((node) => [normalizeNodeId(node && node.id), node])
+          .filter(([nodeId]) => isSelectableNodeId(nodeId))
+      );
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (isSelectableNodeId(selectedId)) {{
+        const selectedName = resolveNodeVisibilityEntryName(selectedId, nodesById);
+        const selectedRule = nodeVisibilityRuleLabel(selectedId);
+        selectedHost.classList.remove("node-visibility-card-empty");
+        selectedHost.innerHTML = `<div class="node-visibility-item">
+          <div class="node-visibility-meta">
+            <div class="node-visibility-name-row">
+              <span class="node-visibility-name">${{escAttr(selectedName)}}</span>
+              <span class="node-visibility-badge">${{escAttr(selectedRule)}}</span>
+            </div>
+            <div class="node-visibility-id">${{escAttr(selectedId)}}</div>
+          </div>
+          <div class="node-visibility-actions">
+            <button type="button" class="btn btn-secondary" data-node-visibility-action="allow" data-node-id="${{escAttr(selectedId)}}"${{nodeVisibilityWhitelistIds.has(selectedId) ? " disabled" : ""}}>Allow</button>
+            <button type="button" class="btn btn-secondary" data-node-visibility-action="block" data-node-id="${{escAttr(selectedId)}}"${{nodeVisibilityBlacklistIds.has(selectedId) ? " disabled" : ""}}>Block</button>
+          </div>
+        </div>`;
+      }} else {{
+        selectedHost.classList.add("node-visibility-card-empty");
+        selectedHost.textContent = "Select a node to manage it here.";
+      }}
+
+      const query = String(nodeVisibilitySettingsSearchQuery || "").trim();
+      const searchRows = buildNodeSearchResults(safeState, query, 200, {{
+        includeHiddenNodes: true,
+      }});
+      if (!searchRows.length) {{
+        resultsHost.innerHTML = '<div class="node-visibility-empty">No nodes match this search.</div>';
+      }} else {{
+        resultsHost.innerHTML = searchRows.map((row) => {{
+          const cleanNodeId = normalizeNodeId(row && row.nodeId);
+          const ruleLabel = nodeVisibilityRuleLabel(cleanNodeId);
+          return `<div class="node-visibility-item">
+            <div class="node-visibility-meta">
+              <div class="node-visibility-name-row">
+                <span class="node-visibility-name">${{escAttr(row && row.name ? row.name : cleanNodeId)}}</span>
+                <span class="node-visibility-badge">${{escAttr(ruleLabel)}}</span>
+              </div>
+              <div class="node-visibility-id">${{escAttr(cleanNodeId)}}</div>
+            </div>
+            <div class="node-visibility-actions">
+              <button type="button" class="btn btn-secondary" data-node-visibility-action="allow" data-node-id="${{escAttr(cleanNodeId)}}"${{nodeVisibilityWhitelistIds.has(cleanNodeId) ? " disabled" : ""}}>Allow</button>
+              <button type="button" class="btn btn-secondary" data-node-visibility-action="block" data-node-id="${{escAttr(cleanNodeId)}}"${{nodeVisibilityBlacklistIds.has(cleanNodeId) ? " disabled" : ""}}>Block</button>
+            </div>
+          </div>`;
+        }}).join("");
+      }}
+
+      const renderList = (host, ids, removeAction, emptyText) => {{
+        if (!ids.length) {{
+          host.innerHTML = `<div class="node-visibility-empty">${{escAttr(emptyText)}}</div>`;
+          return;
+        }}
+        host.innerHTML = ids.map((nodeId) => {{
+          const name = resolveNodeVisibilityEntryName(nodeId, nodesById);
+          return `<div class="node-visibility-item">
+            <div class="node-visibility-meta">
+              <div class="node-visibility-name-row">
+                <span class="node-visibility-name">${{escAttr(name)}}</span>
+              </div>
+              <div class="node-visibility-id">${{escAttr(nodeId)}}</div>
+            </div>
+            <div class="node-visibility-actions">
+              <button type="button" class="btn btn-secondary" data-node-visibility-action="${{escAttr(removeAction)}}" data-node-id="${{escAttr(nodeId)}}">Remove</button>
+            </div>
+          </div>`;
+        }}).join("");
+      }};
+
+      const sortIdsByName = (ids) => ids.slice().sort((a, b) => {{
+        const aName = resolveNodeVisibilityEntryName(a, nodesById);
+        const bName = resolveNodeVisibilityEntryName(b, nodesById);
+        const nameDiff = String(aName || "").localeCompare(String(bName || ""));
+        if (nameDiff !== 0) return nameDiff;
+        return String(a || "").localeCompare(String(b || ""));
+      }});
+      renderList(
+        whitelistHost,
+        sortIdsByName(Array.from(nodeVisibilityWhitelistIds)),
+        "remove-allow",
+        "No whitelist entries yet. Leave this empty to show all non-blacklisted nodes."
+      );
+      renderList(
+        blacklistHost,
+        sortIdsByName(Array.from(nodeVisibilityBlacklistIds)),
+        "remove-block",
+        "No blacklist entries yet."
+      );
+    }}
+
+    function bindNodeVisibilityListControls() {{
+      const panel = document.querySelector('.card.settings [data-settings-tab-panel="lists"]');
+      if (!(panel instanceof HTMLElement) || panel.dataset.boundNodeVisibility === "1") return;
+      panel.dataset.boundNodeVisibility = "1";
+      const searchInput = document.getElementById("settings-lists-node-search-input");
+      if (searchInput instanceof HTMLInputElement) {{
+        searchInput.addEventListener("input", () => {{
+          nodeVisibilitySettingsSearchQuery = String(searchInput.value || "").trim().toLowerCase();
+          renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
+        }});
+      }}
+      panel.addEventListener("click", (ev) => {{
+        const target = ev.target instanceof Element ? ev.target : null;
+        if (!target) return;
+        const actionButton = target.closest("button[data-node-visibility-action]");
+        if (actionButton instanceof HTMLButtonElement) {{
+          const nodeId = normalizeNodeId(actionButton.dataset.nodeId || "");
+          const action = String(actionButton.dataset.nodeVisibilityAction || "").trim().toLowerCase();
+          if (action === "allow") {{
+            addNodeVisibilityWhitelistId(nodeId);
+          }} else if (action === "block") {{
+            addNodeVisibilityBlacklistId(nodeId);
+          }} else if (action === "remove-allow") {{
+            removeNodeVisibilityWhitelistId(nodeId);
+          }} else if (action === "remove-block") {{
+            removeNodeVisibilityBlacklistId(nodeId);
+          }}
+          return;
+        }}
+        const clearWhitelistBtn = target.closest("#settings-whitelist-clear-btn");
+        if (clearWhitelistBtn instanceof HTMLButtonElement) {{
+          clearNodeVisibilityWhitelist();
+          return;
+        }}
+        const clearBlacklistBtn = target.closest("#settings-blacklist-clear-btn");
+        if (clearBlacklistBtn instanceof HTMLButtonElement) {{
+          clearNodeVisibilityBlacklist();
+        }}
+      }});
+    }}
+
     function normalizeNodeNoteText(rawValue, maxChars = 1200) {{
       let text = String(rawValue == null ? "" : rawValue)
         .replace(/\r\n?/g, "\n")
@@ -557,7 +988,7 @@
     }}
 
     function renderSavedRailStatus() {{
-      const count = Math.max(0, favoriteNodeIds.size);
+      const count = Math.max(0, visibleFavoriteNodeIds().length);
       const explicitSelectedId = isSelectableNodeId(selectedNodeId) ? normalizeNodeId(selectedNodeId) : "";
       const selectedId = activeLayoutView === "saved"
         ? resolveSavedViewNodeId(latestState)

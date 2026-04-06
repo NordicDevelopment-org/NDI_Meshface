@@ -213,7 +213,8 @@
 
       if (!isSelectableNodeId(nodeId)) {{
         host.dataset.nodeId = "";
-        const emptyDetailsHtml = favoriteNodeIds.size === 0
+        const visibleFavoriteCount = visibleFavoriteNodeIds().length;
+        const emptyDetailsHtml = visibleFavoriteCount === 0
           ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Tag nodes to build your tagged subsection.</div>'
           : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from tagged nodes.</div>';
         setElementHtmlIfChanged(host, emptyDetailsHtml, "saved-node-details");
@@ -522,7 +523,7 @@
       const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
 
       const nowUnix = Math.floor(Date.now() / 1000);
-      const entries = Array.from(favoriteNodeIds)
+      const entries = visibleFavoriteNodeIds()
         .map((nodeId) => {{
           const node = nodesById.get(nodeId);
           const caps = historyCapsById.get(nodeId);

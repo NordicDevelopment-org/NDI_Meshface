@@ -131,8 +131,10 @@
       }}
     }}
 
-    function buildNodeSearchResults(state, query, limit = 250) {{
+    function buildNodeSearchResults(state, query, limit = 250, options = null) {{
       const safeState = state && typeof state === "object" ? state : {{}};
+      const opts = options && typeof options === "object" ? options : {{}};
+      const includeHiddenNodes = opts.includeHiddenNodes === true;
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       const nodeById = new Map();
       for (const node of nodes) {{
@@ -146,6 +148,7 @@
       const pushNodeId = (nodeId) => {{
         const cleanNodeId = normalizeNodeId(nodeId);
         if (!isSelectableNodeId(cleanNodeId) || seenNodeIds.has(cleanNodeId)) return;
+        if (!includeHiddenNodes && !isNodeVisibleByLists(cleanNodeId)) return;
         seenNodeIds.add(cleanNodeId);
         orderedNodeIds.push(cleanNodeId);
       }};

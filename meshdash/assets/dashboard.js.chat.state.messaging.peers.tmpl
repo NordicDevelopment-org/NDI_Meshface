@@ -555,6 +555,7 @@
       const touchNodeById = (rawNodeId, options = null) => {{
         const nodeId = normalizeNodeId(rawNodeId || "");
         if (!isSelectableNodeId(nodeId)) return;
+        if (!isNodeVisibleByLists(nodeId)) return;
         const opts = options && typeof options === "object" ? options : {{}};
         const node = nodesById instanceof Map ? (nodesById.get(nodeId) || null) : null;
         const snapshot = (typeof resolveChatNodeFreshnessFn === "function")
@@ -1849,6 +1850,7 @@
         const savedPeers = Array.from(manualDirectPeerIds)
           .map((entry) => normalizeNodeId(entry))
           .filter((entry) => isCanonicalNodeId(entry))
+          .filter((entry) => isNodeVisibleByLists(entry))
           .filter((entry) => !(isCanonicalNodeId(selfId) && entry === selfId))
           .map((entry) => {{
             const node = nodesById.get(entry);

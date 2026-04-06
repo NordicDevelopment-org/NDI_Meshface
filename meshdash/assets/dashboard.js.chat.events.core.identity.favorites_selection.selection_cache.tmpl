@@ -209,7 +209,7 @@
         const node = nodesById.get(normalized);
         return preferredNodeName(node) || nodeNameCache.get(normalized) || `Node ${{normalized}}`;
       }};
-      const entries = Array.from(favoriteNodeIds)
+      const entries = visibleFavoriteNodeIds()
         .map((nodeId) => {{
           const name = resolveEntryName(nodeId);
           const tagEntry = nodeTagEntryForNode(nodeId);

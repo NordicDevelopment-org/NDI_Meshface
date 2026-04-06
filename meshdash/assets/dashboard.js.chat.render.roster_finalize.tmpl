@@ -7,6 +7,7 @@
       if (activeChatChannel === "direct") {{
         for (const peerId of manualDirectPeerIds) {{
           if (!isCanonicalNodeId(peerId)) continue;
+          if (!isNodeVisibleByLists(peerId)) continue;
           if (isCanonicalNodeId(localNodeId) && peerId === localNodeId) continue;
           const snapshot = resolveChatNodeFreshness(peerId);
           const node = snapshot.node;
@@ -285,6 +286,7 @@
       const isKnownPeerNode = (peerIdRaw) => {{
         const peerId = normalizeNodeId(peerIdRaw || "");
         if (!isCanonicalNodeId(peerId)) return false;
+        if (!isNodeVisibleByLists(peerId)) return false;
         if (isCanonicalNodeId(localNodeId) && peerId === localNodeId) return false;
         if (manualDirectPeerIds.has(peerId)) return true;
         if (nodesById.has(peerId)) return true;

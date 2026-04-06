@@ -103,6 +103,9 @@
           if (activeLayoutView === "settings" && activeSettingsTab === "channels") {{
             renderChannelsView(latestState);
           }}
+          if (activeLayoutView === "settings" && activeSettingsTab === "lists") {{
+            renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
+          }}
           if (
             activeLayoutView === "environment"
             || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
@@ -157,8 +160,12 @@
         if (newEtag) {{
           stateEtag = String(newEtag);
         }}
-        const state = await resp.json();
+        const rawState = await resp.json();
+        latestRawState = rawState;
+        updateNodeNameCache((rawState && rawState.nodes) || []);
+        const state = applyNodeVisibilityFiltersToState(rawState);
         latestState = state;
+        syncSelectedNodeWithVisibilityFilters();
         lastPollSuccessUnix = Math.floor(Date.now() / 1000);
         lastPollError = "";
         lastPollErrorUnix = 0;
@@ -335,6 +342,8 @@
           renderSettings(state);
           if (activeSettingsTab === "channels") {{
             renderChannelsView(state);
+          }} else if (activeSettingsTab === "lists") {{
+            renderNodeVisibilityListsUi(latestRawState || state || {{}});
           }}
         }}
 

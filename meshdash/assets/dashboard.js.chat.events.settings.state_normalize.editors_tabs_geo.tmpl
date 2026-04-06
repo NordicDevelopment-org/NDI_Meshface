@@ -150,6 +150,7 @@
         || key === "location"
         || key === "channels"
         || key === "tickers"
+        || key === "lists"
         || key === "appearance"
         || key === "system"
       ) return key;
@@ -215,6 +216,8 @@
         void ensureChannelsViewLocalStateHydrated(false);
       }} else if (next === "tickers") {{
         renderTickerSettingsUi();
+      }} else if (next === "lists") {{
+        renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
       }} else if (next === "appearance") {{
         syncSettingsAppearanceControls();
       }}

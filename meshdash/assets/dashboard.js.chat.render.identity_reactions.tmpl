@@ -267,6 +267,7 @@
       const touchNodeById = (nodeId, msgTimeUnix = null) => {{
         const clean = normalizeNodeId(nodeId);
         if (!isSelectableNodeId(clean)) return;
+        if (!isNodeVisibleByLists(clean)) return;
         if (activeChatChannel === "direct" && isCanonicalNodeId(localNodeId) && clean === localNodeId) {{
           return;
         }}
