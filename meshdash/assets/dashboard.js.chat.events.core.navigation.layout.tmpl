@@ -691,7 +691,7 @@
     function normalizeNetworkSubview(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
       if (clean === "details") return "sensors";
-      return clean === "overview" || clean === "sensors" ? clean : "map";
+      return clean === "overview" || clean === "graph" || clean === "sensors" ? clean : "map";
     }}
 
     function loadPreferredNetworkSubview() {{
@@ -811,6 +811,11 @@
           void refreshNetworkOverviewPanels(false);
         }}
       }}
+      if (normalizedView === "network" && next === "graph") {{
+        if (typeof renderNetworkGraphView === "function") {{
+          renderNetworkGraphView(latestState);
+        }}
+      }}
       if (normalizedView === "network" && next === "sensors") {{
         if (typeof renderEnvironmentMetricsView === "function") {{
           void renderEnvironmentMetricsView(false);
@@ -837,6 +842,512 @@
           setActiveNetworkSubview(btn.dataset.networkSubview || "map", {{ persist: true }});
         }});
       }}
+    }}
+
+    function networkGraphNodeDisplayName(nodeId, nodeMap) {{
+      const clean = normalizeNodeId(nodeId || "");
+      const node = nodeMap instanceof Map ? (nodeMap.get(clean) || null) : null;
+      const cachedName = (typeof nodeNameCache !== "undefined" && nodeNameCache instanceof Map)
+        ? nodeNameCache.get(clean)
+        : "";
+      return String(preferredNodeName(node) || cachedName || clean || "Unknown node");
+    }}
+
+    function truncateNetworkGraphLabel(rawValue, maxLength = 18) {{
+      const text = String(rawValue == null ? "" : rawValue).trim();
+      if (!text) return "";
+      if (text.length <= maxLength) return text;
+      return `${{text.slice(0, Math.max(1, maxLength - 3)).trimEnd()}}...`;
+    }}
+
+    function compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap) {{
+      const aMeta = degreeMeta.get(a) || {{ degree: 0, weight: 0 }};
+      const bMeta = degreeMeta.get(b) || {{ degree: 0, weight: 0 }};
+      if (bMeta.degree !== aMeta.degree) return bMeta.degree - aMeta.degree;
+      if (bMeta.weight !== aMeta.weight) return bMeta.weight - aMeta.weight;
+      const aName = networkGraphNodeDisplayName(a, nodeMap).toLowerCase();
+      const bName = networkGraphNodeDisplayName(b, nodeMap).toLowerCase();
+      if (aName !== bName) return aName < bName ? -1 : 1;
+      return a < b ? -1 : (a > b ? 1 : 0);
+    }}
+
+    function combineNetworkGraphEdges(rawEdges, nodeMap) {{
+      const buckets = new Map();
+      for (const edge of (rawEdges || [])) {{
+        const fromId = normalizeNodeId(edge && edge.from);
+        const toId = normalizeNodeId(edge && edge.to);
+        if (!isSelectableNodeId(fromId) || !isSelectableNodeId(toId) || fromId === toId) continue;
+        if (!(nodeMap instanceof Map) || !nodeMap.has(fromId) || !nodeMap.has(toId)) continue;
+        const a = fromId < toId ? fromId : toId;
+        const b = fromId < toId ? toId : fromId;
+        const key = `${{a}}::${{b}}`;
+        if (!buckets.has(key)) {{
+          buckets.set(key, {{
+            key,
+            a,
+            b,
+            weight: 0,
+            sessionWeight: 0,
+            isReal: false,
+            lastSeenUnix: 0,
+            lastSeenLabel: "",
+            lastHops: null,
+            avgHopsWeight: 0,
+            avgHopsSamples: 0,
+            directionCount: 0,
+          }});
+        }}
+        const bucket = buckets.get(key);
+        if (!bucket) continue;
+        const lifetimeCount = Number(edge && (edge.lifetime_count ?? edge.count ?? 0));
+        const sessionCount = Number(edge && (edge.session_count ?? edge.count ?? 0));
+        const parsedLifetime = Number.isFinite(lifetimeCount) ? Math.max(0, lifetimeCount) : 0;
+        const parsedSession = Number.isFinite(sessionCount) ? Math.max(0, sessionCount) : 0;
+        bucket.weight += parsedLifetime;
+        bucket.sessionWeight += parsedSession;
+        bucket.isReal = bucket.isReal || !!(edge && edge.is_real);
+        bucket.directionCount += 1;
+        const lastSeenUnix = (typeof parseEdgeLastSeenUnix === "function")
+          ? parseEdgeLastSeenUnix(edge)
+          : NaN;
+        if (Number.isFinite(lastSeenUnix) && lastSeenUnix > bucket.lastSeenUnix) {{
+          bucket.lastSeenUnix = lastSeenUnix;
+          bucket.lastSeenLabel = String((edge && edge.last_rx_time) || "");
+          const lastHops = Number(edge && edge.last_hops);
+          bucket.lastHops = Number.isFinite(lastHops) ? lastHops : bucket.lastHops;
+        }}
+        const avgHops = Number(edge && edge.avg_hops);
+        const hopsSamples = Number(edge && edge.hops_samples);
+        if (Number.isFinite(avgHops)) {{
+          const sampleWeight = (Number.isFinite(hopsSamples) && hopsSamples > 0) ? hopsSamples : 1;
+          bucket.avgHopsWeight += avgHops * sampleWeight;
+          bucket.avgHopsSamples += sampleWeight;
+        }}
+      }}
+      const combined = Array.from(buckets.values()).map((bucket) => ({{
+        ...bucket,
+        avgHops: bucket.avgHopsSamples > 0
+          ? Math.round((bucket.avgHopsWeight / bucket.avgHopsSamples) * 100) / 100
+          : null,
+      }}));
+      combined.sort((a, b) => (
+        (b.weight - a.weight)
+        || (b.directionCount - a.directionCount)
+        || (a.a < b.a ? -1 : (a.a > b.a ? 1 : 0))
+        || (a.b < b.b ? -1 : (a.b > b.b ? 1 : 0))
+      ));
+      return combined;
+    }}
+
+    function buildNetworkGraphAdjacency(nodeMap, edges) {{
+      const adjacency = new Map();
+      for (const nodeId of (nodeMap instanceof Map ? nodeMap.keys() : [])) {{
+        adjacency.set(nodeId, new Map());
+      }}
+      for (const edge of (edges || [])) {{
+        if (!edge || !adjacency.has(edge.a) || !adjacency.has(edge.b)) continue;
+        adjacency.get(edge.a).set(edge.b, edge);
+        adjacency.get(edge.b).set(edge.a, edge);
+      }}
+      return adjacency;
+    }}
+
+    function resolveNetworkGraphRootId(nodeMap, adjacency, degreeMeta, state) {{
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (selectedId && nodeMap.has(selectedId)) return selectedId;
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || "");
+      if (localNodeId && nodeMap.has(localNodeId)) return localNodeId;
+      let bestId = "";
+      let bestDegree = -1;
+      let bestWeight = -1;
+      for (const nodeId of nodeMap.keys()) {{
+        const peers = adjacency.get(nodeId) || new Map();
+        const meta = degreeMeta.get(nodeId) || {{ degree: peers.size, weight: 0 }};
+        if (meta.degree > bestDegree || (meta.degree === bestDegree && meta.weight > bestWeight)) {{
+          bestId = nodeId;
+          bestDegree = meta.degree;
+          bestWeight = meta.weight;
+        }}
+      }}
+      if (bestId) return bestId;
+      for (const nodeId of nodeMap.keys()) {{
+        return nodeId;
+      }}
+      return "";
+    }}
+
+    function buildNetworkGraphLayout(nodeMap, combinedEdges, state) {{
+      const adjacency = buildNetworkGraphAdjacency(nodeMap, combinedEdges);
+      const degreeMeta = new Map();
+      for (const nodeId of nodeMap.keys()) {{
+        const peers = adjacency.get(nodeId) || new Map();
+        let totalWeight = 0;
+        for (const edge of peers.values()) {{
+          totalWeight += Number(edge && edge.weight) || 0;
+        }}
+        degreeMeta.set(nodeId, {{
+          degree: peers.size,
+          weight: totalWeight,
+        }});
+      }}
+
+      const rootId = resolveNetworkGraphRootId(nodeMap, adjacency, degreeMeta, state);
+      if (!rootId) {{
+        return {{
+          rootId: "",
+          adjacency,
+          degreeMeta,
+          items: [],
+          positions: new Map(),
+          layers: new Map(),
+          rings: [],
+          edges: combinedEdges,
+          connectedCount: 0,
+          disconnectedCount: 0,
+        }};
+      }}
+
+      const layerByNodeId = new Map([[rootId, 0]]);
+      const visitQueue = [rootId];
+      for (let cursor = 0; cursor < visitQueue.length; cursor += 1) {{
+        const currentId = visitQueue[cursor];
+        const currentLayer = Number(layerByNodeId.get(currentId) || 0);
+        const neighbors = Array.from((adjacency.get(currentId) || new Map()).keys())
+          .filter((peerId) => nodeMap.has(peerId))
+          .sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
+        for (const peerId of neighbors) {{
+          if (layerByNodeId.has(peerId)) continue;
+          layerByNodeId.set(peerId, currentLayer + 1);
+          visitQueue.push(peerId);
+        }}
+      }}
+
+      const layers = new Map();
+      for (const [nodeId, layer] of layerByNodeId.entries()) {{
+        if (!layers.has(layer)) {{
+          layers.set(layer, []);
+        }}
+        layers.get(layer).push(nodeId);
+      }}
+      for (const ids of layers.values()) {{
+        ids.sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
+      }}
+
+      const disconnected = Array.from(nodeMap.keys())
+        .filter((nodeId) => !layerByNodeId.has(nodeId))
+        .sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
+
+      const centerX = 480;
+      const centerY = 310;
+      const positions = new Map();
+      const polarAngleByNodeId = new Map();
+      positions.set(rootId, {{ x: centerX, y: centerY, layer: 0, disconnected: false }});
+      polarAngleByNodeId.set(rootId, -Math.PI / 2);
+
+      const connectedLayers = Array.from(layers.keys()).filter((layer) => layer > 0).sort((a, b) => a - b);
+      const maxConnectedLayer = connectedLayers.length ? connectedLayers[connectedLayers.length - 1] : 0;
+      const firstRingRadius = maxConnectedLayer <= 0 ? 0 : (maxConnectedLayer === 1 ? 180 : 116);
+      const outerConnectedRadius = disconnected.length ? 228 : 262;
+      const ringStep = maxConnectedLayer > 1
+        ? Math.max(46, Math.min(88, (outerConnectedRadius - firstRingRadius) / Math.max(1, maxConnectedLayer - 1)))
+        : 0;
+
+      for (const layer of connectedLayers) {{
+        const rawIds = Array.isArray(layers.get(layer)) ? Array.from(layers.get(layer)) : [];
+        const ordered = rawIds.map((nodeId) => {{
+          const parentAngles = Array.from((adjacency.get(nodeId) || new Map()).keys())
+            .filter((peerId) => Number(layerByNodeId.get(peerId)) === (layer - 1))
+            .map((peerId) => Number(polarAngleByNodeId.get(peerId)))
+            .filter((angle) => Number.isFinite(angle));
+          if (!parentAngles.length) {{
+            return {{ nodeId, anchor: null }};
+          }}
+          let sinTotal = 0;
+          let cosTotal = 0;
+          for (const angle of parentAngles) {{
+            sinTotal += Math.sin(angle);
+            cosTotal += Math.cos(angle);
+          }}
+          return {{
+            nodeId,
+            anchor: Math.atan2(sinTotal / parentAngles.length, cosTotal / parentAngles.length),
+          }};
+        }}).sort((a, b) => {{
+          const aAnchor = a.anchor;
+          const bAnchor = b.anchor;
+          if (Number.isFinite(aAnchor) && Number.isFinite(bAnchor) && aAnchor !== bAnchor) {{
+            return aAnchor - bAnchor;
+          }}
+          if (Number.isFinite(aAnchor)) return -1;
+          if (Number.isFinite(bAnchor)) return 1;
+          return compareNetworkGraphNodeIds(a.nodeId, b.nodeId, degreeMeta, nodeMap);
+        }});
+
+        const ids = ordered.map((entry) => entry.nodeId);
+        const radius = maxConnectedLayer === 1
+          ? firstRingRadius
+          : (firstRingRadius + ((layer - 1) * ringStep));
+        const step = ids.length > 0 ? ((Math.PI * 2) / ids.length) : 0;
+        const anchored = ordered.find((entry) => Number.isFinite(entry.anchor));
+        const startAngle = anchored ? (Number(anchored.anchor) - (step / 2)) : (-Math.PI / 2);
+        ids.forEach((nodeId, index) => {{
+          const angle = ids.length === 1 ? (-Math.PI / 2) : (startAngle + (step * index));
+          polarAngleByNodeId.set(nodeId, angle);
+          positions.set(nodeId, {{
+            x: centerX + (Math.cos(angle) * radius),
+            y: centerY + (Math.sin(angle) * radius),
+            layer,
+            disconnected: false,
+          }});
+        }});
+      }}
+
+      if (disconnected.length) {{
+        const detachedRadius = Math.min(302, Math.max(206, outerConnectedRadius + 46));
+        const span = Math.PI * 1.84;
+        const startAngle = Math.PI * 0.08;
+        const step = disconnected.length > 1 ? (span / Math.max(1, disconnected.length - 1)) : 0;
+        disconnected.forEach((nodeId, index) => {{
+          const angle = disconnected.length === 1 ? (Math.PI / 2) : (startAngle + (step * index));
+          polarAngleByNodeId.set(nodeId, angle);
+          positions.set(nodeId, {{
+            x: centerX + (Math.cos(angle) * detachedRadius),
+            y: centerY + (Math.sin(angle) * detachedRadius),
+            layer: maxConnectedLayer + 1,
+            disconnected: true,
+          }});
+        }});
+      }}
+
+      const rings = connectedLayers.map((layer) => {{
+        const radius = maxConnectedLayer === 1
+          ? firstRingRadius
+          : (firstRingRadius + ((layer - 1) * ringStep));
+        return {{
+          radius,
+          label: `${{layer}} hop${{layer === 1 ? "" : "s"}}`,
+          detached: false,
+        }};
+      }});
+      if (disconnected.length) {{
+        rings.push({{
+          radius: Math.min(302, Math.max(206, outerConnectedRadius + 46)),
+          label: "detached",
+          detached: true,
+        }});
+      }}
+
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      const firstLayerCount = Array.isArray(layers.get(1)) ? layers.get(1).length : 0;
+      const items = Array.from(positions.entries()).map(([nodeId, position]) => {{
+        const node = nodeMap.get(nodeId) || null;
+        const meta = degreeMeta.get(nodeId) || {{ degree: 0, weight: 0 }};
+        const baseRadius = position.layer === 0
+          ? 13
+          : Math.max(5.5, Math.min(10.5, 5.4 + (Math.log2(Math.max(1, meta.weight) + 1) * 0.9) + Math.min(2.6, meta.degree * 0.2)));
+        return {{
+          nodeId,
+          node,
+          x: Number(position.x),
+          y: Number(position.y),
+          layer: Number(position.layer || 0),
+          disconnected: !!position.disconnected,
+          degree: meta.degree,
+          weight: meta.weight,
+          radius: position.disconnected ? Math.max(5, baseRadius - 0.7) : baseRadius,
+          showLabel: (
+            nodeId === rootId
+            || nodeId === selectedId
+            || nodeMap.size <= 18
+            || (!position.disconnected && position.layer === 1 && firstLayerCount <= 14)
+            || (!position.disconnected && meta.degree >= 6 && position.layer <= 2)
+          ),
+        }};
+      }});
+
+      return {{
+        rootId,
+        adjacency,
+        degreeMeta,
+        items,
+        positions,
+        layers,
+        rings,
+        edges: combinedEdges,
+        connectedCount: layerByNodeId.size,
+        disconnectedCount: disconnected.length,
+      }};
+    }}
+
+    function renderNetworkGraphView(state = latestState) {{
+      const svg = document.getElementById("network-graph-svg");
+      const empty = document.getElementById("network-graph-empty");
+      const summary = document.getElementById("network-graph-summary");
+      const legend = document.getElementById("network-graph-legend");
+      if (!(svg instanceof SVGElement)) return;
+      if (!(empty instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(legend instanceof HTMLElement)) return;
+
+      if (svg.dataset.bound !== "1") {{
+        svg.dataset.bound = "1";
+        svg.addEventListener("click", (event) => {{
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const nodeGroup = target.closest("[data-network-graph-node-id]");
+          if (!(nodeGroup instanceof Element)) return;
+          const nodeId = normalizeNodeId(nodeGroup.getAttribute("data-network-graph-node-id") || "");
+          if (!isSelectableNodeId(nodeId)) return;
+          selectNode(nodeId, true, false);
+        }});
+      }}
+
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
+      const rawEdges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      const nodeMap = new Map();
+      for (const node of nodes) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (!isSelectableNodeId(nodeId) || nodeMap.has(nodeId)) continue;
+        nodeMap.set(nodeId, node);
+      }}
+
+      const combinedEdges = combineNetworkGraphEdges(rawEdges, nodeMap);
+      const layout = buildNetworkGraphLayout(nodeMap, combinedEdges, safeState);
+      const rootId = layout.rootId;
+      if (!rootId || !layout.items.length) {{
+        svg.innerHTML = "";
+        summary.innerHTML = "";
+        legend.innerHTML = "";
+        empty.hidden = false;
+        return;
+      }}
+
+      empty.hidden = true;
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      const rootLabel = networkGraphNodeDisplayName(rootId, nodeMap);
+      const firstHopCount = Array.isArray(layout.layers.get(1)) ? layout.layers.get(1).length : 0;
+      const realLinkCount = combinedEdges.filter((edge) => !!(edge && edge.isReal)).length;
+      const summaryParts = [
+        `<span class="network-graph-chip"><span class="network-graph-chip-label">Root</span><strong>${{escAttr(truncateNetworkGraphLabel(rootLabel, 28))}}</strong></span>`,
+        `<span class="network-graph-chip"><span class="network-graph-chip-label">Nodes</span><strong>${{layout.items.length}}</strong></span>`,
+        `<span class="network-graph-chip"><span class="network-graph-chip-label">Links</span><strong>${{combinedEdges.length}}</strong></span>`,
+        `<span class="network-graph-chip"><span class="network-graph-chip-label">Reach</span><strong>${{layout.connectedCount}}/${{layout.items.length}}</strong></span>`,
+      ];
+      if (firstHopCount > 0) {{
+        summaryParts.push(
+          `<span class="network-graph-chip"><span class="network-graph-chip-label">1 Hop</span><strong>${{firstHopCount}}</strong></span>`
+        );
+      }}
+      if (layout.disconnectedCount > 0) {{
+        summaryParts.push(
+          `<span class="network-graph-chip"><span class="network-graph-chip-label">Detached</span><strong>${{layout.disconnectedCount}}</strong></span>`
+        );
+      }}
+      summary.innerHTML = summaryParts.join("");
+
+      legend.innerHTML = [
+        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-root"></span>Root / selected node</span>`,
+        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-real"></span>${{realLinkCount}} confirmed links</span>`,
+        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-observed"></span>${{Math.max(0, combinedEdges.length - realLinkCount)}} observed links</span>`,
+        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-detached"></span>Nodes with no current path from the root</span>`,
+        `<span class="network-graph-legend-item hint">Click any node in the graph to recenter the web, sync the left roster selection, and open its details.</span>`,
+      ].join("");
+
+      const ringMarkup = layout.rings.map((ring) => `
+        <g class="network-graph-ring-wrap">
+          <circle class="network-graph-ring${{ring.detached ? " is-detached" : ""}}" cx="480" cy="310" r="${{ring.radius.toFixed(1)}}"></circle>
+          <text class="network-graph-ring-label" x="480" y="${{(310 - ring.radius - 8).toFixed(1)}}" text-anchor="middle">${{escAttr(ring.label)}}</text>
+        </g>
+      `).join("");
+
+      const edgeMarkup = combinedEdges.map((edge) => {{
+        const fromPos = layout.positions.get(edge.a);
+        const toPos = layout.positions.get(edge.b);
+        if (!fromPos || !toPos) return "";
+        const classes = [
+          "network-graph-edge",
+          edge.isReal ? "is-real" : "is-observed",
+          (edge.a === rootId || edge.b === rootId) ? "is-root-link" : "",
+        ].filter(Boolean).join(" ");
+        const width = Math.max(1.1, Math.min(5.2, 1.2 + (Math.log2(Math.max(1, edge.weight) + 1) * 0.85) + (edge.isReal ? 0.35 : 0)));
+        const fromLabel = networkGraphNodeDisplayName(edge.a, nodeMap);
+        const toLabel = networkGraphNodeDisplayName(edge.b, nodeMap);
+        const lastAgeLabel = Number.isFinite(edge.lastSeenUnix) && edge.lastSeenUnix > 0
+          ? (
+            typeof formatIdleAge === "function"
+              ? formatIdleAge(edge.lastSeenUnix, Math.floor(Date.now() / 1000))
+              : `${{Math.max(0, Math.floor((Date.now() / 1000) - edge.lastSeenUnix))}}s ago`
+          )
+          : (edge.lastSeenLabel || "n/a");
+        const edgeTitle = [
+          `${{fromLabel}} <-> ${{toLabel}}`,
+          `Packets: ${{Math.round(edge.weight)}}`,
+          `Directions observed: ${{edge.directionCount}}`,
+          `Last seen: ${{lastAgeLabel}}`,
+          `Avg hops: ${{edge.avgHops == null ? "n/a" : edge.avgHops}}`,
+        ].join("\n");
+        return `
+          <line
+            class="${{classes}}"
+            x1="${{Number(fromPos.x).toFixed(1)}}"
+            y1="${{Number(fromPos.y).toFixed(1)}}"
+            x2="${{Number(toPos.x).toFixed(1)}}"
+            y2="${{Number(toPos.y).toFixed(1)}}"
+            style="stroke-width:${{width.toFixed(2)}}"
+          >
+            <title>${{escAttr(edgeTitle)}}</title>
+          </line>
+        `;
+      }}).join("");
+
+      const nodeMarkup = layout.items.map((item) => {{
+        const classes = [
+          "network-graph-node",
+          item.nodeId === rootId ? "is-root" : "",
+          item.nodeId === selectedId ? "is-selected" : "",
+          item.disconnected ? "is-detached" : "",
+        ].filter(Boolean).join(" ");
+        const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
+        const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
+        const statusLine = item.disconnected
+          ? "Detached from current root"
+          : (item.layer === 0 ? "Root node" : `${{item.layer}} hop${{item.layer === 1 ? "" : "s"}} away`);
+        const title = [
+          displayName,
+          item.nodeId,
+          statusLine,
+          `Visible links: ${{item.degree}}`,
+          `Observed packets on links: ${{Math.round(item.weight)}}`,
+          `Last heard: ${{(item.node && item.node.last_heard) || "n/a"}}`,
+        ].join("\n");
+        return `
+          <g
+            class="${{classes}}"
+            data-network-graph-node-id="${{escAttr(item.nodeId)}}"
+            transform="translate(${{item.x.toFixed(1)}} ${{item.y.toFixed(1)}})"
+          >
+            <circle class="network-graph-node-core" r="${{item.radius.toFixed(1)}}"></circle>
+            ${{
+              item.showLabel
+                ? `<text class="network-graph-node-label${{item.disconnected ? " is-secondary" : ""}}" x="0" y="${{(item.radius + 14).toFixed(1)}}" text-anchor="middle">${{escAttr(label)}}</text>`
+                : ""
+            }}
+            <title>${{escAttr(title)}}</title>
+          </g>
+        `;
+      }}).join("");
+
+      svg.innerHTML = `
+        <g class="network-graph-layers">
+          ${{ringMarkup}}
+        </g>
+        <g class="network-graph-links">
+          ${{edgeMarkup}}
+        </g>
+        <g class="network-graph-nodes">
+          ${{nodeMarkup}}
+        </g>
+      `;
     }}
 
     function syncNodeHistoryDock() {{

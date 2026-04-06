@@ -2413,6 +2413,14 @@ Ready.
                   type="button"
                   role="tab"
                   aria-selected="false"
+                  aria-controls="network-map-panel-graph"
+                  data-network-subview="graph"
+                >Graph</button>
+                <button
+                  class="network-map-subview-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
                   aria-controls="network-map-panel-sensors"
                   data-network-subview="sensors"
                 >Sensors</button>
@@ -2426,6 +2434,35 @@ Ready.
               data-network-subview-panel="map"
             >
               <div id="map"></div>
+            </div>
+            <div
+              id="network-map-panel-graph"
+              class="network-map-subview-panel"
+              role="tabpanel"
+              data-network-subview-panel="graph"
+              hidden
+            >
+              <div class="network-overview-panel network-graph-panel">
+                <section class="network-graph-card">
+                  <div class="network-graph-toolbar">
+                    <div class="network-graph-heading">
+                      <h3>Link Graph</h3>
+                      <p>Topology web of observed node-to-node links. Click a node to recenter and inspect it.</p>
+                    </div>
+                    <div id="network-graph-summary" class="network-graph-summary" aria-live="polite"></div>
+                  </div>
+                  <div class="network-graph-stage">
+                    <svg
+                      id="network-graph-svg"
+                      viewBox="0 0 960 620"
+                      preserveAspectRatio="xMidYMid meet"
+                      aria-label="Network link graph"
+                    ></svg>
+                    <div id="network-graph-empty" class="signal-empty" hidden>No node links recorded yet.</div>
+                  </div>
+                  <div id="network-graph-legend" class="network-graph-legend" aria-label="Network graph legend"></div>
+                </section>
+              </div>
             </div>
             <div
               id="network-map-panel-overview"

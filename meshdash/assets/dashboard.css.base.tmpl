@@ -3725,6 +3725,224 @@
       margin-top: 4px;
       font-size: 14px;
     }}
+    .network-graph-panel {{
+      gap: 0;
+    }}
+    .network-graph-card {{
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
+      flex-direction: column;
+      gap: 14px;
+      border: 1px solid rgba(184, 209, 191, 0.92);
+      border-radius: 16px;
+      padding: 16px;
+      background:
+        radial-gradient(circle at top left, rgba(110, 190, 139, 0.12), transparent 34%),
+        linear-gradient(180deg, rgba(248, 252, 248, 0.98), rgba(237, 245, 239, 0.98));
+      box-shadow: 0 18px 38px rgba(20, 37, 26, 0.08);
+      box-sizing: border-box;
+    }}
+    .network-graph-toolbar {{
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }}
+    .network-graph-heading {{
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 220px;
+      max-width: 540px;
+    }}
+    .network-graph-heading h3 {{
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+      color: #214031;
+      letter-spacing: 0.14px;
+    }}
+    .network-graph-heading p {{
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #4f6a5a;
+    }}
+    .network-graph-summary {{
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+      flex: 1 1 240px;
+    }}
+    .network-graph-chip {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(140, 177, 151, 0.86);
+      background: rgba(248, 252, 249, 0.92);
+      color: #274333;
+      font-size: 11px;
+      line-height: 1.2;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(24, 41, 31, 0.08);
+    }}
+    .network-graph-chip-label {{
+      color: #5a7363;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.18px;
+      text-transform: uppercase;
+    }}
+    .network-graph-stage {{
+      position: relative;
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 360px;
+      border: 1px solid rgba(154, 182, 164, 0.68);
+      border-radius: 14px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at center, rgba(108, 186, 136, 0.14), transparent 24%),
+        linear-gradient(180deg, rgba(251, 253, 251, 0.98), rgba(236, 243, 238, 0.98));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }}
+    #network-graph-svg {{
+      display: block;
+      width: 100%;
+      height: 100%;
+      flex: 1 1 auto;
+    }}
+    #network-graph-empty.signal-empty {{
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      background: rgba(241, 247, 243, 0.82);
+      backdrop-filter: blur(4px);
+    }}
+    .network-graph-legend {{
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      color: #4e6659;
+      font-size: 11px;
+      line-height: 1.35;
+    }}
+    .network-graph-legend-item {{
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }}
+    .network-graph-legend-item.hint {{
+      white-space: normal;
+      max-width: 460px;
+    }}
+    .network-graph-swatch {{
+      width: 18px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(117, 150, 128, 0.45);
+      box-shadow: inset 0 0 0 1px rgba(94, 122, 103, 0.24);
+      flex: 0 0 auto;
+    }}
+    .network-graph-swatch.is-root {{
+      background: rgba(63, 143, 104, 0.72);
+    }}
+    .network-graph-swatch.is-real {{
+      background: rgba(66, 135, 245, 0.6);
+    }}
+    .network-graph-swatch.is-observed {{
+      background: rgba(141, 165, 149, 0.42);
+    }}
+    .network-graph-swatch.is-detached {{
+      background: rgba(158, 166, 175, 0.46);
+    }}
+    .network-graph-ring {{
+      fill: none;
+      stroke: rgba(121, 152, 132, 0.24);
+      stroke-width: 1.5;
+      stroke-dasharray: 6 8;
+    }}
+    .network-graph-ring.is-detached {{
+      stroke: rgba(143, 152, 160, 0.28);
+      stroke-dasharray: 3 9;
+    }}
+    .network-graph-ring-label {{
+      fill: #557063;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.16px;
+      text-transform: uppercase;
+    }}
+    .network-graph-edge {{
+      fill: none;
+      stroke-linecap: round;
+      stroke: rgba(116, 143, 125, 0.36);
+      opacity: 0.95;
+    }}
+    .network-graph-edge.is-real {{
+      stroke: rgba(74, 145, 245, 0.48);
+    }}
+    .network-graph-edge.is-observed {{
+      stroke: rgba(126, 150, 134, 0.28);
+    }}
+    .network-graph-edge.is-root-link {{
+      stroke: rgba(52, 145, 101, 0.58);
+    }}
+    .network-graph-node {{
+      cursor: pointer;
+    }}
+    .network-graph-node-core {{
+      fill: rgba(249, 252, 249, 0.98);
+      stroke: rgba(106, 134, 115, 0.78);
+      stroke-width: 1.6;
+      transition: transform 140ms ease, stroke-width 140ms ease, fill 140ms ease, stroke 140ms ease;
+    }}
+    .network-graph-node:hover .network-graph-node-core {{
+      fill: rgba(240, 248, 242, 0.98);
+      stroke-width: 2.2;
+    }}
+    .network-graph-node.is-root .network-graph-node-core {{
+      fill: rgba(221, 243, 229, 0.98);
+      stroke: rgba(45, 123, 84, 0.96);
+      stroke-width: 2.8;
+    }}
+    .network-graph-node.is-selected .network-graph-node-core {{
+      stroke: rgba(48, 119, 235, 0.96);
+      stroke-width: 3;
+    }}
+    .network-graph-node.is-detached .network-graph-node-core {{
+      fill: rgba(241, 244, 242, 0.94);
+      stroke: rgba(141, 149, 154, 0.78);
+    }}
+    .network-graph-node-label {{
+      fill: #284335;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08px;
+      pointer-events: none;
+      paint-order: stroke;
+      stroke: rgba(249, 252, 249, 0.88);
+      stroke-width: 3px;
+      stroke-linejoin: round;
+    }}
+    .network-graph-node-label.is-secondary {{
+      fill: #557063;
+      font-size: 9px;
+      font-weight: 600;
+    }}
     .network-overview-card {{
       display: flex;
       flex-direction: column;

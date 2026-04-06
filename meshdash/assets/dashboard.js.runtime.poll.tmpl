@@ -262,6 +262,9 @@
           }} else {{
             renderNetworkOverviewSummaryLoading();
           }}
+          if (activeNetworkSubview === "graph" && typeof renderNetworkGraphView === "function") {{
+            renderNetworkGraphView(state);
+          }}
         }}
 
         if (trafficVisible) {{

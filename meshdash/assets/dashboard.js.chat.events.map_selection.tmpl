@@ -684,6 +684,13 @@
       if (latestState) {{
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedHistory);
       }}
+      if (
+        activeLayoutView === "network"
+        && activeNetworkSubview === "graph"
+        && typeof renderNetworkGraphView === "function"
+      ) {{
+        renderNetworkGraphView(latestState);
+      }}
 
       updateMapSelection(focusSelection);
 
@@ -741,6 +748,13 @@
         renderSavedNodeDetails(latestState, null);
       }} else {{
         renderSavedNodeDetails({{}}, null);
+      }}
+      if (
+        activeLayoutView === "network"
+        && activeNetworkSubview === "graph"
+        && typeof renderNetworkGraphView === "function"
+      ) {{
+        renderNetworkGraphView(latestState);
       }}
       applyChatChannel(activeChatChannel, false);
       if (typeof syncChatNodeDetailsDrawer === "function") {{
