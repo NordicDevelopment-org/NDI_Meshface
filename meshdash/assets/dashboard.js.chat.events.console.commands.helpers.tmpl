@@ -262,6 +262,162 @@
       return rows;
     }}
 
+    function collectConsoleNodeLookupNameVariants(row) {{
+      const safeRow = (row && typeof row === "object") ? row : {{}};
+      const raw = (safeRow.raw && typeof safeRow.raw === "object") ? safeRow.raw : {{}};
+      const seen = new Set();
+      const values = [];
+      const push = (value) => {{
+        const clean = String(value == null ? "" : value).trim();
+        if (!clean) return;
+        const key = clean.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        values.push(clean);
+      }};
+      push(safeRow.name);
+      push(raw.long_name);
+      push(raw.short_name);
+      return values;
+    }}
+
+    function resolveConsoleNodeLookupMatches(rawTarget, state = latestState) {{
+      const target = String(rawTarget == null ? "" : rawTarget).trim();
+      const rows = collectConsoleNodeRows(state);
+      if (!target) {{
+        return {{
+          target,
+          rows,
+          matches: [],
+          mode: "missing",
+        }};
+      }}
+      const targetId = normalizeNodeId(target).toLowerCase();
+      const targetName = target.toLowerCase();
+      const exactIdMatches = rows.filter((row) => (
+        String(normalizeNodeId(row && row.id ? row.id : "")).toLowerCase() === targetId
+      ));
+      if (exactIdMatches.length) {{
+        return {{
+          target,
+          rows,
+          matches: exactIdMatches,
+          mode: "exact-id",
+        }};
+      }}
+      const exactNameMatches = rows.filter((row) => (
+        collectConsoleNodeLookupNameVariants(row)
+          .some((value) => String(value == null ? "" : value).trim().toLowerCase() === targetName)
+      ));
+      if (exactNameMatches.length) {{
+        return {{
+          target,
+          rows,
+          matches: exactNameMatches,
+          mode: "exact-name",
+        }};
+      }}
+      const pattern = normalizeWildcardPattern(target);
+      const fuzzyMatches = rows.filter((row) => {{
+        if (wildcardMatches(pattern, row && row.id ? row.id : "")) return true;
+        return collectConsoleNodeLookupNameVariants(row)
+          .some((value) => wildcardMatches(pattern, value));
+      }});
+      return {{
+        target,
+        rows,
+        matches: fuzzyMatches,
+        mode: "fuzzy",
+      }};
+    }}
+
+    function formatConsoleNodeLookupListLine(row) {{
+      const safeRow = (row && typeof row === "object") ? row : {{}};
+      const id = String(safeRow.id || "n/a").trim() || "n/a";
+      const name = String(safeRow.name || "Unknown").trim() || "Unknown";
+      const status = String(safeRow.status || "unknown").trim() || "unknown";
+      const lastSeen = formatConsoleListTime(safeRow.lastSeenUnix);
+      const hops = safeRow.hops == null ? "n/a" : String(safeRow.hops);
+      return `${{id}} | ${{name}} | status=${{status}} | last=${{lastSeen}} | hops=${{hops}}`;
+    }}
+
+    function formatConsoleNodeLookupDetails(row, verbosity = 0) {{
+      const safeRow = (row && typeof row === "object") ? row : {{}};
+      const raw = (safeRow.raw && typeof safeRow.raw === "object") ? safeRow.raw : {{}};
+      const lines = [];
+      const id = String(safeRow.id || "n/a").trim() || "n/a";
+      const name = String(safeRow.name || "Unknown").trim() || "Unknown";
+      const status = String(safeRow.status || "unknown").trim() || "unknown";
+      const hops = safeRow.hops == null ? "n/a" : String(safeRow.hops);
+      const lastSeen = formatConsoleListTime(safeRow.lastSeenUnix);
+      const lat = Number(raw.lat);
+      const lon = Number(raw.lon);
+      const hasGps = Boolean(safeRow.hasGps) && isValidMapCoord(lat, lon);
+      const coordDigits = verbosity > 0 ? 7 : 5;
+      const altitude = Number(raw.altitude ?? raw.alt ?? raw.altitude_m ?? raw.altitudeM);
+      const battery = Number(raw.battery_level ?? raw.batteryLevel);
+      const voltage = Number(raw.voltage);
+      const channelUtil = Number(raw.channel_utilization ?? raw.channelUtilization);
+      const airUtilTx = Number(raw.air_util_tx ?? raw.airUtilTx);
+
+      lines.push(`${{id}} | ${{name}}`);
+      lines.push(`  status=${{status}} | last=${{lastSeen}} | hops=${{hops}}`);
+
+      const gpsParts = [`gps=${{hasGps ? "yes" : "no"}}`];
+      if (hasGps) {{
+        gpsParts.push(`pos=${{lat.toFixed(coordDigits)}},${{lon.toFixed(coordDigits)}}`);
+      }}
+      if (Number.isFinite(altitude)) {{
+        gpsParts.push(`altitude=${{Math.trunc(altitude)}}m`);
+      }}
+      lines.push(`  ${{gpsParts.join(" | ")}}`);
+
+      const powerParts = [];
+      if (Number.isFinite(battery)) {{
+        powerParts.push(`battery=${{Math.round(battery)}}%`);
+      }}
+      if (Number.isFinite(voltage)) {{
+        powerParts.push(`voltage=${{voltage.toFixed(verbosity > 0 ? 3 : 2)}}V`);
+      }}
+      if (Number.isFinite(channelUtil)) {{
+        powerParts.push(`channel_util=${{channelUtil.toFixed(verbosity > 0 ? 2 : 1)}}%`);
+      }}
+      if (Number.isFinite(airUtilTx)) {{
+        powerParts.push(`air_util_tx=${{airUtilTx.toFixed(verbosity > 0 ? 2 : 1)}}%`);
+      }}
+      if (powerParts.length) {{
+        lines.push(`  ${{powerParts.join(" | ")}}`);
+      }}
+
+      lines.push(`  ports=${{formatConsolePortSummary(safeRow.ports, verbosity > 0 ? 12 : 8)}}`);
+
+      if (verbosity >= 2) {{
+        const detailParts = [];
+        const displayName = name.toLowerCase();
+        const shortName = String(raw.short_name || "").trim();
+        const longName = String(raw.long_name || "").trim();
+        const lastSeenUnix = Number(safeRow.lastSeenUnix);
+        if (shortName && shortName.toLowerCase() !== displayName) {{
+          detailParts.push(`short=${{shortName}}`);
+        }}
+        if (longName && longName.toLowerCase() !== displayName) {{
+          detailParts.push(`long=${{longName}}`);
+        }}
+        if (Number.isFinite(lastSeenUnix) && lastSeenUnix > 0) {{
+          detailParts.push(`last_heard_unix=${{Math.trunc(lastSeenUnix)}}`);
+        }}
+        if (hasGps) {{
+          detailParts.push(`lat=${{lat.toFixed(7)}}`);
+          detailParts.push(`lon=${{lon.toFixed(7)}}`);
+        }}
+        if (detailParts.length) {{
+          lines.push(`  details: ${{detailParts.join(" | ")}}`);
+        }}
+      }}
+
+      return lines;
+    }}
+
     function parseConsoleLiveLayerCsv(rawValue) {{
       const clean = String(rawValue == null ? "" : rawValue).trim().toLowerCase();
       if (!clean) {{
