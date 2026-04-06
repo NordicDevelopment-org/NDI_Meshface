@@ -67,6 +67,143 @@
       }}
     }}
 
+    async function clearOriginCacheStorage() {{
+      if (
+        typeof window === "undefined"
+        || !("caches" in window)
+        || !window.caches
+        || typeof window.caches.keys !== "function"
+      ) {{
+        return {{ attempted: 0, cleared: 0, supported: false }};
+      }}
+
+      let keys = [];
+      try {{
+        keys = await window.caches.keys();
+      }} catch (_err) {{
+        return {{ attempted: 0, cleared: 0, supported: true }};
+      }}
+
+      let attempted = 0;
+      let cleared = 0;
+      for (const rawKey of (Array.isArray(keys) ? keys : [])) {{
+        const key = String(rawKey || "");
+        if (!key) continue;
+        attempted += 1;
+        try {{
+          const deleted = await window.caches.delete(key);
+          if (deleted) {{
+            cleared += 1;
+          }}
+        }} catch (_err) {{
+        }}
+      }}
+      return {{ attempted, cleared, supported: true }};
+    }}
+
+    async function deleteIndexedDbDatabaseByName(name) {{
+      const dbName = String(name || "").trim();
+      if (!dbName || typeof indexedDB === "undefined" || !indexedDB || typeof indexedDB.deleteDatabase !== "function") {{
+        return false;
+      }}
+      return await new Promise((resolve) => {{
+        let settled = false;
+        const finish = (value) => {{
+          if (settled) return;
+          settled = true;
+          resolve(!!value);
+        }};
+        try {{
+          const request = indexedDB.deleteDatabase(dbName);
+          request.onsuccess = () => finish(true);
+          request.onerror = () => finish(false);
+          request.onblocked = () => finish(false);
+        }} catch (_err) {{
+          finish(false);
+        }}
+      }});
+    }}
+
+    async function clearOriginIndexedDbStorage() {{
+      if (typeof indexedDB === "undefined" || !indexedDB) {{
+        return {{ attempted: 0, cleared: 0, supported: false }};
+      }}
+      if (typeof indexedDB.databases !== "function") {{
+        return {{ attempted: 0, cleared: 0, supported: false }};
+      }}
+
+      let databases = [];
+      try {{
+        databases = await indexedDB.databases();
+      }} catch (_err) {{
+        return {{ attempted: 0, cleared: 0, supported: true }};
+      }}
+
+      let attempted = 0;
+      let cleared = 0;
+      for (const entry of (Array.isArray(databases) ? databases : [])) {{
+        const name = String(entry && entry.name ? entry.name : "").trim();
+        if (!name) continue;
+        attempted += 1;
+        if (await deleteIndexedDbDatabaseByName(name)) {{
+          cleared += 1;
+        }}
+      }}
+      return {{ attempted, cleared, supported: true }};
+    }}
+
+    async function resetAllLocalSettings() {{
+      if (settingsApplyInFlight) return;
+      const confirmed = window.confirm(
+        "Reset all browser-local dashboard data for this origin? This clears saved settings, location caches, session state, cache storage, and IndexedDB databases for the dashboard UI only."
+      );
+      if (!confirmed) return;
+
+      const typed = window.prompt(
+        "Type RESET LOCAL to clear browser-local dashboard settings and reload:"
+      );
+      if (String(typed || "").trim().toUpperCase() !== "RESET LOCAL") {{
+        setSettingsStatusText("Canceled: confirmation token did not match.");
+        return;
+      }}
+
+      settingsApplyInFlight = true;
+      if (typeof setSettingsButtonsDisabled === "function") {{
+        setSettingsButtonsDisabled(true);
+      }}
+      setSettingsAndChannelsStatusText("Clearing browser-local dashboard settings, caches, and databases…");
+
+      try {{
+        try {{
+          if (window.sessionStorage && typeof window.sessionStorage.clear === "function") {{
+            window.sessionStorage.clear();
+          }}
+        }} catch (_err) {{
+        }}
+        try {{
+          if (window.localStorage && typeof window.localStorage.clear === "function") {{
+            window.localStorage.clear();
+          }}
+        }} catch (_err) {{
+        }}
+        await clearOriginCacheStorage();
+        await clearOriginIndexedDbStorage();
+      }} catch (err) {{
+        settingsApplyInFlight = false;
+        if (typeof setSettingsButtonsDisabled === "function") {{
+          setSettingsButtonsDisabled(false);
+        }}
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        setSettingsAndChannelsStatusText(`Local reset failed: ${{msg}}`);
+        return;
+      }}
+
+      setSettingsAndChannelsStatusText("Browser-local dashboard data cleared. Reloading…");
+      window.setTimeout(() => {{
+        window.location.reload();
+      }}, 120);
+    }}
+
     async function regenerateNodeId() {{
       if (settingsApplyInFlight) return;
       const localNodeId = normalizeNodeId(resolveLocalNodeId(latestState));

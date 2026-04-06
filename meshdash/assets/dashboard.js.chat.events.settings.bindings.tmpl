@@ -267,6 +267,13 @@
         }});
       }}
 
+      const resetLocalStateBtn = document.getElementById("settings-reset-local-state");
+      if (resetLocalStateBtn instanceof HTMLButtonElement) {{
+        resetLocalStateBtn.addEventListener("click", () => {{
+          void resetAllLocalSettings();
+        }});
+      }}
+
       const resetBtn = document.getElementById("settings-reset");
       if (resetBtn instanceof HTMLButtonElement) {{
         resetBtn.addEventListener("click", () => {{
