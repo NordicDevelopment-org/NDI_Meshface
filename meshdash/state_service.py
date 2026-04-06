@@ -67,7 +67,8 @@ _MODEM_PRESET_ENUM_BY_NUMBER: dict[int, str] = {
 _MODEM_PRESET_NORMALIZED_KEYS: dict[str, str] = {
     str(name).replace("_", "").upper(): name for name in _MODEM_PRESET_ENUM_BY_NUMBER.values()
 }
-_ONLINE_NODE_WINDOW_SECONDS = 10 * 60
+# Meshtastic's LocalStats.num_online_nodes counts nodes heard in the past 2 hours.
+_ONLINE_NODE_WINDOW_SECONDS = 2 * 60 * 60
 
 
 def _to_jsonable_safe(

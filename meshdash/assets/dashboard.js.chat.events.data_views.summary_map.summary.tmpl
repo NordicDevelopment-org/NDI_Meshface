@@ -1611,39 +1611,23 @@
       }}
       const chatRosterTickerEl = document.getElementById("m-chat-roster");
       if (chatRosterTickerEl instanceof HTMLElement) {{
-        const nodes = Array.isArray(state.nodes) ? state.nodes : [];
-        const nodesById = new Map(
-          nodes.map((node) => [normalizeNodeId(node && node.id), node])
+        const totalCount = Math.max(0, Math.trunc(Number(s.node_count) || 0));
+        const onlineCount = Math.max(
+          0,
+          Math.min(totalCount, Math.trunc(Number(s.online_node_count) || 0))
         );
-        const capsById = new Map(
-          Object.entries((state.history_caps && typeof state.history_caps === "object") ? state.history_caps : {{}})
-            .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
-            .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
-        );
-        const recentChat = Array.isArray((state.traffic || {{}}).recent_chat)
-          ? state.traffic.recent_chat
-          : [];
-        const latestChatTouchByNode = mapLatestChatTouchInfo(recentChat);
-        const counts = {{ online: 0, warn: 0, stale: 0 }};
-        for (const [nodeId, node] of nodesById.entries()) {{
-          if (!isSelectableNodeId(nodeId)) continue;
-          const caps = capsById.get(nodeId);
-          const chatTouch = latestChatTouchByNode.get(nodeId) || null;
-          const lastSeenUnix = computeNodeFreshnessUnix(node, caps, chatTouch);
-          const key = normalizeFreshnessKey(freshnessStatus(lastSeenUnix, Math.floor(Date.now() / 1000)));
-          if (key === "online") counts.online += 1;
-          else if (key === "warn") counts.warn += 1;
-          else if (key === "stale") counts.stale += 1;
-        }}
+        const offlineCount = Math.max(0, totalCount - onlineCount);
         const rows = [
-          {{ key: "Online", value: String(counts.online) }},
-          {{ key: "Aging", value: String(counts.warn) }},
-          {{ key: "Stale", value: String(counts.stale) }},
+          {{ key: "Online", value: String(onlineCount) }},
+          {{ key: "Offline", value: String(offlineCount) }},
+          {{ key: "Total", value: String(totalCount) }},
         ];
         const rowsHtml = rows
           .map((row) => `<div class="node-ticker-row"><span class="node-ticker-key">${{escAttr(row.key)}}:</span><span class="node-ticker-val">${{escAttr(row.value)}}</span></div>`)
           .join("");
-        const rowsTitle = rows.map((row) => `${{row.key}}: ${{row.value}}`).join(" | ");
+        const rowsTitle = `Online uses Meshtastic LocalStats semantics (heard in the past 2 hours). | ${
+          rows.map((row) => `${row.key}: ${row.value}`).join(" | ")
+        }`;
         updateSummaryMiniPanel("m-chat-roster", chatRosterTickerEl, {{
           mode: "html",
           html: rowsHtml,
