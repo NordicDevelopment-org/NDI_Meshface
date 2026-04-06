@@ -15,11 +15,11 @@ def test_dashboard_js_uses_curated_default_ticker_layout() -> None:
     )
 
     assert re.search(
-        r'const tickerDefaultOrder = \[\s*"target",\s*"node",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"battery",',
+        r'const tickerDefaultOrder = \[\s*"target",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*"battery",',
         js,
     )
     assert re.search(
-        r'for \(const id of \[\s*"target",\s*"node",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"battery",\s*\]\)',
+        r'for \(const id of \[\s*"target",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*\]\)',
         js,
     )
     assert 'enabled: { ...tickerDefaultEnabled },' in js

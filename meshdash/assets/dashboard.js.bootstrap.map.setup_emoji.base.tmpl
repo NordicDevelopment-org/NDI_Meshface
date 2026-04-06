@@ -410,11 +410,11 @@
     const tickerMetricIds = new Set(tickerCatalog.filter((entry) => entry.metric).map((entry) => entry.id));
     const tickerDefaultOrder = [
       "target",
-      "node",
       "known_nodes",
       "online_nodes",
       "packets_per_min",
       "channel_util",
+      "node",
       "battery",
       "wifi",
       "gps",
@@ -432,12 +432,11 @@
     );
     for (const id of [
       "target",
-      "node",
       "known_nodes",
       "online_nodes",
       "packets_per_min",
       "channel_util",
-      "battery",
+      "node",
     ]) {{
       if (!tickerCatalogById.has(id)) continue;
       tickerDefaultEnabled[id] = true;
