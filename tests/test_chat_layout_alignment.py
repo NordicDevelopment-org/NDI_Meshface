@@ -17,7 +17,10 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "padding: 8px 10px;" in css
     assert ".chat-main-pane {" in css
     assert "row-gap: 0;" in css
+    assert ".chat-log-scroll {" in css
+    assert "padding: 0;" in css
     assert ".chat-compose-shell {" in css
+    assert "margin-top: 6px;" in css
     assert "border-radius: 10px;" in css
     assert "padding: 6px;" in css
     assert "gap: 0;" in css
