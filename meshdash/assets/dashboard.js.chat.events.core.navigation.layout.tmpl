@@ -876,6 +876,8 @@
       pointerClientX: 0,
       pointerClientY: 0,
       pointerViewBox: null,
+      pointerDownNodeId: "",
+      captureActive: false,
       dragging: false,
       suppressClick: false,
       suppressClickTimer: null,
@@ -1014,6 +1016,19 @@
     }}
 
     function stopNetworkGraphPan(svg) {{
+      const pointerId = networkGraphViewState.pointerId;
+      if (
+        svg instanceof SVGElement
+        && networkGraphViewState.captureActive
+        && pointerId != null
+        && typeof svg.hasPointerCapture === "function"
+        && svg.hasPointerCapture(pointerId)
+      ) {{
+        try {{
+          svg.releasePointerCapture(pointerId);
+        }} catch (_err) {{
+        }}
+      }}
       if (svg instanceof SVGElement && svg.parentElement instanceof HTMLElement) {{
         svg.parentElement.classList.remove("is-panning");
       }}
@@ -1021,6 +1036,8 @@
       networkGraphViewState.pointerClientX = 0;
       networkGraphViewState.pointerClientY = 0;
       networkGraphViewState.pointerViewBox = null;
+      networkGraphViewState.pointerDownNodeId = "";
+      networkGraphViewState.captureActive = false;
       networkGraphViewState.dragging = false;
     }}
 
@@ -1062,6 +1079,13 @@
       }};
     }}
 
+    function resolveNetworkGraphNodeIdFromTarget(target) {{
+      if (!(target instanceof Element)) return "";
+      const nodeGroup = target.closest("[data-network-graph-node-id]");
+      if (!(nodeGroup instanceof Element)) return "";
+      return normalizeNodeId(nodeGroup.getAttribute("data-network-graph-node-id") || "");
+    }}
+
     function bindNetworkGraphInteractions(svg) {{
       if (!(svg instanceof SVGElement) || svg.dataset.bound === "1") return;
       svg.dataset.bound = "1";
@@ -1074,21 +1098,6 @@
         }});
       }}
 
-      svg.addEventListener("click", (event) => {{
-        if (networkGraphViewState.suppressClick) {{
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }}
-        const target = event.target;
-        if (!(target instanceof Element)) return;
-        const nodeGroup = target.closest("[data-network-graph-node-id]");
-        if (!(nodeGroup instanceof Element)) return;
-        const nodeId = normalizeNodeId(nodeGroup.getAttribute("data-network-graph-node-id") || "");
-        if (!isSelectableNodeId(nodeId)) return;
-        selectNode(nodeId, true, false);
-      }});
-
       svg.addEventListener("pointerdown", (event) => {{
         if (event.pointerType === "mouse" && event.button !== 0) return;
         if (networkGraphViewState.pointerId !== null) return;
@@ -1096,11 +1105,9 @@
         networkGraphViewState.pointerClientX = event.clientX;
         networkGraphViewState.pointerClientY = event.clientY;
         networkGraphViewState.pointerViewBox = cloneNetworkGraphViewBox(networkGraphViewState.viewBox);
+        networkGraphViewState.pointerDownNodeId = resolveNetworkGraphNodeIdFromTarget(event.target);
+        networkGraphViewState.captureActive = false;
         networkGraphViewState.dragging = false;
-        try {{
-          svg.setPointerCapture(event.pointerId);
-        }} catch (_err) {{
-        }}
       }});
 
       svg.addEventListener("pointermove", (event) => {{
@@ -1114,7 +1121,16 @@
         if (!networkGraphViewState.dragging && Math.hypot(dx, dy) < 5) {{
           return;
         }}
-        networkGraphViewState.dragging = true;
+        if (!networkGraphViewState.dragging) {{
+          networkGraphViewState.dragging = true;
+          if (!networkGraphViewState.captureActive) {{
+            try {{
+              svg.setPointerCapture(event.pointerId);
+              networkGraphViewState.captureActive = true;
+            }} catch (_err) {{
+            }}
+          }}
+        }}
         if (svg.parentElement instanceof HTMLElement) {{
           svg.parentElement.classList.add("is-panning");
         }}
@@ -1130,9 +1146,18 @@
       const finishPan = (event) => {{
         if (networkGraphViewState.pointerId !== event.pointerId) return;
         const wasDragging = networkGraphViewState.dragging;
+        const releasedNodeId = resolveNetworkGraphNodeIdFromTarget(event.target);
+        const nodeId = wasDragging
+          ? ""
+          : (releasedNodeId || networkGraphViewState.pointerDownNodeId || "");
         stopNetworkGraphPan(svg);
         if (wasDragging) {{
           suppressNextNetworkGraphClick();
+          return;
+        }}
+        if (isSelectableNodeId(nodeId)) {{
+          suppressNextNetworkGraphClick();
+          selectNode(nodeId, true, false);
         }}
       }};
       svg.addEventListener("pointerup", finishPan);

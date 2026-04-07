@@ -41,7 +41,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'activeNetworkSubview === "graph"' in js
     assert 'const networkGraphViewState = {' in js
     assert 'function bindNetworkGraphInteractions(svg)' in js
+    assert 'pointerDownNodeId' in js
     assert 'svg.addEventListener("wheel"' in js
+    assert 'svg.addEventListener("pointerup", finishPan);' in js
 
 
 def test_network_layout_uses_single_row_map_track() -> None:
