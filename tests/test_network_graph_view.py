@@ -60,6 +60,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {})' in js
     assert 'function setNetworkGraphRootNode(nodeId, options = {})' in js
     assert 'function navigateNetworkGraphBack()' in js
+    assert 'function focusNetworkGraphNodeFromSelection(nodeId, options = {})' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'pointerDownNodeId' in js
     assert 'svg.addEventListener("wheel"' in js

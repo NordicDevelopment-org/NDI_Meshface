@@ -1572,6 +1572,19 @@
       return changed;
     }}
 
+    function focusNetworkGraphNodeFromSelection(nodeId, options = {{}}) {{
+      const nextId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(nextId)) return false;
+      cancelNetworkGraphViewAnimation();
+      cancelNetworkGraphSceneAnimation();
+      networkGraphViewState.pendingFocusTransition = null;
+      setNetworkGraphRootNode(nextId, {{
+        pushHistory: !(options && options.pushHistory === false),
+        rerender: !(options && options.rerender === false),
+      }});
+      return true;
+    }}
+
     function navigateNetworkGraphBack() {{
       const nodeMap = (latestState && Array.isArray(latestState.nodes))
         ? new Map(

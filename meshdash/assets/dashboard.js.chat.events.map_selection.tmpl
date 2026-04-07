@@ -575,6 +575,12 @@
     function selectNode(nodeId, shouldFocus = true, toggleIfSelected = true) {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return;
+      const syncSelectionToNetworkGraph = (
+        activeLayoutView === "network"
+        && activeNetworkSubview === "graph"
+        && !networkGraphRootSyncInProgress
+        && typeof focusNetworkGraphNodeFromSelection === "function"
+      );
       const previousSelectedId = normalizeNodeId(selectedNodeId || "");
       if (normalized !== previousSelectedId) {{
         networkNodeInfoCollapsedNodeId = "";
@@ -583,6 +589,26 @@
         networkNodeInfoCollapsedNodeId = "";
       }}
       if (toggleIfSelected && selectedNodeId && normalized === selectedNodeId) {{
+        if (syncSelectionToNetworkGraph) {{
+          focusNetworkGraphNodeFromSelection(normalized, {{
+            pushHistory: true,
+            rerender: true,
+          }});
+          if (
+            shouldFocus
+            && typeof setChatNodeDetailsDrawerExpanded === "function"
+            && (
+              typeof isChatNodeDetailsDrawerExpanded !== "function"
+              || !isChatNodeDetailsDrawerExpanded()
+            )
+          ) {{
+            setChatNodeDetailsDrawerExpanded(true, {{
+              fetchHistory: true,
+              rerender: false,
+            }});
+          }}
+          return;
+        }}
         if (
           shouldFocus
           && typeof setChatNodeDetailsDrawerExpanded === "function"
@@ -601,16 +627,11 @@
         return;
       }}
       selectedNodeId = normalized;
-      if (
-        activeLayoutView === "network"
-        && activeNetworkSubview === "graph"
-        && !networkGraphRootSyncInProgress
-        && typeof setNetworkGraphRootNode === "function"
-      ) {{
-        setNetworkGraphRootNode(normalized, {{
+      let graphSelectionHandled = false;
+      if (syncSelectionToNetworkGraph) {{
+        graphSelectionHandled = focusNetworkGraphNodeFromSelection(normalized, {{
           pushHistory: true,
-          syncSelection: false,
-          rerender: false,
+          rerender: true,
         }});
       }}
       if (typeof clearChatNodeNavigatorSelectionScrollLock === "function") {{
@@ -700,6 +721,7 @@
         activeLayoutView === "network"
         && activeNetworkSubview === "graph"
         && !networkGraphRootSyncInProgress
+        && !graphSelectionHandled
         && !(networkGraphViewState && networkGraphViewState.pendingFocusTransition)
         && typeof renderNetworkGraphView === "function"
       ) {{
