@@ -125,8 +125,10 @@
       }}
       const btn = document.getElementById("chat-send-channel-menu-btn");
       if (btn instanceof HTMLButtonElement) {{
-        btn.innerHTML = `${{meshChannelPrimaryBadgeHtml(activeMeshSendChannelIndex)}}<span class="mesh-channel-menu-btn-label">${{escAttr(sendLabel)}}</span>`;
-        btn.title = globalMeta.title === sendLabel ? globalMeta.title : `${{globalMeta.title}} • ${{sendLabel}}`;
+        const btnLabel = globalMeta.title === sendLabel ? globalMeta.title : `${{globalMeta.title}} • ${{sendLabel}}`;
+        btn.innerHTML = "";
+        btn.title = btnLabel;
+        btn.setAttribute("aria-label", `Outgoing chat channel: ${{btnLabel}}`);
         const select = document.getElementById("chat-send-channel-select");
         const disabled = select instanceof HTMLSelectElement ? !!select.disabled : false;
         btn.disabled = disabled;

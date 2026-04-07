@@ -419,7 +419,6 @@
 
     function syncMeshChannelMismatchWarning() {{
       const wrap = document.querySelector(".chat-send-channel-wrap");
-      const warningEl = document.getElementById("chat-channel-mismatch-warning");
       if (!(wrap instanceof HTMLElement)) return;
 
       const viewIdx = activeMeshChannelFilterIndex();
@@ -435,10 +434,7 @@
         : "Choose which configured message channel to use for outgoing chat. This sets the encryption group used for sends and does NOT change your LoRa frequency slot.";
       wrap.setAttribute("aria-label", mismatched ? warningText : "Outgoing chat channel");
 
-      if (warningEl instanceof HTMLElement) {{
-        warningEl.hidden = !mismatched;
-        warningEl.textContent = warningText;
-      }}
+      setChatNoticeTickerText("chat-channel-mismatch-warning", warningText, false);
     }}
 
     function meshChannelSendContext(options = {{}}) {{

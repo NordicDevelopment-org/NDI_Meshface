@@ -1,8 +1,89 @@
-    function setChatSendStatus(message, isError = false) {{
-      const el = document.getElementById("chat-send-status");
+    let chatNoticeResizeObserver = null;
+    const chatNoticeTickerGapPx = 36;
+
+    function syncChatComposeNoticesVisibility() {{
+      const rail = document.getElementById("chat-compose-notices");
+      if (!(rail instanceof HTMLElement)) return;
+      const hasVisibleNotice = Array.from(rail.children).some((child) => child instanceof HTMLElement && !child.hidden);
+      rail.hidden = !hasVisibleNotice;
+    }}
+
+    function scheduleChatNoticeTickerLayout(el) {{
       if (!(el instanceof HTMLElement)) return;
-      el.textContent = message ? String(message) : "";
+      const viewport = el.querySelector(".chat-notice-viewport");
+      const primary = el.querySelector(".chat-notice-item-primary");
+      const secondary = el.querySelector(".chat-notice-item-secondary");
+      if (!(viewport instanceof HTMLElement)) return;
+      if (!(primary instanceof HTMLElement)) return;
+      if (!(secondary instanceof HTMLElement)) return;
+
+      if (el._chatNoticeTickerRaf) {{
+        window.cancelAnimationFrame(el._chatNoticeTickerRaf);
+      }}
+      el._chatNoticeTickerRaf = window.requestAnimationFrame(() => {{
+        el._chatNoticeTickerRaf = 0;
+        const text = String(primary.textContent || "").trim();
+        if (!text || el.hidden) {{
+          el.classList.add("is-static");
+          secondary.hidden = true;
+          el.style.removeProperty("--chat-notice-shift");
+          el.style.removeProperty("--chat-notice-duration");
+          return;
+        }}
+        secondary.hidden = false;
+        const viewportWidth = Math.max(0, viewport.clientWidth);
+        const primaryWidth = Math.ceil(primary.getBoundingClientRect().width);
+        if (!viewportWidth || primaryWidth <= Math.max(0, viewportWidth - 18)) {{
+          el.classList.add("is-static");
+          secondary.hidden = true;
+          el.style.removeProperty("--chat-notice-shift");
+          el.style.removeProperty("--chat-notice-duration");
+          return;
+        }}
+        const shiftPx = Math.max(primaryWidth + chatNoticeTickerGapPx, viewportWidth + 24);
+        const durationSec = Math.max(12, Math.min(44, shiftPx / 28));
+        el.style.setProperty("--chat-notice-shift", `${{shiftPx}}px`);
+        el.style.setProperty("--chat-notice-duration", `${{durationSec.toFixed(1)}}s`);
+        el.classList.remove("is-static");
+      }});
+    }}
+
+    function observeChatNoticeTicker(el) {{
+      if (!(el instanceof HTMLElement)) return;
+      if (typeof window === "undefined" || typeof window.ResizeObserver !== "function") return;
+      if (!(chatNoticeResizeObserver instanceof window.ResizeObserver)) {{
+        chatNoticeResizeObserver = new window.ResizeObserver((entries) => {{
+          for (const entry of entries || []) {{
+            if (entry && entry.target instanceof HTMLElement) {{
+              scheduleChatNoticeTickerLayout(entry.target);
+            }}
+          }}
+        }});
+      }}
+      if (el._chatNoticeTickerObserved) return;
+      chatNoticeResizeObserver.observe(el);
+      el._chatNoticeTickerObserved = true;
+    }}
+
+    function setChatNoticeTickerText(elementId, message, isError = false) {{
+      const el = document.getElementById(elementId);
+      if (!(el instanceof HTMLElement)) return;
+      const primary = el.querySelector(".chat-notice-item-primary");
+      const secondary = el.querySelector(".chat-notice-item-secondary");
+      if (!(primary instanceof HTMLElement)) return;
+      if (!(secondary instanceof HTMLElement)) return;
+      const text = message ? String(message).trim() : "";
+      primary.textContent = text;
+      secondary.textContent = text;
       el.classList.toggle("error", !!isError);
+      el.hidden = !text;
+      observeChatNoticeTicker(el);
+      scheduleChatNoticeTickerLayout(el);
+      syncChatComposeNoticesVisibility();
+    }}
+
+    function setChatSendStatus(message, isError = false) {{
+      setChatNoticeTickerText("chat-send-status", message, isError);
     }}
 
     function setChatSendBusy(isBusy) {{

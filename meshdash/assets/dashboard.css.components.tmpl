@@ -16,16 +16,15 @@
       min-height: 0;
     }}
     .chat-compose-notices {{
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: calc(100% + 2px);
+      padding: 6px 10px 0 10px;
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
       gap: 4px;
-      pointer-events: none;
-      z-index: 2;
+      min-height: 0;
+    }}
+    .chat-compose-notices[hidden] {{
+      display: none !important;
     }}
     .chat-composer-top {{
       display: none;
@@ -49,14 +48,16 @@
       --chat-send-channel-rgb: 0, 114, 178;
       display: inline-flex;
       align-items: center;
-      flex: 0 1 156px;
-      min-width: 96px;
-      max-width: 196px;
+      justify-content: center;
+      position: relative;
+      flex: 0 0 27px;
+      min-width: 27px;
+      max-width: 27px;
       height: 27px;
       z-index: 48;
-      padding-left: 7px;
-      gap: 4px;
-      border-radius: 8px;
+      padding: 0;
+      gap: 0;
+      border-radius: 999px;
       background: #e3f4ea;
       border: 1px solid #9cc9ad;
       box-shadow: none;
@@ -77,17 +78,25 @@
       display: none;
     }}
     .chat-send-channel-menu-btn {{
+      position: absolute;
+      inset: 0;
       min-width: 0;
-      width: 100%;
-      justify-content: flex-start;
+      width: auto;
+      justify-content: center;
       text-align: left;
-      padding-left: 4px;
+      padding: 0;
       background: transparent;
       border: 0;
       color: inherit;
       box-shadow: none;
       appearance: none;
       -webkit-appearance: none;
+      border-radius: 999px;
+    }}
+    .chat-send-channel-dot {{
+      pointer-events: none;
+      flex: 0 0 auto;
+      margin: 0;
     }}
     .chat-send-channel-menu {{
       top: auto;
@@ -485,18 +494,18 @@
       border-color: #b4d0bd;
     }}
     .chat-send-status {{
-      display: inline-flex;
-      align-items: center;
+      display: block;
       min-height: 0;
-      max-width: min(100%, 560px);
-      padding: 4px 8px;
+      max-width: none;
+      padding: 0;
       border-radius: 7px;
       border: 1px solid rgba(var(--chat-send-channel-rgb), 0.22);
       background: rgba(243, 250, 245, 0.96);
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
       font-size: 10px;
       color: #446551;
       line-height: 1.25;
+      overflow: hidden;
     }}
     .chat-macro-preview {{
       min-height: 0;
@@ -555,25 +564,65 @@
       outline-offset: 1px;
     }}
     .chat-channel-mismatch-warning {{
-      display: inline-flex;
-      align-items: center;
+      display: block;
       min-height: 0;
-      max-width: min(100%, 560px);
-      padding: 4px 8px;
+      max-width: none;
+      padding: 0;
       border-radius: 7px;
       border: 1px solid rgba(241, 175, 74, 0.38);
       background: rgba(255, 245, 222, 0.98);
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
       font-size: 10px;
       line-height: 1.3;
       color: #8b5b14;
       font-weight: 600;
+      overflow: hidden;
     }}
     .chat-channel-mismatch-warning[hidden] {{
       display: none !important;
     }}
-    .chat-send-status:empty {{
-      display: none;
+    .chat-notice-viewport {{
+      width: 100%;
+      overflow: hidden;
+      min-width: 0;
+      mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 97%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 97%, transparent 100%);
+    }}
+    .chat-notice-track {{
+      display: inline-flex;
+      align-items: center;
+      min-width: max-content;
+      will-change: transform;
+      transform: translateX(0);
+      animation: chatNoticeTickerScroll var(--chat-notice-duration, 18s) linear infinite;
+    }}
+    .chat-send-status.is-static .chat-notice-track,
+    .chat-channel-mismatch-warning.is-static .chat-notice-track {{
+      animation: none;
+      transform: translateX(0);
+    }}
+    .chat-notice-item {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 4px 8px;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }}
+    .chat-notice-item-secondary {{
+      margin-left: 36px;
+    }}
+    .chat-send-status.is-static .chat-notice-item-secondary,
+    .chat-channel-mismatch-warning.is-static .chat-notice-item-secondary {{
+      display: none !important;
+    }}
+    @keyframes chatNoticeTickerScroll {{
+      from {{
+        transform: translateX(100%);
+      }}
+      to {{
+        transform: translateX(calc(var(--chat-notice-shift, 420px) * -1));
+      }}
     }}
     .chat-send-status.error {{
       color: #b43b3b;
