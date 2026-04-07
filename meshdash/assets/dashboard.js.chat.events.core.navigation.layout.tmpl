@@ -756,6 +756,11 @@
     function setActiveNetworkSubview(subviewName, options = {{}}) {{
       const next = normalizeNetworkSubview(subviewName);
       const persist = options && options.persist !== false;
+      if (normalizeLayoutView(activeLayoutView) === "network" && next === "graph") {{
+        networkGraphViewState.pendingEntryViewportSync = true;
+      }} else {{
+        clearNetworkGraphEmptyRetry();
+      }}
       activeNetworkSubview = next;
 
       const normalizedView = normalizeLayoutView(activeLayoutView);
@@ -867,6 +872,7 @@
     const networkGraphViewState = {{
       initialized: false,
       lastRootId: "",
+      pendingEntryViewportSync: false,
       bounds: {{
         minX: networkGraphViewportBase.x,
         minY: networkGraphViewportBase.y,
@@ -885,6 +891,8 @@
       suppressClickTimer: null,
       animationFrame: null,
       sceneAnimationFrame: null,
+      emptyRetryTimer: null,
+      emptyRetryCount: 0,
       renderedPositions: new Map(),
       renderedLayoutSnapshot: null,
       pendingFocusTransition: null,
@@ -903,6 +911,20 @@
         width: Number.isFinite(width) && width > 0 ? width : fallback.width,
         height: Number.isFinite(height) && height > 0 ? height : fallback.height,
       }};
+    }}
+
+    function isNetworkGraphPointVisible(viewBox, x, y, paddingRatio = 0.08) {{
+      const safeViewBox = cloneNetworkGraphViewBox(viewBox);
+      const padX = safeViewBox.width * Math.max(0, Number(paddingRatio) || 0);
+      const padY = safeViewBox.height * Math.max(0, Number(paddingRatio) || 0);
+      return (
+        Number.isFinite(Number(x))
+        && Number.isFinite(Number(y))
+        && Number(x) >= (safeViewBox.x + padX)
+        && Number(x) <= ((safeViewBox.x + safeViewBox.width) - padX)
+        && Number(y) >= (safeViewBox.y + padY)
+        && Number(y) <= ((safeViewBox.y + safeViewBox.height) - padY)
+      );
     }}
 
     function defaultNetworkGraphBounds() {{
@@ -948,6 +970,35 @@
         window.cancelAnimationFrame(networkGraphViewState.sceneAnimationFrame);
       }}
       networkGraphViewState.sceneAnimationFrame = null;
+    }}
+
+    function clearNetworkGraphEmptyRetry() {{
+      if (networkGraphViewState.emptyRetryTimer !== null) {{
+        clearTimeout(networkGraphViewState.emptyRetryTimer);
+      }}
+      networkGraphViewState.emptyRetryTimer = null;
+      networkGraphViewState.emptyRetryCount = 0;
+    }}
+
+    function scheduleNetworkGraphEmptyRetry() {{
+      if (
+        networkGraphViewState.emptyRetryTimer !== null
+        || networkGraphViewState.emptyRetryCount >= 4
+      ) {{
+        return;
+      }}
+      const retryDelayMs = 140 + (networkGraphViewState.emptyRetryCount * 180);
+      networkGraphViewState.emptyRetryCount += 1;
+      networkGraphViewState.emptyRetryTimer = window.setTimeout(() => {{
+        networkGraphViewState.emptyRetryTimer = null;
+        if (
+          activeLayoutView === "network"
+          && activeNetworkSubview === "graph"
+          && typeof renderNetworkGraphView === "function"
+        ) {{
+          renderNetworkGraphView(latestState);
+        }}
+      }}, retryDelayMs);
     }}
 
     function easeNetworkGraphAnimationProgress(progress) {{
@@ -2023,6 +2074,7 @@
         networkGraphViewState.bounds = defaultNetworkGraphBounds();
         networkGraphViewState.lastRootId = "";
         networkGraphViewState.initialized = false;
+        networkGraphViewState.pendingEntryViewportSync = false;
         networkGraphViewState.renderedPositions = new Map();
         networkGraphViewState.renderedLayoutSnapshot = null;
         networkGraphViewState.pendingFocusTransition = null;
@@ -2031,9 +2083,11 @@
         summary.innerHTML = "";
         legend.innerHTML = "";
         empty.hidden = false;
+        scheduleNetworkGraphEmptyRetry();
         return;
       }}
 
+      clearNetworkGraphEmptyRetry();
       empty.hidden = true;
       const selectedId = normalizeNodeId(selectedNodeId || "");
       const rootLabel = networkGraphNodeDisplayName(rootId, nodeMap);
@@ -2058,6 +2112,17 @@
       summary.innerHTML = summaryParts.join("");
       networkGraphViewState.bounds = computeNetworkGraphBounds(layout);
       networkGraphRootNodeId = rootId;
+      const rootPosition = layout.positions.get(rootId) || null;
+      const shouldRecenterForEntry = !!(
+        networkGraphViewState.pendingEntryViewportSync
+        && rootPosition
+        && !isNetworkGraphPointVisible(
+          networkGraphViewState.viewBox,
+          Number(rootPosition.x),
+          Number(rootPosition.y),
+          0.12
+        )
+      );
       renderNetworkGraphNavigationControls(safeState, nodeMap, rootId);
       const previousLayoutSnapshot = networkGraphViewState.renderedLayoutSnapshot;
       const shouldAnimateSceneChange = !!(
@@ -2071,9 +2136,13 @@
       }} else if (networkGraphViewState.lastRootId !== rootId) {{
         stopNetworkGraphPan(svg);
         recenterNetworkGraphView(svg, {{ preserveScale: true }});
+      }} else if (shouldRecenterForEntry) {{
+        stopNetworkGraphPan(svg);
+        recenterNetworkGraphView(svg, {{ preserveScale: true, animate: false }});
       }} else {{
         applyNetworkGraphViewBox(svg, networkGraphViewState.viewBox);
       }}
+      networkGraphViewState.pendingEntryViewportSync = false;
       networkGraphViewState.pendingFocusTransition = null;
       networkGraphViewState.lastRootId = rootId;
       networkGraphViewState.renderedPositions = new Map(layout.positions);
