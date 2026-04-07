@@ -862,6 +862,7 @@
 
     const networkGraphViewportBase = Object.freeze({{ x: 0, y: 0, width: 960, height: 620 }});
     const networkGraphZoomBounds = Object.freeze({{ minScale: 0.62, maxScale: 5.5 }});
+    const networkGraphFocusAnimationDurationMs = 680;
     const networkGraphRootHistoryLimit = 48;
     const networkGraphViewState = {{
       initialized: false,
@@ -882,6 +883,11 @@
       dragging: false,
       suppressClick: false,
       suppressClickTimer: null,
+      animationFrame: null,
+      sceneAnimationFrame: null,
+      renderedPositions: new Map(),
+      renderedLayoutSnapshot: null,
+      pendingFocusTransition: null,
     }};
 
     function cloneNetworkGraphViewBox(rawViewBox = networkGraphViewportBase) {{
@@ -920,6 +926,241 @@
         return current.width / current.height;
       }}
       return networkGraphViewportBase.width / networkGraphViewportBase.height;
+    }}
+
+    function prefersReducedMotion() {{
+      return !!(
+        typeof window !== "undefined"
+        && typeof window.matchMedia === "function"
+        && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      );
+    }}
+
+    function cancelNetworkGraphViewAnimation() {{
+      if (networkGraphViewState.animationFrame !== null) {{
+        window.cancelAnimationFrame(networkGraphViewState.animationFrame);
+      }}
+      networkGraphViewState.animationFrame = null;
+    }}
+
+    function cancelNetworkGraphSceneAnimation() {{
+      if (networkGraphViewState.sceneAnimationFrame !== null) {{
+        window.cancelAnimationFrame(networkGraphViewState.sceneAnimationFrame);
+      }}
+      networkGraphViewState.sceneAnimationFrame = null;
+    }}
+
+    function easeNetworkGraphAnimationProgress(progress) {{
+      const safeProgress = Math.min(1, Math.max(0, Number(progress) || 0));
+      return 1 - Math.pow(1 - safeProgress, 3);
+    }}
+
+    function interpolateNetworkGraphViewBox(fromViewBox, toViewBox, progress) {{
+      const from = cloneNetworkGraphViewBox(fromViewBox);
+      const to = cloneNetworkGraphViewBox(toViewBox);
+      const ratio = Math.min(1, Math.max(0, Number(progress) || 0));
+      return {{
+        x: from.x + ((to.x - from.x) * ratio),
+        y: from.y + ((to.y - from.y) * ratio),
+        width: from.width + ((to.width - from.width) * ratio),
+        height: from.height + ((to.height - from.height) * ratio),
+      }};
+    }}
+
+    function buildNetworkGraphSceneMarkup(scene) {{
+      const safeScene = (scene && typeof scene === "object") ? scene : {{}};
+      const rootId = normalizeNodeId(safeScene.rootId || "");
+      const selectedId = normalizeNodeId(safeScene.selectedId || "");
+      const nodeMap = safeScene.nodeMap instanceof Map ? safeScene.nodeMap : new Map();
+      const positions = safeScene.positions instanceof Map ? safeScene.positions : new Map();
+      const rings = Array.isArray(safeScene.rings) ? safeScene.rings : [];
+      const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
+      const items = Array.isArray(safeScene.items) ? safeScene.items : [];
+
+      const ringMarkup = rings.map((ring) => `
+        <g class="network-graph-ring-wrap">
+          <circle class="network-graph-ring${{ring.detached ? " is-detached" : ""}}" cx="480" cy="310" r="${{Number(ring.radius).toFixed(1)}}"></circle>
+          <text class="network-graph-ring-label" x="480" y="${{(310 - Number(ring.radius) - 8).toFixed(1)}}" text-anchor="middle">${{escAttr(ring.label)}}</text>
+        </g>
+      `).join("");
+
+      const edgeMarkup = edges.map((edge) => {{
+        const fromPos = positions.get(edge.a);
+        const toPos = positions.get(edge.b);
+        if (!fromPos || !toPos) return "";
+        const classes = [
+          "network-graph-edge",
+          edge.isReal ? "is-real" : "is-observed",
+          (edge.a === rootId || edge.b === rootId) ? "is-root-link" : "",
+        ].filter(Boolean).join(" ");
+        const width = Math.max(1.1, Math.min(5.2, 1.2 + (Math.log2(Math.max(1, edge.weight) + 1) * 0.85) + (edge.isReal ? 0.35 : 0)));
+        const fromLabel = networkGraphNodeDisplayName(edge.a, nodeMap);
+        const toLabel = networkGraphNodeDisplayName(edge.b, nodeMap);
+        const lastAgeLabel = Number.isFinite(edge.lastSeenUnix) && edge.lastSeenUnix > 0
+          ? (
+            typeof formatIdleAge === "function"
+              ? formatIdleAge(edge.lastSeenUnix, Math.floor(Date.now() / 1000))
+              : `${{Math.max(0, Math.floor((Date.now() / 1000) - edge.lastSeenUnix))}}s ago`
+          )
+          : (edge.lastSeenLabel || "n/a");
+        const edgeTitle = [
+          `${{fromLabel}} <-> ${{toLabel}}`,
+          `Packets: ${{Math.round(edge.weight)}}`,
+          `Directions observed: ${{edge.directionCount}}`,
+          `Last seen: ${{lastAgeLabel}}`,
+          `Avg hops: ${{edge.avgHops == null ? "n/a" : edge.avgHops}}`,
+        ].join("\n");
+        return `
+          <line
+            class="${{classes}}"
+            x1="${{Number(fromPos.x).toFixed(1)}}"
+            y1="${{Number(fromPos.y).toFixed(1)}}"
+            x2="${{Number(toPos.x).toFixed(1)}}"
+            y2="${{Number(toPos.y).toFixed(1)}}"
+            style="stroke-width:${{width.toFixed(2)}}"
+          >
+            <title>${{escAttr(edgeTitle)}}</title>
+          </line>
+        `;
+      }}).join("");
+
+      const nodeMarkup = items.map((item) => {{
+        const classes = [
+          "network-graph-node",
+          item.nodeId === rootId ? "is-root" : "",
+          item.nodeId === selectedId ? "is-selected" : "",
+          item.disconnected ? "is-detached" : "",
+        ].filter(Boolean).join(" ");
+        const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
+        const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
+        const statusLine = item.disconnected
+          ? "Detached from current root"
+          : (item.layer === 0 ? "Root node" : `${{item.layer}} hop${{item.layer === 1 ? "" : "s"}} away`);
+        const title = [
+          displayName,
+          item.nodeId,
+          statusLine,
+          `Visible links: ${{item.degree}}`,
+          `Observed packets on links: ${{Math.round(item.weight)}}`,
+          `Last heard: ${{(item.node && item.node.last_heard) || "n/a"}}`,
+        ].join("\n");
+        return `
+          <g
+            class="${{classes}}"
+            data-network-graph-node-id="${{escAttr(item.nodeId)}}"
+            transform="translate(${{Number(item.x).toFixed(1)}} ${{Number(item.y).toFixed(1)}})"
+          >
+            <circle class="network-graph-node-core" r="${{Number(item.radius).toFixed(1)}}"></circle>
+            ${{
+              item.showLabel
+                ? `<text class="network-graph-node-label${{item.disconnected ? " is-secondary" : ""}}" x="0" y="${{(Number(item.radius) + 14).toFixed(1)}}" text-anchor="middle">${{escAttr(label)}}</text>`
+                : ""
+            }}
+            <title>${{escAttr(title)}}</title>
+          </g>
+        `;
+      }}).join("");
+
+      return `
+        <g class="network-graph-layers">
+          ${{ringMarkup}}
+        </g>
+        <g class="network-graph-links">
+          ${{edgeMarkup}}
+        </g>
+        <g class="network-graph-nodes">
+          ${{nodeMarkup}}
+        </g>
+      `;
+    }}
+
+    function cloneNetworkGraphLayoutSnapshot(layout) {{
+      if (!layout || typeof layout !== "object") return null;
+      return {{
+        rootId: normalizeNodeId(layout.rootId || ""),
+        positions: new Map(
+          Array.from((layout.positions instanceof Map ? layout.positions : new Map()).entries()).map(([nodeId, position]) => [
+            normalizeNodeId(nodeId),
+            {{
+              x: Number(position && position.x),
+              y: Number(position && position.y),
+            }},
+          ])
+        ),
+        rings: Array.isArray(layout.rings)
+          ? layout.rings.map((ring) => ({{
+              radius: Number(ring && ring.radius),
+              label: String((ring && ring.label) || ""),
+              detached: !!(ring && ring.detached),
+            }}))
+          : [],
+      }};
+    }}
+
+    function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {{}}) {{
+      if (!(svg instanceof SVGElement) || !toLayout || typeof toLayout !== "object") return;
+      const fromSnapshot = cloneNetworkGraphLayoutSnapshot(fromLayout);
+      const toSnapshot = cloneNetworkGraphLayoutSnapshot(toLayout);
+      const onComplete = (options && typeof options.onComplete === "function")
+        ? options.onComplete
+        : null;
+      const durationMs = Math.max(
+        0,
+        Number.isFinite(Number(options && options.durationMs))
+          ? Number(options && options.durationMs)
+          : networkGraphFocusAnimationDurationMs
+      );
+      const shouldAnimate = !!(
+        fromSnapshot
+        && toSnapshot
+        && fromSnapshot.positions.size
+        && !prefersReducedMotion()
+        && !(options && options.animate === false)
+        && durationMs >= 32
+      );
+      if (!shouldAnimate) {{
+        svg.innerHTML = buildNetworkGraphSceneMarkup(toLayout);
+        if (onComplete) onComplete();
+        return;
+      }}
+      cancelNetworkGraphSceneAnimation();
+      const step = (now) => {{
+        const startTime = step.startTime || now;
+        step.startTime = startTime;
+        const progress = durationMs <= 0 ? 1 : Math.min(1, (now - startTime) / durationMs);
+        const eased = easeNetworkGraphAnimationProgress(progress);
+        const positions = new Map();
+        const animatedItems = toLayout.items.map((item) => {{
+          const fromPosition = fromSnapshot.positions.get(item.nodeId) || toSnapshot.positions.get(item.nodeId) || {{
+            x: Number(item.x),
+            y: Number(item.y),
+          }};
+          const toPosition = toSnapshot.positions.get(item.nodeId) || {{
+            x: Number(item.x),
+            y: Number(item.y),
+          }};
+          const x = Number(fromPosition.x) + ((Number(toPosition.x) - Number(fromPosition.x)) * eased);
+          const y = Number(fromPosition.y) + ((Number(toPosition.y) - Number(fromPosition.y)) * eased);
+          positions.set(item.nodeId, {{ x, y }});
+          return {{
+            ...item,
+            x,
+            y,
+          }};
+        }});
+        svg.innerHTML = buildNetworkGraphSceneMarkup({{
+          ...toLayout,
+          positions,
+          items: animatedItems,
+        }});
+        if (progress >= 1) {{
+          networkGraphViewState.sceneAnimationFrame = null;
+          if (onComplete) onComplete();
+          return;
+        }}
+        networkGraphViewState.sceneAnimationFrame = window.requestAnimationFrame(step);
+      }};
+      networkGraphViewState.sceneAnimationFrame = window.requestAnimationFrame(step);
     }}
 
     function computeNetworkGraphBounds(layout) {{
@@ -1019,8 +1260,11 @@
       }}, {{ aspectRatio: viewAspect }});
     }}
 
-    function applyNetworkGraphViewBox(svg, rawViewBox) {{
+    function applyNetworkGraphViewBox(svg, rawViewBox, options = {{}}) {{
       if (!(svg instanceof SVGElement)) return cloneNetworkGraphViewBox();
+      if (!(options && options.skipAnimationCancel)) {{
+        cancelNetworkGraphViewAnimation();
+      }}
       const next = clampNetworkGraphViewBox(rawViewBox, {{ aspectRatio: getNetworkGraphStageAspectRatio(svg) }});
       svg.setAttribute(
         "viewBox",
@@ -1031,27 +1275,92 @@
       return next;
     }}
 
-    function resetNetworkGraphView(svg) {{
+    function animateNetworkGraphViewBox(svg, rawViewBox, options = {{}}) {{
+      if (!(svg instanceof SVGElement)) return cloneNetworkGraphViewBox();
+      const aspectRatio = getNetworkGraphStageAspectRatio(svg);
+      const target = clampNetworkGraphViewBox(rawViewBox, {{ aspectRatio }});
+      const current = cloneNetworkGraphViewBox(networkGraphViewState.viewBox);
+      const onComplete = (options && typeof options.onComplete === "function")
+        ? options.onComplete
+        : null;
+      const durationMs = Math.max(
+        0,
+        Number.isFinite(Number(options && options.durationMs))
+          ? Number(options && options.durationMs)
+          : networkGraphFocusAnimationDurationMs
+      );
+      const shouldAnimate = !(
+        options
+        && options.animate === false
+      ) && networkGraphViewState.initialized && durationMs >= 32 && !prefersReducedMotion();
+      if (
+        current.x === target.x
+        && current.y === target.y
+        && current.width === target.width
+        && current.height === target.height
+      ) {{
+        const applied = applyNetworkGraphViewBox(svg, target);
+        if (onComplete) {{
+          onComplete(cloneNetworkGraphViewBox(applied));
+        }}
+        return applied;
+      }}
+      if (!shouldAnimate) {{
+        const applied = applyNetworkGraphViewBox(svg, target);
+        if (onComplete) {{
+          onComplete(cloneNetworkGraphViewBox(applied));
+        }}
+        return applied;
+      }}
+      cancelNetworkGraphViewAnimation();
+      const startViewBox = cloneNetworkGraphViewBox(current);
+      const startTime = performance.now();
+      const step = (now) => {{
+        const progress = durationMs <= 0 ? 1 : Math.min(1, (now - startTime) / durationMs);
+        const nextViewBox = interpolateNetworkGraphViewBox(
+          startViewBox,
+          target,
+          easeNetworkGraphAnimationProgress(progress)
+        );
+        applyNetworkGraphViewBox(svg, nextViewBox, {{ skipAnimationCancel: true }});
+        if (progress >= 1) {{
+          networkGraphViewState.animationFrame = null;
+          if (onComplete) {{
+            onComplete(cloneNetworkGraphViewBox(target));
+          }}
+          return;
+        }}
+        networkGraphViewState.animationFrame = window.requestAnimationFrame(step);
+      }};
+      networkGraphViewState.animationFrame = window.requestAnimationFrame(step);
+      return target;
+    }}
+
+    function resetNetworkGraphView(svg, options = {{}}) {{
       if (!(svg instanceof SVGElement)) return;
-      applyNetworkGraphViewBox(svg, fitNetworkGraphViewBoxToBounds(networkGraphViewState.bounds, svg));
+      animateNetworkGraphViewBox(
+        svg,
+        fitNetworkGraphViewBoxToBounds(networkGraphViewState.bounds, svg),
+        options
+      );
     }}
 
     function recenterNetworkGraphView(svg, options = {{}}) {{
       if (!(svg instanceof SVGElement)) return;
       const preserveScale = !(options && options.preserveScale === false);
       if (!preserveScale || !networkGraphViewState.initialized) {{
-        resetNetworkGraphView(svg);
+        resetNetworkGraphView(svg, options);
         return;
       }}
       const current = cloneNetworkGraphViewBox(networkGraphViewState.viewBox);
       const centerX = networkGraphViewportBase.x + (networkGraphViewportBase.width / 2);
       const centerY = networkGraphViewportBase.y + (networkGraphViewportBase.height / 2);
-      applyNetworkGraphViewBox(svg, {{
+      animateNetworkGraphViewBox(svg, {{
         x: centerX - (current.width / 2),
         y: centerY - (current.height / 2),
         width: current.width,
         height: current.height,
-      }});
+      }}, options);
     }}
 
     function stopNetworkGraphPan(svg) {{
@@ -1194,6 +1503,9 @@
       if (!isSelectableNodeId(nextId)) return false;
       const pushHistory = !(options && options.pushHistory === false);
       const shouldFocusSelection = !(options && options.focusSelection === false);
+      cancelNetworkGraphViewAnimation();
+      cancelNetworkGraphSceneAnimation();
+      networkGraphViewState.pendingFocusTransition = null;
       const changed = setNetworkGraphRootNode(nextId, {{
         pushHistory,
         rerender: true,
@@ -1268,6 +1580,9 @@
       svg.addEventListener("pointerdown", (event) => {{
         if (event.pointerType === "mouse" && event.button !== 0) return;
         if (networkGraphViewState.pointerId !== null) return;
+        cancelNetworkGraphViewAnimation();
+        cancelNetworkGraphSceneAnimation();
+        networkGraphViewState.pendingFocusTransition = null;
         networkGraphViewState.pointerId = event.pointerId;
         networkGraphViewState.pointerClientX = event.clientX;
         networkGraphViewState.pointerClientY = event.clientY;
@@ -1336,6 +1651,9 @@
       svg.addEventListener("wheel", (event) => {{
         const pointer = resolveNetworkGraphPointerPosition(svg, event.clientX, event.clientY);
         if (!pointer) return;
+        cancelNetworkGraphViewAnimation();
+        cancelNetworkGraphSceneAnimation();
+        networkGraphViewState.pendingFocusTransition = null;
         const current = cloneNetworkGraphViewBox(networkGraphViewState.viewBox);
         const delta = Number(event.deltaY) || 0;
         if (!Number.isFinite(delta) || delta === 0) return;
@@ -1699,11 +2017,15 @@
       const layout = buildNetworkGraphLayout(nodeMap, combinedEdges, safeState);
       const rootId = layout.rootId;
       if (!rootId || !layout.items.length) {{
+        cancelNetworkGraphSceneAnimation();
         svg.innerHTML = "";
         renderNetworkGraphNavigationControls(safeState, nodeMap, "");
         networkGraphViewState.bounds = defaultNetworkGraphBounds();
         networkGraphViewState.lastRootId = "";
         networkGraphViewState.initialized = false;
+        networkGraphViewState.renderedPositions = new Map();
+        networkGraphViewState.renderedLayoutSnapshot = null;
+        networkGraphViewState.pendingFocusTransition = null;
         stopNetworkGraphPan(svg);
         applyNetworkGraphViewBox(svg, networkGraphViewportBase);
         summary.innerHTML = "";
@@ -1737,16 +2059,25 @@
       networkGraphViewState.bounds = computeNetworkGraphBounds(layout);
       networkGraphRootNodeId = rootId;
       renderNetworkGraphNavigationControls(safeState, nodeMap, rootId);
+      const previousLayoutSnapshot = networkGraphViewState.renderedLayoutSnapshot;
+      const shouldAnimateSceneChange = !!(
+        previousLayoutSnapshot
+        && networkGraphViewState.lastRootId
+        && networkGraphViewState.lastRootId !== rootId
+      );
       if (!networkGraphViewState.initialized) {{
         stopNetworkGraphPan(svg);
-        resetNetworkGraphView(svg);
+        resetNetworkGraphView(svg, {{ animate: false }});
       }} else if (networkGraphViewState.lastRootId !== rootId) {{
         stopNetworkGraphPan(svg);
         recenterNetworkGraphView(svg, {{ preserveScale: true }});
       }} else {{
         applyNetworkGraphViewBox(svg, networkGraphViewState.viewBox);
       }}
+      networkGraphViewState.pendingFocusTransition = null;
       networkGraphViewState.lastRootId = rootId;
+      networkGraphViewState.renderedPositions = new Map(layout.positions);
+      networkGraphViewState.renderedLayoutSnapshot = cloneNetworkGraphLayoutSnapshot(layout);
 
       legend.innerHTML = [
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-root"></span>Root / selected node</span>`,
@@ -1755,102 +2086,19 @@
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-detached"></span>Nodes with no current path from the root</span>`,
         `<span class="network-graph-legend-item hint">Click to refocus, scroll to zoom, and use Back, Home, or Reset view from inside the graph.</span>`,
       ].join("");
-
-      const ringMarkup = layout.rings.map((ring) => `
-        <g class="network-graph-ring-wrap">
-          <circle class="network-graph-ring${{ring.detached ? " is-detached" : ""}}" cx="480" cy="310" r="${{ring.radius.toFixed(1)}}"></circle>
-          <text class="network-graph-ring-label" x="480" y="${{(310 - ring.radius - 8).toFixed(1)}}" text-anchor="middle">${{escAttr(ring.label)}}</text>
-        </g>
-      `).join("");
-
-      const edgeMarkup = combinedEdges.map((edge) => {{
-        const fromPos = layout.positions.get(edge.a);
-        const toPos = layout.positions.get(edge.b);
-        if (!fromPos || !toPos) return "";
-        const classes = [
-          "network-graph-edge",
-          edge.isReal ? "is-real" : "is-observed",
-          (edge.a === rootId || edge.b === rootId) ? "is-root-link" : "",
-        ].filter(Boolean).join(" ");
-        const width = Math.max(1.1, Math.min(5.2, 1.2 + (Math.log2(Math.max(1, edge.weight) + 1) * 0.85) + (edge.isReal ? 0.35 : 0)));
-        const fromLabel = networkGraphNodeDisplayName(edge.a, nodeMap);
-        const toLabel = networkGraphNodeDisplayName(edge.b, nodeMap);
-        const lastAgeLabel = Number.isFinite(edge.lastSeenUnix) && edge.lastSeenUnix > 0
-          ? (
-            typeof formatIdleAge === "function"
-              ? formatIdleAge(edge.lastSeenUnix, Math.floor(Date.now() / 1000))
-              : `${{Math.max(0, Math.floor((Date.now() / 1000) - edge.lastSeenUnix))}}s ago`
-          )
-          : (edge.lastSeenLabel || "n/a");
-        const edgeTitle = [
-          `${{fromLabel}} <-> ${{toLabel}}`,
-          `Packets: ${{Math.round(edge.weight)}}`,
-          `Directions observed: ${{edge.directionCount}}`,
-          `Last seen: ${{lastAgeLabel}}`,
-          `Avg hops: ${{edge.avgHops == null ? "n/a" : edge.avgHops}}`,
-        ].join("\n");
-        return `
-          <line
-            class="${{classes}}"
-            x1="${{Number(fromPos.x).toFixed(1)}}"
-            y1="${{Number(fromPos.y).toFixed(1)}}"
-            x2="${{Number(toPos.x).toFixed(1)}}"
-            y2="${{Number(toPos.y).toFixed(1)}}"
-            style="stroke-width:${{width.toFixed(2)}}"
-          >
-            <title>${{escAttr(edgeTitle)}}</title>
-          </line>
-        `;
-      }}).join("");
-
-      const nodeMarkup = layout.items.map((item) => {{
-        const classes = [
-          "network-graph-node",
-          item.nodeId === rootId ? "is-root" : "",
-          item.nodeId === selectedId ? "is-selected" : "",
-          item.disconnected ? "is-detached" : "",
-        ].filter(Boolean).join(" ");
-        const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
-        const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
-        const statusLine = item.disconnected
-          ? "Detached from current root"
-          : (item.layer === 0 ? "Root node" : `${{item.layer}} hop${{item.layer === 1 ? "" : "s"}} away`);
-        const title = [
-          displayName,
-          item.nodeId,
-          statusLine,
-          `Visible links: ${{item.degree}}`,
-          `Observed packets on links: ${{Math.round(item.weight)}}`,
-          `Last heard: ${{(item.node && item.node.last_heard) || "n/a"}}`,
-        ].join("\n");
-        return `
-          <g
-            class="${{classes}}"
-            data-network-graph-node-id="${{escAttr(item.nodeId)}}"
-            transform="translate(${{item.x.toFixed(1)}} ${{item.y.toFixed(1)}})"
-          >
-            <circle class="network-graph-node-core" r="${{item.radius.toFixed(1)}}"></circle>
-            ${{
-              item.showLabel
-                ? `<text class="network-graph-node-label${{item.disconnected ? " is-secondary" : ""}}" x="0" y="${{(item.radius + 14).toFixed(1)}}" text-anchor="middle">${{escAttr(label)}}</text>`
-                : ""
-            }}
-            <title>${{escAttr(title)}}</title>
-          </g>
-        `;
-      }}).join("");
-
-      svg.innerHTML = `
-        <g class="network-graph-layers">
-          ${{ringMarkup}}
-        </g>
-        <g class="network-graph-links">
-          ${{edgeMarkup}}
-        </g>
-        <g class="network-graph-nodes">
-          ${{nodeMarkup}}
-        </g>
-      `;
+      const scene = {{
+        ...layout,
+        rootId,
+        selectedId,
+        nodeMap,
+        edges: combinedEdges,
+      }};
+      if (shouldAnimateSceneChange) {{
+        animateNetworkGraphScene(svg, previousLayoutSnapshot, scene);
+      }} else {{
+        cancelNetworkGraphSceneAnimation();
+        svg.innerHTML = buildNetworkGraphSceneMarkup(scene);
+      }}
     }}
 
     function syncNodeHistoryDock() {{

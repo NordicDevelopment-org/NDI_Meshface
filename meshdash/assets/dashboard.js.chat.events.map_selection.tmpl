@@ -699,6 +699,8 @@
       if (
         activeLayoutView === "network"
         && activeNetworkSubview === "graph"
+        && !networkGraphRootSyncInProgress
+        && !(networkGraphViewState && networkGraphViewState.pendingFocusTransition)
         && typeof renderNetworkGraphView === "function"
       ) {{
         renderNetworkGraphView(latestState);

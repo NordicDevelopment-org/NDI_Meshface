@@ -47,11 +47,17 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const networkGraphViewState = {' in js
     assert 'function bindNetworkGraphInteractions(svg)' in js
     assert 'function getNetworkGraphStageAspectRatio(svg = null)' in js
+    assert 'function cancelNetworkGraphViewAnimation()' in js
+    assert 'function cancelNetworkGraphSceneAnimation()' in js
+    assert 'function animateNetworkGraphViewBox(svg, rawViewBox, options = {})' in js
+    assert 'function buildNetworkGraphSceneMarkup(scene)' in js
+    assert 'function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {})' in js
     assert 'function setNetworkGraphRootNode(nodeId, options = {})' in js
     assert 'function navigateNetworkGraphBack()' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'pointerDownNodeId' in js
     assert 'svg.addEventListener("wheel"' in js
+    assert 'cancelNetworkGraphViewAnimation();' in js
     assert 'svg.addEventListener("pointerup", finishPan);' in js
 
 
