@@ -4314,23 +4314,14 @@
       outline-color: #8db7df;
     }}
     [data-theme="dark"] .network-graph-card {{
-      border-color: rgba(54, 78, 67, 0.95);
-      background:
-        radial-gradient(circle at top left, rgba(63, 143, 104, 0.16), transparent 30%),
-        linear-gradient(180deg, rgba(11, 18, 14, 0.9), rgba(15, 25, 18, 0.92));
-      box-shadow: 0 18px 36px rgba(2, 6, 4, 0.42);
-    }}
-    [data-theme="dark"] .network-graph-heading h3 {{
-      color: #d8e8df;
-    }}
-    [data-theme="dark"] .network-graph-heading p {{
-      color: #a9c4b4;
+      background: transparent;
+      box-shadow: none;
     }}
     [data-theme="dark"] .network-graph-chip {{
       border-color: rgba(63, 110, 82, 0.92);
       background: rgba(13, 22, 16, 0.86);
       color: #d8eee0;
-      box-shadow: 0 8px 18px rgba(4, 10, 6, 0.28);
+      box-shadow: none;
     }}
     [data-theme="dark"] .network-graph-chip-label {{
       color: #8fb59f;
@@ -4362,6 +4353,9 @@
     [data-theme="dark"] .network-graph-swatch.is-observed {{
       background: rgba(117, 138, 124, 0.48);
     }}
+    [data-theme="dark"] .network-graph-swatch.is-broadcast-only {{
+      background: rgba(214, 165, 72, 0.68);
+    }}
     [data-theme="dark"] .network-graph-swatch.is-detached {{
       background: rgba(132, 141, 148, 0.56);
     }}
@@ -4370,6 +4364,9 @@
     }}
     [data-theme="dark"] .network-graph-ring.is-detached {{
       stroke: rgba(102, 113, 121, 0.34);
+    }}
+    [data-theme="dark"] .network-graph-ring.is-broadcast-only {{
+      stroke: rgba(188, 146, 60, 0.46);
     }}
     [data-theme="dark"] .network-graph-ring-label {{
       fill: #8fb19d;
@@ -4404,12 +4401,23 @@
       fill: rgba(17, 20, 19, 0.96);
       stroke: rgba(111, 121, 126, 0.82);
     }}
+    [data-theme="dark"] .network-graph-node.is-broadcast-only .network-graph-node-core {{
+      fill: rgba(33, 28, 16, 0.98);
+      stroke: rgba(214, 165, 72, 0.86);
+    }}
+    [data-theme="dark"] .network-graph-node.is-root.is-broadcast-only .network-graph-node-core {{
+      fill: rgba(47, 35, 14, 0.98);
+      stroke: rgba(230, 177, 74, 0.98);
+    }}
     [data-theme="dark"] .network-graph-node-label {{
       fill: #d9eee0;
       stroke: rgba(8, 13, 11, 0.96);
     }}
     [data-theme="dark"] .network-graph-node-label.is-secondary {{
       fill: #9ab8a7;
+    }}
+    [data-theme="dark"] .network-graph-node-label.is-broadcast-only {{
+      fill: #f0ce85;
     }}
     [data-theme="dark"] .network-overview-card {{
       border-color: rgba(54, 78, 67, 0.95);
