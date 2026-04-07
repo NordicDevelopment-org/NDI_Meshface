@@ -25,6 +25,8 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
     assert 'data-network-subview="graph"' in html
     assert 'id="network-map-panel-graph"' in html
     assert 'id="network-graph-svg"' in html
+    assert 'id="network-graph-reset-view-btn"' in html
+    assert "Drag to pan, scroll to zoom" in html
 
 
 def test_dashboard_js_supports_network_graph_subview() -> None:
@@ -37,6 +39,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'return clean === "overview" || clean === "graph" || clean === "sensors" ? clean : "map";' in js
     assert 'function renderNetworkGraphView(state = latestState)' in js
     assert 'activeNetworkSubview === "graph"' in js
+    assert 'const networkGraphViewState = {' in js
+    assert 'function bindNetworkGraphInteractions(svg)' in js
+    assert 'svg.addEventListener("wheel"' in js
 
 
 def test_network_layout_uses_single_row_map_track() -> None:
@@ -46,3 +51,6 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "grid-template-rows: minmax(0, 1fr);" in css
     assert ".layout.view-network .map {" in css
     assert "grid-row: 1;" in css
+    assert ".network-graph-stage {" in css
+    assert "touch-action: none;" in css
+    assert ".network-graph-stage.is-panning {" in css
