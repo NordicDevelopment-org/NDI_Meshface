@@ -14,6 +14,24 @@ from .tracker_snapshot_build_contracts import (
 from .tracker_snapshot_contracts import TrackerSnapshot
 
 
+def _to_float(value: object) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    return parsed
+
+
+def _metric_average(sum_value: object, count_value: object) -> Optional[float]:
+    total = _to_float(sum_value)
+    count = int(count_value or 0)
+    if total is None or count <= 0:
+        return None
+    return round(total / count, 2)
+
+
 def build_edge_snapshot_rows(
     *,
     session_edges: dict[EdgeKey, EdgeRow],
@@ -39,6 +57,14 @@ def build_edge_snapshot_rows(
             hops_sum = int(hist_edge.get("hops_sum") or 0)
             hops_count = int(hist_edge.get("hops_count") or 0)
             port_set = set(hist_edge.get("portnums") or [])
+            snr_sum = _to_float(hist_edge.get("snr_sum")) or 0.0
+            snr_count = int(hist_edge.get("snr_count") or 0)
+            snr_min = _to_float(hist_edge.get("snr_min"))
+            snr_max = _to_float(hist_edge.get("snr_max"))
+            rssi_sum = _to_float(hist_edge.get("rssi_sum")) or 0.0
+            rssi_count = int(hist_edge.get("rssi_count") or 0)
+            rssi_min = _to_float(hist_edge.get("rssi_min"))
+            rssi_max = _to_float(hist_edge.get("rssi_max"))
         else:
             lifetime_count = session_count
             first_seen = session_edge.get("first_rx_time") if session_edge else None
@@ -47,6 +73,14 @@ def build_edge_snapshot_rows(
             hops_sum = int(session_edge.get("hops_sum") or 0) if session_edge else 0
             hops_count = int(session_edge.get("hops_count") or 0) if session_edge else 0
             port_set = set(session_edge.get("portnums") or []) if session_edge else set()
+            snr_sum = _to_float(session_edge.get("snr_sum")) or 0.0 if session_edge else 0.0
+            snr_count = int(session_edge.get("snr_count") or 0) if session_edge else 0
+            snr_min = _to_float(session_edge.get("snr_min")) if session_edge else None
+            snr_max = _to_float(session_edge.get("snr_max")) if session_edge else None
+            rssi_sum = _to_float(session_edge.get("rssi_sum")) or 0.0 if session_edge else 0.0
+            rssi_count = int(session_edge.get("rssi_count") or 0) if session_edge else 0
+            rssi_min = _to_float(session_edge.get("rssi_min")) if session_edge else None
+            rssi_max = _to_float(session_edge.get("rssi_max")) if session_edge else None
 
         if session_edge:
             port_set |= set(session_edge.get("portnums") or [])
@@ -57,10 +91,22 @@ def build_edge_snapshot_rows(
                 last_seen = session_last
             if last_hops is None and session_edge.get("last_hops") is not None:
                 last_hops = session_edge.get("last_hops")
+            if snr_count <= 0:
+                snr_sum = _to_float(session_edge.get("snr_sum")) or 0.0
+                snr_count = int(session_edge.get("snr_count") or 0)
+                snr_min = _to_float(session_edge.get("snr_min"))
+                snr_max = _to_float(session_edge.get("snr_max"))
+            if rssi_count <= 0:
+                rssi_sum = _to_float(session_edge.get("rssi_sum")) or 0.0
+                rssi_count = int(session_edge.get("rssi_count") or 0)
+                rssi_min = _to_float(session_edge.get("rssi_min"))
+                rssi_max = _to_float(session_edge.get("rssi_max"))
 
         avg_hops: Optional[float] = None
         if hops_count > 0:
             avg_hops = round(hops_sum / hops_count, 2)
+        avg_snr = _metric_average(snr_sum, snr_count)
+        avg_rssi = _metric_average(rssi_sum, rssi_count)
         is_real = lifetime_count >= int(min_real_link_count)
         if is_real:
             real_edge_count += 1
@@ -79,6 +125,14 @@ def build_edge_snapshot_rows(
             "avg_hops": avg_hops,
             "hops_samples": hops_count,
             "portnums": sorted(port_set),
+            "avg_snr": avg_snr,
+            "snr_samples": snr_count,
+            "snr_min": snr_min,
+            "snr_max": snr_max,
+            "avg_rssi": avg_rssi,
+            "rssi_samples": rssi_count,
+            "rssi_min": rssi_min,
+            "rssi_max": rssi_max,
         }
         src = nodes_by_id.get(from_id)
         dst = nodes_by_id.get(to_id)

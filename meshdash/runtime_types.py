@@ -432,6 +432,8 @@ class RecordDirectEdgeObservationFn(Protocol):
         rx_time: Optional[int],
         portnum: Optional[object],
         hops: Optional[int],
+        rx_snr: Optional[object],
+        rx_rssi: Optional[object],
         include_live_count: bool,
     ) -> DirectEdgeKey:
         ...

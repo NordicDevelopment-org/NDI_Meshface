@@ -352,7 +352,14 @@
 
     function updateMapSelection(shouldFocus = false) {{
       for (const [nodeId, marker] of nodeMarkers.entries()) {{
-        marker.setStyle(markerStyle(!!selectedNodeId && nodeId === selectedNodeId));
+        const isSelected = !!selectedNodeId && nodeId === selectedNodeId;
+        const markerKind = nodeMarkerKinds.get(nodeId) || "actual";
+        const markerConfidence = Number(nodeMarkerConfidence.get(nodeId));
+        marker.setStyle(
+          markerKind === "estimated"
+            ? estimatedMarkerStyle(isSelected, Number.isFinite(markerConfidence) ? markerConfidence : 0.45)
+            : markerStyle(isSelected)
+        );
       }}
       const shouldAutoFocusView = (
         !!selectedNodeId

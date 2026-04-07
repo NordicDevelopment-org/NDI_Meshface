@@ -139,6 +139,7 @@
     const nodeLayer = L.layerGroup().addTo(map);
     const edgeLayer = L.layerGroup().addTo(map);
     const trailLayer = L.layerGroup().addTo(map);
+    const linkEstimateLayer = L.layerGroup().addTo(map);
     const signalHeatmapPaneName = "signalHeatmapPane";
     const signalHeatmapGradient = {{
       0.02: "#1f4f79",
@@ -225,8 +226,12 @@
     }};
     const nodeMarkers = new Map();
     const nodeMarkerMeta = new Map();
+    const nodeMarkerKinds = new Map();
+    const nodeMarkerConfidence = new Map();
     const edgeLines = new Map();
     const edgeLineMeta = new Map();
+    const linkEstimateLines = new Map();
+    const linkEstimateLineMeta = new Map();
     const selectionStorageKey = "meshDashboardSelectedNodeId";
     const favoritesStorageKey = "meshDashboardFavoriteNodeIdsV1";
     const nodeTagsStorageKey = "meshDashboardNodeTagsV1";
@@ -281,6 +286,7 @@
     const signalHeatmapStorageKey = "meshDashboardSignalHeatmapEnabledV1";
     const signalHeatmapModeStorageKey = "meshDashboardSignalHeatmapModeV1";
     const mapPacketLinesStorageKey = "meshDashboardMapPacketLinesEnabledV1";
+    const mapLinkLayerStorageKey = "meshDashboardMapLinkLayerEnabledV1";
     const mapBasemapModeStorageKey = "meshDashboardMapBasemapModeV1";
     const settingsPositionSourceStorageKey = "meshDashboardSettingsPositionSourceV1";
     const settingsFixedPositionCacheStorageKey = "meshDashboardSettingsFixedPositionCacheV1";

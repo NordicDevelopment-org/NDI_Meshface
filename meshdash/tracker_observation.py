@@ -28,6 +28,8 @@ def apply_tracker_observation(
     rx_time = parsed["rx_time"]
     hops = parsed["hops"]
     portnum = parsed["portnum"]
+    rx_snr = parsed.get("rx_snr")
+    rx_rssi = parsed.get("rx_rssi")
 
     apply_routing_delivery_update_fn(
         decoded,
@@ -46,5 +48,7 @@ def apply_tracker_observation(
         rx_time=rx_time,
         portnum=portnum,
         hops=hops,
+        rx_snr=rx_snr,
+        rx_rssi=rx_rssi,
         include_live_count=include_live_count,
     )

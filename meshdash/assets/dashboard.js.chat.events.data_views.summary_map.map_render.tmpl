@@ -96,6 +96,7 @@
       syncSignalHeatmapLayer(nodes, hideHeatmap);
       refreshMapCardTitle();
       updateMapPacketLinesControl();
+      updateMapLinkLayerControl();
 
       if (savedSelectionMode) {{
         if (signature === lastMapSignature && lastMapRenderMode === "saved") {{
@@ -107,10 +108,15 @@
         nodeLayer.clearLayers();
         edgeLayer.clearLayers();
         trailLayer.clearLayers();
+        linkEstimateLayer.clearLayers();
         nodeMarkers.clear();
         nodeMarkerMeta.clear();
+        nodeMarkerKinds.clear();
+        nodeMarkerConfidence.clear();
         edgeLines.clear();
         edgeLineMeta.clear();
+        linkEstimateLines.clear();
+        linkEstimateLineMeta.clear();
 
         const historyCapsById = new Map(
           Object.entries((latestState && latestState.history_caps && typeof latestState.history_caps === "object") ? latestState.history_caps : {{}})
@@ -202,6 +208,8 @@
           }});
           marker.addTo(nodeLayer);
           nodeMarkers.set(normalizeNodeId(selectedNode.id || ""), marker);
+          nodeMarkerKinds.set(normalizeNodeId(selectedNode.id || ""), "actual");
+          nodeMarkerConfidence.set(normalizeNodeId(selectedNode.id || ""), 1);
           if (trailPoints.length > 1) {{
             const trailBounds = L.latLngBounds(trailPoints.map((point) => [point.lat, point.lon]));
             trailBounds.extend([selectedNode.lat, selectedNode.lon]);
@@ -249,6 +257,12 @@
         for (const node of (nodes || [])) {{
           byId[normalizeNodeId(node && node.id)] = node;
         }}
+        const linkOverlay = (activeLayoutView === "network" && mapLinkLayerEnabled)
+          ? buildMapLinkLayerOverlay(nodes, edges)
+          : {{ estimates: new Map(), lines: [] }};
+        const estimatedPositions = linkOverlay.estimates instanceof Map
+          ? linkOverlay.estimates
+          : new Map();
         const historyCapsById = new Map(
           Object.entries((latestState && latestState.history_caps && typeof latestState.history_caps === "object") ? latestState.history_caps : {{}})
             .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
@@ -258,22 +272,38 @@
         const seenNodeIds = new Set();
 
         for (const node of (nodes || [])) {{
-          if (typeof node.lat !== "number" || typeof node.lon !== "number") continue;
           const normalizedId = normalizeNodeId(node.id || "");
+          const rawLat = Number(node && node.lat);
+          const rawLon = Number(node && node.lon);
+          const hasActualPosition = isValidMapCoord(rawLat, rawLon);
+          const estimate = hasActualPosition ? null : (estimatedPositions.get(normalizedId) || null);
+          const markerLat = hasActualPosition ? rawLat : Number(estimate && estimate.lat);
+          const markerLon = hasActualPosition ? rawLon : Number(estimate && estimate.lon);
+          const isEstimated = !hasActualPosition && !!estimate;
+          if (!isValidMapCoord(markerLat, markerLon)) continue;
           const isSelected = !!selectedNodeId && normalizedId === selectedNodeId;
           const nodeCaps = historyCapsById.get(normalizedId) || null;
           const posBadge = resolveMapPositionBadge(node, nodeCaps, nowUnix);
           let markerHash = 2166136261;
           markerHash = hashMixStr(markerHash, "network-node");
           markerHash = hashMixStr(markerHash, normalizedId);
-          markerHash = hashMixInt(markerHash, Math.round(node.lat * 100000));
-          markerHash = hashMixInt(markerHash, Math.round(node.lon * 100000));
+          markerHash = hashMixInt(markerHash, Math.round(markerLat * 100000));
+          markerHash = hashMixInt(markerHash, Math.round(markerLon * 100000));
           markerHash = hashMixInt(markerHash, isSelected ? 1 : 0);
+          markerHash = hashMixInt(markerHash, isEstimated ? 1 : 0);
           markerHash = hashMixStr(markerHash, node && (node.num ?? ""));
           markerHash = hashMixStr(markerHash, node && (node.snr ?? ""));
           markerHash = hashMixStr(markerHash, node && (node.rssi ?? ""));
           markerHash = hashMixStr(markerHash, node && (node.last_heard || ""));
-          markerHash = hashMixStr(markerHash, posBadge.className);
+          markerHash = hashMixStr(markerHash, isEstimated ? "estimated" : posBadge.className);
+          markerHash = hashMixInt(
+            markerHash,
+            isEstimated
+              ? Math.round(Number(estimate && estimate.confidence) * 1000)
+              : 1000
+          );
+          markerHash = hashMixInt(markerHash, isEstimated ? Math.trunc(Number(estimate && estimate.anchorCount) || 0) : 0);
+          markerHash = hashMixInt(markerHash, isEstimated ? Math.trunc(Number(estimate && estimate.supportLinks) || 0) : 0);
           const existingMarker = nodeMarkers.get(normalizedId);
           const prevMarkerHash = nodeMarkerMeta.get(normalizedId);
           seenNodeIds.add(normalizedId);
@@ -284,22 +314,51 @@
             nodeLayer.removeLayer(existingMarker);
             nodeMarkers.delete(normalizedId);
           }}
-          const marker = L.circleMarker([node.lat, node.lon], markerStyle(isSelected));
-          marker.bindPopup(`
-            <b>${{nodeLabel(node)}}</b><br/>
-            ${{normalizedId || node.id}}<br/>
-            Num: ${{node.num ?? "n/a"}}<br/>
-            SNR: ${{node.snr ?? "n/a"}}<br/>
-            RSSI: ${{node.rssi ?? "n/a"}}<br/>
-            Position: <span class="map-position-badge ${{posBadge.className}}" title="${{escAttr(posBadge.title)}}">${{escAttr(posBadge.label)}}</span><br/>
-            Last: ${{node.last_heard || "n/a"}}
-          `);
+          const marker = L.circleMarker(
+            [markerLat, markerLon],
+            isEstimated
+              ? estimatedMarkerStyle(isSelected, Number(estimate && estimate.confidence))
+              : markerStyle(isSelected)
+          );
+          if (isEstimated) {{
+            const confidenceValue = clampMapLinkValue(Number(estimate && estimate.confidence), 0, 1);
+            const confidenceLabel = mapLinkConfidenceLabel(confidenceValue);
+            const qualityPct = Math.round(clampMapLinkValue(Number(estimate && estimate.avgLinkQuality), 0, 1) * 100);
+            marker.bindPopup(`
+              <b>${{nodeLabel(node)}}</b><br/>
+              ${{normalizedId || node.id}}<br/>
+              Num: ${{node.num ?? "n/a"}}<br/>
+              SNR: ${{node.snr ?? "n/a"}}<br/>
+              RSSI: ${{node.rssi ?? "n/a"}}<br/>
+              Position: Estimated by link layer<br/>
+              Confidence: ${{confidenceLabel}} (${{Math.round(confidenceValue * 100)}}%)<br/>
+              Anchors: ${{estimate && estimate.anchorCount ? estimate.anchorCount : 0}}<br/>
+              Support links: ${{estimate && estimate.supportLinks ? estimate.supportLinks : 0}}<br/>
+              Link quality: ${{qualityPct}}%<br/>
+              Avg link hops: ${{estimate && estimate.avgHops != null ? estimate.avgHops : "n/a"}}<br/>
+              Avg link SNR: ${{estimate && estimate.avgSnr != null ? estimate.avgSnr : "n/a"}}<br/>
+              Avg link RSSI: ${{estimate && estimate.avgRssi != null ? estimate.avgRssi : "n/a"}}<br/>
+              Last: ${{node.last_heard || "n/a"}}
+            `);
+          }} else {{
+            marker.bindPopup(`
+              <b>${{nodeLabel(node)}}</b><br/>
+              ${{normalizedId || node.id}}<br/>
+              Num: ${{node.num ?? "n/a"}}<br/>
+              SNR: ${{node.snr ?? "n/a"}}<br/>
+              RSSI: ${{node.rssi ?? "n/a"}}<br/>
+              Position: <span class="map-position-badge ${{posBadge.className}}" title="${{escAttr(posBadge.title)}}">${{escAttr(posBadge.label)}}</span><br/>
+              Last: ${{node.last_heard || "n/a"}}
+            `);
+          }}
           marker.on("click", () => {{
             selectNode(normalizedId, true, false);
           }});
           marker.addTo(nodeLayer);
           nodeMarkers.set(normalizedId, marker);
           nodeMarkerMeta.set(normalizedId, markerHash);
+          nodeMarkerKinds.set(normalizedId, isEstimated ? "estimated" : "actual");
+          nodeMarkerConfidence.set(normalizedId, isEstimated ? Number(estimate && estimate.confidence) : 1);
         }}
 
         for (const [nodeId, marker] of Array.from(nodeMarkers.entries())) {{
@@ -307,6 +366,8 @@
           nodeLayer.removeLayer(marker);
           nodeMarkers.delete(nodeId);
           nodeMarkerMeta.delete(nodeId);
+          nodeMarkerKinds.delete(nodeId);
+          nodeMarkerConfidence.delete(nodeId);
         }}
 
         if (activeLayoutView === "network" && mapPacketLinesEnabled) {{
@@ -422,6 +483,106 @@
             edgeLayer.removeLayer(line);
             edgeLines.delete(edgeKey);
             edgeLineMeta.delete(edgeKey);
+          }}
+        }}
+
+        if (activeLayoutView === "network" && mapLinkLayerEnabled) {{
+          const seenEstimateKeys = new Set();
+          for (const estimateLine of (Array.isArray(linkOverlay.lines) ? linkOverlay.lines : [])) {{
+            const lineKey = String(estimateLine && estimateLine.key || "");
+            if (!lineKey) continue;
+            seenEstimateKeys.add(lineKey);
+            const qualityScore = clampMapLinkValue(Number(estimateLine && estimateLine.qualityScore), 0.08, 0.98);
+            const estimatedEndpoints = Math.max(1, Math.trunc(Number(estimateLine && estimateLine.estimatedEndpoints) || 1));
+            const lastSeenUnix = Number(estimateLine && estimateLine.lastSeenUnix);
+            const ageLabel = Number.isFinite(lastSeenUnix) && lastSeenUnix > 0
+              ? (
+                typeof formatIdleAge === "function"
+                  ? formatIdleAge(lastSeenUnix, nowUnix)
+                  : `${{Math.floor((nowUnix - lastSeenUnix) / 60)}}m ago`
+              )
+              : "n/a";
+            let lineHash = 2166136261;
+            lineHash = hashMixStr(lineHash, "network-link-layer");
+            lineHash = hashMixStr(lineHash, lineKey);
+            lineHash = hashMixInt(lineHash, Math.round(Number(estimateLine && estimateLine.fromLat) * 100000));
+            lineHash = hashMixInt(lineHash, Math.round(Number(estimateLine && estimateLine.fromLon) * 100000));
+            lineHash = hashMixInt(lineHash, Math.round(Number(estimateLine && estimateLine.toLat) * 100000));
+            lineHash = hashMixInt(lineHash, Math.round(Number(estimateLine && estimateLine.toLon) * 100000));
+            lineHash = hashMixInt(lineHash, Math.round(qualityScore * 1000));
+            lineHash = hashMixInt(lineHash, estimatedEndpoints);
+            lineHash = hashMixInt(lineHash, Math.round(Number(estimateLine && estimateLine.desiredDistanceKm) * 10));
+            lineHash = hashMixInt(lineHash, Number(estimateLine && estimateLine.weight) || 0);
+            lineHash = hashMixInt(lineHash, Number(estimateLine && estimateLine.sessionWeight) || 0);
+            lineHash = hashMixStr(
+              lineHash,
+              String(estimateLine ? (estimateLine.avgHops ?? "") : "")
+            );
+            lineHash = hashMixStr(
+              lineHash,
+              String(estimateLine ? (estimateLine.avgSnr ?? "") : "")
+            );
+            lineHash = hashMixStr(
+              lineHash,
+              String(estimateLine ? (estimateLine.avgRssi ?? "") : "")
+            );
+
+            const existingLine = linkEstimateLines.get(lineKey);
+            const prevLineHash = linkEstimateLineMeta.get(lineKey);
+            if (existingLine && prevLineHash === lineHash) {{
+              continue;
+            }}
+            if (existingLine) {{
+              linkEstimateLayer.removeLayer(existingLine);
+              linkEstimateLines.delete(lineKey);
+            }}
+
+            const line = L.polyline(
+              [
+                [Number(estimateLine.fromLat), Number(estimateLine.fromLon)],
+                [Number(estimateLine.toLat), Number(estimateLine.toLon)],
+              ],
+              {{
+                color: estimatedEndpoints >= 2 ? "#2f6f8c" : "#3384a6",
+                dashArray: estimatedEndpoints >= 2 ? "4 7" : "8 6",
+                opacity: 0.26 + (qualityScore * 0.38),
+                weight: 1.4 + (qualityScore * 1.8),
+                bubblingMouseEvents: false,
+              }}
+            );
+            line.bindTooltip(`
+              <b>Link layer</b><br/>
+              ${{estimateLine.fromId}} <-> ${{estimateLine.toId}}<br/>
+              Quality: ${{Math.round(qualityScore * 100)}}%<br/>
+              Target span: ${{estimateLine.desiredDistanceKm}} km
+            `, {{ sticky: true, opacity: 0.9 }});
+            line.bindPopup(`
+              <b>Link layer</b><br/>
+              Nodes: ${{estimateLine.fromId}} <-> ${{estimateLine.toId}}<br/>
+              Estimated endpoints: ${{estimatedEndpoints}}<br/>
+              Quality: ${{Math.round(qualityScore * 100)}}%<br/>
+              Target span: ${{estimateLine.desiredDistanceKm}} km<br/>
+              Avg hops: ${{estimateLine.avgHops == null ? "n/a" : estimateLine.avgHops}}<br/>
+              Avg SNR: ${{estimateLine.avgSnr == null ? "n/a" : estimateLine.avgSnr}}<br/>
+              Avg RSSI: ${{estimateLine.avgRssi == null ? "n/a" : estimateLine.avgRssi}}<br/>
+              Age: ${{ageLabel}}
+            `);
+            line.addTo(linkEstimateLayer);
+            linkEstimateLines.set(lineKey, line);
+            linkEstimateLineMeta.set(lineKey, lineHash);
+          }}
+
+          for (const [lineKey, line] of Array.from(linkEstimateLines.entries())) {{
+            if (seenEstimateKeys.has(lineKey)) continue;
+            linkEstimateLayer.removeLayer(line);
+            linkEstimateLines.delete(lineKey);
+            linkEstimateLineMeta.delete(lineKey);
+          }}
+        }} else {{
+          for (const [lineKey, line] of Array.from(linkEstimateLines.entries())) {{
+            linkEstimateLayer.removeLayer(line);
+            linkEstimateLines.delete(lineKey);
+            linkEstimateLineMeta.delete(lineKey);
           }}
         }}
       }}

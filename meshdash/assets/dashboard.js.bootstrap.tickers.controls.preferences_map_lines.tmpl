@@ -234,9 +234,31 @@
       }}
     }}
 
+    function updateMapLinkLayerControl() {{
+      const wrap = document.getElementById("map-link-wrap");
+      const toggle = document.getElementById("map-link-toggle");
+      const inMapLinkContext = activeLayoutView === "network";
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !inMapLinkContext;
+        wrap.title = mapLinkLayerEnabled
+          ? "Hide the heuristic link layer for nodes without GPS."
+          : "Show the heuristic link layer for nodes without GPS.";
+      }}
+      if (toggle instanceof HTMLInputElement) {{
+        toggle.checked = mapLinkLayerEnabled;
+      }}
+    }}
+
     function persistMapPacketLinesPreference() {{
       try {{
         window.localStorage.setItem(mapPacketLinesStorageKey, mapPacketLinesEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistMapLinkLayerPreference() {{
+      try {{
+        window.localStorage.setItem(mapLinkLayerStorageKey, mapLinkLayerEnabled ? "1" : "0");
       }} catch (_err) {{
       }}
     }}
@@ -253,6 +275,20 @@
       }} catch (_err) {{
       }}
       updateMapPacketLinesControl();
+    }}
+
+    function loadMapLinkLayerPreference() {{
+      mapLinkLayerEnabled = false;
+      try {{
+        const stored = window.localStorage.getItem(mapLinkLayerStorageKey);
+        if (stored === "1") {{
+          mapLinkLayerEnabled = true;
+        }} else if (stored === "0") {{
+          mapLinkLayerEnabled = false;
+        }}
+      }} catch (_err) {{
+      }}
+      updateMapLinkLayerControl();
     }}
 
     function bindMapPacketLinesControl() {{
@@ -277,4 +313,28 @@
         }});
       }}
       updateMapPacketLinesControl();
+    }}
+
+    function bindMapLinkLayerControl() {{
+      const toggle = document.getElementById("map-link-toggle");
+      if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
+        toggle.dataset.bound = "1";
+        toggle.checked = mapLinkLayerEnabled;
+        toggle.addEventListener("change", () => {{
+          mapLinkLayerEnabled = !!toggle.checked;
+          persistMapLinkLayerPreference();
+          updateMapLinkLayerControl();
+          lastMapSignature = "";
+          lastMapGraphSignature = "";
+          lastMapRenderMode = "";
+          if (latestState && activeLayoutView === "network") {{
+            renderMap(
+              latestState.nodes || [],
+              (latestState.traffic || {{}}).edges || [],
+              null
+            );
+          }}
+        }});
+      }}
+      updateMapLinkLayerControl();
     }}

@@ -1904,6 +1904,14 @@
             lastHops: null,
             avgHopsWeight: 0,
             avgHopsSamples: 0,
+            avgSnrWeight: 0,
+            avgSnrSamples: 0,
+            snrMin: null,
+            snrMax: null,
+            avgRssiWeight: 0,
+            avgRssiSamples: 0,
+            rssiMin: null,
+            rssiMax: null,
             directionCount: 0,
           }});
         }}
@@ -1933,12 +1941,50 @@
           bucket.avgHopsWeight += avgHops * sampleWeight;
           bucket.avgHopsSamples += sampleWeight;
         }}
+        const avgSnr = Number(edge && edge.avg_snr);
+        const snrSamples = Number(edge && edge.snr_samples);
+        if (Number.isFinite(avgSnr)) {{
+          const sampleWeight = (Number.isFinite(snrSamples) && snrSamples > 0) ? snrSamples : 1;
+          bucket.avgSnrWeight += avgSnr * sampleWeight;
+          bucket.avgSnrSamples += sampleWeight;
+        }}
+        const snrMin = Number(edge && edge.snr_min);
+        const snrMax = Number(edge && edge.snr_max);
+        if (Number.isFinite(snrMin)) {{
+          bucket.snrMin = Number.isFinite(bucket.snrMin) ? Math.min(bucket.snrMin, snrMin) : snrMin;
+        }}
+        if (Number.isFinite(snrMax)) {{
+          bucket.snrMax = Number.isFinite(bucket.snrMax) ? Math.max(bucket.snrMax, snrMax) : snrMax;
+        }}
+        const avgRssi = Number(edge && edge.avg_rssi);
+        const rssiSamples = Number(edge && edge.rssi_samples);
+        if (Number.isFinite(avgRssi)) {{
+          const sampleWeight = (Number.isFinite(rssiSamples) && rssiSamples > 0) ? rssiSamples : 1;
+          bucket.avgRssiWeight += avgRssi * sampleWeight;
+          bucket.avgRssiSamples += sampleWeight;
+        }}
+        const rssiMin = Number(edge && edge.rssi_min);
+        const rssiMax = Number(edge && edge.rssi_max);
+        if (Number.isFinite(rssiMin)) {{
+          bucket.rssiMin = Number.isFinite(bucket.rssiMin) ? Math.min(bucket.rssiMin, rssiMin) : rssiMin;
+        }}
+        if (Number.isFinite(rssiMax)) {{
+          bucket.rssiMax = Number.isFinite(bucket.rssiMax) ? Math.max(bucket.rssiMax, rssiMax) : rssiMax;
+        }}
       }}
       const combined = Array.from(buckets.values()).map((bucket) => ({{
         ...bucket,
         avgHops: bucket.avgHopsSamples > 0
           ? Math.round((bucket.avgHopsWeight / bucket.avgHopsSamples) * 100) / 100
           : null,
+        avgSnr: bucket.avgSnrSamples > 0
+          ? Math.round((bucket.avgSnrWeight / bucket.avgSnrSamples) * 100) / 100
+          : null,
+        snrSamples: bucket.avgSnrSamples,
+        avgRssi: bucket.avgRssiSamples > 0
+          ? Math.round((bucket.avgRssiWeight / bucket.avgRssiSamples) * 100) / 100
+          : null,
+        rssiSamples: bucket.avgRssiSamples,
       }}));
       combined.sort((a, b) => (
         (b.weight - a.weight)
@@ -2561,6 +2607,7 @@
         mapResetBtn.hidden = next === "saved" || next === "history";
       }}
       updateMapPacketLinesControl();
+      updateMapLinkLayerControl();
       if (typeof updateNetworkLegacyExplorerControl === "function") {{
         updateNetworkLegacyExplorerControl();
       }}

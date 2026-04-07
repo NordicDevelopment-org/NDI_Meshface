@@ -50,12 +50,20 @@
       for (const edge of (edges || [])) {{
         const lifetimeCount = Number(edge && (edge.lifetime_count ?? edge.count ?? 0));
         const lastHops = Number(edge && edge.last_hops);
+        const avgSnr = Number(edge && edge.avg_snr);
+        const avgRssi = Number(edge && edge.avg_rssi);
+        const snrSamples = Number(edge && edge.snr_samples);
+        const rssiSamples = Number(edge && edge.rssi_samples);
         let itemHash = 2166136261;
         itemHash = hashMixStr(itemHash, normalizeNodeId(edge && edge.from));
         itemHash = hashMixStr(itemHash, normalizeNodeId(edge && edge.to));
         itemHash = hashMixInt(itemHash, Number.isFinite(lifetimeCount) ? Math.trunc(lifetimeCount) : 0);
         itemHash = hashMixStr(itemHash, edge && edge.last_rx_time);
         itemHash = hashMixInt(itemHash, Number.isFinite(lastHops) ? Math.trunc(lastHops) : -1);
+        itemHash = hashMixInt(itemHash, Number.isFinite(avgSnr) ? Math.round(avgSnr * 100) : -2147483648);
+        itemHash = hashMixInt(itemHash, Number.isFinite(avgRssi) ? Math.round(avgRssi * 100) : -2147483648);
+        itemHash = hashMixInt(itemHash, Number.isFinite(snrSamples) ? Math.trunc(snrSamples) : 0);
+        itemHash = hashMixInt(itemHash, Number.isFinite(rssiSamples) ? Math.trunc(rssiSamples) : 0);
         itemHash = hashMixInt(itemHash, edge && edge.is_real ? 1 : 0);
         edgeXor ^= itemHash;
         edgeSum = (edgeSum + itemHash) >>> 0;
@@ -217,6 +225,388 @@
       map.fitBounds(bounds.pad(pad), {{ animate: false, maxZoom }});
       requestMapResize();
       return true;
+    }}
+
+    function clampMapLinkValue(value, min, max) {{
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return min;
+      if (parsed < min) return min;
+      if (parsed > max) return max;
+      return parsed;
+    }}
+
+    function estimatedMarkerStyle(isSelected, confidence = 0.5) {{
+      const safeConfidence = clampMapLinkValue(confidence, 0.12, 0.96);
+      if (isSelected) {{
+        return {{
+          radius: 8.4 + (safeConfidence * 0.8),
+          color: "#155e75",
+          fillColor: "#b6ecff",
+          fillOpacity: 0.92,
+          weight: 2.4,
+          dashArray: "6 4",
+          bubblingMouseEvents: false,
+        }};
+      }}
+      return {{
+        radius: 5.6 + (safeConfidence * 1.8),
+        color: "#1d6f8a",
+        fillColor: "#8fd8f5",
+        fillOpacity: 0.34 + (safeConfidence * 0.34),
+        weight: 1.8,
+        dashArray: "5 4",
+        bubblingMouseEvents: false,
+      }};
+    }}
+
+    function mapLinkConfidenceLabel(confidence) {{
+      const safeConfidence = clampMapLinkValue(confidence, 0, 1);
+      if (safeConfidence >= 0.78) return "High";
+      if (safeConfidence >= 0.56) return "Medium";
+      return "Low";
+    }}
+
+    function projectMapLinkPoint(lat, lon, refLat, refLon) {{
+      const metersPerDegLat = 111320;
+      const metersPerDegLon = Math.max(
+        1,
+        Math.cos((Number(refLat || 0) * Math.PI) / 180) * metersPerDegLat
+      );
+      return {{
+        x: (Number(lon) - Number(refLon || 0)) * metersPerDegLon,
+        y: (Number(lat) - Number(refLat || 0)) * metersPerDegLat,
+      }};
+    }}
+
+    function unprojectMapLinkPoint(x, y, refLat, refLon) {{
+      const metersPerDegLat = 111320;
+      const metersPerDegLon = Math.max(
+        1,
+        Math.cos((Number(refLat || 0) * Math.PI) / 180) * metersPerDegLat
+      );
+      return {{
+        lat: Number(refLat || 0) + (Number(y) / metersPerDegLat),
+        lon: Number(refLon || 0) + (Number(x) / metersPerDegLon),
+      }};
+    }}
+
+    function mapLinkRecencyScore(lastSeenUnix, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const ts = Number(lastSeenUnix);
+      if (!Number.isFinite(ts) || ts <= 0) return 0.72;
+      const ageSeconds = Math.max(0, nowUnix - ts);
+      if (ageSeconds <= (20 * 60)) return 1;
+      if (ageSeconds >= (48 * 60 * 60)) return 0.14;
+      const span = (48 * 60 * 60) - (20 * 60);
+      return clampMapLinkValue(1 - ((ageSeconds - (20 * 60)) / span), 0.14, 1);
+    }}
+
+    function mapLinkEdgeSignalScore(edge) {{
+      const metrics = [];
+      const avgSnr = Number(edge && edge.avgSnr);
+      if (Number.isFinite(avgSnr)) {{
+        metrics.push([clampMapLinkValue((avgSnr + 18) / 30, 0, 1), 0.42]);
+      }}
+      const avgRssi = Number(edge && edge.avgRssi);
+      if (Number.isFinite(avgRssi)) {{
+        metrics.push([clampMapLinkValue((avgRssi + 126) / 40, 0, 1), 0.28]);
+      }}
+      const avgHops = Number(edge && edge.avgHops);
+      const lastHops = Number(edge && edge.lastHops);
+      const hopsMetric = Number.isFinite(avgHops) ? avgHops : lastHops;
+      if (Number.isFinite(hopsMetric)) {{
+        metrics.push([1 - clampMapLinkValue((Math.max(0, hopsMetric) - 1) / 5, 0, 1), 0.18]);
+      }}
+      const weight = Number(edge && edge.weight);
+      const sessionWeight = Number(edge && edge.sessionWeight);
+      const countMetric = Math.log10(Math.max(1, (Number.isFinite(weight) ? weight : 0) + (Number.isFinite(sessionWeight) ? sessionWeight : 0)) + 1);
+      metrics.push([clampMapLinkValue(countMetric / 2.5, 0.08, 1), 0.12]);
+
+      let weightedTotal = 0;
+      let totalWeight = 0;
+      for (const [value, weightValue] of metrics) {{
+        weightedTotal += value * weightValue;
+        totalWeight += weightValue;
+      }}
+      const baseScore = totalWeight > 0 ? (weightedTotal / totalWeight) : 0.42;
+      const recency = mapLinkRecencyScore(edge && edge.lastSeenUnix);
+      return clampMapLinkValue((baseScore * 0.84) + (recency * 0.16), 0.08, 0.98);
+    }}
+
+    function mapLinkDesiredDistanceMeters(edge) {{
+      const quality = mapLinkEdgeSignalScore(edge);
+      const avgHops = Number(edge && edge.avgHops);
+      const lastHops = Number(edge && edge.lastHops);
+      const hopMetric = Number.isFinite(avgHops)
+        ? avgHops
+        : (Number.isFinite(lastHops) ? lastHops : 1);
+      const hopPenaltyMeters = Math.max(0, hopMetric - 1) * 2800;
+      return Math.round(900 + ((1 - quality) * 17000) + hopPenaltyMeters);
+    }}
+
+    function buildMapLinkLayerOverlay(nodes, rawEdges) {{
+      const nodeMap = new Map();
+      let anchorLatTotal = 0;
+      let anchorLonTotal = 0;
+      let anchorCount = 0;
+
+      for (const node of (nodes || [])) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (!isSelectableNodeId(nodeId) || nodeMap.has(nodeId)) continue;
+        nodeMap.set(nodeId, node);
+        const lat = Number(node && node.lat);
+        const lon = Number(node && node.lon);
+        if (!isValidMapCoord(lat, lon)) continue;
+        anchorLatTotal += lat;
+        anchorLonTotal += lon;
+        anchorCount += 1;
+      }}
+      if (!nodeMap.size || anchorCount <= 0) {{
+        return {{ estimates: new Map(), lines: [] }};
+      }}
+
+      const refLat = anchorLatTotal / anchorCount;
+      const refLon = anchorLonTotal / anchorCount;
+      const positions = new Map();
+      const metaById = new Map();
+      for (const [nodeId, node] of nodeMap.entries()) {{
+        const lat = Number(node && node.lat);
+        const lon = Number(node && node.lon);
+        if (!isValidMapCoord(lat, lon)) continue;
+        const point = projectMapLinkPoint(lat, lon, refLat, refLon);
+        positions.set(nodeId, {{
+          x: point.x,
+          y: point.y,
+          fixed: true,
+        }});
+        metaById.set(nodeId, {{
+          anchorIds: new Set([nodeId]),
+          supportLinks: 0,
+          confidence: 1,
+          seedX: point.x,
+          seedY: point.y,
+        }});
+      }}
+
+      const combinedEdges = (typeof combineNetworkGraphEdges === "function")
+        ? combineNetworkGraphEdges(rawEdges, nodeMap)
+        : [];
+      if (!combinedEdges.length) {{
+        return {{ estimates: new Map(), lines: [] }};
+      }}
+      const adjacency = (typeof buildNetworkGraphAdjacency === "function")
+        ? buildNetworkGraphAdjacency(nodeMap, combinedEdges)
+        : new Map();
+      const unresolvedIds = Array.from(nodeMap.keys()).filter((nodeId) => !positions.has(nodeId));
+      const maxSeedPasses = Math.max(2, unresolvedIds.length + 1);
+
+      for (let pass = 0; pass < maxSeedPasses; pass += 1) {{
+        let progressed = false;
+        for (const nodeId of unresolvedIds) {{
+          if (positions.has(nodeId)) continue;
+          const peers = adjacency.get(nodeId) || new Map();
+          let totalWeight = 0;
+          let sumX = 0;
+          let sumY = 0;
+          let supportLinks = 0;
+          const anchorIds = new Set();
+
+          for (const [peerId, edge] of peers.entries()) {{
+            const peerPos = positions.get(peerId);
+            const peerMeta = metaById.get(peerId) || null;
+            if (!peerPos || !peerMeta) continue;
+            let weight = mapLinkEdgeSignalScore(edge);
+            if (!peerPos.fixed) {{
+              weight *= 0.58 * clampMapLinkValue(peerMeta.confidence, 0.12, 1);
+            }}
+            if (!(weight > 0)) continue;
+            totalWeight += weight;
+            sumX += peerPos.x * weight;
+            sumY += peerPos.y * weight;
+            supportLinks += 1;
+            for (const anchorId of (peerMeta.anchorIds || [])) {{
+              anchorIds.add(anchorId);
+            }}
+          }}
+
+          if (!(totalWeight > 0) || !anchorIds.size) continue;
+          const seedX = sumX / totalWeight;
+          const seedY = sumY / totalWeight;
+          const avgWeight = totalWeight / Math.max(1, supportLinks);
+          positions.set(nodeId, {{ x: seedX, y: seedY, fixed: false }});
+          metaById.set(nodeId, {{
+            anchorIds,
+            supportLinks,
+            confidence: clampMapLinkValue(
+              0.16
+                + (avgWeight * 0.42)
+                + Math.min(0.24, anchorIds.size * 0.08)
+                + Math.min(0.12, supportLinks * 0.035),
+              0.12,
+              0.92
+            ),
+            seedX,
+            seedY,
+          }});
+          progressed = true;
+        }}
+        if (!progressed) break;
+      }}
+
+      const movableIds = Array.from(positions.entries())
+        .filter((entry) => entry[1] && !entry[1].fixed)
+        .map((entry) => entry[0]);
+      const positionedIds = Array.from(positions.keys());
+      const repelRadius = 14000;
+      const repelRadiusSq = repelRadius * repelRadius;
+
+      for (let iter = 0; iter < 56 && movableIds.length > 0; iter += 1) {{
+        const deltas = new Map(movableIds.map((nodeId) => [nodeId, {{ x: 0, y: 0 }}]));
+
+        for (const edge of combinedEdges) {{
+          const fromPos = positions.get(edge.a);
+          const toPos = positions.get(edge.b);
+          if (!fromPos || !toPos) continue;
+          const dx = toPos.x - fromPos.x;
+          const dy = toPos.y - fromPos.y;
+          const distance = Math.hypot(dx, dy) || 1;
+          const desired = mapLinkDesiredDistanceMeters(edge);
+          const stiffness = 0.032 + (mapLinkEdgeSignalScore(edge) * 0.045);
+          const delta = (distance - desired) * stiffness;
+          const unitX = dx / distance;
+          const unitY = dy / distance;
+          if (!fromPos.fixed && deltas.has(edge.a)) {{
+            const next = deltas.get(edge.a);
+            next.x += unitX * delta;
+            next.y += unitY * delta;
+          }}
+          if (!toPos.fixed && deltas.has(edge.b)) {{
+            const next = deltas.get(edge.b);
+            next.x -= unitX * delta;
+            next.y -= unitY * delta;
+          }}
+        }}
+
+        for (const nodeId of movableIds) {{
+          const delta = deltas.get(nodeId);
+          const nodePos = positions.get(nodeId);
+          if (!delta || !nodePos) continue;
+          for (const otherId of positionedIds) {{
+            if (otherId === nodeId) continue;
+            const otherPos = positions.get(otherId);
+            if (!otherPos) continue;
+            const dx = nodePos.x - otherPos.x;
+            const dy = nodePos.y - otherPos.y;
+            const distSq = (dx * dx) + (dy * dy);
+            if (!(distSq > 1) || distSq > repelRadiusSq) continue;
+            const distance = Math.sqrt(distSq);
+            const push = ((repelRadius - distance) / repelRadius) * (otherPos.fixed ? 220 : 120);
+            delta.x += (dx / distance) * push;
+            delta.y += (dy / distance) * push;
+          }}
+
+          const meta = metaById.get(nodeId) || null;
+          if (meta) {{
+            delta.x += (meta.seedX - nodePos.x) * 0.06;
+            delta.y += (meta.seedY - nodePos.y) * 0.06;
+          }}
+        }}
+
+        const maxStep = Math.max(260, 1750 - (iter * 18));
+        for (const nodeId of movableIds) {{
+          const delta = deltas.get(nodeId);
+          const nodePos = positions.get(nodeId);
+          if (!delta || !nodePos) continue;
+          nodePos.x += clampMapLinkValue(delta.x, -maxStep, maxStep);
+          nodePos.y += clampMapLinkValue(delta.y, -maxStep, maxStep);
+        }}
+      }}
+
+      const estimates = new Map();
+      for (const nodeId of movableIds) {{
+        const nodePos = positions.get(nodeId);
+        const meta = metaById.get(nodeId) || null;
+        if (!nodePos || !meta) continue;
+        const ll = unprojectMapLinkPoint(nodePos.x, nodePos.y, refLat, refLon);
+        if (!isValidMapCoord(ll.lat, ll.lon)) continue;
+
+        let qualitySum = 0;
+        let qualityCount = 0;
+        let snrWeight = 0;
+        let snrSum = 0;
+        let rssiWeight = 0;
+        let rssiSum = 0;
+        let hopsWeight = 0;
+        let hopsSum = 0;
+        const peers = adjacency.get(nodeId) || new Map();
+        for (const edge of peers.values()) {{
+          const quality = mapLinkEdgeSignalScore(edge);
+          qualitySum += quality;
+          qualityCount += 1;
+          if (Number.isFinite(Number(edge && edge.avgSnr))) {{
+            snrSum += Number(edge.avgSnr) * quality;
+            snrWeight += quality;
+          }}
+          if (Number.isFinite(Number(edge && edge.avgRssi))) {{
+            rssiSum += Number(edge.avgRssi) * quality;
+            rssiWeight += quality;
+          }}
+          if (Number.isFinite(Number(edge && edge.avgHops))) {{
+            hopsSum += Number(edge.avgHops) * quality;
+            hopsWeight += quality;
+          }}
+        }}
+
+        estimates.set(nodeId, {{
+          lat: ll.lat,
+          lon: ll.lon,
+          confidence: meta.confidence,
+          anchorCount: meta.anchorIds.size,
+          supportLinks: meta.supportLinks,
+          avgLinkQuality: qualityCount > 0 ? (qualitySum / qualityCount) : 0,
+          avgSnr: snrWeight > 0 ? Math.round((snrSum / snrWeight) * 100) / 100 : null,
+          avgRssi: rssiWeight > 0 ? Math.round((rssiSum / rssiWeight) * 100) / 100 : null,
+          avgHops: hopsWeight > 0 ? Math.round((hopsSum / hopsWeight) * 100) / 100 : null,
+        }});
+      }}
+
+      const lines = [];
+      for (const edge of combinedEdges) {{
+        const fromPos = positions.get(edge.a);
+        const toPos = positions.get(edge.b);
+        if (!fromPos || !toPos) continue;
+        const estimatedEndpoints = (fromPos.fixed ? 0 : 1) + (toPos.fixed ? 0 : 1);
+        if (estimatedEndpoints <= 0) continue;
+
+        const fromNode = nodeMap.get(edge.a) || null;
+        const toNode = nodeMap.get(edge.b) || null;
+        const fromLat = fromPos.fixed ? Number(fromNode && fromNode.lat) : Number((estimates.get(edge.a) || {{}}).lat);
+        const fromLon = fromPos.fixed ? Number(fromNode && fromNode.lon) : Number((estimates.get(edge.a) || {{}}).lon);
+        const toLat = toPos.fixed ? Number(toNode && toNode.lat) : Number((estimates.get(edge.b) || {{}}).lat);
+        const toLon = toPos.fixed ? Number(toNode && toNode.lon) : Number((estimates.get(edge.b) || {{}}).lon);
+        if (!isValidMapCoord(fromLat, fromLon) || !isValidMapCoord(toLat, toLon)) continue;
+
+        lines.push({{
+          key: `${{edge.a}}::${{edge.b}}`,
+          fromId: edge.a,
+          toId: edge.b,
+          fromLat,
+          fromLon,
+          toLat,
+          toLon,
+          estimatedEndpoints,
+          qualityScore: mapLinkEdgeSignalScore(edge),
+          desiredDistanceKm: Math.round((mapLinkDesiredDistanceMeters(edge) / 1000) * 10) / 10,
+          lastSeenUnix: Number(edge && edge.lastSeenUnix) || 0,
+          isReal: !!edge.isReal,
+          weight: Number(edge && edge.weight) || 0,
+          sessionWeight: Number(edge && edge.sessionWeight) || 0,
+          avgHops: Number.isFinite(Number(edge && edge.avgHops)) ? Number(edge.avgHops) : null,
+          avgSnr: Number.isFinite(Number(edge && edge.avgSnr)) ? Number(edge.avgSnr) : null,
+          avgRssi: Number.isFinite(Number(edge && edge.avgRssi)) ? Number(edge.avgRssi) : null,
+        }});
+      }}
+
+      return {{ estimates, lines }};
     }}
 
     function bindMapResetControl() {{

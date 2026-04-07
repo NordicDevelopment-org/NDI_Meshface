@@ -137,10 +137,40 @@ def fetch_recent_chat_rows(conn: SqlConnection, limit: int) -> SqlRows:
 def fetch_connection_rows(conn: SqlConnection) -> SqlRows:
     return conn.execute(
         """
-        SELECT from_id, to_id, first_seen_unix, last_seen_unix, seen_count,
-               portnums_json, last_hops, hops_sum, hops_count
-        FROM connections
-        ORDER BY last_seen_unix DESC
+        SELECT c.from_id,
+               c.to_id,
+               c.first_seen_unix,
+               c.last_seen_unix,
+               c.seen_count,
+               c.portnums_json,
+               c.last_hops,
+               c.hops_sum,
+               c.hops_count,
+               metrics.snr_sum,
+               metrics.snr_count,
+               metrics.snr_min,
+               metrics.snr_max,
+               metrics.rssi_sum,
+               metrics.rssi_count,
+               metrics.rssi_min,
+               metrics.rssi_max
+        FROM connections AS c
+        LEFT JOIN (
+          SELECT from_id,
+                 to_id,
+                 COALESCE(SUM(snr_sum), 0.0) AS snr_sum,
+                 COALESCE(SUM(snr_count), 0) AS snr_count,
+                 MIN(snr_min) AS snr_min,
+                 MAX(snr_max) AS snr_max,
+                 COALESCE(SUM(rssi_sum), 0.0) AS rssi_sum,
+                 COALESCE(SUM(rssi_count), 0) AS rssi_count,
+                 MIN(rssi_min) AS rssi_min,
+                 MAX(rssi_max) AS rssi_max
+          FROM link_metrics_1m
+          GROUP BY from_id, to_id
+        ) AS metrics
+          ON metrics.from_id = c.from_id AND metrics.to_id = c.to_id
+        ORDER BY c.last_seen_unix DESC
         """
     ).fetchall()
 

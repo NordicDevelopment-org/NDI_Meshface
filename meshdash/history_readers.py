@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 
 from .file_transfer_protocol import is_file_transfer_protocol_chat_entry as _is_file_transfer_protocol_chat_entry
-from .helpers import safe_json_loads as _safe_json_loads, to_int as _to_int
+from .helpers import safe_json_loads as _safe_json_loads, to_float as _to_float, to_int as _to_int
 
 HistoryRow = tuple[object, ...]
 HistoryPayload = dict[str, object]
@@ -29,6 +29,8 @@ def decode_recent_chat_rows(rows: Iterable[HistoryRow]) -> list[HistoryPayload]:
 def decode_connections_rows(rows: Iterable[HistoryRow]) -> list[HistoryPayload]:
     out: list[HistoryPayload] = []
     for row in rows:
+        if len(row) < 9:
+            continue
         (
             from_id,
             to_id,
@@ -39,7 +41,21 @@ def decode_connections_rows(rows: Iterable[HistoryRow]) -> list[HistoryPayload]:
             last_hops,
             hops_sum,
             hops_count,
-        ) = row
+        ) = row[:9]
+        if len(row) >= 17:
+            (
+                snr_sum,
+                snr_count,
+                snr_min,
+                snr_max,
+                rssi_sum,
+                rssi_count,
+                rssi_min,
+                rssi_max,
+            ) = row[9:17]
+        else:
+            snr_sum = snr_count = snr_min = snr_max = None
+            rssi_sum = rssi_count = rssi_min = rssi_max = None
         portnums = _safe_json_loads(portnums_json, [])
         if not isinstance(portnums, list):
             portnums = []
@@ -54,6 +70,14 @@ def decode_connections_rows(rows: Iterable[HistoryRow]) -> list[HistoryPayload]:
                 "last_hops": _to_int(last_hops),
                 "hops_sum": _to_int(hops_sum) or 0,
                 "hops_count": _to_int(hops_count) or 0,
+                "snr_sum": _to_float(snr_sum) or 0.0,
+                "snr_count": _to_int(snr_count) or 0,
+                "snr_min": _to_float(snr_min),
+                "snr_max": _to_float(snr_max),
+                "rssi_sum": _to_float(rssi_sum) or 0.0,
+                "rssi_count": _to_int(rssi_count) or 0,
+                "rssi_min": _to_float(rssi_min),
+                "rssi_max": _to_float(rssi_max),
             }
         )
     return out

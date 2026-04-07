@@ -64,6 +64,8 @@ def parse_tracker_packet(
         "from_id": from_id,
         "to_id": to_id,
         "rx_time": rx_time,
+        "rx_snr": packet.get("rxSnr"),
+        "rx_rssi": packet.get("rxRssi"),
         "hops": hops,
         "decoded": decoded,
         "portnum": portnum,
