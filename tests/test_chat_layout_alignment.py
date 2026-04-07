@@ -27,6 +27,9 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "padding: 0;" in css
     assert "gap: 0;" in css
     assert ".chat-left-bottom-bar {" in css
+    assert "--chat-user-search-inline-start: 6px;" in css
+    assert "--chat-user-search-inline-end: 6px;" in css
+    assert "margin: 0 var(--chat-user-search-inline-end) 6px var(--chat-user-search-inline-start);" in css
     assert "border: 0;" in css
     assert "[data-theme=\"dark\"] .chat-left-panel," in css
     assert "[data-theme=\"dark\"] .card.chat .body," in css
@@ -109,3 +112,14 @@ def test_chat_send_channel_compact_dot_trigger_geometry() -> None:
     assert "inset: 0;" in css
     assert ".chat-send-channel-dot {" in css
     assert "pointer-events: none;" in css
+
+
+def test_chat_node_search_syncs_to_live_navigator_row_bounds() -> None:
+    js_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
+
+    assert "function syncChatNodeNavigatorSearchBounds() {" in js_src
+    assert 'document.querySelector(".chat-left-bottom-bar")' in js_src
+    assert 'roomList.querySelector(".chat-member-item, .chat-member-empty")' in js_src
+    assert 'bottomBar.style.setProperty("--chat-user-search-inline-start",' in js_src
+    assert 'bottomBar.style.setProperty("--chat-user-search-inline-end",' in js_src
+    assert 'window.addEventListener("resize", scheduleChatNodeNavigatorSearchBoundsSync);' in js_src

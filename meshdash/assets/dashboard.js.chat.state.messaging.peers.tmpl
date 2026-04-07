@@ -966,11 +966,51 @@
       }}
     }}
 
+    let chatNodeNavigatorSearchBoundsResizeBound = false;
+
+    function syncChatNodeNavigatorSearchBounds() {{
+      const panel = document.getElementById("chat-left-panel");
+      const roomList = document.getElementById("chat-room-list");
+      const bottomBar = document.querySelector(".chat-left-bottom-bar");
+      const anchor = roomList instanceof HTMLElement
+        ? roomList.querySelector(".chat-member-item, .chat-member-empty")
+        : null;
+      if (!(panel instanceof HTMLElement) || !(bottomBar instanceof HTMLElement)) return;
+
+      const defaultInset = "6px";
+      if (!(anchor instanceof HTMLElement)) {{
+        bottomBar.style.setProperty("--chat-user-search-inline-start", defaultInset);
+        bottomBar.style.setProperty("--chat-user-search-inline-end", defaultInset);
+        return;
+      }}
+
+      const panelRect = panel.getBoundingClientRect();
+      const anchorRect = anchor.getBoundingClientRect();
+      const leftInset = Math.max(0, Math.round((anchorRect.left - panelRect.left) * 100) / 100);
+      const rightInset = Math.max(0, Math.round((panelRect.right - anchorRect.right) * 100) / 100);
+      bottomBar.style.setProperty("--chat-user-search-inline-start", `${leftInset}px`);
+      bottomBar.style.setProperty("--chat-user-search-inline-end", `${rightInset}px`);
+    }}
+
+    function scheduleChatNodeNavigatorSearchBoundsSync() {{
+      if (typeof requestAnimationFrame === "function") {{
+        requestAnimationFrame(() => {{
+          syncChatNodeNavigatorSearchBounds();
+        }});
+      }} else {{
+        syncChatNodeNavigatorSearchBounds();
+      }}
+    }}
+
     function renderChatNodeNavigatorList(state = latestState, options = null) {{
       const opts = options && typeof options === "object" ? options : {{}};
       const safeState = state && typeof state === "object" ? state : (latestState || {{}});
       const roomList = document.getElementById("chat-room-list");
       if (!(roomList instanceof HTMLElement)) return null;
+      if (!chatNodeNavigatorSearchBoundsResizeBound && typeof window !== "undefined" && typeof window.addEventListener === "function") {{
+        chatNodeNavigatorSearchBoundsResizeBound = true;
+        window.addEventListener("resize", scheduleChatNodeNavigatorSearchBoundsSync);
+      }}
       const usersTitle = document.getElementById("chat-users-title");
       if (usersTitle instanceof HTMLElement) {{
         usersTitle.textContent = activeChatChannel === "direct"
@@ -1072,6 +1112,7 @@
         roomList.__meshLastInnerHtml_chat_room_list = nextMarkup;
       }}
       bindChatNodeNavigatorListInteractions(roomList);
+      scheduleChatNodeNavigatorSearchBoundsSync();
       if (chatNodeNavigatorSelectionScrollLocked) {{
         resetChatNodeNavigatorViewport();
       }}
