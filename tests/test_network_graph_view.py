@@ -46,6 +46,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
 
 def test_network_layout_uses_single_row_map_track() -> None:
     css = build_dashboard_css(theme_css="")
+    graph_label_css = css[css.index(".network-graph-node-label {"):css.index(".network-graph-node-label.is-secondary {")]
 
     assert ".layout.view-network {" in css
     assert "grid-template-rows: minmax(0, 1fr);" in css
@@ -54,3 +55,4 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-stage {" in css
     assert "touch-action: none;" in css
     assert ".network-graph-stage.is-panning {" in css
+    assert "pointer-events: auto;" in graph_label_css
