@@ -1,6 +1,6 @@
       box-shadow: none;
-      border-radius: 10px;
-      padding: 6px;
+      border-radius: 0;
+      padding: 0;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -41,12 +41,14 @@
       display: flex;
       align-items: stretch;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 0;
       min-height: 0;
     }}
     .chat-send-channel-wrap {{
       --chat-send-channel-fill: #0072b2;
       --chat-send-channel-rgb: 0, 114, 178;
+      display: inline-flex;
+      align-items: center;
       flex: 0 1 156px;
       min-width: 96px;
       max-width: 196px;
@@ -57,6 +59,7 @@
       border-radius: 8px;
       background: #e3f4ea;
       border: 1px solid #9cc9ad;
+      box-shadow: none;
     }}
     .chat-send-channel-wrap:hover {{
       background: #d7ecdf;
@@ -79,6 +82,12 @@
       justify-content: flex-start;
       text-align: left;
       padding-left: 4px;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      box-shadow: none;
+      appearance: none;
+      -webkit-appearance: none;
     }}
     .chat-send-channel-menu {{
       top: auto;
@@ -273,6 +282,7 @@
     #chat-send-btn {{
       border: 1px solid #9cc9ad;
       background: #e3f4ea;
+      background-image: none;
       color: #184a32;
       border-radius: 8px;
       height: 27px;
@@ -284,6 +294,9 @@
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
+      box-shadow: none;
+      appearance: none;
+      -webkit-appearance: none;
     }}
     #chat-send-btn:hover {{
       background: #d7ecdf;
@@ -295,6 +308,7 @@
     #chat-emoji-btn {{
       border: 1px solid #9cc9ad;
       background: #f1f9f4;
+      background-image: none;
       color: #184a32;
       border-radius: 8px;
       height: 27px;
@@ -306,6 +320,9 @@
       line-height: 1;
       cursor: pointer;
       white-space: nowrap;
+      box-shadow: none;
+      appearance: none;
+      -webkit-appearance: none;
     }}
     #chat-emoji-btn:hover {{
       background: #e6f2ea;
@@ -3101,7 +3118,7 @@
     }}
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .chat-left-bottom-bar {{
-      background: var(--ui-panel-alt);
+      background: transparent;
       border-color: var(--ui-border);
     }}
     [data-theme="dark"] .chat-node-navigator-menu,
@@ -3724,6 +3741,16 @@
       background: #07140d;
       color: #c6ffdb;
       box-shadow: none;
+      background-image: none;
+    }}
+    [data-theme="dark"] .chat-send-channel-menu-btn {{
+      background: transparent !important;
+      border: 0 !important;
+      color: inherit !important;
+      box-shadow: none !important;
+      background-image: none !important;
+      appearance: none;
+      -webkit-appearance: none;
     }}
     [data-theme="dark"] .chat-send-channel-select {{
       background: transparent;
@@ -4355,9 +4382,56 @@
 
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .card.chat .chat-compose-shell {{
-      background: var(--ui-panel-alt);
-      border-color: var(--ui-border);
+      background: #07140d !important;
+      background-image: none !important;
+      border-color: #2b8a59 !important;
       box-shadow: none;
+    }}
+    [data-theme="dark"] .chat-left-bottom-bar {{
+      background: #07140d !important;
+      background-image: none !important;
+      border-color: #2b8a59 !important;
+    }}
+    [data-theme="dark"] .chat-send-channel-wrap {{
+      background: #07140d !important;
+      background-image: none !important;
+      border-color: #2b8a59 !important;
+      box-shadow: none !important;
+    }}
+    [data-theme="dark"] .chat-send-channel-wrap.mesh-channel-wrap {{
+      background: #07140d !important;
+      background-image: none !important;
+      border-color: #2b8a59 !important;
+      box-shadow: none !important;
+    }}
+    [data-theme="dark"] .chat-send-channel-menu-btn {{
+      background: transparent !important;
+      background-image: none !important;
+      border: 0 !important;
+      color: #c6ffdb !important;
+      box-shadow: none !important;
+      appearance: none;
+      -webkit-appearance: none;
+    }}
+    [data-theme="dark"] #chat-emoji-btn,
+    [data-theme="dark"] #chat-send-btn {{
+      background: #07140d !important;
+      background-image: none !important;
+      border-color: #2b8a59 !important;
+      color: #c6ffdb !important;
+      box-shadow: none !important;
+      appearance: none;
+      -webkit-appearance: none;
+    }}
+    [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] #chat-send-btn:hover {{
+      background: #0d1d13 !important;
+    }}
+    [data-theme="dark"] .chat-left-panel,
+    [data-theme="dark"] .card.chat .body,
+    [data-theme="dark"] .card.chat .chat-shell {{
+      background: transparent !important;
+      background-image: none !important;
     }}
     [data-theme="dark"] .chat-reaction-row .chat-react-btn {{
       background: transparent;

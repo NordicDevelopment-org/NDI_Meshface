@@ -21,9 +21,21 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "padding: 0;" in css
     assert ".chat-compose-shell {" in css
     assert "margin-top: 6px;" in css
-    assert "border-radius: 10px;" in css
-    assert "padding: 6px;" in css
+    assert "background: transparent;" in css
+    assert "border: 0;" in css
+    assert "border-radius: 0;" in css
+    assert "padding: 0;" in css
     assert "gap: 0;" in css
+    assert ".chat-left-bottom-bar {" in css
+    assert "border: 0;" in css
+    assert "[data-theme=\"dark\"] .chat-left-panel," in css
+    assert "[data-theme=\"dark\"] .card.chat .body," in css
+    assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
+    assert "[data-theme=\"dark\"] .chat-left-bottom-bar {" in css
+    assert "background: #07140d !important;" in css
+    assert "[data-theme=\"dark\"] #chat-emoji-btn," in css
+    assert "[data-theme=\"dark\"] #chat-send-btn {" in css
+    assert "border-color: #2b8a59 !important;" in css
     assert ".list-search-input,\n    #chat-input {" in css
     assert "#chat-input:hover {" not in css
     assert "[data-theme=\"dark\"] #chat-input:hover {" not in css
