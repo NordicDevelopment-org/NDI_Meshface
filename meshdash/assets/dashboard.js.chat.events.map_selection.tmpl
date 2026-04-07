@@ -601,6 +601,18 @@
         return;
       }}
       selectedNodeId = normalized;
+      if (
+        activeLayoutView === "network"
+        && activeNetworkSubview === "graph"
+        && !networkGraphRootSyncInProgress
+        && typeof setNetworkGraphRootNode === "function"
+      ) {{
+        setNetworkGraphRootNode(normalized, {{
+          pushHistory: true,
+          syncSelection: false,
+          rerender: false,
+        }});
+      }}
       if (typeof clearChatNodeNavigatorSelectionScrollLock === "function") {{
         clearChatNodeNavigatorSelectionScrollLock();
       }}

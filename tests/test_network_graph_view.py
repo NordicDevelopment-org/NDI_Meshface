@@ -25,8 +25,10 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
     assert 'data-network-subview="graph"' in html
     assert 'id="network-map-panel-graph"' in html
     assert 'id="network-graph-svg"' in html
+    assert 'id="network-graph-back-btn"' in html
+    assert 'id="network-graph-home-btn"' in html
     assert 'id="network-graph-reset-view-btn"' in html
-    assert "Drag to pan, scroll to zoom" in html
+    assert "keeping your zoom level" in html
 
 
 def test_dashboard_js_supports_network_graph_subview() -> None:
@@ -39,8 +41,13 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'return clean === "overview" || clean === "graph" || clean === "sensors" ? clean : "map";' in js
     assert 'function renderNetworkGraphView(state = latestState)' in js
     assert 'activeNetworkSubview === "graph"' in js
+    assert 'let networkGraphRootNodeId = "";' in js
+    assert 'const networkGraphRootHistory = [];' in js
     assert 'const networkGraphViewState = {' in js
     assert 'function bindNetworkGraphInteractions(svg)' in js
+    assert 'function setNetworkGraphRootNode(nodeId, options = {})' in js
+    assert 'function navigateNetworkGraphBack()' in js
+    assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'pointerDownNodeId' in js
     assert 'svg.addEventListener("wheel"' in js
     assert 'svg.addEventListener("pointerup", finishPan);' in js

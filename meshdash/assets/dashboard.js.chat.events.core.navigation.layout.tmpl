@@ -862,6 +862,7 @@
 
     const networkGraphViewportBase = Object.freeze({{ x: 0, y: 0, width: 960, height: 620 }});
     const networkGraphZoomBounds = Object.freeze({{ minScale: 0.62, maxScale: 5.5 }});
+    const networkGraphRootHistoryLimit = 48;
     const networkGraphViewState = {{
       initialized: false,
       lastRootId: "",
@@ -1015,6 +1016,24 @@
       applyNetworkGraphViewBox(svg, fitNetworkGraphViewBoxToBounds(networkGraphViewState.bounds));
     }}
 
+    function recenterNetworkGraphView(svg, options = {{}}) {{
+      if (!(svg instanceof SVGElement)) return;
+      const preserveScale = !(options && options.preserveScale === false);
+      if (!preserveScale || !networkGraphViewState.initialized) {{
+        resetNetworkGraphView(svg);
+        return;
+      }}
+      const current = cloneNetworkGraphViewBox(networkGraphViewState.viewBox);
+      const centerX = networkGraphViewportBase.x + (networkGraphViewportBase.width / 2);
+      const centerY = networkGraphViewportBase.y + (networkGraphViewportBase.height / 2);
+      applyNetworkGraphViewBox(svg, {{
+        x: centerX - (current.width / 2),
+        y: centerY - (current.height / 2),
+        width: current.width,
+        height: current.height,
+      }});
+    }}
+
     function stopNetworkGraphPan(svg) {{
       const pointerId = networkGraphViewState.pointerId;
       if (
@@ -1079,6 +1098,116 @@
       }};
     }}
 
+    function pushNetworkGraphRootHistory(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) return;
+      const lastEntry = normalizeNodeId(networkGraphRootHistory[networkGraphRootHistory.length - 1] || "");
+      if (lastEntry === clean) return;
+      networkGraphRootHistory.push(clean);
+      while (networkGraphRootHistory.length > networkGraphRootHistoryLimit) {{
+        networkGraphRootHistory.shift();
+      }}
+    }}
+
+    function resolveNetworkGraphHomeNodeId(state = latestState, nodeMap = null) {{
+      const clean = normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || "");
+      if (!isSelectableNodeId(clean)) return "";
+      if (nodeMap instanceof Map && nodeMap.size && !nodeMap.has(clean)) return "";
+      return clean;
+    }}
+
+    function renderNetworkGraphNavigationControls(state = latestState, nodeMap = null, rootId = "") {{
+      const backBtn = document.getElementById("network-graph-back-btn");
+      const homeBtn = document.getElementById("network-graph-home-btn");
+      const safeMap = nodeMap instanceof Map ? nodeMap : new Map();
+
+      if (backBtn instanceof HTMLButtonElement) {{
+        let previousId = "";
+        for (let index = networkGraphRootHistory.length - 1; index >= 0; index -= 1) {{
+          const candidateId = normalizeNodeId(networkGraphRootHistory[index] || "");
+          if (!isSelectableNodeId(candidateId)) continue;
+          if (safeMap.size && !safeMap.has(candidateId)) continue;
+          previousId = candidateId;
+          break;
+        }}
+        backBtn.disabled = !previousId;
+        backBtn.setAttribute("aria-disabled", previousId ? "false" : "true");
+        backBtn.title = previousId
+          ? `Go back to ${{networkGraphNodeDisplayName(previousId, safeMap)}}`
+          : "No earlier graph focus yet";
+      }}
+
+      if (homeBtn instanceof HTMLButtonElement) {{
+        const homeNodeId = resolveNetworkGraphHomeNodeId(state, safeMap);
+        const canGoHome = !!homeNodeId && homeNodeId !== normalizeNodeId(rootId || "");
+        homeBtn.disabled = !canGoHome;
+        homeBtn.setAttribute("aria-disabled", canGoHome ? "false" : "true");
+        homeBtn.title = canGoHome
+          ? `Return graph focus to ${{networkGraphNodeDisplayName(homeNodeId, safeMap)}}`
+          : "Graph is already centered on the local node";
+      }}
+    }}
+
+    function setNetworkGraphRootNode(nodeId, options = {{}}) {{
+      const nextId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(nextId)) return false;
+      const previousRootId = normalizeNodeId(networkGraphRootNodeId || "");
+      const pushHistory = !(options && options.pushHistory === false);
+      const rerender = !(options && options.rerender === false);
+      if (nextId !== previousRootId && pushHistory && isSelectableNodeId(previousRootId)) {{
+        pushNetworkGraphRootHistory(previousRootId);
+      }}
+      networkGraphRootNodeId = nextId;
+      if (
+        rerender
+        && activeLayoutView === "network"
+        && activeNetworkSubview === "graph"
+        && typeof renderNetworkGraphView === "function"
+      ) {{
+        renderNetworkGraphView(latestState);
+      }}
+      return nextId !== previousRootId;
+    }}
+
+    function focusNetworkGraphNode(nodeId, options = {{}}) {{
+      const nextId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(nextId)) return false;
+      const pushHistory = !(options && options.pushHistory === false);
+      const shouldFocusSelection = !(options && options.focusSelection === false);
+      const changed = setNetworkGraphRootNode(nextId, {{
+        pushHistory,
+        rerender: true,
+      }});
+      if (typeof selectNode === "function") {{
+        networkGraphRootSyncInProgress = true;
+        try {{
+          selectNode(nextId, shouldFocusSelection, false);
+        }} finally {{
+          networkGraphRootSyncInProgress = false;
+        }}
+      }}
+      return changed;
+    }}
+
+    function navigateNetworkGraphBack() {{
+      const nodeMap = (latestState && Array.isArray(latestState.nodes))
+        ? new Map(
+          latestState.nodes
+            .map((node) => [normalizeNodeId(node && node.id), node])
+            .filter((entry) => isSelectableNodeId(entry[0]))
+        )
+        : new Map();
+      while (networkGraphRootHistory.length) {{
+        const previousId = normalizeNodeId(networkGraphRootHistory.pop() || "");
+        if (!isSelectableNodeId(previousId)) continue;
+        if (nodeMap.size && !nodeMap.has(previousId)) continue;
+        focusNetworkGraphNode(previousId, {{ pushHistory: false, focusSelection: true }});
+        return true;
+      }}
+      renderNetworkGraphNavigationControls(latestState, nodeMap, networkGraphRootNodeId);
+      return false;
+    }}
+
     function resolveNetworkGraphNodeIdFromTarget(target) {{
       if (!(target instanceof Element)) return "";
       const nodeGroup = target.closest("[data-network-graph-node-id]");
@@ -1089,6 +1218,24 @@
     function bindNetworkGraphInteractions(svg) {{
       if (!(svg instanceof SVGElement) || svg.dataset.bound === "1") return;
       svg.dataset.bound = "1";
+
+      const backBtn = document.getElementById("network-graph-back-btn");
+      if (backBtn instanceof HTMLButtonElement && backBtn.dataset.bound !== "1") {{
+        backBtn.dataset.bound = "1";
+        backBtn.addEventListener("click", () => {{
+          navigateNetworkGraphBack();
+        }});
+      }}
+
+      const homeBtn = document.getElementById("network-graph-home-btn");
+      if (homeBtn instanceof HTMLButtonElement && homeBtn.dataset.bound !== "1") {{
+        homeBtn.dataset.bound = "1";
+        homeBtn.addEventListener("click", () => {{
+          const homeNodeId = resolveNetworkGraphHomeNodeId(latestState);
+          if (!isSelectableNodeId(homeNodeId)) return;
+          focusNetworkGraphNode(homeNodeId, {{ pushHistory: true, focusSelection: true }});
+        }});
+      }}
 
       const resetBtn = document.getElementById("network-graph-reset-view-btn");
       if (resetBtn instanceof HTMLButtonElement && resetBtn.dataset.bound !== "1") {{
@@ -1157,7 +1304,7 @@
         }}
         if (isSelectableNodeId(nodeId)) {{
           suppressNextNetworkGraphClick();
-          selectNode(nodeId, true, false);
+          focusNetworkGraphNode(nodeId, {{ pushHistory: true, focusSelection: true }});
         }}
       }};
       svg.addEventListener("pointerup", finishPan);
@@ -1185,10 +1332,6 @@
         event.preventDefault();
       }}, {{ passive: false }});
 
-      svg.addEventListener("dblclick", (event) => {{
-        event.preventDefault();
-        resetNetworkGraphView(svg);
-      }});
     }}
 
     function compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap) {{
@@ -1284,6 +1427,8 @@
     }}
 
     function resolveNetworkGraphRootId(nodeMap, adjacency, degreeMeta, state) {{
+      const graphRootId = normalizeNodeId(networkGraphRootNodeId || "");
+      if (graphRootId && nodeMap.has(graphRootId)) return graphRootId;
       const selectedId = normalizeNodeId(selectedNodeId || "");
       if (selectedId && nodeMap.has(selectedId)) return selectedId;
       const localNodeId = normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || "");
@@ -1535,6 +1680,7 @@
       const rootId = layout.rootId;
       if (!rootId || !layout.items.length) {{
         svg.innerHTML = "";
+        renderNetworkGraphNavigationControls(safeState, nodeMap, "");
         networkGraphViewState.bounds = defaultNetworkGraphBounds();
         networkGraphViewState.lastRootId = "";
         networkGraphViewState.initialized = false;
@@ -1569,9 +1715,14 @@
       }}
       summary.innerHTML = summaryParts.join("");
       networkGraphViewState.bounds = computeNetworkGraphBounds(layout);
-      if (!networkGraphViewState.initialized || networkGraphViewState.lastRootId !== rootId) {{
+      networkGraphRootNodeId = rootId;
+      renderNetworkGraphNavigationControls(safeState, nodeMap, rootId);
+      if (!networkGraphViewState.initialized) {{
         stopNetworkGraphPan(svg);
         resetNetworkGraphView(svg);
+      }} else if (networkGraphViewState.lastRootId !== rootId) {{
+        stopNetworkGraphPan(svg);
+        recenterNetworkGraphView(svg, {{ preserveScale: true }});
       }} else {{
         applyNetworkGraphViewBox(svg, networkGraphViewState.viewBox);
       }}
@@ -1582,7 +1733,7 @@
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-real"></span>${{realLinkCount}} confirmed links</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-observed"></span>${{Math.max(0, combinedEdges.length - realLinkCount)}} observed links</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-detached"></span>Nodes with no current path from the root</span>`,
-        `<span class="network-graph-legend-item hint">Drag to pan, scroll to zoom, double-click or use Reset view to refit, and click any node to recenter the web, sync the left roster selection, and open its details.</span>`,
+        `<span class="network-graph-legend-item hint">Click any node to make it the new graph focus while keeping your zoom level, sync the left roster selection, and keep surfing with Back, Home, drag, scroll, or Reset view.</span>`,
       ].join("");
 
       const ringMarkup = layout.rings.map((ring) => `
