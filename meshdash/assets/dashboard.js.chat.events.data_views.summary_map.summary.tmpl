@@ -1750,21 +1750,37 @@
       }}
 
       const revision = s.revision || {{}};
-      const revisionText = document.getElementById("revision-text");
-      if (revisionText) {{
+      const settingsAboutVersion = document.getElementById("settings-about-version");
+      const settingsAboutCommit = document.getElementById("settings-about-commit");
+      const launcherHeadVersion = document.getElementById("layout-view-menu-head-version");
+      const launcherHeadCommit = document.getElementById("layout-view-menu-head-commit");
+      if (
+        settingsAboutVersion instanceof HTMLElement
+        || settingsAboutCommit instanceof HTMLElement
+        || launcherHeadVersion instanceof HTMLElement
+        || launcherHeadCommit instanceof HTMLElement
+      ) {{
         const fallbackLabel = String(revision.label || "").trim();
         const version = String(revision.version || "").trim();
         const commit = String(revision.commit || "").trim();
-        if (fallbackLabel) {{
-          revisionText.textContent = fallbackLabel;
-        }} else if (version || commit) {{
-          const versionText = version ? `v${{version}}` : "unknown";
-          const commitText = commit || "nogit";
-          revisionText.textContent = `Rev: ${{versionText}} (${{commitText}})`;
-        }}
         const title = String(revision.title || "").trim();
-        if (title) {{
-          revisionText.title = title;
+        const versionText = version ? `v${{version}}` : (fallbackLabel || "n/a");
+        const commitText = commit || "n/a";
+        if (settingsAboutVersion instanceof HTMLElement) {{
+          settingsAboutVersion.textContent = versionText;
+          settingsAboutVersion.title = title || `Dashboard version ${{versionText}}`;
+        }}
+        if (settingsAboutCommit instanceof HTMLElement) {{
+          settingsAboutCommit.textContent = commitText;
+          settingsAboutCommit.title = title || `Dashboard git revision ${{commitText}}`;
+        }}
+        if (launcherHeadVersion instanceof HTMLElement) {{
+          launcherHeadVersion.textContent = `Version ${versionText}`;
+          launcherHeadVersion.title = title || `Dashboard version ${versionText}`;
+        }}
+        if (launcherHeadCommit instanceof HTMLElement) {{
+          launcherHeadCommit.textContent = `Git ${commitText}`;
+          launcherHeadCommit.title = title || `Dashboard git revision ${commitText}`;
         }}
       }}
 

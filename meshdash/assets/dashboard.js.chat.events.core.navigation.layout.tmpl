@@ -2671,16 +2671,12 @@
       const launcherBtn = document.getElementById("layout-view-menu-btn");
       const launcherLabel = document.getElementById("layout-view-menu-btn-label");
       const launcherBadge = document.getElementById("layout-view-menu-btn-badge");
-      const menuCurrent = document.getElementById("layout-view-menu-head-current");
       const attentionIndicator = document.getElementById("layout-view-menu-attention-indicator");
       if (!(launcherBtn instanceof HTMLButtonElement)) return;
 
       const activeLabel = topbarLauncherLayoutLabel(viewName);
       if (launcherLabel instanceof HTMLElement) {{
         launcherLabel.textContent = activeLabel;
-      }}
-      if (menuCurrent instanceof HTMLElement) {{
-        menuCurrent.textContent = `Current: ${{activeLabel}}`;
       }}
 
       const totalCount = totalWorkspaceLauncherNotificationCount();

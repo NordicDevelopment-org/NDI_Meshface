@@ -16,79 +16,6 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="topbar-notify-corner">
-      <div class="self-radio-menu-wrap topbar-self-radio-menu-wrap">
-        <button
-          id="self-radio-profile"
-          class="topbar-self-profile"
-          type="button"
-          title="Connected local radio: unavailable"
-          aria-label="Connected local radio"
-          aria-haspopup="menu"
-          aria-expanded="false"
-        >
-          <span id="self-radio-profile-short" class="topbar-self-profile-short">na</span>
-        </button>
-        <div id="self-radio-menu" class="self-radio-menu" hidden>
-          <button
-            id="self-radio-copy-id-btn"
-            class="self-radio-menu-item"
-            type="button"
-            title="Full radio ID unavailable"
-            disabled
-          >
-            Copy full radio ID
-          </button>
-        </div>
-      </div>
-      <div class="chat-change-menu-wrap topbar-chat-change-menu-wrap">
-        <button
-          id="chat-change-toggle-btn"
-          class="chat-change-toggle-btn"
-          type="button"
-          title="No missed updates"
-          aria-label="Missed updates"
-          aria-haspopup="menu"
-          aria-expanded="false"
-        >
-          <svg class="chat-change-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M12 22c1.32 0 2.4-1.08 2.4-2.4h-4.8c0 1.32 1.08 2.4 2.4 2.4Zm7.2-7.2v-5.4c0-3.31-2.05-6.09-4.95-7.08v-.72a2.25 2.25 0 0 0-4.5 0v.72C6.85 3.31 4.8 6.09 4.8 9.4v5.4l-2.1 2.1v1.2h18.6v-1.2l-2.1-2.1Z"/>
-          </svg>
-          <span id="chat-change-badge" class="chat-change-badge" hidden>0</span>
-        </button>
-        <div id="chat-change-summary" class="chat-change-menu" hidden></div>
-      </div>
-      <div class="peer-dm-menu-wrap topbar-peer-dm-menu-wrap">
-        <button
-          id="peer-dm-toggle-btn"
-          class="peer-dm-toggle-btn"
-          type="button"
-          title="Peer conversations"
-          aria-label="Peer conversations"
-          aria-haspopup="menu"
-          aria-expanded="false"
-        >
-          <svg class="peer-dm-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M4.5 5.5h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3v-3H4.5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/>
-            <path d="M7.5 10.25h9M7.5 13.25h6.5"/>
-          </svg>
-          <span id="peer-dm-badge" class="peer-dm-badge" hidden>0</span>
-        </button>
-        <div id="peer-dm-menu" class="peer-dm-menu" hidden>
-          <div id="peer-dm-menu-list" class="peer-dm-menu-list">
-            <div class="peer-dm-menu-empty">No peer-to-peer conversations yet.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="topbar-main-row">
-      <div class="topbar-brand">
-        <h1 class="topbar-heading">
-          <span id="topbar-heading-app" class="topbar-heading-app">{app_heading}</span>
-        </h1>
-        <span id="revision-text" class="sub-text revision-text" title="{revision_title}">{revision_label}</span>
-      </div>
-    </div>
     <div class="sub">
       <div class="summary-ticker-row" aria-label="Summary tickers">
         <div class="summary-ticker-item summary-ticker-item-target" id="summary-ticker-target" data-ticker-id="target">
@@ -211,9 +138,14 @@
         </button>
         <div id="layout-view-menu" class="topbar-view-menu" role="menu" hidden>
           <div class="topbar-view-menu-head">
-            <div class="topbar-view-menu-head-kicker">Workspace</div>
-            <div class="topbar-view-menu-head-title">Open view</div>
-            <div id="layout-view-menu-head-current" class="topbar-view-menu-head-current">Current: Chat</div>
+            <div class="topbar-view-menu-brand">
+              <div class="topbar-view-menu-brand-mark" aria-hidden="true">MF</div>
+              <div class="topbar-view-menu-brand-copy">
+                <div id="layout-view-menu-head-brand" class="topbar-view-menu-head-brand">{app_heading}</div>
+                <div id="layout-view-menu-head-version" class="topbar-view-menu-head-version">Version loading...</div>
+                <div id="layout-view-menu-head-commit" class="topbar-view-menu-head-commit">Git loading...</div>
+              </div>
+            </div>
           </div>
           <button
             class="topbar-view-menu-item is-active"
@@ -297,6 +229,28 @@
           <div id="topbar-update-track" class="topbar-update-track">
             <span id="topbar-update-text-primary" class="topbar-update-text"></span>
             <span id="topbar-update-text-secondary" class="topbar-update-text" aria-hidden="true"></span>
+          </div>
+        </div>
+      </div>
+      <div class="peer-dm-menu-wrap topbar-peer-dm-menu-wrap workspace-peer-dm-menu-wrap">
+        <button
+          id="peer-dm-toggle-btn"
+          class="peer-dm-toggle-btn"
+          type="button"
+          title="Peer conversations"
+          aria-label="Peer conversations"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <svg class="peer-dm-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4.5 5.5h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3v-3H4.5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/>
+            <path d="M7.5 10.25h9M7.5 13.25h6.5"/>
+          </svg>
+          <span id="peer-dm-badge" class="peer-dm-badge" hidden>0</span>
+        </button>
+        <div id="peer-dm-menu" class="peer-dm-menu" hidden>
+          <div id="peer-dm-menu-list" class="peer-dm-menu-list">
+            <div class="peer-dm-menu-empty">No peer-to-peer conversations yet.</div>
           </div>
         </div>
       </div>
@@ -1607,6 +1561,8 @@
                 Runtime status for this dashboard process.
               </div>
               <div class="chat-settings-meta-list">
+                <div class="chat-settings-meta-item">Version: <span id="settings-about-version">loading...</span></div>
+                <div class="chat-settings-meta-item">Git: <span id="settings-about-commit">loading...</span></div>
                 <div class="chat-settings-meta-item">{safety_label}</div>
                 <div class="chat-settings-meta-item">Packet buffer: {packet_limit}</div>
                 <div class="chat-settings-meta-item">{history_label}</div>

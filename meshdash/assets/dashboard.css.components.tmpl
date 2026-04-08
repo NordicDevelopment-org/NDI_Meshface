@@ -1468,11 +1468,24 @@
       background: linear-gradient(100deg, #101c16, #1a2f25);
       color: #e6f7ed;
     }}
-    [data-theme="dark"] .topbar .revision-text {{
-      color: #dbf7e8;
-    }}
     [data-theme="dark"] .workspace-launcher-shell {{
       color: #dbece3;
+    }}
+    [data-theme="dark"] .topbar-view-menu-brand-mark {{
+      border-color: rgba(156, 228, 188, 0.4);
+      background:
+        radial-gradient(circle at 32% 28%, rgba(121, 230, 172, 0.3), transparent 52%),
+        linear-gradient(160deg, rgba(26, 49, 39, 0.98), rgba(12, 21, 17, 0.99));
+      color: #effff5;
+    }}
+    [data-theme="dark"] .topbar-view-menu-head-brand {{
+      color: #effbf4;
+    }}
+    [data-theme="dark"] .topbar-view-menu-head-version {{
+      color: rgba(216, 239, 226, 0.78);
+    }}
+    [data-theme="dark"] .topbar-view-menu-head-commit {{
+      color: rgba(189, 220, 203, 0.74);
     }}
     [data-theme="dark"] .topbar-view-menu-btn {{
       border-color: rgba(168, 205, 184, 0.42);
@@ -6186,7 +6199,7 @@
     }}
     @media (max-width: 760px) {{
       .topbar {{
-        padding-right: var(--topbar-corner-reserve, 132px);
+        padding-right: var(--topbar-right-inset);
       }}
       .topbar h1 {{
         font-size: 20px;
