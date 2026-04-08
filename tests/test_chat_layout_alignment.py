@@ -123,3 +123,22 @@ def test_chat_node_search_syncs_to_live_navigator_row_bounds() -> None:
     assert 'bottomBar.style.setProperty("--chat-user-search-inline-start",' in js_src
     assert 'bottomBar.style.setProperty("--chat-user-search-inline-end",' in js_src
     assert 'window.addEventListener("resize", scheduleChatNodeNavigatorSearchBoundsSync);' in js_src
+
+
+def test_chat_click_selection_keeps_same_node_selected() -> None:
+    bindings_src = Path("meshdash/assets/dashboard.js.chat.events.bindings.tmpl").read_text()
+    peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
+    selection_src = Path("meshdash/assets/dashboard.js.chat.events.map_selection.tmpl").read_text()
+
+    assert 'selectNode(nodeId, true, false);' in bindings_src
+    assert "function chatFeedSelectionKeyForItem(item) {" in bindings_src
+    assert "const sameExactChat = (" in bindings_src
+    assert "clearNodeSelection();" in bindings_src
+    assert "chatFeedRepeatToggleMessageKey = messageSelectionKey;" in bindings_src
+    assert """if (!isSelectableNodeId(nodeId)) {{
+          selectNode(nodeId, true);
+          return;
+        }}
+        selectNode(nodeId, true);""" in peers_src
+    assert 'if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
+    assert 'if (typeof clearChatFeedRepeatToggleState === "function") {' in selection_src

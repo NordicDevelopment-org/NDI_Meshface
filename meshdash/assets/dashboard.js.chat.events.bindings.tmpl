@@ -24,6 +24,24 @@
       return false;
     }}
 
+    function clearChatFeedRepeatToggleState() {{
+      chatFeedRepeatToggleMessageKey = "";
+      chatFeedRepeatToggleNodeId = "";
+    }}
+
+    function chatFeedSelectionKeyForItem(item) {{
+      if (!(item instanceof HTMLElement)) return "";
+      const messageKey = String(item.dataset.messageKey || "").trim();
+      if (messageKey) return `key:${{messageKey}}`;
+      const messageId = String(item.dataset.messageId || "").trim();
+      if (messageId) return `id:${{messageId}}`;
+      const nodeId = normalizeNodeId(item.dataset.nodeId || "");
+      if (!nodeId) return "";
+      const replyText = String(item.dataset.replyText || "").trim();
+      if (replyText) return `node:${{nodeId}}:text:${{replyText}}`;
+      return `node:${{nodeId}}`;
+    }}
+
     function bindChatFeedClicks() {{
       const feed = document.getElementById("chat-feed");
       if (!(feed instanceof HTMLElement) || feed.dataset.feedClickBound === "1") return;
@@ -123,7 +141,29 @@
         }}
 
         if (item.classList.contains("chat-selectable")) {{
-          selectNode(item.dataset.nodeId || "", true);
+          const nodeId = normalizeNodeId(item.dataset.nodeId || "");
+          const selectedId = normalizeNodeId(selectedNodeId || "");
+          const messageSelectionKey = chatFeedSelectionKeyForItem(item);
+          const sameExactChat = (
+            !!nodeId
+            && nodeId === selectedId
+            && nodeId === chatFeedRepeatToggleNodeId
+            && !!messageSelectionKey
+            && messageSelectionKey === chatFeedRepeatToggleMessageKey
+          );
+          if (sameExactChat) {{
+            clearChatFeedRepeatToggleState();
+            clearNodeSelection();
+            return;
+          }}
+          chatFeedSelectionSyncInProgress = true;
+          try {{
+            chatFeedRepeatToggleNodeId = nodeId;
+            chatFeedRepeatToggleMessageKey = messageSelectionKey;
+            selectNode(nodeId, true, false);
+          }} finally {{
+            chatFeedSelectionSyncInProgress = false;
+          }}
         }}
       }});
     }}

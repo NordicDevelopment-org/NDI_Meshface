@@ -582,6 +582,9 @@
     function selectNode(nodeId, shouldFocus = true, toggleIfSelected = true) {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return;
+      if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {{
+        clearChatFeedRepeatToggleState();
+      }}
       const syncSelectionToNetworkGraph = (
         activeLayoutView === "network"
         && activeNetworkSubview === "graph"
@@ -753,6 +756,9 @@
     }}
 
     function clearNodeSelection() {{
+      if (typeof clearChatFeedRepeatToggleState === "function") {{
+        clearChatFeedRepeatToggleState();
+      }}
       selectedNodeId = null;
       networkNodeInfoCollapsedNodeId = "";
       chatNodeDetailsDrawerExpanded = false;
