@@ -778,6 +778,19 @@
           }}
           closeChatEmojiPanel();
         }});
+        panel.addEventListener("wheel", (ev) => {{
+          if (chatEmojiMode !== "react" || !chatReactionPickerExpanded) return;
+          const grid = document.getElementById("chat-emoji-grid");
+          if (!(grid instanceof HTMLElement) || grid.hidden) return;
+          const maxScroll = Math.max(0, grid.scrollHeight - grid.clientHeight);
+          if (maxScroll <= 0) return;
+          const deltaY = Number(ev.deltaY) || 0;
+          if (!deltaY) return;
+          const next = Math.max(0, Math.min(maxScroll, grid.scrollTop + deltaY));
+          if (next === grid.scrollTop) return;
+          ev.preventDefault();
+          grid.scrollTop = next;
+        }}, {{ passive: false }});
       }}
 
       if (document.body.dataset.chatEmojiCloseBound !== "1") {{
@@ -822,7 +835,11 @@
         window.addEventListener("resize", () => {{
           positionChatEmojiPanel();
         }});
-        window.addEventListener("scroll", () => {{
+        window.addEventListener("scroll", (ev) => {{
+          const target = ev.target;
+          if (target instanceof Element && target.closest("#chat-emoji-panel")) {{
+            return;
+          }}
           positionChatEmojiPanel();
         }}, true);
       }}
