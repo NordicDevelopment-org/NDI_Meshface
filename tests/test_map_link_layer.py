@@ -28,6 +28,8 @@ def test_dashboard_html_adds_map_link_layer_toggle() -> None:
     assert 'id="map-link-wrap"' in html
     assert 'id="map-link-toggle"' in html
     assert "Link Layer" in html
+    assert 'class="map-control-group map-heatmap-controls"' in html
+    assert html.index('id="map-heatmap-wrap"') < html.index('id="map-heatmap-mode-wrap"')
 
 
 def test_dashboard_js_supports_map_link_layer_overlay() -> None:

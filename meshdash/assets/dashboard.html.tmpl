@@ -2369,10 +2369,6 @@ Ready.
               aria-label="Toggle map basemap offline mode"
               aria-pressed="false"
             >Basemap: checking...</button>
-            <label id="map-heatmap-wrap" class="map-heatmap-wrap" title="Overlay realtime signal heatmap">
-              <input id="map-heatmap-toggle" type="checkbox" checked />
-              <span>Signal Heatmap</span>
-            </label>
             <label id="map-lines-wrap" class="map-heatmap-wrap" title="Show packet lines between nodes">
               <input id="map-lines-toggle" type="checkbox" checked />
               <span>Packet Lines</span>
@@ -2381,13 +2377,19 @@ Ready.
               <input id="map-link-toggle" type="checkbox" />
               <span>Link Layer</span>
             </label>
-            <label id="map-heatmap-mode-wrap" class="map-heatmap-mode-wrap" title="Choose heatmap recency behavior">
-              <span>Mode</span>
-              <select id="map-heatmap-mode" class="map-heatmap-mode">
-                <option value="live">Live only</option>
-                <option value="coverage">Coverage</option>
-              </select>
-            </label>
+            <div class="map-control-group map-heatmap-controls">
+              <label id="map-heatmap-wrap" class="map-heatmap-wrap" title="Overlay realtime signal heatmap">
+                <input id="map-heatmap-toggle" type="checkbox" checked />
+                <span>Signal Heatmap</span>
+              </label>
+              <label id="map-heatmap-mode-wrap" class="map-heatmap-mode-wrap" title="Choose heatmap recency behavior">
+                <span>Mode</span>
+                <select id="map-heatmap-mode" class="map-heatmap-mode">
+                  <option value="live">Live only</option>
+                  <option value="coverage">Coverage</option>
+                </select>
+              </label>
+            </div>
           </div>
         </div>
       </div>
