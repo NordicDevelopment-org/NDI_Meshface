@@ -503,12 +503,14 @@
         panel.style.maxHeight = "";
       }}
 
+      const computedPanelStyle = window.getComputedStyle(panel);
+      const panelPaddingLeft = parseFloat(computedPanelStyle.paddingLeft || "0") || 0;
       const width = panel.offsetWidth || 320;
       const height = panel.offsetHeight || 240;
 
       let left = anchorRect.right - width;
       if (chatEmojiMode === "react") {{
-        left = anchorRect.left + (anchorRect.width / 2) - (width / 2);
+        left = anchorRect.left - panelPaddingLeft;
       }}
       if (left < margin) left = margin;
       if ((left + width) > (viewportWidth - margin)) {{
