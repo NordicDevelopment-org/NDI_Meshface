@@ -2713,6 +2713,9 @@
       if (chatLeftPanel instanceof HTMLElement) {{
         chatLeftPanel.hidden = false;
       }}
+      if (typeof applyChatPanelCollapseState === "function") {{
+        applyChatPanelCollapseState();
+      }}
       if (typeof applyChatPanelSplitState === "function") {{
         applyChatPanelSplitState();
       }}

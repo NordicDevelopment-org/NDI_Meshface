@@ -54,6 +54,13 @@
       }}
     }}
 
+    function persistChatPanelCollapseState() {{
+      try {{
+        window.localStorage.setItem(chatPanelCollapsedStorageKey, chatPanelCollapsed ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
     function persistChatNodeListSplitState() {{
       try {{
         window.localStorage.setItem(chatNodeListSplitStorageKey, String(chatNodeListPct));

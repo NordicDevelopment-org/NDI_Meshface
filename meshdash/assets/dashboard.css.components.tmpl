@@ -1419,6 +1419,16 @@
     [data-theme="dark"] .topbar-view-menu-btn.has-unread {{
       border-color: rgba(121, 230, 172, 0.76);
     }}
+    [data-theme="dark"] .chat-panel-collapse-btn {{
+      border-color: #35556d;
+      background: #16273a;
+      color: #dbeeff;
+    }}
+    [data-theme="dark"] .chat-panel-collapse-btn:hover {{
+      background: #203346;
+      border-color: #4a708f;
+      color: #eef7ff;
+    }}
     [data-theme="dark"] .topbar-view-menu-btn-label {{
       color: #edf9f2;
     }}
@@ -5868,6 +5878,10 @@
         grid-template-columns: 1fr;
         grid-template-rows: auto auto minmax(0, 1fr);
       }}
+      .workspace-shell.chat-panel-open.chat-panel-collapsed {{
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }}
       .chat-panel-splitter {{
         display: none !important;
       }}
@@ -5878,6 +5892,9 @@
         height: auto;
         min-height: 0;
         max-height: 220px;
+      }}
+      .workspace-shell.chat-panel-collapsed .chat-left-panel {{
+        max-height: 112px;
       }}
       .workspace-shell.chat-panel-open .workspace-main {{
         grid-row: 3;

@@ -257,6 +257,17 @@
       }});
     }}
 
+    function bindChatPanelCollapseToggle() {{
+      const btn = document.getElementById("chat-panel-collapse-btn");
+      if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+
+      btn.addEventListener("click", (ev) => {{
+        ev.preventDefault();
+        setChatPanelCollapsed(!chatPanelCollapsed, {{ persist: true }});
+      }});
+    }}
+
     function bindChatNodeDetailsSplitter() {{
       const splitter = document.getElementById("chat-node-details-splitter");
       if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;

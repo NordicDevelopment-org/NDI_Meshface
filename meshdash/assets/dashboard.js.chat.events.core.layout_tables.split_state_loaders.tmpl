@@ -131,6 +131,56 @@
       shell.style.setProperty("--chat-panel-width", `${{chatPanelWidthPx}}px`);
     }}
 
+    function applyChatPanelCollapseState() {{
+      const shell = document.querySelector(".workspace-shell");
+      const panel = document.getElementById("chat-left-panel");
+      const toggleBtn = document.getElementById("chat-panel-collapse-btn");
+      const toggleGlyph = document.getElementById("chat-panel-collapse-glyph");
+      const collapsed = !!chatPanelCollapsed;
+
+      if (shell instanceof HTMLElement) {{
+        shell.classList.toggle("chat-panel-collapsed", collapsed);
+      }}
+      if (panel instanceof HTMLElement) {{
+        panel.classList.toggle("chat-panel-collapsed", collapsed);
+      }}
+      if (toggleBtn instanceof HTMLButtonElement) {{
+        const nextLabel = collapsed ? "Expand node list" : "Collapse node list";
+        toggleBtn.setAttribute("aria-pressed", collapsed ? "true" : "false");
+        toggleBtn.setAttribute("aria-label", nextLabel);
+        toggleBtn.title = nextLabel;
+      }}
+      if (toggleGlyph instanceof HTMLElement) {{
+        toggleGlyph.textContent = collapsed ? ">" : "<";
+      }}
+      if (typeof scheduleChatNodeNavigatorSearchBoundsSync === "function") {{
+        scheduleChatNodeNavigatorSearchBoundsSync();
+      }}
+    }}
+
+    function setChatPanelCollapsed(nextCollapsed, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const collapsed = !!nextCollapsed;
+      if (chatPanelCollapsed === collapsed) {{
+        applyChatPanelCollapseState();
+        return;
+      }}
+      chatPanelCollapsed = collapsed;
+      if (collapsed) {{
+        chatNodeNavigatorMenuOpen = false;
+        if (typeof renderChatNodeNavigatorMenuControls === "function") {{
+          renderChatNodeNavigatorMenuControls();
+        }}
+      }}
+      applyChatPanelCollapseState();
+      if (opts.persist !== false && typeof persistChatPanelCollapseState === "function") {{
+        persistChatPanelCollapseState();
+      }}
+      if (typeof requestMapResize === "function") {{
+        requestMapResize();
+      }}
+    }}
+
     function applyChatNodeListSplitState() {{
       const panel = document.getElementById("chat-left-panel");
       if (!(panel instanceof HTMLElement)) return;
@@ -285,6 +335,15 @@
       }} catch (_err) {{
       }}
       applyChatPanelSplitState();
+    }}
+
+    function loadChatPanelCollapseState() {{
+      try {{
+        const raw = String(window.localStorage.getItem(chatPanelCollapsedStorageKey) || "").trim().toLowerCase();
+        chatPanelCollapsed = raw === "1" || raw === "true";
+      }} catch (_err) {{
+      }}
+      applyChatPanelCollapseState();
     }}
 
     function loadChatNodeListSplitState() {{

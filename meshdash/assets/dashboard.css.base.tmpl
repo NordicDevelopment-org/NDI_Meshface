@@ -1270,6 +1270,7 @@
     }}
     .workspace-shell {{
       --chat-panel-width: 250px;
+      --chat-panel-collapsed-width: 96px;
       --chat-panel-splitter-size: 8px;
       display: grid;
       grid-template-columns: minmax(0, 1fr);
@@ -1291,6 +1292,13 @@
         minmax(0, 1fr)
       ;
       grid-template-rows: auto minmax(0, 1fr);
+    }}
+    .workspace-shell.chat-panel-open.chat-panel-collapsed {{
+      grid-template-columns:
+        var(--chat-panel-collapsed-width)
+        0px
+        minmax(0, 1fr)
+      ;
     }}
     .workspace-main {{
       min-width: 0;
@@ -1421,6 +1429,9 @@
     .workspace-shell:not(.chat-panel-open) .chat-panel-splitter {{
       display: none !important;
     }}
+    .workspace-shell.chat-panel-collapsed .chat-panel-splitter {{
+      display: none !important;
+    }}
     .chat-left-panel[hidden] {{
       display: none !important;
     }}
@@ -1479,6 +1490,23 @@
       gap: 5px;
       min-width: 0;
     }}
+    .chat-panel-collapse-btn {{
+      min-width: 24px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      justify-content: center;
+      font-size: 11px;
+      line-height: 1;
+    }}
+    .chat-panel-collapse-glyph {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      line-height: 1;
+      transform: translateX(-0.5px);
+    }}
     .chat-peer-add-toggle-btn {{
       border: 1px solid #c2d8c7;
       background: #f3faf5;
@@ -1492,6 +1520,22 @@
     }}
     .chat-peer-add-toggle-btn:hover {{
       background: #e7f3eb;
+    }}
+    .workspace-shell.chat-panel-collapsed .chat-left-section.chat-users-section {{
+      padding: 6px 4px 4px 4px;
+      gap: 4px;
+    }}
+    .workspace-shell.chat-panel-collapsed .chat-users-head {{
+      justify-content: center;
+    }}
+    .workspace-shell.chat-panel-collapsed .chat-users-head-view-btn,
+    .workspace-shell.chat-panel-collapsed #chat-peer-add-toggle-btn,
+    .workspace-shell.chat-panel-collapsed #chat-node-navigator-menu,
+    .workspace-shell.chat-panel-collapsed #chat-peer-add-panel,
+    .workspace-shell.chat-panel-collapsed .chat-left-bottom-bar,
+    .workspace-shell.chat-panel-collapsed .chat-node-details-splitter,
+    .workspace-shell.chat-panel-collapsed .chat-node-details-drawer {{
+      display: none !important;
     }}
     .chat-node-navigator-menu {{
       border: 1px solid #d0dfd0;

@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from meshdash.html_css import build_dashboard_css
+from meshdash.html_js import build_dashboard_js
 from meshdash.html_sections import build_html_shell
 
 
@@ -142,3 +143,41 @@ def test_chat_click_selection_keeps_same_node_selected() -> None:
         selectNode(nodeId, true);""" in peers_src
     assert 'if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
     assert 'if (typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
+
+
+def test_chat_node_list_can_collapse_into_compact_rail() -> None:
+    html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
+        style_css="",
+        app_js="",
+        revision_title="rev",
+        revision_label="rev",
+        safety_label="safe",
+        packet_limit=100,
+        history_label="history",
+        refresh_ms=1000,
+    )
+    css = build_dashboard_css(theme_css="")
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'id="chat-panel-collapse-btn"' in html
+    assert 'id="chat-panel-collapse-glyph"' in html
+    assert "--chat-panel-collapsed-width: 96px;" in css
+    assert ".workspace-shell.chat-panel-open.chat-panel-collapsed {" in css
+    assert ".workspace-shell.chat-panel-collapsed .chat-users-head-view-btn," in css
+    assert ".workspace-shell.chat-panel-collapsed .chat-member-meta-row," in css
+    assert "const chatPanelCollapsedStorageKey = \"meshDashboardChatPanelCollapsedV1\";" in js
+    assert "let chatPanelCollapsed = false;" in js
+    assert "function applyChatPanelCollapseState() {" in js
+    assert "function setChatPanelCollapsed(nextCollapsed, options = null) {" in js
+    assert "function loadChatPanelCollapseState() {" in js
+    assert "function persistChatPanelCollapseState() {" in js
+    assert "function bindChatPanelCollapseToggle() {" in js
+    assert 'window.localStorage.setItem(chatPanelCollapsedStorageKey, chatPanelCollapsed ? "1" : "0");' in js
+    assert 'loadChatPanelCollapseState();' in js
+    assert 'bindChatPanelCollapseToggle();' in js
