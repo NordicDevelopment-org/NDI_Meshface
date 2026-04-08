@@ -145,6 +145,27 @@ def test_chat_click_selection_keeps_same_node_selected() -> None:
     assert 'if (typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
 
 
+def test_chat_reaction_anchor_reuses_same_button_for_more_and_less_states() -> None:
+    emoji_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.emoji_ui.tmpl").read_text()
+    bindings_src = Path("meshdash/assets/dashboard.js.chat.events.bindings.tmpl").read_text()
+    css = build_dashboard_css(theme_css="")
+
+    assert "function syncChatReactionAnchorLabels() {{" in emoji_src
+    assert 'function setChatReactionPickerExpanded(expanded, focusSearch = false) {{' in emoji_src
+    assert "function isChatReactionAnchorToggleSource(anchor) {{" in emoji_src
+    assert '"Less reactions"' in emoji_src
+    assert '"More reactions"' in emoji_src
+    assert "const reactionExpandedFromAnchor = (" in emoji_src
+    assert "reactToggleRow.hidden = true;" in emoji_src
+    assert 'const reactionAnchorGap = reactionAnchorOwnsToggle ? 0 : 6;' in emoji_src
+    assert 'const availableAbove = Math.max(220, Math.round(anchorRect.top - minTop + 2));' in emoji_src
+    assert 'if (target.closest(".chat-reaction-summary") || target.closest(".chat-react-btn")) return;' in emoji_src
+    assert 'openReactionPickerFromAnchor(summary, {{ expand: true, toggleExpanded: true }});' in bindings_src
+    assert 'openReactionPickerFromAnchor(anchor, {{ expand: false }});' in bindings_src
+    assert ".chat-reaction-summary.is-empty.is-reaction-preview," in css
+    assert "[data-theme=\"dark\"] .card.chat .chat-reaction-summary.is-empty.is-reaction-preview," in css
+
+
 def test_chat_node_list_can_collapse_into_compact_rail() -> None:
     html = build_html_shell(
         app_title="Meshyface",

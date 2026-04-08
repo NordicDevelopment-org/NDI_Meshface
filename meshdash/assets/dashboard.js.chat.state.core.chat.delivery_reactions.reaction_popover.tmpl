@@ -133,7 +133,7 @@
         <div class="chat-reaction-popover-section-label">Quick react</div>
         <div class="chat-reaction-popover-quick-row">
           ${{quickButtons}}
-          <button type="button" class="chat-reaction-popover-more-btn" data-reply-id="${{escAttr(replyId)}}" aria-label="Open full reaction picker" title="More reactions">More</button>
+          <button type="button" class="chat-reaction-popover-more-btn" data-reply-id="${{escAttr(replyId)}}" aria-label="Open full reaction picker" title="More reactions">More reactions</button>
         </div>
       </div>`;
     }}
@@ -285,7 +285,7 @@
             : moreBtn;
           closeReactionPopover(true);
           if (typeof openChatEmojiPanel === "function") {{
-            openChatEmojiPanel("react", replyId, anchor);
+            openChatEmojiPanel("react", replyId, anchor, true);
           }}
         }}
       }});

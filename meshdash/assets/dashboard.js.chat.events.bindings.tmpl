@@ -176,31 +176,33 @@
         if (feed.dataset.reactionDelegatedBound === "1") return;
         feed.dataset.reactionDelegatedBound = "1";
 
-        const openReactionPickerFromAnchor = (anchor) => {{
+        const openReactionPickerFromAnchor = (anchor, options = null) => {{
           if (!(anchor instanceof HTMLButtonElement)) return false;
           if (chatSendInFlight) return false;
           if (Date.now() < chatReactionPickerSuppressOpenUntilMs) {{
             return false;
           }}
-          const panel = document.getElementById("chat-emoji-panel");
+          const expand = !!(options && options.expand === true);
+          const toggleExpanded = !!(options && options.toggleExpanded === true);
           const replyId = Number(anchor.dataset.replyId || "");
           if (!Number.isInteger(replyId) || replyId <= 0) {{
             setChatSendStatus("Cannot react: target message id is missing.", true);
             return false;
           }}
-          const panelOpenForSameTarget = (
-            panel instanceof HTMLElement
-            && !panel.hidden
-            && chatEmojiMode === "react"
-            && Number.isInteger(chatReactionTargetId)
-            && chatReactionTargetId === replyId
-            && chatEmojiAnchorElement === anchor
-          );
+          const panelOpenForSameTarget = isChatReactionPickerOpenForAnchor(anchor);
           closeReactionPopover(true);
           if (panelOpenForSameTarget) {{
+            clearChatReactionPickerHideTimer();
+            if (toggleExpanded) {{
+              setChatReactionPickerExpanded(!chatReactionPickerExpanded, true);
+              return true;
+            }}
+            if (expand && !chatReactionPickerExpanded) {{
+              setChatReactionPickerExpanded(true, true);
+            }}
             return true;
           }}
-          openChatEmojiPanel("react", replyId, anchor);
+          openChatEmojiPanel("react", replyId, anchor, expand);
           return true;
         }};
 
@@ -227,7 +229,7 @@
           if (reactBtn) {{
             ev.preventDefault();
             ev.stopPropagation();
-            openReactionPickerFromAnchor(reactBtn);
+            openReactionPickerFromAnchor(reactBtn, {{ expand: true, toggleExpanded: true }});
             return;
           }}
 
@@ -235,7 +237,7 @@
           if (!(summary instanceof HTMLButtonElement)) return;
           ev.preventDefault();
           ev.stopPropagation();
-          openReactionPickerFromAnchor(summary);
+          openReactionPickerFromAnchor(summary, {{ expand: true, toggleExpanded: true }});
         }});
 
         feed.addEventListener("pointerover", (ev) => {{
@@ -246,7 +248,7 @@
             return;
           }}
           clearChatReactionPickerHideTimer();
-          openReactionPickerFromAnchor(anchor);
+          openReactionPickerFromAnchor(anchor, {{ expand: false }});
         }});
 
         feed.addEventListener("pointerout", (ev) => {{
@@ -271,7 +273,7 @@
           const anchor = reactionAnchorFromTarget(ev.target);
           if (!(anchor instanceof HTMLButtonElement)) return;
           clearChatReactionPickerHideTimer();
-          openReactionPickerFromAnchor(anchor);
+          openReactionPickerFromAnchor(anchor, {{ expand: false }});
         }});
       }};
 
