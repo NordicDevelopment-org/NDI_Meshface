@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from meshdash.html_js import build_dashboard_js
+from meshdash.html_template import render_html
 
 
 def test_dashboard_js_uses_curated_default_ticker_layout() -> None:
@@ -72,3 +73,27 @@ def test_dashboard_js_normalizes_unknown_profile_to_core_ui() -> None:
     )
 
     assert unknown_js == core_js
+
+
+def test_render_html_uses_single_row_compact_ticker_strip() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert re.search(
+        r"\.topbar \.sub \.summary-ticker-row \{\s*display: grid;\s*grid-auto-flow: column;\s*grid-auto-columns: minmax\(112px, 1fr\);\s*gap: 4px;",
+        html,
+    )
+    assert re.search(
+        r"\.topbar\.ticker-expanded \.sub \.summary-ticker-row \{\s*grid-auto-flow: row;\s*grid-auto-columns: auto;\s*grid-template-columns: repeat\(auto-fit, minmax\(208px, 1fr\)\);",
+        html,
+    )
