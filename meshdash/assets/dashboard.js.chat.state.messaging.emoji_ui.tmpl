@@ -32,6 +32,56 @@
       return out;
     }}
 
+    function clearChatReactionPickerHideTimer() {{
+      if (chatReactionPickerHideTimer !== null) {{
+        clearTimeout(chatReactionPickerHideTimer);
+        chatReactionPickerHideTimer = null;
+      }}
+    }}
+
+    function isChatReactionPickerHoverActive() {{
+      if (chatEmojiTopDragEmoji) {{
+        return true;
+      }}
+      const panel = chatEmojiPanelElement();
+      if (panel instanceof HTMLElement && panel.matches(":hover")) {{
+        return true;
+      }}
+      return chatEmojiAnchorElement instanceof HTMLElement && chatEmojiAnchorElement.matches(":hover");
+    }}
+
+    function scheduleChatReactionPickerHide(delayMs = 260) {{
+      clearChatReactionPickerHideTimer();
+      chatReactionPickerHideTimer = window.setTimeout(() => {{
+        if (
+          chatEmojiMode === "react"
+          && !chatReactionPickerExpanded
+          && !isChatReactionPickerHoverActive()
+        ) {{
+          closeChatEmojiPanel();
+        }}
+      }}, Math.max(0, Number(delayMs) || 0));
+    }}
+
+    function estimateChatReactionCompactPanelHeight(panel) {{
+      if (!(panel instanceof HTMLElement)) return 88;
+      const topLabel = document.getElementById("chat-emoji-top-label");
+      const topGrid = document.getElementById("chat-emoji-top-grid");
+      const toggleRow = document.getElementById("chat-emoji-react-toggle-row");
+      const computed = window.getComputedStyle(panel);
+      const paddingTop = parseFloat(computed.paddingTop || "0") || 0;
+      const paddingBottom = parseFloat(computed.paddingBottom || "0") || 0;
+      const gap = parseFloat(computed.rowGap || computed.gap || "0") || 0;
+      const labelHeight = topLabel instanceof HTMLElement ? topLabel.offsetHeight : 0;
+      const gridHeight = topGrid instanceof HTMLElement ? topGrid.offsetHeight : 0;
+      const toggleHeight = (toggleRow instanceof HTMLElement && !toggleRow.hidden) ? toggleRow.offsetHeight : 0;
+      let gapCount = 0;
+      if (labelHeight > 0 && gridHeight > 0) gapCount += 1;
+      if (gridHeight > 0 && toggleHeight > 0) gapCount += 1;
+      const total = paddingTop + paddingBottom + labelHeight + gridHeight + toggleHeight + (gap * gapCount);
+      return Math.max(88, Math.round(total));
+    }}
+
     function setChatEmojiButtonsExpanded(expanded, anchor = null) {{
       const activeAnchor = anchor instanceof HTMLButtonElement ? anchor : null;
       for (const btn of chatEmojiComposeButtons()) {{
@@ -206,9 +256,11 @@
       const meta = document.getElementById("chat-emoji-meta");
       if (!(grid instanceof HTMLElement)) return;
       const reactionCollapsed = chatEmojiMode === "react" && !chatReactionPickerExpanded;
+      const reactionExpanded = chatEmojiMode === "react" && chatReactionPickerExpanded;
 
       if (panel instanceof HTMLElement) {{
         panel.classList.toggle("chat-emoji-panel-react-collapsed", reactionCollapsed);
+        panel.classList.toggle("chat-emoji-panel-react-expanded", reactionExpanded);
       }}
       if (reactToggleRow instanceof HTMLElement) {{
         reactToggleRow.hidden = chatEmojiMode !== "react";
@@ -392,8 +444,6 @@
 
       const anchorRect = anchor.getBoundingClientRect();
       const margin = 8;
-      const width = panel.offsetWidth || 320;
-      const height = panel.offsetHeight || 240;
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1280;
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 720;
       const topbar = document.querySelector(".topbar");
@@ -403,34 +453,57 @@
           : 0
       );
       const minTop = Math.max(margin, topbarBottom + 6);
+      let reactionCompactTop = null;
+      let reactionCompactBottom = null;
+
+      if (chatEmojiMode === "react") {{
+        const compactHeight = chatReactionPickerExpanded
+          ? estimateChatReactionCompactPanelHeight(panel)
+          : (panel.offsetHeight || estimateChatReactionCompactPanelHeight(panel));
+        let compactTop = anchorRect.bottom + 6;
+        if ((compactTop + compactHeight) > (viewportHeight - margin)) {{
+          compactTop = anchorRect.top - compactHeight - 6;
+        }}
+        if (compactTop < minTop) compactTop = minTop;
+        if ((compactTop + compactHeight) > (viewportHeight - margin)) {{
+          compactTop = Math.max(minTop, viewportHeight - compactHeight - margin);
+        }}
+        reactionCompactTop = compactTop;
+        reactionCompactBottom = compactTop + compactHeight;
+      }}
+
+      if (chatEmojiMode === "react" && chatReactionPickerExpanded && reactionCompactBottom !== null) {{
+        const availableHeight = Math.max(160, Math.round(reactionCompactBottom - minTop));
+        panel.style.maxHeight = `${{availableHeight}}px`;
+      }} else {{
+        panel.style.maxHeight = "";
+      }}
+
+      const width = panel.offsetWidth || 320;
+      const height = panel.offsetHeight || 240;
 
       let left = anchorRect.right - width;
       if (chatEmojiMode === "react") {{
-        if (chatReactionPickerExpanded) {{
-          left = anchorRect.right + 10;
-          if ((left + width) > (viewportWidth - margin)) {{
-            left = anchorRect.left - width - 10;
-          }}
-          if (left < margin || (left + width) > (viewportWidth - margin)) {{
-            left = anchorRect.left + (anchorRect.width / 2) - (width / 2);
-          }}
-        }} else {{
-          left = anchorRect.left + (anchorRect.width / 2) - (width / 2);
-        }}
+        left = anchorRect.left + (anchorRect.width / 2) - (width / 2);
       }}
       if (left < margin) left = margin;
       if ((left + width) > (viewportWidth - margin)) {{
         left = Math.max(margin, viewportWidth - width - margin);
       }}
 
-      const preferBelow = chatEmojiMode === "react" && !chatReactionPickerExpanded;
-      let top = (chatEmojiMode === "react" && chatReactionPickerExpanded)
-        ? (anchorRect.top - 2)
-        : (preferBelow ? (anchorRect.bottom + 6) : (anchorRect.top - height - 6));
-      if (preferBelow && (top + height) > (viewportHeight - margin)) {{
-        top = anchorRect.top - height - 6;
-      }} else if (!preferBelow && top < minTop) {{
-        top = anchorRect.bottom + 6;
+      const preferBelow = chatEmojiMode === "react";
+      let top;
+      if (chatEmojiMode === "react" && chatReactionPickerExpanded) {{
+        top = (reactionCompactBottom !== null ? reactionCompactBottom : (anchorRect.bottom + 6)) - height;
+      }} else {{
+        top = reactionCompactTop !== null
+          ? reactionCompactTop
+          : (preferBelow ? (anchorRect.bottom + 6) : (anchorRect.top - height - 6));
+        if (preferBelow && (top + height) > (viewportHeight - margin)) {{
+          top = anchorRect.top - height - 6;
+        }} else if (!preferBelow && top < minTop) {{
+          top = anchorRect.bottom + 6;
+        }}
       }}
       if (top < minTop) top = minTop;
       if ((top + height) > (viewportHeight - margin)) {{
@@ -448,6 +521,7 @@
       const panel = chatEmojiPanelElement();
       const chatBtn = document.getElementById("chat-emoji-btn");
       if (!(panel instanceof HTMLElement)) return;
+      clearChatReactionPickerHideTimer();
       chatEmojiMode = mode === "react" ? "react" : "compose";
       chatReactionPickerExpanded = chatEmojiMode !== "react";
       const parsedTarget = Number(reactionTargetId);
@@ -479,6 +553,7 @@
 
     function closeChatEmojiPanel() {{
       const panel = chatEmojiPanelElement();
+      clearChatReactionPickerHideTimer();
       chatEmojiMode = "compose";
       chatReactionTargetId = null;
       chatReactionPickerExpanded = false;
@@ -487,6 +562,8 @@
       if (panel instanceof HTMLElement) {{
         panel.hidden = true;
         panel.classList.remove("chat-emoji-panel-react-collapsed");
+        panel.classList.remove("chat-emoji-panel-react-expanded");
+        panel.style.maxHeight = "";
         panel.style.position = "";
         panel.style.left = "";
         panel.style.top = "";
@@ -535,8 +612,14 @@
         const groupOptions = '<option value="all">All groups (loading...)</option>';
         panel.innerHTML = `<div id="chat-emoji-top-label" class="chat-emoji-top-label">Top used</div>
         <div id="chat-emoji-top-grid" class="chat-emoji-top-grid" aria-label="Top used"></div>
-        <div id="chat-emoji-react-toggle-row" class="chat-emoji-react-toggle-row" hidden>
-          <button id="chat-emoji-react-toggle" class="chat-emoji-react-toggle-btn" type="button" aria-expanded="false">More reactions ▸</button>
+          <div id="chat-emoji-react-toggle-row" class="chat-emoji-react-toggle-row" hidden>
+            <button id="chat-emoji-react-toggle" class="chat-emoji-react-toggle-btn" type="button" aria-expanded="false">More reactions ▸</button>
+          </div>
+        <div id="chat-emoji-controls-row" class="chat-emoji-toolbar">
+          <select id="chat-emoji-group-select" class="chat-emoji-filter" aria-label="Emoji group">
+            ${{groupOptions}}
+          </select>
+          <span id="chat-emoji-meta" class="chat-emoji-meta"></span>
         </div>
         <div id="chat-emoji-search-row" class="chat-emoji-toolbar chat-emoji-search-row">
           <input
@@ -549,12 +632,6 @@
             spellcheck="false"
             title="Shortcut: Ctrl/Cmd+E"
           />
-        </div>
-        <div id="chat-emoji-controls-row" class="chat-emoji-toolbar">
-          <select id="chat-emoji-group-select" class="chat-emoji-filter" aria-label="Emoji group">
-            ${{groupOptions}}
-          </select>
-          <span id="chat-emoji-meta" class="chat-emoji-meta"></span>
         </div>
         <div id="chat-emoji-grid" class="chat-emoji-grid"></div>`;
         panel.dataset.init = "1";
@@ -583,6 +660,7 @@
           reactToggleBtn.addEventListener("click", (ev) => {{
             ev.preventDefault();
             chatReactionPickerExpanded = !chatReactionPickerExpanded;
+            clearChatReactionPickerHideTimer();
             renderChatEmojiPickerPanel();
             if (chatReactionPickerExpanded) {{
               focusChatEmojiSearchInput();
@@ -612,6 +690,16 @@
 
       if (panel.dataset.bound !== "1") {{
         panel.dataset.bound = "1";
+        panel.addEventListener("pointerenter", () => {{
+          if (chatEmojiMode === "react") {{
+            clearChatReactionPickerHideTimer();
+          }}
+        }});
+        panel.addEventListener("pointerleave", () => {{
+          if (chatEmojiMode === "react" && !chatReactionPickerExpanded && !chatEmojiTopDragEmoji) {{
+            scheduleChatReactionPickerHide(260);
+          }}
+        }});
         panel.addEventListener("dragstart", (ev) => {{
           const target = ev.target;
           if (!(target instanceof Element)) return;
@@ -621,6 +709,7 @@
           if (!(topGrid instanceof HTMLElement) || topGrid.dataset.sortable !== "1") return;
           const emoji = String(emojiBtn.getAttribute("data-emoji") || emojiBtn.textContent || "").trim();
           if (!emoji) return;
+          clearChatReactionPickerHideTimer();
           chatEmojiTopDragEmoji = emoji;
           emojiBtn.classList.add("dragging");
           topGrid.classList.add("dragging");
@@ -631,6 +720,13 @@
         }});
         panel.addEventListener("dragend", () => {{
           clearChatEmojiTopDragState(document.getElementById("chat-emoji-top-grid"));
+          if (
+            chatEmojiMode === "react"
+            && !chatReactionPickerExpanded
+            && !isChatReactionPickerHoverActive()
+          ) {{
+            scheduleChatReactionPickerHide(160);
+          }}
         }});
         panel.addEventListener("click", (ev) => {{
           const target = ev.target;
@@ -658,14 +754,12 @@
         document.addEventListener("pointerdown", (ev) => {{
           const target = ev.target;
           if (!(target instanceof Element)) return;
-          if (
-            !target.closest("#chat-emoji-panel")
-            && !target.closest("#chat-emoji-btn")
-            && !target.closest("#games-emoji-btn")
-            && !target.closest(".chat-react-btn")
-          ) {{
-            closeChatEmojiPanel();
+          if (target.closest("#chat-emoji-panel")) return;
+          if (target.closest("#chat-emoji-btn") || target.closest("#games-emoji-btn")) return;
+          if (chatEmojiMode === "react") {{
+            chatReactionPickerSuppressOpenUntilMs = Date.now() + 160;
           }}
+          closeChatEmojiPanel();
         }});
         document.addEventListener("keydown", (ev) => {{
           if (ev.key === "Escape") {{

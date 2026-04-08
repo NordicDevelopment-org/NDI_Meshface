@@ -434,7 +434,7 @@
     }}
     .chat-emoji-react-toggle-row {{
       display: flex;
-      justify-content: flex-end;
+      justify-content: flex-start;
       align-items: center;
       min-height: 0;
     }}
@@ -457,6 +457,25 @@
     }}
     .chat-emoji-panel.chat-emoji-panel-react-collapsed {{
       width: min(360px, 92vw);
+    }}
+    .chat-emoji-panel.chat-emoji-panel-react-expanded {{
+      width: min(360px, 92vw);
+      overflow: hidden;
+    }}
+    .chat-emoji-panel.chat-emoji-panel-react-expanded #chat-emoji-controls-row {{
+      order: 4;
+    }}
+    .chat-emoji-panel.chat-emoji-panel-react-expanded #chat-emoji-grid {{
+      order: 5;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
+    }}
+    .chat-emoji-panel.chat-emoji-panel-react-expanded #chat-emoji-search-row {{
+      order: 6;
+    }}
+    .chat-emoji-panel.chat-emoji-panel-react-expanded .chat-emoji-react-toggle-row {{
+      order: 7;
     }}
     .chat-emoji-grid {{
       display: grid;
