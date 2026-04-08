@@ -74,9 +74,12 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     )
 
     assert "function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {" in js
+    assert "function shouldCloseLayoutViewMenuForScrollTarget(target = null) {" in js
     assert 'target.closest("#layout-view-menu .topbar-view-menu-item")' in js
     assert 'document.getElementById("layout-view-menu-btn-label")' in js
     assert 'document.getElementById("layout-view-menu-head-current")' in js
     assert 'document.getElementById("layout-view-menu-btn")' in js
     assert 'Math.max(260, Math.ceil(btnRect.width))' in js
+    assert 'if (!shouldCloseLayoutViewMenuForScrollTarget(ev ? ev.target : null)) {' in js
+    assert 'return target === document.body || target === document.documentElement;' in js
     assert 'window.syncLayoutViewLauncherButtonState = syncLayoutViewLauncherButtonState;' in js

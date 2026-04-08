@@ -2827,6 +2827,19 @@
       return false;
     }}
 
+    function shouldCloseLayoutViewMenuForScrollTarget(target = null) {{
+      if (target === window || target === document) {{
+        return true;
+      }}
+      if (target instanceof Document) {{
+        return true;
+      }}
+      if (target instanceof HTMLElement) {{
+        return target === document.body || target === document.documentElement;
+      }}
+      return false;
+    }}
+
     function resolveLayoutViewTargetFromEvent(ev) {{
       const rawTarget = ev && ev.target;
       const target = rawTarget instanceof Element
@@ -3274,7 +3287,10 @@
       window.addEventListener("resize", () => {{
         closeLayoutViewMenu();
       }});
-      window.addEventListener("scroll", () => {{
+      window.addEventListener("scroll", (ev) => {{
+        if (!shouldCloseLayoutViewMenuForScrollTarget(ev ? ev.target : null)) {{
+          return;
+        }}
         closeLayoutViewMenu();
       }}, true);
     }}
