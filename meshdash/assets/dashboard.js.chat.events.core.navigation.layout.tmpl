@@ -2543,6 +2543,11 @@
       return total;
     }}
 
+    function workspaceLauncherNotificationLabel(count) {{
+      const safeCount = Math.max(0, Math.trunc(Number(count) || 0));
+      return safeCount > 99 ? "99+" : String(safeCount);
+    }}
+
     function setWorkspaceLauncherViewNotificationCount(viewName, count, options = {{}}) {{
       const key = resolveTopbarLauncherLayoutView(viewName);
       if (!Object.prototype.hasOwnProperty.call(workspaceLauncherNotificationCounts, key)) {{
@@ -2665,6 +2670,7 @@
     function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {{
       const launcherBtn = document.getElementById("layout-view-menu-btn");
       const launcherLabel = document.getElementById("layout-view-menu-btn-label");
+      const launcherBadge = document.getElementById("layout-view-menu-btn-badge");
       const menuCurrent = document.getElementById("layout-view-menu-head-current");
       const attentionIndicator = document.getElementById("layout-view-menu-attention-indicator");
       if (!(launcherBtn instanceof HTMLButtonElement)) return;
@@ -2678,17 +2684,27 @@
       }}
 
       const totalCount = totalWorkspaceLauncherNotificationCount();
+      const totalLabel = workspaceLauncherNotificationLabel(totalCount);
+      if (launcherBadge instanceof HTMLElement) {{
+        launcherBadge.hidden = totalCount <= 0;
+        if (totalCount > 0 && launcherBadge.textContent !== totalLabel) {{
+          launcherBadge.textContent = totalLabel;
+        }}
+      }}
       if (attentionIndicator instanceof HTMLElement) {{
-        attentionIndicator.hidden = totalCount <= 0;
+        attentionIndicator.hidden = true;
       }}
       launcherBtn.classList.toggle("has-unread", totalCount > 0);
 
       const titleParts = ["Open workspace view menu.", `Current view: ${{activeLabel}}.`];
+      if (totalCount > 0) {{
+        titleParts.push(`Total notifications: ${{totalLabel}}.`);
+      }}
       const summaryParts = [];
       for (const launcherView of ["chat", "network", "console", "apps", "settings"]) {{
         const count = workspaceLauncherViewNotificationCount(launcherView);
         if (count <= 0) continue;
-        const countLabel = count > 99 ? "99+" : String(count);
+        const countLabel = workspaceLauncherNotificationLabel(count);
         summaryParts.push(`${{topbarLauncherLayoutLabel(launcherView)}} ${{countLabel}}`);
       }}
       if (summaryParts.length > 0) {{
@@ -2706,7 +2722,7 @@
         const btnView = String(btn.dataset.view || "").trim().toLowerCase();
         const isActive = btnView === launcherView;
         const notificationCount = workspaceLauncherViewNotificationCount(btnView);
-        const notificationLabel = notificationCount > 99 ? "99+" : String(notificationCount);
+        const notificationLabel = workspaceLauncherNotificationLabel(notificationCount);
         const notificationText = notificationCount > 0
           ? `${{notificationLabel}} new notification${{notificationCount === 1 ? "" : "s"}}`
           : "";
