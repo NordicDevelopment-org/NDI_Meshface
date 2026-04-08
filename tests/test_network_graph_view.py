@@ -42,6 +42,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'return clean === "overview" || clean === "graph" || clean === "sensors" ? clean : "map";' in js
     assert 'function renderNetworkGraphView(state = latestState)' in js
     assert 'activeNetworkSubview === "graph"' in js
+    assert 'activeLayoutView !== "network"\n          || activeNetworkSubview === "map"' in js
     assert 'let networkGraphRootNodeId = "";' in js
     assert 'const networkGraphRootHistory = [];' in js
     assert 'const networkGraphViewState = {' in js

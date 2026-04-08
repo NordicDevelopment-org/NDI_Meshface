@@ -697,7 +697,14 @@
         }});
       }}
       highlightNodeSelection();
-      const focusSelection = shouldFocus && activeLayoutView !== "saved";
+      const focusSelection = (
+        shouldFocus
+        && activeLayoutView !== "saved"
+        && (
+          activeLayoutView !== "network"
+          || activeNetworkSubview === "map"
+        )
+      );
       pendingMapHistoryFocus = focusSelection;
       scrollSelectionIntoView();
       let cachedHistory = null;
