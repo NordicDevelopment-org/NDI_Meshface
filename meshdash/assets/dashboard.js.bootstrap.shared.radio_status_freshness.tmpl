@@ -471,11 +471,24 @@
       let chatOnlineCount = 0;
       let chatWarnCount = 0;
       let chatStaleCount = 0;
+      let rosterStatusChanged = false;
       const rosterModel = Array.isArray(chatRosterModel) ? chatRosterModel : [];
       if (rosterModel.length > 0) {{
         for (const entry of rosterModel) {{
           const freshness = freshnessForNode(entry && entry.id);
           if (!freshness) continue;
+          if (entry && typeof entry === "object") {{
+            const nextStatus = normalizeFreshnessKey(freshness.status);
+            const nextLastSeenUnix = Number.isFinite(Number(freshness.lastSeenUnix))
+              ? Math.trunc(Number(freshness.lastSeenUnix))
+              : null;
+            const prevStatus = normalizeFreshnessKey(entry.status);
+            entry.status = nextStatus;
+            entry.lastSeenUnix = nextLastSeenUnix;
+            if (prevStatus !== nextStatus) {{
+              rosterStatusChanged = true;
+            }}
+          }}
           if (freshness.key === "online") chatOnlineCount += 1;
           else if (freshness.key === "warn") chatWarnCount += 1;
           else if (freshness.key === "stale") chatStaleCount += 1;
@@ -529,6 +542,20 @@
       const leftSub = document.getElementById("chat-left-sub");
       if (leftSub) {{
         leftSub.textContent = `Scope: ${{channelLabel(activeChatChannel)}} • View Ch: ${{currentMeshChannelViewLabel()}} • Send Ch: ${{currentMeshChannelSendLabel()}} • ${{chatOnlineCount}} online, ${{chatWarnCount}} aging, ${{chatStaleCount}} stale`;
+      }}
+
+      if (
+        rosterStatusChanged
+        && rosterList instanceof HTMLElement
+        && typeof renderChatNodeNavigatorList === "function"
+        && normalizeChatNodeNavigatorSortKeyPref(chatNodeNavigatorSortKey) === "status"
+      ) {{
+        renderChatNodeNavigatorList(state, {{
+          nowUnix,
+          nodesById,
+          historyCapsById: capsById,
+          rosterAll: rosterModel.slice(),
+        }});
       }}
 
       // Saved nodes list freshness.
