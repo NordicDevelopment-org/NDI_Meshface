@@ -132,6 +132,21 @@
       applyEditorState();
     }}
 
+    function bindSavedNodeDetailLinkButtons(root = null) {{
+      if (!(root instanceof HTMLElement)) return;
+      for (const btn of root.querySelectorAll(".saved-node-inline-link[data-node-id]")) {{
+        if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") continue;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const nodeId = normalizeNodeId(btn.dataset.nodeId || "");
+          if (!isSelectableNodeId(nodeId)) return;
+          selectNode(nodeId, true, false);
+        }});
+      }}
+    }}
+
     function renderSavedNodeDetails(state, nodeHistory = null, loadingNodeId = "") {{
       const host = document.getElementById("saved-node-details");
       if (!(host instanceof HTMLElement)) return;
@@ -354,6 +369,17 @@
       const linkAvgHops = linkStats.hopsWeight > 0
         ? formatMetricValue(linkStats.hopsWeighted / linkStats.hopsWeight, 2)
         : "n/a";
+      const topPeerId = normalizeNodeId(linkStats.topPeer || "");
+      const topPeerName = topPeerId
+        ? resolveSavedViewNodeName(safeState, topPeerId)
+        : "";
+      const topPeerLabel = savedDetailText(topPeerName || topPeerId, topPeerId || "n/a");
+      const topPeerValue = isSelectableNodeId(topPeerId)
+        ? savedDetailHtmlValue(
+            `<button type="button" class="saved-node-inline-link" data-node-id="${{escAttr(topPeerId)}}" title="${{escAttr(`Open node details for ${{topPeerLabel}} (${{topPeerId}})` )}}" aria-label="${{escAttr(`Open node details for ${{topPeerLabel}} (${{topPeerId}})` )}}">${{escAttr(topPeerLabel)}}</button>`,
+            topPeerLabel,
+          )
+        : "n/a";
       const nodeDisplayName = node
         ? nodeLabel(node)
         : (nodeNameCache.get(nodeId) || nodeId || "n/a");
@@ -407,7 +433,7 @@
         ["Session Packets", String(Math.round(linkStats.sessionPackets))],
         ["Avg Link Hops", linkAvgHops],
         ["Last Link Activity", savedDetailText(linkStats.lastSeenText)],
-        ["Top Peer", savedDetailText(linkStats.topPeer)],
+        ["Top Peer", topPeerValue],
         ["Top Peer Packets", linkStats.topPeer ? String(Math.round(linkStats.topPeerPackets)) : "n/a"],
         ["Seen Ports", linkStats.ports.size > 0 ? Array.from(linkStats.ports).slice(0, 10).join(", ") : "n/a"],
       ]);
@@ -437,6 +463,8 @@
       setElementHtmlIfChanged(chatHost, nextChatHtml, "chat-node-details-chat");
       setElementHtmlIfChanged(linksHost, nextLinksHtml, "chat-node-details-links");
       const notesMarkupChanged = setElementHtmlIfChanged(notesHost, nextNotesHtml, "chat-node-details-notes");
+      bindSavedNodeDetailLinkButtons(host);
+      bindSavedNodeDetailLinkButtons(linksHost);
       if (detailsMarkupChanged || notesMarkupChanged) {{
         bindSavedNodeNotesEditor(nodeId);
       }}

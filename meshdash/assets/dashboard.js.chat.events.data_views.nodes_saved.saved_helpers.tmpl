@@ -4,6 +4,25 @@
       return String(fallback == null ? "n/a" : fallback);
     }}
 
+    function savedDetailHtmlValue(html, text = "", fallback = "n/a") {{
+      return {{
+        __savedDetailHtml: true,
+        html: String(html == null ? "" : html),
+        text: savedDetailText(text, fallback),
+      }};
+    }}
+
+    function savedDetailValueMarkup(value, fallback = "n/a") {{
+      if (value && typeof value === "object" && value.__savedDetailHtml === true) {{
+        const markup = String(value.html == null ? "" : value.html).trim();
+        if (markup) {{
+          return markup;
+        }}
+        return escAttr(savedDetailText(value.text, fallback));
+      }}
+      return escAttr(savedDetailText(value, fallback));
+    }}
+
     function savedDetailPercent(value, decimals = 1) {{
       const num = Number(value);
       if (!Number.isFinite(num)) return "n/a";
@@ -42,7 +61,7 @@
       const rows = items.map(([label, value]) => (
         `<div class="saved-node-stat">
           <div class="saved-node-stat-k">${{escAttr(label)}}</div>
-          <div class="saved-node-stat-v">${{escAttr(savedDetailText(value))}}</div>
+          <div class="saved-node-stat-v">${{savedDetailValueMarkup(value)}}</div>
         </div>`
       )).join("");
       const noteHtml = note

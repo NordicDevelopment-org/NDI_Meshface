@@ -3,6 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from meshdash.html_css import build_dashboard_css
 from meshdash.html_js import build_dashboard_js
 from meshdash.html_template import render_html
 
@@ -165,3 +166,24 @@ def test_dashboard_js_avoids_rebuilding_saved_node_details_on_unchanged_polls() 
     assert 'const notesMarkupChanged = setElementHtmlIfChanged(notesHost, nextNotesHtml, "chat-node-details-notes");' in js
     assert 'if (detailsMarkupChanged || notesMarkupChanged) {' in js
     assert 'if ((detailsMarkupChanged || notesMarkupChanged) && previousNodeId === nodeId) {' in js
+
+
+def test_dashboard_js_renders_top_peer_as_clickable_node_link() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+    css = build_dashboard_css(theme_css="")
+
+    assert 'function savedDetailHtmlValue(html, text = "", fallback = "n/a") {' in js
+    assert 'function savedDetailValueMarkup(value, fallback = "n/a") {' in js
+    assert 'const topPeerId = normalizeNodeId(linkStats.topPeer || "");' in js
+    assert 'const topPeerLabel = savedDetailText(topPeerName || topPeerId, topPeerId || "n/a");' in js
+    assert 'class="saved-node-inline-link"' in js
+    assert 'bindSavedNodeDetailLinkButtons(host);' in js
+    assert 'bindSavedNodeDetailLinkButtons(linksHost);' in js
+    assert 'selectNode(nodeId, true, false);' in js
+    assert ".saved-node-inline-link {" in css
+    assert ".saved-node-inline-link:hover {" in css
+    assert "[data-theme=\"dark\"] .saved-node-inline-link:hover {" in css
