@@ -2516,6 +2516,130 @@
       tabsBar.setAttribute("aria-hidden", showTabs ? "false" : "true");
     }}
 
+    function resolveTopbarLauncherLayoutView(viewName) {{
+      const normalized = normalizeLayoutView(viewName);
+      return isAppsLayoutView(normalized) ? "apps" : normalized;
+    }}
+
+    function topbarLauncherLayoutLabel(viewName) {{
+      const normalized = resolveTopbarLauncherLayoutView(viewName);
+      if (normalized === "network") return "Network";
+      if (normalized === "console") return "Console";
+      if (normalized === "apps") return "Apps";
+      if (normalized === "settings") return "Settings";
+      return "Chat";
+    }}
+
+    function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {{
+      const launcherBtn = document.getElementById("layout-view-menu-btn");
+      const menuCurrent = document.getElementById("layout-view-menu-head-current");
+      const unreadBadge = document.getElementById("layout-view-menu-chat-badge");
+      if (!(launcherBtn instanceof HTMLButtonElement)) return;
+
+      const activeLabel = topbarLauncherLayoutLabel(viewName);
+      if (menuCurrent instanceof HTMLElement) {{
+        menuCurrent.textContent = `Current: ${{activeLabel}}`;
+      }}
+
+      const unreadCount = Math.max(0, Math.trunc(Number(launcherBtn.dataset.chatUnreadCount || 0) || 0));
+      const missedCount = Math.max(0, Math.trunc(Number(launcherBtn.dataset.chatMissedCount || 0) || 0));
+      const attentionCount = Math.max(unreadCount, missedCount);
+      if (unreadBadge instanceof HTMLElement) {{
+        const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
+        unreadBadge.hidden = unreadCount <= 0;
+        if (unreadCount > 0 && unreadBadge.textContent !== unreadLabel) {{
+          unreadBadge.textContent = unreadLabel;
+        }}
+      }}
+      launcherBtn.classList.toggle("has-unread", attentionCount > 0);
+
+      const titleParts = ["Open workspace view menu.", `Current view: ${{activeLabel}}.`];
+      if (unreadCount > 0) {{
+        titleParts.push(`${{unreadCount}} unread chat message${{unreadCount === 1 ? "" : "s"}}.`);
+      }}
+      if (missedCount > 0) {{
+        titleParts.push(`${{missedCount}} missed update${{missedCount === 1 ? "" : "s"}}.`);
+      }}
+      const nextTitle = titleParts.join(" ");
+      launcherBtn.title = nextTitle;
+      launcherBtn.setAttribute("aria-label", nextTitle);
+    }}
+
+    function syncLayoutViewMenu(viewName = activeLayoutView) {{
+      const launcherView = resolveTopbarLauncherLayoutView(viewName);
+      for (const btn of document.querySelectorAll("#layout-view-menu .topbar-view-menu-item")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const btnView = String(btn.dataset.view || "").trim().toLowerCase();
+        const isActive = btnView === launcherView;
+        btn.classList.toggle("is-active", isActive);
+        btn.setAttribute("aria-checked", isActive ? "true" : "false");
+        btn.setAttribute("aria-current", isActive ? "page" : "false");
+      }}
+      syncLayoutViewLauncherButtonState(viewName);
+    }}
+
+    function closeLayoutViewMenu(options = {{}}) {{
+      const restoreFocus = !!(options && options.restoreFocus);
+      const launcherBtn = document.getElementById("layout-view-menu-btn");
+      const menu = document.getElementById("layout-view-menu");
+      if (menu instanceof HTMLElement) {{
+        menu.hidden = true;
+        menu.style.removeProperty("left");
+        menu.style.removeProperty("top");
+        menu.style.removeProperty("min-width");
+        menu.style.removeProperty("visibility");
+      }}
+      if (launcherBtn instanceof HTMLButtonElement) {{
+        launcherBtn.setAttribute("aria-expanded", "false");
+        if (restoreFocus) {{
+          launcherBtn.focus();
+        }}
+      }}
+    }}
+
+    function openLayoutViewMenu() {{
+      const launcherBtn = document.getElementById("layout-view-menu-btn");
+      const menu = document.getElementById("layout-view-menu");
+      if (!(launcherBtn instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) return;
+
+      syncLayoutViewMenu(activeLayoutView);
+      menu.hidden = false;
+      menu.style.visibility = "hidden";
+      launcherBtn.setAttribute("aria-expanded", "true");
+
+      const btnRect = launcherBtn.getBoundingClientRect();
+      menu.style.minWidth = `${{Math.max(260, Math.ceil(btnRect.width))}}px`;
+      menu.style.left = "8px";
+      menu.style.top = "8px";
+
+      const menuRect = menu.getBoundingClientRect();
+      const viewportWidth = Math.max(0, window.innerWidth || document.documentElement.clientWidth || 0);
+      const viewportHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
+      let left = Math.max(8, Math.round(btnRect.left));
+      if (viewportWidth > 0) {{
+        left = Math.min(left, Math.max(8, viewportWidth - Math.ceil(menuRect.width) - 8));
+      }}
+      let top = Math.round(btnRect.bottom + 8);
+      if (viewportHeight > 0 && (top + menuRect.height) > (viewportHeight - 8)) {{
+        top = Math.max(8, Math.round(btnRect.top - menuRect.height - 8));
+      }}
+      menu.style.left = `${{left}}px`;
+      menu.style.top = `${{top}}px`;
+      menu.style.visibility = "";
+    }}
+
+    function toggleLayoutViewMenu() {{
+      const launcherBtn = document.getElementById("layout-view-menu-btn");
+      if (!(launcherBtn instanceof HTMLButtonElement)) return false;
+      const expanded = launcherBtn.getAttribute("aria-expanded") === "true";
+      if (expanded) {{
+        closeLayoutViewMenu();
+      }} else {{
+        openLayoutViewMenu();
+      }}
+      return false;
+    }}
+
     function resolveLayoutViewTargetFromEvent(ev) {{
       const rawTarget = ev && ev.target;
       const target = rawTarget instanceof Element
@@ -2523,10 +2647,10 @@
         : ((rawTarget instanceof Node) ? rawTarget.parentElement : null);
       if (!(target instanceof Element)) return "";
 
-      const railBtn = target.closest(".teams-rail .rail-btn");
-      if (railBtn instanceof HTMLButtonElement) {{
-        if (railBtn.disabled) return "";
-        return String(railBtn.dataset.view || "chat");
+      const launcherBtn = target.closest("#layout-view-menu .topbar-view-menu-item");
+      if (launcherBtn instanceof HTMLButtonElement) {{
+        if (launcherBtn.disabled) return "";
+        return String(launcherBtn.dataset.view || "chat");
       }}
 
       const appsBtn = target.closest(".apps-tab-btn");
@@ -2568,21 +2692,8 @@
       }}
       layout.classList.add(`view-${{next}}`);
 
-      // Keep rail selection in sync even if any later view-specific setup throws.
-      for (const btn of document.querySelectorAll(".teams-rail .rail-btn")) {{
-        if (!(btn instanceof HTMLButtonElement)) continue;
-        const railView = String(btn.dataset.view || "").trim().toLowerCase();
-        const isActive = railView === "apps"
-          ? isAppsLayoutView(next)
-          : normalizeLayoutView(railView) === next;
-        btn.classList.toggle("active", isActive);
-        btn.setAttribute("aria-current", isActive ? "page" : "false");
-      }}
-      const chatRailBtn = document.querySelector('.teams-rail .rail-btn[data-view="chat"]');
-      if (chatRailBtn instanceof HTMLButtonElement) {{
-        chatRailBtn.hidden = false;
-        chatRailBtn.disabled = false;
-      }}
+      syncLayoutViewMenu(next);
+      closeLayoutViewMenu();
       syncFileTransferFeatureVisibility();
       syncAppsTabBarVisibility(next);
       syncAppsTabBar(next);
@@ -2898,6 +3009,8 @@
     if (typeof window !== "undefined") {{
       window.applyLayoutView = applyLayoutView;
       window.meshSelectLayoutView = meshSelectLayoutView;
+      window.syncLayoutViewLauncherButtonState = syncLayoutViewLauncherButtonState;
+      window.toggleLayoutViewMenu = toggleLayoutViewMenu;
       window.setActiveNetworkSubview = setActiveNetworkSubview;
     }}
 
@@ -2931,7 +3044,50 @@
       }}, true);
     }}
 
+    function bindLayoutViewLauncher() {{
+      if (window.__meshLayoutViewLauncherBound === true) return;
+      window.__meshLayoutViewLauncherBound = true;
+      document.addEventListener("click", (ev) => {{
+        const rawTarget = ev && ev.target;
+        const target = rawTarget instanceof Element
+          ? rawTarget
+          : ((rawTarget instanceof Node) ? rawTarget.parentElement : null);
+        if (!(target instanceof Element)) {{
+          closeLayoutViewMenu();
+          return;
+        }}
+        const launcherBtn = target.closest("#layout-view-menu-btn");
+        if (launcherBtn instanceof HTMLButtonElement) {{
+          ev.preventDefault();
+          toggleLayoutViewMenu();
+          return;
+        }}
+        const launcherItem = target.closest("#layout-view-menu .topbar-view-menu-item");
+        if (launcherItem instanceof HTMLButtonElement) {{
+          closeLayoutViewMenu();
+          return;
+        }}
+        if (!target.closest("#layout-view-menu")) {{
+          closeLayoutViewMenu();
+        }}
+      }});
+      document.addEventListener("keydown", (ev) => {{
+        if (!ev || ev.key !== "Escape") return;
+        const launcherBtn = document.getElementById("layout-view-menu-btn");
+        if (!(launcherBtn instanceof HTMLButtonElement)) return;
+        if (launcherBtn.getAttribute("aria-expanded") !== "true") return;
+        closeLayoutViewMenu({{ restoreFocus: true }});
+      }});
+      window.addEventListener("resize", () => {{
+        closeLayoutViewMenu();
+      }});
+      window.addEventListener("scroll", () => {{
+        closeLayoutViewMenu();
+      }}, true);
+    }}
+
     // Install layout navigation delegation as soon as this template loads so
     // view switching still works even if later boot/setup code short-circuits.
     bindLayoutNav();
+    bindLayoutViewLauncher();
     bindNetworkSubviewTabs();

@@ -202,17 +202,100 @@
   </div>
 
   <div class="workspace-shell chat-panel-open">
-    <aside class="teams-rail" aria-label="Dashboard views">
-      <button class="rail-btn active" data-view="chat" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Teams-style chat workspace">Chat</button>
-      <button class="rail-btn" data-view="network" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Topology, nodes, and links">Network</button>
-      <button class="rail-btn" data-view="console" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Realtime dashboard console">Console</button>
-      <button class="rail-btn" data-view="environment" type="button" hidden disabled onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Historical sensor telemetry">Sensors</button>
-      <button class="rail-btn" data-view="history" type="button" hidden disabled onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Network and chat history">History</button>
-      <button class="rail-btn" data-view="apps" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Games and file transfer workspace">Apps</button>
-      <button class="rail-btn" data-view="bots" type="button" hidden disabled onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Bots workspace and command controls">Bots</button>
-      <button class="rail-btn" data-view="chatlabs" type="button" hidden disabled onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Experimental console-rendered chat workspace">Labs</button>
-      <button class="rail-btn" data-view="settings" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.view || "chat") : true);' title="Radio + dashboard settings">Settings</button>
-    </aside>
+    <div class="workspace-launcher-row" aria-label="Dashboard views">
+      <div class="workspace-launcher-shell">
+        <button
+          id="layout-view-menu-btn"
+          class="topbar-view-menu-btn"
+          type="button"
+          title="Switch workspace view"
+          aria-label="Switch workspace view"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <span class="topbar-view-menu-btn-label">Views</span>
+          <span id="layout-view-menu-chat-badge" class="topbar-view-menu-badge" hidden>0</span>
+          <span class="topbar-view-menu-caret" aria-hidden="true"></span>
+        </button>
+        <div id="layout-view-menu" class="topbar-view-menu" role="menu" hidden>
+          <div class="topbar-view-menu-head">
+            <div class="topbar-view-menu-head-kicker">Workspace</div>
+            <div class="topbar-view-menu-head-title">Open view</div>
+            <div id="layout-view-menu-head-current" class="topbar-view-menu-head-current">Current: Chat</div>
+          </div>
+          <button
+            class="topbar-view-menu-item is-active"
+            data-view="chat"
+            type="button"
+            role="menuitemradio"
+            aria-checked="true"
+            title="Teams-style chat workspace"
+          >
+            <span class="topbar-view-menu-item-icon" aria-hidden="true">CH</span>
+            <span class="topbar-view-menu-item-copy">
+              <span class="topbar-view-menu-item-label">Chat</span>
+              <span class="topbar-view-menu-item-meta">Messages</span>
+            </span>
+          </button>
+          <button
+            class="topbar-view-menu-item"
+            data-view="network"
+            type="button"
+            role="menuitemradio"
+            aria-checked="false"
+            title="Topology, nodes, and links"
+          >
+            <span class="topbar-view-menu-item-icon" aria-hidden="true">NW</span>
+            <span class="topbar-view-menu-item-copy">
+              <span class="topbar-view-menu-item-label">Network</span>
+              <span class="topbar-view-menu-item-meta">Map and nodes</span>
+            </span>
+          </button>
+          <button
+            class="topbar-view-menu-item"
+            data-view="console"
+            type="button"
+            role="menuitemradio"
+            aria-checked="false"
+            title="Realtime dashboard console"
+          >
+            <span class="topbar-view-menu-item-icon" aria-hidden="true">CL</span>
+            <span class="topbar-view-menu-item-copy">
+              <span class="topbar-view-menu-item-label">Console</span>
+              <span class="topbar-view-menu-item-meta">Live logs</span>
+            </span>
+          </button>
+          <button
+            class="topbar-view-menu-item"
+            data-view="apps"
+            type="button"
+            role="menuitemradio"
+            aria-checked="false"
+            title="Games and file transfer workspace"
+          >
+            <span class="topbar-view-menu-item-icon" aria-hidden="true">AP</span>
+            <span class="topbar-view-menu-item-copy">
+              <span class="topbar-view-menu-item-label">Apps</span>
+              <span class="topbar-view-menu-item-meta">Games and files</span>
+            </span>
+          </button>
+          <button
+            class="topbar-view-menu-item"
+            data-view="settings"
+            type="button"
+            role="menuitemradio"
+            aria-checked="false"
+            title="Radio + dashboard settings"
+          >
+            <span class="topbar-view-menu-item-icon" aria-hidden="true">ST</span>
+            <span class="topbar-view-menu-item-copy">
+              <span class="topbar-view-menu-item-label">Settings</span>
+              <span class="topbar-view-menu-item-meta">Radio settings</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
     <aside id="chat-left-panel" class="chat-left-panel" aria-label="Global node selection and search">
       <div class="chat-left-section chat-users-section">
         <div class="chat-users-head">

@@ -377,6 +377,212 @@
     .topbar .summary-ticker-item[hidden] {{
       display: none !important;
     }}
+    .workspace-launcher-row {{
+      grid-column: 1 / -1;
+      grid-row: 1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      min-width: 0;
+    }}
+    .workspace-launcher-shell {{
+      position: relative;
+      display: inline-flex;
+      min-width: 0;
+      min-height: 0;
+      overflow: visible;
+    }}
+    .topbar-view-menu-btn {{
+      width: auto;
+      min-width: 88px;
+      min-height: 38px;
+      position: relative;
+      border: 1px solid #c6d6c0;
+      background:
+        linear-gradient(180deg, rgba(247, 253, 249, 0.98), rgba(230, 242, 234, 0.96));
+      color: #f2fff7;
+      border-radius: 999px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 7px;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 700;
+      text-align: left;
+      color: #143226;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        0 8px 18px rgba(9, 28, 18, 0.12);
+      transition: border-color 140ms ease, background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+    }}
+    .topbar-view-menu-btn:hover,
+    .topbar-view-menu-btn[aria-expanded="true"] {{
+      border-color: #9fc7ae;
+      background:
+        linear-gradient(180deg, rgba(250, 255, 252, 0.99), rgba(221, 239, 229, 0.98));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.48),
+        0 10px 22px rgba(9, 28, 18, 0.16);
+    }}
+    .topbar-view-menu-btn.has-unread {{
+      border-color: #67b886;
+      box-shadow:
+        inset 0 0 0 1px rgba(103, 184, 134, 0.18),
+        0 10px 22px rgba(9, 28, 18, 0.16);
+    }}
+    .topbar-view-menu-btn:focus-visible {{
+      outline: 2px solid rgba(67, 125, 92, 0.9);
+      outline-offset: 2px;
+    }}
+    .topbar-view-menu-btn-label {{
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: 0.16px;
+      color: #17372a;
+    }}
+    .topbar-view-menu-badge {{
+      flex: 0 0 auto;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(58, 135, 91, 0.42);
+      background: rgba(46, 119, 78, 0.92);
+      color: #e8fff1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      line-height: 1;
+      font-weight: 700;
+      box-shadow: 0 8px 18px rgba(11, 34, 21, 0.22);
+    }}
+    .topbar-view-menu-caret {{
+      flex: 0 0 auto;
+      margin-left: 1px;
+      width: 0;
+      height: 0;
+      border-left: 3px solid transparent;
+      border-right: 3px solid transparent;
+      border-top: 5px solid rgba(31, 68, 48, 0.78);
+      transition: transform 140ms ease;
+    }}
+    .topbar-view-menu-btn[aria-expanded="true"] .topbar-view-menu-caret {{
+      transform: rotate(180deg);
+    }}
+    .topbar-view-menu {{
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      min-width: max(260px, 100%);
+      max-width: min(320px, calc(100vw - 24px));
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px;
+      border: 1px solid rgba(184, 211, 194, 0.78);
+      border-radius: 16px;
+      background: rgba(7, 20, 15, 0.96);
+      box-shadow: 0 16px 34px rgba(4, 12, 8, 0.42);
+      z-index: 32;
+      backdrop-filter: blur(14px);
+    }}
+    .topbar-view-menu[hidden] {{
+      display: none !important;
+    }}
+    .topbar-view-menu-head {{
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 2px 4px 8px;
+      border-bottom: 1px solid rgba(214, 238, 223, 0.18);
+    }}
+    .topbar-view-menu-head-kicker {{
+      font-size: 9px;
+      line-height: 1.1;
+      text-transform: uppercase;
+      letter-spacing: 0.42px;
+      color: rgba(207, 233, 218, 0.62);
+    }}
+    .topbar-view-menu-head-title {{
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 700;
+      color: #f2fff7;
+    }}
+    .topbar-view-menu-head-current {{
+      font-size: 10px;
+      line-height: 1.2;
+      color: rgba(222, 244, 231, 0.78);
+    }}
+    .topbar-view-menu-item {{
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: transparent;
+      color: #f2fff7;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      column-gap: 10px;
+      row-gap: 2px;
+      text-align: left;
+      cursor: pointer;
+      line-height: 1.2;
+    }}
+    .topbar-view-menu-item-icon {{
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      border: 1px solid rgba(214, 238, 223, 0.18);
+      background: rgba(248, 255, 251, 0.08);
+      color: rgba(239, 255, 246, 0.9);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }}
+    .topbar-view-menu-item-copy {{
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
+    .topbar-view-menu-item:hover {{
+      border-color: rgba(121, 230, 172, 0.34);
+      background: rgba(53, 154, 101, 0.16);
+    }}
+    .topbar-view-menu-item.is-active,
+    .topbar-view-menu-item[aria-checked="true"] {{
+      border-color: rgba(121, 230, 172, 0.62);
+      background: rgba(53, 154, 101, 0.24);
+      box-shadow: inset 0 0 0 1px rgba(121, 230, 172, 0.08);
+    }}
+    .topbar-view-menu-item:focus-visible {{
+      outline: 2px solid rgba(214, 238, 223, 0.92);
+      outline-offset: 2px;
+    }}
+    .topbar-view-menu-item-label {{
+      font-size: 12px;
+      font-weight: 700;
+      color: inherit;
+    }}
+    .topbar-view-menu-item-meta {{
+      font-size: 10px;
+      color: rgba(226, 245, 234, 0.68);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
     .topbar .summary-ticker-item-target {{
       grid-column: span 1;
       grid-template-rows: auto auto auto;
