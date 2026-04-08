@@ -31,7 +31,8 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
 
     assert 'class="workspace-launcher-row"' in html
     assert 'class="workspace-launcher-shell"' in html
-    assert 'class="topbar-view-menu-btn-label">Views<' in html
+    assert 'id="layout-view-menu-btn-label"' in html
+    assert 'class="topbar-view-menu-btn-label">Chat<' in html
     assert 'class="topbar-update-ticker workspace-update-ticker"' in html
     assert 'id="layout-view-menu-head-current"' in html
     assert 'id="layout-view-menu-btn"' in html
@@ -67,6 +68,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
 
     assert "function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {" in js
     assert 'target.closest("#layout-view-menu .topbar-view-menu-item")' in js
+    assert 'document.getElementById("layout-view-menu-btn-label")' in js
     assert 'document.getElementById("layout-view-menu-head-current")' in js
     assert 'document.getElementById("layout-view-menu-btn")' in js
     assert 'Math.max(260, Math.ceil(btnRect.width))' in js

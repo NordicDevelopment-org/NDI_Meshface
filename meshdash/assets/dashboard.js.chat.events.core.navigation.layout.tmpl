@@ -2532,11 +2532,15 @@
 
     function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {{
       const launcherBtn = document.getElementById("layout-view-menu-btn");
+      const launcherLabel = document.getElementById("layout-view-menu-btn-label");
       const menuCurrent = document.getElementById("layout-view-menu-head-current");
       const unreadBadge = document.getElementById("layout-view-menu-chat-badge");
       if (!(launcherBtn instanceof HTMLButtonElement)) return;
 
       const activeLabel = topbarLauncherLayoutLabel(viewName);
+      if (launcherLabel instanceof HTMLElement) {{
+        launcherLabel.textContent = activeLabel;
+      }}
       if (menuCurrent instanceof HTMLElement) {{
         menuCurrent.textContent = `Current: ${{activeLabel}}`;
       }}
