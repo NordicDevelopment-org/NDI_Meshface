@@ -2530,11 +2530,143 @@
       return "Chat";
     }}
 
+    function workspaceLauncherViewNotificationCount(viewName) {{
+      const key = resolveTopbarLauncherLayoutView(viewName);
+      return Math.max(0, Math.trunc(Number(workspaceLauncherNotificationCounts[key] || 0) || 0));
+    }}
+
+    function totalWorkspaceLauncherNotificationCount() {{
+      let total = 0;
+      for (const viewName of ["chat", "network", "console", "apps", "settings"]) {{
+        total += workspaceLauncherViewNotificationCount(viewName);
+      }}
+      return total;
+    }}
+
+    function setWorkspaceLauncherViewNotificationCount(viewName, count, options = {{}}) {{
+      const key = resolveTopbarLauncherLayoutView(viewName);
+      if (!Object.prototype.hasOwnProperty.call(workspaceLauncherNotificationCounts, key)) {{
+        return 0;
+      }}
+      const safeCount = Math.max(0, Math.min(999, Math.trunc(Number(count) || 0)));
+      if (workspaceLauncherNotificationCounts[key] === safeCount) {{
+        return safeCount;
+      }}
+      workspaceLauncherNotificationCounts[key] = safeCount;
+      if (!(options && options.sync === false)) {{
+        syncLayoutViewMenu(activeLayoutView);
+      }}
+      return safeCount;
+    }}
+
+    function incrementWorkspaceLauncherViewNotificationCount(viewName, delta = 1) {{
+      const key = resolveTopbarLauncherLayoutView(viewName);
+      const safeDelta = Math.max(0, Math.trunc(Number(delta) || 0));
+      return setWorkspaceLauncherViewNotificationCount(
+        key,
+        workspaceLauncherViewNotificationCount(key) + safeDelta
+      );
+    }}
+
+    function rememberAppsLauncherNotificationKey(rawKey) {{
+      const key = String(rawKey || "").trim();
+      if (!key || appsLauncherSeenKeys.has(key)) return false;
+      appsLauncherSeenKeys.add(key);
+      appsLauncherSeenOrder.push(key);
+      if (appsLauncherSeenOrder.length > 2200) {{
+        while (appsLauncherSeenOrder.length > 1600) {{
+          const stale = appsLauncherSeenOrder.shift();
+          if (stale) appsLauncherSeenKeys.delete(stale);
+        }}
+      }}
+      return true;
+    }}
+
+    function collectAppsLauncherNotificationKeys(state = latestState) {{
+      const keys = [];
+      const keySet = new Set();
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      const pushKey = (rawKey) => {{
+        const key = String(rawKey || "").trim();
+        if (!key || keySet.has(key)) return;
+        keySet.add(key);
+        keys.push(key);
+      }};
+
+      if (fileTransferFeatureEnabled) {{
+        const fileRows = buildFileTransferRows(safeState);
+        for (const row of fileRows) {{
+          if (!row || typeof row !== "object") continue;
+          const rowKey = String(row.key || "").trim();
+          if (!rowKey) continue;
+          if (String(row.directionClass || "").trim().toLowerCase() !== "inbound") continue;
+          if (row.delivered || row.inboundDeclined) continue;
+          const progressState = String(row.progressState || "").trim().toLowerCase();
+          if (progressState === "success") continue;
+          pushKey(`files:${{rowKey}}`);
+        }}
+      }}
+
+      for (const row of (Array.isArray(reversiPendingInvites) ? reversiPendingInvites : [])) {{
+        const inviteKey = reversiInviteKey(
+          row && (row.from_id ?? row.fromId),
+          row && (row.session_id ?? row.sessionId)
+        );
+        if (inviteKey) {{
+          pushKey(`games:reversi:${{inviteKey}}`);
+        }}
+      }}
+
+      for (const gameId of ["checkers", "chess"]) {{
+        const refs = boardGameRefs(gameId);
+        for (const row of refs.getPendingInvites()) {{
+          const inviteKey = boardGameInviteKey(
+            row && (row.from_id ?? row.fromId),
+            row && (row.session_id ?? row.sessionId)
+          );
+          if (inviteKey) {{
+            pushKey(`games:${{gameId}}:${{inviteKey}}`);
+          }}
+        }}
+      }}
+
+      return keys;
+    }}
+
+    function acknowledgeAppsLauncherNotifications(state = latestState, options = {{}}) {{
+      for (const key of collectAppsLauncherNotificationKeys(state)) {{
+        rememberAppsLauncherNotificationKey(key);
+      }}
+      return setWorkspaceLauncherViewNotificationCount("apps", 0, options);
+    }}
+
+    function syncAppsLauncherNotifications(state = latestState) {{
+      const appsViewVisible = (
+        resolveTopbarLauncherLayoutView(activeLayoutView) === "apps"
+        && !(typeof document !== "undefined" && document.hidden)
+        && !!tabHasFocus
+      );
+      if (appsViewVisible) {{
+        acknowledgeAppsLauncherNotifications(state);
+        return 0;
+      }}
+      let freshCount = 0;
+      for (const key of collectAppsLauncherNotificationKeys(state)) {{
+        if (rememberAppsLauncherNotificationKey(key)) {{
+          freshCount += 1;
+        }}
+      }}
+      if (freshCount > 0) {{
+        incrementWorkspaceLauncherViewNotificationCount("apps", freshCount);
+      }}
+      return freshCount;
+    }}
+
     function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {{
       const launcherBtn = document.getElementById("layout-view-menu-btn");
       const launcherLabel = document.getElementById("layout-view-menu-btn-label");
       const menuCurrent = document.getElementById("layout-view-menu-head-current");
-      const unreadBadge = document.getElementById("layout-view-menu-chat-badge");
+      const attentionIndicator = document.getElementById("layout-view-menu-attention-indicator");
       if (!(launcherBtn instanceof HTMLButtonElement)) return;
 
       const activeLabel = topbarLauncherLayoutLabel(viewName);
@@ -2545,24 +2677,22 @@
         menuCurrent.textContent = `Current: ${{activeLabel}}`;
       }}
 
-      const unreadCount = Math.max(0, Math.trunc(Number(launcherBtn.dataset.chatUnreadCount || 0) || 0));
-      const missedCount = Math.max(0, Math.trunc(Number(launcherBtn.dataset.chatMissedCount || 0) || 0));
-      const attentionCount = Math.max(unreadCount, missedCount);
-      if (unreadBadge instanceof HTMLElement) {{
-        const unreadLabel = unreadCount > 99 ? "99+" : String(unreadCount);
-        unreadBadge.hidden = unreadCount <= 0;
-        if (unreadCount > 0 && unreadBadge.textContent !== unreadLabel) {{
-          unreadBadge.textContent = unreadLabel;
-        }}
+      const totalCount = totalWorkspaceLauncherNotificationCount();
+      if (attentionIndicator instanceof HTMLElement) {{
+        attentionIndicator.hidden = totalCount <= 0;
       }}
-      launcherBtn.classList.toggle("has-unread", attentionCount > 0);
+      launcherBtn.classList.toggle("has-unread", totalCount > 0);
 
       const titleParts = ["Open workspace view menu.", `Current view: ${{activeLabel}}.`];
-      if (unreadCount > 0) {{
-        titleParts.push(`${{unreadCount}} unread chat message${{unreadCount === 1 ? "" : "s"}}.`);
+      const summaryParts = [];
+      for (const launcherView of ["chat", "network", "console", "apps", "settings"]) {{
+        const count = workspaceLauncherViewNotificationCount(launcherView);
+        if (count <= 0) continue;
+        const countLabel = count > 99 ? "99+" : String(count);
+        summaryParts.push(`${{topbarLauncherLayoutLabel(launcherView)}} ${{countLabel}}`);
       }}
-      if (missedCount > 0) {{
-        titleParts.push(`${{missedCount}} missed update${{missedCount === 1 ? "" : "s"}}.`);
+      if (summaryParts.length > 0) {{
+        titleParts.push(`New activity: ${{summaryParts.join(", ")}}.`);
       }}
       const nextTitle = titleParts.join(" ");
       launcherBtn.title = nextTitle;
@@ -2575,9 +2705,46 @@
         if (!(btn instanceof HTMLButtonElement)) continue;
         const btnView = String(btn.dataset.view || "").trim().toLowerCase();
         const isActive = btnView === launcherView;
+        const notificationCount = workspaceLauncherViewNotificationCount(btnView);
+        const notificationLabel = notificationCount > 99 ? "99+" : String(notificationCount);
+        const notificationText = notificationCount > 0
+          ? `${{notificationLabel}} new notification${{notificationCount === 1 ? "" : "s"}}`
+          : "";
+        const badge = btn.querySelector(".topbar-view-menu-item-badge");
+        if (badge instanceof HTMLElement) {{
+          badge.hidden = notificationCount <= 0;
+          if (notificationCount > 0 && badge.textContent !== notificationLabel) {{
+            badge.textContent = notificationLabel;
+          }}
+        }}
+        const baseTitle = String(btn.dataset.baseTitle || btn.title || "").trim();
+        if (!btn.dataset.baseTitle) {{
+          btn.dataset.baseTitle = baseTitle;
+        }}
         btn.classList.toggle("is-active", isActive);
+        btn.classList.toggle("has-notifications", notificationCount > 0);
         btn.setAttribute("aria-checked", isActive ? "true" : "false");
         btn.setAttribute("aria-current", isActive ? "page" : "false");
+        const label = topbarLauncherLayoutLabel(btnView);
+        if (notificationText) {{
+          btn.title = baseTitle
+            ? `${{baseTitle}} • ${{notificationText}}`
+            : `${{label}} • ${{notificationText}}`;
+          btn.setAttribute(
+            "aria-label",
+            isActive
+              ? `${{label}}. ${{notificationText}}. Current view.`
+              : `${{label}}. ${{notificationText}}.`
+          );
+        }} else {{
+          btn.title = baseTitle;
+          btn.setAttribute(
+            "aria-label",
+            isActive
+              ? `${{label}}. Current view.`
+              : label
+          );
+        }}
       }}
       syncLayoutViewLauncherButtonState(viewName);
     }}
@@ -2683,6 +2850,9 @@
         consoleHotkeyReturnLayoutView = next;
       }}
       activeLayoutView = next;
+      if (resolveTopbarLauncherLayoutView(next) === "apps") {{
+        acknowledgeAppsLauncherNotifications(latestState, {{ sync: false }});
+      }}
       if (next === "settings") {{
         if (requested === "data" || requested === "packets") {{
           setActiveSettingsTab("data", true);

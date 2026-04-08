@@ -354,7 +354,9 @@
       if (!(launcherBtn instanceof HTMLButtonElement)) return;
       launcherBtn.dataset.chatUnreadCount = String(unreadCount);
       launcherBtn.dataset.chatMissedCount = String(missedCount);
-      if (typeof syncLayoutViewLauncherButtonState === "function") {{
+      if (typeof setWorkspaceLauncherViewNotificationCount === "function") {{
+        setWorkspaceLauncherViewNotificationCount("chat", unreadCount);
+      }} else if (typeof syncLayoutViewLauncherButtonState === "function") {{
         syncLayoutViewLauncherButtonState(activeLayoutView);
       }}
     }}
