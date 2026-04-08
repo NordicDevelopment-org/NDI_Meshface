@@ -32,6 +32,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'class="workspace-launcher-row"' in html
     assert 'class="workspace-launcher-shell"' in html
     assert 'class="topbar-view-menu-btn-label">Views<' in html
+    assert 'class="topbar-update-ticker workspace-update-ticker"' in html
     assert 'id="layout-view-menu-head-current"' in html
     assert 'id="layout-view-menu-btn"' in html
     assert 'id="layout-view-menu"' in html
@@ -39,10 +40,17 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'data-view="network"' in html
     assert 'data-view="apps"' in html
     assert '<aside class="teams-rail"' not in html
+    assert re.search(
+        r'<div class="workspace-launcher-row"[\s\S]*id="layout-view-menu-btn"[\s\S]*id="topbar-update-ticker"',
+        html,
+    )
 
     assert ".workspace-launcher-row {" in css
     assert ".workspace-launcher-shell {" in css
     assert "min-height: 38px;" in css
+    assert ".topbar-update-ticker {" in css
+    assert ".workspace-update-ticker {" in css
+    assert "flex: 1 1 auto;" in css
     assert ".topbar-view-menu-btn {" in css
     assert ".topbar-view-menu-btn-label {" in css
     assert ".topbar-view-menu-head {" in css
