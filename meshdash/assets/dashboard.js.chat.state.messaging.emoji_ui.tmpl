@@ -82,6 +82,12 @@
       return Math.max(88, Math.round(total));
     }}
 
+    function estimateChatReactionCompactToggleTop(panel) {{
+      if (!(panel instanceof HTMLElement)) return 0;
+      const computed = window.getComputedStyle(panel);
+      return Math.max(0, parseFloat(computed.paddingTop || "0") || 0);
+    }}
+
     function setChatEmojiButtonsExpanded(expanded, anchor = null) {{
       const activeAnchor = anchor instanceof HTMLButtonElement ? anchor : null;
       for (const btn of chatEmojiComposeButtons()) {{
@@ -246,6 +252,7 @@
 
     function renderChatEmojiPickerPanel() {{
       const panel = chatEmojiPanelElement();
+      const topLabel = document.getElementById("chat-emoji-top-label");
       const groupSelect = document.getElementById("chat-emoji-group-select");
       const searchInput = document.getElementById("chat-emoji-search");
       const searchRow = document.getElementById("chat-emoji-search-row");
@@ -264,6 +271,9 @@
       }}
       if (reactToggleRow instanceof HTMLElement) {{
         reactToggleRow.hidden = chatEmojiMode !== "react";
+      }}
+      if (topLabel instanceof HTMLElement) {{
+        topLabel.hidden = chatEmojiMode === "react";
       }}
       if (reactToggleBtn instanceof HTMLButtonElement) {{
         reactToggleBtn.textContent = reactionCollapsed ? "More reactions ▸" : "Less reactions ▾";
@@ -441,6 +451,7 @@
       if (!(panel instanceof HTMLElement) || panel.hidden) return;
       const anchor = resolveChatEmojiPanelAnchor();
       if (!(anchor instanceof HTMLElement)) return;
+      const reactToggleRow = document.getElementById("chat-emoji-react-toggle-row");
 
       const anchorRect = anchor.getBoundingClientRect();
       const margin = 8;
@@ -454,12 +465,13 @@
       );
       const minTop = Math.max(margin, topbarBottom + 6);
       let reactionCompactTop = null;
-      let reactionCompactBottom = null;
+      let reactionCompactToggleTop = null;
 
       if (chatEmojiMode === "react") {{
         const compactHeight = chatReactionPickerExpanded
           ? estimateChatReactionCompactPanelHeight(panel)
           : (panel.offsetHeight || estimateChatReactionCompactPanelHeight(panel));
+        const compactToggleTop = estimateChatReactionCompactToggleTop(panel);
         let compactTop = anchorRect.bottom + 6;
         if ((compactTop + compactHeight) > (viewportHeight - margin)) {{
           compactTop = anchorRect.top - compactHeight - 6;
@@ -469,11 +481,23 @@
           compactTop = Math.max(minTop, viewportHeight - compactHeight - margin);
         }}
         reactionCompactTop = compactTop;
-        reactionCompactBottom = compactTop + compactHeight;
+        reactionCompactToggleTop = compactTop + compactToggleTop;
       }}
 
-      if (chatEmojiMode === "react" && chatReactionPickerExpanded && reactionCompactBottom !== null) {{
-        const availableHeight = Math.max(160, Math.round(reactionCompactBottom - minTop));
+      if (
+        chatEmojiMode === "react"
+        && chatReactionPickerExpanded
+        && reactionCompactToggleTop !== null
+        && reactToggleRow instanceof HTMLElement
+      ) {{
+        panel.style.maxHeight = "";
+        const rawHeight = panel.offsetHeight || 240;
+        const rawToggleTop = reactToggleRow.offsetTop || 0;
+        const remainingBelowToggle = Math.max(0, rawHeight - rawToggleTop);
+        const availableHeight = Math.max(
+          160,
+          Math.round((reactionCompactToggleTop - minTop) + remainingBelowToggle),
+        );
         panel.style.maxHeight = `${{availableHeight}}px`;
       }} else {{
         panel.style.maxHeight = "";
@@ -493,8 +517,13 @@
 
       const preferBelow = chatEmojiMode === "react";
       let top;
-      if (chatEmojiMode === "react" && chatReactionPickerExpanded) {{
-        top = (reactionCompactBottom !== null ? reactionCompactBottom : (anchorRect.bottom + 6)) - height;
+      if (
+        chatEmojiMode === "react"
+        && chatReactionPickerExpanded
+        && reactionCompactToggleTop !== null
+        && reactToggleRow instanceof HTMLElement
+      ) {{
+        top = reactionCompactToggleTop - (reactToggleRow.offsetTop || 0);
       }} else {{
         top = reactionCompactTop !== null
           ? reactionCompactTop
