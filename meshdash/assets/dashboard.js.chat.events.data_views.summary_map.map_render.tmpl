@@ -75,12 +75,15 @@
       const ts = Number(lastSeenUnix);
       if (!Number.isFinite(ts) || ts <= 0) return 1;
       const ageSec = Math.max(0, nowUnix - ts);
-      const fadeStartSec = 45 * 60;
-      const fadeFullSec = 24 * 60 * 60;
-      if (ageSec <= fadeStartSec) return 1;
-      if (ageSec >= fadeFullSec) return 0;
-      const span = Math.max(1, fadeFullSec - fadeStartSec);
-      return 1 - ((ageSec - fadeStartSec) / span);
+      const onlineWindowSec = Math.max(0, Number(chatWarnWindowSeconds) || (10 * 60));
+      const staleWindowSec = Math.max(
+        onlineWindowSec + 1,
+        Number(chatStaleWindowSeconds) || (30 * 60)
+      );
+      if (ageSec <= onlineWindowSec) return 1;
+      if (ageSec >= staleWindowSec) return 0;
+      const span = Math.max(1, staleWindowSec - onlineWindowSec);
+      return 1 - ((ageSec - onlineWindowSec) / span);
     }}
 
     function renderMap(nodes, edges, nodeHistory = null) {{
