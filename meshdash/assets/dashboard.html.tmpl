@@ -428,110 +428,106 @@
   </div>
   <div id="dashboard-layout" class="layout view-chat">
     <section class="card settings" aria-label="Settings">
-      <div class="settings-card-head">
-        <h2>Settings</h2>
-        <div class="settings-caption" id="settings-caption">
-          Configure the connected radio. Some changes (especially LoRa) may reboot the device.
-        </div>
-      </div>
       <div class="body">
-        <div class="settings-actions settings-actions-top">
-          <button id="settings-apply-lora" class="btn" type="button">Apply LoRa settings</button>
-          <button id="settings-reset" class="btn btn-secondary" type="button">Fetch settings</button>
-          <span id="settings-apply-status" class="settings-status"></span>
+        <div class="settings-toolbar">
+          <div class="settings-tabbar" role="tablist" aria-label="Settings categories">
+            <button
+              id="settings-tab-core-btn"
+              class="settings-tab-btn is-active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              data-settings-tab="core"
+            >
+              Core
+            </button>
+            <button
+              id="settings-tab-device-btn"
+              class="settings-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-settings-tab="device"
+            >
+              Device
+            </button>
+            <button
+              id="settings-tab-connectivity-btn"
+              class="settings-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-settings-tab="connectivity"
+            >
+              Connectivity
+            </button>
+            <button
+              id="settings-tab-location-btn"
+              class="settings-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-settings-tab="location"
+            >
+              Location
+            </button>
+            <button
+              id="settings-tab-channels-btn"
+              class="settings-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-settings-tab="channels"
+            >
+              Channels
+            </button>
+            <button
+              id="settings-tab-tickers-btn"
+              class="settings-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-settings-tab="tickers"
+            >
+              Tickers
+            </button>
+            <button
+              id="settings-tab-lists-btn"
+              class="settings-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-settings-tab="lists"
+            >
+              Lists
+            </button>
+            <button
+              id="settings-tab-appearance-btn"
+              class="settings-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-settings-tab="appearance"
+            >
+              Appearance
+            </button>
+            <button
+              id="settings-tab-system-btn"
+              class="settings-tab-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-settings-tab="system"
+            >
+              About
+            </button>
+          </div>
+          <div class="settings-actions settings-actions-top">
+            <button id="settings-apply-lora" class="btn" type="button">Apply LoRa settings</button>
+            <button id="settings-reset" class="btn btn-secondary" type="button">Fetch settings</button>
+          </div>
         </div>
-        <div class="settings-tabbar" role="tablist" aria-label="Settings categories">
-          <button
-            id="settings-tab-core-btn"
-            class="settings-tab-btn is-active"
-            type="button"
-            role="tab"
-            aria-selected="true"
-            data-settings-tab="core"
-          >
-            Core
-          </button>
-          <button
-            id="settings-tab-device-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="device"
-          >
-            Device
-          </button>
-          <button
-            id="settings-tab-connectivity-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="connectivity"
-          >
-            Connectivity
-          </button>
-          <button
-            id="settings-tab-location-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="location"
-          >
-            Location
-          </button>
-          <button
-            id="settings-tab-channels-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="channels"
-          >
-            Channels
-          </button>
-          <button
-            id="settings-tab-tickers-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="tickers"
-          >
-            Tickers
-          </button>
-          <button
-            id="settings-tab-lists-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="lists"
-          >
-            Lists
-          </button>
-          <button
-            id="settings-tab-appearance-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="appearance"
-          >
-            Appearance
-          </button>
-          <button
-            id="settings-tab-system-btn"
-            class="settings-tab-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            data-settings-tab="system"
-          >
-            About
-          </button>
-        </div>
+        <div id="settings-apply-status" class="settings-status settings-status-top"></div>
 
         <div class="settings-grid">
           <div class="settings-panel" data-settings-tab-panel="core">
