@@ -64,6 +64,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert ".topbar-view-menu-head {" in css
     assert ".topbar-view-menu-item-icon {" in css
     assert ".topbar-view-menu {" in css
+    assert "z-index: 1350;" in css
     assert re.search(
         r"\.workspace-shell \{\s*--chat-panel-width: 250px;[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);",
         css,
