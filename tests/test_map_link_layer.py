@@ -51,6 +51,17 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "estimateLine && estimateLine.avgRssi ??" not in js
 
 
+def test_dashboard_js_keeps_leaflet_tile_layers_removable_on_theme_swap() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "mapTileLayer.off();" not in js
+    assert "settingsFixedMapTileLayer.off();" not in js
+
+
 def test_record_direct_edge_observation_tracks_signal_metrics() -> None:
     session_edges: dict[tuple[str, str], dict[str, object]] = {}
     historical_edges: dict[tuple[str, str], dict[str, object]] = {}
