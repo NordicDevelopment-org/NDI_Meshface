@@ -1648,7 +1648,7 @@
         backBtn.setAttribute("aria-disabled", previousId ? "false" : "true");
         backBtn.title = previousId
           ? `Go back to ${{networkGraphNodeDisplayName(previousId, safeMap)}}`
-          : "No earlier graph focus yet";
+          : "No earlier links focus yet";
       }}
 
       if (homeBtn instanceof HTMLButtonElement) {{
@@ -1657,8 +1657,8 @@
         homeBtn.disabled = !canGoHome;
         homeBtn.setAttribute("aria-disabled", canGoHome ? "false" : "true");
         homeBtn.title = canGoHome
-          ? `Return graph focus to ${{networkGraphNodeDisplayName(homeNodeId, safeMap)}}`
-          : "Graph is already centered on the local node";
+          ? `Center links view on ${{networkGraphNodeDisplayName(homeNodeId, safeMap)}}`
+          : "Links view is already centered on the local node";
       }}
     }}
 

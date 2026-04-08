@@ -30,6 +30,8 @@ def test_dashboard_html_adds_map_link_layer_toggle() -> None:
     assert "Link Layer" in html
     assert 'class="map-control-group map-heatmap-controls"' in html
     assert html.index('id="map-heatmap-wrap"') < html.index('id="map-heatmap-mode-wrap"')
+    assert ">Links</button>" in html
+    assert 'title="Reset links view"' in html
 
 
 def test_dashboard_js_supports_map_link_layer_overlay() -> None:
@@ -51,6 +53,8 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "estimateLine && estimateLine.avgHops ??" not in js
     assert "estimateLine && estimateLine.avgSnr ??" not in js
     assert "estimateLine && estimateLine.avgRssi ??" not in js
+    assert "No earlier links focus yet" in js
+    assert "Links view is already centered on the local node" in js
 
 
 def test_dashboard_js_keeps_leaflet_tile_layers_removable_on_theme_swap() -> None:
