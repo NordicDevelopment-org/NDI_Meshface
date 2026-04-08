@@ -148,11 +148,17 @@ def test_chat_click_selection_keeps_same_node_selected() -> None:
 def test_chat_reaction_anchor_reuses_same_button_for_more_and_less_states() -> None:
     emoji_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.emoji_ui.tmpl").read_text()
     bindings_src = Path("meshdash/assets/dashboard.js.chat.events.bindings.tmpl").read_text()
+    feed_src = Path("meshdash/assets/dashboard.js.chat.render.feed_items.tmpl").read_text()
+    layout_src = Path("meshdash/assets/dashboard.js.chat.events.core.navigation.layout.tmpl").read_text()
     css = build_dashboard_css(theme_css="")
 
     assert "function syncChatReactionAnchorLabels() {{" in emoji_src
     assert 'function setChatReactionPickerExpanded(expanded, focusSearch = false) {{' in emoji_src
     assert "function isChatReactionAnchorToggleSource(anchor) {{" in emoji_src
+    assert "function restoreChatReactionContextTooltip() {{" in emoji_src
+    assert "function suppressChatReactionContextTooltip(anchor = null) {{" in emoji_src
+    assert "function parseChatReactionSummaryGroups(anchor) {{" in emoji_src
+    assert "function renderChatEmojiReactionSummaryRow(anchor = null) {{" in emoji_src
     assert "function animateChatEmojiPanelTransition(previousRect = null, options = null) {{" in emoji_src
     assert "function animateChatEmojiPanelClose(options = null) {{" in emoji_src
     assert "function finalizeChatEmojiPanelClose(panel = null) {{" in emoji_src
@@ -163,12 +169,29 @@ def test_chat_reaction_anchor_reuses_same_button_for_more_and_less_states() -> N
     assert 'const reactionAnchorGap = reactionAnchorOwnsToggle ? 0 : 6;' in emoji_src
     assert 'const availableAbove = Math.max(220, Math.round(anchorRect.top - minTop + 2));' in emoji_src
     assert 'if (target.closest(".chat-reaction-summary") || target.closest(".chat-react-btn")) return;' in emoji_src
+    assert 'const owner = anchor.closest(".chat-feed-item[title], .chatlabs-message-row[title], [data-message-id][title]");' in emoji_src
+    assert 'owner.removeAttribute("title");' in emoji_src
     assert 'animateChatEmojiPanelTransition(previousRect, {{' in emoji_src
     assert 'animateChatEmojiPanelClose({{' in emoji_src
+    assert 'const canManageOrder = !usePreferredChoices && chatEmojiMode !== "react";' in emoji_src
+    assert 'id="chat-emoji-current-reactions-shell"' in emoji_src
+    assert 'target.closest(".chat-emoji-current-reaction-chip")' in emoji_src
+    assert '<div class="chat-emoji-top-label">Current reactions</div>' not in emoji_src
+    assert "restoreChatReactionContextTooltip();" in emoji_src
+    assert "suppressChatReactionContextTooltip(chatEmojiAnchorElement);" in emoji_src
     assert 'openReactionPickerFromAnchor(summary, {{ expand: true, toggleExpanded: true }});' in bindings_src
     assert 'openReactionPickerFromAnchor(anchor, {{ expand: false }});' in bindings_src
+    assert 'aria-label="${{escAttr(summaryAria)}}">' in feed_src
+    assert 'title="${{escAttr(summaryTitle)}}"' not in feed_src
+    assert 'title="${{escAttr(`${{reactionSummaryTitle}} • React to this message`)}}"' not in layout_src
+    assert 'title="Add reaction"' not in layout_src
+    assert "node.dataset.defaultReactionTitle" not in emoji_src
+    assert 'node.setAttribute("title", nextText);' not in emoji_src
     assert ".chat-reaction-summary.is-empty.is-reaction-preview," in css
     assert ".chat-emoji-panel.is-closing {" in css
+    assert ".chat-emoji-current-reactions-shell {" in css
+    assert "gap: 0;" in css
+    assert ".chat-emoji-current-reaction-chip {" in css
     assert "@keyframes chatEmojiPanelContentIn {" in css
     assert "transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 180ms ease, transform 180ms ease;" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-reaction-summary.is-empty.is-reaction-preview," in css

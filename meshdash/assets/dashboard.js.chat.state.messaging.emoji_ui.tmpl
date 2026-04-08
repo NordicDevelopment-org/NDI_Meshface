@@ -32,6 +32,28 @@
       return out;
     }}
 
+    function restoreChatReactionContextTooltip() {{
+      for (const node of document.querySelectorAll("[data-chat-reaction-muted-title]")) {{
+        if (!(node instanceof HTMLElement)) continue;
+        const mutedTitle = String(node.dataset.chatReactionMutedTitle || "");
+        if (mutedTitle) {{
+          node.setAttribute("title", mutedTitle);
+        }} else {{
+          node.removeAttribute("title");
+        }}
+        delete node.dataset.chatReactionMutedTitle;
+      }}
+    }}
+
+    function suppressChatReactionContextTooltip(anchor = null) {{
+      restoreChatReactionContextTooltip();
+      if (!(anchor instanceof HTMLElement)) return;
+      const owner = anchor.closest(".chat-feed-item[title], .chatlabs-message-row[title], [data-message-id][title]");
+      if (!(owner instanceof HTMLElement)) return;
+      owner.dataset.chatReactionMutedTitle = owner.getAttribute("title") || "";
+      owner.removeAttribute("title");
+    }}
+
     function clearChatReactionPickerHideTimer() {{
       if (chatReactionPickerHideTimer !== null) {{
         clearTimeout(chatReactionPickerHideTimer);
@@ -131,6 +153,7 @@
 
     function finalizeChatEmojiPanelClose(panel = null) {{
       const targetPanel = panel instanceof HTMLElement ? panel : chatEmojiPanelElement();
+      restoreChatReactionContextTooltip();
       chatEmojiMode = "compose";
       chatReactionTargetId = null;
       chatReactionPickerExpanded = false;
@@ -230,14 +253,86 @@
       return !!anchor.closest(".chat-reaction-summary, .chat-react-btn");
     }}
 
+    function normalizeChatReactionSummaryName(value) {{
+      const clean = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+      return clean || "Unknown node";
+    }}
+
+    function parseChatReactionSummaryGroups(anchor) {{
+      if (!(anchor instanceof HTMLButtonElement)) return [];
+      const raw = String(anchor.dataset.reactionSummary || "").trim();
+      if (!raw) return [];
+      try {{
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .map((item) => {{
+            if (!item || typeof item !== "object") return null;
+            const emoji = String(item.emoji || "").trim();
+            const count = Number(item.count || 0);
+            const names = Array.isArray(item.names)
+              ? item.names
+                  .map((name) => normalizeChatReactionSummaryName(name))
+                  .filter((name, idx, arr) => !!name && arr.indexOf(name) === idx)
+              : [];
+            if (!emoji || !Number.isFinite(count) || count <= 0) return null;
+            return {{
+              emoji,
+              count: Math.trunc(count),
+              names,
+            }};
+          }})
+          .filter((item) => !!item);
+      }} catch (_err) {{
+        return [];
+      }}
+    }}
+
+    function chatReactionSummaryGroupTooltip(group) {{
+      if (!group || typeof group !== "object") return "";
+      const emoji = String(group.emoji || "").trim();
+      const count = Math.max(0, Number(group.count || 0));
+      const names = Array.isArray(group.names) ? group.names : [];
+      const shownNames = names.slice(0, 6);
+      const remainder = Math.max(0, count - shownNames.length);
+      if (!shownNames.length) {{
+        return `${{emoji}} ${{count}} reaction${{count === 1 ? "" : "s"}}`;
+      }}
+      return `${{emoji}} ${{count}} • ${{shownNames.join(", ")}}${{remainder > 0 ? ` +${{remainder}} more` : ""}}`;
+    }}
+
+    function renderChatEmojiReactionSummaryRow(anchor = null) {{
+      const shell = document.getElementById("chat-emoji-current-reactions-shell");
+      const row = document.getElementById("chat-emoji-current-reactions");
+      if (!(shell instanceof HTMLElement) || !(row instanceof HTMLElement)) return;
+      const groups = (
+        chatEmojiMode === "react" && anchor instanceof HTMLButtonElement
+      ) ? parseChatReactionSummaryGroups(anchor) : [];
+      if (!groups.length) {{
+        shell.hidden = true;
+        row.replaceChildren();
+        return;
+      }}
+      const nodes = groups.map((group) => {{
+        const tooltip = chatReactionSummaryGroupTooltip(group);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chat-reaction-chip chat-emoji-current-reaction-chip";
+        btn.setAttribute("data-emoji", group.emoji);
+        btn.setAttribute("title", tooltip);
+        btn.setAttribute("aria-label", tooltip);
+        btn.innerHTML = `<span class="chat-reaction-emoji">${{escAttr(group.emoji)}}</span><span class="chat-reaction-count">${{escAttr(group.count)}}</span>`;
+        return btn;
+      }});
+      row.replaceChildren(...nodes);
+      shell.hidden = false;
+    }}
+
     function syncChatReactionAnchorLabels() {{
       for (const node of document.querySelectorAll(".chat-reaction-summary.is-empty")) {{
         if (!(node instanceof HTMLButtonElement)) continue;
         const label = node.querySelector(".chat-reaction-summary-label");
         if (!(label instanceof HTMLElement)) continue;
-        if (!node.dataset.defaultReactionTitle) {{
-          node.dataset.defaultReactionTitle = node.getAttribute("title") || "Add reaction";
-        }}
         if (!node.dataset.defaultReactionAria) {{
           node.dataset.defaultReactionAria = node.getAttribute("aria-label") || "Add reaction";
         }}
@@ -254,10 +349,8 @@
         node.classList.toggle("is-reaction-preview", state === "preview");
         node.classList.toggle("is-reaction-expanded", state === "expanded");
         if (state) {{
-          node.setAttribute("title", nextText);
           node.setAttribute("aria-label", nextText);
         }} else {{
-          node.setAttribute("title", node.dataset.defaultReactionTitle);
           node.setAttribute("aria-label", node.dataset.defaultReactionAria);
         }}
       }}
@@ -455,7 +548,7 @@
       );
       const usePreferredChoices = preferredChoices.length > 0;
       const sourceChoices = usePreferredChoices ? preferredChoices : chatEmojiTopChoices();
-      const canManageOrder = !usePreferredChoices;
+      const canManageOrder = !usePreferredChoices && chatEmojiMode !== "react";
       const labelText = usePreferredChoices
         ? String((options && options.label) || "Top matches").trim() || "Top matches"
         : "Top used (drag from below to replace)";
@@ -503,6 +596,7 @@
 
     function renderChatEmojiPickerPanel() {{
       const panel = chatEmojiPanelElement();
+      const currentReactionsShell = document.getElementById("chat-emoji-current-reactions-shell");
       const topLabel = document.getElementById("chat-emoji-top-label");
       const groupSelect = document.getElementById("chat-emoji-group-select");
       const searchInput = document.getElementById("chat-emoji-search");
@@ -524,6 +618,12 @@
         panel.classList.toggle("chat-emoji-panel-react-collapsed", reactionCollapsed);
         panel.classList.toggle("chat-emoji-panel-react-expanded", reactionExpanded);
         panel.classList.toggle("chat-emoji-panel-react-anchor-toggle", reactionAnchorOwnsToggle);
+      }}
+      renderChatEmojiReactionSummaryRow(
+        chatEmojiAnchorElement instanceof HTMLButtonElement ? chatEmojiAnchorElement : null
+      );
+      if (currentReactionsShell instanceof HTMLElement) {{
+        currentReactionsShell.hidden = currentReactionsShell.hidden || chatEmojiMode !== "react";
       }}
       if (reactToggleRow instanceof HTMLElement) {{
         reactToggleRow.hidden = true;
@@ -800,6 +900,11 @@
       chatEmojiAnchorElement = anchorEl instanceof HTMLElement
         ? anchorEl
         : (chatBtn instanceof HTMLElement ? chatBtn : null);
+      if (chatEmojiMode === "react") {{
+        suppressChatReactionContextTooltip(chatEmojiAnchorElement);
+      }} else {{
+        restoreChatReactionContextTooltip();
+      }}
       renderChatEmojiPickerPanel();
       panel.hidden = false;
       positionChatEmojiPanel();
@@ -876,7 +981,10 @@
 
       if (panel.dataset.init !== "1") {{
         const groupOptions = '<option value="all">All groups (loading...)</option>';
-        panel.innerHTML = `<div id="chat-emoji-top-label" class="chat-emoji-top-label">Top used</div>
+        panel.innerHTML = `<div id="chat-emoji-current-reactions-shell" class="chat-emoji-current-reactions-shell" hidden>
+          <div id="chat-emoji-current-reactions" class="chat-emoji-current-reactions" aria-label="Current reactions"></div>
+        </div>
+        <div id="chat-emoji-top-label" class="chat-emoji-top-label">Top used</div>
         <div id="chat-emoji-top-grid" class="chat-emoji-top-grid" aria-label="Top used"></div>
           <div id="chat-emoji-react-toggle-row" class="chat-emoji-react-toggle-row" hidden>
             <button id="chat-emoji-react-toggle" class="chat-emoji-react-toggle-btn" type="button" aria-expanded="false">More reactions ▸</button>
@@ -992,6 +1100,19 @@
         panel.addEventListener("click", (ev) => {{
           const target = ev.target;
           if (!(target instanceof Element)) return;
+          const reactionChip = target.closest(".chat-emoji-current-reaction-chip");
+          if (reactionChip instanceof HTMLButtonElement) {{
+            const emoji = String(reactionChip.getAttribute("data-emoji") || "").trim();
+            if (!emoji) return;
+            noteChatEmojiUsage(emoji);
+            if (chatEmojiMode === "react" && Number.isInteger(chatReactionTargetId) && chatReactionTargetId > 0) {{
+              sendChatReaction(chatReactionTargetId, emoji);
+            }} else {{
+              insertEmojiAtCursor(emoji);
+            }}
+            closeChatEmojiPanel();
+            return;
+          }}
           const emojiBtn = target.closest(".chat-emoji-item");
           if (!(emojiBtn instanceof HTMLButtonElement)) return;
           const emoji = String(emojiBtn.getAttribute("data-emoji") || emojiBtn.textContent || "").trim();

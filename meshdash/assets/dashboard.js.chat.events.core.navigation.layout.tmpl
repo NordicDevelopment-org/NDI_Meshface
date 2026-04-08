@@ -558,13 +558,13 @@
           .map((bucket) => `<span class="chat-reaction-summary-emoji">${{escAttr(bucket.emoji)}}</span>`)
           .join("");
         const reactionSummary = reactionGroups.length > 0
-          ? `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" data-reply-id="${{escAttr(messageId)}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}" title="${{escAttr(`${{reactionSummaryTitle}} • React to this message`)}}">
+          ? `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" data-reply-id="${{escAttr(messageId)}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}">
               <span class="chat-reaction-summary-icons">${{reactionSummaryIcons}}</span>
               <span class="chat-reaction-summary-total">${{reactionTotal}}</span>
             </button>`
           : "";
         const reactButton = messageId
-          ? `<button type="button" class="chat-react-btn chatlabs-react-meta${{reactionGroups.length > 0 ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" title="Add reaction" aria-label="Add reaction">+</button>`
+          ? `<button type="button" class="chat-react-btn chatlabs-react-meta${{reactionGroups.length > 0 ? " has-reactions" : ""}}" data-reply-id="${{escAttr(messageId)}}" aria-label="Add reaction">+</button>`
           : "";
         const tools = (reactionSummary || reactButton)
           ? `<div class="chatlabs-message-tools">${{reactionSummary}}${{reactButton}}</div>`
