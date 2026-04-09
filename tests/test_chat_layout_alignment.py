@@ -14,11 +14,29 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".workspace-main > .layout.view-chat," in css
     assert ".workspace-main > .layout.view-console {" in css
     assert "grid-row: 1 / -1;" in css
+    assert ".chat-left-head-shell {" in css
+    assert "border: 1px solid #d2e1d0;" in css
+    assert "background: #edf6ec;" in css
+    assert ".chat-left-roster-shell {" in css
+    assert "border: 1px solid #d2e1d0;" in css
+    assert "background: #f7fcf7;" in css
     assert ".layout.view-chat .chat {" in css
     assert "background: transparent;" in css
     assert "border: 0;" in css
     assert "box-shadow: none;" in css
     assert "overflow: visible;" in css
+    assert "gap: 8px;" in css
+    assert ".chat-left-panel {" in css
+    assert "border: 0;" in css
+    assert "background: transparent;" in css
+    assert "box-shadow: none;" in css
+    assert ".chat-left-section.chat-users-section {" in css
+    assert "gap: 0;" in css
+    assert ".chat-users-head {" in css
+    assert "padding: 0;" in css
+    assert "background: transparent;" in css
+    assert ".chat-left-panel .chat-member-list {" in css
+    assert "background: transparent;" in css
     assert ".layout.view-chat .chat .body {" in css
     assert "padding: 0;" in css
     assert ".layout.view-chat .chat-shell {" in css
@@ -39,10 +57,9 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "padding: 6px 8px;" in css
     assert "gap: 0;" in css
     assert ".chat-left-bottom-bar {" in css
-    assert "--chat-user-search-inline-start: 6px;" in css
-    assert "--chat-user-search-inline-end: 6px;" in css
-    assert "margin: 0 var(--chat-user-search-inline-end) 6px var(--chat-user-search-inline-start);" in css
-    assert "border: 0;" in css
+    assert "margin: 0;" in css
+    assert "border: 1px solid #d2e1d0;" in css
+    assert "background: #edf6ec;" in css
     assert ".chat-member-list {" in css
     assert "gap: 0;" in css
     assert ".chat-member-item {" in css
@@ -60,6 +77,24 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "#chat-input:hover {" not in css
     assert "[data-theme=\"dark\"] #chat-input:hover {" not in css
     assert "[data-theme=\"dark\"] #chat-input:focus {" not in css
+
+
+def test_chat_left_column_uses_distinct_head_and_roster_shells() -> None:
+    html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
+        style_css="",
+        app_js="",
+        revision_title="rev",
+        revision_label="rev",
+        safety_label="safe",
+        packet_limit=100,
+        history_label="history",
+        refresh_ms=1000,
+    )
+
+    assert 'class="chat-left-head-shell"' in html
+    assert 'class="chat-left-section chat-users-section chat-left-roster-shell"' in html
 
 
 def test_chat_compose_notices_float_above_composer_shell() -> None:
@@ -99,6 +134,10 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "background: #0d1711;" in css
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat {" in css
     assert "border-color: transparent;" in css
+    assert "[data-theme=\"dark\"] .chat-left-panel {" in css
+    assert "border-color: transparent !important;" in css
+    assert "[data-theme=\"dark\"] .chat-left-head-shell {" in css
+    assert "[data-theme=\"dark\"] .chat-left-roster-shell {" in css
     assert "[data-theme=\"dark\"] .card.chat .body {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "background: #08120d;" in css
@@ -113,8 +152,7 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "border-color: var(--workspace-shell-border);" in css
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell {" in css
     assert "background: var(--workspace-shell-bg-alt);" in css
-    assert "[data-theme=\"dark\"] .chat-left-panel {" in css
-    assert "border-color: #2d8f5d !important;" in css
+    assert "[data-theme=\"dark\"] .chat-left-bottom-bar {" in css
     assert "[data-theme=\"dark\"] .chat-panel-splitter {" in css
     assert "[data-theme=\"dark\"] .chat-member-pane {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-feed-item {" in css

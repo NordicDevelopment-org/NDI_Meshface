@@ -1481,14 +1481,15 @@
       top: auto;
       height: 100%;
       min-height: 0;
-      border: 1px solid #c6d6c0;
-      border-radius: 10px;
-      background: #f6fbf5;
-      box-shadow: var(--shadow);
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
       display: flex;
       flex-direction: column;
+      gap: 8px;
       min-width: 0;
-      overflow: hidden;
+      overflow: visible;
     }}
     .chat-panel-splitter {{
       grid-column: 2;
@@ -1528,6 +1529,26 @@
     .chat-left-panel[hidden] {{
       display: none !important;
     }}
+    .chat-left-head-shell {{
+      border: 1px solid #d2e1d0;
+      border-radius: 10px;
+      background: #edf6ec;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 0 0 auto;
+      min-width: 0;
+      overflow: visible;
+    }}
+    .chat-left-roster-shell {{
+      border: 1px solid #d2e1d0;
+      border-radius: 10px;
+      background: #f7fcf7;
+      padding: 0;
+      min-height: 0;
+      overflow: hidden;
+    }}
     .chat-left-head {{
       border-bottom: 1px solid #d2e1d0;
       background: #edf6ec;
@@ -1551,12 +1572,14 @@
       background: #f7fcf7;
     }}
     .chat-left-section.chat-users-section {{
-      border-bottom: none;
+      border-bottom: 0;
+      padding: 0;
+      background: transparent;
       flex: 1 1 auto;
       min-height: 0;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 0;
     }}
     .chat-left-label {{
       font-size: 10px;
@@ -1572,6 +1595,9 @@
       justify-content: space-between;
       gap: 6px;
       min-width: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
     }}
     .chat-users-head-view-btn {{
       flex: 0 0 auto;
@@ -1615,7 +1641,7 @@
       background: #e7f3eb;
     }}
     .workspace-shell.chat-panel-collapsed .chat-left-section.chat-users-section {{
-      padding: 6px 4px 4px 4px;
+      padding: 0;
       gap: 4px;
     }}
     .workspace-shell.chat-panel-collapsed .chat-users-head {{
@@ -1928,6 +1954,8 @@
     .chat-left-panel .chat-member-list {{
       padding: 0;
       flex: 1 1 auto;
+      background: transparent;
+      border: 0;
     }}
     .list-search-input,
     #chat-input {{
@@ -2013,11 +2041,11 @@
     .chat-left-bottom-bar {{
       --chat-user-search-inline-start: 6px;
       --chat-user-search-inline-end: 6px;
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-      padding: 0;
-      margin: 0 var(--chat-user-search-inline-end) 6px var(--chat-user-search-inline-start);
+      border: 1px solid #d2e1d0;
+      border-radius: 10px;
+      background: #edf6ec;
+      padding: 6px 8px;
+      margin: 0;
       flex: 0 0 auto;
     }}
     .nodes-search-wrap {{
