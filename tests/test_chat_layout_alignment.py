@@ -14,18 +14,29 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".workspace-main > .layout.view-chat," in css
     assert ".workspace-main > .layout.view-console {" in css
     assert "grid-row: 1 / -1;" in css
-    assert ".chat-shell {" in css
-    assert "padding: 8px 10px;" in css
-    assert ".chat-main-pane {" in css
-    assert "row-gap: 0;" in css
-    assert ".chat-log-scroll {" in css
-    assert "padding: 0;" in css
-    assert ".chat-compose-shell {" in css
-    assert "margin-top: 6px;" in css
+    assert ".layout.view-chat .chat {" in css
     assert "background: transparent;" in css
     assert "border: 0;" in css
-    assert "border-radius: 0;" in css
+    assert "box-shadow: none;" in css
+    assert "overflow: visible;" in css
+    assert ".layout.view-chat .chat .body {" in css
     assert "padding: 0;" in css
+    assert ".layout.view-chat .chat-shell {" in css
+    assert "padding: 0;" in css
+    assert ".layout.view-chat .chat-compose-notices {" in css
+    assert "padding: 0 0 6px 0;" in css
+    assert ".layout.view-chat .chat-main-pane {" in css
+    assert "row-gap: 8px;" in css
+    assert ".layout.view-chat .chat-log-scroll {" in css
+    assert "border: 1px solid #d2e1d0;" in css
+    assert "border-radius: 10px;" in css
+    assert "background: #f7fcf7;" in css
+    assert ".layout.view-chat .chat-compose-shell {" in css
+    assert "margin-top: 0;" in css
+    assert "border: 1px solid #d2e1d0;" in css
+    assert "border-radius: 10px;" in css
+    assert "background: #edf6ec;" in css
+    assert "padding: 6px 8px;" in css
     assert "gap: 0;" in css
     assert ".chat-left-bottom-bar {" in css
     assert "--chat-user-search-inline-start: 6px;" in css
@@ -86,10 +97,22 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
 
     assert "[data-theme=\"dark\"] .card.chat .chat-card-head {" in css
     assert "background: #0d1711;" in css
+    assert "[data-theme=\"dark\"] .layout.view-chat .card.chat {" in css
+    assert "border-color: transparent;" in css
     assert "[data-theme=\"dark\"] .card.chat .body {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "background: #08120d;" in css
     assert "background: #08120d !important;" in css
+    assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .body," in css
+    assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-shell {" in css
+    assert "background: transparent !important;" in css
+    assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-card-head.workspace-chrome-bar {" in css
+    assert "background: var(--workspace-shell-bg-alt);" in css
+    assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-log-scroll {" in css
+    assert "background: var(--workspace-shell-bg);" in css
+    assert "border-color: var(--workspace-shell-border);" in css
+    assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell {" in css
+    assert "background: var(--workspace-shell-bg-alt);" in css
     assert "[data-theme=\"dark\"] .chat-left-panel {" in css
     assert "border-color: #2d8f5d !important;" in css
     assert "[data-theme=\"dark\"] .chat-panel-splitter {" in css

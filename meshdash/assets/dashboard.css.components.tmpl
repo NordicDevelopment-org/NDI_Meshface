@@ -3212,10 +3212,21 @@
       background: var(--ui-panel);
       border-color: var(--ui-border);
     }}
+    [data-theme="dark"] .layout.view-chat .card.chat {{
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }}
     [data-theme="dark"] .card.chat .chat-card-head {{
       background: #0d1711;
       border-bottom: 1px solid #2e4a3a;
       border-color: #2e4a3a;
+    }}
+    [data-theme="dark"] .layout.view-chat .card.chat .chat-card-head.workspace-chrome-bar {{
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
     }}
     [data-theme="dark"] .card:not(.chat) > h2 {{
       background: #070d07;
@@ -3228,9 +3239,21 @@
     [data-theme="dark"] .card.chat .chat-shell {{
       background: #08120d;
     }}
+    [data-theme="dark"] .layout.view-chat .card.chat .body,
+    [data-theme="dark"] .layout.view-chat .card.chat .chat-shell {{
+      background: transparent !important;
+      box-shadow: none;
+    }}
     [data-theme="dark"] .card.chat .chat-log-scroll {{
       background: transparent;
       border: 0;
+    }}
+    [data-theme="dark"] .layout.view-chat .card.chat .chat-log-scroll {{
+      background: #08120d;
+      background: var(--workspace-shell-bg);
+      border: 1px solid #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      box-shadow: none;
     }}
     [data-theme="dark"] .card.chat .chat-feed-item {{
       --chat-feed-node-hue: 148;
@@ -3437,6 +3460,13 @@
     [data-theme="dark"] .card.chat .chat-compose-shell {{
       background: var(--ui-panel-alt);
       border-color: var(--ui-border);
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .layout.view-chat .card.chat .chat-compose-shell {{
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
       box-shadow: none;
     }}
     [data-theme="dark"] .card.chat .chat-endpoint .chat-id-bg,
