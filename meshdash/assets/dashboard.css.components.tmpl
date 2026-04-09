@@ -5594,14 +5594,22 @@
       background: var(--workspace-shell-bg);
     }}
     [data-theme="dark"] .games-board-wrap {{
-      --games-board-default-background: linear-gradient(180deg, #173526, #122a1f);
-      border-color: #2f5f48;
+      --games-board-accent: var(--ui-accent-soft);
+      --games-board-accent-strong: var(--ui-accent);
+      --games-board-frame: color-mix(in srgb, var(--workspace-shell-border) 74%, var(--games-board-accent-strong) 26%);
+      --games-board-inner-line: color-mix(in srgb, var(--workspace-shell-border-muted) 52%, black);
+      --games-board-surface-top: color-mix(in srgb, var(--workspace-shell-bg-alt) 72%, var(--games-board-accent) 28%);
+      --games-board-surface-bottom: color-mix(in srgb, var(--workspace-shell-bg) 86%, var(--games-board-accent-strong) 14%);
+      --games-board-default-background:
+        radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--games-board-accent) 24%, transparent) 0%, transparent 54%),
+        linear-gradient(180deg, var(--games-board-surface-top), var(--games-board-surface-bottom));
+      border-color: var(--games-board-frame);
     }}
     [data-theme="dark"] .games-board-wrap[data-turn="black"] {{
-      border-color: rgba(0, 0, 0, 0.92);
+      border-color: color-mix(in srgb, var(--games-board-frame) 38%, #000000);
     }}
     [data-theme="dark"] .games-board-wrap[data-turn="white"] {{
-      border-color: rgba(255, 255, 255, 0.84);
+      border-color: color-mix(in srgb, var(--games-board-frame) 44%, #ffffff);
     }}
     [data-theme="dark"] .games-toolbar {{
       background: #07140d;
@@ -5826,22 +5834,29 @@
       box-shadow: inset 0 0 0 1px rgba(76, 168, 118, 0.36);
     }}
     [data-theme="dark"] .reversi-board {{
-      border-color: #2a6a4c;
-      background: linear-gradient(180deg, #113a2b, #102d23);
-      box-shadow: inset 0 0 0 1px rgba(2, 10, 7, 0.42);
+      --reversi-board-root: color-mix(in srgb, var(--ui-accent-soft) 54%, var(--workspace-shell-bg) 46%);
+      --reversi-board-frame: color-mix(in srgb, var(--workspace-shell-border) 68%, var(--ui-accent) 32%);
+      --reversi-board-surface: color-mix(in srgb, var(--reversi-board-root) 78%, black);
+      --reversi-board-cell: color-mix(in srgb, var(--reversi-board-root) 86%, #eef7f2);
+      --reversi-board-cell-hover: color-mix(in srgb, var(--reversi-board-root) 80%, #f7fdf9);
+      --reversi-board-grid: color-mix(in srgb, var(--workspace-shell-border-muted) 56%, var(--ui-accent) 44%);
+      --reversi-board-focus: color-mix(in srgb, var(--ui-accent) 62%, #ffffff);
+      border-color: var(--reversi-board-frame);
+      background: linear-gradient(180deg, var(--reversi-board-root), var(--reversi-board-surface));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-shell-bg-alt) 54%, black);
     }}
     [data-theme="dark"] .reversi-cell {{
-      border-color: #2f7858;
-      background: #215940;
+      background: var(--reversi-board-cell);
+      box-shadow: inset 0 0 0 1px var(--reversi-board-grid);
     }}
     [data-theme="dark"] .reversi-cell:hover {{
-      background: #28684b;
-      border-color: #32835f;
+      background: var(--reversi-board-cell-hover);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--reversi-board-grid) 84%, #ffffff);
     }}
     [data-theme="dark"] .reversi-hint {{
-      background: rgba(179, 240, 207, 0.95);
-      border-color: rgba(109, 184, 146, 0.92);
-      box-shadow: 0 0 0 1px rgba(11, 38, 26, 0.45);
+      background: color-mix(in srgb, var(--ui-accent) 56%, #ffffff);
+      border-color: color-mix(in srgb, var(--ui-accent-soft) 72%, #f4fffa);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-shell-bg) 58%, transparent);
     }}
     [data-theme="dark"] .reversi-hint.hint-black {{
       background: radial-gradient(circle at 30% 26%, #5a6f7e 0%, #273742 56%, #131c23 100%);
@@ -5855,12 +5870,16 @@
     }}
     [data-theme="dark"] .checkers-board,
     [data-theme="dark"] .chess-board {{
-      --classic-board-root: color-mix(in srgb, var(--accent-2, var(--accent, var(--ui-accent-soft, var(--ui-accent, #2ea043)))) 64%, #070d0a);
-      --classic-board-frame: color-mix(in srgb, var(--classic-board-root) 58%, #000000);
-      --classic-board-frame-inner: color-mix(in srgb, var(--classic-board-root) 50%, #000000);
-      --classic-board-cell-light: color-mix(in srgb, var(--classic-board-root) 46%, #899b92);
+      --classic-board-accent: var(--ui-accent-soft);
+      --classic-board-accent-strong: var(--ui-accent);
+      --classic-board-root: color-mix(in srgb, var(--classic-board-accent) 48%, var(--workspace-shell-bg) 52%);
+      --classic-board-frame: color-mix(in srgb, var(--workspace-shell-border) 66%, var(--classic-board-accent-strong) 34%);
+      --classic-board-frame-inner: color-mix(in srgb, var(--workspace-shell-bg-alt) 62%, var(--classic-board-accent) 38%);
+      --classic-board-cell-light: color-mix(in srgb, var(--classic-board-root) 42%, #bac9c1);
       --classic-board-cell-dark: color-mix(in srgb, var(--classic-board-root) 78%, #000000);
       --classic-board-cell-dark-hover: color-mix(in srgb, var(--classic-board-cell-dark) 94%, #ffffff);
+      --classic-board-focus: color-mix(in srgb, var(--classic-board-accent-strong) 62%, #ffffff);
+      --classic-board-target: color-mix(in srgb, var(--classic-board-accent) 62%, #f3fff7);
     }}
     [data-theme="dark"] .checkers-board {{
       border-color: var(--classic-board-frame);
@@ -5886,9 +5905,9 @@
       color: #173143;
     }}
     [data-theme="dark"] .checkers-hint {{
-      background: rgba(170, 231, 184, 0.94);
-      border-color: rgba(99, 168, 118, 0.9);
-      box-shadow: 0 0 0 1px rgba(5, 18, 11, 0.48);
+      background: var(--classic-board-target);
+      border-color: color-mix(in srgb, var(--classic-board-accent) 72%, #f4fffa);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-shell-bg) 58%, transparent);
     }}
     [data-theme="dark"] .chess-board {{
       border-color: var(--classic-board-frame);
@@ -5920,9 +5939,9 @@
         0 -1px 0 rgba(232, 241, 248, 0.4);
     }}
     [data-theme="dark"] .chess-hint {{
-      background: rgba(170, 231, 184, 0.94);
-      border-color: rgba(99, 168, 118, 0.9);
-      box-shadow: 0 0 0 1px rgba(5, 18, 11, 0.48);
+      background: var(--classic-board-target);
+      border-color: color-mix(in srgb, var(--classic-board-accent) 72%, #f4fffa);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-shell-bg) 58%, transparent);
     }}
     [data-theme="dark"] .poker-table {{
       border-color: #2b5843;

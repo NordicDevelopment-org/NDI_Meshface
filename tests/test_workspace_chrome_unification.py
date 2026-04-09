@@ -98,6 +98,30 @@ def test_dark_text_input_variants_share_workspace_shell_tokens() -> None:
     assert "opacity: 0.9;" in css
 
 
+def test_games_boards_follow_runtime_theme_tokens() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    board_wrap_section = css.split(".games-board-wrap {", 1)[1].split("}", 1)[0]
+    reversi_board_section = css.split(".reversi-board {", 1)[1].split("}", 1)[0]
+    reversi_cell_section = css.split(".reversi-cell {", 1)[1].split("}", 1)[0]
+    classic_board_section = css.split(".checkers-board,\n    .chess-board {", 1)[1].split("}", 1)[0]
+    dark_board_wrap_section = css.split("[data-theme=\"dark\"] .games-board-wrap {", 1)[1].split("}", 1)[0]
+    dark_reversi_board_section = css.split("[data-theme=\"dark\"] .reversi-board {", 1)[1].split("}", 1)[0]
+    dark_classic_board_section = css.split("[data-theme=\"dark\"] .checkers-board,\n    [data-theme=\"dark\"] .chess-board {", 1)[1].split("}", 1)[0]
+
+    assert "var(--ui-accent-soft, var(--accent, #2f855a))" in board_wrap_section
+    assert "var(--games-board-frame)" in board_wrap_section
+    assert "var(--reversi-board-accent)" in reversi_board_section
+    assert "var(--reversi-board-cell)" in reversi_cell_section
+    assert "var(--classic-board-accent)" in classic_board_section
+    assert "var(--workspace-shell-bg-alt)" in dark_board_wrap_section
+    assert "var(--workspace-shell-border)" in dark_board_wrap_section
+    assert "var(--ui-accent)" in dark_reversi_board_section
+    assert "var(--workspace-shell-bg)" in dark_classic_board_section
+    assert "#173526" not in dark_board_wrap_section
+    assert "#113a2b" not in dark_reversi_board_section
+
+
 def test_console_view_removes_body_shell_and_keeps_terminal_frame() -> None:
     css = build_dashboard_css(theme_css="")
     body_section = css.split(".layout.view-console .console .body {", 1)[1].split("}", 1)[0]

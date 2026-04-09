@@ -5928,13 +5928,19 @@
       justify-content: center;
     }}
     .games-board-wrap {{
+      --games-board-accent: var(--ui-accent-soft, var(--accent, #2f855a));
+      --games-board-accent-strong: var(--ui-accent, var(--accent-2, var(--accent, #2f855a)));
       --games-turn-black-rgb: 15, 27, 20;
       --games-turn-black-accent-rgb: 49, 67, 57;
       --games-turn-white-rgb: 255, 255, 255;
       --games-turn-white-accent-rgb: 214, 224, 233;
+      --games-board-frame: color-mix(in srgb, var(--line, #7ab18a) 58%, var(--games-board-accent-strong) 42%);
+      --games-board-inner-line: color-mix(in srgb, var(--games-board-accent-strong) 18%, #08110d);
+      --games-board-surface-top: color-mix(in srgb, var(--games-board-accent) 34%, var(--panel, #112016));
+      --games-board-surface-bottom: color-mix(in srgb, var(--games-board-accent-strong) 28%, #07110c);
       --games-board-default-background:
-        radial-gradient(circle at 50% 0%, rgba(136, 195, 162, 0.09), transparent 44%),
-        linear-gradient(180deg, #15452f, #113726);
+        radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--games-board-accent) 26%, white) 0%, transparent 48%),
+        linear-gradient(180deg, var(--games-board-surface-top), var(--games-board-surface-bottom));
       --games-board-active-background: var(--games-board-default-background);
       width: 100%;
       min-height: 0;
@@ -5944,10 +5950,10 @@
       overflow: auto;
       position: relative;
       isolation: isolate;
-      border: 1px solid #2d6b4c;
+      border: 1px solid var(--games-board-frame);
       border-radius: 12px;
       background: var(--games-board-active-background);
-      box-shadow: inset 0 0 0 1px rgba(8, 24, 17, 0.12);
+      box-shadow: inset 0 0 0 1px var(--games-board-inner-line);
       padding: 10px;
       transition: background 300ms ease, border-color 240ms ease, box-shadow 280ms ease;
     }}
@@ -5977,11 +5983,11 @@
         linear-gradient(270deg, rgba(var(--games-turn-white-rgb), 0.11) 0%, rgba(var(--games-turn-white-accent-rgb), 0.04) 9%, transparent 22%);
     }}
     .games-board-wrap[data-turn="black"] {{
-      border-color: rgba(0, 0, 0, 0.92);
+      border-color: color-mix(in srgb, var(--games-board-frame) 42%, #000000);
       box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(0, 0, 0, 0.28);
     }}
     .games-board-wrap[data-turn="white"] {{
-      border-color: rgba(255, 255, 255, 0.84);
+      border-color: color-mix(in srgb, var(--games-board-frame) 48%, #ffffff);
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.16);
     }}
     .games-board-wrap[data-turn="black"]::before,
@@ -6152,15 +6158,24 @@
       font-variant-numeric: tabular-nums;
     }}
     .reversi-board {{
+      --reversi-board-accent: var(--ui-accent-soft, var(--accent, #2f855a));
+      --reversi-board-accent-strong: var(--ui-accent, var(--accent-2, var(--accent, #2f855a)));
+      --reversi-board-root: color-mix(in srgb, var(--reversi-board-accent) 68%, #0c1611);
+      --reversi-board-frame: color-mix(in srgb, var(--reversi-board-root) 64%, #000000);
+      --reversi-board-surface: color-mix(in srgb, var(--reversi-board-root) 82%, #000000);
+      --reversi-board-cell: color-mix(in srgb, var(--reversi-board-root) 82%, #eef7f2);
+      --reversi-board-cell-hover: color-mix(in srgb, var(--reversi-board-root) 74%, #f7fdf9);
+      --reversi-board-grid: color-mix(in srgb, var(--reversi-board-root) 58%, #dceee4);
+      --reversi-board-focus: color-mix(in srgb, var(--reversi-board-accent-strong) 58%, #ffffff);
       --reversi-cell-size: clamp(30px, 4.8vw, 64px);
       display: grid;
       grid-template-columns: repeat(8, var(--reversi-cell-size));
       grid-template-rows: repeat(8, var(--reversi-cell-size));
-      border: 1px solid #1f6e4d;
+      border: 1px solid var(--reversi-board-frame);
       border-radius: 12px;
       overflow: hidden;
-      background: #1d5b41;
-      box-shadow: inset 0 0 0 1px rgba(10, 33, 22, 0.34);
+      background: linear-gradient(180deg, var(--reversi-board-root), var(--reversi-board-surface));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--reversi-board-frame) 34%, #000000);
     }}
     .reversi-cell {{
       position: relative;
@@ -6169,8 +6184,8 @@
       justify-content: center;
       border: 0;
       border-radius: 0;
-      background: #2f855a;
-      box-shadow: inset 0 0 0 1px rgba(36, 105, 75, 0.92);
+      background: var(--reversi-board-cell);
+      box-shadow: inset 0 0 0 1px var(--reversi-board-grid);
       cursor: pointer;
       margin: 0;
       padding: 0;
@@ -6178,15 +6193,15 @@
       height: var(--reversi-cell-size);
     }}
     .reversi-cell:hover {{
-      background: #378f63;
-      box-shadow: inset 0 0 0 1px rgba(72, 150, 110, 0.95);
+      background: var(--reversi-board-cell-hover);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--reversi-board-grid) 82%, #ffffff);
     }}
     .reversi-cell:disabled {{
       cursor: default;
       opacity: 1;
     }}
     .reversi-cell:focus-visible {{
-      outline: 2px solid #b9f1d1;
+      outline: 2px solid var(--reversi-board-focus);
       outline-offset: -2px;
       z-index: 2;
     }}
@@ -6212,9 +6227,9 @@
       width: calc(var(--reversi-cell-size) * 0.19);
       height: calc(var(--reversi-cell-size) * 0.19);
       border-radius: 999px;
-      background: rgba(223, 247, 234, 0.92);
-      border: 1px solid rgba(159, 214, 184, 0.92);
-      box-shadow: 0 0 0 1px rgba(23, 74, 50, 0.3);
+      background: color-mix(in srgb, var(--reversi-board-accent-strong) 52%, #ffffff);
+      border: 1px solid color-mix(in srgb, var(--reversi-board-accent) 72%, #f2fff8);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--reversi-board-frame) 44%, transparent);
     }}
     .reversi-hint.hint-black {{
       background: radial-gradient(circle at 30% 26%, #4a5d6b 0%, #202d36 58%, #111920 100%);
@@ -6228,12 +6243,16 @@
     }}
     .checkers-board,
     .chess-board {{
-      --classic-board-root: color-mix(in srgb, var(--accent-2, var(--accent, #2f855a)) 70%, #0b140f);
-      --classic-board-frame: color-mix(in srgb, var(--classic-board-root) 68%, #000000);
-      --classic-board-frame-inner: color-mix(in srgb, var(--classic-board-root) 60%, #000000);
-      --classic-board-cell-light: color-mix(in srgb, var(--classic-board-root) 52%, #b6c6bd);
-      --classic-board-cell-dark: color-mix(in srgb, var(--classic-board-root) 84%, #000000);
+      --classic-board-accent: var(--ui-accent-soft, var(--accent, #2f855a));
+      --classic-board-accent-strong: var(--ui-accent, var(--accent-2, var(--accent, #2f855a)));
+      --classic-board-root: color-mix(in srgb, var(--classic-board-accent) 72%, #0b140f);
+      --classic-board-frame: color-mix(in srgb, var(--classic-board-root) 62%, #000000);
+      --classic-board-frame-inner: color-mix(in srgb, var(--classic-board-root) 54%, #000000);
+      --classic-board-cell-light: color-mix(in srgb, var(--classic-board-root) 58%, #d6e3dc);
+      --classic-board-cell-dark: color-mix(in srgb, var(--classic-board-root) 80%, #000000);
       --classic-board-cell-dark-hover: color-mix(in srgb, var(--classic-board-cell-dark) 94%, #ffffff);
+      --classic-board-focus: color-mix(in srgb, var(--classic-board-accent-strong) 58%, #ffffff);
+      --classic-board-target: color-mix(in srgb, var(--classic-board-accent) 58%, #f3fff7);
     }}
     .checkers-board {{
       --checkers-cell-size: clamp(30px, 4.8vw, 64px);
@@ -6269,7 +6288,7 @@
       background: var(--classic-board-cell-dark-hover);
     }}
     button.checkers-cell:focus-visible {{
-      outline: 2px solid #d9efc1;
+      outline: 2px solid var(--classic-board-focus);
       outline-offset: -2px;
       z-index: 2;
     }}
@@ -6317,9 +6336,9 @@
       width: calc(var(--checkers-cell-size) * 0.22);
       height: calc(var(--checkers-cell-size) * 0.22);
       border-radius: 999px;
-      background: rgba(196, 236, 202, 0.94);
-      border: 1px solid rgba(127, 183, 141, 0.9);
-      box-shadow: 0 0 0 1px rgba(32, 64, 43, 0.33);
+      background: var(--classic-board-target);
+      border: 1px solid color-mix(in srgb, var(--classic-board-accent) 72%, #f4fffa);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--classic-board-frame) 42%, transparent);
     }}
     .chess-board {{
       --chess-cell-size: clamp(30px, 4.8vw, 64px);
@@ -6356,7 +6375,7 @@
       filter: brightness(1.04);
     }}
     .chess-cell:focus-visible {{
-      outline: 2px solid #d9efc1;
+      outline: 2px solid var(--classic-board-focus);
       outline-offset: -2px;
       z-index: 2;
     }}
@@ -6412,9 +6431,9 @@
       width: calc(var(--chess-cell-size) * 0.2);
       height: calc(var(--chess-cell-size) * 0.2);
       border-radius: 999px;
-      background: rgba(196, 236, 202, 0.94);
-      border: 1px solid rgba(127, 183, 141, 0.9);
-      box-shadow: 0 0 0 1px rgba(32, 64, 43, 0.33);
+      background: var(--classic-board-target);
+      border: 1px solid color-mix(in srgb, var(--classic-board-accent) 72%, #f4fffa);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--classic-board-frame) 42%, transparent);
     }}
     @supports (width: 1cqi) {{
       .games-main {{
