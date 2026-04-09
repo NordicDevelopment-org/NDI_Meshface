@@ -85,6 +85,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert ".topbar-view-menu-head {" in css
     assert ".topbar-view-menu-brand {" in css
     assert ".topbar-view-menu-brand-mark {" in css
+    assert '.topbar-view-menu-brand-mark[data-badge-mode="emoji"] {' in css
     assert ".topbar-view-menu-head-brand {" in css
     assert ".topbar-view-menu-head-version," in css
     assert ".topbar-view-menu-head-commit {" in css
@@ -109,6 +110,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'document.getElementById("settings-about-version")' in js
     assert 'document.getElementById("settings-about-commit")' in js
     assert 'document.getElementById("layout-view-menu-head-mark")' in js
+    assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' in js
     assert 'document.getElementById("layout-view-menu-head-version")' in js
     assert 'document.getElementById("layout-view-menu-head-commit")' in js
     assert 'document.getElementById("chat-users-head-version")' in js

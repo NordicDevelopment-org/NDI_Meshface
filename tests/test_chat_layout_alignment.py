@@ -383,5 +383,7 @@ def test_launcher_menu_head_tracks_local_radio_identity() -> None:
     assert 'document.getElementById("layout-view-menu-head-brand")' in js
     assert 'document.getElementById("layout-view-menu-head-version")' in js
     assert 'document.getElementById("layout-view-menu-head-commit")' in js
+    assert "normalizeSettingsBadgeEmoji(settingsBadgeEmoji)" in js
+    assert 'launcherMark.dataset.badgeMode = useEmojiBadge ? "emoji" : "text";' in js
     assert 'setLauncherHead("na", "Local radio", "Short name: n/a", "Connected local radio: unavailable", "Connected local radio: unavailable");' in js
     assert "setLauncherHead(launcherShort, launcherPrimary, launcherSecondary, launcherTertiary, profileTitle);" in js

@@ -82,20 +82,25 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert 'id="theme-custom-base-color"' in html
     assert 'id="theme-custom-color-depth"' in html
     assert 'id="theme-custom-color-depth-value"' in html
+    assert 'id="settings-appearance-badge-emoji"' in html
     assert "Default is green, blue is the dev preset" in html
     assert "Higher color depth increases tint and gradient presence" in html
+    assert "Badge shows in the workspace menu header" in html
 
     assert 'let themeCustomBaseColor = "#2f855a";' in js
     assert "let themeCustomColorDepth = 58;" in js
+    assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' in js
     assert "function formatThemePresetLabel(name) {" in js
     assert 'return "green";' in js
     assert "function normalizeThemeCustomSettings(rawSettings) {" in js
+    assert "function normalizeSettingsBadgeEmoji(value) {" in js
     assert "function syncThemeCustomControls() {" in js
     assert "function buildThemeSettingsSavePayload(options = null) {" in js
     assert "custom_theme: {" in js
     assert 'presetName: "custom"' in js
     assert "function bindThemeCustomControls() {" in js
     assert "bindThemeCustomControls();" in js
+    assert 'controlId === "settings-appearance-badge-emoji"' in js
     assert 'controlId === "theme-custom-base-color"' in js
     assert 'controlId === "theme-custom-color-depth"' in js
     assert "payload.custom_theme" in js

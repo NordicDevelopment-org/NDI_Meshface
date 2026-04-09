@@ -650,7 +650,14 @@
         const launcherCommit = document.getElementById("layout-view-menu-head-commit");
         const safeTitle = String(titleText || "Connected local radio: unavailable");
         if (launcherMark instanceof HTMLElement) {{
-          launcherMark.textContent = String(markText || "na").slice(0, 4).toUpperCase();
+          const badgeEmoji = typeof normalizeSettingsBadgeEmoji === "function"
+            ? normalizeSettingsBadgeEmoji(settingsBadgeEmoji)
+            : "";
+          const useEmojiBadge = !!badgeEmoji;
+          launcherMark.textContent = useEmojiBadge
+            ? badgeEmoji
+            : String(markText || "na").slice(0, 4).toUpperCase();
+          launcherMark.dataset.badgeMode = useEmojiBadge ? "emoji" : "text";
           launcherMark.title = safeTitle;
         }}
         if (launcherBrand instanceof HTMLElement) {{

@@ -294,8 +294,22 @@
     const settingsFixedPositionCacheStorageKey = "meshDashboardSettingsFixedPositionCacheV1";
     const settingsTabStorageKey = "meshDashboardSettingsTabV1";
     const settingsUniqueNodeColorsStorageKey = "meshDashboardSettingsUniqueNodeColorsV1";
+    const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";
     const settingsTimeSyncEnabledStorageKey = "meshDashboardSettingsTimeSyncEnabledV1";
     const settingsTimeSyncTimezoneStorageKey = "meshDashboardSettingsTimeSyncTimezoneV1";
+    const settingsBadgeEmojiChoices = Object.freeze([
+      "",
+      "🛰️",
+      "📡",
+      "🚀",
+      "🤖",
+      "🧭",
+      "⚡",
+      "🛠️",
+      "🌲",
+      "🌙",
+    ]);
+    const settingsBadgeEmojiChoiceSet = new Set(settingsBadgeEmojiChoices.filter((emoji) => !!String(emoji || "").trim()));
     const tickerPreferencesStorageKey = "meshDashboardTickerPreferencesV1";
     const themeSettingsEndpoint = "/api/settings/theme";
     const radioSettingsEndpoint = "/api/settings/radio";
