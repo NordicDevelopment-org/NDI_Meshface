@@ -90,6 +90,10 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "background: #08120d;" in css
     assert "background: #08120d !important;" in css
+    assert "[data-theme=\"dark\"] .chat-left-panel {" in css
+    assert "border-color: #2d8f5d !important;" in css
+    assert "[data-theme=\"dark\"] .chat-panel-splitter {" in css
+    assert "[data-theme=\"dark\"] .chat-member-pane {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-feed-item {" in css
     assert "--chat-feed-node-hue: 148;" in css
     assert "--chat-feed-node-tint-end-hue: 170;" in css
