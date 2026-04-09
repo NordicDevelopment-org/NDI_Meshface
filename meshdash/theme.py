@@ -26,6 +26,20 @@ DARK_THEME_VARS: Dict[str, str] = {
     "--ui-accent-soft": "#2ea043",
     "--ui-link": "#79c0ff",
     "--ui-shadow": "0 10px 24px rgba(1, 4, 9, 0.36)",
+    "--workspace-shell-bg": "#08120d",
+    "--workspace-shell-bg-alt": "#07140d",
+    "--workspace-shell-border": "#2d8f5d",
+    "--workspace-shell-border-muted": "#236744",
+    "--workspace-shell-border-strong": "#3f8f68",
+    "--workspace-shell-text": "#c6ffdb",
+    "--workspace-shell-text-soft": "#b8d6c4",
+    "--workspace-shell-hover-bg": "#0d1d13",
+    "--workspace-shell-active-bg": "#173126",
+    "--workspace-shell-active-text": "#8ce7b4",
+    "--workspace-shell-divider-bg": "linear-gradient(90deg, #08140d, #0b1a11)",
+    "--workspace-shell-divider-line": "#236744",
+    "--workspace-shell-divider-line-active": "#2d8f5d",
+    "--workspace-shell-shadow": "0 12px 28px rgba(2, 6, 4, 0.5)",
 }
 
 

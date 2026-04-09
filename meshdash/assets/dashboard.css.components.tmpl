@@ -2859,9 +2859,10 @@
     }}
     [data-theme="dark"] .console-terminal-screen {{
       border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
       background:
         radial-gradient(circle at top, rgba(83, 170, 112, 0.09), transparent 42%),
-        linear-gradient(180deg, #031109 0%, #04150d 100%);
+        linear-gradient(180deg, var(--workspace-shell-bg) 0%, var(--workspace-shell-bg-alt) 100%);
       box-shadow:
         inset 0 0 0 1px rgba(127, 255, 177, 0.08),
         inset 0 0 28px rgba(10, 71, 40, 0.28);
@@ -2900,12 +2901,17 @@
     }}
     [data-theme="dark"] .console-controls button {{
       background: #07140d;
+      background: var(--workspace-shell-bg-alt);
       border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
       color: #c6ffda;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .console-controls button:hover {{
       background: #0d1d13;
+      background: var(--workspace-shell-hover-bg);
       border-color: #39af72;
+      border-color: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] #chat-caption,
     [data-theme="dark"] #updated-at,
@@ -4247,31 +4253,52 @@
       border-bottom-color: transparent;
     }}
     [data-theme="dark"] .layout.view-saved .map {{
-      --saved-pane-head-bg: #070d07;
-      --saved-pane-body-bg: #16273a;
-      --saved-pane-head-border: #236744;
-      --saved-pane-divider-bg: linear-gradient(90deg, #1a2430, #16202c);
-      --saved-pane-divider-border: var(--ui-border);
-      --saved-pane-divider-line: #44566a;
-      --saved-pane-divider-line-active: #79c0ff;
+      --saved-pane-head-bg: #07140d;
+      --saved-pane-head-bg: var(--workspace-shell-bg-alt);
+      --saved-pane-body-bg: #08120d;
+      --saved-pane-body-bg: var(--workspace-shell-bg);
+      --saved-pane-head-border: #2d8f5d;
+      --saved-pane-head-border: var(--workspace-shell-border);
+      --saved-pane-divider-bg: linear-gradient(90deg, #08140d, #0b1a11);
+      --saved-pane-divider-bg: var(--workspace-shell-divider-bg);
+      --saved-pane-divider-border: #2d8f5d;
+      --saved-pane-divider-border: var(--workspace-shell-border);
+      --saved-pane-divider-line: #236744;
+      --saved-pane-divider-line: var(--workspace-shell-divider-line);
+      --saved-pane-divider-line-active: #2d8f5d;
+      --saved-pane-divider-line-active: var(--workspace-shell-divider-line-active);
     }}
     [data-theme="dark"] .layout.view-network {{
-      --network-pane-head-bg: #070d07;
-      --network-pane-body-bg: #16273a;
-      --network-pane-head-border: #236744;
-      --network-pane-divider-bg: linear-gradient(90deg, #1a2430, #16202c);
-      --network-pane-divider-border: var(--ui-border);
-      --network-pane-divider-line: #44566a;
-      --network-pane-divider-line-active: #79c0ff;
+      --network-pane-head-bg: #07140d;
+      --network-pane-head-bg: var(--workspace-shell-bg-alt);
+      --network-pane-body-bg: #08120d;
+      --network-pane-body-bg: var(--workspace-shell-bg);
+      --network-pane-head-border: #2d8f5d;
+      --network-pane-head-border: var(--workspace-shell-border);
+      --network-pane-divider-bg: linear-gradient(90deg, #08140d, #0b1a11);
+      --network-pane-divider-bg: var(--workspace-shell-divider-bg);
+      --network-pane-divider-border: #2d8f5d;
+      --network-pane-divider-border: var(--workspace-shell-border);
+      --network-pane-divider-line: #236744;
+      --network-pane-divider-line: var(--workspace-shell-divider-line);
+      --network-pane-divider-line-active: #2d8f5d;
+      --network-pane-divider-line-active: var(--workspace-shell-divider-line-active);
     }}
     [data-theme="dark"] .layout.view-history {{
-      --history-pane-head-bg: #070d07;
-      --history-pane-body-bg: #16273a;
-      --history-pane-head-border: #236744;
-      --history-pane-divider-bg: linear-gradient(90deg, #1a2430, #16202c);
-      --history-pane-divider-border: var(--ui-border);
-      --history-pane-divider-line: #44566a;
-      --history-pane-divider-line-active: #79c0ff;
+      --history-pane-head-bg: #07140d;
+      --history-pane-head-bg: var(--workspace-shell-bg-alt);
+      --history-pane-body-bg: #08120d;
+      --history-pane-body-bg: var(--workspace-shell-bg);
+      --history-pane-head-border: #2d8f5d;
+      --history-pane-head-border: var(--workspace-shell-border);
+      --history-pane-divider-bg: linear-gradient(90deg, #08140d, #0b1a11);
+      --history-pane-divider-bg: var(--workspace-shell-divider-bg);
+      --history-pane-divider-border: #2d8f5d;
+      --history-pane-divider-border: var(--workspace-shell-border);
+      --history-pane-divider-line: #236744;
+      --history-pane-divider-line: var(--workspace-shell-divider-line);
+      --history-pane-divider-line-active: #2d8f5d;
+      --history-pane-divider-line-active: var(--workspace-shell-divider-line-active);
     }}
     [data-theme="dark"] .layout.view-saved .map-card-head .pane-head-actions {{
       border-color: var(--saved-pane-head-border);
@@ -4325,12 +4352,16 @@
     }}
 
     [data-theme="dark"] .map-reset-view-btn {{
-      background: #16231d;
-      border-color: #355343;
-      color: #cbe8d7;
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      color: #c6ffdb;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .map-reset-view-btn:hover {{
-      background: #1b2b23;
+      background: #0d1d13;
+      background: var(--workspace-shell-hover-bg);
     }}
     [data-theme="dark"] .map-basemap-status {{
       background: #151f2b;
@@ -4345,8 +4376,11 @@
     }}
     [data-theme="dark"] .map-basemap-status.status-online {{
       background: #173126;
+      background: var(--workspace-shell-active-bg);
       border-color: #3f8f68;
+      border-color: var(--workspace-shell-border-strong);
       color: #8ce7b4;
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .map-basemap-status.status-loading {{
       background: #2a2416;
@@ -4362,27 +4396,38 @@
       border-color: #5f7ea7;
     }}
     [data-theme="dark"] .network-map-subview-tabs {{
-      border-color: rgba(71, 105, 86, 0.78);
-      background: rgba(7, 13, 7, 0.84);
+      border-color: #236744;
+      border-color: var(--workspace-shell-border-muted);
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
       box-shadow: 0 12px 28px rgba(2, 6, 4, 0.5);
+      box-shadow: var(--workspace-shell-shadow);
     }}
     [data-theme="dark"] .network-map-subview-tab {{
       color: #b8d6c4;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-map-subview-tab:hover {{
-      background: rgba(26, 48, 34, 0.92);
-      border-color: rgba(67, 116, 87, 0.88);
-      color: #e0f7e7;
+      background: #0d1d13;
+      background: var(--workspace-shell-hover-bg);
+      border-color: #236744;
+      border-color: var(--workspace-shell-border-muted);
+      color: #c6ffdb;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .network-map-subview-tab.is-active,
     [data-theme="dark"] .network-map-subview-tab[aria-selected="true"] {{
       background: #173126;
+      background: var(--workspace-shell-active-bg);
       border-color: #3f8f68;
+      border-color: var(--workspace-shell-border-strong);
       color: #8ce7b4;
+      color: var(--workspace-shell-active-text);
       box-shadow: 0 6px 16px rgba(4, 14, 8, 0.42);
     }}
     [data-theme="dark"] .network-map-subview-tab:focus-visible {{
-      outline-color: rgba(137, 176, 230, 0.65);
+      outline-color: #3f8f68;
+      outline-color: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .network-map-placeholder {{
       background:
@@ -4607,25 +4652,33 @@
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .card.chat .chat-compose-shell {{
       background: #07140d !important;
+      background: var(--workspace-shell-bg-alt) !important;
       background-image: none !important;
       border-color: #2b8a59 !important;
+      border-color: var(--workspace-shell-border) !important;
       box-shadow: none;
     }}
     [data-theme="dark"] .chat-left-bottom-bar {{
       background: #07140d !important;
+      background: var(--workspace-shell-bg-alt) !important;
       background-image: none !important;
       border-color: #2b8a59 !important;
+      border-color: var(--workspace-shell-border) !important;
     }}
     [data-theme="dark"] .chat-send-channel-wrap {{
       background: #07140d !important;
+      background: var(--workspace-shell-bg-alt) !important;
       background-image: none !important;
       border-color: #2b8a59 !important;
+      border-color: var(--workspace-shell-border) !important;
       box-shadow: none !important;
     }}
     [data-theme="dark"] .chat-send-channel-wrap.mesh-channel-wrap {{
       background: #07140d !important;
+      background: var(--workspace-shell-bg-alt) !important;
       background-image: none !important;
       border-color: #2b8a59 !important;
+      border-color: var(--workspace-shell-border) !important;
       box-shadow: none !important;
     }}
     [data-theme="dark"] .chat-send-channel-menu-btn {{
@@ -4640,9 +4693,12 @@
     [data-theme="dark"] #chat-emoji-btn,
     [data-theme="dark"] #chat-send-btn {{
       background: #07140d !important;
+      background: var(--workspace-shell-bg-alt) !important;
       background-image: none !important;
       border-color: #2b8a59 !important;
+      border-color: var(--workspace-shell-border) !important;
       color: #c6ffdb !important;
+      color: var(--workspace-shell-text) !important;
       box-shadow: none !important;
       appearance: none;
       -webkit-appearance: none;
@@ -4650,25 +4706,32 @@
     [data-theme="dark"] #chat-emoji-btn:hover,
     [data-theme="dark"] #chat-send-btn:hover {{
       background: #0d1d13 !important;
+      background: var(--workspace-shell-hover-bg) !important;
     }}
     [data-theme="dark"] .chat-left-panel,
     [data-theme="dark"] .card.chat .body,
     [data-theme="dark"] .card.chat .chat-shell {{
       background: #08120d !important;
+      background: var(--workspace-shell-bg) !important;
       background-image: none !important;
     }}
     [data-theme="dark"] .chat-left-panel {{
       border-color: #2d8f5d !important;
+      border-color: var(--workspace-shell-border) !important;
     }}
     [data-theme="dark"] .chat-panel-splitter {{
       border-color: #2d8f5d !important;
+      border-color: var(--workspace-shell-border) !important;
       background: linear-gradient(180deg, #08140d, #0b1a11);
+      background: var(--workspace-shell-divider-bg);
     }}
     [data-theme="dark"] .chat-panel-splitter::before {{
       background: #2d8f5d;
+      background: var(--workspace-shell-divider-line-active);
     }}
     [data-theme="dark"] .chat-member-pane {{
       border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
     }}
     [data-theme="dark"] .chat-reaction-row .chat-react-btn {{
       background: transparent;
