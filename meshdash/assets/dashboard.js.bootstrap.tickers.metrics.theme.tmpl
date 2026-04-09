@@ -100,6 +100,10 @@
       return "#2f855a";
     }}
 
+    function normalizeThemeCustomLineColor(raw, fallback = "#2f855a") {{
+      return normalizeThemeCustomBaseColor(raw || fallback);
+    }}
+
     function normalizeThemeCustomColorDepth(raw) {{
       const parsed = Number.parseInt(String(raw ?? ""), 10);
       if (!Number.isFinite(parsed)) {{
@@ -114,6 +118,10 @@
         : {{}};
       return {{
         base_color: normalizeThemeCustomBaseColor(payload.base_color),
+        line_color: normalizeThemeCustomLineColor(
+          payload.line_color,
+          normalizeThemeCustomBaseColor(payload.base_color)
+        ),
         color_depth: normalizeThemeCustomColorDepth(payload.color_depth),
       }};
     }}
@@ -122,6 +130,10 @@
       const colorInput = document.getElementById("theme-custom-base-color");
       if (colorInput instanceof HTMLInputElement) {{
         colorInput.value = normalizeThemeCustomBaseColor(themeCustomBaseColor);
+      }}
+      const lineColorInput = document.getElementById("theme-custom-line-color");
+      if (lineColorInput instanceof HTMLInputElement) {{
+        lineColorInput.value = normalizeThemeCustomLineColor(themeCustomLineColor, themeCustomBaseColor);
       }}
       const depthInput = document.getElementById("theme-custom-color-depth");
       if (depthInput instanceof HTMLInputElement) {{
@@ -186,6 +198,7 @@
       themePresetCatalog = normalizedCatalog;
       themePresetSelected = normalizeThemePresetName(payload.selected_preset, normalizedCatalog);
       themeCustomBaseColor = normalizedCustomTheme.base_color;
+      themeCustomLineColor = normalizedCustomTheme.line_color;
       themeCustomColorDepth = normalizedCustomTheme.color_depth;
       updateThemePresetControl(payload.available_presets);
       applyThemePreference(themePreference, false);
@@ -222,6 +235,10 @@
         preset_name: cleanPreset || "default",
         custom_theme: {{
           base_color: normalizeThemeCustomBaseColor(
+            opts.baseColor == null ? themeCustomBaseColor : opts.baseColor
+          ),
+          line_color: normalizeThemeCustomLineColor(
+            opts.lineColor == null ? themeCustomLineColor : opts.lineColor,
             opts.baseColor == null ? themeCustomBaseColor : opts.baseColor
           ),
           color_depth: normalizeThemeCustomColorDepth(
@@ -289,6 +306,27 @@
           await saveThemeSettings({{
             presetName: "custom",
             baseColor: themeCustomBaseColor,
+            lineColor: themeCustomLineColor,
+            colorDepth: themeCustomColorDepth,
+          }});
+          updateThemePresetControl();
+        }});
+      }}
+
+      const lineColorInput = document.getElementById("theme-custom-line-color");
+      if (lineColorInput instanceof HTMLInputElement && lineColorInput.dataset.bound !== "1") {{
+        lineColorInput.dataset.bound = "1";
+        lineColorInput.addEventListener("input", () => {{
+          themeCustomLineColor = normalizeThemeCustomLineColor(lineColorInput.value, themeCustomBaseColor);
+          syncThemeCustomControls();
+        }});
+        lineColorInput.addEventListener("change", async () => {{
+          themeCustomLineColor = normalizeThemeCustomLineColor(lineColorInput.value, themeCustomBaseColor);
+          syncThemeCustomControls();
+          await saveThemeSettings({{
+            presetName: "custom",
+            baseColor: themeCustomBaseColor,
+            lineColor: themeCustomLineColor,
             colorDepth: themeCustomColorDepth,
           }});
           updateThemePresetControl();
@@ -308,6 +346,7 @@
           await saveThemeSettings({{
             presetName: "custom",
             baseColor: themeCustomBaseColor,
+            lineColor: themeCustomLineColor,
             colorDepth: themeCustomColorDepth,
           }});
           updateThemePresetControl();

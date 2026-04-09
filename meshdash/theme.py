@@ -44,6 +44,7 @@ DARK_THEME_VARS: Dict[str, str] = {
 }
 
 DEFAULT_THEME_BASE_COLOR = LIGHT_THEME_VARS["--accent"]
+DEFAULT_THEME_LINE_COLOR = DEFAULT_THEME_BASE_COLOR
 DEFAULT_THEME_COLOR_DEPTH = 58
 DEV_THEME_BASE_COLOR = "#2563eb"
 _HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
@@ -60,6 +61,14 @@ def normalize_theme_base_color(
     if len(clean) == 4:
         clean = "#" + "".join(ch * 2 for ch in clean[1:])
     return clean.lower()
+
+
+def normalize_theme_line_color(
+    value: object,
+    *,
+    fallback: str = DEFAULT_THEME_LINE_COLOR,
+) -> str:
+    return normalize_theme_base_color(value, fallback=fallback)
 
 
 def normalize_theme_color_depth(
@@ -157,11 +166,14 @@ def _rgba(rgb: tuple[int, int, int], alpha: float) -> str:
 def build_palette_theme_preset(
     base_color: object,
     *,
+    line_color: object = None,
     color_depth: int = DEFAULT_THEME_COLOR_DEPTH,
 ) -> dict[str, Dict[str, str]]:
     base_hex = normalize_theme_base_color(base_color)
+    line_hex = normalize_theme_line_color(line_color, fallback=base_hex)
     depth = normalize_theme_color_depth(color_depth)
     base_rgb = _hex_to_rgb(base_hex)
+    line_rgb = _hex_to_rgb(line_hex)
     deep_base_rgb = _mix_rgb(base_rgb, (0, 0, 0), 0.34)
 
     light_accent_rgb = _ensure_max_luminance(base_rgb, 0.34)
@@ -181,10 +193,14 @@ def build_palette_theme_preset(
         base_rgb,
         _depth_mix(depth, 0.02, 0.05),
     )
-    light_line_rgb = _mix_rgb(
-        _hex_to_rgb(LIGHT_THEME_VARS["--line"]),
-        light_accent_rgb,
-        _depth_mix(depth, 0.14, 0.24),
+    light_line_source_rgb = _mix_rgb(line_rgb, _hex_to_rgb(LIGHT_THEME_VARS["--ink"]), 0.18)
+    light_line_rgb = _ensure_max_luminance(
+        _mix_rgb(
+            _hex_to_rgb(LIGHT_THEME_VARS["--line"]),
+            light_line_source_rgb,
+            _depth_mix(depth, 0.62, 0.82),
+        ),
+        0.34,
     )
     light_ink_rgb = _ensure_max_luminance(
         _mix_rgb(_hex_to_rgb(LIGHT_THEME_VARS["--ink"]), light_accent_strong_rgb, _depth_mix(depth, 0.08, 0.14)),
@@ -211,10 +227,11 @@ def build_palette_theme_preset(
         deep_base_rgb,
         _depth_mix(depth, 0.14, 0.28),
     )
+    dark_line_rgb = _ensure_min_luminance(line_rgb, 0.16)
     dark_ui_border_rgb = _mix_rgb(
         _hex_to_rgb(DARK_THEME_VARS["--ui-border"]),
-        dark_accent_soft_rgb,
-        _depth_mix(depth, 0.18, 0.32),
+        dark_line_rgb,
+        _depth_mix(depth, 0.6, 0.78),
     )
     dark_ui_text_rgb = _ensure_min_luminance(
         _mix_rgb(_hex_to_rgb(DARK_THEME_VARS["--ui-text"]), dark_accent_rgb, _depth_mix(depth, 0.04, 0.1)),
@@ -241,18 +258,20 @@ def build_palette_theme_preset(
     )
     workspace_border_rgb = _mix_rgb(
         _hex_to_rgb(DARK_THEME_VARS["--workspace-shell-border"]),
-        dark_accent_soft_rgb,
-        _depth_mix(depth, 0.22, 0.42),
+        dark_line_rgb,
+        _depth_mix(depth, 0.72, 0.86),
     )
+    workspace_line_muted_source_rgb = _mix_rgb(dark_line_rgb, workspace_bg_rgb, 0.28)
     workspace_border_muted_rgb = _mix_rgb(
         _hex_to_rgb(DARK_THEME_VARS["--workspace-shell-border-muted"]),
-        dark_accent_soft_rgb,
-        _depth_mix(depth, 0.18, 0.34),
+        workspace_line_muted_source_rgb,
+        _depth_mix(depth, 0.66, 0.82),
     )
+    workspace_line_strong_source_rgb = _mix_rgb(dark_line_rgb, (255, 255, 255), 0.16)
     workspace_border_strong_rgb = _mix_rgb(
         _hex_to_rgb(DARK_THEME_VARS["--workspace-shell-border-strong"]),
-        dark_accent_rgb,
-        _depth_mix(depth, 0.2, 0.4),
+        workspace_line_strong_source_rgb,
+        _depth_mix(depth, 0.74, 0.9),
     )
     workspace_text_rgb = _ensure_min_luminance(
         _mix_rgb(_hex_to_rgb(DARK_THEME_VARS["--workspace-shell-text"]), dark_accent_rgb, _depth_mix(depth, 0.08, 0.16)),

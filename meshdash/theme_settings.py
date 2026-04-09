@@ -6,9 +6,11 @@ from typing import Optional
 from .theme import (
     DEFAULT_THEME_BASE_COLOR,
     DEFAULT_THEME_COLOR_DEPTH,
+    DEFAULT_THEME_LINE_COLOR,
     build_palette_theme_preset,
     normalize_theme_base_color,
     normalize_theme_color_depth,
+    normalize_theme_line_color,
 )
 from .theme_presets import ThemePreset, ThemePresetMap, default_theme_presets, select_theme_preset
 
@@ -49,6 +51,7 @@ def save_selected_theme_preset(settings_path: Optional[str], preset_name: str) -
 def _default_custom_theme_settings() -> dict[str, object]:
     return {
         "base_color": DEFAULT_THEME_BASE_COLOR,
+        "line_color": DEFAULT_THEME_LINE_COLOR,
         "color_depth": DEFAULT_THEME_COLOR_DEPTH,
     }
 
@@ -60,10 +63,20 @@ def _normalize_custom_theme_settings(
 ) -> dict[str, object]:
     base = fallback if isinstance(fallback, dict) else _default_custom_theme_settings()
     payload = raw_settings if isinstance(raw_settings, dict) else {}
+    normalized_base_color = normalize_theme_base_color(
+        payload.get("base_color"),
+        fallback=str(base.get("base_color") or DEFAULT_THEME_BASE_COLOR),
+    )
+    raw_line_color = payload.get("line_color")
     return {
-        "base_color": normalize_theme_base_color(
-            payload.get("base_color"),
-            fallback=str(base.get("base_color") or DEFAULT_THEME_BASE_COLOR),
+        "base_color": normalized_base_color,
+        "line_color": normalize_theme_line_color(
+            raw_line_color,
+            fallback=(
+                normalized_base_color
+                if raw_line_color is None
+                else str(base.get("line_color") or normalized_base_color or DEFAULT_THEME_LINE_COLOR)
+            ),
         ),
         "color_depth": normalize_theme_color_depth(
             payload.get("color_depth"),
@@ -175,6 +188,7 @@ class ThemePresetSettings:
         if selected == "custom":
             return build_palette_theme_preset(
                 custom_theme.get("base_color"),
+                line_color=custom_theme.get("line_color"),
                 color_depth=int(custom_theme.get("color_depth") or DEFAULT_THEME_COLOR_DEPTH),
             )
         return select_theme_preset(self._presets, selected)
@@ -185,6 +199,7 @@ class ThemePresetSettings:
         catalog = {name: preset for name, preset in self._presets.items()}
         catalog["custom"] = build_palette_theme_preset(
             custom_theme.get("base_color"),
+            line_color=custom_theme.get("line_color"),
             color_depth=int(custom_theme.get("color_depth") or DEFAULT_THEME_COLOR_DEPTH),
         )
         return catalog
