@@ -1,3 +1,14 @@
+    function historyChartThemeColor(name, fallback) {{
+      const themeStyles = window.getComputedStyle
+        ? window.getComputedStyle(document.documentElement)
+        : null;
+      if (!(themeStyles && typeof themeStyles.getPropertyValue === "function")) {{
+        return fallback;
+      }}
+      const value = String(themeStyles.getPropertyValue(name) || "").trim();
+      return value || fallback;
+    }}
+
     function renderSignalChart(points) {{
       const svg = document.getElementById("signal-chart");
       const empty = document.getElementById("signal-empty");
@@ -130,11 +141,11 @@
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const chartPalette = darkTheme
         ? {{
-            grid: "#324152",
-            snr: "#58c878",
-            rssi: "#79c0ff",
-            snrLabel: "#88e8a5",
-            rssiLabel: "#a4d0ff",
+            grid: historyChartThemeColor("--workspace-shell-border-muted", "#324152"),
+            snr: historyChartThemeColor("--ui-accent", "#58c878"),
+            rssi: historyChartThemeColor("--workspace-shell-active-text", "#79c0ff"),
+            snrLabel: historyChartThemeColor("--workspace-shell-text-soft", "#88e8a5"),
+            rssiLabel: historyChartThemeColor("--workspace-shell-text", "#a4d0ff"),
             rawOpacity: 0.32,
           }}
         : {{
@@ -415,14 +426,14 @@
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const chartPalette = darkTheme
         ? {{
-            grid: "#324152",
-            label: "#a4d0ff",
-            connector: "#9fb3c8",
+            grid: historyChartThemeColor("--workspace-shell-border-muted", "#324152"),
+            label: historyChartThemeColor("--workspace-shell-text-soft", "#a4d0ff"),
+            connector: historyChartThemeColor("--workspace-shell-border-strong", "#9fb3c8"),
             statusOnline: "#58c878",
             statusWarn: "#d9b95c",
             statusStale: "#e27b7b",
-            officialOnline: "#79c0ff",
-            officialOffline: "#7f90a5",
+            officialOnline: historyChartThemeColor("--workspace-shell-active-text", "#79c0ff"),
+            officialOffline: historyChartThemeColor("--workspace-shell-border-strong", "#7f90a5"),
           }}
         : {{
             grid: "#dce8df",
@@ -652,9 +663,9 @@
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const chartPalette = darkTheme
         ? {{
-            grid: "#324152",
-            line: "#79c0ff",
-            label: "#a4d0ff",
+            grid: historyChartThemeColor("--workspace-shell-border-muted", "#324152"),
+            line: historyChartThemeColor("--ui-accent", "#79c0ff"),
+            label: historyChartThemeColor("--workspace-shell-active-text", "#a4d0ff"),
           }}
         : {{
             grid: "#dce8df",
@@ -852,9 +863,9 @@
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
       const chartPalette = darkTheme
         ? {{
-            grid: "#324152",
-            line: "#79c0ff",
-            label: "#a4d0ff",
+            grid: historyChartThemeColor("--workspace-shell-border-muted", "#324152"),
+            line: historyChartThemeColor("--ui-accent", "#79c0ff"),
+            label: historyChartThemeColor("--workspace-shell-active-text", "#a4d0ff"),
           }}
         : {{
             grid: "#dce8df",

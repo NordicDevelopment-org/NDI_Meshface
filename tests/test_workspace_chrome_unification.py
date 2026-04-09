@@ -255,6 +255,42 @@ def test_node_navigator_menu_follows_workspace_shell_tokens() -> None:
     assert "#16261f" not in sort_btn_section
 
 
+def test_history_chart_surfaces_follow_workspace_shell_tokens() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    toggle_section = css.split("[data-theme=\"dark\"] .history-metric-toggle {", 1)[1].split("}", 1)[0]
+    wrap_section = css.split("[data-theme=\"dark\"] #signal-chart-wrap,", 1)[1].split("}", 1)[0]
+    empty_section = css.split("[data-theme=\"dark\"] .signal-empty {", 1)[1].split("}", 1)[0]
+    track_section = css.split("[data-theme=\"dark\"] .signal-timeline-track {", 1)[1].split("}", 1)[0]
+    tick_section = css.split("[data-theme=\"dark\"] .signal-timeline-tick {", 1)[1].split("}", 1)[0]
+    major_label_section = css.split("[data-theme=\"dark\"] .signal-timeline-label-major {", 1)[1].split("}", 1)[0]
+
+    assert "var(--ui-accent)" in toggle_section
+    assert "var(--workspace-shell-border)" in wrap_section
+    assert "var(--workspace-shell-bg-alt)" in wrap_section
+    assert "var(--workspace-shell-bg)" in wrap_section
+    assert "var(--workspace-shell-text-soft)" in empty_section
+    assert "var(--workspace-shell-border-muted)" in track_section
+    assert "var(--workspace-shell-border-strong)" in tick_section
+    assert "var(--workspace-shell-text)" in major_label_section
+    assert "#141c27" not in wrap_section
+    assert "#344353" not in track_section
+
+
+def test_history_charts_pull_runtime_theme_vars() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "function historyChartThemeColor(name, fallback)" in js
+    assert 'historyChartThemeColor("--workspace-shell-border-muted"' in js
+    assert 'historyChartThemeColor("--ui-accent"' in js
+    assert 'historyChartThemeColor("--workspace-shell-active-text"' in js
+    assert 'historyChartThemeColor("--workspace-shell-text-soft"' in js
+
+
 def test_topbar_tickers_follow_workspace_shell_and_semantic_states() -> None:
     css = build_dashboard_css(theme_css="")
 
