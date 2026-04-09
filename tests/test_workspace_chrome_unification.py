@@ -78,6 +78,26 @@ def test_network_map_controls_follow_theme_tokens() -> None:
     assert "var(--workspace-shell-text-soft)" in dark_status_section
 
 
+def test_dark_text_input_variants_share_workspace_shell_tokens() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    search_input_section = css.split("[data-theme=\"dark\"] .list-search-input,", 1)[1].split("}", 1)[0]
+    shared_text_inputs_section = css.split("[data-theme=\"dark\"] .chat-peer-input,", 1)[1].split("}", 1)[0]
+    shared_focus_section = css.split("[data-theme=\"dark\"] .chat-peer-input:focus,", 1)[1].split("}", 1)[0]
+
+    assert "var(--workspace-shell-border-strong)" in search_input_section
+    assert "var(--workspace-shell-text)" in search_input_section
+    assert "[data-theme=\"dark\"] .settings-textarea," in css
+    assert "[data-theme=\"dark\"] .chat-input," in css
+    assert "var(--workspace-shell-border)" in shared_text_inputs_section
+    assert "var(--workspace-shell-text)" in shared_text_inputs_section
+    assert "var(--workspace-shell-border-strong)" in shared_focus_section
+    assert "var(--workspace-shell-hover-bg)" in shared_focus_section
+    assert "[data-theme=\"dark\"] .settings-textarea::placeholder," in css
+    assert "[data-theme=\"dark\"] .bbs-post-input::placeholder {" in css
+    assert "opacity: 0.9;" in css
+
+
 def test_console_view_removes_body_shell_and_keeps_terminal_frame() -> None:
     css = build_dashboard_css(theme_css="")
     body_section = css.split(".layout.view-console .console .body {", 1)[1].split("}", 1)[0]

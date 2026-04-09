@@ -5332,7 +5332,10 @@
       text-transform: uppercase;
       color: #355b44;
     }}
-    .settings-input, .settings-select {{
+    .settings-input,
+    .settings-select,
+    .settings-textarea,
+    .chat-input {{
       border: 1px solid #c8d7c4;
       border-radius: 10px;
       padding: 7px 10px;
@@ -5340,10 +5343,23 @@
       background: #f8fbf7;
       color: #0f2018;
       outline: none;
+      box-sizing: border-box;
     }}
-    .settings-input:focus, .settings-select:focus {{
+    .settings-input:focus,
+    .settings-select:focus,
+    .settings-textarea:focus,
+    .chat-input:focus {{
       border-color: var(--ui-accent-soft, var(--accent, #2f855a));
+      background: #ffffff;
       box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent-soft, var(--accent, #2f855a)) 22%, transparent);
+    }}
+    .settings-textarea::placeholder,
+    .chat-input::placeholder {{
+      color: #5e6e64;
+      color: var(--muted);
+    }}
+    .chat-input {{
+      width: 100%;
     }}
     .settings-color-input {{
       min-width: 84px;

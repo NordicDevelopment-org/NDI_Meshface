@@ -2943,9 +2943,9 @@
     [data-theme="dark"] .list-search-input,
     [data-theme="dark"] #chat-input,
     [data-theme="dark"] .chat-send-channel-select {{
-      background: #07140d;
-      border-color: #2b8a59;
-      color: #c6ffdb;
+      background: var(--workspace-shell-bg-alt);
+      border-color: var(--workspace-shell-border-strong);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .search-input-clear-btn {{
       background: rgba(72, 132, 96, 0.22);
@@ -2960,7 +2960,7 @@
     }}
     [data-theme="dark"] .list-search-input::placeholder,
     [data-theme="dark"] #chat-input::placeholder {{
-      color: #90d9ac;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .chat-reaction-popover {{
       background: #060d08;
@@ -4101,14 +4101,27 @@
     [data-theme="dark"] .list-search-input,
     [data-theme="dark"] #chat-input,
     [data-theme="dark"] .chat-send-channel-select {{
-      background: #07140d;
-      border-color: #2b8a59;
-      color: #c6ffdb;
+      background: var(--workspace-shell-bg-alt);
+      border-color: var(--workspace-shell-border-strong);
+      color: var(--workspace-shell-text);
       font-size: 11px;
       padding: 5px 7px;
     }}
     [data-theme="dark"] .list-search-input.has-search-clear-button {{
       padding-right: 28px;
+    }}
+    [data-theme="dark"] .chat-peer-input,
+    [data-theme="dark"] .remote-search-input,
+    [data-theme="dark"] .settings-input,
+    [data-theme="dark"] .settings-textarea,
+    [data-theme="dark"] .chat-input,
+    [data-theme="dark"] .bbs-post-input {{
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      color: #c6ffdb;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .chat-send-channel-wrap {{
       border-color: #2b8a59;
@@ -4148,6 +4161,20 @@
       border-color: var(--ui-accent);
       box-shadow: 0 0 0 1px rgba(122, 190, 255, 0.2);
     }}
+    [data-theme="dark"] .chat-peer-input:focus,
+    [data-theme="dark"] .remote-search-input:focus,
+    [data-theme="dark"] .settings-input:focus,
+    [data-theme="dark"] .settings-textarea:focus,
+    [data-theme="dark"] .chat-input:focus,
+    [data-theme="dark"] .bbs-post-input:focus {{
+      outline-color: #3f8f68;
+      outline-color: var(--workspace-shell-border-strong);
+      border-color: #3f8f68;
+      border-color: var(--workspace-shell-border-strong);
+      background: #0d1d13;
+      background: var(--workspace-shell-hover-bg);
+      box-shadow: none;
+    }}
     [data-theme="dark"] .chat-send-channel-select {{
       padding: 0;
     }}
@@ -4157,8 +4184,13 @@
       box-shadow: 0 12px 24px rgba(0, 0, 0, 0.26);
     }}
     [data-theme="dark"] .list-search-input::placeholder,
-    [data-theme="dark"] #chat-input::placeholder {{
-      color: var(--ui-text-soft);
+    [data-theme="dark"] #chat-input::placeholder,
+    [data-theme="dark"] .remote-search-input::placeholder,
+    [data-theme="dark"] .settings-input::placeholder,
+    [data-theme="dark"] .settings-textarea::placeholder,
+    [data-theme="dark"] .chat-input::placeholder,
+    [data-theme="dark"] .bbs-post-input::placeholder {{
+      color: var(--workspace-shell-text-soft);
       opacity: 0.9;
     }}
     [data-theme="dark"] .chat-channel-mismatch-warning {{
