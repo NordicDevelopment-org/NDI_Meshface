@@ -3829,10 +3829,10 @@
         inset 0 0 0 1px hsl(var(--chat-feed-node-outline-hue, 30) calc(28% * var(--chat-feed-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-feed-node-outline-dark-light-shift, 0%)) / 0.34);
     }}
     [data-theme="dark"] .chat-member-item.selected-node {{
-      border-color: hsl(var(--chat-member-node-outline-hue, 325) calc(24% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(44% + var(--chat-member-node-outline-dark-light-shift, 0%))) !important;
+      border-color: hsl(var(--chat-member-node-outline-hue, 154) calc(30% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(42% + var(--chat-member-node-outline-dark-light-shift, 0%))) !important;
       box-shadow:
-        inset 2px 0 0 hsl(var(--chat-member-node-hue, 205) calc(40% * var(--chat-member-node-dark-sat-mult, 1)) calc(64% + var(--chat-member-node-dark-light-shift, 0%)) / 0.56),
-        inset 0 0 0 1px hsl(var(--chat-member-node-outline-hue, 325) calc(26% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(52% + var(--chat-member-node-outline-dark-light-shift, 0%)) / 0.28);
+        inset 2px 0 0 hsl(var(--chat-member-node-hue, 145) calc(44% * var(--chat-member-node-dark-sat-mult, 1)) calc(64% + var(--chat-member-node-dark-light-shift, 0%)) / 0.62),
+        inset 0 0 0 1px hsl(var(--chat-member-node-outline-hue, 154) calc(24% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(48% + var(--chat-member-node-outline-dark-light-shift, 0%)) / 0.28);
     }}
     [data-theme="dark"] .chat-member-item.tagged-node {{
       box-shadow:
@@ -3842,7 +3842,7 @@
     [data-theme="dark"] .chat-member-item.tagged-node.selected-node {{
       box-shadow:
         inset 2px 0 0 var(--node-tag-color, #3fb950),
-        inset 0 0 0 1px hsl(var(--chat-member-node-outline-hue, 325) calc(26% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(52% + var(--chat-member-node-outline-dark-light-shift, 0%)) / 0.28);
+        inset 0 0 0 1px hsl(var(--chat-member-node-outline-hue, 154) calc(24% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(48% + var(--chat-member-node-outline-dark-light-shift, 0%)) / 0.28);
     }}
     [data-theme="dark"] .chat-member-dm-link {{
       color: #8fc8ff;
@@ -4037,38 +4037,45 @@
       color: var(--ui-text-soft);
     }}
     [data-theme="dark"] .chat-member-item {{
-      --chat-member-node-dark-sat-mult: 1;
-      --chat-member-node-dark-light-shift: 0%;
-      --chat-member-node-outline-dark-sat-mult: 1.1;
-      --chat-member-node-outline-dark-light-shift: 4%;
+      --chat-member-node-dark-sat-mult: 1.02;
+      --chat-member-node-dark-light-shift: 2%;
+      --chat-member-node-outline-dark-sat-mult: 1.18;
+      --chat-member-node-outline-dark-light-shift: 6%;
       background:
         linear-gradient(
           96deg,
-          hsl(var(--chat-member-node-tint-start-hue, 145) calc(34% * var(--chat-member-node-dark-sat-mult, 1)) calc(48% + var(--chat-member-node-dark-light-shift, 0%)) / 0.24) 0%,
-          hsl(var(--chat-member-node-tint-start-hue, 145) calc(28% * var(--chat-member-node-dark-sat-mult, 1)) calc(42% + var(--chat-member-node-dark-light-shift, 0%)) / 0.18) 36%,
-          hsl(var(--chat-member-node-tint-end-hue, 176) calc(28% * var(--chat-member-node-dark-sat-mult, 1)) calc(40% + var(--chat-member-node-dark-light-shift, 0%)) / 0.16) 70%,
-          hsl(var(--chat-member-node-tint-end-hue, 176) calc(22% * var(--chat-member-node-dark-sat-mult, 1)) calc(34% + var(--chat-member-node-dark-light-shift, 0%)) / 0.06) 92%,
-          rgba(12, 18, 24, 0) 100%
+          hsl(var(--chat-member-node-tint-start-hue, 145) calc(46% * var(--chat-member-node-dark-sat-mult, 1)) calc(36% + var(--chat-member-node-dark-light-shift, 0%)) / 0.44) 0%,
+          hsl(var(--chat-member-node-tint-start-hue, 145) calc(38% * var(--chat-member-node-dark-sat-mult, 1)) calc(30% + var(--chat-member-node-dark-light-shift, 0%)) / 0.31) 34%,
+          hsl(var(--chat-member-node-tint-end-hue, 176) calc(32% * var(--chat-member-node-dark-sat-mult, 1)) calc(28% + var(--chat-member-node-dark-light-shift, 0%)) / 0.24) 70%,
+          hsl(var(--chat-member-node-tint-end-hue, 176) calc(24% * var(--chat-member-node-dark-sat-mult, 1)) calc(22% + var(--chat-member-node-dark-light-shift, 0%)) / 0.1) 92%,
+          rgba(8, 18, 13, 0) 100%
         ),
-        #10161b;
-      border-color: hsl(var(--chat-member-node-outline-hue, 325) calc(14% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(32% + var(--chat-member-node-outline-dark-light-shift, 0%)) / 0.44);
-      color: hsl(var(--chat-member-node-hue, 145) calc(24% * var(--chat-member-node-dark-sat-mult, 1)) calc(86% + var(--chat-member-node-dark-light-shift, 0%)));
-      box-shadow: inset 1px 0 0 hsl(var(--chat-member-node-hue, 145) calc(24% * var(--chat-member-node-dark-sat-mult, 1)) calc(48% + var(--chat-member-node-dark-light-shift, 0%)) / 0.1);
+        hsl(var(--chat-member-node-hue, 145) calc(18% * var(--chat-member-node-dark-sat-mult, 1)) calc(14% + var(--chat-member-node-dark-light-shift, 0%)) / 0.16);
+      border-color: hsl(var(--chat-member-node-outline-hue, 154) calc(20% * var(--chat-member-node-outline-dark-sat-mult, 1.18)) calc(30% + var(--chat-member-node-outline-dark-light-shift, 0%)) / 0.54);
+      color: var(--ui-text);
+      box-shadow:
+        inset 1px 0 0 hsl(var(--chat-member-node-hue, 145) calc(36% * var(--chat-member-node-dark-sat-mult, 1)) calc(56% + var(--chat-member-node-dark-light-shift, 0%)) / 0.22);
     }}
     [data-theme="dark"] .chat-member-item:hover {{
       background:
         linear-gradient(
-          96deg,
-          hsl(var(--chat-member-node-tint-start-hue, 145) calc(38% * var(--chat-member-node-dark-sat-mult, 1)) calc(52% + var(--chat-member-node-dark-light-shift, 0%)) / 0.30) 0%,
-          hsl(var(--chat-member-node-tint-start-hue, 145) calc(32% * var(--chat-member-node-dark-sat-mult, 1)) calc(46% + var(--chat-member-node-dark-light-shift, 0%)) / 0.24) 36%,
-          hsl(var(--chat-member-node-tint-end-hue, 176) calc(32% * var(--chat-member-node-dark-sat-mult, 1)) calc(44% + var(--chat-member-node-dark-light-shift, 0%)) / 0.22) 70%,
-          hsl(var(--chat-member-node-tint-end-hue, 176) calc(24% * var(--chat-member-node-dark-sat-mult, 1)) calc(36% + var(--chat-member-node-dark-light-shift, 0%)) / 0.08) 92%,
-          rgba(14, 20, 28, 0) 100%
+          90deg,
+          rgba(83, 160, 112, 0.12),
+          rgba(83, 160, 112, 0.05) 56%,
+          rgba(83, 160, 112, 0) 100%
         ),
-        #121a20;
-      border-color: hsl(var(--chat-member-node-outline-hue, 325) calc(16% * var(--chat-member-node-outline-dark-sat-mult, 1.1)) calc(35% + var(--chat-member-node-outline-dark-light-shift, 0%)) / 0.54);
-      color: hsl(var(--chat-member-node-hue, 145) calc(24% * var(--chat-member-node-dark-sat-mult, 1)) calc(90% + var(--chat-member-node-dark-light-shift, 0%)));
-      box-shadow: inset 1px 0 0 hsl(var(--chat-member-node-hue, 145) calc(26% * var(--chat-member-node-dark-sat-mult, 1)) calc(52% + var(--chat-member-node-dark-light-shift, 0%)) / 0.14);
+        linear-gradient(
+          96deg,
+          hsl(var(--chat-member-node-tint-start-hue, 145) calc(50% * var(--chat-member-node-dark-sat-mult, 1)) calc(40% + var(--chat-member-node-dark-light-shift, 0%)) / 0.5) 0%,
+          hsl(var(--chat-member-node-tint-start-hue, 145) calc(42% * var(--chat-member-node-dark-sat-mult, 1)) calc(33% + var(--chat-member-node-dark-light-shift, 0%)) / 0.36) 34%,
+          hsl(var(--chat-member-node-tint-end-hue, 176) calc(36% * var(--chat-member-node-dark-sat-mult, 1)) calc(30% + var(--chat-member-node-dark-light-shift, 0%)) / 0.28) 70%,
+          hsl(var(--chat-member-node-tint-end-hue, 176) calc(26% * var(--chat-member-node-dark-sat-mult, 1)) calc(24% + var(--chat-member-node-dark-light-shift, 0%)) / 0.12) 92%,
+          rgba(10, 20, 15, 0) 100%
+        ),
+        hsl(var(--chat-member-node-hue, 145) calc(20% * var(--chat-member-node-dark-sat-mult, 1)) calc(16% + var(--chat-member-node-dark-light-shift, 0%)) / 0.2);
+      border-color: hsl(var(--chat-member-node-outline-hue, 154) calc(24% * var(--chat-member-node-outline-dark-sat-mult, 1.18)) calc(36% + var(--chat-member-node-outline-dark-light-shift, 0%)) / 0.64);
+      color: var(--ui-text);
+      box-shadow: inset 1px 0 0 hsl(var(--chat-member-node-hue, 145) calc(40% * var(--chat-member-node-dark-sat-mult, 1)) calc(60% + var(--chat-member-node-dark-light-shift, 0%)) / 0.26);
     }}
     [data-theme="dark"] .chat-member-metadata-chip {{
       border-color: hsl(var(--chat-member-node-hue, 145) calc(16% * var(--chat-member-node-dark-sat-mult, 1)) calc(34% + var(--chat-member-node-dark-light-shift, 0%)) / 0.44);
@@ -4103,18 +4110,18 @@
     [data-theme="dark"] .chat-peer-add-btn:hover,
     [data-theme="dark"] .chat-peer-remove-btn:hover,
     [data-theme="dark"] .chat-peer-saved-remove-btn:hover {{
-      background: #223448;
-      border-color: #4e6a86;
-      color: #eef6ff;
+      background: #1f3329;
+      border-color: #5b886f;
+      color: #e7fff1;
     }}
     [data-theme="dark"] .favorites-clear-btn {{
-      border-color: #35556d;
-      background: #16273a;
-      color: #dbeeff;
+      border-color: #416454;
+      background: #16261f;
+      color: #d5e9de;
     }}
     [data-theme="dark"] .favorites-clear-btn:hover {{
-      background: #223448;
-      border-color: #4e6a86;
+      background: #1f3329;
+      border-color: #5b886f;
     }}
     [data-theme="dark"] .favorites-empty {{
       border-color: var(--ui-border);
@@ -4122,13 +4129,13 @@
       color: var(--ui-text-soft);
     }}
     [data-theme="dark"] .favorite-node-item {{
-      border-color: #35556d;
-      background: #16273a;
-      color: #dbeeff;
+      border-color: #416454;
+      background: #16261f;
+      color: #d5e9de;
     }}
     [data-theme="dark"] .favorite-node-item:hover {{
-      background: #223448;
-      border-color: #4e6a86;
+      background: #1f3329;
+      border-color: #5b886f;
     }}
     [data-theme="dark"] .favorite-node-item.status-warn {{
       background: #40351f;
@@ -4146,15 +4153,15 @@
       border-color: #3e544c;
     }}
     [data-theme="dark"] .favorite-node-item.selected-node {{
-      background: #1f3342 !important;
-      border-color: #4a6b87 !important;
-      color: #eef6ff !important;
-      box-shadow: inset 2px 0 0 #79c0ff;
+      background: #20372b !important;
+      border-color: #5b886f !important;
+      color: #e7fff1 !important;
+      box-shadow: inset 2px 0 0 #8ce7b4;
     }}
     [data-theme="dark"] .favorite-node-id,
     [data-theme="dark"] .favorite-node-meta,
     [data-theme="dark"] .favorites-caption {{
-      color: #a9bfd3;
+      color: #9fbcae;
     }}
     [data-theme="dark"] .favorite-toggle-btn,
     [data-theme="dark"] .mute-toggle-btn {{

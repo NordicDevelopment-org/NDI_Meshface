@@ -854,15 +854,21 @@
           if (chips.length <= 0) return "";
           return `<span class="chat-member-fields-row">${{chips.join("")}}</span>`;
         }})();
+        const tintSeedNode = (
+          nodesById instanceof Map
+            ? (
+              nodesById.get(normalizeNodeId(nodeId))
+              || nodesById.get(normalizeNodeId(item && item.id))
+              || null
+            )
+            : null
+        ) || (nodeProjection && nodeProjection.node) || node || null;
         const shortNameSeedRaw = String(
-          (node && (node.short_name || node.shortName || (node.user && (node.user.short_name || node.user.shortName))))
-          || (nodeProjection && nodeProjection.node && (nodeProjection.node.short_name || nodeProjection.node.shortName || (nodeProjection.node.user && (nodeProjection.node.user.short_name || nodeProjection.node.user.shortName))))
+          (tintSeedNode && (tintSeedNode.short_name || tintSeedNode.shortName || (tintSeedNode.user && (tintSeedNode.user.short_name || tintSeedNode.user.shortName))))
           || ""
         ).trim();
         const longNameSeedRaw = String(
-          (node && (node.long_name || node.longName || (node.user && (node.user.long_name || node.user.longName))))
-          || (nodeProjection && nodeProjection.node && (nodeProjection.node.long_name || nodeProjection.node.longName || (nodeProjection.node.user && (nodeProjection.node.user.long_name || nodeProjection.node.user.longName))))
-          || (nodeProjection && nodeProjection.name)
+          (tintSeedNode && (tintSeedNode.long_name || tintSeedNode.longName || (tintSeedNode.user && (tintSeedNode.user.long_name || tintSeedNode.user.longName))))
           || (item && item.name)
           || ""
         ).trim();
@@ -875,12 +881,12 @@
         const tintEndSeed = (typeof normalizeNodeTintSeedText === "function")
           ? normalizeNodeTintSeedText(longNameSeedRaw, (item && item.name) || tintStartSeed || tintOutlineSeed)
           : String(longNameSeedRaw || (item && item.name) || tintStartSeed || tintOutlineSeed).trim();
-        const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 145) : 145;
+        const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 210) : 210;
         const nodeHue = tagActive ? nodeTagTintHue(tagEntry, autoNodeHue) : autoNodeHue;
         const tagStyleVars = tagActive ? nodeTagStyleVars(tagEntry) : "";
         const memberTintOptions = {{
           scope: "member",
-          fallbackHue: 145,
+          fallbackHue: 210,
           tagActive,
           hue: nodeHue,
           outlineSeed: tintOutlineSeed,
@@ -924,7 +930,7 @@
       }} catch (err) {{
         const fallbackId = normalizeNodeId(item && item.id);
         const fallbackName = String((item && item.name) || fallbackId || "Unknown node");
-        const fallbackHue = (typeof nodeTintHue === "function") ? nodeTintHue(fallbackId || "unknown", 145) : 145;
+        const fallbackHue = (typeof nodeTintHue === "function") ? nodeTintHue(fallbackId || "unknown", 210) : 210;
         const fallbackOutlineSeed = (typeof normalizeNodeTintSeedText === "function")
           ? normalizeNodeTintSeedText(fallbackId || "unknown", "unknown")
           : String(fallbackId || "unknown").trim();
@@ -937,7 +943,7 @@
         const fallbackTintStyle = (typeof nodeTintStyleVars === "function")
           ? nodeTintStyleVars(fallbackId || "unknown", {{
             scope: "member",
-            fallbackHue: 145,
+            fallbackHue: 210,
             tagActive: false,
             hue: fallbackHue,
             outlineSeed: fallbackOutlineSeed,

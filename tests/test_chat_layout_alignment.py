@@ -32,6 +32,11 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "--chat-user-search-inline-end: 6px;" in css
     assert "margin: 0 var(--chat-user-search-inline-end) 6px var(--chat-user-search-inline-start);" in css
     assert "border: 0;" in css
+    assert ".chat-member-list {" in css
+    assert "gap: 0;" in css
+    assert ".chat-member-item {" in css
+    assert "border-radius: 0;" in css
+    assert "border-bottom: 1px solid var(--chat-member-node-border);" in css
     assert "[data-theme=\"dark\"] .chat-left-panel," in css
     assert "[data-theme=\"dark\"] .card.chat .body," in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
@@ -96,6 +101,18 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "background: #173126;" in css
     assert "[data-theme=\"dark\"] .chat-node-navigator-menu," in css
     assert "background: #0d1711;" in css
+    assert "[data-theme=\"dark\"] .chat-member-item {" in css
+    assert "--chat-member-node-dark-sat-mult: 1.02;" in css
+    assert "--chat-member-node-outline-dark-sat-mult: 1.18;" in css
+    assert "calc(46% * var(--chat-member-node-dark-sat-mult, 1))" in css
+    assert "calc(18% * var(--chat-member-node-dark-sat-mult, 1))" in css
+    assert "color: var(--ui-text);" in css
+    assert "[data-theme=\"dark\"] .chat-member-item:hover {" in css
+    assert "rgba(83, 160, 112, 0.12)" in css
+    assert "calc(50% * var(--chat-member-node-dark-sat-mult, 1))" in css
+    assert "[data-theme=\"dark\"] .chat-member-item.selected-node {" in css
+    assert "hsl(var(--chat-member-node-outline-hue, 154) calc(30% * var(--chat-member-node-outline-dark-sat-mult, 1.1))" in css
+    assert "hsl(var(--chat-member-node-hue, 145) calc(44% * var(--chat-member-node-dark-sat-mult, 1))" in css
 
 
 def test_chat_compose_controls_order_matches_current_layout() -> None:
@@ -165,6 +182,19 @@ def test_chat_click_selection_keeps_same_node_selected() -> None:
         selectNode(nodeId, true);""" in peers_src
     assert 'if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
     assert 'if (typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
+
+
+def test_chat_node_list_uses_same_tint_seed_family_as_feed() -> None:
+    peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
+    feed_src = Path("meshdash/assets/dashboard.js.chat.render.feed_items.tmpl").read_text()
+
+    assert "const tintSeedNode = (" in peers_src
+    assert 'nodesById.get(normalizeNodeId(nodeId))' in peers_src
+    assert 'const autoNodeHue = (typeof nodeTintHue === "function") ? nodeTintHue(nodeId, 210) : 210;' in peers_src
+    assert "fallbackHue: 210," in peers_src
+    assert 'const autoNodeTintHue = (typeof nodeTintHue === "function")' in feed_src
+    assert '? nodeTintHue(tintNodeId, 210)' in feed_src
+    assert "fallbackHue: 210," in feed_src
 
 
 def test_chat_reaction_anchor_reuses_same_button_for_more_and_less_states() -> None:
