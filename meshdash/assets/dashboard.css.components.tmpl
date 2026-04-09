@@ -1634,23 +1634,34 @@
       box-shadow: 0 0 0 1px rgba(79, 143, 108, 0.3);
     }}
     [data-theme="dark"] .apps-tabs-bar {{
-      background: rgba(12, 21, 17, 0.45);
-      border-color: #31473b;
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+      border-color: #236744;
+      border-color: var(--workspace-shell-border-muted);
     }}
     [data-theme="dark"] .apps-tab-btn {{
-      background: #21352a;
-      border-color: #3a5346;
-      color: #a9c8b9;
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+      border-color: #236744;
+      border-color: var(--workspace-shell-border-muted);
+      color: #b8d6c4;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .apps-tab-btn:hover {{
-      background: #2a4033;
-      border-color: #4b6a5a;
-      color: #c2dece;
+      background: #0d1d13;
+      background: var(--workspace-shell-hover-bg);
+      border-color: #236744;
+      border-color: var(--workspace-shell-border-muted);
+      color: #c6ffdb;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .apps-tab-btn.is-active {{
-      background: #2b4a39;
-      border-color: #4f8f6c;
-      color: #d1eadb;
+      background: #173126;
+      background: var(--workspace-shell-active-bg);
+      border-color: #3f8f68;
+      border-color: var(--workspace-shell-border-strong);
+      color: #8ce7b4;
+      color: var(--workspace-shell-active-text);
       box-shadow: 0 0 0 1px rgba(79, 143, 108, 0.3);
     }}
     [data-theme="dark"] .settings-help-note {{
@@ -1809,13 +1820,24 @@
       background: transparent;
     }}
     [data-theme="dark"] .card.files {{
-      border-color: #33483c;
-      background: #16241c;
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      background: #08120d;
+      background: var(--workspace-shell-bg);
+      color: #dbece3;
+    }}
+    [data-theme="dark"] .card.games {{
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      background: #08120d;
+      background: var(--workspace-shell-bg);
       color: #dbece3;
     }}
     [data-theme="dark"] .files-controls {{
-      border-color: #355042;
-      background: #1a2b22;
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
     }}
     [data-theme="dark"] .files-caption,
     [data-theme="dark"] .files-send-status,
@@ -1826,30 +1848,43 @@
       color: #9fbead;
     }}
     [data-theme="dark"] .files-input {{
-      background: #22352b;
-      border-color: #3b5949;
-      color: #deeee5;
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      color: #c6ffdb;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .files-input:focus {{
-      outline-color: #5f8a73;
-      border-color: #5f8a73;
-      background: #243b30;
+      outline-color: #3f8f68;
+      outline-color: var(--workspace-shell-border-strong);
+      border-color: #3f8f68;
+      border-color: var(--workspace-shell-border-strong);
+      background: #0d1d13;
+      background: var(--workspace-shell-hover-bg);
     }}
     [data-theme="dark"] .files-console {{
-      border-color: #355042;
-      background: #182820;
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
     }}
     [data-theme="dark"] .files-console-title {{
       color: #a7c4b5;
     }}
     [data-theme="dark"] .files-console-log {{
-      border-color: #355042;
-      background: #101a15;
-      color: #cfe6d8;
+      border-color: #236744;
+      border-color: var(--workspace-shell-border-muted);
+      background: #08120d;
+      background: var(--workspace-shell-bg);
+      color: #c6ffdb;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .files-transfers-scroll {{
-      border-color: #355042;
-      background: #16241c;
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      background: #08120d;
+      background: var(--workspace-shell-bg);
     }}
     [data-theme="dark"] .files-transfer-action {{
       border-color: #426452;
@@ -5401,8 +5436,15 @@
     }}
     [data-theme="dark"] .games-sidebar,
     [data-theme="dark"] .games-main {{
-      background: #13241b;
-      border-color: #2a4638;
+      background: #08120d;
+      background: var(--workspace-shell-bg);
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+    }}
+    [data-theme="dark"] .layout.view-games .games .body,
+    [data-theme="dark"] .layout.view-files .files .body {{
+      background: #08120d;
+      background: var(--workspace-shell-bg);
     }}
     [data-theme="dark"] .games-board-wrap {{
       --games-board-default-background: linear-gradient(180deg, #173526, #122a1f);
@@ -5415,18 +5457,26 @@
       border-color: rgba(255, 255, 255, 0.84);
     }}
     [data-theme="dark"] .games-toolbar {{
-      background: #1a2b22;
-      border-bottom-color: #355042;
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+      border-bottom-color: #2d8f5d;
+      border-bottom-color: var(--workspace-shell-border);
     }}
     [data-theme="dark"] .games-tab-btn {{
-      border-color: #3b5b4a;
-      background: #0f1d16;
-      color: #c8e8d6;
+      border-color: #236744;
+      border-color: var(--workspace-shell-border-muted);
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+      color: #b8d6c4;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .games-tab-btn.is-active {{
-      border-color: #2f855a;
-      background: #173526;
-      color: #9ce3ba;
+      border-color: #3f8f68;
+      border-color: var(--workspace-shell-border-strong);
+      background: #173126;
+      background: var(--workspace-shell-active-bg);
+      color: #8ce7b4;
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .games-chat-compose-wrap {{
       background: #13241b;
@@ -6440,9 +6490,12 @@
     [data-theme="dark"] .apps-tabs-bar.workspace-chrome-bar,
     [data-theme="dark"] .games-toolbar.workspace-chrome-bar,
     [data-theme="dark"] .card.chat .chat-card-head.workspace-chrome-bar {{
-      border-color: rgba(71, 105, 86, 0.78);
-      background: rgba(7, 13, 7, 0.84);
+      border-color: #236744;
+      border-color: var(--workspace-shell-border-muted);
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
       box-shadow: 0 12px 28px rgba(2, 6, 4, 0.5);
+      box-shadow: var(--workspace-shell-shadow);
     }}
     [data-theme="dark"] .network-map-subview-tab,
     [data-theme="dark"] .workspace-pill-btn {{

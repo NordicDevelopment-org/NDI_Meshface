@@ -34,3 +34,8 @@ def test_workspace_views_reuse_shared_shell_tokens() -> None:
     assert "background: var(--workspace-shell-bg, #08110d);" in css
     assert "background: var(--workspace-shell-bg-alt);" in css
     assert "border-color: var(--workspace-shell-border);" in css
+    assert "[data-theme=\"dark\"] .card.games {" in css
+    assert "[data-theme=\"dark\"] .card.files {" in css
+    assert "[data-theme=\"dark\"] .games-sidebar," in css
+    assert "[data-theme=\"dark\"] .layout.view-games .games .body," in css
+    assert "[data-theme=\"dark\"] .apps-tabs-bar.workspace-chrome-bar," in css
