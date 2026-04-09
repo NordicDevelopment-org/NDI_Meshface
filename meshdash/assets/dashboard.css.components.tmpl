@@ -4537,7 +4537,30 @@
       background: var(--ui-accent-soft);
     }}
     [data-theme="dark"] .leaflet-container {{
-      background: #0f141a;
+      background: color-mix(in srgb, var(--workspace-shell-bg) 90%, black 10%);
+    }}
+    [data-theme="dark"] .map-frame:not(.map-basemap-offline) .leaflet-container::before {{
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 250;
+      pointer-events: none;
+      background:
+        radial-gradient(
+          circle at 24% 28%,
+          color-mix(in srgb, var(--ui-accent) 14%, transparent),
+          transparent 34%
+        ),
+        radial-gradient(
+          circle at 76% 70%,
+          color-mix(in srgb, var(--workspace-shell-border-strong) 12%, transparent),
+          transparent 38%
+        ),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 18%, transparent),
+          color-mix(in srgb, var(--workspace-shell-active-bg) 16%, transparent)
+        );
     }}
     [data-theme="dark"] .leaflet-tile {{
       filter: none;
