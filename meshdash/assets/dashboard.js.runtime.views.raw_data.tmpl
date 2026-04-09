@@ -985,15 +985,25 @@
       const clippedPointCount = Math.max(0, Math.trunc(Number(bounds && bounds.clippedCount) || 0));
 
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const themeStyles = window.getComputedStyle
+        ? window.getComputedStyle(document.documentElement)
+        : null;
+      const themeColor = (name, fallback) => {{
+        if (!(themeStyles && typeof themeStyles.getPropertyValue === "function")) {{
+          return fallback;
+        }}
+        const value = String(themeStyles.getPropertyValue(name) || "").trim();
+        return value || fallback;
+      }};
       const palette = dockedInNetwork
         ? (
           darkTheme
             ? {{
-              grid: "#324152",
-              guide: "#324152",
+              grid: themeColor("--workspace-shell-border-muted", "#324152"),
+              guide: themeColor("--workspace-shell-border-muted", "#324152"),
               guideOpacity: "0.45",
-              text: "#9ce7b8",
-              axis: "#9ce7b8",
+              text: themeColor("--workspace-shell-text-soft", "#9ce7b8"),
+              axis: themeColor("--workspace-shell-active-text", "#9ce7b8"),
             }}
             : {{
               grid: "#dce8df",

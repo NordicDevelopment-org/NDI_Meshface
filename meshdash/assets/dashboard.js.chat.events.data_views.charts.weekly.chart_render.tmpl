@@ -280,19 +280,29 @@
         }}
       }}
       const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const themeStyles = window.getComputedStyle
+        ? window.getComputedStyle(document.documentElement)
+        : null;
+      const themeColor = (name, fallback) => {{
+        if (!(themeStyles && typeof themeStyles.getPropertyValue === "function")) {{
+          return fallback;
+        }}
+        const value = String(themeStyles.getPropertyValue(name) || "").trim();
+        return value || fallback;
+      }};
       const chartPalette = darkTheme
         ? {{
-            grid: "#324152",
-            line: "#58c878",
-            compare: "#79c0ff",
-            aux1: "#f3b36b",
-            aux2: "#6fcad8",
-            aux3: "#d0e18a",
-            label: "#9ce7b8",
-            compareLabel: "#a4d0ff",
-            aux1Label: "#f6c88e",
-            aux2Label: "#8ddde8",
-            aux3Label: "#dde8a8",
+            grid: themeColor("--workspace-shell-border-muted", "#324152"),
+            line: themeColor("--ui-accent", "#58c878"),
+            compare: themeColor("--workspace-shell-border-strong", "#79c0ff"),
+            aux1: themeColor("--ui-link", "#f3b36b"),
+            aux2: themeColor("--workspace-shell-active-text", "#6fcad8"),
+            aux3: themeColor("--workspace-shell-text-soft", "#d0e18a"),
+            label: themeColor("--workspace-shell-active-text", "#9ce7b8"),
+            compareLabel: themeColor("--workspace-shell-text", "#a4d0ff"),
+            aux1Label: themeColor("--ui-link", "#f6c88e"),
+            aux2Label: themeColor("--workspace-shell-active-text", "#8ddde8"),
+            aux3Label: themeColor("--workspace-shell-text-soft", "#dde8a8"),
           }}
         : {{
             grid: "#dce8df",

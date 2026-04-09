@@ -4744,139 +4744,238 @@
     }}
     [data-theme="dark"] .network-map-placeholder {{
       background:
-        radial-gradient(circle at top left, rgba(63, 143, 104, 0.18), transparent 34%),
-        radial-gradient(circle at bottom right, rgba(121, 192, 255, 0.16), transparent 30%),
-        linear-gradient(180deg, rgba(7, 13, 7, 0.96), rgba(22, 39, 58, 0.94));
-      color: #e2eef8;
+        radial-gradient(
+          circle at top left,
+          color-mix(in srgb, var(--ui-accent) 22%, transparent),
+          transparent 34%
+        ),
+        radial-gradient(
+          circle at bottom right,
+          color-mix(in srgb, var(--workspace-shell-border-strong) 18%, transparent),
+          transparent 30%
+        ),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 92%, black 8%),
+          color-mix(in srgb, var(--workspace-shell-bg) 94%, black 6%)
+        );
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .network-map-placeholder-eyebrow {{
-      border-color: rgba(61, 89, 115, 0.88);
-      background: rgba(17, 28, 41, 0.88);
-      color: #b9d4ef;
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 78%, var(--workspace-shell-active-bg) 22%);
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-map-placeholder-copy {{
-      color: #a8bed2;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-overview-panel {{
       background:
-        radial-gradient(circle at top left, rgba(63, 143, 104, 0.14), transparent 30%),
-        radial-gradient(circle at bottom right, rgba(121, 192, 255, 0.14), transparent 28%),
-        linear-gradient(180deg, rgba(8, 13, 11, 0.98), rgba(14, 23, 33, 0.98));
+        radial-gradient(
+          circle at top left,
+          color-mix(in srgb, var(--workspace-shell-active-bg) 32%, transparent),
+          transparent 32%
+        ),
+        radial-gradient(
+          circle at bottom right,
+          color-mix(in srgb, var(--ui-accent) 16%, transparent),
+          transparent 30%
+        ),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 94%, black 6%),
+          color-mix(in srgb, var(--workspace-shell-bg) 96%, black 4%)
+        );
+    }}
+    [data-theme="dark"] .network-overview-panel .history-metric-wrap {{
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 82%, var(--workspace-shell-bg-alt) 18%);
+    }}
+    [data-theme="dark"] .network-overview-panel .history-metric-label {{
+      color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .network-overview-panel .history-metric-inline {{
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-overview-panel .history-metric-select {{
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, var(--workspace-shell-active-bg) 12%);
+      border-color: var(--workspace-shell-border-muted);
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-overview-panel .history-metric-toggle {{
+      accent-color: var(--ui-accent);
+    }}
+    [data-theme="dark"] .network-overview-panel #network-overview-chart-wrap {{
+      border-color: var(--workspace-shell-border);
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, var(--workspace-shell-active-bg) 12%),
+          color-mix(in srgb, var(--workspace-shell-bg) 94%, black 6%)
+        );
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--workspace-shell-text) 8%, transparent);
+    }}
+    [data-theme="dark"] .network-overview-panel .signal-empty {{
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 92%, black 8%);
+      color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .network-overview-panel #network-overview-timeline .signal-timeline-track {{
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 72%, transparent);
+    }}
+    [data-theme="dark"] .network-overview-panel #network-overview-timeline .signal-timeline-tick {{
+      background: color-mix(in srgb, var(--workspace-shell-border-strong) 72%, var(--workspace-shell-text-soft) 28%);
+    }}
+    [data-theme="dark"] .network-overview-panel #network-overview-timeline .signal-timeline-tick-major {{
+      background: var(--workspace-shell-border-strong);
+    }}
+    [data-theme="dark"] .network-overview-panel #network-overview-timeline .signal-timeline-tick-minor {{
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 74%, var(--workspace-shell-text-soft) 26%);
+      opacity: 0.72;
+    }}
+    [data-theme="dark"] .network-overview-panel #network-overview-timeline .signal-timeline-label,
+    [data-theme="dark"] .network-overview-panel #network-overview-timeline .signal-timeline-empty {{
+      color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .network-overview-panel #network-overview-timeline .signal-timeline-label-major {{
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-overview-panel .overview-item {{
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 80%, var(--workspace-shell-bg-alt) 20%);
+    }}
+    [data-theme="dark"] .network-overview-panel .overview-item .k {{
+      color: var(--workspace-shell-text-soft) !important;
+    }}
+    [data-theme="dark"] .network-overview-panel .overview-item .v {{
+      color: var(--workspace-shell-text) !important;
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-explorer {{
-      border-color: rgba(54, 78, 67, 0.95);
-      background: rgba(11, 18, 14, 0.86);
-      box-shadow: 0 18px 36px rgba(2, 6, 4, 0.42);
+      border-color: var(--workspace-shell-border);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 92%, black 8%);
+      box-shadow: var(--workspace-shell-shadow);
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-head h3 {{
-      color: #d8e8df;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-status {{
-      color: #aac6b7;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-control-group {{
-      background: #1a2835;
-      border-color: #35556d;
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 82%, var(--workspace-shell-bg-alt) 18%);
+      border-color: var(--workspace-shell-border-muted);
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-control-group label {{
-      color: var(--ui-text-soft);
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-control-group .env-metric-select {{
-      color: #dbeeff;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-refresh-btn {{
-      border-color: #35556d;
-      background: #1a2835;
-      color: #dbeeff;
-      box-shadow: 0 8px 20px rgba(6, 13, 20, 0.26);
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 72%, var(--workspace-shell-active-bg) 28%);
+      color: var(--workspace-shell-text);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--workspace-shell-text) 8%, transparent);
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-refresh-btn:hover {{
-      background: #223447;
+      background: var(--workspace-shell-hover-bg);
     }}
     [data-theme="dark"] .network-sensors-panel #env-metrics-chart-wrap {{
-      border-color: rgba(61, 89, 115, 0.86);
-      background: linear-gradient(180deg, rgba(14, 22, 34, 0.98), rgba(18, 28, 40, 0.98));
-      box-shadow: inset 0 1px 0 rgba(144, 177, 226, 0.08);
+      border-color: var(--workspace-shell-border);
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, var(--workspace-shell-active-bg) 12%),
+          color-mix(in srgb, var(--workspace-shell-bg) 94%, black 6%)
+        );
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--workspace-shell-text) 8%, transparent);
     }}
     [data-theme="dark"] .network-sensors-panel #env-metrics-timeline .signal-timeline-track {{
-      background: #344353;
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 72%, transparent);
     }}
     [data-theme="dark"] .network-sensors-panel #env-metrics-timeline .signal-timeline-tick {{
-      background: #70879f;
+      background: color-mix(in srgb, var(--workspace-shell-border-strong) 72%, var(--workspace-shell-text-soft) 28%);
     }}
     [data-theme="dark"] .network-sensors-panel #env-metrics-timeline .signal-timeline-tick-major {{
-      background: #8ea9c5;
+      background: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .network-sensors-panel #env-metrics-timeline .signal-timeline-tick-minor {{
-      background: #5f758d;
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 74%, var(--workspace-shell-text-soft) 26%);
       opacity: 0.72;
     }}
     [data-theme="dark"] .network-sensors-panel #env-metrics-timeline .signal-timeline-label,
     [data-theme="dark"] .network-sensors-panel #env-metrics-timeline .signal-timeline-empty {{
-      color: #a4b7c9;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-sensors-panel #env-metrics-timeline .signal-timeline-label-major {{
-      color: #d6e6f7;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .network-sensors-panel .env-metrics-available {{
-      color: #b7cadc;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-sensors-panel .env-node-legend-card {{
-      border-color: #3d5973;
-      background: #223447;
-      color: #ebf3ff;
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 78%, var(--workspace-shell-bg-alt) 22%);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .network-sensors-panel .env-node-legend-card .k {{
-      color: #b7cadc;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-sensors-panel .env-node-legend-card .v {{
-      color: #dbeeff;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .network-sensors-panel .env-node-legend-toggle:hover {{
-      background: #294058;
+      background: var(--workspace-shell-hover-bg);
     }}
     [data-theme="dark"] .network-sensors-panel .env-node-legend-toggle:focus-visible {{
-      outline-color: #8db7df;
+      outline-color: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .network-graph-card {{
       background: transparent;
       box-shadow: none;
     }}
     [data-theme="dark"] .network-graph-chip {{
-      border-color: rgba(63, 110, 82, 0.92);
-      background: rgba(13, 22, 16, 0.86);
-      color: #d8eee0;
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 76%, var(--workspace-shell-active-bg) 24%);
+      color: var(--workspace-shell-text);
       box-shadow: none;
     }}
     [data-theme="dark"] .network-graph-chip-label {{
-      color: #8fb59f;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-graph-stage {{
-      border-color: rgba(52, 79, 64, 0.9);
+      border-color: var(--workspace-shell-border);
       background:
-        radial-gradient(circle at center, rgba(63, 143, 104, 0.18), transparent 24%),
-        linear-gradient(180deg, rgba(8, 13, 11, 0.98), rgba(13, 20, 16, 0.98));
-      box-shadow: inset 0 1px 0 rgba(123, 157, 137, 0.08);
+        radial-gradient(
+          circle at center,
+          color-mix(in srgb, var(--ui-accent) 20%, transparent),
+          transparent 26%
+        ),
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 94%, black 6%),
+          color-mix(in srgb, var(--workspace-shell-bg) 96%, black 4%)
+        );
+      box-shadow: inset 0 1px 0 color-mix(in srgb, var(--workspace-shell-text) 6%, transparent);
     }}
     [data-theme="dark"] #network-graph-empty.signal-empty {{
-      background: rgba(9, 15, 11, 0.84);
-      color: #b9d3c3;
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 92%, black 8%);
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-graph-legend {{
-      color: #9ab8a7;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-graph-swatch {{
-      background: rgba(109, 136, 119, 0.48);
-      box-shadow: inset 0 0 0 1px rgba(104, 134, 116, 0.22);
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 58%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border) 32%, transparent);
     }}
     [data-theme="dark"] .network-graph-swatch.is-root {{
-      background: rgba(72, 190, 128, 0.78);
+      background: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .network-graph-swatch.is-real {{
-      background: rgba(110, 176, 255, 0.72);
+      background: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .network-graph-swatch.is-observed {{
-      background: rgba(117, 138, 124, 0.48);
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 48%, transparent);
     }}
     [data-theme="dark"] .network-graph-swatch.is-broadcast-only {{
       background: rgba(214, 165, 72, 0.68);
@@ -4885,7 +4984,7 @@
       background: rgba(132, 141, 148, 0.56);
     }}
     [data-theme="dark"] .network-graph-ring {{
-      stroke: rgba(88, 119, 102, 0.32);
+      stroke: color-mix(in srgb, var(--workspace-shell-border-muted) 56%, transparent);
     }}
     [data-theme="dark"] .network-graph-ring.is-detached {{
       stroke: rgba(102, 113, 121, 0.34);
@@ -4894,33 +4993,33 @@
       stroke: rgba(188, 146, 60, 0.46);
     }}
     [data-theme="dark"] .network-graph-ring-label {{
-      fill: #8fb19d;
+      fill: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-graph-edge {{
-      stroke: rgba(92, 123, 104, 0.42);
+      stroke: color-mix(in srgb, var(--workspace-shell-border-muted) 72%, var(--ui-accent) 28%);
     }}
     [data-theme="dark"] .network-graph-edge.is-real {{
-      stroke: rgba(107, 176, 255, 0.52);
+      stroke: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .network-graph-edge.is-observed {{
-      stroke: rgba(108, 129, 115, 0.32);
+      stroke: color-mix(in srgb, var(--workspace-shell-border-muted) 62%, transparent);
     }}
     [data-theme="dark"] .network-graph-edge.is-root-link {{
-      stroke: rgba(72, 190, 128, 0.64);
+      stroke: var(--ui-accent);
     }}
     [data-theme="dark"] .network-graph-node-core {{
-      fill: rgba(12, 19, 15, 0.98);
-      stroke: rgba(98, 127, 110, 0.88);
+      fill: color-mix(in srgb, var(--workspace-shell-bg-alt) 94%, black 6%);
+      stroke: var(--workspace-shell-border-muted);
     }}
     [data-theme="dark"] .network-graph-node:hover .network-graph-node-core {{
-      fill: rgba(17, 27, 21, 0.98);
+      fill: var(--workspace-shell-hover-bg);
     }}
     [data-theme="dark"] .network-graph-node.is-root .network-graph-node-core {{
-      fill: rgba(16, 44, 28, 0.98);
-      stroke: rgba(72, 190, 128, 0.96);
+      fill: var(--workspace-shell-active-bg);
+      stroke: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .network-graph-node.is-selected .network-graph-node-core {{
-      stroke: rgba(113, 181, 255, 0.98);
+      stroke: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .network-graph-node.is-detached .network-graph-node-core {{
       fill: rgba(17, 20, 19, 0.96);
@@ -4935,19 +5034,19 @@
       stroke: rgba(230, 177, 74, 0.98);
     }}
     [data-theme="dark"] .network-graph-node-label {{
-      fill: #d9eee0;
-      stroke: rgba(8, 13, 11, 0.96);
+      fill: var(--workspace-shell-text);
+      stroke: color-mix(in srgb, var(--workspace-shell-bg) 94%, black 6%);
     }}
     [data-theme="dark"] .network-graph-node-label.is-secondary {{
-      fill: #9ab8a7;
+      fill: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-graph-node-label.is-broadcast-only {{
       fill: #f0ce85;
     }}
     [data-theme="dark"] .network-overview-card {{
-      border-color: rgba(54, 78, 67, 0.95);
-      background: rgba(11, 18, 14, 0.86);
-      box-shadow: 0 18px 36px rgba(2, 6, 4, 0.42);
+      border-color: var(--workspace-shell-border);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, black 12%);
+      box-shadow: var(--workspace-shell-shadow);
     }}
     [data-theme="dark"] .offline-landmark-icon span {{
       border-color: rgba(116, 147, 191, 0.62);

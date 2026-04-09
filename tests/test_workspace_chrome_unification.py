@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from meshdash.html_css import build_dashboard_css
+from meshdash.html_js import build_dashboard_js
 from meshdash.html_sections import build_html_shell
 
 
@@ -76,6 +77,48 @@ def test_network_map_controls_follow_theme_tokens() -> None:
     assert "var(--workspace-shell-border)" in dark_heatmap_section
     assert "var(--workspace-shell-bg-alt)" in dark_zoom_section
     assert "var(--workspace-shell-text-soft)" in dark_status_section
+
+
+def test_network_subviews_follow_workspace_theme_tokens() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    overview_panel_section = css.split("[data-theme=\"dark\"] .network-overview-panel {", 1)[1].split("}", 1)[0]
+    overview_control_section = css.split("[data-theme=\"dark\"] .network-overview-panel .history-metric-wrap {", 1)[1].split("}", 1)[0]
+    overview_chart_section = css.split("[data-theme=\"dark\"] .network-overview-panel #network-overview-chart-wrap {", 1)[1].split("}", 1)[0]
+    overview_stat_section = css.split("[data-theme=\"dark\"] .network-overview-panel .overview-item {", 1)[1].split("}", 1)[0]
+    sensors_control_section = css.split("[data-theme=\"dark\"] .network-sensors-panel .env-metrics-control-group {", 1)[1].split("}", 1)[0]
+    sensors_chart_section = css.split("[data-theme=\"dark\"] .network-sensors-panel #env-metrics-chart-wrap {", 1)[1].split("}", 1)[0]
+    graph_chip_section = css.split("[data-theme=\"dark\"] .network-graph-chip {", 1)[1].split("}", 1)[0]
+    graph_stage_section = css.split("[data-theme=\"dark\"] .network-graph-stage {", 1)[1].split("}", 1)[0]
+    graph_edge_section = css.split("[data-theme=\"dark\"] .network-graph-edge {", 1)[1].split("}", 1)[0]
+    graph_root_section = css.split("[data-theme=\"dark\"] .network-graph-node.is-root .network-graph-node-core {", 1)[1].split("}", 1)[0]
+
+    assert "var(--workspace-shell-bg-alt)" in overview_panel_section
+    assert "var(--workspace-shell-active-bg)" in overview_panel_section
+    assert "var(--workspace-shell-border-muted)" in overview_control_section
+    assert "var(--workspace-shell-active-bg)" in overview_control_section
+    assert "var(--workspace-shell-border)" in overview_chart_section
+    assert "var(--workspace-shell-bg-alt)" in overview_chart_section
+    assert "var(--workspace-shell-active-bg)" in overview_stat_section
+    assert "var(--workspace-shell-border-muted)" in sensors_control_section
+    assert "var(--workspace-shell-border)" in sensors_chart_section
+    assert "var(--workspace-shell-bg-alt)" in graph_chip_section
+    assert "var(--workspace-shell-border)" in graph_stage_section
+    assert "var(--ui-accent)" in graph_edge_section
+    assert "var(--workspace-shell-border-strong)" in graph_root_section
+
+
+def test_network_subview_charts_pull_runtime_theme_vars() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'themeColor("--workspace-shell-border-muted"' in js
+    assert 'themeColor("--workspace-shell-active-text"' in js
+    assert 'themeColor("--workspace-shell-text-soft"' in js
+    assert 'themeColor("--ui-accent"' in js
 
 
 def test_dark_text_input_variants_share_workspace_shell_tokens() -> None:
