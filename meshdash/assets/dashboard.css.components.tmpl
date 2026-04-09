@@ -1493,7 +1493,7 @@
       color: color-mix(in srgb, var(--workspace-shell-text-soft) 94%, white 6%);
     }}
     [data-theme="dark"] .topbar-view-menu-btn {{
-      border-color: color-mix(in srgb, var(--workspace-shell-border) 66%, var(--ui-border));
+      border-color: var(--workspace-shell-border);
       background:
         linear-gradient(
           180deg,
@@ -3105,6 +3105,35 @@
     }}
     [data-theme="dark"] .summary-updated-row {{
       color: var(--ui-text-soft);
+    }}
+    [data-theme="dark"] .topbar-update-ticker {{
+      border-color: var(--workspace-shell-border);
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--ui-panel)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, black)
+        );
+      color: var(--workspace-shell-text);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border-muted) 62%, transparent);
+    }}
+    [data-theme="dark"] .topbar-update-ticker:hover,
+    [data-theme="dark"] .topbar-update-ticker:focus-within {{
+      border-color: var(--workspace-shell-border-strong);
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-hover-bg) 86%, var(--ui-panel-alt)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, var(--workspace-shell-hover-bg))
+        );
+    }}
+    [data-theme="dark"] .topbar-update-text,
+    [data-theme="dark"] .topbar-update-item {{
+      color: color-mix(in srgb, var(--workspace-shell-text-soft) 92%, white 8%);
+      text-shadow: 0 0 8px color-mix(in srgb, var(--workspace-shell-active-bg) 34%, transparent);
+    }}
+    [data-theme="dark"] .topbar-update-item.is-oneshot {{
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item {{
       --ticker-card-accent: color-mix(in srgb, var(--workspace-shell-border-strong) 72%, var(--ui-accent) 28%);
@@ -5030,78 +5059,103 @@
     [data-theme="dark"] .topbar-peer-dm-menu-wrap .peer-dm-toggle-btn,
     [data-theme="dark"] .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn,
     [data-theme="dark"] .topbar-favorite-menu-wrap .favorite-menu-toggle-btn {{
-      background: rgba(13, 24, 34, 0.82);
-      border-color: rgba(125, 164, 191, 0.62);
-      color: #d7ecff;
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--ui-panel)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, black)
+        );
+      border-color: var(--workspace-shell-border);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-self-profile {{
-      background: rgba(13, 24, 34, 0.82);
-      border-color: rgba(125, 164, 191, 0.62);
-      color: #d7ecff;
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--ui-panel)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, black)
+        );
+      border-color: var(--workspace-shell-border);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-self-profile.status-online {{
-      border-color: rgba(89, 184, 131, 0.85);
-      background: rgba(29, 72, 51, 0.9);
-      color: #c8ffe0;
-      box-shadow: 0 0 0 1px rgba(89, 184, 131, 0.45);
+      border-color: color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 84%, var(--workspace-shell-bg) 16%);
+      color: var(--workspace-shell-active-text);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
     }}
     [data-theme="dark"] .topbar-self-profile.status-warn {{
-      border-color: rgba(242, 206, 122, 0.88);
-      background: rgba(99, 73, 24, 0.84);
+      border-color: #d1a24f;
+      background: color-mix(in srgb, #8d6120 28%, var(--workspace-shell-bg) 72%);
       color: #fff0cc;
-      box-shadow: 0 0 0 1px rgba(201, 160, 78, 0.42);
+      box-shadow: 0 0 0 1px rgba(209, 162, 79, 0.42);
     }}
     [data-theme="dark"] .topbar-self-profile.status-stale {{
-      border-color: rgba(255, 158, 158, 0.9);
-      background: rgba(104, 34, 34, 0.88);
+      border-color: #cf6f6f;
+      background: color-mix(in srgb, #732c2c 34%, var(--workspace-shell-bg) 66%);
       color: #ffdede;
-      box-shadow: 0 0 0 1px rgba(198, 91, 91, 0.45);
+      box-shadow: 0 0 0 1px rgba(207, 111, 111, 0.45);
     }}
     [data-theme="dark"] .topbar-self-profile.status-unknown {{
-      background: rgba(13, 24, 34, 0.82);
-      border-color: rgba(125, 164, 191, 0.62);
-      color: #d7ecff;
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--ui-panel)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, black)
+        );
+      border-color: var(--workspace-shell-border);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn:hover,
     [data-theme="dark"] .topbar-peer-dm-menu-wrap .peer-dm-toggle-btn:hover,
     [data-theme="dark"] .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn:hover,
     [data-theme="dark"] .topbar-favorite-menu-wrap .favorite-menu-toggle-btn:hover {{
-      background: rgba(25, 46, 64, 0.94);
-      border-color: rgba(157, 194, 220, 0.78);
-      color: #f0f8ff;
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-hover-bg) 86%, var(--ui-panel-alt)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, var(--workspace-shell-hover-bg))
+        );
+      border-color: var(--workspace-shell-border-strong);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn[aria-expanded="true"],
     [data-theme="dark"] .topbar-peer-dm-menu-wrap .peer-dm-toggle-btn[aria-expanded="true"],
     [data-theme="dark"] .topbar-chat-settings-menu-wrap .chat-settings-toggle-btn[aria-expanded="true"],
     [data-theme="dark"] .topbar-favorite-menu-wrap .favorite-menu-toggle-btn[aria-expanded="true"] {{
-      background: rgba(31, 58, 79, 0.96);
-      border-color: rgba(157, 194, 220, 0.82);
-      color: #f0f8ff;
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-hover-bg) 86%, var(--ui-panel-alt)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, var(--workspace-shell-hover-bg))
+        );
+      border-color: var(--workspace-shell-border-strong);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn.has-unread {{
-      border-color: #59b883;
-      color: #baf8d4;
-      box-shadow: 0 0 0 1px rgba(89, 184, 131, 0.45);
+      border-color: color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
+      color: var(--workspace-shell-active-text);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
     }}
     [data-theme="dark"] .topbar-peer-dm-menu-wrap .peer-dm-toggle-btn.has-unread {{
-      border-color: #59b883;
-      color: #baf8d4;
-      box-shadow: 0 0 0 1px rgba(89, 184, 131, 0.45);
+      border-color: color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
+      color: var(--workspace-shell-active-text);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
     }}
     [data-theme="dark"] .topbar .topbar-chat-context {{
       background: rgba(31, 58, 79, 0.38);
       color: #e6f3fb;
     }}
     [data-theme="dark"] .topbar-favorite-menu-wrap .favorite-menu-toggle-btn.has-saved {{
-      border-color: #59b883;
-      color: #baf8d4;
-      box-shadow: 0 0 0 1px rgba(89, 184, 131, 0.45);
+      border-color: color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
+      color: var(--workspace-shell-active-text);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
     }}
     [data-theme="dark"] .topbar-favorite-menu-wrap .favorite-menu-toggle-btn.has-selected {{
-      background: rgba(29, 72, 51, 0.92);
-      border-color: #59b883;
-      color: #baf8d4;
-      box-shadow: 0 0 0 1px rgba(89, 184, 131, 0.45);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 84%, var(--workspace-shell-bg) 16%);
+      border-color: color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
+      color: var(--workspace-shell-active-text);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
     }}
     [data-theme="dark"] .topbar-chat-change-menu-wrap .chat-change-badge {{
       border-color: #0d1a24;

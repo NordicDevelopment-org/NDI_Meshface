@@ -168,6 +168,34 @@ def test_topbar_tickers_follow_workspace_shell_and_semantic_states() -> None:
     assert "var(--workspace-shell-text-soft)" in target_status_section
 
 
+def test_topbar_controls_share_workspace_shell_tokens() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    update_section = css.split("[data-theme=\"dark\"] .topbar-update-ticker {", 1)[1].split("}", 1)[0]
+    update_text_section = css.split("[data-theme=\"dark\"] .topbar-update-text,", 1)[1].split("}", 1)[0]
+    icon_section = css.split("[data-theme=\"dark\"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn,", 1)[1].split("}", 1)[0]
+    icon_hover_section = css.split("[data-theme=\"dark\"] .topbar-chat-change-menu-wrap .chat-change-toggle-btn:hover,", 1)[1].split("}", 1)[0]
+    self_profile_section = css.split("[data-theme=\"dark\"] .topbar-self-profile {", 1)[1].split("}", 1)[0]
+
+    assert "--topbar-shell-border:" not in css
+    assert "--topbar-shell-control-bg:" not in css
+    assert "var(--workspace-shell-border)" in update_section
+    assert "var(--workspace-shell-bg-alt)" in update_section
+    assert "var(--workspace-shell-bg)" in update_section
+    assert "var(--workspace-shell-text)" in update_section
+    assert "var(--workspace-shell-text-soft)" in update_text_section
+    assert "var(--workspace-shell-border)" in icon_section
+    assert "var(--workspace-shell-bg-alt)" in icon_section
+    assert "var(--workspace-shell-bg)" in icon_section
+    assert "var(--workspace-shell-text)" in icon_section
+    assert "var(--workspace-shell-border-strong)" in icon_hover_section
+    assert "var(--workspace-shell-hover-bg)" in icon_hover_section
+    assert "var(--workspace-shell-border)" in self_profile_section
+    assert "var(--workspace-shell-bg-alt)" in self_profile_section
+    assert "var(--workspace-shell-bg)" in self_profile_section
+    assert "var(--workspace-shell-text)" in self_profile_section
+
+
 def test_console_view_removes_body_shell_and_keeps_terminal_frame() -> None:
     css = build_dashboard_css(theme_css="")
     body_section = css.split(".layout.view-console .console .body {", 1)[1].split("}", 1)[0]
