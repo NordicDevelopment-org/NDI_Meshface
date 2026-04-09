@@ -3993,13 +3993,17 @@
       color: #a9bfd3;
     }}
     [data-theme="dark"] .saved-node-note-input {{
-      border-color: var(--ui-border);
-      background: #121b24;
-      color: #e6eef8;
+      border-color: var(--workspace-shell-border);
+      background: color-mix(in srgb, var(--workspace-shell-bg) 78%, var(--workspace-shell-bg-alt) 22%);
+      color: var(--workspace-shell-text);
+      caret-color: var(--workspace-shell-active-text);
+    }}
+    [data-theme="dark"] .saved-node-note-input::placeholder {{
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .saved-node-note-input:focus {{
-      border-color: #4e7aa6;
-      box-shadow: 0 0 0 2px rgba(121, 192, 255, 0.24);
+      border-color: var(--workspace-shell-border-strong);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--workspace-shell-border-strong) 24%, transparent);
     }}
     [data-theme="dark"] .overview-item {{
       border-color: var(--ui-border);
@@ -5427,8 +5431,8 @@
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.56);
     }}
     [data-theme="dark"] .peer-dm-menu {{
-      background: #0f1f17;
-      border-color: #2f4d3d;
+      background: var(--workspace-shell-bg-alt);
+      border-color: var(--workspace-shell-border);
       box-shadow: 0 12px 30px rgba(0, 0, 0, 0.56);
     }}
     [data-theme="dark"] .chat-settings-menu {{
@@ -5490,168 +5494,195 @@
       border-color: rgba(99, 146, 122, 0.88);
     }}
     [data-theme="dark"] .favorite-menu-tag-editor {{
-      border-color: #345646;
-      background: #15281f;
+      border-color: var(--workspace-shell-border);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--workspace-shell-bg) 16%);
     }}
     [data-theme="dark"] .favorite-menu-tag-editor-label {{
-      color: #9ab7a7;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .favorite-menu-tag-preset-select,
     [data-theme="dark"] .favorite-menu-tag-editor-input {{
-      border-color: #355547;
-      background: #102017;
-      color: #d5ebdd;
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg) 78%, var(--workspace-shell-bg-alt) 22%);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .favorite-menu-tag-color-input {{
-      border-color: #355547;
-      background: #102017;
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg) 78%, var(--workspace-shell-bg-alt) 22%);
+    }}
+    [data-theme="dark"] .favorite-menu-tag-preset-select:focus,
+    [data-theme="dark"] .favorite-menu-tag-editor-input:focus,
+    [data-theme="dark"] .favorite-menu-tag-color-input:focus {{
+      border-color: var(--workspace-shell-border-strong);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--workspace-shell-border-strong) 24%, transparent);
     }}
     [data-theme="dark"] .favorite-menu-tag-vibrance-value,
     [data-theme="dark"] .favorite-menu-tag-status {{
-      color: #9ab7a7;
+      color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .favorite-menu-tag-editor-actions .btn {{
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 86%, transparent);
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .favorite-menu-tag-editor-actions .btn:hover {{
+      border-color: var(--workspace-shell-border-strong);
+      background: var(--workspace-shell-hover-bg);
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .peer-dm-menu-list {{
-      background: #13241b;
-      border-color: #2a4638;
+      background: color-mix(in srgb, var(--workspace-shell-bg) 76%, var(--workspace-shell-bg-alt) 24%);
+      border-color: var(--workspace-shell-border);
     }}
     [data-theme="dark"] .peer-dm-menu-empty {{
-      color: #9ab7a7;
-      border-color: #355547;
-      background: rgba(19, 36, 27, 0.68);
+      color: var(--workspace-shell-text-soft);
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 86%, transparent);
     }}
     [data-theme="dark"] .peer-dm-menu-item {{
-      color: #c5e2d2;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .peer-dm-menu-item:hover {{
-      border-color: #3f6a56;
-      background: #193128;
-      color: #e2f6eb;
+      border-color: var(--workspace-shell-border-strong);
+      background: var(--workspace-shell-hover-bg);
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .peer-dm-menu-item.is-active {{
-      border-color: #467560;
-      background: #1e3a2f;
-      color: #e6fbef;
+      border-color: var(--workspace-shell-border-strong);
+      background: var(--workspace-shell-active-bg);
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .peer-dm-menu-preview,
     [data-theme="dark"] .peer-dm-menu-meta {{
-      color: #9ab7a7;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .peer-dm-menu-unread {{
-      border-color: #4b7f65;
-      background: #214535;
-      color: #c8ffe0;
+      border-color: var(--workspace-shell-border-strong);
+      background: var(--workspace-shell-active-bg);
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .peer-dm-popout-window {{
-      border-color: rgba(var(--peer-dm-channel-rgb), 0.5);
+      border-color: var(--workspace-shell-border);
       background:
         linear-gradient(
           180deg,
-          rgba(var(--peer-dm-channel-rgb), 0.2) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.12) 0%,
           rgba(var(--peer-dm-channel-rgb), 0.08) 52%,
-          rgba(var(--peer-dm-channel-rgb), 0.03) 100%
+          rgba(var(--peer-dm-channel-rgb), 0.02) 100%
         ),
-        #0f1f17;
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 92%, black 8%) 0%,
+          var(--workspace-shell-bg) 100%
+        );
       box-shadow: 0 16px 34px rgba(0, 0, 0, 0.62);
     }}
     [data-theme="dark"] .peer-dm-popout-head {{
-      border-color: rgba(var(--peer-dm-channel-rgb), 0.42);
+      border-color: var(--workspace-shell-border-muted);
       background:
         linear-gradient(
           180deg,
-          rgba(var(--peer-dm-channel-rgb), 0.25) 0%,
-          rgba(var(--peer-dm-channel-rgb), 0.1) 100%
+          rgba(var(--peer-dm-channel-rgb), 0.12) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.04) 100%
         ),
-        #13241b;
+        color-mix(in srgb, var(--workspace-shell-bg-alt) 90%, var(--workspace-shell-bg) 10%);
     }}
     [data-theme="dark"] .peer-dm-popout-name {{
-      color: #c6e8d5;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .peer-dm-popout-id {{
-      color: #93b8a6;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .peer-dm-popout-channel {{
-      border-color: rgba(var(--peer-dm-channel-rgb), 0.56);
-      background: rgba(var(--peer-dm-channel-rgb), 0.22);
-      color: #d4f0e0;
+      border-color: var(--workspace-shell-border-strong);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 72%, rgba(var(--peer-dm-channel-rgb), 0.18));
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .peer-dm-popout-btn {{
-      background: #162820;
-      border-color: #3a5a49;
-      color: #c6e8d5;
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, transparent);
+      border-color: var(--workspace-shell-border-muted);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .peer-dm-popout-btn:hover {{
-      background: #1d3228;
-      border-color: #4e7962;
-      color: #e2f6eb;
+      background: var(--workspace-shell-hover-bg);
+      border-color: var(--workspace-shell-border-strong);
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .peer-dm-popout-body {{
       background:
         linear-gradient(
           180deg,
-          rgba(var(--peer-dm-channel-rgb), 0.14) 0%,
-          rgba(var(--peer-dm-channel-rgb), 0.05) 48%,
+          rgba(var(--peer-dm-channel-rgb), 0.08) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.03) 48%,
           rgba(var(--peer-dm-channel-rgb), 0.02) 100%
         ),
-        #13241b;
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg) 94%, black 6%) 0%,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--workspace-shell-bg) 16%) 100%
+        );
     }}
     [data-theme="dark"] .peer-dm-popout-empty {{
-      color: #9ab7a7;
-      border-color: #355547;
-      background: rgba(19, 36, 27, 0.68);
+      color: var(--workspace-shell-text-soft);
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, rgba(var(--peer-dm-channel-rgb), 0.08));
     }}
     [data-theme="dark"] .peer-dm-popout-msg {{
-      border-color: rgba(var(--peer-dm-channel-rgb), 0.45);
-      background: rgba(var(--peer-dm-channel-rgb), 0.12);
-      color: #c5e2d2;
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg) 82%, rgba(var(--peer-dm-channel-rgb), 0.12));
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .peer-dm-popout-msg.is-own {{
-      border-color: rgba(var(--peer-dm-channel-rgb), 0.64);
-      background: rgba(var(--peer-dm-channel-rgb), 0.26);
-      color: #e6fbef;
+      border-color: var(--workspace-shell-border-strong);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 82%, rgba(var(--peer-dm-channel-rgb), 0.18));
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .peer-dm-popout-msg-meta {{
-      color: #9ab7a7;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .peer-dm-popout-composer {{
-      border-color: rgba(var(--peer-dm-channel-rgb), 0.42);
+      border-color: var(--workspace-shell-border-muted);
       background:
         linear-gradient(
           180deg,
-          rgba(var(--peer-dm-channel-rgb), 0.18) 0%,
-          rgba(var(--peer-dm-channel-rgb), 0.08) 100%
+          rgba(var(--peer-dm-channel-rgb), 0.08) 0%,
+          rgba(var(--peer-dm-channel-rgb), 0.03) 100%
         ),
-        #13241b;
+        color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, var(--workspace-shell-bg) 12%);
     }}
     [data-theme="dark"] .peer-dm-popout-input {{
-      background: #152633;
-      border-color: rgba(var(--peer-dm-channel-rgb), 0.62);
-      color: #dbeeff;
+      background: color-mix(in srgb, var(--workspace-shell-bg) 78%, var(--workspace-shell-bg-alt) 22%);
+      border-color: var(--workspace-shell-border);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .peer-dm-popout-input::placeholder {{
-      color: #92b5ca;
+      color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .peer-dm-popout-input:focus-visible {{
+      outline-color: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .peer-dm-popout-send-btn {{
-      border-color: #3f8f68;
-      background: #2f8f61;
-      color: #ecfff4;
+      border-color: color-mix(in srgb, var(--ui-accent, var(--accent)) 72%, white 28%);
+      background: var(--ui-accent, var(--accent));
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .peer-dm-popout-send-btn:hover {{
-      background: #2a7f56;
-      border-color: #57aa7f;
+      background: color-mix(in srgb, var(--ui-accent, var(--accent)) 88%, black 12%);
+      border-color: color-mix(in srgb, var(--ui-accent, var(--accent)) 64%, white 36%);
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress {{
-      border-color: rgba(var(--peer-dm-channel-rgb), 0.42);
-      background: rgba(var(--peer-dm-channel-rgb), 0.12);
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, rgba(var(--peer-dm-channel-rgb), 0.08));
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress-text,
     [data-theme="dark"] .peer-dm-popout-file-progress-pct {{
-      color: #9ab7a7;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress-meter {{
-      background: rgba(var(--peer-dm-channel-rgb), 0.24);
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 64%, transparent);
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress-meter > span {{
-      background: #4aa878;
+      background: var(--ui-accent, var(--accent));
     }}
     [data-theme="dark"] .peer-dm-popout-file-progress.is-error {{
       border-color: #734545;

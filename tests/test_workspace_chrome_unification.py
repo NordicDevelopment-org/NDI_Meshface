@@ -291,6 +291,69 @@ def test_history_charts_pull_runtime_theme_vars() -> None:
     assert 'historyChartThemeColor("--workspace-shell-text-soft"' in js
 
 
+def test_saved_node_notes_and_tag_editor_follow_theme_tokens() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    note_section = css.split("[data-theme=\"dark\"] .saved-node-note-input {", 1)[1].split("}", 1)[0]
+    note_focus_section = css.split("[data-theme=\"dark\"] .saved-node-note-input:focus {", 1)[1].split("}", 1)[0]
+    tag_editor_section = css.split("[data-theme=\"dark\"] .favorite-menu-tag-editor {", 1)[1].split("}", 1)[0]
+    tag_input_section = css.split("[data-theme=\"dark\"] .favorite-menu-tag-preset-select,", 1)[1].split("}", 1)[0]
+    tag_focus_section = css.split("[data-theme=\"dark\"] .favorite-menu-tag-preset-select:focus,", 1)[1].split("}", 1)[0]
+    tag_action_section = css.split("[data-theme=\"dark\"] .favorite-menu-tag-editor-actions .btn {", 1)[1].split("}", 1)[0]
+    slider_section = css.split(".favorite-menu-tag-vibrance-input {", 1)[1].split("}", 1)[0]
+
+    assert "var(--workspace-shell-border)" in note_section
+    assert "var(--workspace-shell-bg)" in note_section
+    assert "var(--workspace-shell-bg-alt)" in note_section
+    assert "var(--workspace-shell-text)" in note_section
+    assert "var(--workspace-shell-border-strong)" in note_focus_section
+    assert "var(--workspace-shell-border)" in tag_editor_section
+    assert "var(--workspace-shell-bg-alt)" in tag_editor_section
+    assert "var(--workspace-shell-border-muted)" in tag_input_section
+    assert "var(--workspace-shell-text)" in tag_input_section
+    assert "var(--workspace-shell-border-strong)" in tag_focus_section
+    assert "var(--workspace-shell-border-muted)" in tag_action_section
+    assert "var(--workspace-shell-text)" in tag_action_section
+    assert "var(--ui-accent, var(--accent))" in slider_section
+    assert "#121b24" not in note_section
+    assert "#15281f" not in tag_editor_section
+
+
+def test_peer_dm_menu_and_popout_follow_workspace_shell_tokens() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    menu_section = css.split("[data-theme=\"dark\"] .peer-dm-menu {", 1)[1].split("}", 1)[0]
+    menu_list_section = css.split("[data-theme=\"dark\"] .peer-dm-menu-list {", 1)[1].split("}", 1)[0]
+    empty_section = css.split("[data-theme=\"dark\"] .peer-dm-menu-empty {", 1)[1].split("}", 1)[0]
+    item_hover_section = css.split("[data-theme=\"dark\"] .peer-dm-menu-item:hover {", 1)[1].split("}", 1)[0]
+    popout_section = css.split("[data-theme=\"dark\"] .peer-dm-popout-window {", 1)[1].split("}", 1)[0]
+    head_section = css.split("[data-theme=\"dark\"] .peer-dm-popout-head {", 1)[1].split("}", 1)[0]
+    msg_section = css.split("[data-theme=\"dark\"] .peer-dm-popout-msg {", 1)[1].split("}", 1)[0]
+    composer_section = css.split("[data-theme=\"dark\"] .peer-dm-popout-composer {", 1)[1].split("}", 1)[0]
+    input_section = css.split("[data-theme=\"dark\"] .peer-dm-popout-input {", 1)[1].split("}", 1)[0]
+    send_section = css.split("[data-theme=\"dark\"] .peer-dm-popout-send-btn {", 1)[1].split("}", 1)[0]
+
+    assert "var(--workspace-shell-bg-alt)" in menu_section
+    assert "var(--workspace-shell-border)" in menu_section
+    assert "var(--workspace-shell-bg)" in menu_list_section
+    assert "var(--workspace-shell-text-soft)" in empty_section
+    assert "var(--workspace-shell-border-muted)" in empty_section
+    assert "var(--workspace-shell-hover-bg)" in item_hover_section
+    assert "var(--workspace-shell-border-strong)" in item_hover_section
+    assert "var(--workspace-shell-border)" in popout_section
+    assert "var(--workspace-shell-bg-alt)" in popout_section
+    assert "var(--workspace-shell-bg)" in popout_section
+    assert "var(--workspace-shell-border-muted)" in head_section
+    assert "var(--workspace-shell-border-muted)" in msg_section
+    assert "var(--workspace-shell-text)" in msg_section
+    assert "var(--workspace-shell-border-muted)" in composer_section
+    assert "var(--workspace-shell-border)" in input_section
+    assert "var(--workspace-shell-text)" in input_section
+    assert "var(--ui-accent, var(--accent))" in send_section
+    assert "#13241b" not in menu_list_section
+    assert "#152633" not in input_section
+
+
 def test_topbar_tickers_follow_workspace_shell_and_semantic_states() -> None:
     css = build_dashboard_css(theme_css="")
 
