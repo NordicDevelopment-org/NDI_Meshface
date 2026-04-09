@@ -133,6 +133,8 @@ def test_node_details_drawer_follows_workspace_shell_tokens() -> None:
     saved_details_section = css.split("[data-theme=\"dark\"] .chat-node-details-drawer .saved-node-details {", 1)[1].split("}", 1)[0]
     saved_section = css.split("[data-theme=\"dark\"] .saved-node-section {", 1)[1].split("}", 1)[0]
     saved_stat_section = css.split("[data-theme=\"dark\"] .saved-node-stat {", 1)[1].split("}", 1)[0]
+    splitter_section = css.split("[data-theme=\"dark\"] .chat-node-details-splitter {", 1)[1].split("}", 1)[0]
+    splitter_handle_section = css.split("[data-theme=\"dark\"] .chat-node-details-splitter::before {", 1)[1].split("}", 1)[0]
 
     assert "var(--workspace-shell-border)" in drawer_section
     assert "var(--workspace-shell-bg)" in drawer_section
@@ -144,6 +146,10 @@ def test_node_details_drawer_follows_workspace_shell_tokens() -> None:
     assert "var(--workspace-shell-bg)" in saved_details_section
     assert "var(--workspace-shell-bg-alt)" in saved_section
     assert "var(--workspace-shell-border-muted)" in saved_stat_section
+    assert "var(--workspace-shell-border)" in splitter_section
+    assert "var(--workspace-shell-bg-alt)" in splitter_section
+    assert "var(--workspace-shell-bg)" in splitter_section
+    assert "var(--workspace-shell-border-muted)" in splitter_handle_section
     assert "#0e1713" not in drawer_section
     assert "#172820" not in tab_section
 

@@ -3986,15 +3986,19 @@
       border-top: none;
     }}
     [data-theme="dark"] .chat-node-details-splitter {{
-      border-color: var(--ui-border);
-      background: linear-gradient(90deg, #1a2430, #16202c);
+      border-color: var(--workspace-shell-border);
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--workspace-shell-bg-alt) 86%, black),
+        color-mix(in srgb, var(--workspace-shell-bg) 92%, black)
+      );
     }}
     [data-theme="dark"] .chat-node-details-splitter::before {{
-      background: #44566a;
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 78%, transparent);
     }}
     [data-theme="dark"] .chat-node-details-splitter:hover::before,
     [data-theme="dark"] .chat-node-details-splitter.active::before {{
-      background: #79c0ff;
+      background: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .network-node-splitter {{
       border-color: var(--ui-border);
