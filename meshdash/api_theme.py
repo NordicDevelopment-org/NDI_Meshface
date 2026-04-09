@@ -72,12 +72,12 @@ def handle_theme_settings_post(
     request = parse_theme_settings_request_fn(raw)
 
     try:
-        response_obj = set_theme_preset_fn(request.preset_name)
+        response_obj = set_theme_preset_fn(request)
     except Exception as exc:
         write_json_response_fn(
             handler,
             status_code=500,
-            payload_obj={"ok": False, "error": f"Theme preset update failed: {exc}"},
+            payload_obj={"ok": False, "error": f"Theme settings update failed: {exc}"},
         )
         return
 

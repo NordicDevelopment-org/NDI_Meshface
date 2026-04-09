@@ -5,6 +5,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class ThemeSettingsRequest:
     preset_name: object
+    custom_theme: object
 
 
 def parse_theme_settings_request(raw_body: bytes) -> ThemeSettingsRequest:
@@ -13,4 +14,7 @@ def parse_theme_settings_request(raw_body: bytes) -> ThemeSettingsRequest:
     except Exception:
         body = {}
     payload = body if isinstance(body, dict) else {}
-    return ThemeSettingsRequest(preset_name=payload.get("preset_name"))
+    return ThemeSettingsRequest(
+        preset_name=payload.get("preset_name"),
+        custom_theme=payload.get("custom_theme"),
+    )

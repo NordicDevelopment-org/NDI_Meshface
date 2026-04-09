@@ -2,7 +2,13 @@ import json
 from pathlib import Path
 from typing import Callable, Optional
 
-from .theme import DARK_THEME_VARS, LIGHT_THEME_VARS
+from .theme import (
+    DARK_THEME_VARS,
+    DEV_THEME_BASE_COLOR,
+    DEFAULT_THEME_COLOR_DEPTH,
+    LIGHT_THEME_VARS,
+    build_palette_theme_preset,
+)
 
 
 ThemeTokens = dict[str, str]
@@ -19,7 +25,11 @@ def default_theme_presets() -> ThemePresetMap:
         "default": {
             "light": _copy_theme_tokens(LIGHT_THEME_VARS),
             "dark": _copy_theme_tokens(DARK_THEME_VARS),
-        }
+        },
+        "blue": build_palette_theme_preset(
+            DEV_THEME_BASE_COLOR,
+            color_depth=DEFAULT_THEME_COLOR_DEPTH,
+        ),
     }
 
 

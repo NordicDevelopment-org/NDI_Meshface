@@ -1459,125 +1459,138 @@
     }}
     [data-theme="dark"] body {{
       background:
-        radial-gradient(circle at 20% -10%, #1b2922 0, transparent 45%),
-        radial-gradient(circle at 80% 0%, #1a2b22 0, transparent 40%),
+        radial-gradient(circle at 20% -10%, color-mix(in srgb, var(--ui-accent-soft) 18%, transparent) 0, transparent 45%),
+        radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--ui-accent) 16%, transparent) 0, transparent 40%),
         var(--bg);
       color: var(--ink);
     }}
     [data-theme="dark"] .topbar {{
-      background: linear-gradient(100deg, #101c16, #1a2f25);
-      color: #e6f7ed;
+      background:
+        linear-gradient(
+          100deg,
+          color-mix(in srgb, var(--workspace-shell-bg) 82%, var(--ui-accent-soft)),
+          color-mix(in srgb, var(--workspace-shell-border) 38%, var(--workspace-shell-bg-alt))
+        );
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .workspace-launcher-shell {{
-      color: #dbece3;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-view-menu-brand-mark {{
-      border-color: rgba(156, 228, 188, 0.4);
+      border-color: color-mix(in srgb, var(--ui-accent) 40%, transparent);
       background:
-        radial-gradient(circle at 32% 28%, rgba(121, 230, 172, 0.3), transparent 52%),
-        linear-gradient(160deg, rgba(26, 49, 39, 0.98), rgba(12, 21, 17, 0.99));
-      color: #effff5;
+        radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--ui-accent) 30%, transparent) 0, transparent 52%),
+        linear-gradient(160deg, color-mix(in srgb, var(--workspace-shell-bg-alt) 72%, var(--ui-accent-soft)), color-mix(in srgb, var(--workspace-shell-bg) 88%, black));
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-view-menu-head-brand {{
-      color: #effbf4;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-view-menu-head-version {{
-      color: rgba(216, 239, 226, 0.78);
+      color: color-mix(in srgb, var(--workspace-shell-text-soft) 88%, white 12%);
     }}
     [data-theme="dark"] .topbar-view-menu-head-commit {{
-      color: rgba(189, 220, 203, 0.74);
+      color: color-mix(in srgb, var(--workspace-shell-text-soft) 94%, white 6%);
     }}
     [data-theme="dark"] .topbar-view-menu-btn {{
-      border-color: rgba(168, 205, 184, 0.42);
+      border-color: color-mix(in srgb, var(--workspace-shell-border) 66%, var(--ui-border));
       background:
-        linear-gradient(180deg, rgba(28, 45, 37, 0.96), rgba(18, 31, 25, 0.98));
-      color: #edf9f2;
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--ui-panel)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, black)
+        );
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-view-menu-btn:hover,
     [data-theme="dark"] .topbar-view-menu-btn[aria-expanded="true"] {{
-      border-color: rgba(191, 230, 207, 0.62);
+      border-color: var(--workspace-shell-border-strong);
       background:
-        linear-gradient(180deg, rgba(35, 58, 47, 0.98), rgba(21, 37, 29, 0.99));
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-hover-bg) 86%, var(--ui-panel-alt)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, var(--workspace-shell-hover-bg))
+        );
     }}
     [data-theme="dark"] .topbar-view-menu-btn.has-unread {{
-      border-color: rgba(121, 230, 172, 0.76);
+      border-color: var(--ui-accent);
     }}
     [data-theme="dark"] .topbar-view-menu-btn-badge {{
-      border-color: rgba(121, 230, 172, 0.34);
-      background: rgba(57, 199, 121, 0.16);
-      color: #eafff1;
+      border-color: color-mix(in srgb, var(--ui-accent) 34%, transparent);
+      background: color-mix(in srgb, var(--ui-accent) 16%, transparent);
+      color: var(--workspace-shell-text);
       box-shadow: inset 0 1px 0 rgba(211, 255, 228, 0.06);
     }}
     [data-theme="dark"] .topbar-view-menu-btn-attention {{
-      border-color: rgba(121, 230, 172, 0.54);
-      background: linear-gradient(135deg, #9bf1be 0%, #39c779 100%);
+      border-color: color-mix(in srgb, var(--ui-accent) 54%, transparent);
+      background: linear-gradient(135deg, color-mix(in srgb, var(--ui-accent) 58%, white) 0%, var(--ui-accent) 100%);
       box-shadow:
-        0 0 0 3px rgba(121, 230, 172, 0.14),
-        0 0 12px rgba(57, 199, 121, 0.24);
+        0 0 0 3px color-mix(in srgb, var(--ui-accent) 14%, transparent),
+        0 0 12px color-mix(in srgb, var(--ui-accent) 24%, transparent);
     }}
     [data-theme="dark"] .chat-panel-collapse-btn {{
-      border-color: #35556d;
-      background: #16273a;
-      color: #dbeeff;
+      border-color: var(--ui-border);
+      background: color-mix(in srgb, var(--ui-panel-alt) 82%, var(--workspace-shell-bg-alt));
+      color: var(--ui-link);
     }}
     [data-theme="dark"] .chat-panel-collapse-btn:hover {{
-      background: #203346;
-      border-color: #4a708f;
-      color: #eef7ff;
+      background: color-mix(in srgb, var(--ui-panel-alt) 72%, var(--ui-accent-soft));
+      border-color: color-mix(in srgb, var(--ui-link) 46%, var(--ui-border));
+      color: white;
     }}
     [data-theme="dark"] .topbar-view-menu-btn-label {{
-      color: #edf9f2;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-view-menu-caret {{
-      border-top-color: rgba(237, 249, 242, 0.92);
+      border-top-color: color-mix(in srgb, var(--workspace-shell-text) 92%, white 8%);
     }}
     [data-theme="dark"] .topbar-view-menu {{
-      border-color: rgba(76, 122, 95, 0.88);
-      background: rgba(4, 10, 8, 0.97);
+      border-color: color-mix(in srgb, var(--workspace-shell-border) 72%, var(--ui-border));
+      background: color-mix(in srgb, var(--workspace-shell-bg) 88%, black);
       box-shadow: 0 18px 38px rgba(0, 0, 0, 0.6);
     }}
     [data-theme="dark"] .topbar-view-menu-item:hover {{
-      border-color: rgba(93, 162, 120, 0.48);
-      background: rgba(23, 69, 44, 0.42);
+      border-color: color-mix(in srgb, var(--workspace-shell-border-strong) 48%, transparent);
+      background: color-mix(in srgb, var(--workspace-shell-hover-bg) 82%, transparent);
     }}
     [data-theme="dark"] .topbar-view-menu-item.is-active,
     [data-theme="dark"] .topbar-view-menu-item[aria-checked="true"] {{
-      border-color: rgba(121, 230, 172, 0.62);
-      background: rgba(28, 92, 57, 0.46);
+      border-color: var(--workspace-shell-border-strong);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 88%, transparent);
     }}
     [data-theme="dark"] .topbar-view-menu-item-icon {{
-      border-color: rgba(168, 205, 184, 0.22);
-      background: rgba(166, 215, 190, 0.1);
-      color: rgba(237, 249, 242, 0.92);
+      border-color: color-mix(in srgb, var(--workspace-shell-border-muted) 74%, transparent);
+      background: color-mix(in srgb, var(--workspace-shell-text) 10%, transparent);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-view-menu-item.has-notifications .topbar-view-menu-item-icon {{
-      border-color: rgba(121, 230, 172, 0.42);
-      background: rgba(57, 199, 121, 0.14);
-      color: #eafff1;
+      border-color: color-mix(in srgb, var(--ui-accent) 42%, transparent);
+      background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar-view-menu-item-meta {{
-      color: rgba(220, 240, 228, 0.76);
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .topbar-view-menu-item-badge {{
-      border-color: rgba(121, 230, 172, 0.34);
-      background: rgba(57, 199, 121, 0.16);
-      color: #eafff1;
+      border-color: color-mix(in srgb, var(--ui-accent) 34%, transparent);
+      background: color-mix(in srgb, var(--ui-accent) 16%, transparent);
+      color: var(--workspace-shell-text);
       box-shadow: inset 0 1px 0 rgba(211, 255, 228, 0.06);
     }}
     [data-theme="dark"] .theme-btn {{
-      border-color: rgba(168, 205, 184, 0.45);
-      background: rgba(166, 215, 190, 0.18);
-      color: #e5f8ec;
+      border-color: color-mix(in srgb, var(--workspace-shell-border) 64%, transparent);
+      background: color-mix(in srgb, var(--ui-accent-soft) 18%, transparent);
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .theme-btn:hover {{
-      background: rgba(166, 215, 190, 0.28);
+      background: color-mix(in srgb, var(--ui-accent-soft) 28%, transparent);
     }}
     [data-theme="dark"] .pill,
     [data-theme="dark"] .selection-btn,
     [data-theme="dark"] .starred-node-wrap {{
-      background: #22342a;
-      border-color: #355041;
-      color: #d6e8dd;
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 82%, var(--ui-panel));
+      border-color: color-mix(in srgb, var(--workspace-shell-border-muted) 82%, var(--ui-border));
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .starred-node-select {{
       color: inherit;
@@ -1586,30 +1599,30 @@
       opacity: 0.65;
     }}
     [data-theme="dark"] .disk-meter {{
-      background: rgba(12, 21, 17, 0.45);
-      border-color: #2f483b;
-      color: #d0e5d8;
+      background: color-mix(in srgb, var(--workspace-shell-bg) 82%, transparent);
+      border-color: color-mix(in srgb, var(--workspace-shell-border-muted) 82%, var(--ui-border));
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .disk-track {{
-      background: rgba(185, 231, 207, 0.18);
+      background: color-mix(in srgb, var(--ui-accent) 18%, transparent);
     }}
     [data-theme="dark"] .teams-rail,
     [data-theme="dark"] .chat-panel-splitter,
     [data-theme="dark"] .chat-left-panel,
     [data-theme="dark"] .card {{
-      background: #17231c;
-      border-color: #33483c;
-      color: #dbece3;
+      background: color-mix(in srgb, var(--workspace-shell-bg) 78%, var(--ui-panel));
+      border-color: color-mix(in srgb, var(--workspace-shell-border-muted) 82%, var(--ui-border));
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .chat-panel-splitter {{
-      background: linear-gradient(180deg, #1b2b22, #16241d);
+      background: linear-gradient(180deg, var(--workspace-shell-bg-alt), var(--workspace-shell-bg));
     }}
     [data-theme="dark"] .chat-panel-splitter::before {{
-      background: #455b4f;
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 74%, var(--ui-border));
     }}
     [data-theme="dark"] .chat-panel-splitter:hover::before,
     [data-theme="dark"] .chat-panel-splitter.active::before {{
-      background: #3fb950;
+      background: var(--ui-accent);
     }}
 
     [data-theme="dark"] .settings-tab-btn {{
@@ -1809,6 +1822,16 @@
       color: #c6ffdb;
       color: var(--workspace-shell-text);
     }}
+    [data-theme="dark"] .settings-range-row {{
+      border-color: #2d8f5d;
+      border-color: var(--workspace-shell-border);
+      background: #07140d;
+      background: var(--workspace-shell-bg-alt);
+    }}
+    [data-theme="dark"] .settings-theme-depth-field output {{
+      color: #b8d6c4;
+      color: var(--workspace-shell-text-soft);
+    }}
     [data-theme="dark"] .settings-fixed-map-help {{
       color: #b8d6c4;
       color: var(--workspace-shell-text-soft);
@@ -1898,12 +1921,12 @@
       color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .btn {{
-      border-color: #3a5346;
-      background: #22342a;
-      color: #b6d7c6;
+      border-color: color-mix(in srgb, var(--workspace-shell-border-muted) 82%, var(--ui-border));
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 82%, var(--ui-panel));
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .btn:hover {{
-      background: #2a4033;
+      background: color-mix(in srgb, var(--workspace-shell-hover-bg) 82%, var(--ui-panel-alt));
     }}
     [data-theme="dark"] .btn.btn-secondary {{
       background: transparent;
@@ -2297,9 +2320,9 @@
       background: #284034;
     }}
     [data-theme="dark"] .rail-btn.active {{
-      background: #2f855a;
-      border-color: #3f9868;
-      color: #ebfff3;
+      background: var(--workspace-shell-active-bg);
+      border-color: var(--workspace-shell-border-strong);
+      color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .metric-ticker-delta {{
       color: #9cb7a8;
@@ -5373,32 +5396,32 @@
       color: #93b8a6;
     }}
     [data-theme="dark"] .chat-settings-menu .theme-btn {{
-      background: #162820;
-      border-color: #3a5a49;
-      color: #c6e8d5;
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 82%, var(--ui-panel));
+      border-color: color-mix(in srgb, var(--workspace-shell-border-muted) 82%, var(--ui-border));
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .chat-settings-menu .theme-btn:hover {{
-      background: #1d3228;
-      border-color: #4e7962;
-      color: #e2f6eb;
+      background: color-mix(in srgb, var(--workspace-shell-hover-bg) 82%, var(--ui-panel-alt));
+      border-color: var(--workspace-shell-border-strong);
+      color: white;
     }}
     [data-theme="dark"] .chat-settings-menu .theme-preset-wrap {{
-      background: #13241b;
-      border-color: #2a4638;
-      color: #c5e2d2;
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 82%, var(--ui-panel));
+      border-color: color-mix(in srgb, var(--workspace-shell-border-muted) 82%, var(--ui-border));
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .chat-settings-menu .theme-preset-label {{
-      color: #93b8a6;
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .chat-settings-menu .theme-preset-select {{
-      background-color: #152633;
-      border-color: #35556d;
-      color: #dbeeff;
+      background-color: color-mix(in srgb, var(--ui-panel-alt) 82%, var(--workspace-shell-bg-alt));
+      border-color: var(--ui-border);
+      color: var(--ui-link);
     }}
     [data-theme="dark"] .chat-settings-menu .theme-preset-select:hover {{
-      background-color: #1b2f3e;
-      border-color: #476b87;
-      color: #f0f8ff;
+      background-color: color-mix(in srgb, var(--ui-panel-alt) 74%, var(--ui-accent-soft));
+      border-color: color-mix(in srgb, var(--ui-link) 48%, var(--ui-border));
+      color: white;
     }}
     [data-theme="dark"] .chat-settings-meta-item {{
       background: #13241b;

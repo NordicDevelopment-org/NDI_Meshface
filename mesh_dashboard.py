@@ -223,7 +223,7 @@ def _build_make_http_handler_with_theme_settings(
             summary_metrics_fn=summary_metrics_fn,
             send_chat_fn=send_chat_fn,
             get_theme_settings_fn=theme_settings.get_settings_payload,
-            set_theme_preset_fn=theme_settings.set_selected_preset,
+            set_theme_preset_fn=theme_settings.apply_settings,
             api_token=clean_api_token,
             private_mode=bool(private_mode),
             default_node_history_hours=default_node_history_hours,

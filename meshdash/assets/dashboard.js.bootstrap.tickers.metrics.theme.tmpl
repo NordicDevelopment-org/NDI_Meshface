@@ -81,6 +81,58 @@
       return ordered;
     }}
 
+    function formatThemePresetLabel(name) {{
+      const clean = String(name || "").trim();
+      if (clean === "default") {{
+        return "green";
+      }}
+      return clean || "default";
+    }}
+
+    function normalizeThemeCustomBaseColor(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      if (/^#[0-9a-f]{6}$/.test(clean)) {{
+        return clean;
+      }}
+      if (/^#[0-9a-f]{3}$/.test(clean)) {{
+        return `#${{clean[1]}}${{clean[1]}}${{clean[2]}}${{clean[2]}}${{clean[3]}}${{clean[3]}}`;
+      }}
+      return "#2f855a";
+    }}
+
+    function normalizeThemeCustomColorDepth(raw) {{
+      const parsed = Number.parseInt(String(raw ?? ""), 10);
+      if (!Number.isFinite(parsed)) {{
+        return 58;
+      }}
+      return Math.max(0, Math.min(100, parsed));
+    }}
+
+    function normalizeThemeCustomSettings(rawSettings) {{
+      const payload = rawSettings && typeof rawSettings === "object" && !Array.isArray(rawSettings)
+        ? rawSettings
+        : {{}};
+      return {{
+        base_color: normalizeThemeCustomBaseColor(payload.base_color),
+        color_depth: normalizeThemeCustomColorDepth(payload.color_depth),
+      }};
+    }}
+
+    function syncThemeCustomControls() {{
+      const colorInput = document.getElementById("theme-custom-base-color");
+      if (colorInput instanceof HTMLInputElement) {{
+        colorInput.value = normalizeThemeCustomBaseColor(themeCustomBaseColor);
+      }}
+      const depthInput = document.getElementById("theme-custom-color-depth");
+      if (depthInput instanceof HTMLInputElement) {{
+        depthInput.value = String(normalizeThemeCustomColorDepth(themeCustomColorDepth));
+      }}
+      const depthValue = document.getElementById("theme-custom-color-depth-value");
+      if (depthValue instanceof HTMLOutputElement || depthValue instanceof HTMLElement) {{
+        depthValue.textContent = `${{normalizeThemeCustomColorDepth(themeCustomColorDepth)}}%`;
+      }}
+    }}
+
     function applyThemePresetTokens(resolvedTheme) {{
       const selected = normalizeThemePresetName(themePresetSelected, themePresetCatalog);
       const preset = themePresetCatalog[selected] || themePresetCatalog.default || {{ light: {{}}, dark: {{}} }};
@@ -114,7 +166,7 @@
       for (const name of names) {{
         const option = document.createElement("option");
         option.value = name;
-        option.textContent = name;
+        option.textContent = formatThemePresetLabel(name);
         select.appendChild(option);
       }}
       select.value = selected;
@@ -122,6 +174,7 @@
       select.title = names.length > 1
         ? "Select runtime color preset"
         : "Only one preset is available";
+      syncThemeCustomControls();
     }}
 
     function applyThemeSettingsPayload(payload) {{
@@ -129,8 +182,11 @@
         return false;
       }}
       const normalizedCatalog = normalizeThemePresetCatalog(payload.presets);
+      const normalizedCustomTheme = normalizeThemeCustomSettings(payload.custom_theme);
       themePresetCatalog = normalizedCatalog;
       themePresetSelected = normalizeThemePresetName(payload.selected_preset, normalizedCatalog);
+      themeCustomBaseColor = normalizedCustomTheme.base_color;
+      themeCustomColorDepth = normalizedCustomTheme.color_depth;
       updateThemePresetControl(payload.available_presets);
       applyThemePreference(themePreference, false);
       return true;
@@ -157,16 +213,31 @@
       return false;
     }}
 
-    async function saveThemePresetSelection(presetName) {{
-      const clean = String(presetName || "").trim();
-      if (!clean) {{
-        return false;
-      }}
+    function buildThemeSettingsSavePayload(options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const cleanPreset = String(
+        opts.presetName == null ? themePresetSelected : opts.presetName
+      ).trim();
+      return {{
+        preset_name: cleanPreset || "default",
+        custom_theme: {{
+          base_color: normalizeThemeCustomBaseColor(
+            opts.baseColor == null ? themeCustomBaseColor : opts.baseColor
+          ),
+          color_depth: normalizeThemeCustomColorDepth(
+            opts.colorDepth == null ? themeCustomColorDepth : opts.colorDepth
+          ),
+        }},
+      }};
+    }}
+
+    async function saveThemeSettings(options = null) {{
+      const payloadBody = buildThemeSettingsSavePayload(options);
       try {{
         const resp = await fetch(themeSettingsEndpoint, {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{ preset_name: clean }}),
+          body: JSON.stringify(payloadBody),
         }});
         const payload = await resp.json().catch(() => ({{ ok: false, error: `API ${{resp.status}}` }}));
         if (!resp.ok || !payload || payload.ok === false) {{
@@ -199,9 +270,51 @@
           return;
         }}
         select.disabled = true;
-        await saveThemePresetSelection(selected);
+        await saveThemeSettings({{ presetName: selected }});
         updateThemePresetControl();
       }});
+    }}
+
+    function bindThemeCustomControls() {{
+      const colorInput = document.getElementById("theme-custom-base-color");
+      if (colorInput instanceof HTMLInputElement && colorInput.dataset.bound !== "1") {{
+        colorInput.dataset.bound = "1";
+        colorInput.addEventListener("input", () => {{
+          themeCustomBaseColor = normalizeThemeCustomBaseColor(colorInput.value);
+          syncThemeCustomControls();
+        }});
+        colorInput.addEventListener("change", async () => {{
+          themeCustomBaseColor = normalizeThemeCustomBaseColor(colorInput.value);
+          syncThemeCustomControls();
+          await saveThemeSettings({{
+            presetName: "custom",
+            baseColor: themeCustomBaseColor,
+            colorDepth: themeCustomColorDepth,
+          }});
+          updateThemePresetControl();
+        }});
+      }}
+
+      const depthInput = document.getElementById("theme-custom-color-depth");
+      if (depthInput instanceof HTMLInputElement && depthInput.dataset.bound !== "1") {{
+        depthInput.dataset.bound = "1";
+        depthInput.addEventListener("input", () => {{
+          themeCustomColorDepth = normalizeThemeCustomColorDepth(depthInput.value);
+          syncThemeCustomControls();
+        }});
+        depthInput.addEventListener("change", async () => {{
+          themeCustomColorDepth = normalizeThemeCustomColorDepth(depthInput.value);
+          syncThemeCustomControls();
+          await saveThemeSettings({{
+            presetName: "custom",
+            baseColor: themeCustomBaseColor,
+            colorDepth: themeCustomColorDepth,
+          }});
+          updateThemePresetControl();
+        }});
+      }}
+
+      syncThemeCustomControls();
     }}
 
     function systemPreferredTheme() {{
@@ -210,4 +323,3 @@
       }}
       return "light";
     }}
-

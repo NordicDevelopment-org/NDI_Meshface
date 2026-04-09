@@ -1527,6 +1527,40 @@
                 </select>
               </label>
               <div class="settings-help-note">
+                Default is green, blue is the dev preset, and changing the controls below switches to <strong>custom</strong>.
+              </div>
+              <div class="settings-row">
+                <label class="settings-field" for="theme-custom-base-color">
+                  <span class="settings-label">Base color</span>
+                  <input
+                    id="theme-custom-base-color"
+                    class="settings-input settings-color-input"
+                    type="color"
+                    value="#2f855a"
+                    aria-label="Custom theme base color"
+                  />
+                </label>
+                <label class="settings-field settings-theme-depth-field" for="theme-custom-color-depth">
+                  <span class="settings-label">Color depth</span>
+                  <div class="settings-range-row">
+                    <input
+                      id="theme-custom-color-depth"
+                      class="settings-range-input"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value="58"
+                      aria-label="Custom theme color depth"
+                    />
+                    <output id="theme-custom-color-depth-value" for="theme-custom-color-depth">58%</output>
+                  </div>
+                </label>
+              </div>
+              <div class="settings-help-note">
+                Higher color depth increases tint and gradient presence across the shell chrome.
+              </div>
+              <div class="settings-help-note">
                 Control node color styling for chat rows and the node list.
               </div>
               <label class="settings-field settings-inline">

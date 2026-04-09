@@ -12,8 +12,8 @@
       font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at 20% -10%, #d7ead3 0, transparent 45%),
-        radial-gradient(circle at 80% 0%, #d0e6d4 0, transparent 40%),
+        radial-gradient(circle at 20% -10%, color-mix(in srgb, var(--accent) 22%, #ffffff) 0, transparent 45%),
+        radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--accent-2) 18%, #ffffff) 0, transparent 40%),
         var(--bg);
       min-height: 100%;
       min-height: 100vh;
@@ -28,7 +28,12 @@
     }}
     .topbar {{
       padding: 8px 12px;
-      background: linear-gradient(100deg, #173d2d, #2d6f50);
+      background:
+        linear-gradient(
+          100deg,
+          color-mix(in srgb, var(--accent-2) 82%, #102218),
+          color-mix(in srgb, var(--accent) 88%, #183425)
+        );
       color: #f4fff7;
       box-shadow: var(--shadow);
       position: sticky;
@@ -419,9 +424,13 @@
       min-width: 88px;
       min-height: 38px;
       position: relative;
-      border: 1px solid #c6d6c0;
+      border: 1px solid color-mix(in srgb, var(--line) 74%, var(--accent));
       background:
-        linear-gradient(180deg, rgba(247, 253, 249, 0.98), rgba(230, 242, 234, 0.96));
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--panel) 94%, var(--accent) 6%),
+          color-mix(in srgb, var(--panel) 84%, var(--accent) 16%)
+        );
       color: #f2fff7;
       border-radius: 999px;
       padding: 0 12px;
@@ -434,29 +443,33 @@
       line-height: 1.2;
       font-weight: 700;
       text-align: left;
-      color: #143226;
+      color: color-mix(in srgb, var(--ink) 86%, var(--accent-2));
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.4),
-        0 8px 18px rgba(9, 28, 18, 0.12);
+        0 8px 18px color-mix(in srgb, var(--accent-2) 14%, transparent);
       transition: border-color 140ms ease, background 140ms ease, color 140ms ease, box-shadow 140ms ease;
     }}
     .topbar-view-menu-btn:hover,
     .topbar-view-menu-btn[aria-expanded="true"] {{
-      border-color: #9fc7ae;
+      border-color: color-mix(in srgb, var(--accent) 52%, var(--line));
       background:
-        linear-gradient(180deg, rgba(250, 255, 252, 0.99), rgba(221, 239, 229, 0.98));
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--panel) 90%, var(--accent) 10%),
+          color-mix(in srgb, var(--panel) 76%, var(--accent) 24%)
+        );
       box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.48),
-        0 10px 22px rgba(9, 28, 18, 0.16);
+        0 10px 22px color-mix(in srgb, var(--accent-2) 18%, transparent);
     }}
     .topbar-view-menu-btn.has-unread {{
-      border-color: #67b886;
+      border-color: var(--accent);
       box-shadow:
-        inset 0 0 0 1px rgba(103, 184, 134, 0.18),
-        0 10px 22px rgba(9, 28, 18, 0.16);
+        inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+        0 10px 22px color-mix(in srgb, var(--accent-2) 18%, transparent);
     }}
     .topbar-view-menu-btn:focus-visible {{
-      outline: 2px solid rgba(67, 125, 92, 0.9);
+      outline: 2px solid color-mix(in srgb, var(--accent-2) 74%, black);
       outline-offset: 2px;
     }}
     .topbar-view-menu-btn-label {{
@@ -464,7 +477,7 @@
       line-height: 1;
       font-weight: 700;
       letter-spacing: 0.16px;
-      color: #17372a;
+      color: color-mix(in srgb, var(--ink) 84%, var(--accent-2));
     }}
     .topbar-view-menu-btn-badge {{
       flex: 0 0 auto;
@@ -472,9 +485,9 @@
       height: 18px;
       padding: 0 6px;
       border-radius: 999px;
-      border: 1px solid rgba(41, 130, 84, 0.24);
-      background: rgba(49, 187, 114, 0.12);
-      color: #185234;
+      border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      color: color-mix(in srgb, var(--accent-2) 78%, var(--ink));
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -488,11 +501,16 @@
       width: 10px;
       height: 10px;
       border-radius: 3px;
-      border: 1px solid rgba(41, 130, 84, 0.54);
-      background: linear-gradient(135deg, #9ef0bd 0%, #31bb72 100%);
+      border: 1px solid color-mix(in srgb, var(--accent-2) 54%, transparent);
+      background:
+        linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--accent) 58%, white) 0%,
+          var(--accent) 100%
+        );
       box-shadow:
-        0 0 0 3px rgba(110, 224, 160, 0.16),
-        0 0 12px rgba(49, 187, 114, 0.26);
+        0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent),
+        0 0 12px color-mix(in srgb, var(--accent) 26%, transparent);
       transform: rotate(18deg);
     }}
     .topbar-view-menu-btn-badge[hidden],
@@ -507,7 +525,7 @@
       height: 0;
       border-left: 3px solid transparent;
       border-right: 3px solid transparent;
-      border-top: 5px solid rgba(31, 68, 48, 0.78);
+      border-top: 5px solid color-mix(in srgb, var(--accent-2) 64%, var(--ink));
       transition: transform 140ms ease;
     }}
     .topbar-view-menu-btn[aria-expanded="true"] .topbar-view-menu-caret {{
@@ -523,10 +541,10 @@
       flex-direction: column;
       gap: 6px;
       padding: 10px;
-      border: 1px solid rgba(184, 211, 194, 0.78);
+      border: 1px solid color-mix(in srgb, var(--accent) 32%, #b8d3c2);
       border-radius: 16px;
-      background: rgba(7, 20, 15, 0.96);
-      box-shadow: 0 16px 34px rgba(4, 12, 8, 0.42);
+      background: color-mix(in srgb, var(--accent-2) 38%, #07140f);
+      box-shadow: 0 16px 34px color-mix(in srgb, var(--accent-2) 24%, rgba(4, 12, 8, 0.42));
       z-index: 1350;
       backdrop-filter: blur(14px);
     }}
@@ -538,7 +556,7 @@
       flex-direction: column;
       gap: 0;
       padding: 4px 4px 10px;
-      border-bottom: 1px solid rgba(214, 238, 223, 0.18);
+      border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, rgba(214, 238, 223, 0.18));
     }}
     .topbar-view-menu-brand {{
       display: grid;
@@ -551,10 +569,10 @@
       width: 42px;
       height: 42px;
       border-radius: 13px;
-      border: 1px solid rgba(151, 226, 184, 0.34);
+      border: 1px solid color-mix(in srgb, var(--accent) 34%, rgba(151, 226, 184, 0.34));
       background:
-        radial-gradient(circle at 32% 28%, rgba(158, 240, 189, 0.38), transparent 52%),
-        linear-gradient(160deg, rgba(27, 67, 48, 0.96), rgba(13, 28, 21, 0.98));
+        radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--accent) 40%, white) 0, transparent 52%),
+        linear-gradient(160deg, color-mix(in srgb, var(--accent-2) 70%, #1b4330), color-mix(in srgb, var(--accent-2) 54%, #0d1c15));
       color: #effff5;
       display: inline-flex;
       align-items: center;
@@ -581,7 +599,7 @@
       line-height: 1.05;
       font-weight: 800;
       letter-spacing: 0.02em;
-      color: #f2fff7;
+      color: color-mix(in srgb, white 92%, var(--accent) 8%);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -591,14 +609,14 @@
       min-width: 0;
       font-size: 10px;
       line-height: 1.2;
-      color: rgba(222, 244, 231, 0.78);
+      color: color-mix(in srgb, white 76%, var(--accent) 24%);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }}
     .topbar-view-menu-head-commit {{
       font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-      color: rgba(210, 239, 223, 0.72);
+      color: color-mix(in srgb, white 70%, var(--accent) 30%);
     }}
     .topbar-view-menu-item {{
       width: 100%;
@@ -620,8 +638,8 @@
       width: 30px;
       height: 30px;
       border-radius: 9px;
-      border: 1px solid rgba(214, 238, 223, 0.18);
-      background: rgba(248, 255, 251, 0.08);
+      border: 1px solid color-mix(in srgb, var(--accent) 18%, rgba(214, 238, 223, 0.18));
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
       color: rgba(239, 255, 246, 0.9);
       display: inline-flex;
       align-items: center;
@@ -643,8 +661,8 @@
       height: 20px;
       padding: 0 6px;
       border-radius: 999px;
-      border: 1px solid rgba(102, 211, 148, 0.34);
-      background: rgba(49, 187, 114, 0.14);
+      border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
       color: #e4fff0;
       display: inline-flex;
       align-items: center;
@@ -656,19 +674,19 @@
       box-shadow: inset 0 1px 0 rgba(208, 255, 228, 0.08);
     }}
     .topbar-view-menu-item:hover {{
-      border-color: rgba(121, 230, 172, 0.34);
-      background: rgba(53, 154, 101, 0.16);
+      border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
     }}
     .topbar-view-menu-item.has-notifications .topbar-view-menu-item-icon {{
-      border-color: rgba(102, 211, 148, 0.34);
-      background: rgba(49, 187, 114, 0.12);
+      border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
       color: #effff5;
     }}
     .topbar-view-menu-item.is-active,
     .topbar-view-menu-item[aria-checked="true"] {{
-      border-color: rgba(121, 230, 172, 0.62);
-      background: rgba(53, 154, 101, 0.24);
-      box-shadow: inset 0 0 0 1px rgba(121, 230, 172, 0.08);
+      border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+      background: color-mix(in srgb, var(--accent) 24%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
     }}
     .topbar-view-menu-item:focus-visible {{
       outline: 2px solid rgba(214, 238, 223, 0.92);
@@ -681,7 +699,7 @@
     }}
     .topbar-view-menu-item-meta {{
       font-size: 10px;
-      color: rgba(226, 245, 234, 0.68);
+      color: color-mix(in srgb, white 70%, var(--accent) 30%);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1103,8 +1121,8 @@
       margin-right: 2px;
     }}
     .theme-btn {{
-      border: 1px solid rgba(214, 238, 223, 0.55);
-      background: rgba(248, 255, 251, 0.12);
+      border: 1px solid color-mix(in srgb, var(--accent) 28%, rgba(214, 238, 223, 0.55));
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
       color: #f2fff7;
       border-radius: 999px;
       padding: 3px 10px;
@@ -1114,14 +1132,14 @@
       white-space: nowrap;
     }}
     .theme-btn:hover {{
-      background: rgba(248, 255, 251, 0.22);
+      background: color-mix(in srgb, var(--accent) 22%, transparent);
     }}
     .theme-preset-wrap {{
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      border: 1px solid rgba(214, 238, 223, 0.55);
-      background: rgba(248, 255, 251, 0.12);
+      border: 1px solid color-mix(in srgb, var(--accent) 28%, rgba(214, 238, 223, 0.55));
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
       border-radius: 999px;
       padding: 2px 8px;
       font-size: 10px;
@@ -1135,7 +1153,7 @@
     .theme-preset-select {{
       border: none;
       border-radius: 999px;
-      background: rgba(248, 255, 251, 0.16);
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
       color: #f2fff7;
       font-size: 10px;
       line-height: 1.2;
@@ -1424,9 +1442,9 @@
       align-self: stretch;
       height: auto;
       min-height: 0;
-      border: 1px solid #c6d6c0;
+      border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent));
       border-radius: 10px;
-      background: #eef6ee;
+      background: color-mix(in srgb, var(--panel) 86%, var(--accent) 14%);
       box-shadow: var(--shadow);
       display: flex;
       flex-direction: row;
@@ -1441,15 +1459,15 @@
       font-size: 9px;
       font-weight: 700;
       letter-spacing: 0.35px;
-      color: #355445;
+      color: color-mix(in srgb, var(--muted) 82%, var(--accent-2));
       text-transform: uppercase;
       text-align: center;
       margin-bottom: 2px;
     }}
     .rail-btn {{
-      border: 1px solid #c4d8c6;
-      background: #f4faf3;
-      color: #234735;
+      border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent));
+      background: color-mix(in srgb, var(--panel) 88%, var(--accent) 12%);
+      color: color-mix(in srgb, var(--ink) 82%, var(--accent-2));
       border-radius: 8px;
       padding: 6px 9px;
       font-size: 10px;
@@ -1460,16 +1478,16 @@
       flex: 0 0 auto;
     }}
     .rail-btn:hover {{
-      background: #e7f3eb;
+      background: color-mix(in srgb, var(--panel) 78%, var(--accent) 22%);
     }}
     .rail-btn.has-unread {{
-      border-color: #2f855a;
-      box-shadow: inset 0 0 0 1px rgba(47, 133, 90, 0.22);
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
       font-weight: 700;
     }}
     .rail-btn.active {{
-      background: #2f855a;
-      border-color: #256f4a;
+      background: var(--accent);
+      border-color: var(--accent-2);
       color: #effff4;
       font-weight: 700;
     }}
@@ -1640,9 +1658,9 @@
       transform: translateX(-0.5px);
     }}
     .chat-peer-add-toggle-btn {{
-      border: 1px solid #c2d8c7;
-      background: #f3faf5;
-      color: #214434;
+      border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent));
+      background: color-mix(in srgb, var(--panel) 88%, var(--accent) 12%);
+      color: color-mix(in srgb, var(--ink) 82%, var(--accent-2));
       border-radius: 999px;
       padding: 3px 9px;
       font-size: 10px;
@@ -1651,7 +1669,7 @@
       white-space: nowrap;
     }}
     .chat-peer-add-toggle-btn:hover {{
-      background: #e7f3eb;
+      background: color-mix(in srgb, var(--panel) 78%, var(--accent) 22%);
     }}
     .workspace-shell.chat-panel-collapsed .chat-left-section.chat-users-section {{
       padding: 0;
@@ -2139,9 +2157,9 @@
       font-weight: 700;
       letter-spacing: 0.15px;
       text-transform: uppercase;
-      color: #274935;
-      border-bottom: 1px solid #d2e1d0;
-      background: #edf6ec;
+      color: color-mix(in srgb, var(--ink) 82%, var(--accent-2));
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 84%, var(--accent));
+      background: color-mix(in srgb, var(--panel) 80%, var(--accent) 20%);
     }}
     .games-toolbar {{
       margin: 0;
@@ -5324,8 +5342,38 @@
       outline: none;
     }}
     .settings-input:focus, .settings-select:focus {{
-      border-color: #2f855a;
-      box-shadow: 0 0 0 2px rgba(47, 133, 90, 0.18);
+      border-color: var(--ui-accent-soft, var(--accent, #2f855a));
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent-soft, var(--accent, #2f855a)) 22%, transparent);
+    }}
+    .settings-color-input {{
+      min-width: 84px;
+      width: 84px;
+      padding: 4px;
+      cursor: pointer;
+    }}
+    .settings-range-row {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 38px;
+      padding: 0 4px;
+      border: 1px solid #c8d7c4;
+      border-radius: 10px;
+      background: #f8fbf7;
+    }}
+    .settings-range-input {{
+      flex: 1 1 auto;
+      min-width: 140px;
+      accent-color: var(--ui-accent-soft, var(--accent, #2f855a));
+      cursor: pointer;
+    }}
+    .settings-theme-depth-field output {{
+      flex: 0 0 auto;
+      min-width: 3.5ch;
+      text-align: right;
+      font-size: 11px;
+      font-weight: 700;
+      color: #355b44;
     }}
     .settings-fixed-map-wrap {{
       display: flex;
@@ -5475,15 +5523,15 @@
     .btn {{
       font-size: 12px;
       line-height: 1.2;
-      border: 1px solid #c2d8c7;
-      color: #194c33;
-      background: #f0f8f2;
+      border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent));
+      color: color-mix(in srgb, var(--ink) 80%, var(--accent-2));
+      background: color-mix(in srgb, var(--panel) 84%, var(--accent) 16%);
       border-radius: 999px;
       padding: 6px 12px;
       cursor: pointer;
     }}
     .btn:hover {{
-      background: #e1f2e7;
+      background: color-mix(in srgb, var(--panel) 72%, var(--accent) 28%);
     }}
     .btn:disabled {{
       opacity: 0.55;

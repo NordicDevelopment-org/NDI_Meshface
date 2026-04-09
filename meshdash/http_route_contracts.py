@@ -72,7 +72,7 @@ class GetThemeSettingsFn(Protocol):
 
 
 class SetThemePresetFn(Protocol):
-    def __call__(self, preset_name: object) -> dict[str, object]:
+    def __call__(self, payload: object) -> dict[str, object]:
         ...
 
 
