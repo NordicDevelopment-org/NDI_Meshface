@@ -1768,13 +1768,13 @@
       const revision = s.revision || {{}};
       const settingsAboutVersion = document.getElementById("settings-about-version");
       const settingsAboutCommit = document.getElementById("settings-about-commit");
-      const launcherHeadVersion = document.getElementById("layout-view-menu-head-version");
-      const launcherHeadCommit = document.getElementById("layout-view-menu-head-commit");
+      const chatHeadVersion = document.getElementById("chat-users-head-version");
+      const chatHeadCommit = document.getElementById("chat-users-head-commit");
       if (
         settingsAboutVersion instanceof HTMLElement
         || settingsAboutCommit instanceof HTMLElement
-        || launcherHeadVersion instanceof HTMLElement
-        || launcherHeadCommit instanceof HTMLElement
+        || chatHeadVersion instanceof HTMLElement
+        || chatHeadCommit instanceof HTMLElement
       ) {{
         const fallbackLabel = String(revision.label || "").trim();
         const version = String(revision.version || "").trim();
@@ -1790,13 +1790,13 @@
           settingsAboutCommit.textContent = commitText;
           settingsAboutCommit.title = title || `Dashboard git revision ${{commitText}}`;
         }}
-        if (launcherHeadVersion instanceof HTMLElement) {{
-          launcherHeadVersion.textContent = `Version ${versionText}`;
-          launcherHeadVersion.title = title || `Dashboard version ${versionText}`;
+        if (chatHeadVersion instanceof HTMLElement) {{
+          chatHeadVersion.textContent = `Version ${versionText}`;
+          chatHeadVersion.title = title || `Dashboard version ${versionText}`;
         }}
-        if (launcherHeadCommit instanceof HTMLElement) {{
-          launcherHeadCommit.textContent = `Git ${commitText}`;
-          launcherHeadCommit.title = title || `Dashboard git revision ${commitText}`;
+        if (chatHeadCommit instanceof HTMLElement) {{
+          chatHeadCommit.textContent = `Git ${commitText}`;
+          chatHeadCommit.title = title || `Dashboard git revision ${commitText}`;
         }}
       }}
 

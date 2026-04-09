@@ -1621,17 +1621,37 @@
       flex: 0 0 auto;
       min-width: 0;
     }}
-    .chat-users-head-title {{
+    .chat-users-head-brand-copy {{
       flex: 1 1 auto;
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }}
+    .chat-users-head-title {{
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       color: #274935;
       letter-spacing: 0.08px;
       text-align: left;
+    }}
+    .chat-users-head-version,
+    .chat-users-head-commit {{
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 9px;
+      line-height: 1.2;
+      color: color-mix(in srgb, #274935 74%, #6b8c78);
+      text-align: left;
+    }}
+    .chat-users-head-commit {{
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      letter-spacing: 0.02em;
     }}
     .chat-users-head-actions {{
       display: inline-flex;
@@ -1683,7 +1703,11 @@
       margin-left: auto;
     }}
     .workspace-shell.chat-panel-collapsed .chat-users-head-title {{
-      font-size: 11px;
+      font-size: 10px;
+    }}
+    .workspace-shell.chat-panel-collapsed .chat-users-head-version,
+    .workspace-shell.chat-panel-collapsed .chat-users-head-commit {{
+      font-size: 8px;
     }}
     .workspace-shell.chat-panel-collapsed .chat-users-head-view-btn,
     .workspace-shell.chat-panel-collapsed #chat-peer-add-toggle-btn,

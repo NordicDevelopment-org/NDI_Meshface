@@ -643,11 +643,28 @@
           profile.setAttribute("aria-label", profile.title);
         }}
       }};
-      const setNavigatorTitle = (labelText, titleText) => {{
-        const navigatorTitle = document.getElementById("chat-users-head-title");
-        if (!(navigatorTitle instanceof HTMLElement)) return;
-        navigatorTitle.textContent = String(labelText || "Local radio");
-        navigatorTitle.title = String(titleText || "Connected local radio");
+      const setLauncherHead = (markText, primaryText, secondaryText, tertiaryText, titleText) => {{
+        const launcherMark = document.getElementById("layout-view-menu-head-mark");
+        const launcherBrand = document.getElementById("layout-view-menu-head-brand");
+        const launcherVersion = document.getElementById("layout-view-menu-head-version");
+        const launcherCommit = document.getElementById("layout-view-menu-head-commit");
+        const safeTitle = String(titleText || "Connected local radio: unavailable");
+        if (launcherMark instanceof HTMLElement) {{
+          launcherMark.textContent = String(markText || "na").slice(0, 4).toUpperCase();
+          launcherMark.title = safeTitle;
+        }}
+        if (launcherBrand instanceof HTMLElement) {{
+          launcherBrand.textContent = String(primaryText || "Local radio");
+          launcherBrand.title = safeTitle;
+        }}
+        if (launcherVersion instanceof HTMLElement) {{
+          launcherVersion.textContent = String(secondaryText || "Short name: n/a");
+          launcherVersion.title = safeTitle;
+        }}
+        if (launcherCommit instanceof HTMLElement) {{
+          launcherCommit.textContent = String(tertiaryText || "Connected local radio: unavailable");
+          launcherCommit.title = safeTitle;
+        }}
       }};
       const setProfileFullId = (nodeId) => {{
         const cleanId = normalizeNodeId(nodeId || "");
@@ -696,7 +713,7 @@
           pill.textContent = "n/a";
           pill.title = "Connected local radio: unavailable";
         }}
-        setNavigatorTitle("Local radio", "Connected local radio: unavailable");
+        setLauncherHead("na", "Local radio", "Short name: n/a", "Connected local radio: unavailable", "Connected local radio: unavailable");
         setProfile("na", "Connected local radio: unavailable");
         setProfileFullId("");
         setProfileFreshness("unknown");
@@ -723,16 +740,27 @@
       const statusDetail = Number.isFinite(lastSeenUnix)
         ? `${{freshnessLabel(status)}} (seen ${{savedDetailAge(lastSeenUnix, nowUnix)}})`
         : freshnessLabel(status);
+      const selfLongName = String((selfNode && selfNode.long_name) || "").trim();
+      const selfShortName = String((selfNode && selfNode.short_name) || "").trim();
       const selfName = preferredNodeName(selfNode) || nodeNameCache.get(selfId) || "";
       const profileLabel = selfName || selfId;
       const profileShortLabel = selfRadioProfileShortLabel(selfId);
       const profileIdentity = selfName ? `${{selfName}} • ID: ${{selfId}}` : selfId;
       const profileTitle = `Connected local radio: ${{profileIdentity}} • Status: ${{statusDetail}}`;
+      const launcherPrimary = selfLongName || selfShortName || selfName || selfId;
+      const launcherShort = selfShortName || profileShortLabel;
+      const launcherSecondaryParts = [];
+      if (launcherShort && launcherShort !== launcherPrimary) {{
+        launcherSecondaryParts.push(`Short: ${{launcherShort}}`);
+      }}
+      launcherSecondaryParts.push(`ID: ${{selfId}}`);
+      const launcherSecondary = launcherSecondaryParts.join(" • ");
+      const launcherTertiary = `Status: ${{statusDetail}}`;
       if (hasPill) {{
         pill.textContent = profileLabel;
         pill.title = profileTitle;
       }}
-      setNavigatorTitle(profileLabel, profileTitle);
+      setLauncherHead(launcherShort, launcherPrimary, launcherSecondary, launcherTertiary, profileTitle);
       setProfile(profileShortLabel, profileTitle);
       setProfileFreshness(status, lastSeenUnix);
       syncConsoleCommandInputState(safeState);

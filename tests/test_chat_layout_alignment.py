@@ -97,6 +97,8 @@ def test_chat_left_column_uses_distinct_head_and_roster_shells() -> None:
     assert 'class="chat-left-head-shell"' in html
     assert 'class="chat-left-section chat-users-section chat-left-roster-shell"' in html
     assert 'id="chat-users-head-title"' in html
+    assert 'id="chat-users-head-version"' in html
+    assert 'id="chat-users-head-commit"' in html
 
 
 def test_chat_compose_notices_float_above_composer_shell() -> None:
@@ -357,9 +359,12 @@ def test_chat_node_list_can_collapse_into_compact_rail() -> None:
     assert 'bindChatPanelCollapseToggle();' in js
 
 
-def test_chat_left_head_title_tracks_local_radio_identity() -> None:
+def test_launcher_menu_head_tracks_local_radio_identity() -> None:
     js = Path("meshdash/assets/dashboard.js.chat.events.core.identity.node_self.tmpl").read_text()
 
-    assert 'document.getElementById("chat-users-head-title")' in js
-    assert 'setNavigatorTitle("Local radio", "Connected local radio: unavailable");' in js
-    assert "setNavigatorTitle(profileLabel, profileTitle);" in js
+    assert 'document.getElementById("layout-view-menu-head-mark")' in js
+    assert 'document.getElementById("layout-view-menu-head-brand")' in js
+    assert 'document.getElementById("layout-view-menu-head-version")' in js
+    assert 'document.getElementById("layout-view-menu-head-commit")' in js
+    assert 'setLauncherHead("na", "Local radio", "Short name: n/a", "Connected local radio: unavailable", "Connected local radio: unavailable");' in js
+    assert "setLauncherHead(launcherShort, launcherPrimary, launcherSecondary, launcherTertiary, profileTitle);" in js

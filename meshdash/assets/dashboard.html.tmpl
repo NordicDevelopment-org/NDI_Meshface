@@ -139,11 +139,11 @@
         <div id="layout-view-menu" class="topbar-view-menu" role="menu" hidden>
           <div class="topbar-view-menu-head">
             <div class="topbar-view-menu-brand">
-              <div class="topbar-view-menu-brand-mark" aria-hidden="true">MF</div>
+              <div id="layout-view-menu-head-mark" class="topbar-view-menu-brand-mark" aria-hidden="true">NA</div>
               <div class="topbar-view-menu-brand-copy">
-                <div id="layout-view-menu-head-brand" class="topbar-view-menu-head-brand">{app_heading}</div>
-                <div id="layout-view-menu-head-version" class="topbar-view-menu-head-version">Version loading...</div>
-                <div id="layout-view-menu-head-commit" class="topbar-view-menu-head-commit">Git loading...</div>
+                <div id="layout-view-menu-head-brand" class="topbar-view-menu-head-brand">Local radio</div>
+                <div id="layout-view-menu-head-version" class="topbar-view-menu-head-version">Short name: n/a</div>
+                <div id="layout-view-menu-head-commit" class="topbar-view-menu-head-commit">Connected local radio: unavailable</div>
               </div>
             </div>
           </div>
@@ -266,7 +266,11 @@
             aria-expanded="false"
             aria-controls="chat-node-navigator-menu"
           >View</button>
-          <div id="chat-users-head-title" class="chat-users-head-title" title="Connected local radio">Local radio</div>
+          <div class="chat-users-head-brand-copy">
+            <div id="chat-users-head-title" class="chat-users-head-title" title="{app_heading}">{app_heading}</div>
+            <div id="chat-users-head-version" class="chat-users-head-version">Version loading...</div>
+            <div id="chat-users-head-commit" class="chat-users-head-commit">Git loading...</div>
+          </div>
           <div class="chat-users-head-actions">
             <button
               id="chat-panel-collapse-btn"

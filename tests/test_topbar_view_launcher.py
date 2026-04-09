@@ -36,9 +36,12 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'class="topbar-update-ticker workspace-update-ticker"' in html
     assert 'workspace-peer-dm-menu-wrap' in html
     assert 'id="peer-dm-toggle-btn"' in html
+    assert 'id="layout-view-menu-head-mark"' in html
     assert 'id="layout-view-menu-head-brand"' in html
     assert 'id="layout-view-menu-head-version"' in html
     assert 'id="layout-view-menu-head-commit"' in html
+    assert 'id="chat-users-head-version"' in html
+    assert 'id="chat-users-head-commit"' in html
     assert 'id="layout-view-menu-btn"' in html
     assert 'id="layout-view-menu"' in html
     assert 'id="settings-about-version"' in html
@@ -85,6 +88,8 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert ".topbar-view-menu-head-brand {" in css
     assert ".topbar-view-menu-head-version," in css
     assert ".topbar-view-menu-head-commit {" in css
+    assert ".chat-users-head-version," in css
+    assert ".chat-users-head-commit {" in css
     assert ".topbar-view-menu-item-icon {" in css
     assert ".topbar-view-menu {" in css
     assert "z-index: 1350;" in css
@@ -103,8 +108,11 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "function shouldCloseLayoutViewMenuForScrollTarget(target = null) {" in js
     assert 'document.getElementById("settings-about-version")' in js
     assert 'document.getElementById("settings-about-commit")' in js
+    assert 'document.getElementById("layout-view-menu-head-mark")' in js
     assert 'document.getElementById("layout-view-menu-head-version")' in js
     assert 'document.getElementById("layout-view-menu-head-commit")' in js
+    assert 'document.getElementById("chat-users-head-version")' in js
+    assert 'document.getElementById("chat-users-head-commit")' in js
     assert 'target.closest("#layout-view-menu .topbar-view-menu-item")' in js
     assert 'document.getElementById("layout-view-menu-btn-label")' in js
     assert 'document.getElementById("layout-view-menu-btn")' in js
