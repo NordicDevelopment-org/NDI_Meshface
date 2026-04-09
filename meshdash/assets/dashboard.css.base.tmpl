@@ -1592,7 +1592,7 @@
     .chat-users-head {{
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 6px;
       min-width: 0;
       padding: 0;
@@ -1603,11 +1603,24 @@
       flex: 0 0 auto;
       min-width: 0;
     }}
+    .chat-users-head-title {{
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 700;
+      color: #274935;
+      letter-spacing: 0.08px;
+      text-align: left;
+    }}
     .chat-users-head-actions {{
       display: inline-flex;
       align-items: center;
       gap: 5px;
       min-width: 0;
+      margin-left: auto;
     }}
     .chat-panel-collapse-btn {{
       min-width: 24px;
@@ -1650,6 +1663,7 @@
     .workspace-shell.chat-panel-collapsed .chat-users-head-actions {{
       margin-left: auto;
     }}
+    .workspace-shell.chat-panel-collapsed .chat-users-head-title,
     .workspace-shell.chat-panel-collapsed .chat-users-head-view-btn,
     .workspace-shell.chat-panel-collapsed #chat-peer-add-toggle-btn,
     .workspace-shell.chat-panel-collapsed #chat-node-navigator-menu,

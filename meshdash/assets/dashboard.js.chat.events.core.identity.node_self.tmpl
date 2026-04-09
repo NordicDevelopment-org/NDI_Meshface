@@ -643,6 +643,12 @@
           profile.setAttribute("aria-label", profile.title);
         }}
       }};
+      const setNavigatorTitle = (labelText, titleText) => {{
+        const navigatorTitle = document.getElementById("chat-users-head-title");
+        if (!(navigatorTitle instanceof HTMLElement)) return;
+        navigatorTitle.textContent = String(labelText || "Local radio");
+        navigatorTitle.title = String(titleText || "Connected local radio");
+      }};
       const setProfileFullId = (nodeId) => {{
         const cleanId = normalizeNodeId(nodeId || "");
         const hasFullId = isCanonicalNodeId(cleanId);
@@ -690,6 +696,7 @@
           pill.textContent = "n/a";
           pill.title = "Connected local radio: unavailable";
         }}
+        setNavigatorTitle("Local radio", "Connected local radio: unavailable");
         setProfile("na", "Connected local radio: unavailable");
         setProfileFullId("");
         setProfileFreshness("unknown");
@@ -725,6 +732,7 @@
         pill.textContent = profileLabel;
         pill.title = profileTitle;
       }}
+      setNavigatorTitle(profileLabel, profileTitle);
       setProfile(profileShortLabel, profileTitle);
       setProfileFreshness(status, lastSeenUnix);
       syncConsoleCommandInputState(safeState);

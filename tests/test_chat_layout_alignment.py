@@ -35,6 +35,7 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".chat-users-head {" in css
     assert "padding: 0;" in css
     assert "background: transparent;" in css
+    assert ".chat-users-head-title {" in css
     assert ".chat-left-panel .chat-member-list {" in css
     assert "background: transparent;" in css
     assert ".layout.view-chat .chat .body {" in css
@@ -95,6 +96,7 @@ def test_chat_left_column_uses_distinct_head_and_roster_shells() -> None:
 
     assert 'class="chat-left-head-shell"' in html
     assert 'class="chat-left-section chat-users-section chat-left-roster-shell"' in html
+    assert 'id="chat-users-head-title"' in html
 
 
 def test_chat_compose_notices_float_above_composer_shell() -> None:
@@ -138,6 +140,7 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "border-color: transparent !important;" in css
     assert "[data-theme=\"dark\"] .chat-left-head-shell {" in css
     assert "[data-theme=\"dark\"] .chat-left-roster-shell {" in css
+    assert "[data-theme=\"dark\"] .chat-users-head-title {" in css
     assert "[data-theme=\"dark\"] .card.chat .body {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "background: #08120d;" in css
@@ -338,6 +341,7 @@ def test_chat_node_list_can_collapse_into_compact_rail() -> None:
     assert 'id="chat-panel-collapse-glyph"' in html
     assert "--chat-panel-collapsed-width: 96px;" in css
     assert ".workspace-shell.chat-panel-open.chat-panel-collapsed {" in css
+    assert ".workspace-shell.chat-panel-collapsed .chat-users-head-title," in css
     assert ".workspace-shell.chat-panel-collapsed .chat-users-head-view-btn," in css
     assert ".workspace-shell.chat-panel-collapsed .chat-member-meta-row," in css
     assert "const chatPanelCollapsedStorageKey = \"meshDashboardChatPanelCollapsedV1\";" in js
@@ -350,3 +354,11 @@ def test_chat_node_list_can_collapse_into_compact_rail() -> None:
     assert 'window.localStorage.setItem(chatPanelCollapsedStorageKey, chatPanelCollapsed ? "1" : "0");' in js
     assert 'loadChatPanelCollapseState();' in js
     assert 'bindChatPanelCollapseToggle();' in js
+
+
+def test_chat_left_head_title_tracks_local_radio_identity() -> None:
+    js = Path("meshdash/assets/dashboard.js.chat.events.core.identity.node_self.tmpl").read_text()
+
+    assert 'document.getElementById("chat-users-head-title")' in js
+    assert 'setNavigatorTitle("Local radio", "Connected local radio: unavailable");' in js
+    assert "setNavigatorTitle(profileLabel, profileTitle);" in js
