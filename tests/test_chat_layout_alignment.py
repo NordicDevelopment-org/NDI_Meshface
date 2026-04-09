@@ -76,6 +76,28 @@ def test_chat_compose_notices_float_above_composer_shell() -> None:
     assert "@keyframes chatNoticeTickerScroll {" in css
 
 
+def test_dark_chat_palette_matches_green_workspace_theme() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    assert "[data-theme=\"dark\"] .card.chat .chat-card-head {" in css
+    assert "background: #0d1711;" in css
+    assert "[data-theme=\"dark\"] .card.chat .body {" in css
+    assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
+    assert "background: #08120d;" in css
+    assert "background: #08120d !important;" in css
+    assert "[data-theme=\"dark\"] .card.chat .chat-feed-item {" in css
+    assert "--chat-feed-node-hue: 148;" in css
+    assert "--chat-feed-node-tint-end-hue: 170;" in css
+    assert "--chat-feed-node-outline-hue: 154;" in css
+    assert "rgba(83, 160, 112, 0.11)" in css
+    assert "[data-theme=\"dark\"] .chat-feed-item.kind-status {" in css
+    assert "rgba(44, 82, 60, 0.58)" in css
+    assert "[data-theme=\"dark\"] .card.chat .chat-reaction-chip," in css
+    assert "background: #173126;" in css
+    assert "[data-theme=\"dark\"] .chat-node-navigator-menu," in css
+    assert "background: #0d1711;" in css
+
+
 def test_chat_compose_controls_order_matches_current_layout() -> None:
     html = build_html_shell(
         app_title="Meshyface",
