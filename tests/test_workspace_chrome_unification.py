@@ -385,6 +385,18 @@ def test_lists_and_about_panels_follow_workspace_shell_tokens() -> None:
     assert "#15241c" not in list_section
 
 
+def test_settings_checkboxes_follow_runtime_accent() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    settings_checkbox_section = css.split(".settings-panel input[type=\"checkbox\"] {", 1)[1].split("}", 1)[0]
+    time_sync_checkbox_section = css.split(".settings-time-sync-toggle input[type=\"checkbox\"] {", 1)[1].split("}", 1)[0]
+
+    assert "accent-color: var(--ui-accent, var(--accent));" in settings_checkbox_section
+    assert "accent-color: var(--ui-accent, var(--accent));" in time_sync_checkbox_section
+    assert "width: 14px;" in settings_checkbox_section
+    assert "#2f855a" not in time_sync_checkbox_section
+
+
 def test_topbar_tickers_follow_workspace_shell_and_semantic_states() -> None:
     css = build_dashboard_css(theme_css="")
 
