@@ -52,7 +52,9 @@ def test_render_html_places_overview_first_in_history_tabs() -> None:
     names_index = html.index('id="tab-btn-names"')
 
     assert overview_index < signal_index < packets_index < online_index < names_index
-    assert 'class="history-tab-btn active" id="tab-btn-overview"' in html
+    assert 'class="history-tabs workspace-pillbar"' in html
+    assert 'class="history-tab-btn workspace-pill-btn is-active" id="tab-btn-overview"' in html
+    assert 'id="tab-btn-signal" data-tab="signal" type="button" aria-selected="false"' in html
     assert 'id="tab-panel-overview" class="history-panel"' in html
     assert 'id="tab-panel-signal" class="history-panel" hidden' in html
 
@@ -67,6 +69,8 @@ def test_dashboard_js_renders_name_history_and_overview_under_history_tab() -> N
     assert 'let activeHistoryTab = "overview";' in js
     assert 'nextTab === "signal" || nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview"' in js
     assert ': "overview";' in js
+    assert 'btn.classList.toggle("is-active", isActive);' in js
+    assert 'btn.setAttribute("aria-selected", isActive ? "true" : "false");' in js
     assert 'const namesPanel = document.getElementById("tab-panel-names");' in js
     assert 'const overviewPanel = document.getElementById("tab-panel-overview");' in js
     assert 'renderNodeNameHistoryPanel(nameHistoryEntries);' in js

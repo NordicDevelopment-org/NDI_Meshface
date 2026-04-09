@@ -32,6 +32,8 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert 'class="chat-card-head workspace-chrome-bar"' in html
     assert 'class="games-toolbar workspace-chrome-bar"' in html
     assert 'class="games-tab-btn workspace-pill-btn is-active"' in html
+    assert 'class="history-tabs workspace-pillbar"' in html
+    assert 'class="history-tab-btn workspace-pill-btn is-active"' in html
     assert "<h2>Files</h2>" not in html
     assert 'id="network-map-chrome" class="network-map-chrome"' in html
     assert 'class="network-map-subview-tabs"' in html
