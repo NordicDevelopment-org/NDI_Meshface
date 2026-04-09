@@ -35,7 +35,7 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".chat-users-head {" in css
     assert "padding: 0;" in css
     assert "background: transparent;" in css
-    assert ".chat-users-head-title {" in css
+    assert ".chat-users-head-launcher-shell {" in css
     assert ".chat-left-panel .chat-member-list {" in css
     assert "background: transparent;" in css
     assert ".layout.view-chat .chat .body {" in css
@@ -61,6 +61,13 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "margin: 0;" in css
     assert "border: 1px solid #d2e1d0;" in css
     assert "background: #edf6ec;" in css
+    assert "position: relative;" in css
+    assert "display: flex;" in css
+    assert ".chat-user-search-wrap {" in css
+    assert "flex: 1 1 auto;" in css
+    assert ".chat-node-navigator-dock-btn {" in css
+    assert ".chat-node-navigator-menu-docked {" in css
+    assert "bottom: calc(100% + 6px);" in css
     assert ".chat-member-list {" in css
     assert "gap: 0;" in css
     assert ".chat-member-item {" in css
@@ -96,9 +103,9 @@ def test_chat_left_column_uses_distinct_head_and_roster_shells() -> None:
 
     assert 'class="chat-left-head-shell"' in html
     assert 'class="chat-left-section chat-users-section chat-left-roster-shell"' in html
-    assert 'id="chat-users-head-title"' in html
-    assert 'id="chat-users-head-version"' in html
-    assert 'id="chat-users-head-commit"' in html
+    assert 'class="workspace-launcher-shell chat-users-head-launcher-shell"' in html
+    assert 'id="chat-node-navigator-menu-btn"' in html
+    assert 'class="chat-node-navigator-menu chat-node-navigator-menu-docked"' in html
 
 
 def test_chat_compose_notices_float_above_composer_shell() -> None:
@@ -142,7 +149,6 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "border-color: transparent !important;" in css
     assert "[data-theme=\"dark\"] .chat-left-head-shell {" in css
     assert "[data-theme=\"dark\"] .chat-left-roster-shell {" in css
-    assert "[data-theme=\"dark\"] .chat-users-head-title {" in css
     assert "[data-theme=\"dark\"] .card.chat .body {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "background: #08120d;" in css
@@ -360,10 +366,12 @@ def test_chat_node_list_can_collapse_into_compact_rail() -> None:
     assert 'id="chat-panel-collapse-glyph"' in html
     assert "--chat-panel-collapsed-width: 160px;" in css
     assert ".workspace-shell.chat-panel-open.chat-panel-collapsed {" in css
-    assert ".workspace-shell.chat-panel-collapsed .chat-users-head-title {" in css
-    assert ".workspace-shell.chat-panel-collapsed .chat-users-head-view-btn," in css
+    assert ".workspace-shell.chat-panel-collapsed .chat-users-head-launcher-shell {" in css
+    assert ".workspace-shell.chat-panel-collapsed .chat-users-head-launcher-shell .topbar-view-menu-btn {" in css
+    assert ".workspace-shell.chat-panel-collapsed #chat-node-navigator-menu," in css
     assert ".workspace-shell.chat-panel-collapsed .chat-member-meta-row," in css
     assert ".workspace-shell.chat-panel-collapsed #chat-peer-add-toggle-btn," in css
+    assert ".workspace-shell.chat-panel-collapsed .chat-left-bottom-bar," in css
     assert "const chatPanelCollapsedStorageKey = \"meshDashboardChatPanelCollapsedV1\";" in js
     assert "let chatPanelCollapsed = false;" in js
     assert "function applyChatPanelCollapseState() {" in js

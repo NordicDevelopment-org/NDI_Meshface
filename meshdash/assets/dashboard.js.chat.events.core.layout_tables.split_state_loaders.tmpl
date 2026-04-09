@@ -147,7 +147,6 @@
       const shell = document.querySelector(".workspace-shell");
       const panel = document.getElementById("chat-left-panel");
       const toggleBtn = document.getElementById("chat-panel-collapse-btn");
-      const toggleGlyph = document.getElementById("chat-panel-collapse-glyph");
       const collapsed = !!chatPanelCollapsed;
 
       if (shell instanceof HTMLElement) {{
@@ -161,9 +160,6 @@
         toggleBtn.setAttribute("aria-pressed", collapsed ? "true" : "false");
         toggleBtn.setAttribute("aria-label", nextLabel);
         toggleBtn.title = nextLabel;
-      }}
-      if (toggleGlyph instanceof HTMLElement) {{
-        toggleGlyph.textContent = collapsed ? ">" : "<";
       }}
       if (typeof syncChatNodeDetailsDrawer === "function") {{
         syncChatNodeDetailsDrawer(latestState, {{

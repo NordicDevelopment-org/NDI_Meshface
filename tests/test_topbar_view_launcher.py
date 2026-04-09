@@ -30,7 +30,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     )
 
     assert 'class="workspace-launcher-row"' in html
-    assert 'class="workspace-launcher-shell"' in html
+    assert 'class="workspace-launcher-shell chat-users-head-launcher-shell"' in html
     assert 'id="layout-view-menu-btn-label"' in html
     assert 'class="topbar-view-menu-btn-label">Chat<' in html
     assert 'class="topbar-update-ticker workspace-update-ticker"' in html
@@ -40,8 +40,9 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'id="layout-view-menu-head-brand"' in html
     assert 'id="layout-view-menu-head-version"' in html
     assert 'id="layout-view-menu-head-commit"' in html
-    assert 'id="chat-users-head-version"' in html
-    assert 'id="chat-users-head-commit"' in html
+    assert 'id="chat-users-head-title"' not in html
+    assert 'id="chat-users-head-version"' not in html
+    assert 'id="chat-users-head-commit"' not in html
     assert 'id="layout-view-menu-btn"' in html
     assert 'id="layout-view-menu"' in html
     assert 'id="settings-about-version"' in html
@@ -58,14 +59,21 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'topbar-view-menu-head-kicker' not in html
     assert 'topbar-view-menu-head-title' not in html
     assert 'layout-view-menu-head-current' not in html
-    assert 'class="chat-peer-add-toggle-btn chat-node-navigator-menu-btn chat-users-head-view-btn"' in html
+    assert 'class="chat-peer-add-toggle-btn chat-node-navigator-menu-btn chat-node-navigator-dock-btn"' in html
+    assert 'class="chat-peer-add-toggle-btn chat-panel-collapse-btn chat-users-head-action-btn"' in html
+    assert 'class="chat-users-head-gear-icon"' in html
+    assert '>View</button>' not in html
     assert '<aside class="teams-rail"' not in html
     assert re.search(
-        r'<div class="workspace-launcher-row"[\s\S]*id="layout-view-menu-btn"[\s\S]*id="topbar-update-ticker"[\s\S]*id="peer-dm-toggle-btn"',
+        r'<div class="workspace-launcher-row"[\s\S]*id="topbar-update-ticker"[\s\S]*id="peer-dm-toggle-btn"',
         html,
     )
     assert re.search(
-        r'<div class="chat-users-head"[\s\S]*id="chat-node-navigator-menu-btn"[\s\S]*id="chat-peer-add-toggle-btn"',
+        r'<div class="chat-users-head"[\s\S]*id="layout-view-menu-btn"[\s\S]*id="chat-panel-collapse-btn"',
+        html,
+    )
+    assert re.search(
+        r'<div class="chat-left-bottom-bar"[\s\S]*id="chat-user-search-input"[\s\S]*id="chat-node-navigator-menu-btn"[\s\S]*id="chat-node-navigator-menu"',
         html,
     )
 
@@ -73,7 +81,12 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "z-index: 500;" in css
     assert ".workspace-launcher-shell {" in css
     assert ".workspace-peer-dm-menu-wrap {" in css
+    assert ".chat-users-head-launcher-shell {" in css
     assert ".chat-users-head-view-btn {" in css
+    assert ".chat-users-head-action-btn {" in css
+    assert ".chat-users-head-gear-icon {" in css
+    assert ".chat-node-navigator-dock-btn {" in css
+    assert ".chat-node-navigator-menu-docked {" in css
     assert "min-height: 38px;" in css
     assert ".topbar-update-ticker {" in css
     assert ".workspace-update-ticker {" in css
@@ -89,13 +102,12 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert ".topbar-view-menu-head-brand {" in css
     assert ".topbar-view-menu-head-version," in css
     assert ".topbar-view-menu-head-commit {" in css
-    assert ".chat-users-head-version," in css
-    assert ".chat-users-head-commit {" in css
     assert ".topbar-view-menu-item-icon {" in css
     assert ".topbar-view-menu {" in css
     assert "z-index: 1350;" in css
     assert ".workspace-peer-dm-menu-wrap .peer-dm-toggle-btn {" in css
     assert "width: 38px;" in css
+    assert '.chat-panel-collapse-btn[aria-pressed="false"] .chat-panel-collapse-glyph {' in css
     assert re.search(
         r"\.workspace-shell \{\s*--chat-panel-width: 250px;[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);",
         css,
@@ -113,8 +125,8 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' in js
     assert 'document.getElementById("layout-view-menu-head-version")' in js
     assert 'document.getElementById("layout-view-menu-head-commit")' in js
-    assert 'document.getElementById("chat-users-head-version")' in js
-    assert 'document.getElementById("chat-users-head-commit")' in js
+    assert 'document.getElementById("chat-users-head-version")' not in js
+    assert 'document.getElementById("chat-users-head-commit")' not in js
     assert 'target.closest("#layout-view-menu .topbar-view-menu-item")' in js
     assert 'document.getElementById("layout-view-menu-btn-label")' in js
     assert 'document.getElementById("layout-view-menu-btn")' in js

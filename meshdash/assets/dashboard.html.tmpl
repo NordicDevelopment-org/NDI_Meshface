@@ -121,109 +121,6 @@
 
   <div class="workspace-shell chat-panel-open">
     <div class="workspace-launcher-row" aria-label="Dashboard views">
-      <div class="workspace-launcher-shell">
-        <button
-          id="layout-view-menu-btn"
-          class="topbar-view-menu-btn"
-          type="button"
-          title="Switch workspace view"
-          aria-label="Switch workspace view"
-          aria-haspopup="menu"
-          aria-expanded="false"
-        >
-          <span id="layout-view-menu-btn-label" class="topbar-view-menu-btn-label">Chat</span>
-          <span id="layout-view-menu-btn-badge" class="topbar-view-menu-btn-badge" hidden>0</span>
-          <span id="layout-view-menu-attention-indicator" class="topbar-view-menu-btn-attention" hidden aria-hidden="true"></span>
-          <span class="topbar-view-menu-caret" aria-hidden="true"></span>
-        </button>
-        <div id="layout-view-menu" class="topbar-view-menu" role="menu" hidden>
-          <div class="topbar-view-menu-head">
-            <div class="topbar-view-menu-brand">
-              <div id="layout-view-menu-head-mark" class="topbar-view-menu-brand-mark" aria-hidden="true">NA</div>
-              <div class="topbar-view-menu-brand-copy">
-                <div id="layout-view-menu-head-brand" class="topbar-view-menu-head-brand">Local radio</div>
-                <div id="layout-view-menu-head-version" class="topbar-view-menu-head-version">Short name: n/a</div>
-                <div id="layout-view-menu-head-commit" class="topbar-view-menu-head-commit">Connected local radio: unavailable</div>
-              </div>
-            </div>
-          </div>
-          <button
-            class="topbar-view-menu-item is-active"
-            data-view="chat"
-            type="button"
-            role="menuitemradio"
-            aria-checked="true"
-            title="Teams-style chat workspace"
-          >
-            <span class="topbar-view-menu-item-icon" aria-hidden="true">CH</span>
-            <span class="topbar-view-menu-item-copy">
-              <span class="topbar-view-menu-item-label">Chat</span>
-              <span class="topbar-view-menu-item-meta">Messages</span>
-            </span>
-            <span class="topbar-view-menu-item-badge" hidden>0</span>
-          </button>
-          <button
-            class="topbar-view-menu-item"
-            data-view="network"
-            type="button"
-            role="menuitemradio"
-            aria-checked="false"
-            title="Topology, nodes, and links"
-          >
-            <span class="topbar-view-menu-item-icon" aria-hidden="true">NW</span>
-            <span class="topbar-view-menu-item-copy">
-              <span class="topbar-view-menu-item-label">Network</span>
-              <span class="topbar-view-menu-item-meta">Map and nodes</span>
-            </span>
-            <span class="topbar-view-menu-item-badge" hidden>0</span>
-          </button>
-          <button
-            class="topbar-view-menu-item"
-            data-view="console"
-            type="button"
-            role="menuitemradio"
-            aria-checked="false"
-            title="Realtime dashboard console"
-          >
-            <span class="topbar-view-menu-item-icon" aria-hidden="true">CL</span>
-            <span class="topbar-view-menu-item-copy">
-              <span class="topbar-view-menu-item-label">Console</span>
-              <span class="topbar-view-menu-item-meta">Live logs</span>
-            </span>
-            <span class="topbar-view-menu-item-badge" hidden>0</span>
-          </button>
-          <button
-            class="topbar-view-menu-item"
-            data-view="apps"
-            type="button"
-            role="menuitemradio"
-            aria-checked="false"
-            title="Games and file transfer workspace"
-          >
-            <span class="topbar-view-menu-item-icon" aria-hidden="true">AP</span>
-            <span class="topbar-view-menu-item-copy">
-              <span class="topbar-view-menu-item-label">Apps</span>
-              <span class="topbar-view-menu-item-meta">Games and files</span>
-            </span>
-            <span class="topbar-view-menu-item-badge" hidden>0</span>
-          </button>
-          <button
-            class="topbar-view-menu-item"
-            data-view="settings"
-            type="button"
-            role="menuitemradio"
-            aria-checked="false"
-            title="Radio + dashboard settings"
-          >
-            <span class="topbar-view-menu-item-icon" aria-hidden="true">ST</span>
-            <span class="topbar-view-menu-item-copy">
-              <span class="topbar-view-menu-item-label">Settings</span>
-              <span class="topbar-view-menu-item-meta">Radio settings</span>
-            </span>
-            <span class="topbar-view-menu-item-badge" hidden>0</span>
-          </button>
-        </div>
-      </div>
       <div id="topbar-update-ticker" class="topbar-update-ticker workspace-update-ticker" role="status" aria-live="polite" aria-label="Live update ticker" hidden>
         <div id="topbar-update-viewport" class="topbar-update-viewport">
           <div id="topbar-update-track" class="topbar-update-track">
@@ -258,40 +155,125 @@
     <aside id="chat-left-panel" class="chat-left-panel" aria-label="Global node selection and search">
       <div class="chat-left-head-shell">
         <div class="chat-users-head">
-          <button
-            id="chat-node-navigator-menu-btn"
-            class="chat-peer-add-toggle-btn chat-node-navigator-menu-btn chat-users-head-view-btn"
-            type="button"
-            title="Configure node navigator sort and metadata"
-            aria-expanded="false"
-            aria-controls="chat-node-navigator-menu"
-          >View</button>
-          <div class="chat-users-head-brand-copy">
-            <div id="chat-users-head-title" class="chat-users-head-title" title="{app_heading}">{app_heading}</div>
-            <div id="chat-users-head-version" class="chat-users-head-version">Version loading...</div>
-            <div id="chat-users-head-commit" class="chat-users-head-commit">Git loading...</div>
+          <div class="workspace-launcher-shell chat-users-head-launcher-shell">
+            <button
+              id="layout-view-menu-btn"
+              class="topbar-view-menu-btn"
+              type="button"
+              title="Switch workspace view"
+              aria-label="Switch workspace view"
+              aria-haspopup="menu"
+              aria-expanded="false"
+            >
+              <span id="layout-view-menu-btn-label" class="topbar-view-menu-btn-label">Chat</span>
+              <span id="layout-view-menu-btn-badge" class="topbar-view-menu-btn-badge" hidden>0</span>
+              <span id="layout-view-menu-attention-indicator" class="topbar-view-menu-btn-attention" hidden aria-hidden="true"></span>
+              <span class="topbar-view-menu-caret" aria-hidden="true"></span>
+            </button>
+            <div id="layout-view-menu" class="topbar-view-menu" role="menu" hidden>
+              <div class="topbar-view-menu-head">
+                <div class="topbar-view-menu-brand">
+                  <div id="layout-view-menu-head-mark" class="topbar-view-menu-brand-mark" aria-hidden="true">NA</div>
+                  <div class="topbar-view-menu-brand-copy">
+                    <div id="layout-view-menu-head-brand" class="topbar-view-menu-head-brand">Local radio</div>
+                    <div id="layout-view-menu-head-version" class="topbar-view-menu-head-version">Short name: n/a</div>
+                    <div id="layout-view-menu-head-commit" class="topbar-view-menu-head-commit">Connected local radio: unavailable</div>
+                  </div>
+                </div>
+              </div>
+              <button
+                class="topbar-view-menu-item is-active"
+                data-view="chat"
+                type="button"
+                role="menuitemradio"
+                aria-checked="true"
+                title="Teams-style chat workspace"
+              >
+                <span class="topbar-view-menu-item-icon" aria-hidden="true">CH</span>
+                <span class="topbar-view-menu-item-copy">
+                  <span class="topbar-view-menu-item-label">Chat</span>
+                  <span class="topbar-view-menu-item-meta">Messages</span>
+                </span>
+                <span class="topbar-view-menu-item-badge" hidden>0</span>
+              </button>
+              <button
+                class="topbar-view-menu-item"
+                data-view="network"
+                type="button"
+                role="menuitemradio"
+                aria-checked="false"
+                title="Topology, nodes, and links"
+              >
+                <span class="topbar-view-menu-item-icon" aria-hidden="true">NW</span>
+                <span class="topbar-view-menu-item-copy">
+                  <span class="topbar-view-menu-item-label">Network</span>
+                  <span class="topbar-view-menu-item-meta">Map and nodes</span>
+                </span>
+                <span class="topbar-view-menu-item-badge" hidden>0</span>
+              </button>
+              <button
+                class="topbar-view-menu-item"
+                data-view="console"
+                type="button"
+                role="menuitemradio"
+                aria-checked="false"
+                title="Realtime dashboard console"
+              >
+                <span class="topbar-view-menu-item-icon" aria-hidden="true">CL</span>
+                <span class="topbar-view-menu-item-copy">
+                  <span class="topbar-view-menu-item-label">Console</span>
+                  <span class="topbar-view-menu-item-meta">Live logs</span>
+                </span>
+                <span class="topbar-view-menu-item-badge" hidden>0</span>
+              </button>
+              <button
+                class="topbar-view-menu-item"
+                data-view="apps"
+                type="button"
+                role="menuitemradio"
+                aria-checked="false"
+                title="Games and file transfer workspace"
+              >
+                <span class="topbar-view-menu-item-icon" aria-hidden="true">AP</span>
+                <span class="topbar-view-menu-item-copy">
+                  <span class="topbar-view-menu-item-label">Apps</span>
+                  <span class="topbar-view-menu-item-meta">Games and files</span>
+                </span>
+                <span class="topbar-view-menu-item-badge" hidden>0</span>
+              </button>
+              <button
+                class="topbar-view-menu-item"
+                data-view="settings"
+                type="button"
+                role="menuitemradio"
+                aria-checked="false"
+                title="Radio + dashboard settings"
+              >
+                <span class="topbar-view-menu-item-icon" aria-hidden="true">ST</span>
+                <span class="topbar-view-menu-item-copy">
+                  <span class="topbar-view-menu-item-label">Settings</span>
+                  <span class="topbar-view-menu-item-meta">Radio settings</span>
+                </span>
+                <span class="topbar-view-menu-item-badge" hidden>0</span>
+              </button>
+            </div>
           </div>
           <div class="chat-users-head-actions">
             <button
               id="chat-panel-collapse-btn"
-              class="chat-peer-add-toggle-btn chat-panel-collapse-btn"
+              class="chat-peer-add-toggle-btn chat-panel-collapse-btn chat-users-head-action-btn"
               type="button"
               title="Collapse node list"
               aria-label="Collapse node list"
               aria-pressed="false"
               aria-controls="chat-left-panel"
-            ><span id="chat-panel-collapse-glyph" class="chat-panel-collapse-glyph" aria-hidden="true">&lt;</span></button>
+            >
+              <svg id="chat-panel-collapse-glyph" class="chat-panel-collapse-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="m9 6 6 6-6 6"/>
+              </svg>
+            </button>
             <button id="chat-peer-add-toggle-btn" class="chat-peer-add-toggle-btn" type="button" title="Add a peer-to-peer user" hidden>Add</button>
           </div>
-        </div>
-        <div id="chat-node-navigator-menu" class="chat-node-navigator-menu" hidden>
-          <div class="chat-node-navigator-row">
-            <label for="chat-node-navigator-sort-select" class="chat-node-navigator-label">Sort</label>
-            <select id="chat-node-navigator-sort-select" class="chat-peer-input chat-node-navigator-select" aria-label="Sort node navigator list"></select>
-            <button id="chat-node-navigator-sort-dir-btn" class="chat-peer-add-btn chat-node-navigator-sort-dir-btn" type="button" aria-label="Toggle sort direction">Asc</button>
-          </div>
-          <div class="chat-node-navigator-fields-head">Metadata</div>
-          <div id="chat-node-navigator-fields" class="chat-node-navigator-fields"></div>
         </div>
         <div id="chat-peer-add-panel" class="chat-peer-add-panel" hidden>
           <div class="chat-peer-add-row">
@@ -474,6 +456,29 @@
       <div class="chat-left-bottom-bar">
         <div class="chat-user-search-wrap">
           <input id="chat-user-search-input" class="list-search-input" type="search" placeholder="Search nodes by ID or name" autocomplete="off" />
+        </div>
+        <button
+          id="chat-node-navigator-menu-btn"
+          class="chat-peer-add-toggle-btn chat-node-navigator-menu-btn chat-node-navigator-dock-btn"
+          type="button"
+          title="Configure node navigator sort and metadata"
+          aria-label="Configure node navigator sort and metadata"
+          aria-expanded="false"
+          aria-controls="chat-node-navigator-menu"
+        >
+          <svg class="chat-users-head-gear-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 8.35a3.65 3.65 0 1 0 0 7.3a3.65 3.65 0 0 0 0-7.3Z"/>
+            <path d="m4.95 13.5l-1.7-1.5l1.7-1.5l.22-1.02l-.78-2.13l2.05-1.18l1.92 1.18l.98-.43l.62-2.18h2.36l.62 2.18l.98.43l1.92-1.18l2.05 1.18l-.78 2.13l.22 1.02l1.7 1.5l-1.7 1.5l-.22 1.02l.78 2.13l-2.05 1.18l-1.92-1.18l-.98.43l-.62 2.18H9.7l-.62-2.18l-.98-.43l-1.92 1.18l-2.05-1.18l.78-2.13Z"/>
+          </svg>
+        </button>
+        <div id="chat-node-navigator-menu" class="chat-node-navigator-menu chat-node-navigator-menu-docked" hidden>
+          <div class="chat-node-navigator-row">
+            <label for="chat-node-navigator-sort-select" class="chat-node-navigator-label">Sort</label>
+            <select id="chat-node-navigator-sort-select" class="chat-peer-input chat-node-navigator-select" aria-label="Sort node navigator list"></select>
+            <button id="chat-node-navigator-sort-dir-btn" class="chat-peer-add-btn chat-node-navigator-sort-dir-btn" type="button" aria-label="Toggle sort direction">Asc</button>
+          </div>
+          <div class="chat-node-navigator-fields-head">Metadata</div>
+          <div id="chat-node-navigator-fields" class="chat-node-navigator-fields"></div>
         </div>
       </div>
     </aside>
