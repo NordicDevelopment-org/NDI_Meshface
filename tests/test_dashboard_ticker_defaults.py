@@ -37,7 +37,9 @@ def test_dashboard_js_defaults_live_update_ticker_to_enabled() -> None:
     assert "update_ticker_enabled: true," in js
     assert "raw.update_ticker_enabled" in js
     assert "function topbarUpdateTickerEnabled() {" in js
+    assert "function topbarUpdateTickerHasRenderableContent(trackEl, primaryEl, secondaryEl) {" in js
     assert "prefs.update_ticker_enabled = !!liveUpdateToggle.checked;" in js
+    assert "if (topbarUpdateTickerEnabled() && topbarUpdateTickerHasRenderableContent(trackEl, primaryEl, secondaryEl)) {" in js
     assert "if (!topbarUpdateTickerEnabled()) {" in js
 
 

@@ -600,6 +600,10 @@
     function setTopbarUpdateTickerVisibility(tickerEl, visible) {{
       if (!(tickerEl instanceof HTMLElement)) return;
       tickerEl.hidden = !visible;
+      const launcherRow = tickerEl.closest(".workspace-launcher-row");
+      if (launcherRow instanceof HTMLElement) {{
+        launcherRow.hidden = !visible;
+      }}
       const workspaceShell = tickerEl.closest(".workspace-shell");
       if (workspaceShell instanceof HTMLElement) {{
         workspaceShell.classList.toggle("has-topbar-update-ticker", !!visible);
@@ -611,7 +615,7 @@
         window.clearTimeout(topbarUpdateTickerSpawnTimer);
         topbarUpdateTickerSpawnTimer = 0;
       }}
-      setTopbarUpdateTickerVisibility(tickerEl, topbarUpdateTickerEnabled());
+      setTopbarUpdateTickerVisibility(tickerEl, false);
       tickerEl.classList.add("is-static");
       tickerEl.classList.remove("is-fading");
       for (const itemEl of Array.from(trackEl.querySelectorAll(".topbar-update-item"))) {{

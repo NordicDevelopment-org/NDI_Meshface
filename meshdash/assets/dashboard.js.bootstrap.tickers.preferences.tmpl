@@ -569,6 +569,19 @@
       );
     }}
 
+    function topbarUpdateTickerHasRenderableContent(trackEl, primaryEl, secondaryEl) {{
+      if (trackEl instanceof HTMLElement && trackEl.querySelector(".topbar-update-item")) {{
+        return true;
+      }}
+      if ((String(primaryEl && primaryEl.textContent || "").trim()).length > 0) {{
+        return true;
+      }}
+      if ((String(secondaryEl && secondaryEl.textContent || "").trim()).length > 0) {{
+        return true;
+      }}
+      return false;
+    }}
+
     function syncTopbarUpdateTickerVisibilityPreference() {{
       const tickerEl = document.getElementById("topbar-update-ticker");
       const trackEl = document.getElementById("topbar-update-track");
@@ -579,7 +592,7 @@
       if (!(primaryEl instanceof HTMLElement)) return;
       if (!(secondaryEl instanceof HTMLElement)) return;
       cancelTopbarTickerClearTimers(tickerEl);
-      if (topbarUpdateTickerEnabled()) {{
+      if (topbarUpdateTickerEnabled() && topbarUpdateTickerHasRenderableContent(trackEl, primaryEl, secondaryEl)) {{
         setTopbarUpdateTickerVisibility(tickerEl, true);
         tickerEl.classList.add("is-static");
         tickerEl.classList.remove("is-fading");

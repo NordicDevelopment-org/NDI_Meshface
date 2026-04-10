@@ -117,6 +117,8 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
 
     assert "function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {" in js
     assert "function setTopbarUpdateTickerVisibility(tickerEl, visible) {" in js
+    assert 'const launcherRow = tickerEl.closest(".workspace-launcher-row");' in js
+    assert "launcherRow.hidden = !visible;" in js
     assert 'workspaceShell.classList.toggle("has-topbar-update-ticker", !!visible);' in js
     assert "function shouldCloseLayoutViewMenuForScrollTarget(target = null) {" in js
     assert 'document.getElementById("settings-about-version")' in js
