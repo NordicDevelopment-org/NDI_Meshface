@@ -81,11 +81,16 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "padding-right: var(--chat-header-compose-trailing-space);" in css
     assert ".layout.view-chat .chat-card-head .chat-card-head-actions::before {" in css
     assert ".layout.view-chat .chat-card-head .chat-mesh-channel-wrap {" in css
+    assert "flex: 0 1 auto;" in chat_channel_wrap_section
     assert "min-height: 27px;" in chat_channel_wrap_section
-    assert "padding: 0 12px;" in css
-    assert "border-radius: 999px;" in css
+    assert "border: 0;" in chat_channel_wrap_section
+    assert "background: transparent;" in chat_channel_wrap_section
+    assert "padding: 0;" in chat_channel_wrap_section
     assert ".layout.view-chat .chat-card-head .mesh-channel-pill-strip {" in css
+    assert "flex: 0 1 auto;" in chat_channel_strip_section
+    assert "width: auto;" in chat_channel_strip_section
     assert "min-height: 27px;" in chat_channel_strip_section
+    assert "justify-content: flex-start;" in chat_channel_strip_section
     assert "flex-wrap: nowrap;" in css
     assert ".layout.view-chat .chat-card-head .mesh-channel-pill {" in css
     assert ".layout.view-chat .chat-card-head .mesh-channel-pill:hover," in css
