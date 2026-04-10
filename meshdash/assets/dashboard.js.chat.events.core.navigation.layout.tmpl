@@ -3192,6 +3192,11 @@
 
       const chatViewActive = isChatWorkspaceLayoutView(next);
       if (shell instanceof HTMLElement) {{
+        shell.dataset.layoutView = next;
+        for (const name of knownLayoutViews) {{
+          shell.classList.remove(`layout-view-${{name}}`);
+        }}
+        shell.classList.add(`layout-view-${{next}}`);
         shell.classList.add("chat-panel-open");
       }}
       if (chatLeftPanel instanceof HTMLElement) {{

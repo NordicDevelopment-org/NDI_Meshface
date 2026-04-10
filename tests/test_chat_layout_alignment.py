@@ -32,19 +32,19 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "box-shadow: none;" in css
     assert ".chat-left-section.chat-users-section {" in css
     assert "gap: 0;" in css
-    assert ".layout.view-chat .chat-left-head-shell {" in css
+    assert ".workspace-shell[data-layout-view=\"chat\"] .chat-left-head-shell {" in css
     assert "padding: 6px 8px;" in css
     assert ".chat-users-head {" in css
     assert "padding: 0;" in css
     assert "background: transparent;" in css
-    assert ".layout.view-chat .chat-users-head {" in css
+    assert ".workspace-shell[data-layout-view=\"chat\"] .chat-users-head {" in css
     assert "border-radius: 0;" in css
     assert "min-height: 27px;" in css
     assert ".chat-users-head-launcher-shell {" in css
-    assert ".layout.view-chat .chat-users-head-launcher-shell {" in css
-    assert ".layout.view-chat .chat-users-head-launcher-shell .topbar-view-menu-btn {" in css
-    assert ".layout.view-chat .chat-users-head-launcher-shell .topbar-view-menu-btn:hover," in css
-    assert ".layout.view-chat .chat-users-head-action-btn {" in css
+    assert ".workspace-shell[data-layout-view=\"chat\"] .chat-users-head-launcher-shell {" in css
+    assert ".workspace-shell[data-layout-view=\"chat\"] .chat-users-head-launcher-shell .topbar-view-menu-btn {" in css
+    assert ".workspace-shell[data-layout-view=\"chat\"] .chat-users-head-launcher-shell .topbar-view-menu-btn:hover," in css
+    assert ".workspace-shell[data-layout-view=\"chat\"] .chat-users-head-action-btn {" in css
     assert ".chat-left-panel .chat-member-list {" in css
     assert "background: transparent;" in css
     assert ".layout.view-chat .chat .body {" in css
@@ -187,7 +187,7 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "box-shadow: none;" in css
     assert "[data-theme=\"dark\"] .layout.view-chat .chat-card-head .chat-card-head-actions::before," in css
     assert "[data-theme=\"dark\"] .layout.view-chat .chat-card-head .chat-mesh-channel-wrap {" in css
-    assert "[data-theme=\"dark\"] .layout.view-chat .chat-users-head-launcher-shell .topbar-view-menu-btn:hover," in css
+    assert "[data-theme=\"dark\"] .workspace-shell[data-layout-view=\"chat\"] .chat-users-head-launcher-shell .topbar-view-menu-btn:hover," in css
     assert "[data-theme=\"dark\"] .layout.view-chat .chat-card-head .mesh-channel-pill:hover," in css
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-log-scroll {" in css
     assert "background: var(--workspace-shell-bg);" in css
@@ -446,3 +446,11 @@ def test_launcher_menu_head_tracks_local_radio_identity() -> None:
     assert 'launcherMark.dataset.badgeMode = useEmojiBadge ? "emoji" : "text";' in js
     assert 'setLauncherHead("na", "Local radio", "Short name: n/a", "Connected local radio: unavailable", "Connected local radio: unavailable");' in js
     assert "setLauncherHead(launcherShort, launcherPrimary, launcherSecondary, launcherTertiary, profileTitle);" in js
+
+
+def test_workspace_shell_records_active_layout_view_for_chat_css_hooks() -> None:
+    js = Path("meshdash/assets/dashboard.js.chat.events.core.navigation.layout.tmpl").read_text()
+
+    assert "shell.dataset.layoutView = next;" in js
+    assert "shell.classList.remove(`layout-view-${{name}}`);" in js
+    assert "shell.classList.add(`layout-view-${{next}}`);" in js
