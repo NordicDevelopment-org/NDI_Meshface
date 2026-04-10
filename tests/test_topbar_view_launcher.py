@@ -30,6 +30,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     )
 
     assert 'class="workspace-launcher-row"' in html
+    assert 'class="workspace-launcher-row" aria-label="Dashboard views">' in html
     assert 'class="workspace-launcher-shell chat-users-head-launcher-shell"' in html
     assert 'id="layout-view-menu-btn-label"' in html
     assert 'class="topbar-view-menu-btn-label">Chat<' in html
@@ -75,6 +76,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     )
 
     assert ".workspace-launcher-row {" in css
+    assert ".topbar-update-ticker[hidden] {" in css
     assert "z-index: 500;" in css
     assert ".workspace-launcher-shell {" in css
     assert ".chat-users-head-launcher-shell {" in css
@@ -103,15 +105,19 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "z-index: 1350;" in css
     assert '.chat-panel-collapse-btn[aria-pressed="false"] .chat-panel-collapse-glyph {' in css
     assert re.search(
-        r"\.workspace-shell \{\s*--chat-panel-width: 250px;[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);",
+        r"\.workspace-shell \{\s*--chat-panel-width: 250px;[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);[\s\S]*column-gap: 8px;[\s\S]*row-gap: 0;",
         css,
     )
+    assert ".workspace-shell.has-topbar-update-ticker {" in css
+    assert "row-gap: 8px;" in css
     assert re.search(
         r"\.workspace-shell\.chat-panel-open \{[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);",
         css,
     )
 
     assert "function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {" in js
+    assert "function setTopbarUpdateTickerVisibility(tickerEl, visible) {" in js
+    assert 'workspaceShell.classList.toggle("has-topbar-update-ticker", !!visible);' in js
     assert "function shouldCloseLayoutViewMenuForScrollTarget(target = null) {" in js
     assert 'document.getElementById("settings-about-version")' in js
     assert 'document.getElementById("settings-about-commit")' in js

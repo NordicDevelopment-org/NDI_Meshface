@@ -388,6 +388,9 @@
     .topbar .summary-ticker-item[hidden] {{
       display: none !important;
     }}
+    .topbar-update-ticker[hidden] {{
+      display: none !important;
+    }}
     .workspace-launcher-row {{
       grid-column: 1 / -1;
       grid-row: 1;
@@ -1396,7 +1399,8 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto minmax(0, 1fr);
-      gap: 8px;
+      column-gap: 8px;
+      row-gap: 0;
       padding: 8px;
       min-height: 0;
       flex: 1 1 auto;
@@ -1405,6 +1409,9 @@
       background: var(--panel);
       align-items: stretch;
       overflow: hidden;
+    }}
+    .workspace-shell.has-topbar-update-ticker {{
+      row-gap: 8px;
     }}
     .workspace-shell.chat-panel-open {{
       grid-template-columns:

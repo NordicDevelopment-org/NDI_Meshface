@@ -345,6 +345,7 @@
         battery_window_hours: tickerDefaultBatteryWindowHours,
         node_rows: {{ ...nodeTickerDefaultRows }},
         node_packet_trend: true,
+        update_ticker_enabled: true,
         oneshots: defaultTickerOneshotPreferences(),
       }};
     }}
@@ -424,6 +425,13 @@
           ?? raw.nodeListPacketSparkline,
         true
       );
+      const updateTickerEnabled = parseBoolToken(
+        raw.update_ticker_enabled
+          ?? raw.updateTickerEnabled
+          ?? raw.show_update_ticker
+          ?? raw.showUpdateTicker,
+        true
+      );
       const oneshotsRaw = (
         raw.oneshots && typeof raw.oneshots === "object"
           ? raw.oneshots
@@ -464,6 +472,7 @@
         battery_window_hours: batteryWindowHours,
         node_rows: nodeRows,
         node_packet_trend: nodePacketTrend,
+        update_ticker_enabled: updateTickerEnabled,
         oneshots,
       }};
     }}
@@ -552,6 +561,33 @@
       return true;
     }}
 
+    function topbarUpdateTickerEnabled() {{
+      const prefs = currentTickerPreferences();
+      return parseBoolToken(
+        prefs && (prefs.update_ticker_enabled ?? prefs.updateTickerEnabled),
+        true
+      );
+    }}
+
+    function syncTopbarUpdateTickerVisibilityPreference() {{
+      const tickerEl = document.getElementById("topbar-update-ticker");
+      const trackEl = document.getElementById("topbar-update-track");
+      const primaryEl = document.getElementById("topbar-update-text-primary");
+      const secondaryEl = document.getElementById("topbar-update-text-secondary");
+      if (!(tickerEl instanceof HTMLElement)) return;
+      if (!(trackEl instanceof HTMLElement)) return;
+      if (!(primaryEl instanceof HTMLElement)) return;
+      if (!(secondaryEl instanceof HTMLElement)) return;
+      cancelTopbarTickerClearTimers(tickerEl);
+      if (topbarUpdateTickerEnabled()) {{
+        setTopbarUpdateTickerVisibility(tickerEl, true);
+        tickerEl.classList.add("is-static");
+        tickerEl.classList.remove("is-fading");
+        return;
+      }}
+      hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl);
+    }}
+
     function topbarOneshotNodeOnlineEnabled() {{
       return false;
     }}
@@ -607,6 +643,7 @@
         orderIndex += 1;
       }}
       requestTopbarLayoutMetricsSync();
+      syncTopbarUpdateTickerVisibilityPreference();
     }}
 
     function saveTickerPreferences({{

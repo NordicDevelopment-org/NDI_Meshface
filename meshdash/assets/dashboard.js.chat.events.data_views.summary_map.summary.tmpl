@@ -597,12 +597,21 @@
       }}
     }}
 
+    function setTopbarUpdateTickerVisibility(tickerEl, visible) {{
+      if (!(tickerEl instanceof HTMLElement)) return;
+      tickerEl.hidden = !visible;
+      const workspaceShell = tickerEl.closest(".workspace-shell");
+      if (workspaceShell instanceof HTMLElement) {{
+        workspaceShell.classList.toggle("has-topbar-update-ticker", !!visible);
+      }}
+    }}
+
     function hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl) {{
       if (topbarUpdateTickerSpawnTimer) {{
         window.clearTimeout(topbarUpdateTickerSpawnTimer);
         topbarUpdateTickerSpawnTimer = 0;
       }}
-      tickerEl.hidden = true;
+      setTopbarUpdateTickerVisibility(tickerEl, topbarUpdateTickerEnabled());
       tickerEl.classList.add("is-static");
       tickerEl.classList.remove("is-fading");
       for (const itemEl of Array.from(trackEl.querySelectorAll(".topbar-update-item"))) {{
@@ -813,6 +822,11 @@
       if (topbarUpdateTickerActiveRowByKey.size > 0) return;
       if (topbarUpdateTickerPendingSpawnKeys.length > 0) return;
       if (topbarUpdateTickerVisibleItemCount > 0 || topbarUpdateTickerAnyLiveItems(trackEl)) return;
+      if (topbarUpdateTickerEnabled()) {{
+        cancelTopbarTickerClearTimers(tickerEl);
+        hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl);
+        return;
+      }}
       if (tickerEl.hidden) {{
         cancelTopbarTickerClearTimers(tickerEl);
         return;
@@ -910,7 +924,7 @@
           return;
         }}
 
-        tickerEl.hidden = false;
+        setTopbarUpdateTickerVisibility(tickerEl, true);
         tickerEl.classList.remove("is-static");
         cancelTopbarTickerClearTimers(tickerEl);
         const itemEl = document.createElement("span");
@@ -1025,7 +1039,7 @@
         if (!(secondaryEl instanceof HTMLElement)) return;
         topbarUpdateTickerPendingRows = [];
         cancelTopbarTickerClearTimers(tickerEl);
-        tickerEl.hidden = false;
+        setTopbarUpdateTickerVisibility(tickerEl, true);
         applyTopbarUpdateTickerRows(tickerEl, viewportEl, liveTrackEl, primaryEl, secondaryEl, pendingRows);
       }});
     }}
@@ -1288,6 +1302,11 @@
       if (!(trackEl instanceof HTMLElement)) return;
       if (!(primaryEl instanceof HTMLElement)) return;
       if (!(secondaryEl instanceof HTMLElement)) return;
+      if (!topbarUpdateTickerEnabled()) {{
+        cancelTopbarTickerClearTimers(tickerEl);
+        hideTopbarUpdateTickerNow(tickerEl, trackEl, primaryEl, secondaryEl);
+        return;
+      }}
       const rows = topbarUpdateTickerRows(state, context);
       primaryEl.textContent = "";
       primaryEl.hidden = true;
@@ -1305,7 +1324,7 @@
         return;
       }}
       cancelTopbarTickerClearTimers(tickerEl);
-      tickerEl.hidden = false;
+      setTopbarUpdateTickerVisibility(tickerEl, true);
       topbarUpdateTickerScheduleSpawnPump(tickerEl, viewportEl, trackEl, primaryEl, secondaryEl);
     }}
 

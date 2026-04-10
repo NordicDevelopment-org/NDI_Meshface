@@ -27,6 +27,20 @@ def test_dashboard_js_uses_curated_default_ticker_layout() -> None:
     assert "prefs.enabled[id] = !!defaults.enabled[id];" in js
 
 
+def test_dashboard_js_defaults_live_update_ticker_to_enabled() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "update_ticker_enabled: true," in js
+    assert "raw.update_ticker_enabled" in js
+    assert "function topbarUpdateTickerEnabled() {" in js
+    assert "prefs.update_ticker_enabled = !!liveUpdateToggle.checked;" in js
+    assert "if (!topbarUpdateTickerEnabled()) {" in js
+
+
 def test_dashboard_js_defaults_unique_node_colors_to_off() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
@@ -114,3 +128,22 @@ def test_render_html_uses_single_row_compact_ticker_strip() -> None:
         r"\.topbar\.ticker-expanded \.sub \.summary-ticker-row \{\s*grid-auto-flow: row;\s*grid-auto-columns: auto;\s*grid-template-columns: repeat\(auto-fit, minmax\(208px, 1fr\)\);",
         html,
     )
+
+
+def test_render_html_exposes_live_update_ticker_toggle_in_settings() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert 'id="settings-ticker-live-update-enabled"' in html
+    assert "Show live update ticker" in html
+    assert "sideways scrolling live-update bar" in html
