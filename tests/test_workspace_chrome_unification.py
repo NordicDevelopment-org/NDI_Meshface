@@ -273,11 +273,16 @@ def test_node_navigator_unread_direct_marker_reuses_status_slot_geometry() -> No
 
     status_section = css.split(".chat-member-item.tagged-node.selected-node {", 1)[1].split(".chat-member-status {", 1)[1].split("}", 1)[0]
     unread_section = css.split(".chat-member-status.is-unread-direct {", 1)[1].split("}", 1)[0]
+    history_section = css.split(".chat-member-status.is-direct-history {", 1)[1].split("}", 1)[0]
     icon_section = css.split(".chat-member-status-icon {", 1)[1].split("}", 1)[0]
 
-    assert "min-width: 10px;" in status_section
+    assert "min-width: 12px;" in status_section
     assert "display: inline-flex;" in unread_section
     assert "justify-content: center;" in unread_section
+    assert "display: inline-flex;" in history_section
+    assert "justify-content: center;" in history_section
+    assert "width: 12px;" in icon_section
+    assert "height: 12px;" in icon_section
     assert "stroke: currentColor;" in icon_section
     assert "vector-effect: non-scaling-stroke;" in icon_section
 

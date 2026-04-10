@@ -130,7 +130,7 @@ def test_dashboard_js_supports_dm_history_first_toggle_in_node_navigator() -> No
     assert "<span>DM history first</span>" in js
     assert 'pinDirectHistory: !!target.checked,' in js
     assert "const pinDirectHistory = normalizeChatNodeNavigatorPinDirectHistoryPref(chatNodeNavigatorPinDirectHistory);" in js
-    assert "const directHistoryPeerIds = pinDirectHistory ? chatNodeNavigatorDirectHistoryPeerIds(safeState) : new Set();" in js
+    assert "const directHistoryPeerIds = chatNodeNavigatorDirectHistoryPeerIds(safeState);" in js
     assert "const historyPriorityRows = [];" in js
     assert "} else if (pinDirectHistory && directHistoryPeerIds.has(nodeId)) {" in js
     assert "historyPriorityRows.push(item);" in js
@@ -197,10 +197,13 @@ def test_dashboard_js_marks_muted_nodes_in_navigator_rows() -> None:
     assert 'const muted = (typeof isMutedNode === "function") && isMutedNode(nodeId);' in js
     assert 'const mutedClass = muted ? " muted-node" : "";' in js
     assert '`Muted: ${muted ? "yes" : "no"}`' in js
-    assert 'const statusGlyph = unreadDirectMarkerHtml || (muted ? "‖" : "●");' in js
+    assert 'const hasDirectHistory = directHistoryPeerIds.has(nodeId);' in js
+    assert 'const directHistoryMarkerHtml = hasDirectHistory' in js
+    assert 'const statusGlyph = unreadDirectMarkerHtml || directHistoryMarkerHtml || (muted ? "‖" : "●");' in js
     assert 'const statusGlyphClass = unreadDirectCount > 0' in js
     assert '? " is-unread-direct"' in js
-    assert ': (muted ? " is-muted" : "");' in js
+    assert '? " is-direct-history"' in js
+    assert ': (muted ? " is-muted" : ""));' in js
     assert '${statusGlyphClass}' in js
     assert '${statusGlyph}' in js
     assert '${mutedClass}' in js
@@ -228,6 +231,11 @@ def test_dashboard_js_replaces_node_status_dot_with_message_icon_for_unread_dire
     assert 'tooltipLines.splice(4, 0, `Unread direct messages: ${unreadDirectCount}`);' in js
     assert '`Pinned: ${((typeof isPinnedNode === "function") && isPinnedNode(nodeId)) ? "yes" : "no"}`' in js
     assert 'const unreadDirectMarkerHtml = unreadDirectCount > 0' in js
+    assert 'class="chat-member-status-icon chat-member-status-icon-message chat-member-status-icon-message-alert"' in js
+    assert 'const directHistoryMarkerHtml = hasDirectHistory' in js
     assert 'class="chat-member-status-icon chat-member-status-icon-message"' in js
-    assert 'const statusGlyph = unreadDirectMarkerHtml || (muted ? "‖" : "●");' in js
+    assert 'const statusGlyph = unreadDirectMarkerHtml || directHistoryMarkerHtml || (muted ? "‖" : "●");' in js
+    assert 'const statusGlyphLabel = unreadDirectCount > 0' in js
+    assert 'const statusGlyphAttrs = statusGlyphLabel' in js
     assert 'unreadDirectByPeer,' in js
+    assert 'directHistoryPeerIds,' in js
