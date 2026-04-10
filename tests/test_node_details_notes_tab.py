@@ -168,6 +168,23 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'mode: "drawer"' in js
 
 
+def test_dashboard_html_places_messages_tab_first_in_node_drawer() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert html.index('id="chat-node-details-tab-messages"') < html.index('id="chat-node-details-tab-details"')
+
+
 def test_dashboard_js_avoids_rebuilding_saved_node_details_on_unchanged_polls() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,

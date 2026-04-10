@@ -572,11 +572,17 @@
         const member = target.closest(".chat-member-item");
         if (!(member instanceof HTMLElement) || !targetList.contains(member)) return;
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
+        const unreadDirectCount = Math.max(0, Math.trunc(Number(member.dataset.unreadDirectCount) || 0));
         if (!isSelectableNodeId(nodeId)) {{
           selectNode(nodeId, true);
           return;
         }}
-        selectNode(nodeId, true);
+        selectNode(nodeId, true, unreadDirectCount <= 0);
+        if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {{
+          setChatNodeDetailsDrawerTab("messages", {{
+            fetchHistory: false,
+          }});
+        }}
       }});
     }}
 
@@ -1062,7 +1068,7 @@
         const actionRowHtml = removeBtn
           ? `<span class="chat-member-actions">${{removeBtn}}</span>`
           : '<span class="chat-member-actions"></span>';
-        return `<div class="chat-member-item status-${{statusKey}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{mutedClass}}${{packetSparkClass}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
+        return `<div class="chat-member-item status-${{statusKey}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{mutedClass}}${{packetSparkClass}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-unread-direct-count="${{escAttr(unreadDirectCount)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
           <span class="chat-member-status status-${{statusKey}}${{statusGlyphClass}}"${{unreadDirectCount > 0 ? ` title="${{escAttr(unreadDirectLabel)}}" aria-label="${{escAttr(unreadDirectLabel)}}"` : ""}}>${{statusGlyph}}</span>
           <span class="chat-member-main">
             <span class="chat-member-name-row">

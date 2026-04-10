@@ -7,7 +7,7 @@
         const nodeId = normalizeNodeId(item.dataset.nodeId || "");
         item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
       }}
-      for (const member of document.querySelectorAll("#chat-room-list .chat-member-item")) {{
+      for (const member of document.querySelectorAll("#chat-room-unread-list .chat-member-item, #chat-room-list .chat-member-item")) {{
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
         const isSelected = !!selectedNodeId && nodeId === selectedNodeId;
         member.classList.toggle("selected-node", isSelected);
@@ -100,26 +100,35 @@
         didScroll = true;
       }}
 
-      const chatRoomList = document.getElementById("chat-room-list");
       const suppressChatRosterSelectionScroll = (
         !!chatNodeNavigatorSelectionScrollLocked
       );
-      if (isVisibleForSelectionScroll(chatRoomList) && !suppressChatRosterSelectionScroll) {{
-        let selectedMember = null;
-        for (const member of chatRoomList.querySelectorAll(".chat-member-item")) {{
-          if (normalizeNodeId(member.dataset.nodeId || "") === selectedNodeId) {{
-            selectedMember = member;
-            break;
+      if (!suppressChatRosterSelectionScroll) {{
+        for (const chatRoomList of [
+          document.getElementById("chat-room-unread-list"),
+          document.getElementById("chat-room-list"),
+        ]) {{
+          if (!isVisibleForSelectionScroll(chatRoomList)) {{
+            continue;
           }}
-        }}
-        if (selectedMember instanceof HTMLElement) {{
+          let selectedMember = null;
+          for (const member of chatRoomList.querySelectorAll(".chat-member-item")) {{
+            if (normalizeNodeId(member.dataset.nodeId || "") === selectedNodeId) {{
+              selectedMember = member;
+              break;
+            }}
+          }}
+          if (!(selectedMember instanceof HTMLElement)) {{
+            continue;
+          }}
           const listRect = chatRoomList.getBoundingClientRect();
           const rowRect = selectedMember.getBoundingClientRect();
           const topSafe = listRect.top + 3;
           let bottomSafe = listRect.bottom - 3;
           const detailsDrawer = document.getElementById("chat-node-details-drawer");
           if (
-            detailsDrawer instanceof HTMLElement
+            chatRoomList.id === "chat-room-list"
+            && detailsDrawer instanceof HTMLElement
             && !detailsDrawer.hidden
             && isVisibleForSelectionScroll(detailsDrawer)
           ) {{
@@ -137,6 +146,7 @@
             chatRoomList.scrollTo({{ top: chatRoomList.scrollTop + delta, behavior: "smooth" }});
           }}
           didScroll = true;
+          break;
         }}
       }}
 

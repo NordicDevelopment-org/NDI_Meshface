@@ -328,7 +328,7 @@
         : [];
       const showTagBadge = Array.isArray(visibleMetaFieldIds)
         && visibleMetaFieldIds.includes("favorite");
-      for (const member of document.querySelectorAll("#chat-room-list .chat-member-item")) {{
+      for (const member of document.querySelectorAll("#chat-room-unread-list .chat-member-item, #chat-room-list .chat-member-item")) {{
         if (!(member instanceof HTMLElement)) continue;
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
         const tintOutlineSeed = (typeof normalizeNodeTintSeedText === "function")

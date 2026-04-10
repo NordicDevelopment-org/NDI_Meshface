@@ -260,6 +260,17 @@ def test_chat_node_search_syncs_to_live_navigator_row_bounds() -> None:
     assert 'window.addEventListener("resize", scheduleChatNodeNavigatorSearchBoundsSync);' in js_src
 
 
+def test_chat_unread_node_click_routes_into_messages_tab() -> None:
+    peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
+
+    assert 'const unreadDirectCount = Math.max(0, Math.trunc(Number(member.dataset.unreadDirectCount) || 0));' in peers_src
+    assert 'selectNode(nodeId, true, unreadDirectCount <= 0);' in peers_src
+    assert 'if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {' in peers_src
+    assert 'setChatNodeDetailsDrawerTab("messages", {' in peers_src
+    assert 'fetchHistory: false,' in peers_src
+    assert 'data-unread-direct-count="${{escAttr(unreadDirectCount)}}"' in peers_src
+
+
 def test_chat_click_selection_keeps_same_node_selected() -> None:
     bindings_src = Path("meshdash/assets/dashboard.js.chat.events.bindings.tmpl").read_text()
     peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
@@ -274,7 +285,12 @@ def test_chat_click_selection_keeps_same_node_selected() -> None:
           selectNode(nodeId, true);
           return;
         }}
-        selectNode(nodeId, true);""" in peers_src
+        selectNode(nodeId, true, unreadDirectCount <= 0);
+        if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {{
+          setChatNodeDetailsDrawerTab("messages", {{
+            fetchHistory: false,
+          }});
+        }}""" in peers_src
     assert 'if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
     assert 'if (typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
 
