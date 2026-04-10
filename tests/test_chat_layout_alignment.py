@@ -10,6 +10,14 @@ from meshdash.html_sections import build_html_shell
 
 def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     css = build_dashboard_css(theme_css="")
+    chat_channel_wrap_section = css.split(
+        ".layout.view-chat .chat-card-head .chat-mesh-channel-wrap {",
+        1,
+    )[1].split("}", 1)[0]
+    chat_channel_strip_section = css.split(
+        ".layout.view-chat .chat-card-head .mesh-channel-pill-strip {",
+        1,
+    )[1].split("}", 1)[0]
 
     assert ".workspace-main > .layout.view-chat," in css
     assert ".workspace-main > .layout.view-console {" in css
@@ -64,6 +72,7 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "background: #f7fcf7;" in css
     assert ".layout.view-chat .chat-card-head.workspace-chrome-bar {" in css
     assert "margin: 0;" in css
+    assert "padding: 8px 10px;" in css
     assert "box-shadow: none;" in css
     assert ".layout.view-chat .chat-card-head.workspace-chrome-bar .chat-card-head-controls {" in css
     assert ".layout.view-chat .chat-card-head.workspace-chrome-bar .workspace-chrome-row {" in css
@@ -72,10 +81,11 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "padding-right: var(--chat-header-compose-trailing-space);" in css
     assert ".layout.view-chat .chat-card-head .chat-card-head-actions::before {" in css
     assert ".layout.view-chat .chat-card-head .chat-mesh-channel-wrap {" in css
-    assert "min-height: 27px;" in css
+    assert "min-height: 27px;" in chat_channel_wrap_section
     assert "padding: 0 12px;" in css
     assert "border-radius: 999px;" in css
     assert ".layout.view-chat .chat-card-head .mesh-channel-pill-strip {" in css
+    assert "min-height: 27px;" in chat_channel_strip_section
     assert "flex-wrap: nowrap;" in css
     assert ".layout.view-chat .chat-card-head .mesh-channel-pill {" in css
     assert ".layout.view-chat .chat-card-head .mesh-channel-pill:hover," in css
