@@ -1606,7 +1606,6 @@
       const closeBtn = document.getElementById("chat-node-details-close-btn");
       const detailsSplitter = document.getElementById("chat-node-details-splitter");
       const muteBtn = document.getElementById("chat-node-details-mute-btn");
-      const dmBtn = document.getElementById("chat-node-details-dm-btn");
       const detailsTabBtn = document.getElementById("chat-node-details-tab-details");
       const locationTabBtn = document.getElementById("chat-node-details-tab-location");
       const chatTabBtn = document.getElementById("chat-node-details-tab-chat");
@@ -1663,11 +1662,6 @@
         if (muteLabel instanceof HTMLElement) {{
           muteLabel.textContent = "Mute";
         }}
-      }}
-      if (dmBtn instanceof HTMLButtonElement) {{
-        dmBtn.hidden = true;
-        dmBtn.disabled = true;
-        dmBtn.dataset.nodeId = "";
       }}
       if (!visibleExpanded) {{
         if (locationHost instanceof HTMLElement) {{
@@ -1800,15 +1794,6 @@
       if (titleEl instanceof HTMLElement) {{
         titleEl.textContent = `${{titleName}} (${selectedId})`;
       }}
-      if (dmBtn instanceof HTMLButtonElement) {{
-        const canOpenPeerDm = isCanonicalNodeId(selectedId) && !isSelfNodeId(selectedId);
-        dmBtn.hidden = !canOpenPeerDm;
-        dmBtn.disabled = !canOpenPeerDm;
-        dmBtn.dataset.nodeId = canOpenPeerDm ? selectedId : "";
-        dmBtn.title = canOpenPeerDm
-          ? `Open direct messages with ${{titleName}}`
-          : "Send message unavailable for this node";
-      }}
       if (muteBtn instanceof HTMLButtonElement) {{
         const canMute = isCanonicalNodeId(selectedId) && !isSelfNodeId(selectedId);
         const active = canMute && isMutedNode(selectedId);
@@ -1924,33 +1909,12 @@
     function bindChatNodeDetailsDrawerControls() {{
       const closeBtn = document.getElementById("chat-node-details-close-btn");
       const drawer = document.getElementById("chat-node-details-drawer");
-      const dmBtn = document.getElementById("chat-node-details-dm-btn");
       if (closeBtn instanceof HTMLButtonElement && closeBtn.dataset.bound !== "1") {{
         closeBtn.dataset.bound = "1";
         closeBtn.addEventListener("click", () => {{
           setChatNodeDetailsDrawerExpanded(false, {{
             fetchHistory: false,
             rerender: false,
-          }});
-        }});
-      }}
-      if (dmBtn instanceof HTMLButtonElement && dmBtn.dataset.bound !== "1") {{
-        dmBtn.dataset.bound = "1";
-        dmBtn.addEventListener("click", () => {{
-          const nodeId = normalizeNodeId(dmBtn.dataset.nodeId || "");
-          if (!isCanonicalNodeId(nodeId) || isSelfNodeId(nodeId)) return;
-          setPeerDmMenuOpen(false);
-          setChatNodeDetailsDrawerTab("messages", {{
-            fetchHistory: false,
-          }});
-          window.requestAnimationFrame(() => {{
-            const input = document.querySelector("#chat-node-details-messages-host .peer-dm-popout-input");
-            if (!(input instanceof HTMLInputElement)) return;
-            try {{
-              input.focus({{ preventScroll: true }});
-            }} catch (_err) {{
-              input.focus();
-            }}
           }});
         }});
       }}

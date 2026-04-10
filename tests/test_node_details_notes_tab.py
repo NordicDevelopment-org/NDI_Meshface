@@ -93,6 +93,8 @@ def test_render_html_places_messages_before_details_and_notes_in_drawer_tabs() -
         revision_title="test",
     )
 
+    head_index = html.index('class="chat-node-details-head"')
+    tabs_index = html.index('class="chat-node-details-tabs"')
     tag_index = html.index('id="chat-node-details-tab-tag"')
     details_index = html.index('id="chat-node-details-tab-details"')
     history_index = html.index('id="chat-node-details-tab-history"')
@@ -102,10 +104,11 @@ def test_render_html_places_messages_before_details_and_notes_in_drawer_tabs() -
     notes_index = html.index('id="chat-node-details-tab-notes"')
     messages_index = html.index('id="chat-node-details-tab-messages"')
 
-    assert tag_index < messages_index < details_index < history_index < location_index < chat_index < links_index < notes_index
+    assert head_index < tag_index < tabs_index
+    assert messages_index < details_index < history_index < location_index < chat_index < links_index < notes_index
 
 
-def test_render_html_places_mute_and_send_message_actions_in_drawer_header() -> None:
+def test_render_html_places_tag_title_and_mute_action_in_drawer_header() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -120,12 +123,13 @@ def test_render_html_places_mute_and_send_message_actions_in_drawer_header() -> 
     )
 
     head_index = html.index('class="chat-node-details-head"')
+    tag_index = html.index('id="chat-node-details-tab-tag"')
     title_index = html.index('id="chat-node-details-title"')
     mute_index = html.index('id="chat-node-details-mute-btn"')
-    dm_index = html.index('id="chat-node-details-dm-btn"')
     tabs_index = html.index('class="chat-node-details-tabs"')
 
-    assert head_index < title_index < mute_index < dm_index < tabs_index
+    assert 'id="chat-node-details-dm-btn"' not in html
+    assert head_index < tag_index < title_index < mute_index < tabs_index
 
 
 def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:

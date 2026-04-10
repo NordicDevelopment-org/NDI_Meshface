@@ -3995,9 +3995,9 @@
       display: none !important;
     }}
     .chat-node-details-head {{
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      justify-content: space-between;
       gap: 8px;
       padding: 7px 8px 6px 8px;
       border-bottom: 1px solid #d2e1d0;
@@ -4005,28 +4005,31 @@
     }}
     .chat-node-details-head-main {{
       min-width: 0;
-      flex: 1 1 auto;
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(72px, 1fr) minmax(0, 1.45fr) minmax(116px, 1fr);
       align-items: center;
       gap: 8px;
     }}
     .chat-node-details-title {{
       min-width: 0;
-      flex: 1 1 auto;
+      width: 100%;
       font-size: 11px;
       font-weight: 700;
       color: #264734;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      text-align: center;
       text-transform: uppercase;
       letter-spacing: 0.2px;
     }}
     .chat-node-details-head-actions {{
       display: inline-flex;
       align-items: center;
+      justify-content: flex-end;
       gap: 6px;
-      flex: 0 0 auto;
+      min-width: 0;
+      justify-self: end;
     }}
     .chat-node-details-close-btn {{
       border: 1px solid #bfd5c3;
@@ -4115,6 +4118,10 @@
       align-items: center;
       gap: 5px;
       min-width: 0;
+    }}
+    .chat-node-details-head-tag-btn {{
+      justify-self: start;
+      max-width: 100%;
     }}
     .chat-node-details-tab-tag-label {{
       min-width: 0;
