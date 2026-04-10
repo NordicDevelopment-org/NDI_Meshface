@@ -39,12 +39,15 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert 'class="network-map-subview-tabs"' in html
 
     assert ".workspace-chrome-bar {" in css
+    assert ".apps-tabs-bar.workspace-chrome-bar {" in css
+    assert "margin-bottom: 0;" in css
     assert ".workspace-pillbar {" in css
     assert ".workspace-chrome-row {" in css
     assert ".network-map-subview-tab,\n    .workspace-pill-btn {" in css
     assert ".workspace-action-chip {" in css
     assert ".settings-chrome {" in css
     assert ".chat-card-head.workspace-chrome-bar {" in css
+    assert ".settings-status.settings-status-top:empty {" in css
     assert "[data-theme=\"dark\"] .settings-chrome.workspace-chrome-bar," in css
     assert "[data-theme=\"dark\"] .network-map-subview-tab,\n    [data-theme=\"dark\"] .workspace-pill-btn {" in css
 
