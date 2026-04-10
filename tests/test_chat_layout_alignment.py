@@ -32,10 +32,17 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "box-shadow: none;" in css
     assert ".chat-left-section.chat-users-section {" in css
     assert "gap: 0;" in css
+    assert ".layout.view-chat .chat-left-head-shell {" in css
+    assert "padding: 6px 8px;" in css
     assert ".chat-users-head {" in css
     assert "padding: 0;" in css
     assert "background: transparent;" in css
+    assert ".layout.view-chat .chat-users-head {" in css
+    assert "border-radius: 0;" in css
+    assert "min-height: 27px;" in css
     assert ".chat-users-head-launcher-shell {" in css
+    assert ".layout.view-chat .chat-users-head-launcher-shell .topbar-view-menu-btn {" in css
+    assert ".layout.view-chat .chat-users-head-action-btn {" in css
     assert ".chat-left-panel .chat-member-list {" in css
     assert "background: transparent;" in css
     assert ".layout.view-chat .chat .body {" in css
@@ -50,6 +57,19 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "border: 1px solid #d2e1d0;" in css
     assert "border-radius: 10px;" in css
     assert "background: #f7fcf7;" in css
+    assert ".layout.view-chat .chat-card-head.workspace-chrome-bar {" in css
+    assert "margin: 0;" in css
+    assert "box-shadow: none;" in css
+    assert ".layout.view-chat .chat-card-head.workspace-chrome-bar .chat-card-head-controls {" in css
+    assert ".layout.view-chat .chat-card-head.workspace-chrome-bar .workspace-chrome-row {" in css
+    assert ".layout.view-chat .chat-card-head .chat-card-head-actions {" in css
+    assert "min-height: 27px;" in css
+    assert "padding: 0 12px;" in css
+    assert "border-radius: 999px;" in css
+    assert ".layout.view-chat .chat-card-head .chat-mesh-channel-wrap {" in css
+    assert ".layout.view-chat .chat-card-head .mesh-channel-pill-strip {" in css
+    assert "flex-wrap: nowrap;" in css
+    assert ".layout.view-chat .chat-card-head .mesh-channel-pill {" in css
     assert ".layout.view-chat .chat-compose-shell {" in css
     assert "margin-top: 0;" in css
     assert "border: 1px solid #d2e1d0;" in css
@@ -158,6 +178,8 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "background: transparent !important;" in css
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-card-head.workspace-chrome-bar {" in css
     assert "background: var(--workspace-shell-bg-alt);" in css
+    assert "box-shadow: none;" in css
+    assert "[data-theme=\"dark\"] .layout.view-chat .chat-card-head .chat-card-head-actions {" in css
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-log-scroll {" in css
     assert "background: var(--workspace-shell-bg);" in css
     assert "border-color: var(--workspace-shell-border);" in css

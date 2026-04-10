@@ -3421,6 +3421,21 @@
       border-color: var(--workspace-shell-border);
       background: #07140d;
       background: var(--workspace-shell-bg-alt);
+      box-shadow: none;
+      backdrop-filter: none;
+    }}
+    [data-theme="dark"] .layout.view-chat .chat-card-head .chat-card-head-actions {{
+      border-color: var(--workspace-shell-border);
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--ui-panel)),
+          color-mix(in srgb, var(--workspace-shell-bg) 92%, black)
+        );
+      color: var(--workspace-shell-text);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border-muted) 54%, transparent),
+        0 8px 18px color-mix(in srgb, var(--ui-shadow) 45%, transparent);
     }}
     [data-theme="dark"] .card:not(.chat) > h2 {{
       background: #070d07;
