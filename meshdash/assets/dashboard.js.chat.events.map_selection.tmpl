@@ -7,7 +7,7 @@
         const nodeId = normalizeNodeId(item.dataset.nodeId || "");
         item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
       }}
-      for (const member of document.querySelectorAll("#chat-room-unread-list .chat-member-item, #chat-room-list .chat-member-item")) {{
+      for (const member of document.querySelectorAll("#chat-room-unread-list .chat-member-item, #chat-room-pinned-list .chat-member-item, #chat-room-list .chat-member-item")) {{
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
         const isSelected = !!selectedNodeId && nodeId === selectedNodeId;
         member.classList.toggle("selected-node", isSelected);
@@ -106,6 +106,7 @@
       if (!suppressChatRosterSelectionScroll) {{
         for (const chatRoomList of [
           document.getElementById("chat-room-unread-list"),
+          document.getElementById("chat-room-pinned-list"),
           document.getElementById("chat-room-list"),
         ]) {{
           if (!isVisibleForSelectionScroll(chatRoomList)) {{

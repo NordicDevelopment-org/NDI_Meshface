@@ -399,6 +399,31 @@
       }}
     }}
 
+    function loadPinnedNodes() {{
+      pinnedNodeIds.clear();
+      try {{
+        const raw = window.localStorage.getItem(pinnedNodesStorageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        for (const entry of parsed) {{
+          const nodeId = normalizeNodeId(entry);
+          if (isSelectableNodeId(nodeId)) {{
+            pinnedNodeIds.add(nodeId);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistPinnedNodes() {{
+      try {{
+        const ids = Array.from(pinnedNodeIds).slice(0, 2000);
+        window.localStorage.setItem(pinnedNodesStorageKey, JSON.stringify(ids));
+      }} catch (_err) {{
+      }}
+    }}
+
     function normalizeNodeVisibilityListIds(rawValue) {{
       const entries = Array.isArray(rawValue)
         ? rawValue
@@ -961,6 +986,11 @@
     function isMutedNode(nodeId) {{
       const normalized = normalizeNodeId(nodeId);
       return isSelectableNodeId(normalized) && mutedNodeIds.has(normalized);
+    }}
+
+    function isPinnedNode(nodeId) {{
+      const normalized = normalizeNodeId(nodeId);
+      return isSelectableNodeId(normalized) && pinnedNodeIds.has(normalized);
     }}
 
     function favoriteToggleButtonHtml(nodeId, extraClass = "") {{

@@ -328,7 +328,7 @@
         : [];
       const showTagBadge = Array.isArray(visibleMetaFieldIds)
         && visibleMetaFieldIds.includes("favorite");
-      for (const member of document.querySelectorAll("#chat-room-unread-list .chat-member-item, #chat-room-list .chat-member-item")) {{
+      for (const member of document.querySelectorAll("#chat-room-unread-list .chat-member-item, #chat-room-pinned-list .chat-member-item, #chat-room-list .chat-member-item")) {{
         if (!(member instanceof HTMLElement)) continue;
         const nodeId = normalizeNodeId(member.dataset.nodeId || "");
         const tintOutlineSeed = (typeof normalizeNodeTintSeedText === "function")
@@ -520,6 +520,25 @@
       }}
     }}
 
+    function refreshPinToggleButtons() {{
+      for (const btn of document.querySelectorAll(".pin-toggle-btn")) {{
+        if (!(btn instanceof HTMLButtonElement)) continue;
+        const nodeId = normalizeNodeId(btn.dataset.nodeId || "");
+        const active = isPinnedNode(nodeId);
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
+        const title = active
+          ? "Unpin this node from the top of the chat list"
+          : "Pin this node to the top of the chat list";
+        btn.title = title;
+        btn.setAttribute("aria-label", title);
+        const label = btn.querySelector(".chat-node-details-pin-label");
+        if (label) {{
+          label.textContent = active ? "Pinned" : "Pin";
+        }}
+      }}
+    }}
+
     function toggleFavoriteNode(nodeId, forceActive = null) {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return;
@@ -568,5 +587,27 @@
         targetActive
           ? `Muted ${{normalized}} in chat feed.`
           : `Unmuted ${{normalized}} in chat feed.`
+      );
+    }}
+
+    function togglePinnedNode(nodeId, forceActive = null) {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized)) return;
+      const targetActive = forceActive == null ? !pinnedNodeIds.has(normalized) : !!forceActive;
+      if (targetActive) {{
+        pinnedNodeIds.add(normalized);
+      }} else {{
+        pinnedNodeIds.delete(normalized);
+      }}
+      persistPinnedNodes();
+      if (latestState) {{
+        renderChat(latestState);
+      }} else {{
+        refreshPinToggleButtons();
+      }}
+      setChatSendStatus(
+        targetActive
+          ? `Pinned ${{normalized}} to the top of the chat list.`
+          : `Unpinned ${{normalized}} from the top of the chat list.`
       );
     }}

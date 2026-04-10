@@ -77,6 +77,7 @@ def test_render_html_includes_chat_node_details_location_chat_and_links_tabs() -
     assert 'data-drawer-tab="messages"' in html
     assert 'id="chat-node-details-panel-messages"' in html
     assert 'id="chat-node-details-messages-host"' in html
+    assert 'id="chat-node-details-pin-btn"' in html
 
 
 def test_render_html_places_messages_before_details_and_notes_in_drawer_tabs() -> None:
@@ -108,7 +109,7 @@ def test_render_html_places_messages_before_details_and_notes_in_drawer_tabs() -
     assert messages_index < details_index < history_index < location_index < chat_index < links_index < notes_index
 
 
-def test_render_html_places_tag_title_and_mute_action_in_drawer_header() -> None:
+def test_render_html_places_tag_title_pin_and_mute_actions_in_drawer_header() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -125,11 +126,12 @@ def test_render_html_places_tag_title_and_mute_action_in_drawer_header() -> None
     head_index = html.index('class="chat-node-details-head"')
     tag_index = html.index('id="chat-node-details-tab-tag"')
     title_index = html.index('id="chat-node-details-title"')
+    pin_index = html.index('id="chat-node-details-pin-btn"')
     mute_index = html.index('id="chat-node-details-mute-btn"')
     tabs_index = html.index('class="chat-node-details-tabs"')
 
     assert 'id="chat-node-details-dm-btn"' not in html
-    assert head_index < tag_index < title_index < mute_index < tabs_index
+    assert head_index < tag_index < title_index < pin_index < mute_index < tabs_index
 
 
 def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
@@ -159,6 +161,7 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'const notesTabBtn = document.getElementById("chat-node-details-tab-notes");' in js
     assert 'const notesPanel = document.getElementById("chat-node-details-panel-notes");' in js
     assert 'const notesHost = document.getElementById("chat-node-details-notes-host");' in js
+    assert 'const pinBtn = document.getElementById("chat-node-details-pin-btn");' in js
     assert 'const renderNotesInDrawer = (' in js
     assert 'const renderLocationInDrawer = (' in js
     assert 'const renderChatInDrawer = (' in js
@@ -186,6 +189,7 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'input.addEventListener("click", acknowledgeUnreadThreadNotices);' in js
     assert "window.requestAnimationFrame(() => {" in js
     assert "scheduleBodyScroll(bodyEl, unreadFocusKeys);" in js
+    assert 'pinBtn.classList.toggle("active", active);' in js
 
 
 def test_dashboard_html_places_messages_tab_first_in_node_drawer() -> None:

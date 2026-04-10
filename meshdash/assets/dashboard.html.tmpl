@@ -299,6 +299,13 @@
           </div>
           <div id="chat-room-unread-list" class="chat-member-pinned-list"></div>
         </div>
+        <div id="chat-room-pinned-shell" class="chat-member-pinned-shell" hidden>
+          <div class="chat-member-pinned-head">
+            <span class="chat-member-pinned-title">Pinned</span>
+            <span id="chat-room-pinned-count" class="chat-member-pinned-count">0</span>
+          </div>
+          <div id="chat-room-pinned-list" class="chat-member-pinned-list"></div>
+        </div>
         <div id="chat-room-list" class="chat-member-list"></div>
         <div
           id="chat-node-details-splitter"
@@ -321,6 +328,15 @@
               ><span id="chat-node-details-tab-tag-chip" class="favorite-menu-tag-chip chat-node-details-tab-tag-chip" aria-hidden="true"></span><span id="chat-node-details-tab-tag-label" class="chat-node-details-tab-tag-label">+tag</span></button>
               <div id="chat-node-details-title" class="chat-node-details-title">Node Details</div>
               <div class="chat-node-details-head-actions">
+                <button
+                  id="chat-node-details-pin-btn"
+                  class="pin-toggle-btn chat-node-details-action-btn chat-node-details-pin-btn"
+                  type="button"
+                  title="Pin this node to the top of the chat list"
+                  aria-label="Pin this node to the top of the chat list"
+                  aria-pressed="false"
+                  hidden
+                ><span class="chat-node-details-pin-label">Pin</span></button>
                 <button
                   id="chat-node-details-mute-btn"
                   class="mute-toggle-btn chat-node-details-action-btn chat-node-details-mute-btn"

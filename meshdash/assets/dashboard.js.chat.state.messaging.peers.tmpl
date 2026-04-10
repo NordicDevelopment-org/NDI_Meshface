@@ -205,14 +205,24 @@
     }}
 
     function resetChatNodeNavigatorViewport() {{
+      const scrollLists = [
+        document.getElementById("chat-room-unread-list"),
+        document.getElementById("chat-room-pinned-list"),
+        document.getElementById("chat-room-list"),
+      ].filter((listEl) => listEl instanceof HTMLElement);
+      if (scrollLists.length <= 0) return;
       const roomList = document.getElementById("chat-room-list");
-      if (!(roomList instanceof HTMLElement)) return;
       const applyReset = () => {{
         noteChatNodeNavigatorProgrammaticScrollReset();
-        roomList.scrollTop = 0;
-        const parentPane = roomList.closest(".chat-member-pane");
-        if (parentPane instanceof HTMLElement) {{
-          parentPane.scrollTop = 0;
+        for (const listEl of scrollLists) {{
+          listEl.scrollTop = 0;
+        }}
+        if (roomList instanceof HTMLElement) {{
+          roomList.scrollTop = 0;
+          const parentPane = roomList.closest(".chat-member-pane");
+          if (parentPane instanceof HTMLElement) {{
+            parentPane.scrollTop = 0;
+          }}
         }}
       }};
       applyReset();
@@ -695,6 +705,13 @@
           }});
         }});
       }}
+      if (pinnedNodeIds && typeof pinnedNodeIds.forEach === "function") {{
+        pinnedNodeIds.forEach((nodeId) => {{
+          touchNodeById(nodeId, {{
+            p2pPinned: manualDirectPeerIds.has(normalizeNodeId(nodeId)),
+          }});
+        }});
+      }}
       if (nodeNotesById && typeof nodeNotesById.forEach === "function") {{
         nodeNotesById.forEach((_entry, nodeId) => {{
           touchNodeById(nodeId, {{
@@ -906,6 +923,7 @@
           `Battery: ${{batteryText}}`,
           `Hops: ${{hopsText}}`,
           `GPS: ${{gpsText}}`,
+          `Pinned: ${{((typeof isPinnedNode === "function") && isPinnedNode(nodeId)) ? "yes" : "no"}}`,
           `Muted: ${{muted ? "yes" : "no"}}`,
           `Saved P2P: ${{item && item.p2pPinned ? "yes" : "no"}}`,
         ];
@@ -1134,11 +1152,16 @@
     function syncChatNodeNavigatorSearchBounds() {{
       const panel = document.getElementById("chat-left-panel");
       const unreadList = document.getElementById("chat-room-unread-list");
+      const pinnedList = document.getElementById("chat-room-pinned-list");
       const roomList = document.getElementById("chat-room-list");
       const bottomBar = document.querySelector(".chat-left-bottom-bar");
       const anchor = (
         unreadList instanceof HTMLElement
           ? unreadList.querySelector(".chat-member-item, .chat-member-empty")
+          : null
+      ) || (
+        pinnedList instanceof HTMLElement
+          ? pinnedList.querySelector(".chat-member-item, .chat-member-empty")
           : null
       ) || (
         roomList instanceof HTMLElement
@@ -1178,6 +1201,9 @@
       const unreadShell = document.getElementById("chat-room-unread-shell");
       const unreadList = document.getElementById("chat-room-unread-list");
       const unreadCountEl = document.getElementById("chat-room-unread-count");
+      const pinnedShell = document.getElementById("chat-room-pinned-shell");
+      const pinnedList = document.getElementById("chat-room-pinned-list");
+      const pinnedCountEl = document.getElementById("chat-room-pinned-count");
       const roomList = document.getElementById("chat-room-list");
       if (!(roomList instanceof HTMLElement)) return null;
       if (!chatNodeNavigatorSearchBoundsResizeBound && typeof window !== "undefined" && typeof window.addEventListener === "function") {{
@@ -1282,10 +1308,14 @@
       ));
       chatRosterModel = rosterAll;
       const pinnedUnreadRows = [];
+      const pinnedManualRows = [];
       const regularRows = [];
       for (const item of rosterFiltered) {{
-        if (chatNodeNavigatorUnreadDirectCount(unreadDirectByPeer, item && item.id) > 0) {{
+        const nodeId = normalizeNodeId(item && item.id);
+        if (chatNodeNavigatorUnreadDirectCount(unreadDirectByPeer, nodeId) > 0) {{
           pinnedUnreadRows.push(item);
+        }} else if ((typeof isPinnedNode === "function") && isPinnedNode(nodeId)) {{
+          pinnedManualRows.push(item);
         }} else {{
           regularRows.push(item);
         }}
@@ -1316,6 +1346,22 @@
           unreadCountEl.textContent = String(pinnedUnreadRows.length);
         }}
       }}
+      if (pinnedShell instanceof HTMLElement && pinnedList instanceof HTMLElement) {{
+        const nextPinnedHtml = pinnedManualRows.length > 0
+          ? pinnedManualRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
+          : "";
+        const previousPinnedHtml = (typeof pinnedList.__meshLastInnerHtml_chat_room_pinned_list === "string")
+          ? pinnedList.__meshLastInnerHtml_chat_room_pinned_list
+          : null;
+        if (previousPinnedHtml !== nextPinnedHtml) {{
+          pinnedList.innerHTML = nextPinnedHtml;
+          pinnedList.__meshLastInnerHtml_chat_room_pinned_list = nextPinnedHtml;
+        }}
+        pinnedShell.hidden = pinnedManualRows.length <= 0;
+        if (pinnedCountEl instanceof HTMLElement) {{
+          pinnedCountEl.textContent = String(pinnedManualRows.length);
+        }}
+      }}
       const nextRoomListHtml = regularRows.length > 0
         ? regularRows.map((item) => buildChatNodeNavigatorMemberHtml(item, {{
             nowUnix,
@@ -1327,9 +1373,9 @@
             unreadDirectByPeer,
             resolveChatNodeFreshnessFn,
           }})).join("")
-        : ((pinnedUnreadRows.length <= 0 && rosterQuery)
+        : (((pinnedUnreadRows.length + pinnedManualRows.length) <= 0 && rosterQuery)
             ? '<div class="chat-member-empty">No users match this search.</div>'
-            : (pinnedUnreadRows.length <= 0
+            : ((pinnedUnreadRows.length + pinnedManualRows.length) <= 0
                 ? '<div class="chat-member-empty">No users discovered yet.</div>'
                 : ""));
       const nextMarkup = String(nextRoomListHtml == null ? "" : nextRoomListHtml);
@@ -1342,6 +1388,7 @@
       }}
       bindChatNodeNavigatorListInteractions(roomList);
       bindChatNodeNavigatorListInteractions(unreadList);
+      bindChatNodeNavigatorListInteractions(pinnedList);
       scheduleChatNodeNavigatorSearchBoundsSync();
       if (chatNodeNavigatorSelectionScrollLocked) {{
         resetChatNodeNavigatorViewport();
@@ -1605,6 +1652,7 @@
       const titleEl = document.getElementById("chat-node-details-title");
       const closeBtn = document.getElementById("chat-node-details-close-btn");
       const detailsSplitter = document.getElementById("chat-node-details-splitter");
+      const pinBtn = document.getElementById("chat-node-details-pin-btn");
       const muteBtn = document.getElementById("chat-node-details-mute-btn");
       const detailsTabBtn = document.getElementById("chat-node-details-tab-details");
       const locationTabBtn = document.getElementById("chat-node-details-tab-location");
@@ -1651,6 +1699,17 @@
       drawer.hidden = !visibleExpanded;
       if (closeBtn instanceof HTMLButtonElement) {{
         closeBtn.disabled = !visibleExpanded;
+      }}
+      if (pinBtn instanceof HTMLButtonElement) {{
+        pinBtn.hidden = true;
+        pinBtn.disabled = true;
+        pinBtn.dataset.nodeId = "";
+        pinBtn.classList.remove("active");
+        pinBtn.setAttribute("aria-pressed", "false");
+        const pinLabel = pinBtn.querySelector(".chat-node-details-pin-label");
+        if (pinLabel instanceof HTMLElement) {{
+          pinLabel.textContent = "Pin";
+        }}
       }}
       if (muteBtn instanceof HTMLButtonElement) {{
         muteBtn.hidden = true;
@@ -1793,6 +1852,24 @@
       const titleName = String(resolvedName || fallbackName || selectedId);
       if (titleEl instanceof HTMLElement) {{
         titleEl.textContent = `${{titleName}} (${selectedId})`;
+      }}
+      if (pinBtn instanceof HTMLButtonElement) {{
+        const canPin = isSelectableNodeId(selectedId);
+        const active = canPin && (typeof isPinnedNode === "function") && isPinnedNode(selectedId);
+        pinBtn.hidden = !canPin;
+        pinBtn.disabled = !canPin;
+        pinBtn.dataset.nodeId = canPin ? selectedId : "";
+        pinBtn.classList.toggle("active", active);
+        pinBtn.setAttribute("aria-pressed", active ? "true" : "false");
+        const pinTitle = active
+          ? `Unpin ${{titleName}} from the top of the chat list`
+          : `Pin ${{titleName}} to the top of the chat list`;
+        pinBtn.title = pinTitle;
+        pinBtn.setAttribute("aria-label", pinTitle);
+        const pinLabel = pinBtn.querySelector(".chat-node-details-pin-label");
+        if (pinLabel instanceof HTMLElement) {{
+          pinLabel.textContent = active ? "Pinned" : "Pin";
+        }}
       }}
       if (muteBtn instanceof HTMLButtonElement) {{
         const canMute = isCanonicalNodeId(selectedId) && !isSelfNodeId(selectedId);

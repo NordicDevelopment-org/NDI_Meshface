@@ -371,6 +371,20 @@
       }}, true);
     }}
 
+    function bindPinToggleControls() {{
+      if (document.body.dataset.pinBound === "1") return;
+      document.body.dataset.pinBound = "1";
+      document.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        const btn = target.closest(".pin-toggle-btn");
+        if (!(btn instanceof HTMLButtonElement)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        togglePinnedNode(btn.dataset.nodeId || "");
+      }}, true);
+    }}
+
     function rerenderNodeSearchDependents(state = latestState) {{
       const safeState = state && typeof state === "object" ? state : null;
       if (!safeState) return;

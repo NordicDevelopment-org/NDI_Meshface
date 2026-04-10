@@ -253,7 +253,9 @@ def test_chat_node_search_syncs_to_live_navigator_row_bounds() -> None:
     assert "function syncChatNodeNavigatorSearchBounds() {" in js_src
     assert 'document.querySelector(".chat-left-bottom-bar")' in js_src
     assert 'document.getElementById("chat-room-unread-list")' in js_src
+    assert 'document.getElementById("chat-room-pinned-list")' in js_src
     assert 'unreadList.querySelector(".chat-member-item, .chat-member-empty")' in js_src
+    assert 'pinnedList.querySelector(".chat-member-item, .chat-member-empty")' in js_src
     assert 'roomList.querySelector(".chat-member-item, .chat-member-empty")' in js_src
     assert 'bottomBar.style.setProperty("--chat-user-search-inline-start",' in js_src
     assert 'bottomBar.style.setProperty("--chat-user-search-inline-end",' in js_src
