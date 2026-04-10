@@ -53,6 +53,25 @@ def test_render_html_disables_roster_scroll_anchoring() -> None:
     assert "overflow-anchor: none;" in html
 
 
+def test_render_html_adds_pinned_unread_node_shell() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert 'id="chat-room-unread-shell"' in html
+    assert 'id="chat-room-unread-list"' in html
+    assert 'id="chat-room-unread-count"' in html
+
+
 def test_dashboard_js_only_applies_saved_peer_pin_sorting_in_direct_mode() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
@@ -169,9 +188,15 @@ def test_dashboard_js_replaces_node_status_dot_with_message_icon_for_unread_dire
     )
 
     assert "const unreadDirectByPeer = new Map();" in js
+    assert "function normalizeChatNodeNavigatorUnreadDirectByPeer(source = null) {" in js
+    assert 'const unreadShell = document.getElementById("chat-room-unread-shell");' in js
+    assert "const pinnedUnreadRows = [];" in js
+    assert "const regularRows = [];" in js
+    assert "unreadShell.hidden = pinnedUnreadRows.length <= 0;" in js
+    assert 'bindChatNodeNavigatorListInteractions(unreadList);' in js
     assert "const unreadDirectCount = Math.max(0, Math.trunc(Number(unreadDirectByPeer.get(nodeId) || 0)));" in js
     assert 'tooltipLines.splice(4, 0, `Unread direct messages: ${unreadDirectCount}`);' in js
     assert 'const unreadDirectMarkerHtml = unreadDirectCount > 0' in js
     assert 'class="chat-member-status-icon chat-member-status-icon-message"' in js
     assert 'const statusGlyph = unreadDirectMarkerHtml || (muted ? "‖" : "●");' in js
-    assert 'unreadDirectByPeer: opts.unreadDirectByPeer instanceof Map ? opts.unreadDirectByPeer : new Map(),' in js
+    assert 'unreadDirectByPeer,' in js

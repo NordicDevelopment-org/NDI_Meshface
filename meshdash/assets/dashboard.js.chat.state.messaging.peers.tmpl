@@ -155,6 +155,43 @@
       return String(left == null ? "" : left).localeCompare(String(right == null ? "" : right));
     }}
 
+    function normalizeChatNodeNavigatorUnreadDirectByPeer(source = null) {{
+      const unreadByPeer = new Map();
+      if (source instanceof Map) {{
+        for (const [rawPeerId, rawCount] of source.entries()) {{
+          const peerId = normalizeNodeId(rawPeerId || "");
+          if (!isSelectableNodeId(peerId)) continue;
+          const count = Math.max(0, Math.trunc(Number(rawCount) || 0));
+          if (count <= 0) continue;
+          unreadByPeer.set(peerId, count);
+        }}
+        return unreadByPeer;
+      }}
+      const directAckSet = (typeof chatChangeAcknowledgedKeySetForChannel === "function")
+        ? chatChangeAcknowledgedKeySetForChannel("direct")
+        : null;
+      const notices = (typeof chatChangeNoticesForChannel === "function")
+        ? chatChangeNoticesForChannel("direct")
+        : [];
+      for (const notice of notices) {{
+        const noticeKey = String((notice && notice.key) || "").trim();
+        if (directAckSet instanceof Set && noticeKey && directAckSet.has(noticeKey)) continue;
+        const peerId = normalizeNodeId(notice && notice.peerNodeId);
+        if (!isSelectableNodeId(peerId)) continue;
+        unreadByPeer.set(peerId, (unreadByPeer.get(peerId) || 0) + 1);
+      }}
+      return unreadByPeer;
+    }}
+
+    function chatNodeNavigatorUnreadDirectCount(unreadDirectByPeer, rawPeerId) {{
+      const unreadByPeer = unreadDirectByPeer instanceof Map
+        ? unreadDirectByPeer
+        : normalizeChatNodeNavigatorUnreadDirectByPeer(unreadDirectByPeer);
+      const peerId = normalizeNodeId(rawPeerId || "");
+      if (!peerId) return 0;
+      return Math.max(0, Math.trunc(Number(unreadByPeer.get(peerId) || 0)));
+    }}
+
     function noteChatNodeNavigatorProgrammaticScrollReset(durationMs = 700) {{
       const duration = Number.isFinite(Number(durationMs))
         ? Math.max(120, Math.trunc(Number(durationMs)))
@@ -241,11 +278,13 @@
       participantsList,
       nodesById,
       nowUnix = Math.floor(Date.now() / 1000),
-      historyCapsById = null
+      historyCapsById = null,
+      unreadDirectByPeer = null
     ) {{
       const rows = Array.isArray(participantsList) ? participantsList : [];
       const sourceNodes = nodesById instanceof Map ? nodesById : new Map();
       const sourceHistoryCaps = historyCapsById instanceof Map ? historyCapsById : new Map();
+      const sourceUnreadDirectByPeer = normalizeChatNodeNavigatorUnreadDirectByPeer(unreadDirectByPeer);
       const sortKey = normalizeChatNodeNavigatorSortKeyPref(chatNodeNavigatorSortKey);
       const sortDir = normalizeChatNodeNavigatorSortDirPref(chatNodeNavigatorSortDir);
       const projectionById = new Map();
@@ -266,6 +305,12 @@
         return projection;
       }};
       rows.sort((a, b) => {{
+        const unreadDiff = (
+          chatNodeNavigatorUnreadDirectCount(sourceUnreadDirectByPeer, b && b.id)
+          - chatNodeNavigatorUnreadDirectCount(sourceUnreadDirectByPeer, a && a.id)
+        );
+        if (unreadDiff !== 0) return unreadDiff;
+
         const pinDiff = activeChatChannel === "direct"
           ? (Number(!!(b && b.p2pPinned)) - Number(!!(a && a.p2pPinned)))
           : 0;
@@ -1082,11 +1127,18 @@
 
     function syncChatNodeNavigatorSearchBounds() {{
       const panel = document.getElementById("chat-left-panel");
+      const unreadList = document.getElementById("chat-room-unread-list");
       const roomList = document.getElementById("chat-room-list");
       const bottomBar = document.querySelector(".chat-left-bottom-bar");
-      const anchor = roomList instanceof HTMLElement
-        ? roomList.querySelector(".chat-member-item, .chat-member-empty")
-        : null;
+      const anchor = (
+        unreadList instanceof HTMLElement
+          ? unreadList.querySelector(".chat-member-item, .chat-member-empty")
+          : null
+      ) || (
+        roomList instanceof HTMLElement
+          ? roomList.querySelector(".chat-member-item, .chat-member-empty")
+          : null
+      );
       if (!(panel instanceof HTMLElement) || !(bottomBar instanceof HTMLElement)) return;
 
       const defaultInset = "6px";
@@ -1117,6 +1169,9 @@
     function renderChatNodeNavigatorList(state = latestState, options = null) {{
       const opts = options && typeof options === "object" ? options : {{}};
       const safeState = state && typeof state === "object" ? state : (latestState || {{}});
+      const unreadShell = document.getElementById("chat-room-unread-shell");
+      const unreadList = document.getElementById("chat-room-unread-list");
+      const unreadCountEl = document.getElementById("chat-room-unread-count");
       const roomList = document.getElementById("chat-room-list");
       if (!(roomList instanceof HTMLElement)) return null;
       if (!chatNodeNavigatorSearchBoundsResizeBound && typeof window !== "undefined" && typeof window.addEventListener === "function") {{
@@ -1194,12 +1249,9 @@
                 )
               : new Map()
           );
-      const rosterAll = Array.isArray(opts.rosterAll)
-        ? (
-            typeof sortChatNodeNavigatorParticipants === "function"
-              ? sortChatNodeNavigatorParticipants(opts.rosterAll.slice(), nodesById, nowUnix, historyCapsById)
-              : opts.rosterAll.slice()
-          )
+      const unreadDirectByPeer = normalizeChatNodeNavigatorUnreadDirectByPeer(opts.unreadDirectByPeer);
+      const rosterSource = Array.isArray(opts.rosterAll)
+        ? opts.rosterAll.slice()
         : buildChatNodeNavigatorDefaultRoster(
             safeState,
             nodesById,
@@ -1207,6 +1259,15 @@
             resolveChatNodeFreshnessFn,
             nowUnix
           );
+      const rosterAll = typeof sortChatNodeNavigatorParticipants === "function"
+        ? sortChatNodeNavigatorParticipants(
+            rosterSource,
+            nodesById,
+            nowUnix,
+            historyCapsById,
+            unreadDirectByPeer
+          )
+        : rosterSource;
       const rosterQuery = globalNodeSearchQuery();
       const rosterFiltered = rosterAll.filter((item) => (
         matchesIdOrNameQuery(item && item.id, item && item.name, rosterQuery, {{
@@ -1214,20 +1275,57 @@
         }})
       ));
       chatRosterModel = rosterAll;
-      const nextRoomListHtml = rosterFiltered.length > 0
-        ? rosterFiltered.map((item) => buildChatNodeNavigatorMemberHtml(item, {{
+      const pinnedUnreadRows = [];
+      const regularRows = [];
+      for (const item of rosterFiltered) {{
+        if (chatNodeNavigatorUnreadDirectCount(unreadDirectByPeer, item && item.id) > 0) {{
+          pinnedUnreadRows.push(item);
+        }} else {{
+          regularRows.push(item);
+        }}
+      }}
+      const rowRenderContext = {{
+        nowUnix,
+        nodesById,
+        historyCapsById,
+        packetTickerByNode: packetMaps.packetTickerByNode,
+        packetSparklineByNode: packetMaps.packetSparklineByNode,
+        malformedTextByNode,
+        unreadDirectByPeer,
+        resolveChatNodeFreshnessFn,
+      }};
+      if (unreadShell instanceof HTMLElement && unreadList instanceof HTMLElement) {{
+        const nextUnreadHtml = pinnedUnreadRows.length > 0
+          ? pinnedUnreadRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
+          : "";
+        const previousUnreadHtml = (typeof unreadList.__meshLastInnerHtml_chat_room_unread_list === "string")
+          ? unreadList.__meshLastInnerHtml_chat_room_unread_list
+          : null;
+        if (previousUnreadHtml !== nextUnreadHtml) {{
+          unreadList.innerHTML = nextUnreadHtml;
+          unreadList.__meshLastInnerHtml_chat_room_unread_list = nextUnreadHtml;
+        }}
+        unreadShell.hidden = pinnedUnreadRows.length <= 0;
+        if (unreadCountEl instanceof HTMLElement) {{
+          unreadCountEl.textContent = String(pinnedUnreadRows.length);
+        }}
+      }}
+      const nextRoomListHtml = regularRows.length > 0
+        ? regularRows.map((item) => buildChatNodeNavigatorMemberHtml(item, {{
             nowUnix,
             nodesById,
             historyCapsById,
             packetTickerByNode: packetMaps.packetTickerByNode,
             packetSparklineByNode: packetMaps.packetSparklineByNode,
             malformedTextByNode,
-            unreadDirectByPeer: opts.unreadDirectByPeer instanceof Map ? opts.unreadDirectByPeer : new Map(),
+            unreadDirectByPeer,
             resolveChatNodeFreshnessFn,
           }})).join("")
-        : (rosterQuery
+        : ((pinnedUnreadRows.length <= 0 && rosterQuery)
             ? '<div class="chat-member-empty">No users match this search.</div>'
-            : '<div class="chat-member-empty">No users discovered yet.</div>');
+            : (pinnedUnreadRows.length <= 0
+                ? '<div class="chat-member-empty">No users discovered yet.</div>'
+                : ""));
       const nextMarkup = String(nextRoomListHtml == null ? "" : nextRoomListHtml);
       const previousMarkup = (typeof roomList.__meshLastInnerHtml_chat_room_list === "string")
         ? roomList.__meshLastInnerHtml_chat_room_list
@@ -1237,6 +1335,7 @@
         roomList.__meshLastInnerHtml_chat_room_list = nextMarkup;
       }}
       bindChatNodeNavigatorListInteractions(roomList);
+      bindChatNodeNavigatorListInteractions(unreadList);
       scheduleChatNodeNavigatorSearchBoundsSync();
       if (chatNodeNavigatorSelectionScrollLocked) {{
         resetChatNodeNavigatorViewport();

@@ -4408,6 +4408,25 @@
       background: var(--ui-panel-alt);
       color: var(--ui-text-soft);
     }}
+    [data-theme="dark"] .chat-member-pinned-shell {{
+      border-color: var(--workspace-shell-border);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, var(--workspace-shell-border-strong) 16%),
+        color-mix(in srgb, var(--workspace-shell-bg) 94%, var(--workspace-shell-bg-alt) 6%)
+      );
+    }}
+    [data-theme="dark"] .chat-member-pinned-head {{
+      border-color: color-mix(in srgb, var(--workspace-shell-border) 76%, transparent);
+    }}
+    [data-theme="dark"] .chat-member-pinned-title {{
+      color: var(--ui-text-soft);
+    }}
+    [data-theme="dark"] .chat-member-pinned-count {{
+      border-color: color-mix(in srgb, var(--workspace-shell-border-strong) 74%, var(--ui-accent) 26%);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 70%, var(--ui-accent) 30%);
+      color: var(--ui-text);
+    }}
     [data-theme="dark"] .chat-member-item {{
       --chat-member-node-dark-sat-mult: 1.02;
       --chat-member-node-dark-light-shift: 2%;
