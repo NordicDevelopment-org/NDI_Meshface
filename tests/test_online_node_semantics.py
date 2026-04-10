@@ -48,3 +48,19 @@ def test_dashboard_js_node_online_history_shows_status_and_official_windows() ->
     assert "Official (2h online)" in js
     assert 'Status O/A/S: ${percentText(statusOnlinePercent)} / ${percentText(statusWarnPercent)} / ${percentText(statusStalePercent)}%' in js
     assert 'Official online: ${percentText(officialOnlinePercent)}%' in js
+    assert "const rightSummaryX = width - 6;" in js
+    assert '<text x="${rightSummaryX.toFixed(2)}" y="${(padTop + 10).toFixed(2)}" font-size="10" text-anchor="end" fill="${chartPalette.label}">' in js
+    assert '<tspan x="${rightSummaryX.toFixed(2)}" dy="12">Official online: ${percentText(officialOnlinePercent)}%</tspan>' in js
+
+
+def test_dashboard_js_keeps_node_history_right_side_labels_inside_chart_frame() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const rightAxisLabelX = width - 6;" in js
+    assert "const rightMetricX = width - 6;" in js
+    assert '<text x="${rightAxisLabelX.toFixed(2)}" y="${padTop + 10}" font-size="10" text-anchor="end" fill="${chartPalette.rssiLabel}">${formatMetricValue(rssiMax, 0)}</text>' in js
+    assert '<text x="${rightMetricX.toFixed(2)}" y="${(padTop + 10).toFixed(2)}" font-size="10" text-anchor="end" fill="${chartPalette.label}">avg ${formatMetricValue(avgPackets, 1)}/min</text>' in js

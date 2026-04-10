@@ -102,6 +102,20 @@ def test_render_html_hides_history_caption_inside_drawer_history_view() -> None:
     assert 'display: none !important;' in html
 
 
+def test_drawer_history_charts_expand_for_node_detail_views() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    block = re.search(
+        r"\.chat-node-details-history-host #signal-chart-wrap,\n    \.chat-node-details-history-host #node-online-chart-wrap,\n    \.chat-node-details-history-host #node-packets-chart-wrap \{[\s\S]*?\n    \}",
+        css,
+    )
+    assert block
+    section = block.group(0)
+    assert "height: 260px;" in section
+    assert "min-height: 240px;" in section
+    assert "flex: 0 0 auto;" in section
+
+
 def test_name_history_empty_state_uses_workspace_theme_tokens_in_dark_mode() -> None:
     css = build_dashboard_css(theme_css="")
 

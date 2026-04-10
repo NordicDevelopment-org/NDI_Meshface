@@ -156,6 +156,7 @@
             rssiLabel: "#265d7b",
             rawOpacity: 0.24,
           }};
+      const rightAxisLabelX = width - 6;
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `
@@ -169,8 +170,8 @@
         ${{rssiPaths.trendPath ? `<path d="${{rssiPaths.trendPath}}" fill="none" stroke="${{chartPalette.rssi}}" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"></path>` : ""}}
         <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMax, 1)}}</text>
         <text x="${{padLeft - 4}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMin, 1)}}</text>
-        <text x="${{width - padRight + 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="start" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMax, 0)}}</text>
-        <text x="${{width - padRight + 4}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="start" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMin, 0)}}</text>
+        <text x="${{rightAxisLabelX.toFixed(2)}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMax, 0)}}</text>
+        <text x="${{rightAxisLabelX.toFixed(2)}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="end" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMin, 0)}}</text>
       `;
       renderSignalTimeline(plotRows, padLeft, padRight, width);
     }}
@@ -445,6 +446,7 @@
             officialOnline: "#265d7b",
             officialOffline: "#8b98a3",
           }};
+      const rightSummaryX = width - 6;
       const renderSegmentLines = (rows, stateKeyName, yByState, colorByState, strokeWidth = 2.6) => {{
         const horizontals = [];
         const connectors = [];
@@ -523,9 +525,9 @@
         <text x="${{(padLeft + 4).toFixed(2)}}" y="${{(officialLaneTop - 2).toFixed(2)}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">Official (2h online)</text>
         <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(officialYByKey.online + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.officialOnline}}">Online</text>
         <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(officialYByKey.offline + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.officialOffline}}">Offline</text>
-        <text x="${{(width - padRight + 4).toFixed(2)}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">
-          <tspan x="${{(width - padRight + 4).toFixed(2)}}" dy="0">Status O/A/S: ${{percentText(statusOnlinePercent)}} / ${{percentText(statusWarnPercent)}} / ${{percentText(statusStalePercent)}}%</tspan>
-          <tspan x="${{(width - padRight + 4).toFixed(2)}}" dy="12">Official online: ${{percentText(officialOnlinePercent)}}%</tspan>
+        <text x="${{rightSummaryX.toFixed(2)}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">
+          <tspan x="${{rightSummaryX.toFixed(2)}}" dy="0">Status O/A/S: ${{percentText(statusOnlinePercent)}} / ${{percentText(statusWarnPercent)}} / ${{percentText(statusStalePercent)}}%</tspan>
+          <tspan x="${{rightSummaryX.toFixed(2)}}" dy="12">Official online: ${{percentText(officialOnlinePercent)}}%</tspan>
         </text>
       `;
 
@@ -672,6 +674,7 @@
             line: "#265d7b",
             label: "#265d7b",
           }};
+      const rightMetricX = width - 6;
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
       svg.innerHTML = `
@@ -683,7 +686,7 @@
         <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
         <text x="${{padLeft - 4}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(maxPackets, 0)}}</text>
         <text x="${{padLeft - 4}}" y="${{(padTop + plotH + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">0</text>
-        <text x="${{width - padRight + 4}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">avg ${{formatMetricValue(avgPackets, 1)}}/min</text>
+        <text x="${{rightMetricX.toFixed(2)}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">avg ${{formatMetricValue(avgPackets, 1)}}/min</text>
       `;
 
       renderTimeline(
