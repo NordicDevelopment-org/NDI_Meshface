@@ -51,6 +51,9 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "padding: 0;" in css
     assert ".layout.view-chat .chat-shell {" in css
     assert "padding: 0;" in css
+    assert "margin-top: 8px;" in css
+    assert ".layout.view-chat .chat-compose-notices:not([hidden]) + .chat-shell {" in css
+    assert "margin-top: 0;" in css
     assert ".layout.view-chat .chat-compose-notices {" in css
     assert "padding: 0 0 6px 0;" in css
     assert ".layout.view-chat .chat-main-pane {" in css
