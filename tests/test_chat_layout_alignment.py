@@ -33,7 +33,7 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".chat-left-section.chat-users-section {" in css
     assert "gap: 0;" in css
     assert ".workspace-shell[data-layout-view=\"chat\"] .chat-left-head-shell {" in css
-    assert "padding: 6px 8px;" in css
+    assert "padding: 8px 10px;" in css
     assert ".chat-users-head {" in css
     assert "padding: 0;" in css
     assert "background: transparent;" in css
