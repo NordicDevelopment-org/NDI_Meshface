@@ -79,7 +79,7 @@ def test_render_html_includes_chat_node_details_location_chat_and_links_tabs() -
     assert 'id="chat-node-details-messages-host"' in html
 
 
-def test_render_html_places_location_chat_links_before_notes_in_drawer_tabs() -> None:
+def test_render_html_places_messages_before_details_and_notes_in_drawer_tabs() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -93,6 +93,8 @@ def test_render_html_places_location_chat_links_before_notes_in_drawer_tabs() ->
         revision_title="test",
     )
 
+    tag_index = html.index('id="chat-node-details-tab-tag"')
+    details_index = html.index('id="chat-node-details-tab-details"')
     history_index = html.index('id="chat-node-details-tab-history"')
     location_index = html.index('id="chat-node-details-tab-location"')
     chat_index = html.index('id="chat-node-details-tab-chat"')
@@ -100,7 +102,7 @@ def test_render_html_places_location_chat_links_before_notes_in_drawer_tabs() ->
     notes_index = html.index('id="chat-node-details-tab-notes"')
     messages_index = html.index('id="chat-node-details-tab-messages"')
 
-    assert history_index < location_index < chat_index < links_index < notes_index < messages_index
+    assert tag_index < messages_index < details_index < history_index < location_index < chat_index < links_index < notes_index
 
 
 def test_render_html_places_mute_and_send_message_actions_in_drawer_header() -> None:
@@ -166,9 +168,20 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'setChatNodeDetailsDrawerTab("messages"' in js
     assert 'const drawerMessagesHost = document.getElementById("chat-node-details-messages-host");' in js
     assert 'mode: "drawer"' in js
-    assert "const scheduleBodyScrollToBottom = (bodyEl) => {" in js
+    assert "const unreadDirectFocusKeysByPeer = new Map();" in js
+    assert "let unreadThreadNoticeAckQueued = false;" in js
+    assert "const acknowledgeUnreadThreadNotices = () => {" in js
+    assert 'acknowledgeChatChangeNoticesByFocusKey(focusKey, "direct")' in js
+    assert "const scheduleBodyScroll = (bodyEl, focusMessageKeysRaw = null) => {" in js
+    assert 'const acknowledgeFocusedNotice = (focusKey) => {' in js
+    assert 'acknowledgeChatChangeNoticesByFocusKey(matchedFocusKey, "direct")' in js
+    assert 'const unreadFocusKeys = Array.isArray(unreadDirectFocusKeysByPeer.get(peerId))' in js
+    assert 'const messageKey = String(chatMessageKey(msg) || "").trim();' in js
+    assert 'data-message-key="${escAttr(messageKey)}"' in js
+    assert 'input.addEventListener("focus", acknowledgeUnreadThreadNotices);' in js
+    assert 'input.addEventListener("click", acknowledgeUnreadThreadNotices);' in js
     assert "window.requestAnimationFrame(() => {" in js
-    assert "scheduleBodyScrollToBottom(bodyEl);" in js
+    assert "scheduleBodyScroll(bodyEl, unreadFocusKeys);" in js
 
 
 def test_dashboard_html_places_messages_tab_first_in_node_drawer() -> None:

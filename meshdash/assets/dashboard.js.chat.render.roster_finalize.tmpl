@@ -329,6 +329,7 @@
         }}
       }}
       const unreadDirectByPeer = new Map();
+      const unreadDirectFocusKeysByPeer = new Map();
       const directAckSet = chatChangeAcknowledgedKeySetForChannel("direct");
       for (const notice of chatChangeNoticesForChannel("direct")) {{
         const noticeKey = String((notice && notice.key) || "").trim();
@@ -337,6 +338,13 @@
         if (!directConversationPeerIds.has(peerId)) continue;
         if (directBucketForPeer(peerId).length <= 0) continue;
         unreadDirectByPeer.set(peerId, (unreadDirectByPeer.get(peerId) || 0) + 1);
+        const focusKey = String((notice && (notice.focusKey || notice.key)) || "").trim();
+        if (!focusKey) continue;
+        const focusKeys = unreadDirectFocusKeysByPeer.get(peerId) || [];
+        if (!focusKeys.includes(focusKey)) {{
+          focusKeys.push(focusKey);
+          unreadDirectFocusKeysByPeer.set(peerId, focusKeys);
+        }}
       }}
       const directConversationRows = Array.from(directConversationPeerIds)
         .map((peerId) => {{
@@ -432,16 +440,65 @@
         const priorSelectionEnd = preserveInputFocus
           ? Number(priorInput.selectionEnd)
           : null;
-        const scheduleBodyScrollToBottom = (bodyEl) => {{
+        const scheduleBodyScroll = (bodyEl, focusMessageKeysRaw = null) => {{
           if (!(bodyEl instanceof HTMLElement)) return;
-          const scrollToBottom = () => {{
+          const focusMessageKeys = Array.isArray(focusMessageKeysRaw)
+            ? focusMessageKeysRaw
+                .map((value) => String(value || "").trim())
+                .filter((value) => !!value)
+            : [];
+          let acknowledgedFocusKey = "";
+          const acknowledgeFocusedNotice = (focusKey) => {{
+            const matchedFocusKey = String(focusKey || "").trim();
+            if (!matchedFocusKey || acknowledgedFocusKey === matchedFocusKey) return;
+            acknowledgedFocusKey = matchedFocusKey;
+            window.requestAnimationFrame(() => {{
+              const changed = (typeof acknowledgeChatChangeNoticesByFocusKey === "function")
+                ? acknowledgeChatChangeNoticesByFocusKey(matchedFocusKey, "direct")
+                : false;
+              if (!changed) return;
+              if (latestState && isChatWorkspaceLayoutView(activeLayoutView)) {{
+                renderChat(latestState);
+                if (activeLayoutView === "chatlabs") {{
+                  renderChatLabsView(latestState);
+                }}
+              }} else {{
+                syncChatChangeAutoDismiss();
+              }}
+            }});
+          }};
+          const scrollBody = () => {{
+            let focusTarget = null;
+            let matchedFocusKey = "";
+            if (focusMessageKeys.length > 0) {{
+              const rows = Array.from(bodyEl.querySelectorAll(".peer-dm-popout-msg[data-message-key]"));
+              for (const focusKey of focusMessageKeys) {{
+                focusTarget = rows.find((row) => String(row.dataset.messageKey || "") === focusKey) || null;
+                if (focusTarget) {{
+                  matchedFocusKey = focusKey;
+                  break;
+                }}
+              }}
+            }}
+            if (focusTarget instanceof HTMLElement) {{
+              const targetTop = Math.max(0, Number(focusTarget.offsetTop) || 0);
+              const targetHeight = Math.max(0, Number(focusTarget.offsetHeight) || 0);
+              const bodyHeight = Math.max(0, Number(bodyEl.clientHeight) || 0);
+              const targetScrollTop = Math.max(
+                0,
+                Math.round(targetTop - Math.max(12, (bodyHeight - targetHeight) / 2))
+              );
+              bodyEl.scrollTop = targetScrollTop;
+              acknowledgeFocusedNotice(matchedFocusKey);
+              return;
+            }}
             bodyEl.scrollTop = bodyEl.scrollHeight;
           }};
-          scrollToBottom();
+          scrollBody();
           window.requestAnimationFrame(() => {{
-            scrollToBottom();
+            scrollBody();
             window.requestAnimationFrame(() => {{
-              scrollToBottom();
+              scrollBody();
             }});
           }});
         }};
@@ -479,6 +536,32 @@
         const fileProgressTitle = fileLabel
           ? `File transfer: ${{fileLabel}}`
           : "File transfer";
+        const unreadFocusKeys = Array.isArray(unreadDirectFocusKeysByPeer.get(peerId))
+          ? unreadDirectFocusKeysByPeer.get(peerId).slice()
+          : [];
+        let unreadThreadNoticeAckQueued = false;
+        const acknowledgeUnreadThreadNotices = () => {{
+          if (unreadThreadNoticeAckQueued || unreadFocusKeys.length <= 0) return;
+          unreadThreadNoticeAckQueued = true;
+          window.requestAnimationFrame(() => {{
+            let changed = false;
+            for (const focusKey of unreadFocusKeys) {{
+              changed = (typeof acknowledgeChatChangeNoticesByFocusKey === "function")
+                ? (acknowledgeChatChangeNoticesByFocusKey(focusKey, "direct") || changed)
+                : changed;
+            }}
+            unreadThreadNoticeAckQueued = false;
+            if (!changed) return;
+            if (latestState && isChatWorkspaceLayoutView(activeLayoutView)) {{
+              renderChat(latestState);
+              if (activeLayoutView === "chatlabs") {{
+                renderChatLabsView(latestState);
+              }}
+            }} else {{
+              syncChatChangeAutoDismiss();
+            }}
+          }});
+        }};
         const threadChannelIndex = (() => {{
           for (let idx = bucket.length - 1; idx >= 0; idx -= 1) {{
             const candidate = bucket[idx];
@@ -534,9 +617,10 @@
                 }}
                 return ` • ${{deliveryState}}`;
               }})();
+              const messageKey = String(chatMessageKey(msg) || "").trim();
               const textHtml = chatPlainTextToHtml((msg && msg.text) || "", true)
                 || escAttr(String(emojiOf(msg) || "").trim() || "(no text)");
-              return `<div class="peer-dm-popout-msg${{isOwn ? " is-own" : ""}}">
+              return `<div class="peer-dm-popout-msg${{isOwn ? " is-own" : ""}}" data-message-key="${{escAttr(messageKey)}}">
                 <div class="peer-dm-popout-msg-meta"><span>${{escAttr(fromLabel)}}</span><span>${{escAttr(`${{timeLabel}}${{deliverySuffix}}`)}}</span></div>
                 <div class="peer-dm-popout-msg-text">${{textHtml}}</div>
               </div>`;
@@ -843,6 +927,8 @@
           }}
         }};
         if (input instanceof HTMLInputElement) {{
+          input.addEventListener("focus", acknowledgeUnreadThreadNotices);
+          input.addEventListener("click", acknowledgeUnreadThreadNotices);
           input.addEventListener("input", () => {{
             const nextDraft = String(input.value || "");
             if (nextDraft.trim()) {{
@@ -886,7 +972,7 @@
         }}
         const bodyEl = host.querySelector('[data-peer-dm-role="body"]');
         if (bodyEl instanceof HTMLElement) {{
-          scheduleBodyScrollToBottom(bodyEl);
+          scheduleBodyScroll(bodyEl, unreadFocusKeys);
         }}
       }};
 
