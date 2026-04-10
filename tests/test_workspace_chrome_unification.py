@@ -268,6 +268,20 @@ def test_node_navigator_menu_follows_workspace_shell_tokens() -> None:
     assert "#16261f" not in sort_btn_section
 
 
+def test_node_navigator_unread_direct_marker_reuses_status_slot_geometry() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    status_section = css.split(".chat-member-item.tagged-node.selected-node {", 1)[1].split(".chat-member-status {", 1)[1].split("}", 1)[0]
+    unread_section = css.split(".chat-member-status.is-unread-direct {", 1)[1].split("}", 1)[0]
+    icon_section = css.split(".chat-member-status-icon {", 1)[1].split("}", 1)[0]
+
+    assert "min-width: 10px;" in status_section
+    assert "display: inline-flex;" in unread_section
+    assert "justify-content: center;" in unread_section
+    assert "stroke: currentColor;" in icon_section
+    assert "vector-effect: non-scaling-stroke;" in icon_section
+
+
 def test_history_chart_surfaces_follow_workspace_shell_tokens() -> None:
     css = build_dashboard_css(theme_css="")
 

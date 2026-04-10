@@ -152,8 +152,26 @@ def test_dashboard_js_marks_muted_nodes_in_navigator_rows() -> None:
     assert 'const muted = (typeof isMutedNode === "function") && isMutedNode(nodeId);' in js
     assert 'const mutedClass = muted ? " muted-node" : "";' in js
     assert '`Muted: ${muted ? "yes" : "no"}`' in js
-    assert 'const statusGlyph = muted ? "‖" : "●";' in js
-    assert 'const statusGlyphClass = muted ? " is-muted" : "";' in js
+    assert 'const statusGlyph = unreadDirectMarkerHtml || (muted ? "‖" : "●");' in js
+    assert 'const statusGlyphClass = unreadDirectCount > 0' in js
+    assert '? " is-unread-direct"' in js
+    assert ': (muted ? " is-muted" : "");' in js
     assert '${statusGlyphClass}' in js
     assert '${statusGlyph}' in js
     assert '${mutedClass}' in js
+
+
+def test_dashboard_js_replaces_node_status_dot_with_message_icon_for_unread_directs() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const unreadDirectByPeer = new Map();" in js
+    assert "const unreadDirectCount = Math.max(0, Math.trunc(Number(unreadDirectByPeer.get(nodeId) || 0)));" in js
+    assert 'tooltipLines.splice(4, 0, `Unread direct messages: ${unreadDirectCount}`);' in js
+    assert 'const unreadDirectMarkerHtml = unreadDirectCount > 0' in js
+    assert 'class="chat-member-status-icon chat-member-status-icon-message"' in js
+    assert 'const statusGlyph = unreadDirectMarkerHtml || (muted ? "‖" : "●");' in js
+    assert 'unreadDirectByPeer: opts.unreadDirectByPeer instanceof Map ? opts.unreadDirectByPeer : new Map(),' in js

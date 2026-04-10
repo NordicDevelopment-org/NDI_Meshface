@@ -737,6 +737,7 @@
         const packetTickerByNode = ctx.packetTickerByNode instanceof Map ? ctx.packetTickerByNode : new Map();
         const packetSparklineByNode = ctx.packetSparklineByNode instanceof Map ? ctx.packetSparklineByNode : new Map();
         const malformedTextByNode = ctx.malformedTextByNode instanceof Map ? ctx.malformedTextByNode : new Map();
+        const unreadDirectByPeer = ctx.unreadDirectByPeer instanceof Map ? ctx.unreadDirectByPeer : new Map();
         const resolveChatNodeFreshnessFn = (typeof ctx.resolveChatNodeFreshnessFn === "function")
           ? ctx.resolveChatNodeFreshnessFn
           : (() => ({{ id: normalizeNodeId(item && item.id), lastSeenUnix: null, status: "unknown" }}));
@@ -787,6 +788,7 @@
         const noteEntry = (typeof nodeNoteEntry === "function") ? nodeNoteEntry(nodeId) : null;
         const noteText = String((noteEntry && noteEntry.note) || "").trim();
         const muted = (typeof isMutedNode === "function") && isMutedNode(nodeId);
+        const unreadDirectCount = Math.max(0, Math.trunc(Number(unreadDirectByPeer.get(nodeId) || 0)));
         const idleText = Number.isFinite(Number(snapshot && snapshot.lastSeenUnix))
           ? formatIdleAge(snapshot.lastSeenUnix, nowUnix)
           : "n/a";
@@ -856,6 +858,9 @@
           `Muted: ${{muted ? "yes" : "no"}}`,
           `Saved P2P: ${{item && item.p2pPinned ? "yes" : "no"}}`,
         ];
+        if (unreadDirectCount > 0) {{
+          tooltipLines.splice(4, 0, `Unread direct messages: ${{unreadDirectCount}}`);
+        }}
         if (showPacketTrendRow) {{
           tooltipLines.splice(4, 0, packetTickerDetail);
         }}
@@ -996,13 +1001,24 @@
           ? `<span class="chat-member-alert-chip" title="${{escAttr(`Malformed text payloads detected: ${{malformedTextCount}} recent packet${{malformedTextCount === 1 ? "" : "s"}} on TEXT_MESSAGE_APP. Last seen ${{malformedTextLatestText}}${{malformedTextPayloadPreview ? `. Payload: ${{malformedTextPayloadPreview}}` : ""}`)}}">bad text</span>`
           : "";
         const packetSparkClass = packetSparkWrapHtml ? " has-packet-spark" : "";
-        const statusGlyph = muted ? "‖" : "●";
-        const statusGlyphClass = muted ? " is-muted" : "";
+        const unreadDirectLabel = unreadDirectCount === 1
+          ? "1 unread direct message"
+          : `${{unreadDirectCount}} unread direct messages`;
+        const unreadDirectMarkerHtml = unreadDirectCount > 0
+          ? `<svg class="chat-member-status-icon chat-member-status-icon-message" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M4.5 5.5h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3v-3H4.5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/>
+              <path d="M7.5 10.25h9M7.5 13.25h6.5"/>
+            </svg>`
+          : "";
+        const statusGlyph = unreadDirectMarkerHtml || (muted ? "‖" : "●");
+        const statusGlyphClass = unreadDirectCount > 0
+          ? " is-unread-direct"
+          : (muted ? " is-muted" : "");
         const actionRowHtml = removeBtn
           ? `<span class="chat-member-actions">${{removeBtn}}</span>`
           : '<span class="chat-member-actions"></span>';
         return `<div class="chat-member-item status-${{statusKey}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{mutedClass}}${{packetSparkClass}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
-          <span class="chat-member-status status-${{statusKey}}${{statusGlyphClass}}">${{statusGlyph}}</span>
+          <span class="chat-member-status status-${{statusKey}}${{statusGlyphClass}}"${{unreadDirectCount > 0 ? ` title="${{escAttr(unreadDirectLabel)}}" aria-label="${{escAttr(unreadDirectLabel)}}"` : ""}}>${{statusGlyph}}</span>
           <span class="chat-member-main">
             <span class="chat-member-name-row">
               <span class="chat-member-name-left">
@@ -1206,6 +1222,7 @@
             packetTickerByNode: packetMaps.packetTickerByNode,
             packetSparklineByNode: packetMaps.packetSparklineByNode,
             malformedTextByNode,
+            unreadDirectByPeer: opts.unreadDirectByPeer instanceof Map ? opts.unreadDirectByPeer : new Map(),
             resolveChatNodeFreshnessFn,
           }})).join("")
         : (rosterQuery
