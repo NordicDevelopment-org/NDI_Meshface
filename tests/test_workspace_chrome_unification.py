@@ -57,6 +57,22 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert "[data-theme=\"dark\"] .network-map-subview-tab,\n    [data-theme=\"dark\"] .workspace-pill-btn {" in css
 
 
+def test_workspace_main_gap_stays_uniform_across_apps_and_chat_views() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    workspace_main_section = css.split(".workspace-main {", 1)[1].split("}", 1)[0]
+    assert "gap: 8px;" in workspace_main_section
+
+    assert '.workspace-shell[data-layout-view="games"] .workspace-main,' in css
+    assert '.workspace-shell[data-layout-view="files"] .workspace-main {' in css
+    apps_gap_section = css.split(
+        '.workspace-shell[data-layout-view="games"] .workspace-main,',
+        1,
+    )[1].split("}", 1)[0]
+    assert "gap: 8px;" in apps_gap_section
+    assert "gap: 0;" not in apps_gap_section
+
+
 def test_network_view_keeps_map_frame_and_removes_body_shell() -> None:
     css = build_dashboard_css(theme_css="")
     body_section = css.split(".layout.view-network .map .body {", 1)[1].split("}", 1)[0]
