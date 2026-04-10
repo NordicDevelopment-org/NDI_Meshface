@@ -1,8 +1,10 @@
 import sys
+import re
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from meshdash.html_css import build_dashboard_css
 from meshdash.html_js import build_dashboard_js
 from meshdash.html_template import render_html
 
@@ -98,3 +100,15 @@ def test_render_html_hides_history_caption_inside_drawer_history_view() -> None:
 
     assert '.chat-node-details-history-host #node-history-caption {' in html
     assert 'display: none !important;' in html
+
+
+def test_name_history_empty_state_uses_workspace_theme_tokens_in_dark_mode() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    assert '[data-theme="dark"] .saved-node-name-history-empty {' in css
+    assert 'border-color: var(--workspace-shell-border-muted);' in css
+    assert 'background: color-mix(in srgb, var(--workspace-shell-bg-alt) 82%, transparent);' in css
+    assert 'color: var(--workspace-shell-text-soft);' in css
+    block = re.search(r'\[data-theme="dark"\] \.saved-node-name-history-empty \{[\s\S]*?\n    \}', css)
+    assert block
+    assert 'background: #121b24;' not in block.group(0)
