@@ -442,12 +442,19 @@
           }}
         }}
         if (!isSelectableNodeId(rowNodeId)) continue;
+        const outlineSeedRaw = String(row.dataset.nodeTintOutlineSeed || "").trim();
+        const outlineSeedCandidate = (outlineSeedRaw && outlineSeedRaw.toLowerCase() !== "unknown")
+          ? outlineSeedRaw
+          : "";
         const tintOutlineSeed = (typeof normalizeNodeTintSeedText === "function")
-          ? normalizeNodeTintSeedText(row.dataset.nodeTintOutlineSeed, rowNodeId || "unknown")
-          : String(row.dataset.nodeTintOutlineSeed || rowNodeId || "unknown").trim();
+          ? normalizeNodeTintSeedText(
+            outlineSeedCandidate,
+            rowNodeId || row.dataset.fromNodeId || row.dataset.replyName || "unknown"
+          )
+          : String(outlineSeedCandidate || rowNodeId || row.dataset.fromNodeId || row.dataset.replyName || "unknown").trim();
         const tintStartSeed = (typeof normalizeNodeTintSeedText === "function")
-          ? normalizeNodeTintSeedText(row.dataset.nodeTintStartSeed, tintOutlineSeed)
-          : String(row.dataset.nodeTintStartSeed || tintOutlineSeed).trim();
+          ? normalizeNodeTintSeedText(row.dataset.nodeTintStartSeed, row.dataset.replyName || tintOutlineSeed)
+          : String(row.dataset.nodeTintStartSeed || row.dataset.replyName || tintOutlineSeed).trim();
         const tintEndSeed = (typeof normalizeNodeTintSeedText === "function")
           ? normalizeNodeTintSeedText(row.dataset.nodeTintEndSeed, tintStartSeed || tintOutlineSeed)
           : String(row.dataset.nodeTintEndSeed || tintStartSeed || tintOutlineSeed).trim();
@@ -474,7 +481,10 @@
           }}
           applyNodeTintStyleVars(row, rowNodeId, feedTintOptions);
         }} else {{
-          if (typeof shouldUseUniqueNodeColors !== "function" || shouldUseUniqueNodeColors(active)) {{
+          const uniqueFeedColorsEnabled = (typeof shouldUseUniqueNodeColorsForScope === "function")
+            ? shouldUseUniqueNodeColorsForScope("feed", active)
+            : (typeof shouldUseUniqueNodeColors !== "function" || shouldUseUniqueNodeColors(active));
+          if (uniqueFeedColorsEnabled) {{
             row.style.setProperty("--chat-feed-node-hue", String(Math.max(0, Math.min(359, Math.trunc(Number(nodeHue) || autoNodeHue)))));
           }} else {{
             row.style.removeProperty("--chat-feed-node-hue");

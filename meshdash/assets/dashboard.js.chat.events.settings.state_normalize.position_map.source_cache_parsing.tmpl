@@ -30,9 +30,18 @@
       }}
     }}
 
-    function shouldUseUniqueNodeColors(tagActive = false) {{
+    function shouldUseUniqueNodeColorsForScope(scope = "member", tagActive = false) {{
       if (tagActive) return true;
-      return !!settingsUniqueNodeColorsEnabled;
+      const cleanScope = String(scope || "member").trim().toLowerCase() === "feed"
+        ? "feed"
+        : "member";
+      return cleanScope === "feed"
+        ? !!settingsUniqueChatColorsEnabled
+        : !!settingsUniqueNodeColorsEnabled;
+    }}
+
+    function shouldUseUniqueNodeColors(tagActive = false) {{
+      return shouldUseUniqueNodeColorsForScope("member", tagActive);
     }}
 
     function normalizeSettingsBadgeEmoji(value) {{
@@ -43,11 +52,16 @@
 
     function loadSettingsAppearancePreferences() {{
       settingsUniqueNodeColorsEnabled = false;
+      settingsUniqueChatColorsEnabled = false;
       settingsBadgeEmoji = "";
       try {{
         settingsUniqueNodeColorsEnabled = parseBoolToken(
           window.localStorage.getItem(settingsUniqueNodeColorsStorageKey),
           false
+        );
+        settingsUniqueChatColorsEnabled = parseBoolToken(
+          window.localStorage.getItem(settingsUniqueChatColorsStorageKey),
+          settingsUniqueNodeColorsEnabled
         );
         settingsBadgeEmoji = normalizeSettingsBadgeEmoji(
           window.localStorage.getItem(settingsBadgeEmojiStorageKey)
@@ -63,6 +77,10 @@
           settingsUniqueNodeColorsEnabled ? "1" : "0"
         );
         window.localStorage.setItem(
+          settingsUniqueChatColorsStorageKey,
+          settingsUniqueChatColorsEnabled ? "1" : "0"
+        );
+        window.localStorage.setItem(
           settingsBadgeEmojiStorageKey,
           normalizeSettingsBadgeEmoji(settingsBadgeEmoji)
         );
@@ -74,6 +92,10 @@
       const toggle = document.getElementById("settings-appearance-unique-node-colors");
       if (toggle instanceof HTMLInputElement) {{
         toggle.checked = !!settingsUniqueNodeColorsEnabled;
+      }}
+      const chatToggle = document.getElementById("settings-appearance-unique-chat-colors");
+      if (chatToggle instanceof HTMLInputElement) {{
+        chatToggle.checked = !!settingsUniqueChatColorsEnabled;
       }}
       const badgeSelect = document.getElementById("settings-appearance-badge-emoji");
       if (badgeSelect instanceof HTMLSelectElement) {{
@@ -104,8 +126,32 @@
       if (opts.announce && typeof setSettingsStatusText === "function") {{
         setSettingsStatusText(
           settingsUniqueNodeColorsEnabled
-            ? "Unique node colors enabled for chat + node list."
-            : "Unique node colors disabled. Untagged nodes use neutral tint."
+            ? "Unique node colors enabled for node list."
+            : "Unique node colors disabled for node list. Untagged nodes use neutral tint."
+        );
+      }}
+      if (changed && opts.rerender !== false && latestState) {{
+        renderChat(latestState);
+        if (activeLayoutView === "chatlabs") {{
+          renderChatLabsView(latestState);
+        }}
+      }}
+    }}
+
+    function setSettingsUniqueChatColorsEnabled(enabled, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const normalized = !!enabled;
+      const changed = settingsUniqueChatColorsEnabled !== normalized;
+      settingsUniqueChatColorsEnabled = normalized;
+      if (opts.persist !== false) {{
+        persistSettingsAppearancePreferences();
+      }}
+      syncSettingsAppearanceControls();
+      if (opts.announce && typeof setSettingsStatusText === "function") {{
+        setSettingsStatusText(
+          settingsUniqueChatColorsEnabled
+            ? "Unique node colors enabled for chat feed."
+            : "Unique node colors disabled for chat feed. Untagged messages use neutral tint."
         );
       }}
       if (changed && opts.rerender !== false && latestState) {{

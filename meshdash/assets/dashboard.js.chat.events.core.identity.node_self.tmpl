@@ -412,6 +412,10 @@
     function shouldApplyNodeTintStyle(options = null) {{
       const opts = options && typeof options === "object" ? options : {{}};
       const tagActive = !!opts.tagActive;
+      const scope = nodeTintStyleScopeFromOptions(opts);
+      if (typeof shouldUseUniqueNodeColorsForScope === "function") {{
+        return shouldUseUniqueNodeColorsForScope(scope, tagActive);
+      }}
       if (typeof shouldUseUniqueNodeColors === "function") {{
         return shouldUseUniqueNodeColors(tagActive);
       }}
@@ -476,9 +480,6 @@
     }}
 
     function nodeTintHue(nodeId, fallbackHue = 145) {{
-      if (typeof shouldUseUniqueNodeColors === "function" && !shouldUseUniqueNodeColors(false)) {{
-        return normalizeNodeTintHue(fallbackHue, 145);
-      }}
       return nodeTintProfile(nodeId, fallbackHue).hue;
     }}
 

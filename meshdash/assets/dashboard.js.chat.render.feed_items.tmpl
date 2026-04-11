@@ -175,12 +175,21 @@
           || fromMeta.label
           || ""
         ).trim();
+        const tintIdentitySeedRaw = String(
+          tintNodeId
+          || sourceNode
+          || nodeId
+          || sourceNodeRaw
+          || fromMeta.idTag
+          || fromMeta.label
+          || ""
+        ).trim();
         const tintOutlineSeed = (typeof normalizeNodeTintSeedText === "function")
-          ? normalizeNodeTintSeedText(tintNodeId || sourceNode || nodeId || "", nodeId || sourceNode || "unknown")
-          : String(tintNodeId || sourceNode || nodeId || "unknown").trim();
+          ? normalizeNodeTintSeedText(tintIdentitySeedRaw, fromMeta.label || "unknown")
+          : String(tintIdentitySeedRaw || fromMeta.label || "unknown").trim();
         const tintStartSeed = (typeof normalizeNodeTintSeedText === "function")
-          ? normalizeNodeTintSeedText(feedShortNameSeedRaw, tintOutlineSeed)
-          : String(feedShortNameSeedRaw || tintOutlineSeed).trim();
+          ? normalizeNodeTintSeedText(feedShortNameSeedRaw, fromMeta.idTag || fromMeta.label || tintOutlineSeed)
+          : String(feedShortNameSeedRaw || fromMeta.idTag || fromMeta.label || tintOutlineSeed).trim();
         const tintEndSeed = (typeof normalizeNodeTintSeedText === "function")
           ? normalizeNodeTintSeedText(feedLongNameSeedRaw, fromMeta.label || tintStartSeed || tintOutlineSeed)
           : String(feedLongNameSeedRaw || fromMeta.label || tintStartSeed || tintOutlineSeed).trim();
