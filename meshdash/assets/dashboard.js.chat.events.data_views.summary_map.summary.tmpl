@@ -1413,12 +1413,52 @@
             : (status === "warn" ? "Aging" : (status === "stale" ? "Stale" : "Unknown"));
         }}
       }}
+      const nodes = Array.isArray(state.nodes) ? state.nodes : [];
+      const localId = normalizeNodeId(resolveLocalNodeId(state) || "");
+      const localNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === localId) || null;
+      const localOwner = localNodeUserFromState(state);
+      const localLongName = String(
+        (localOwner && localOwner.long_name) || (localNode && localNode.long_name) || ""
+      ).trim();
+      const localShortName = String(
+        (localOwner && localOwner.short_name) || (localNode && localNode.short_name) || ""
+      ).trim();
+      const localName = preferredNodeName(localNode)
+        || localLongName
+        || localShortName
+        || (isCanonicalNodeId(localId) ? String(nodeNameCache.get(localId) || "").trim() : "");
+      const hasLocalIdentity = !!localName || isCanonicalNodeId(localId);
       const targetDisplay = compactTargetMetric(targetValue);
-      setText("m-target", targetDisplay);
+      const targetLabel = document.querySelector("#summary-ticker-target [data-ticker-label]");
+      if (targetLabel instanceof HTMLElement) {{
+        targetLabel.textContent = hasLocalIdentity ? "Node" : "Target";
+      }}
       const targetMetric = document.getElementById("m-target");
       if (targetMetric instanceof HTMLElement) {{
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
-        targetMetric.title = fullTarget || "n/a";
+        targetMetric.classList.remove("target-node-value", "node-ticker-value");
+        targetMetric.replaceChildren();
+        if (hasLocalIdentity) {{
+          targetMetric.classList.add("target-node-value", "node-ticker-value");
+          const nameRow = document.createElement("div");
+          nameRow.className = "target-node-name";
+          nameRow.textContent = localName || "Local node";
+          const idRow = document.createElement("div");
+          idRow.className = "target-node-id";
+          idRow.textContent = isCanonicalNodeId(localId) ? localId : "ID unavailable";
+          targetMetric.append(nameRow, idRow);
+          const titleParts = [localName || "Local node"];
+          if (isCanonicalNodeId(localId)) {{
+            titleParts.push(localId);
+          }}
+          if (fullTarget) {{
+            titleParts.push(`Target ${{fullTarget}}`);
+          }}
+          targetMetric.title = titleParts.join(" • ");
+        }} else {{
+          targetMetric.textContent = targetDisplay;
+          targetMetric.title = fullTarget || "n/a";
+        }}
       }}
       renderTargetRadioStatus(state);
       setText("m-nodes", s.node_count ?? 0);

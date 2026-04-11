@@ -37,10 +37,11 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'class="topbar-update-ticker workspace-update-ticker"' in html
     assert 'workspace-peer-dm-menu-wrap' not in html
     assert 'id="peer-dm-toggle-btn"' not in html
-    assert 'id="layout-view-menu-head-mark"' in html
-    assert 'id="layout-view-menu-head-brand"' in html
-    assert 'id="layout-view-menu-head-version"' in html
-    assert 'id="layout-view-menu-head-commit"' in html
+    assert 'class="topbar-view-menu-head"' not in html
+    assert 'id="layout-view-menu-head-mark"' not in html
+    assert 'id="layout-view-menu-head-brand"' not in html
+    assert 'id="layout-view-menu-head-version"' not in html
+    assert 'id="layout-view-menu-head-commit"' not in html
     assert 'id="chat-users-head-title"' not in html
     assert 'id="chat-users-head-version"' not in html
     assert 'id="chat-users-head-commit"' not in html
@@ -93,14 +94,12 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "padding-right: var(--topbar-right-inset);" in css
     assert ".topbar-view-menu-btn {" in css
     assert ".topbar-view-menu-btn-label {" in css
-    assert ".topbar-view-menu-head {" in css
-    assert ".topbar-view-menu-brand {" in css
-    assert ".topbar-view-menu-brand-mark {" in css
-    assert '.topbar-view-menu-brand-mark[data-badge-mode="emoji"] {' in css
-    assert ".topbar-view-menu-head-brand {" in css
-    assert ".topbar-view-menu-head-version," in css
-    assert ".topbar-view-menu-head-commit {" in css
-    assert "overflow-wrap: anywhere;" in css
+    assert ".topbar-view-menu-head {" not in css
+    assert ".topbar-view-menu-brand {" not in css
+    assert ".topbar-view-menu-brand-mark {" not in css
+    assert ".topbar-view-menu-head-brand {" not in css
+    assert ".topbar-view-menu-head-version," not in css
+    assert ".topbar-view-menu-head-commit {" not in css
     assert ".topbar-view-menu-item-icon {" in css
     assert ".topbar-view-menu {" in css
     assert "z-index: 1350;" in css
@@ -124,10 +123,10 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "function shouldCloseLayoutViewMenuForScrollTarget(target = null) {" in js
     assert 'document.getElementById("settings-about-version")' in js
     assert 'document.getElementById("settings-about-commit")' in js
-    assert 'document.getElementById("layout-view-menu-head-mark")' in js
     assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' in js
-    assert 'document.getElementById("layout-view-menu-head-version")' in js
-    assert 'document.getElementById("layout-view-menu-head-commit")' in js
+    assert 'document.getElementById("layout-view-menu-head-mark")' not in js
+    assert 'document.getElementById("layout-view-menu-head-version")' not in js
+    assert 'document.getElementById("layout-view-menu-head-commit")' not in js
     assert 'document.getElementById("chat-users-head-version")' not in js
     assert 'document.getElementById("chat-users-head-commit")' not in js
     assert 'target.closest("#layout-view-menu .topbar-view-menu-item")' in js

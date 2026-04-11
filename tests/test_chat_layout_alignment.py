@@ -476,21 +476,16 @@ def test_chat_mobile_layout_stacks_feed_meta_and_header_filters() -> None:
     assert "background: transparent;" in mobile_section
 
 
-def test_launcher_menu_head_tracks_local_radio_identity() -> None:
+def test_launcher_menu_omits_header_block() -> None:
     js = Path("meshdash/assets/dashboard.js.chat.events.core.identity.node_self.tmpl").read_text()
 
-    assert 'document.getElementById("layout-view-menu-head-mark")' in js
-    assert 'document.getElementById("layout-view-menu-head-brand")' in js
-    assert 'document.getElementById("layout-view-menu-head-version")' in js
-    assert 'document.getElementById("layout-view-menu-head-commit")' in js
-    assert "normalizeSettingsBadgeEmoji(settingsBadgeEmoji)" in js
-    assert 'launcherMark.dataset.badgeMode = useEmojiBadge ? "emoji" : "text";' in js
-    assert 'setLauncherHead("na", "Local radio", "Short name: n/a", "Connected local radio: unavailable", "Connected local radio: unavailable");' in js
-    assert 'const revision = (summary.revision && typeof summary.revision === "object") ? summary.revision : {{}};' in js
-    assert 'const launcherAppName = "Meshyface";' in js
-    assert 'return `${{revisionVersionText}} • ${{revisionCommit}}`;' in js
-    assert "launcherTertiaryParts.push(revisionInline);" in js
-    assert "setLauncherHead(launcherShort, launcherPrimary, launcherSecondary, launcherTertiary, launcherTitle);" in js
+    assert 'document.getElementById("layout-view-menu-head-mark")' not in js
+    assert 'document.getElementById("layout-view-menu-head-brand")' not in js
+    assert 'document.getElementById("layout-view-menu-head-version")' not in js
+    assert 'document.getElementById("layout-view-menu-head-commit")' not in js
+    assert "const setLauncherHead = " not in js
+    assert 'const launcherAppMark = "MF";' not in js
+    assert 'const launcherAppName = "Meshyface";' not in js
 
 
 def test_workspace_shell_records_active_layout_view_for_chat_css_hooks() -> None:

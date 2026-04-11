@@ -170,3 +170,36 @@ def test_render_html_exposes_live_update_ticker_toggle_in_settings() -> None:
     assert 'id="settings-ticker-live-update-enabled"' in html
     assert "Show live update ticker" in html
     assert "sideways scrolling live-update bar" in html
+
+
+def test_dashboard_js_renders_local_identity_in_target_ticker() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'targetLabel.textContent = hasLocalIdentity ? "Node" : "Target";' in js
+    assert 'targetMetric.classList.add("target-node-value", "node-ticker-value");' in js
+    assert 'nameRow.className = "target-node-name";' in js
+    assert 'idRow.className = "target-node-id";' in js
+    assert 'targetMetric.textContent = targetDisplay;' in js
+
+
+def test_render_html_styles_local_identity_target_ticker() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert ".topbar .summary-ticker-item-target .value.target-node-value {" in html
+    assert ".target-node-name {" in html
+    assert ".target-node-id {" in html
