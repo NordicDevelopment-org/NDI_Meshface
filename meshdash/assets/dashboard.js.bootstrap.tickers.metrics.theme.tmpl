@@ -104,6 +104,18 @@
       return normalizeThemeCustomBaseColor(raw || fallback);
     }}
 
+    function normalizeThemeCustomTintColor(raw, fallback = "#9a9996") {{
+      return normalizeThemeCustomBaseColor(raw || fallback);
+    }}
+
+    function normalizeThemeCustomTintIntensity(raw) {{
+      const parsed = Number.parseInt(String(raw ?? ""), 10);
+      if (!Number.isFinite(parsed)) {{
+        return 50;
+      }}
+      return Math.max(0, Math.min(100, parsed));
+    }}
+
     function normalizeThemeCustomColorDepth(raw) {{
       const parsed = Number.parseInt(String(raw ?? ""), 10);
       if (!Number.isFinite(parsed)) {{
@@ -116,12 +128,19 @@
       const payload = rawSettings && typeof rawSettings === "object" && !Array.isArray(rawSettings)
         ? rawSettings
         : {{}};
+      const normalizedBaseColor = normalizeThemeCustomBaseColor(payload.base_color);
+      const normalizedLineColor = normalizeThemeCustomLineColor(
+        payload.line_color,
+        normalizedBaseColor
+      );
       return {{
-        base_color: normalizeThemeCustomBaseColor(payload.base_color),
-        line_color: normalizeThemeCustomLineColor(
-          payload.line_color,
-          normalizeThemeCustomBaseColor(payload.base_color)
+        base_color: normalizedBaseColor,
+        line_color: normalizedLineColor,
+        tint_color: normalizeThemeCustomTintColor(
+          payload.tint_color,
+          normalizedLineColor
         ),
+        tint_intensity: normalizeThemeCustomTintIntensity(payload.tint_intensity),
         color_depth: normalizeThemeCustomColorDepth(payload.color_depth),
       }};
     }}
@@ -134,6 +153,18 @@
       const lineColorInput = document.getElementById("theme-custom-line-color");
       if (lineColorInput instanceof HTMLInputElement) {{
         lineColorInput.value = normalizeThemeCustomLineColor(themeCustomLineColor, themeCustomBaseColor);
+      }}
+      const tintColorInput = document.getElementById("theme-custom-tint-color");
+      if (tintColorInput instanceof HTMLInputElement) {{
+        tintColorInput.value = normalizeThemeCustomTintColor(themeCustomTintColor, themeCustomLineColor);
+      }}
+      const tintIntensityInput = document.getElementById("theme-custom-tint-intensity");
+      if (tintIntensityInput instanceof HTMLInputElement) {{
+        tintIntensityInput.value = String(normalizeThemeCustomTintIntensity(themeCustomTintIntensity));
+      }}
+      const tintIntensityValue = document.getElementById("theme-custom-tint-intensity-value");
+      if (tintIntensityValue instanceof HTMLOutputElement || tintIntensityValue instanceof HTMLElement) {{
+        tintIntensityValue.textContent = `${{normalizeThemeCustomTintIntensity(themeCustomTintIntensity)}}%`;
       }}
       const depthInput = document.getElementById("theme-custom-color-depth");
       if (depthInput instanceof HTMLInputElement) {{
@@ -199,6 +230,8 @@
       themePresetSelected = normalizeThemePresetName(payload.selected_preset, normalizedCatalog);
       themeCustomBaseColor = normalizedCustomTheme.base_color;
       themeCustomLineColor = normalizedCustomTheme.line_color;
+      themeCustomTintColor = normalizedCustomTheme.tint_color;
+      themeCustomTintIntensity = normalizedCustomTheme.tint_intensity;
       themeCustomColorDepth = normalizedCustomTheme.color_depth;
       updateThemePresetControl(payload.available_presets);
       applyThemePreference(themePreference, false);
@@ -231,15 +264,24 @@
       const cleanPreset = String(
         opts.presetName == null ? themePresetSelected : opts.presetName
       ).trim();
+      const normalizedBaseColor = normalizeThemeCustomBaseColor(
+        opts.baseColor == null ? themeCustomBaseColor : opts.baseColor
+      );
+      const normalizedLineColor = normalizeThemeCustomLineColor(
+        opts.lineColor == null ? themeCustomLineColor : opts.lineColor,
+        normalizedBaseColor
+      );
       return {{
         preset_name: cleanPreset || "default",
         custom_theme: {{
-          base_color: normalizeThemeCustomBaseColor(
-            opts.baseColor == null ? themeCustomBaseColor : opts.baseColor
+          base_color: normalizedBaseColor,
+          line_color: normalizedLineColor,
+          tint_color: normalizeThemeCustomTintColor(
+            opts.tintColor == null ? themeCustomTintColor : opts.tintColor,
+            normalizedLineColor
           ),
-          line_color: normalizeThemeCustomLineColor(
-            opts.lineColor == null ? themeCustomLineColor : opts.lineColor,
-            opts.baseColor == null ? themeCustomBaseColor : opts.baseColor
+          tint_intensity: normalizeThemeCustomTintIntensity(
+            opts.tintIntensity == null ? themeCustomTintIntensity : opts.tintIntensity
           ),
           color_depth: normalizeThemeCustomColorDepth(
             opts.colorDepth == null ? themeCustomColorDepth : opts.colorDepth
@@ -307,6 +349,8 @@
             presetName: "custom",
             baseColor: themeCustomBaseColor,
             lineColor: themeCustomLineColor,
+            tintColor: themeCustomTintColor,
+            tintIntensity: themeCustomTintIntensity,
             colorDepth: themeCustomColorDepth,
           }});
           updateThemePresetControl();
@@ -327,6 +371,52 @@
             presetName: "custom",
             baseColor: themeCustomBaseColor,
             lineColor: themeCustomLineColor,
+            tintColor: themeCustomTintColor,
+            tintIntensity: themeCustomTintIntensity,
+            colorDepth: themeCustomColorDepth,
+          }});
+          updateThemePresetControl();
+        }});
+      }}
+
+      const tintColorInput = document.getElementById("theme-custom-tint-color");
+      if (tintColorInput instanceof HTMLInputElement && tintColorInput.dataset.bound !== "1") {{
+        tintColorInput.dataset.bound = "1";
+        tintColorInput.addEventListener("input", () => {{
+          themeCustomTintColor = normalizeThemeCustomTintColor(tintColorInput.value, themeCustomLineColor);
+          syncThemeCustomControls();
+        }});
+        tintColorInput.addEventListener("change", async () => {{
+          themeCustomTintColor = normalizeThemeCustomTintColor(tintColorInput.value, themeCustomLineColor);
+          syncThemeCustomControls();
+          await saveThemeSettings({{
+            presetName: "custom",
+            baseColor: themeCustomBaseColor,
+            lineColor: themeCustomLineColor,
+            tintColor: themeCustomTintColor,
+            tintIntensity: themeCustomTintIntensity,
+            colorDepth: themeCustomColorDepth,
+          }});
+          updateThemePresetControl();
+        }});
+      }}
+
+      const tintIntensityInput = document.getElementById("theme-custom-tint-intensity");
+      if (tintIntensityInput instanceof HTMLInputElement && tintIntensityInput.dataset.bound !== "1") {{
+        tintIntensityInput.dataset.bound = "1";
+        tintIntensityInput.addEventListener("input", () => {{
+          themeCustomTintIntensity = normalizeThemeCustomTintIntensity(tintIntensityInput.value);
+          syncThemeCustomControls();
+        }});
+        tintIntensityInput.addEventListener("change", async () => {{
+          themeCustomTintIntensity = normalizeThemeCustomTintIntensity(tintIntensityInput.value);
+          syncThemeCustomControls();
+          await saveThemeSettings({{
+            presetName: "custom",
+            baseColor: themeCustomBaseColor,
+            lineColor: themeCustomLineColor,
+            tintColor: themeCustomTintColor,
+            tintIntensity: themeCustomTintIntensity,
             colorDepth: themeCustomColorDepth,
           }});
           updateThemePresetControl();
@@ -347,6 +437,8 @@
             presetName: "custom",
             baseColor: themeCustomBaseColor,
             lineColor: themeCustomLineColor,
+            tintColor: themeCustomTintColor,
+            tintIntensity: themeCustomTintIntensity,
             colorDepth: themeCustomColorDepth,
           }});
           updateThemePresetControl();

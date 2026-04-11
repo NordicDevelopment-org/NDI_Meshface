@@ -7,6 +7,8 @@ from .theme import (
     DEFAULT_CUSTOM_THEME_BASE_COLOR,
     DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
     DEFAULT_CUSTOM_THEME_LINE_COLOR,
+    DEFAULT_CUSTOM_THEME_TINT_COLOR,
+    DEFAULT_CUSTOM_THEME_TINT_INTENSITY,
     DEFAULT_THEME_BASE_COLOR,
     DEFAULT_THEME_COLOR_DEPTH,
     DEFAULT_THEME_LINE_COLOR,
@@ -14,6 +16,8 @@ from .theme import (
     normalize_theme_base_color,
     normalize_theme_color_depth,
     normalize_theme_line_color,
+    normalize_theme_tint_color,
+    normalize_theme_tint_intensity,
 )
 from .theme_presets import ThemePreset, ThemePresetMap, default_theme_presets, select_theme_preset
 
@@ -56,7 +60,16 @@ def _default_custom_theme_settings() -> dict[str, object]:
         "base_color": DEFAULT_CUSTOM_THEME_BASE_COLOR,
         "line_color": DEFAULT_CUSTOM_THEME_LINE_COLOR,
         "color_depth": DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
+        "tint_color": DEFAULT_CUSTOM_THEME_TINT_COLOR,
+        "tint_intensity": DEFAULT_CUSTOM_THEME_TINT_INTENSITY,
     }
+
+
+def _int_setting(value: object, default: int) -> int:
+    try:
+        return int(default if value is None else value)
+    except (TypeError, ValueError):
+        return int(default)
 
 
 def _normalize_custom_theme_settings(
@@ -71,19 +84,33 @@ def _normalize_custom_theme_settings(
         fallback=str(base.get("base_color") or DEFAULT_THEME_BASE_COLOR),
     )
     raw_line_color = payload.get("line_color")
+    raw_tint_color = payload.get("tint_color")
+    normalized_line_color = normalize_theme_line_color(
+        raw_line_color,
+        fallback=(
+            normalized_base_color
+            if raw_line_color is None
+            else str(base.get("line_color") or normalized_base_color or DEFAULT_THEME_LINE_COLOR)
+        ),
+    )
     return {
         "base_color": normalized_base_color,
-        "line_color": normalize_theme_line_color(
-            raw_line_color,
-            fallback=(
-                normalized_base_color
-                if raw_line_color is None
-                else str(base.get("line_color") or normalized_base_color or DEFAULT_THEME_LINE_COLOR)
-            ),
-        ),
+        "line_color": normalized_line_color,
         "color_depth": normalize_theme_color_depth(
             payload.get("color_depth"),
-            fallback=int(base.get("color_depth") or DEFAULT_THEME_COLOR_DEPTH),
+            fallback=_int_setting(base.get("color_depth"), DEFAULT_THEME_COLOR_DEPTH),
+        ),
+        "tint_color": normalize_theme_tint_color(
+            raw_tint_color,
+            fallback=(
+                normalized_line_color
+                if raw_tint_color is None
+                else str(base.get("tint_color") or normalized_line_color or DEFAULT_THEME_LINE_COLOR)
+            ),
+        ),
+        "tint_intensity": normalize_theme_tint_intensity(
+            payload.get("tint_intensity"),
+            fallback=_int_setting(base.get("tint_intensity"), DEFAULT_CUSTOM_THEME_TINT_INTENSITY),
         ),
     }
 
@@ -194,7 +221,9 @@ class ThemePresetSettings:
             return build_palette_theme_preset(
                 custom_theme.get("base_color"),
                 line_color=custom_theme.get("line_color"),
-                color_depth=int(custom_theme.get("color_depth") or DEFAULT_THEME_COLOR_DEPTH),
+                color_depth=_int_setting(custom_theme.get("color_depth"), DEFAULT_THEME_COLOR_DEPTH),
+                tint_color=custom_theme.get("tint_color"),
+                tint_intensity=_int_setting(custom_theme.get("tint_intensity"), DEFAULT_CUSTOM_THEME_TINT_INTENSITY),
             )
         return select_theme_preset(self._presets, selected)
 
@@ -205,7 +234,9 @@ class ThemePresetSettings:
         catalog["custom"] = build_palette_theme_preset(
             custom_theme.get("base_color"),
             line_color=custom_theme.get("line_color"),
-            color_depth=int(custom_theme.get("color_depth") or DEFAULT_THEME_COLOR_DEPTH),
+            color_depth=_int_setting(custom_theme.get("color_depth"), DEFAULT_THEME_COLOR_DEPTH),
+            tint_color=custom_theme.get("tint_color"),
+            tint_intensity=_int_setting(custom_theme.get("tint_intensity"), DEFAULT_CUSTOM_THEME_TINT_INTENSITY),
         )
         return catalog
 

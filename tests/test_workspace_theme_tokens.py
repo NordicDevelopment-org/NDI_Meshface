@@ -17,10 +17,15 @@ def test_dark_theme_exposes_shared_workspace_shell_tokens() -> None:
     assert DARK_THEME_VARS["--workspace-shell-border-strong"] == "#3f8f68"
     assert DARK_THEME_VARS["--workspace-shell-active-bg"] == "#173126"
     assert DARK_THEME_VARS["--workspace-shell-active-text"] == "#8ce7b4"
+    assert DARK_THEME_VARS["--surface-tint-bg"] == "#08120d"
+    assert DARK_THEME_VARS["--surface-tint-border"] == "#236744"
     assert "--workspace-shell-bg: #08120d;" in theme_css
     assert "--workspace-shell-bg-alt: #07140d;" in theme_css
     assert "--workspace-shell-border: #2d8f5d;" in theme_css
     assert "--workspace-shell-divider-bg: linear-gradient(90deg, #08140d, #0b1a11);" in theme_css
+    assert "--surface-tint-bg: #08120d;" in theme_css
+    assert "--surface-tint-border: #236744;" in theme_css
+    assert "--surface-tint-alpha-mult: 1;" in theme_css
 
 
 def test_workspace_views_reuse_shared_shell_tokens() -> None:
@@ -31,6 +36,15 @@ def test_workspace_views_reuse_shared_shell_tokens() -> None:
     assert "--network-pane-head-border: var(--workspace-shell-border);" in css
     assert "--saved-pane-head-border: var(--workspace-shell-border);" in css
     assert "--history-pane-head-border: var(--workspace-shell-border);" in css
+    assert "--network-pane-head-bg: var(--surface-tint-bg-alt, #edf6ec);" in css
+    assert "--history-pane-head-bg: var(--surface-tint-bg-alt, #edf6ec);" in css
+    assert "--saved-pane-head-bg: var(--surface-tint-bg-alt, #edf6ec);" in css
+    assert ".settings-help-note {" in css
+    assert "background: var(--surface-tint-bg-soft, #f4faf3);" in css
+    assert ".chat-member-item {" in css
+    assert "--chat-member-node-bg: var(--surface-tint-bg, #ecf5ef);" in css
+    assert ".chat-feed-item {" in css
+    assert "--chat-feed-node-bg: var(--surface-tint-bg, #f7fcf7);" in css
     assert "background: var(--workspace-shell-bg, #08110d);" in css
     assert "background: var(--workspace-shell-bg-alt);" in css
     assert "border-color: var(--workspace-shell-border);" in css

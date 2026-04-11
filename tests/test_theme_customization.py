@@ -10,6 +10,8 @@ from meshdash.theme import (
     DEFAULT_CUSTOM_THEME_BASE_COLOR,
     DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
     DEFAULT_CUSTOM_THEME_LINE_COLOR,
+    DEFAULT_CUSTOM_THEME_TINT_COLOR,
+    DEFAULT_CUSTOM_THEME_TINT_INTENSITY,
     DEV_THEME_BASE_COLOR,
     DEFAULT_THEME_COLOR_DEPTH,
     LIGHT_THEME_VARS,
@@ -45,6 +47,8 @@ def test_theme_settings_support_generated_custom_theme_state() -> None:
             "custom_theme": {
                 "base_color": "#1d4ed8",
                 "line_color": "#ef4444",
+                "tint_color": "#64748b",
+                "tint_intensity": 61,
                 "color_depth": 72,
             },
         }
@@ -53,6 +57,8 @@ def test_theme_settings_support_generated_custom_theme_state() -> None:
     expected_custom = build_palette_theme_preset(
         "#1d4ed8",
         line_color="#ef4444",
+        tint_color="#64748b",
+        tint_intensity=61,
         color_depth=72,
     )
     default_line_custom = build_palette_theme_preset("#1d4ed8", color_depth=72)
@@ -62,6 +68,8 @@ def test_theme_settings_support_generated_custom_theme_state() -> None:
     assert response["custom_theme"] == {
         "base_color": "#1d4ed8",
         "line_color": "#ef4444",
+        "tint_color": "#64748b",
+        "tint_intensity": 61,
         "color_depth": 72,
     }
     assert "custom" in response["available_presets"]
@@ -81,6 +89,8 @@ def test_theme_settings_default_to_meshyface_custom_palette() -> None:
     expected_custom = build_palette_theme_preset(
         DEFAULT_CUSTOM_THEME_BASE_COLOR,
         line_color=DEFAULT_CUSTOM_THEME_LINE_COLOR,
+        tint_color=DEFAULT_CUSTOM_THEME_TINT_COLOR,
+        tint_intensity=DEFAULT_CUSTOM_THEME_TINT_INTENSITY,
         color_depth=DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
     )
 
@@ -88,8 +98,44 @@ def test_theme_settings_default_to_meshyface_custom_palette() -> None:
     assert settings.custom_theme_settings() == {
         "base_color": DEFAULT_CUSTOM_THEME_BASE_COLOR,
         "line_color": DEFAULT_CUSTOM_THEME_LINE_COLOR,
+        "tint_color": DEFAULT_CUSTOM_THEME_TINT_COLOR,
+        "tint_intensity": DEFAULT_CUSTOM_THEME_TINT_INTENSITY,
         "color_depth": DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
     }
+    assert settings.selected_preset_tokens() == expected_custom
+
+
+def test_theme_settings_preserve_zero_tint_intensity() -> None:
+    settings = ThemePresetSettings(
+        presets=default_theme_presets(),
+        selected_preset="custom",
+        settings_path=None,
+    )
+
+    response = settings.apply_settings(
+        {
+            "preset_name": "custom",
+            "custom_theme": {
+                "base_color": "#1d4ed8",
+                "line_color": "#9a9996",
+                "tint_color": "#9a9996",
+                "tint_intensity": 0,
+                "color_depth": 0,
+            },
+        }
+    )
+
+    expected_custom = build_palette_theme_preset(
+        "#1d4ed8",
+        line_color="#9a9996",
+        tint_color="#9a9996",
+        tint_intensity=0,
+        color_depth=0,
+    )
+
+    assert response["ok"] is True
+    assert response["custom_theme"]["tint_intensity"] == 0
+    assert response["custom_theme"]["color_depth"] == 0
     assert settings.selected_preset_tokens() == expected_custom
 
 
@@ -114,27 +160,35 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
 
     assert 'id="theme-custom-base-color"' in html
     assert 'id="theme-custom-line-color"' in html
+    assert 'id="theme-custom-tint-color"' in html
+    assert 'id="theme-custom-tint-intensity"' in html
+    assert 'id="theme-custom-tint-intensity-value"' in html
     assert 'id="theme-custom-color-depth"' in html
     assert 'id="theme-custom-color-depth-value"' in html
     assert 'id="settings-appearance-badge-emoji"' in html
     assert '<option value="custom">custom</option>' in html
-    assert "Fresh installs default to Meshyface blue with a neutral gray line" in html
+    assert "Fresh installs default to Meshyface blue with a neutral gray line and tint" in html
     assert 'value="#2563eb"' in html
     assert 'value="#9a9996"' in html
     assert 'value="50"' in html
     assert '>50%</output>' in html
-    assert "Higher color depth increases tint and gradient presence" in html
+    assert "Tint color drives the shared shell tint" in html
+    assert "Tint intensity controls how strongly that shared tint shows up" in html
     assert "Badge shows in the workspace menu header" in html
 
     assert 'let themePresetSelected = "custom";' in js
     assert 'let themeCustomBaseColor = "#2563eb";' in js
     assert 'let themeCustomLineColor = "#9a9996";' in js
+    assert 'let themeCustomTintColor = "#9a9996";' in js
+    assert "let themeCustomTintIntensity = 50;" in js
     assert "let themeCustomColorDepth = 50;" in js
     assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' in js
     assert "function formatThemePresetLabel(name) {" in js
     assert 'return "green";' in js
     assert "function normalizeThemeCustomSettings(rawSettings) {" in js
     assert "function normalizeThemeCustomLineColor(raw, fallback = \"#9a9996\") {" in js
+    assert "function normalizeThemeCustomTintColor(raw, fallback = \"#9a9996\") {" in js
+    assert "function normalizeThemeCustomTintIntensity(raw) {" in js
     assert "function normalizeSettingsBadgeEmoji(value) {" in js
     assert "function syncThemeCustomControls() {" in js
     assert "function buildThemeSettingsSavePayload(options = null) {" in js
@@ -145,5 +199,7 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert 'controlId === "settings-appearance-badge-emoji"' in js
     assert 'controlId === "theme-custom-base-color"' in js
     assert 'controlId === "theme-custom-line-color"' in js
+    assert 'controlId === "theme-custom-tint-color"' in js
+    assert 'controlId === "theme-custom-tint-intensity"' in js
     assert 'controlId === "theme-custom-color-depth"' in js
     assert "payload.custom_theme" in js

@@ -1544,7 +1544,7 @@
                 </select>
               </label>
               <div class="settings-help-note">
-                Fresh installs default to Meshyface blue with a neutral gray line, and changing the controls below keeps the preset on <strong>custom</strong>.
+                Fresh installs default to Meshyface blue with a neutral gray line and tint, and changing the controls below keeps the preset on <strong>custom</strong>.
               </div>
               <div class="settings-row">
                 <label class="settings-field" for="theme-custom-base-color">
@@ -1566,6 +1566,32 @@
                     value="#9a9996"
                     aria-label="Custom theme line color"
                   />
+                </label>
+                <label class="settings-field" for="theme-custom-tint-color">
+                  <span class="settings-label">Tint color</span>
+                  <input
+                    id="theme-custom-tint-color"
+                    class="settings-input settings-color-input"
+                    type="color"
+                    value="#9a9996"
+                    aria-label="Custom theme tint color"
+                  />
+                </label>
+                <label class="settings-field settings-theme-depth-field" for="theme-custom-tint-intensity">
+                  <span class="settings-label">Tint intensity</span>
+                  <div class="settings-range-row">
+                    <input
+                      id="theme-custom-tint-intensity"
+                      class="settings-range-input"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value="50"
+                      aria-label="Custom theme tint intensity"
+                    />
+                    <output id="theme-custom-tint-intensity-value" for="theme-custom-tint-intensity">50%</output>
+                  </div>
                 </label>
                 <label class="settings-field settings-theme-depth-field" for="theme-custom-color-depth">
                   <span class="settings-label">Color depth</span>
@@ -1604,7 +1630,10 @@
                 </label>
               </div>
               <div class="settings-help-note">
-                Higher color depth increases tint and gradient presence across the shell chrome.
+                Tint color drives the shared shell tint used by help notes, pane headers, and untagged node or chat rows when node-specific tinting is not active.
+              </div>
+              <div class="settings-help-note">
+                Tint intensity controls how strongly that shared tint shows up on neutral surfaces. Color depth still tunes the broader shell palette and gradients.
               </div>
               <div class="settings-help-note">
                 Badge shows in the workspace menu header and falls back to the short-name mark when set to auto.
@@ -1621,7 +1650,7 @@
                 <span>Apply unique node colors to chat feed</span>
               </label>
               <div class="settings-help-note">
-                Off keeps tag colors, but untagged nodes use the shared neutral tint.
+                Off keeps tag colors, but untagged nodes and messages use the shared theme tint.
               </div>
               <div class="settings-help-note">
                 <strong>Console</strong> tuning for packet logs and command output.
