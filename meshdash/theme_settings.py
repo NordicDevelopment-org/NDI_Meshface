@@ -209,27 +209,7 @@ class ThemePresetSettings:
         names.sort()
         return ["default", *names] if "default" in self._presets else names
 
-    def selected_preset_name(self) -> str:
-        with self._lock:
-            return self._selected_preset
-
-    def selected_preset_tokens(self) -> ThemePreset:
-        with self._lock:
-            selected = self._selected_preset
-            custom_theme = dict(self._custom_theme)
-        if selected == "custom":
-            return build_palette_theme_preset(
-                custom_theme.get("base_color"),
-                line_color=custom_theme.get("line_color"),
-                color_depth=_int_setting(custom_theme.get("color_depth"), DEFAULT_THEME_COLOR_DEPTH),
-                tint_color=custom_theme.get("tint_color"),
-                tint_intensity=_int_setting(custom_theme.get("tint_intensity"), DEFAULT_CUSTOM_THEME_TINT_INTENSITY),
-            )
-        return select_theme_preset(self._presets, selected)
-
-    def preset_catalog(self) -> ThemePresetMap:
-        with self._lock:
-            custom_theme = dict(self._custom_theme)
+    def _preset_catalog_for_custom_theme(self, custom_theme: dict[str, object]) -> ThemePresetMap:
         catalog = {name: preset for name, preset in self._presets.items()}
         catalog["custom"] = build_palette_theme_preset(
             custom_theme.get("base_color"),
@@ -240,6 +220,43 @@ class ThemePresetSettings:
         )
         return catalog
 
+    def _available_preset_names_for_catalog(self, catalog: ThemePresetMap) -> list[str]:
+        names = [str(name) for name in catalog.keys() if str(name) != "default"]
+        names.sort()
+        return ["default", *names] if "default" in self._presets else names
+
+    def _build_settings_payload(
+        self,
+        *,
+        selected_preset: str,
+        custom_theme: dict[str, object],
+    ) -> dict[str, object]:
+        catalog = self._preset_catalog_for_custom_theme(custom_theme)
+        return {
+            "ok": True,
+            "selected_preset": selected_preset,
+            "available_presets": self._available_preset_names_for_catalog(catalog),
+            "presets": catalog,
+            "custom_theme": dict(custom_theme),
+        }
+
+    def selected_preset_name(self) -> str:
+        with self._lock:
+            return self._selected_preset
+
+    def selected_preset_tokens(self) -> ThemePreset:
+        with self._lock:
+            selected = self._selected_preset
+            custom_theme = dict(self._custom_theme)
+        if selected == "custom":
+            return self._preset_catalog_for_custom_theme(custom_theme)["custom"]
+        return select_theme_preset(self._presets, selected)
+
+    def preset_catalog(self) -> ThemePresetMap:
+        with self._lock:
+            custom_theme = dict(self._custom_theme)
+        return self._preset_catalog_for_custom_theme(custom_theme)
+
     def custom_theme_settings(self) -> dict[str, object]:
         with self._lock:
             return dict(self._custom_theme)
@@ -248,13 +265,10 @@ class ThemePresetSettings:
         with self._lock:
             selected = self._selected_preset
             custom_theme = dict(self._custom_theme)
-        return {
-            "ok": True,
-            "selected_preset": selected,
-            "available_presets": self.available_presets(),
-            "presets": self.preset_catalog(),
-            "custom_theme": custom_theme,
-        }
+        return self._build_settings_payload(
+            selected_preset=selected,
+            custom_theme=custom_theme,
+        )
 
     def set_selected_preset(self, preset_name: object) -> dict[str, object]:
         return self.apply_settings({"preset_name": preset_name})
@@ -263,6 +277,9 @@ class ThemePresetSettings:
         payload_obj = request if isinstance(request, dict) else {}
         raw_preset = None
         raw_custom_theme = payload_obj.get("custom_theme") if payload_obj else getattr(request, "custom_theme", None)
+        preview_only = bool(payload_obj.get("preview_only")) if payload_obj else bool(
+            getattr(request, "preview_only", False)
+        )
         if payload_obj:
             raw_preset = payload_obj.get("preset_name")
         elif hasattr(request, "preset_name"):
@@ -282,22 +299,32 @@ class ThemePresetSettings:
             )
             selected = self._selected_preset
             if clean is not None:
-                available = set(self.preset_catalog().keys())
+                available = set(self._preset_catalog_for_custom_theme(next_custom_theme).keys())
                 if clean not in available:
                     payload = self.get_settings_payload()
                     payload["ok"] = False
                     payload["error"] = f"Unknown theme preset: {clean}"
                     return payload
-                self._selected_preset = clean
-                selected = self._selected_preset
-            self._custom_theme = next_custom_theme
-            persist_error = _save_persisted_theme_settings(
-                self._settings_path,
-                selected_preset=selected,
-                custom_theme=self._custom_theme,
-            )
+                selected = clean
+            if preview_only:
+                persist_error = None
+                payload = self._build_settings_payload(
+                    selected_preset=selected,
+                    custom_theme=next_custom_theme,
+                )
+            else:
+                self._selected_preset = selected
+                self._custom_theme = next_custom_theme
+                persist_error = _save_persisted_theme_settings(
+                    self._settings_path,
+                    selected_preset=self._selected_preset,
+                    custom_theme=self._custom_theme,
+                )
+                payload = self._build_settings_payload(
+                    selected_preset=self._selected_preset,
+                    custom_theme=dict(self._custom_theme),
+                )
 
-        payload = self.get_settings_payload()
         if persist_error:
             payload["persist_error"] = persist_error
         return payload

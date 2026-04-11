@@ -145,6 +145,61 @@
       }};
     }}
 
+    let themeSettingsSaveDebounceTimer = null;
+    let themeSettingsStatusResetTimer = null;
+    let themeSettingsRequestSerial = 0;
+    let themeSettingsAppliedSerial = 0;
+    let themeSettingsAbortController = null;
+
+    function syncThemePresetControlValue() {{
+      const select = document.getElementById("theme-preset-select");
+      if (!(select instanceof HTMLSelectElement)) {{
+        return;
+      }}
+      const selected = normalizeThemePresetName(themePresetSelected, themePresetCatalog);
+      if ([...select.options].some((option) => option.value === selected)) {{
+        select.value = selected;
+      }}
+    }}
+
+    function setThemeLivePreviewStatus(message = "Updates while you drag.", resetDelayMs = 0) {{
+      const status = document.getElementById("theme-live-preview-status");
+      if (!(status instanceof HTMLElement)) {{
+        return;
+      }}
+      if (themeSettingsStatusResetTimer !== null) {{
+        window.clearTimeout(themeSettingsStatusResetTimer);
+        themeSettingsStatusResetTimer = null;
+      }}
+      status.textContent = String(message || "Updates while you drag.");
+      if (resetDelayMs > 0) {{
+        themeSettingsStatusResetTimer = window.setTimeout(() => {{
+          themeSettingsStatusResetTimer = null;
+          status.textContent = "Updates while you drag.";
+        }}, resetDelayMs);
+      }}
+    }}
+
+    function buildCurrentThemeCustomOptions(extraOptions = null) {{
+      const opts = extraOptions && typeof extraOptions === "object" ? extraOptions : {{}};
+      return {{
+        presetName: opts.presetName == null ? "custom" : opts.presetName,
+        baseColor: opts.baseColor == null ? themeCustomBaseColor : opts.baseColor,
+        lineColor: opts.lineColor == null ? themeCustomLineColor : opts.lineColor,
+        tintColor: opts.tintColor == null ? themeCustomTintColor : opts.tintColor,
+        tintIntensity: opts.tintIntensity == null ? themeCustomTintIntensity : opts.tintIntensity,
+        colorDepth: opts.colorDepth == null ? themeCustomColorDepth : opts.colorDepth,
+        previewOnly: Boolean(opts.previewOnly),
+      }};
+    }}
+
+    function clearThemeSettingsPreviewTimer() {{
+      if (themeSettingsSaveDebounceTimer !== null) {{
+        window.clearTimeout(themeSettingsSaveDebounceTimer);
+        themeSettingsSaveDebounceTimer = null;
+      }}
+    }}
+
     function syncThemeCustomControls() {{
       const colorInput = document.getElementById("theme-custom-base-color");
       if (colorInput instanceof HTMLInputElement) {{
@@ -220,10 +275,11 @@
       syncThemeCustomControls();
     }}
 
-    function applyThemeSettingsPayload(payload) {{
+    function applyThemeSettingsPayload(payload, options = null) {{
       if (!payload || typeof payload !== "object" || Array.isArray(payload)) {{
         return false;
       }}
+      const opts = options && typeof options === "object" ? options : {{}};
       const normalizedCatalog = normalizeThemePresetCatalog(payload.presets);
       const normalizedCustomTheme = normalizeThemeCustomSettings(payload.custom_theme);
       themePresetCatalog = normalizedCatalog;
@@ -233,7 +289,12 @@
       themeCustomTintColor = normalizedCustomTheme.tint_color;
       themeCustomTintIntensity = normalizedCustomTheme.tint_intensity;
       themeCustomColorDepth = normalizedCustomTheme.color_depth;
-      updateThemePresetControl(payload.available_presets);
+      if (opts.refreshControls === false) {{
+        syncThemePresetControlValue();
+        syncThemeCustomControls();
+      }} else {{
+        updateThemePresetControl(payload.available_presets);
+      }}
       applyThemePreference(themePreference, false);
       return true;
     }}
@@ -273,6 +334,7 @@
       );
       return {{
         preset_name: cleanPreset || "default",
+        preview_only: Boolean(opts.previewOnly),
         custom_theme: {{
           base_color: normalizedBaseColor,
           line_color: normalizedLineColor,
@@ -290,26 +352,89 @@
       }};
     }}
 
-    async function saveThemeSettings(options = null) {{
+    async function saveThemeSettings(options = null, requestOptions = null) {{
+      const opts = requestOptions && typeof requestOptions === "object" ? requestOptions : {{}};
       const payloadBody = buildThemeSettingsSavePayload(options);
+      const requestSerial = ++themeSettingsRequestSerial;
+      let abortController = null;
+      if (typeof AbortController === "function") {{
+        if (themeSettingsAbortController instanceof AbortController) {{
+          themeSettingsAbortController.abort();
+        }}
+        abortController = new AbortController();
+        themeSettingsAbortController = abortController;
+      }}
       try {{
-        const resp = await fetch(themeSettingsEndpoint, {{
+        const requestInit = {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify(payloadBody),
-        }});
+        }};
+        if (abortController instanceof AbortController) {{
+          requestInit.signal = abortController.signal;
+        }}
+        const resp = await fetch(themeSettingsEndpoint, requestInit);
         const payload = await resp.json().catch(() => ({{ ok: false, error: `API ${{resp.status}}` }}));
         if (!resp.ok || !payload || payload.ok === false) {{
           const message = payload && payload.error ? payload.error : `API ${{resp.status}}`;
           throw new Error(String(message));
         }}
-        return applyThemeSettingsPayload(payload);
+        if (requestSerial < themeSettingsAppliedSerial) {{
+          return false;
+        }}
+        themeSettingsAppliedSerial = requestSerial;
+        return applyThemeSettingsPayload(payload, {{
+          refreshControls: opts.refreshControls !== false,
+        }});
       }} catch (err) {{
+        if (abortController instanceof AbortController && abortController.signal.aborted) {{
+          return false;
+        }}
         const msg = err instanceof Error ? err.message : String(err || "unknown error");
-        appendConsoleLine(`theme-settings-save|${{Date.now()}}|${{msg}}`, `[theme settings] save failed: ${{msg}}`);
-        updateThemePresetControl();
+        if (opts.logErrors !== false) {{
+          appendConsoleLine(`theme-settings-save|${{Date.now()}}|${{msg}}`, `[theme settings] save failed: ${{msg}}`);
+        }}
+        if (opts.refreshControls !== false) {{
+          updateThemePresetControl();
+        }} else {{
+          syncThemePresetControlValue();
+          syncThemeCustomControls();
+        }}
+      }} finally {{
+        if (themeSettingsAbortController === abortController) {{
+          themeSettingsAbortController = null;
+        }}
       }}
       return false;
+    }}
+
+    function queueLiveThemePreview() {{
+      clearThemeSettingsPreviewTimer();
+      setThemeLivePreviewStatus("Previewing live...");
+      themeSettingsSaveDebounceTimer = window.setTimeout(() => {{
+        themeSettingsSaveDebounceTimer = null;
+        void saveThemeSettings(
+          buildCurrentThemeCustomOptions({{ previewOnly: true }}),
+          {{
+            refreshControls: false,
+            logErrors: false,
+          }},
+        );
+      }}, 110);
+    }}
+
+    async function persistThemeCustomControls() {{
+      clearThemeSettingsPreviewTimer();
+      setThemeLivePreviewStatus("Saving...");
+      const saved = await saveThemeSettings(
+        buildCurrentThemeCustomOptions(),
+        {{
+          refreshControls: true,
+        }},
+      );
+      updateThemePresetControl();
+      setThemeLivePreviewStatus(saved ? "Saved." : "Live preview paused.", saved ? 1000 : 1600);
+      return saved;
     }}
 
     function bindThemePresetSelector() {{
@@ -329,8 +454,10 @@
           return;
         }}
         select.disabled = true;
+        setThemeLivePreviewStatus("Saving...");
         await saveThemeSettings({{ presetName: selected }});
         updateThemePresetControl();
+        setThemeLivePreviewStatus("Saved.", 1000);
       }});
     }}
 
@@ -341,19 +468,12 @@
         colorInput.addEventListener("input", () => {{
           themeCustomBaseColor = normalizeThemeCustomBaseColor(colorInput.value);
           syncThemeCustomControls();
+          queueLiveThemePreview();
         }});
         colorInput.addEventListener("change", async () => {{
           themeCustomBaseColor = normalizeThemeCustomBaseColor(colorInput.value);
           syncThemeCustomControls();
-          await saveThemeSettings({{
-            presetName: "custom",
-            baseColor: themeCustomBaseColor,
-            lineColor: themeCustomLineColor,
-            tintColor: themeCustomTintColor,
-            tintIntensity: themeCustomTintIntensity,
-            colorDepth: themeCustomColorDepth,
-          }});
-          updateThemePresetControl();
+          await persistThemeCustomControls();
         }});
       }}
 
@@ -363,19 +483,12 @@
         lineColorInput.addEventListener("input", () => {{
           themeCustomLineColor = normalizeThemeCustomLineColor(lineColorInput.value, themeCustomBaseColor);
           syncThemeCustomControls();
+          queueLiveThemePreview();
         }});
         lineColorInput.addEventListener("change", async () => {{
           themeCustomLineColor = normalizeThemeCustomLineColor(lineColorInput.value, themeCustomBaseColor);
           syncThemeCustomControls();
-          await saveThemeSettings({{
-            presetName: "custom",
-            baseColor: themeCustomBaseColor,
-            lineColor: themeCustomLineColor,
-            tintColor: themeCustomTintColor,
-            tintIntensity: themeCustomTintIntensity,
-            colorDepth: themeCustomColorDepth,
-          }});
-          updateThemePresetControl();
+          await persistThemeCustomControls();
         }});
       }}
 
@@ -385,19 +498,12 @@
         tintColorInput.addEventListener("input", () => {{
           themeCustomTintColor = normalizeThemeCustomTintColor(tintColorInput.value, themeCustomLineColor);
           syncThemeCustomControls();
+          queueLiveThemePreview();
         }});
         tintColorInput.addEventListener("change", async () => {{
           themeCustomTintColor = normalizeThemeCustomTintColor(tintColorInput.value, themeCustomLineColor);
           syncThemeCustomControls();
-          await saveThemeSettings({{
-            presetName: "custom",
-            baseColor: themeCustomBaseColor,
-            lineColor: themeCustomLineColor,
-            tintColor: themeCustomTintColor,
-            tintIntensity: themeCustomTintIntensity,
-            colorDepth: themeCustomColorDepth,
-          }});
-          updateThemePresetControl();
+          await persistThemeCustomControls();
         }});
       }}
 
@@ -407,19 +513,12 @@
         tintIntensityInput.addEventListener("input", () => {{
           themeCustomTintIntensity = normalizeThemeCustomTintIntensity(tintIntensityInput.value);
           syncThemeCustomControls();
+          queueLiveThemePreview();
         }});
         tintIntensityInput.addEventListener("change", async () => {{
           themeCustomTintIntensity = normalizeThemeCustomTintIntensity(tintIntensityInput.value);
           syncThemeCustomControls();
-          await saveThemeSettings({{
-            presetName: "custom",
-            baseColor: themeCustomBaseColor,
-            lineColor: themeCustomLineColor,
-            tintColor: themeCustomTintColor,
-            tintIntensity: themeCustomTintIntensity,
-            colorDepth: themeCustomColorDepth,
-          }});
-          updateThemePresetControl();
+          await persistThemeCustomControls();
         }});
       }}
 
@@ -429,23 +528,17 @@
         depthInput.addEventListener("input", () => {{
           themeCustomColorDepth = normalizeThemeCustomColorDepth(depthInput.value);
           syncThemeCustomControls();
+          queueLiveThemePreview();
         }});
         depthInput.addEventListener("change", async () => {{
           themeCustomColorDepth = normalizeThemeCustomColorDepth(depthInput.value);
           syncThemeCustomControls();
-          await saveThemeSettings({{
-            presetName: "custom",
-            baseColor: themeCustomBaseColor,
-            lineColor: themeCustomLineColor,
-            tintColor: themeCustomTintColor,
-            tintIntensity: themeCustomTintIntensity,
-            colorDepth: themeCustomColorDepth,
-          }});
-          updateThemePresetControl();
+          await persistThemeCustomControls();
         }});
       }}
 
       syncThemeCustomControls();
+      setThemeLivePreviewStatus();
     }}
 
     function systemPreferredTheme() {{

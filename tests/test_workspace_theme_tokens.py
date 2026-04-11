@@ -41,6 +41,15 @@ def test_workspace_views_reuse_shared_shell_tokens() -> None:
     assert "--saved-pane-head-bg: var(--surface-tint-bg-alt, #edf6ec);" in css
     assert ".settings-help-note {" in css
     assert "background: var(--surface-tint-bg-soft, #f4faf3);" in css
+    assert ".theme-live-preview {" in css
+    assert ".theme-preview-card-shell {" in css
+    assert "color-mix(in srgb, var(--panel) 94%, var(--bg) 6%)" in css
+    assert ".theme-preview-card-tint {" in css
+    assert "var(--surface-tint-bg-soft, #f4faf3)" in css
+    assert ".theme-preview-card-console {" in css
+    assert "var(--surface-tint-border-strong, #b8cab9)" in css
+    assert "[data-theme=\"dark\"] .theme-live-preview {" in css
+    assert "[data-theme=\"dark\"] .theme-preview-card-shell {" in css
     assert ".chat-member-item {" in css
     assert "--chat-member-node-bg: color-mix(in srgb, var(--panel) 94%, var(--bg) 6%);" in css
     assert "--chat-member-node-sat-mult: 0;" in css

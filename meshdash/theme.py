@@ -243,6 +243,7 @@ def _rgba(rgb: tuple[int, int, int], alpha: float) -> str:
 
 def _intensity_mix(intensity: int, low: float, high: float) -> float:
     ratio = normalize_theme_tint_intensity(intensity) / 100.0
+    ratio = 1.0 - ((1.0 - ratio) ** 1.35)
     return low + ((high - low) * ratio)
 
 
@@ -391,52 +392,53 @@ def build_palette_theme_preset(
     tint_start_hue = int(round(tint_hue_degrees)) % 360
     tint_end_hue = int(round(tint_hue_degrees + 28.0)) % 360
     tint_outline_hue = int(round(tint_hue_degrees + (8.0 if tint_saturation >= 0.06 else 0.0))) % 360
-    tint_sat_mult = min(1.08, (intensity / 100.0) * tint_saturation * 1.9)
-    tint_outline_sat_mult = min(1.16, (intensity / 100.0) * tint_saturation * 2.1)
-    tint_dark_sat_mult = min(1.12, (intensity / 100.0) * tint_saturation * 2.0)
-    tint_outline_dark_sat_mult = min(1.2, (intensity / 100.0) * tint_saturation * 2.2)
-    tint_alpha_mult = intensity / 100.0
+    tint_intensity_ratio = _intensity_mix(intensity, 0.0, 1.0)
+    tint_sat_mult = min(1.08, tint_intensity_ratio * tint_saturation * 1.9)
+    tint_outline_sat_mult = min(1.16, tint_intensity_ratio * tint_saturation * 2.1)
+    tint_dark_sat_mult = min(1.12, tint_intensity_ratio * tint_saturation * 2.0)
+    tint_outline_dark_sat_mult = min(1.2, tint_intensity_ratio * tint_saturation * 2.2)
+    tint_alpha_mult = tint_intensity_ratio
     tint_dark_alpha_mult = max(0.0, min(1.0, tint_alpha_mult * 0.86))
 
-    light_surface_soft_rgb = _mix_rgb((255, 255, 255), tint_rgb, _intensity_mix(intensity, 0.0, 0.08))
-    light_surface_bg_rgb = _mix_rgb((255, 255, 255), tint_rgb, _intensity_mix(intensity, 0.0, 0.12))
-    light_surface_bg_alt_rgb = _mix_rgb((255, 255, 255), tint_rgb, _intensity_mix(intensity, 0.0, 0.18))
-    light_surface_hover_rgb = _mix_rgb((255, 255, 255), tint_rgb, _intensity_mix(intensity, 0.0, 0.22))
+    light_surface_soft_rgb = _mix_rgb((255, 255, 255), tint_rgb, _intensity_mix(intensity, 0.0, 0.18))
+    light_surface_bg_rgb = _mix_rgb((255, 255, 255), tint_rgb, _intensity_mix(intensity, 0.0, 0.26))
+    light_surface_bg_alt_rgb = _mix_rgb((255, 255, 255), tint_rgb, _intensity_mix(intensity, 0.0, 0.34))
+    light_surface_hover_rgb = _mix_rgb((255, 255, 255), tint_rgb, _intensity_mix(intensity, 0.0, 0.42))
     light_surface_border_rgb = _ensure_max_luminance(
-        _mix_rgb(_hex_to_rgb(LIGHT_THEME_VARS["--line"]), tint_rgb, _intensity_mix(intensity, 0.0, 0.5)),
+        _mix_rgb(_hex_to_rgb(LIGHT_THEME_VARS["--line"]), tint_rgb, _intensity_mix(intensity, 0.0, 0.68)),
         0.34,
     )
     light_surface_border_strong_rgb = _ensure_max_luminance(
-        _mix_rgb(light_surface_border_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.3)),
+        _mix_rgb(light_surface_border_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.54)),
         0.28,
     )
     light_surface_text_rgb = _ensure_max_luminance(
-        _mix_rgb(light_ink_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.1)),
+        _mix_rgb(light_ink_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.16)),
         0.08,
     )
     light_surface_text_soft_rgb = _ensure_max_luminance(
-        _mix_rgb(light_muted_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.14)),
+        _mix_rgb(light_muted_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.22)),
         0.22,
     )
-    light_surface_divider_start_rgb = _mix_rgb(light_surface_soft_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.02))
-    light_surface_divider_end_rgb = _mix_rgb(light_surface_bg_alt_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.04))
+    light_surface_divider_start_rgb = _mix_rgb(light_surface_soft_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.06))
+    light_surface_divider_end_rgb = _mix_rgb(light_surface_bg_alt_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.12))
 
-    dark_surface_soft_rgb = _mix_rgb(workspace_bg_alt_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.08))
-    dark_surface_bg_rgb = _mix_rgb(workspace_bg_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.1))
-    dark_surface_bg_alt_rgb = _mix_rgb(workspace_bg_alt_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.14))
-    dark_surface_hover_rgb = _mix_rgb(workspace_hover_bg_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.18))
-    dark_surface_border_rgb = _mix_rgb(workspace_border_muted_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.36))
-    dark_surface_border_strong_rgb = _mix_rgb(workspace_border_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.44))
+    dark_surface_soft_rgb = _mix_rgb(workspace_bg_alt_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.18))
+    dark_surface_bg_rgb = _mix_rgb(workspace_bg_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.24))
+    dark_surface_bg_alt_rgb = _mix_rgb(workspace_bg_alt_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.32))
+    dark_surface_hover_rgb = _mix_rgb(workspace_hover_bg_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.4))
+    dark_surface_border_rgb = _mix_rgb(workspace_border_muted_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.52))
+    dark_surface_border_strong_rgb = _mix_rgb(workspace_border_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.64))
     dark_surface_text_rgb = _ensure_min_luminance(
-        _mix_rgb(workspace_text_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.08)),
+        _mix_rgb(workspace_text_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.14)),
         0.72,
     )
     dark_surface_text_soft_rgb = _ensure_min_luminance(
-        _mix_rgb(workspace_text_soft_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.12)),
+        _mix_rgb(workspace_text_soft_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.2)),
         0.5,
     )
-    dark_surface_divider_start_rgb = _mix_rgb(dark_surface_soft_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.03))
-    dark_surface_divider_end_rgb = _mix_rgb(dark_surface_bg_alt_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.05))
+    dark_surface_divider_start_rgb = _mix_rgb(dark_surface_soft_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.08))
+    dark_surface_divider_end_rgb = _mix_rgb(dark_surface_bg_alt_rgb, tint_rgb, _intensity_mix(intensity, 0.0, 0.14))
 
     light_tokens = {
         "--bg": _rgb_to_hex(light_bg_rgb),

@@ -3,6 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from meshdash.api_input_theme import parse_theme_settings_request
 from meshdash.html_js import build_dashboard_js
 from meshdash.html_template import render_html
 from meshdash.theme import (
@@ -139,6 +140,89 @@ def test_theme_settings_preserve_zero_tint_intensity() -> None:
     assert settings.selected_preset_tokens() == expected_custom
 
 
+def test_theme_settings_preview_request_does_not_persist_runtime_state() -> None:
+    settings = ThemePresetSettings(
+        presets=default_theme_presets(),
+        selected_preset="default",
+        settings_path=None,
+    )
+
+    response = settings.apply_settings(
+        {
+            "preset_name": "custom",
+            "preview_only": True,
+            "custom_theme": {
+                "base_color": "#1d4ed8",
+                "line_color": "#ef4444",
+                "tint_color": "#64748b",
+                "tint_intensity": 83,
+                "color_depth": 91,
+            },
+        }
+    )
+
+    assert response["ok"] is True
+    assert response["selected_preset"] == "custom"
+    assert response["custom_theme"]["tint_intensity"] == 83
+    assert response["custom_theme"]["color_depth"] == 91
+    assert settings.selected_preset_name() == "default"
+    assert settings.custom_theme_settings() == {
+        "base_color": DEFAULT_CUSTOM_THEME_BASE_COLOR,
+        "line_color": DEFAULT_CUSTOM_THEME_LINE_COLOR,
+        "tint_color": DEFAULT_CUSTOM_THEME_TINT_COLOR,
+        "tint_intensity": DEFAULT_CUSTOM_THEME_TINT_INTENSITY,
+        "color_depth": DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
+    }
+
+
+def test_theme_settings_request_parser_supports_preview_only() -> None:
+    request = parse_theme_settings_request(
+        b'{"preset_name":"custom","preview_only":true,"custom_theme":{"tint_intensity":77}}'
+    )
+
+    assert request.preset_name == "custom"
+    assert request.preview_only is True
+    assert request.custom_theme == {"tint_intensity": 77}
+
+
+def test_tint_intensity_generates_clear_surface_spread() -> None:
+    def _hex_to_rgb(value: str) -> tuple[int, int, int]:
+        return (
+            int(value[1:3], 16),
+            int(value[3:5], 16),
+            int(value[5:7], 16),
+        )
+
+    def _rgb_distance(start: str, end: str) -> int:
+        start_rgb = _hex_to_rgb(start)
+        end_rgb = _hex_to_rgb(end)
+        return sum(abs(end_channel - start_channel) for start_channel, end_channel in zip(start_rgb, end_rgb))
+
+    neutral = build_palette_theme_preset(
+        "#2563eb",
+        line_color="#9a9996",
+        tint_color="#2563eb",
+        tint_intensity=0,
+        color_depth=0,
+    )
+    vivid = build_palette_theme_preset(
+        "#2563eb",
+        line_color="#9a9996",
+        tint_color="#2563eb",
+        tint_intensity=100,
+        color_depth=0,
+    )
+
+    assert neutral["light"]["--surface-tint-bg"] == "#ffffff"
+    assert neutral["dark"]["--surface-tint-bg"] == "#0c1d2f"
+    assert neutral["light"]["--surface-tint-alpha-mult"] == "0"
+    assert vivid["light"]["--surface-tint-alpha-mult"] == "1"
+    assert _rgb_distance(neutral["light"]["--surface-tint-bg"], vivid["light"]["--surface-tint-bg"]) >= 90
+    assert _rgb_distance(neutral["dark"]["--surface-tint-bg"], vivid["dark"]["--surface-tint-bg"]) >= 55
+    assert vivid["light"]["--surface-tint-border"] != neutral["light"]["--surface-tint-border"]
+    assert vivid["dark"]["--surface-tint-border"] != neutral["dark"]["--surface-tint-border"]
+
+
 def test_theme_customization_controls_are_rendered_and_wired() -> None:
     html = render_html(
         refresh_ms=1000,
@@ -166,15 +250,22 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert 'id="theme-custom-color-depth"' in html
     assert 'id="theme-custom-color-depth-value"' in html
     assert 'id="settings-appearance-badge-emoji"' in html
+    assert 'id="theme-live-preview"' in html
+    assert 'id="theme-live-preview-status"' in html
     assert '<option value="custom">custom</option>' in html
     assert "Fresh installs default to Meshyface blue with a neutral gray line and tint" in html
     assert 'value="#2563eb"' in html
     assert 'value="#9a9996"' in html
     assert 'value="50"' in html
     assert '>50%</output>' in html
-    assert "Tint color drives the shared shell tint" in html
-    assert "Tint intensity controls how strongly that shared tint shows up" in html
+    assert "Live preview" in html
+    assert "Primary shell" in html
+    assert "Shared tint surfaces" in html
+    assert "Tint-backed utility chrome" in html
+    assert "Tint color drives the shared shell tint used by help notes, console chrome" in html
+    assert "Tint intensity scales that shared tint from neutral up to a clearly visible wash" in html
     assert "Badge shows in the workspace menu header" in html
+    assert "Off leaves untagged node and chat surfaces neutral" in html
 
     assert 'let themePresetSelected = "custom";' in js
     assert 'let themeCustomBaseColor = "#2563eb";' in js
@@ -190,10 +281,15 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert "function normalizeThemeCustomTintColor(raw, fallback = \"#9a9996\") {" in js
     assert "function normalizeThemeCustomTintIntensity(raw) {" in js
     assert "function normalizeSettingsBadgeEmoji(value) {" in js
+    assert "function setThemeLivePreviewStatus(message = \"Updates while you drag.\", resetDelayMs = 0) {" in js
+    assert "function buildCurrentThemeCustomOptions(extraOptions = null) {" in js
+    assert "function queueLiveThemePreview() {" in js
+    assert "function persistThemeCustomControls() {" in js
     assert "function syncThemeCustomControls() {" in js
     assert "function buildThemeSettingsSavePayload(options = null) {" in js
+    assert "preview_only: Boolean(opts.previewOnly)," in js
     assert "custom_theme: {" in js
-    assert 'presetName: "custom"' in js
+    assert 'presetName: opts.presetName == null ? "custom" : opts.presetName' in js
     assert "function bindThemeCustomControls() {" in js
     assert "bindThemeCustomControls();" in js
     assert 'controlId === "settings-appearance-badge-emoji"' in js

@@ -1629,11 +1629,53 @@
                   </select>
                 </label>
               </div>
+              <section id="theme-live-preview" class="theme-live-preview" aria-label="Live theme preview">
+                <div class="theme-live-preview-head">
+                  <div class="theme-live-preview-title-wrap">
+                    <strong>Live preview</strong>
+                    <span id="theme-live-preview-status">Updates while you drag.</span>
+                  </div>
+                </div>
+                <div class="theme-live-preview-grid">
+                  <article class="theme-preview-card theme-preview-card-shell">
+                    <span class="theme-preview-kicker">Color depth</span>
+                    <strong class="theme-preview-title">Primary shell</strong>
+                    <div class="theme-preview-pill-row">
+                      <span class="theme-preview-pill theme-preview-pill-active">Active tab</span>
+                      <span class="theme-preview-pill">Panel edge</span>
+                    </div>
+                    <div class="theme-preview-shell-stage">
+                      <span class="theme-preview-shell-line"></span>
+                      <span class="theme-preview-shell-meter">
+                        <span class="theme-preview-shell-meter-fill"></span>
+                      </span>
+                    </div>
+                  </article>
+                  <article class="theme-preview-card theme-preview-card-tint">
+                    <span class="theme-preview-kicker">Tint intensity</span>
+                    <strong class="theme-preview-title">Shared tint surfaces</strong>
+                    <div class="theme-preview-note-pill">Help notes, pane heads, console chrome</div>
+                    <div class="theme-preview-swatch-row" aria-hidden="true">
+                      <span class="theme-preview-swatch theme-preview-swatch-soft"></span>
+                      <span class="theme-preview-swatch theme-preview-swatch-base"></span>
+                      <span class="theme-preview-swatch theme-preview-swatch-alt"></span>
+                    </div>
+                  </article>
+                  <article class="theme-preview-card theme-preview-card-console">
+                    <span class="theme-preview-kicker">Console</span>
+                    <strong class="theme-preview-title">Tint-backed utility chrome</strong>
+                    <div class="theme-preview-console">
+                      <span class="theme-preview-console-line">$ tail -f mesh.log</span>
+                      <span class="theme-preview-console-line">[mesh] preview responds live</span>
+                    </div>
+                  </article>
+                </div>
+              </section>
               <div class="settings-help-note">
-                Tint color drives the shared shell tint used by help notes, pane headers, and untagged node or chat rows when node-specific tinting is not active.
+                Tint color drives the shared shell tint used by help notes, console chrome, pane headers, and other shared secondary surfaces.
               </div>
               <div class="settings-help-note">
-                Tint intensity controls how strongly that shared tint shows up on neutral surfaces. Color depth still tunes the broader shell palette and gradients.
+                Tint intensity scales that shared tint from neutral up to a clearly visible wash. Color depth still tunes the broader shell palette and gradients.
               </div>
               <div class="settings-help-note">
                 Badge shows in the workspace menu header and falls back to the short-name mark when set to auto.
@@ -1650,7 +1692,7 @@
                 <span>Apply unique node colors to chat feed</span>
               </label>
               <div class="settings-help-note">
-                Off keeps tag colors, but untagged nodes and messages use the shared theme tint.
+                Off leaves untagged node and chat surfaces neutral. Tagged nodes still keep their explicit tag colors.
               </div>
               <div class="settings-help-note">
                 <strong>Console</strong> tuning for packet logs and command output.
