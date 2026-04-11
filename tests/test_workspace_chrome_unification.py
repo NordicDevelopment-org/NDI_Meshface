@@ -114,6 +114,30 @@ def test_network_map_controls_follow_theme_tokens() -> None:
     assert "var(--workspace-shell-active-bg)" in dark_leaflet_overlay_section
 
 
+def test_mobile_network_and_games_shells_expand_to_single_phone_column() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    mobile_section = css.split("@media (max-width: 760px) {", 1)[1]
+
+    assert '.workspace-shell[data-layout-view="network"] {' in mobile_section
+    assert "height: calc(100dvh - var(--workspace-viewport-offset));" in mobile_section
+    assert '.workspace-shell[data-layout-view="network"] .workspace-main {' in mobile_section
+    assert "overflow: hidden;" in mobile_section
+    assert '.workspace-shell[data-layout-view="network"] .workspace-main > .layout.view-network {' in mobile_section
+    assert ".network-map-chrome {" in mobile_section
+    assert "left: 6px;" in mobile_section
+    assert ".layout.view-network .map .body {" in mobile_section
+    assert "height: 100%;" in mobile_section
+    assert ".layout.view-network .map," in mobile_section
+    assert ".network-map-subview-tabs," in mobile_section
+    assert "overflow-x: auto;" in mobile_section
+    assert "flex-wrap: nowrap;" in mobile_section
+    assert ".games-main {" in mobile_section
+    assert "min-height: clamp(280px, 52vh, 420px);" in mobile_section
+    assert ".games-main-panel {" in mobile_section
+    assert "justify-content: stretch;" in mobile_section
+
+
 def test_network_subviews_follow_workspace_theme_tokens() -> None:
     css = build_dashboard_css(theme_css="")
 
