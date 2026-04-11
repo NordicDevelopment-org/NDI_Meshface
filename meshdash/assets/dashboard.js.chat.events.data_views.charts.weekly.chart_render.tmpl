@@ -35,6 +35,27 @@
         return false;
       }}
 
+      const measuredWidth = Number(svg.clientWidth);
+      const measuredHeight = Number(svg.clientHeight);
+      const width = Number.isFinite(measuredWidth) && measuredWidth > 10
+        ? Math.round(measuredWidth)
+        : (Number(chartLayout.width) || 900);
+      const height = Number.isFinite(measuredHeight) && measuredHeight > 10
+        ? Math.round(measuredHeight)
+        : (Number(chartLayout.height) || 220);
+      const padLeft = Number(chartLayout.padLeft) || 46;
+      const padRight = Number(chartLayout.padRight) || 10;
+      const padTop = Number(chartLayout.padTop) || 12;
+      const padBottom = Number(chartLayout.padBottom) || 24;
+      chartState.layout = {{
+        width,
+        height,
+        padLeft,
+        padRight,
+        padTop,
+        padBottom,
+      }};
+
       bindHistoryTrendChartZoom(
         chartState,
         () => rerenderWeeklySummaryChartFromCache(target.key),
@@ -137,12 +158,6 @@
       }}
       empty.hidden = true;
 
-      const width = chartLayout.width;
-      const height = chartLayout.height;
-      const padLeft = chartLayout.padLeft;
-      const padRight = chartLayout.padRight;
-      const padTop = chartLayout.padTop;
-      const padBottom = chartLayout.padBottom;
       const plotW = width - padLeft - padRight;
       const plotH = height - padTop - padBottom;
       const n = plotRows.length;
