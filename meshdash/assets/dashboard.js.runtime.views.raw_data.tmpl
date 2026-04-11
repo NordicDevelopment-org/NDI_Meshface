@@ -93,8 +93,7 @@
       if (!Number.isFinite(num)) return fallback;
       const abs = Math.abs(num);
       const decimals = abs >= 100 ? 0 : (abs >= 10 ? 1 : 2);
-      const text = num.toFixed(decimals);
-      return text.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+      return num.toFixed(decimals);
     }}
 
     function normalizeEnvHistoryHours(raw) {{
