@@ -7040,6 +7040,20 @@
       }}
     }}
     @media (max-width: 760px) {{
+      .workspace-shell[data-layout-view="network"] {{
+        min-height: calc(100dvh - var(--workspace-viewport-offset));
+        height: calc(100dvh - var(--workspace-viewport-offset));
+        overflow: hidden;
+      }}
+      .workspace-shell[data-layout-view="network"] .workspace-main {{
+        min-height: 0;
+        height: 100%;
+        overflow: hidden;
+      }}
+      .workspace-shell[data-layout-view="network"] .workspace-main > .layout.view-network {{
+        min-height: 0;
+        height: 100%;
+      }}
       .topbar {{
         padding-right: var(--topbar-right-inset);
       }}
@@ -7062,7 +7076,16 @@
         max-height: 180px;
       }}
       .layout.view-network .map .body {{
+        height: 100%;
+        min-height: 0;
         grid-template-rows: minmax(320px, 1fr);
+      }}
+      .layout.view-network .map,
+      .layout.view-network .map-frame,
+      .layout.view-network .network-map-subviews,
+      .layout.view-network .network-map-subview-panel {{
+        min-height: 0;
+        height: 100%;
       }}
       .network-map-chrome {{
         top: 6px;
