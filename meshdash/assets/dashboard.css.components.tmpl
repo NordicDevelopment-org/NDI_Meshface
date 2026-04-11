@@ -1455,6 +1455,7 @@
       --line: #32453b;
       --muted: #8ea99b;
       --shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+      --floating-stage-bg: color-mix(in srgb, var(--ui-bg) 78%, var(--workspace-shell-bg) 22%);
       color-scheme: dark;
     }}
     [data-theme="dark"] body {{
@@ -2318,7 +2319,7 @@
     [data-theme="dark"] .workspace-shell,
     [data-theme="dark"] .workspace-main {{
       color: #dbece3;
-      background: var(--ui-bg, #0d1117);
+      background: var(--floating-stage-bg, var(--ui-bg, #0d1117));
     }}
     [data-theme="dark"] .rail-btn,
     [data-theme="dark"] .chat-channel-item,
@@ -3137,6 +3138,10 @@
     [data-theme="dark"] .topbar .sub {{
       color: var(--workspace-shell-text);
     }}
+    [data-theme="dark"] .topbar .sub {{
+      border-color: color-mix(in srgb, var(--workspace-shell-border) 72%, transparent);
+      background: var(--floating-stage-bg);
+    }}
     [data-theme="dark"] .topbar .sub .sub-text,
     [data-theme="dark"] .topbar .revision-text,
     [data-theme="dark"] #chat-caption,
@@ -3180,26 +3185,16 @@
     [data-theme="dark"] .topbar .summary-ticker-item {{
       --ticker-card-accent: color-mix(in srgb, var(--workspace-shell-border-strong) 72%, var(--ui-accent) 28%);
       --ticker-card-accent-soft: var(--workspace-shell-active-text);
-      border-color: var(--workspace-shell-border);
-      background:
-        linear-gradient(
-          180deg,
-          color-mix(in srgb, var(--workspace-shell-bg-alt) 86%, var(--ticker-card-accent) 14%),
-          color-mix(in srgb, var(--workspace-shell-bg) 94%, var(--workspace-shell-bg-alt) 6%)
-        );
-      color: var(--workspace-shell-text);
+      border-color: var(--ui-border);
+      background: var(--ui-panel);
+      color: var(--ui-text);
       box-shadow:
-        inset 0 0 0 1px color-mix(in srgb, var(--workspace-shell-border-muted) 62%, transparent),
-        0 10px 18px rgba(2, 6, 4, 0.16);
+        inset 0 1px 0 rgba(255, 255, 255, 0.04),
+        0 10px 18px rgba(1, 4, 9, 0.18);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item:hover {{
-      border-color: var(--workspace-shell-border-strong);
-      background:
-        linear-gradient(
-          180deg,
-          color-mix(in srgb, var(--workspace-shell-hover-bg) 84%, var(--ticker-card-accent) 16%),
-          color-mix(in srgb, var(--workspace-shell-bg) 88%, var(--workspace-shell-hover-bg) 12%)
-        );
+      border-color: color-mix(in srgb, var(--ui-border) 58%, var(--ui-link) 42%);
+      background: color-mix(in srgb, var(--ui-panel-alt) 88%, var(--workspace-shell-hover-bg) 12%);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item.metric-state-neutral {{
       --ticker-card-accent: color-mix(in srgb, var(--workspace-shell-border-muted) 82%, var(--workspace-shell-text-soft) 18%);
@@ -3218,18 +3213,18 @@
       --ticker-card-accent-soft: #f0b6b6;
     }}
     [data-theme="dark"] .topbar .summary-ticker-item .label {{
-      color: var(--workspace-shell-text-soft);
+      color: var(--ui-text-soft);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item .value,
     [data-theme="dark"] .topbar .summary-ticker-item .value.node-ticker-value .node-ticker-val,
     [data-theme="dark"] .topbar .summary-ticker-item .value.wifi-ticker-value .wifi-ticker-val,
     [data-theme="dark"] .topbar .summary-ticker-item .time-ticker-val {{
-      color: var(--workspace-shell-text);
+      color: var(--ui-text);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item .value.node-ticker-value .node-ticker-key,
     [data-theme="dark"] .topbar .summary-ticker-item .value.wifi-ticker-value .wifi-ticker-key,
     [data-theme="dark"] .topbar .summary-ticker-item .time-ticker-key {{
-      color: color-mix(in srgb, var(--workspace-shell-text-soft) 88%, var(--ticker-card-accent-soft) 12%);
+      color: color-mix(in srgb, var(--ui-text-soft) 90%, var(--ticker-card-accent-soft) 10%);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item .metric-ticker-delta,
     [data-theme="dark"] .topbar .summary-ticker-item .metric-ticker-rate {{
@@ -3239,13 +3234,13 @@
       stroke: var(--ticker-card-accent);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item .target-radio-status {{
-      border-color: var(--workspace-shell-border-muted);
-      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, transparent);
-      color: var(--workspace-shell-text-soft);
+      border-color: var(--ui-border);
+      background: color-mix(in srgb, var(--ui-panel-alt) 88%, black 12%);
+      color: var(--ui-text-soft);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item .target-radio-status.status-online {{
-      border-color: var(--workspace-shell-border-strong);
-      background: color-mix(in srgb, var(--workspace-shell-active-bg) 84%, transparent);
+      border-color: color-mix(in srgb, var(--ui-accent) 56%, var(--ui-border) 44%);
+      background: color-mix(in srgb, var(--ui-panel-alt) 72%, var(--workspace-shell-active-bg) 28%);
       color: var(--workspace-shell-active-text);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item .target-radio-status.status-warn,

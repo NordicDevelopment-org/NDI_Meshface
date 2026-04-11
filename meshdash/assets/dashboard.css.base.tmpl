@@ -5,6 +5,7 @@
       --workspace-viewport-offset: 84px;
       --topbar-right-inset: max(12px, env(safe-area-inset-right));
       --topbar-corner-reserve: 0px;
+      --floating-stage-bg: color-mix(in srgb, var(--accent) 64%, var(--accent-2) 36%);
     }}
     html, body {{
       margin: 0;
@@ -261,6 +262,10 @@
       flex-direction: column;
       align-items: stretch;
       gap: 2px;
+      padding: 4px;
+      border: 1px solid color-mix(in srgb, var(--line) 34%, transparent);
+      border-radius: 10px;
+      background: var(--floating-stage-bg);
     }}
     .topbar .sub .summary-ticker-row {{
       width: calc(100% + var(--topbar-corner-reserve, 0px));
@@ -372,18 +377,21 @@
       scrollbar-width: thin;
     }}
     .topbar .summary-ticker-item {{
-      border: 1px solid rgba(214, 238, 223, 0.45);
-      background: rgba(248, 255, 251, 0.1);
+      border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent) 18%);
+      background: var(--panel);
       border-radius: 7px;
       padding: 3px 5px;
       min-width: 0;
-      color: #f2fff7;
+      color: var(--ink);
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       grid-template-rows: auto auto;
       column-gap: 5px;
       row-gap: 1px;
       align-items: end;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.44),
+        0 8px 18px color-mix(in srgb, var(--accent-2) 8%, transparent);
     }}
     .topbar .summary-ticker-item[hidden] {{
       display: none !important;
@@ -684,9 +692,9 @@
       overflow: hidden;
       text-overflow: ellipsis;
       border-radius: 999px;
-      border: 1px solid rgba(214, 238, 223, 0.35);
-      background: rgba(248, 255, 251, 0.08);
-      color: rgba(236, 255, 244, 0.9);
+      border: 1px solid color-mix(in srgb, var(--line) 78%, var(--accent) 22%);
+      background: color-mix(in srgb, var(--panel) 94%, var(--accent) 6%);
+      color: color-mix(in srgb, var(--muted) 80%, var(--accent-2) 20%);
       padding: 1px 5px;
       justify-self: start;
       max-width: 100%;
@@ -702,41 +710,41 @@
       background: #f2ce7a;
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-online {{
-      border-color: rgba(121, 230, 172, 0.7);
-      color: #d5ffea;
-      background: rgba(53, 154, 101, 0.22);
+      border-color: color-mix(in srgb, var(--accent) 64%, var(--line) 36%);
+      color: color-mix(in srgb, var(--ink) 76%, var(--accent) 24%);
+      background: color-mix(in srgb, var(--panel) 82%, var(--accent) 18%);
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-online::before {{
       background: #79e6ac;
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-warn {{
-      border-color: rgba(234, 203, 129, 0.76);
-      color: #fff0cc;
-      background: rgba(174, 134, 57, 0.2);
+      border-color: rgba(205, 149, 54, 0.72);
+      color: #7d4a11;
+      background: rgba(236, 203, 138, 0.28);
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-warn::before {{
       background: #f2ce7a;
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-stale {{
-      border-color: rgba(234, 203, 129, 0.76);
-      color: #fff0cc;
-      background: rgba(174, 134, 57, 0.2);
+      border-color: rgba(205, 149, 54, 0.72);
+      color: #7d4a11;
+      background: rgba(236, 203, 138, 0.28);
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-stale::before {{
       background: #f2ce7a;
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-lost {{
-      border-color: rgba(255, 162, 162, 0.88);
-      color: #fff0f0;
-      background: rgba(182, 38, 38, 0.28);
+      border-color: rgba(205, 74, 74, 0.74);
+      color: #8a2323;
+      background: rgba(240, 188, 188, 0.34);
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-lost::before {{
       background: #ff9e9e;
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-unknown {{
-      border-color: rgba(234, 203, 129, 0.76);
-      color: #fff0cc;
-      background: rgba(174, 134, 57, 0.2);
+      border-color: color-mix(in srgb, var(--line) 74%, #c59b48 26%);
+      color: color-mix(in srgb, var(--muted) 76%, #8a641c 24%);
+      background: color-mix(in srgb, var(--panel) 90%, #f1d79a 10%);
     }}
     .topbar .summary-ticker-item-target .target-radio-status.status-unknown::before {{
       background: #f2ce7a;
@@ -748,7 +756,7 @@
       line-height: 1.15;
       text-transform: uppercase;
       letter-spacing: 0.18px;
-      color: rgba(236, 255, 244, 0.92);
+      color: color-mix(in srgb, var(--muted) 88%, var(--accent-2) 12%);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -789,14 +797,14 @@
       font-size: 8px;
       letter-spacing: 0.2px;
       text-transform: uppercase;
-      color: rgba(223, 248, 233, 0.85);
+      color: color-mix(in srgb, var(--muted) 86%, var(--accent-2) 14%);
       white-space: nowrap;
       flex: 0 0 auto;
     }}
     .topbar .summary-ticker-item .value.node-ticker-value .node-ticker-val {{
       font-size: 11px;
       font-weight: 700;
-      color: #f2fff7;
+      color: var(--ink);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -857,14 +865,14 @@
       font-size: 8px;
       letter-spacing: 0.2px;
       text-transform: uppercase;
-      color: rgba(223, 248, 233, 0.85);
+      color: color-mix(in srgb, var(--muted) 86%, var(--accent-2) 14%);
       white-space: nowrap;
       flex: 0 0 auto;
     }}
     .topbar .summary-ticker-item .value.wifi-ticker-value .wifi-ticker-val {{
       font-size: 11px;
       font-weight: 700;
-      color: #f2fff7;
+      color: var(--ink);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -890,7 +898,7 @@
       font-size: 8px;
       line-height: 1.2;
       letter-spacing: 0.22px;
-      color: rgba(223, 248, 233, 0.88);
+      color: color-mix(in srgb, var(--muted) 86%, var(--accent-2) 14%);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -899,7 +907,7 @@
       font-size: 11px;
       line-height: 1.15;
       font-weight: 700;
-      color: #f2fff7;
+      color: var(--ink);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -916,18 +924,18 @@
       gap: 4px;
     }}
     .topbar .summary-ticker-item .metric-ticker-delta {{
-      color: rgba(232, 252, 242, 0.9);
+      color: color-mix(in srgb, var(--muted) 82%, var(--accent-2) 18%);
       font-size: 8px;
     }}
     .topbar .summary-ticker-item .metric-ticker-rate {{
       display: none;
-      color: rgba(219, 242, 229, 0.86);
+      color: color-mix(in srgb, var(--muted) 88%, var(--accent-2) 12%);
       font-size: 9px;
       line-height: 1.1;
       white-space: nowrap;
     }}
     .topbar .summary-ticker-item .metric-ticker-chart path {{
-      stroke: rgba(196, 228, 208, 0.92);
+      stroke: color-mix(in srgb, var(--line) 74%, var(--accent-2) 26%);
       fill: none;
       stroke-width: 1.3;
       vector-effect: non-scaling-stroke;
@@ -937,30 +945,33 @@
       height: 10px;
     }}
     .topbar .summary-ticker-item .metric-ticker.trend-up .metric-ticker-delta {{
-      color: #b9ffd5;
+      color: color-mix(in srgb, var(--ink) 66%, var(--accent) 34%);
     }}
     .topbar .summary-ticker-item .metric-ticker.trend-up .metric-ticker-chart path {{
-      stroke: #79e6ac;
+      stroke: color-mix(in srgb, var(--accent) 76%, white 24%);
     }}
     .topbar .summary-ticker-item .metric-ticker.trend-down .metric-ticker-delta {{
-      color: #ffd2d2;
+      color: color-mix(in srgb, var(--danger) 72%, var(--ink) 28%);
     }}
     .topbar .summary-ticker-item .metric-ticker.trend-down .metric-ticker-chart path {{
-      stroke: #ff9c9c;
+      stroke: color-mix(in srgb, var(--danger) 74%, white 26%);
     }}
     .topbar .summary-ticker-item .metric-ticker.trend-flat .metric-ticker-delta {{
-      color: rgba(228, 249, 238, 0.9);
+      color: color-mix(in srgb, var(--muted) 86%, var(--accent-2) 14%);
     }}
     .topbar .summary-ticker-item .metric-ticker.trend-flat .metric-ticker-chart path {{
-      stroke: rgba(187, 220, 200, 0.94);
+      stroke: color-mix(in srgb, var(--line) 82%, var(--accent-2) 18%);
     }}
     .topbar .summary-ticker-item {{
       cursor: pointer;
-      transition: border-color 120ms ease, background 120ms ease;
+      transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
     }}
     .topbar .summary-ticker-item:hover {{
-      border-color: rgba(214, 238, 223, 0.72);
-      background: rgba(248, 255, 251, 0.18);
+      border-color: color-mix(in srgb, var(--accent) 48%, var(--line) 52%);
+      background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.52),
+        0 10px 22px color-mix(in srgb, var(--accent-2) 10%, transparent);
     }}
     .topbar.ticker-expanded .sub .summary-ticker-row {{
       grid-auto-flow: row;
@@ -976,7 +987,6 @@
       grid-template-rows: auto auto auto;
       row-gap: 4px;
       align-items: start;
-      background: rgba(248, 255, 251, 0.14);
     }}
     .topbar.ticker-expanded .summary-ticker-item-target {{
       grid-column: span 1;
@@ -1373,7 +1383,7 @@
       flex: 1 1 auto;
       height: auto;
       max-height: none;
-      background: var(--panel);
+      background: var(--floating-stage-bg);
       align-items: stretch;
       overflow: hidden;
     }}
