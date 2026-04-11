@@ -374,13 +374,14 @@
       }});
       const axisTicks = buildLinearAxisTicks(minVal, maxVal, 5);
       const axisLabelColor = enrichSeries[0] ? enrichSeries[0].labelColor : chartPalette.label;
+      const axisTextStyle = "font-family:'IBM Plex Sans','Segoe UI',sans-serif;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:0.01em;";
       const axisLines = axisTicks.map((tick) => {{
         const y = padTop + (tick.ratio * plotH);
         return `<line x1="${{padLeft}}" y1="${{y.toFixed(2)}}" x2="${{width - padRight}}" y2="${{y.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>`;
       }}).join("");
       const axisLabels = axisTicks.map((tick) => {{
         const y = padTop + (tick.ratio * plotH);
-        return `<text x="${{padLeft - 4}}" y="${{(y + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{axisLabelColor}}">${{formatMetricValue(tick.value, metricMeta.decimals)}}</text>`;
+        return `<text class="chart-axis-label" style="${{axisTextStyle}}" x="${{padLeft - 4}}" y="${{(y + 4).toFixed(2)}}" text-anchor="end" fill="${{axisLabelColor}}">${{formatMetricValue(tick.value, metricMeta.decimals)}}</text>`;
       }}).join("");
       const dayGuideLines = dayBoundaries.map((boundary) => {{
         const x = padLeft + ((Math.max(0, boundary.idx) / Math.max(1, n - 1)) * plotW);
