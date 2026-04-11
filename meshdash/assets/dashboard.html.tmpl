@@ -488,6 +488,7 @@
   <div id="apps-tabs-bar" class="apps-tabs-bar workspace-chrome-bar workspace-pillbar" role="tablist" aria-label="Apps tabs" hidden>
     <button class="apps-tab-btn workspace-pill-btn is-active" data-app-view="games" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.appView || "games") : true);'>Games</button>
     <button class="apps-tab-btn workspace-pill-btn" data-app-view="files" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.appView || "games") : true);'{file_transfer_files_tab_hidden_attrs}>Files</button>
+    <button class="apps-tab-btn workspace-pill-btn" data-app-view="bbs" type="button" onclick='return (window.meshSelectLayoutView ? window.meshSelectLayoutView(this.dataset.appView || "games") : true);'>BBS</button>
   </div>
   <div id="dashboard-layout" class="layout view-chat">
     <section class="card settings" aria-label="Settings">
@@ -2333,40 +2334,19 @@ Ready.
     </section>
 
     <section class="card games" aria-label="Games">
-      <div class="games-toolbar workspace-chrome-bar">
-        <div class="games-tabs workspace-pillbar" role="tablist" aria-label="Game library">
-          <button
-            id="games-select-reversi-btn"
-            class="games-tab-btn workspace-pill-btn is-active"
-            type="button"
-            role="tab"
-            aria-selected="true"
-            title="Reversi (also known as Othello)"
-            data-game-id="reversi"
-          >Reversi</button>
-          <button
-            id="games-select-checkers-btn"
-            class="games-tab-btn workspace-pill-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            title="Checkers"
-            data-game-id="checkers"
-          >Checkers</button>
-          <button
-            id="games-select-chess-btn"
-            class="games-tab-btn workspace-pill-btn"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            title="Chess"
-            data-game-id="chess"
-          >Chess</button>
-        </div>
-      </div>
       <div class="body">
         <div class="games-shell">
           <aside class="games-sidebar">
+            <div class="games-toolbar workspace-chrome-bar">
+              <label class="games-toolbar-picker" for="games-library-select">
+                <span class="games-library-label">Game</span>
+                <select id="games-library-select" class="games-peer-select" aria-label="Choose game">
+                  <option value="reversi">Reversi</option>
+                  <option value="checkers">Checkers</option>
+                  <option value="chess">Chess</option>
+                </select>
+              </label>
+            </div>
             <div id="games-side-reversi" class="games-side-panel is-active" data-game-id="reversi">
               <div id="reversi-link-status" class="reversi-link-status">Local hotseat mode.</div>
               <div class="games-peer-wrap">

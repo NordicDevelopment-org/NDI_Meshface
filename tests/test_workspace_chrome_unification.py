@@ -24,6 +24,7 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     css = build_dashboard_css(theme_css="")
 
     assert 'id="apps-tabs-bar" class="apps-tabs-bar workspace-chrome-bar workspace-pillbar"' in html
+    assert 'data-app-view="bbs"' in html
     assert 'class="settings-chrome workspace-chrome-bar"' in html
     assert 'class="settings-toolbar workspace-chrome-row"' in html
     assert 'class="settings-tabbar workspace-pillbar"' in html
@@ -31,7 +32,7 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert 'class="btn workspace-action-chip"' in html
     assert 'class="chat-card-head workspace-chrome-bar"' in html
     assert 'class="games-toolbar workspace-chrome-bar"' in html
-    assert 'class="games-tab-btn workspace-pill-btn is-active"' in html
+    assert 'id="games-library-select"' in html
     assert 'class="history-tabs workspace-pillbar"' in html
     assert 'class="history-tab-btn workspace-pill-btn is-active"' in html
     assert "<h2>Files</h2>" not in html
@@ -50,6 +51,7 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert ".workspace-action-chip {" in css
     assert ".settings-chrome {" in css
     assert ".chat-card-head.workspace-chrome-bar {" in css
+    assert ".games-toolbar-picker {" in css
     assert ".settings-status.settings-status-top:empty {" in css
     workspace_status_section = css.split(".workspace-chrome-status {", 1)[1].split("}", 1)[0]
     assert "position: absolute;" in workspace_status_section
@@ -61,6 +63,32 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert "[data-theme=\"dark\"] .network-map-subview-tab,\n    [data-theme=\"dark\"] .workspace-pill-btn {" in css
 
 
+def test_apps_views_promote_apps_tabs_to_desktop_side_rail() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    apps_main_section = css.split(
+        '.workspace-shell[data-layout-view="games"] .workspace-main,',
+        1,
+    )[1].split("}", 1)[0]
+    apps_tabs_section = css.split(
+        '.workspace-shell[data-layout-view="games"] #apps-tabs-bar,',
+        1,
+    )[1].split("}", 1)[0]
+    apps_btn_section = css.split(
+        '.workspace-shell[data-layout-view="games"] .apps-tab-btn,',
+        1,
+    )[1].split("}", 1)[0]
+
+    assert "grid-template-columns: minmax(68px, 82px) minmax(0, 1fr);" in apps_main_section
+    assert "grid-template-rows: minmax(0, 1fr);" in apps_main_section
+    assert "flex-direction: column;" in apps_tabs_section
+    assert "align-items: stretch;" in apps_tabs_section
+    assert "justify-content: flex-start;" in apps_tabs_section
+    assert "width: 100%;" in apps_btn_section
+    assert "min-height: 38px;" in apps_btn_section
+    assert "justify-content: center;" in apps_btn_section
+
+
 def test_workspace_main_gap_stays_uniform_across_apps_and_chat_views() -> None:
     css = build_dashboard_css(theme_css="")
 
@@ -68,7 +96,8 @@ def test_workspace_main_gap_stays_uniform_across_apps_and_chat_views() -> None:
     assert "gap: 8px;" in workspace_main_section
 
     assert '.workspace-shell[data-layout-view="games"] .workspace-main,' in css
-    assert '.workspace-shell[data-layout-view="files"] .workspace-main {' in css
+    assert '.workspace-shell[data-layout-view="files"] .workspace-main,' in css
+    assert '.workspace-shell[data-layout-view="bbs"] .workspace-main {' in css
     apps_gap_section = css.split(
         '.workspace-shell[data-layout-view="games"] .workspace-main,',
         1,

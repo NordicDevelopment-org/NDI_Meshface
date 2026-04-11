@@ -12,16 +12,15 @@
 
     function syncGamesActivePanels() {{
       activeGameId = normalizeActiveGameId(activeGameId);
+      const gamesLibrarySelect = document.getElementById("games-library-select");
+      if (gamesLibrarySelect instanceof HTMLSelectElement) {{
+        if (gamesLibrarySelect.value !== activeGameId) {{
+          gamesLibrarySelect.value = activeGameId;
+        }}
+      }}
       const gameIds = ["reversi", "checkers", "chess"];
       for (const gameId of gameIds) {{
         const isActive = activeGameId === gameId;
-        const selectBtn = document.getElementById(`games-select-${{gameId}}-btn`);
-        if (selectBtn instanceof HTMLButtonElement) {{
-          selectBtn.classList.toggle("is-active", isActive);
-          selectBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
-          selectBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-          selectBtn.tabIndex = isActive ? 0 : -1;
-        }}
         const sidePanel = document.getElementById(`games-side-${{gameId}}`);
         if (sidePanel instanceof HTMLElement) {{
           sidePanel.hidden = !isActive;
@@ -437,34 +436,16 @@
     }}
 
     function bindGamesControls() {{
-      const reversiBtn = document.getElementById("games-select-reversi-btn");
-      if (reversiBtn instanceof HTMLButtonElement && reversiBtn.dataset.bound !== "1") {{
-        reversiBtn.dataset.bound = "1";
-        reversiBtn.addEventListener("click", () => {{
-          activeGameId = "reversi";
+      const gamesLibrarySelect = document.getElementById("games-library-select");
+      if (gamesLibrarySelect instanceof HTMLSelectElement && gamesLibrarySelect.dataset.bound !== "1") {{
+        gamesLibrarySelect.dataset.bound = "1";
+        gamesLibrarySelect.addEventListener("change", () => {{
+          activeGameId = normalizeActiveGameId(gamesLibrarySelect.value);
           if (activeLayoutView === "games") {{
             renderGamesView(latestState);
+            return;
           }}
-        }});
-      }}
-      const checkersBtn = document.getElementById("games-select-checkers-btn");
-      if (checkersBtn instanceof HTMLButtonElement && checkersBtn.dataset.bound !== "1") {{
-        checkersBtn.dataset.bound = "1";
-        checkersBtn.addEventListener("click", () => {{
-          activeGameId = "checkers";
-          if (activeLayoutView === "games") {{
-            renderGamesView(latestState);
-          }}
-        }});
-      }}
-      const chessBtn = document.getElementById("games-select-chess-btn");
-      if (chessBtn instanceof HTMLButtonElement && chessBtn.dataset.bound !== "1") {{
-        chessBtn.dataset.bound = "1";
-        chessBtn.addEventListener("click", () => {{
-          activeGameId = "chess";
-          if (activeLayoutView === "games") {{
-            renderGamesView(latestState);
-          }}
+          syncGamesActivePanels();
         }});
       }}
       const gamesChatInput = document.getElementById("games-chat-input");

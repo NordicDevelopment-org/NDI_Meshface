@@ -6195,26 +6195,8 @@
       border-color: color-mix(in srgb, var(--games-board-frame) 44%, #ffffff);
     }}
     [data-theme="dark"] .games-toolbar {{
-      background: #07140d;
-      background: var(--workspace-shell-bg-alt);
-      border-bottom-color: #2d8f5d;
-      border-bottom-color: var(--workspace-shell-border);
-    }}
-    [data-theme="dark"] .games-tab-btn {{
-      border-color: #236744;
-      border-color: var(--workspace-shell-border-muted);
-      background: #07140d;
-      background: var(--workspace-shell-bg-alt);
-      color: #b8d6c4;
-      color: var(--workspace-shell-text-soft);
-    }}
-    [data-theme="dark"] .games-tab-btn.is-active {{
-      border-color: #3f8f68;
-      border-color: var(--workspace-shell-border-strong);
-      background: #173126;
-      background: var(--workspace-shell-active-bg);
-      color: #8ce7b4;
-      color: var(--workspace-shell-active-text);
+      background: transparent;
+      border: 0;
     }}
     [data-theme="dark"] .games-chat-compose-wrap {{
       background: #07140d;
@@ -6955,6 +6937,41 @@
       .workspace-shell.chat-panel-open .workspace-main {{
         grid-column: 1;
         grid-row: 3;
+      }}
+      .workspace-shell[data-layout-view="games"] .workspace-main,
+      .workspace-shell[data-layout-view="files"] .workspace-main,
+      .workspace-shell[data-layout-view="bbs"] .workspace-main {{
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+      }}
+      .workspace-shell[data-layout-view="games"] #apps-tabs-bar,
+      .workspace-shell[data-layout-view="files"] #apps-tabs-bar,
+      .workspace-shell[data-layout-view="bbs"] #apps-tabs-bar {{
+        grid-column: 1;
+        grid-row: 1;
+        width: auto;
+        padding: 8px 10px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+        overflow: visible;
+      }}
+      .workspace-shell[data-layout-view="games"] .apps-tab-btn,
+      .workspace-shell[data-layout-view="files"] .apps-tab-btn,
+      .workspace-shell[data-layout-view="bbs"] .apps-tab-btn {{
+        width: auto;
+        min-height: 0;
+        padding: 4px 10px;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+      }}
+      .workspace-shell[data-layout-view="games"] .workspace-main > .layout.view-games,
+      .workspace-shell[data-layout-view="files"] .workspace-main > .layout.view-files,
+      .workspace-shell[data-layout-view="bbs"] .workspace-main > .layout.view-bbs {{
+        grid-column: 1;
+        grid-row: 2;
       }}
       .layout {{
         grid-template-columns: 1fr;

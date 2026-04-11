@@ -1404,8 +1404,50 @@
       grid-row: 2;
     }}
     .workspace-shell[data-layout-view="games"] .workspace-main,
-    .workspace-shell[data-layout-view="files"] .workspace-main {{
+    .workspace-shell[data-layout-view="files"] .workspace-main,
+    .workspace-shell[data-layout-view="bbs"] .workspace-main {{
       gap: 8px;
+      grid-template-columns: minmax(68px, 82px) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      align-items: stretch;
+    }}
+    .workspace-shell[data-layout-view="games"] #apps-tabs-bar,
+    .workspace-shell[data-layout-view="files"] #apps-tabs-bar,
+    .workspace-shell[data-layout-view="bbs"] #apps-tabs-bar {{
+      grid-column: 1;
+      grid-row: 1;
+      align-self: stretch;
+      width: 100%;
+      min-width: 0;
+      padding: 8px 6px;
+      display: flex;
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 6px;
+      overflow: hidden;
+    }}
+    .workspace-shell[data-layout-view="games"] .apps-tab-btn,
+    .workspace-shell[data-layout-view="files"] .apps-tab-btn,
+    .workspace-shell[data-layout-view="bbs"] .apps-tab-btn {{
+      width: 100%;
+      min-height: 38px;
+      padding: 7px 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      white-space: normal;
+      line-height: 1.15;
+      font-size: 10px;
+    }}
+    .workspace-shell[data-layout-view="games"] .workspace-main > .layout.view-games,
+    .workspace-shell[data-layout-view="files"] .workspace-main > .layout.view-files,
+    .workspace-shell[data-layout-view="bbs"] .workspace-main > .layout.view-bbs {{
+      grid-column: 2;
+      grid-row: 1;
+      min-width: 0;
     }}
     .workspace-main > .layout {{
       min-height: 0;
@@ -2266,40 +2308,26 @@
     }}
     .games-toolbar {{
       margin: 0;
-      padding: 6px 10px;
-      min-height: 32px;
-      border-bottom: 1px solid #d2e1d0;
-      background: #edf6ec;
+      padding: 0;
+      min-height: 0;
+      border: 0;
+      background: transparent;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
     }}
-    .games-tabs {{
+    .games-toolbar-picker {{
       display: flex;
-      align-items: center;
+      flex-direction: column;
       gap: 6px;
       width: 100%;
       min-width: 0;
-      overflow-x: auto;
-      scrollbar-width: thin;
     }}
-    .games-tab-btn {{
-      border: 1px solid #bfd4c3;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #254837;
-      padding: 6px 10px;
-      text-align: left;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      white-space: nowrap;
-      flex: 0 0 auto;
-    }}
-    .games-tab-btn.is-active {{
-      border-color: #2f855a;
-      background: #ecf8f0;
-      color: #1f5c3d;
+    .games-toolbar.workspace-chrome-bar {{
+      min-height: 0;
+      padding: 8px;
+      box-shadow: none;
     }}
     .games-chat-compose-wrap {{
       margin-top: 10px;
@@ -6280,12 +6308,12 @@
       min-height: 0;
       display: flex;
       flex-direction: column;
-      padding: 10px;
+      padding: 8px;
     }}
     .games-shell {{
       display: grid;
-      grid-template-columns: minmax(220px, 290px) minmax(0, 1fr) minmax(220px, 290px);
-      gap: 12px;
+      grid-template-columns: minmax(210px, 248px) minmax(0, 1fr) minmax(168px, 216px);
+      gap: 10px;
       min-height: 0;
       height: 100%;
       flex: 1 1 auto;
@@ -6294,10 +6322,10 @@
       border: 1px solid #d7e5d2;
       border-radius: 10px;
       background: #f8fcf7;
-      padding: 10px;
+      padding: 8px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       min-height: 0;
       overflow: auto;
     }}
@@ -6519,7 +6547,7 @@
       align-items: stretch;
       justify-content: stretch;
       overflow: hidden;
-      padding: 10px;
+      padding: 8px;
     }}
     .games-main-panel {{
       width: 100%;
@@ -6557,7 +6585,7 @@
       border-radius: 12px;
       background: var(--games-board-active-background);
       box-shadow: inset 0 0 0 1px var(--games-board-inner-line);
-      padding: 10px;
+      padding: 8px;
       transition: background 300ms ease, border-color 240ms ease, box-shadow 280ms ease;
     }}
     .games-board-wrap::before,
@@ -6726,12 +6754,12 @@
     }}
     @media (max-width: 1560px) {{
       .games-shell {{
-        grid-template-columns: minmax(205px, 260px) minmax(0, 1fr) minmax(205px, 250px);
+        grid-template-columns: minmax(198px, 232px) minmax(0, 1fr) minmax(156px, 196px);
       }}
     }}
     @media (max-width: 1180px) {{
       .games-shell {{
-        grid-template-columns: minmax(190px, 235px) minmax(0, 1fr);
+        grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
       }}
       .games-status-sidebar {{
         grid-column: 1 / -1;
@@ -6770,7 +6798,7 @@
       --reversi-board-cell-hover: color-mix(in srgb, var(--reversi-board-root) 74%, #f7fdf9);
       --reversi-board-grid: color-mix(in srgb, var(--reversi-board-root) 58%, #dceee4);
       --reversi-board-focus: color-mix(in srgb, var(--reversi-board-accent-strong) 58%, #ffffff);
-      --reversi-cell-size: clamp(30px, 4.8vw, 64px);
+      --reversi-cell-size: clamp(30px, 5.4vw, 76px);
       display: grid;
       grid-template-columns: repeat(8, var(--reversi-cell-size));
       grid-template-rows: repeat(8, var(--reversi-cell-size));
@@ -6858,7 +6886,7 @@
       --classic-board-target: color-mix(in srgb, var(--classic-board-accent) 58%, #f3fff7);
     }}
     .checkers-board {{
-      --checkers-cell-size: clamp(30px, 4.8vw, 64px);
+      --checkers-cell-size: clamp(30px, 5.4vw, 76px);
       display: grid;
       grid-template-columns: repeat(8, var(--checkers-cell-size));
       grid-template-rows: repeat(8, var(--checkers-cell-size));
@@ -6944,7 +6972,7 @@
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--classic-board-frame) 42%, transparent);
     }}
     .chess-board {{
-      --chess-cell-size: clamp(30px, 4.8vw, 64px);
+      --chess-cell-size: clamp(30px, 5.4vw, 76px);
       display: grid;
       grid-template-columns: repeat(8, var(--chess-cell-size));
       grid-template-rows: repeat(8, var(--chess-cell-size));
@@ -7043,13 +7071,13 @@
         container-type: inline-size;
       }}
       .reversi-board {{
-        --reversi-cell-size: clamp(28px, 10.6cqi, 64px);
+        --reversi-cell-size: clamp(28px, 11.6cqi, 76px);
       }}
       .checkers-board {{
-        --checkers-cell-size: clamp(28px, 10.6cqi, 64px);
+        --checkers-cell-size: clamp(28px, 11.6cqi, 76px);
       }}
       .chess-board {{
-        --chess-cell-size: clamp(28px, 10.6cqi, 64px);
+        --chess-cell-size: clamp(28px, 11.6cqi, 76px);
       }}
       .checkers-disc {{
         font-size: clamp(10px, 2.5cqi, 15px);
