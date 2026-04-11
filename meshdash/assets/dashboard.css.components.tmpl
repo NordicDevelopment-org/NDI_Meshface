@@ -1459,19 +1459,11 @@
       color-scheme: dark;
     }}
     [data-theme="dark"] body {{
-      background:
-        radial-gradient(circle at 20% -10%, color-mix(in srgb, var(--ui-accent-soft) 18%, transparent) 0, transparent 45%),
-        radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--ui-accent) 16%, transparent) 0, transparent 40%),
-        var(--bg);
+      background: var(--bg);
       color: var(--ink);
     }}
     [data-theme="dark"] .topbar {{
-      background:
-        linear-gradient(
-          100deg,
-          color-mix(in srgb, var(--workspace-shell-bg) 82%, var(--ui-accent-soft)),
-          color-mix(in srgb, var(--workspace-shell-border) 38%, var(--workspace-shell-bg-alt))
-        );
+      background: var(--floating-stage-bg);
       color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .workspace-launcher-shell {{
@@ -2828,7 +2820,7 @@
     }}
     [data-theme="dark"] .topbar {{
       background: #000000 !important;
-      border-bottom: 1px solid #1f6a41;
+      border-bottom: 0;
       box-shadow: none;
     }}
     [data-theme="dark"] .topbar h1,
@@ -3120,26 +3112,17 @@
       text-shadow: none;
     }}
     [data-theme="dark"] .topbar {{
-      background:
-        radial-gradient(
-          circle at top center,
-          color-mix(in srgb, var(--workspace-shell-active-bg) 18%, transparent) 0,
-          transparent 58%
-        ),
-        linear-gradient(
-          180deg,
-          color-mix(in srgb, var(--workspace-shell-bg-alt) 78%, black),
-          color-mix(in srgb, var(--workspace-shell-bg) 92%, black)
-        ) !important;
-      border-bottom: 1px solid var(--workspace-shell-border);
-      box-shadow: var(--workspace-shell-shadow);
+      background: var(--floating-stage-bg) !important;
+      border-bottom: 0;
+      box-shadow: none;
     }}
     [data-theme="dark"] .topbar h1,
     [data-theme="dark"] .topbar .sub {{
       color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .topbar .sub {{
-      border-color: color-mix(in srgb, var(--workspace-shell-border) 72%, transparent);
+      opacity: 1;
+      border-color: transparent;
       background: var(--floating-stage-bg);
     }}
     [data-theme="dark"] .topbar .sub .sub-text,
@@ -3185,15 +3168,13 @@
     [data-theme="dark"] .topbar .summary-ticker-item {{
       --ticker-card-accent: color-mix(in srgb, var(--workspace-shell-border-strong) 72%, var(--ui-accent) 28%);
       --ticker-card-accent-soft: var(--workspace-shell-active-text);
-      border-color: var(--ui-border);
+      border-color: transparent;
       background: var(--ui-panel);
       color: var(--ui-text);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.04),
-        0 10px 18px rgba(1, 4, 9, 0.18);
+      box-shadow: none;
     }}
     [data-theme="dark"] .topbar .summary-ticker-item:hover {{
-      border-color: color-mix(in srgb, var(--ui-border) 58%, var(--ui-link) 42%);
+      border-color: transparent;
       background: color-mix(in srgb, var(--ui-panel-alt) 88%, var(--workspace-shell-hover-bg) 12%);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item.metric-state-neutral {{
@@ -3254,6 +3235,9 @@
       border-color: rgba(207, 111, 111, 0.9);
       background: rgba(153, 27, 27, 0.3);
       color: #f3c8c8;
+    }}
+    [data-theme="dark"] .teams-rail {{
+      border-color: transparent !important;
     }}
     [data-theme="dark"] .summary-freshness {{
       border-color: rgba(124, 161, 190, 0.36);
