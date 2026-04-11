@@ -83,7 +83,10 @@
     }}
 
     function setChatSendStatus(message, isError = false) {{
-      setChatNoticeTickerText("chat-send-status", message, isError);
+      setChatNoticeTickerText("chat-send-status", "", false);
+      setChatInputPlaceholderStatus(message, {{
+        ttlMs: isError ? 9000 : 7000,
+      }});
     }}
 
     function setChatSendBusy(isBusy) {{

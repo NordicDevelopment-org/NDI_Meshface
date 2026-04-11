@@ -109,9 +109,70 @@
       return isCanonicalNodeId(activePeer) ? activePeer : "";
     }}
 
+    let chatInputPlaceholderStatusText = "";
+    let chatInputPlaceholderStatusFullText = "";
+    let chatInputPlaceholderStatusHideTimer = null;
+    let chatInputPlaceholderStatusHideToken = "";
+    const chatInputPlaceholderStatusTtlMs = 7000;
+
+    function clearChatInputPlaceholderStatus(expectedToken = "") {{
+      if (
+        expectedToken
+        && String(chatInputPlaceholderStatusHideToken || "").trim()
+        && chatInputPlaceholderStatusHideToken !== expectedToken
+      ) {{
+        return;
+      }}
+      if (chatInputPlaceholderStatusHideTimer !== null) {{
+        clearTimeout(chatInputPlaceholderStatusHideTimer);
+        chatInputPlaceholderStatusHideTimer = null;
+      }}
+      chatInputPlaceholderStatusHideToken = "";
+      chatInputPlaceholderStatusText = "";
+      chatInputPlaceholderStatusFullText = "";
+      updateChatInputPlaceholder();
+    }}
+
+    function setChatInputPlaceholderStatus(message, options = null) {{
+      const rawText = String(message || "").replace(/\\s+/g, " ").trim();
+      if (!rawText) {{
+        clearChatInputPlaceholderStatus();
+        return;
+      }}
+      const opts = options && typeof options === "object" ? options : {{}};
+      const compactText = rawText.length <= 96
+        ? rawText
+        : `${{rawText.slice(0, 95).trimEnd()}}…`;
+      chatInputPlaceholderStatusText = compactText;
+      chatInputPlaceholderStatusFullText = rawText;
+      updateChatInputPlaceholder();
+
+      if (chatInputPlaceholderStatusHideTimer !== null) {{
+        clearTimeout(chatInputPlaceholderStatusHideTimer);
+        chatInputPlaceholderStatusHideTimer = null;
+      }}
+      chatInputPlaceholderStatusHideToken = "";
+
+      const ttlMs = Math.max(0, Math.trunc(Number(opts.ttlMs) || chatInputPlaceholderStatusTtlMs));
+      if (ttlMs <= 0 || typeof window === "undefined" || typeof window.setTimeout !== "function") {{
+        return;
+      }}
+      const token = `${{compactText}}|${{Date.now()}}`;
+      chatInputPlaceholderStatusHideToken = token;
+      chatInputPlaceholderStatusHideTimer = window.setTimeout(() => {{
+        clearChatInputPlaceholderStatus(token);
+      }}, ttlMs);
+    }}
+
     function updateChatInputPlaceholder() {{
       const input = document.getElementById("chat-input");
       if (!(input instanceof HTMLInputElement)) return;
+      if (chatInputPlaceholderStatusText) {{
+        input.placeholder = chatInputPlaceholderStatusText;
+        input.title = chatInputPlaceholderStatusFullText || chatInputPlaceholderStatusText;
+        return;
+      }}
+      input.title = "";
       if (!chatMainDirectModeEnabled || activeChatChannel !== "direct") {{
         input.placeholder = "Message the room (^all)...";
         return;

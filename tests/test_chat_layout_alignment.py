@@ -341,6 +341,24 @@ def test_chat_send_channel_compact_dot_trigger_geometry() -> None:
     assert "pointer-events: none;" in css
 
 
+def test_chat_send_status_reuses_input_placeholder_instead_of_notice_row() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "let chatInputPlaceholderStatusText = \"\";" in js
+    assert "function clearChatInputPlaceholderStatus(expectedToken = \"\") {" in js
+    assert "function setChatInputPlaceholderStatus(message, options = null) {" in js
+    assert 'input.placeholder = chatInputPlaceholderStatusText;' in js
+    assert 'input.title = chatInputPlaceholderStatusFullText || chatInputPlaceholderStatusText;' in js
+    assert 'setChatNoticeTickerText("chat-send-status", "", false);' in js
+    assert 'setChatInputPlaceholderStatus(message, {' in js
+    assert "ttlMs: isError ? 9000 : 7000," in js
+    assert "clearChatInputPlaceholderStatus(token);" in js
+
+
 def test_chat_node_search_syncs_to_live_navigator_row_bounds() -> None:
     js_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
 
