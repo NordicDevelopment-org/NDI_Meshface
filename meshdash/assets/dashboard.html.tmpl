@@ -143,10 +143,19 @@
               aria-haspopup="menu"
               aria-expanded="false"
             >
-              <span id="layout-view-menu-btn-label" class="topbar-view-menu-btn-label">Chat</span>
-              <span id="layout-view-menu-btn-badge" class="topbar-view-menu-btn-badge" hidden>0</span>
-              <span id="layout-view-menu-attention-indicator" class="topbar-view-menu-btn-attention" hidden aria-hidden="true"></span>
-              <span class="topbar-view-menu-caret" aria-hidden="true"></span>
+              <span
+                id="layout-view-menu-btn-mark"
+                class="topbar-view-menu-btn-mark"
+                data-default-mark="{app_short_mark}"
+                data-mark-style="text"
+                aria-hidden="true"
+              >{app_short_mark}</span>
+              <span class="topbar-view-menu-btn-main">
+                <span id="layout-view-menu-btn-label" class="topbar-view-menu-btn-label">Chat</span>
+                <span id="layout-view-menu-btn-badge" class="topbar-view-menu-btn-badge" hidden>0</span>
+                <span id="layout-view-menu-attention-indicator" class="topbar-view-menu-btn-attention" hidden aria-hidden="true"></span>
+                <span class="topbar-view-menu-caret" aria-hidden="true"></span>
+              </span>
             </button>
             <div id="layout-view-menu" class="topbar-view-menu" role="menu" hidden>
               <button
@@ -1736,7 +1745,7 @@
                 Tint intensity scales that shared tint from neutral up to a clearly visible wash. Color depth still tunes the broader shell palette and gradients.
               </div>
               <div class="settings-help-note">
-                Badge shows in the workspace menu header and falls back to the short-name mark when set to auto.
+                Badge shows in the workspace launcher square and falls back to the short-name mark when set to auto.
               </div>
               <div class="settings-help-note">
                 Control node color styling for the node list and chat feed.

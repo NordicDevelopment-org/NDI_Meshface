@@ -434,11 +434,11 @@
         );
       color: #f2fff7;
       border-radius: 999px;
-      padding: 0 12px;
+      padding: 0 7px 0 4px;
       display: inline-flex;
       align-items: center;
       justify-content: flex-start;
-      gap: 7px;
+      gap: 8px;
       cursor: pointer;
       font-size: 12px;
       line-height: 1.2;
@@ -447,6 +447,36 @@
       color: color-mix(in srgb, var(--ink) 86%, var(--accent-2));
       box-shadow: none;
       transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+    }}
+    .topbar-view-menu-btn-mark {{
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border: 0;
+      background: transparent;
+      color: color-mix(in srgb, var(--ink) 78%, var(--accent-2) 22%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0.24px;
+      text-transform: uppercase;
+      box-shadow: none;
+    }}
+    .topbar-view-menu-btn-mark[data-mark-style="emoji"] {{
+      font-size: 13px;
+      letter-spacing: 0;
+      text-transform: none;
+    }}
+    .topbar-view-menu-btn-main {{
+      min-width: 0;
+      flex: 1 1 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
     }}
     .topbar-view-menu-btn:hover,
     .topbar-view-menu-btn[aria-expanded="true"] {{
@@ -468,6 +498,11 @@
       outline-offset: 2px;
     }}
     .topbar-view-menu-btn-label {{
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       font-size: 12px;
       line-height: 1;
       font-weight: 700;
@@ -476,6 +511,7 @@
     }}
     .topbar-view-menu-btn-badge {{
       flex: 0 0 auto;
+      margin-left: auto;
       min-width: 18px;
       height: 18px;
       padding: 0 6px;
@@ -1855,7 +1891,7 @@
     .workspace-shell.chat-panel-collapsed .chat-users-head-launcher-shell .topbar-view-menu-btn {{
       width: 100%;
       min-width: 0;
-      padding: 0 10px;
+      padding: 0 7px 0 4px;
     }}
     .workspace-shell.chat-panel-collapsed .chat-users-head-actions {{
       margin-left: auto;

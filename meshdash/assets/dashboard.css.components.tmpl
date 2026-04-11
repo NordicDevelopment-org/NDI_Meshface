@@ -1515,6 +1515,17 @@
       border-color: var(--ui-accent);
       box-shadow: none;
     }}
+    [data-theme="dark"] .topbar-view-menu-btn-mark {{
+      background: transparent;
+      color: var(--workspace-shell-active-text);
+    }}
+    [data-theme="dark"] .topbar-view-menu-btn:hover .topbar-view-menu-btn-mark,
+    [data-theme="dark"] .topbar-view-menu-btn[aria-expanded="true"] .topbar-view-menu-btn-mark {{
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .topbar-view-menu-btn.has-unread .topbar-view-menu-btn-mark {{
+      color: color-mix(in srgb, var(--workspace-shell-active-text) 72%, var(--ui-accent) 28%);
+    }}
     [data-theme="dark"] .topbar-view-menu-btn-badge {{
       border-color: color-mix(in srgb, var(--ui-accent) 34%, transparent);
       background: color-mix(in srgb, var(--ui-accent) 16%, transparent);

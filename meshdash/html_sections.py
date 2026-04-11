@@ -1,6 +1,17 @@
 from .html_assets import render_asset_template as _render_asset_template_helper
 
 
+def _short_mark(label: str) -> str:
+    text = "".join(ch if ch.isalnum() else " " for ch in str(label or "")).strip()
+    parts = [part for part in text.split() if part]
+    if len(parts) >= 2:
+        return f"{parts[0][0]}{parts[1][0]}".upper()
+    if len(parts) == 1:
+        token = parts[0][:2]
+        return token.upper() if token else "MF"
+    return "MF"
+
+
 def build_html_shell(
     *,
     app_title: str,
@@ -22,6 +33,7 @@ def build_html_shell(
         "dashboard.html.tmpl",
         app_title=app_title,
         app_heading=app_heading,
+        app_short_mark=_short_mark(app_heading or app_title),
         style_css=style_css,
         app_js=app_js,
         revision_title=revision_title,

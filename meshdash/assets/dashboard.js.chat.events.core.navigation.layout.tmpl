@@ -2954,6 +2954,26 @@
       return topbarLauncherLayoutLabel(viewName);
     }}
 
+    function currentWorkspaceLauncherMark() {{
+      const badgeEmoji = settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())
+        ? String(settingsBadgeEmoji || "").trim()
+        : "";
+      if (badgeEmoji) {{
+        return {{
+          text: badgeEmoji,
+          style: "emoji",
+        }};
+      }}
+      const markEl = document.getElementById("layout-view-menu-btn-mark");
+      const fallbackMark = (markEl instanceof HTMLElement)
+        ? String(markEl.dataset.defaultMark || markEl.textContent || "").trim()
+        : "";
+      return {{
+        text: fallbackMark || "MF",
+        style: "text",
+      }};
+    }}
+
     function topbarLauncherLayoutLabel(viewName) {{
       const normalized = resolveTopbarLauncherLayoutView(viewName);
       if (normalized === "network") return "Network";
@@ -3102,10 +3122,19 @@
 
     function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {{
       const launcherBtn = document.getElementById("layout-view-menu-btn");
+      const launcherMark = document.getElementById("layout-view-menu-btn-mark");
       const launcherLabel = document.getElementById("layout-view-menu-btn-label");
       const launcherBadge = document.getElementById("layout-view-menu-btn-badge");
       const attentionIndicator = document.getElementById("layout-view-menu-attention-indicator");
       if (!(launcherBtn instanceof HTMLButtonElement)) return;
+
+      const activeMark = currentWorkspaceLauncherMark();
+      if (launcherMark instanceof HTMLElement) {{
+        if (launcherMark.textContent !== activeMark.text) {{
+          launcherMark.textContent = activeMark.text;
+        }}
+        launcherMark.dataset.markStyle = activeMark.style;
+      }}
 
       const activeLabel = currentWorkspaceLauncherLabel(viewName);
       if (launcherLabel instanceof HTMLElement) {{
