@@ -114,7 +114,6 @@ unavailable.
 - `meshdash/history*.py`, `meshdash/history/` - SQLite schema, reads, writes,
   analytics, rollups, pruning
 - `scripts/deploy_meshyface.sh` - remote deploy/bootstrap helper
-- `scripts/deploy_dual.sh` - dual private/public deploy helper
 - `scripts/check_public_branch_drift.sh` - branch-drift guard
 - `scripts/release_public.sh` - allowlist-driven public release packager
 - `tests/` - public-branch regression tests included in this repo
