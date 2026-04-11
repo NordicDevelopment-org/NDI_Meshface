@@ -145,6 +145,7 @@ def test_network_subviews_follow_workspace_theme_tokens() -> None:
     overview_control_section = css.split("[data-theme=\"dark\"] .network-overview-panel .history-metric-wrap {", 1)[1].split("}", 1)[0]
     overview_chart_section = css.split("[data-theme=\"dark\"] .network-overview-panel #network-overview-chart-wrap {", 1)[1].split("}", 1)[0]
     overview_stat_section = css.split("[data-theme=\"dark\"] .network-overview-panel .overview-item {", 1)[1].split("}", 1)[0]
+    sensors_panel_section = css.split("[data-theme=\"dark\"] .network-sensors-panel .env-metrics-explorer {", 1)[1].split("}", 1)[0]
     sensors_control_section = css.split("[data-theme=\"dark\"] .network-sensors-panel .env-metrics-control-group {", 1)[1].split("}", 1)[0]
     sensors_chart_section = css.split("[data-theme=\"dark\"] .network-sensors-panel #env-metrics-chart-wrap {", 1)[1].split("}", 1)[0]
     diagnostics_pane_section = css.split("[data-theme=\"dark\"] .network-diagnostics-pane {", 1)[1].split("}", 1)[0]
@@ -163,6 +164,8 @@ def test_network_subviews_follow_workspace_theme_tokens() -> None:
     assert "var(--workspace-shell-border)" in overview_chart_section
     assert "var(--workspace-shell-bg-alt)" in overview_chart_section
     assert "var(--workspace-shell-active-bg)" in overview_stat_section
+    assert "var(--workspace-shell-border)" in sensors_panel_section
+    assert "var(--workspace-shell-bg-alt)" in sensors_panel_section
     assert "var(--workspace-shell-border-muted)" in sensors_control_section
     assert "var(--workspace-shell-border)" in sensors_chart_section
     assert "var(--workspace-shell-border)" in diagnostics_pane_section
@@ -175,6 +178,29 @@ def test_network_subviews_follow_workspace_theme_tokens() -> None:
     assert "var(--workspace-shell-border)" in graph_stage_section
     assert "var(--ui-accent)" in graph_edge_section
     assert "var(--workspace-shell-border-strong)" in graph_root_section
+
+
+def test_network_sensors_docked_explorer_reuses_overview_light_shell() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    explorer_section = css.split(".network-sensors-panel .env-metrics-explorer {", 1)[1].split("}", 1)[0]
+    chart_section = css.split(".network-sensors-panel #env-metrics-chart-wrap {", 1)[1].split("}", 1)[0]
+    legend_section = css.split(".network-sensors-panel .env-node-legend-card {", 1)[1].split("}", 1)[0]
+
+    assert "border: 1px solid rgba(188, 214, 195, 0.9);" in explorer_section
+    assert "background: rgba(249, 253, 249, 0.92);" in explorer_section
+    assert "box-shadow: 0 14px 34px rgba(22, 40, 30, 0.08);" in explorer_section
+    assert "padding: 14px;" in explorer_section
+    assert "gap: 8px;" in explorer_section
+
+    assert "border-color: #d7e5d2;" in chart_section
+    assert "linear-gradient(180deg, #fbfffc 0%, #eef8f1 100%)" in chart_section
+    assert "padding: 0;" in chart_section
+    assert "rgba(18, 29, 39, 0.98)" not in chart_section
+
+    assert "border: 1px solid #d7e5d2;" in legend_section
+    assert "background: #f9fdf9;" in legend_section
+    assert "color: #193a28;" in legend_section
 
 
 def test_network_subview_charts_pull_runtime_theme_vars() -> None:
