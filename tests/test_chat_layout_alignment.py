@@ -130,6 +130,8 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     channel_badge_section = css.split(".mesh-channel-primary-badge {", 1)[1].split("}", 1)[0]
     channel_unread_section = css.split(".mesh-channel-pill-unread {", 1)[1].split("}", 1)[0]
     channel_menu_btn_section = css.split(".mesh-channel-menu-btn {", 1)[1].split("}", 1)[0]
+    dark_channel_badge_section = css.rsplit("[data-theme=\"dark\"] .mesh-channel-primary-badge {", 1)[1].split("}", 1)[0]
+    dark_channel_badge_active_section = css.split("[data-theme=\"dark\"] .mesh-channel-pill:hover .mesh-channel-primary-badge,\n    [data-theme=\"dark\"] .mesh-channel-pill.active .mesh-channel-primary-badge,\n    [data-theme=\"dark\"] .mesh-channel-menu-btn:hover .mesh-channel-primary-badge,\n    [data-theme=\"dark\"] .mesh-channel-menu-btn[aria-expanded=\"true\"] .mesh-channel-primary-badge {", 1)[1].split("}", 1)[0]
     dark_input_section = css.rsplit("[data-theme=\"dark\"] .list-search-input,\n    [data-theme=\"dark\"] #chat-input,\n    [data-theme=\"dark\"] .chat-send-channel-select {", 1)[1].split("}", 1)[0]
     dark_bottom_bar_section = css.rsplit("[data-theme=\"dark\"] .chat-left-bottom-bar {", 1)[1].split("}", 1)[0]
     dark_send_btn_section = css.split("[data-theme=\"dark\"] #chat-emoji-btn,\n    [data-theme=\"dark\"] #chat-send-btn {", 1)[1].split("}", 1)[0]
@@ -147,6 +149,10 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     assert "[data-theme=\"dark\"] .card.chat .body," in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "[data-theme=\"dark\"] .chat-left-bottom-bar {" in css
+    assert "var(--workspace-shell-border-muted)" in dark_channel_badge_section
+    assert "var(--workspace-shell-active-bg)" in dark_channel_badge_section
+    assert "var(--workspace-shell-text-soft)" in dark_channel_badge_section
+    assert "var(--workspace-shell-active-text)" in dark_channel_badge_active_section
     assert "background: var(--ui-panel) !important;" in dark_bottom_bar_section
     assert "var(--ui-border)" in dark_bottom_bar_section
     assert "[data-theme=\"dark\"] #chat-emoji-btn," in css
