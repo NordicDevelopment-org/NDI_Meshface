@@ -100,6 +100,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert ".topbar-view-menu-head-brand {" in css
     assert ".topbar-view-menu-head-version," in css
     assert ".topbar-view-menu-head-commit {" in css
+    assert "overflow-wrap: anywhere;" in css
     assert ".topbar-view-menu-item-icon {" in css
     assert ".topbar-view-menu {" in css
     assert "z-index: 1350;" in css

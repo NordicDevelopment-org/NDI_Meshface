@@ -715,6 +715,26 @@
       }};
 
       const safeState = (state && typeof state === "object") ? state : {{}};
+      const summary = (safeState.summary && typeof safeState.summary === "object") ? safeState.summary : {{}};
+      const revision = (summary.revision && typeof summary.revision === "object") ? summary.revision : {{}};
+      const revisionVersion = String(revision.version || "").trim();
+      const revisionCommit = String(revision.commit || "").trim();
+      const revisionLabel = String(revision.label || "").trim();
+      const revisionTitle = String(revision.title || "").trim();
+      const revisionVersionText = revisionVersion ? `v${{revisionVersion}}` : "";
+      const launcherAppName = "Meshyface";
+      const revisionInline = (() => {{
+        if (revisionVersionText && revisionCommit) {{
+          return `${{revisionVersionText}} • ${{revisionCommit}}`;
+        }}
+        if (revisionVersionText) {{
+          return revisionVersionText;
+        }}
+        if (revisionCommit) {{
+          return revisionCommit;
+        }}
+        return revisionLabel;
+      }})();
       const selfId = resolveLocalNodeId(safeState);
       if (!isCanonicalNodeId(selfId)) {{
         if (hasPill) {{
@@ -755,6 +775,7 @@
       const profileShortLabel = selfRadioProfileShortLabel(selfId);
       const profileIdentity = selfName ? `${{selfName}} • ID: ${{selfId}}` : selfId;
       const profileTitle = `Connected local radio: ${{profileIdentity}} • Status: ${{statusDetail}}`;
+      const launcherTitle = revisionTitle ? `${{profileTitle}} • ${{revisionTitle}}` : profileTitle;
       const launcherPrimary = selfLongName || selfShortName || selfName || selfId;
       const launcherShort = selfShortName || profileShortLabel;
       const launcherSecondaryParts = [];
@@ -763,13 +784,17 @@
       }}
       launcherSecondaryParts.push(`ID: ${{selfId}}`);
       const launcherSecondary = launcherSecondaryParts.join(" • ");
-      const launcherTertiary = `Status: ${{statusDetail}}`;
+      const launcherTertiaryParts = [launcherAppName];
+      if (revisionInline) {{
+        launcherTertiaryParts.push(revisionInline);
+      }}
+      const launcherTertiary = launcherTertiaryParts.join(" • ");
       if (hasPill) {{
         pill.textContent = profileLabel;
-        pill.title = profileTitle;
+        pill.title = launcherTitle;
       }}
-      setLauncherHead(launcherShort, launcherPrimary, launcherSecondary, launcherTertiary, profileTitle);
-      setProfile(profileShortLabel, profileTitle);
+      setLauncherHead(launcherShort, launcherPrimary, launcherSecondary, launcherTertiary, launcherTitle);
+      setProfile(profileShortLabel, launcherTitle);
       setProfileFreshness(status, lastSeenUnix);
       syncConsoleCommandInputState(safeState);
     }}
