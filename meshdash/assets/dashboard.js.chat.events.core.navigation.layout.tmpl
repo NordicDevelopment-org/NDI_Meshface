@@ -1116,6 +1116,29 @@
         void refreshNetworkDiagnosticsPanel(false);
       }}
 
+      if (normalizedView === "network" && next === "map") {{
+        if (latestState && typeof renderMap === "function") {{
+          const cachedHistory = isSelectableNodeId(selectedNodeId)
+            ? cachedNodeHistory(selectedNodeId)
+            : null;
+          renderMap(
+            latestState.nodes || [],
+            (latestState.traffic || {{}}).edges || [],
+            cachedHistory
+          );
+        }}
+        if (!networkMapInitialAutoResetDone && typeof resetMapViewToMostNodes === "function") {{
+          networkMapInitialAutoResetDone = true;
+          fitDone = false;
+          window.setTimeout(() => {{
+            try {{
+              resetMapViewToMostNodes();
+            }} catch (_err) {{
+            }}
+          }}, 0);
+        }}
+      }}
+
       if (showMapPanel && (normalizedView === "network" || normalizedView === "saved")) {{
         if (typeof requestMapResizeNow === "function") {{
           requestMapResizeNow();
@@ -3272,7 +3295,9 @@
         mapDataFocus = "auto";
       }}
       if (next === "network") {{
-        fitDone = false;
+        if (!networkMapInitialAutoResetDone) {{
+          fitDone = false;
+        }}
         window.setTimeout(() => {{
           try {{
             if (typeof requestMapResizeNow === "function") {{

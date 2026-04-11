@@ -220,7 +220,7 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "--chat-feed-node-tint-end-hue: 170;" in css
     assert "--chat-feed-node-outline-hue: 154;" in css
     assert "--chat-feed-node-gradient: linear-gradient(" in css
-    assert "color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, var(--ui-bg-elev) 12%)" in css
+    assert "hsl(var(--chat-feed-node-tint-start-hue, 148) calc(34% * var(--chat-feed-node-dark-sat-mult, 1))" in css
     assert "[data-theme=\"dark\"] .chat-feed-item.kind-status {" in css
     assert "rgba(44, 82, 60, 0.58)" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-reaction-chip," in css

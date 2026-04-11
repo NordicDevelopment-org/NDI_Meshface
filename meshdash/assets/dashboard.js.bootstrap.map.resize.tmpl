@@ -5,6 +5,34 @@
       const height = Math.round(Number(rect && rect.height) || mapElement.clientHeight || 0);
       if (width <= 0 || height <= 0) return;
       map.invalidateSize({{ pan: false, animate: false }});
+      ensureMapViewportCoverage();
+    }}
+
+    function ensureMapViewportCoverage() {{
+      if (typeof isMapVisibleLayoutView === "function" && !isMapVisibleLayoutView(activeLayoutView)) {{
+        return;
+      }}
+      if (!map || typeof map.getSize !== "function" || typeof map.getZoom !== "function") return;
+      const size = map.getSize();
+      const mapHeight = Math.round(Number(size && size.y) || 0);
+      if (mapHeight <= 0) return;
+      const zoom = Number(map.getZoom());
+      if (!Number.isFinite(zoom)) return;
+      const configuredMinZoom = (typeof map.getMinZoom === "function")
+        ? Number(map.getMinZoom())
+        : 0;
+      const minZoomFloor = Number.isFinite(configuredMinZoom) ? configuredMinZoom : 0;
+      const coverageMinZoom = Math.max(
+        minZoomFloor,
+        Math.ceil(Math.log2(Math.max(1, mapHeight) / 256))
+      );
+      if (Number.isFinite(coverageMinZoom) && zoom < coverageMinZoom && typeof map.setZoom === "function") {{
+        map.setZoom(coverageMinZoom, {{ animate: false }});
+      }}
+      const boundedViewport = map && map.options ? map.options.maxBounds : null;
+      if (boundedViewport && typeof map.panInsideBounds === "function") {{
+        map.panInsideBounds(boundedViewport, {{ animate: false }});
+      }}
     }}
 
     function requestMapResize() {{
@@ -13,6 +41,7 @@
       }}
       mapResizeRaf = requestAnimationFrame(() => {{
         map.invalidateSize({{ pan: false, animate: false }});
+        ensureMapViewportCoverage();
         mapResizeRaf = null;
       }});
     }}

@@ -93,8 +93,7 @@
       if (!Number.isFinite(num)) return fallback;
       const abs = Math.abs(num);
       const decimals = abs >= 100 ? 0 : (abs >= 10 ? 1 : 2);
-      const text = num.toFixed(decimals);
-      return text.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+      return num.toFixed(decimals);
     }}
 
     function normalizeEnvHistoryHours(raw) {{
@@ -1003,7 +1002,7 @@
               guide: themeColor("--workspace-shell-border-muted", "#324152"),
               guideOpacity: "0.45",
               text: themeColor("--workspace-shell-text-soft", "#9ce7b8"),
-              axis: themeColor("--workspace-shell-active-text", "#9ce7b8"),
+              axis: themeColor("--workspace-shell-text", "#d7e6f2"),
             }}
             : {{
               grid: "#dce8df",
@@ -1039,10 +1038,10 @@
       const height = Number.isFinite(measuredHeight) && measuredHeight > 10
         ? Math.max(240, Math.round(measuredHeight))
         : envMetricsChartLayout.height;
-      const padLeft = envMetricsChartLayout.padLeft;
-      const padRight = envMetricsChartLayout.padRight;
+      const padLeft = dockedInNetwork ? 38 : envMetricsChartLayout.padLeft;
+      const padRight = dockedInNetwork ? 18 : envMetricsChartLayout.padRight;
       const padTop = envMetricsChartLayout.padTop;
-      const padBottom = envMetricsChartLayout.padBottom;
+      const padBottom = dockedInNetwork ? 18 : envMetricsChartLayout.padBottom;
       const chartWidth = width - padLeft - padRight;
       const chartHeight = height - padTop - padBottom;
       const unixSpan = Math.max(1, visibleMaxUnix - visibleMinUnix);
@@ -1054,13 +1053,14 @@
       }};
 
       const yAxisTicks = buildLinearAxisTicks(minValue, maxValue, 5);
+      const axisTextStyle = "font-family:'IBM Plex Sans','Segoe UI',sans-serif;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:0.01em;";
       const yGrid = [];
       const yLabels = [];
       for (const tick of yAxisTicks) {{
         const value = Number(tick && tick.value);
         const y = yForValue(value);
         yGrid.push(`<line x1="${{padLeft}}" y1="${{y.toFixed(2)}}" x2="${{(padLeft + chartWidth).toFixed(2)}}" y2="${{y.toFixed(2)}}" stroke="${{palette.grid}}" stroke-width="1"></line>`);
-        yLabels.push(`<text x="${{(padLeft - 4).toFixed(2)}}" y="${{(y + 4).toFixed(2)}}" text-anchor="end" fill="${{palette.axis}}" font-size="10">${{escAttr(envMetricValueText(value))}}</text>`);
+        yLabels.push(`<text class="chart-axis-label" style="${{axisTextStyle}}" x="${{(padLeft - 4).toFixed(2)}}" y="${{(y + 4).toFixed(2)}}" text-anchor="end" fill="${{palette.axis}}">${{escAttr(envMetricValueText(value))}}</text>`);
       }}
 
       const xGrid = [];

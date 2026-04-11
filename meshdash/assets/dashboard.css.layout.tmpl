@@ -805,6 +805,24 @@
     #network-overview-chart.chart-dragging {{
       cursor: grabbing;
     }}
+    #signal-chart text,
+    #node-online-chart text,
+    #node-packets-chart text,
+    #online-activity-chart text,
+    #weekly-summary-chart text,
+    #network-overview-chart text,
+    #history-chat-trend-chart text,
+    #encription-trend-chart text,
+    #encription-route-chart text,
+    #env-metrics-chart text {{
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      font-variant-numeric: tabular-nums;
+    }}
+    .chart-axis-label {{
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }}
     .signal-empty {{
       position: absolute;
       inset: 0;
@@ -2374,9 +2392,9 @@
       box-shadow: none;
     }}
     .workspace-shell[data-layout-view="chat"] .chat-left-panel .chat-member-list {{
-      border: 1px solid #d2e1d0;
-      border-radius: 10px;
-      background: #f7fcf7;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
       overflow: auto;
     }}
     .layout.view-chat .chat-shell {{
@@ -3027,9 +3045,28 @@
     .layout.view-network .network-map-chrome {{
       display: flex;
     }}
+    .layout.view-network #network-map-panel-overview > .network-overview-panel {{
+      overflow: hidden;
+    }}
+    .layout.view-network #network-map-panel-overview .network-overview-card {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .layout.view-network #network-map-panel-sensors > .network-overview-panel {{
+      overflow: hidden;
+    }}
+    .layout.view-network #network-map-panel-sensors .network-sensors-host {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .layout.view-network #network-map-panel-sensors .env-metrics-explorer {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
     .layout.view-network #network-overview-chart-wrap {{
+      flex: 1 1 auto;
       min-height: clamp(280px, 48vh, 460px);
-      height: clamp(280px, 48vh, 460px);
+      height: auto;
     }}
     .layout.view-network .network-overview-card .overview-grid {{
       margin-top: 2px;
@@ -4347,9 +4384,9 @@
     .chat-node-details-history-host #signal-chart-wrap,
     .chat-node-details-history-host #node-online-chart-wrap,
     .chat-node-details-history-host #node-packets-chart-wrap {{
-      flex: 0 0 auto;
-      height: 260px;
-      min-height: 240px;
+      flex: 1 1 auto;
+      height: auto;
+      min-height: 0;
     }}
     .chat-member-item {{
       --chat-member-node-hue: 145;

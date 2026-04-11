@@ -35,6 +35,27 @@
         return false;
       }}
 
+      const measuredWidth = Number(svg.clientWidth);
+      const measuredHeight = Number(svg.clientHeight);
+      const width = Number.isFinite(measuredWidth) && measuredWidth > 10
+        ? Math.round(measuredWidth)
+        : (Number(chartLayout.width) || 900);
+      const height = Number.isFinite(measuredHeight) && measuredHeight > 10
+        ? Math.round(measuredHeight)
+        : (Number(chartLayout.height) || 220);
+      const padLeft = Number(chartLayout.padLeft) || 46;
+      const padRight = Number(chartLayout.padRight) || 10;
+      const padTop = Number(chartLayout.padTop) || 12;
+      const padBottom = Number(chartLayout.padBottom) || 24;
+      chartState.layout = {{
+        width,
+        height,
+        padLeft,
+        padRight,
+        padTop,
+        padBottom,
+      }};
+
       bindHistoryTrendChartZoom(
         chartState,
         () => rerenderWeeklySummaryChartFromCache(target.key),
@@ -137,12 +158,6 @@
       }}
       empty.hidden = true;
 
-      const width = chartLayout.width;
-      const height = chartLayout.height;
-      const padLeft = chartLayout.padLeft;
-      const padRight = chartLayout.padRight;
-      const padTop = chartLayout.padTop;
-      const padBottom = chartLayout.padBottom;
       const plotW = width - padLeft - padRight;
       const plotH = height - padTop - padBottom;
       const n = plotRows.length;
@@ -373,14 +388,17 @@
         }};
       }});
       const axisTicks = buildLinearAxisTicks(minVal, maxVal, 5);
-      const axisLabelColor = enrichSeries[0] ? enrichSeries[0].labelColor : chartPalette.label;
+      const axisLabelColor = darkTheme
+        ? themeColor("--workspace-shell-text", "#d7e6f2")
+        : themeColor("--workspace-shell-text", "#1f6f53");
+      const axisTextStyle = "font-family:'IBM Plex Sans','Segoe UI',sans-serif;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:0.01em;";
       const axisLines = axisTicks.map((tick) => {{
         const y = padTop + (tick.ratio * plotH);
         return `<line x1="${{padLeft}}" y1="${{y.toFixed(2)}}" x2="${{width - padRight}}" y2="${{y.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>`;
       }}).join("");
       const axisLabels = axisTicks.map((tick) => {{
         const y = padTop + (tick.ratio * plotH);
-        return `<text x="${{padLeft - 4}}" y="${{(y + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{axisLabelColor}}">${{formatMetricValue(tick.value, metricMeta.decimals)}}</text>`;
+        return `<text class="chart-axis-label" style="${{axisTextStyle}}" x="${{padLeft - 4}}" y="${{(y + 4).toFixed(2)}}" text-anchor="end" fill="${{axisLabelColor}}">${{formatMetricValue(tick.value, metricMeta.decimals)}}</text>`;
       }}).join("");
       const dayGuideLines = dayBoundaries.map((boundary) => {{
         const x = padLeft + ((Math.max(0, boundary.idx) / Math.max(1, n - 1)) * plotW);

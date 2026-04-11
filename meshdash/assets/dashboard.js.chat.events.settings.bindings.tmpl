@@ -6,6 +6,7 @@
         controlId === "settings-time-sync-enabled"
         || controlId === "settings-time-sync-timezone"
         || controlId === "settings-appearance-unique-node-colors"
+        || controlId === "settings-appearance-unique-chat-colors"
         || controlId === "settings-appearance-badge-emoji"
         || controlId === "theme-custom-base-color"
         || controlId === "theme-custom-line-color"
@@ -78,6 +79,13 @@
         }}
         if (target instanceof HTMLInputElement && target.id === "settings-appearance-unique-node-colors") {{
           setSettingsUniqueNodeColorsEnabled(!!target.checked, {{
+            persist: true,
+            rerender: true,
+            announce: true,
+          }});
+        }}
+        if (target instanceof HTMLInputElement && target.id === "settings-appearance-unique-chat-colors") {{
+          setSettingsUniqueChatColorsEnabled(!!target.checked, {{
             persist: true,
             rerender: true,
             announce: true,
