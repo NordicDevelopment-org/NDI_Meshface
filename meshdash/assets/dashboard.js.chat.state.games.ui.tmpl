@@ -1,3 +1,8 @@
+    let gamesBoardResizeObserver = null;
+    let gamesBoardObservedWrap = null;
+    let gamesBoardResizeRaf = null;
+    let gamesBoardWindowResizeBound = false;
+
     function normalizeActiveGameId(value) {{
       const token = String(value || "").trim().toLowerCase();
       if (token === "checkers") return "checkers";
@@ -54,6 +59,82 @@
         return;
       }}
       delete wrapEl.dataset.turn;
+    }}
+
+    function gamesBoardCellSizeVarName(gameId = "") {{
+      const normalizedGameId = normalizeActiveGameId(gameId);
+      if (normalizedGameId === "checkers") return "--checkers-cell-size";
+      if (normalizedGameId === "chess") return "--chess-cell-size";
+      return "--reversi-cell-size";
+    }}
+
+    function queueActiveGamesBoardAutosize() {{
+      if (gamesBoardResizeRaf != null) return;
+      if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {{
+        syncActiveGamesBoardAutosize();
+        return;
+      }}
+      gamesBoardResizeRaf = window.requestAnimationFrame(() => {{
+        gamesBoardResizeRaf = null;
+        if (activeLayoutView !== "games") return;
+        syncActiveGamesBoardAutosize();
+      }});
+    }}
+
+    function syncActiveGamesBoardAutosize() {{
+      const gameId = normalizeActiveGameId(activeGameId);
+      const panelEl = document.getElementById(`games-main-${{gameId}}`);
+      if (!(panelEl instanceof HTMLElement)) return;
+      if (panelEl.hidden) return;
+      const wrapEl = panelEl.querySelector(".games-board-wrap");
+      if (!(wrapEl instanceof HTMLElement)) return;
+      const boardId = gameId === "reversi" ? "reversi-board" : `${{gameId}}-board`;
+      const boardEl = document.getElementById(boardId);
+      if (!(boardEl instanceof HTMLElement)) return;
+      const wrapRect = wrapEl.getBoundingClientRect();
+      if (!Number.isFinite(wrapRect.width) || !Number.isFinite(wrapRect.height)) return;
+      if (wrapRect.width < 32 || wrapRect.height < 32) return;
+      const wrapStyle = window.getComputedStyle(wrapEl);
+      const padX = (parseFloat(wrapStyle.paddingLeft || "0") || 0) + (parseFloat(wrapStyle.paddingRight || "0") || 0);
+      const padY = (parseFloat(wrapStyle.paddingTop || "0") || 0) + (parseFloat(wrapStyle.paddingBottom || "0") || 0);
+      const frameInset = 2;
+      const usableWidth = Math.max(0, Math.floor(wrapRect.width - padX - frameInset));
+      const usableHeight = Math.max(0, Math.floor(wrapRect.height - padY - frameInset));
+      const boardSizePx = Math.floor(Math.min(usableWidth, usableHeight));
+      if (!Number.isFinite(boardSizePx) || boardSizePx < 120) return;
+      const cellSizePx = Math.max(16, Math.floor(boardSizePx / 8));
+      const varName = gamesBoardCellSizeVarName(gameId);
+      const nextValue = `${{cellSizePx}}px`;
+      if (boardEl.style.getPropertyValue(varName) === nextValue) return;
+      boardEl.style.setProperty(varName, nextValue);
+    }}
+
+    function ensureActiveGamesBoardResizeTracking() {{
+      if (!gamesBoardWindowResizeBound && typeof window !== "undefined") {{
+        gamesBoardWindowResizeBound = true;
+        window.addEventListener("resize", () => {{
+          if (activeLayoutView !== "games") return;
+          queueActiveGamesBoardAutosize();
+        }}, {{ passive: true }});
+      }}
+      if (!gamesBoardResizeObserver && typeof ResizeObserver !== "undefined") {{
+        gamesBoardResizeObserver = new ResizeObserver(() => {{
+          if (activeLayoutView !== "games") return;
+          queueActiveGamesBoardAutosize();
+        }});
+      }}
+      const gameId = normalizeActiveGameId(activeGameId);
+      const panelEl = document.getElementById(`games-main-${{gameId}}`);
+      const wrapEl = panelEl instanceof HTMLElement ? panelEl.querySelector(".games-board-wrap") : null;
+      if (!(wrapEl instanceof HTMLElement)) return;
+      if (gamesBoardObservedWrap === wrapEl) return;
+      if (gamesBoardResizeObserver && gamesBoardObservedWrap instanceof HTMLElement) {{
+        gamesBoardResizeObserver.unobserve(gamesBoardObservedWrap);
+      }}
+      gamesBoardObservedWrap = wrapEl;
+      if (gamesBoardResizeObserver) {{
+        gamesBoardResizeObserver.observe(wrapEl);
+      }}
     }}
 
     function gamesQuickChatTrimText(value, maxLen = 120) {{
@@ -331,11 +412,13 @@
       syncBoardGameNetworkState("checkers", _state);
       syncBoardGameNetworkState("chess", _state);
       syncGamesActivePanels();
+      ensureActiveGamesBoardResizeTracking();
       renderGamesQuickChatHeader(_state);
       if (activeGameId === "reversi") {{
         renderReversiLinkUi(_state);
         renderReversiBoard();
         renderReversiStatus();
+        queueActiveGamesBoardAutosize();
         return;
       }}
       if (activeGameId === "checkers") {{
@@ -343,12 +426,14 @@
         refreshCheckersGame();
         renderCheckersBoard();
         renderCheckersStatus();
+        queueActiveGamesBoardAutosize();
         return;
       }}
       renderBoardGameLinkUi("chess", _state);
       refreshChessGame();
       renderChessBoard();
       renderChessStatus();
+      queueActiveGamesBoardAutosize();
     }}
 
     function bindGamesControls() {{
