@@ -2603,8 +2603,9 @@
       flex-direction: column;
     }}
     .card.files {{
-      border: 1px solid #c6d6c0;
-      background: #f6fbf5;
+      border: 1px solid color-mix(in srgb, var(--line) 72%, var(--accent) 28%);
+      background: color-mix(in srgb, var(--panel) 96%, var(--bg) 4%);
+      color: var(--ui-text, #183223);
       display: none;
       flex-direction: column;
     }}
@@ -2616,9 +2617,9 @@
       min-height: 0;
     }}
     .files-controls {{
-      border: 1px solid #d2e1d0;
+      border: 1px solid var(--surface-tint-border, #c2d8c7);
       border-radius: 8px;
-      background: #edf6ec;
+      background: var(--surface-tint-bg-soft, #f0f8f2);
       padding: 8px;
       display: flex;
       flex-direction: column;
@@ -2627,7 +2628,7 @@
     .files-caption {{
       font-size: 11px;
       line-height: 1.35;
-      color: #355343;
+      color: var(--surface-tint-text-soft, #5c7567);
     }}
     .files-field {{
       display: flex;
@@ -2638,7 +2639,7 @@
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.2px;
-      color: #4f6758;
+      color: var(--surface-tint-text, #294735);
       font-weight: 700;
     }}
     .files-row {{
@@ -2664,26 +2665,43 @@
     .files-channel-hint {{
       font-size: 11px;
       line-height: 1.35;
-      color: #456352;
+      color: var(--surface-tint-text-soft, #5c7567);
     }}
     .files-input {{
       width: 100%;
       min-width: 0;
-      border: 1px solid #c2d8c7;
+      border: 1px solid color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 72%, var(--ui-border, #c2d8c7) 28%);
       border-radius: 7px;
       padding: 5px 7px;
       font-size: 11px;
       line-height: 1.25;
-      color: #183223;
-      background: #ffffff;
+      color: var(--ui-text, #183223);
+      background: color-mix(in srgb, var(--ui-panel, #ffffff) 96%, white 4%);
       box-sizing: border-box;
     }}
     .files-input:focus {{
-      outline: 2px solid #9ac5aa;
+      outline: 2px solid var(--surface-tint-border-strong, var(--ui-accent, #9ac5aa));
       outline-offset: 0;
-      border-color: #9ac5aa;
-      background: #ffffff;
+      border-color: var(--surface-tint-border-strong, var(--ui-accent, #9ac5aa));
+      background: var(--ui-panel, #ffffff);
       box-shadow: none;
+    }}
+    .files-input[type="file"] {{
+      padding: 4px 6px;
+      color: var(--ui-text-soft, #4f6758);
+    }}
+    .files-input[type="file"]::file-selector-button,
+    .files-input[type="file"]::-webkit-file-upload-button {{
+      margin-right: 8px;
+      border: 1px solid color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 78%, var(--ui-border, #c2d8c7) 22%);
+      border-radius: 7px;
+      background: color-mix(in srgb, var(--surface-tint-bg-alt, #e1f2e7) 72%, white 28%);
+      color: var(--surface-tint-text, #294735);
+      padding: 3px 9px;
+      font-size: 10px;
+      line-height: 1.2;
+      cursor: pointer;
+      font-family: inherit;
     }}
     .files-actions {{
       display: flex;
@@ -2692,22 +2710,23 @@
       flex-wrap: wrap;
     }}
     .files-controls .btn.btn-secondary {{
-      background: #e6f0ea;
-      border-color: #b7ccbe;
-      color: #1f4a35;
+      background: color-mix(in srgb, var(--surface-tint-bg-alt, #e1f2e7) 72%, white 28%);
+      border-color: color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 76%, var(--ui-border, #c2d8c7) 24%);
+      color: var(--surface-tint-text, #294735);
     }}
     .files-controls .btn.btn-secondary:hover {{
-      background: #dce9e1;
+      background: color-mix(in srgb, var(--surface-tint-bg, #d1e6d8) 70%, white 30%);
+      border-color: var(--surface-tint-border-strong, #9ac5aa);
     }}
     .files-send-status {{
       font-size: 11px;
-      color: #365746;
+      color: var(--surface-tint-text-soft, #5c7567);
       line-height: 1.35;
     }}
     .files-console {{
-      border: 1px solid #d2e1d0;
+      border: 1px solid var(--surface-tint-border, #c2d8c7);
       border-radius: 8px;
-      background: #f2f8f2;
+      background: color-mix(in srgb, var(--surface-tint-bg-alt, #e1f2e7) 76%, white 24%);
       padding: 7px;
       display: flex;
       flex-direction: column;
@@ -2723,7 +2742,7 @@
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.25px;
-      color: #4d6858;
+      color: var(--surface-tint-text, #294735);
       font-weight: 700;
     }}
     .files-console-actions {{
@@ -2742,10 +2761,15 @@
       min-height: 92px;
       max-height: 168px;
       overflow: auto;
-      border: 1px solid #274033;
+      border: 1px solid var(--surface-tint-border-strong, #7ab18a);
       border-radius: 7px;
-      background: #0f1b14;
-      color: #cde3d4;
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, #0b1210 90%, var(--surface-tint-color, #7ab18a) 10%),
+          color-mix(in srgb, #101915 78%, var(--surface-tint-color, #7ab18a) 22%)
+        );
+      color: color-mix(in srgb, var(--surface-tint-text, #294735) 18%, white 82%);
       font-family: "Fira Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
       font-size: 11px;
       line-height: 1.35;
@@ -2753,6 +2777,7 @@
       white-space: pre-wrap;
       word-break: break-word;
       box-sizing: border-box;
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, white 12%, transparent);
     }}
     .files-send-status.error {{
       color: #8b3a3a;
@@ -2762,14 +2787,44 @@
       flex: 1 1 auto;
       min-height: 0;
       max-height: none;
-      border: 1px solid #d2e1d0;
+      border: 1px solid var(--surface-tint-border, #c2d8c7);
       border-radius: 8px;
-      background: #f9fdf9;
+      background: color-mix(in srgb, var(--panel, #ffffff) 96%, var(--bg, #edf6ec) 4%);
+    }}
+    #files-transfer-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      color: var(--ui-text, #183223);
+    }}
+    #files-transfer-table thead th {{
+      padding: 9px 6px;
+      text-align: left;
+      font-size: 10px;
+      line-height: 1.2;
+      text-transform: uppercase;
+      letter-spacing: 0.16px;
+      color: var(--surface-tint-text, #294735);
+      background: color-mix(in srgb, var(--surface-tint-bg-soft, #f0f8f2) 78%, white 22%);
+      border-bottom: 1px solid var(--surface-tint-border, #c2d8c7);
+      white-space: nowrap;
+    }}
+    #files-transfer-table tbody td {{
+      padding: 9px 6px;
+      vertical-align: top;
+      border-top: 1px solid color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 70%, transparent);
+      color: var(--ui-text, #183223);
+    }}
+    #files-transfer-table tbody tr:first-child td {{
+      border-top: 0;
+    }}
+    #files-transfer-table tbody tr:nth-child(even) {{
+      background: color-mix(in srgb, var(--surface-tint-bg-soft, #f0f8f2) 44%, white 56%);
     }}
     .files-transfer-action {{
-      border: 1px solid #bfd4c3;
-      background: #f7fcf7;
-      color: #264634;
+      border: 1px solid color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 76%, var(--ui-border, #c2d8c7) 24%);
+      background: color-mix(in srgb, var(--surface-tint-bg-soft, #f0f8f2) 72%, white 28%);
+      color: color-mix(in srgb, var(--surface-tint-text, #294735) 88%, var(--ink, #183223) 12%);
       border-radius: 7px;
       padding: 3px 8px;
       font-size: 10px;
@@ -2778,8 +2833,8 @@
       white-space: nowrap;
     }}
     .files-transfer-action:hover {{
-      background: #e7f3eb;
-      border-color: #95b6a2;
+      background: color-mix(in srgb, var(--surface-tint-bg-alt, #e1f2e7) 78%, white 22%);
+      border-color: var(--surface-tint-border-strong, #9ac5aa);
     }}
     .files-transfer-action:disabled {{
       opacity: 0.6;
@@ -2821,15 +2876,15 @@
       display: inline-flex;
       align-items: center;
       border-radius: 999px;
-      border: 1px solid #bfd4c3;
+      border: 1px solid color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 78%, var(--ui-border, #c2d8c7) 22%);
       padding: 2px 7px;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.1px;
       line-height: 1.2;
       text-transform: uppercase;
-      background: #f7fcf7;
-      color: #2a4a39;
+      background: color-mix(in srgb, var(--surface-tint-bg-soft, #f0f8f2) 68%, white 32%);
+      color: var(--surface-tint-text, #294735);
       white-space: nowrap;
     }}
     .files-transfer-dir.inbound {{
@@ -2855,7 +2910,7 @@
     }}
     .files-transfer-name-main {{
       font-weight: 600;
-      color: #1f3f2f;
+      color: var(--ui-text, #183223);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -2863,7 +2918,7 @@
     }}
     .files-transfer-name-sub {{
       font-size: 10px;
-      color: #5f7b6c;
+      color: var(--ui-text-soft, #5f7b6c);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -2886,7 +2941,7 @@
     .files-transfer-progress-text {{
       font-size: 10px;
       line-height: 1.2;
-      color: #365746;
+      color: var(--ui-text-soft, #5c7567);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -2896,14 +2951,14 @@
     .files-transfer-progress-pct {{
       font-size: 10px;
       line-height: 1.2;
-      color: #2f4f3e;
+      color: var(--surface-tint-text, #294735);
       font-weight: 700;
       flex: 0 0 auto;
     }}
     .files-transfer-progress-meter {{
       height: 5px;
       border-radius: 999px;
-      background: #d7e6da;
+      background: color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 42%, white 58%);
       overflow: hidden;
     }}
     .files-transfer-progress-meter > span {{
@@ -2911,7 +2966,7 @@
       height: 100%;
       width: 0%;
       border-radius: inherit;
-      background: #3a9263;
+      background: var(--ui-accent, #3a9263);
       transition: width 140ms ease;
     }}
     .files-transfer-progress.is-pending .files-transfer-progress-meter > span {{

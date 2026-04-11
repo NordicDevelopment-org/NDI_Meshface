@@ -1998,7 +1998,7 @@
       border-color: var(--workspace-shell-border);
       background: #08120d;
       background: var(--workspace-shell-bg);
-      color: #dbece3;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .card.games {{
       border-color: #2d8f5d;
@@ -2015,11 +2015,15 @@
     }}
     [data-theme="dark"] .files-caption,
     [data-theme="dark"] .files-send-status,
-    [data-theme="dark"] .files-channel-hint {{
-      color: #a8c6b7;
+    [data-theme="dark"] .files-channel-hint,
+    [data-theme="dark"] .files-transfer-name-sub,
+    [data-theme="dark"] .files-transfer-progress-text {{
+      color: var(--workspace-shell-text-soft);
     }}
-    [data-theme="dark"] .files-label {{
-      color: #9fbead;
+    [data-theme="dark"] .files-label,
+    [data-theme="dark"] .files-console-title,
+    [data-theme="dark"] #files-transfer-table thead th {{
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .files-input {{
       background: #07140d;
@@ -2037,22 +2041,30 @@
       background: #0d1d13;
       background: var(--workspace-shell-hover-bg);
     }}
+    [data-theme="dark"] .files-input[type="file"] {{
+      color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .files-input[type="file"]::file-selector-button,
+    [data-theme="dark"] .files-input[type="file"]::-webkit-file-upload-button {{
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, black 16%);
+      color: var(--workspace-shell-text-soft);
+    }}
     [data-theme="dark"] .files-console {{
       border-color: #2d8f5d;
       border-color: var(--workspace-shell-border);
       background: #07140d;
       background: var(--workspace-shell-bg-alt);
     }}
-    [data-theme="dark"] .files-console-title {{
-      color: #a7c4b5;
-    }}
     [data-theme="dark"] .files-console-log {{
-      border-color: #236744;
-      border-color: var(--workspace-shell-border-muted);
-      background: #08120d;
-      background: var(--workspace-shell-bg);
-      color: #c6ffdb;
-      color: var(--workspace-shell-text);
+      border-color: var(--surface-tint-border, var(--workspace-shell-border-muted));
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 86%, black 14%),
+          color-mix(in srgb, var(--workspace-shell-bg) 70%, var(--surface-tint-color, #2d8f5d) 30%)
+        );
+      color: color-mix(in srgb, var(--surface-tint-text, var(--workspace-shell-text)) 84%, white 16%);
     }}
     [data-theme="dark"] .files-transfers-scroll {{
       border-color: #2d8f5d;
@@ -2060,14 +2072,25 @@
       background: #08120d;
       background: var(--workspace-shell-bg);
     }}
+    [data-theme="dark"] #files-transfer-table thead th {{
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 86%, black 14%);
+      border-bottom-color: var(--workspace-shell-border);
+    }}
+    [data-theme="dark"] #files-transfer-table tbody td {{
+      border-top-color: color-mix(in srgb, var(--workspace-shell-border-muted) 74%, transparent);
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] #files-transfer-table tbody tr:nth-child(even) {{
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 48%, transparent);
+    }}
     [data-theme="dark"] .files-transfer-action {{
-      border-color: #426452;
-      background: #263a30;
-      color: #d5e9de;
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 82%, black 18%);
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .files-transfer-action:hover {{
-      background: #30493c;
-      border-color: #547d66;
+      background: color-mix(in srgb, var(--workspace-shell-hover-bg) 78%, black 22%);
+      border-color: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .files-transfer-action.accept {{
       border-color: #4f7d63;
@@ -2087,15 +2110,37 @@
       border-color: #9b6f70;
       background: #4a2d2e;
     }}
-    [data-theme="dark"] .files-transfer-progress-text,
+    [data-theme="dark"] .files-transfer-dir {{
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, black 12%);
+      color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .files-transfer-dir.inbound {{
+      border-color: color-mix(in srgb, #2f8a5c 60%, var(--workspace-shell-border) 40%);
+      background: color-mix(in srgb, #163525 64%, var(--workspace-shell-bg-alt) 36%);
+      color: color-mix(in srgb, #8ce7b4 76%, white 24%);
+    }}
+    [data-theme="dark"] .files-transfer-dir.outbound {{
+      border-color: color-mix(in srgb, #c59a46 60%, var(--workspace-shell-border-muted) 40%);
+      background: color-mix(in srgb, #3b2c12 68%, var(--workspace-shell-bg-alt) 32%);
+      color: #f2d79e;
+    }}
+    [data-theme="dark"] .files-transfer-dir.other {{
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 92%, transparent);
+      color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .files-transfer-name-main {{
+      color: var(--workspace-shell-text);
+    }}
     [data-theme="dark"] .files-transfer-progress-pct {{
-      color: #a6c6b5;
+      color: var(--workspace-shell-text);
     }}
     [data-theme="dark"] .files-transfer-progress-meter {{
-      background: #2a4436;
+      background: color-mix(in srgb, var(--workspace-shell-border-muted) 62%, black 38%);
     }}
     [data-theme="dark"] .files-transfer-progress-meter > span {{
-      background: #4aa878;
+      background: var(--ui-accent, #4aa878);
     }}
     [data-theme="dark"] .files-transfer-progress.is-pending .files-transfer-progress-meter > span {{
       background: #c59a46;
@@ -2114,12 +2159,13 @@
       background: #55bb85;
     }}
     [data-theme="dark"] .files-controls .btn.btn-secondary {{
-      background: #22352b;
-      border-color: #3b5949;
-      color: #deeee5;
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 58%, transparent);
+      border-color: var(--workspace-shell-border-muted);
+      color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .files-controls .btn.btn-secondary:hover {{
-      background: #2a4033;
+      background: color-mix(in srgb, var(--workspace-shell-hover-bg) 78%, black 22%);
+      border-color: var(--workspace-shell-border-strong);
     }}
     [data-theme="dark"] .card.bbs {{
       border-color: #33483c;

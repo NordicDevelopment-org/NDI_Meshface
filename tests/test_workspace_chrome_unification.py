@@ -655,3 +655,41 @@ def test_games_view_removes_outer_card_shell_but_keeps_inner_panels() -> None:
     assert ".games-toolbar {" in css
     assert ".games-sidebar {" in css
     assert ".games-main {" in css
+
+
+def test_files_view_uses_theme_tokens_in_light_and_dark_modes() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    light_card_section = css.split(".card.files {", 1)[1].split("}", 1)[0]
+    light_controls_section = css.split(".files-controls {", 1)[1].split("}", 1)[0]
+    light_console_log_section = css.split(".files-console-log {", 1)[1].split("}", 1)[0]
+    light_table_head_section = css.split("#files-transfer-table thead th {", 1)[1].split("}", 1)[0]
+    dark_card_section = css.split("[data-theme=\"dark\"] .card.files {", 1)[1].split("}", 1)[0]
+    dark_caption_section = css.split("[data-theme=\"dark\"] .files-caption,", 1)[1].split("}", 1)[0]
+    dark_console_log_section = css.split("[data-theme=\"dark\"] .files-console-log {", 1)[1].split("}", 1)[0]
+    dark_table_head_section = css.rsplit("[data-theme=\"dark\"] #files-transfer-table thead th {", 1)[1].split("}", 1)[0]
+    dark_secondary_btn_section = css.split("[data-theme=\"dark\"] .files-controls .btn.btn-secondary {", 1)[1].split("}", 1)[0]
+
+    assert "var(--panel)" in light_card_section
+    assert "var(--ui-text" in light_card_section
+    assert "#f6fbf5" not in light_card_section
+    assert "var(--surface-tint-bg-soft" in light_controls_section
+    assert "var(--surface-tint-border" in light_controls_section
+    assert "#edf6ec" not in light_controls_section
+    assert "var(--surface-tint-color" in light_console_log_section
+    assert "var(--surface-tint-border-strong" in light_console_log_section
+    assert "#0f1b14" not in light_console_log_section
+    assert "var(--surface-tint-text" in light_table_head_section
+    assert "var(--surface-tint-border" in light_table_head_section
+
+    assert "var(--workspace-shell-bg)" in dark_card_section
+    assert "var(--workspace-shell-text)" in dark_card_section
+    assert "#dbece3" not in dark_card_section
+    assert "var(--workspace-shell-text-soft)" in dark_caption_section
+    assert "#a8c6b7" not in dark_caption_section
+    assert "var(--surface-tint-color" in dark_console_log_section
+    assert "var(--surface-tint-text" in dark_console_log_section
+    assert "var(--workspace-shell-border)" in dark_table_head_section
+    assert "var(--workspace-shell-bg-alt)" in dark_table_head_section
+    assert "var(--workspace-shell-border-muted)" in dark_secondary_btn_section
+    assert "var(--workspace-shell-text-soft)" in dark_secondary_btn_section
