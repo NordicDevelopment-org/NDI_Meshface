@@ -43,6 +43,10 @@ def test_dashboard_js_defaults_live_update_ticker_to_disabled() -> None:
     assert "if (topbarUpdateTickerEnabled()) {" in js
     assert "setTopbarUpdateTickerVisibility(tickerEl, topbarUpdateTickerEnabled());" in js
     assert "if (!topbarUpdateTickerEnabled()) {" in js
+    assert "Ticker preferences saved locally." not in js
+    assert "Live update ticker shown." not in js
+    assert "Live update ticker hidden." not in js
+    assert "Ticker preferences reset to defaults." not in js
 
 
 def test_dashboard_js_defaults_unique_node_colors_to_off() -> None:

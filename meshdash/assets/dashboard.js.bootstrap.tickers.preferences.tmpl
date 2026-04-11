@@ -649,7 +649,7 @@
     function saveTickerPreferences({{
       rerenderSummary = true,
       rerenderSettings = true,
-      status = "Ticker preferences saved locally.",
+      status = "",
     }} = {{}}) {{
       tickerPreferences = normalizeTickerPreferences(currentTickerPreferences());
       persistTickerPreferences();
@@ -660,7 +660,7 @@
       if (rerenderSettings && activeSettingsTab === "tickers") {{
         renderTickerSettingsUi();
       }}
-      if (status) {{
+      if (status !== undefined && status !== null) {{
         setSettingsStatusText(status);
       }}
     }}
