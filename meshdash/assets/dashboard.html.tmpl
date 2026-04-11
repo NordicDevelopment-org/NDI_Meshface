@@ -591,7 +591,13 @@
               <button id="settings-reset" class="btn btn-secondary workspace-action-chip" type="button">Fetch settings</button>
             </div>
           </div>
-          <div id="settings-apply-status" class="settings-status settings-status-top workspace-chrome-status"></div>
+          <div
+            id="settings-apply-status"
+            class="settings-status settings-status-top workspace-chrome-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          ></div>
         </div>
 
         <div class="settings-grid">
@@ -2661,6 +2667,7 @@ Ready.
                   aria-selected="false"
                   aria-controls="network-map-panel-diagnostics"
                   data-network-subview="diagnostics"
+                  {network_diagnostics_tab_hidden_attrs}
                 >Diagnostics</button>
               </div>
               <div id="network-map-controls-host" class="network-map-controls-host" aria-hidden="true"></div>
@@ -2894,6 +2901,7 @@ Ready.
               role="tabpanel"
               data-network-subview-panel="diagnostics"
               hidden
+              {network_diagnostics_panel_hidden_attrs}
             >
               <div class="network-overview-panel network-diagnostics-panel">
                 <section class="network-diagnostics-card">

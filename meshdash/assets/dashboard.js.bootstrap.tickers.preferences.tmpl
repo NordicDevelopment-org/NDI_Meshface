@@ -345,7 +345,7 @@
         battery_window_hours: tickerDefaultBatteryWindowHours,
         node_rows: {{ ...nodeTickerDefaultRows }},
         node_packet_trend: true,
-        update_ticker_enabled: true,
+        update_ticker_enabled: false,
         oneshots: defaultTickerOneshotPreferences(),
       }};
     }}
@@ -430,7 +430,7 @@
           ?? raw.updateTickerEnabled
           ?? raw.show_update_ticker
           ?? raw.showUpdateTicker,
-        true
+        false
       );
       const oneshotsRaw = (
         raw.oneshots && typeof raw.oneshots === "object"
@@ -565,21 +565,8 @@
       const prefs = currentTickerPreferences();
       return parseBoolToken(
         prefs && (prefs.update_ticker_enabled ?? prefs.updateTickerEnabled),
-        true
+        false
       );
-    }}
-
-    function topbarUpdateTickerHasRenderableContent(trackEl, primaryEl, secondaryEl) {{
-      if (trackEl instanceof HTMLElement && trackEl.querySelector(".topbar-update-item")) {{
-        return true;
-      }}
-      if ((String(primaryEl && primaryEl.textContent || "").trim()).length > 0) {{
-        return true;
-      }}
-      if ((String(secondaryEl && secondaryEl.textContent || "").trim()).length > 0) {{
-        return true;
-      }}
-      return false;
     }}
 
     function syncTopbarUpdateTickerVisibilityPreference() {{
@@ -592,7 +579,7 @@
       if (!(primaryEl instanceof HTMLElement)) return;
       if (!(secondaryEl instanceof HTMLElement)) return;
       cancelTopbarTickerClearTimers(tickerEl);
-      if (topbarUpdateTickerEnabled() && topbarUpdateTickerHasRenderableContent(trackEl, primaryEl, secondaryEl)) {{
+      if (topbarUpdateTickerEnabled()) {{
         setTopbarUpdateTickerVisibility(tickerEl, true);
         tickerEl.classList.add("is-static");
         tickerEl.classList.remove("is-fading");
@@ -662,7 +649,7 @@
     function saveTickerPreferences({{
       rerenderSummary = true,
       rerenderSettings = true,
-      status = "Ticker preferences saved locally.",
+      status = "",
     }} = {{}}) {{
       tickerPreferences = normalizeTickerPreferences(currentTickerPreferences());
       persistTickerPreferences();
@@ -673,7 +660,7 @@
       if (rerenderSettings && activeSettingsTab === "tickers") {{
         renderTickerSettingsUi();
       }}
-      if (status) {{
+      if (status !== undefined && status !== null) {{
         setSettingsStatusText(status);
       }}
     }}

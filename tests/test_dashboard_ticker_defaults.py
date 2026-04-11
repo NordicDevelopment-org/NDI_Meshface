@@ -28,20 +28,25 @@ def test_dashboard_js_uses_curated_default_ticker_layout() -> None:
     assert "prefs.enabled[id] = !!defaults.enabled[id];" in js
 
 
-def test_dashboard_js_defaults_live_update_ticker_to_enabled() -> None:
+def test_dashboard_js_defaults_live_update_ticker_to_disabled() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
         node_history_max_points=240,
     )
 
-    assert "update_ticker_enabled: true," in js
+    assert "update_ticker_enabled: false," in js
     assert "raw.update_ticker_enabled" in js
     assert "function topbarUpdateTickerEnabled() {" in js
-    assert "function topbarUpdateTickerHasRenderableContent(trackEl, primaryEl, secondaryEl) {" in js
     assert "prefs.update_ticker_enabled = !!liveUpdateToggle.checked;" in js
-    assert "if (topbarUpdateTickerEnabled() && topbarUpdateTickerHasRenderableContent(trackEl, primaryEl, secondaryEl)) {" in js
+    assert "topbarUpdateTickerHasRenderableContent" not in js
+    assert "if (topbarUpdateTickerEnabled()) {" in js
+    assert "setTopbarUpdateTickerVisibility(tickerEl, topbarUpdateTickerEnabled());" in js
     assert "if (!topbarUpdateTickerEnabled()) {" in js
+    assert "Ticker preferences saved locally." not in js
+    assert "Live update ticker shown." not in js
+    assert "Live update ticker hidden." not in js
+    assert "Ticker preferences reset to defaults." not in js
 
 
 def test_dashboard_js_defaults_unique_node_colors_to_off() -> None:

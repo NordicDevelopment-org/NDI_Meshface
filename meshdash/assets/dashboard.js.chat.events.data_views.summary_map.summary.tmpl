@@ -615,7 +615,7 @@
         window.clearTimeout(topbarUpdateTickerSpawnTimer);
         topbarUpdateTickerSpawnTimer = 0;
       }}
-      setTopbarUpdateTickerVisibility(tickerEl, false);
+      setTopbarUpdateTickerVisibility(tickerEl, topbarUpdateTickerEnabled());
       tickerEl.classList.add("is-static");
       tickerEl.classList.remove("is-fading");
       for (const itemEl of Array.from(trackEl.querySelectorAll(".topbar-update-item"))) {{

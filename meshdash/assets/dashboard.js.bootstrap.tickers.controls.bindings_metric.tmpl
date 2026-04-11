@@ -20,11 +20,7 @@
         liveUpdateToggle.addEventListener("change", () => {{
           const prefs = currentTickerPreferences();
           prefs.update_ticker_enabled = !!liveUpdateToggle.checked;
-          saveTickerPreferences({{
-            status: liveUpdateToggle.checked
-              ? "Live update ticker shown."
-              : "Live update ticker hidden.",
-          }});
+          saveTickerPreferences();
         }});
       }}
 
@@ -157,9 +153,7 @@
         resetAllBtn.addEventListener("click", () => {{
           tickerPreferences = defaultTickerPreferences();
           activeTickerSettingsId = tickerDefaultOrder[0] || "";
-          saveTickerPreferences({{
-            status: "Ticker preferences reset to defaults.",
-          }});
+          saveTickerPreferences();
         }});
       }}
     }}

@@ -51,6 +51,10 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert ".settings-chrome {" in css
     assert ".chat-card-head.workspace-chrome-bar {" in css
     assert ".settings-status.settings-status-top:empty {" in css
+    workspace_status_section = css.split(".workspace-chrome-status {", 1)[1].split("}", 1)[0]
+    assert "position: absolute;" in workspace_status_section
+    assert "clip-path: inset(50%);" in workspace_status_section
+    assert "white-space: nowrap;" in workspace_status_section
     assert ".layout.view-settings .settings-toolbar.workspace-chrome-row {" in css
     assert ".layout.view-settings .settings-actions.settings-actions-top .workspace-action-chip {" in css
     assert "[data-theme=\"dark\"] .settings-chrome.workspace-chrome-bar," in css
