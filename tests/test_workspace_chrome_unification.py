@@ -567,6 +567,7 @@ def test_topbar_controls_share_workspace_shell_tokens() -> None:
 def test_console_view_removes_body_shell_and_keeps_terminal_frame() -> None:
     css = build_dashboard_css(theme_css="")
     body_section = css.split(".layout.view-console .console .body {", 1)[1].split("}", 1)[0]
+    light_screen_section = css.split("\n    .console-terminal-screen {", 1)[1].split("}", 1)[0]
     dark_screen_section = css.split("[data-theme=\"dark\"] .console-terminal-screen {", 1)[1].split("}", 1)[0]
     dark_overlay_section = css.split("[data-theme=\"dark\"] .console-terminal-screen::before {", 1)[1].split("}", 1)[0]
     dark_live_console_section = css.split("[data-theme=\"dark\"] #live-console {", 1)[1].split("}", 1)[0]
@@ -575,17 +576,19 @@ def test_console_view_removes_body_shell_and_keeps_terminal_frame() -> None:
     assert "background: transparent;" in body_section
     assert "padding: 0;" in body_section
     assert ".console-terminal-screen {" in css
-    assert "border: 1px solid #7ab18a;" in css
+    assert "border: 1px solid var(--surface-tint-border-strong, #7ab18a);" in light_screen_section
     assert "border-radius: 8px;" in css
-    assert "var(--workspace-shell-border)" in dark_screen_section
-    assert "var(--workspace-shell-bg)" in dark_screen_section
-    assert "var(--workspace-shell-bg-alt)" in dark_screen_section
-    assert "var(--workspace-shell-active-bg)" in dark_screen_section
-    assert "var(--workspace-shell-hover-bg)" in dark_screen_section
+    assert "var(--surface-tint-color)" in light_screen_section
+    assert "var(--surface-tint-bg-soft," in light_screen_section
+    assert "var(--surface-tint-bg-alt," in light_screen_section
+    assert "var(--surface-tint-bg," in light_screen_section
+    assert "var(--surface-tint-border)" in dark_screen_section
+    assert "var(--surface-tint-bg)" in dark_screen_section
+    assert "var(--surface-tint-bg-alt)" in dark_screen_section
+    assert "var(--surface-tint-color)" in dark_screen_section
     assert "rgba(83, 170, 112, 0.09)" not in dark_screen_section
-    assert "var(--workspace-shell-border-muted)" in dark_overlay_section
-    assert "var(--workspace-shell-text)" in dark_live_console_section
-    assert "var(--workspace-shell-active-text)" in dark_live_console_section
+    assert "var(--surface-tint-border)" in dark_overlay_section
+    assert "var(--surface-tint-text)" in dark_live_console_section
 
 
 def test_settings_view_removes_outer_card_shell_but_keeps_inner_panels() -> None:
