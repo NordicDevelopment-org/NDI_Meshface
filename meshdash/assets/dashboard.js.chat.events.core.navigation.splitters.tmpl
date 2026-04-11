@@ -200,6 +200,86 @@
       }});
     }}
 
+    function bindGamesSplitters() {{
+      const splitters = [
+        {{
+          element: document.getElementById("games-sidebar-splitter"),
+          storage: () => persistGamesSidebarSplitState(),
+          canResize: () => !(typeof window.matchMedia === "function" && window.matchMedia("(max-width: 760px)").matches),
+          resolveWidth: (paneRect) => Number.isFinite(Number(paneRect.width)) && paneRect.width > 0
+            ? paneRect.width
+            : gamesSidebarWidthPx,
+          updateWidth: (startWidth, deltaX, shellWidth) => {{
+            gamesSidebarWidthPx = clampGamesSidebarWidthPx(startWidth + deltaX, shellWidth, gamesStatusWidthPx);
+          }},
+        }},
+        {{
+          element: document.getElementById("games-status-splitter"),
+          storage: () => persistGamesStatusSplitState(),
+          canResize: () => !(typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1180px)").matches),
+          resolveWidth: (paneRect) => Number.isFinite(Number(paneRect.width)) && paneRect.width > 0
+            ? paneRect.width
+            : gamesStatusWidthPx,
+          updateWidth: (startWidth, deltaX, shellWidth) => {{
+            gamesStatusWidthPx = clampGamesStatusWidthPx(startWidth - deltaX, shellWidth, gamesSidebarWidthPx);
+          }},
+        }},
+      ];
+
+      for (const entry of splitters) {{
+        const splitter = entry && entry.element;
+        if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") continue;
+        const shell = splitter.closest(".games-shell");
+        const targetPane = splitter.dataset.target === "right"
+          ? splitter.nextElementSibling
+          : splitter.previousElementSibling;
+        if (!(shell instanceof HTMLElement) || !(targetPane instanceof HTMLElement)) continue;
+        splitter.dataset.bound = "1";
+
+        splitter.addEventListener("pointerdown", (ev) => {{
+          if (activeLayoutView !== "games") return;
+          if (typeof entry.canResize === "function" && !entry.canResize()) return;
+          ev.preventDefault();
+          splitter.classList.add("active");
+          document.body.classList.add("resizing-panels-x");
+          splitter.setPointerCapture(ev.pointerId);
+
+          const startX = ev.clientX;
+          const paneRect = targetPane.getBoundingClientRect();
+          const startWidth = entry.resolveWidth(paneRect);
+
+          const updateFromClientX = (clientX) => {{
+            const deltaX = clientX - startX;
+            const shellRect = shell.getBoundingClientRect();
+            const shellWidth = Number.isFinite(Number(shellRect.width)) && shellRect.width > 0
+              ? shellRect.width
+              : window.innerWidth;
+            entry.updateWidth(startWidth, deltaX, shellWidth);
+            applyGamesSplitState();
+          }};
+
+          updateFromClientX(ev.clientX);
+
+          const onMove = (moveEv) => {{
+            updateFromClientX(moveEv.clientX);
+          }};
+
+          const onUp = () => {{
+            splitter.classList.remove("active");
+            document.body.classList.remove("resizing-panels-x");
+            entry.storage();
+            splitter.removeEventListener("pointermove", onMove);
+            splitter.removeEventListener("pointerup", onUp);
+            splitter.removeEventListener("pointercancel", onUp);
+          }};
+
+          splitter.addEventListener("pointermove", onMove);
+          splitter.addEventListener("pointerup", onUp);
+          splitter.addEventListener("pointercancel", onUp);
+        }});
+      }}
+    }}
+
     function bindChatPanelSplitter() {{
       const splitter = document.getElementById("chat-panel-splitter");
       if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;

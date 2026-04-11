@@ -341,7 +341,12 @@ def test_apps_views_bias_space_toward_primary_canvas() -> None:
     assert "grid-template-columns: clamp(232px, 24vw, 300px) minmax(0, 1fr);" in bbs_shell_section
     assert "flex: 1 1 auto;" in bbs_list_section
     assert "max-height: none;" in bbs_list_section
-    assert "grid-template-columns: clamp(176px, 16vw, 220px) minmax(0, 1fr) clamp(140px, 12vw, 176px);" in games_shell_section
+    assert "--games-sidebar-width: 220px;" in games_shell_section
+    assert "--games-status-width: 176px;" in games_shell_section
+    assert "minmax(176px, var(--games-sidebar-width))" in games_shell_section
+    assert "var(--splitter-size)" in games_shell_section
+    assert "minmax(140px, var(--games-status-width))" in games_shell_section
+    assert "gap: 0;" in games_shell_section
     assert "padding: 4px;" in games_main_section
     assert "padding: 4px;" in games_board_wrap_section
     assert "--reversi-cell-size: clamp(32px, min(6.9vw, 8.7vh), 94px);" in reversi_board_section
@@ -350,6 +355,52 @@ def test_apps_views_bias_space_toward_primary_canvas() -> None:
     assert "--reversi-cell-size: clamp(30px, 14.1cqi, 94px);" in container_query_section
     assert "--checkers-cell-size: clamp(30px, 14.1cqi, 94px);" in container_query_section
     assert "--chess-cell-size: clamp(30px, 14.1cqi, 94px);" in container_query_section
+
+
+def test_games_workspace_uses_persistent_adjustable_splitters() -> None:
+    html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
+        style_css="",
+        app_js="",
+        revision_title="rev",
+        revision_label="rev",
+        safety_label="safe",
+        packet_limit=100,
+        history_label="history",
+        refresh_ms=1000,
+    )
+    css = build_dashboard_css(theme_css="")
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    mobile_section = css.split("@media (max-width: 1100px) {", 1)[1]
+    dark_splitter_section = css.split("[data-theme=\"dark\"] .games-shell-splitter {", 1)[1].split("}", 1)[0]
+
+    assert 'id="games-sidebar-splitter"' in html
+    assert 'id="games-status-splitter"' in html
+    assert 'data-target="left"' in html
+    assert 'data-target="right"' in html
+    assert ".games-shell-splitter {" in css
+    assert ".games-shell-splitter::before {" in css
+    assert "#games-status-splitter {" in css
+    assert "display: none;" in mobile_section
+    assert "var(--ui-border)" in dark_splitter_section
+    assert 'const gamesSidebarSplitStorageKey = "meshDashboardGamesSidebarWidthPx";' in js
+    assert 'const gamesStatusSplitStorageKey = "meshDashboardGamesStatusWidthPx";' in js
+    assert "let gamesSidebarWidthPx = 220;" in js
+    assert "let gamesStatusWidthPx = 176;" in js
+    assert "function applyGamesSplitState() {" in js
+    assert "function bindGamesSplitters() {" in js
+    assert "loadGamesSidebarSplitState();" in js
+    assert "loadGamesStatusSplitState();" in js
+    assert "bindGamesSplitters();" in js
+    assert "persistGamesSidebarSplitState()" in js
+    assert "persistGamesStatusSplitState()" in js
+    assert 'if (next === "games" && typeof applyGamesSplitState === "function") {' in js
 
 
 def test_node_details_drawer_follows_workspace_shell_tokens() -> None:

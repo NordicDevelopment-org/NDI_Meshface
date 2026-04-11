@@ -47,6 +47,20 @@
       }}
     }}
 
+    function persistGamesSidebarSplitState() {{
+      try {{
+        window.localStorage.setItem(gamesSidebarSplitStorageKey, String(gamesSidebarWidthPx));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistGamesStatusSplitState() {{
+      try {{
+        window.localStorage.setItem(gamesStatusSplitStorageKey, String(gamesStatusWidthPx));
+      }} catch (_err) {{
+      }}
+    }}
+
     function persistChatPanelSplitState() {{
       try {{
         window.localStorage.setItem(chatPanelSplitStorageKey, String(chatPanelWidthPx));

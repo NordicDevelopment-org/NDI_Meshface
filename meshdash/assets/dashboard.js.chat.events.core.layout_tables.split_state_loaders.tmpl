@@ -45,6 +45,58 @@
       return Math.max(30, Math.min(70, value));
     }}
 
+    function resolveGamesShellMetrics(containerWidth = window.innerWidth) {{
+      const width = Number(containerWidth);
+      const safeWidth = Number.isFinite(width) && width > 0 ? width : window.innerWidth;
+      const stackedStatus = typeof window.matchMedia === "function"
+        && window.matchMedia("(max-width: 1180px)").matches;
+      return {{
+        safeWidth,
+        stackedStatus,
+        splitterWidth: 8,
+        sidebarMin: stackedStatus ? 160 : 176,
+        sidebarMax: 420,
+        statusMin: 140,
+        statusMax: 320,
+        boardMin: stackedStatus ? 280 : 360,
+      }};
+    }}
+
+    function clampGamesSidebarWidthPx(value, containerWidth = window.innerWidth, statusWidth = gamesStatusWidthPx) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return 220;
+      const metrics = resolveGamesShellMetrics(containerWidth);
+      const pairedStatusWidth = Number.isFinite(Number(statusWidth))
+        ? Math.max(metrics.statusMin, Math.round(Number(statusWidth)))
+        : gamesStatusWidthPx;
+      const reservedWidth = metrics.boardMin + metrics.splitterWidth + (
+        metrics.stackedStatus ? 0 : (metrics.splitterWidth + pairedStatusWidth)
+      );
+      const max = Math.max(
+        metrics.sidebarMin,
+        Math.min(metrics.sidebarMax, metrics.safeWidth - reservedWidth)
+      );
+      return Math.max(metrics.sidebarMin, Math.min(max, Math.round(numeric)));
+    }}
+
+    function clampGamesStatusWidthPx(value, containerWidth = window.innerWidth, sidebarWidth = gamesSidebarWidthPx) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return 176;
+      const metrics = resolveGamesShellMetrics(containerWidth);
+      const pairedSidebarWidth = Number.isFinite(Number(sidebarWidth))
+        ? Math.max(metrics.sidebarMin, Math.round(Number(sidebarWidth)))
+        : gamesSidebarWidthPx;
+      if (metrics.stackedStatus) {{
+        return Math.max(metrics.statusMin, Math.min(metrics.statusMax, Math.round(numeric)));
+      }}
+      const reservedWidth = metrics.boardMin + (metrics.splitterWidth * 2) + pairedSidebarWidth;
+      const max = Math.max(
+        metrics.statusMin,
+        Math.min(metrics.statusMax, metrics.safeWidth - reservedWidth)
+      );
+      return Math.max(metrics.statusMin, Math.min(max, Math.round(numeric)));
+    }}
+
     function clampChatPanelWidthPx(value, containerWidth = window.innerWidth) {{
       const numeric = Number(value);
       if (!Number.isFinite(numeric)) return 250;
@@ -131,6 +183,20 @@
       const layout = document.getElementById("dashboard-layout");
       if (!(layout instanceof HTMLElement)) return;
       layout.style.setProperty("--bots-command-list-pct", `${{botsCommandListPct}}%`);
+    }}
+
+    function applyGamesSplitState() {{
+      const shell = document.querySelector(".games-shell");
+      if (!(shell instanceof HTMLElement)) return;
+      const rect = shell.getBoundingClientRect();
+      const containerWidth = Number.isFinite(Number(rect.width)) && rect.width > 0
+        ? rect.width
+        : window.innerWidth;
+      gamesSidebarWidthPx = clampGamesSidebarWidthPx(gamesSidebarWidthPx, containerWidth, gamesStatusWidthPx);
+      gamesStatusWidthPx = clampGamesStatusWidthPx(gamesStatusWidthPx, containerWidth, gamesSidebarWidthPx);
+      gamesSidebarWidthPx = clampGamesSidebarWidthPx(gamesSidebarWidthPx, containerWidth, gamesStatusWidthPx);
+      shell.style.setProperty("--games-sidebar-width", `${{gamesSidebarWidthPx}}px`);
+      shell.style.setProperty("--games-status-width", `${{gamesStatusWidthPx}}px`);
     }}
 
     function applyChatPanelSplitState() {{
@@ -334,6 +400,34 @@
       }} catch (_err) {{
       }}
       applyBotsCommandSplitState();
+    }}
+
+    function loadGamesSidebarSplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(gamesSidebarSplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            gamesSidebarWidthPx = clampGamesSidebarWidthPx(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applyGamesSplitState();
+    }}
+
+    function loadGamesStatusSplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(gamesStatusSplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            gamesStatusWidthPx = clampGamesStatusWidthPx(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applyGamesSplitState();
     }}
 
     function loadChatPanelSplitState() {{

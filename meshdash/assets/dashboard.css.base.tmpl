@@ -6505,12 +6505,45 @@
       padding: 0;
     }}
     .games-shell {{
+      --games-sidebar-width: 220px;
+      --games-status-width: 176px;
       display: grid;
-      grid-template-columns: clamp(176px, 16vw, 220px) minmax(0, 1fr) clamp(140px, 12vw, 176px);
-      gap: 8px;
+      grid-template-columns:
+        minmax(176px, var(--games-sidebar-width))
+        var(--splitter-size)
+        minmax(0, 1fr)
+        var(--splitter-size)
+        minmax(140px, var(--games-status-width));
+      gap: 0;
       min-height: 0;
       height: 100%;
       flex: 1 1 auto;
+    }}
+    .games-shell-splitter {{
+      position: relative;
+      min-height: 0;
+      border-radius: 8px;
+      border: 1px solid #d1e0cb;
+      background: linear-gradient(180deg, #f4faf3, #edf5ea);
+      cursor: col-resize;
+      touch-action: none;
+      user-select: none;
+      min-width: 6px;
+    }}
+    .games-shell-splitter::before {{
+      content: "";
+      position: absolute;
+      top: 8px;
+      bottom: 8px;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-50%);
+      background: #b8cab9;
+      border-radius: 1px;
+    }}
+    .games-shell-splitter:hover::before,
+    .games-shell-splitter.active::before {{
+      background: #2f855a;
     }}
     .games-sidebar {{
       border: 1px solid #d7e5d2;
@@ -6948,12 +6981,16 @@
     }}
     @media (max-width: 1560px) {{
       .games-shell {{
-        grid-template-columns: clamp(168px, 18vw, 208px) minmax(0, 1fr) clamp(132px, 14vw, 164px);
+        --games-sidebar-width: 208px;
+        --games-status-width: 164px;
       }}
     }}
     @media (max-width: 1180px) {{
       .games-shell {{
-        grid-template-columns: clamp(160px, 28vw, 204px) minmax(0, 1fr);
+        grid-template-columns: minmax(160px, var(--games-sidebar-width)) var(--splitter-size) minmax(0, 1fr);
+      }}
+      #games-status-splitter {{
+        display: none;
       }}
       .games-status-sidebar {{
         grid-column: 1 / -1;
