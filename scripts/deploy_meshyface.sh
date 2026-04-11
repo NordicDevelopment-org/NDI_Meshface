@@ -240,9 +240,16 @@ uninstall_remote_meshyface() {
   echo "[deploy] uninstalling ${SERVICE_NAME} from ${TARGET}"
   ssh_cmd -tt "${TARGET}" "\
 set -euo pipefail && \
-if systemctl list-unit-files --type=service --all | grep -q '^${SERVICE_NAME}\.service'; then \
+if systemctl list-unit-files --type=service --all | grep -q '^${SERVICE_NAME}\.service' || systemctl list-units --type=service --all | grep -q '^${SERVICE_NAME}\.service'; then \
+  sudo systemctl disable --now '${SERVICE_NAME}' || true; \
   sudo systemctl stop '${SERVICE_NAME}' || true; \
-  sudo systemctl disable '${SERVICE_NAME}' || true; \
+  sudo systemctl kill --kill-who=all --signal=SIGKILL '${SERVICE_NAME}' || true; \
+  active_state=\$(systemctl show '${SERVICE_NAME}' -p ActiveState --value 2>/dev/null || true); \
+  sub_state=\$(systemctl show '${SERVICE_NAME}' -p SubState --value 2>/dev/null || true); \
+  if [[ \"\${active_state}\" == 'active' || \"\${sub_state}\" == 'running' ]]; then \
+    echo 'service process still active after forced stop' >&2; \
+    exit 1; \
+  fi; \
 fi && \
 sudo rm -f '/etc/systemd/system/${SERVICE_NAME}.service' && \
 sudo systemctl daemon-reload && \
@@ -697,7 +704,8 @@ fi
 if [[ "${BOOTSTRAP}" -eq 1 ]]; then
   ssh_cmd -tt "${TARGET}" "\
 '${REMOTE_PYTHON}' -m compileall -q '${APP_DIR}' && \
-sudo systemctl enable --now '${SERVICE_NAME}' && \
+sudo systemctl enable '${SERVICE_NAME}' && \
+sudo systemctl restart '${SERVICE_NAME}' && \
 SYSTEMD_PAGER=cat sudo systemctl --no-pager -l status '${SERVICE_NAME}'"
 else
   if ! ssh_cmd "${TARGET}" "systemctl list-unit-files --type=service --all | grep -q '^${SERVICE_NAME}\.service'"; then

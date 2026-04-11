@@ -97,17 +97,17 @@
       if (/^#[0-9a-f]{3}$/.test(clean)) {{
         return `#${{clean[1]}}${{clean[1]}}${{clean[2]}}${{clean[2]}}${{clean[3]}}${{clean[3]}}`;
       }}
-      return "#2f855a";
+      return "#2563eb";
     }}
 
-    function normalizeThemeCustomLineColor(raw, fallback = "#2f855a") {{
+    function normalizeThemeCustomLineColor(raw, fallback = "#9a9996") {{
       return normalizeThemeCustomBaseColor(raw || fallback);
     }}
 
     function normalizeThemeCustomColorDepth(raw) {{
       const parsed = Number.parseInt(String(raw ?? ""), 10);
       if (!Number.isFinite(parsed)) {{
-        return 58;
+        return 50;
       }}
       return Math.max(0, Math.min(100, parsed));
     }}

@@ -7,6 +7,9 @@ from meshdash.html_js import build_dashboard_js
 from meshdash.html_template import render_html
 from meshdash.theme import (
     DARK_THEME_VARS,
+    DEFAULT_CUSTOM_THEME_BASE_COLOR,
+    DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
+    DEFAULT_CUSTOM_THEME_LINE_COLOR,
     DEV_THEME_BASE_COLOR,
     DEFAULT_THEME_COLOR_DEPTH,
     LIGHT_THEME_VARS,
@@ -68,6 +71,28 @@ def test_theme_settings_support_generated_custom_theme_state() -> None:
     assert settings.selected_preset_tokens() == expected_custom
 
 
+def test_theme_settings_default_to_meshyface_custom_palette() -> None:
+    settings = ThemePresetSettings(
+        presets=default_theme_presets(),
+        selected_preset=None,
+        settings_path=None,
+    )
+
+    expected_custom = build_palette_theme_preset(
+        DEFAULT_CUSTOM_THEME_BASE_COLOR,
+        line_color=DEFAULT_CUSTOM_THEME_LINE_COLOR,
+        color_depth=DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
+    )
+
+    assert settings.selected_preset_name() == "custom"
+    assert settings.custom_theme_settings() == {
+        "base_color": DEFAULT_CUSTOM_THEME_BASE_COLOR,
+        "line_color": DEFAULT_CUSTOM_THEME_LINE_COLOR,
+        "color_depth": DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
+    }
+    assert settings.selected_preset_tokens() == expected_custom
+
+
 def test_theme_customization_controls_are_rendered_and_wired() -> None:
     html = render_html(
         refresh_ms=1000,
@@ -92,18 +117,24 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert 'id="theme-custom-color-depth"' in html
     assert 'id="theme-custom-color-depth-value"' in html
     assert 'id="settings-appearance-badge-emoji"' in html
-    assert "Default is green, blue is the dev preset" in html
+    assert '<option value="custom">custom</option>' in html
+    assert "Fresh installs default to Meshyface blue with a neutral gray line" in html
+    assert 'value="#2563eb"' in html
+    assert 'value="#9a9996"' in html
+    assert 'value="50"' in html
+    assert '>50%</output>' in html
     assert "Higher color depth increases tint and gradient presence" in html
     assert "Badge shows in the workspace menu header" in html
 
-    assert 'let themeCustomBaseColor = "#2f855a";' in js
-    assert 'let themeCustomLineColor = "#2f855a";' in js
-    assert "let themeCustomColorDepth = 58;" in js
+    assert 'let themePresetSelected = "custom";' in js
+    assert 'let themeCustomBaseColor = "#2563eb";' in js
+    assert 'let themeCustomLineColor = "#9a9996";' in js
+    assert "let themeCustomColorDepth = 50;" in js
     assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' in js
     assert "function formatThemePresetLabel(name) {" in js
     assert 'return "green";' in js
     assert "function normalizeThemeCustomSettings(rawSettings) {" in js
-    assert "function normalizeThemeCustomLineColor(raw, fallback = \"#2f855a\") {" in js
+    assert "function normalizeThemeCustomLineColor(raw, fallback = \"#9a9996\") {" in js
     assert "function normalizeSettingsBadgeEmoji(value) {" in js
     assert "function syncThemeCustomControls() {" in js
     assert "function buildThemeSettingsSavePayload(options = null) {" in js

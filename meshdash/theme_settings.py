@@ -4,6 +4,9 @@ from threading import RLock
 from typing import Optional
 
 from .theme import (
+    DEFAULT_CUSTOM_THEME_BASE_COLOR,
+    DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
+    DEFAULT_CUSTOM_THEME_LINE_COLOR,
     DEFAULT_THEME_BASE_COLOR,
     DEFAULT_THEME_COLOR_DEPTH,
     DEFAULT_THEME_LINE_COLOR,
@@ -50,9 +53,9 @@ def save_selected_theme_preset(settings_path: Optional[str], preset_name: str) -
 
 def _default_custom_theme_settings() -> dict[str, object]:
     return {
-        "base_color": DEFAULT_THEME_BASE_COLOR,
-        "line_color": DEFAULT_THEME_LINE_COLOR,
-        "color_depth": DEFAULT_THEME_COLOR_DEPTH,
+        "base_color": DEFAULT_CUSTOM_THEME_BASE_COLOR,
+        "line_color": DEFAULT_CUSTOM_THEME_LINE_COLOR,
+        "color_depth": DEFAULT_CUSTOM_THEME_COLOR_DEPTH,
     }
 
 
@@ -168,9 +171,11 @@ class ThemePresetSettings:
             return "custom"
         if clean and clean in self._presets:
             return clean
+        if not clean:
+            return "custom"
         if "default" in self._presets:
             return "default"
-        return next(iter(self._presets.keys()), "default")
+        return next(iter(self._presets.keys()), "custom")
 
     def available_presets(self) -> list[str]:
         names = [str(name) for name in self.preset_catalog().keys() if str(name) != "default"]
