@@ -1117,7 +1117,6 @@
       }}
 
       if (normalizedView === "network" && next === "map") {{
-        fitDone = false;
         if (latestState && typeof renderMap === "function") {{
           const cachedHistory = isSelectableNodeId(selectedNodeId)
             ? cachedNodeHistory(selectedNodeId)
@@ -1128,7 +1127,9 @@
             cachedHistory
           );
         }}
-        if (typeof resetMapViewToMostNodes === "function") {{
+        if (!networkMapInitialAutoResetDone && typeof resetMapViewToMostNodes === "function") {{
+          networkMapInitialAutoResetDone = true;
+          fitDone = false;
           window.setTimeout(() => {{
             try {{
               resetMapViewToMostNodes();
@@ -3294,7 +3295,9 @@
         mapDataFocus = "auto";
       }}
       if (next === "network") {{
-        fitDone = false;
+        if (!networkMapInitialAutoResetDone) {{
+          fitDone = false;
+        }}
         window.setTimeout(() => {{
           try {{
             if (typeof requestMapResizeNow === "function") {{
