@@ -296,6 +296,43 @@ Important naming note:
   --clean-app-dir
 ```
 
+#### Full reset + redeploy
+
+If you want to remove the current Meshyface install on the target and rebuild it
+from scratch in one step, use `--wipe-remote-root`. This removes the managed
+systemd unit plus the deploy root, then bootstraps fresh:
+
+```bash
+./scripts/deploy_meshyface.sh \
+  --target j@192.168.1.121 \
+  --wipe-remote-root \
+  --serial-path /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 \
+  --ui-profile core-ui
+```
+
+`--wipe-remote-root` implies `--bootstrap`.
+
+#### Full uninstall + hard reboot
+
+If you want to remove Meshyface from the Pi and stop there:
+
+```bash
+./scripts/deploy_meshyface.sh \
+  --target j@192.168.1.121 \
+  --uninstall \
+  --hard-reboot
+```
+
+That removes:
+
+- `/etc/systemd/system/meshtastic-dashboard.service`
+- the managed deploy root, which defaults to `/home/<ssh-user>/mesh`
+- any managed app/config/log/venv/history paths that were explicitly configured
+  outside the deploy root
+
+`--hard-reboot` can also be used after a normal deploy if you want the host to
+come back from a forced reboot instead of just restarting the service.
+
 #### Raspberry Pi target
 
 For a Raspberry Pi running Raspberry Pi OS Bookworm or newer, the same

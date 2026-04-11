@@ -12,6 +12,18 @@ Examples:
   # Fast update to an already configured host
   ./scripts/deploy_meshyface.sh j@192.168.1.241
 
+  # Full reset + redeploy
+  ./scripts/deploy_meshyface.sh \
+    --target j@192.168.1.121 \
+    --wipe-remote-root \
+    --serial-path /dev/serial/by-id/usb-...
+
+  # Full uninstall + hard reboot
+  ./scripts/deploy_meshyface.sh \
+    --target j@192.168.1.121 \
+    --uninstall \
+    --hard-reboot
+
   # First-time bootstrap + deploy
   ./scripts/deploy_meshyface.sh \
     --target j@192.168.1.29 \
@@ -22,6 +34,9 @@ Options:
   --target <user@host>     SSH deploy target.
   --bootstrap              Prepare a fresh host (venv, deps, service, env file).
   --clean-app-dir          Remove stale managed app code in APP_DIR before copy.
+  --wipe-remote-root       Remove Meshyface service + REMOTE_ROOT, then bootstrap fresh.
+  --uninstall              Remove Meshyface service + managed files from the target and exit.
+  --hard-reboot            Force reboot the target after uninstall or deploy.
   --mesh-host <ip_or_dns>  Radio host for dashboard.env MESH_HOST.
   --mesh-port <port>       Radio TCP port (default: 4403).
   --serial-path <path>     Radio serial device path for dashboard.env MESH_SERIAL_PATH.
@@ -60,6 +75,9 @@ Env overrides:
   MESH_DASH_DEPLOY_SERVICE_USER
   MESH_DASH_DEPLOY_SERVICE_GROUP
   MESH_DASH_DEPLOY_CLEAN_APP_DIR
+  MESH_DASH_DEPLOY_WIPE_REMOTE_ROOT
+  MESH_DASH_DEPLOY_UNINSTALL
+  MESH_DASH_DEPLOY_HARD_REBOOT
   MESH_DASH_DEPLOY_MESH_HOST
   MESH_DASH_DEPLOY_MESH_PORT
   MESH_DASH_DEPLOY_SERIAL_PATH
@@ -118,6 +136,9 @@ SERVICE_GROUP="${MESH_DASH_DEPLOY_SERVICE_GROUP:-dialout}"
 
 BOOTSTRAP=0
 CLEAN_APP_DIR="${MESH_DASH_DEPLOY_CLEAN_APP_DIR:-0}"
+WIPE_REMOTE_ROOT="${MESH_DASH_DEPLOY_WIPE_REMOTE_ROOT:-0}"
+UNINSTALL="${MESH_DASH_DEPLOY_UNINSTALL:-0}"
+HARD_REBOOT="${MESH_DASH_DEPLOY_HARD_REBOOT:-0}"
 MESH_HOST="${MESH_DASH_DEPLOY_MESH_HOST:-}"
 MESH_PORT="${MESH_DASH_DEPLOY_MESH_PORT:-4403}"
 SERIAL_PATH="${MESH_DASH_DEPLOY_SERIAL_PATH:-}"
@@ -160,6 +181,80 @@ scp_cmd() {
   scp "${SCP_OPTS[@]}" "$@"
 }
 
+path_is_within_root() {
+  local path="${1:-}"
+  local root="${2:-}"
+  [[ -n "${path}" && -n "${root}" && ( "${path}" == "${root}" || "${path}" == "${root}/"* ) ]]
+}
+
+assert_safe_remote_path() {
+  local label="$1"
+  local path="${2:-}"
+  if [[ -z "${path}" ]]; then
+    echo "refusing destructive operation on unsafe ${label}='${path}'" >&2
+    exit 1
+  fi
+  case "${path}" in
+    /|/home|/root|/usr|/var|/etc|/opt|/tmp)
+      echo "refusing destructive operation on unsafe ${label}='${path}'" >&2
+      exit 1
+      ;;
+  esac
+  if [[ -n "${REMOTE_HOME_DIR:-}" && "${path}" == "${REMOTE_HOME_DIR}" ]]; then
+    echo "refusing destructive operation on unsafe ${label}='${path}'" >&2
+    exit 1
+  fi
+}
+
+build_extra_uninstall_targets() {
+  local targets=()
+  local candidate
+  for candidate in "${APP_DIR}" "${CONFIG_DIR}" "${LOG_DIR}" "${REMOTE_VENV}"; do
+    if [[ -n "${candidate}" ]] && ! path_is_within_root "${candidate}" "${REMOTE_ROOT}"; then
+      targets+=("${candidate}")
+    fi
+  done
+  if [[ -n "${HISTORY_DB}" ]] && ! path_is_within_root "${HISTORY_DB}" "${REMOTE_ROOT}"; then
+    targets+=("${HISTORY_DB}")
+  fi
+  printf '%s\n' "${targets[@]}"
+}
+
+uninstall_remote_meshyface() {
+  local extra_targets=()
+  local remove_cmd=""
+  local target_path
+
+  assert_safe_remote_path "REMOTE_ROOT" "${REMOTE_ROOT}"
+  while IFS= read -r target_path; do
+    [[ -n "${target_path}" ]] || continue
+    assert_safe_remote_path "managed path" "${target_path}"
+    extra_targets+=("${target_path}")
+  done < <(build_extra_uninstall_targets)
+
+  for target_path in "${extra_targets[@]}"; do
+    remove_cmd="${remove_cmd}rm -rf '${target_path}' && "
+  done
+  remove_cmd="${remove_cmd}rm -rf '${REMOTE_ROOT}'"
+
+  echo "[deploy] uninstalling ${SERVICE_NAME} from ${TARGET}"
+  ssh_cmd -tt "${TARGET}" "\
+set -euo pipefail && \
+if systemctl list-unit-files --type=service --all | grep -q '^${SERVICE_NAME}\.service'; then \
+  sudo systemctl stop '${SERVICE_NAME}' || true; \
+  sudo systemctl disable '${SERVICE_NAME}' || true; \
+fi && \
+sudo rm -f '/etc/systemd/system/${SERVICE_NAME}.service' && \
+sudo systemctl daemon-reload && \
+{ sudo systemctl reset-failed || true; } && \
+${remove_cmd}"
+}
+
+hard_reboot_remote_target() {
+  echo "[deploy] forcing reboot of ${TARGET}"
+  ssh_cmd -tt "${TARGET}" "sudo systemctl reboot --force --force" || true
+}
+
 read_existing_dashboard_env_value() {
   local key="$1"
   ssh_cmd "${TARGET}" "if [[ -f '${CONFIG_DIR}/dashboard.env' ]]; then awk -F= -v key='${key}' 'index(\$0, key \"=\") == 1 { print substr(\$0, length(key) + 2); exit }' '${CONFIG_DIR}/dashboard.env'; fi" 2>/dev/null || true
@@ -192,6 +287,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --clean-app-dir)
       CLEAN_APP_DIR=1
+      shift
+      ;;
+    --wipe-remote-root)
+      WIPE_REMOTE_ROOT=1
+      shift
+      ;;
+    --uninstall)
+      UNINSTALL=1
+      shift
+      ;;
+    --hard-reboot)
+      HARD_REBOOT=1
       shift
       ;;
     --mesh-host)
@@ -380,6 +487,20 @@ if [[ -z "${HISTORY_DB}" ]]; then
   HISTORY_DB="${REMOTE_ROOT}/mesh_dashboard_history.sqlite3"
 fi
 
+if [[ "${UNINSTALL}" -eq 1 && "${WIPE_REMOTE_ROOT}" -eq 1 ]]; then
+  echo "use either --uninstall or --wipe-remote-root, not both" >&2
+  exit 2
+fi
+
+if [[ "${UNINSTALL}" -eq 1 && ( "${BOOTSTRAP}" -eq 1 || "${CLEAN_APP_DIR}" -eq 1 ) ]]; then
+  echo "--uninstall cannot be combined with --bootstrap or --clean-app-dir" >&2
+  exit 2
+fi
+
+if [[ "${WIPE_REMOTE_ROOT}" -eq 1 && "${BOOTSTRAP}" -eq 0 ]]; then
+  BOOTSTRAP=1
+fi
+
 if [[ -z "${MESH_HOST}" ]]; then
   MESH_HOST="$(
     ssh_cmd "${TARGET}" "if [[ -f '${CONFIG_DIR}/dashboard.env' ]]; then awk -F= '/^MESH_HOST=/{print \$2; exit}' '${CONFIG_DIR}/dashboard.env'; fi" \
@@ -439,7 +560,7 @@ fi
 
 echo "[deploy] target=${TARGET}"
 echo "[deploy] app_dir=${APP_DIR} config_dir=${CONFIG_DIR} logs_dir=${LOG_DIR}"
-echo "[deploy] service=${SERVICE_NAME} bootstrap=${BOOTSTRAP} clean_app_dir=${CLEAN_APP_DIR}"
+echo "[deploy] service=${SERVICE_NAME} bootstrap=${BOOTSTRAP} clean_app_dir=${CLEAN_APP_DIR} wipe_remote_root=${WIPE_REMOTE_ROOT} uninstall=${UNINSTALL} hard_reboot=${HARD_REBOOT}"
 echo "[deploy] service_user=${SERVICE_USER} service_group=${SERVICE_GROUP}"
 if [[ -n "${MESH_HOST}" ]]; then
   echo "[deploy] mesh=${MESH_HOST}:${MESH_PORT} dash=${DASH_HOST}:${DASH_PORT} refresh_ms=${REFRESH_MS}"
@@ -451,6 +572,20 @@ if [[ -n "${UI_PROFILE}" ]]; then
   echo "[deploy] ui_profile=${UI_PROFILE}"
 fi
 echo "[deploy] file_transfer_enable=${FILE_TRANSFER_ENABLE} file_transfer_max_bytes=${FILE_TRANSFER_MAX_BYTES}"
+
+if [[ "${UNINSTALL}" -eq 1 ]]; then
+  uninstall_remote_meshyface
+  if [[ "${HARD_REBOOT}" -eq 1 ]]; then
+    hard_reboot_remote_target
+  fi
+  echo "[deploy] uninstall complete"
+  exit 0
+fi
+
+if [[ "${WIPE_REMOTE_ROOT}" -eq 1 ]]; then
+  echo "[deploy] wiping ${REMOTE_ROOT} and reinstalling from scratch"
+  uninstall_remote_meshyface
+fi
 
 ssh_cmd "${TARGET}" "mkdir -p '${REMOTE_ROOT}' '${APP_DIR}' '${CONFIG_DIR}' '${LOG_DIR}'"
 
@@ -576,5 +711,11 @@ SYSTEMD_PAGER=cat sudo systemctl --no-pager -l status '${SERVICE_NAME}'"
 fi
 
 target_host="${TARGET#*@}"
+if [[ "${HARD_REBOOT}" -eq 1 ]]; then
+  hard_reboot_remote_target
+  echo "[deploy] reboot requested; wait for ${target_host} to come back before opening the UI"
+  exit 0
+fi
+
 echo "[deploy] complete"
 echo "[deploy] open: http://${target_host}:${DASH_PORT}"
