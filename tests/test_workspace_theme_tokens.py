@@ -79,3 +79,25 @@ def test_workspace_views_reuse_shared_shell_tokens() -> None:
     assert "[data-theme=\"dark\"] .settings-ticker-config {" in css
     assert "[data-theme=\"dark\"] .layout.view-settings .settings," in css
     assert "[data-theme=\"dark\"] .layout.view-settings .settings .body {" in css
+
+
+def test_bbs_view_uses_themed_console_shell() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    light_card_section = css.split(".card.bbs {", 1)[1].split("}", 1)[0]
+    light_main_section = css.split(".bbs-main {", 1)[1].split("}", 1)[0]
+    dark_card_section = css.split("[data-theme=\"dark\"] .card.bbs {", 1)[1].split("}", 1)[0]
+    dark_sidebar_section = css.split("[data-theme=\"dark\"] .bbs-sidebar {", 1)[1].split("}", 1)[0]
+    dark_main_section = css.split("[data-theme=\"dark\"] .bbs-main {", 1)[1].split("}", 1)[0]
+
+    assert "radial-gradient(" in light_card_section
+    assert "box-shadow:" in light_card_section
+    assert "position: relative;" in light_main_section
+    assert "isolation: isolate;" in light_main_section
+    assert ".bbs-main::before {" in css
+    assert ".bbs-main::after {" in css
+    assert ".bbs-post-status:empty {" in css
+    assert "var(--workspace-shell-border)" in dark_card_section
+    assert "var(--workspace-shell-bg)" in dark_card_section
+    assert "var(--workspace-shell-border-muted)" in dark_sidebar_section
+    assert "var(--workspace-shell-active-text)" in dark_main_section
