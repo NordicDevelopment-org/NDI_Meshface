@@ -32,8 +32,6 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'class="workspace-launcher-row"' in html
     assert 'class="workspace-launcher-row" aria-label="Dashboard views">' in html
     assert 'class="workspace-launcher-shell chat-users-head-launcher-shell"' in html
-    assert 'id="layout-view-menu-btn-mark"' in html
-    assert 'data-default-mark="' in html
     assert 'id="layout-view-menu-btn-label"' in html
     assert 'id="layout-view-menu-btn-label-text"' in html
     assert 'class="topbar-view-menu-btn-label-text">Chat<' in html
@@ -101,8 +99,6 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "--topbar-corner-reserve: 0px;" in css
     assert "padding-right: var(--topbar-right-inset);" in css
     assert ".topbar-view-menu-btn {" in css
-    assert ".topbar-view-menu-btn-mark {" in css
-    assert ".topbar-view-menu-btn-mark[hidden]," in css
     assert ".topbar-view-menu-btn-main {" in css
     assert ".topbar-view-menu-btn-label {" in css
     assert ".topbar-view-menu-btn-label-text {" in css
@@ -148,7 +144,6 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     )
 
     assert "function syncLayoutViewLauncherButtonState(viewName = activeLayoutView) {" in js
-    assert "function currentWorkspaceLauncherMark() {" in js
     assert "function setTopbarUpdateTickerVisibility(tickerEl, visible) {" in js
     assert 'const launcherRow = tickerEl.closest(".workspace-launcher-row");' in js
     assert "launcherRow.hidden = !visible;" in js
@@ -165,8 +160,6 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'target.closest("#layout-view-menu .topbar-view-menu-item")' in js
     assert 'document.getElementById("layout-view-menu-btn-label")' in js
     assert 'const launcherLabelText = document.getElementById("layout-view-menu-btn-label-text");' in js
-    assert 'document.getElementById("layout-view-menu-btn-mark")' in js
-    assert 'launcherMark.hidden = activeMark.style === "emoji";' in js
     assert 'document.getElementById("layout-view-menu-btn")' in js
     assert 'if (typeof syncLayoutViewLauncherButtonState === "function") {' in js
     assert 'syncLayoutViewLauncherButtonState(activeLayoutView);' in js
