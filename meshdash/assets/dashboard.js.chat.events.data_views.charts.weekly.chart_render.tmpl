@@ -388,7 +388,9 @@
         }};
       }});
       const axisTicks = buildLinearAxisTicks(minVal, maxVal, 5);
-      const axisLabelColor = enrichSeries[0] ? enrichSeries[0].labelColor : chartPalette.label;
+      const axisLabelColor = darkTheme
+        ? themeColor("--workspace-shell-text", "#d7e6f2")
+        : themeColor("--workspace-shell-text", "#1f6f53");
       const axisTextStyle = "font-family:'IBM Plex Sans','Segoe UI',sans-serif;font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:0.01em;";
       const axisLines = axisTicks.map((tick) => {{
         const y = padTop + (tick.ratio * plotH);

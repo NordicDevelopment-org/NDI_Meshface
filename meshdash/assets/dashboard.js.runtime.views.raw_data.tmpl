@@ -1002,7 +1002,7 @@
               guide: themeColor("--workspace-shell-border-muted", "#324152"),
               guideOpacity: "0.45",
               text: themeColor("--workspace-shell-text-soft", "#9ce7b8"),
-              axis: themeColor("--workspace-shell-active-text", "#9ce7b8"),
+              axis: themeColor("--workspace-shell-text", "#d7e6f2"),
             }}
             : {{
               grid: "#dce8df",
@@ -1038,10 +1038,10 @@
       const height = Number.isFinite(measuredHeight) && measuredHeight > 10
         ? Math.max(240, Math.round(measuredHeight))
         : envMetricsChartLayout.height;
-      const padLeft = envMetricsChartLayout.padLeft;
-      const padRight = envMetricsChartLayout.padRight;
+      const padLeft = dockedInNetwork ? 38 : envMetricsChartLayout.padLeft;
+      const padRight = dockedInNetwork ? 18 : envMetricsChartLayout.padRight;
       const padTop = envMetricsChartLayout.padTop;
-      const padBottom = envMetricsChartLayout.padBottom;
+      const padBottom = dockedInNetwork ? 18 : envMetricsChartLayout.padBottom;
       const chartWidth = width - padLeft - padRight;
       const chartHeight = height - padTop - padBottom;
       const unixSpan = Math.max(1, visibleMaxUnix - visibleMinUnix);
