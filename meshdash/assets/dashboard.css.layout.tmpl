@@ -910,13 +910,23 @@
       text-align: center;
       padding: 2px 4px;
     }}
-    .activity-legend-nodes {{
-      color: #1f6f53;
-    }}
     .legend-chip {{
       display: inline-flex;
       align-items: center;
       gap: 5px;
+    }}
+    .signal-legend .legend-chip.is-primary,
+    .activity-legend-nodes {{
+      color: #009E73;
+    }}
+    .signal-legend .legend-chip.is-compare {{
+      color: #56B4E9;
+    }}
+    .signal-legend .legend-chip.is-warn {{
+      color: #E69F00;
+    }}
+    .signal-legend .legend-chip.is-danger {{
+      color: #D55E00;
     }}
     .legend-chip::before {{
       content: "";
@@ -4969,7 +4979,35 @@
     .chat-member-packet-sparkline.metric-ticker-chart {{
       width: 56px;
       height: 100%;
-      opacity: 0.88;
+      opacity: 1;
+    }}
+    .chat-member-packet-trend.metric-ticker {{
+      color: #009E73;
+    }}
+    .chat-member-packet-trend.metric-ticker.trend-up {{
+      color: #009E73;
+    }}
+    .chat-member-packet-trend.metric-ticker.trend-flat {{
+      color: #56B4E9;
+    }}
+    .chat-member-packet-trend.metric-ticker.trend-down {{
+      color: #D55E00;
+    }}
+    .chat-member-packet-trend.metric-ticker .chat-member-packet-sparkline-raw {{
+      fill: none;
+      stroke: color-mix(in srgb, currentColor 28%, transparent);
+      stroke-width: 1.1;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }}
+    .chat-member-packet-trend.metric-ticker .chat-member-packet-sparkline-trend {{
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
     }}
     .workspace-shell.chat-panel-collapsed .chat-left-panel .chat-member-list {{
       padding: 0;

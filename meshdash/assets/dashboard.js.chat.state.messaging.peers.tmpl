@@ -1046,7 +1046,8 @@
           packetSparkWrapHtml = `<span class="chat-member-packet-spark-wrap">
             <span class="chat-member-packet-trend metric-ticker ${{packetSparklineTrend}}" title="${{escAttr(packetRowTitle)}}">
               <svg class="metric-ticker-chart chat-member-packet-sparkline" viewBox="0 0 56 12" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-                <path d="${{escAttr(packetSparklinePath)}}" />
+                <path class="chat-member-packet-sparkline-raw" d="${{escAttr(packetSparklinePath)}}" />
+                <path class="chat-member-packet-sparkline-trend" d="${{escAttr(packetSparklinePath)}}" />
               </svg>
             </span>
           </span>`;

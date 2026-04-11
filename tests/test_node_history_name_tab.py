@@ -102,6 +102,27 @@ def test_render_html_hides_history_caption_inside_drawer_history_view() -> None:
     assert 'display: none !important;' in html
 
 
+def test_render_html_uses_palette_classes_for_node_history_legends() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert 'class="legend-chip is-primary">Avg SNR (dB)</span>' in html
+    assert 'class="legend-chip is-compare">Avg RSSI (dBm)</span>' in html
+    assert 'class="legend-chip is-primary">Packets per minute (history buckets)</span>' in html
+    assert 'style="color:#1f6f53;"' not in html
+    assert 'style="color:#265d7b;"' not in html
+
+
 def test_drawer_history_charts_expand_for_node_detail_views() -> None:
     css = build_dashboard_css(theme_css="")
 
@@ -111,9 +132,9 @@ def test_drawer_history_charts_expand_for_node_detail_views() -> None:
     )
     assert block
     section = block.group(0)
-    assert "height: 260px;" in section
-    assert "min-height: 240px;" in section
-    assert "flex: 0 0 auto;" in section
+    assert "height: auto;" in section
+    assert "min-height: 0;" in section
+    assert "flex: 1 1 auto;" in section
 
 
 def test_name_history_empty_state_uses_workspace_theme_tokens_in_dark_mode() -> None:

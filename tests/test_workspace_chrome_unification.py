@@ -383,6 +383,17 @@ def test_history_chart_surfaces_follow_workspace_shell_tokens() -> None:
     assert "#344353" not in track_section
 
 
+def test_dark_history_legends_reuse_network_plot_palette() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    primary_section = css.split("[data-theme=\"dark\"] .signal-legend .legend-chip.is-primary,", 1)[1].split("}", 1)[0]
+    compare_section = css.split("[data-theme=\"dark\"] .signal-legend .legend-chip.is-compare {", 1)[1].split("}", 1)[0]
+
+    assert "#009E73" in primary_section
+    assert "#56B4E9" in compare_section
+    assert "var(--workspace-shell-border-strong)" not in compare_section
+
+
 def test_history_charts_pull_runtime_theme_vars() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
@@ -391,10 +402,34 @@ def test_history_charts_pull_runtime_theme_vars() -> None:
     )
 
     assert "function historyChartThemeColor(name, fallback)" in js
+    assert "function historyChartSeriesPaletteColor(paletteName, fallback)" in js
+    assert "function historyChartPalette()" in js
+    assert 'historyChartSeriesPaletteColor("bluish green", "#009E73")' in js
+    assert 'historyChartSeriesPaletteColor("sky blue", "#56B4E9")' in js
+    assert 'historyChartSeriesPaletteColor("orange", "#E69F00")' in js
+    assert 'historyChartSeriesPaletteColor("vermillion", "#D55E00")' in js
     assert 'historyChartThemeColor("--workspace-shell-border-muted"' in js
-    assert 'historyChartThemeColor("--ui-accent"' in js
-    assert 'historyChartThemeColor("--workspace-shell-active-text"' in js
-    assert 'historyChartThemeColor("--workspace-shell-text-soft"' in js
+
+
+def test_node_row_packet_sparklines_use_layered_chart_markup() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'chat-member-packet-sparkline-raw' in js
+    assert 'chat-member-packet-sparkline-trend' in js
+    assert 'class="metric-ticker-chart chat-member-packet-sparkline"' in js
+
+
+def test_dark_row_packet_sparklines_reuse_network_compare_blue() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    flat_section = css.split("[data-theme=\"dark\"] .chat-member-packet-trend.metric-ticker.trend-flat {", 1)[1].split("}", 1)[0]
+
+    assert "#56B4E9" in flat_section
+    assert "var(--workspace-shell-border-strong)" not in flat_section
 
 
 def test_saved_node_notes_and_tag_editor_follow_theme_tokens() -> None:

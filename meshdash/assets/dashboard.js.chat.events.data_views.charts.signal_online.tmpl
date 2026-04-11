@@ -9,6 +9,48 @@
       return value || fallback;
     }}
 
+    function historyChartSeriesPaletteColor(paletteName, fallback) {{
+      const clean = String(paletteName || "").trim().toLowerCase();
+      if (!clean || !Array.isArray(meshChannelColorPalette)) {{
+        return fallback;
+      }}
+      for (const palette of meshChannelColorPalette) {{
+        const name = String(palette && palette.name || "").trim().toLowerCase();
+        if (name !== clean) continue;
+        const fill = String(palette && palette.fill || "").trim();
+        if (fill) return fill;
+      }}
+      return fallback;
+    }}
+
+    function historyChartPalette() {{
+      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
+      const lineColor = historyChartSeriesPaletteColor("bluish green", "#009E73");
+      const compareColor = historyChartSeriesPaletteColor("sky blue", "#56B4E9");
+      const aux1Color = historyChartSeriesPaletteColor("orange", "#E69F00");
+      const aux2Color = historyChartSeriesPaletteColor("reddish purple", "#CC79A7");
+      const dangerColor = historyChartSeriesPaletteColor("vermillion", "#D55E00");
+      const offlineColor = historyChartSeriesPaletteColor("gray", "#999999");
+      return {
+        grid: darkTheme
+          ? historyChartThemeColor("--workspace-shell-border-muted", "#324152")
+          : "#dce8df",
+        line: lineColor,
+        compare: compareColor,
+        aux1: aux1Color,
+        aux2: aux2Color,
+        label: lineColor,
+        compareLabel: compareColor,
+        aux1Label: aux1Color,
+        danger: dangerColor,
+        connector: darkTheme
+          ? historyChartThemeColor("--workspace-shell-border-muted", "#324152")
+          : "#c3d2dc",
+        offline: offlineColor,
+        rawOpacity: darkTheme ? 0.20 : 0.24,
+      };
+    }}
+
     function renderSignalChart(points) {{
       const svg = document.getElementById("signal-chart");
       const empty = document.getElementById("signal-empty");
@@ -138,24 +180,7 @@
       const snrPaths = buildPaths("avg_snr", snrMin, snrMax);
       const rssiPaths = buildPaths("avg_rssi", rssiMin, rssiMax);
       const midY = padTop + (plotH / 2);
-      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
-      const chartPalette = darkTheme
-        ? {{
-            grid: historyChartThemeColor("--workspace-shell-border-muted", "#324152"),
-            snr: historyChartThemeColor("--ui-accent", "#58c878"),
-            rssi: historyChartThemeColor("--workspace-shell-active-text", "#79c0ff"),
-            snrLabel: historyChartThemeColor("--workspace-shell-text-soft", "#88e8a5"),
-            rssiLabel: historyChartThemeColor("--workspace-shell-text", "#a4d0ff"),
-            rawOpacity: 0.32,
-          }}
-        : {{
-            grid: "#dce8df",
-            snr: "#1f6f53",
-            rssi: "#265d7b",
-            snrLabel: "#1f6f53",
-            rssiLabel: "#265d7b",
-            rawOpacity: 0.24,
-          }};
+      const chartPalette = historyChartPalette();
       const rightAxisLabelX = width - 6;
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
@@ -164,14 +189,14 @@
         <line x1="${{padLeft}}" y1="${{midY.toFixed(2)}}" x2="${{width - padRight}}" y2="${{midY.toFixed(2)}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
         <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
         <line x1="${{width - padRight}}" y1="${{padTop}}" x2="${{width - padRight}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
-        ${{snrPaths.rawPath ? `<path d="${{snrPaths.rawPath}}" fill="none" stroke="${{chartPalette.snr}}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{chartPalette.rawOpacity.toFixed(2)}}"></path>` : ""}}
-        ${{rssiPaths.rawPath ? `<path d="${{rssiPaths.rawPath}}" fill="none" stroke="${{chartPalette.rssi}}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{chartPalette.rawOpacity.toFixed(2)}}"></path>` : ""}}
-        ${{snrPaths.trendPath ? `<path d="${{snrPaths.trendPath}}" fill="none" stroke="${{chartPalette.snr}}" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"></path>` : ""}}
-        ${{rssiPaths.trendPath ? `<path d="${{rssiPaths.trendPath}}" fill="none" stroke="${{chartPalette.rssi}}" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"></path>` : ""}}
-        <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMax, 1)}}</text>
-        <text x="${{padLeft - 4}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="end" fill="${{chartPalette.snrLabel}}">${{formatMetricValue(snrMin, 1)}}</text>
-        <text x="${{rightAxisLabelX.toFixed(2)}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMax, 0)}}</text>
-        <text x="${{rightAxisLabelX.toFixed(2)}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="end" fill="${{chartPalette.rssiLabel}}">${{formatMetricValue(rssiMin, 0)}}</text>
+        ${{snrPaths.rawPath ? `<path d="${{snrPaths.rawPath}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{chartPalette.rawOpacity.toFixed(2)}}"></path>` : ""}}
+        ${{rssiPaths.rawPath ? `<path d="${{rssiPaths.rawPath}}" fill="none" stroke="${{chartPalette.compare}}" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="${{chartPalette.rawOpacity.toFixed(2)}}"></path>` : ""}}
+        ${{snrPaths.trendPath ? `<path d="${{snrPaths.trendPath}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"></path>` : ""}}
+        ${{rssiPaths.trendPath ? `<path d="${{rssiPaths.trendPath}}" fill="none" stroke="${{chartPalette.compare}}" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round"></path>` : ""}}
+        <text x="${{padLeft - 4}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(snrMax, 1)}}</text>
+        <text x="${{padLeft - 4}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(snrMin, 1)}}</text>
+        <text x="${{rightAxisLabelX.toFixed(2)}}" y="${{padTop + 10}}" font-size="10" text-anchor="end" fill="${{chartPalette.compareLabel}}">${{formatMetricValue(rssiMax, 0)}}</text>
+        <text x="${{rightAxisLabelX.toFixed(2)}}" y="${{height - padBottom + 11}}" font-size="10" text-anchor="end" fill="${{chartPalette.compareLabel}}">${{formatMetricValue(rssiMin, 0)}}</text>
       `;
       renderSignalTimeline(plotRows, padLeft, padRight, width);
     }}
@@ -424,28 +449,7 @@
       const statusWarnPercent = viewWindowSeconds > 0 ? (statusDurations.warn / viewWindowSeconds) * 100 : 0;
       const statusStalePercent = viewWindowSeconds > 0 ? (statusDurations.stale / viewWindowSeconds) * 100 : 0;
       const officialOnlinePercent = viewWindowSeconds > 0 ? (officialDurations.online / viewWindowSeconds) * 100 : 0;
-      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
-      const chartPalette = darkTheme
-        ? {{
-            grid: historyChartThemeColor("--workspace-shell-border-muted", "#324152"),
-            label: historyChartThemeColor("--workspace-shell-text-soft", "#a4d0ff"),
-            connector: historyChartThemeColor("--workspace-shell-border-strong", "#9fb3c8"),
-            statusOnline: "#58c878",
-            statusWarn: "#d9b95c",
-            statusStale: "#e27b7b",
-            officialOnline: historyChartThemeColor("--workspace-shell-active-text", "#79c0ff"),
-            officialOffline: historyChartThemeColor("--workspace-shell-border-strong", "#7f90a5"),
-          }}
-        : {{
-            grid: "#dce8df",
-            label: "#3b5c4b",
-            connector: "#7b8992",
-            statusOnline: "#1f6f53",
-            statusWarn: "#9a7724",
-            statusStale: "#b45151",
-            officialOnline: "#265d7b",
-            officialOffline: "#8b98a3",
-          }};
+      const chartPalette = historyChartPalette();
       const rightSummaryX = width - 6;
       const renderSegmentLines = (rows, stateKeyName, yByState, colorByState, strokeWidth = 2.6) => {{
         const horizontals = [];
@@ -479,9 +483,9 @@
         "statusKey",
         statusYByKey,
         {{
-          online: chartPalette.statusOnline,
-          warn: chartPalette.statusWarn,
-          stale: chartPalette.statusStale,
+          online: chartPalette.line,
+          warn: chartPalette.aux1,
+          stale: chartPalette.danger,
         }},
         3.1
       );
@@ -490,8 +494,8 @@
         "officialKey",
         officialYByKey,
         {{
-          online: chartPalette.officialOnline,
-          offline: chartPalette.officialOffline,
+          online: chartPalette.compare,
+          offline: chartPalette.offline,
         }},
         2.7
       );
@@ -501,7 +505,7 @@
           const startX = xFromUnix(segment && segment.start_unix);
           const endX = xFromUnix(segment && segment.end_unix);
           const rectW = Math.max(1, endX - startX);
-          return `<rect x="${{startX.toFixed(2)}}" y="${{officialLaneTop.toFixed(2)}}" width="${{rectW.toFixed(2)}}" height="${{officialLaneHeight.toFixed(2)}}" fill="${{escAttr(chartPalette.officialOnline)}}" opacity="0.12"></rect>`;
+          return `<rect x="${{startX.toFixed(2)}}" y="${{officialLaneTop.toFixed(2)}}" width="${{rectW.toFixed(2)}}" height="${{officialLaneHeight.toFixed(2)}}" fill="${{escAttr(chartPalette.compare)}}" opacity="0.12"></rect>`;
         }});
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
@@ -519,12 +523,12 @@
         <g>${{statusLines.connectors.join("")}}${{statusLines.horizontals.join("")}}</g>
         <g>${{officialLines.connectors.join("")}}${{officialLines.horizontals.join("")}}</g>
         <text x="${{(padLeft + 4).toFixed(2)}}" y="${{(statusLaneTop - 2).toFixed(2)}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">Status (10m online / 30m stale)</text>
-        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(statusYByKey.online + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.statusOnline}}">Online</text>
-        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(statusYByKey.warn + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.statusWarn}}">Aging</text>
-        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(statusYByKey.stale + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.statusStale}}">Stale</text>
+        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(statusYByKey.online + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.line}}">Online</text>
+        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(statusYByKey.warn + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.aux1}}">Aging</text>
+        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(statusYByKey.stale + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.danger}}">Stale</text>
         <text x="${{(padLeft + 4).toFixed(2)}}" y="${{(officialLaneTop - 2).toFixed(2)}}" font-size="10" text-anchor="start" fill="${{chartPalette.label}}">Official (2h online)</text>
-        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(officialYByKey.online + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.officialOnline}}">Online</text>
-        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(officialYByKey.offline + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.officialOffline}}">Offline</text>
+        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(officialYByKey.online + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.compare}}">Online</text>
+        <text x="${{(padLeft - 4).toFixed(2)}}" y="${{(officialYByKey.offline + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.offline}}">Offline</text>
         <text x="${{rightSummaryX.toFixed(2)}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">
           <tspan x="${{rightSummaryX.toFixed(2)}}" dy="0">Status O/A/S: ${{percentText(statusOnlinePercent)}} / ${{percentText(statusWarnPercent)}} / ${{percentText(statusStalePercent)}}%</tspan>
           <tspan x="${{rightSummaryX.toFixed(2)}}" dy="12">Official online: ${{percentText(officialOnlinePercent)}}%</tspan>
@@ -662,18 +666,7 @@
         );
       }}
 
-      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
-      const chartPalette = darkTheme
-        ? {{
-            grid: historyChartThemeColor("--workspace-shell-border-muted", "#324152"),
-            line: historyChartThemeColor("--ui-accent", "#79c0ff"),
-            label: historyChartThemeColor("--workspace-shell-active-text", "#a4d0ff"),
-          }}
-        : {{
-            grid: "#dce8df",
-            line: "#265d7b",
-            label: "#265d7b",
-          }};
+      const chartPalette = historyChartPalette();
       const rightMetricX = width - 6;
 
       svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
@@ -863,18 +856,7 @@
         `${{idx === 0 ? "M" : "L"}} ${{pt.x.toFixed(2)}} ${{pt.y.toFixed(2)}}`
       )).join(" ");
 
-      const darkTheme = document.documentElement.getAttribute("data-theme") === "dark";
-      const chartPalette = darkTheme
-        ? {{
-            grid: historyChartThemeColor("--workspace-shell-border-muted", "#324152"),
-            line: historyChartThemeColor("--ui-accent", "#79c0ff"),
-            label: historyChartThemeColor("--workspace-shell-active-text", "#a4d0ff"),
-          }}
-        : {{
-            grid: "#dce8df",
-            line: "#1f6f53",
-            label: "#1f6f53",
-          }};
+      const chartPalette = historyChartPalette();
 
       const axisTicks = buildLinearAxisTicks(minVal, maxVal, 5);
       const axisLines = axisTicks.map((tick) => {{
