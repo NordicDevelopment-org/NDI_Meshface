@@ -227,6 +227,18 @@
       return true;
     }}
 
+    function resetMapViewToMostNodes() {{
+      if (!map) return false;
+      map.closePopup();
+      pendingMapHistoryFocus = false;
+      if (!latestState) {{
+        requestMapResize();
+        return false;
+      }}
+      const nodes = Array.isArray(latestState.nodes) ? latestState.nodes : [];
+      return fitMapToMostNodes(nodes, {{ pad: 0.18, maxZoom: 13 }});
+    }}
+
     function clampMapLinkValue(value, min, max) {{
       const parsed = Number(value);
       if (!Number.isFinite(parsed)) return min;
@@ -614,12 +626,7 @@
       if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") return;
       btn.dataset.bound = "1";
       btn.addEventListener("click", () => {{
-        map.closePopup();
-        pendingMapHistoryFocus = false;
-        if (latestState) {{
-          const nodes = Array.isArray(latestState.nodes) ? latestState.nodes : [];
-          fitMapToMostNodes(nodes, {{ pad: 0.18, maxZoom: 13 }});
-        }}
+        resetMapViewToMostNodes();
       }});
     }}
 
