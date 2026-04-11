@@ -23,11 +23,11 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".workspace-main > .layout.view-console {" in css
     assert "grid-row: 1 / -1;" in css
     assert ".chat-left-head-shell {" in css
-    assert "border: 1px solid var(--surface-tint-border, #d2e1d0);" in css
-    assert "background: var(--surface-tint-bg-alt, #edf6ec);" in css
+    assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
+    assert "background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%);" in css
     assert ".chat-left-roster-shell {" in css
-    assert "border: 1px solid var(--surface-tint-border, #d2e1d0);" in css
-    assert "background: var(--surface-tint-bg, #f7fcf7);" in css
+    assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
+    assert "background: color-mix(in srgb, var(--panel) 92%, var(--bg) 8%);" in css
     assert ".layout.view-chat .chat {" in css
     assert "background: transparent;" in css
     assert "border: 0;" in css
@@ -67,9 +67,9 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".layout.view-chat .chat-main-pane {" in css
     assert "row-gap: 8px;" in css
     assert ".layout.view-chat .chat-log-scroll {" in css
-    assert "border: 1px solid var(--surface-tint-border, #d2e1d0);" in css
+    assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
     assert "border-radius: 10px;" in css
-    assert "background: var(--surface-tint-bg, #f7fcf7);" in css
+    assert "background: color-mix(in srgb, var(--panel) 92%, var(--bg) 8%);" in css
     assert ".layout.view-chat .chat-card-head.workspace-chrome-bar {" in css
     assert "margin: 0;" in css
     assert "padding: 8px 10px;" in css
@@ -96,15 +96,15 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".layout.view-chat .chat-card-head .mesh-channel-pill:hover," in css
     assert ".layout.view-chat .chat-compose-shell {" in css
     assert "margin-top: 0;" in css
-    assert "border: 1px solid var(--surface-tint-border, #d2e1d0);" in css
+    assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
     assert "border-radius: 10px;" in css
-    assert "background: var(--surface-tint-bg-alt, #edf6ec);" in css
+    assert "background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%);" in css
     assert "padding: 6px 8px;" in css
     assert "gap: 0;" in css
     assert ".chat-left-bottom-bar {" in css
     assert "margin: 0;" in css
-    assert "border: 1px solid var(--surface-tint-border, #d2e1d0);" in css
-    assert "background: var(--surface-tint-bg-alt, #edf6ec);" in css
+    assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
+    assert "background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%);" in css
     assert "position: relative;" in css
     assert "display: flex;" in css
     assert ".chat-user-search-wrap {" in css
@@ -115,8 +115,8 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".chat-member-list {" in css
     assert "gap: 0;" in css
     assert ".chat-member-item {" in css
-    assert "--chat-member-node-bg: var(--surface-tint-bg, #ecf5ef);" in css
-    assert "--chat-member-node-sat-mult: var(--surface-tint-sat-mult, 1);" in css
+    assert "--chat-member-node-bg: color-mix(in srgb, var(--panel) 94%, var(--bg) 6%);" in css
+    assert "--chat-member-node-sat-mult: 0;" in css
     assert "border-radius: 0;" in css
     assert "border-bottom: 1px solid var(--chat-member-node-border);" in css
     assert "[data-theme=\"dark\"] .chat-left-panel," in css
@@ -239,9 +239,10 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "[data-theme=\"dark\"] .chat-panel-splitter {" in css
     assert "[data-theme=\"dark\"] .chat-member-pane {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-feed-item {" in css
-    assert "--chat-feed-node-hue: var(--surface-tint-start-hue, 148);" in css
-    assert "--chat-feed-node-tint-end-hue: var(--surface-tint-end-hue, 170);" in css
-    assert "--chat-feed-node-outline-hue: var(--surface-tint-outline-hue, 154);" in css
+    assert "--chat-feed-node-hue: 148;" in css
+    assert "--chat-feed-node-tint-end-hue: 170;" in css
+    assert "--chat-feed-node-outline-hue: 154;" in css
+    assert "--chat-feed-node-dark-sat-mult: 0;" in css
     assert "--chat-feed-node-gradient: linear-gradient(" in css
     assert "hsl(var(--chat-feed-node-tint-start-hue, 148) calc(34% * var(--chat-feed-node-dark-sat-mult, 1))" in css
     assert "[data-theme=\"dark\"] .chat-feed-item.kind-status {" in css
@@ -251,8 +252,8 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "[data-theme=\"dark\"] .chat-node-navigator-menu," in css
     assert "background: #0d1711;" in css
     assert "[data-theme=\"dark\"] .chat-member-item {" in css
-    assert "--chat-member-node-dark-sat-mult: var(--surface-tint-dark-sat-mult, 1.02);" in css
-    assert "--chat-member-node-outline-dark-sat-mult: var(--surface-tint-outline-dark-sat-mult, 1.18);" in css
+    assert "--chat-member-node-dark-sat-mult: 0;" in css
+    assert "--chat-member-node-outline-dark-sat-mult: 0;" in css
     assert "calc(44% * var(--chat-member-node-dark-sat-mult, 1))" in css
     assert "calc(18% * var(--chat-member-node-dark-sat-mult, 1))" in css
     assert "color: var(--ui-text);" in css

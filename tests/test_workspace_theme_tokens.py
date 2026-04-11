@@ -42,9 +42,11 @@ def test_workspace_views_reuse_shared_shell_tokens() -> None:
     assert ".settings-help-note {" in css
     assert "background: var(--surface-tint-bg-soft, #f4faf3);" in css
     assert ".chat-member-item {" in css
-    assert "--chat-member-node-bg: var(--surface-tint-bg, #ecf5ef);" in css
+    assert "--chat-member-node-bg: color-mix(in srgb, var(--panel) 94%, var(--bg) 6%);" in css
+    assert "--chat-member-node-sat-mult: 0;" in css
     assert ".chat-feed-item {" in css
-    assert "--chat-feed-node-bg: var(--surface-tint-bg, #f7fcf7);" in css
+    assert "--chat-feed-node-bg: color-mix(in srgb, var(--panel) 94%, var(--bg) 6%);" in css
+    assert "--chat-feed-node-sat-mult: 0;" in css
     assert "background: var(--workspace-shell-bg, #08110d);" in css
     assert "background: var(--workspace-shell-bg-alt);" in css
     assert "border-color: var(--workspace-shell-border);" in css
