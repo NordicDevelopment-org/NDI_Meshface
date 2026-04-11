@@ -118,6 +118,27 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "border-radius: 0;" in css
     assert "border-bottom: 1px solid var(--chat-member-node-border);" in css
     assert "[data-theme=\"dark\"] .chat-left-panel," in css
+
+
+def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    channel_wrap_section = css.split(".mesh-channel-wrap {", 1)[1].split("}", 1)[0]
+    channel_pill_section = css.split(".mesh-channel-pill {", 1)[1].split("}", 1)[0]
+    channel_badge_section = css.split(".mesh-channel-primary-badge {", 1)[1].split("}", 1)[0]
+    channel_unread_section = css.split(".mesh-channel-pill-unread {", 1)[1].split("}", 1)[0]
+    channel_menu_btn_section = css.split(".mesh-channel-menu-btn {", 1)[1].split("}", 1)[0]
+
+    assert "color-mix(in srgb, var(--ink) 88%, var(--accent-2) 12%)" in channel_wrap_section
+    assert "#f2fff7" not in channel_wrap_section
+    assert "color-mix(in srgb, var(--ink) 88%, var(--accent-2) 12%)" in channel_pill_section
+    assert "#f2fff7" not in channel_pill_section
+    assert "color-mix(in srgb, var(--ink) 78%, var(--accent-2) 22%)" in channel_badge_section
+    assert "rgba(242, 255, 247, 0.88)" not in channel_badge_section
+    assert "color-mix(in srgb, var(--muted) 82%, var(--accent-2) 18%)" in channel_unread_section
+    assert "rgba(242, 255, 247, 0.88)" not in channel_unread_section
+    assert "color-mix(in srgb, var(--ink) 88%, var(--accent-2) 12%)" in channel_menu_btn_section
+    assert "#f2fff7" not in channel_menu_btn_section
     assert "[data-theme=\"dark\"] .card.chat .body," in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "[data-theme=\"dark\"] .chat-left-bottom-bar {" in css

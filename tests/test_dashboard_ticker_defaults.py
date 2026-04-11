@@ -4,6 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from meshdash.html_css import build_dashboard_css
 from meshdash.html_js import build_dashboard_js
 from meshdash.html_template import render_html
 
@@ -203,3 +204,14 @@ def test_render_html_styles_local_identity_target_ticker() -> None:
     assert ".topbar .summary-ticker-item-target .value.target-node-value {" in html
     assert ".target-node-name {" in html
     assert ".target-node-id {" in html
+
+
+def test_target_ticker_id_uses_muted_light_mode_text() -> None:
+    css = build_dashboard_css(theme_css="")
+    target_id_section = css.split(
+        ".topbar .summary-ticker-item-target .value.target-node-value .target-node-id {",
+        1,
+    )[1].split("}", 1)[0]
+
+    assert "color-mix(in srgb, var(--muted) 84%, var(--ink) 16%)" in target_id_section
+    assert "rgba(230, 248, 237, 0.84)" not in target_id_section
