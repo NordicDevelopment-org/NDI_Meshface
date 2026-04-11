@@ -216,21 +216,24 @@ def test_network_subview_charts_pull_runtime_theme_vars() -> None:
     assert 'themeColor("--ui-accent"' in js
 
 
-def test_dark_text_input_variants_share_workspace_shell_tokens() -> None:
+def test_dark_text_input_variants_use_neutral_ui_tokens_for_chat_compose_controls() -> None:
     css = build_dashboard_css(theme_css="")
 
-    search_input_section = css.split("[data-theme=\"dark\"] .list-search-input,", 1)[1].split("}", 1)[0]
+    search_input_section = css.rsplit("[data-theme=\"dark\"] .list-search-input,", 1)[1].split("}", 1)[0]
     shared_text_inputs_section = css.split("[data-theme=\"dark\"] .chat-peer-input,", 1)[1].split("}", 1)[0]
     shared_focus_section = css.split("[data-theme=\"dark\"] .chat-peer-input:focus,", 1)[1].split("}", 1)[0]
 
-    assert "var(--workspace-shell-border-strong)" in search_input_section
-    assert "var(--workspace-shell-text)" in search_input_section
+    assert "var(--ui-panel)" in search_input_section
+    assert "var(--ui-border)" in search_input_section
+    assert "var(--ui-text)" in search_input_section
     assert "[data-theme=\"dark\"] .settings-textarea," in css
     assert "[data-theme=\"dark\"] .chat-input," in css
-    assert "var(--workspace-shell-border)" in shared_text_inputs_section
-    assert "var(--workspace-shell-text)" in shared_text_inputs_section
-    assert "var(--workspace-shell-border-strong)" in shared_focus_section
-    assert "var(--workspace-shell-hover-bg)" in shared_focus_section
+    assert "var(--ui-panel)" in shared_text_inputs_section
+    assert "var(--ui-border)" in shared_text_inputs_section
+    assert "var(--ui-text)" in shared_text_inputs_section
+    assert "var(--ui-accent)" in shared_focus_section
+    assert "var(--ui-panel-alt)" in shared_focus_section
+    assert "color-mix(in srgb, var(--ui-accent) 22%, transparent)" in shared_focus_section
     assert "[data-theme=\"dark\"] .settings-textarea::placeholder," in css
     assert "[data-theme=\"dark\"] .bbs-post-input::placeholder {" in css
     assert "opacity: 0.9;" in css

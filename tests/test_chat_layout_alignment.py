@@ -130,6 +130,9 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     channel_badge_section = css.split(".mesh-channel-primary-badge {", 1)[1].split("}", 1)[0]
     channel_unread_section = css.split(".mesh-channel-pill-unread {", 1)[1].split("}", 1)[0]
     channel_menu_btn_section = css.split(".mesh-channel-menu-btn {", 1)[1].split("}", 1)[0]
+    dark_input_section = css.rsplit("[data-theme=\"dark\"] .list-search-input,\n    [data-theme=\"dark\"] #chat-input,\n    [data-theme=\"dark\"] .chat-send-channel-select {", 1)[1].split("}", 1)[0]
+    dark_bottom_bar_section = css.rsplit("[data-theme=\"dark\"] .chat-left-bottom-bar {", 1)[1].split("}", 1)[0]
+    dark_send_btn_section = css.split("[data-theme=\"dark\"] #chat-emoji-btn,\n    [data-theme=\"dark\"] #chat-send-btn {", 1)[1].split("}", 1)[0]
 
     assert "color-mix(in srgb, var(--ink) 88%, var(--accent-2) 12%)" in channel_wrap_section
     assert "#f2fff7" not in channel_wrap_section
@@ -144,10 +147,16 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     assert "[data-theme=\"dark\"] .card.chat .body," in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "[data-theme=\"dark\"] .chat-left-bottom-bar {" in css
-    assert "background: #07140d !important;" in css
+    assert "background: var(--ui-panel) !important;" in dark_bottom_bar_section
+    assert "var(--ui-border)" in dark_bottom_bar_section
     assert "[data-theme=\"dark\"] #chat-emoji-btn," in css
     assert "[data-theme=\"dark\"] #chat-send-btn {" in css
-    assert "border-color: #2b8a59 !important;" in css
+    assert "background: var(--ui-panel);" in dark_input_section
+    assert "border-color: var(--ui-border);" in dark_input_section
+    assert "background: var(--ui-panel) !important;" in dark_send_btn_section
+    assert "border-color: var(--ui-border) !important;" in dark_send_btn_section
+    assert "color: var(--ui-text) !important;" in dark_send_btn_section
+    assert "var(--workspace-shell-border)" not in dark_send_btn_section
     assert ".list-search-input,\n    #chat-input {" in css
     assert "#chat-input:hover {" not in css
     assert "[data-theme=\"dark\"] #chat-input:hover {" not in css
@@ -233,9 +242,15 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-log-scroll {" in css
     assert "background: var(--workspace-shell-bg);" in css
     assert "border-color: var(--workspace-shell-border);" in css
+    dark_compose_shell_section = css.rsplit("[data-theme=\"dark\"] .chat-compose-shell,\n    [data-theme=\"dark\"] .card.chat .chat-compose-shell {", 1)[1].split("}", 1)[0]
+    dark_bottom_bar_section = css.rsplit("[data-theme=\"dark\"] .chat-left-bottom-bar {", 1)[1].split("}", 1)[0]
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell {" in css
-    assert "background: var(--workspace-shell-bg-alt);" in css
+    assert "background: var(--ui-panel) !important;" in dark_compose_shell_section
+    assert "var(--ui-border)" in dark_compose_shell_section
+    assert "var(--workspace-shell-border)" not in dark_compose_shell_section
     assert "[data-theme=\"dark\"] .chat-left-bottom-bar {" in css
+    assert "background: var(--ui-panel) !important;" in dark_bottom_bar_section
+    assert "var(--ui-border)" in dark_bottom_bar_section
     assert "[data-theme=\"dark\"] .chat-panel-splitter {" in css
     assert "[data-theme=\"dark\"] .chat-member-pane {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-feed-item {" in css
