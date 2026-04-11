@@ -120,15 +120,18 @@ def test_apps_views_move_app_switching_into_launcher_submenu() -> None:
     assert 'return `Apps · ${currentAppsLauncherLabel(viewName)}`;' in js
 
 
-def test_workspace_main_gap_stays_uniform_across_apps_and_chat_views() -> None:
+def test_workspace_main_gap_stays_uniform_and_lets_apps_views_use_full_width() -> None:
     css = build_dashboard_css(theme_css="")
 
     workspace_main_section = css.split(".workspace-main {", 1)[1].split("}", 1)[0]
+    apps_workspace_main_section = css.split('.workspace-shell[data-layout-view="games"] .workspace-main,', 1)[1].split("}", 1)[0]
+    apps_layout_section = css.split('.workspace-shell[data-layout-view="games"] .workspace-main > .layout.view-games,', 1)[1].split("}", 1)[0]
     assert "gap: 8px;" in workspace_main_section
     assert "gap: 0;" not in workspace_main_section
-    assert '.workspace-shell[data-layout-view="games"] .workspace-main,' not in css
-    assert '.workspace-shell[data-layout-view="files"] .workspace-main,' not in css
-    assert '.workspace-shell[data-layout-view="bbs"] .workspace-main {' not in css
+    assert "grid-template-columns: minmax(0, 1fr);" in apps_workspace_main_section
+    assert "grid-template-rows: minmax(0, 1fr);" in apps_workspace_main_section
+    assert '.workspace-shell[data-layout-view="games"] .workspace-main::before,' not in css
+    assert "grid-column: 1;" in apps_layout_section
 
 
 def test_network_view_keeps_map_frame_and_removes_body_shell() -> None:
