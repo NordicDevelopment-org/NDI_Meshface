@@ -6854,12 +6854,22 @@
       --games-turn-black-accent-rgb: 49, 67, 57;
       --games-turn-white-rgb: 255, 255, 255;
       --games-turn-white-accent-rgb: 214, 224, 233;
-      --games-board-frame: color-mix(in srgb, var(--line, #7ab18a) 58%, var(--games-board-accent-strong) 42%);
-      --games-board-inner-line: color-mix(in srgb, var(--games-board-accent-strong) 18%, #08110d);
-      --games-board-surface-top: color-mix(in srgb, var(--games-board-accent) 34%, var(--panel, #112016));
-      --games-board-surface-bottom: color-mix(in srgb, var(--games-board-accent-strong) 28%, #07110c);
+      --games-board-frame: color-mix(in srgb, var(--surface-tint-border-strong, #b8cab9) 76%, var(--games-board-accent-strong) 24%);
+      --games-board-inner-line: color-mix(in srgb, var(--surface-tint-border, #cbd8ce) 74%, white 26%);
+      --games-board-surface-top: color-mix(in srgb, var(--surface-tint-bg-soft, #f4faf3) 82%, var(--games-board-accent) 18%);
+      --games-board-surface-bottom: color-mix(in srgb, var(--surface-tint-bg, #edf6ec) 76%, var(--games-board-accent-strong) 24%);
+      --games-board-turn-black-overlay:
+        linear-gradient(180deg, rgba(44, 59, 72, 0.24) 0%, rgba(44, 59, 72, 0.12) 14%, rgba(44, 59, 72, 0.04) 28%, transparent 42%),
+        linear-gradient(0deg, rgba(44, 59, 72, 0.2) 0%, rgba(44, 59, 72, 0.1) 14%, rgba(44, 59, 72, 0.03) 28%, transparent 42%),
+        linear-gradient(90deg, rgba(44, 59, 72, 0.22) 0%, rgba(44, 59, 72, 0.11) 10%, rgba(44, 59, 72, 0.03) 20%, transparent 32%),
+        linear-gradient(270deg, rgba(44, 59, 72, 0.22) 0%, rgba(44, 59, 72, 0.11) 10%, rgba(44, 59, 72, 0.03) 20%, transparent 32%);
+      --games-board-turn-white-overlay:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, rgba(239, 246, 252, 0.1) 14%, transparent 34%),
+        linear-gradient(0deg, rgba(239, 246, 252, 0.16) 0%, rgba(239, 246, 252, 0.07) 14%, transparent 34%),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0%, rgba(239, 246, 252, 0.08) 10%, transparent 24%),
+        linear-gradient(270deg, rgba(255, 255, 255, 0.18) 0%, rgba(239, 246, 252, 0.08) 10%, transparent 24%);
       --games-board-default-background:
-        radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--games-board-accent) 26%, white) 0%, transparent 48%),
+        radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--games-board-accent) 14%, white 86%) 0%, transparent 58%),
         linear-gradient(180deg, var(--games-board-surface-top), var(--games-board-surface-bottom));
       --games-board-active-background: var(--games-board-default-background);
       width: 100%;
@@ -6889,18 +6899,10 @@
       z-index: 0;
     }}
     .games-board-wrap::before {{
-      background:
-        linear-gradient(180deg, rgba(var(--games-turn-black-rgb), 0.88) 0%, rgba(var(--games-turn-black-rgb), 0.48) 12%, rgba(var(--games-turn-black-rgb), 0.14) 24%, transparent 38%),
-        linear-gradient(0deg, rgba(var(--games-turn-black-rgb), 0.76) 0%, rgba(var(--games-turn-black-rgb), 0.4) 12%, rgba(var(--games-turn-black-rgb), 0.12) 24%, transparent 38%),
-        linear-gradient(90deg, rgba(var(--games-turn-black-rgb), 0.82) 0%, rgba(var(--games-turn-black-rgb), 0.42) 9%, rgba(var(--games-turn-black-rgb), 0.12) 18%, transparent 30%),
-        linear-gradient(270deg, rgba(var(--games-turn-black-rgb), 0.82) 0%, rgba(var(--games-turn-black-rgb), 0.42) 9%, rgba(var(--games-turn-black-rgb), 0.12) 18%, transparent 30%);
+      background: var(--games-board-turn-black-overlay);
     }}
     .games-board-wrap::after {{
-      background:
-        linear-gradient(180deg, rgba(var(--games-turn-white-rgb), 0.12) 0%, rgba(var(--games-turn-white-accent-rgb), 0.05) 13%, transparent 30%),
-        linear-gradient(0deg, rgba(var(--games-turn-white-accent-rgb), 0.1) 0%, rgba(var(--games-turn-white-accent-rgb), 0.04) 13%, transparent 30%),
-        linear-gradient(90deg, rgba(var(--games-turn-white-rgb), 0.11) 0%, rgba(var(--games-turn-white-accent-rgb), 0.04) 9%, transparent 22%),
-        linear-gradient(270deg, rgba(var(--games-turn-white-rgb), 0.11) 0%, rgba(var(--games-turn-white-accent-rgb), 0.04) 9%, transparent 22%);
+      background: var(--games-board-turn-white-overlay);
     }}
     .games-board-wrap[data-turn="black"] {{
       border-color: color-mix(in srgb, var(--games-board-frame) 42%, #000000);
@@ -7084,12 +7086,12 @@
     .reversi-board {{
       --reversi-board-accent: var(--ui-accent-soft, var(--accent, #2f855a));
       --reversi-board-accent-strong: var(--ui-accent, var(--accent-2, var(--accent, #2f855a)));
-      --reversi-board-root: color-mix(in srgb, var(--reversi-board-accent) 68%, #0c1611);
-      --reversi-board-frame: color-mix(in srgb, var(--reversi-board-root) 64%, #000000);
-      --reversi-board-surface: color-mix(in srgb, var(--reversi-board-root) 82%, #000000);
-      --reversi-board-cell: color-mix(in srgb, var(--reversi-board-root) 82%, #eef7f2);
-      --reversi-board-cell-hover: color-mix(in srgb, var(--reversi-board-root) 74%, #f7fdf9);
-      --reversi-board-grid: color-mix(in srgb, var(--reversi-board-root) 58%, #dceee4);
+      --reversi-board-root: color-mix(in srgb, var(--reversi-board-accent) 34%, var(--surface-tint-bg-soft, #f4faf3) 66%);
+      --reversi-board-frame: color-mix(in srgb, var(--reversi-board-accent-strong) 22%, var(--surface-tint-border-strong, #b8cab9) 78%);
+      --reversi-board-surface: color-mix(in srgb, var(--reversi-board-root) 76%, #d7e6f6);
+      --reversi-board-cell: color-mix(in srgb, var(--reversi-board-root) 46%, #f7fbff);
+      --reversi-board-cell-hover: color-mix(in srgb, var(--reversi-board-root) 34%, #ffffff);
+      --reversi-board-grid: color-mix(in srgb, var(--reversi-board-accent-strong) 18%, var(--surface-tint-border-strong, #b8cab9) 82%);
       --reversi-board-focus: color-mix(in srgb, var(--reversi-board-accent-strong) 58%, #ffffff);
       --reversi-cell-size: clamp(32px, min(6.9vw, 8.7vh), 94px);
       display: grid;
@@ -7099,7 +7101,7 @@
       border-radius: 12px;
       overflow: hidden;
       background: linear-gradient(180deg, var(--reversi-board-root), var(--reversi-board-surface));
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--reversi-board-frame) 34%, #000000);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--reversi-board-frame) 42%, #ffffff);
     }}
     .reversi-cell {{
       position: relative;
@@ -7169,14 +7171,14 @@
     .chess-board {{
       --classic-board-accent: var(--ui-accent-soft, var(--accent, #2f855a));
       --classic-board-accent-strong: var(--ui-accent, var(--accent-2, var(--accent, #2f855a)));
-      --classic-board-root: color-mix(in srgb, var(--classic-board-accent) 72%, #0b140f);
-      --classic-board-frame: color-mix(in srgb, var(--classic-board-root) 62%, #000000);
-      --classic-board-frame-inner: color-mix(in srgb, var(--classic-board-root) 54%, #000000);
-      --classic-board-cell-light: color-mix(in srgb, var(--classic-board-root) 58%, #d6e3dc);
-      --classic-board-cell-dark: color-mix(in srgb, var(--classic-board-root) 80%, #000000);
-      --classic-board-cell-dark-hover: color-mix(in srgb, var(--classic-board-cell-dark) 94%, #ffffff);
+      --classic-board-root: color-mix(in srgb, var(--classic-board-accent) 22%, var(--surface-tint-bg, #edf6ec) 78%);
+      --classic-board-frame: color-mix(in srgb, var(--classic-board-accent-strong) 24%, var(--surface-tint-border-strong, #b8cab9) 76%);
+      --classic-board-frame-inner: color-mix(in srgb, var(--classic-board-accent) 24%, #dbe5ef 76%);
+      --classic-board-cell-light: color-mix(in srgb, #fbf7ef 84%, var(--classic-board-root) 16%);
+      --classic-board-cell-dark: color-mix(in srgb, var(--classic-board-root) 66%, #6b88a5);
+      --classic-board-cell-dark-hover: color-mix(in srgb, var(--classic-board-cell-dark) 86%, #ffffff);
       --classic-board-focus: color-mix(in srgb, var(--classic-board-accent-strong) 58%, #ffffff);
-      --classic-board-target: color-mix(in srgb, var(--classic-board-accent) 58%, #f3fff7);
+      --classic-board-target: color-mix(in srgb, var(--classic-board-accent) 34%, #f8fff8);
     }}
     .checkers-board {{
       --checkers-cell-size: clamp(32px, min(6.9vw, 8.7vh), 94px);
@@ -7187,7 +7189,7 @@
       border-radius: 12px;
       overflow: hidden;
       background: var(--classic-board-frame-inner);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--classic-board-root) 34%, #000000);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--classic-board-frame) 42%, #ffffff);
     }}
     .checkers-cell {{
       width: var(--checkers-cell-size);
@@ -7273,7 +7275,7 @@
       border-radius: 12px;
       overflow: hidden;
       background: var(--classic-board-frame-inner);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--classic-board-root) 34%, #000000);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--classic-board-frame) 42%, #ffffff);
     }}
     .chess-cell {{
       width: var(--chess-cell-size);

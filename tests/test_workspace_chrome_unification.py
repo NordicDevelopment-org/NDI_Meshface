@@ -313,13 +313,22 @@ def test_games_boards_follow_runtime_theme_tokens() -> None:
 
     assert "var(--ui-accent-soft, var(--accent, #2f855a))" in board_wrap_section
     assert "var(--games-board-frame)" in board_wrap_section
+    assert "var(--surface-tint-bg-soft, #f4faf3)" in board_wrap_section
+    assert "var(--surface-tint-bg, #edf6ec)" in board_wrap_section
     assert "var(--reversi-board-accent)" in reversi_board_section
     assert "var(--reversi-board-cell)" in reversi_cell_section
+    assert "var(--surface-tint-bg-soft, #f4faf3)" in reversi_board_section
+    assert "var(--surface-tint-border-strong, #b8cab9)" in reversi_board_section
     assert "var(--classic-board-accent)" in classic_board_section
+    assert "var(--surface-tint-bg, #edf6ec)" in classic_board_section
+    assert "var(--surface-tint-border-strong, #b8cab9)" in classic_board_section
     assert "var(--workspace-shell-bg-alt)" in dark_board_wrap_section
     assert "var(--workspace-shell-border)" in dark_board_wrap_section
     assert "var(--ui-accent)" in dark_reversi_board_section
     assert "var(--workspace-shell-bg)" in dark_classic_board_section
+    assert "#07110c" not in board_wrap_section
+    assert "#0c1611" not in reversi_board_section
+    assert "#0b140f" not in classic_board_section
     assert "#173526" not in dark_board_wrap_section
     assert "#113a2b" not in dark_reversi_board_section
 
