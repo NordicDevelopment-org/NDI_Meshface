@@ -220,7 +220,7 @@
                   role="menuitem"
                   aria-haspopup="menu"
                   aria-expanded="false"
-                  title="Games, file transfer, and bulletin board workspace"
+                  title="Games and file transfer workspace"
                 >
                   <span class="topbar-view-menu-item-icon" aria-hidden="true">AP</span>
                   <span class="topbar-view-menu-item-copy">
@@ -228,7 +228,7 @@
                       <span class="topbar-view-menu-item-label">Apps</span>
                       <span id="layout-view-menu-apps-current" class="topbar-view-menu-item-context">Games</span>
                     </span>
-                    <span id="layout-view-menu-apps-meta" class="topbar-view-menu-item-meta">Boards, files, and BBS</span>
+                    <span id="layout-view-menu-apps-meta" class="topbar-view-menu-item-meta">Games and transfers</span>
                   </span>
                   <span class="topbar-view-menu-item-badge" hidden>0</span>
                   <span class="topbar-view-menu-item-branch" aria-hidden="true"></span>
@@ -263,21 +263,6 @@
                     <span class="topbar-view-submenu-item-copy">
                       <span class="topbar-view-submenu-item-label">Files</span>
                       <span class="topbar-view-submenu-item-meta">Transfers and inbox</span>
-                    </span>
-                  </button>
-                  <button
-                    class="topbar-view-submenu-item"
-                    data-view="bbs"
-                    data-app-view="bbs"
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked="false"
-                    title="BBS workspace"
-                  >
-                    <span class="topbar-view-submenu-item-icon" aria-hidden="true">BB</span>
-                    <span class="topbar-view-submenu-item-copy">
-                      <span class="topbar-view-submenu-item-label">BBS</span>
-                      <span class="topbar-view-submenu-item-meta">Boards and posts</span>
                     </span>
                   </button>
                 </div>
@@ -2118,88 +2103,6 @@
       </div>
     </section>
 
-    <section class="card bbs" aria-label="Dial-up bulletin board">
-      <h2>BBS</h2>
-      <div class="body">
-        <div class="bbs-shell">
-          <aside class="bbs-sidebar">
-            <div class="bbs-panel">
-              <div class="bbs-panel-title">Host Console</div>
-              <label class="bbs-field">
-                <span class="bbs-label">Board Title</span>
-                <input
-                  id="bbs-host-title-input"
-                  class="bbs-input"
-                  type="text"
-                  maxlength="42"
-                  placeholder="Packet Exchange"
-                  autocomplete="off"
-                />
-              </label>
-              <label class="bbs-field">
-                <span class="bbs-label">Board ID</span>
-                <input
-                  id="bbs-host-id-input"
-                  class="bbs-input"
-                  type="text"
-                  maxlength="24"
-                  placeholder="packet-exchange"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </label>
-              <label class="bbs-field">
-                <span class="bbs-label">Welcome Banner</span>
-                <input
-                  id="bbs-host-motd-input"
-                  class="bbs-input"
-                  type="text"
-                  maxlength="120"
-                  placeholder="2400 baud online."
-                  autocomplete="off"
-                />
-              </label>
-              <div class="bbs-actions">
-                <button id="bbs-host-start-btn" class="btn" type="button">Host Board</button>
-                <button id="bbs-host-stop-btn" class="btn btn-secondary" type="button">Go Offline</button>
-                <button id="bbs-host-announce-btn" class="btn btn-secondary" type="button">Broadcast</button>
-              </div>
-              <div id="bbs-host-channel" class="bbs-host-channel" aria-live="polite"></div>
-              <div id="bbs-host-status" class="bbs-host-status" aria-live="polite">Offline.</div>
-            </div>
-            <div class="bbs-panel">
-              <div class="bbs-panel-title">Dial Directory</div>
-              <div id="bbs-board-list" class="bbs-board-list" role="listbox" aria-label="Available BBS boards"></div>
-              <div class="bbs-actions">
-                <button id="bbs-refresh-directory-btn" class="btn btn-secondary" type="button">Refresh Directory</button>
-              </div>
-            </div>
-          </aside>
-          <div class="bbs-main">
-            <div class="bbs-terminal-head">
-              <div id="bbs-terminal-title" class="bbs-terminal-title">No board selected</div>
-              <div id="bbs-terminal-meta" class="bbs-terminal-meta">Host a board or dial a listing from the directory.</div>
-            </div>
-            <pre id="bbs-terminal-log" class="bbs-terminal-log" aria-live="polite">*** CONNECT 2400 ***
-Ready.
-</pre>
-            <div class="bbs-compose-row">
-              <input
-                id="bbs-post-input"
-                class="bbs-post-input"
-                type="text"
-                maxlength="220"
-                placeholder="Write a board post..."
-                autocomplete="off"
-              />
-              <button id="bbs-post-send-btn" class="btn" type="button">Post</button>
-            </div>
-            <div id="bbs-post-status" class="bbs-post-status" aria-live="polite"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <section class="card remote" aria-label="Remote node operations">
       <h2>Remote</h2>
       <div class="body">
@@ -2237,166 +2140,6 @@ Ready.
                 <button id="remote-stage-whois-btn" class="btn btn-secondary" type="button">Stage Whois</button>
               </div>
               <div id="remote-action-status" class="remote-action-status">Select a node to start exploring remote actions.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card bots" aria-label="Mesh bot tools">
-      <h2>Bots</h2>
-      <div class="body">
-        <div class="bots-grid">
-          <div class="bots-sidebar-stack">
-            <div class="bots-panel bots-commands-panel">
-              <h3>Bot Commands</h3>
-              <label class="chat-bot-toggle-wrap bots-master-toggle" for="bots-command-master-enabled" title="Master switch for backend bot responses on this node. Turn off to silence all bot replies while keeping individual command settings intact.">
-                <input id="bots-command-master-enabled" type="checkbox" />
-                <span>Enable Bot Responses</span>
-              </label>
-              <div class="bots-setting-note">Select a command to edit its settings. The public <code>zork</code> handoff option appears when <code>zork</code> is selected.</div>
-              <div class="bots-command-shell" aria-label="Managed bot commands">
-                <div class="bots-command-list-wrap">
-                  <div class="chat-bot-cheatsheet-title">Managed bot commands</div>
-                  <div id="bots-command-list" class="bots-command-list" role="listbox" aria-label="Managed bot commands" aria-live="polite"></div>
-                </div>
-                <div id="bots-command-splitter" class="bots-command-splitter" title="Drag to resize command list and bot settings"></div>
-                <div class="bots-command-config">
-                  <div id="bots-command-config-empty" class="bots-history-empty">Select a command to configure.</div>
-                  <div id="bots-command-config-form" hidden>
-                    <div class="bots-command-config-head">
-                      <div class="bots-command-config-title-row">
-                        <span id="bots-command-selected-usage" class="bots-command-config-usage">n/a</span>
-                        <span id="bots-command-selected-kind" class="bots-command-kind">built-in</span>
-                      </div>
-                      <div id="bots-command-selected-name" class="bots-command-config-name">command</div>
-                    </div>
-                    <div id="bots-command-selected-description" class="bots-command-config-description">Managed backend bot command.</div>
-                    <label class="chat-bot-toggle-wrap bots-command-config-toggle" for="bots-command-selected-enabled" title="Enable or disable this backend bot command.">
-                      <input id="bots-command-selected-enabled" type="checkbox" />
-                      <span>Enabled</span>
-                    </label>
-                    <div id="bots-command-ping-config-wrap" class="bots-command-config-section" hidden>
-                      <label class="bots-command-config-label" for="bots-command-ping-triggers">Ping triggers</label>
-                      <textarea
-                        id="bots-command-ping-triggers"
-                        class="bots-command-config-textarea"
-                        rows="3"
-                        placeholder="&#123;nodename&#125; ping&#10;&#123;nodename&#125; test&#10;&#123;nodename&#125; can you see this"
-                      ></textarea>
-                      <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>&#123;nodename&#125; ping</code>, <code>&#123;nodename&#125; test</code>, and <code>&#123;nodename&#125; can you see this</code> are defaults. <code>&#123;nodename&#125;</code> is optional in matching.</div>
-                      <label class="bots-command-config-label" for="bots-command-ping-response-template">Ping reply template (optional)</label>
-                      <input
-                        id="bots-command-ping-response-template"
-                        class="chat-input"
-                        type="text"
-                        maxlength="240"
-                        placeholder="Hey $sender, you are $hops hops away!"
-                      />
-                      <div class="bots-setting-note">Leave blank for default reply. Tokens: <code>$sender</code>, <code>$sender_id</code>, <code>$hops</code>, <code>$hop_label</code>, <code>$bot</code>, <code>$bot_id</code>, <code>$location</code>, <code>$city</code>, <code>$state</code>. <code>$location</code> is the bot's nearest offline-map city+state, while <code>$city</code> and <code>$state</code> are split tokens.</div>
-                      <div class="bots-command-config-actions">
-                        <button id="bots-command-ping-save-btn" class="btn btn-secondary" type="button">Save Ping Settings</button>
-                      </div>
-                    </div>
-                    <div id="bots-command-pull-config-wrap" class="bots-command-config-section" hidden>
-                      <label class="bots-command-config-label" for="bots-command-pull-reel-symbols">Pull reel emojis</label>
-                      <input
-                        id="bots-command-pull-reel-symbols"
-                        class="settings-input bots-command-config-input"
-                        type="text"
-                        placeholder="🍒, 🍋, 🍉, 🔔, ⭐, 7️⃣"
-                      />
-                      <div class="bots-setting-note">Comma-delimited symbol list (example: <code>🍒, 🍋, ⭐, 7️⃣</code>). At least 3 symbols are required; shorter lists fall back to defaults.</div>
-                      <label class="bots-command-config-label" for="bots-command-pull-response-template">Pull reply template (optional)</label>
-                      <input
-                        id="bots-command-pull-response-template"
-                        class="chat-input"
-                        type="text"
-                        maxlength="280"
-                        placeholder="$headline: $reels (+$prize)"
-                      />
-                      <div class="bots-setting-note">Leave blank for default slot output. Tokens: <code>$reel1</code>, <code>$reel2</code>, <code>$reel3</code>, <code>$reels</code>, <code>$payout</code>, <code>$prize</code>, <code>$tier</code>, <code>$win</code>, <code>$won</code>, <code>$result</code>, <code>$jackpot</code>, <code>$top_prize</code>, <code>$headline</code>.</div>
-                      <div class="bots-command-config-actions">
-                        <button id="bots-command-pull-save-btn" class="btn btn-secondary" type="button">Save Pull Settings</button>
-                      </div>
-                    </div>
-                    <div id="bots-command-zork-config-wrap" class="bots-command-config-section" hidden>
-                      <label class="bots-command-config-label" for="bots-command-zork-triggers">Zork start triggers</label>
-                      <textarea
-                        id="bots-command-zork-triggers"
-                        class="bots-command-config-textarea"
-                        rows="3"
-                        placeholder="&#123;nodename&#125; zork&#10;&#123;nodename&#125; play zork"
-                      ></textarea>
-                      <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>&#123;nodename&#125; zork</code> and <code>&#123;nodename&#125; play zork</code> are defaults. <code>&#123;nodename&#125;</code> is optional in matching.</div>
-                      <div class="bots-command-config-actions">
-                        <button id="bots-command-zork-save-btn" class="btn btn-secondary" type="button">Save Zork Triggers</button>
-                      </div>
-                    </div>
-                    <label id="bots-command-selected-public-start-wrap" class="chat-bot-toggle-wrap bots-command-config-toggle" for="bots-command-selected-public-start-enabled" title="When enabled, a public &quot;zork&quot; message gets a direct peer-to-peer game start reply. Follow-up commands still need to continue in direct chat." hidden>
-                      <input id="bots-command-selected-public-start-enabled" type="checkbox" />
-                      <span>Allow public &quot;zork&quot; handoff</span>
-                    </label>
-                    <div id="bots-command-selected-public-start-note" class="bots-setting-note" hidden>
-                      A public <code>zork</code> gets a direct game start reply. Follow-up moves still belong in peer-to-peer chat.
-                    </div>
-                    <div id="bots-command-joke-config-wrap" class="bots-command-config-section" hidden>
-                      <label
-                        class="chat-bot-toggle-wrap bots-command-config-toggle"
-                        for="bots-command-joke-delay-punchline-enabled"
-                        title="When enabled, jokes that contain a question mark pause before the punchline to let people answer."
-                      >
-                        <input id="bots-command-joke-delay-punchline-enabled" type="checkbox" />
-                        <span>Delay punchline</span>
-                      </label>
-                      <div class="bots-setting-note">Question jokes pause up to 15 seconds for replies, then the punchline posts automatically.</div>
-                      <label class="bots-command-config-label" for="bots-command-joke-triggers">Joke triggers</label>
-                      <textarea
-                        id="bots-command-joke-triggers"
-                        class="bots-command-config-textarea"
-                        rows="3"
-                        placeholder="&#123;nodename&#125; tell me a joke&#10;joke time"
-                      ></textarea>
-                      <div class="bots-setting-note">Delimited phrases (newline, comma, or semicolon). <code>&#123;nodename&#125; tell me a joke</code> works by default, and <code>&#123;nodename&#125;</code> is optional in matching.</div>
-                      <label class="bots-command-config-label" for="bots-command-joke-lines">Jokes (one per line)</label>
-                      <textarea
-                        id="bots-command-joke-lines"
-                        class="bots-command-config-textarea"
-                        rows="7"
-                        placeholder="Why did the packet cross the mesh? Better line of sight."
-                      ></textarea>
-                      <label class="bots-command-config-label" for="bots-command-joke-near-guess-lines">Near-guess responses (one per line)</label>
-                      <textarea
-                        id="bots-command-joke-near-guess-lines"
-                        class="bots-command-config-textarea"
-                        rows="3"
-                        placeholder="Nice guess, close enough. {{punchline}}"
-                      ></textarea>
-                      <div class="bots-setting-note">Use <code>{{punchline}}</code> to place the punchline. If omitted, the bot sends your response without revealing it.</div>
-                      <div class="bots-command-config-actions">
-                        <button id="bots-command-joke-save-btn" class="btn btn-secondary" type="button">Save Joke Settings</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div id="bots-main-splitter" class="bots-main-splitter" title="Drag to resize bot controls and bot review"></div>
-          <div class="bots-panel bots-history-panel">
-            <div class="bots-history-head">
-              <div class="bots-review-head-copy">
-                <h3>Bot History</h3>
-              </div>
-              <button id="bots-history-clear-btn" class="btn btn-secondary bots-history-clear-btn" type="button">Clear History</button>
-            </div>
-            <div id="bots-history-tab-panel" class="bots-tab-panel" role="region" aria-label="Bot history">
-              <div class="bots-history-stats">
-                <span>Total <strong id="bots-history-total">0</strong></span>
-                <span>Pending <strong id="bots-history-pending">0</strong></span>
-                <span>Responded <strong id="bots-history-responded">0</strong></span>
-              </div>
-              <div id="bots-history-list" class="scroll bots-history-list" aria-live="polite"></div>
             </div>
           </div>
         </div>

@@ -1,4 +1,139 @@
-    // Core UI profile no-op stubs for omitted bot modules.
+    // Core UI compatibility shims for omitted bot modules.
+
+    function normalizeWhoisCommandPrefix(value) {{
+      const clean = String(value || "").trim().toLowerCase();
+      return knownWhoisCommandPrefixes.has(clean) ? clean : "whois";
+    }}
+
+    function nodeIdSuffixForWhois(nodeId) {{
+      const clean = String(nodeId || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (!clean) return "";
+      return clean.slice(-4);
+    }}
+
+    function buildWhoisCommandForNode(nodeId, prefixValue = chatWhoisQuickActionPrefix) {{
+      const prefix = normalizeWhoisCommandPrefix(prefixValue);
+      const suffix = nodeIdSuffixForWhois(nodeId);
+      if (!suffix) return prefix;
+      return `${{prefix}} ${{suffix}}`;
+    }}
+
+    function syncChatWhoisQuickActionControls() {{
+      const enabledInput = document.getElementById("chat-bot-whois-enabled");
+      const prefixSelect = document.getElementById("chat-bot-whois-prefix");
+      const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
+      const commandsInput = document.getElementById("chat-bot-commands-enabled");
+      const historyInput = document.getElementById("chat-bot-history-enabled");
+      const commandsEnabled = !!chatBotCommandsEnabled;
+      const enabled = commandsEnabled && !!chatWhoisQuickActionEnabled;
+      const prefix = normalizeWhoisCommandPrefix(chatWhoisQuickActionPrefix);
+
+      if (enabledInput instanceof HTMLInputElement) {{
+        enabledInput.checked = !!chatWhoisQuickActionEnabled;
+        enabledInput.disabled = !commandsEnabled;
+      }}
+      if (prefixSelect instanceof HTMLSelectElement) {{
+        prefixSelect.value = prefix;
+        prefixSelect.disabled = !enabled;
+      }}
+      if (threadReplyInput instanceof HTMLInputElement) {{
+        threadReplyInput.checked = !!chatWhoisQuickActionThreadReply;
+        threadReplyInput.disabled = !enabled;
+      }}
+      if (commandsInput instanceof HTMLInputElement) {{
+        commandsInput.checked = commandsEnabled;
+      }}
+      if (historyInput instanceof HTMLInputElement) {{
+        historyInput.checked = !!chatBotHistoryEnabled;
+        historyInput.disabled = !commandsEnabled;
+      }}
+    }}
+
+    function applyChatWhoisQuickActionConfig(config = {{}}, persist = true) {{
+      const nextEnabled = Object.prototype.hasOwnProperty.call(config, "enabled")
+        ? !!config.enabled
+        : !!chatWhoisQuickActionEnabled;
+      const nextPrefix = Object.prototype.hasOwnProperty.call(config, "prefix")
+        ? normalizeWhoisCommandPrefix(config.prefix)
+        : normalizeWhoisCommandPrefix(chatWhoisQuickActionPrefix);
+      const nextThreadReply = Object.prototype.hasOwnProperty.call(config, "threadReply")
+        ? !!config.threadReply
+        : !!chatWhoisQuickActionThreadReply;
+      const nextCommandsEnabled = Object.prototype.hasOwnProperty.call(config, "commandsEnabled")
+        ? !!config.commandsEnabled
+        : !!chatBotCommandsEnabled;
+      const nextHistoryEnabled = Object.prototype.hasOwnProperty.call(config, "historyEnabled")
+        ? !!config.historyEnabled
+        : !!chatBotHistoryEnabled;
+
+      chatWhoisQuickActionEnabled = nextEnabled;
+      chatWhoisQuickActionPrefix = nextPrefix;
+      chatWhoisQuickActionThreadReply = nextThreadReply;
+      chatBotCommandsEnabled = nextCommandsEnabled;
+      chatBotHistoryEnabled = nextHistoryEnabled;
+      syncChatWhoisQuickActionControls();
+
+      if (persist) {{
+        try {{
+          window.localStorage.setItem(chatWhoisQuickActionEnabledStorageKey, nextEnabled ? "1" : "0");
+          window.localStorage.setItem(chatWhoisQuickActionPrefixStorageKey, nextPrefix);
+          window.localStorage.setItem(chatWhoisQuickActionThreadReplyStorageKey, nextThreadReply ? "1" : "0");
+          window.localStorage.setItem(chatBotCommandsEnabledStorageKey, nextCommandsEnabled ? "1" : "0");
+          window.localStorage.setItem(chatBotHistoryEnabledStorageKey, nextHistoryEnabled ? "1" : "0");
+        }} catch (_err) {{
+        }}
+      }}
+    }}
+
+    function loadChatWhoisQuickActionConfig() {{
+      const config = {{
+        enabled: false,
+        prefix: "whois",
+        threadReply: true,
+        commandsEnabled: true,
+        historyEnabled: true,
+      }};
+      applyChatWhoisQuickActionConfig(config, false);
+    }}
+
+    function bindChatWhoisQuickActionControls() {{
+      const enabledInput = document.getElementById("chat-bot-whois-enabled");
+      if (enabledInput instanceof HTMLInputElement && enabledInput.dataset.bound !== "1") {{
+        enabledInput.dataset.bound = "1";
+        enabledInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ enabled: enabledInput.checked }}, true);
+        }});
+      }}
+      const prefixSelect = document.getElementById("chat-bot-whois-prefix");
+      if (prefixSelect instanceof HTMLSelectElement && prefixSelect.dataset.bound !== "1") {{
+        prefixSelect.dataset.bound = "1";
+        prefixSelect.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ prefix: prefixSelect.value }}, true);
+        }});
+      }}
+      const threadReplyInput = document.getElementById("chat-bot-whois-thread-reply");
+      if (threadReplyInput instanceof HTMLInputElement && threadReplyInput.dataset.bound !== "1") {{
+        threadReplyInput.dataset.bound = "1";
+        threadReplyInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ threadReply: threadReplyInput.checked }}, true);
+        }});
+      }}
+      const commandsInput = document.getElementById("chat-bot-commands-enabled");
+      if (commandsInput instanceof HTMLInputElement && commandsInput.dataset.bound !== "1") {{
+        commandsInput.dataset.bound = "1";
+        commandsInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ commandsEnabled: commandsInput.checked }}, true);
+        }});
+      }}
+      const historyInput = document.getElementById("chat-bot-history-enabled");
+      if (historyInput instanceof HTMLInputElement && historyInput.dataset.bound !== "1") {{
+        historyInput.dataset.bound = "1";
+        historyInput.addEventListener("change", () => {{
+          applyChatWhoisQuickActionConfig({{ historyEnabled: historyInput.checked }}, true);
+        }});
+      }}
+      syncChatWhoisQuickActionControls();
+    }}
 
     function loadBotRequestHistory() {{
       return;
@@ -12,8 +147,44 @@
       return;
     }}
 
+    function bindBotCommandCatalogControls() {{
+      return;
+    }}
+
     function bindBotsReviewControls() {{
       return;
+    }}
+
+    function normalizeServerBotSettings(_state = null) {{
+      return {{
+        available: false,
+        enabled: false,
+        log_enabled: false,
+        game_enabled: false,
+        game_public_start_enabled: false,
+        hard_disabled_incoming_commands: [],
+        ping_triggers: [],
+        ping_response_template: "",
+        pull_reel_symbols: [],
+        pull_response_template: "",
+        joke_triggers: [],
+        zork_triggers: [],
+        joke_lines: [],
+        joke_near_guess_lines: [],
+        joke_delay_punchline_enabled: false,
+        active_game_sessions: 0,
+        commands: [],
+        disabled_commands: [],
+      }};
+    }}
+
+    function applyServerBotSettingsFromState(_state = latestState) {{
+      serverBotSettings = normalizeServerBotSettings();
+      return serverBotSettings;
+    }}
+
+    function hardDisableIncomingAutomationAndFileTransferEnabled() {{
+      return false;
     }}
 
     function renderBotsView(_state = latestState) {{

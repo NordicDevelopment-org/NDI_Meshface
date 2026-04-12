@@ -22,16 +22,32 @@ def test_dashboard_js_keeps_layout_switches_in_app() -> None:
     assert "window.requestAnimationFrame(() => {" in switcher_block
 
 
-def test_dashboard_js_treats_bbs_as_an_apps_view() -> None:
+def test_dashboard_js_limits_apps_view_to_games_and_files() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
         node_history_max_points=240,
     )
 
-    assert 'if (clean === "games" || clean === "bbs") {' in js
-    assert 'return clean === "games" || clean === "bbs" || (clean === "files" && fileTransferFeatureEnabled);' in js
-    assert '|| resolved === "bbs"' in js
+    assert 'if (clean === "games") {' in js
+    assert 'return clean === "games" || (clean === "files" && fileTransferFeatureEnabled);' in js
+    assert '|| resolved === "bbs"' not in js
+    assert '"bbs"' not in js.split("const knownLayoutViews = new Set([", 1)[1].split("]);", 1)[0]
+    assert '"bots"' not in js.split("const knownLayoutViews = new Set([", 1)[1].split("]);", 1)[0]
+
+
+def test_dashboard_js_keeps_whois_quick_action_boot_helpers() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "function normalizeWhoisCommandPrefix(value)" in js
+    assert "function nodeIdSuffixForWhois(nodeId)" in js
+    assert "function buildWhoisCommandForNode(nodeId, prefixValue = chatWhoisQuickActionPrefix)" in js
+    assert "function loadChatWhoisQuickActionConfig()" in js
+    assert "function bindChatWhoisQuickActionControls()" in js
 
 
 def test_dashboard_js_binds_games_picker_select() -> None:
@@ -48,7 +64,7 @@ def test_dashboard_js_binds_games_picker_select() -> None:
     assert 'activeGameId = normalizeActiveGameId(gamesLibrarySelect.value);' in js
 
 
-def test_dashboard_js_includes_bbs_in_app_channel_routing() -> None:
+def test_dashboard_js_limits_app_channel_routing_to_games() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
@@ -61,6 +77,5 @@ def test_dashboard_js_includes_bbs_in_app_channel_routing() -> None:
 
     assert 'id: "games"' in routing_block
     assert 'label: "Games"' in routing_block
-    assert 'id: "bbs"' in routing_block
-    assert 'label: "BBS"' in routing_block
-    assert 'description: "Board hosting, directory announces, and posts"' in routing_block
+    assert 'id: "bbs"' not in routing_block
+    assert 'label: "BBS"' not in routing_block

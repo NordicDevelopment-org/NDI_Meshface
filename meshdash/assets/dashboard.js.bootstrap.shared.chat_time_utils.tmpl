@@ -98,12 +98,24 @@
 
     function messageIdOfChatPacket(msg) {{
       if (!msg || typeof msg !== "object") return null;
-      return parsePositiveMessageId(msg.message_id ?? msg.messageId ?? msg.packet_id ?? msg.packetId);
+      return parsePositiveMessageId(
+        msg.message_id
+        ?? msg.messageId
+        ?? msg.packet_id
+        ?? msg.packetId
+        ?? (msg.summary && (msg.summary.message_id ?? msg.summary.messageId ?? msg.summary.packet_id ?? msg.summary.packetId))
+        ?? (msg.packet && (msg.packet.message_id ?? msg.packet.messageId ?? msg.packet_id ?? msg.packetId ?? msg.packet.id))
+      );
     }}
 
     function replyIdOfChatPacket(msg) {{
       if (!msg || typeof msg !== "object") return null;
-      return parsePositiveMessageId(msg.reply_id ?? msg.replyId);
+      return parsePositiveMessageId(
+        msg.reply_id
+        ?? msg.replyId
+        ?? (msg.summary && (msg.summary.reply_id ?? msg.summary.replyId))
+        ?? (msg.packet && (msg.packet.reply_id ?? msg.packet.replyId))
+      );
     }}
 
     function hopCountOfChatPacket(msg) {{

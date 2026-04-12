@@ -1,5 +1,53 @@
     function renderChat(state) {{
       syncTopbarChatContext(state);
+      let renderChatPhase = "init";
+      const markRenderChatPhase = (phase) => {{
+        const clean = String(phase || "").trim();
+        if (clean) {{
+          renderChatPhase = clean;
+        }}
+      }};
+      const handleRenderChatFailure = (err) => {{
+        const message = err instanceof Error ? (err.message || String(err)) : String(err || "unknown error");
+        const detail = `Chat render failed at ${{renderChatPhase}}: ${{message}}`;
+        try {{
+          if (typeof appendConsoleLine === "function") {{
+            appendConsoleLine(`render-chat-error|${{Date.now()}}|${{renderChatPhase}}`, `[chat render error] ${{detail}}`);
+          }}
+        }} catch (_appendErr) {{
+        }}
+        try {{
+          if (typeof console !== "undefined" && console && typeof console.error === "function") {{
+            console.error(`[chat render error] ${{renderChatPhase}}`, err);
+          }}
+        }} catch (_consoleErr) {{
+        }}
+        try {{
+          if (typeof document !== "undefined" && document && document.body instanceof HTMLElement) {{
+            document.body.dataset.chatRenderErrorPhase = renderChatPhase;
+          }}
+        }} catch (_datasetErr) {{
+        }}
+        const safeDetail = (typeof trimInlineError === "function")
+          ? trimInlineError(detail, 180)
+          : detail;
+        const feed = (typeof document !== "undefined")
+          ? document.getElementById("chat-feed")
+          : null;
+        if (feed instanceof HTMLElement) {{
+          feed.innerHTML = `<div class="chat-feed-empty">${{escAttr(safeDetail)}}</div>`;
+        }}
+        const roomList = (typeof document !== "undefined")
+          ? document.getElementById("chat-room-list")
+          : null;
+        if (roomList instanceof HTMLElement) {{
+          roomList.innerHTML = `<div class="chat-member-empty">${{escAttr(safeDetail)}}</div>`;
+        }}
+      }};
+      try {{
+      if (typeof document !== "undefined" && document && document.body instanceof HTMLElement) {{
+        document.body.dataset.chatRenderEntered = "1";
+      }}
       const chatRenderStartMs = (
         chatPerfEnabled
         && typeof window.performance !== "undefined"

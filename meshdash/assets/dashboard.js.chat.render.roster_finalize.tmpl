@@ -63,6 +63,7 @@
         element[propName] = nextMarkup;
         return true;
       }};
+      markRenderChatPhase("feed-dom");
       const feed = document.getElementById("chat-feed");
       if (feed) {{
         feed.classList.toggle("chat-feed-view-monitor", chatViewMode === "monitor");
@@ -105,8 +106,10 @@
         }}
         setElementHtmlIfChanged(feed, nextFeedHtml, "chat-feed");
       }}
+      markRenderChatPhase("change-summary");
       renderChatChangeSummary(nowUnix);
 
+      markRenderChatPhase("roster-build");
       const rosterQuery = globalNodeSearchQuery();
       const roomList = document.getElementById("chat-room-list");
       const rosterAll = (() => {{
@@ -1014,6 +1017,7 @@
       }} else if (drawerMessagesHost instanceof HTMLElement) {{
         drawerMessagesHost.innerHTML = "";
       }}
+      markRenderChatPhase("roster-render");
       renderChatNodeNavigatorList(state, {{
         nowUnix,
         rosterAll,
@@ -1025,6 +1029,7 @@
         packetSparklineByNode,
       }});
 
+      markRenderChatPhase("post-bind");
       renderChatReplyContext();
       bindChatAutoScroll();
       bindChatFeedClicks();
@@ -1055,5 +1060,8 @@
 
       if (typeof applyChatFeedSearchFilter === "function") {{
         applyChatFeedSearchFilter();
+      }}
+      }} catch (err) {{
+        handleRenderChatFailure(err);
       }}
     }}

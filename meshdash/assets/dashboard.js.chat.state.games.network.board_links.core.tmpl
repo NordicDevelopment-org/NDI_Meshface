@@ -36,6 +36,124 @@
       return String(nodeNameCache.get(peerId) || peerId);
     }}
 
+    function protocolMessageSummary(msg) {{
+      return (msg && msg.summary && typeof msg.summary === "object")
+        ? msg.summary
+        : {{}};
+    }}
+
+    function protocolMessagePacket(msg) {{
+      return (msg && msg.packet && typeof msg.packet === "object")
+        ? msg.packet
+        : {{}};
+    }}
+
+    function protocolMessageDecoded(msg) {{
+      const packet = protocolMessagePacket(msg);
+      return (packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : {{}};
+    }}
+
+    function protocolMessageRawPacket(msg) {{
+      const packet = protocolMessagePacket(msg);
+      return (packet.raw && typeof packet.raw === "object")
+        ? packet.raw
+        : {{}};
+    }}
+
+    function protocolMessageRawDecoded(msg) {{
+      const rawPacket = protocolMessageRawPacket(msg);
+      return (rawPacket.decoded && typeof rawPacket.decoded === "object")
+        ? rawPacket.decoded
+        : {{}};
+    }}
+
+    function protocolMessageText(msg) {{
+      if (!msg || typeof msg !== "object") return "";
+      const summary = protocolMessageSummary(msg);
+      const packet = protocolMessagePacket(msg);
+      const decoded = protocolMessageDecoded(msg);
+      const rawDecoded = protocolMessageRawDecoded(msg);
+      return String(
+        msg.text
+        ?? msg.decoded_text
+        ?? msg.payload_text
+        ?? summary.decoded_text
+        ?? decoded.text
+        ?? rawDecoded.text
+        ?? packet.text
+        ?? ""
+      ).trim();
+    }}
+
+    function protocolMessageFromNodeId(msg) {{
+      if (!msg || typeof msg !== "object") return "";
+      const summary = protocolMessageSummary(msg);
+      const packet = protocolMessagePacket(msg);
+      const rawPacket = protocolMessageRawPacket(msg);
+      return normalizeNodeId(
+        msg.from
+        ?? summary.from
+        ?? packet.fromId
+        ?? packet.from
+        ?? rawPacket.fromId
+        ?? rawPacket.from
+        ?? ""
+      );
+    }}
+
+    function protocolMessageToNodeId(msg) {{
+      if (!msg || typeof msg !== "object") return "";
+      const summary = protocolMessageSummary(msg);
+      const packet = protocolMessagePacket(msg);
+      const rawPacket = protocolMessageRawPacket(msg);
+      return normalizeNodeId(
+        msg.to
+        ?? msg.destination
+        ?? summary.to
+        ?? packet.toId
+        ?? packet.to
+        ?? packet.destination
+        ?? rawPacket.toId
+        ?? rawPacket.to
+        ?? rawPacket.destination
+        ?? ""
+      );
+    }}
+
+    function protocolMessageUnix(msg) {{
+      if (!msg || typeof msg !== "object") return Math.floor(Date.now() / 1000);
+      const summary = protocolMessageSummary(msg);
+      const packet = protocolMessagePacket(msg);
+      const rawPacket = protocolMessageRawPacket(msg);
+      return latestUnixTimestamp(
+        msg.rx_time,
+        msg.captured_at,
+        msg.sent_at,
+        msg.created_at,
+        summary.rx_time_unix,
+        packet.rxTime,
+        rawPacket.rx_time,
+        summary.rx_time,
+        summary.captured_at
+      ) || Math.floor(Date.now() / 1000);
+    }}
+
+    function protocolMessageIsLocalEcho(msg) {{
+      if (!msg || typeof msg !== "object") return false;
+      const summary = protocolMessageSummary(msg);
+      const packet = protocolMessagePacket(msg);
+      return !!(
+        msg.local_echo === true
+        || msg.localEcho === true
+        || summary.local_echo === true
+        || summary.localEcho === true
+        || packet.local_echo === true
+        || packet.localEcho === true
+      );
+    }}
+
     function boardGameRefs(gameId) {{
       const id = boardGameNormalizeId(gameId);
       if (id === "chess") {{
@@ -224,6 +342,12 @@
       const parsed = Number.parseInt(token, 36);
       if (Number.isFinite(parsed) && parsed >= 0) return parsed;
       return Math.max(0, Math.trunc(Number(token) || 0));
+    }}
+
+    function boardGameProtocolParseCoordinate(value, fallback = -1) {{
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return Math.trunc(Number(fallback) || -1);
+      return Math.trunc(parsed);
     }}
 
     function boardGameProtocolTypeCode(typeRaw) {{
@@ -590,14 +714,14 @@
     function boardGameProtocolMessageKey(gameId, msg, parsed) {{
       const messageId = messageIdOfChatPacket(msg);
       if (messageId) return `${{boardGameNormalizeId(gameId)}}:msg:${{messageId}}`;
-      const fromId = normalizeNodeId(msg && msg.from || "");
-      const toId = normalizeNodeId(msg && (msg.to || msg.destination) || "");
+      const fromId = protocolMessageFromNodeId(msg);
+      const toId = protocolMessageToNodeId(msg);
       return [
         boardGameNormalizeId(gameId),
         "raw",
         fromId,
         toId,
-        String(msg && msg.rx_time || ""),
+        String(protocolMessageUnix(msg) || ""),
         String(parsed && parsed.raw || ""),
       ].join("|");
     }}

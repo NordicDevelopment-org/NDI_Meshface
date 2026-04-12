@@ -264,11 +264,6 @@
           label: "Games",
           description: "Reversi, Checkers, and Chess link traffic",
         }},
-        {{
-          id: "bbs",
-          label: "BBS",
-          description: "Board hosting, directory announces, and posts",
-        }},
       ];
     }}
 
@@ -276,7 +271,6 @@
       const token = String(rawAppId == null ? "" : rawAppId).trim().toLowerCase();
       if (token === "files") return "files";
       if (token === "games") return "games";
-      if (token === "bbs") return "bbs";
       return "";
     }}
 
@@ -291,7 +285,6 @@
       return {{
         files: {{ mode: "global", channel_index: sendIndex }},
         games: {{ mode: "global", channel_index: sendIndex }},
-        bbs: {{ mode: "global", channel_index: sendIndex }},
       }};
     }}
 
@@ -402,8 +395,6 @@
           renderFilesView(latestState);
         }} else if (activeLayoutView === "games") {{
           renderGamesView(latestState);
-        }} else if (activeLayoutView === "bbs") {{
-          renderBbsView(latestState);
         }} else if (isChannelsViewActive()) {{
           renderChannelsView(latestState);
         }}

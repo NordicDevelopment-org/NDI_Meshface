@@ -67,7 +67,9 @@
         }}
         return {{ entry: null, matchedNodeId: "" }};
       }};
+      markRenderChatPhase("feed-items");
       const feedItems = visibleMessages.map((msg) => {{
+        try {{
         const endpoints = endpointsForMessage(msg);
         const sourceNodeRaw = endpoints.fromId;
         const fallbackNodeRaw = endpoints.toId;
@@ -519,4 +521,21 @@
           </div>
           ${{extraRows}}
         </div>`;
+        }} catch (err) {{
+          const failedMessageId = Number(messageIdOf(msg));
+          const failedFromId = normalizeNodeId(
+            (msg && (msg.from || msg.from_id || msg.fromId || msg.source || msg.source_id || msg.sourceId)) || ""
+          );
+          try {{
+            if (typeof console !== "undefined" && console && typeof console.error === "function") {{
+              console.error("Chat feed row render failed", {{
+                messageId: Number.isInteger(failedMessageId) && failedMessageId > 0 ? failedMessageId : null,
+                from: failedFromId || null,
+                message: msg,
+              }}, err);
+            }}
+          }} catch (_consoleErr) {{
+          }}
+          return "";
+        }}
       }}).filter((item) => !!item);

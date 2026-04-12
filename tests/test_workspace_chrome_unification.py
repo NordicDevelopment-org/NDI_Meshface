@@ -27,7 +27,7 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert 'id="layout-view-menu-apps-submenu"' in html
     assert 'class="topbar-view-menu-item topbar-view-menu-item-has-submenu"' in html
     assert 'class="topbar-view-submenu-item is-active"' in html
-    assert 'data-app-view="bbs"' in html
+    assert 'data-app-view="bbs"' not in html
     assert 'class="settings-chrome workspace-chrome-bar"' in html
     assert 'class="settings-toolbar workspace-chrome-row"' in html
     assert 'class="settings-tabbar workspace-pillbar"' in html
@@ -96,7 +96,7 @@ def test_apps_views_move_app_switching_into_launcher_submenu() -> None:
     assert 'id="layout-view-menu-apps-submenu"' in html
     assert 'data-app-view="games"' in html
     assert 'data-app-view="files"' in html
-    assert 'data-app-view="bbs"' in html
+    assert 'data-app-view="bbs"' not in html
     assert 'id="apps-tabs-bar"' not in html
 
     assert ".topbar-view-menu-item-has-submenu {" in css
@@ -307,7 +307,6 @@ def test_dark_text_input_variants_use_neutral_ui_tokens_for_chat_compose_control
     assert "var(--ui-panel-alt)" in shared_focus_section
     assert "color-mix(in srgb, var(--ui-accent) 22%, transparent)" in shared_focus_section
     assert "[data-theme=\"dark\"] .settings-textarea::placeholder," in css
-    assert "[data-theme=\"dark\"] .bbs-post-input::placeholder {" in css
     assert "opacity: 0.9;" in css
 
 
@@ -348,8 +347,6 @@ def test_apps_views_bias_space_toward_primary_canvas() -> None:
     css = build_dashboard_css(theme_css="")
 
     files_shell_section = css.split(".files-shell {", 1)[1].split("}", 1)[0]
-    bbs_shell_section = css.split(".bbs-shell {", 1)[1].split("}", 1)[0]
-    bbs_list_section = css.split(".bbs-board-list {", 1)[1].split("}", 1)[0]
     games_shell_section = css.split(".games-shell {", 1)[1].split("}", 1)[0]
     games_main_section = css.split(".games-main {", 1)[1].split("}", 1)[0]
     games_board_wrap_section = css.split(".games-board-wrap {", 1)[1].split("}", 1)[0]
@@ -358,9 +355,6 @@ def test_apps_views_bias_space_toward_primary_canvas() -> None:
     container_query_section = css.split("@supports (width: 1cqi) {", 1)[1]
 
     assert "height: 100%;" in files_shell_section
-    assert "grid-template-columns: clamp(232px, 24vw, 300px) minmax(0, 1fr);" in bbs_shell_section
-    assert "flex: 1 1 auto;" in bbs_list_section
-    assert "max-height: none;" in bbs_list_section
     assert "--games-sidebar-width: 220px;" in games_shell_section
     assert "--games-status-width: 176px;" in games_shell_section
     assert "minmax(176px, var(--games-sidebar-width))" in games_shell_section
@@ -415,9 +409,9 @@ def test_games_workspace_uses_persistent_adjustable_splitters() -> None:
     assert "let gamesStatusWidthPx = 176;" in js
     assert "function applyGamesSplitState() {" in js
     assert "function bindGamesSplitters() {" in js
-    assert "loadGamesSidebarSplitState();" in js
-    assert "loadGamesStatusSplitState();" in js
-    assert "bindGamesSplitters();" in js
+    assert 'runBootStep("loadGamesSidebarSplitState", () => loadGamesSidebarSplitState());' in js
+    assert 'runBootStep("loadGamesStatusSplitState", () => loadGamesStatusSplitState());' in js
+    assert 'runBootStep("bindGamesSplitters", () => bindGamesSplitters());' in js
     assert "persistGamesSidebarSplitState()" in js
     assert "persistGamesStatusSplitState()" in js
     assert 'if (next === "games" && typeof applyGamesSplitState === "function") {' in js
@@ -825,12 +819,10 @@ def test_games_view_removes_outer_card_shell_but_keeps_inner_panels() -> None:
     assert ".games-main {" in css
 
 
-def test_files_and_bbs_views_remove_outer_card_shells_for_full_app_canvas() -> None:
+def test_files_view_removes_outer_card_shell_for_full_app_canvas() -> None:
     css = build_dashboard_css(theme_css="")
     files_section = css.split(".layout.view-files .files {", 1)[1].split("}", 1)[0]
     files_body_section = css.split(".layout.view-files .files .body {", 1)[1].split("}", 1)[0]
-    bbs_section = css.split(".layout.view-bbs .bbs {", 1)[1].split("}", 1)[0]
-    bbs_body_section = css.split(".layout.view-bbs .bbs .body {", 1)[1].split("}", 1)[0]
 
     assert "background: transparent;" in files_section
     assert "border: 0;" in files_section
@@ -838,13 +830,6 @@ def test_files_and_bbs_views_remove_outer_card_shells_for_full_app_canvas() -> N
     assert "overflow: visible;" in files_section
     assert "background: transparent;" in files_body_section
     assert "padding: 0;" in files_body_section
-
-    assert "background: transparent;" in bbs_section
-    assert "border: 0;" in bbs_section
-    assert "box-shadow: none;" in bbs_section
-    assert "overflow: visible;" in bbs_section
-    assert "background: transparent;" in bbs_body_section
-    assert "padding: 0;" in bbs_body_section
 
 
 def test_files_view_uses_theme_tokens_in_light_and_dark_modes() -> None:

@@ -33,7 +33,6 @@ def make_http_handler(
     api_metrics = DashboardApiMetrics()
     apply_radio_settings_fn = getattr(state_fn, "apply_radio_settings_fn", None)
     apply_channel_settings_fn = getattr(state_fn, "apply_channel_settings_fn", None)
-    apply_bot_settings_fn = getattr(state_fn, "apply_bot_settings_fn", None)
     get_custom_telemetry_settings_fn = getattr(state_fn, "get_custom_telemetry_settings_fn", None)
     set_custom_telemetry_settings_fn = getattr(state_fn, "set_custom_telemetry_settings_fn", None)
     play_standalone_zork_fn = getattr(state_fn, "play_standalone_zork_fn", None)
@@ -57,7 +56,6 @@ def make_http_handler(
         set_theme_preset_fn=set_theme_preset_fn,
         apply_radio_settings_fn=apply_radio_settings_fn,
         apply_channel_settings_fn=apply_channel_settings_fn,
-        apply_bot_settings_fn=apply_bot_settings_fn,
         set_custom_telemetry_settings_fn=set_custom_telemetry_settings_fn,
         play_standalone_zork_fn=play_standalone_zork_fn,
         run_network_tool_fn=run_network_tool_fn,

@@ -621,7 +621,7 @@
 
     function normalizeAppsLayoutView(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
-      if (clean === "games" || clean === "bbs") {{
+      if (clean === "games") {{
         return clean;
       }}
       if (clean === "files" && fileTransferFeatureEnabled) {{
@@ -632,7 +632,7 @@
 
     function isAppsLayoutView(viewName) {{
       const clean = String(viewName || "").trim().toLowerCase();
-      return clean === "games" || clean === "bbs" || (clean === "files" && fileTransferFeatureEnabled);
+      return clean === "games" || (clean === "files" && fileTransferFeatureEnabled);
     }}
 
     function loadPreferredAppsLayoutView() {{
@@ -670,13 +670,12 @@
         resolved = "games";
       }}
 
-      // Public v0 rail: expose only Chat/Network/Console/Games/Files/BBS/Settings.
+      // Public v0 rail: expose only Chat/Network/Console/Games/Files/Settings.
       return (
         resolved === "chat"
         || resolved === "network"
         || resolved === "console"
         || resolved === "games"
-        || resolved === "bbs"
         || (resolved === "files" && fileTransferFeatureEnabled)
         || resolved === "settings"
       )

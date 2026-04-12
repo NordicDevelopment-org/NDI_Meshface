@@ -109,11 +109,11 @@
         : (Array.isArray(traffic.recent_chat) ? traffic.recent_chat : []);
       for (const msg of recentProtocolMessages) {{
         if (!msg || typeof msg !== "object") continue;
-        if (msg.local_echo === true || msg.localEcho === true) continue;
+        if (protocolMessageIsLocalEcho(msg)) continue;
         const parsed = parseBoardGameProtocolMessage(gameId, reversiProtocolMessageText(msg));
         if (!parsed) continue;
-        const fromId = normalizeNodeId(msg.from || "");
-        const toId = normalizeNodeId(msg.to || msg.destination || "");
+        const fromId = protocolMessageFromNodeId(msg);
+        const toId = protocolMessageToNodeId(msg);
         if (!isCanonicalNodeId(fromId) || fromId === localNodeId) continue;
         if (toId && toId !== localNodeId) continue;
         const dedupeKey = boardGameProtocolMessageKey(gameId, msg, parsed);
@@ -330,10 +330,10 @@
         if (parsed.type === "move") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const seq = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));
-          const fromRow = Math.trunc(Number(parsed.parts[4]) || -1);
-          const fromCol = Math.trunc(Number(parsed.parts[5]) || -1);
-          const toRow = Math.trunc(Number(parsed.parts[6]) || -1);
-          const toCol = Math.trunc(Number(parsed.parts[7]) || -1);
+          const fromRow = boardGameProtocolParseCoordinate(parsed.parts[4], -1);
+          const fromCol = boardGameProtocolParseCoordinate(parsed.parts[5], -1);
+          const toRow = boardGameProtocolParseCoordinate(parsed.parts[6], -1);
+          const toCol = boardGameProtocolParseCoordinate(parsed.parts[7], -1);
           if (!sessionId || seq <= 0) {{
             rememberBoardGameNetworkMessage(gameId, dedupeKey);
             continue;

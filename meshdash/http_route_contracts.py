@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Mapping, Optional, Protocol
 
 if TYPE_CHECKING:
-    from .api_input_bot import BotSettingsRequest
     from .api_input_channels import ChannelSettingsRequest
     from .api_input_chat import ChatSendRequest
     from .api_input_custom_telemetry import CustomTelemetrySettingsRequest
@@ -12,7 +11,6 @@ if TYPE_CHECKING:
     from .api_input_theme import ThemeSettingsRequest
     from .api_input_zork import StandaloneZorkRequest
 else:
-    BotSettingsRequest = object
     ChannelSettingsRequest = object
     ChatSendRequest = object
     CustomTelemetrySettingsRequest = object
@@ -167,11 +165,6 @@ class ParseChannelSettingsRequestFn(Protocol):
         ...
 
 
-class ParseBotSettingsRequestFn(Protocol):
-    def __call__(self, raw_body: bytes) -> BotSettingsRequest:
-        ...
-
-
 class ParseNetworkToolRequestFn(Protocol):
     def __call__(
         self,
@@ -189,11 +182,6 @@ class ApplyRadioSettingsFn(Protocol):
 
 class ApplyChannelSettingsFn(Protocol):
     def __call__(self, request: ChannelSettingsRequest) -> dict[str, object]:
-        ...
-
-
-class ApplyBotSettingsFn(Protocol):
-    def __call__(self, request: BotSettingsRequest) -> dict[str, object]:
         ...
 
 
@@ -309,8 +297,6 @@ class DashboardPostRouteDependencies:
     parse_radio_settings_request_fn: Optional[ParseRadioSettingsRequestFn] = None
     apply_channel_settings_fn: Optional[ApplyChannelSettingsFn] = None
     parse_channel_settings_request_fn: Optional[ParseChannelSettingsRequestFn] = None
-    apply_bot_settings_fn: Optional[ApplyBotSettingsFn] = None
-    parse_bot_settings_request_fn: Optional[ParseBotSettingsRequestFn] = None
     play_standalone_zork_fn: Optional[PlayStandaloneZorkFn] = None
     parse_standalone_zork_request_fn: Optional[ParseStandaloneZorkRequestFn] = None
     run_network_tool_fn: Optional[RunNetworkToolFn] = None

@@ -9,7 +9,6 @@ from .http_route_contracts import (
     ApiMetricsRecorder,
     ApplyRadioSettingsFn,
     ApplyChannelSettingsFn,
-    ApplyBotSettingsFn,
     DashboardPostRouteDependencies,
     PlayStandaloneZorkFn,
     RunNetworkToolFn,
@@ -48,7 +47,6 @@ validate_content_length = _load_optional_callable(".api_input_chat", "validate_c
 parse_chat_send_request = _load_optional_callable(".api_input_chat", "parse_chat_send_request")
 parse_radio_settings_request = _load_optional_callable(".api_input_radio", "parse_radio_settings_request")
 parse_channel_settings_request = _load_optional_callable(".api_input_channels", "parse_channel_settings_request")
-parse_bot_settings_request = _load_optional_callable(".api_input_bot", "parse_bot_settings_request")
 parse_theme_settings_request = _load_optional_callable(".api_input_theme", "parse_theme_settings_request")
 parse_custom_telemetry_settings_request = _load_optional_callable(
     ".api_input_custom_telemetry",
@@ -67,7 +65,6 @@ def build_post_route_dependencies(
     set_theme_preset_fn: SetThemePresetFn | None = None,
     apply_radio_settings_fn: ApplyRadioSettingsFn | None = None,
     apply_channel_settings_fn: ApplyChannelSettingsFn | None = None,
-    apply_bot_settings_fn: ApplyBotSettingsFn | None = None,
     set_custom_telemetry_settings_fn: SetCustomTelemetrySettingsFn | None = None,
     play_standalone_zork_fn: PlayStandaloneZorkFn | None = None,
     run_network_tool_fn: RunNetworkToolFn | None = None,
@@ -95,8 +92,6 @@ def build_post_route_dependencies(
         parse_radio_settings_request_fn=parse_radio_settings_request,
         apply_channel_settings_fn=apply_channel_settings_fn,
         parse_channel_settings_request_fn=parse_channel_settings_request,
-        apply_bot_settings_fn=apply_bot_settings_fn,
-        parse_bot_settings_request_fn=parse_bot_settings_request,
         play_standalone_zork_fn=play_standalone_zork_fn,
         parse_standalone_zork_request_fn=parse_standalone_zork_request,
         run_network_tool_fn=run_network_tool_fn,

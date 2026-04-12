@@ -61,36 +61,6 @@ from .history_profile import (
 from .fault_recorder import FaultRecorder
 
 
-_GAME_PROTOCOL_PREFIXES = ("rv1|", "ck1|", "ch1|")
-
-
-def _packet_decoded_text(packet: object) -> str:
-    if not isinstance(packet, dict):
-        return ""
-    decoded = packet.get("decoded")
-    if not isinstance(decoded, dict):
-        return ""
-    raw_text = decoded.get("text")
-    if isinstance(raw_text, bytes):
-        try:
-            return raw_text.decode("utf-8", errors="ignore").strip()
-        except Exception:
-            return ""
-    return str(raw_text or "").strip()
-
-
-def _is_game_protocol_packet(packet: object) -> bool:
-    text = _packet_decoded_text(packet).lower()
-    return bool(text) and text.startswith(_GAME_PROTOCOL_PREFIXES)
-
-
-def _build_mesh_response_bot_from_env(**kwargs):
-    # Lazy import so slim public builds can omit bot modules.
-    from .bot_responder import build_mesh_response_bot_from_env as _impl
-
-    return _impl(**kwargs)
-
-
 def _build_standalone_zork_service():
     # Lazy import so slim public builds can omit game modules.
     from .services_standalone_zork import build_standalone_zork_service as _impl
@@ -233,7 +203,6 @@ def build_dashboard_runtime_context(
 
     fault_recorder = FaultRecorder(now_unix_fn=now_unix_fn)
     fault_history_fn = fault_recorder.recent_faults
-    bot_fault_history_fn = lambda: fault_recorder.recent_faults(source="bot")
     try:
         setattr(loaders.state_fn, "fault_history_fn", fault_history_fn)
     except Exception:
@@ -242,18 +211,10 @@ def build_dashboard_runtime_context(
         setattr(loaders.state_fn, "record_fault_fn", fault_recorder.record_fault)
     except Exception:
         pass
-    try:
-        setattr(loaders.state_fn, "bot_fault_history_fn", bot_fault_history_fn)
-    except Exception:
-        pass
     state_lite_fn = getattr(loaders.state_fn, "lite", None)
     if callable(state_lite_fn):
         try:
             setattr(state_lite_fn, "fault_history_fn", fault_history_fn)
-        except Exception:
-            pass
-        try:
-            setattr(state_lite_fn, "bot_fault_history_fn", bot_fault_history_fn)
         except Exception:
             pass
 
@@ -340,127 +301,6 @@ def build_dashboard_runtime_context(
                     setattr(state_lite_fn, "set_custom_telemetry_settings_fn", _set_custom_telemetry_settings)
                 except Exception:
                     pass
-
-    # Optional: attach chat response bot hook (server-side, radio-wide behavior).
-    try:
-        def _bot_delivery_state_lookup(message_id: int) -> Optional[str]:
-            clean_message_id = to_int_fn(message_id)
-            if clean_message_id is None or clean_message_id <= 0:
-                return None
-            recent_chat = getattr(tracker, "recent_chat", None)
-            if recent_chat is None:
-                return None
-
-            def _scan_recent_chat() -> Optional[str]:
-                try:
-                    iterator = reversed(recent_chat)
-                except Exception:
-                    try:
-                        iterator = reversed(list(recent_chat))
-                    except Exception:
-                        return None
-                for entry in iterator:
-                    if not isinstance(entry, dict):
-                        continue
-                    if entry.get("local_echo") is not True:
-                        continue
-                    row_message_id = to_int_fn(
-                        entry.get("message_id")
-                        or entry.get("messageId")
-                        or entry.get("packet_id")
-                        or entry.get("packetId")
-                    )
-                    if row_message_id != clean_message_id:
-                        continue
-                    state = str(entry.get("delivery_state") or "").strip().lower()
-                    return state or None
-                return None
-
-            tracker_lock = getattr(tracker, "_lock", None)
-            if tracker_lock is not None and hasattr(tracker_lock, "__enter__") and hasattr(tracker_lock, "__exit__"):
-                try:
-                    with tracker_lock:
-                        return _scan_recent_chat()
-                except Exception:
-                    return _scan_recent_chat()
-            return _scan_recent_chat()
-
-        response_bot = _build_mesh_response_bot_from_env(
-            send_chat_fn=loaders.send_chat_fn,
-            get_local_node_id_fn=get_local_node_id_fn,
-            chat_max_bytes=default_chat_max_bytes,
-            delivery_state_lookup_fn=_bot_delivery_state_lookup,
-            record_fault_fn=fault_recorder.record_fault,
-        )
-    except Exception:
-        response_bot = None
-
-    if response_bot is not None:
-        def _response_bot_on_receive(packet: object, interface: object, *args: object, **kwargs: object) -> None:
-            # Game invites/moves travel as text payloads over mesh chat. Keep those
-            # out of bot command parsing so they don't generate "invalid command"
-            # replies when public/main exchange game protocol traffic.
-            if _is_game_protocol_packet(packet):
-                return
-            response_bot.on_receive(packet, interface, *args, **kwargs)
-
-        subscribe_fn(_response_bot_on_receive, "meshtastic.receive")
-        try:
-            setattr(loaders.state_fn, "bot_responder", response_bot)
-        except Exception:
-            pass
-        def _bot_settings_fn():
-            settings = response_bot.bot_settings()
-            settings["ok"] = True
-            return settings
-        def _apply_bot_settings_fn(request):
-            return response_bot.configure(
-                enabled=getattr(request, "enabled", None),
-                log_enabled=getattr(request, "log_enabled", None),
-                game_enabled=getattr(request, "game_enabled", None),
-                game_public_start_enabled=getattr(request, "game_public_start_enabled", None),
-                command_settings=getattr(request, "command_settings", None),
-                hard_disabled_incoming_commands=getattr(
-                    request,
-                    "hard_disabled_incoming_commands",
-                    None,
-                ),
-                ping_triggers=getattr(request, "ping_triggers", None),
-                ping_response_template=getattr(request, "ping_response_template", None),
-                pull_reel_symbols=getattr(request, "pull_reel_symbols", None),
-                pull_response_template=getattr(request, "pull_response_template", None),
-                joke_triggers=getattr(request, "joke_triggers", None),
-                zork_triggers=getattr(request, "zork_triggers", None),
-                joke_lines=getattr(request, "joke_lines", None),
-                joke_near_guess_lines=getattr(request, "joke_near_guess_lines", None),
-                joke_delay_punchline_enabled=getattr(
-                    request,
-                    "joke_delay_punchline_enabled",
-                    None,
-                ),
-            )
-        try:
-            setattr(loaders.state_fn, "bot_request_history_fn", response_bot.recent_requests)
-        except Exception:
-            pass
-        try:
-            setattr(loaders.state_fn, "bot_settings_fn", _bot_settings_fn)
-        except Exception:
-            pass
-        try:
-            setattr(loaders.state_fn, "apply_bot_settings_fn", _apply_bot_settings_fn)
-        except Exception:
-            pass
-        state_lite_fn = getattr(loaders.state_fn, "lite", None)
-        if callable(state_lite_fn):
-            try:
-                setattr(state_lite_fn, "bot_request_history_fn", response_bot.recent_requests)
-            except Exception:
-                pass
-            try:
-                setattr(state_lite_fn, "bot_settings_fn", _bot_settings_fn)
-            except Exception:
-                pass
 
     try:
         standalone_zork = _build_standalone_zork_service()

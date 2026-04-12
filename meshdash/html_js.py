@@ -37,7 +37,6 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.chat.state.core.chat.delivery_reactions.ack_delivery.tmpl",
     "dashboard.js.chat.state.core.chat.delivery_reactions.reaction_popover.tmpl",
     "dashboard.js.chat.state.core.chat.channels_notifications.tmpl",
-    "dashboard.js.chat.state.core.chat.bot_quick_actions.tmpl",
     "dashboard.js.chat.state.channels.labels_menu.tmpl",
     "dashboard.js.chat.state.channels.options_controls.tmpl",
     "dashboard.js.chat.state.channels.bindings_modes.tmpl",

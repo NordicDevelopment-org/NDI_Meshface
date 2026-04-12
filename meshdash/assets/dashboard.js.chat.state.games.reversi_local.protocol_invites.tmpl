@@ -103,6 +103,12 @@
       return Math.max(0, Math.trunc(Number(token) || 0));
     }}
 
+    function reversiProtocolParseCoordinate(value, fallback = -1) {{
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return Math.trunc(Number(fallback) || -1);
+      return Math.trunc(parsed);
+    }}
+
     function reversiProtocolEncodeCell(rowRaw, colRaw) {{
       const row = Math.trunc(Number(rowRaw) || 0);
       const col = Math.trunc(Number(colRaw) || 0);

@@ -13,7 +13,6 @@ _TOKEN_PROTECTED_WRITE_PATHS = {
     "/api/settings/channels",
     "/api/settings/theme",
     "/api/settings/custom_telemetry",
-    "/api/settings/bot",
 }
 _PRIVATE_MODE_BLOCKED_POST_PATHS = {
     "/api/chat/send",
@@ -47,7 +46,6 @@ _handle_channel_settings_post_helper = _load_optional_handler(
     ".api_channels",
     "handle_channel_settings_post",
 )
-_handle_bot_settings_post_helper = _load_optional_handler(".api_bot", "handle_bot_settings_post")
 _handle_standalone_zork_post_helper = _load_optional_handler(
     ".api_zork",
     "handle_standalone_zork_post",
@@ -277,25 +275,6 @@ def handle_dashboard_post(
             to_int_fn=deps.to_int_fn,
             validate_content_length_fn=deps.validate_content_length_fn,
             parse_custom_telemetry_settings_request_fn=parse_custom_telemetry_settings_request_fn,
-            write_json_response_fn=deps.write_json_response_fn,
-        )
-        return
-
-    if path == "/api/settings/bot":
-        parse_bot_settings_request_fn = deps.parse_bot_settings_request_fn
-        if parse_bot_settings_request_fn is None or not callable(_handle_bot_settings_post_helper):
-            deps.write_json_response_fn(
-                handler,
-                status_code=503,
-                payload_obj={"ok": False, "error": "Bot settings are not enabled on this dashboard instance"},
-            )
-            return
-        _handle_bot_settings_post_helper(
-            handler,
-            apply_bot_settings_fn=deps.apply_bot_settings_fn,
-            to_int_fn=deps.to_int_fn,
-            validate_content_length_fn=deps.validate_content_length_fn,
-            parse_bot_settings_request_fn=parse_bot_settings_request_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )
         return

@@ -40,29 +40,23 @@
     }}
 
     function reversiProtocolMessageText(msg) {{
-      if (!msg || typeof msg !== "object") return "";
-      return String(msg.text ?? msg.decoded_text ?? msg.payload_text ?? "").trim();
+      return protocolMessageText(msg);
     }}
 
     function reversiProtocolMessageUnix(msg) {{
-      return latestUnixTimestamp(
-        msg && msg.rx_time,
-        msg && msg.captured_at,
-        msg && msg.sent_at,
-        msg && msg.created_at
-      ) || Math.floor(Date.now() / 1000);
+      return protocolMessageUnix(msg);
     }}
 
     function reversiProtocolMessageKey(msg, parsed) {{
       const messageId = messageIdOfChatPacket(msg);
       if (messageId) return `msg:${{messageId}}`;
-      const fromId = normalizeNodeId(msg && msg.from || "");
-      const toId = normalizeNodeId(msg && (msg.to || msg.destination) || "");
+      const fromId = protocolMessageFromNodeId(msg);
+      const toId = protocolMessageToNodeId(msg);
       return [
         "raw",
         fromId,
         toId,
-        String(msg && msg.rx_time || ""),
+        String(reversiProtocolMessageUnix(msg) || ""),
         String(parsed && parsed.raw || ""),
       ].join("|");
     }}
@@ -80,11 +74,11 @@
         : (Array.isArray(traffic.recent_chat) ? traffic.recent_chat : []);
       for (const msg of recentProtocolMessages) {{
         if (!msg || typeof msg !== "object") continue;
-        if (msg.local_echo === true || msg.localEcho === true) continue;
+        if (protocolMessageIsLocalEcho(msg)) continue;
         const parsed = parseReversiProtocolMessage(reversiProtocolMessageText(msg));
         if (!parsed) continue;
-        const fromId = normalizeNodeId(msg.from || "");
-        const toId = normalizeNodeId(msg.to || msg.destination || "");
+        const fromId = protocolMessageFromNodeId(msg);
+        const toId = protocolMessageToNodeId(msg);
         if (!isCanonicalNodeId(fromId) || fromId === localNodeId) continue;
         if (toId && toId !== localNodeId) continue;
         const dedupeKey = reversiProtocolMessageKey(msg, parsed);
@@ -295,8 +289,8 @@
         if (parsed.type === "move") {{
           const sessionId = String(parsed.parts[2] || "").trim().toLowerCase();
           const seq = Math.max(0, Math.trunc(Number(parsed.parts[3]) || 0));
-          const row = Math.trunc(Number(parsed.parts[4]) || -1);
-          const col = Math.trunc(Number(parsed.parts[5]) || -1);
+          const row = reversiProtocolParseCoordinate(parsed.parts[4], -1);
+          const col = reversiProtocolParseCoordinate(parsed.parts[5], -1);
           if (!sessionId || !inReversiBounds(row, col) || seq <= 0) {{
             rememberReversiNetworkMessage(dedupeKey);
             continue;

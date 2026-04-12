@@ -37,6 +37,7 @@
           || lower.includes("ch1|")
         );
       }};
+      markRenderChatPhase("derive-cache");
       let derived = null;
       if (chatDerivedCache
         && chatDerivedCache.rawMessagesRef === rawMessages
@@ -415,6 +416,7 @@
         messageEndpoints.set(msg, resolved);
         return resolved;
       }};
+      markRenderChatPhase("unread-sync");
       const keyedMessages = collectChatMessageEntries(state);
       syncChatUnreadFromEntries(keyedMessages, {{ clearActiveWhenInChat: true }});
 
@@ -522,6 +524,7 @@
       const showAllMeshChannels = activeMeshChannelFilterIndex() === meshChannelAllIndex;
       const activeSendMeshIdx = activeMeshChannelSendIndex();
       const activeChangeFocusKeys = chatChangeFocusKeysForChannel(activeChatChannel);
+      markRenderChatPhase("participants");
       const participantSourceMessages = (activeChatChannel === "direct")
         ? channelMessages.direct
         : messages;

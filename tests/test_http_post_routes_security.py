@@ -1,0 +1,83 @@
+import io
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from meshdash.helpers import to_int
+from meshdash.http_api_post import build_post_route_dependencies
+from meshdash.http_routes_post import handle_dashboard_post
+
+
+class _FakeHandler:
+    def __init__(self, body: bytes = b"", *, headers: dict[str, object] | None = None) -> None:
+        self.path = "/"
+        self.headers = headers or {}
+        self.rfile = io.BytesIO(body)
+        self.wfile = io.BytesIO()
+
+    def send_response(self, code: int) -> None:
+        self._last_code = code
+
+    def send_header(self, key: str, value: str) -> None:
+        pass
+
+    def end_headers(self) -> None:
+        pass
+
+
+def test_handle_dashboard_post_returns_not_found_for_removed_bot_settings_route() -> None:
+    handler = _FakeHandler()
+    calls: list[tuple[int, object]] = []
+    deps = build_post_route_dependencies(send_chat_fn=None, to_int_fn=to_int)
+    deps = type(deps)(
+        **{
+            **deps.__dict__,
+            "write_json_response_fn": lambda handler, *, status_code, payload_obj, **kwargs: calls.append((status_code, payload_obj)),
+        }
+    )
+
+    handle_dashboard_post(handler, path="/api/settings/bot", deps=deps)
+
+    assert calls == [(404, {"ok": False, "error": "Not Found"})]
+
+
+def test_handle_dashboard_post_keeps_standalone_zork_route_available() -> None:
+    body = json.dumps({"text": "zork", "session_id": "session-1"}).encode("utf-8")
+    handler = _FakeHandler(body, headers={"Content-Length": str(len(body))})
+    calls: list[tuple[int, object]] = []
+
+    def _write_json_response(handler, *, status_code, payload_obj, **kwargs):
+        calls.append((status_code, payload_obj))
+
+    deps = build_post_route_dependencies(
+        send_chat_fn=None,
+        play_standalone_zork_fn=lambda *, text, session_id=None: {
+            "ok": True,
+            "reply_text": f"started:{text}",
+            "session_id": session_id,
+            "active_session": True,
+        },
+        to_int_fn=to_int,
+    )
+    deps = type(deps)(
+        **{
+            **deps.__dict__,
+            "write_json_response_fn": _write_json_response,
+        }
+    )
+
+    handle_dashboard_post(handler, path="/api/games/zork", deps=deps)
+
+    assert calls == [
+        (
+            200,
+            {
+                "ok": True,
+                "reply_text": "started:zork",
+                "session_id": "session-1",
+                "active_session": True,
+            },
+        )
+    ]
