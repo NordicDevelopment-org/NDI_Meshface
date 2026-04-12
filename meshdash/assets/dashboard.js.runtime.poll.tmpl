@@ -166,6 +166,9 @@
         const state = applyNodeVisibilityFiltersToState(rawState);
         latestState = state;
         syncSelectedNodeWithVisibilityFilters();
+        if (mapLiveActivityEnabled) {{
+          syncNetworkMapPacketActivity(state);
+        }}
         lastPollSuccessUnix = Math.floor(Date.now() / 1000);
         lastPollError = "";
         lastPollErrorUnix = 0;

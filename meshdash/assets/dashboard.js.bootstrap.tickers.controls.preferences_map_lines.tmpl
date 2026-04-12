@@ -249,6 +249,21 @@
       }}
     }}
 
+    function updateMapLiveActivityControl() {{
+      const wrap = document.getElementById("map-live-wrap");
+      const toggle = document.getElementById("map-live-toggle");
+      const inMapLiveContext = activeLayoutView === "network";
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !inMapLiveContext;
+        wrap.title = mapLiveActivityEnabled
+          ? "Disable live node marker flashing for packet activity."
+          : "Enable live node marker flashing for packet activity.";
+      }}
+      if (toggle instanceof HTMLInputElement) {{
+        toggle.checked = mapLiveActivityEnabled;
+      }}
+    }}
+
     function persistMapPacketLinesPreference() {{
       try {{
         window.localStorage.setItem(mapPacketLinesStorageKey, mapPacketLinesEnabled ? "1" : "0");
@@ -259,6 +274,13 @@
     function persistMapLinkLayerPreference() {{
       try {{
         window.localStorage.setItem(mapLinkLayerStorageKey, mapLinkLayerEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistMapLiveActivityPreference() {{
+      try {{
+        window.localStorage.setItem(mapLiveActivityStorageKey, mapLiveActivityEnabled ? "1" : "0");
       }} catch (_err) {{
       }}
     }}
@@ -289,6 +311,20 @@
       }} catch (_err) {{
       }}
       updateMapLinkLayerControl();
+    }}
+
+    function loadMapLiveActivityPreference() {{
+      mapLiveActivityEnabled = true;
+      try {{
+        const stored = window.localStorage.getItem(mapLiveActivityStorageKey);
+        if (stored === "0") {{
+          mapLiveActivityEnabled = false;
+        }} else if (stored === "1") {{
+          mapLiveActivityEnabled = true;
+        }}
+      }} catch (_err) {{
+      }}
+      updateMapLiveActivityControl();
     }}
 
     function bindMapPacketLinesControl() {{
@@ -337,4 +373,28 @@
         }});
       }}
       updateMapLinkLayerControl();
+    }}
+
+    function bindMapLiveActivityControl() {{
+      const toggle = document.getElementById("map-live-toggle");
+      if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
+        toggle.dataset.bound = "1";
+        toggle.checked = mapLiveActivityEnabled;
+        toggle.addEventListener("change", () => {{
+          mapLiveActivityEnabled = !!toggle.checked;
+          persistMapLiveActivityPreference();
+          updateMapLiveActivityControl();
+          if (mapLiveActivityEnabled) {{
+            if (typeof seedNetworkMapPacketActivityTokens === "function") {{
+              seedNetworkMapPacketActivityTokens(latestState);
+            }}
+          }} else {{
+            lastNetworkMapPacketTokens = new Set();
+            mapNodeActivityFlashById.clear();
+            stopMapNodeActivityFlashLoop();
+          }}
+          refreshMapMarkerStyles();
+        }});
+      }}
+      updateMapLiveActivityControl();
     }}

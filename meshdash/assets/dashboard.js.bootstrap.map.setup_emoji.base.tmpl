@@ -233,10 +233,13 @@
     const nodeMarkerMeta = new Map();
     const nodeMarkerKinds = new Map();
     const nodeMarkerConfidence = new Map();
+    const mapNodeActivityFlashById = new Map();
     const edgeLines = new Map();
     const edgeLineMeta = new Map();
     const linkEstimateLines = new Map();
     const linkEstimateLineMeta = new Map();
+    let mapNodeActivityFlashRaf = null;
+    let lastNetworkMapPacketTokens = new Set();
     const selectionStorageKey = "meshDashboardSelectedNodeId";
     const favoritesStorageKey = "meshDashboardFavoriteNodeIdsV1";
     const nodeTagsStorageKey = "meshDashboardNodeTagsV1";
@@ -297,6 +300,7 @@
     const signalHeatmapModeStorageKey = "meshDashboardSignalHeatmapModeV1";
     const mapPacketLinesStorageKey = "meshDashboardMapPacketLinesEnabledV1";
     const mapLinkLayerStorageKey = "meshDashboardMapLinkLayerEnabledV1";
+    const mapLiveActivityStorageKey = "meshDashboardMapLiveActivityEnabledV1";
     const mapBasemapModeStorageKey = "meshDashboardMapBasemapModeV1";
     const settingsPositionSourceStorageKey = "meshDashboardSettingsPositionSourceV1";
     const settingsFixedPositionCacheStorageKey = "meshDashboardSettingsFixedPositionCacheV1";

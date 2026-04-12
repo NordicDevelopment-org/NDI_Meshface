@@ -271,6 +271,230 @@
       }};
     }}
 
+    function isNetworkMapActivityFlashVisible() {{
+      return (
+        !!mapLiveActivityEnabled
+        && activeLayoutView === "network"
+        && activeNetworkSubview === "map"
+        && !(typeof document !== "undefined" && document.hidden)
+      );
+    }}
+
+    function mapPacketActivityToken(packetEntry) {{
+      const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+        ? packetEntry.summary
+        : {{}};
+      const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
+        ? packetEntry.packet
+        : ((packetEntry && typeof packetEntry === "object") ? packetEntry : {{}});
+      const decoded = (packet && packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : {{}};
+      const fromId = normalizeNodeId(
+        summary.from_id
+        ?? summary.fromId
+        ?? summary.from
+        ?? packet.from_id
+        ?? packet.fromId
+        ?? packet.from
+      );
+      const toId = normalizeNodeId(
+        summary.to_id
+        ?? summary.toId
+        ?? summary.to
+        ?? packet.to_id
+        ?? packet.toId
+        ?? packet.to
+        ?? packet.destination
+      );
+      const portnum = String(
+        summary.portnum
+        ?? decoded.portnum
+        ?? packet.portnum
+        ?? ""
+      ).trim().toUpperCase();
+      const packetId = parsePositiveMessageId(
+        summary.packet_id
+        ?? summary.message_id
+        ?? packet.id
+        ?? packet.packet_id
+        ?? packet.message_id
+      );
+      const packetMs = latestTimestampMs(
+        summary.rx_time_unix,
+        summary.rx_time,
+        summary.captured_at,
+        summary.time,
+        packetEntry && (packetEntry.captured_at || packetEntry.rx_time || packetEntry.time),
+        packet.rxTime,
+      );
+      if (packetId) {{
+        return `id:${{fromId}}|${{toId}}|${{portnum}}|${{packetId}}`;
+      }}
+      if (Number.isFinite(packetMs) && packetMs > 0) {{
+        return `ts:${{fromId}}|${{toId}}|${{portnum}}|${{Math.trunc(packetMs)}}`;
+      }}
+      return `raw:${{fromId}}|${{toId}}|${{portnum}}|${{JSON.stringify(summary)}}`;
+    }}
+
+    function mapPacketActivityNodeIds(packetEntry) {{
+      const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+        ? packetEntry.summary
+        : {{}};
+      const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
+        ? packetEntry.packet
+        : ((packetEntry && typeof packetEntry === "object") ? packetEntry : {{}});
+      const nodeIds = new Set();
+      const pushNodeId = (rawValue) => {{
+        const normalized = normalizeNodeId(rawValue);
+        if (!isSelectableNodeId(normalized)) return;
+        nodeIds.add(normalized);
+      }};
+      pushNodeId(summary.from_id ?? summary.fromId ?? summary.from ?? packet.from_id ?? packet.fromId ?? packet.from);
+      pushNodeId(summary.to_id ?? summary.toId ?? summary.to ?? packet.to_id ?? packet.toId ?? packet.to ?? packet.destination);
+      return Array.from(nodeIds);
+    }}
+
+    function snapshotNetworkMapPacketActivityTokens(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const recentPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const localNodeId = resolveLocalNodeId(safeState);
+      const tokens = new Set();
+      for (const packetEntry of recentPackets) {{
+        if (!isMeshRadioActivityPacket(packetEntry, localNodeId)) continue;
+        tokens.add(mapPacketActivityToken(packetEntry));
+      }}
+      return tokens;
+    }}
+
+    function seedNetworkMapPacketActivityTokens(state = latestState) {{
+      lastNetworkMapPacketTokens = snapshotNetworkMapPacketActivityTokens(state);
+    }}
+
+    function pruneExpiredMapNodeActivityFlashes(nowMs = Date.now()) {{
+      let activeCount = 0;
+      for (const [nodeId, flash] of Array.from(mapNodeActivityFlashById.entries())) {{
+        const untilMs = Number(flash && flash.untilMs);
+        if (!Number.isFinite(untilMs) || untilMs <= nowMs) {{
+          mapNodeActivityFlashById.delete(nodeId);
+          continue;
+        }}
+        activeCount += 1;
+      }}
+      return activeCount;
+    }}
+
+    function stopMapNodeActivityFlashLoop() {{
+      if (mapNodeActivityFlashRaf != null) {{
+        window.cancelAnimationFrame(mapNodeActivityFlashRaf);
+        mapNodeActivityFlashRaf = null;
+      }}
+    }}
+
+    function mapNodeActivityFlashStrength(nodeId, nowMs = Date.now()) {{
+      const normalizedId = normalizeNodeId(nodeId || "");
+      if (!normalizedId || !isNetworkMapActivityFlashVisible()) return 0;
+      const flash = mapNodeActivityFlashById.get(normalizedId);
+      if (!(flash && typeof flash === "object")) return 0;
+      const startedAtMs = Number(flash.startedAtMs);
+      const untilMs = Number(flash.untilMs);
+      if (!Number.isFinite(untilMs) || untilMs <= nowMs) {{
+        mapNodeActivityFlashById.delete(normalizedId);
+        return 0;
+      }}
+      const durationMs = Math.max(1, untilMs - (Number.isFinite(startedAtMs) ? startedAtMs : (untilMs - 1100)));
+      const elapsedMs = Math.max(0, nowMs - (Number.isFinite(startedAtMs) ? startedAtMs : (untilMs - durationMs)));
+      const envelope = clampMapLinkValue((untilMs - nowMs) / durationMs, 0, 1);
+      const pulsePhase = (elapsedMs % 260) / 260;
+      const pulse = 0.35 + (0.65 * (0.5 + (0.5 * Math.cos(pulsePhase * Math.PI * 2))));
+      return clampMapLinkValue((0.3 + (pulse * 0.7)) * envelope, 0, 1);
+    }}
+
+    function applyMapNodeActivityFlashStyle(baseStyle, flashStrength, markerKind = "actual") {{
+      const strength = clampMapLinkValue(flashStrength, 0, 1);
+      if (!(strength > 0)) return baseStyle;
+      const style = Object.assign({{}}, baseStyle);
+      const radiusBase = Number(style.radius);
+      const weightBase = Number(style.weight);
+      const fillOpacityBase = Number(style.fillOpacity);
+      style.radius = (Number.isFinite(radiusBase) ? radiusBase : 6) + ((markerKind === "estimated" ? 1.4 : 1.9) * strength);
+      style.weight = (Number.isFinite(weightBase) ? weightBase : 1) + (1.2 * strength);
+      style.fillOpacity = clampMapLinkValue((Number.isFinite(fillOpacityBase) ? fillOpacityBase : 0.78) + (0.22 * strength), 0.12, 1);
+      style.opacity = clampMapLinkValue(0.78 + (0.22 * strength), 0.12, 1);
+      style.color = strength >= 0.52 ? "#9a1f10" : "#c65819";
+      style.fillColor = strength >= 0.52 ? "#fff1a3" : "#ffd06a";
+      return style;
+    }}
+
+    function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45) {{
+      const kind = markerKind === "estimated" ? "estimated" : "actual";
+      const baseStyle = kind === "estimated"
+        ? estimatedMarkerStyle(isSelected, markerConfidence)
+        : markerStyle(isSelected);
+      const flashStrength = mapNodeActivityFlashStrength(nodeId);
+      return applyMapNodeActivityFlashStyle(baseStyle, flashStrength, kind);
+    }}
+
+    function scheduleMapNodeActivityFlashUpdate() {{
+      if (mapNodeActivityFlashRaf != null) return;
+      mapNodeActivityFlashRaf = window.requestAnimationFrame(() => {{
+        mapNodeActivityFlashRaf = null;
+        const activeCount = pruneExpiredMapNodeActivityFlashes();
+        refreshMapMarkerStyles();
+        if (!isNetworkMapActivityFlashVisible()) {{
+          stopMapNodeActivityFlashLoop();
+          return;
+        }}
+        if (activeCount > 0) {{
+          scheduleMapNodeActivityFlashUpdate();
+        }}
+      }});
+    }}
+
+    function syncNetworkMapPacketActivity(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const recentPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const localNodeId = resolveLocalNodeId(safeState);
+      const currentTokens = new Set();
+      const nodesToFlash = new Set();
+      const networkMapVisible = isNetworkMapActivityFlashVisible();
+      for (const packetEntry of recentPackets) {{
+        if (!isMeshRadioActivityPacket(packetEntry, localNodeId)) continue;
+        const token = mapPacketActivityToken(packetEntry);
+        currentTokens.add(token);
+        if (!networkMapVisible || lastNetworkMapPacketTokens.has(token)) {{
+          continue;
+        }}
+        const nodeIds = mapPacketActivityNodeIds(packetEntry);
+        for (const nodeId of nodeIds) {{
+          nodesToFlash.add(nodeId);
+        }}
+      }}
+      lastNetworkMapPacketTokens = currentTokens;
+      if (!networkMapVisible || nodesToFlash.size <= 0) {{
+        if (!networkMapVisible) {{
+          lastNetworkMapPacketTokens = currentTokens;
+          mapNodeActivityFlashById.clear();
+          stopMapNodeActivityFlashLoop();
+        }}
+        return;
+      }}
+      const nowMs = Date.now();
+      for (const nodeId of nodesToFlash) {{
+        mapNodeActivityFlashById.set(nodeId, {{
+          startedAtMs: nowMs,
+          untilMs: nowMs + 1100,
+        }});
+      }}
+      scheduleMapNodeActivityFlashUpdate();
+    }}
+
     function mapLinkConfidenceLabel(confidence) {{
       const safeConfidence = clampMapLinkValue(confidence, 0, 1);
       if (safeConfidence >= 0.78) return "High";

@@ -361,17 +361,22 @@
       return usedHistory;
     }}
 
-    function updateMapSelection(shouldFocus = false) {{
+    function refreshMapMarkerStyles() {{
       for (const [nodeId, marker] of nodeMarkers.entries()) {{
         const isSelected = !!selectedNodeId && nodeId === selectedNodeId;
         const markerKind = nodeMarkerKinds.get(nodeId) || "actual";
         const markerConfidence = Number(nodeMarkerConfidence.get(nodeId));
-        marker.setStyle(
-          markerKind === "estimated"
-            ? estimatedMarkerStyle(isSelected, Number.isFinite(markerConfidence) ? markerConfidence : 0.45)
-            : markerStyle(isSelected)
-        );
+        marker.setStyle(resolveMapNodeMarkerStyle(
+          nodeId,
+          isSelected,
+          markerKind,
+          Number.isFinite(markerConfidence) ? markerConfidence : 0.45
+        ));
       }}
+    }}
+
+    function updateMapSelection(shouldFocus = false) {{
+      refreshMapMarkerStyles();
       const shouldAutoFocusView = (
         !!selectedNodeId
         && (!!shouldFocus || !!pendingMapHistoryFocus)

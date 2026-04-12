@@ -319,9 +319,12 @@
           }}
           const marker = L.circleMarker(
             [markerLat, markerLon],
-            isEstimated
-              ? estimatedMarkerStyle(isSelected, Number(estimate && estimate.confidence))
-              : markerStyle(isSelected)
+            resolveMapNodeMarkerStyle(
+              normalizedId,
+              isSelected,
+              isEstimated ? "estimated" : "actual",
+              Number(estimate && estimate.confidence)
+            )
           );
           if (isEstimated) {{
             const confidenceValue = clampMapLinkValue(Number(estimate && estimate.confidence), 0, 1);

@@ -27,6 +27,9 @@ def test_dashboard_html_adds_map_link_layer_toggle() -> None:
 
     assert 'id="map-link-wrap"' in html
     assert 'id="map-link-toggle"' in html
+    assert 'id="map-live-wrap"' in html
+    assert 'id="map-live-toggle"' in html
+    assert ">Live</span>" in html
     assert "Link Layer" in html
     assert 'class="map-control-group map-heatmap-controls"' in html
     assert html.index('id="map-heatmap-wrap"') < html.index('id="map-heatmap-mode-wrap"')
@@ -42,9 +45,14 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     )
 
     assert 'let mapLinkLayerEnabled = false;' in js
+    assert 'let mapLiveActivityEnabled = true;' in js
     assert 'const mapLinkLayerStorageKey = "meshDashboardMapLinkLayerEnabledV1";' in js
+    assert 'const mapLiveActivityStorageKey = "meshDashboardMapLiveActivityEnabledV1";' in js
     assert "function updateMapLinkLayerControl()" in js
     assert "function bindMapLinkLayerControl()" in js
+    assert "function updateMapLiveActivityControl()" in js
+    assert "function loadMapLiveActivityPreference()" in js
+    assert "function bindMapLiveActivityControl()" in js
     assert "function estimatedMarkerStyle(isSelected, confidence = 0.5)" in js
     assert "function buildMapLinkLayerOverlay(nodes, rawEdges)" in js
     assert "nodeMarkerKinds" in js
@@ -84,6 +92,31 @@ def test_dashboard_js_packet_line_fade_tracks_node_freshness_windows() -> None:
     assert "Math.max(isReal ? 2.2 : 1.7, baseWeight * 0.62)" in js
     assert 'lineCap: "round"' in js
     assert 'lineJoin: "round"' in js
+
+
+def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const mapNodeActivityFlashById = new Map();" in js
+    assert "let mapNodeActivityFlashRaf = null;" in js
+    assert "let lastNetworkMapPacketTokens = new Set();" in js
+    assert "function isNetworkMapActivityFlashVisible()" in js
+    assert "function mapPacketActivityToken(packetEntry)" in js
+    assert "function mapPacketActivityNodeIds(packetEntry)" in js
+    assert "function snapshotNetworkMapPacketActivityTokens(state = latestState)" in js
+    assert "function seedNetworkMapPacketActivityTokens(state = latestState)" in js
+    assert 'function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45)' in js
+    assert "function scheduleMapNodeActivityFlashUpdate()" in js
+    assert "function syncNetworkMapPacketActivity(state = latestState)" in js
+    assert "!!mapLiveActivityEnabled" in js
+    assert "mapNodeActivityFlashById.set(nodeId, {" in js
+    assert "scheduleMapNodeActivityFlashUpdate();" in js
+    assert "seedNetworkMapPacketActivityTokens(latestState);" in js
+    assert "if (mapLiveActivityEnabled)" in js
 
 
 def test_record_direct_edge_observation_tracks_signal_metrics() -> None:
