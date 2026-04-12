@@ -46,3 +46,21 @@ def test_dashboard_js_binds_games_picker_select() -> None:
     assert 'gamesLibrarySelect.value = activeGameId;' in js
     assert 'gamesLibrarySelect.addEventListener("change", () => {' in js
     assert 'activeGameId = normalizeActiveGameId(gamesLibrarySelect.value);' in js
+
+
+def test_dashboard_js_includes_bbs_in_app_channel_routing() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    start = js.index("function meshChannelAppRoutingRows() {")
+    end = js.index("function normalizeMeshChannelAppId", start)
+    routing_block = js[start:end]
+
+    assert 'id: "games"' in routing_block
+    assert 'label: "Games"' in routing_block
+    assert 'id: "bbs"' in routing_block
+    assert 'label: "BBS"' in routing_block
+    assert 'description: "Board hosting, directory announces, and posts"' in routing_block
