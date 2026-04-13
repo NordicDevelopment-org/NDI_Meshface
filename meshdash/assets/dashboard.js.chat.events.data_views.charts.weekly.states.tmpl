@@ -1,5 +1,21 @@
     function resolveWeeklySummaryRenderTarget(targetKey = "history") {{
       const clean = String(targetKey || "").trim().toLowerCase();
+      if (clean === "node-packets") {{
+        return {{
+          key: "node-packets",
+          chartState: historyTrendCharts.nodePackets,
+          captionId: "",
+          overviewId: "",
+          svgId: "node-packets-chart",
+          emptyId: "node-packets-empty",
+          timelineId: "node-packets-timeline",
+          captionPrefix: "Node packet trend for",
+          loadingCaption: "",
+          loadingEmpty: "Loading packet-rate history...",
+          errorPrefix: "Node packet trend error",
+          errorEmpty: "Unable to load node packet trends.",
+        }};
+      }}
       if (clean === "network-overview") {{
         return {{
           key: "network-overview",

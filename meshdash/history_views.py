@@ -33,11 +33,28 @@ class HistoryViewStore(Protocol):
 def empty_node_history(node_id: str) -> dict[str, object]:
     return {
         "node_id": str(node_id or ""),
+        "window_hours": 72,
         "points": [],
         "positions": [],
         "name_history": [],
         "packet_timestamps": [],
         "packet_history": [],
+        "packet_series": {
+            "available": False,
+            "bucket_seconds": 60,
+            "order": ["all", "chat", "telemetry", "position", "routing", "nodeinfo", "admin", "encrypted", "other"],
+            "series": {
+                "all": [],
+                "chat": [],
+                "telemetry": [],
+                "position": [],
+                "routing": [],
+                "nodeinfo": [],
+                "admin": [],
+                "encrypted": [],
+                "other": [],
+            },
+        },
         "summary": {},
     }
 

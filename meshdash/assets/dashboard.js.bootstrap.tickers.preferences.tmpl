@@ -302,6 +302,35 @@
       }}
     }}
 
+    function updateNodePacketSeriesControls() {{
+      const wrap = document.getElementById("node-packet-lines-wrap");
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = false;
+      }}
+      for (const key of networkOverviewPacketSeriesOrder) {{
+        const toggleId = nodePacketSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        const seriesColor = networkOverviewPacketSeriesPaletteColor(key);
+        if (seriesColor) {{
+          toggle.style.accentColor = seriesColor;
+        }} else {{
+          toggle.style.removeProperty("accent-color");
+        }}
+        toggle.checked = !!nodePacketSeriesEnabled[key];
+        toggle.disabled = false;
+      }}
+    }}
+
+    function applyNodePacketSeries(nextSeries) {{
+      nodePacketSeriesEnabled = normalizeNetworkOverviewPacketSeries(nextSeries);
+      updateNodePacketSeriesControls();
+      const chartState = historyTrendCharts && historyTrendCharts.nodePackets;
+      if (chartState && Array.isArray(chartState.sourcePoints) && chartState.sourcePoints.length) {{
+        rerenderNodePacketsChartFromCache();
+      }}
+    }}
+
     function applyTickerDensity(mode, persist = true) {{
       const normalized = normalizeTickerDensityMode(mode);
       tickerDensity = normalized;

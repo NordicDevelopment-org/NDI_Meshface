@@ -170,7 +170,8 @@
         renderNodePacketsChart(
           history.points || [],
           history.window_hours,
-          historyNodeId
+          historyNodeId,
+          (history && typeof history.packet_series === "object") ? history.packet_series : null
         );
       }});
       if (!packetsRendered.ok) {{

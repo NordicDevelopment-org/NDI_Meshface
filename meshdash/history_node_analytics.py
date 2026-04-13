@@ -20,6 +20,27 @@ from .history_node_positions import (
 
 _PACKET_HISTORY_MAX_ROWS = 200
 _PACKET_HISTORY_TEXT_MAX_CHARS = 180
+_PACKET_TYPE_ORDER = (
+    "all",
+    "chat",
+    "telemetry",
+    "position",
+    "routing",
+    "nodeinfo",
+    "admin",
+    "encrypted",
+    "other",
+)
+_PACKET_SERIES_BUCKET_SECONDS = 60
+
+
+def _empty_packet_series_payload() -> dict[str, object]:
+    return {
+        "available": True,
+        "bucket_seconds": _PACKET_SERIES_BUCKET_SECONDS,
+        "order": list(_PACKET_TYPE_ORDER),
+        "series": {key: [] for key in _PACKET_TYPE_ORDER},
+    }
 
 
 def _is_hex_text(value: str) -> bool:
@@ -290,6 +311,56 @@ def _collect_packet_timestamps(
     return sorted(timestamps)
 
 
+def _build_packet_series_payload(
+    packet_type_rows: Iterable[tuple[object, ...]],
+) -> dict[str, object]:
+    bucket_counts_by_bucket: dict[int, dict[str, int]] = {}
+    for raw_row in packet_type_rows:
+        if isinstance(raw_row, tuple):
+            row = raw_row
+        elif isinstance(raw_row, list):
+            row = tuple(raw_row)
+        else:
+            try:
+                row = tuple(raw_row)
+            except Exception:
+                continue
+        if len(row) < 3:
+            continue
+        bucket = _to_int(row[0])
+        packet_type = str(row[1] or "").strip().lower()
+        packet_count = max(0, _to_int(row[2]) or 0)
+        if bucket is None or bucket <= 0 or packet_count <= 0:
+            continue
+        clean_type = packet_type if packet_type in _PACKET_TYPE_ORDER else "other"
+        bucket_counts = bucket_counts_by_bucket.setdefault(
+            bucket,
+            {key: 0 for key in _PACKET_TYPE_ORDER},
+        )
+        bucket_counts[clean_type] = int(bucket_counts.get(clean_type, 0)) + packet_count
+        bucket_counts["all"] = int(bucket_counts.get("all", 0)) + packet_count
+
+    if not bucket_counts_by_bucket:
+        return _empty_packet_series_payload()
+
+    return {
+        "available": True,
+        "bucket_seconds": _PACKET_SERIES_BUCKET_SECONDS,
+        "order": list(_PACKET_TYPE_ORDER),
+        "series": {
+            key: [
+                {
+                    "bucket_unix": bucket,
+                    "packet_count": int(bucket_counts.get(key, 0)),
+                }
+                for bucket, bucket_counts in sorted(bucket_counts_by_bucket.items())
+                if int(bucket_counts.get(key, 0)) > 0
+            ]
+            for key in _PACKET_TYPE_ORDER
+        },
+    }
+
+
 def build_node_history_payload(
     *,
     node_id: str,
@@ -297,6 +368,7 @@ def build_node_history_payload(
     metric_rows: Iterable[tuple[object, ...]],
     position_rows: Iterable[tuple[object, ...]],
     packet_rows: Iterable[tuple[object, ...]],
+    packet_type_rows: Iterable[tuple[object, ...]],
 ) -> dict[str, object]:
     clean_node_id = str(node_id or "").strip()
     hours = max(1, int(window_hours))
@@ -309,6 +381,7 @@ def build_node_history_payload(
             "name_history": [],
             "packet_timestamps": [],
             "packet_history": [],
+            "packet_series": _empty_packet_series_payload(),
             "summary": {},
         }
 
@@ -345,6 +418,7 @@ def build_node_history_payload(
         node_id=clean_node_id,
         packet_rows=packet_rows,
     )
+    packet_series = _build_packet_series_payload(packet_type_rows)
     name_history = _build_name_history_points_helper(
         node_id=clean_node_id,
         packet_rows=packet_rows,
@@ -358,6 +432,7 @@ def build_node_history_payload(
         "name_history": name_history,
         "packet_timestamps": packet_timestamps,
         "packet_history": packet_history,
+        "packet_series": packet_series,
         "summary": {
             "total_packets": total_packets,
             "points": len(points),

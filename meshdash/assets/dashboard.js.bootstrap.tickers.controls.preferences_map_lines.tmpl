@@ -98,6 +98,29 @@
       updateNetworkOverviewPacketSeriesControls(networkOverviewMetric);
     }}
 
+    function bindNodePacketSeriesControls() {{
+      for (const key of networkOverviewPacketSeriesOrder) {{
+        const toggleId = nodePacketSeriesControlIds[key];
+        const toggle = document.getElementById(toggleId);
+        if (!(toggle instanceof HTMLInputElement)) continue;
+        if (toggle.dataset.bound === "1") continue;
+        toggle.dataset.bound = "1";
+        toggle.checked = !!nodePacketSeriesEnabled[key];
+        toggle.addEventListener("change", () => {{
+          const nextSeries = {{}};
+          for (const innerKey of networkOverviewPacketSeriesOrder) {{
+            const innerToggleId = nodePacketSeriesControlIds[innerKey];
+            const innerToggle = document.getElementById(innerToggleId);
+            if (innerToggle instanceof HTMLInputElement) {{
+              nextSeries[innerKey] = innerToggle.checked;
+            }}
+          }}
+          applyNodePacketSeries(nextSeries);
+        }});
+      }}
+      updateNodePacketSeriesControls();
+    }}
+
     function loadThemePreference() {{
       let stored = "auto";
       try {{

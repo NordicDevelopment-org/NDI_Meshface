@@ -1,6 +1,17 @@
     function resolveWeeklySummaryChartLayout(targetKey = "history") {{
       const base = historyTrendChartLayout || {{}};
       const clean = String(targetKey || "").trim().toLowerCase();
+      if (clean === "node-packets") {{
+        const signalBase = signalChartLayout || {{}};
+        return {{
+          width: Number(signalBase.width) || 900,
+          height: Number(signalBase.height) || 220,
+          padLeft: Number(signalBase.padLeft) || 44,
+          padRight: Number(signalBase.padRight) || 44,
+          padTop: Number(signalBase.padTop) || 12,
+          padBottom: Number(signalBase.padBottom) || 30,
+        }};
+      }}
       if (clean === "network-overview") {{
         return {{
           width: Number(base.width) || 900,

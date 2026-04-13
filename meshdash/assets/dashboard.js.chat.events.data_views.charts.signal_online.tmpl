@@ -227,9 +227,168 @@
       const sourcePoints = chartState && Array.isArray(chartState.sourcePoints)
         ? chartState.sourcePoints
         : [];
+      const sourcePacketSeries = chartState && chartState.sourcePacketSeries
+        ? chartState.sourcePacketSeries
+        : null;
       const sourceWindowHours = chartState ? chartState.sourceWindowHours : null;
       const sourceNodeId = chartState ? chartState.nodeId : "";
-      renderNodePacketsChart(sourcePoints, sourceWindowHours, sourceNodeId);
+      renderNodePacketsChart(sourcePoints, sourceWindowHours, sourceNodeId, sourcePacketSeries);
+    }}
+
+    function normalizeNodePacketBucketUnix(raw) {{
+      const numeric = Number(raw);
+      if (!Number.isFinite(numeric) || numeric <= 0) return null;
+      if (numeric > 100000000000) {{
+        return Math.floor(numeric / 1000);
+      }}
+      return Math.floor(numeric);
+    }}
+
+    function buildNodePacketChartRows(points, packetSeriesPayload, startUnix, endUnix) {{
+      const rows = Array.isArray(points) ? points : [];
+      const normalizedRows = rows
+        .map((row) => {{
+          const bucketUnix = normalizeNodePacketBucketUnix(row && row.bucket_unix);
+          const packetCountRaw = Number(row && row.packet_count);
+          const packetCount = Number.isFinite(packetCountRaw)
+            ? Math.max(0, Math.trunc(packetCountRaw))
+            : 0;
+          return bucketUnix
+            ? {{
+                bucket_unix: bucketUnix,
+                bucket_time: String(row && row.bucket_time || "").trim(),
+                packet_count: packetCount,
+              }}
+            : null;
+        }})
+        .filter((row) => !!row)
+        .filter((row) => row.bucket_unix >= startUnix && row.bucket_unix <= endUnix)
+        .sort((a, b) => a.bucket_unix - b.bucket_unix);
+      const zeroFilledRows = (baseRows, bucketPointMap = null) => {{
+        const sourceRows = Array.isArray(baseRows) ? baseRows : [];
+        if (!sourceRows.length) return [];
+        const firstBucket = Number(sourceRows[0] && (sourceRows[0].bucketUnix ?? sourceRows[0].bucket_unix));
+        const lastBucket = Number(sourceRows[sourceRows.length - 1] && (sourceRows[sourceRows.length - 1].bucketUnix ?? sourceRows[sourceRows.length - 1].bucket_unix));
+        if (!Number.isFinite(firstBucket) || !Number.isFinite(lastBucket) || lastBucket < firstBucket) {{
+          return sourceRows;
+        }}
+        const spanBuckets = Math.floor((lastBucket - firstBucket) / 60) + 1;
+        if (!Number.isFinite(spanBuckets) || spanBuckets <= 0 || spanBuckets > 10000) {{
+          return sourceRows;
+        }}
+        const lookup = bucketPointMap instanceof Map
+          ? bucketPointMap
+          : new Map(sourceRows.map((row) => [Number(row && (row.bucketUnix ?? row.bucket_unix)), row]));
+        const filledRows = [];
+        for (let bucketUnix = firstBucket; bucketUnix <= lastBucket; bucketUnix += 60) {{
+          const existing = lookup.get(bucketUnix);
+          filledRows.push(existing || {{
+            bucket_unix: bucketUnix,
+            bucket_time: "",
+            packet_count: 0,
+          }});
+        }}
+        return filledRows;
+      }};
+
+      const payload = (packetSeriesPayload && typeof packetSeriesPayload === "object")
+        ? packetSeriesPayload
+        : null;
+      const packetSeriesByKey = (
+        payload
+        && payload.series
+        && typeof payload.series === "object"
+      ) ? payload.series : null;
+      const packetSeriesMetric = !!(
+        payload
+        && payload.available === true
+        && packetSeriesByKey
+      );
+      if (!packetSeriesMetric) {{
+        return {{
+          rows: zeroFilledRows(normalizedRows).map((row) => ({{
+            value: row.packet_count,
+            totalValue: row.packet_count,
+            bucketText: row.bucket_time,
+            bucketUnix: row.bucket_unix,
+          }})),
+          packetSeriesMetric: false,
+        }};
+      }}
+
+      const selectedPacketSeriesKeys = networkOverviewPacketSeriesOrder.filter((key) => nodePacketSeriesEnabled[key]);
+      const packetSeriesLookups = new Map();
+      const bucketPointMap = new Map();
+      for (const row of normalizedRows) {{
+        bucketPointMap.set(row.bucket_unix, {{
+          bucketUnix: row.bucket_unix,
+          bucketText: row.bucket_time,
+          totalValue: row.packet_count,
+        }});
+      }}
+
+      for (const key of networkOverviewPacketSeriesOrder) {{
+        const lookup = new Map();
+        const seriesRows = Array.isArray(packetSeriesByKey[key]) ? packetSeriesByKey[key] : [];
+        for (const row of seriesRows) {{
+          if (!row || typeof row !== "object") continue;
+          const bucketUnix = normalizeNodePacketBucketUnix(row.bucket_unix);
+          const packetCount = Number(row.packet_count);
+          if (!Number.isFinite(bucketUnix) || bucketUnix < startUnix || bucketUnix > endUnix) continue;
+          if (!Number.isFinite(packetCount) || packetCount <= 0) continue;
+          lookup.set(bucketUnix, packetCount);
+          if (!bucketPointMap.has(bucketUnix)) {{
+            bucketPointMap.set(bucketUnix, {{
+              bucketUnix,
+              bucketText: "",
+              totalValue: null,
+            }});
+          }}
+        }}
+        packetSeriesLookups.set(key, lookup);
+      }}
+
+      const bucketSeconds = Math.max(1, Number(payload.bucket_seconds) || 60);
+      const packetRateScale = 60 / bucketSeconds;
+      const chartRows = [];
+      const orderedRows = zeroFilledRows(
+        Array.from(bucketPointMap.values())
+          .slice()
+          .sort((left, right) => left.bucketUnix - right.bucketUnix),
+        new Map(Array.from(bucketPointMap.entries()))
+      ).map((row) => ({{
+        bucketUnix: Number(row.bucketUnix ?? row.bucket_unix),
+        bucketText: String((row.bucketText ?? row.bucket_time) || "").trim(),
+        totalValue: Number.isFinite(Number(row.totalValue))
+          ? Number(row.totalValue)
+          : Math.max(0, Math.trunc(Number(row.packet_count) || 0)),
+      }}));
+      for (const row of orderedRows) {{
+        const seriesValues = {{}};
+        let primaryValue = null;
+        for (const key of selectedPacketSeriesKeys) {{
+          const lookup = packetSeriesLookups.get(key);
+          const packetCount = lookup instanceof Map ? Number(lookup.get(row.bucketUnix) || 0) : 0;
+          const packetRate = Math.max(0, packetCount) * packetRateScale;
+          seriesValues[key] = packetRate;
+          if (primaryValue === null) {{
+            primaryValue = packetRate;
+          }}
+        }}
+        if (primaryValue === null) continue;
+        chartRows.push({{
+          value: primaryValue,
+          series: seriesValues,
+          totalValue: Number.isFinite(Number(row.totalValue)) ? Number(row.totalValue) : null,
+          bucketText: String(row.bucketText || "").trim(),
+          bucketUnix: row.bucketUnix,
+        }});
+      }}
+
+      return {{
+        rows: chartRows,
+        packetSeriesMetric: true,
+      }};
     }}
 
     function renderNodeOnlineChart(points, windowHours = null, packetTimestamps = null, nodeId = null) {{
@@ -545,26 +704,8 @@
       );
     }}
 
-    function renderNodePacketsChart(points, windowHours = null, nodeId = null) {{
-      const svg = document.getElementById("node-packets-chart");
-      const empty = document.getElementById("node-packets-empty");
-      if (!(svg instanceof SVGElement) || !(empty instanceof HTMLElement)) return;
+    function renderNodePacketsChart(points, windowHours = null, nodeId = null, packetSeriesPayload = null) {{
       const chartState = historyTrendCharts.nodePackets;
-      bindHistoryTrendChartZoom(
-        chartState,
-        () => rerenderNodePacketsChartFromCache(),
-        "Node packets history chart"
-      );
-
-      const normalizeUnixSeconds = (raw) => {{
-        const numeric = Number(raw);
-        if (!Number.isFinite(numeric) || numeric <= 0) return null;
-        if (numeric > 100000000000) {{
-          return Math.floor(numeric / 1000);
-        }}
-        return Math.floor(numeric);
-      }};
-
       const rows = Array.isArray(points) ? points : [];
       const windowHoursRaw = Number(windowHours);
       const defaultWindowHours = Number(nodeHistoryHours);
@@ -578,117 +719,28 @@
       chartState.nodeId = currentNodeId;
       chartState.sourcePoints = rows;
       chartState.sourceWindowHours = resolvedWindowHours;
+      chartState.sourcePacketSeries = (packetSeriesPayload && typeof packetSeriesPayload === "object")
+        ? packetSeriesPayload
+        : null;
       const windowSeconds = Math.max(60, Math.round(resolvedWindowHours * 3600));
       const endUnix = Math.floor(Date.now() / 1000);
       const startUnix = endUnix - windowSeconds;
-
-      const allPlotRows = rows
-        .map((row) => {{
-          const bucketUnix = normalizeUnixSeconds(row && row.bucket_unix);
-          const packetCountRaw = Number(row && row.packet_count);
-          const packetCount = Number.isFinite(packetCountRaw)
-            ? Math.max(0, Math.trunc(packetCountRaw))
-            : 0;
-          return bucketUnix
-            ? {{ bucket_unix: bucketUnix, packet_count: packetCount }}
-            : null;
-        }})
-        .filter((row) => !!row)
-        .filter((row) => row.bucket_unix >= startUnix && row.bucket_unix <= endUnix)
-        .sort((a, b) => a.bucket_unix - b.bucket_unix);
-      chartState.points = allPlotRows;
-      const visible = getVisibleHistoryTrendRows(chartState, allPlotRows);
-      const plotRows = visible.rows;
-      setHistoryTrendChartTitle(svg, "Node packets history chart", visible.zoomed);
-
-      const width = signalChartLayout.width;
-      const height = signalChartLayout.height;
-      const padLeft = signalChartLayout.padLeft;
-      const padRight = signalChartLayout.padRight;
-      const padTop = signalChartLayout.padTop;
-      const padBottom = signalChartLayout.padBottom;
-      const plotW = width - padLeft - padRight;
-      const plotH = height - padTop - padBottom;
-
-      if (allPlotRows.length === 0 || plotRows.length === 0) {{
-        svg.innerHTML = "";
-        empty.hidden = false;
-        empty.textContent = "No packet-rate history yet for this node.";
-        renderTimeline(
-          "node-packets-timeline",
-          plotRows,
-          padLeft,
-          padRight,
-          width,
-          (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
-        );
-        return;
-      }}
-      empty.hidden = true;
-
-      const counts = plotRows.map((row) => Number(row.packet_count) || 0);
-      const maxPackets = Math.max(1, ...counts);
-      const avgPackets = counts.length
-        ? (counts.reduce((sum, value) => sum + value, 0) / counts.length)
-        : 0;
-      let viewStartUnix = Number(plotRows[0] && plotRows[0].bucket_unix);
-      let viewEndUnix = Number(plotRows[plotRows.length - 1] && plotRows[plotRows.length - 1].bucket_unix);
-      if (!Number.isFinite(viewStartUnix)) viewStartUnix = startUnix;
-      if (!Number.isFinite(viewEndUnix)) viewEndUnix = endUnix;
-      viewStartUnix = Math.max(startUnix, Math.trunc(viewStartUnix));
-      viewEndUnix = Math.min(endUnix, Math.trunc(viewEndUnix));
-      if (!(viewEndUnix > viewStartUnix)) {{
-        viewStartUnix = startUnix;
-        viewEndUnix = endUnix;
-      }}
-      const viewWindowSeconds = Math.max(60, viewEndUnix - viewStartUnix);
-
-      const xFromUnix = (unixTs) => {{
-        const ratio = Math.max(0, Math.min(1, (Number(unixTs) - viewStartUnix) / viewWindowSeconds));
-        return padLeft + (ratio * plotW);
-      }};
-      const yFromCount = (count) => (
-        padTop + ((maxPackets - Math.max(0, Number(count) || 0)) / maxPackets) * plotH
+      const built = buildNodePacketChartRows(
+        rows,
+        packetSeriesPayload,
+        startUnix,
+        endUnix
       );
-
-      let path = "";
-      const bars = [];
-      const minBarWidth = 1.5;
-      const approxWidth = Math.max(minBarWidth, plotW / Math.max(25, plotRows.length));
-      for (let i = 0; i < plotRows.length; i += 1) {{
-        const row = plotRows[i];
-        const x = xFromUnix(row.bucket_unix);
-        const y = yFromCount(row.packet_count);
-        path += `${{i === 0 ? "M" : " L"}} ${{x.toFixed(2)}} ${{y.toFixed(2)}}`;
-        const barHeight = Math.max(1, (padTop + plotH) - y);
-        bars.push(
-          `<rect x="${{(x - (approxWidth / 2)).toFixed(2)}}" y="${{y.toFixed(2)}}" width="${{approxWidth.toFixed(2)}}" height="${{barHeight.toFixed(2)}}" fill="currentColor" opacity="0.22"></rect>`
-        );
-      }}
-
-      const chartPalette = historyChartPalette();
-      const rightMetricX = width - 6;
-
-      svg.setAttribute("viewBox", `0 0 ${{width}} ${{height}}`);
-      svg.innerHTML = `
-        <rect x="0" y="0" width="${{width}}" height="${{height}}" fill="none"></rect>
-        <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{padLeft}}" y2="${{height - padBottom}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
-        <line x1="${{padLeft}}" y1="${{padTop + plotH}}" x2="${{width - padRight}}" y2="${{padTop + plotH}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
-        <line x1="${{padLeft}}" y1="${{padTop}}" x2="${{width - padRight}}" y2="${{padTop}}" stroke="${{chartPalette.grid}}" stroke-width="1"></line>
-        <g style="color:${{chartPalette.line}}">${{bars.join("")}}</g>
-        <path d="${{path}}" fill="none" stroke="${{chartPalette.line}}" stroke-width="2.3"></path>
-        <text x="${{padLeft - 4}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">${{formatMetricValue(maxPackets, 0)}}</text>
-        <text x="${{padLeft - 4}}" y="${{(padTop + plotH + 4).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">0</text>
-        <text x="${{rightMetricX.toFixed(2)}}" y="${{(padTop + 10).toFixed(2)}}" font-size="10" text-anchor="end" fill="${{chartPalette.label}}">avg ${{formatMetricValue(avgPackets, 1)}}/min</text>
-      `;
-
-      renderTimeline(
-        "node-packets-timeline",
-        plotRows,
-        padLeft,
-        padRight,
-        width,
-        (row) => timelinePointUnix(row, "bucket_unix", ["bucket_local", "bucket_time"])
+      const packetSeries = built.packetSeriesMetric ? nodePacketSeriesEnabled : null;
+      const metricMeta = resolveWeeklySummaryMetricMeta("packets", weeklySummaryNodeSeriesEnabled, packetSeries);
+      const emptyMessage = built.packetSeriesMetric
+        ? "No packet activity yet in this window."
+        : "No packet-rate history yet for this node.";
+      renderWeeklySummaryChartRows(
+        built.rows,
+        metricMeta,
+        emptyMessage,
+        {{ targetKey: "node-packets" }}
       );
     }}
 
@@ -702,6 +754,17 @@
       const target = resolveWeeklySummaryRenderTarget(targetKey);
       const chartState = target && target.chartState;
       const rows = chartState && Array.isArray(chartState.points) ? chartState.points : [];
+      if (target && target.key === "node-packets") {{
+        const packetSeries = rows.some((row) => row && row.series && typeof row.series === "object")
+          ? nodePacketSeriesEnabled
+          : null;
+        const metricMeta = resolveWeeklySummaryMetricMeta("packets", weeklySummaryNodeSeriesEnabled, packetSeries);
+        const emptyMessage = packetSeries
+          ? "No packet activity yet in this window."
+          : "No packet-rate history yet for this node.";
+        renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage, {{ targetKey: target.key }});
+        return;
+      }}
       const metricKey = target && target.key === "network-overview"
         ? normalizeWeeklySummaryMetric(networkOverviewMetric)
         : normalizeWeeklySummaryMetric(weeklySummaryMetric);

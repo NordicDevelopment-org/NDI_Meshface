@@ -39,11 +39,12 @@ def load_node_history_data(
             metric_rows=[],
             position_rows=[],
             packet_rows=[],
+            packet_type_rows=[],
         )
 
     limit = max(20, min(10000, int(max_points)))
     cutoff = int(now_unix_fn()) - (hours * 3600)
-    rows, position_rows, packet_rows = fetch_node_history_rows_fn(
+    rows, position_rows, packet_rows, packet_type_rows = fetch_node_history_rows_fn(
         conn,
         node_id=clean_node_id,
         cutoff=cutoff,
@@ -55,6 +56,7 @@ def load_node_history_data(
         metric_rows=rows,
         position_rows=position_rows,
         packet_rows=packet_rows,
+        packet_type_rows=packet_type_rows,
     )
 
 
