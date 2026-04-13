@@ -32,20 +32,6 @@
       }};
     }}
 
-    function weeklySummaryQuantileFromSorted(sortedValues, quantile) {{
-      const values = Array.isArray(sortedValues) ? sortedValues : [];
-      if (!values.length) return null;
-      const q = Math.max(0, Math.min(1, Number(quantile) || 0));
-      const pos = (values.length - 1) * q;
-      const base = Math.floor(pos);
-      const frac = pos - base;
-      const lower = Number(values[base]);
-      if (!Number.isFinite(lower)) return null;
-      const upper = Number(values[base + 1]);
-      if (!Number.isFinite(upper)) return lower;
-      return lower + ((upper - lower) * frac);
-    }}
-
     function resolveWeeklySummaryChartDomain(plottedSeriesEntries, targetKey = "history") {{
       const rawValues = plottedSeriesEntries.flatMap((entry) => (
         Array.isArray(entry && entry.displayedRawValues) ? entry.displayedRawValues : []
@@ -101,31 +87,17 @@
         }};
         const domainRawValues = collectEnvelopeValues("rawPoints");
         const domainTrendValues = collectEnvelopeValues("plottedPoints");
-        const domainValues = domainRawValues.concat(domainTrendValues)
+        const domainValues = (domainTrendValues.length ? domainTrendValues : domainRawValues)
           .filter((value) => Number.isFinite(value));
-        const sortedRawValues = domainRawValues.slice().sort((a, b) => a - b);
-        const rawSoftCeiling = weeklySummaryQuantileFromSorted(
-          sortedRawValues,
-          sortedRawValues.length >= 96 ? 0.97 : 0.94
-        );
-        const trendMax = domainTrendValues.length ? Math.max(...domainTrendValues) : Number.NEGATIVE_INFINITY;
         const rawMax = domainRawValues.length ? Math.max(...domainRawValues) : Number.NEGATIVE_INFINITY;
         if (domainValues.every((value) => value >= 0)) {{
           minVal = 0;
         }} else if (domainValues.length) {{
           minVal = Math.min(...domainValues);
         }}
-        if (Number.isFinite(rawSoftCeiling)) {{
-          maxVal = Math.max(
-            Number.isFinite(trendMax) ? trendMax : Number.NEGATIVE_INFINITY,
-            rawSoftCeiling
-          );
-          if (Number.isFinite(rawMax) && rawMax <= (rawSoftCeiling * 1.35)) {{
-            maxVal = Math.max(maxVal, rawMax);
-          }}
-          clampValues = Number.isFinite(rawMax) && rawMax > maxVal;
-        }} else if (domainValues.length) {{
+        if (domainValues.length) {{
           maxVal = Math.max(...domainValues);
+          clampValues = Number.isFinite(rawMax) && rawMax > maxVal;
         }}
       }} else if (allNonNegative) {{
         minVal = Math.min(0, minVal);

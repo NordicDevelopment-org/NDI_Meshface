@@ -26,6 +26,7 @@ _PACKET_TYPE_ORDER = (
     "telemetry",
     "position",
     "routing",
+    "storeforward",
     "nodeinfo",
     "admin",
     "encrypted",

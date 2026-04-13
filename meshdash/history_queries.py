@@ -11,6 +11,7 @@ CASE
   WHEN upper(trim(portnum)) = 'TELEMETRY_APP' THEN 'telemetry'
   WHEN upper(trim(portnum)) = 'POSITION_APP' THEN 'position'
   WHEN upper(trim(portnum)) = 'ROUTING_APP' THEN 'routing'
+  WHEN upper(trim(portnum)) = 'STORE_FORWARD_APP' THEN 'storeforward'
   WHEN upper(trim(portnum)) = 'NODEINFO_APP' THEN 'nodeinfo'
   WHEN upper(trim(portnum)) = 'ADMIN_APP' THEN 'admin'
   ELSE 'other'
