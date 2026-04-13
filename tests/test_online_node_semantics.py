@@ -62,5 +62,5 @@ def test_dashboard_js_keeps_node_history_right_side_labels_inside_chart_frame() 
 
     assert "const rightAxisLabelX = width - 6;" in js
     assert "const rightMetricX = width - 6;" in js
-    assert '<text x="${rightAxisLabelX.toFixed(2)}" y="${padTop + 10}" font-size="10" text-anchor="end" fill="${chartPalette.rssiLabel}">${formatMetricValue(rssiMax, 0)}</text>' in js
+    assert '<text x="${rightAxisLabelX.toFixed(2)}" y="${padTop + 10}" font-size="10" text-anchor="end" fill="${chartPalette.compareLabel}">${formatMetricValue(rssiMax, 0)}</text>' in js
     assert '<text x="${rightMetricX.toFixed(2)}" y="${(padTop + 10).toFixed(2)}" font-size="10" text-anchor="end" fill="${chartPalette.label}">avg ${formatMetricValue(avgPackets, 1)}/min</text>' in js

@@ -15,7 +15,7 @@ def test_dashboard_js_includes_node_arrow_navigation_binding() -> None:
 
     assert "function bindNodeDirectionalKeys()" in js
     assert 'if (ev.key !== "ArrowUp" && ev.key !== "ArrowDown") return;' in js
-    assert "bindNodeDirectionalKeys();" in js
+    assert 'runBootStep("bindNodeDirectionalKeys", () => bindNodeDirectionalKeys());' in js
 
 
 def test_dashboard_js_limits_arrow_navigation_to_visible_node_lists() -> None:

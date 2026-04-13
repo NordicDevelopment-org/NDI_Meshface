@@ -548,8 +548,8 @@ def test_chat_node_list_can_collapse_into_compact_rail() -> None:
     assert "function persistChatPanelCollapseState() {" in js
     assert "function bindChatPanelCollapseToggle() {" in js
     assert 'window.localStorage.setItem(chatPanelCollapsedStorageKey, chatPanelCollapsed ? "1" : "0");' in js
-    assert 'loadChatPanelCollapseState();' in js
-    assert 'bindChatPanelCollapseToggle();' in js
+    assert 'runBootStep("loadChatPanelCollapseState", () => loadChatPanelCollapseState());' in js
+    assert 'runBootStep("bindChatPanelCollapseToggle", () => bindChatPanelCollapseToggle());' in js
 
 
 def test_chat_mobile_layout_stacks_feed_meta_and_header_filters() -> None:

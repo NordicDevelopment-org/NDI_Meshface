@@ -158,7 +158,7 @@ def test_dashboard_js_supports_idle_toggle_in_node_navigator() -> None:
         node_history_max_points=240,
     )
 
-    assert "let chatNodeNavigatorShowIdle = true;" in js
+    assert "let chatNodeNavigatorShowIdle = false;" in js
     assert "function normalizeChatNodeNavigatorShowIdlePref(value) {" in js
     assert 'showIdle: normalizeChatNodeNavigatorShowIdlePref(chatNodeNavigatorShowIdle),' in js
     assert 'const nextShowIdle = normalizeChatNodeNavigatorShowIdlePref(' in js

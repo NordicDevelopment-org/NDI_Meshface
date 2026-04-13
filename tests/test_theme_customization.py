@@ -264,7 +264,7 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert "Tint-backed utility chrome" in html
     assert "Tint color drives the shared shell tint used by help notes, console chrome" in html
     assert "Tint intensity scales that shared tint from neutral up to a clearly visible wash" in html
-    assert "Badge shows in the workspace menu header" in html
+    assert "Badge shows in the workspace launcher square" in html
     assert "Off leaves untagged node and chat surfaces neutral" in html
 
     assert 'let themePresetSelected = "custom";' in js
@@ -291,7 +291,7 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert "custom_theme: {" in js
     assert 'presetName: opts.presetName == null ? "custom" : opts.presetName' in js
     assert "function bindThemeCustomControls() {" in js
-    assert "bindThemeCustomControls();" in js
+    assert 'runBootStep("bindThemeCustomControls", () => bindThemeCustomControls());' in js
     assert 'controlId === "settings-appearance-badge-emoji"' in js
     assert 'controlId === "theme-custom-base-color"' in js
     assert 'controlId === "theme-custom-line-color"' in js
