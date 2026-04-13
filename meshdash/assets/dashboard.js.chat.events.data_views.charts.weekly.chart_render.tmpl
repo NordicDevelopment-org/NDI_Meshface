@@ -270,7 +270,9 @@
       );
       const rawBucketWidthPx = 1.05;
       const trendBucketWidthPx = 4.0;
-      const trendTension = 0.28;
+      const trendTension = String(target && target.key || "").trim().toLowerCase() === "node-packets"
+        ? 0.16
+        : 0.28;
       const pointScreenX = (point) => (
         padLeft + ((Math.max(0, Number(point && point.idx) || 0) / Math.max(1, n - 1)) * plotW)
       );
