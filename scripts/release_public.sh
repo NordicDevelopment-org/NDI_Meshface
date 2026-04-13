@@ -14,10 +14,6 @@ Options:
   --target-branch <name>   Public branch name (default: $PUBLIC_RELEASE_BRANCH or release-candidate)
   --allowlist <path>       Allowlist file (default: .public-release-allowlist)
   --profile <name>         Use .public-release/allowlists/<name>.allowlist
-  --drift-branch <name>    Branch name that requires drift guard (default: $PUBLIC_DRIFT_BRANCH or source branch)
-  --drift-base-branch <name> Base branch for drift guard (default: $PUBLIC_DRIFT_BASE_BRANCH; unset disables drift check)
-  --drift-allowlist <path> Drift allowlist file (default: $PUBLIC_DRIFT_ALLOWLIST or .public-release/allowlists/public-v0-drift.allowlist)
-  --skip-drift-check       Skip branch drift preflight guard
   --config <path>          Config file to source (default: .public-release/config.env)
   --list-profiles          Show available allowlist profiles and exit
   --message <text>         Commit message for the public release commit
@@ -36,9 +32,6 @@ Config file format:
       PUBLIC_RELEASE_BRANCH
       PUBLIC_RELEASE_PROFILE
       PUBLIC_RELEASE_ALLOWLIST
-      PUBLIC_DRIFT_BRANCH
-      PUBLIC_DRIFT_BASE_BRANCH
-      PUBLIC_DRIFT_ALLOWLIST
 EOF
 }
 
@@ -68,14 +61,10 @@ target_remote=""
 target_branch=""
 allowlist_file=""
 profile_name=""
-drift_branch=""
-drift_base_branch=""
-drift_allowlist_file=""
 config_file=".public-release/config.env"
 commit_message=""
 dry_run=0
 allow_dirty=0
-drift_check=1
 list_profiles=0
 target_remote_arg=0
 target_branch_arg=0
@@ -112,25 +101,6 @@ while [[ $# -gt 0 ]]; do
       profile_name="$2"
       profile_arg=1
       shift 2
-      ;;
-    --drift-branch)
-      require_arg "$1" "${2-}"
-      drift_branch="$2"
-      shift 2
-      ;;
-    --drift-base-branch)
-      require_arg "$1" "${2-}"
-      drift_base_branch="$2"
-      shift 2
-      ;;
-    --drift-allowlist)
-      require_arg "$1" "${2-}"
-      drift_allowlist_file="$2"
-      shift 2
-      ;;
-    --skip-drift-check)
-      drift_check=0
-      shift
       ;;
     --config)
       require_arg "$1" "${2-}"
@@ -192,15 +162,6 @@ fi
 if [[ "$allowlist_arg" -eq 0 ]]; then
   allowlist_file="${PUBLIC_RELEASE_ALLOWLIST:-.public-release-allowlist}"
 fi
-if [[ -z "$drift_branch" ]]; then
-  drift_branch="${PUBLIC_DRIFT_BRANCH:-$source_branch}"
-fi
-if [[ -z "$drift_base_branch" ]]; then
-  drift_base_branch="${PUBLIC_DRIFT_BASE_BRANCH:-}"
-fi
-if [[ -z "$drift_allowlist_file" ]]; then
-  drift_allowlist_file="${PUBLIC_DRIFT_ALLOWLIST:-.public-release/allowlists/public-v0-drift.allowlist}"
-fi
 
 if [[ -n "$profile_name" ]]; then
   profile_file=".public-release/allowlists/${profile_name}.allowlist"
@@ -215,15 +176,6 @@ echo "Release allowlist: ${allowlist_file}"
 if [[ -n "$profile_name" ]]; then
   echo "Release profile: ${profile_name}"
 fi
-if [[ "$drift_check" -eq 1 ]]; then
-  if [[ -n "$drift_base_branch" ]]; then
-    echo "Drift guard: ${drift_branch} vs ${drift_base_branch} (${drift_allowlist_file})"
-  else
-    echo "Drift guard: disabled (no base branch configured)"
-  fi
-else
-  echo "Drift guard: disabled (--skip-drift-check)"
-fi
 
 [[ -f "$allowlist_file" ]] || die "allowlist file not found: $allowlist_file"
 git remote get-url "$target_remote" >/dev/null 2>&1 || die "remote '$target_remote' not found"
@@ -231,13 +183,6 @@ source_commit="$(git rev-parse --verify "${source_branch}^{commit}")" || die "in
 
 if [[ "$allow_dirty" -eq 0 ]] && [[ -n "$(git status --porcelain)" ]]; then
   die "source repo has uncommitted changes (commit/stash first, or use --allow-dirty)"
-fi
-
-if [[ "$drift_check" -eq 1 ]] && [[ -n "$drift_base_branch" ]] && [[ "$source_branch" == "$drift_branch" ]]; then
-  bash "./scripts/check_public_branch_drift.sh" \
-    --base-branch "$drift_base_branch" \
-    --public-branch "$source_branch" \
-    --allowlist "$drift_allowlist_file"
 fi
 
 allowlist_paths=()

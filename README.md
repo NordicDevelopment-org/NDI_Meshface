@@ -112,7 +112,6 @@ unavailable.
 - `meshdash/history*.py`, `meshdash/history/` - SQLite schema, reads, writes,
   analytics, rollups, pruning
 - `scripts/deploy_meshyface.sh` - remote deploy/bootstrap helper
-- `scripts/check_public_branch_drift.sh` - branch-drift guard
 - `scripts/release_public.sh` - allowlist-driven public release packager
 - `tests/` - public-branch regression tests included in this repo
 
@@ -702,7 +701,6 @@ python -m pytest -q
 Useful public-branch release checks:
 
 ```bash
-./scripts/check_public_branch_drift.sh --public-branch release/public-v0 --base-branch <private-branch>
 ./scripts/release_public.sh --source-branch release/public-v0 --dry-run
 ```
 
