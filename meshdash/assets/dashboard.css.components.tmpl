@@ -1,10 +1,11 @@
-      box-shadow: none;
-      border-radius: 0;
-      padding: 0;
+      );
+      box-shadow: inset 0 0 0 1px rgba(var(--chat-send-channel-rgb), 0.06);
+      border-radius: 10px;
+      padding: 6px;
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 0;
+      gap: 5px;
       min-height: 0;
     }}
     .chat-composer {{
@@ -284,9 +285,43 @@
       background: #edf6f0;
     }}
     #chat-input {{
+      --chat-send-channel-fill: #0072b2;
+      --chat-send-channel-rgb: 0, 114, 178;
       flex: 1 1 auto;
       width: auto;
       min-width: 0;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.34);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-send-channel-rgb), 0.08),
+          rgba(var(--chat-send-channel-rgb), 0.03) 38%,
+          rgba(249, 253, 249, 0.98) 100%
+        );
+      box-shadow: none;
+    }}
+    #chat-input:hover {{
+      border-color: rgba(var(--chat-send-channel-rgb), 0.42);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-send-channel-rgb), 0.09),
+          rgba(var(--chat-send-channel-rgb), 0.035) 38%,
+          rgba(250, 254, 250, 0.98) 100%
+        );
+    }}
+    #chat-input:focus {{
+      outline: 2px solid rgba(var(--chat-send-channel-rgb), 0.28);
+      outline-offset: 0;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.48);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-send-channel-rgb), 0.1),
+          rgba(var(--chat-send-channel-rgb), 0.04) 38%,
+          rgba(255, 255, 255, 0.99) 100%
+        );
+      box-shadow: none;
     }}
     #chat-send-btn {{
       border: 1px solid #9cc9ad;
@@ -4555,6 +4590,41 @@
       font-size: 11px;
       padding: 5px 7px;
     }}
+    [data-theme="dark"] #chat-input {{
+      border-color: rgba(var(--chat-send-channel-rgb), 0.4);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-send-channel-rgb), 0.12),
+          rgba(var(--chat-send-channel-rgb), 0.05) 40%,
+          rgba(7, 20, 13, 0.99) 100%
+        );
+      box-shadow: none;
+    }}
+    [data-theme="dark"] #chat-input:hover {{
+      border-color: rgba(var(--chat-send-channel-rgb), 0.48);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-send-channel-rgb), 0.14),
+          rgba(var(--chat-send-channel-rgb), 0.055) 40%,
+          rgba(9, 23, 15, 0.99) 100%
+        );
+    }}
+    [data-theme="dark"] #chat-input:focus {{
+      outline: 2px solid rgba(var(--chat-send-channel-rgb), 0.32);
+      outline-offset: 0;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.54);
+      outline-color: rgba(var(--chat-send-channel-rgb), 0.32);
+      background:
+        linear-gradient(
+          90deg,
+          rgba(var(--chat-send-channel-rgb), 0.15),
+          rgba(var(--chat-send-channel-rgb), 0.06) 40%,
+          rgba(11, 30, 19, 0.99) 100%
+        );
+      box-shadow: none;
+    }}
     [data-theme="dark"] .list-search-input.has-search-clear-button {{
       padding-right: 28px;
     }}
@@ -5473,12 +5543,15 @@
 
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .card.chat .chat-compose-shell {{
-      background: var(--ui-panel) !important;
-      background-image: none !important;
-      border-color: color-mix(in srgb, var(--ui-border) 62%, transparent) !important;
-      box-shadow: none;
+      background:
+        linear-gradient(
+          180deg,
+          rgba(var(--chat-send-channel-rgb), 0.1),
+          rgba(16, 26, 36, 0.99) 34%
+        ) !important;
+      border-color: rgba(var(--chat-send-channel-rgb), 0.38) !important;
+      box-shadow: inset 0 0 0 1px rgba(var(--chat-send-channel-rgb), 0.08);
     }}
-    [data-theme="dark"] .layout.view-chat .card.chat .chat-compose-shell,
     [data-theme="dark"] .layout.view-chat .card.chat .chat-composer {{
       background: transparent !important;
       background-image: none !important;
