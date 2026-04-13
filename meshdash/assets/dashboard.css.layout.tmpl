@@ -4216,6 +4216,9 @@
       min-height: 92px;
       max-height: none;
     }}
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-member-list {{
+      flex-basis: clamp(18%, var(--chat-node-list-pct, 56%), 42%);
+    }}
     .chat-left-section.chat-users-section.has-node-details .chat-node-details-splitter {{
       display: block;
     }}
@@ -4471,6 +4474,25 @@
       flex: 1 1 auto;
       height: auto;
       min-height: 0;
+    }}
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-node-details-history-host {{
+      padding: 4px 6px 6px 6px;
+      gap: 4px;
+    }}
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-node-details-history-host #tab-panel-signal,
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-node-details-history-host #tab-panel-online,
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-node-details-history-host #tab-panel-packets,
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-node-details-history-host #tab-panel-names,
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-node-details-history-host #tab-panel-overview {{
+      gap: 6px;
+    }}
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-node-details-history-host .signal-timeline {{
+      height: 34px;
+      margin-top: 4px;
+    }}
+    .chat-left-section.chat-users-section.has-node-details.history-focus .chat-node-details-history-host .signal-legend {{
+      margin-top: 4px;
+      gap: 8px;
     }}
     .chat-member-item {{
       --chat-member-node-hue: 145;

@@ -32,6 +32,117 @@
       }};
     }}
 
+    function weeklySummaryQuantileFromSorted(sortedValues, quantile) {{
+      const values = Array.isArray(sortedValues) ? sortedValues : [];
+      if (!values.length) return null;
+      const q = Math.max(0, Math.min(1, Number(quantile) || 0));
+      const pos = (values.length - 1) * q;
+      const base = Math.floor(pos);
+      const frac = pos - base;
+      const lower = Number(values[base]);
+      if (!Number.isFinite(lower)) return null;
+      const upper = Number(values[base + 1]);
+      if (!Number.isFinite(upper)) return lower;
+      return lower + ((upper - lower) * frac);
+    }}
+
+    function resolveWeeklySummaryChartDomain(plottedSeriesEntries, targetKey = "history") {{
+      const rawValues = plottedSeriesEntries.flatMap((entry) => (
+        Array.isArray(entry && entry.displayedRawValues) ? entry.displayedRawValues : []
+      ));
+      const trendValues = plottedSeriesEntries.flatMap((entry) => (
+        Array.isArray(entry && entry.displayedTrendValues) ? entry.displayedTrendValues : []
+      ));
+      const allValues = rawValues.concat(trendValues)
+        .filter((value) => Number.isFinite(value));
+      if (!allValues.length) {{
+        return {{
+          allValues,
+          minVal: 0,
+          maxVal: 1,
+          clampValues: false,
+        }};
+      }}
+      const cleanTargetKey = String(targetKey || "").trim().toLowerCase();
+      const allNonNegative = allValues.every((value) => value >= 0);
+      let minVal = Math.min(...allValues);
+      let maxVal = Math.max(...allValues);
+      let clampValues = false;
+      if (cleanTargetKey === "node-packets") {{
+        const preferredAllEntry = plottedSeriesEntries.find((entry) => (
+          String(entry && entry.key || "").trim().toLowerCase() === "all"
+        ));
+        const collectEnvelopeValues = (pointKey) => {{
+          const preferredPoints = Array.isArray(preferredAllEntry && preferredAllEntry[pointKey])
+            ? preferredAllEntry[pointKey]
+            : null;
+          if (preferredPoints && preferredPoints.length) {{
+            return preferredPoints
+              .map((point) => Number(point && point.value))
+              .filter((value) => Number.isFinite(value));
+          }}
+          const maximaByIdx = new Map();
+          for (const entry of plottedSeriesEntries) {{
+            const points = Array.isArray(entry && entry[pointKey]) ? entry[pointKey] : [];
+            for (const point of points) {{
+              const idx = Number(point && point.idx);
+              const value = Number(point && point.value);
+              if (!Number.isFinite(idx) || !Number.isFinite(value)) continue;
+              const current = maximaByIdx.get(idx);
+              if (!Number.isFinite(current) || value > current) {{
+                maximaByIdx.set(idx, value);
+              }}
+            }}
+          }}
+          return Array.from(maximaByIdx.entries())
+            .sort((left, right) => left[0] - right[0])
+            .map(([, value]) => value)
+            .filter((value) => Number.isFinite(value));
+        }};
+        const domainRawValues = collectEnvelopeValues("rawPoints");
+        const domainTrendValues = collectEnvelopeValues("plottedPoints");
+        const domainValues = domainRawValues.concat(domainTrendValues)
+          .filter((value) => Number.isFinite(value));
+        const sortedRawValues = domainRawValues.slice().sort((a, b) => a - b);
+        const rawSoftCeiling = weeklySummaryQuantileFromSorted(
+          sortedRawValues,
+          sortedRawValues.length >= 96 ? 0.97 : 0.94
+        );
+        const trendMax = domainTrendValues.length ? Math.max(...domainTrendValues) : Number.NEGATIVE_INFINITY;
+        const rawMax = domainRawValues.length ? Math.max(...domainRawValues) : Number.NEGATIVE_INFINITY;
+        if (domainValues.every((value) => value >= 0)) {{
+          minVal = 0;
+        }} else if (domainValues.length) {{
+          minVal = Math.min(...domainValues);
+        }}
+        if (Number.isFinite(rawSoftCeiling)) {{
+          maxVal = Math.max(
+            Number.isFinite(trendMax) ? trendMax : Number.NEGATIVE_INFINITY,
+            rawSoftCeiling
+          );
+          if (Number.isFinite(rawMax) && rawMax <= (rawSoftCeiling * 1.35)) {{
+            maxVal = Math.max(maxVal, rawMax);
+          }}
+          clampValues = Number.isFinite(rawMax) && rawMax > maxVal;
+        }} else if (domainValues.length) {{
+          maxVal = Math.max(...domainValues);
+        }}
+      }} else if (allNonNegative) {{
+        minVal = Math.min(0, minVal);
+      }}
+      if ((maxVal - minVal) < 1e-6) {{
+        maxVal = minVal + 1;
+      }} else {{
+        maxVal += ((maxVal - minVal) * 0.04);
+      }}
+      return {{
+        allValues,
+        minVal,
+        maxVal,
+        clampValues,
+      }};
+    }}
+
     function renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage, options = {{}}) {{
       const opts = (options && typeof options === "object") ? options : {{}};
       const target = resolveWeeklySummaryRenderTarget(opts.targetKey || "history");
@@ -272,19 +383,10 @@
         }};
       }});
 
-      const allValues = plottedSeriesEntries.flatMap((entry) => (
-        entry.displayedRawValues.concat(entry.displayedTrendValues)
-      ));
-      let minVal = Math.min(...allValues);
-      let maxVal = Math.max(...allValues);
-      if (allValues.every((value) => Number.isFinite(value) && value >= 0)) {{
-        minVal = Math.min(0, minVal);
-      }}
-      if ((maxVal - minVal) < 1e-6) {{
-        maxVal = minVal + 1;
-      }} else {{
-        maxVal += ((maxVal - minVal) * 0.04);
-      }}
+      const chartDomain = resolveWeeklySummaryChartDomain(plottedSeriesEntries, target && target.key);
+      let minVal = Number(chartDomain && chartDomain.minVal);
+      let maxVal = Number(chartDomain && chartDomain.maxVal);
+      const clampValues = !!(chartDomain && chartDomain.clampValues);
       const dayBoundaries = [];
       if (n > 1) {{
         let lastDayKey = "";
@@ -368,8 +470,12 @@
         const dashText = entry.dashed ? "5 3" : "";
         const dashAttr = dashText ? ` stroke-dasharray="${{dashText}}"` : "";
         const toScreenPoint = (point) => {{
+          const rawValue = Number(point && point.value);
+          const plottedValue = clampValues
+            ? Math.max(minVal, Math.min(maxVal, rawValue))
+            : rawValue;
           const x = padLeft + ((Math.max(0, point.idx) / Math.max(1, n - 1)) * plotW);
-          const y = padTop + ((maxVal - point.value) / (maxVal - minVal)) * plotH;
+          const y = padTop + ((maxVal - plottedValue) / (maxVal - minVal)) * plotH;
           return {{
             x,
             y,

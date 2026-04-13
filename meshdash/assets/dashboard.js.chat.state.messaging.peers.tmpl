@@ -1796,7 +1796,12 @@
       const usersSection = drawer.closest(".chat-left-section.chat-users-section");
       if (usersSection instanceof HTMLElement) {{
         usersSection.classList.toggle("has-node-details", visibleExpanded);
+        usersSection.classList.toggle(
+          "history-focus",
+          visibleExpanded && chatNodeDetailsDrawerTab === "history"
+        );
       }}
+      drawer.dataset.activeTab = visibleExpanded ? chatNodeDetailsDrawerTab : "";
       if (detailsSplitter instanceof HTMLElement) {{
         detailsSplitter.hidden = !visibleExpanded;
       }}
