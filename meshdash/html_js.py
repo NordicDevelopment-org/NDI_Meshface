@@ -160,14 +160,7 @@ _CORE_UI_STUB_TEMPLATE = "dashboard.js.profile.core_ui.noop_feature_hooks.tmpl"
 _RUNTIME_BOOT_TEMPLATE = "dashboard.js.runtime.boot.tmpl"
 
 
-def _normalize_ui_profile(raw_profile: object = None) -> str:
-    # The public branch only ships the curated core-ui asset set, so every
-    # profile token resolves to core-ui here.
-    return "core-ui"
-
-
-def _template_parts_for_profile(raw_profile: object = None) -> tuple[str, ...]:
-    _normalize_ui_profile(raw_profile)
+def _template_parts_for_profile() -> tuple[str, ...]:
     selected = list(_DASHBOARD_JS_TEMPLATE_PARTS)
     if _CORE_UI_STUB_TEMPLATE not in selected:
         try:
@@ -185,11 +178,10 @@ def build_dashboard_js(
     node_history_max_points: int,
     reset_ticker_scale_on_restart: bool = True,
     debug_mode: bool = False,
-    ui_profile: str | None = None,
     file_transfer_enabled: bool = False,
     file_transfer_max_bytes: int = _DEFAULT_FILE_TRANSFER_MAX_BYTES,
 ) -> str:
-    selected_parts = _template_parts_for_profile(ui_profile)
+    selected_parts = _template_parts_for_profile()
     try:
         parsed_file_transfer_max_bytes = int(file_transfer_max_bytes)
     except (TypeError, ValueError):

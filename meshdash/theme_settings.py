@@ -22,39 +22,6 @@ from .theme import (
 from .theme_presets import ThemePreset, ThemePresetMap, default_theme_presets, select_theme_preset
 
 
-def load_selected_theme_preset(settings_path: Optional[str]) -> Optional[str]:
-    if not settings_path:
-        return None
-    try:
-        payload = json.loads(Path(settings_path).read_text(encoding="utf-8"))
-    except Exception:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    selected = payload.get("selected_preset")
-    if selected is None:
-        return None
-    clean = str(selected).strip()
-    return clean or None
-
-
-def save_selected_theme_preset(settings_path: Optional[str], preset_name: str) -> Optional[str]:
-    if not settings_path:
-        return None
-    path = Path(settings_path)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = path.with_suffix(path.suffix + ".tmp")
-        temp_path.write_text(
-            json.dumps({"selected_preset": str(preset_name)}, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        temp_path.replace(path)
-    except Exception as exc:
-        return str(exc)
-    return None
-
-
 def _default_custom_theme_settings() -> dict[str, object]:
     return {
         "base_color": DEFAULT_CUSTOM_THEME_BASE_COLOR,

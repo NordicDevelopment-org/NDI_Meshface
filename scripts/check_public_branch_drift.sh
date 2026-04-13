@@ -9,8 +9,8 @@ Usage:
   ./scripts/check_public_branch_drift.sh [options]
 
 Options:
-  --base-branch <name>     Base/private branch (default: $PUBLIC_DRIFT_BASE_BRANCH or main)
-  --public-branch <name>   Public staging branch (default: $PUBLIC_DRIFT_BRANCH or release/public-v0)
+  --base-branch <name>     Base/private branch (default: $PUBLIC_DRIFT_BASE_BRANCH)
+  --public-branch <name>   Public staging branch (default: $PUBLIC_DRIFT_BRANCH or current branch)
   --allowlist <path>       Drift allowlist path (default: $PUBLIC_DRIFT_ALLOWLIST or .public-release/allowlists/public-v0-drift.allowlist)
   -h, --help               Show this help
 
@@ -41,8 +41,8 @@ trim() {
   printf '%s' "$value"
 }
 
-base_branch="${PUBLIC_DRIFT_BASE_BRANCH:-main}"
-public_branch="${PUBLIC_DRIFT_BRANCH:-release/public-v0}"
+base_branch="${PUBLIC_DRIFT_BASE_BRANCH:-}"
+public_branch="${PUBLIC_DRIFT_BRANCH:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')}"
 allowlist_file="${PUBLIC_DRIFT_ALLOWLIST:-.public-release/allowlists/public-v0-drift.allowlist}"
 
 while [[ $# -gt 0 ]]; do
@@ -75,6 +75,8 @@ done
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+[[ -n "$base_branch" ]] || die "base branch is required (pass --base-branch or set PUBLIC_DRIFT_BASE_BRANCH)"
+[[ -n "$public_branch" ]] || die "public branch is required (pass --public-branch or set PUBLIC_DRIFT_BRANCH)"
 git rev-parse --verify "${base_branch}^{commit}" >/dev/null 2>&1 || die "invalid base branch/commit: ${base_branch}"
 git rev-parse --verify "${public_branch}^{commit}" >/dev/null 2>&1 || die "invalid public branch/commit: ${public_branch}"
 [[ -f "$allowlist_file" ]] || die "drift allowlist file not found: ${allowlist_file}"

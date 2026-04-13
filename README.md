@@ -4,8 +4,7 @@ Meshyface is a chat-first Meshtastic dashboard that runs as a single Python
 service and serves a single-page web UI over HTTP.
 
 This branch (`release/public-v0`) is the curated public surface. In this branch,
-the renderer always normalizes the UI profile to `core-ui`, even if another
-profile token is supplied.
+the shipped frontend is the curated `core-ui` surface.
 
 ## Current Public Surface
 
@@ -23,8 +22,7 @@ Public `core-ui` currently exposes:
 Not part of the supported public launcher surface:
 
 - Dedicated Bots or Labs launcher views
-- Alternate UI profiles such as `full` or `labs-preview`; this branch resolves
-  them back to `core-ui`
+- Alternate UI profiles such as `full` or `labs-preview`
 
 The source tree still contains optional/private modules and dormant template
 sections used by other branches or slim builds. If an optional backend handler
@@ -262,7 +260,6 @@ From this repo:
   --bootstrap \
   --mesh-host 192.168.1.69 \
   --mesh-port 4403 \
-  --ui-profile core-ui \
   --clean-app-dir
 ```
 
@@ -292,7 +289,6 @@ Important naming note:
   --target j@192.168.1.241 \
   --mesh-host 192.168.1.69 \
   --mesh-port 4403 \
-  --ui-profile core-ui \
   --clean-app-dir
 ```
 
@@ -306,8 +302,7 @@ systemd unit plus the deploy root, then bootstraps fresh:
 ./scripts/deploy_meshyface.sh \
   --target j@192.168.1.121 \
   --wipe-remote-root \
-  --serial-path /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 \
-  --ui-profile core-ui
+  --serial-path /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
 ```
 
 `--wipe-remote-root` implies `--bootstrap`.
@@ -344,7 +339,6 @@ bootstrap flow works as long as the SSH user has `sudo` access:
   --bootstrap \
   --mesh-host 192.168.1.211 \
   --mesh-port 4403 \
-  --ui-profile core-ui \
   --clean-app-dir
 ```
 
@@ -362,7 +356,6 @@ If the Pi has a radio attached over USB serial instead of TCP, use the stable
   --target pi@raspberrypi.local \
   --bootstrap \
   --serial-path /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0 \
-  --ui-profile core-ui \
   --clean-app-dir
 ```
 
@@ -410,7 +403,6 @@ MESH_PORT=4403
 DASH_HOST=0.0.0.0
 DASH_PORT=8877
 REFRESH_MS=3000
-MESH_DASH_UI_PROFILE=core-ui
 MESH_DASH_HISTORY_DB=/home/j/mesh/mesh_dashboard_history.sqlite3
 MESH_DASH_FILE_TRANSFER_ENABLE=0
 MESH_DASH_FILE_TRANSFER_MAX_BYTES=65536
@@ -524,8 +516,6 @@ Related environment variables:
 
 - `MESH_DASH_PRIVATE_MODE`
 - `MESH_DASH_API_TOKEN`
-- `MESH_DASH_UI_PROFILE`
-
 ### History and analytics
 
 - `--history-db <path>`: base SQLite DB path
@@ -608,7 +598,6 @@ The deploy helper also accepts:
 - `MESH_DASH_DEPLOY_DASH_HOST`
 - `MESH_DASH_DEPLOY_DASH_PORT`
 - `MESH_DASH_DEPLOY_REFRESH_MS`
-- `MESH_DASH_DEPLOY_UI_PROFILE`
 - `MESH_DASH_DEPLOY_HISTORY_DB`
 - `MESH_DASH_DEPLOY_PYTHON_UNBUFFERED`
 - `MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE`
@@ -713,7 +702,7 @@ python -m pytest -q
 Useful public-branch release checks:
 
 ```bash
-./scripts/check_public_branch_drift.sh --public-branch release/public-v0 --base-branch main
+./scripts/check_public_branch_drift.sh --public-branch release/public-v0 --base-branch <private-branch>
 ./scripts/release_public.sh --source-branch release/public-v0 --dry-run
 ```
 

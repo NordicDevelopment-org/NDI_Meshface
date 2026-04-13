@@ -79,41 +79,6 @@ def test_dashboard_js_uses_semantic_ticker_state_profiles() -> None:
     assert 'stateProfile: Number.isFinite(nodeRssi) ? "signal_rssi" : "signal_snr"' in js
     assert 'stateProfile: "wifi_rssi"' in js
 
-
-def test_dashboard_js_normalizes_full_profile_to_core_ui() -> None:
-    core_js = build_dashboard_js(
-        refresh_ms=1000,
-        node_history_hours=24,
-        node_history_max_points=240,
-        ui_profile="core-ui",
-    )
-    full_js = build_dashboard_js(
-        refresh_ms=1000,
-        node_history_hours=24,
-        node_history_max_points=240,
-        ui_profile="full",
-    )
-
-    assert full_js == core_js
-
-
-def test_dashboard_js_normalizes_unknown_profile_to_core_ui() -> None:
-    core_js = build_dashboard_js(
-        refresh_ms=1000,
-        node_history_hours=24,
-        node_history_max_points=240,
-        ui_profile="core-ui",
-    )
-    unknown_js = build_dashboard_js(
-        refresh_ms=1000,
-        node_history_hours=24,
-        node_history_max_points=240,
-        ui_profile="labs-preview",
-    )
-
-    assert unknown_js == core_js
-
-
 def test_render_html_uses_single_row_compact_ticker_strip() -> None:
     html = render_html(
         refresh_ms=1000,

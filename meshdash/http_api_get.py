@@ -17,7 +17,7 @@ from .http_route_contracts import (
     ToIntFn,
 )
 from .http_routes import handle_dashboard_get
-from .services import empty_node_history, empty_online_activity, empty_summary_metrics
+from .history_views import empty_node_history, empty_online_activity, empty_summary_metrics
 
 
 class ParsedUrl(Protocol):

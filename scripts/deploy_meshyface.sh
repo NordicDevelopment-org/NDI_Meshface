@@ -43,7 +43,6 @@ Options:
   --dash-host <ip_or_dns>  Dashboard bind host (default: 0.0.0.0).
   --dash-port <port>       Dashboard bind port (default: 8877).
   --refresh-ms <ms>        Poll interval in ms (default: 3000).
-  --ui-profile <name>      Dashboard UI profile (public branch supports core-ui only).
   --history-db <path>      History DB path on target host.
   --file-transfer-enable   Enable file transfer in dashboard.env.
   --no-file-transfer-enable Disable file transfer in dashboard.env.
@@ -84,28 +83,12 @@ Env overrides:
   MESH_DASH_DEPLOY_DASH_HOST
   MESH_DASH_DEPLOY_DASH_PORT
   MESH_DASH_DEPLOY_REFRESH_MS
-  MESH_DASH_DEPLOY_UI_PROFILE
   MESH_DASH_DEPLOY_HISTORY_DB
   MESH_DASH_DEPLOY_PYTHON_UNBUFFERED
   MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE
   MESH_DASH_DEPLOY_FILE_TRANSFER_MAX_BYTES
   MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER
 EOF
-}
-
-normalize_ui_profile() {
-  local raw="${1:-}"
-  local token="${raw,,}"
-  token="${token//_/-}"
-  case "${token}" in
-    ""|core|coreui|core-ui)
-      printf 'core-ui\n'
-      ;;
-    *)
-      echo "unsupported --ui-profile '${raw}' for release/public-v0; use core-ui" >&2
-      exit 2
-      ;;
-  esac
 }
 
 require_arg() {
@@ -145,7 +128,6 @@ SERIAL_PATH="${MESH_DASH_DEPLOY_SERIAL_PATH:-}"
 DASH_HOST="${MESH_DASH_DEPLOY_DASH_HOST:-0.0.0.0}"
 DASH_PORT="${MESH_DASH_DEPLOY_DASH_PORT:-8877}"
 REFRESH_MS="${MESH_DASH_DEPLOY_REFRESH_MS:-3000}"
-UI_PROFILE="${MESH_DASH_DEPLOY_UI_PROFILE:-core-ui}"
 HISTORY_DB="${MESH_DASH_DEPLOY_HISTORY_DB:-}"
 PYTHON_UNBUFFERED="${MESH_DASH_DEPLOY_PYTHON_UNBUFFERED:-1}"
 FILE_TRANSFER_ENABLE="${MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE:-0}"
@@ -338,11 +320,6 @@ while [[ $# -gt 0 ]]; do
       REFRESH_MS="$2"
       shift 2
       ;;
-    --ui-profile)
-      require_arg "$1" "${2:-}"
-      UI_PROFILE="$2"
-      shift 2
-      ;;
     --history-db)
       require_arg "$1" "${2:-}"
       HISTORY_DB="$2"
@@ -530,8 +507,6 @@ if [[ "${BOOTSTRAP}" -eq 1 && -z "${MESH_HOST}" && -z "${SERIAL_PATH}" ]]; then
   exit 1
 fi
 
-UI_PROFILE="$(normalize_ui_profile "${UI_PROFILE}")"
-
 if [[ "${FILE_TRANSFER_ENABLE_SET}" -eq 0 ]]; then
   existing_file_transfer_enable="$(read_existing_dashboard_env_value "MESH_DASH_FILE_TRANSFER_ENABLE")"
   if [[ -n "${existing_file_transfer_enable}" ]]; then
@@ -574,9 +549,6 @@ if [[ -n "${MESH_HOST}" ]]; then
 fi
 if [[ -n "${SERIAL_PATH}" ]]; then
   echo "[deploy] mesh_serial_path=${SERIAL_PATH} dash=${DASH_HOST}:${DASH_PORT} refresh_ms=${REFRESH_MS}"
-fi
-if [[ -n "${UI_PROFILE}" ]]; then
-  echo "[deploy] ui_profile=${UI_PROFILE}"
 fi
 echo "[deploy] file_transfer_enable=${FILE_TRANSFER_ENABLE} file_transfer_max_bytes=${FILE_TRANSFER_MAX_BYTES}"
 
@@ -687,7 +659,6 @@ MESH_SERIAL_PATH=${SERIAL_PATH}
 DASH_HOST=${DASH_HOST}
 DASH_PORT=${DASH_PORT}
 REFRESH_MS=${REFRESH_MS}
-MESH_DASH_UI_PROFILE=${UI_PROFILE}
 MESH_DASH_HISTORY_DB=${HISTORY_DB}
 MESH_DASH_FILE_TRANSFER_ENABLE=${FILE_TRANSFER_ENABLE}
 MESH_DASH_FILE_TRANSFER_MAX_BYTES=${FILE_TRANSFER_MAX_BYTES}

@@ -35,7 +35,6 @@ DEFAULT_ROOMS_PORTNUM = 257
 
 DEFAULT_APP_VERSION_FALLBACK = "0.1.0"
 UNKNOWN_GIT_COMMIT = "nogit"
-DEFAULT_UI_PROFILE = str(os.environ.get("MESH_DASH_UI_PROFILE", "") or "core-ui").strip()
 
 SENSITIVE_FIELD_NAMES = {
     "private_key",

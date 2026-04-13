@@ -33,7 +33,6 @@ from meshdash.config import (
     DEFAULT_PACKET_LIMIT,
     DEFAULT_REFRESH_MS,
     DEFAULT_RESET_TICKER_SCALE_ON_RESTART,
-    DEFAULT_UI_PROFILE,
     MAX_FILE_TRANSFER_MAX_BYTES,
     MIN_FILE_TRANSFER_MAX_BYTES,
     SENSITIVE_FIELD_NAMES,
@@ -45,44 +44,47 @@ from meshdash.helpers import (
     to_jsonable as _to_jsonable_helper,
     to_int as _to_int,
 )
-from meshdash.app_meta import (
-    detect_git_commit_from_env as _detect_git_commit_from_env_helper,
-    revision_info_from_env as _revision_info_from_env_helper,
-)
 from meshdash.nodes import utc_now as _utc_now_helper
-from meshdash.mesh_ops import (
-    get_local_node_id as _get_local_node_id_helper,
-    send_emoji_reaction_packet as _send_emoji_reaction_packet_helper,
+from meshdash.nodes_identity import get_local_node_id as _get_local_node_id_helper
+from meshdash.packet_send import send_emoji_reaction_packet as _send_emoji_reaction_packet_helper
+from meshdash.state_nodes import (
+    collect_local_state as _collect_local_state_helper,
+    collect_nodes_rows_typed as _collect_nodes_rows_typed_helper,
+    collect_nodes_typed as _collect_nodes_typed_helper,
 )
-from meshdash.runtime import (
-    apply_default_gateway as _apply_default_gateway_helper,
-    guess_lan_ipv4 as _guess_lan_ipv4_helper,
+from meshdash.state_service import (
+    build_dashboard_state as _build_dashboard_state_helper,
+    build_dashboard_state_lite as _build_dashboard_state_lite_helper,
 )
-from meshdash.state import build_state as _build_state_helper, build_state_lite as _build_state_lite_helper
-from meshdash.services import (
+from meshdash.history_views import (
     build_node_history_loader as _build_node_history_loader,
     build_online_activity_loader as _build_online_activity_loader,
     build_summary_metrics_loader as _build_summary_metrics_loader,
-    send_chat_message as _send_chat_message_helper,
 )
+from meshdash.services_chat import send_chat_message as _send_chat_message_helper
 from meshdash.theme_presets import (
     load_theme_presets as _load_theme_presets_helper,
 )
 from meshdash.theme_settings import ThemePresetSettings as _ThemePresetSettings
 from meshdash.cli import build_dashboard_parser as _build_dashboard_parser_helper
-from meshdash.dashboard_runtime import run_dashboard_runtime as _run_dashboard_runtime_helper
+from meshdash.dashboard_runner_impl import run_dashboard_runtime as _run_dashboard_runtime_helper
 from meshdash.history.db import (
     open_and_initialize_history_connection as _open_and_initialize_history_connection_helper,
 )
 from meshdash.history_backfill import (
     backfill_environment_metric_rollups as _backfill_environment_metric_rollups_helper,
 )
-from meshdash.history_store import HistoryStore
-from meshdash.revision import RevisionInfo
-from meshdash.tracker import DashboardTracker, seed_tracker_from_node_db as _seed_tracker_from_node_db_helper
-from meshdash.html import render_html as _render_html_helper
+from meshdash.history_store_runtime import HistoryStore
+from meshdash.revision import (
+    RevisionInfo,
+    detect_git_commit as _detect_git_commit_helper,
+    revision_info as _build_revision_info_helper,
+)
+from meshdash.tracker_runtime import DashboardTracker, seed_tracker_from_node_db as _seed_tracker_from_node_db_helper
+from meshdash.html_template import render_html as _render_html_helper
 from meshdash.http_api import make_http_handler as _make_http_handler_helper
-from meshdash.wiring import (
+from meshdash.runtime_lifecycle import guess_lan_ipv4 as _guess_lan_ipv4_helper
+from meshdash.wiring_runtime import (
     build_dashboard_runtime_dependencies as _build_dashboard_runtime_dependencies_helper,
     ensure_runtime_dependencies as _ensure_runtime_dependencies_helper,
 )
@@ -144,21 +146,36 @@ def _validate_file_transfer_startup_args(
     )
 
 
+def _apply_default_gateway(args: argparse.Namespace) -> None:
+    # If the user did not override the transport, prefer the shared TCP gateway.
+    if bool(getattr(args, "no_default_gateway", False)):
+        return
+    if getattr(args, "mesh_host", None):
+        return
+    if str(getattr(args, "mesh_port", "")) != DEFAULT_MESH_PORT:
+        return
+    gateway_host = str(getattr(args, "default_gateway_host", "") or "").strip()
+    if not gateway_host:
+        return
+    args.mesh_host = gateway_host
+    args.mesh_tcp_port = int(getattr(args, "default_gateway_port", DEFAULT_GATEWAY_PORT))
+
+
 def _detect_git_commit() -> Optional[str]:
-    return _detect_git_commit_from_env_helper(
-        script_file=__file__,
-        cwd=os.getcwd(),
+    return _detect_git_commit_helper(
         explicit_commit=os.environ.get("MESH_DASH_GIT_COMMIT", ""),
+        script_dir=os.path.dirname(os.path.abspath(__file__)),
+        cwd=os.getcwd(),
         unknown_git_commit=UNKNOWN_GIT_COMMIT,
     )
 
 
 def _revision_info() -> RevisionInfo:
-    return _revision_info_from_env_helper(
-        env_version=os.environ.get("MESH_DASH_VERSION"),
+    return _build_revision_info_helper(
+        version_raw=os.environ.get("MESH_DASH_VERSION"),
         default_version=DEFAULT_APP_VERSION,
         unknown_git_commit=UNKNOWN_GIT_COMMIT,
-        detect_commit_fn=_detect_git_commit,
+        detect_commit=_detect_git_commit,
     )
 
 
@@ -171,13 +188,99 @@ def _build_theme_preset_settings(args: argparse.Namespace) -> _ThemePresetSettin
     )
 
 
+def _get_local_node_id(iface: object) -> str:
+    broadcast_num = (
+        getattr(meshtastic, "BROADCAST_NUM", None)
+        if meshtastic is not None
+        else None
+    )
+    return _get_local_node_id_helper(
+        iface,
+        broadcast_num=broadcast_num,
+        to_jsonable_fn=_to_jsonable_helper,
+        to_int_fn=_to_int,
+    )
+
+
+def _send_reaction_packet(
+    *,
+    iface: object,
+    destination_id: str,
+    channel_index: int,
+    reply_id: int,
+    emoji_codepoint: int,
+    emoji_text: str,
+    want_ack: bool,
+) -> object:
+    return _send_emoji_reaction_packet_helper(
+        iface=iface,
+        destination_id=destination_id,
+        channel_index=channel_index,
+        reply_id=reply_id,
+        emoji_codepoint=emoji_codepoint,
+        emoji_text=emoji_text,
+        want_ack=want_ack,
+        mesh_pb2_module=mesh_pb2,
+        portnums_pb2_module=portnums_pb2,
+    )
+
+
+def _build_state_helper(
+    *,
+    iface: object,
+    tracker: object,
+    started_at: float,
+    target: str,
+    show_secrets: bool,
+    storage_probe_path: Optional[str],
+    revision_info: object,
+    sensitive_field_names: set[str],
+) -> dict[str, object]:
+    return _build_dashboard_state_helper(
+        iface=iface,
+        tracker=tracker,
+        started_at=started_at,
+        target=target,
+        show_secrets=show_secrets,
+        storage_probe_path=storage_probe_path,
+        revision_info=revision_info,
+        sensitive_field_names=sensitive_field_names,
+        collect_nodes_fn=_collect_nodes_typed_helper,
+        collect_local_state_fn=_collect_local_state_helper,
+    )
+
+
+def _build_state_lite_helper(
+    *,
+    iface: object,
+    tracker: object,
+    started_at: float,
+    target: str,
+    show_secrets: bool,
+    storage_probe_path: Optional[str],
+    revision_info: object,
+    sensitive_field_names: set[str],
+) -> dict[str, object]:
+    return _build_dashboard_state_lite_helper(
+        iface=iface,
+        tracker=tracker,
+        started_at=started_at,
+        target=target,
+        show_secrets=show_secrets,
+        storage_probe_path=storage_probe_path,
+        revision_info=revision_info,
+        sensitive_field_names=sensitive_field_names,
+        collect_nodes_fn=_collect_nodes_rows_typed_helper,
+        collect_local_state_fn=_collect_local_state_helper,
+    )
+
+
 def _build_render_html_fn_with_theme(
     args: argparse.Namespace,
     *,
     theme_preset_settings: _ThemePresetSettings | None = None,
 ):
     settings = theme_preset_settings or _build_theme_preset_settings(args)
-    ui_profile = str(getattr(args, "ui_profile", "") or DEFAULT_UI_PROFILE).strip()
     file_transfer_enabled = bool(getattr(args, "file_transfer_enable", False))
     file_transfer_max_bytes = _normalize_file_transfer_max_bytes(
         getattr(args, "file_transfer_max_bytes", DEFAULT_FILE_TRANSFER_MAX_BYTES)
@@ -187,7 +290,6 @@ def _build_render_html_fn_with_theme(
         selected = settings.selected_preset_tokens()
         return _render_html_helper(
             **kwargs,
-            ui_profile=ui_profile,
             light_theme_vars=selected.get("light"),
             dark_theme_vars=selected.get("dark"),
             file_transfer_enabled=file_transfer_enabled,
@@ -292,7 +394,6 @@ def run_dashboard(args: argparse.Namespace) -> None:
         pub_module=pub,
     )
     runtime_dependencies = _build_dashboard_runtime_dependencies_helper(
-        meshtastic_module=meshtastic,
         pub_module=pub,
         mesh_target_label_fn=mesh_target_label,
         open_mesh_interface_fn=open_mesh_interface,
@@ -307,11 +408,8 @@ def run_dashboard(args: argparse.Namespace) -> None:
         build_online_activity_loader_fn=_build_online_activity_loader,
         build_summary_metrics_loader_fn=_build_summary_metrics_loader,
         send_chat_message_fn=_send_chat_message_helper,
-        send_emoji_reaction_packet_fn=_send_emoji_reaction_packet_helper,
-        mesh_pb2_module=mesh_pb2,
-        portnums_pb2_module=portnums_pb2,
-        get_local_node_id_fn=_get_local_node_id_helper,
-        to_jsonable_fn=_to_jsonable_helper,
+        send_reaction_packet_fn=_send_reaction_packet,
+        get_local_node_id_fn=_get_local_node_id,
         normalize_single_emoji_fn=_normalize_single_emoji,
         to_int_fn=_to_int,
         utc_now_fn=_utc_now_helper,
@@ -394,7 +492,7 @@ def main() -> None:
     if bool(getattr(args, "backfill_environment_rollups", False)):
         run_environment_rollup_backfill(args)
         return
-    _apply_default_gateway_helper(args, default_mesh_port=DEFAULT_MESH_PORT)
+    _apply_default_gateway(args)
     run_dashboard(args)
 
 

@@ -5,7 +5,7 @@ from typing import Optional
 from .helpers import (
     to_int as _to_int,
 )
-from .history_store import HistoryStore
+from .history_store_runtime import HistoryStore
 from .nodes import (
     parse_utc_text_to_unix as _parse_utc_text_to_unix,
     utc_now as _utc_now,

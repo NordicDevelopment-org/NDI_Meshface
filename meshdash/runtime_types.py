@@ -124,18 +124,6 @@ FormatEpochFn = Callable[[object], str]
 ToJsonableFn = Callable[[object], object]
 
 
-class RawGetLocalNodeIdFn(Protocol):
-    def __call__(
-        self,
-        iface: object,
-        *,
-        meshtastic_module: object,
-        to_jsonable_fn: ToJsonableFn,
-        to_int_fn: ToIntFn,
-    ) -> str:
-        ...
-
-
 class RecordLocalChatFn(Protocol):
     def __call__(
         self,
@@ -166,23 +154,6 @@ class SendReactionPacketFn(Protocol):
         emoji_codepoint: int,
         emoji_text: str,
         want_ack: bool,
-    ) -> object:
-        ...
-
-
-class SendReactionPacketWithModulesFn(Protocol):
-    def __call__(
-        self,
-        *,
-        iface: object,
-        destination_id: str,
-        channel_index: int,
-        reply_id: int,
-        emoji_codepoint: int,
-        emoji_text: str,
-        want_ack: bool,
-        mesh_pb2_module: object,
-        portnums_pb2_module: object,
     ) -> object:
         ...
 

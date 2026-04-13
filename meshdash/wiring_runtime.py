@@ -12,25 +12,69 @@ from .runtime_types import (
     GuessLanIpv4Fn,
     MakeHttpHandlerFn,
     MeshTargetLabelFn,
+    NodeHistoryFn,
     NormalizeSingleEmojiFn,
+    OnlineActivityFn,
     OpenMeshInterfaceFn,
     RevisionInfoFn,
     RenderHtmlFn,
+    SendChatFn,
     SendChatMessageFn,
     SendReactionPacketFn,
-    SendReactionPacketWithModulesFn,
     SeedTrackerFn,
+    StateFn,
+    SummaryMetricsHistoryFn,
     SubscribeFn,
     ToIntFn,
-    ToJsonableFn,
     UtcNowFn,
 )
-from .wiring_adapters import (
-    build_http_handler_factory as _build_http_handler_factory_helper,
-    build_local_node_id_getter as _build_local_node_id_getter_helper,
-    build_reaction_sender as _build_reaction_sender_helper,
-    build_state_builder as _build_state_builder_helper,
-)
+
+
+def _build_state_builder(
+    *,
+    build_state_fn: BuildStateWithSensitiveFn,
+    sensitive_field_names: set[str],
+) -> BuildStateFn:
+    def state_with_sensitive_fields(**kwargs: object) -> dict[str, object]:
+        return build_state_fn(
+            sensitive_field_names=sensitive_field_names,
+            **kwargs,
+        )
+
+    try:
+        setattr(state_with_sensitive_fields, "_sensitive_field_names", sensitive_field_names)
+    except Exception:
+        pass
+
+    return state_with_sensitive_fields
+
+
+def _build_http_handler_factory(
+    *,
+    make_http_handler_fn: MakeHttpHandlerFn,
+    default_node_history_hours: int,
+    to_int_fn: ToIntFn,
+) -> MakeHttpHandlerFn:
+    def make_http_handler(
+        html_text: str,
+        state_fn: StateFn,
+        node_history_fn: NodeHistoryFn | None = None,
+        online_activity_fn: OnlineActivityFn | None = None,
+        summary_metrics_fn: SummaryMetricsHistoryFn | None = None,
+        send_chat_fn: SendChatFn | None = None,
+    ) -> object:
+        return make_http_handler_fn(
+            html_text=html_text,
+            state_fn=state_fn,
+            node_history_fn=node_history_fn,
+            online_activity_fn=online_activity_fn,
+            summary_metrics_fn=summary_metrics_fn,
+            send_chat_fn=send_chat_fn,
+            default_node_history_hours=default_node_history_hours,
+            to_int_fn=to_int_fn,
+        )
+
+    return make_http_handler
 
 
 @dataclass(frozen=True)
@@ -76,7 +120,6 @@ def ensure_runtime_dependencies(*, meshtastic_module: object | None, pub_module:
 
 def build_dashboard_runtime_dependencies(
     *,
-    meshtastic_module: object,
     pub_module: PubSubModule,
     mesh_target_label_fn: MeshTargetLabelFn,
     open_mesh_interface_fn: OpenMeshInterfaceFn,
@@ -91,11 +134,8 @@ def build_dashboard_runtime_dependencies(
     build_online_activity_loader_fn: BuildOnlineActivityLoaderFn,
     build_summary_metrics_loader_fn: BuildSummaryMetricsLoaderFn,
     send_chat_message_fn: SendChatMessageFn,
-    send_emoji_reaction_packet_fn: SendReactionPacketWithModulesFn,
-    mesh_pb2_module: object,
-    portnums_pb2_module: object,
+    send_reaction_packet_fn: SendReactionPacketFn,
     get_local_node_id_fn: GetLocalNodeIdFn,
-    to_jsonable_fn: ToJsonableFn,
     normalize_single_emoji_fn: NormalizeSingleEmojiFn,
     to_int_fn: ToIntFn,
     utc_now_fn: UtcNowFn,
@@ -105,12 +145,12 @@ def build_dashboard_runtime_dependencies(
     guess_lan_ipv4_fn: GuessLanIpv4Fn,
     default_chat_max_bytes: int,
 ) -> DashboardRuntimeDependencies:
-    build_state_with_sensitive_fields = _build_state_builder_helper(
+    build_state_with_sensitive_fields = _build_state_builder(
         build_state_fn=build_state_fn,
         sensitive_field_names=sensitive_field_names,
     )
     if build_state_lite_fn is not None:
-        build_state_lite_with_sensitive_fields = _build_state_builder_helper(
+        build_state_lite_with_sensitive_fields = _build_state_builder(
             build_state_fn=build_state_lite_fn,
             sensitive_field_names=sensitive_field_names,
         )
@@ -120,18 +160,7 @@ def build_dashboard_runtime_dependencies(
             setattr(build_state_with_sensitive_fields, "lite", build_state_lite_with_sensitive_fields)
         except Exception:
             pass
-    send_reaction_packet = _build_reaction_sender_helper(
-        send_emoji_reaction_packet_fn=send_emoji_reaction_packet_fn,
-        mesh_pb2_module=mesh_pb2_module,
-        portnums_pb2_module=portnums_pb2_module,
-    )
-    get_local_node_id = _build_local_node_id_getter_helper(
-        get_local_node_id_fn=get_local_node_id_fn,
-        meshtastic_module=meshtastic_module,
-        to_jsonable_fn=to_jsonable_fn,
-        to_int_fn=to_int_fn,
-    )
-    make_http_handler = _build_http_handler_factory_helper(
+    make_http_handler = _build_http_handler_factory(
         make_http_handler_fn=make_http_handler_fn,
         default_node_history_hours=default_node_history_hours,
         to_int_fn=to_int_fn,
@@ -150,8 +179,8 @@ def build_dashboard_runtime_dependencies(
         build_online_activity_loader_fn=build_online_activity_loader_fn,
         build_summary_metrics_loader_fn=build_summary_metrics_loader_fn,
         send_chat_message_fn=send_chat_message_fn,
-        send_reaction_packet_fn=send_reaction_packet,
-        get_local_node_id_fn=get_local_node_id,
+        send_reaction_packet_fn=send_reaction_packet_fn,
+        get_local_node_id_fn=get_local_node_id_fn,
         normalize_single_emoji_fn=normalize_single_emoji_fn,
         to_int_fn=to_int_fn,
         utc_now_fn=utc_now_fn,

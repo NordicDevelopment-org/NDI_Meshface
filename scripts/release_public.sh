@@ -11,11 +11,11 @@ Usage:
 Options:
   --source-branch <name>   Source branch to export (default: current branch)
   --target-remote <name>   Public remote name (default: $PUBLIC_RELEASE_REMOTE or public)
-  --target-branch <name>   Public branch name (default: $PUBLIC_RELEASE_BRANCH or main)
+  --target-branch <name>   Public branch name (default: $PUBLIC_RELEASE_BRANCH or release-candidate)
   --allowlist <path>       Allowlist file (default: .public-release-allowlist)
   --profile <name>         Use .public-release/allowlists/<name>.allowlist
-  --drift-branch <name>    Branch name that requires drift guard (default: $PUBLIC_DRIFT_BRANCH or release/public-v0)
-  --drift-base-branch <name> Base branch for drift guard (default: $PUBLIC_DRIFT_BASE_BRANCH or main)
+  --drift-branch <name>    Branch name that requires drift guard (default: $PUBLIC_DRIFT_BRANCH or source branch)
+  --drift-base-branch <name> Base branch for drift guard (default: $PUBLIC_DRIFT_BASE_BRANCH; unset disables drift check)
   --drift-allowlist <path> Drift allowlist file (default: $PUBLIC_DRIFT_ALLOWLIST or .public-release/allowlists/public-v0-drift.allowlist)
   --skip-drift-check       Skip branch drift preflight guard
   --config <path>          Config file to source (default: .public-release/config.env)
@@ -184,7 +184,7 @@ if [[ "$target_remote_arg" -eq 0 ]]; then
   target_remote="${PUBLIC_RELEASE_REMOTE:-public}"
 fi
 if [[ "$target_branch_arg" -eq 0 ]]; then
-  target_branch="${PUBLIC_RELEASE_BRANCH:-main}"
+  target_branch="${PUBLIC_RELEASE_BRANCH:-release-candidate}"
 fi
 if [[ "$profile_arg" -eq 0 ]]; then
   profile_name="${PUBLIC_RELEASE_PROFILE:-}"
@@ -193,10 +193,10 @@ if [[ "$allowlist_arg" -eq 0 ]]; then
   allowlist_file="${PUBLIC_RELEASE_ALLOWLIST:-.public-release-allowlist}"
 fi
 if [[ -z "$drift_branch" ]]; then
-  drift_branch="${PUBLIC_DRIFT_BRANCH:-release/public-v0}"
+  drift_branch="${PUBLIC_DRIFT_BRANCH:-$source_branch}"
 fi
 if [[ -z "$drift_base_branch" ]]; then
-  drift_base_branch="${PUBLIC_DRIFT_BASE_BRANCH:-main}"
+  drift_base_branch="${PUBLIC_DRIFT_BASE_BRANCH:-}"
 fi
 if [[ -z "$drift_allowlist_file" ]]; then
   drift_allowlist_file="${PUBLIC_DRIFT_ALLOWLIST:-.public-release/allowlists/public-v0-drift.allowlist}"
@@ -216,7 +216,11 @@ if [[ -n "$profile_name" ]]; then
   echo "Release profile: ${profile_name}"
 fi
 if [[ "$drift_check" -eq 1 ]]; then
-  echo "Drift guard: ${drift_branch} vs ${drift_base_branch} (${drift_allowlist_file})"
+  if [[ -n "$drift_base_branch" ]]; then
+    echo "Drift guard: ${drift_branch} vs ${drift_base_branch} (${drift_allowlist_file})"
+  else
+    echo "Drift guard: disabled (no base branch configured)"
+  fi
 else
   echo "Drift guard: disabled (--skip-drift-check)"
 fi
@@ -229,7 +233,7 @@ if [[ "$allow_dirty" -eq 0 ]] && [[ -n "$(git status --porcelain)" ]]; then
   die "source repo has uncommitted changes (commit/stash first, or use --allow-dirty)"
 fi
 
-if [[ "$drift_check" -eq 1 ]] && [[ "$source_branch" == "$drift_branch" ]]; then
+if [[ "$drift_check" -eq 1 ]] && [[ -n "$drift_base_branch" ]] && [[ "$source_branch" == "$drift_branch" ]]; then
   bash "./scripts/check_public_branch_drift.sh" \
     --base-branch "$drift_base_branch" \
     --public-branch "$source_branch" \

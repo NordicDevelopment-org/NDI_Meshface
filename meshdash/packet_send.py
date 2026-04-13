@@ -1,8 +1,5 @@
 from typing import Protocol, cast
 
-from .nodes import get_local_node_id as _get_local_node_id_helper
-from .runtime_types import ToIntFn, ToJsonableFn
-
 
 class PacketSender(Protocol):
     def _sendPacket(
@@ -27,22 +24,7 @@ def send_decoded_payload_packet(
     reply_id: int | None = None,
     emoji_codepoint: int | None = None,
 ) -> object:
-    """Low-level send helper for decoded payload packets.
-
-    Meshyface uses this primitive to implement features that don't map cleanly
-    onto the high-level Meshtastic python API (e.g. reactions, Rooms sideband).
-
-    Args:
-        iface: Meshtastic interface instance.
-        destination_id: "^all" or a node id like "!abcdef12".
-        channel_index: Meshtastic channel index to transmit on.
-        portnum: numeric port number (protobuf enum value).
-        payload: raw decoded payload bytes.
-        want_ack: request ACK for direct messages.
-        mesh_pb2_module: meshtastic.protobuf.mesh_pb2 module.
-        reply_id: optional packet id being replied to.
-        emoji_codepoint: optional emoji codepoint for reactions.
-    """
+    """Low-level send helper for decoded payload packets."""
 
     if mesh_pb2_module is None:
         raise RuntimeError("Meshtastic protobuf modules are unavailable for low-level sends")
@@ -59,26 +41,6 @@ def send_decoded_payload_packet(
     packet.decoded.payload = bytes(payload or b"")
     sender = cast(PacketSender, iface)
     return sender._sendPacket(packet, destinationId=destination_id, wantAck=bool(want_ack))
-
-
-def get_local_node_id(
-    iface: object,
-    *,
-    meshtastic_module: object,
-    to_jsonable_fn: ToJsonableFn,
-    to_int_fn: ToIntFn,
-) -> str:
-    broadcast_num = (
-        getattr(meshtastic_module, "BROADCAST_NUM", None)
-        if meshtastic_module is not None
-        else None
-    )
-    return _get_local_node_id_helper(
-        iface,
-        broadcast_num=broadcast_num,
-        to_jsonable_fn=to_jsonable_fn,
-        to_int_fn=to_int_fn,
-    )
 
 
 def send_emoji_reaction_packet(

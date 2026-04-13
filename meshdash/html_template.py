@@ -22,7 +22,6 @@ def render_html(
     revision_title: str,
     reset_ticker_scale_on_restart: bool = True,
     debug_mode: bool = False,
-    ui_profile: str | None = None,
     light_theme_vars: dict | None = None,
     dark_theme_vars: dict | None = None,
     file_transfer_enabled: bool = False,
@@ -43,7 +42,6 @@ def render_html(
         node_history_max_points=node_history_max_points,
         reset_ticker_scale_on_restart=reset_ticker_scale_on_restart,
         debug_mode=debug_mode,
-        ui_profile=ui_profile,
         file_transfer_enabled=file_transfer_enabled,
         file_transfer_max_bytes=file_transfer_max_bytes,
     )
