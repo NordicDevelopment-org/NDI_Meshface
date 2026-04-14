@@ -127,6 +127,7 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     css = build_dashboard_css(theme_css="")
 
     compose_shell_section = css.rsplit("\n    .chat-compose-shell {", 1)[1].split("}", 1)[0]
+    tinted_compose_shell_section = css.split(".chat-compose-shell.channel-tinted,\n    .layout.view-chat .chat-compose-shell.channel-tinted {", 1)[1].split("}", 1)[0]
     chat_input_section = css.rsplit("\n    #chat-input {", 1)[1].split("}", 1)[0]
     chat_input_hover_section = css.rsplit("\n    #chat-input:hover {", 1)[1].split("}", 1)[0]
     channel_wrap_section = css.split(".mesh-channel-wrap {", 1)[1].split("}", 1)[0]
@@ -143,12 +144,15 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     dark_bottom_bar_section = css.rsplit("[data-theme=\"dark\"] .chat-left-bottom-bar {", 1)[1].split("}", 1)[0]
     dark_send_btn_section = css.split("[data-theme=\"dark\"] #chat-emoji-btn,\n    [data-theme=\"dark\"] #chat-send-btn {", 1)[1].split("}", 1)[0]
 
-    assert "border: 1px solid rgba(var(--chat-send-channel-rgb), 0.34);" in compose_shell_section
-    assert "rgba(var(--chat-send-channel-rgb), 0.06)" in compose_shell_section
-    assert "box-shadow: inset 0 0 0 1px rgba(var(--chat-send-channel-rgb), 0.06);" in compose_shell_section
+    assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in compose_shell_section
+    assert "background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%);" in compose_shell_section
+    assert "box-shadow: none;" in compose_shell_section
     assert "border-radius: 10px;" in compose_shell_section
-    assert "padding: 6px;" in compose_shell_section
-    assert "gap: 5px;" in compose_shell_section
+    assert "padding: 6px 8px;" in compose_shell_section
+    assert "gap: 0;" in compose_shell_section
+    assert "border-color: rgba(var(--chat-send-channel-rgb), 0.34);" in tinted_compose_shell_section
+    assert "rgba(var(--chat-send-channel-rgb), 0.06)" in tinted_compose_shell_section
+    assert "box-shadow: inset 0 0 0 1px rgba(var(--chat-send-channel-rgb), 0.06);" in tinted_compose_shell_section
     assert "color-mix(in srgb, var(--ink) 88%, var(--accent-2) 12%)" in channel_wrap_section
     assert "#f2fff7" not in channel_wrap_section
     assert "color-mix(in srgb, var(--ink) 88%, var(--accent-2) 12%)" in channel_pill_section
@@ -172,13 +176,20 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     assert "[data-theme=\"dark\"] #chat-send-btn {" in css
     assert "background: var(--ui-panel);" in dark_input_section
     assert "border-color: var(--ui-border);" in dark_input_section
-    assert "rgba(var(--chat-send-channel-rgb), 0.08)" in chat_input_section
-    assert "rgba(249, 253, 249, 0.98) 100%" in chat_input_section
-    assert "rgba(var(--chat-send-channel-rgb), 0.09)" in chat_input_hover_section
-    assert "rgba(var(--chat-send-channel-rgb), 0.12)" in dark_chat_input_section
-    assert "rgba(7, 20, 13, 0.99) 100%" in dark_chat_input_section
-    assert "rgba(var(--chat-send-channel-rgb), 0.14)" in dark_chat_input_hover_section
-    assert "rgba(var(--chat-send-channel-rgb), 0.32)" in dark_chat_input_focus_section
+    assert "border-color: #c2d8c7;" in chat_input_section
+    assert "background: #f9fdf9;" in chat_input_section
+    assert "rgba(var(--chat-send-channel-rgb)" not in chat_input_section
+    assert "border-color: #b7cfbe;" in chat_input_hover_section
+    assert "background: #fbfefb;" in chat_input_hover_section
+    assert "rgba(var(--chat-send-channel-rgb)" not in chat_input_hover_section
+    assert "border-color: var(--ui-border);" in dark_chat_input_section
+    assert "background: var(--ui-panel);" in dark_chat_input_section
+    assert "rgba(var(--chat-send-channel-rgb)" not in dark_chat_input_section
+    assert "color-mix(in srgb, var(--ui-border) 72%, var(--ui-text) 28%)" in dark_chat_input_hover_section
+    assert "background: var(--ui-panel-alt);" in dark_chat_input_hover_section
+    assert "color-mix(in srgb, var(--ui-accent) 34%, transparent)" in dark_chat_input_focus_section
+    assert "border-color: var(--ui-accent);" in dark_chat_input_focus_section
+    assert "background: var(--ui-panel-alt);" in dark_chat_input_focus_section
     assert "background: var(--ui-panel) !important;" in dark_send_btn_section
     assert "border-color: var(--ui-border) !important;" in dark_send_btn_section
     assert "color: var(--ui-text) !important;" in dark_send_btn_section
@@ -269,14 +280,18 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-log-scroll {" in css
     assert "background: var(--workspace-shell-bg);" in css
     assert "border-color: var(--workspace-shell-border);" in css
-    dark_compose_shell_section = css.rsplit("[data-theme=\"dark\"] .chat-compose-shell,\n    [data-theme=\"dark\"] .card.chat .chat-compose-shell {", 1)[1].split("}", 1)[0]
+    dark_compose_shell_section = css.rsplit("[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell {", 1)[1].split("}", 1)[0]
+    dark_tinted_compose_shell_section = css.split("[data-theme=\"dark\"] .chat-compose-shell.channel-tinted,\n    [data-theme=\"dark\"] .card.chat .chat-compose-shell.channel-tinted,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell.channel-tinted {", 1)[1].split("}", 1)[0]
     dark_bottom_bar_section = css.rsplit("[data-theme=\"dark\"] .chat-left-bottom-bar {", 1)[1].split("}", 1)[0]
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell {" in css
-    assert "rgba(var(--chat-send-channel-rgb), 0.1)" in dark_compose_shell_section
-    assert "rgba(16, 26, 36, 0.99) 34%" in dark_compose_shell_section
-    assert "border-color: rgba(var(--chat-send-channel-rgb), 0.38) !important;" in dark_compose_shell_section
-    assert "box-shadow: inset 0 0 0 1px rgba(var(--chat-send-channel-rgb), 0.08);" in dark_compose_shell_section
-    assert "var(--workspace-shell-border)" not in dark_compose_shell_section
+    assert "background: var(--ui-panel);" in dark_compose_shell_section
+    assert "background-image: none;" in dark_compose_shell_section
+    assert "color-mix(in srgb, var(--ui-border) 62%, transparent)" in dark_compose_shell_section
+    assert "rgba(var(--chat-send-channel-rgb), 0.1)" in dark_tinted_compose_shell_section
+    assert "rgba(16, 26, 36, 0.99) 34%" in dark_tinted_compose_shell_section
+    assert "border-color: rgba(var(--chat-send-channel-rgb), 0.38) !important;" in dark_tinted_compose_shell_section
+    assert "box-shadow: inset 0 0 0 1px rgba(var(--chat-send-channel-rgb), 0.08);" in dark_tinted_compose_shell_section
+    assert "var(--workspace-shell-border)" not in dark_tinted_compose_shell_section
     assert "[data-theme=\"dark\"] .chat-left-bottom-bar {" in css
     assert "background: var(--ui-panel) !important;" in dark_bottom_bar_section
     assert "var(--ui-border)" in dark_bottom_bar_section
@@ -348,6 +363,11 @@ def test_chat_ui_flags_nodes_with_malformed_text_payloads() -> None:
 
 
 def test_chat_send_channel_compact_dot_trigger_geometry() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
     css = build_dashboard_css(theme_css="")
 
     assert ".chat-composer-input-row {" in css
@@ -362,6 +382,8 @@ def test_chat_send_channel_compact_dot_trigger_geometry() -> None:
     assert "inset: 0;" in css
     assert ".chat-send-channel-dot {" in css
     assert "pointer-events: none;" in css
+    assert 'const chatComposerTinted = !meshChannelIsPrimary(activeMeshSendChannelIndex);' in js
+    assert 'composeShell.classList.toggle("channel-tinted", chatComposerTinted);' in js
 
 
 def test_chat_send_status_reuses_input_placeholder_instead_of_notice_row() -> None:

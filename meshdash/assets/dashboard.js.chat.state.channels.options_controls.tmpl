@@ -58,6 +58,7 @@
       const filesHint = document.getElementById("files-send-channel-hint");
       const globalMeta = meshChannelColorMeta(activeMeshSendChannelIndex, {{ allowAll: false }});
       const globalRgb = hexColorRgbTriplet(globalMeta.fill);
+      const chatComposerTinted = !meshChannelIsPrimary(activeMeshSendChannelIndex);
       const sendLabel = currentMeshChannelSendLabel();
       const gamesSendCtx = meshChannelSendContext({{ appId: "games" }});
       const gamesMeta = meshChannelColorMeta(gamesSendCtx.sendIndex, {{ allowAll: false }});
@@ -73,6 +74,7 @@
       if (composeShell instanceof HTMLElement) {{
         composeShell.style.setProperty("--chat-send-channel-fill", globalMeta.fill);
         composeShell.style.setProperty("--chat-send-channel-rgb", globalRgb);
+        composeShell.classList.toggle("channel-tinted", chatComposerTinted);
       }}
       if (input instanceof HTMLElement) {{
         input.style.setProperty("--chat-send-channel-fill", globalMeta.fill);
