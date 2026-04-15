@@ -221,6 +221,216 @@ def _merge_recent_chat_entries(
     return [entry for _, entry in decorated_entries]
 
 
+def _normalize_node_id_text(value: object) -> str:
+    text = str(value or "").strip()
+    return text if text else ""
+
+
+def _slim_history_caps(
+    history_caps: dict[str, dict[str, object]],
+    *,
+    nodes: list[dict[str, object]],
+    recent_chat: list[dict[str, object]],
+    recent_packets: list[dict[str, object]],
+    edges: list[dict[str, object]],
+    local_node_id: str,
+) -> dict[str, dict[str, object]]:
+    relevant_ids: set[str] = set()
+
+    def add_node_id(value: object) -> None:
+        node_id = _normalize_node_id_text(value)
+        if not node_id or node_id.startswith("^"):
+            return
+        relevant_ids.add(node_id)
+
+    for row in nodes:
+        if not isinstance(row, Mapping):
+            continue
+        add_node_id(row.get("id"))
+
+    for entry in recent_chat:
+        if not isinstance(entry, Mapping):
+            continue
+        add_node_id(entry.get("from"))
+        add_node_id(entry.get("from_id"))
+        add_node_id(entry.get("fromId"))
+        add_node_id(entry.get("source"))
+        add_node_id(entry.get("source_id"))
+        add_node_id(entry.get("sourceId"))
+        add_node_id(entry.get("to"))
+        add_node_id(entry.get("to_id"))
+        add_node_id(entry.get("toId"))
+        add_node_id(entry.get("destination"))
+        add_node_id(entry.get("dest"))
+        add_node_id(entry.get("dest_id"))
+        add_node_id(entry.get("destId"))
+
+    for entry in recent_packets:
+        if not isinstance(entry, Mapping):
+            continue
+        summary = entry.get("summary")
+        packet = entry.get("packet")
+        if isinstance(summary, Mapping):
+            add_node_id(summary.get("from"))
+            add_node_id(summary.get("from_id"))
+            add_node_id(summary.get("fromId"))
+            add_node_id(summary.get("to"))
+            add_node_id(summary.get("to_id"))
+            add_node_id(summary.get("toId"))
+        if isinstance(packet, Mapping):
+            add_node_id(packet.get("fromId"))
+            add_node_id(packet.get("toId"))
+            add_node_id(packet.get("destination"))
+
+    for edge in edges:
+        if not isinstance(edge, Mapping):
+            continue
+        add_node_id(edge.get("from"))
+        add_node_id(edge.get("to"))
+
+    add_node_id(local_node_id)
+
+    slim: dict[str, dict[str, object]] = {}
+    for raw_node_id, caps in history_caps.items():
+        node_id = _normalize_node_id_text(raw_node_id)
+        if not node_id or node_id not in relevant_ids or not isinstance(caps, Mapping):
+            continue
+        slim_caps: dict[str, object] = {}
+        for key in (
+            "last_seen_unix",
+            "last_seen",
+            "has_position",
+            "last_position_unix",
+            "last_position_time",
+            "last_hops",
+            "battery_level",
+        ):
+            value = caps.get(key)
+            if value is not None:
+                slim_caps[key] = value
+        if slim_caps:
+            slim[node_id] = slim_caps
+    return slim
+
+
+def _slim_packet_decoded(decoded: object) -> dict[str, object]:
+    if not isinstance(decoded, Mapping):
+        return {}
+    slim: dict[str, object] = {}
+    for key in (
+        "portnum",
+        "requestId",
+        "request_id",
+        "channel",
+        "channelIndex",
+        "channel_index",
+        "text",
+        "payload",
+    ):
+        value = decoded.get(key)
+        if value is not None:
+            slim[key] = value
+    routing = decoded.get("routing")
+    if isinstance(routing, Mapping):
+        slim_routing: dict[str, object] = {}
+        for key in ("requestId", "request_id"):
+            value = routing.get(key)
+            if value is not None:
+                slim_routing[key] = value
+        if slim_routing:
+            slim["routing"] = slim_routing
+    return slim
+
+
+def _slim_packet_summary(summary: object) -> dict[str, object]:
+    if not isinstance(summary, Mapping):
+        return {}
+    slim: dict[str, object] = {}
+    for key in (
+        "captured_at",
+        "live",
+        "packet_id",
+        "message_id",
+        "from",
+        "to",
+        "portnum",
+        "rx_time",
+        "rx_time_unix",
+        "rx_rssi",
+        "rx_snr",
+        "hop_start",
+        "hop_limit",
+        "hops",
+        "channel",
+        "decoded_text",
+        "reply_id",
+        "emoji",
+        "is_reaction",
+    ):
+        value = summary.get(key)
+        if value is not None:
+            slim[key] = value
+    return slim
+
+
+def _slim_recent_packets(recent_packets: list[dict[str, object]]) -> list[dict[str, object]]:
+    max_packets = 120
+    slimmed: list[dict[str, object]] = []
+    for entry in recent_packets[:max_packets]:
+        if not isinstance(entry, Mapping):
+            continue
+        slim_entry: dict[str, object] = {}
+        summary = entry.get("summary")
+        slim_summary = _slim_packet_summary(summary)
+        if slim_summary:
+            slim_entry["summary"] = slim_summary
+        packet = entry.get("packet")
+        if isinstance(packet, Mapping):
+            slim_packet: dict[str, object] = {}
+            for key in (
+                "from",
+                "to",
+                "fromId",
+                "toId",
+                "destination",
+                "channel",
+                "channelIndex",
+                "channel_index",
+                "encrypted",
+                "id",
+                "packet_id",
+                "message_id",
+                "rxTime",
+                "rxSnr",
+                "rxRssi",
+                "hopLimit",
+                "hopStart",
+                "relayNode",
+                "transportMechanism",
+                "portnum",
+                "payload",
+                "payload_text",
+                "raw_payload",
+                "rawPayload",
+                "text",
+            ):
+                value = packet.get(key)
+                if value is not None:
+                    slim_packet[key] = value
+            decoded = _slim_packet_decoded(packet.get("decoded"))
+            if decoded:
+                slim_packet["decoded"] = decoded
+            if slim_packet:
+                slim_entry["packet"] = slim_packet
+        for key in ("captured_at", "rx_time", "time"):
+            value = entry.get(key)
+            if value is not None:
+                slim_entry[key] = value
+        if slim_entry:
+            slimmed.append(slim_entry)
+    return slimmed
+
+
 def _normalize_modem_preset(value: object) -> Optional[str]:
     if value is None:
         return None
@@ -616,7 +826,42 @@ def build_dashboard_state_lite(
         include_debug=False,
         include_nodes_full=False,
     )
-    state = state_payload.as_dict()
+    slim_recent_packets = _slim_recent_packets(state_payload.traffic.recent_packets)
+    slim_recent_chat = list(state_payload.traffic.recent_chat)
+    slim_history_caps = _slim_history_caps(
+        state_payload.history_caps,
+        nodes=state_payload.nodes,
+        recent_chat=slim_recent_chat,
+        recent_packets=slim_recent_packets,
+        edges=state_payload.traffic.edges,
+        local_node_id=state_payload.local_node_id,
+    )
+    slim_traffic = StateTrafficPayload(
+        edges=state_payload.traffic.edges,
+        port_counts=state_payload.traffic.port_counts,
+        recent_packets=slim_recent_packets,
+        recent_chat=slim_recent_chat,
+    )
+    state = DashboardStatePayload(
+        generated_at=state_payload.generated_at,
+        summary=state_payload.summary,
+        summary_error=state_payload.summary_error,
+        my_info=state_payload.my_info,
+        my_info_error=state_payload.my_info_error,
+        metadata=state_payload.metadata,
+        metadata_error=state_payload.metadata_error,
+        local_state=state_payload.local_state,
+        local_state_error=state_payload.local_state_error,
+        nodes_error=state_payload.nodes_error,
+        tracker_error=state_payload.tracker_error,
+        tracker_saved_counts_error=state_payload.tracker_saved_counts_error,
+        tracker_capabilities_error=state_payload.tracker_capabilities_error,
+        nodes=state_payload.nodes,
+        history_caps=slim_history_caps,
+        nodes_full=state_payload.nodes_full,
+        traffic=slim_traffic,
+        local_node_id=state_payload.local_node_id,
+    ).as_dict()
 
     if show_secrets:
         return state

@@ -153,15 +153,20 @@
               : null;
             renderFavorites(latestState, cachedHistory304, loadingId304);
           }}
+          let chatRenderedThisPoll304 = false;
           if (isChatWorkspaceLayoutView(activeLayoutView)) {{
-            renderChat(latestState);
+            renderChat(latestState, {{ allowPollSkip: true }});
+            chatRenderedThisPoll304 = true;
             if (activeLayoutView === "chatlabs") {{
               renderChatLabsView(latestState);
             }}
           }} else if (shouldHydrateNodeNavigatorRoster(latestState)) {{
             renderChat(latestState);
+            chatRenderedThisPoll304 = true;
           }}
           if (
+            !chatRenderedThisPoll304
+            &&
             typeof syncChatNodeDetailsDrawer === "function"
             && typeof isChatNodeDetailsDrawerExpanded === "function"
             && isChatNodeDetailsDrawerExpanded()
@@ -356,7 +361,7 @@
 
         if (isChatWorkspaceLayoutView(activeLayoutView)) {{
           if (!chatRenderedThisPoll) {{
-            runPollStep("renderChat.workspace", () => renderChat(state));
+            runPollStep("renderChat.workspace", () => renderChat(state, {{ allowPollSkip: true }}));
             chatRenderedThisPoll = true;
           }}
           if (activeLayoutView === "chatlabs") {{
@@ -383,6 +388,8 @@
           runPollStep("bindChatChangeSummaryControls.default", () => bindChatChangeSummaryControls());
         }}
         if (
+          !chatRenderedThisPoll
+          &&
           typeof syncChatNodeDetailsDrawer === "function"
           && typeof isChatNodeDetailsDrawerExpanded === "function"
           && isChatNodeDetailsDrawerExpanded()
