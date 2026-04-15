@@ -406,8 +406,12 @@
           stats.hopsWeight += hopsWeight;
         }}
 
-        const lastText = String((edge && edge.last_rx_time) || "").trim();
-        const lastUnix = parseDashboardTimeToUnix(lastText);
+        const lastText = (typeof edgeRxLabel === "function")
+          ? String(edgeRxLabel(edge, "last", "") || "").trim()
+          : String((edge && edge.last_rx_time) || "").trim();
+        const lastUnix = (typeof edgeRxUnix === "function")
+          ? edgeRxUnix(edge, "last")
+          : parseDashboardTimeToUnix(lastText);
         if (Number.isFinite(lastUnix) && (!Number.isFinite(stats.lastSeenUnix) || lastUnix > stats.lastSeenUnix)) {{
           stats.lastSeenUnix = lastUnix;
           stats.lastSeenText = lastText || "n/a";

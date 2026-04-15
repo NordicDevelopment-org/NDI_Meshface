@@ -1,4 +1,5 @@
 from meshdash.state_service import (
+    _slim_edges_for_network,
     _slim_history_caps,
     _slim_nodes_for_chat,
     _slim_recent_packets,
@@ -151,5 +152,55 @@ def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:
             "long_name": "Alpha",
             "last_heard_unix": 10,
             "role": "CLIENT",
+        }
+    ]
+
+
+def test_slim_edges_for_network_drops_duplicate_strings_and_counts() -> None:
+    slimmed = _slim_edges_for_network(
+        [
+            {
+                "from": "!a",
+                "to": "!b",
+                "count": 12,
+                "session_count": 3,
+                "lifetime_count": 12,
+                "is_real": True,
+                "confidence": "confirmed",
+                "first_rx_time": "2026-04-15 00:00:01Z",
+                "last_rx_time": "2026-04-15 00:00:05Z",
+                "avg_hops": 1.5,
+                "last_hops": 2,
+                "portnums": ["TEXT_MESSAGE_APP"],
+                "avg_snr": 9.5,
+                "snr_samples": 7,
+                "snr_min": 3.0,
+                "snr_max": 12.0,
+                "avg_rssi": -101.5,
+                "rssi_samples": 7,
+                "rssi_min": -110,
+                "rssi_max": -95,
+            }
+        ]
+    )
+
+    assert slimmed == [
+        {
+            "from": "!a",
+            "to": "!b",
+            "session_count": 3,
+            "lifetime_count": 12,
+            "is_real": True,
+            "first_rx_unix": 1776211201,
+            "last_rx_unix": 1776211205,
+            "avg_hops": 1.5,
+            "last_hops": 2,
+            "portnums": ["TEXT_MESSAGE_APP"],
+            "avg_snr": 9.5,
+            "snr_min": 3.0,
+            "snr_max": 12.0,
+            "avg_rssi": -101.5,
+            "rssi_min": -110,
+            "rssi_max": -95,
         }
     ]

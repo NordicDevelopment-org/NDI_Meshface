@@ -352,6 +352,48 @@ def _slim_nodes_for_chat(nodes: list[dict[str, object]]) -> list[dict[str, objec
     return slimmed
 
 
+def _slim_edges_for_network(edges: list[dict[str, object]]) -> list[dict[str, object]]:
+    slimmed: list[dict[str, object]] = []
+    for row in edges:
+        if not isinstance(row, Mapping):
+            continue
+        slim_row: dict[str, object] = {}
+        for key in (
+            "from",
+            "to",
+            "session_count",
+            "lifetime_count",
+            "is_real",
+            "last_hops",
+            "avg_hops",
+            "portnums",
+            "avg_snr",
+            "snr_min",
+            "snr_max",
+            "avg_rssi",
+            "rssi_min",
+            "rssi_max",
+            "src_lat",
+            "src_lon",
+            "dst_lat",
+            "dst_lon",
+        ):
+            value = row.get(key)
+            if value is not None:
+                slim_row[key] = value
+        first_rx_time = row.get("first_rx_time")
+        first_rx_unix = _parse_utc_text_to_unix_helper(first_rx_time)
+        if first_rx_unix is not None and first_rx_unix > 0:
+            slim_row["first_rx_unix"] = int(first_rx_unix)
+        last_rx_time = row.get("last_rx_time")
+        last_rx_unix = _parse_utc_text_to_unix_helper(last_rx_time)
+        if last_rx_unix is not None and last_rx_unix > 0:
+            slim_row["last_rx_unix"] = int(last_rx_unix)
+        if slim_row:
+            slimmed.append(slim_row)
+    return slimmed
+
+
 def _slim_packet_decoded(decoded: object) -> dict[str, object]:
     if not isinstance(decoded, Mapping):
         return {}
@@ -874,6 +916,9 @@ def build_dashboard_state_lite(
     if profile_name == "chat":
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = []
+    elif profile_name == "network":
+        slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
+        slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
     slim_history_caps = _slim_history_caps(
         state_payload.history_caps,
         nodes=slim_nodes,
@@ -881,7 +926,7 @@ def build_dashboard_state_lite(
         recent_packets=slim_recent_packets,
         edges=slim_edges,
         local_node_id=state_payload.local_node_id,
-        include_text_times=profile_name != "chat",
+        include_text_times=profile_name not in {"chat", "network"},
     )
     slim_traffic = StateTrafficPayload(
         edges=slim_edges,

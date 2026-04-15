@@ -58,7 +58,10 @@
         itemHash = hashMixStr(itemHash, normalizeNodeId(edge && edge.from));
         itemHash = hashMixStr(itemHash, normalizeNodeId(edge && edge.to));
         itemHash = hashMixInt(itemHash, Number.isFinite(lifetimeCount) ? Math.trunc(lifetimeCount) : 0);
-        itemHash = hashMixStr(itemHash, edge && edge.last_rx_time);
+        itemHash = hashMixStr(
+          itemHash,
+          (typeof edgeRxLabel === "function") ? edgeRxLabel(edge, "last", "") : (edge && edge.last_rx_time)
+        );
         itemHash = hashMixInt(itemHash, Number.isFinite(lastHops) ? Math.trunc(lastHops) : -1);
         itemHash = hashMixInt(itemHash, Number.isFinite(avgSnr) ? Math.round(avgSnr * 100) : -2147483648);
         itemHash = hashMixInt(itemHash, Number.isFinite(avgRssi) ? Math.round(avgRssi * 100) : -2147483648);

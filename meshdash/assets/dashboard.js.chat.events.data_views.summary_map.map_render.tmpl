@@ -53,6 +53,10 @@
     }}
 
     function parseEdgeLastSeenUnix(edge) {{
+      const helperUnix = (typeof edgeRxUnix === "function") ? edgeRxUnix(edge, "last") : null;
+      if (Number.isFinite(helperUnix) && helperUnix > 0) {{
+        return Math.floor(helperUnix);
+      }}
       const directUnix = Number(edge && (edge.last_rx_unix ?? edge.last_seen_unix ?? edge.last_unix));
       if (Number.isFinite(directUnix) && directUnix > 0) {{
         return Math.floor(directUnix);
@@ -434,8 +438,14 @@
             edgeHash = hashMixInt(edgeHash, isReal ? 1 : 0);
             edgeHash = hashMixInt(edgeHash, ageMinutes);
             edgeHash = hashMixStr(edgeHash, edge && (edge.confidence || ""));
-            edgeHash = hashMixStr(edgeHash, edge && (edge.first_rx_time || ""));
-            edgeHash = hashMixStr(edgeHash, edge && (edge.last_rx_time || ""));
+            edgeHash = hashMixStr(
+              edgeHash,
+              (typeof edgeRxLabel === "function") ? edgeRxLabel(edge, "first", "") : (edge && (edge.first_rx_time || ""))
+            );
+            edgeHash = hashMixStr(
+              edgeHash,
+              (typeof edgeRxLabel === "function") ? edgeRxLabel(edge, "last", "") : (edge && (edge.last_rx_time || ""))
+            );
             edgeHash = hashMixStr(edgeHash, edge && (edge.avg_hops ?? ""));
             edgeHash = hashMixStr(edgeHash, edge && (edge.last_hops ?? ""));
             const ports = Array.isArray(edge && edge.portnums) ? edge.portnums : [];
@@ -456,6 +466,12 @@
             const hopsLabel = edge.avg_hops == null
               ? "n/a"
               : `avg ${{edge.avg_hops}}${{edge.last_hops == null ? "" : ` (last ${{edge.last_hops}})`}}`;
+            const firstRxLabel = (typeof edgeRxLabel === "function")
+              ? edgeRxLabel(edge, "first", "n/a", nowUnix)
+              : (edge.first_rx_time || "n/a");
+            const lastRxLabel = (typeof edgeRxLabel === "function")
+              ? edgeRxLabel(edge, "last", "n/a", nowUnix)
+              : (edge.last_rx_time || "n/a");
             const line = L.polyline([[src.lat, src.lon], [dst.lat, dst.lon]], {{
               color: isReal ? "#bf1f43" : "#b7791f",
               dashArray: isReal ? null : "6 6",
@@ -469,7 +485,7 @@
               <b>${{edge.from}} -> ${{edge.to}}</b><br/>
               Status: ${{edge.confidence || (isReal ? "confirmed" : "observed")}}<br/>
               Packets: ${{lifetimeCount}}<br/>
-              Last: ${{edge.last_rx_time || "n/a"}} (${{lastAgeLabel}})<br/>
+              Last: ${{lastRxLabel}} (${{lastAgeLabel}})<br/>
               Hops: ${{hopsLabel}}
             `, {{ sticky: true, opacity: 0.92 }});
             line.bindPopup(`
@@ -477,8 +493,8 @@
               Status: ${{edge.confidence || (isReal ? "confirmed" : "observed")}}<br/>
               Session packets: ${{sessionCount}}<br/>
               Lifetime packets: ${{lifetimeCount}}<br/>
-              First: ${{edge.first_rx_time || "n/a"}}<br/>
-              Last: ${{edge.last_rx_time || "n/a"}}<br/>
+              First: ${{firstRxLabel}}<br/>
+              Last: ${{lastRxLabel}}<br/>
               Age: ${{lastAgeLabel}}<br/>
               Hops: ${{hopsLabel}}<br/>
               Ports: ${{ports.join(", ") || "n/a"}}

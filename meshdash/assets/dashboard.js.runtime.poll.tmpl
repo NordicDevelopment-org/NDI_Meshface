@@ -52,6 +52,9 @@
       if (isChatWorkspaceLayoutView(activeLayoutView) && !drawerLinksActive) {{
         return "chat";
       }}
+      if (activeLayoutView === "network") {{
+        return "network";
+      }}
       return "default";
     }}
 
@@ -60,7 +63,9 @@
         const pollProfile = statePollProfile();
         const stateUrlBase = pollProfile === "chat"
           ? "/api/state?lite=1&profile=chat"
-          : "/api/state?lite=1";
+          : (pollProfile === "network"
+            ? "/api/state?lite=1&profile=network"
+            : "/api/state?lite=1");
         const stateUrl = forceStateReloadOnce
           ? `${{stateUrlBase}}&_=${{Date.now()}}`
           : stateUrlBase;

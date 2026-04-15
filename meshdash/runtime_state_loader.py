@@ -179,6 +179,42 @@ def build_state_snapshot_loader_with_dependencies(
         except Exception:
             pass
 
+    build_state_lite_network = getattr(build_state_fn, "lite_network", None)
+    if callable(build_state_lite_network):
+        lite_network_cache_key: tuple[int, int, int] | None = None
+        lite_network_cache_payload: dict[str, object] | None = None
+
+        def state_fn_lite_network() -> dict:
+            nonlocal lite_network_cache_key, lite_network_cache_payload
+            key = _cache_key()
+            if lite_network_cache_payload is not None and lite_network_cache_key == key:
+                return lite_network_cache_payload
+            payload = build_state_lite_network(
+                iface=dependencies.iface,
+                tracker=dependencies.tracker,
+                started_at=dependencies.started_at,
+                target=dependencies.target,
+                show_secrets=dependencies.show_secrets,
+                storage_probe_path=dependencies.storage_probe_path,
+                revision_info=dependencies.revision_info,
+            )
+            lite_network_cache_key = key
+            lite_network_cache_payload = payload
+            return payload
+
+        def state_fn_lite_network_etag() -> str:
+            return _etag_for("lite-network")
+
+        try:
+            setattr(state_fn_lite_network, "etag", state_fn_lite_network_etag)
+        except Exception:
+            pass
+
+        try:
+            setattr(state_fn, "lite_network", state_fn_lite_network)
+        except Exception:
+            pass
+
     # Optional raw/debug getters used by the Data view.
     sensitive_field_names = getattr(build_state_fn, "_sensitive_field_names", set())
     if not isinstance(sensitive_field_names, set):

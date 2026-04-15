@@ -19,6 +19,7 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert 'runPollStep("renderChat.workspace", () => renderChat(state, { allowPollSkip: true }));' in js
     assert "renderChat(latestState, { allowPollSkip: true });" in js
     assert '"/api/state?lite=1&profile=chat"' in js
+    assert '"/api/state?lite=1&profile=network"' in js
     assert 'function statePollProfile() {' in js
     assert "&& pollStructuralSignature === chatPollStructuralSignature" in js
     assert "&& pollStructuralAgeMs < chatPollStructuralRefreshMs" in js

@@ -81,7 +81,9 @@
         const avgHopsSortValue = avgHopsRaw ?? "";
         const avgHopsText = avgHopsRaw == null ? "n/a" : avgHopsRaw;
         const confidenceValue = edge.confidence || (edge.is_real ? "confirmed" : "observed");
-        const lastRxValue = edge.last_rx_time || "n/a";
+        const lastRxValue = (typeof edgeRxLabel === "function")
+          ? edgeRxLabel(edge, "last", "n/a")
+          : (edge.last_rx_time || "n/a");
         linksHash = trafficTableHashMixStr(linksHash, fromValue);
         linksHash = trafficTableHashMixStr(linksHash, toValue);
         linksHash = trafficTableHashMixInt(linksHash, countValue);
