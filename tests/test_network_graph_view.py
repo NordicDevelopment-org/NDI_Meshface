@@ -92,10 +92,20 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function buildNetworkGraphSceneMarkup(scene)' in js
     assert 'function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {})' in js
     assert 'function buildNetworkGraphNodeSignalMeta(nodeMap, recentPackets)' in js
+    assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
+    assert 'function buildNetworkGraphPlaceholderNode(nodeId, caps = null)' in js
+    assert 'function buildNetworkGraphNodeMap(nodes, historyCapsRaw, rawEdges)' in js
     assert 'function setNetworkGraphRootNode(nodeId, options = {})' in js
     assert 'function navigateNetworkGraphBack()' in js
     assert 'function focusNetworkGraphNodeFromSelection(nodeId, options = {})' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
+    assert 'const localNodeHasLinkPeers = localNodeAvailable' in js
+    assert 'if (localNodeAvailable && (localNodeHasLinkPeers || bestDegree <= 0)) {' in js
+    assert 'Object.entries((historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {})' in js
+    assert 'buildNetworkGraphPlaceholderNode(fromId, historyCapsById.get(fromId) || null)' in js
+    assert 'buildNetworkGraphPlaceholderNode(toId, historyCapsById.get(toId) || null)' in js
+    assert 'const nodeMap = buildNetworkGraphNodeMap(nodes, historyCaps, rawEdges);' in js
+    assert 'const nodeMap = buildNetworkGraphNodeMap(liveNodes, historyCaps, rawEdges);' in js
     assert 'Broadcast only' in js
     assert 'is-broadcast-only' in js
     assert 'pointerDownNodeId' in js

@@ -1301,6 +1301,7 @@
 
     const networkGraphViewportBase = Object.freeze({{ x: 0, y: 0, width: 960, height: 620 }});
     const networkGraphZoomBounds = Object.freeze({{ minScale: 0.62, maxScale: 5.5 }});
+    const networkGraphFitZoomOutScale = 1.14;
     const networkGraphFocusAnimationDurationMs = 680;
     const networkGraphRootHistoryLimit = 48;
     const networkGraphBroadcastOnlyFreshnessSeconds = 2 * 60 * 60;
@@ -1745,6 +1746,9 @@
       const centerY = (Number(safeBounds.minY) + Number(safeBounds.maxY)) / 2;
       const rawWidth = Math.max(220, Number(safeBounds.maxX) - Number(safeBounds.minX));
       const rawHeight = Math.max(160, Number(safeBounds.maxY) - Number(safeBounds.minY));
+      const fitZoomOutScale = Number.isFinite(networkGraphFitZoomOutScale) && networkGraphFitZoomOutScale > 1
+        ? networkGraphFitZoomOutScale
+        : 1;
       const viewAspect = getNetworkGraphStageAspectRatio(svg);
       let width = rawWidth;
       let height = rawHeight;
@@ -1753,6 +1757,8 @@
       }} else {{
         width = height * viewAspect;
       }}
+      width *= fitZoomOutScale;
+      height *= fitZoomOutScale;
       return clampNetworkGraphViewBox({{
         x: centerX - (width / 2),
         y: centerY - (height / 2),
@@ -2036,13 +2042,15 @@
     }}
 
     function navigateNetworkGraphBack() {{
-      const nodeMap = (latestState && Array.isArray(latestState.nodes))
-        ? new Map(
-          latestState.nodes
-            .map((node) => [normalizeNodeId(node && node.id), node])
-            .filter((entry) => isSelectableNodeId(entry[0]))
-        )
-        : new Map();
+      const liveNodes = (latestState && Array.isArray(latestState.nodes)) ? latestState.nodes : [];
+      const historyCaps = (latestState && latestState.history_caps && typeof latestState.history_caps === "object")
+        ? latestState.history_caps
+        : {{}};
+      const traffic = (latestState && latestState.traffic && typeof latestState.traffic === "object")
+        ? latestState.traffic
+        : {{}};
+      const rawEdges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      const nodeMap = buildNetworkGraphNodeMap(liveNodes, historyCaps, rawEdges);
       while (networkGraphRootHistory.length) {{
         const previousId = normalizeNodeId(networkGraphRootHistory.pop() || "");
         if (!isSelectableNodeId(previousId)) continue;
@@ -2197,6 +2205,61 @@
       return a < b ? -1 : (a > b ? 1 : 0);
     }}
 
+    function buildNetworkGraphPlaceholderNode(nodeId, caps = null) {{
+      const clean = normalizeNodeId(nodeId || "");
+      const safeCaps = (caps && typeof caps === "object") ? caps : null;
+      const lastSeenRaw = Number(safeCaps && safeCaps.last_seen_unix);
+      const lastSeenUnix = Number.isFinite(lastSeenRaw) && lastSeenRaw > 0
+        ? Math.trunc(lastSeenRaw)
+        : 0;
+      const lastPositionRaw = Number(safeCaps && safeCaps.last_position_unix);
+      const lastPositionUnix = Number.isFinite(lastPositionRaw) && lastPositionRaw > 0
+        ? Math.trunc(lastPositionRaw)
+        : null;
+      const lastHopsRaw = Number(safeCaps && safeCaps.last_hops);
+      const lastHops = Number.isFinite(lastHopsRaw)
+        ? Math.max(0, Math.trunc(lastHopsRaw))
+        : null;
+      return {{
+        id: clean,
+        last_heard_unix: lastSeenUnix,
+        last_heard: String((safeCaps && safeCaps.last_seen) || ""),
+        has_position: !!(safeCaps && safeCaps.has_position),
+        last_position_unix: lastPositionUnix,
+        last_position_time: String((safeCaps && safeCaps.last_position_time) || ""),
+        hops_away: lastHops,
+        is_graph_placeholder: true,
+      }};
+    }}
+
+    function buildNetworkGraphNodeMap(nodes, historyCapsRaw, rawEdges) {{
+      const nodeMap = new Map();
+      for (const node of (Array.isArray(nodes) ? nodes : [])) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (!isSelectableNodeId(nodeId) || nodeMap.has(nodeId)) continue;
+        nodeMap.set(nodeId, node);
+      }}
+
+      const historyCapsById = new Map(
+        Object.entries((historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
+
+      for (const edge of (Array.isArray(rawEdges) ? rawEdges : [])) {{
+        const fromId = normalizeNodeId(edge && edge.from);
+        const toId = normalizeNodeId(edge && edge.to);
+        if (isSelectableNodeId(fromId) && !nodeMap.has(fromId)) {{
+          nodeMap.set(fromId, buildNetworkGraphPlaceholderNode(fromId, historyCapsById.get(fromId) || null));
+        }}
+        if (isSelectableNodeId(toId) && !nodeMap.has(toId)) {{
+          nodeMap.set(toId, buildNetworkGraphPlaceholderNode(toId, historyCapsById.get(toId) || null));
+        }}
+      }}
+
+      return nodeMap;
+    }}
+
     function combineNetworkGraphEdges(rawEdges, nodeMap) {{
       const buckets = new Map();
       for (const edge of (rawEdges || [])) {{
@@ -2324,13 +2387,28 @@
       return adjacency;
     }}
 
+    function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean || !(adjacency instanceof Map) || !adjacency.has(clean)) return false;
+      const peers = adjacency.get(clean);
+      if (!(peers instanceof Map) || peers.size <= 0) return false;
+      if (!(nodeMap instanceof Map) || nodeMap.size <= 0) return peers.size > 0;
+      for (const peerId of peers.keys()) {{
+        if (nodeMap.has(peerId)) return true;
+      }}
+      return false;
+    }}
+
     function resolveNetworkGraphRootId(nodeMap, adjacency, degreeMeta, state) {{
       const graphRootId = normalizeNodeId(networkGraphRootNodeId || "");
       if (graphRootId && nodeMap.has(graphRootId)) return graphRootId;
       const selectedId = normalizeNodeId(selectedNodeId || "");
       if (selectedId && nodeMap.has(selectedId)) return selectedId;
       const localNodeId = normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || "");
-      if (localNodeId && nodeMap.has(localNodeId)) return localNodeId;
+      const localNodeAvailable = !!(localNodeId && nodeMap.has(localNodeId));
+      const localNodeHasLinkPeers = localNodeAvailable
+        ? networkGraphNodeHasLinkPeers(localNodeId, adjacency, nodeMap)
+        : false;
       let bestId = "";
       let bestDegree = -1;
       let bestWeight = -1;
@@ -2342,6 +2420,9 @@
           bestDegree = meta.degree;
           bestWeight = meta.weight;
         }}
+      }}
+      if (localNodeAvailable && (localNodeHasLinkPeers || bestDegree <= 0)) {{
+        return localNodeId;
       }}
       if (bestId) return bestId;
       for (const nodeId of nodeMap.keys()) {{
@@ -2638,14 +2719,12 @@
 
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const historyCaps = (safeState.history_caps && typeof safeState.history_caps === "object")
+        ? safeState.history_caps
+        : {{}};
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
       const rawEdges = Array.isArray(traffic.edges) ? traffic.edges : [];
-      const nodeMap = new Map();
-      for (const node of nodes) {{
-        const nodeId = normalizeNodeId(node && node.id);
-        if (!isSelectableNodeId(nodeId) || nodeMap.has(nodeId)) continue;
-        nodeMap.set(nodeId, node);
-      }}
+      const nodeMap = buildNetworkGraphNodeMap(nodes, historyCaps, rawEdges);
 
       const combinedEdges = combineNetworkGraphEdges(rawEdges, nodeMap);
       const layout = buildNetworkGraphLayout(nodeMap, combinedEdges, safeState);
