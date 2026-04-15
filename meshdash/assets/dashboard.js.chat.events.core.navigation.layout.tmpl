@@ -2879,7 +2879,6 @@
       let hash = 2166136261;
       hash = hashMixStr(hash, normalizeNetworkGraphEdgeMode(edgeMode));
       hash = hashMixStr(hash, normalizeNodeId(networkGraphRootNodeId || ""));
-      hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || ""));
       hash = hashMixStr(hash, normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || ""));
 
       const safeNodes = Array.isArray(nodes) ? nodes : [];
@@ -3076,6 +3075,13 @@
         && selectionChanged
         && svg.childElementCount
       );
+      const canSkipSceneRender = !!(
+        canReuseGraphData
+        && previousLayoutSnapshot
+        && !rootChanged
+        && !selectionChanged
+        && svg.childElementCount
+      );
       const shouldRefitForRootChange = !!(
         rootChanged
         && !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)
@@ -3133,6 +3139,8 @@
       }} else if (canPatchSelectionOnly) {{
         cancelNetworkGraphSceneAnimation();
         syncNetworkGraphSceneSelection(svg, {{ rootId, selectedId }});
+      }} else if (canSkipSceneRender) {{
+        cancelNetworkGraphSceneAnimation();
       }} else {{
         cancelNetworkGraphSceneAnimation();
         svg.innerHTML = buildNetworkGraphSceneMarkup(scene);

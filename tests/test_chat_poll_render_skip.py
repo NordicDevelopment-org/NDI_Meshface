@@ -32,4 +32,6 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert "renderChatChangeSummary(nowUnix);" in js
     assert "function syncNetworkGraphSceneSelection(svg, options = {}) {" in js
     assert "const canPatchSelectionOnly = !!(" in js
+    assert "const canSkipSceneRender = !!(" in js
     assert "syncNetworkGraphSceneSelection(svg, { rootId, selectedId });" in js
+    assert "hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || \"\"));" not in js
