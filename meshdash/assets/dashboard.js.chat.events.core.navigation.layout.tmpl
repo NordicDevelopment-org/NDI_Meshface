@@ -1332,6 +1332,7 @@
     const networkGraphViewState = {{
       initialized: false,
       lastRootId: "",
+      lastSelectedId: "",
       renderSourceSignature: "",
       cachedNodeMap: null,
       cachedCombinedEdges: null,
@@ -1626,6 +1627,19 @@
             }}))
           : [],
       }};
+    }}
+
+    function syncNetworkGraphSceneSelection(svg, options = {{}}) {{
+      if (!(svg instanceof SVGElement)) return;
+      const rootId = normalizeNodeId(options && options.rootId);
+      const selectedId = normalizeNodeId(options && options.selectedId);
+      const groups = svg.querySelectorAll("[data-network-graph-node-id]");
+      groups.forEach((group) => {{
+        if (!(group instanceof SVGGElement)) return;
+        const nodeId = normalizeNodeId(group.getAttribute("data-network-graph-node-id") || "");
+        group.classList.toggle("is-root", !!rootId && nodeId === rootId);
+        group.classList.toggle("is-selected", !!selectedId && nodeId === selectedId);
+      }});
     }}
 
     function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {{}}) {{
@@ -2977,6 +2991,7 @@
         networkGraphViewState.pendingModeViewportSync = false;
         networkGraphViewState.renderedPositions = new Map();
         networkGraphViewState.renderedLayoutSnapshot = null;
+        networkGraphViewState.lastSelectedId = "";
         networkGraphViewState.renderSourceSignature = "";
         networkGraphViewState.cachedNodeMap = null;
         networkGraphViewState.cachedCombinedEdges = null;
@@ -3048,10 +3063,18 @@
       renderNetworkGraphNavigationControls(safeState, nodeMap, rootId);
       const previousLayoutSnapshot = networkGraphViewState.renderedLayoutSnapshot;
       const rootChanged = networkGraphViewState.lastRootId !== rootId;
+      const selectionChanged = networkGraphViewState.lastSelectedId !== selectedId;
       const shouldAnimateSceneChange = !!(
         previousLayoutSnapshot
         && networkGraphViewState.lastRootId
         && rootChanged
+      );
+      const canPatchSelectionOnly = !!(
+        canReuseGraphData
+        && previousLayoutSnapshot
+        && !rootChanged
+        && selectionChanged
+        && svg.childElementCount
       );
       const shouldRefitForRootChange = !!(
         rootChanged
@@ -3084,6 +3107,7 @@
       networkGraphViewState.pendingModeViewportSync = false;
       networkGraphViewState.pendingFocusTransition = null;
       networkGraphViewState.lastRootId = rootId;
+      networkGraphViewState.lastSelectedId = selectedId;
       networkGraphViewState.renderedPositions = new Map(layout.positions);
       networkGraphViewState.renderedLayoutSnapshot = cloneNetworkGraphLayoutSnapshot(layout);
 
@@ -3106,6 +3130,9 @@
       }};
       if (shouldAnimateSceneChange) {{
         animateNetworkGraphScene(svg, previousLayoutSnapshot, scene);
+      }} else if (canPatchSelectionOnly) {{
+        cancelNetworkGraphSceneAnimation();
+        syncNetworkGraphSceneSelection(svg, {{ rootId, selectedId }});
       }} else {{
         cancelNetworkGraphSceneAnimation();
         svg.innerHTML = buildNetworkGraphSceneMarkup(scene);
