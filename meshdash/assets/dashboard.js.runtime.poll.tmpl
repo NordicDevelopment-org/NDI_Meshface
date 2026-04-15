@@ -94,8 +94,6 @@
           lastPollErrorUnix = 0;
           renderSelfRadioPill(latestState);
           const hidden304 = (typeof document !== "undefined") && !!document.hidden;
-          const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network";
-          const trafficVisible304 = mapVisible304 || activeLayoutView === "history";
           const drawerHistoryVisible304 = (
             typeof isChatNodeDetailsDrawerExpanded === "function"
             && isChatNodeDetailsDrawerExpanded()
@@ -123,6 +121,9 @@
             renderChatNodeNavigatorList(latestState);
           }}
           renderSummary(latestState);
+          const networkMapActive304 = activeLayoutView === "network" && activeNetworkSubview === "map";
+          const mapVisible304 = activeLayoutView === "saved" || networkMapActive304;
+          const trafficVisible304 = mapVisible304 || activeLayoutView === "history";
           if (mapVisible304) {{
             renderMap(nodes304, traffic304.edges || [], cachedHistory304);
           }}
@@ -263,7 +264,8 @@
           renderChatNodeNavigatorList(state);
         }}
 
-        const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network";
+        const networkMapActive = activeLayoutView === "network" && activeNetworkSubview === "map";
+        const mapVisible = activeLayoutView === "saved" || networkMapActive;
         const trafficVisible = mapVisible || activeLayoutView === "history";
         const drawerHistoryVisible = (
           typeof isChatNodeDetailsDrawerExpanded === "function"
