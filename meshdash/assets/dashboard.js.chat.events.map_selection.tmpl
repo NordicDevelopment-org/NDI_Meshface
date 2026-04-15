@@ -1,39 +1,150 @@
-    function highlightNodeSelection() {{
-      for (const row of document.querySelectorAll("#nodes-table tbody tr")) {{
-        const nodeId = normalizeNodeId(row.dataset.nodeId || "");
-        row.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+    const nodeSelectionUiState = {{
+      frame: null,
+      pendingShouldFocus: false,
+    }};
+
+    function cssEscapeAttrValue(value) {{
+      const text = String(value == null ? "" : value);
+      if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {{
+        return CSS.escape(text);
       }}
-      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item")) {{
-        const nodeId = normalizeNodeId(item.dataset.nodeId || "");
-        item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+      return text.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    }}
+
+    function applySelectedNodeClassToSelector(selector, isSelected) {{
+      if (!selector) return;
+      for (const element of document.querySelectorAll(selector)) {{
+        if (!(element instanceof HTMLElement)) continue;
+        element.classList.toggle("selected-node", !!isSelected);
       }}
-      for (const member of document.querySelectorAll("#chat-room-unread-list .chat-member-item, #chat-room-pinned-list .chat-member-item, #chat-room-list .chat-member-item")) {{
-        const nodeId = normalizeNodeId(member.dataset.nodeId || "");
-        const isSelected = !!selectedNodeId && nodeId === selectedNodeId;
-        member.classList.toggle("selected-node", isSelected);
+    }}
+
+    function refreshNodeSelectionCrossReferenceRows(nodeId, isSelected) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(cleanNodeId)) return;
+      const rowMatchers = [
+        "#encription-packets-table tbody tr",
+        "#encription-traffic-table tbody tr",
+        "#history-chat-table tbody tr",
+      ];
+      for (const selector of rowMatchers) {{
+        for (const row of document.querySelectorAll(selector)) {{
+          if (!(row instanceof HTMLTableRowElement)) continue;
+          const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
+          const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
+          if (fromNodeId !== cleanNodeId && toNodeId !== cleanNodeId) continue;
+          row.classList.toggle("selected-node", !!isSelected);
+        }}
       }}
-      for (const item of document.querySelectorAll("#favorites-list .favorite-node-item")) {{
-        const nodeId = normalizeNodeId(item.dataset.nodeId || "");
-        item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+    }}
+
+    function highlightNodeSelection(previousNodeId = "", nextNodeId = selectedNodeId) {{
+      const previousId = normalizeNodeId(previousNodeId || "");
+      const nextId = normalizeNodeId(nextNodeId || "");
+      const directSelectors = [
+        '#nodes-table tbody tr[data-node-id="%ID%"]',
+        '#chat-feed .chat-feed-item[data-node-id="%ID%"]',
+        '#chat-room-unread-list .chat-member-item[data-node-id="%ID%"]',
+        '#chat-room-pinned-list .chat-member-item[data-node-id="%ID%"]',
+        '#chat-room-list .chat-member-item[data-node-id="%ID%"]',
+        '#favorites-list .favorite-node-item[data-node-id="%ID%"]',
+      ];
+      const applyNodeIdSelection = (nodeId, isSelected) => {{
+        const cleanNodeId = normalizeNodeId(nodeId || "");
+        if (!isSelectableNodeId(cleanNodeId)) return;
+        const escapedId = cssEscapeAttrValue(cleanNodeId);
+        for (const pattern of directSelectors) {{
+          applySelectedNodeClassToSelector(pattern.replace("%ID%", escapedId), isSelected);
+        }}
+        refreshNodeSelectionCrossReferenceRows(cleanNodeId, isSelected);
+      }};
+
+      if (previousId && previousId !== nextId) {{
+        applyNodeIdSelection(previousId, false);
       }}
-      for (const row of document.querySelectorAll("#encription-packets-table tbody tr, #encription-traffic-table tbody tr")) {{
-        const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
-        const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
-        const isSelected = !!selectedNodeId && (
-          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
-          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
-        );
-        row.classList.toggle("selected-node", isSelected);
+      if (nextId) {{
+        applyNodeIdSelection(nextId, true);
       }}
-      for (const row of document.querySelectorAll("#history-chat-table tbody tr")) {{
-        const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
-        const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
-        const isSelected = !!selectedNodeId && (
-          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
-          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
-        );
-        row.classList.toggle("selected-node", isSelected);
+    }}
+
+    function flushNodeSelectionUiRefresh() {{
+      if (nodeSelectionUiState.frame !== null) {{
+        window.cancelAnimationFrame(nodeSelectionUiState.frame);
       }}
+      nodeSelectionUiState.frame = null;
+
+      const activeSelectedId = normalizeNodeId(selectedNodeId || "");
+      if (!isSelectableNodeId(activeSelectedId)) return;
+
+      const shouldFocus = !!nodeSelectionUiState.pendingShouldFocus;
+      nodeSelectionUiState.pendingShouldFocus = false;
+
+      let cachedHistory = null;
+      if (latestState && (activeLayoutView === "saved" || activeLayoutView === "network")) {{
+        cachedHistory = cachedNodeHistory(activeSelectedId);
+      }}
+
+      if (activeLayoutView === "saved") {{
+        if (cachedHistory) {{
+          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
+          renderSavedNodeDetails(latestState || {{}}, cachedHistory);
+        }} else {{
+          renderNodeHistoryLoading(activeSelectedId);
+        }}
+      }} else if (activeLayoutView === "network") {{
+        renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
+        setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
+      }} else if (activeLayoutView === "history") {{
+        setMapDataMode("activity");
+      }} else {{
+        setMapDataMode("live");
+      }}
+
+      if (latestState) {{
+        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedHistory);
+      }}
+      if (typeof renderNetworkGraphView === "function") {{
+        const networkGraphActive = activeLayoutView === "network" && activeNetworkSubview === "graph";
+        if (
+          networkGraphActive
+          && !networkGraphRootSyncInProgress
+          && !(networkGraphViewState && networkGraphViewState.pendingFocusTransition)
+        ) {{
+          renderNetworkGraphView(latestState);
+        }}
+      }}
+
+      const focusSelection = (
+        shouldFocus
+        && activeLayoutView !== "saved"
+        && (
+          activeLayoutView !== "network"
+          || activeNetworkSubview === "map"
+        )
+      );
+      updateMapSelection(focusSelection);
+      scrollSelectionIntoView();
+      void refreshSelectedNodeHistory(false);
+      applyChatChannel(activeChatChannel, false);
+      if (typeof syncChatNodeDetailsDrawer === "function") {{
+        syncChatNodeDetailsDrawer(latestState, {{
+          fetchHistory: false,
+        }});
+      }}
+      if (activeLayoutView === "games") {{
+        renderGamesView(latestState);
+      }} else if (activeLayoutView === "files") {{
+        renderFilesView(latestState);
+      }}
+    }}
+
+    function scheduleNodeSelectionUiRefresh(options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      nodeSelectionUiState.pendingShouldFocus = nodeSelectionUiState.pendingShouldFocus || !!opts.shouldFocus;
+      if (nodeSelectionUiState.frame !== null) return;
+      nodeSelectionUiState.frame = window.requestAnimationFrame(() => {{
+        flushNodeSelectionUiRefresh();
+      }});
     }}
 
     function isVisibleForSelectionScroll(el) {{
@@ -673,6 +784,7 @@
       persistSelection();
       renderSelectionStatus();
       renderSavedNodeSearchDropdown(latestState);
+      highlightNodeSelection(previousSelectedId, normalized);
       if (isChatWorkspaceLayoutView(activeLayoutView)) {{
         pendingMapHistoryFocus = false;
         const shouldOpenDrawer = (
@@ -715,7 +827,6 @@
           rerender: false,
         }});
       }}
-      highlightNodeSelection();
       const focusSelection = (
         shouldFocus
         && activeLayoutView !== "saved"
@@ -725,34 +836,6 @@
         )
       );
       pendingMapHistoryFocus = focusSelection;
-      scrollSelectionIntoView();
-      let cachedHistory = null;
-      if (latestState && (activeLayoutView === "saved" || activeLayoutView === "network")) {{
-        cachedHistory = cachedNodeHistory(selectedNodeId);
-      }}
-
-      if (activeLayoutView === "saved") {{
-        if (cachedHistory) {{
-          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
-          renderSavedNodeDetails(latestState || {{}}, cachedHistory);
-        }} else {{
-          renderNodeHistoryLoading(selectedNodeId);
-        }}
-      }} else if (activeLayoutView === "network") {{
-        // Map-data panel is visible in these views.
-        renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
-        setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
-      }} else if (activeLayoutView === "history") {{
-        // Keep History view stable; node selection is for row highlighting/filtering
-        // and should not swap the left pane away from trend charts.
-        setMapDataMode("activity");
-      }} else {{
-        setMapDataMode("live");
-      }}
-
-      if (latestState) {{
-        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedHistory);
-      }}
       if (
         activeLayoutView === "network"
         && activeNetworkSubview === "graph"
@@ -763,22 +846,7 @@
       ) {{
         renderNetworkGraphView(latestState);
       }}
-
-      updateMapSelection(focusSelection);
-
-      // Kick an immediate history refresh so the signal plot/trail doesn't wait for the next poll.
-      void refreshSelectedNodeHistory(false);
-      applyChatChannel(activeChatChannel, false);
-      if (typeof syncChatNodeDetailsDrawer === "function") {{
-        syncChatNodeDetailsDrawer(latestState, {{
-          fetchHistory: false,
-        }});
-      }}
-      if (activeLayoutView === "games") {{
-        renderGamesView(latestState);
-      }} else if (activeLayoutView === "files") {{
-        renderFilesView(latestState);
-      }}
+      scheduleNodeSelectionUiRefresh({{ shouldFocus: focusSelection }});
     }}
 
     function clearNodeSelection() {{
