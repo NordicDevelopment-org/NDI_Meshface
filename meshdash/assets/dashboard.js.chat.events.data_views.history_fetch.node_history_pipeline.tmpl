@@ -314,6 +314,12 @@
     }}
 
     async function refreshSelectedNodeHistory(force = false) {{
+      const perfToken = (typeof currentNodeSelectionPerfToken === "function")
+        ? currentNodeSelectionPerfToken()
+        : 0;
+      const perfStartMs = perfToken > 0 && typeof nodeSelectionPerfNow === "function"
+        ? nodeSelectionPerfNow()
+        : 0;
       const nodeId = activeLayoutView === "saved"
         ? resolveSavedViewNodeId(latestState)
         : normalizeNodeId(selectedNodeId || "");
@@ -327,16 +333,34 @@
       );
       if (!isSelectableNodeId(nodeId)) {{
         abortNodeHistoryFetch();
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs, {{
+            skipped: true,
+            reason: "no-selection",
+          }});
+        }}
         return null;
       }}
       if (!(activeLayoutView === "saved" || activeLayoutView === "network" || drawerExpanded)) {{
         // No need to load node history unless the map views that can use it are visible.
         abortNodeHistoryFetch();
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs, {{
+            skipped: true,
+            reason: "view-inactive",
+          }});
+        }}
         return null;
       }}
       if (mapDataFocus === "activity" && !drawerExpanded) {{
         // When showing online activity, keep node history idle.
         abortNodeHistoryFetch();
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs, {{
+            skipped: true,
+            reason: "activity-mode",
+          }});
+        }}
         return null;
       }}
 
@@ -350,10 +374,22 @@
         // Ensure the UI is actually showing the cached history (selection changes can
         // switch the UI into a loading state without re-rendering the chart).
         applyNodeHistoryToView(cachedData);
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs, {{
+            cacheHit: true,
+          }});
+          finishNodeSelectionPerf(perfToken, "history-cache-hit");
+        }}
         return cachedData;
       }}
 
       if (!force && nodeHistoryFetchAbort && nodeHistoryFetchNodeId === nodeId) {{
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs, {{
+            skipped: true,
+            reason: "already-fetching",
+          }});
+        }}
         return null;
       }}
 
@@ -382,6 +418,13 @@
         if (!(activeLayoutView === "saved" || activeLayoutView === "network" || drawerExpandedNow)) return null;
         if (mapDataFocus === "activity" && !drawerExpandedNow) return null;
         applyNodeHistoryToView(data);
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs, {{
+            cacheHit: false,
+            points: Array.isArray(data && data.positions) ? data.positions.length : 0,
+          }});
+          finishNodeSelectionPerf(perfToken, "history-fetched");
+        }}
         return data;
       }} catch (err) {{
         if (err && err.name === "AbortError") return null;
@@ -390,6 +433,14 @@
         const caption = document.getElementById("node-history-caption");
         if (caption && (activeLayoutView === "saved" || drawerHistoryActive)) {{
           caption.textContent = `History error for ${{nodeId}}: ${{msg}}`;
+        }}
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs, {{
+            error: msg,
+          }});
+          finishNodeSelectionPerf(perfToken, "history-error", {{
+            error: msg,
+          }});
         }}
         return null;
       }} finally {{

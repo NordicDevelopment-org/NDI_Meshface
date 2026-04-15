@@ -1755,6 +1755,12 @@
     }}
 
     function syncChatNodeDetailsDrawer(state = latestState, options = null) {{
+      const perfToken = (typeof currentNodeSelectionPerfToken === "function")
+        ? currentNodeSelectionPerfToken()
+        : 0;
+      const perfStartMs = perfToken > 0 && typeof nodeSelectionPerfNow === "function"
+        ? nodeSelectionPerfNow()
+        : 0;
       const opts = options && typeof options === "object" ? options : {{}};
       const drawer = document.getElementById("chat-node-details-drawer");
       const titleEl = document.getElementById("chat-node-details-title");
@@ -1853,6 +1859,11 @@
         }}
         syncSavedNodeDetailsDock(true);
         syncNodeHistoryDock();
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.drawer_sync", perfStartMs, {{
+            visibleExpanded: false,
+          }});
+        }}
         return;
       }}
 
@@ -2023,6 +2034,12 @@
         }}
       }} else {{
         syncNodeHistoryDock();
+      }}
+      if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+        markNodeSelectionPerf(perfToken, "selection.drawer_sync", perfStartMs, {{
+          visibleExpanded: true,
+          activeTab,
+        }});
       }}
     }}
 

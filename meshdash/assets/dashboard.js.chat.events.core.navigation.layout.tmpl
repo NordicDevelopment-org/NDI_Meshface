@@ -3060,6 +3060,12 @@
     }}
 
     function renderNetworkGraphView(state = latestState) {{
+      const perfToken = (typeof currentNodeSelectionPerfToken === "function")
+        ? currentNodeSelectionPerfToken()
+        : 0;
+      const perfStartMs = perfToken > 0 && typeof nodeSelectionPerfNow === "function"
+        ? nodeSelectionPerfNow()
+        : 0;
       const svg = document.getElementById("network-graph-svg");
       const empty = document.getElementById("network-graph-empty");
       const summary = document.getElementById("network-graph-summary");
@@ -3142,6 +3148,11 @@
           : "No node links recorded yet.";
         empty.hidden = false;
         scheduleNetworkGraphEmptyRetry();
+        if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+          markNodeSelectionPerf(perfToken, "selection.graph_render", perfStartMs, {{
+            empty: true,
+          }});
+        }}
         return;
       }}
 
@@ -3295,6 +3306,12 @@
         svg.innerHTML = buildNetworkGraphSceneMarkup(scene);
       }}
       networkGraphViewState.lastSceneStructureSignature = sceneStructureSignature;
+      if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
+        markNodeSelectionPerf(perfToken, "selection.graph_render", perfStartMs, {{
+          nodes: layout.items.length,
+          edges: combinedEdges.length,
+        }});
+      }}
     }}
 
     function syncNodeHistoryDock() {{

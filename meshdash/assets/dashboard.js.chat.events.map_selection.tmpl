@@ -1,7 +1,114 @@
     const nodeSelectionUiState = {{
       frame: null,
       pendingShouldFocus: false,
+      pendingPerfToken: 0,
     }};
+
+    const nodeSelectionPerfState = {{
+      nextToken: 0,
+      activeToken: 0,
+      runs: [],
+    }};
+
+    function nodeSelectionPerfNow() {{
+      return (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+        ? performance.now()
+        : Date.now();
+    }}
+
+    function nodeSelectionPerfStore() {{
+      if (typeof window === "undefined") return null;
+      const existing = window.__meshNodeSelectionPerf;
+      if (existing && typeof existing === "object") return existing;
+      const created = {{
+        runs: [],
+        lastRun: null,
+      }};
+      window.__meshNodeSelectionPerf = created;
+      return created;
+    }}
+
+    function findNodeSelectionPerfRun(token) {{
+      const targetToken = Math.trunc(Number(token) || 0);
+      if (!(targetToken > 0)) return null;
+      const runs = Array.isArray(nodeSelectionPerfState.runs) ? nodeSelectionPerfState.runs : [];
+      for (let index = runs.length - 1; index >= 0; index -= 1) {{
+        const entry = runs[index];
+        if (entry && Math.trunc(Number(entry.token) || 0) === targetToken) {{
+          return entry;
+        }}
+      }}
+      return null;
+    }}
+
+    function beginNodeSelectionPerf(nodeId, meta = {{}}) {{
+      const token = (Math.trunc(Number(nodeSelectionPerfState.nextToken) || 0) + 1);
+      nodeSelectionPerfState.nextToken = token;
+      nodeSelectionPerfState.activeToken = token;
+      const run = {{
+        token,
+        nodeId: normalizeNodeId(nodeId || ""),
+        startedAtMs: nodeSelectionPerfNow(),
+        phases: [],
+        meta: (meta && typeof meta === "object") ? {{ ...meta }} : {{}},
+        status: "active",
+      }};
+      nodeSelectionPerfState.runs.push(run);
+      while (nodeSelectionPerfState.runs.length > 40) {{
+        nodeSelectionPerfState.runs.shift();
+      }}
+      const store = nodeSelectionPerfStore();
+      if (store) {{
+        store.runs = nodeSelectionPerfState.runs.slice();
+        store.lastRun = run;
+      }}
+      return token;
+    }}
+
+    function currentNodeSelectionPerfToken() {{
+      return Math.trunc(Number(nodeSelectionPerfState.activeToken) || 0);
+    }}
+
+    function markNodeSelectionPerf(token, phase, startedAtMs, extra = null) {{
+      const run = findNodeSelectionPerfRun(token);
+      if (!run) return 0;
+      const startMs = Number(startedAtMs);
+      const endMs = nodeSelectionPerfNow();
+      const durationMs = Number.isFinite(startMs) ? Math.max(0, endMs - startMs) : 0;
+      const phaseEntry = {{
+        phase: String(phase || "unknown"),
+        durationMs: Math.round(durationMs * 100) / 100,
+      }};
+      if (extra && typeof extra === "object") {{
+        phaseEntry.extra = {{ ...extra }};
+      }}
+      run.phases.push(phaseEntry);
+      const store = nodeSelectionPerfStore();
+      if (store) {{
+        store.runs = nodeSelectionPerfState.runs.slice();
+        store.lastRun = run;
+      }}
+      return durationMs;
+    }}
+
+    function finishNodeSelectionPerf(token, status = "complete", extra = null) {{
+      const run = findNodeSelectionPerfRun(token);
+      if (!run) return null;
+      run.status = String(status || "complete");
+      run.totalDurationMs = Math.round(Math.max(0, nodeSelectionPerfNow() - Number(run.startedAtMs || 0)) * 100) / 100;
+      if (extra && typeof extra === "object") {{
+        run.result = {{ ...extra }};
+      }}
+      if (currentNodeSelectionPerfToken() === Math.trunc(Number(token) || 0)) {{
+        nodeSelectionPerfState.activeToken = 0;
+      }}
+      const store = nodeSelectionPerfStore();
+      if (store) {{
+        store.runs = nodeSelectionPerfState.runs.slice();
+        store.lastRun = run;
+      }}
+      return run;
+    }}
 
     function cssEscapeAttrValue(value) {{
       const text = String(value == null ? "" : value);
@@ -68,13 +175,25 @@
     }}
 
     function flushNodeSelectionUiRefresh() {{
+      const perfToken = Math.trunc(Number(nodeSelectionUiState.pendingPerfToken) || 0);
+      const flushStartedAtMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
       if (nodeSelectionUiState.frame !== null) {{
         window.cancelAnimationFrame(nodeSelectionUiState.frame);
       }}
       nodeSelectionUiState.frame = null;
+      nodeSelectionUiState.pendingPerfToken = 0;
 
       const activeSelectedId = normalizeNodeId(selectedNodeId || "");
-      if (!isSelectableNodeId(activeSelectedId)) return;
+      if (!isSelectableNodeId(activeSelectedId)) {{
+        if (perfToken > 0) {{
+          markNodeSelectionPerf(perfToken, "selection.ui_flush", flushStartedAtMs, {{
+            skipped: true,
+            reason: "no-selection",
+          }});
+          finishNodeSelectionPerf(perfToken, "no-selection");
+        }}
+        return;
+      }}
 
       const shouldFocus = !!nodeSelectionUiState.pendingShouldFocus;
       nodeSelectionUiState.pendingShouldFocus = false;
@@ -83,28 +202,52 @@
       if (latestState && (activeLayoutView === "saved" || activeLayoutView === "network")) {{
         cachedHistory = cachedNodeHistory(activeSelectedId);
       }}
+      const activeNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
+        ? normalizeNetworkSubview(activeNetworkSubview)
+        : String(activeNetworkSubview || "map").trim().toLowerCase();
+      const networkMapVisible = activeLayoutView === "network" && activeNetworkSubviewName === "map";
+      const networkGraphVisible = activeLayoutView === "network" && activeNetworkSubviewName === "graph";
 
       if (activeLayoutView === "saved") {{
+        const phaseStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
         if (cachedHistory) {{
           renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
           renderSavedNodeDetails(latestState || {{}}, cachedHistory);
         }} else {{
           renderNodeHistoryLoading(activeSelectedId);
         }}
+        if (perfToken > 0) {{
+          markNodeSelectionPerf(perfToken, "selection.saved_view", phaseStartMs, {{
+            cachedHistory: !!cachedHistory,
+          }});
+        }}
       }} else if (activeLayoutView === "network") {{
-        renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
-        setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
+        const phaseStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
+        if (networkMapVisible) {{
+          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
+          setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
+        }}
+        if (perfToken > 0) {{
+          markNodeSelectionPerf(perfToken, "selection.network_view", phaseStartMs, {{
+            cachedHistory: !!cachedHistory,
+            subview: activeNetworkSubviewName,
+          }});
+        }}
       }} else if (activeLayoutView === "history") {{
         setMapDataMode("activity");
       }} else {{
         setMapDataMode("live");
       }}
 
-      if (latestState) {{
+      if (latestState && (activeLayoutView !== "network" || networkMapVisible)) {{
+        const phaseStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
         renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedHistory);
+        if (perfToken > 0) {{
+          markNodeSelectionPerf(perfToken, "selection.map_render", phaseStartMs);
+        }}
       }}
       if (typeof renderNetworkGraphView === "function") {{
-        const networkGraphActive = activeLayoutView === "network" && activeNetworkSubview === "graph";
+        const networkGraphActive = networkGraphVisible;
         if (
           networkGraphActive
           && !networkGraphRootSyncInProgress
@@ -119,13 +262,25 @@
         && activeLayoutView !== "saved"
         && (
           activeLayoutView !== "network"
-          || activeNetworkSubview === "map"
+          || networkMapVisible
         )
       );
-      updateMapSelection(focusSelection);
+      const focusStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
+      if (activeLayoutView !== "network" || networkMapVisible) {{
+        updateMapSelection(focusSelection);
+      }}
       scrollSelectionIntoView();
+      if (perfToken > 0) {{
+        markNodeSelectionPerf(perfToken, "selection.focus_scroll", focusStartMs, {{
+          focusSelection: !!focusSelection,
+        }});
+      }}
       void refreshSelectedNodeHistory(false);
+      const channelStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
       applyChatChannel(activeChatChannel, false);
+      if (perfToken > 0) {{
+        markNodeSelectionPerf(perfToken, "selection.chat_channel", channelStartMs);
+      }}
       if (typeof syncChatNodeDetailsDrawer === "function") {{
         syncChatNodeDetailsDrawer(latestState, {{
           fetchHistory: false,
@@ -136,11 +291,21 @@
       }} else if (activeLayoutView === "files") {{
         renderFilesView(latestState);
       }}
+      if (perfToken > 0) {{
+        markNodeSelectionPerf(perfToken, "selection.ui_flush", flushStartedAtMs, {{
+          activeLayoutView,
+          activeNetworkSubview,
+        }});
+      }}
     }}
 
     function scheduleNodeSelectionUiRefresh(options = null) {{
       const opts = options && typeof options === "object" ? options : {{}};
       nodeSelectionUiState.pendingShouldFocus = nodeSelectionUiState.pendingShouldFocus || !!opts.shouldFocus;
+      const perfToken = Math.trunc(Number(opts.perfToken) || 0);
+      if (perfToken > 0) {{
+        nodeSelectionUiState.pendingPerfToken = perfToken;
+      }}
       if (nodeSelectionUiState.frame !== null) return;
       nodeSelectionUiState.frame = window.requestAnimationFrame(() => {{
         flushNodeSelectionUiRefresh();
@@ -712,6 +877,12 @@
     function selectNode(nodeId, shouldFocus = true, toggleIfSelected = true) {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return;
+      const perfToken = beginNodeSelectionPerf(normalized, {{
+        activeLayoutView,
+        activeNetworkSubview,
+        shouldFocus: !!shouldFocus,
+      }});
+      const dispatchStartedAtMs = nodeSelectionPerfNow();
       if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {{
         clearChatFeedRepeatToggleState();
       }}
@@ -785,6 +956,9 @@
       renderSelectionStatus();
       renderSavedNodeSearchDropdown(latestState);
       highlightNodeSelection(previousSelectedId, normalized);
+      markNodeSelectionPerf(perfToken, "selection.dispatch", dispatchStartedAtMs, {{
+        previousSelectedId,
+      }});
       if (isChatWorkspaceLayoutView(activeLayoutView)) {{
         pendingMapHistoryFocus = false;
         const shouldOpenDrawer = (
@@ -804,6 +978,7 @@
             fetchHistory: true,
           }});
         }}
+        finishNodeSelectionPerf(perfToken, "chat-workspace");
         return;
       }}
       if (
@@ -846,7 +1021,7 @@
       ) {{
         renderNetworkGraphView(latestState);
       }}
-      scheduleNodeSelectionUiRefresh({{ shouldFocus: focusSelection }});
+      scheduleNodeSelectionUiRefresh({{ shouldFocus: focusSelection, perfToken }});
     }}
 
     function clearNodeSelection() {{

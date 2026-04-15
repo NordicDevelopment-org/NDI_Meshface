@@ -34,8 +34,14 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert "function buildNetworkGraphSceneStructureSignature(scene) {" in js
     assert "function syncNetworkGraphSceneData(svg, scene) {" in js
     assert "const nodeSelectionUiState = {" in js
+    assert "const nodeSelectionPerfState = {" in js
+    assert "function beginNodeSelectionPerf(nodeId, meta = {}) {" in js
+    assert "function markNodeSelectionPerf(token, phase, startedAtMs, extra = null) {" in js
+    assert "function finishNodeSelectionPerf(token, status = \"complete\", extra = null) {" in js
     assert "function scheduleNodeSelectionUiRefresh(options = null) {" in js
     assert "function flushNodeSelectionUiRefresh() {" in js
+    assert 'const networkMapVisible = activeLayoutView === "network" && activeNetworkSubviewName === "map";' in js
+    assert 'if (latestState && (activeLayoutView !== "network" || networkMapVisible)) {' in js
     assert "const canPatchSelectionOnly = !!(" in js
     assert "const canSkipSceneRender = !!(" in js
     assert "const canPatchSceneDataOnly = !!(" in js
@@ -43,5 +49,8 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert 'data-network-graph-edge-key="${escAttr(buildNetworkGraphEdgeDomKey(edge))}"' in js
     assert "syncNetworkGraphSceneData(svg, scene);" in js
     assert "highlightNodeSelection(previousSelectedId, normalized);" in js
-    assert "scheduleNodeSelectionUiRefresh({ shouldFocus: focusSelection });" in js
+    assert "scheduleNodeSelectionUiRefresh({ shouldFocus: focusSelection, perfToken });" in js
+    assert 'markNodeSelectionPerf(perfToken, "selection.graph_render", perfStartMs' in js
+    assert 'markNodeSelectionPerf(perfToken, "selection.drawer_sync", perfStartMs' in js
+    assert 'markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs' in js
     assert "hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || \"\"));" not in js
