@@ -1300,8 +1300,8 @@
     }}
 
     const networkGraphViewportBase = Object.freeze({{ x: 0, y: 0, width: 960, height: 620 }});
-    const networkGraphZoomBounds = Object.freeze({{ minScale: 0.62, maxScale: 5.5 }});
-    const networkGraphFitZoomOutScale = 1.14;
+    const networkGraphZoomBounds = Object.freeze({{ minScale: 0.42, maxScale: 5.5 }});
+    const networkGraphFitZoomOutScale = 1.22;
     const networkGraphFocusAnimationDurationMs = 680;
     const networkGraphRootHistoryLimit = 48;
     const networkGraphBroadcastOnlyFreshnessSeconds = 2 * 60 * 60;
@@ -1738,6 +1738,19 @@
         ? Math.min(maxY, Math.max(minY, next.y))
         : ((Number(bounds.minY) + (spanHeight / 2)) - (next.height / 2));
       return next;
+    }}
+
+    function doesNetworkGraphViewBoxContainBounds(viewBox, bounds, paddingRatio = 0.04) {{
+      const safeViewBox = cloneNetworkGraphViewBox(viewBox);
+      const safeBounds = (bounds && typeof bounds === "object") ? bounds : defaultNetworkGraphBounds();
+      const padX = safeViewBox.width * Math.max(0, Number(paddingRatio) || 0);
+      const padY = safeViewBox.height * Math.max(0, Number(paddingRatio) || 0);
+      return (
+        Number(safeBounds.minX) >= (safeViewBox.x + padX)
+        && Number(safeBounds.maxX) <= ((safeViewBox.x + safeViewBox.width) - padX)
+        && Number(safeBounds.minY) >= (safeViewBox.y + padY)
+        && Number(safeBounds.maxY) <= ((safeViewBox.y + safeViewBox.height) - padY)
+      );
     }}
 
     function fitNetworkGraphViewBoxToBounds(bounds, svg = null) {{
@@ -2785,6 +2798,7 @@
       summary.innerHTML = summaryParts.join("");
       networkGraphViewState.bounds = computeNetworkGraphBounds(layout);
       networkGraphRootNodeId = rootId;
+      const fittedViewBox = fitNetworkGraphViewBoxToBounds(networkGraphViewState.bounds, svg);
       const rootPosition = layout.positions.get(rootId) || null;
       const shouldRecenterForEntry = !!(
         networkGraphViewState.pendingEntryViewportSync
@@ -2798,17 +2812,26 @@
       );
       renderNetworkGraphNavigationControls(safeState, nodeMap, rootId);
       const previousLayoutSnapshot = networkGraphViewState.renderedLayoutSnapshot;
+      const rootChanged = networkGraphViewState.lastRootId !== rootId;
       const shouldAnimateSceneChange = !!(
         previousLayoutSnapshot
         && networkGraphViewState.lastRootId
-        && networkGraphViewState.lastRootId !== rootId
+        && rootChanged
+      );
+      const shouldRefitForRootChange = !!(
+        rootChanged
+        && !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)
       );
       if (!networkGraphViewState.initialized) {{
         stopNetworkGraphPan(svg);
         resetNetworkGraphView(svg, {{ animate: false }});
-      }} else if (networkGraphViewState.lastRootId !== rootId) {{
+      }} else if (rootChanged) {{
         stopNetworkGraphPan(svg);
-        recenterNetworkGraphView(svg, {{ preserveScale: true }});
+        if (shouldRefitForRootChange) {{
+          animateNetworkGraphViewBox(svg, fittedViewBox);
+        }} else {{
+          recenterNetworkGraphView(svg, {{ preserveScale: true }});
+        }}
       }} else if (shouldRecenterForEntry) {{
         stopNetworkGraphPan(svg);
         recenterNetworkGraphView(svg, {{ preserveScale: true, animate: false }});

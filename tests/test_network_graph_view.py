@@ -92,9 +92,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function buildNetworkGraphSceneMarkup(scene)' in js
     assert 'function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {})' in js
     assert 'function buildNetworkGraphNodeSignalMeta(nodeMap, recentPackets)' in js
+    assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.42, maxScale: 5.5 });' in js
     assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
     assert 'function buildNetworkGraphPlaceholderNode(nodeId, caps = null)' in js
     assert 'function buildNetworkGraphNodeMap(nodes, historyCapsRaw, rawEdges)' in js
+    assert 'function doesNetworkGraphViewBoxContainBounds(viewBox, bounds, paddingRatio = 0.04)' in js
     assert 'function setNetworkGraphRootNode(nodeId, options = {})' in js
     assert 'function navigateNetworkGraphBack()' in js
     assert 'function focusNetworkGraphNodeFromSelection(nodeId, options = {})' in js
@@ -106,6 +108,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'buildNetworkGraphPlaceholderNode(toId, historyCapsById.get(toId) || null)' in js
     assert 'const nodeMap = buildNetworkGraphNodeMap(nodes, historyCaps, rawEdges);' in js
     assert 'const nodeMap = buildNetworkGraphNodeMap(liveNodes, historyCaps, rawEdges);' in js
+    assert 'const fittedViewBox = fitNetworkGraphViewBoxToBounds(networkGraphViewState.bounds, svg);' in js
+    assert 'const rootChanged = networkGraphViewState.lastRootId !== rootId;' in js
+    assert '&& !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)' in js
+    assert 'animateNetworkGraphViewBox(svg, fittedViewBox);' in js
     assert 'Broadcast only' in js
     assert 'is-broadcast-only' in js
     assert 'pointerDownNodeId' in js
