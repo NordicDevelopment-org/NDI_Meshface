@@ -1,0 +1,79 @@
+from meshdash.api_system import handle_state_get
+
+
+class _Headers:
+    def get(self, _key: str):
+        return None
+
+    def items(self):
+        return []
+
+
+class _Handler:
+    def __init__(self) -> None:
+        self.headers = _Headers()
+
+
+def test_handle_state_get_uses_lite_chat_profile_when_requested() -> None:
+    calls: list[str] = []
+
+    def state_fn():
+        calls.append("full")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    def state_lite():
+        calls.append("lite")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    def state_lite_chat():
+        calls.append("lite_chat")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    setattr(state_fn, "lite", state_lite)
+    setattr(state_fn, "lite_chat", state_lite_chat)
+    setattr(state_fn, "fault_history_fn", lambda: [])
+
+    written: list[object] = []
+
+    def write_json_response_fn(_handler, *, status_code, payload_obj, no_store=False, extra_headers=None):
+        written.append((status_code, payload_obj, no_store, extra_headers))
+
+    handle_state_get(
+        _Handler(),
+        state_fn=state_fn,
+        write_json_response_fn=write_json_response_fn,
+        query="lite=1&profile=chat",
+        private_mode=False,
+    )
+
+    assert calls == ["lite_chat"]
+    assert written
+    assert written[0][0] == 200
+
+
+def test_handle_state_get_falls_back_to_lite_when_chat_profile_missing() -> None:
+    calls: list[str] = []
+
+    def state_fn():
+        calls.append("full")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    def state_lite():
+        calls.append("lite")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    setattr(state_fn, "lite", state_lite)
+    setattr(state_fn, "fault_history_fn", lambda: [])
+
+    def write_json_response_fn(_handler, *, status_code, payload_obj, no_store=False, extra_headers=None):
+        return None
+
+    handle_state_get(
+        _Handler(),
+        state_fn=state_fn,
+        write_json_response_fn=write_json_response_fn,
+        query="lite=1&profile=chat",
+        private_mode=False,
+    )
+
+    assert calls == ["lite"]

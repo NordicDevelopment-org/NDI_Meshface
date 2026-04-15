@@ -42,9 +42,25 @@
       }}
     }}
 
+    function statePollProfile() {{
+      const drawerLinksActive = (
+        typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+        && typeof normalizeChatNodeDetailsDrawerTab === "function"
+        && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "links"
+      );
+      if (isChatWorkspaceLayoutView(activeLayoutView) && !drawerLinksActive) {{
+        return "chat";
+      }}
+      return "default";
+    }}
+
     async function poll() {{
       try {{
-        const stateUrlBase = "/api/state?lite=1";
+        const pollProfile = statePollProfile();
+        const stateUrlBase = pollProfile === "chat"
+          ? "/api/state?lite=1&profile=chat"
+          : "/api/state?lite=1";
         const stateUrl = forceStateReloadOnce
           ? `${{stateUrlBase}}&_=${{Date.now()}}`
           : stateUrlBase;

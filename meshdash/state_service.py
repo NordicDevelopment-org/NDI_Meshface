@@ -234,6 +234,7 @@ def _slim_history_caps(
     recent_packets: list[dict[str, object]],
     edges: list[dict[str, object]],
     local_node_id: str,
+    include_text_times: bool = True,
 ) -> dict[str, dict[str, object]]:
     relevant_ids: set[str] = set()
 
@@ -298,19 +299,57 @@ def _slim_history_caps(
         slim_caps: dict[str, object] = {}
         for key in (
             "last_seen_unix",
-            "last_seen",
             "has_position",
             "last_position_unix",
-            "last_position_time",
             "last_hops",
             "battery_level",
         ):
             value = caps.get(key)
             if value is not None:
                 slim_caps[key] = value
+        if include_text_times:
+            for key in ("last_seen", "last_position_time"):
+                value = caps.get(key)
+                if value is not None:
+                    slim_caps[key] = value
         if slim_caps:
             slim[node_id] = slim_caps
     return slim
+
+
+def _slim_nodes_for_chat(nodes: list[dict[str, object]]) -> list[dict[str, object]]:
+    kept_keys = (
+        "air_util_tx",
+        "battery_level",
+        "channel_utilization",
+        "hardware_model",
+        "hops_away",
+        "id",
+        "last_heard_unix",
+        "lat",
+        "lon",
+        "long_name",
+        "num",
+        "role",
+        "rssi",
+        "saved_packets",
+        "saved_points",
+        "short_name",
+        "snr",
+        "voltage",
+    )
+    slimmed: list[dict[str, object]] = []
+    for row in nodes:
+        if not isinstance(row, Mapping):
+            continue
+        slim_row = {
+            key: row.get(key)
+            for key in kept_keys
+            if row.get(key) is not None
+        }
+        if slim_row:
+            slimmed.append(slim_row)
+    return slimmed
 
 
 def _slim_packet_decoded(decoded: object) -> dict[str, object]:
@@ -797,6 +836,7 @@ def build_dashboard_state_lite(
     to_jsonable_fn: ToJsonableFn = _to_jsonable,
     redact_secrets_fn: RedactSecretsFn = _redact_secrets,
     utc_now_fn: UtcNowFn = _utc_now,
+    profile: str = "default",
 ) -> Dict[str, object]:
     """Build a slimmed-down state snapshot optimized for UI polling.
 
@@ -828,16 +868,23 @@ def build_dashboard_state_lite(
     )
     slim_recent_packets = _slim_recent_packets(state_payload.traffic.recent_packets)
     slim_recent_chat = list(state_payload.traffic.recent_chat)
+    slim_edges = list(state_payload.traffic.edges)
+    profile_name = str(profile or "").strip().lower()
+    slim_nodes = state_payload.nodes
+    if profile_name == "chat":
+        slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
+        slim_edges = []
     slim_history_caps = _slim_history_caps(
         state_payload.history_caps,
-        nodes=state_payload.nodes,
+        nodes=slim_nodes,
         recent_chat=slim_recent_chat,
         recent_packets=slim_recent_packets,
-        edges=state_payload.traffic.edges,
+        edges=slim_edges,
         local_node_id=state_payload.local_node_id,
+        include_text_times=profile_name != "chat",
     )
     slim_traffic = StateTrafficPayload(
-        edges=state_payload.traffic.edges,
+        edges=slim_edges,
         port_counts=state_payload.traffic.port_counts,
         recent_packets=slim_recent_packets,
         recent_chat=slim_recent_chat,
@@ -856,7 +903,7 @@ def build_dashboard_state_lite(
         tracker_error=state_payload.tracker_error,
         tracker_saved_counts_error=state_payload.tracker_saved_counts_error,
         tracker_capabilities_error=state_payload.tracker_capabilities_error,
-        nodes=state_payload.nodes,
+        nodes=slim_nodes,
         history_caps=slim_history_caps,
         nodes_full=state_payload.nodes_full,
         traffic=slim_traffic,

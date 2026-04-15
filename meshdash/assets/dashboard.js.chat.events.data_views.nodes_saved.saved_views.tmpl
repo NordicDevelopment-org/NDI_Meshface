@@ -372,7 +372,11 @@
         ? (Number.isFinite(capsPosUnix) ? capsPosUnix : trailPosUnix)
         : trailPosUnix;
       const latestPosTimeText = livePositionAvailable
-        ? savedDetailText((caps && caps.last_position_time) || (latestTrail && latestTrail.time))
+        ? savedDetailText(
+            Number.isFinite(capsPosUnix)
+              ? formatLocalChatTime(capsPosUnix, (latestTrail && latestTrail.time) || "n/a", nowUnix)
+              : ((latestTrail && latestTrail.time) || "n/a")
+          )
         : savedDetailText(latestTrail && latestTrail.time);
       const latestPosAgeText = savedDetailAge(latestPosTimeUnix, nowUnix);
       const positionSource = livePositionAvailable
@@ -415,7 +419,7 @@
         ["Channel Util", Number.isFinite(channelUtilValue) ? savedDetailPercent(channelUtilValue) : "n/a"],
         ["Air Util TX", Number.isFinite(airUtilTxValue) ? savedDetailPercent(airUtilTxValue) : "n/a"],
         ["GPS Capable", positionCapable],
-        ["Last Position Ping", savedDetailText((caps && caps.last_position_time) || (latestTrail && latestTrail.time))],
+        ["Last Position Ping", savedDetailText(latestPosTimeText)],
       ]);
       const noteDraft = needsNotesSection && nodeNoteDraftById.has(nodeId)
         ? String(nodeNoteDraftById.get(nodeId) || "")

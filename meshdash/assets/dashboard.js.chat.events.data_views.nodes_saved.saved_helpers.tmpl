@@ -302,7 +302,9 @@
       if (Number.isFinite(liveLastSeenUnix) && liveLastSeenUnix > 0) {{
         candidates.push({{
           unix: Math.trunc(liveLastSeenUnix),
-          text: String((node && node.last_heard) || "").trim(),
+          text: (typeof nodeLastHeardLabel === "function")
+            ? nodeLastHeardLabel(node, "", Math.floor(Date.now() / 1000))
+            : String((node && node.last_heard) || "").trim(),
           source: "live",
         }});
       }}
@@ -311,7 +313,11 @@
       if (Number.isFinite(capsLastSeenUnix) && capsLastSeenUnix > 0) {{
         candidates.push({{
           unix: Math.trunc(capsLastSeenUnix),
-          text: String((caps && (caps.last_seen || caps.last_position_time)) || "").trim(),
+          text: formatLocalChatTime(
+            Math.trunc(capsLastSeenUnix),
+            String((caps && (caps.last_seen || caps.last_position_time)) || "").trim(),
+            Math.floor(Date.now() / 1000)
+          ),
           source: "caps",
         }});
       }}

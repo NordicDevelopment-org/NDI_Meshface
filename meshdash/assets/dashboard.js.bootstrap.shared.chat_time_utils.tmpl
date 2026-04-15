@@ -236,6 +236,12 @@
       return parseDashboardTimeToUnix(node.last_heard);
     }}
 
+    function nodeLastHeardLabel(node, fallback = "n/a", nowUnix = Math.floor(Date.now() / 1000)) {{
+      const text = String(node && node.last_heard || "").trim();
+      if (text) return text;
+      return formatLocalChatTime(nodeLastHeardUnix(node), fallback, nowUnix);
+    }}
+
     function freshnessStatus(lastSeenUnix, nowUnix = Math.floor(Date.now() / 1000)) {{
       const ts = Number(lastSeenUnix);
       if (!Number.isFinite(ts) || ts <= 0) return "unknown";

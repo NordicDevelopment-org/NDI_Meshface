@@ -2334,10 +2334,10 @@
       return {{
         id: clean,
         last_heard_unix: lastSeenUnix,
-        last_heard: String((safeCaps && safeCaps.last_seen) || ""),
+        last_heard: formatLocalChatTime(lastSeenUnix, String((safeCaps && safeCaps.last_seen) || ""), Math.floor(Date.now() / 1000)),
         has_position: !!(safeCaps && safeCaps.has_position),
         last_position_unix: lastPositionUnix,
-        last_position_time: String((safeCaps && safeCaps.last_position_time) || ""),
+        last_position_time: formatLocalChatTime(lastPositionUnix, String((safeCaps && safeCaps.last_position_time) || ""), Math.floor(Date.now() / 1000)),
         hops_away: lastHops,
         is_graph_placeholder: true,
       }};

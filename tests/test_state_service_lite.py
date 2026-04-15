@@ -1,4 +1,8 @@
-from meshdash.state_service import _slim_history_caps, _slim_recent_packets
+from meshdash.state_service import (
+    _slim_history_caps,
+    _slim_nodes_for_chat,
+    _slim_recent_packets,
+)
 
 
 def test_slim_recent_packets_drops_raw_packet_blob_but_keeps_ui_fields() -> None:
@@ -78,6 +82,36 @@ def test_slim_history_caps_keeps_only_relevant_nodes_and_fields() -> None:
     assert "battery_updated_unix" not in slimmed["!node-a"]
 
 
+def test_slim_history_caps_chat_profile_drops_duplicate_text_times() -> None:
+    history_caps = {
+        "!node-a": {
+            "last_seen_unix": 10,
+            "last_seen": "2026-04-15 00:00:10Z",
+            "has_position": True,
+            "last_position_unix": 8,
+            "last_position_time": "2026-04-15 00:00:08Z",
+            "last_hops": 2,
+            "battery_level": 90,
+        },
+    }
+
+    slimmed = _slim_history_caps(
+        history_caps,
+        nodes=[{"id": "!node-a"}],
+        recent_chat=[],
+        recent_packets=[],
+        edges=[],
+        local_node_id="!local",
+        include_text_times=False,
+    )
+
+    assert set(slimmed) == {"!node-a"}
+    assert slimmed["!node-a"]["last_seen_unix"] == 10
+    assert slimmed["!node-a"]["last_position_unix"] == 8
+    assert "last_seen" not in slimmed["!node-a"]
+    assert "last_position_time" not in slimmed["!node-a"]
+
+
 def test_slim_recent_packets_caps_lite_buffer_length() -> None:
     recent_packets = [
         {
@@ -92,3 +126,30 @@ def test_slim_recent_packets_caps_lite_buffer_length() -> None:
     assert len(slimmed) == 120
     assert slimmed[0]["summary"]["packet_id"] == 0
     assert slimmed[-1]["summary"]["packet_id"] == 119
+
+
+def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:
+    slimmed = _slim_nodes_for_chat(
+        [
+            {
+                "id": "!node-a",
+                "short_name": "A",
+                "long_name": "Alpha",
+                "saved_last_seen": "2026-04-15 00:00:10Z",
+                "is_licensed": True,
+                "last_heard": "2026-04-15 00:00:10Z",
+                "last_heard_unix": 10,
+                "role": "CLIENT",
+            }
+        ]
+    )
+
+    assert slimmed == [
+        {
+            "id": "!node-a",
+            "short_name": "A",
+            "long_name": "Alpha",
+            "last_heard_unix": 10,
+            "role": "CLIENT",
+        }
+    ]

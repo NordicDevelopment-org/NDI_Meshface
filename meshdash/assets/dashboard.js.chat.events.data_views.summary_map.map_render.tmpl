@@ -202,7 +202,7 @@
             SNR: ${{selectedNode.snr ?? "n/a"}}<br/>
             RSSI: ${{selectedNode.rssi ?? "n/a"}}<br/>
             Position: <span class="map-position-badge ${{posBadge.className}}" title="${{escAttr(posBadge.title)}}">${{escAttr(posBadge.label)}}</span><br/>
-            Last: ${{selectedNode.last_heard || "n/a"}}<br/>
+            Last: ${{typeof nodeLastHeardLabel === "function" ? nodeLastHeardLabel(selectedNode, "n/a", nowUnix) : (selectedNode.last_heard || "n/a")}}<br/>
             Trail points: ${{trailPointsCount}}<br/>
             Trail latest: ${{trailLast}}
           `);
@@ -297,7 +297,12 @@
           markerHash = hashMixStr(markerHash, node && (node.num ?? ""));
           markerHash = hashMixStr(markerHash, node && (node.snr ?? ""));
           markerHash = hashMixStr(markerHash, node && (node.rssi ?? ""));
-          markerHash = hashMixStr(markerHash, node && (node.last_heard || ""));
+          markerHash = hashMixStr(
+            markerHash,
+            (typeof nodeLastHeardLabel === "function")
+              ? nodeLastHeardLabel(node, "n/a", nowUnix)
+              : (node && (node.last_heard || ""))
+          );
           markerHash = hashMixStr(markerHash, isEstimated ? "estimated" : posBadge.className);
           markerHash = hashMixInt(
             markerHash,
@@ -344,7 +349,7 @@
               Avg link hops: ${{estimate && estimate.avgHops != null ? estimate.avgHops : "n/a"}}<br/>
               Avg link SNR: ${{estimate && estimate.avgSnr != null ? estimate.avgSnr : "n/a"}}<br/>
               Avg link RSSI: ${{estimate && estimate.avgRssi != null ? estimate.avgRssi : "n/a"}}<br/>
-              Last: ${{node.last_heard || "n/a"}}
+              Last: ${{typeof nodeLastHeardLabel === "function" ? nodeLastHeardLabel(node, "n/a", nowUnix) : (node.last_heard || "n/a")}}
             `);
           }} else {{
             marker.bindPopup(`
@@ -354,7 +359,7 @@
               SNR: ${{node.snr ?? "n/a"}}<br/>
               RSSI: ${{node.rssi ?? "n/a"}}<br/>
               Position: <span class="map-position-badge ${{posBadge.className}}" title="${{escAttr(posBadge.title)}}">${{escAttr(posBadge.label)}}</span><br/>
-              Last: ${{node.last_heard || "n/a"}}
+              Last: ${{typeof nodeLastHeardLabel === "function" ? nodeLastHeardLabel(node, "n/a", nowUnix) : (node.last_heard || "n/a")}}
             `);
           }}
           marker.on("click", () => {{
