@@ -1754,6 +1754,37 @@
       }}
     }}
 
+    function setDrawerElementTextIfChanged(element, nextText) {{
+      if (!(element instanceof HTMLElement)) return false;
+      const normalized = String(nextText == null ? "" : nextText);
+      if (element.textContent === normalized) return false;
+      element.textContent = normalized;
+      return true;
+    }}
+
+    function setDrawerElementHtmlIfChanged(element, nextHtml, cacheKey = "default") {{
+      if (!(element instanceof HTMLElement)) return false;
+      const normalized = String(nextHtml == null ? "" : nextHtml);
+      const propName = `__meshDrawerLastHtml_${{cacheKey}}`;
+      const previousMarkup = (typeof element[propName] === "string") ? element[propName] : null;
+      if (previousMarkup === normalized) return false;
+      element.innerHTML = normalized;
+      element[propName] = normalized;
+      return true;
+    }}
+
+    function syncDrawerTabButtonState(button, isActive) {{
+      if (!(button instanceof HTMLButtonElement)) return;
+      const nextActive = !!isActive;
+      button.classList.toggle("is-active", nextActive);
+      button.setAttribute("aria-selected", nextActive ? "true" : "false");
+    }}
+
+    function syncDrawerPanelHiddenState(panel, isActive) {{
+      if (!(panel instanceof HTMLElement)) return;
+      panel.hidden = !isActive;
+    }}
+
     function syncChatNodeDetailsDrawer(state = latestState, options = null) {{
       const perfToken = (typeof currentNodeSelectionPerfToken === "function")
         ? currentNodeSelectionPerfToken()
@@ -1819,44 +1850,28 @@
       if (closeBtn instanceof HTMLButtonElement) {{
         closeBtn.disabled = !visibleExpanded;
       }}
-      if (pinBtn instanceof HTMLButtonElement) {{
-        pinBtn.hidden = true;
-        pinBtn.disabled = true;
-        pinBtn.dataset.nodeId = "";
-        pinBtn.classList.remove("active");
-        pinBtn.setAttribute("aria-pressed", "false");
-        const pinLabel = pinBtn.querySelector(".chat-node-details-pin-label");
-        if (pinLabel instanceof HTMLElement) {{
-          pinLabel.textContent = "Pin";
-        }}
-      }}
-      if (muteBtn instanceof HTMLButtonElement) {{
-        muteBtn.hidden = true;
-        muteBtn.disabled = true;
-        muteBtn.dataset.nodeId = "";
-        muteBtn.classList.remove("active");
-        muteBtn.setAttribute("aria-pressed", "false");
-        const muteLabel = muteBtn.querySelector(".chat-node-details-mute-label");
-        if (muteLabel instanceof HTMLElement) {{
-          muteLabel.textContent = "Mute";
-        }}
-      }}
       if (!visibleExpanded) {{
-        if (locationHost instanceof HTMLElement) {{
-          locationHost.innerHTML = "";
+        if (pinBtn instanceof HTMLButtonElement) {{
+          pinBtn.hidden = true;
+          pinBtn.disabled = true;
+          pinBtn.dataset.nodeId = "";
+          pinBtn.classList.remove("active");
+          pinBtn.setAttribute("aria-pressed", "false");
+          setDrawerElementTextIfChanged(pinBtn.querySelector(".chat-node-details-pin-label"), "Pin");
         }}
-        if (chatHost instanceof HTMLElement) {{
-          chatHost.innerHTML = "";
+        if (muteBtn instanceof HTMLButtonElement) {{
+          muteBtn.hidden = true;
+          muteBtn.disabled = true;
+          muteBtn.dataset.nodeId = "";
+          muteBtn.classList.remove("active");
+          muteBtn.setAttribute("aria-pressed", "false");
+          setDrawerElementTextIfChanged(muteBtn.querySelector(".chat-node-details-mute-label"), "Mute");
         }}
-        if (linksHost instanceof HTMLElement) {{
-          linksHost.innerHTML = "";
-        }}
-        if (notesHost instanceof HTMLElement) {{
-          notesHost.innerHTML = "";
-        }}
-        if (messagesHost instanceof HTMLElement) {{
-          messagesHost.innerHTML = "";
-        }}
+        setDrawerElementHtmlIfChanged(locationHost, "", "location");
+        setDrawerElementHtmlIfChanged(chatHost, "", "chat");
+        setDrawerElementHtmlIfChanged(linksHost, "", "links");
+        setDrawerElementHtmlIfChanged(notesHost, "", "notes");
+        setDrawerElementHtmlIfChanged(messagesHost, "", "messages");
         syncSavedNodeDetailsDock(true);
         syncNodeHistoryDock();
         if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
@@ -1868,70 +1883,22 @@
       }}
 
       const activeTab = normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab);
-      if (detailsTabBtn instanceof HTMLButtonElement) {{
-        const isActive = activeTab === "details";
-        detailsTabBtn.classList.toggle("is-active", isActive);
-        detailsTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-      }}
-      if (locationTabBtn instanceof HTMLButtonElement) {{
-        const isActive = activeTab === "location";
-        locationTabBtn.classList.toggle("is-active", isActive);
-        locationTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-      }}
-      if (chatTabBtn instanceof HTMLButtonElement) {{
-        const isActive = activeTab === "chat";
-        chatTabBtn.classList.toggle("is-active", isActive);
-        chatTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-      }}
-      if (linksTabBtn instanceof HTMLButtonElement) {{
-        const isActive = activeTab === "links";
-        linksTabBtn.classList.toggle("is-active", isActive);
-        linksTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-      }}
-      if (notesTabBtn instanceof HTMLButtonElement) {{
-        const isActive = activeTab === "notes";
-        notesTabBtn.classList.toggle("is-active", isActive);
-        notesTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-      }}
-      if (messagesTabBtn instanceof HTMLButtonElement) {{
-        const isActive = activeTab === "messages";
-        messagesTabBtn.classList.toggle("is-active", isActive);
-        messagesTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-      }}
-      if (historyTabBtn instanceof HTMLButtonElement) {{
-        const isActive = activeTab === "history";
-        historyTabBtn.classList.toggle("is-active", isActive);
-        historyTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-      }}
-      if (tagTabBtn instanceof HTMLButtonElement) {{
-        const isActive = activeTab === "tag";
-        tagTabBtn.classList.toggle("is-active", isActive);
-        tagTabBtn.setAttribute("aria-selected", isActive ? "true" : "false");
-      }}
-      if (detailsPanel instanceof HTMLElement) {{
-        detailsPanel.hidden = activeTab !== "details";
-      }}
-      if (locationPanel instanceof HTMLElement) {{
-        locationPanel.hidden = activeTab !== "location";
-      }}
-      if (chatPanel instanceof HTMLElement) {{
-        chatPanel.hidden = activeTab !== "chat";
-      }}
-      if (linksPanel instanceof HTMLElement) {{
-        linksPanel.hidden = activeTab !== "links";
-      }}
-      if (notesPanel instanceof HTMLElement) {{
-        notesPanel.hidden = activeTab !== "notes";
-      }}
-      if (messagesPanel instanceof HTMLElement) {{
-        messagesPanel.hidden = activeTab !== "messages";
-      }}
-      if (historyPanel instanceof HTMLElement) {{
-        historyPanel.hidden = activeTab !== "history";
-      }}
-      if (tagPanel instanceof HTMLElement) {{
-        tagPanel.hidden = activeTab !== "tag";
-      }}
+      syncDrawerTabButtonState(detailsTabBtn, activeTab === "details");
+      syncDrawerTabButtonState(locationTabBtn, activeTab === "location");
+      syncDrawerTabButtonState(chatTabBtn, activeTab === "chat");
+      syncDrawerTabButtonState(linksTabBtn, activeTab === "links");
+      syncDrawerTabButtonState(notesTabBtn, activeTab === "notes");
+      syncDrawerTabButtonState(messagesTabBtn, activeTab === "messages");
+      syncDrawerTabButtonState(historyTabBtn, activeTab === "history");
+      syncDrawerTabButtonState(tagTabBtn, activeTab === "tag");
+      syncDrawerPanelHiddenState(detailsPanel, activeTab === "details");
+      syncDrawerPanelHiddenState(locationPanel, activeTab === "location");
+      syncDrawerPanelHiddenState(chatPanel, activeTab === "chat");
+      syncDrawerPanelHiddenState(linksPanel, activeTab === "links");
+      syncDrawerPanelHiddenState(notesPanel, activeTab === "notes");
+      syncDrawerPanelHiddenState(messagesPanel, activeTab === "messages");
+      syncDrawerPanelHiddenState(historyPanel, activeTab === "history");
+      syncDrawerPanelHiddenState(tagPanel, activeTab === "tag");
 
       const tagEntry = nodeTagEntryForNode(selectedId);
       const tagPreset = tagEntry && tagEntry.preset ? tagEntry.preset : null;
@@ -1940,7 +1907,7 @@
         ? normalizeNodeTagPresetName(tagPreset.name, "Tagged")
         : "+tag";
       if (tagTabLabel instanceof HTMLElement) {{
-        tagTabLabel.textContent = tagLabel;
+        setDrawerElementTextIfChanged(tagTabLabel, tagLabel);
       }}
       if (tagTabBtn instanceof HTMLButtonElement) {{
         const tagTitle = hasTag
@@ -1975,7 +1942,7 @@
       const fallbackName = nodeNameCache.get(selectedId) || selectedId;
       const titleName = String(resolvedName || fallbackName || selectedId);
       if (titleEl instanceof HTMLElement) {{
-        titleEl.textContent = `${{titleName}} (${selectedId})`;
+        setDrawerElementTextIfChanged(titleEl, `${{titleName}} (${selectedId})`);
       }}
       if (pinBtn instanceof HTMLButtonElement) {{
         const canPin = isSelectableNodeId(selectedId);
@@ -1990,10 +1957,7 @@
           : `Pin ${{titleName}} to the top of the chat list`;
         pinBtn.title = pinTitle;
         pinBtn.setAttribute("aria-label", pinTitle);
-        const pinLabel = pinBtn.querySelector(".chat-node-details-pin-label");
-        if (pinLabel instanceof HTMLElement) {{
-          pinLabel.textContent = active ? "Pinned" : "Pin";
-        }}
+        setDrawerElementTextIfChanged(pinBtn.querySelector(".chat-node-details-pin-label"), active ? "Pinned" : "Pin");
       }}
       if (muteBtn instanceof HTMLButtonElement) {{
         const canMute = isCanonicalNodeId(selectedId) && !isSelfNodeId(selectedId);
@@ -2006,10 +1970,7 @@
         muteBtn.title = canMute
           ? (active ? "Unmute this user in chat feed" : "Mute this user in chat feed")
           : "Mute unavailable for this node";
-        const muteLabel = muteBtn.querySelector(".chat-node-details-mute-label");
-        if (muteLabel instanceof HTMLElement) {{
-          muteLabel.textContent = active ? "Muted" : "Mute";
-        }}
+        setDrawerElementTextIfChanged(muteBtn.querySelector(".chat-node-details-mute-label"), active ? "Muted" : "Mute");
       }}
 
       syncSavedNodeDetailsDock(false);

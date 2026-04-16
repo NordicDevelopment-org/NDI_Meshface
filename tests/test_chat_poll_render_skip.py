@@ -51,6 +51,10 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert 'const shouldPrefetchNodeHistory = !!(' in js
     assert 'activeTab === "history"' in js
     assert 'if (activeLayoutView === "saved" || networkMapVisible) {' in js
+    assert "function setDrawerElementTextIfChanged(element, nextText) {" in js
+    assert "function setDrawerElementHtmlIfChanged(element, nextHtml, cacheKey = \"default\") {" in js
+    assert "function syncDrawerTabButtonState(button, isActive) {" in js
+    assert "function syncDrawerPanelHiddenState(panel, isActive) {" in js
     assert "const canPatchSelectionOnly = !!(" in js
     assert "const canSkipSceneRender = !!(" in js
     assert "const canPatchSceneDataOnly = !!(" in js
