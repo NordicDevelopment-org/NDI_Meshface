@@ -56,15 +56,20 @@
       let portsHash = 2166136261;
       portsHash = trafficTableHashMixInt(portsHash, portsSortState.index);
       portsHash = trafficTableHashMixStr(portsHash, portsSortState.dir);
-      const ports = (traffic.port_counts || []).slice(0, 30).map((item) => {{
+      const portsData = (traffic.port_counts || []).slice(0, 30);
+      for (const item of portsData) {{
         const portValue = item.portnum ?? "";
         const countValue = item.count ?? "";
         portsHash = trafficTableHashMixStr(portsHash, portValue);
         portsHash = trafficTableHashMixInt(portsHash, countValue);
-        return `<tr><td data-sort="${{escAttr(portValue)}}">${{portValue}}</td><td data-sort="${{escAttr(countValue)}}">${{countValue}}</td></tr>`;
-      }});
-      portsHash = trafficTableHashMixInt(portsHash, ports.length);
+      }}
+      portsHash = trafficTableHashMixInt(portsHash, portsData.length);
       if (portsHash !== trafficPortsTableLastHash) {{
+        const ports = portsData.map((item) => {{
+          const portValue = item.portnum ?? "";
+          const countValue = item.count ?? "";
+          return `<tr><td data-sort="${{escAttr(portValue)}}">${{portValue}}</td><td data-sort="${{escAttr(countValue)}}">${{countValue}}</td></tr>`;
+        }});
         fillTable("ports-table", ports);
         trafficPortsTableLastHash = portsHash;
       }}
@@ -73,13 +78,13 @@
       let linksHash = 2166136261;
       linksHash = trafficTableHashMixInt(linksHash, linksSortState.index);
       linksHash = trafficTableHashMixStr(linksHash, linksSortState.dir);
-      const links = (traffic.edges || []).slice(0, 60).map((edge) => {{
+      const linksData = (traffic.edges || []).slice(0, 60);
+      for (const edge of linksData) {{
         const fromValue = edge.from ?? "";
         const toValue = edge.to ?? "";
         const countValue = edge.lifetime_count ?? edge.count ?? 0;
         const avgHopsRaw = edge.avg_hops;
         const avgHopsSortValue = avgHopsRaw ?? "";
-        const avgHopsText = avgHopsRaw == null ? "n/a" : avgHopsRaw;
         const confidenceValue = edge.confidence || (edge.is_real ? "confirmed" : "observed");
         const lastRxValue = (typeof edgeRxLabel === "function")
           ? edgeRxLabel(edge, "last", "n/a")
@@ -90,17 +95,29 @@
         linksHash = trafficTableHashMixStr(linksHash, avgHopsSortValue);
         linksHash = trafficTableHashMixStr(linksHash, confidenceValue);
         linksHash = trafficTableHashMixStr(linksHash, lastRxValue);
-        return `<tr>
-          <td data-sort="${{escAttr(fromValue)}}">${{fromValue}}</td>
-          <td data-sort="${{escAttr(toValue)}}">${{toValue}}</td>
-          <td data-sort="${{escAttr(countValue)}}">${{countValue}}</td>
-          <td data-sort="${{escAttr(avgHopsSortValue)}}">${{avgHopsText}}</td>
-          <td data-sort="${{escAttr(confidenceValue)}}">${{confidenceValue}}</td>
-          <td data-sort="${{escAttr(lastRxValue)}}">${{lastRxValue}}</td>
-        </tr>`;
-      }});
-      linksHash = trafficTableHashMixInt(linksHash, links.length);
+      }}
+      linksHash = trafficTableHashMixInt(linksHash, linksData.length);
       if (linksHash !== trafficLinksTableLastHash) {{
+        const links = linksData.map((edge) => {{
+          const fromValue = edge.from ?? "";
+          const toValue = edge.to ?? "";
+          const countValue = edge.lifetime_count ?? edge.count ?? 0;
+          const avgHopsRaw = edge.avg_hops;
+          const avgHopsSortValue = avgHopsRaw ?? "";
+          const avgHopsText = avgHopsRaw == null ? "n/a" : avgHopsRaw;
+          const confidenceValue = edge.confidence || (edge.is_real ? "confirmed" : "observed");
+          const lastRxValue = (typeof edgeRxLabel === "function")
+            ? edgeRxLabel(edge, "last", "n/a")
+            : (edge.last_rx_time || "n/a");
+          return `<tr>
+            <td data-sort="${{escAttr(fromValue)}}">${{fromValue}}</td>
+            <td data-sort="${{escAttr(toValue)}}">${{toValue}}</td>
+            <td data-sort="${{escAttr(countValue)}}">${{countValue}}</td>
+            <td data-sort="${{escAttr(avgHopsSortValue)}}">${{avgHopsText}}</td>
+            <td data-sort="${{escAttr(confidenceValue)}}">${{confidenceValue}}</td>
+            <td data-sort="${{escAttr(lastRxValue)}}">${{lastRxValue}}</td>
+          </tr>`;
+        }});
         fillTable("links-table", links);
         trafficLinksTableLastHash = linksHash;
       }}

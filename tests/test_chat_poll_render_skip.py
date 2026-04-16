@@ -55,6 +55,10 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert "function setDrawerElementHtmlIfChanged(element, nextHtml, cacheKey = \"default\") {" in js
     assert "function syncDrawerTabButtonState(button, isActive) {" in js
     assert "function syncDrawerPanelHiddenState(panel, isActive) {" in js
+    assert 'const portsData = (traffic.port_counts || []).slice(0, 30);' in js
+    assert 'const linksData = (traffic.edges || []).slice(0, 60);' in js
+    assert 'if (linksHash !== trafficLinksTableLastHash) {' in js
+    assert 'if (portsHash !== trafficPortsTableLastHash) {' in js
     assert "const canPatchSelectionOnly = !!(" in js
     assert "const canSkipSceneRender = !!(" in js
     assert "const canPatchSceneDataOnly = !!(" in js
