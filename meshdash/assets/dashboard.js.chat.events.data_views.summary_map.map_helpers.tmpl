@@ -250,8 +250,19 @@
       return parsed;
     }}
 
-    function estimatedMarkerStyle(isSelected, confidence = 0.5) {{
+    function estimatedMarkerStyle(isSelected, confidence = 0.5, isLocal = false) {{
       const safeConfidence = clampMapLinkValue(confidence, 0.12, 0.96);
+      if (isLocal) {{
+        return {{
+          radius: (isSelected ? 8.8 : 6.2) + (safeConfidence * (isSelected ? 0.9 : 1.9)),
+          color: isSelected ? "#3f2b8c" : "#5f40c9",
+          fillColor: isSelected ? "#efe4ff" : "#ccb8ff",
+          fillOpacity: isSelected ? 0.96 : 0.62,
+          weight: isSelected ? 2.8 : 2.2,
+          dashArray: "5 3",
+          bubblingMouseEvents: false,
+        }};
+      }}
       if (isSelected) {{
         return {{
           radius: 8.4 + (safeConfidence * 0.8),
@@ -432,11 +443,21 @@
       return style;
     }}
 
-    function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45) {{
+    function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState) {{
       const kind = markerKind === "estimated" ? "estimated" : "actual";
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState || {{}}) || "");
+      const isLocal = !!(localNodeId && normalizeNodeId(nodeId || "") === localNodeId);
       const baseStyle = kind === "estimated"
-        ? estimatedMarkerStyle(isSelected, markerConfidence)
-        : markerStyle(isSelected);
+        ? estimatedMarkerStyle(isSelected, markerConfidence, isLocal)
+        : markerStyle(isSelected || isLocal);
+      if (isLocal && kind !== "estimated") {{
+        baseStyle.radius = Math.max(Number(baseStyle.radius) || 0, isSelected ? 8.6 : 7.2);
+        baseStyle.color = isSelected ? "#3f2b8c" : "#5f40c9";
+        baseStyle.fillColor = isSelected ? "#efe4ff" : "#ccb8ff";
+        baseStyle.fillOpacity = isSelected ? 0.96 : 0.9;
+        baseStyle.weight = Math.max(Number(baseStyle.weight) || 0, isSelected ? 2.8 : 2.1);
+      }}
       const flashStrength = mapNodeActivityFlashStrength(nodeId);
       return applyMapNodeActivityFlashStyle(baseStyle, flashStrength, kind);
     }}

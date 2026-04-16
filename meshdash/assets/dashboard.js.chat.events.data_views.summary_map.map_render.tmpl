@@ -314,6 +314,10 @@
               ? Math.round(Number(estimate && estimate.confidence) * 1000)
               : 1000
           );
+          markerHash = hashMixInt(
+            markerHash,
+            normalizeNodeId(resolveLocalNodeId(latestState || {}) || "") === normalizedId ? 1 : 0
+          );
           markerHash = hashMixInt(markerHash, isEstimated ? Math.trunc(Number(estimate && estimate.anchorCount) || 0) : 0);
           markerHash = hashMixInt(markerHash, isEstimated ? Math.trunc(Number(estimate && estimate.supportLinks) || 0) : 0);
           const existingMarker = nodeMarkers.get(normalizedId);
@@ -332,7 +336,8 @@
               normalizedId,
               isSelected,
               isEstimated ? "estimated" : "actual",
-              Number(estimate && estimate.confidence)
+              Number(estimate && estimate.confidence),
+              latestState
             )
           );
           if (isEstimated) {{

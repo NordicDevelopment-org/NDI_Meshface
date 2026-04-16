@@ -1492,6 +1492,7 @@
       const safeScene = (scene && typeof scene === "object") ? scene : {{}};
       const rootId = normalizeNodeId(safeScene.rootId || "");
       const selectedId = normalizeNodeId(safeScene.selectedId || "");
+      const localId = normalizeNodeId(resolveLocalNodeId(latestState || {{}}) || "");
       const nodeMap = safeScene.nodeMap instanceof Map ? safeScene.nodeMap : new Map();
       const positions = safeScene.positions instanceof Map ? safeScene.positions : new Map();
       const rings = Array.isArray(safeScene.rings) ? safeScene.rings : [];
@@ -1584,6 +1585,7 @@
       const nodeMarkup = items.map((item) => {{
         const classes = [
           "network-graph-node",
+          item.nodeId === localId ? "is-local" : "",
           item.nodeId === rootId ? "is-root" : "",
           item.nodeId === selectedId ? "is-selected" : "",
           item.detached ? "is-detached" : "",
@@ -3339,6 +3341,7 @@
       legend.innerHTML = [
         `<span class="network-graph-legend-item hint">${{modeLabel}} mode: ${{edgeMode === "live" ? "current-session link topology only" : "stored link-history topology"}}</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-root"></span>Root / selected node</span>`,
+        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-local"></span>Your node / local radio</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-real"></span>${{realLinkCount}} confirmed links</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-observed"></span>${{Math.max(0, combinedEdges.length - realLinkCount)}} observed links</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-broadcast-only"></span>Nodes heard recently, but only via broadcast</span>`,
