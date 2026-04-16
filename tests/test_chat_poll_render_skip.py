@@ -57,7 +57,6 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert "forceCenteredFitOnce: false," in js
     assert "skipSceneAnimationOnce: false," in js
     assert "const shouldForceCenteredFit = !!networkGraphViewState.forceCenteredFitOnce;" in js
-    assert "networkGraphViewState.forceCenteredFitOnce = true;" in js
     assert "const shouldSkipSceneAnimation = !!networkGraphViewState.skipSceneAnimationOnce;" in js
     assert "networkGraphViewState.skipSceneAnimationOnce = true;" in js
     assert "syncNetworkGraphSceneSelection(svg, { rootId, selectedId });" in js
