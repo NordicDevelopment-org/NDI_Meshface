@@ -46,6 +46,19 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
 
     assert 'let mapLinkLayerEnabled = false;' in js
     assert 'let mapLiveActivityEnabled = true;' in js
+    assert 'const nodePacketSeriesDefaults = {' in js
+    assert 'all: false,' in js
+    assert 'chat: true,' in js
+    assert 'telemetry: true,' in js
+    assert 'position: true,' in js
+    assert 'routing: true,' in js
+    assert 'storeforward: true,' in js
+    assert 'nodeinfo: true,' in js
+    assert 'admin: true,' in js
+    assert 'encrypted: true,' in js
+    assert 'other: true,' in js
+    assert 'let nodePacketSeriesEnabled = { ...nodePacketSeriesDefaults };' in js
+    assert "function normalizeNodePacketSeries(raw) {" in js
     assert 'const mapLinkLayerStorageKey = "meshDashboardMapLinkLayerEnabledV1";' in js
     assert 'const mapLiveActivityStorageKey = "meshDashboardMapLiveActivityEnabledV1";' in js
     assert "function updateMapLinkLayerControl()" in js
