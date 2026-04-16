@@ -21,6 +21,7 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert '"/api/state?lite=1&profile=chat"' in js
     assert '"/api/state?lite=1&profile=network"' in js
     assert 'function statePollProfile() {' in js
+    assert 'if (clean === "links") return "graph";' in js
     assert "&& pollStructuralSignature === chatPollStructuralSignature" in js
     assert "&& pollStructuralAgeMs < chatPollStructuralRefreshMs" in js
     assert 'markRenderChatPhase("poll-skip");' in js
@@ -37,6 +38,9 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert 'if (selectedId && nodeMap.has(selectedId)) return selectedId;' in js
     assert "const nodeSelectionUiState = {" in js
     assert "const nodeSelectionPerfState = {" in js
+    assert "nodeSelectionPerfStore();" in js
+    assert '"saved-node-details-shell"' in js
+    assert '"saved-node-sections"' in js
     assert "function beginNodeSelectionPerf(nodeId, meta = {}) {" in js
     assert "function markNodeSelectionPerf(token, phase, startedAtMs, extra = null) {" in js
     assert "function finishNodeSelectionPerf(token, status = \"complete\", extra = null) {" in js
@@ -50,6 +54,12 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert "const canPatchSelectionOnly = !!(" in js
     assert "const canSkipSceneRender = !!(" in js
     assert "const canPatchSceneDataOnly = !!(" in js
+    assert "forceCenteredFitOnce: false," in js
+    assert "skipSceneAnimationOnce: false," in js
+    assert "const shouldForceCenteredFit = !!networkGraphViewState.forceCenteredFitOnce;" in js
+    assert "networkGraphViewState.forceCenteredFitOnce = true;" in js
+    assert "const shouldSkipSceneAnimation = !!networkGraphViewState.skipSceneAnimationOnce;" in js
+    assert "networkGraphViewState.skipSceneAnimationOnce = true;" in js
     assert "syncNetworkGraphSceneSelection(svg, { rootId, selectedId });" in js
     assert 'data-network-graph-edge-key="${escAttr(buildNetworkGraphEdgeDomKey(edge))}"' in js
     assert "syncNetworkGraphSceneData(svg, scene);" in js
@@ -58,4 +68,6 @@ def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
     assert 'markNodeSelectionPerf(perfToken, "selection.graph_render", perfStartMs' in js
     assert 'markNodeSelectionPerf(perfToken, "selection.drawer_sync", perfStartMs' in js
     assert 'markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs' in js
-    assert "hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || \"\"));" not in js
+    assert "const stableNetworkSubviewName = (typeof normalizeNetworkSubview === \"function\")" in js
+    assert "window.setTimeout(() => {" in js
+    assert "hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || \"\"));" in js

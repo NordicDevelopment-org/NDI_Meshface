@@ -160,6 +160,17 @@
         element[propName] = nextMarkup;
         return true;
       }};
+      const detachDockedHistoryPanel = () => {{
+        const dockedHistoryPanel = document.getElementById("map-data-node");
+        const mapDataBody = document.getElementById("map-data-body");
+        if (
+          dockedHistoryPanel instanceof HTMLElement
+          && mapDataBody instanceof HTMLElement
+          && host.contains(dockedHistoryPanel)
+        ) {{
+          mapDataBody.appendChild(dockedHistoryPanel);
+        }}
+      }};
       const previousMainScroll = host.querySelector(".saved-node-main-scroll");
       const locationHost = document.getElementById("chat-node-details-location-host");
       const chatHost = document.getElementById("chat-node-details-chat-host");
@@ -191,16 +202,6 @@
         previousMainScroll instanceof HTMLElement
         && Number.isFinite(previousMainScroll.clientHeight)
       ) ? previousMainScroll.clientHeight : 0;
-      const dockedHistoryPanel = document.getElementById("map-data-node");
-      const mapDataBody = document.getElementById("map-data-body");
-      // Preserve the shared history panel node before replacing host.innerHTML.
-      if (
-        dockedHistoryPanel instanceof HTMLElement
-        && mapDataBody instanceof HTMLElement
-        && host.contains(dockedHistoryPanel)
-      ) {{
-        mapDataBody.appendChild(dockedHistoryPanel);
-      }}
 
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nodeId = resolveSavedViewNodeId(safeState);
@@ -239,6 +240,7 @@
         const emptyDetailsHtml = visibleFavoriteCount === 0
           ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Tag nodes to build your tagged subsection.</div>'
           : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from tagged nodes.</div>';
+        detachDockedHistoryPanel();
         setElementHtmlIfChanged(host, emptyDetailsHtml, "saved-node-details");
         setElementHtmlIfChanged(locationHost, "", "chat-node-details-location");
         setElementHtmlIfChanged(chatHost, "", "chat-node-details-chat");
@@ -485,22 +487,32 @@
           ])
         : "";
 
-      const nextDetailsHtml = `
-        <div class="saved-node-stack">
-          <div class="saved-node-main-scroll">
-            <div class="saved-node-sections">
-              ${{nodeSection}}
-              ${{renderNotesInDrawer ? "" : notesSection}}
-              ${{renderLocationInDrawer ? "" : locationSection}}
-              ${{renderChatInDrawer ? "" : chatSection}}
-              ${{renderLinksInDrawer ? "" : linksSection}}
-            </div>
-          </div>
-          <div id="saved-node-history-splitter" class="saved-node-history-splitter" title="Drag to resize node info and history panels"></div>
-          <div id="saved-node-history-host" class="saved-node-history-host"></div>
-        </div>
+      const nextSectionsHtml = `
+        ${{nodeSection}}
+        ${{renderNotesInDrawer ? "" : notesSection}}
+        ${{renderLocationInDrawer ? "" : locationSection}}
+        ${{renderChatInDrawer ? "" : chatSection}}
+        ${{renderLinksInDrawer ? "" : linksSection}}
       `;
-      const detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsHtml, "saved-node-details");
+      let sectionsHost = host.querySelector(".saved-node-sections");
+      let detailsMarkupChanged = false;
+      if (!(sectionsHost instanceof HTMLElement)) {{
+        detachDockedHistoryPanel();
+        const nextDetailsShellHtml = `
+          <div class="saved-node-stack">
+            <div class="saved-node-main-scroll">
+              <div class="saved-node-sections"></div>
+            </div>
+            <div id="saved-node-history-splitter" class="saved-node-history-splitter" title="Drag to resize node info and history panels"></div>
+            <div id="saved-node-history-host" class="saved-node-history-host"></div>
+          </div>
+        `;
+        detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsShellHtml, "saved-node-details-shell");
+        sectionsHost = host.querySelector(".saved-node-sections");
+      }}
+      if (sectionsHost instanceof HTMLElement) {{
+        detailsMarkupChanged = setElementHtmlIfChanged(sectionsHost, nextSectionsHtml, "saved-node-sections") || detailsMarkupChanged;
+      }}
       host.dataset.nodeId = nodeId;
       const nextLocationHtml = renderLocationInDrawer ? locationSection : "";
       const nextChatHtml = renderChatInDrawer ? chatSection : "";

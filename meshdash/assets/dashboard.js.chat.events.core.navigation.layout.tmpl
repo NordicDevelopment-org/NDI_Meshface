@@ -695,6 +695,7 @@
     function normalizeNetworkSubview(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
       if (clean === "details") return "sensors";
+      if (clean === "links") return "graph";
       if (clean === "diag") return networkDiagnosticsEnabled ? "diagnostics" : "map";
       if (clean === "overview" || clean === "graph" || clean === "sensors") return clean;
       if (clean === "diagnostics") return networkDiagnosticsEnabled ? "diagnostics" : "map";
@@ -1340,6 +1341,8 @@
       cachedLayout: null,
       pendingEntryViewportSync: false,
       pendingModeViewportSync: false,
+      forceCenteredFitOnce: false,
+      skipSceneAnimationOnce: false,
       bounds: {{
         minX: networkGraphViewportBase.x,
         minY: networkGraphViewportBase.y,
@@ -1959,6 +1962,53 @@
       }}, {{ aspectRatio: viewAspect }});
     }}
 
+    function fitNetworkGraphViewBoxToCenteredBounds(bounds, svg = null, center = null) {{
+      const safeBounds = (bounds && typeof bounds === "object") ? bounds : defaultNetworkGraphBounds();
+      const focusCenter = (center && typeof center === "object") ? center : {{
+        x: networkGraphViewportBase.x + (networkGraphViewportBase.width / 2),
+        y: networkGraphViewportBase.y + (networkGraphViewportBase.height / 2),
+      }};
+      const targetCenterX = Number.isFinite(Number(focusCenter.x))
+        ? Number(focusCenter.x)
+        : (networkGraphViewportBase.x + (networkGraphViewportBase.width / 2));
+      const targetCenterY = Number.isFinite(Number(focusCenter.y))
+        ? Number(focusCenter.y)
+        : (networkGraphViewportBase.y + (networkGraphViewportBase.height / 2));
+      const rawWidth = Math.max(
+        220,
+        Math.max(
+          Math.abs(Number(safeBounds.maxX) - targetCenterX),
+          Math.abs(targetCenterX - Number(safeBounds.minX))
+        ) * 2
+      );
+      const rawHeight = Math.max(
+        160,
+        Math.max(
+          Math.abs(Number(safeBounds.maxY) - targetCenterY),
+          Math.abs(targetCenterY - Number(safeBounds.minY))
+        ) * 2
+      );
+      const fitZoomOutScale = Number.isFinite(networkGraphFitZoomOutScale) && networkGraphFitZoomOutScale > 1
+        ? networkGraphFitZoomOutScale
+        : 1;
+      const viewAspect = getNetworkGraphStageAspectRatio(svg);
+      let width = rawWidth;
+      let height = rawHeight;
+      if ((width / height) > viewAspect) {{
+        height = width / viewAspect;
+      }} else {{
+        width = height * viewAspect;
+      }}
+      width *= fitZoomOutScale;
+      height *= fitZoomOutScale;
+      return clampNetworkGraphViewBox({{
+        x: targetCenterX - (width / 2),
+        y: targetCenterY - (height / 2),
+        width,
+        height,
+      }}, {{ aspectRatio: viewAspect }});
+    }}
+
     function applyNetworkGraphViewBox(svg, rawViewBox, options = {{}}) {{
       if (!(svg instanceof SVGElement)) return cloneNetworkGraphViewBox();
       if (!(options && options.skipAnimationCancel)) {{
@@ -2039,7 +2089,7 @@
       if (!(svg instanceof SVGElement)) return;
       animateNetworkGraphViewBox(
         svg,
-        fitNetworkGraphViewBoxToBounds(networkGraphViewState.bounds, svg),
+        fitNetworkGraphViewBoxToCenteredBounds(networkGraphViewState.bounds, svg),
         options
       );
     }}
@@ -2796,6 +2846,8 @@
       for (const ids of layers.values()) {{
         ids.sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
       }}
+      const firstLayerCount = Array.isArray(layers.get(1)) ? layers.get(1).length : 0;
+      const secondLayerCount = Array.isArray(layers.get(2)) ? layers.get(2).length : 0;
 
       const disconnectedCandidates = Array.from(nodeMap.keys())
         .filter((nodeId) => !layerByNodeId.has(nodeId))
@@ -2838,51 +2890,32 @@
 
       const connectedLayers = Array.from(layers.keys()).filter((layer) => layer > 0).sort((a, b) => a - b);
       const maxConnectedLayer = connectedLayers.length ? connectedLayers[connectedLayers.length - 1] : 0;
-      const firstRingRadius = maxConnectedLayer <= 0 ? 0 : (maxConnectedLayer === 1 ? 180 : 116);
+      const baseFirstRingRadius = maxConnectedLayer <= 0 ? 0 : (maxConnectedLayer === 1 ? 180 : 116);
+      const denseFirstRingRadius = firstLayerCount > 0
+        ? Math.ceil((firstLayerCount * 20) / (Math.PI * 2))
+        : 0;
+      const firstRingRadius = maxConnectedLayer <= 0
+        ? 0
+        : Math.max(
+            baseFirstRingRadius,
+            Math.min(maxConnectedLayer === 1 ? 260 : 176, denseFirstRingRadius)
+          );
       const disconnectedRingCount = (broadcastOnlyDisconnected.length ? 1 : 0) + (disconnected.length ? 1 : 0);
-      const outerConnectedRadius = disconnectedRingCount ? 228 : 262;
+      const outerConnectedRadius = Math.max(
+        disconnectedRingCount ? 228 : 262,
+        Math.min(disconnectedRingCount ? 286 : 320, firstRingRadius + Math.max(56, (maxConnectedLayer - 1) * 56))
+      );
       const ringStep = maxConnectedLayer > 1
         ? Math.max(46, Math.min(88, (outerConnectedRadius - firstRingRadius) / Math.max(1, maxConnectedLayer - 1)))
         : 0;
 
       for (const layer of connectedLayers) {{
-        const rawIds = Array.isArray(layers.get(layer)) ? Array.from(layers.get(layer)) : [];
-        const ordered = rawIds.map((nodeId) => {{
-          const parentAngles = Array.from((adjacency.get(nodeId) || new Map()).keys())
-            .filter((peerId) => Number(layerByNodeId.get(peerId)) === (layer - 1))
-            .map((peerId) => Number(polarAngleByNodeId.get(peerId)))
-            .filter((angle) => Number.isFinite(angle));
-          if (!parentAngles.length) {{
-            return {{ nodeId, anchor: null }};
-          }}
-          let sinTotal = 0;
-          let cosTotal = 0;
-          for (const angle of parentAngles) {{
-            sinTotal += Math.sin(angle);
-            cosTotal += Math.cos(angle);
-          }}
-          return {{
-            nodeId,
-            anchor: Math.atan2(sinTotal / parentAngles.length, cosTotal / parentAngles.length),
-          }};
-        }}).sort((a, b) => {{
-          const aAnchor = a.anchor;
-          const bAnchor = b.anchor;
-          if (Number.isFinite(aAnchor) && Number.isFinite(bAnchor) && aAnchor !== bAnchor) {{
-            return aAnchor - bAnchor;
-          }}
-          if (Number.isFinite(aAnchor)) return -1;
-          if (Number.isFinite(bAnchor)) return 1;
-          return compareNetworkGraphNodeIds(a.nodeId, b.nodeId, degreeMeta, nodeMap);
-        }});
-
-        const ids = ordered.map((entry) => entry.nodeId);
+        const ids = Array.isArray(layers.get(layer)) ? Array.from(layers.get(layer)) : [];
         const radius = maxConnectedLayer === 1
           ? firstRingRadius
           : (firstRingRadius + ((layer - 1) * ringStep));
         const step = ids.length > 0 ? ((Math.PI * 2) / ids.length) : 0;
-        const anchored = ordered.find((entry) => Number.isFinite(entry.anchor));
-        const startAngle = anchored ? (Number(anchored.anchor) - (step / 2)) : (-Math.PI / 2);
+        const startAngle = -Math.PI / 2;
         ids.forEach((nodeId, index) => {{
           const angle = ids.length === 1 ? (-Math.PI / 2) : (startAngle + (step * index));
           polarAngleByNodeId.set(nodeId, angle);
@@ -2959,7 +2992,41 @@
       }});
 
       const selectedId = normalizeNodeId(selectedNodeId || "");
-      const firstLayerCount = Array.isArray(layers.get(1)) ? layers.get(1).length : 0;
+      const visibleLabelNodeIds = new Set();
+      if (nodeMap.size <= 18) {{
+        for (const nodeId of positions.keys()) {{
+          visibleLabelNodeIds.add(nodeId);
+        }}
+      }} else {{
+        const labelPlan = [
+          {{
+            layer: 1,
+            limit: firstLayerCount <= 14
+              ? firstLayerCount
+              : (firstLayerCount <= 24 ? 10 : (firstLayerCount <= 40 ? 8 : 6)),
+          }},
+          {{
+            layer: 2,
+            limit: secondLayerCount <= 8
+              ? secondLayerCount
+              : Math.min(4, Math.max(2, Math.round(secondLayerCount / 12))),
+          }},
+        ];
+        for (const plan of labelPlan) {{
+          const ids = Array.isArray(layers.get(plan.layer)) ? Array.from(layers.get(plan.layer)) : [];
+          const safeLimit = Math.max(0, Math.trunc(Number(plan.limit) || 0));
+          if (!ids.length || safeLimit <= 0) continue;
+          for (const nodeId of ids.slice(0, safeLimit)) {{
+            visibleLabelNodeIds.add(nodeId);
+          }}
+        }}
+      }}
+      if (isSelectableNodeId(rootId)) {{
+        visibleLabelNodeIds.add(rootId);
+      }}
+      if (isSelectableNodeId(selectedId)) {{
+        visibleLabelNodeIds.add(selectedId);
+      }}
       const items = Array.from(positions.entries()).map(([nodeId, position]) => {{
         const node = nodeMap.get(nodeId) || null;
         const meta = degreeMeta.get(nodeId) || {{ degree: 0, weight: 0 }};
@@ -2980,13 +3047,7 @@
           weight: meta.weight,
           signalMeta,
           radius: position.disconnected ? Math.max(5, baseRadius - 0.7) : baseRadius,
-          showLabel: (
-            nodeId === rootId
-            || nodeId === selectedId
-            || nodeMap.size <= 18
-            || (!position.disconnected && position.layer === 1 && firstLayerCount <= 14)
-            || (!position.disconnected && meta.degree >= 6 && position.layer <= 2)
-          ),
+          showLabel: visibleLabelNodeIds.has(nodeId),
         }};
       }});
 
@@ -3015,6 +3076,7 @@
       let hash = 2166136261;
       hash = hashMixStr(hash, normalizeNetworkGraphEdgeMode(edgeMode));
       hash = hashMixStr(hash, normalizeNodeId(networkGraphRootNodeId || ""));
+      hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || ""));
       hash = hashMixStr(hash, normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || ""));
 
       const safeNodes = Array.isArray(nodes) ? nodes : [];
@@ -3195,8 +3257,12 @@
       bindNetworkGraphSummaryControls();
       networkGraphViewState.bounds = computeNetworkGraphBounds(layout);
       networkGraphRootNodeId = rootId;
-      const fittedViewBox = fitNetworkGraphViewBoxToBounds(networkGraphViewState.bounds, svg);
       const rootPosition = layout.positions.get(rootId) || null;
+      const fittedViewBox = fitNetworkGraphViewBoxToCenteredBounds(
+        networkGraphViewState.bounds,
+        svg,
+        rootPosition || null
+      );
       const shouldRecenterForEntry = !!(
         networkGraphViewState.pendingEntryViewportSync
         && rootPosition
@@ -3211,10 +3277,12 @@
       const previousLayoutSnapshot = networkGraphViewState.renderedLayoutSnapshot;
       const rootChanged = networkGraphViewState.lastRootId !== rootId;
       const selectionChanged = networkGraphViewState.lastSelectedId !== selectedId;
+      const shouldSkipSceneAnimation = !!networkGraphViewState.skipSceneAnimationOnce;
       const shouldAnimateSceneChange = !!(
         previousLayoutSnapshot
         && networkGraphViewState.lastRootId
         && rootChanged
+        && !shouldSkipSceneAnimation
       );
       const canPatchSelectionOnly = !!(
         canReuseGraphData
@@ -3238,9 +3306,10 @@
         networkGraphViewState.pendingModeViewportSync
         && !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)
       );
-      if (!networkGraphViewState.initialized) {{
+      const shouldForceCenteredFit = !!networkGraphViewState.forceCenteredFitOnce;
+      if (!networkGraphViewState.initialized || shouldForceCenteredFit) {{
         stopNetworkGraphPan(svg);
-        resetNetworkGraphView(svg, {{ animate: false }});
+        applyNetworkGraphViewBox(svg, fittedViewBox);
       }} else if (shouldRefitForModeChange) {{
         stopNetworkGraphPan(svg);
         animateNetworkGraphViewBox(svg, fittedViewBox);
@@ -3259,6 +3328,8 @@
       }}
       networkGraphViewState.pendingEntryViewportSync = false;
       networkGraphViewState.pendingModeViewportSync = false;
+      networkGraphViewState.forceCenteredFitOnce = false;
+      networkGraphViewState.skipSceneAnimationOnce = false;
       networkGraphViewState.pendingFocusTransition = null;
       networkGraphViewState.lastRootId = rootId;
       networkGraphViewState.lastSelectedId = selectedId;

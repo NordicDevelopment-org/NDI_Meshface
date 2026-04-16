@@ -28,6 +28,8 @@
       return created;
     }}
 
+    nodeSelectionPerfStore();
+
     function findNodeSelectionPerfRun(token) {{
       const targetToken = Math.trunc(Number(token) || 0);
       if (!(targetToken > 0)) return null;
@@ -253,6 +255,10 @@
           && !networkGraphRootSyncInProgress
           && !(networkGraphViewState && networkGraphViewState.pendingFocusTransition)
         ) {{
+          if (networkGraphViewState && typeof networkGraphViewState === "object") {{
+            networkGraphViewState.forceCenteredFitOnce = true;
+            networkGraphViewState.skipSceneAnimationOnce = true;
+          }}
           renderNetworkGraphView(latestState);
         }}
       }}
@@ -284,6 +290,22 @@
       if (typeof syncChatNodeDetailsDrawer === "function") {{
         syncChatNodeDetailsDrawer(latestState, {{
           fetchHistory: false,
+        }});
+      }}
+      if (networkGraphVisible && typeof renderNetworkGraphView === "function") {{
+        window.requestAnimationFrame(() => {{
+          const stableNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
+            ? normalizeNetworkSubview(activeNetworkSubview)
+            : String(activeNetworkSubview || "map").trim().toLowerCase();
+          if (activeLayoutView !== "network" || stableNetworkSubviewName !== "graph") return;
+          renderNetworkGraphView(latestState);
+          window.setTimeout(() => {{
+            const finalNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
+              ? normalizeNetworkSubview(activeNetworkSubview)
+              : String(activeNetworkSubview || "map").trim().toLowerCase();
+            if (activeLayoutView !== "network" || finalNetworkSubviewName !== "graph") return;
+            renderNetworkGraphView(latestState);
+          }}, 80);
         }});
       }}
       if (activeLayoutView === "games") {{
