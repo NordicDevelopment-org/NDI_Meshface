@@ -310,15 +310,13 @@
     function updateMapLiveActivityControl() {{
       const wrap = document.getElementById("map-live-wrap");
       const toggle = document.getElementById("map-live-toggle");
-      const inMapLiveContext = activeLayoutView === "network";
+      mapLiveActivityEnabled = true;
       if (wrap instanceof HTMLElement) {{
-        wrap.hidden = !inMapLiveContext;
-        wrap.title = mapLiveActivityEnabled
-          ? "Disable live node marker flashing for packet activity."
-          : "Enable live node marker flashing for packet activity.";
+        wrap.hidden = true;
       }}
       if (toggle instanceof HTMLInputElement) {{
-        toggle.checked = mapLiveActivityEnabled;
+        toggle.checked = true;
+        toggle.disabled = true;
       }}
     }}
 
@@ -395,15 +393,6 @@
 
     function loadMapLiveActivityPreference() {{
       mapLiveActivityEnabled = true;
-      try {{
-        const stored = window.localStorage.getItem(mapLiveActivityStorageKey);
-        if (stored === "0") {{
-          mapLiveActivityEnabled = false;
-        }} else if (stored === "1") {{
-          mapLiveActivityEnabled = true;
-        }}
-      }} catch (_err) {{
-      }}
       updateMapLiveActivityControl();
     }}
 
@@ -477,24 +466,10 @@
 
     function bindMapLiveActivityControl() {{
       const toggle = document.getElementById("map-live-toggle");
-      if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
-        toggle.dataset.bound = "1";
-        toggle.checked = mapLiveActivityEnabled;
-        toggle.addEventListener("change", () => {{
-          mapLiveActivityEnabled = !!toggle.checked;
-          persistMapLiveActivityPreference();
-          updateMapLiveActivityControl();
-          if (mapLiveActivityEnabled) {{
-            if (typeof seedNetworkMapPacketActivityTokens === "function") {{
-              seedNetworkMapPacketActivityTokens(latestState);
-            }}
-          }} else {{
-            lastNetworkMapPacketTokens = new Set();
-            mapNodeActivityFlashById.clear();
-            stopMapNodeActivityFlashLoop();
-          }}
-          refreshMapMarkerStyles();
-        }});
+      mapLiveActivityEnabled = true;
+      if (toggle instanceof HTMLInputElement) {{
+        toggle.checked = true;
+        toggle.disabled = true;
       }}
       updateMapLiveActivityControl();
     }}
