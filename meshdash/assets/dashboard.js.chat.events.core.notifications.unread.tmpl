@@ -335,11 +335,9 @@
 
     function syncDocumentUnreadTitle(count) {{
       const unreadCount = Math.max(0, Math.trunc(Number(count) || 0));
-      const systemCount = Math.max(0, Math.trunc(Number(totalSystemNotificationCount()) || 0));
-      const attentionCount = Math.max(unreadCount, systemCount);
-      const attentionBadge = attentionCount > 99 ? "99+" : String(attentionCount);
-      const nextTitle = attentionCount > 0
-        ? `(${{attentionBadge}}) ${{baseDocumentTitle}}`
+      const unreadBadge = unreadCount > 99 ? "99+" : String(unreadCount);
+      const nextTitle = unreadCount > 0
+        ? `(${{unreadBadge}}) ${{baseDocumentTitle}}`
         : baseDocumentTitle;
       if (document.title !== nextTitle) {{
         document.title = nextTitle;

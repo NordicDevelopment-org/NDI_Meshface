@@ -106,6 +106,20 @@ def test_dashboard_js_flushes_ticker_series_on_page_exit() -> None:
     assert 'window.addEventListener("pagehide", () => {' in js
     assert 'window.addEventListener("beforeunload", () => {' in js
 
+
+def test_dashboard_js_tab_title_uses_chat_unread_only() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'function syncDocumentUnreadTitle(count) {' in js
+    assert 'const unreadBadge = unreadCount > 99 ? "99+" : String(unreadCount);' in js
+    assert 'const nextTitle = unreadCount > 0' in js
+    assert 'const attentionCount = Math.max(unreadCount, systemCount);' not in js
+    assert 'const systemCount = Math.max(0, Math.trunc(Number(totalSystemNotificationCount()) || 0));' not in js
+
 def test_render_html_uses_single_row_compact_ticker_strip() -> None:
     html = render_html(
         refresh_ms=1000,
