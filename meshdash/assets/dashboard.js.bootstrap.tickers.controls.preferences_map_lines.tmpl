@@ -42,10 +42,26 @@
       if (select.dataset.bound === "1") return;
       select.dataset.bound = "1";
       select.value = normalizeWeeklySummaryMetric(networkOverviewMetric);
+      updateNetworkOverviewLinkModeControl(networkOverviewMetric);
       updateNetworkOverviewNodeSeriesControls(networkOverviewMetric);
       updateNetworkOverviewPacketSeriesControls(networkOverviewMetric);
       select.addEventListener("change", () => {{
         applyNetworkOverviewMetric(select.value || "nodes", true);
+        if (activeLayoutView === "network") {{
+          void refreshNetworkOverviewPanels(false);
+        }}
+      }});
+    }}
+
+    function bindNetworkOverviewLinkModeControl() {{
+      const select = document.getElementById("network-overview-link-mode");
+      if (!(select instanceof HTMLSelectElement)) return;
+      if (select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+      select.value = normalizeNetworkOverviewLinkMode(networkOverviewLinkMode);
+      updateNetworkOverviewLinkModeControl(networkOverviewMetric);
+      select.addEventListener("change", () => {{
+        applyNetworkOverviewLinkMode(select.value || "history", true);
         if (activeLayoutView === "network") {{
           void refreshNetworkOverviewPanels(false);
         }}
@@ -193,6 +209,15 @@
       applyNetworkOverviewMetric(stored, false);
     }}
 
+    function loadNetworkOverviewLinkModePreference() {{
+      let stored = "history";
+      try {{
+        stored = window.localStorage.getItem(networkOverviewLinkModeStorageKey) || "history";
+      }} catch (_err) {{
+      }}
+      applyNetworkOverviewLinkMode(stored, false);
+    }}
+
     function loadNetworkOverviewNodeSeriesPreference() {{
       let storedJson = "";
       try {{
@@ -260,6 +285,8 @@
     function updateMapLinkLayerControl() {{
       const wrap = document.getElementById("map-link-wrap");
       const toggle = document.getElementById("map-link-toggle");
+      const modeWrap = document.getElementById("map-link-mode-wrap");
+      const modeSelect = document.getElementById("map-link-mode");
       const inMapLinkContext = activeLayoutView === "network";
       if (wrap instanceof HTMLElement) {{
         wrap.hidden = !inMapLinkContext;
@@ -269,6 +296,14 @@
       }}
       if (toggle instanceof HTMLInputElement) {{
         toggle.checked = mapLinkLayerEnabled;
+      }}
+      if (modeWrap instanceof HTMLElement) {{
+        modeWrap.hidden = !inMapLinkContext;
+        modeWrap.classList.toggle("disabled", !mapLinkLayerEnabled);
+      }}
+      if (modeSelect instanceof HTMLSelectElement) {{
+        modeSelect.disabled = !mapLinkLayerEnabled;
+        modeSelect.value = normalizeMapLinkLayerMode(mapLinkLayerMode);
       }}
     }}
 
@@ -297,6 +332,19 @@
     function persistMapLinkLayerPreference() {{
       try {{
         window.localStorage.setItem(mapLinkLayerStorageKey, mapLinkLayerEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
+    function normalizeMapLinkLayerMode(value) {{
+      const clean = String(value || "").trim().toLowerCase();
+      if (clean === "history" || clean === "live" || clean === "both") return clean;
+      return "both";
+    }}
+
+    function persistMapLinkLayerModePreference() {{
+      try {{
+        window.localStorage.setItem(mapLinkModeStorageKey, normalizeMapLinkLayerMode(mapLinkLayerMode));
       }} catch (_err) {{
       }}
     }}
@@ -331,6 +379,15 @@
         }} else if (stored === "0") {{
           mapLinkLayerEnabled = false;
         }}
+      }} catch (_err) {{
+      }}
+      updateMapLinkLayerControl();
+    }}
+
+    function loadMapLinkLayerModePreference() {{
+      mapLinkLayerMode = "both";
+      try {{
+        mapLinkLayerMode = normalizeMapLinkLayerMode(window.localStorage.getItem(mapLinkModeStorageKey) || "both");
       }} catch (_err) {{
       }}
       updateMapLinkLayerControl();
@@ -376,12 +433,32 @@
 
     function bindMapLinkLayerControl() {{
       const toggle = document.getElementById("map-link-toggle");
+      const modeSelect = document.getElementById("map-link-mode");
       if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
         toggle.dataset.bound = "1";
         toggle.checked = mapLinkLayerEnabled;
         toggle.addEventListener("change", () => {{
           mapLinkLayerEnabled = !!toggle.checked;
           persistMapLinkLayerPreference();
+          updateMapLinkLayerControl();
+          lastMapSignature = "";
+          lastMapGraphSignature = "";
+          lastMapRenderMode = "";
+          if (latestState && activeLayoutView === "network") {{
+            renderMap(
+              latestState.nodes || [],
+              (latestState.traffic || {{}}).edges || [],
+              null
+            );
+          }}
+        }});
+      }}
+      if (modeSelect instanceof HTMLSelectElement && modeSelect.dataset.bound !== "1") {{
+        modeSelect.dataset.bound = "1";
+        modeSelect.value = normalizeMapLinkLayerMode(mapLinkLayerMode);
+        modeSelect.addEventListener("change", () => {{
+          mapLinkLayerMode = normalizeMapLinkLayerMode(modeSelect.value);
+          persistMapLinkLayerModePreference();
           updateMapLinkLayerControl();
           lastMapSignature = "";
           lastMapGraphSignature = "";

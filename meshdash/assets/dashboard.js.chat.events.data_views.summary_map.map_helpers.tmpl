@@ -603,7 +603,11 @@
       return Math.round(900 + ((1 - quality) * 17000) + hopPenaltyMeters);
     }}
 
-    function buildMapLinkLayerOverlay(nodes, rawEdges) {{
+    function buildMapLinkLayerOverlay(nodes, rawEdges, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const edgeMode = (typeof normalizeMapLinkLayerMode === "function")
+        ? normalizeMapLinkLayerMode(opts.mode)
+        : "both";
       const nodeMap = new Map();
       let anchorLatTotal = 0;
       let anchorLonTotal = 0;
@@ -647,8 +651,16 @@
         }});
       }}
 
+      const safeRawEdges = Array.isArray(rawEdges) ? rawEdges : [];
+      const liveRawEdges = (typeof filterNetworkGraphRawEdgesByMode === "function")
+        ? filterNetworkGraphRawEdgesByMode(safeRawEdges, "live")
+        : safeRawEdges.filter((edge) => {{
+            const sessionCount = Number(edge && (edge.session_count ?? edge.count ?? 0));
+            return Number.isFinite(sessionCount) && sessionCount > 0;
+          }});
+      const seedRawEdges = edgeMode === "live" ? liveRawEdges : safeRawEdges;
       const combinedEdges = (typeof combineNetworkGraphEdges === "function")
-        ? combineNetworkGraphEdges(rawEdges, nodeMap)
+        ? combineNetworkGraphEdges(seedRawEdges, nodeMap, {{ mode: edgeMode === "live" ? "live" : "history" }})
         : [];
       if (!combinedEdges.length) {{
         return {{ estimates: new Map(), lines: [] }};
@@ -829,8 +841,23 @@
         }});
       }}
 
+      const historyCombinedEdges = (typeof combineNetworkGraphEdges === "function")
+        ? combineNetworkGraphEdges(safeRawEdges, nodeMap, {{ mode: "history" }})
+        : combinedEdges;
+      const liveCombinedEdges = (typeof combineNetworkGraphEdges === "function")
+        ? combineNetworkGraphEdges(liveRawEdges, nodeMap, {{ mode: "live" }})
+        : [];
+      const lineGroups = [];
+      if (edgeMode === "history" || edgeMode === "both") {{
+        lineGroups.push(["history", historyCombinedEdges]);
+      }}
+      if (edgeMode === "live" || edgeMode === "both") {{
+        lineGroups.push(["live", liveCombinedEdges]);
+      }}
+
       const lines = [];
-      for (const edge of combinedEdges) {{
+      for (const [lineMode, edgeList] of lineGroups) {{
+        for (const edge of edgeList) {{
         const fromPos = positions.get(edge.a);
         const toPos = positions.get(edge.b);
         if (!fromPos || !toPos) continue;
@@ -846,7 +873,8 @@
         if (!isValidMapCoord(fromLat, fromLon) || !isValidMapCoord(toLat, toLon)) continue;
 
         lines.push({{
-          key: `${{edge.a}}::${{edge.b}}`,
+          key: `${{lineMode}}::${{edge.a}}::${{edge.b}}`,
+          mode: lineMode,
           fromId: edge.a,
           toId: edge.b,
           fromLat,
@@ -864,6 +892,7 @@
           avgSnr: Number.isFinite(Number(edge && edge.avgSnr)) ? Number(edge.avgSnr) : null,
           avgRssi: Number.isFinite(Number(edge && edge.avgRssi)) ? Number(edge.avgRssi) : null,
         }});
+      }}
       }}
 
       return {{ estimates, lines }};

@@ -7,6 +7,7 @@
       const packetRateMetric = normalizedMetric === "packets";
       const nodesMetric = normalizedMetric === "nodes";
       const linksMetric = normalizedMetric === "links";
+      const linkMode = normalizeNetworkOverviewLinkMode(opts.linkMode || "history");
       const packetSeries = (opts.packetSeries && typeof opts.packetSeries === "object")
         ? normalizeNetworkOverviewPacketSeries(opts.packetSeries)
         : null;
@@ -89,10 +90,26 @@
           continue;
         }}
         if (linksMetric) {{
-          const value = continuityAdjustedValue("real_edge_count", point.real_edge_count, resetBreak);
-          if (!Number.isFinite(value)) continue;
+          const historyValue = Number(point.edge_count);
+          const liveValue = continuityAdjustedValue("real_edge_count", point.real_edge_count, resetBreak);
+          const seriesValues = {{}};
+          if (linkMode !== "live" && Number.isFinite(historyValue)) {{
+            seriesValues.links = historyValue;
+          }}
+          if (linkMode !== "history" && Number.isFinite(liveValue)) {{
+            seriesValues.real_links = liveValue;
+          }}
+          const value = linkMode === "live"
+            ? liveValue
+            : (linkMode === "both"
+              ? (Number.isFinite(liveValue) ? liveValue : historyValue)
+              : historyValue);
+          if (!Number.isFinite(value) || !Object.keys(seriesValues).length) continue;
           rows.push({{
             value,
+            series: seriesValues,
+            linkCount: Number.isFinite(historyValue) ? historyValue : null,
+            realLinkCount: Number.isFinite(liveValue) ? liveValue : null,
             bucketText,
             bucketUnix: Number.isFinite(bucketUnix) && bucketUnix > 0 ? bucketUnix : null,
           }});
@@ -216,16 +233,18 @@
       const packetSeries = (opts.packetSeries && typeof opts.packetSeries === "object")
         ? normalizeNetworkOverviewPacketSeries(opts.packetSeries)
         : null;
-      const metricMeta = resolveWeeklySummaryMetricMeta(metricKey, nodeSeries, packetSeries);
+      const metricMeta = resolveWeeklySummaryMetricMeta(metricKey, nodeSeries, packetSeries, opts.linkMode);
       const built = buildWeeklySummaryChartRows(summaryHistory, metricKey, {{
         targetKey: target.key,
         packetSeries,
+        linkMode: opts.linkMode,
       }});
       const chartRows = built.chartRows;
       const payload = built.payload;
       const packetRateMetric = built.packetRateMetric;
       const packetSeriesMetric = built.packetSeriesMetric;
       const nodesMetric = built.nodesMetric;
+      const linksMetric = built.linksMetric;
 
       const caption = document.getElementById(target.captionId);
       const overview = document.getElementById(target.overviewId);
@@ -291,7 +310,11 @@
             ? (selectedNodeSeriesLabels.length > 1
               ? ` Showing lines: ${{selectedNodeSeriesLabels.join(", ")}}.`
               : ` Showing ${{selectedNodeSeriesLabels[0] || "All Packets"}} line.`)
-            : "");
+            : (linksMetric && selectedNodeSeriesLabels.length
+              ? (selectedNodeSeriesLabels.length > 1
+                ? ` Showing lines: ${{selectedNodeSeriesLabels.join(", ")}}.`
+                : ` Showing ${{selectedNodeSeriesLabels[0] || "Links"}} line.`)
+              : ""));
         caption.textContent = `${{captionPrefix}} ${{metricMeta.label}}. Window: ${{Number.isFinite(windowHours) ? windowHours : weeklySummaryHours}}h, samples: ${{chartRows.length}}.${{compareNote}}`;
       }}
 
@@ -332,6 +355,16 @@
             items.push(["Saved / Known", "n/a"]);
           }}
         }}
+      }} else if (linksMetric) {{
+        const latestRow = chartRows[chartRows.length - 1] || null;
+        const latestHistoryLinks = Number(latestRow && latestRow.linkCount);
+        const latestLiveLinks = Number(latestRow && latestRow.realLinkCount);
+        if (Number.isFinite(latestHistoryLinks)) {{
+          items.push(["History Links", formatMetricValue(latestHistoryLinks, 0)]);
+        }}
+        if (Number.isFinite(latestLiveLinks)) {{
+          items.push(["Live Links", formatMetricValue(latestLiveLinks, 0)]);
+        }}
       }}
       if (target && target.key === "network-overview") {{
         const hiddenOverviewKeys = new Set(["Metric", "Window", "Range"]);
@@ -361,5 +394,6 @@
         metricKey: networkOverviewMetric,
         nodeSeries: networkOverviewNodeSeriesEnabled,
         packetSeries: networkOverviewPacketSeriesEnabled,
+        linkMode: networkOverviewLinkMode,
       }});
     }}

@@ -265,7 +265,7 @@
           byId[normalizeNodeId(node && node.id)] = node;
         }}
         const linkOverlay = (activeLayoutView === "network" && mapLinkLayerEnabled)
-          ? buildMapLinkLayerOverlay(nodes, edges)
+          ? buildMapLinkLayerOverlay(nodes, edges, {{ mode: mapLinkLayerMode }})
           : {{ estimates: new Map(), lines: [] }};
         const estimatedPositions = linkOverlay.estimates instanceof Map
           ? linkOverlay.estimates
@@ -529,6 +529,9 @@
             const lineKey = String(estimateLine && estimateLine.key || "");
             if (!lineKey) continue;
             seenEstimateKeys.add(lineKey);
+            const lineMode = String((estimateLine && estimateLine.mode) || "history").trim().toLowerCase() === "live"
+              ? "live"
+              : "history";
             const qualityScore = clampMapLinkValue(Number(estimateLine && estimateLine.qualityScore), 0.08, 0.98);
             const estimatedEndpoints = Math.max(1, Math.trunc(Number(estimateLine && estimateLine.estimatedEndpoints) || 1));
             const lastSeenUnix = Number(estimateLine && estimateLine.lastSeenUnix);
@@ -551,6 +554,7 @@
             lineHash = hashMixInt(lineHash, Math.round(Number(estimateLine && estimateLine.desiredDistanceKm) * 10));
             lineHash = hashMixInt(lineHash, Number(estimateLine && estimateLine.weight) || 0);
             lineHash = hashMixInt(lineHash, Number(estimateLine && estimateLine.sessionWeight) || 0);
+            lineHash = hashMixStr(lineHash, lineMode);
             lineHash = hashMixStr(
               lineHash,
               String(estimateLine ? (estimateLine.avgHops ?? "") : "")
@@ -580,21 +584,29 @@
                 [Number(estimateLine.toLat), Number(estimateLine.toLon)],
               ],
               {{
-                color: estimatedEndpoints >= 2 ? "#2f6f8c" : "#3384a6",
-                dashArray: estimatedEndpoints >= 2 ? "4 7" : "8 6",
-                opacity: 0.26 + (qualityScore * 0.38),
-                weight: 1.4 + (qualityScore * 1.8),
+                color: lineMode === "live"
+                  ? (estimatedEndpoints >= 2 ? "#9cd8ff" : "#7cc7ff")
+                  : (estimatedEndpoints >= 2 ? "#2f6f8c" : "#3384a6"),
+                dashArray: lineMode === "live"
+                  ? (estimatedEndpoints >= 2 ? "2 5" : "5 5")
+                  : (estimatedEndpoints >= 2 ? "4 7" : "8 6"),
+                opacity: lineMode === "live"
+                  ? (0.68 + (qualityScore * 0.22))
+                  : (0.18 + (qualityScore * 0.26)),
+                weight: lineMode === "live"
+                  ? (2.2 + (qualityScore * 2.4))
+                  : (1.2 + (qualityScore * 1.4)),
                 bubblingMouseEvents: false,
               }}
             );
             line.bindTooltip(`
-              <b>Link layer</b><br/>
+              <b>Link layer (${{lineMode === "live" ? "live" : "history"}})</b><br/>
               ${{estimateLine.fromId}} <-> ${{estimateLine.toId}}<br/>
               Quality: ${{Math.round(qualityScore * 100)}}%<br/>
               Target span: ${{estimateLine.desiredDistanceKm}} km
             `, {{ sticky: true, opacity: 0.9 }});
             line.bindPopup(`
-              <b>Link layer</b><br/>
+              <b>Link layer (${{lineMode === "live" ? "live" : "history"}})</b><br/>
               Nodes: ${{estimateLine.fromId}} <-> ${{estimateLine.toId}}<br/>
               Estimated endpoints: ${{estimatedEndpoints}}<br/>
               Quality: ${{Math.round(qualityScore * 100)}}%<br/>

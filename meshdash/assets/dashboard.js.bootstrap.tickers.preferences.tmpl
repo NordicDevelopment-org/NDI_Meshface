@@ -101,10 +101,29 @@
       return "";
     }}
 
+    function normalizeNetworkOverviewLinkMode(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      if (clean === "live" || clean === "both") return clean;
+      return "history";
+    }}
+
+    function networkOverviewLinkSeriesPaletteColor(seriesKey) {{
+      const paletteName = String(networkOverviewLinkSeriesPaletteNames[seriesKey] || "").trim().toLowerCase();
+      if (!paletteName) return "";
+      for (const palette of meshChannelColorPalette) {{
+        const name = String(palette && palette.name || "").trim().toLowerCase();
+        if (name !== paletteName) continue;
+        const fill = String(palette && palette.fill || "").trim();
+        if (fill) return fill;
+      }}
+      return "";
+    }}
+
     function resolveWeeklySummaryMetricMeta(
       metricKey,
       nodeSeries = weeklySummaryNodeSeriesEnabled,
-      packetSeries = null
+      packetSeries = null,
+      linkMode = null
     ) {{
       const metric = normalizeWeeklySummaryMetric(metricKey);
       const base = weeklySummaryMetricCatalog.get(metric) || {{
@@ -133,6 +152,33 @@
           ...base,
           seriesOrder: seriesOrder.length ? seriesOrder : ["all"],
           seriesLabels: networkOverviewPacketSeriesLabels,
+          seriesStyles: resolvedStyles,
+        }};
+      }}
+      if (metric === "links" && linkMode !== null && linkMode !== undefined) {{
+        const normalizedLinkMode = normalizeNetworkOverviewLinkMode(linkMode);
+        const seriesOrder = normalizedLinkMode === "both"
+          ? ["links", "real_links"]
+          : [normalizedLinkMode === "live" ? "real_links" : "links"];
+        const resolvedStyles = {{}};
+        for (const seriesKey of networkOverviewLinkSeriesOrder) {{
+          const baseStyle = (
+            networkOverviewLinkSeriesStyles[seriesKey]
+            && typeof networkOverviewLinkSeriesStyles[seriesKey] === "object"
+          ) ? networkOverviewLinkSeriesStyles[seriesKey] : {{}};
+          const paletteColor = networkOverviewLinkSeriesPaletteColor(seriesKey);
+          resolvedStyles[seriesKey] = paletteColor
+            ? {{
+                ...baseStyle,
+                color: paletteColor,
+                labelColor: paletteColor,
+              }}
+            : {{ ...baseStyle }};
+        }}
+        return {{
+          ...base,
+          seriesOrder,
+          seriesLabels: networkOverviewLinkSeriesLabels,
           seriesStyles: resolvedStyles,
         }};
       }}
@@ -244,6 +290,20 @@
       }}
     }}
 
+    function updateNetworkOverviewLinkModeControl(metricKey = networkOverviewMetric) {{
+      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const showControl = metric === "links";
+      const wrap = document.getElementById("network-overview-link-mode-wrap");
+      const select = document.getElementById("network-overview-link-mode");
+      if (wrap instanceof HTMLElement) {{
+        wrap.hidden = !showControl;
+      }}
+      if (select instanceof HTMLSelectElement) {{
+        select.value = normalizeNetworkOverviewLinkMode(networkOverviewLinkMode);
+        select.disabled = !showControl;
+      }}
+    }}
+
     function updateNetworkOverviewPacketSeriesControls(metricKey = networkOverviewMetric) {{
       const metric = normalizeWeeklySummaryMetric(metricKey);
       const showLines = metric === "packets";
@@ -273,6 +333,7 @@
       if (select instanceof HTMLSelectElement && select.value !== normalized) {{
         select.value = normalized;
       }}
+      updateNetworkOverviewLinkModeControl(normalized);
       updateNetworkOverviewNodeSeriesControls(normalized);
       updateNetworkOverviewPacketSeriesControls(normalized);
       const cached = summaryMetricsCache.get(String(weeklySummaryHours));
@@ -282,6 +343,20 @@
       if (!persist) return;
       try {{
         window.localStorage.setItem(networkOverviewMetricStorageKey, normalized);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function applyNetworkOverviewLinkMode(mode, persist = true) {{
+      networkOverviewLinkMode = normalizeNetworkOverviewLinkMode(mode);
+      updateNetworkOverviewLinkModeControl(networkOverviewMetric);
+      const cached = summaryMetricsCache.get(String(weeklySummaryHours));
+      if (cached && cached.data) {{
+        renderNetworkOverviewSummary(cached.data);
+      }}
+      if (!persist) return;
+      try {{
+        window.localStorage.setItem(networkOverviewLinkModeStorageKey, networkOverviewLinkMode);
       }} catch (_err) {{
       }}
     }}

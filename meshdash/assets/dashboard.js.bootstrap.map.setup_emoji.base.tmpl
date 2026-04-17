@@ -300,6 +300,7 @@
     const signalHeatmapModeStorageKey = "meshDashboardSignalHeatmapModeV1";
     const mapPacketLinesStorageKey = "meshDashboardMapPacketLinesEnabledV1";
     const mapLinkLayerStorageKey = "meshDashboardMapLinkLayerEnabledV1";
+    const mapLinkModeStorageKey = "meshDashboardMapLinkModeV1";
     const mapLiveActivityStorageKey = "meshDashboardMapLiveActivityEnabledV1";
     const mapBasemapModeStorageKey = "meshDashboardMapBasemapModeV1";
     const settingsPositionSourceStorageKey = "meshDashboardSettingsPositionSourceV1";
@@ -491,6 +492,7 @@
     const weeklySummaryMetricStorageKey = "meshDashboardWeeklySummaryMetricV1";
     const weeklySummaryNodeSeriesStorageKey = "meshDashboardWeeklySummaryNodeSeriesV1";
     const networkOverviewMetricStorageKey = "meshDashboardNetworkOverviewMetricV1";
+    const networkOverviewLinkModeStorageKey = "meshDashboardNetworkOverviewLinkModeV1";
     const networkOverviewNodeSeriesStorageKey = "meshDashboardNetworkOverviewNodeSeriesV1";
     const networkOverviewPacketSeriesStorageKey = "meshDashboardNetworkOverviewPacketSeriesV1";
     const weeklySummaryNodesCompareLegacyStorageKey = "meshDashboardWeeklySummaryNodesCompareV1";
@@ -536,6 +538,10 @@
       encrypted: "network-overview-packet-line-encrypted",
       other: "network-overview-packet-line-other",
     }};
+    const networkOverviewLinkSeriesOrder = [
+      "links",
+      "real_links",
+    ];
     const nodePacketSeriesControlIds = {{
       all: "node-packet-line-all",
       chat: "node-packet-line-chat",
@@ -619,6 +625,18 @@
       admin: false,
       encrypted: false,
       other: false,
+    }};
+    const networkOverviewLinkSeriesLabels = {{
+      links: "History Links",
+      real_links: "Live Links",
+    }};
+    const networkOverviewLinkSeriesStyles = {{
+      links: {{ tone: "compare", dashed: true, width: 2.0 }},
+      real_links: {{ tone: "line", dashed: false, width: 2.4 }},
+    }};
+    const networkOverviewLinkSeriesPaletteNames = {{
+      links: "sky blue",
+      real_links: "bluish green",
     }};
     const nodePacketSeriesDefaults = {{
       all: false,

@@ -2499,6 +2499,14 @@
               <input id="map-link-toggle" type="checkbox" />
               <span>Link Layer</span>
             </label>
+            <label id="map-link-mode-wrap" class="map-heatmap-mode-wrap" title="Choose whether the link layer shows history links, live links, or both">
+              <span>Links</span>
+              <select id="map-link-mode" class="map-heatmap-mode">
+                <option value="both">Both</option>
+                <option value="history">History</option>
+                <option value="live">Live only</option>
+              </select>
+            </label>
             <label id="map-live-wrap" class="map-heatmap-wrap" title="Flash node markers when live packet activity is observed">
               <input id="map-live-toggle" type="checkbox" checked />
               <span>Live</span>
@@ -2667,6 +2675,14 @@
                         <option value="nodes">Nodes</option>
                         <option value="packets">Packets</option>
                         <option value="links">Links</option>
+                      </select>
+                    </div>
+                    <div id="network-overview-link-mode-wrap" class="history-metric-wrap" hidden>
+                      <label for="network-overview-link-mode" class="history-metric-label">Links</label>
+                      <select id="network-overview-link-mode" class="history-metric-select" aria-label="Network overview link mode">
+                        <option value="history">History</option>
+                        <option value="live">Live</option>
+                        <option value="both">Both</option>
                       </select>
                     </div>
                     <div id="network-overview-node-lines-wrap" class="history-metric-wrap history-metric-wrap-lines" hidden>
