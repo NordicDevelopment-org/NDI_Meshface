@@ -194,7 +194,10 @@
             && isChatNodeDetailsDrawerExpanded()
           ) {{
             syncChatNodeDetailsDrawer(latestState, {{
-              fetchHistory: false,
+              // Allow the drawer to refresh its node history even when the active
+              // screen is not a chat workspace. refreshSelectedNodeHistory()
+              // already applies its own cache/TTL guards.
+              fetchHistory: true,
             }});
           }}
           if (historyRelevant304) {{
@@ -419,7 +422,8 @@
           && isChatNodeDetailsDrawerExpanded()
         ) {{
           syncChatNodeDetailsDrawer(state, {{
-            fetchHistory: false,
+            // Keep node-details history tabs live across non-chat screens too.
+            fetchHistory: true,
           }});
         }}
 
