@@ -164,7 +164,7 @@
       const optionsHtml = [
         '<option value="">All nodes</option>',
         ...safeNodes.map((meta) => (
-          `<option value="${{escAttr(meta.id)}}">${{escAttr(meta.label || meta.id)}} (${{Math.max(0, Math.trunc(Number(meta.count) || 0))}})</option>`
+          `<option value="${{escAttr(meta.id)}}">${{escAttr(formatEnvironmentNodeTooltipLabel(meta.id, meta.label || meta.id))}} (${{Math.max(0, Math.trunc(Number(meta.count) || 0))}})</option>`
         )),
       ].join("");
       if (select.innerHTML !== optionsHtml) {{
