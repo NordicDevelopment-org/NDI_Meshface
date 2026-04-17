@@ -343,6 +343,7 @@ def fetch_summary_metrics_rows(
                online_node_count,
                nodes_with_position,
                live_packet_count,
+               edge_count,
                real_edge_count
         FROM summary_metrics_1m
         WHERE bucket_unix >= ?

@@ -74,7 +74,18 @@ def build_summary_metrics_payload(
                 raw_row = tuple(row)
             except Exception:
                 continue
-        if len(raw_row) >= 7:
+        if len(raw_row) >= 8:
+            (
+                raw_bucket,
+                raw_nodes,
+                raw_saved_nodes,
+                raw_online_nodes,
+                raw_pos_nodes,
+                raw_live_packets,
+                raw_edge_count,
+                raw_links,
+            ) = raw_row[:8]
+        elif len(raw_row) >= 7:
             (
                 raw_bucket,
                 raw_nodes,
@@ -84,6 +95,7 @@ def build_summary_metrics_payload(
                 raw_live_packets,
                 raw_links,
             ) = raw_row[:7]
+            raw_edge_count = raw_links
         elif len(raw_row) >= 6:
             (
                 raw_bucket,
@@ -94,6 +106,7 @@ def build_summary_metrics_payload(
                 raw_links,
             ) = raw_row[:6]
             raw_online_nodes = None
+            raw_edge_count = raw_links
         elif len(raw_row) >= 5:
             (
                 raw_bucket,
@@ -104,6 +117,7 @@ def build_summary_metrics_payload(
             ) = raw_row[:5]
             raw_saved_nodes = None
             raw_online_nodes = None
+            raw_edge_count = raw_links
         else:
             continue
         bucket = _to_int(raw_bucket)
@@ -117,6 +131,7 @@ def build_summary_metrics_payload(
             "online_node_count": max(0, _to_int(raw_online_nodes) or 0),
             "nodes_with_position": max(0, _to_int(raw_pos_nodes) or 0),
             "live_packet_count": max(0, _to_int(raw_live_packets) or 0),
+            "edge_count": max(0, _to_int(raw_edge_count) or 0),
             "real_edge_count": max(0, _to_int(raw_links) or 0),
         }
         points.append(point)
@@ -143,6 +158,7 @@ def build_summary_metrics_payload(
                 "online_node_count": latest.get("online_node_count"),
                 "nodes_with_position": latest.get("nodes_with_position"),
                 "live_packet_count": latest.get("live_packet_count"),
+                "edge_count": latest.get("edge_count"),
                 "real_edge_count": latest.get("real_edge_count"),
             },
             "delta": {
@@ -151,6 +167,7 @@ def build_summary_metrics_payload(
                 "online_node_count": int(latest.get("online_node_count") or 0) - int(first.get("online_node_count") or 0),
                 "nodes_with_position": int(latest.get("nodes_with_position") or 0) - int(first.get("nodes_with_position") or 0),
                 "live_packet_count": int(latest.get("live_packet_count") or 0) - int(first.get("live_packet_count") or 0),
+                "edge_count": int(latest.get("edge_count") or 0) - int(first.get("edge_count") or 0),
                 "real_edge_count": int(latest.get("real_edge_count") or 0) - int(first.get("real_edge_count") or 0),
             },
         }

@@ -38,9 +38,12 @@ def save_summary_metrics(
     online_node_count = _summary_int(summary, "online_node_count")
     nodes_with_position = _summary_int(summary, "nodes_with_position")
     live_packet_count = _summary_int(summary, "live_packet_count")
+    edge_count = _summary_int(summary, "edge_count")
     real_edge_count = _summary_int(summary, "real_edge_count")
     if real_edge_count <= 0:
         real_edge_count = _summary_int(summary, "edge_count")
+    if edge_count <= 0:
+        edge_count = real_edge_count
 
     with store._lock:
         store._conn.execute(
@@ -52,15 +55,17 @@ def save_summary_metrics(
               online_node_count,
               nodes_with_position,
               live_packet_count,
+              edge_count,
               real_edge_count,
               last_seen_unix
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(bucket_unix) DO UPDATE SET
               node_count = excluded.node_count,
               saved_node_count = excluded.saved_node_count,
               online_node_count = excluded.online_node_count,
               nodes_with_position = excluded.nodes_with_position,
               live_packet_count = excluded.live_packet_count,
+              edge_count = excluded.edge_count,
               real_edge_count = excluded.real_edge_count,
               last_seen_unix = excluded.last_seen_unix
             """,
@@ -71,6 +76,7 @@ def save_summary_metrics(
                 online_node_count,
                 nodes_with_position,
                 live_packet_count,
+                edge_count,
                 real_edge_count,
                 now_unix,
             ),

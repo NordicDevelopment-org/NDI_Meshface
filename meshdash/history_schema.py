@@ -43,6 +43,21 @@ def _ensure_summary_metrics_compat_columns(conn: SqlConnection) -> None:
             ADD COLUMN online_node_count INTEGER NOT NULL DEFAULT 0
             """
         )
+        columns.add("online_node_count")
+    if "edge_count" not in columns:
+        conn.execute(
+            """
+            ALTER TABLE summary_metrics_1m
+            ADD COLUMN edge_count INTEGER NOT NULL DEFAULT 0
+            """
+        )
+        conn.execute(
+            """
+            UPDATE summary_metrics_1m
+            SET edge_count = real_edge_count
+            WHERE edge_count <= 0 AND real_edge_count > 0
+            """
+        )
 
 
 def initialize_history_schema(conn: SqlConnection) -> None:
