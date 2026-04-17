@@ -6982,6 +6982,12 @@
       --games-turn-white-rgb: 248, 253, 255;
       --games-turn-white-accent-rgb: 228, 239, 246;
     }}
+    #games-main-wallchess .games-board-wrap {{
+      --games-turn-black-rgb: 35, 23, 15;
+      --games-turn-black-accent-rgb: 93, 57, 34;
+      --games-turn-white-rgb: 255, 248, 232;
+      --games-turn-white-accent-rgb: 245, 226, 181;
+    }}
     .games-board-wrap > * {{
       position: relative;
       z-index: 1;
@@ -7216,7 +7222,8 @@
       box-shadow: 0 0 0 1px rgba(23, 74, 50, 0.24);
     }}
     .checkers-board,
-    .chess-board {{
+    .chess-board,
+    .wall-chess-board {{
       --classic-board-accent: var(--ui-accent-soft, var(--accent, #2f855a));
       --classic-board-accent-strong: var(--ui-accent, var(--accent-2, var(--accent, #2f855a)));
       --classic-board-root: color-mix(in srgb, var(--classic-board-accent) 22%, var(--surface-tint-bg, #edf6ec) 78%);
@@ -7409,6 +7416,126 @@
       border: 1px solid color-mix(in srgb, var(--classic-board-accent) 72%, #f4fffa);
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--classic-board-frame) 42%, transparent);
     }}
+    .wall-chess-board {{
+      --wall-chess-cell-size: clamp(16px, min(3.8vw, 5.2vh), 46px);
+      --wall-chess-gap-size: calc(var(--wall-chess-cell-size) * 0.17);
+      --wall-chess-frame: color-mix(in srgb, var(--classic-board-frame) 74%, #c4d8e7 26%);
+      --wall-chess-frame-inner: color-mix(in srgb, var(--classic-board-frame-inner) 76%, #ffffff 24%);
+      --wall-chess-surface:
+        radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.18) 0%, transparent 58%),
+        linear-gradient(180deg, color-mix(in srgb, var(--classic-board-root) 64%, #7895b4 36%), color-mix(in srgb, var(--classic-board-root) 52%, #243d56 48%));
+      --wall-chess-cell: color-mix(in srgb, #122536 72%, #203d55 28%);
+      --wall-chess-cell-hover: color-mix(in srgb, var(--wall-chess-cell) 76%, #6f8eaa 24%);
+      --wall-chess-grid: color-mix(in srgb, #9cb3c7 56%, #dce8f0 44%);
+      --wall-chess-focus: color-mix(in srgb, var(--classic-board-focus) 70%, #ffffff);
+      --wall-chess-target: color-mix(in srgb, var(--classic-board-target) 76%, #ffffff 24%);
+      --wall-chess-wall: linear-gradient(180deg, #dbe7f1, #9fb5c8);
+      --wall-chess-wall-border: color-mix(in srgb, #5f7e99 66%, #ecf6ff 34%);
+      --wall-chess-black-piece: radial-gradient(circle at 30% 24%, #6f8599 0%, #34485c 46%, #1a2836 100%);
+      --wall-chess-white-piece: radial-gradient(circle at 30% 24%, #ffffff 0%, #eef4f9 56%, #cad8e2 100%);
+      display: grid;
+      grid-template-columns: repeat(17, auto);
+      grid-template-rows: repeat(17, auto);
+      gap: 0;
+      width: max-content;
+      max-width: 100%;
+      max-height: 100%;
+      padding: clamp(6px, calc(var(--wall-chess-cell-size) * 0.22), 10px);
+      border: 1px solid var(--wall-chess-frame);
+      border-radius: 12px;
+      background: var(--wall-chess-surface);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--wall-chess-frame-inner) 70%, #ffffff 30%),
+        0 0 0 1px rgba(255, 255, 255, 0.06);
+    }}
+    .wall-chess-cell,
+    .wall-chess-slot,
+    .wall-chess-corner {{
+      padding: 0;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }}
+    .wall-chess-cell {{
+      width: var(--wall-chess-cell-size);
+      height: var(--wall-chess-cell-size);
+      background: var(--wall-chess-cell);
+      box-shadow: inset 0 0 0 1px var(--wall-chess-grid);
+      cursor: pointer;
+    }}
+    .wall-chess-cell:hover {{
+      background: var(--wall-chess-cell-hover);
+    }}
+    .wall-chess-cell:focus-visible,
+    .wall-chess-slot:focus-visible {{
+      outline: 2px solid var(--wall-chess-focus);
+      outline-offset: -2px;
+      z-index: 3;
+    }}
+    .wall-chess-cell.is-selected {{
+      box-shadow: inset 0 0 0 3px rgba(255, 220, 114, 0.88);
+      z-index: 2;
+    }}
+    .wall-chess-cell.is-target {{
+      box-shadow: inset 0 0 0 2px rgba(110, 214, 146, 0.8);
+    }}
+    .wall-chess-cell.is-last-from,
+    .wall-chess-cell.is-last-to {{
+      box-shadow: inset 0 0 0 2px rgba(255, 229, 141, 0.74);
+    }}
+    .wall-chess-piece {{
+      width: calc(var(--wall-chess-cell-size) * 0.44);
+      height: calc(var(--wall-chess-cell-size) * 0.62);
+      border-radius: 999px 999px 44% 44%;
+      box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.26);
+      border: 1px solid rgba(38, 24, 10, 0.28);
+    }}
+    .wall-chess-piece.piece-black {{
+      background: var(--wall-chess-black-piece);
+    }}
+    .wall-chess-piece.piece-white {{
+      background: var(--wall-chess-white-piece);
+    }}
+    .wall-chess-slot {{
+      background: transparent;
+      cursor: pointer;
+    }}
+    .wall-chess-slot.horizontal {{
+      width: calc((var(--wall-chess-cell-size) * 2) + var(--wall-chess-gap-size));
+      height: var(--wall-chess-gap-size);
+    }}
+    .wall-chess-slot.vertical {{
+      width: var(--wall-chess-gap-size);
+      height: calc((var(--wall-chess-cell-size) * 2) + var(--wall-chess-gap-size));
+    }}
+    .wall-chess-slot.is-preview::before,
+    .wall-chess-slot.is-placed::before {{
+      content: "";
+      width: 100%;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--wall-chess-wall);
+      box-shadow: inset 0 0 0 1px var(--wall-chess-wall-border), 0 1px 1px rgba(0, 0, 0, 0.12);
+    }}
+    .wall-chess-slot.is-preview::before {{
+      opacity: 0.38;
+    }}
+    .wall-chess-slot.is-placed::before {{
+      opacity: 1;
+    }}
+    .wall-chess-slot.is-illegal {{
+      cursor: not-allowed;
+      opacity: 0.36;
+    }}
+    .wall-chess-corner {{
+      width: var(--wall-chess-gap-size);
+      height: var(--wall-chess-gap-size);
+      background: transparent;
+    }}
     @supports (width: 1cqi) {{
       .games-main {{
         container-type: inline-size;
@@ -7421,6 +7548,9 @@
       }}
       .chess-board {{
         --chess-cell-size: clamp(30px, 14.1cqi, 94px);
+      }}
+      .wall-chess-board {{
+        --wall-chess-cell-size: clamp(16px, 7.35cqi, 46px);
       }}
       .checkers-disc {{
         font-size: clamp(10px, 2.8cqi, 16px);

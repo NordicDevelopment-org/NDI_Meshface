@@ -2157,6 +2157,7 @@
                   <option value="reversi">Reversi</option>
                   <option value="checkers">Checkers</option>
                   <option value="chess">Chess</option>
+                  <option value="wallchess">Wall Chess</option>
                 </select>
               </label>
             </div>
@@ -2235,6 +2236,13 @@
               </div>
               <button id="checkers-new-game-btn" class="btn" type="button">New game</button>
             </div>
+            <div id="games-side-wallchess" class="games-side-panel" data-game-id="wallchess" hidden>
+              <div class="reversi-link-status">Local hotseat mode.</div>
+              <div class="games-coming-soon">
+                Reach the opposite side first. Move one square orthogonally, or place a two-segment wall to redirect the other player. Each side starts with 10 walls.
+              </div>
+              <button id="wallchess-new-game-btn" class="btn" type="button">New game</button>
+            </div>
           </aside>
           <div
             id="games-sidebar-splitter"
@@ -2257,6 +2265,11 @@
             <div id="games-main-chess" class="games-main-panel" data-game-id="chess" hidden>
               <div class="games-board-wrap">
                 <div id="chess-board" class="chess-board" role="grid" aria-label="Chess board"></div>
+              </div>
+            </div>
+            <div id="games-main-wallchess" class="games-main-panel" data-game-id="wallchess" hidden>
+              <div class="games-board-wrap">
+                <div id="wallchess-board" class="wall-chess-board" role="grid" aria-label="Wall Chess board"></div>
               </div>
             </div>
           </div>
@@ -2358,6 +2371,37 @@
                 <div class="reversi-score-card">
                   <span class="label">Legal</span>
                   <strong id="chess-legal-count">20</strong>
+                </div>
+              </div>
+            </div>
+            <div id="games-status-wallchess" class="games-status-panel" data-game-id="wallchess" hidden>
+              <div id="wallchess-status-text" class="games-coming-soon" aria-live="polite">Initializing Wall Chess board...</div>
+              <div class="reversi-player-row" aria-label="Wall Chess players">
+                <div id="wallchess-player-white-pill" class="reversi-player-pill is-white">
+                  <span class="reversi-player-role">South</span>
+                  <span id="wallchess-player-white-name" class="reversi-player-name">White</span>
+                </div>
+                <div id="wallchess-player-black-pill" class="reversi-player-pill is-black">
+                  <span class="reversi-player-role">North</span>
+                  <span id="wallchess-player-black-name" class="reversi-player-name">Black</span>
+                </div>
+              </div>
+              <div class="reversi-score-grid">
+                <div class="reversi-score-card">
+                  <span class="label">White Walls</span>
+                  <strong id="wallchess-white-walls">10</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Black Walls</span>
+                  <strong id="wallchess-black-walls">10</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Moves</span>
+                  <strong id="wallchess-move-count">0</strong>
+                </div>
+                <div class="reversi-score-card">
+                  <span class="label">Legal</span>
+                  <strong id="wallchess-legal-count">3</strong>
                 </div>
               </div>
             </div>

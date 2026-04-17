@@ -1,0 +1,522 @@
+    const wallChessBoardSize = 9;
+    const wallChessWallLimit = 10;
+
+    function wallChessOpponent(player) {{
+      return String(player || "").trim().toLowerCase() === "white" ? "black" : "white";
+    }}
+
+    function wallChessPlayerLabel(player) {{
+      return String(player || "").trim().toLowerCase() === "white" ? "White" : "Black";
+    }}
+
+    function wallChessInBounds(rowRaw, colRaw) {{
+      const row = Math.trunc(Number(rowRaw) || 0);
+      const col = Math.trunc(Number(colRaw) || 0);
+      return row >= 0 && row < wallChessBoardSize && col >= 0 && col < wallChessBoardSize;
+    }}
+
+    function wallChessCellLabel(rowRaw, colRaw) {{
+      const row = Math.trunc(Number(rowRaw) || 0);
+      const col = Math.trunc(Number(colRaw) || 0);
+      const file = chessFiles[col] || "?";
+      const rank = String(wallChessBoardSize - row);
+      return `${{file}}${{rank}}`;
+    }}
+
+    function wallChessAnchorKey(rowRaw, colRaw) {{
+      const row = Math.trunc(Number(rowRaw) || 0);
+      const col = Math.trunc(Number(colRaw) || 0);
+      return `${{row}}:${{col}}`;
+    }}
+
+    function wallChessParseAnchorKey(key) {{
+      const text = String(key || "").trim();
+      const parts = text.split(":");
+      if (parts.length !== 2) return null;
+      const row = Math.trunc(Number(parts[0]) || 0);
+      const col = Math.trunc(Number(parts[1]) || 0);
+      if (row < 0 || row >= (wallChessBoardSize - 1) || col < 0 || col >= (wallChessBoardSize - 1)) {{
+        return null;
+      }}
+      return [row, col];
+    }}
+
+    function wallChessNormalizeWallSet(rawSet) {{
+      const normalized = new Set();
+      const source = rawSet instanceof Set ? Array.from(rawSet) : (Array.isArray(rawSet) ? rawSet : []);
+      for (const entry of source) {{
+        const parsed = wallChessParseAnchorKey(entry);
+        if (!parsed) continue;
+        normalized.add(wallChessAnchorKey(parsed[0], parsed[1]));
+      }}
+      return normalized;
+    }}
+
+    function createNewWallChessState() {{
+      return {{
+        turn: "white",
+        white: {{ row: wallChessBoardSize - 1, col: Math.floor(wallChessBoardSize / 2), walls: wallChessWallLimit }},
+        black: {{ row: 0, col: Math.floor(wallChessBoardSize / 2), walls: wallChessWallLimit }},
+        horizontal_walls: new Set(),
+        vertical_walls: new Set(),
+        move_count: 0,
+        game_over: false,
+        winner: "",
+        notice: "White to move.",
+        last_move: null,
+        last_wall: null,
+      }};
+    }}
+
+    function cloneWallChessState(rawState) {{
+      const source = rawState && typeof rawState === "object" ? rawState : createNewWallChessState();
+      const white = source.white && typeof source.white === "object" ? source.white : {{}};
+      const black = source.black && typeof source.black === "object" ? source.black : {{}};
+      return {{
+        turn: String(source.turn || "").trim().toLowerCase() === "black" ? "black" : "white",
+        white: {{
+          row: wallChessInBounds(white.row, white.col) ? Math.trunc(Number(white.row) || 0) : (wallChessBoardSize - 1),
+          col: wallChessInBounds(white.row, white.col) ? Math.trunc(Number(white.col) || 0) : Math.floor(wallChessBoardSize / 2),
+          walls: Math.max(0, Math.trunc(Number(white.walls) || 0)),
+        }},
+        black: {{
+          row: wallChessInBounds(black.row, black.col) ? Math.trunc(Number(black.row) || 0) : 0,
+          col: wallChessInBounds(black.row, black.col) ? Math.trunc(Number(black.col) || 0) : Math.floor(wallChessBoardSize / 2),
+          walls: Math.max(0, Math.trunc(Number(black.walls) || 0)),
+        }},
+        horizontal_walls: wallChessNormalizeWallSet(source.horizontal_walls || source.horizontalWalls),
+        vertical_walls: wallChessNormalizeWallSet(source.vertical_walls || source.verticalWalls),
+        move_count: Math.max(0, Math.trunc(Number(source.move_count) || 0)),
+        game_over: source.game_over === true,
+        winner: String(source.winner || "").trim().toLowerCase() === "black" ? "black" : (String(source.winner || "").trim().toLowerCase() === "white" ? "white" : ""),
+        notice: String(source.notice || "").trim(),
+        last_move: source.last_move && typeof source.last_move === "object" ? {{
+          from: Array.isArray(source.last_move.from) ? source.last_move.from.slice(0, 2).map((value) => Math.trunc(Number(value) || 0)) : null,
+          to: Array.isArray(source.last_move.to) ? source.last_move.to.slice(0, 2).map((value) => Math.trunc(Number(value) || 0)) : null,
+          player: String(source.last_move.player || "").trim().toLowerCase(),
+        }} : null,
+        last_wall: source.last_wall && typeof source.last_wall === "object" ? {{
+          orientation: String(source.last_wall.orientation || "").trim().toLowerCase(),
+          row: Math.trunc(Number(source.last_wall.row) || 0),
+          col: Math.trunc(Number(source.last_wall.col) || 0),
+          player: String(source.last_wall.player || "").trim().toLowerCase(),
+        }} : null,
+      }};
+    }}
+
+    function wallChessPlayerState(player, state = wallChessState) {{
+      const safeState = state && typeof state === "object" ? state : wallChessState;
+      return String(player || "").trim().toLowerCase() === "black"
+        ? safeState.black
+        : safeState.white;
+    }}
+
+    function wallChessPlayersShareCell(state = wallChessState) {{
+      const safeState = state && typeof state === "object" ? state : wallChessState;
+      return Number(safeState.white && safeState.white.row) === Number(safeState.black && safeState.black.row)
+        && Number(safeState.white && safeState.white.col) === Number(safeState.black && safeState.black.col);
+    }}
+
+    function wallChessEdgeBlocked(rowA, colA, rowB, colB, state = wallChessState) {{
+      const safeState = state && typeof state === "object" ? state : wallChessState;
+      const aRow = Math.trunc(Number(rowA) || 0);
+      const aCol = Math.trunc(Number(colA) || 0);
+      const bRow = Math.trunc(Number(rowB) || 0);
+      const bCol = Math.trunc(Number(colB) || 0);
+      if (!wallChessInBounds(aRow, aCol) || !wallChessInBounds(bRow, bCol)) return true;
+      const dr = bRow - aRow;
+      const dc = bCol - aCol;
+      if (Math.abs(dr) + Math.abs(dc) !== 1) return true;
+      const horizontalWalls = safeState.horizontal_walls instanceof Set ? safeState.horizontal_walls : new Set();
+      const verticalWalls = safeState.vertical_walls instanceof Set ? safeState.vertical_walls : new Set();
+      if (dr !== 0) {{
+        const edgeRow = Math.min(aRow, bRow);
+        return horizontalWalls.has(wallChessAnchorKey(edgeRow, aCol))
+          || horizontalWalls.has(wallChessAnchorKey(edgeRow, aCol - 1));
+      }}
+      const edgeCol = Math.min(aCol, bCol);
+      return verticalWalls.has(wallChessAnchorKey(aRow, edgeCol))
+        || verticalWalls.has(wallChessAnchorKey(aRow - 1, edgeCol));
+    }}
+
+    function wallChessGoalReached(player, state = wallChessState) {{
+      const piece = wallChessPlayerState(player, state);
+      if (!piece) return false;
+      if (String(player || "").trim().toLowerCase() === "black") {{
+        return Number(piece.row) === (wallChessBoardSize - 1);
+      }}
+      return Number(piece.row) === 0;
+    }}
+
+    function wallChessShortestPathExists(player, state = wallChessState) {{
+      const start = wallChessPlayerState(player, state);
+      if (!start || !wallChessInBounds(start.row, start.col)) return false;
+      const targetRow = String(player || "").trim().toLowerCase() === "black"
+        ? (wallChessBoardSize - 1)
+        : 0;
+      const seen = new Set([wallChessAnchorKey(start.row, start.col)]);
+      const queue = [[start.row, start.col]];
+      while (queue.length > 0) {{
+        const current = queue.shift();
+        if (!Array.isArray(current) || current.length < 2) continue;
+        const [row, col] = current;
+        if (row === targetRow) return true;
+        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {{
+          const nextRow = row + dr;
+          const nextCol = col + dc;
+          if (!wallChessInBounds(nextRow, nextCol)) continue;
+          if (wallChessEdgeBlocked(row, col, nextRow, nextCol, state)) continue;
+          const key = wallChessAnchorKey(nextRow, nextCol);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          queue.push([nextRow, nextCol]);
+        }}
+      }}
+      return false;
+    }}
+
+    function wallChessCanPlaceWall(state, orientationRaw, rowRaw, colRaw) {{
+      const safeState = cloneWallChessState(state);
+      const orientation = String(orientationRaw || "").trim().toLowerCase();
+      const row = Math.trunc(Number(rowRaw) || 0);
+      const col = Math.trunc(Number(colRaw) || 0);
+      if (row < 0 || row >= (wallChessBoardSize - 1) || col < 0 || col >= (wallChessBoardSize - 1)) return false;
+      if (safeState.game_over) return false;
+      const currentPlayer = wallChessPlayerState(safeState.turn, safeState);
+      if (!currentPlayer || Number(currentPlayer.walls) <= 0) return false;
+      const key = wallChessAnchorKey(row, col);
+      const horizontalWalls = safeState.horizontal_walls;
+      const verticalWalls = safeState.vertical_walls;
+      if (orientation === "h") {{
+        if (horizontalWalls.has(key) || verticalWalls.has(key)) return false;
+        if (horizontalWalls.has(wallChessAnchorKey(row, col - 1)) || horizontalWalls.has(wallChessAnchorKey(row, col + 1))) {{
+          return false;
+        }}
+        horizontalWalls.add(key);
+      }} else if (orientation === "v") {{
+        if (verticalWalls.has(key) || horizontalWalls.has(key)) return false;
+        if (verticalWalls.has(wallChessAnchorKey(row - 1, col)) || verticalWalls.has(wallChessAnchorKey(row + 1, col))) {{
+          return false;
+        }}
+        verticalWalls.add(key);
+      }} else {{
+        return false;
+      }}
+      return wallChessShortestPathExists("white", safeState) && wallChessShortestPathExists("black", safeState);
+    }}
+
+    function wallChessCollectLegalMoves(state = wallChessState) {{
+      const safeState = cloneWallChessState(state);
+      if (safeState.game_over) return [];
+      const player = String(safeState.turn || "").trim().toLowerCase() === "black" ? "black" : "white";
+      const piece = wallChessPlayerState(player, safeState);
+      const opponent = wallChessPlayerState(wallChessOpponent(player), safeState);
+      if (!piece || !opponent) return [];
+      const moves = [];
+      const addMove = (row, col, kind = "step", via = null) => {{
+        if (!wallChessInBounds(row, col)) return;
+        if (row === Number(opponent.row) && col === Number(opponent.col)) return;
+        const key = wallChessAnchorKey(row, col);
+        if (moves.some((entry) => wallChessAnchorKey(entry.to[0], entry.to[1]) === key)) return;
+        moves.push({{
+          from: [piece.row, piece.col],
+          to: [row, col],
+          kind,
+          via: Array.isArray(via) ? [Number(via[0]), Number(via[1])] : null,
+        }});
+      }};
+
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {{
+        const nearRow = Number(piece.row) + dr;
+        const nearCol = Number(piece.col) + dc;
+        if (!wallChessInBounds(nearRow, nearCol)) continue;
+        if (wallChessEdgeBlocked(piece.row, piece.col, nearRow, nearCol, safeState)) continue;
+        const hitsOpponent = nearRow === Number(opponent.row) && nearCol === Number(opponent.col);
+        if (!hitsOpponent) {{
+          addMove(nearRow, nearCol, "step");
+          continue;
+        }}
+        const jumpRow = nearRow + dr;
+        const jumpCol = nearCol + dc;
+        if (
+          wallChessInBounds(jumpRow, jumpCol)
+          && !wallChessEdgeBlocked(nearRow, nearCol, jumpRow, jumpCol, safeState)
+        ) {{
+          addMove(jumpRow, jumpCol, "jump", [nearRow, nearCol]);
+          continue;
+        }}
+        if (dr !== 0) {{
+          for (const sideCol of [nearCol - 1, nearCol + 1]) {{
+            if (!wallChessInBounds(nearRow, sideCol)) continue;
+            if (wallChessEdgeBlocked(nearRow, nearCol, nearRow, sideCol, safeState)) continue;
+            addMove(nearRow, sideCol, "sidestep", [nearRow, nearCol]);
+          }}
+        }} else {{
+          for (const sideRow of [nearRow - 1, nearRow + 1]) {{
+            if (!wallChessInBounds(sideRow, nearCol)) continue;
+            if (wallChessEdgeBlocked(nearRow, nearCol, sideRow, nearCol, safeState)) continue;
+            addMove(sideRow, nearCol, "sidestep", [nearRow, nearCol]);
+          }}
+        }}
+      }}
+
+      return moves;
+    }}
+
+    function refreshWallChessGame() {{
+      wallChessState = cloneWallChessState(wallChessState);
+      if (wallChessPlayersShareCell(wallChessState)) {{
+        wallChessState = createNewWallChessState();
+      }}
+      wallChessLegalMoves = wallChessCollectLegalMoves(wallChessState);
+      wallChessLegalMoveTargets = new Map();
+      for (const move of wallChessLegalMoves) {{
+        if (!move || !Array.isArray(move.to) || move.to.length < 2) continue;
+        wallChessLegalMoveTargets.set(wallChessAnchorKey(move.to[0], move.to[1]), move);
+      }}
+      if (wallChessGoalReached("white", wallChessState)) {{
+        wallChessState.game_over = true;
+        wallChessState.winner = "white";
+        wallChessState.notice = "Game over: White reached the north edge.";
+        wallChessSelectedCell = null;
+        return;
+      }}
+      if (wallChessGoalReached("black", wallChessState)) {{
+        wallChessState.game_over = true;
+        wallChessState.winner = "black";
+        wallChessState.notice = "Game over: Black reached the south edge.";
+        wallChessSelectedCell = null;
+        return;
+      }}
+      if (!Array.isArray(wallChessSelectedCell) || wallChessSelectedCell.length < 2) {{
+        wallChessSelectedCell = [Number(wallChessState[wallChessState.turn].row), Number(wallChessState[wallChessState.turn].col)];
+      }}
+      if (!String(wallChessState.notice || "").trim()) {{
+        const wallsLeft = Math.max(0, Math.trunc(Number(wallChessPlayerState(wallChessState.turn, wallChessState).walls) || 0));
+        wallChessState.notice = `${{wallChessPlayerLabel(wallChessState.turn)}} to move. ${{wallsLeft}} walls left.`;
+      }}
+    }}
+
+    function startNewWallChessGame() {{
+      wallChessState = createNewWallChessState();
+      wallChessSelectedCell = [Number(wallChessState.white.row), Number(wallChessState.white.col)];
+      refreshWallChessGame();
+      if (activeLayoutView === "games") renderGamesView(latestState);
+    }}
+
+    function applyWallChessMove(move) {{
+      const nextMove = move && typeof move === "object" ? move : null;
+      if (!nextMove || !Array.isArray(nextMove.to) || nextMove.to.length < 2) return false;
+      if (!wallChessState || typeof wallChessState !== "object") return false;
+      if (wallChessState.game_over) return false;
+      const player = String(wallChessState.turn || "").trim().toLowerCase() === "black" ? "black" : "white";
+      const piece = wallChessPlayerState(player, wallChessState);
+      const toRow = Math.trunc(Number(nextMove.to[0]) || 0);
+      const toCol = Math.trunc(Number(nextMove.to[1]) || 0);
+      if (!wallChessInBounds(toRow, toCol)) return false;
+      piece.row = toRow;
+      piece.col = toCol;
+      wallChessState.last_move = {{
+        from: Array.isArray(nextMove.from) ? [Number(nextMove.from[0]), Number(nextMove.from[1])] : null,
+        to: [toRow, toCol],
+        player,
+      }};
+      wallChessState.last_wall = null;
+      wallChessState.move_count = Math.max(0, Math.trunc(Number(wallChessState.move_count) || 0)) + 1;
+      if (wallChessGoalReached(player, wallChessState)) {{
+        wallChessState.game_over = true;
+        wallChessState.winner = player;
+        wallChessState.notice = `Game over: ${{wallChessPlayerLabel(player)}} wins by reaching the far edge.`;
+      }} else {{
+        wallChessState.turn = wallChessOpponent(player);
+        wallChessState.notice = `${{wallChessPlayerLabel(player)}} moved to ${{wallChessCellLabel(toRow, toCol)}}. ${{wallChessPlayerLabel(wallChessState.turn)}} to move.`;
+      }}
+      wallChessSelectedCell = [toRow, toCol];
+      if (activeLayoutView === "games") renderGamesView(latestState);
+      return true;
+    }}
+
+    function applyWallChessWall(orientationRaw, rowRaw, colRaw) {{
+      if (!wallChessState || typeof wallChessState !== "object") return false;
+      if (wallChessState.game_over) return false;
+      const orientation = String(orientationRaw || "").trim().toLowerCase();
+      const row = Math.trunc(Number(rowRaw) || 0);
+      const col = Math.trunc(Number(colRaw) || 0);
+      if (!wallChessCanPlaceWall(wallChessState, orientation, row, col)) return false;
+      const player = String(wallChessState.turn || "").trim().toLowerCase() === "black" ? "black" : "white";
+      const current = wallChessPlayerState(player, wallChessState);
+      const key = wallChessAnchorKey(row, col);
+      if (orientation === "h") {{
+        wallChessState.horizontal_walls.add(key);
+      }} else {{
+        wallChessState.vertical_walls.add(key);
+      }}
+      current.walls = Math.max(0, Math.trunc(Number(current.walls) || 0) - 1);
+      wallChessState.last_wall = {{
+        orientation,
+        row,
+        col,
+        player,
+      }};
+      wallChessState.last_move = null;
+      wallChessState.move_count = Math.max(0, Math.trunc(Number(wallChessState.move_count) || 0)) + 1;
+      wallChessState.turn = wallChessOpponent(player);
+      wallChessState.notice = `${{wallChessPlayerLabel(player)}} placed a ${{orientation === "h" ? "horizontal" : "vertical"}} wall. ${{wallChessPlayerLabel(wallChessState.turn)}} to move.`;
+      wallChessSelectedCell = [Number(wallChessState[wallChessState.turn].row), Number(wallChessState[wallChessState.turn].col)];
+      if (activeLayoutView === "games") renderGamesView(latestState);
+      return true;
+    }}
+
+    function handleWallChessCellClick(rowRaw, colRaw) {{
+      if (!wallChessState || typeof wallChessState !== "object") return;
+      if (wallChessState.game_over) return;
+      const row = Math.trunc(Number(rowRaw) || 0);
+      const col = Math.trunc(Number(colRaw) || 0);
+      if (!wallChessInBounds(row, col)) return;
+      const current = wallChessPlayerState(wallChessState.turn, wallChessState);
+      const currentCellKey = wallChessAnchorKey(row, col);
+      const move = wallChessLegalMoveTargets.get(currentCellKey) || null;
+      if (move) {{
+        applyWallChessMove(move);
+        return;
+      }}
+      if (row === Number(current.row) && col === Number(current.col)) {{
+        wallChessSelectedCell = [row, col];
+        const wallsLeft = Math.max(0, Math.trunc(Number(current.walls) || 0));
+        wallChessState.notice = `${{wallChessPlayerLabel(wallChessState.turn)}} at ${{wallChessCellLabel(row, col)}}. Move one square, jump, or place a wall. ${{wallsLeft}} walls left.`;
+        if (activeLayoutView === "games") renderGamesView(latestState);
+      }}
+    }}
+
+    function handleWallChessWallClick(orientationRaw, rowRaw, colRaw) {{
+      if (!wallChessState || typeof wallChessState !== "object") return;
+      if (wallChessState.game_over) return;
+      const orientation = String(orientationRaw || "").trim().toLowerCase();
+      const row = Math.trunc(Number(rowRaw) || 0);
+      const col = Math.trunc(Number(colRaw) || 0);
+      if (applyWallChessWall(orientation, row, col)) return;
+      const current = wallChessPlayerState(wallChessState.turn, wallChessState);
+      if (Number(current && current.walls) <= 0) {{
+        wallChessState.notice = `${{wallChessPlayerLabel(wallChessState.turn)}} has no walls left.`;
+      }} else {{
+        wallChessState.notice = "Illegal wall placement. Walls cannot overlap, cross, or block every path.";
+      }}
+      if (activeLayoutView === "games") renderGamesView(latestState);
+    }}
+
+    function renderWallChessBoard() {{
+      const boardEl = document.getElementById("wallchess-board");
+      if (!(boardEl instanceof HTMLElement)) return;
+      if (!wallChessState || typeof wallChessState !== "object") {{
+        startNewWallChessGame();
+      }}
+      const state = cloneWallChessState(wallChessState);
+      const currentPlayer = wallChessPlayerState(state.turn, state);
+      const selected = Array.isArray(wallChessSelectedCell) && wallChessSelectedCell.length >= 2
+        ? [Math.trunc(Number(wallChessSelectedCell[0]) || 0), Math.trunc(Number(wallChessSelectedCell[1]) || 0)]
+        : null;
+      const targetKeys = new Set(Array.isArray(wallChessLegalMoves) ? wallChessLegalMoves.map((move) => wallChessAnchorKey(move.to[0], move.to[1])) : []);
+      const horizontalLegal = new Set();
+      const verticalLegal = new Set();
+      if (!state.game_over && Number(currentPlayer && currentPlayer.walls) > 0) {{
+        for (let row = 0; row < (wallChessBoardSize - 1); row += 1) {{
+          for (let col = 0; col < (wallChessBoardSize - 1); col += 1) {{
+            const key = wallChessAnchorKey(row, col);
+            if (wallChessCanPlaceWall(state, "h", row, col)) horizontalLegal.add(key);
+            if (wallChessCanPlaceWall(state, "v", row, col)) verticalLegal.add(key);
+          }}
+        }}
+      }}
+
+      const html = [];
+      const pushStyle = (rowStart, colStart, rowSpan, colSpan) => `style="grid-row:${{rowStart}} / span ${{rowSpan}}; grid-column:${{colStart}} / span ${{colSpan}};"`;
+      const white = state.white;
+      const black = state.black;
+      const lastMove = state.last_move && typeof state.last_move === "object" ? state.last_move : null;
+      const lastWall = state.last_wall && typeof state.last_wall === "object" ? state.last_wall : null;
+
+      for (let row = 0; row < wallChessBoardSize; row += 1) {{
+        for (let col = 0; col < wallChessBoardSize; col += 1) {{
+          const classes = ["wall-chess-cell"];
+          const key = wallChessAnchorKey(row, col);
+          if (selected && row === selected[0] && col === selected[1]) classes.push("is-selected");
+          if (targetKeys.has(key)) classes.push("is-target");
+          if (lastMove && Array.isArray(lastMove.from) && row === Number(lastMove.from[0]) && col === Number(lastMove.from[1])) {{
+            classes.push("is-last-from");
+          }}
+          if (lastMove && Array.isArray(lastMove.to) && row === Number(lastMove.to[0]) && col === Number(lastMove.to[1])) {{
+            classes.push("is-last-to");
+          }}
+          let pieceHtml = "";
+          let occupant = "";
+          if (row === Number(white.row) && col === Number(white.col)) {{
+            occupant = "White pawn";
+            pieceHtml = '<span class="wall-chess-piece piece-white" aria-hidden="true"></span>';
+          }} else if (row === Number(black.row) && col === Number(black.col)) {{
+            occupant = "Black pawn";
+            pieceHtml = '<span class="wall-chess-piece piece-black" aria-hidden="true"></span>';
+          }}
+          const title = occupant
+            ? `${{wallChessCellLabel(row, col)}} • ${{occupant}}`
+            : `${{wallChessCellLabel(row, col)}} • empty`;
+          html.push(
+            `<button class="${{escAttr(classes.join(" "))}}" type="button" data-row="${{row}}" data-col="${{col}}" title="${{escAttr(title)}}" ${pushStyle((row * 2) + 1, (col * 2) + 1, 1, 1)}>${{pieceHtml}}</button>`
+          );
+        }}
+      }}
+
+      for (let row = 0; row < (wallChessBoardSize - 1); row += 1) {{
+        for (let col = 0; col < (wallChessBoardSize - 1); col += 1) {{
+          const key = wallChessAnchorKey(row, col);
+          const horizontalPlaced = state.horizontal_walls.has(key);
+          const verticalPlaced = state.vertical_walls.has(key);
+          const horizontalClasses = ["wall-chess-slot", "horizontal"];
+          const verticalClasses = ["wall-chess-slot", "vertical"];
+          if (horizontalPlaced) horizontalClasses.push("is-placed");
+          else if (!horizontalLegal.has(key)) horizontalClasses.push("is-illegal");
+          if (verticalPlaced) verticalClasses.push("is-placed");
+          else if (!verticalLegal.has(key)) verticalClasses.push("is-illegal");
+          if (lastWall && lastWall.orientation === "h" && Number(lastWall.row) === row && Number(lastWall.col) === col) {{
+            horizontalClasses.push("is-last-to");
+          }}
+          if (lastWall && lastWall.orientation === "v" && Number(lastWall.row) === row && Number(lastWall.col) === col) {{
+            verticalClasses.push("is-last-to");
+          }}
+          html.push(
+            `<button class="${{escAttr(horizontalClasses.join(" "))}}" type="button" data-orientation="h" data-row="${{row}}" data-col="${{col}}" title="${{escAttr(`${{horizontalPlaced ? "Horizontal wall" : "Place horizontal wall"}} between rows ${{wallChessBoardSize - row}} and ${{wallChessBoardSize - row - 1}}`)}}" ${pushStyle((row * 2) + 2, (col * 2) + 1, 1, 3)}></button>`
+          );
+          html.push(
+            `<button class="${{escAttr(verticalClasses.join(" "))}}" type="button" data-orientation="v" data-row="${{row}}" data-col="${{col}}" title="${{escAttr(`${{verticalPlaced ? "Vertical wall" : "Place vertical wall"}} between files ${{chessFiles[col] || "?"}} and ${{chessFiles[col + 1] || "?"}}`)}}" ${pushStyle((row * 2) + 1, (col * 2) + 2, 3, 1)}></button>`
+          );
+          html.push(`<span class="wall-chess-corner" aria-hidden="true" ${pushStyle((row * 2) + 2, (col * 2) + 2, 1, 1)}></span>`);
+        }}
+      }}
+
+      boardEl.innerHTML = html.join("");
+      setGamesBoardTurnAccent("wallchess", state.game_over ? "" : state.turn);
+    }}
+
+    function renderWallChessStatus() {{
+      if (!wallChessState || typeof wallChessState !== "object") return;
+      const state = cloneWallChessState(wallChessState);
+      setText("wallchess-status-text", state.notice || "Wall Chess ready.");
+      setText("wallchess-white-walls", Math.max(0, Math.trunc(Number(state.white && state.white.walls) || 0)));
+      setText("wallchess-black-walls", Math.max(0, Math.trunc(Number(state.black && state.black.walls) || 0)));
+      setText("wallchess-move-count", Math.max(0, Math.trunc(Number(state.move_count) || 0)));
+      setText("wallchess-legal-count", state.game_over ? 0 : Math.max(0, Array.isArray(wallChessLegalMoves) ? wallChessLegalMoves.length : 0));
+
+      const whitePill = document.getElementById("wallchess-player-white-pill");
+      const blackPill = document.getElementById("wallchess-player-black-pill");
+      if (whitePill instanceof HTMLElement) {{
+        whitePill.classList.toggle("is-active", !state.game_over && state.turn === "white");
+        whitePill.classList.toggle("is-over", state.game_over && state.winner === "white");
+      }}
+      if (blackPill instanceof HTMLElement) {{
+        blackPill.classList.toggle("is-active", !state.game_over && state.turn === "black");
+        blackPill.classList.toggle("is-over", state.game_over && state.winner === "black");
+      }}
+      const whiteNameEl = document.getElementById("wallchess-player-white-name");
+      const blackNameEl = document.getElementById("wallchess-player-black-name");
+      if (whiteNameEl instanceof HTMLElement) whiteNameEl.textContent = "White";
+      if (blackNameEl instanceof HTMLElement) blackNameEl.textContent = "Black";
+    }}

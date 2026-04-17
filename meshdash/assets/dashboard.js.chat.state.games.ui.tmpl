@@ -7,6 +7,7 @@
       const token = String(value || "").trim().toLowerCase();
       if (token === "checkers") return "checkers";
       if (token === "chess") return "chess";
+      if (token === "wallchess") return "wallchess";
       return "reversi";
     }}
 
@@ -18,7 +19,7 @@
           gamesLibrarySelect.value = activeGameId;
         }}
       }}
-      const gameIds = ["reversi", "checkers", "chess"];
+      const gameIds = ["reversi", "checkers", "chess", "wallchess"];
       for (const gameId of gameIds) {{
         const isActive = activeGameId === gameId;
         const sidePanel = document.getElementById(`games-side-${{gameId}}`);
@@ -64,7 +65,20 @@
       const normalizedGameId = normalizeActiveGameId(gameId);
       if (normalizedGameId === "checkers") return "--checkers-cell-size";
       if (normalizedGameId === "chess") return "--chess-cell-size";
+      if (normalizedGameId === "wallchess") return "--wall-chess-cell-size";
       return "--reversi-cell-size";
+    }}
+
+    function gamesBoardAutosizeUnits(gameId = "") {{
+      const normalizedGameId = normalizeActiveGameId(gameId);
+      if (normalizedGameId === "wallchess") return 10.36;
+      return 8;
+    }}
+
+    function gamesBoardAutosizeMinCellPx(gameId = "") {{
+      const normalizedGameId = normalizeActiveGameId(gameId);
+      if (normalizedGameId === "wallchess") return 10;
+      return 16;
     }}
 
     function queueActiveGamesBoardAutosize() {{
@@ -101,7 +115,9 @@
       const usableHeight = Math.max(0, Math.floor(wrapRect.height - padY - frameInset));
       const boardSizePx = Math.floor(Math.min(usableWidth, usableHeight));
       if (!Number.isFinite(boardSizePx) || boardSizePx < 120) return;
-      const cellSizePx = Math.max(16, Math.floor(boardSizePx / 8));
+      const unitCount = Math.max(1, Number(gamesBoardAutosizeUnits(gameId)) || 8);
+      const minCellPx = Math.max(8, Math.trunc(Number(gamesBoardAutosizeMinCellPx(gameId)) || 16));
+      const cellSizePx = Math.max(minCellPx, Math.floor(boardSizePx / unitCount));
       const varName = gamesBoardCellSizeVarName(gameId);
       const nextValue = `${{cellSizePx}}px`;
       if (boardEl.style.getPropertyValue(varName) === nextValue) return;
@@ -167,6 +183,7 @@
       const normalized = normalizeActiveGameId(gameId);
       if (normalized === "checkers") return "Checkers";
       if (normalized === "chess") return "Chess";
+      if (normalized === "wallchess") return "Wall Chess";
       return "Reversi";
     }}
 
@@ -293,6 +310,20 @@
           localLabel,
           peerLabel: "peer",
           disabledText: "Connect to a peer to start a match.",
+        }};
+      }}
+      if (gameId === "wallchess") {{
+        return {{
+          enabled: false,
+          gameId,
+          sessionId: "",
+          peerId: "",
+          channelIndex: meshChannelEffectiveSendIndexForApp("games"),
+          sessionKey: "",
+          localNodeId,
+          localLabel,
+          peerLabel: "peer",
+          disabledText: "Wall Chess is local hotseat in this build.",
         }};
       }}
       return {{
@@ -425,6 +456,13 @@
         refreshCheckersGame();
         renderCheckersBoard();
         renderCheckersStatus();
+        queueActiveGamesBoardAutosize();
+        return;
+      }}
+      if (activeGameId === "wallchess") {{
+        refreshWallChessGame();
+        renderWallChessBoard();
+        renderWallChessStatus();
         queueActiveGamesBoardAutosize();
         return;
       }}
@@ -590,6 +628,13 @@
           startNewChessGame();
         }});
       }}
+      const wallChessNewGameBtn = document.getElementById("wallchess-new-game-btn");
+      if (wallChessNewGameBtn instanceof HTMLButtonElement && wallChessNewGameBtn.dataset.bound !== "1") {{
+        wallChessNewGameBtn.dataset.bound = "1";
+        wallChessNewGameBtn.addEventListener("click", () => {{
+          startNewWallChessGame();
+        }});
+      }}
       const boardEl = document.getElementById("reversi-board");
       if (boardEl instanceof HTMLElement && boardEl.dataset.bound !== "1") {{
         boardEl.dataset.bound = "1";
@@ -627,6 +672,28 @@
           const row = Math.trunc(Number(button.dataset.row) || 0);
           const col = Math.trunc(Number(button.dataset.col) || 0);
           handleChessBoardClick(row, col);
+        }});
+      }}
+      const wallChessBoardEl = document.getElementById("wallchess-board");
+      if (wallChessBoardEl instanceof HTMLElement && wallChessBoardEl.dataset.bound !== "1") {{
+        wallChessBoardEl.dataset.bound = "1";
+        wallChessBoardEl.addEventListener("click", (event) => {{
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const cellButton = target.closest("button.wall-chess-cell");
+          if (cellButton instanceof HTMLButtonElement) {{
+            const row = Math.trunc(Number(cellButton.dataset.row) || 0);
+            const col = Math.trunc(Number(cellButton.dataset.col) || 0);
+            handleWallChessCellClick(row, col);
+            return;
+          }}
+          const wallButton = target.closest("button.wall-chess-slot");
+          if (wallButton instanceof HTMLButtonElement) {{
+            const orientation = String(wallButton.dataset.orientation || "").trim().toLowerCase();
+            const row = Math.trunc(Number(wallButton.dataset.row) || 0);
+            const col = Math.trunc(Number(wallButton.dataset.col) || 0);
+            handleWallChessWallClick(orientation, row, col);
+          }}
         }});
       }}
       const inviteListEl = document.getElementById("reversi-invite-list");

@@ -49,6 +49,7 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.chat.state.games.classic.checkers.render_status.tmpl",
     "dashboard.js.chat.state.games.classic.checkers.tmpl",
     "dashboard.js.chat.state.games.classic.chess.tmpl",
+    "dashboard.js.chat.state.games.classic.wall_chess.tmpl",
     "dashboard.js.chat.state.games.network.board_links.core.tmpl",
     "dashboard.js.chat.state.games.network.board_links.sync_ui.tmpl",
     "dashboard.js.chat.state.games.network.board_links.actions.tmpl",
