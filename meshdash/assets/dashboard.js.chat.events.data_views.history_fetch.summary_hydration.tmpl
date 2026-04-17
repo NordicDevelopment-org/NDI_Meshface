@@ -91,6 +91,35 @@
       return data;
     }}
 
+    function mergeMetricTickerSeries(metricKey, incomingSeries, cutoffMs = Date.now() - metricTickerWindowMs) {{
+      const cleanKey = String(metricKey || "").trim();
+      const incoming = Array.isArray(incomingSeries) ? incomingSeries : [];
+      if (!cleanKey || incoming.length === 0) return [];
+      const existing = Array.isArray(metricTickerSeries.get(cleanKey))
+        ? metricTickerSeries.get(cleanKey)
+        : [];
+      const mergedByBucket = new Map();
+      for (const point of existing) {{
+        const ms = Number(point && point.ms);
+        const value = Number(point && point.value);
+        if (!Number.isFinite(ms) || !Number.isFinite(value)) continue;
+        mergedByBucket.set(ms, {{ ms, value }});
+      }}
+      for (const point of incoming) {{
+        const ms = Number(point && point.ms);
+        const value = Number(point && point.value);
+        if (!Number.isFinite(ms) || !Number.isFinite(value)) continue;
+        mergedByBucket.set(ms, {{ ms, value }});
+      }}
+      const merged = Array.from(mergedByBucket.values())
+        .sort((a, b) => Number(a.ms) - Number(b.ms));
+      trimMetricTickerPoints(merged, cutoffMs);
+      if (merged.length > 0) {{
+        metricTickerSeries.set(cleanKey, merged);
+      }}
+      return merged;
+    }}
+
     function hydrateTickerSeriesFromSummaryMetrics(historyPayload) {{
       const payload = (historyPayload && typeof historyPayload === "object") ? historyPayload : {{}};
       const points = sliceSummaryPointsAfterLiveCounterReset(payload.points);
@@ -136,8 +165,8 @@
         if (!Array.isArray(series) || series.length === 0) continue;
         series.sort((a, b) => Number(a.ms) - Number(b.ms));
         trimMetricTickerPoints(series, cutoffMs);
-        metricTickerSeries.set(metricKey, series);
-        loadedAny = true;
+        const merged = mergeMetricTickerSeries(metricKey, series, cutoffMs);
+        loadedAny = loadedAny || merged.length > 0;
       }}
       if (loadedAny && typeof scheduleMetricTickerSeriesPersist === "function") {{
         scheduleMetricTickerSeriesPersist();
