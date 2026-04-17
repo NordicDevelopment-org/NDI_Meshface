@@ -259,12 +259,62 @@
       border-radius: 10px;
       background: var(--floating-stage-bg);
     }}
+    .summary-ticker-density-toggle {{
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-rows: auto auto;
+      column-gap: 5px;
+      row-gap: 1px;
+      align-items: end;
+      order: 999;
+      justify-self: stretch;
+      width: 64px;
+      min-width: 64px;
+      max-width: 64px;
+      min-height: 0;
+      padding: 3px 5px;
+      font: inherit;
+      cursor: pointer;
+      transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+    }}
+    .summary-ticker-density-toggle:hover,
+    .summary-ticker-density-toggle:focus-visible {{
+      border-color: color-mix(in srgb, var(--accent) 56%, var(--line) 44%);
+      background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%);
+      box-shadow: none;
+      outline: none;
+    }}
+    .summary-ticker-density-toggle[aria-pressed="true"] {{
+      background: color-mix(in srgb, var(--panel) 88%, var(--accent) 12%);
+      border-color: color-mix(in srgb, var(--accent) 42%, var(--line) 58%);
+    }}
+    .summary-ticker-density-toggle-label {{
+      grid-column: 1;
+      grid-row: 1;
+      align-self: center;
+      color: color-mix(in srgb, var(--muted) 84%, var(--accent-2) 16%);
+    }}
+    .summary-ticker-density-toggle-icon {{
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      align-self: stretch;
+      min-width: 16px;
+      color: color-mix(in srgb, var(--ink) 76%, var(--accent) 24%);
+      font-size: 10px;
+      line-height: 1;
+    }}
+    .summary-ticker-density-toggle-text {{
+      grid-column: 1;
+      grid-row: 2;
+      color: color-mix(in srgb, var(--ink) 90%, white 10%);
+      white-space: nowrap;
+      font-size: 12px;
+    }}
     .topbar .sub .summary-ticker-row {{
       width: calc(100% + var(--topbar-corner-reserve, 0px));
       margin-right: calc(var(--topbar-corner-reserve, 0px) * -1);
-    }}
-    .topbar .sub .summary-ticker-row {{
-      padding-right: 0;
     }}
     .topbar-update-ticker.is-fading {{
       opacity: 0;
@@ -1103,13 +1153,8 @@
       stroke: color-mix(in srgb, var(--line) 82%, var(--accent-2) 18%);
     }}
     .topbar .summary-ticker-item {{
-      cursor: pointer;
+      cursor: default;
       transition: border-color 120ms ease, background 120ms ease;
-    }}
-    .topbar .summary-ticker-item:hover {{
-      border-color: color-mix(in srgb, var(--accent) 48%, var(--line) 52%);
-      background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%);
-      box-shadow: none;
     }}
     .topbar.ticker-expanded .sub .summary-ticker-row {{
       grid-auto-flow: row;

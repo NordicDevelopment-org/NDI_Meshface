@@ -1,12 +1,23 @@
+    function updateSummaryTickerExpandControl() {{
+      const btn = document.getElementById("summary-ticker-density-toggle");
+      const textEl = document.getElementById("summary-ticker-density-toggle-text");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const expanded = tickerDensity === "expanded";
+      const actionLabel = expanded ? "Collapse summary tickers" : "Expand summary tickers";
+      btn.setAttribute("aria-pressed", expanded ? "true" : "false");
+      btn.setAttribute("aria-label", actionLabel);
+      btn.title = actionLabel;
+      if (textEl instanceof HTMLElement) {{
+        textEl.textContent = expanded ? "Hide" : "Show";
+      }}
+    }}
+
     function bindSummaryTickerExpandControl() {{
-      const row = document.querySelector(".summary-ticker-row");
-      if (!(row instanceof HTMLElement) || row.dataset.expandBound === "1") return;
-      row.dataset.expandBound = "1";
-      row.addEventListener("click", (ev) => {{
-        const target = ev.target;
-        if (!(target instanceof Element)) return;
-        const item = target.closest(".summary-ticker-item");
-        if (!(item instanceof HTMLElement) || !row.contains(item)) return;
+      const btn = document.getElementById("summary-ticker-density-toggle");
+      if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      updateSummaryTickerExpandControl();
+      btn.addEventListener("click", () => {{
         const next = tickerDensity === "expanded" ? "compact" : "expanded";
         applyTickerDensity(next, true);
       }});
