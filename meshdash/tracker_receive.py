@@ -49,7 +49,7 @@ def process_parsed_tracker_packet(
     hops = parsed["hops"]
     portnum = parsed["portnum"]
 
-    direct_key = apply_tracker_observation_fn(
+    direct_keys = apply_tracker_observation_fn(
         parsed=parsed,
         include_live_count=include_live_count,
         session_edges=session_edges,
@@ -77,7 +77,7 @@ def process_parsed_tracker_packet(
         recent_chat=recent_chat,
         history_store=history_store,
         include_live_count=include_live_count,
-        direct_key=direct_key,
+        direct_keys=direct_keys,
         rx_time=rx_time,
         portnum=portnum,
         hops=hops,

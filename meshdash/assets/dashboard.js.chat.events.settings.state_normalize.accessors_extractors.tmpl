@@ -91,3 +91,9 @@
       return cfg && typeof cfg === "object" ? cfg : null;
     }}
 
+    function neighborInfoConfigFromState(state) {{
+      const localState = settingsLocalStateFrom(state);
+      const moduleConfig = localState && typeof localState === "object" ? localState.module_config : null;
+      const cfg = moduleConfig && typeof moduleConfig === "object" ? moduleConfig.neighbor_info : null;
+      return cfg && typeof cfg === "object" ? cfg : null;
+    }}

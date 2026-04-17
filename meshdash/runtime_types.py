@@ -112,6 +112,7 @@ TrackerPacket = dict[str, object]
 TrackerParsedPacket = dict[str, object]
 TrackerEdgeMap = dict[object, dict[str, object]]
 DirectEdgeKey = Optional[tuple[str, str]]
+DirectEdgeKeys = tuple[tuple[str, str], ...]
 
 GetNodeIdFromNumFn = Callable[[object, object], Optional[str]]
 CalculateHopsFn = Callable[[object, object], Optional[int]]
@@ -346,7 +347,7 @@ class ApplyTrackerStorageUpdatesFn(Protocol):
         recent_chat: RecentChatBuffer,
         history_store: TrackerHistoryWriter | None,
         include_live_count: bool,
-        direct_key: DirectEdgeKey,
+        direct_keys: DirectEdgeKeys,
         rx_time: Optional[int],
         portnum: Optional[object],
         hops: Optional[int],
@@ -424,7 +425,7 @@ class ApplyTrackerObservationFn(Protocol):
         extract_update_fn: ExtractDeliveryUpdateFn,
         set_delivery_state_fn: SetDeliveryStateFn,
         record_direct_edge_observation_fn: RecordDirectEdgeObservationFn,
-    ) -> DirectEdgeKey:
+    ) -> DirectEdgeKeys:
         ...
 
 

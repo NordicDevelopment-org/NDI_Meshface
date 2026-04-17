@@ -118,6 +118,9 @@
       const extNotifyOutputMsInput = document.getElementById("settings-ext-notify-output-ms");
       const extNotifyOutputPinInput = document.getElementById("settings-ext-notify-output-pin");
       const extNotifyNagTimeoutInput = document.getElementById("settings-ext-notify-nag-timeout");
+      const neighborInfoEnabledInput = document.getElementById("settings-neighbor-info-enabled");
+      const neighborInfoTransmitInput = document.getElementById("settings-neighbor-info-transmit-over-lora");
+      const neighborInfoUpdateIntervalInput = document.getElementById("settings-neighbor-info-update-interval");
 
       setFormValue(region, lora && lora.region != null ? lora.region : "UNSET");
       setFormValue(preset, lora && lora.modem_preset != null ? lora.modem_preset : "LONG_FAST");
@@ -306,6 +309,17 @@
       setFormValue(extNotifyOutputMsInput, normalizeConfigSeconds(extNotifyCfg && extNotifyCfg.output_ms, 0, 0));
       setFormValue(extNotifyOutputPinInput, normalizeConfigSeconds(extNotifyCfg && extNotifyCfg.output, 0, 0));
       setFormValue(extNotifyNagTimeoutInput, normalizeConfigSeconds(extNotifyCfg && extNotifyCfg.nag_timeout, 0, 0));
+
+      const neighborInfoCfg = neighborInfoConfigFromState(state);
+      setFormChecked(neighborInfoEnabledInput, normalizeConfigBool(neighborInfoCfg && neighborInfoCfg.enabled, false));
+      setFormChecked(
+        neighborInfoTransmitInput,
+        normalizeConfigBool(neighborInfoCfg && neighborInfoCfg.transmit_over_lora, false)
+      );
+      setFormValue(
+        neighborInfoUpdateIntervalInput,
+        normalizeConfigSeconds(neighborInfoCfg && neighborInfoCfg.update_interval, 0, 0)
+      );
 
       const fixedFromState = fixedPositionFromState(state);
       if (fixedFromState) {{

@@ -114,6 +114,44 @@
       }}
     }}
 
+    async function applyNeighborInfoSettings() {{
+      if (settingsApplyInFlight) return;
+      const updateInterval = readNumberValue("settings-neighbor-info-update-interval");
+      if (!Number.isFinite(updateInterval) || Number(updateInterval) < 0) {{
+        setText("settings-apply-status", "Neighbor Info interval must be 0 or more.");
+        return;
+      }}
+
+      const payload = {{
+        module: {{
+          neighbor_info: {{
+            enabled: readCheckboxValue("settings-neighbor-info-enabled"),
+            transmit_over_lora: readCheckboxValue("settings-neighbor-info-transmit-over-lora"),
+            update_interval: Math.trunc(Number(updateInterval)),
+          }},
+        }},
+      }};
+
+      for (const [key, value] of Object.entries(payload.module.neighbor_info)) {{
+        if (value == null) delete payload.module.neighbor_info[key];
+      }}
+      if (!Object.keys(payload.module.neighbor_info).length) {{
+        setText("settings-apply-status", "No Neighbor Info fields to apply.");
+        return;
+      }}
+
+      const ok = await postRadioSettingsPayload(
+        payload,
+        "Applying Neighbor Info settings…",
+        "Neighbor Info settings saved"
+      );
+      if (ok) {{
+        setTimeout(() => {{
+          void fetchSettingsFromRadio();
+        }}, 600);
+      }}
+    }}
+
     async function applyPositionConfigSettings() {{
       if (settingsApplyInFlight) return;
       const smartEnabled = !!readCheckboxValue("settings-position-smart-enabled");

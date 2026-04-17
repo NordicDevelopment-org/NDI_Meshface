@@ -1,6 +1,6 @@
 from .runtime_types import (
     ApplyRoutingDeliveryUpdateFn,
-    DirectEdgeKey,
+    DirectEdgeKeys,
     ExtractDeliveryUpdateFn,
     PortCounter,
     RecordDirectEdgeObservationFn,
@@ -21,7 +21,7 @@ def apply_tracker_observation(
     extract_update_fn: ExtractDeliveryUpdateFn,
     set_delivery_state_fn: SetDeliveryStateFn,
     record_direct_edge_observation_fn: RecordDirectEdgeObservationFn,
-) -> DirectEdgeKey:
+) -> DirectEdgeKeys:
     decoded = parsed["decoded"]
     from_id = parsed["from_id"]
     to_id = parsed["to_id"]
@@ -40,7 +40,8 @@ def apply_tracker_observation(
         key = str(portnum)
         port_counts[key] = int(port_counts.get(key, 0)) + 1
 
-    return record_direct_edge_observation_fn(
+    direct_keys: list[tuple[str, str]] = []
+    direct_key = record_direct_edge_observation_fn(
         session_edges=session_edges,
         historical_edges=historical_edges,
         from_id=from_id,
@@ -52,3 +53,23 @@ def apply_tracker_observation(
         rx_rssi=rx_rssi,
         include_live_count=include_live_count,
     )
+    if direct_key is not None:
+        direct_keys.append(direct_key)
+    for edge in parsed.get("neighbor_info_edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        neighbor_key = record_direct_edge_observation_fn(
+            session_edges=session_edges,
+            historical_edges=historical_edges,
+            from_id=edge.get("from_id"),
+            to_id=edge.get("to_id"),
+            rx_time=edge.get("rx_time"),
+            portnum=portnum,
+            hops=0,
+            rx_snr=edge.get("rx_snr"),
+            rx_rssi=None,
+            include_live_count=include_live_count,
+        )
+        if neighbor_key is not None:
+            direct_keys.append(neighbor_key)
+    return tuple(dict.fromkeys(direct_keys))
