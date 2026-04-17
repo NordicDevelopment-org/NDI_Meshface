@@ -207,12 +207,21 @@
       }}
     }}
 
+    function persistDashboardSessionStateNow() {{
+      if (typeof persistConsoleSessionState === "function") {{
+        persistConsoleSessionState({{ immediate: true }});
+      }}
+      if (typeof persistMetricTickerSeriesNow === "function") {{
+        persistMetricTickerSeriesNow();
+      }}
+    }}
+
     document.addEventListener("visibilitychange", () => {{
       if (document.hidden) {{
         tabHasFocus = false;
         chatChangeCatchupArmed = true;
         clearAllChatChangeAutoDismissTimers();
-        persistConsoleSessionState({{ immediate: true }});
+        persistDashboardSessionStateNow();
         return;
       }}
       tabHasFocus = (typeof document.hasFocus === "function") ? !!document.hasFocus() : true;
@@ -222,11 +231,17 @@
       tabHasFocus = false;
       chatChangeCatchupArmed = true;
       clearAllChatChangeAutoDismissTimers();
-      persistConsoleSessionState({{ immediate: true }});
+      persistDashboardSessionStateNow();
     }});
     window.addEventListener("focus", () => {{
       tabHasFocus = true;
       void pollOnce();
+    }});
+    window.addEventListener("pagehide", () => {{
+      persistDashboardSessionStateNow();
+    }});
+    window.addEventListener("beforeunload", () => {{
+      persistDashboardSessionStateNow();
     }});
 
     void pollOnce();

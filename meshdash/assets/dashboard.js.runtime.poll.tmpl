@@ -42,9 +42,30 @@
       }}
     }}
 
+    function statePollProfile() {{
+      const drawerLinksActive = (
+        typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+        && typeof normalizeChatNodeDetailsDrawerTab === "function"
+        && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "links"
+      );
+      if (isChatWorkspaceLayoutView(activeLayoutView) && !drawerLinksActive) {{
+        return "chat";
+      }}
+      if (activeLayoutView === "network") {{
+        return "network";
+      }}
+      return "default";
+    }}
+
     async function poll() {{
       try {{
-        const stateUrlBase = "/api/state?lite=1";
+        const pollProfile = statePollProfile();
+        const stateUrlBase = pollProfile === "chat"
+          ? "/api/state?lite=1&profile=chat"
+          : (pollProfile === "network"
+            ? "/api/state?lite=1&profile=network"
+            : "/api/state?lite=1");
         const stateUrl = forceStateReloadOnce
           ? `${{stateUrlBase}}&_=${{Date.now()}}`
           : stateUrlBase;
@@ -73,8 +94,6 @@
           lastPollErrorUnix = 0;
           renderSelfRadioPill(latestState);
           const hidden304 = (typeof document !== "undefined") && !!document.hidden;
-          const mapVisible304 = activeLayoutView === "saved" || activeLayoutView === "network";
-          const trafficVisible304 = mapVisible304 || activeLayoutView === "history";
           const drawerHistoryVisible304 = (
             typeof isChatNodeDetailsDrawerExpanded === "function"
             && isChatNodeDetailsDrawerExpanded()
@@ -102,6 +121,9 @@
             renderChatNodeNavigatorList(latestState);
           }}
           renderSummary(latestState);
+          const networkMapActive304 = activeLayoutView === "network" && activeNetworkSubview === "map";
+          const mapVisible304 = activeLayoutView === "saved" || networkMapActive304;
+          const trafficVisible304 = mapVisible304 || activeLayoutView === "history";
           if (mapVisible304) {{
             renderMap(nodes304, traffic304.edges || [], cachedHistory304);
           }}
@@ -153,15 +175,20 @@
               : null;
             renderFavorites(latestState, cachedHistory304, loadingId304);
           }}
+          let chatRenderedThisPoll304 = false;
           if (isChatWorkspaceLayoutView(activeLayoutView)) {{
-            renderChat(latestState);
+            renderChat(latestState, {{ allowPollSkip: true }});
+            chatRenderedThisPoll304 = true;
             if (activeLayoutView === "chatlabs") {{
               renderChatLabsView(latestState);
             }}
           }} else if (shouldHydrateNodeNavigatorRoster(latestState)) {{
             renderChat(latestState);
+            chatRenderedThisPoll304 = true;
           }}
           if (
+            !chatRenderedThisPoll304
+            &&
             typeof syncChatNodeDetailsDrawer === "function"
             && typeof isChatNodeDetailsDrawerExpanded === "function"
             && isChatNodeDetailsDrawerExpanded()
@@ -237,7 +264,8 @@
           renderChatNodeNavigatorList(state);
         }}
 
-        const mapVisible = activeLayoutView === "saved" || activeLayoutView === "network";
+        const networkMapActive = activeLayoutView === "network" && activeNetworkSubview === "map";
+        const mapVisible = activeLayoutView === "saved" || networkMapActive;
         const trafficVisible = mapVisible || activeLayoutView === "history";
         const drawerHistoryVisible = (
           typeof isChatNodeDetailsDrawerExpanded === "function"
@@ -356,7 +384,7 @@
 
         if (isChatWorkspaceLayoutView(activeLayoutView)) {{
           if (!chatRenderedThisPoll) {{
-            runPollStep("renderChat.workspace", () => renderChat(state));
+            runPollStep("renderChat.workspace", () => renderChat(state, {{ allowPollSkip: true }}));
             chatRenderedThisPoll = true;
           }}
           if (activeLayoutView === "chatlabs") {{
@@ -383,6 +411,8 @@
           runPollStep("bindChatChangeSummaryControls.default", () => bindChatChangeSummaryControls());
         }}
         if (
+          !chatRenderedThisPoll
+          &&
           typeof syncChatNodeDetailsDrawer === "function"
           && typeof isChatNodeDetailsDrawerExpanded === "function"
           && isChatNodeDetailsDrawerExpanded()

@@ -87,7 +87,9 @@
 
       const lastHeardUnixRaw = Number(node && (node.last_heard_unix ?? node.last_heard_epoch ?? 0));
       const lastHeardUnix = Number.isFinite(lastHeardUnixRaw) ? Math.trunc(lastHeardUnixRaw) : 0;
-      const lastHeardText = String(node && node.last_heard || "").trim() || "n/a";
+      const lastHeardText = (typeof nodeLastHeardLabel === "function")
+        ? nodeLastHeardLabel(node, "n/a", nowUnix)
+        : (String(node && node.last_heard || "").trim() || "n/a");
       const hardwareText = String((node && (node.hardware_model || node.hardware)) || "").trim() || "n/a";
       const snrRaw = Number(node && node.snr);
       const snrNum = Number.isFinite(snrRaw) ? snrRaw : null;

@@ -18,6 +18,16 @@ def _truthy_query_flag(query: str, key: str) -> bool:
     return value not in ("", "0", "false", "no", "off")
 
 
+def _query_value(query: str, key: str, default: str = "") -> str:
+    try:
+        params = parse_qs(query or "", keep_blank_values=True)
+    except Exception:
+        return default
+    raw = params.get(key) or []
+    value = str(raw[0] if raw else "").strip()
+    return value or default
+
+
 def _lite_state_payload(payload: object) -> object:
     """Drop large/raw-only fields to speed up UI polling."""
     if not isinstance(payload, dict):
@@ -114,12 +124,30 @@ def handle_state_get(
     private_mode: bool = False,
 ) -> None:
     lite = _truthy_query_flag(query, "lite")
+    profile = _query_value(query, "profile", "").lower()
 
     selected_fn = state_fn
     if lite:
-        state_lite_fn = getattr(state_fn, "lite", None)
-        if callable(state_lite_fn):
-            selected_fn = state_lite_fn
+        if profile == "chat":
+            state_lite_chat_fn = getattr(state_fn, "lite_chat", None)
+            if callable(state_lite_chat_fn):
+                selected_fn = state_lite_chat_fn
+            else:
+                state_lite_fn = getattr(state_fn, "lite", None)
+                if callable(state_lite_fn):
+                    selected_fn = state_lite_fn
+        elif profile == "network":
+            state_lite_network_fn = getattr(state_fn, "lite_network", None)
+            if callable(state_lite_network_fn):
+                selected_fn = state_lite_network_fn
+            else:
+                state_lite_fn = getattr(state_fn, "lite", None)
+                if callable(state_lite_fn):
+                    selected_fn = state_lite_fn
+        else:
+            state_lite_fn = getattr(state_fn, "lite", None)
+            if callable(state_lite_fn):
+                selected_fn = state_lite_fn
 
     etag_fn = getattr(selected_fn, "etag", None)
     etag = None

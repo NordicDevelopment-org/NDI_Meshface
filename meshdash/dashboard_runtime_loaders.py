@@ -123,6 +123,32 @@ def _with_summary_persistence(
         except Exception:
             pass
 
+    lite_chat_fn = getattr(base_state_fn, "lite_chat", None)
+    if callable(lite_chat_fn):
+        def _wrapped_state_lite_chat_fn() -> object:
+            payload = lite_chat_fn()
+            _persist_summary(payload)
+            return payload
+
+        _copy_state_fn_attrs(_wrapped_state_lite_chat_fn, lite_chat_fn)
+        try:
+            setattr(_wrapped_state_fn, "lite_chat", _wrapped_state_lite_chat_fn)
+        except Exception:
+            pass
+
+    lite_network_fn = getattr(base_state_fn, "lite_network", None)
+    if callable(lite_network_fn):
+        def _wrapped_state_lite_network_fn() -> object:
+            payload = lite_network_fn()
+            _persist_summary(payload)
+            return payload
+
+        _copy_state_fn_attrs(_wrapped_state_lite_network_fn, lite_network_fn)
+        try:
+            setattr(_wrapped_state_fn, "lite_network", _wrapped_state_lite_network_fn)
+        except Exception:
+            pass
+
     return _wrapped_state_fn
 
 

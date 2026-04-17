@@ -71,6 +71,24 @@
       return normalized;
     }}
 
+    function normalizeNodePacketSeries(raw) {{
+      const normalized = {{}};
+      for (const key of networkOverviewPacketSeriesOrder) {{
+        normalized[key] = nodePacketSeriesDefaults[key] === true;
+      }}
+      if (raw && typeof raw === "object") {{
+        for (const key of networkOverviewPacketSeriesOrder) {{
+          if (Object.prototype.hasOwnProperty.call(raw, key)) {{
+            normalized[key] = !!raw[key];
+          }}
+        }}
+      }}
+      if (!networkOverviewPacketSeriesOrder.some((key) => normalized[key])) {{
+        normalized.all = true;
+      }}
+      return normalized;
+    }}
+
     function networkOverviewPacketSeriesPaletteColor(seriesKey) {{
       const paletteName = String(networkOverviewPacketSeriesPaletteNames[seriesKey] || "").trim().toLowerCase();
       if (!paletteName) return "";
@@ -323,7 +341,7 @@
     }}
 
     function applyNodePacketSeries(nextSeries) {{
-      nodePacketSeriesEnabled = normalizeNetworkOverviewPacketSeries(nextSeries);
+      nodePacketSeriesEnabled = normalizeNodePacketSeries(nextSeries);
       updateNodePacketSeriesControls();
       const chartState = historyTrendCharts && historyTrendCharts.nodePackets;
       if (chartState && Array.isArray(chartState.sourcePoints) && chartState.sourcePoints.length) {{

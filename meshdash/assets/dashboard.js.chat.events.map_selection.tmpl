@@ -1,39 +1,336 @@
-    function highlightNodeSelection() {{
-      for (const row of document.querySelectorAll("#nodes-table tbody tr")) {{
-        const nodeId = normalizeNodeId(row.dataset.nodeId || "");
-        row.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+    const nodeSelectionUiState = {{
+      frame: null,
+      pendingShouldFocus: false,
+      pendingPerfToken: 0,
+    }};
+
+    const nodeSelectionPerfState = {{
+      nextToken: 0,
+      activeToken: 0,
+      runs: [],
+    }};
+
+    function nodeSelectionPerfNow() {{
+      return (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+        ? performance.now()
+        : Date.now();
+    }}
+
+    function nodeSelectionPerfStore() {{
+      if (typeof window === "undefined") return null;
+      const existing = window.__meshNodeSelectionPerf;
+      if (existing && typeof existing === "object") return existing;
+      const created = {{
+        runs: [],
+        lastRun: null,
+      }};
+      window.__meshNodeSelectionPerf = created;
+      return created;
+    }}
+
+    nodeSelectionPerfStore();
+
+    function findNodeSelectionPerfRun(token) {{
+      const targetToken = Math.trunc(Number(token) || 0);
+      if (!(targetToken > 0)) return null;
+      const runs = Array.isArray(nodeSelectionPerfState.runs) ? nodeSelectionPerfState.runs : [];
+      for (let index = runs.length - 1; index >= 0; index -= 1) {{
+        const entry = runs[index];
+        if (entry && Math.trunc(Number(entry.token) || 0) === targetToken) {{
+          return entry;
+        }}
       }}
-      for (const item of document.querySelectorAll("#chat-feed .chat-feed-item")) {{
-        const nodeId = normalizeNodeId(item.dataset.nodeId || "");
-        item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+      return null;
+    }}
+
+    function beginNodeSelectionPerf(nodeId, meta = {{}}) {{
+      const token = (Math.trunc(Number(nodeSelectionPerfState.nextToken) || 0) + 1);
+      nodeSelectionPerfState.nextToken = token;
+      nodeSelectionPerfState.activeToken = token;
+      const run = {{
+        token,
+        nodeId: normalizeNodeId(nodeId || ""),
+        startedAtMs: nodeSelectionPerfNow(),
+        phases: [],
+        meta: (meta && typeof meta === "object") ? {{ ...meta }} : {{}},
+        status: "active",
+      }};
+      nodeSelectionPerfState.runs.push(run);
+      while (nodeSelectionPerfState.runs.length > 40) {{
+        nodeSelectionPerfState.runs.shift();
       }}
-      for (const member of document.querySelectorAll("#chat-room-unread-list .chat-member-item, #chat-room-pinned-list .chat-member-item, #chat-room-list .chat-member-item")) {{
-        const nodeId = normalizeNodeId(member.dataset.nodeId || "");
-        const isSelected = !!selectedNodeId && nodeId === selectedNodeId;
-        member.classList.toggle("selected-node", isSelected);
+      const store = nodeSelectionPerfStore();
+      if (store) {{
+        store.runs = nodeSelectionPerfState.runs.slice();
+        store.lastRun = run;
       }}
-      for (const item of document.querySelectorAll("#favorites-list .favorite-node-item")) {{
-        const nodeId = normalizeNodeId(item.dataset.nodeId || "");
-        item.classList.toggle("selected-node", !!selectedNodeId && nodeId === selectedNodeId);
+      return token;
+    }}
+
+    function currentNodeSelectionPerfToken() {{
+      return Math.trunc(Number(nodeSelectionPerfState.activeToken) || 0);
+    }}
+
+    function markNodeSelectionPerf(token, phase, startedAtMs, extra = null) {{
+      const run = findNodeSelectionPerfRun(token);
+      if (!run) return 0;
+      const startMs = Number(startedAtMs);
+      const endMs = nodeSelectionPerfNow();
+      const durationMs = Number.isFinite(startMs) ? Math.max(0, endMs - startMs) : 0;
+      const phaseEntry = {{
+        phase: String(phase || "unknown"),
+        durationMs: Math.round(durationMs * 100) / 100,
+      }};
+      if (extra && typeof extra === "object") {{
+        phaseEntry.extra = {{ ...extra }};
       }}
-      for (const row of document.querySelectorAll("#encription-packets-table tbody tr, #encription-traffic-table tbody tr")) {{
-        const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
-        const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
-        const isSelected = !!selectedNodeId && (
-          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
-          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
-        );
-        row.classList.toggle("selected-node", isSelected);
+      run.phases.push(phaseEntry);
+      const store = nodeSelectionPerfStore();
+      if (store) {{
+        store.runs = nodeSelectionPerfState.runs.slice();
+        store.lastRun = run;
       }}
-      for (const row of document.querySelectorAll("#history-chat-table tbody tr")) {{
-        const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
-        const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
-        const isSelected = !!selectedNodeId && (
-          (isSelectableNodeId(fromNodeId) && fromNodeId === selectedNodeId)
-          || (isSelectableNodeId(toNodeId) && toNodeId === selectedNodeId)
-        );
-        row.classList.toggle("selected-node", isSelected);
+      return durationMs;
+    }}
+
+    function finishNodeSelectionPerf(token, status = "complete", extra = null) {{
+      const run = findNodeSelectionPerfRun(token);
+      if (!run) return null;
+      run.status = String(status || "complete");
+      run.totalDurationMs = Math.round(Math.max(0, nodeSelectionPerfNow() - Number(run.startedAtMs || 0)) * 100) / 100;
+      if (extra && typeof extra === "object") {{
+        run.result = {{ ...extra }};
       }}
+      if (currentNodeSelectionPerfToken() === Math.trunc(Number(token) || 0)) {{
+        nodeSelectionPerfState.activeToken = 0;
+      }}
+      const store = nodeSelectionPerfStore();
+      if (store) {{
+        store.runs = nodeSelectionPerfState.runs.slice();
+        store.lastRun = run;
+      }}
+      return run;
+    }}
+
+    function cssEscapeAttrValue(value) {{
+      const text = String(value == null ? "" : value);
+      if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {{
+        return CSS.escape(text);
+      }}
+      return text.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    }}
+
+    function applySelectedNodeClassToSelector(selector, isSelected) {{
+      if (!selector) return;
+      for (const element of document.querySelectorAll(selector)) {{
+        if (!(element instanceof HTMLElement)) continue;
+        element.classList.toggle("selected-node", !!isSelected);
+      }}
+    }}
+
+    function refreshNodeSelectionCrossReferenceRows(nodeId, isSelected) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(cleanNodeId)) return;
+      const rowMatchers = [
+        "#encription-packets-table tbody tr",
+        "#encription-traffic-table tbody tr",
+        "#history-chat-table tbody tr",
+      ];
+      for (const selector of rowMatchers) {{
+        for (const row of document.querySelectorAll(selector)) {{
+          if (!(row instanceof HTMLTableRowElement)) continue;
+          const fromNodeId = normalizeNodeId(row.dataset.fromNodeId || "");
+          const toNodeId = normalizeNodeId(row.dataset.toNodeId || "");
+          if (fromNodeId !== cleanNodeId && toNodeId !== cleanNodeId) continue;
+          row.classList.toggle("selected-node", !!isSelected);
+        }}
+      }}
+    }}
+
+    function highlightNodeSelection(previousNodeId = "", nextNodeId = selectedNodeId) {{
+      const previousId = normalizeNodeId(previousNodeId || "");
+      const nextId = normalizeNodeId(nextNodeId || "");
+      const directSelectors = [
+        '#nodes-table tbody tr[data-node-id="%ID%"]',
+        '#chat-feed .chat-feed-item[data-node-id="%ID%"]',
+        '#chat-room-unread-list .chat-member-item[data-node-id="%ID%"]',
+        '#chat-room-pinned-list .chat-member-item[data-node-id="%ID%"]',
+        '#chat-room-list .chat-member-item[data-node-id="%ID%"]',
+        '#favorites-list .favorite-node-item[data-node-id="%ID%"]',
+      ];
+      const applyNodeIdSelection = (nodeId, isSelected) => {{
+        const cleanNodeId = normalizeNodeId(nodeId || "");
+        if (!isSelectableNodeId(cleanNodeId)) return;
+        const escapedId = cssEscapeAttrValue(cleanNodeId);
+        for (const pattern of directSelectors) {{
+          applySelectedNodeClassToSelector(pattern.replace("%ID%", escapedId), isSelected);
+        }}
+        refreshNodeSelectionCrossReferenceRows(cleanNodeId, isSelected);
+      }};
+
+      if (previousId && previousId !== nextId) {{
+        applyNodeIdSelection(previousId, false);
+      }}
+      if (nextId) {{
+        applyNodeIdSelection(nextId, true);
+      }}
+    }}
+
+    function flushNodeSelectionUiRefresh() {{
+      const perfToken = Math.trunc(Number(nodeSelectionUiState.pendingPerfToken) || 0);
+      const flushStartedAtMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
+      if (nodeSelectionUiState.frame !== null) {{
+        window.cancelAnimationFrame(nodeSelectionUiState.frame);
+      }}
+      nodeSelectionUiState.frame = null;
+      nodeSelectionUiState.pendingPerfToken = 0;
+
+      const activeSelectedId = normalizeNodeId(selectedNodeId || "");
+      if (!isSelectableNodeId(activeSelectedId)) {{
+        if (perfToken > 0) {{
+          markNodeSelectionPerf(perfToken, "selection.ui_flush", flushStartedAtMs, {{
+            skipped: true,
+            reason: "no-selection",
+          }});
+          finishNodeSelectionPerf(perfToken, "no-selection");
+        }}
+        return;
+      }}
+
+      const shouldFocus = !!nodeSelectionUiState.pendingShouldFocus;
+      nodeSelectionUiState.pendingShouldFocus = false;
+
+      let cachedHistory = null;
+      if (latestState && (activeLayoutView === "saved" || activeLayoutView === "network")) {{
+        cachedHistory = cachedNodeHistory(activeSelectedId);
+      }}
+      const activeNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
+        ? normalizeNetworkSubview(activeNetworkSubview)
+        : String(activeNetworkSubview || "map").trim().toLowerCase();
+      const networkMapVisible = activeLayoutView === "network" && activeNetworkSubviewName === "map";
+      const networkGraphVisible = activeLayoutView === "network" && activeNetworkSubviewName === "graph";
+
+      if (activeLayoutView === "saved") {{
+        const phaseStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
+        if (cachedHistory) {{
+          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
+          renderSavedNodeDetails(latestState || {{}}, cachedHistory);
+        }} else {{
+          renderNodeHistoryLoading(activeSelectedId);
+        }}
+        if (perfToken > 0) {{
+          markNodeSelectionPerf(perfToken, "selection.saved_view", phaseStartMs, {{
+            cachedHistory: !!cachedHistory,
+          }});
+        }}
+      }} else if (activeLayoutView === "network") {{
+        const phaseStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
+        if (networkMapVisible) {{
+          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
+          setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
+        }}
+        if (perfToken > 0) {{
+          markNodeSelectionPerf(perfToken, "selection.network_view", phaseStartMs, {{
+            cachedHistory: !!cachedHistory,
+            subview: activeNetworkSubviewName,
+          }});
+        }}
+      }} else if (activeLayoutView === "history") {{
+        setMapDataMode("activity");
+      }} else {{
+        setMapDataMode("live");
+      }}
+
+      if (latestState && (activeLayoutView !== "network" || networkMapVisible)) {{
+        const phaseStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
+        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedHistory);
+        if (perfToken > 0) {{
+          markNodeSelectionPerf(perfToken, "selection.map_render", phaseStartMs);
+        }}
+      }}
+      if (typeof renderNetworkGraphView === "function") {{
+        const networkGraphActive = networkGraphVisible;
+        if (
+          networkGraphActive
+          && !networkGraphRootSyncInProgress
+          && !(networkGraphViewState && networkGraphViewState.pendingFocusTransition)
+        ) {{
+          if (networkGraphViewState && typeof networkGraphViewState === "object") {{
+            networkGraphViewState.skipSceneAnimationOnce = true;
+          }}
+          renderNetworkGraphView(latestState);
+        }}
+      }}
+
+      const focusSelection = (
+        shouldFocus
+        && activeLayoutView !== "saved"
+        && (
+          activeLayoutView !== "network"
+          || networkMapVisible
+        )
+      );
+      const focusStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
+      if (activeLayoutView !== "network" || networkMapVisible) {{
+        updateMapSelection(focusSelection);
+      }}
+      scrollSelectionIntoView();
+      if (perfToken > 0) {{
+        markNodeSelectionPerf(perfToken, "selection.focus_scroll", focusStartMs, {{
+          focusSelection: !!focusSelection,
+        }});
+      }}
+      void refreshSelectedNodeHistory(false);
+      const channelStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
+      applyChatChannel(activeChatChannel, false);
+      if (perfToken > 0) {{
+        markNodeSelectionPerf(perfToken, "selection.chat_channel", channelStartMs);
+      }}
+      if (typeof syncChatNodeDetailsDrawer === "function") {{
+        syncChatNodeDetailsDrawer(latestState, {{
+          fetchHistory: false,
+        }});
+      }}
+      if (networkGraphVisible && typeof renderNetworkGraphView === "function") {{
+        window.requestAnimationFrame(() => {{
+          const stableNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
+            ? normalizeNetworkSubview(activeNetworkSubview)
+            : String(activeNetworkSubview || "map").trim().toLowerCase();
+          if (activeLayoutView !== "network" || stableNetworkSubviewName !== "graph") return;
+          renderNetworkGraphView(latestState);
+          window.setTimeout(() => {{
+            const finalNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
+              ? normalizeNetworkSubview(activeNetworkSubview)
+              : String(activeNetworkSubview || "map").trim().toLowerCase();
+            if (activeLayoutView !== "network" || finalNetworkSubviewName !== "graph") return;
+            renderNetworkGraphView(latestState);
+          }}, 80);
+        }});
+      }}
+      if (activeLayoutView === "games") {{
+        renderGamesView(latestState);
+      }} else if (activeLayoutView === "files") {{
+        renderFilesView(latestState);
+      }}
+      if (perfToken > 0) {{
+        markNodeSelectionPerf(perfToken, "selection.ui_flush", flushStartedAtMs, {{
+          activeLayoutView,
+          activeNetworkSubview,
+        }});
+      }}
+    }}
+
+    function scheduleNodeSelectionUiRefresh(options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      nodeSelectionUiState.pendingShouldFocus = nodeSelectionUiState.pendingShouldFocus || !!opts.shouldFocus;
+      const perfToken = Math.trunc(Number(opts.perfToken) || 0);
+      if (perfToken > 0) {{
+        nodeSelectionUiState.pendingPerfToken = perfToken;
+      }}
+      if (nodeSelectionUiState.frame !== null) return;
+      nodeSelectionUiState.frame = window.requestAnimationFrame(() => {{
+        flushNodeSelectionUiRefresh();
+      }});
     }}
 
     function isVisibleForSelectionScroll(el) {{
@@ -601,6 +898,12 @@
     function selectNode(nodeId, shouldFocus = true, toggleIfSelected = true) {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return;
+      const perfToken = beginNodeSelectionPerf(normalized, {{
+        activeLayoutView,
+        activeNetworkSubview,
+        shouldFocus: !!shouldFocus,
+      }});
+      const dispatchStartedAtMs = nodeSelectionPerfNow();
       if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {{
         clearChatFeedRepeatToggleState();
       }}
@@ -673,6 +976,10 @@
       persistSelection();
       renderSelectionStatus();
       renderSavedNodeSearchDropdown(latestState);
+      highlightNodeSelection(previousSelectedId, normalized);
+      markNodeSelectionPerf(perfToken, "selection.dispatch", dispatchStartedAtMs, {{
+        previousSelectedId,
+      }});
       if (isChatWorkspaceLayoutView(activeLayoutView)) {{
         pendingMapHistoryFocus = false;
         const shouldOpenDrawer = (
@@ -692,6 +999,7 @@
             fetchHistory: true,
           }});
         }}
+        finishNodeSelectionPerf(perfToken, "chat-workspace");
         return;
       }}
       if (
@@ -715,7 +1023,6 @@
           rerender: false,
         }});
       }}
-      highlightNodeSelection();
       const focusSelection = (
         shouldFocus
         && activeLayoutView !== "saved"
@@ -725,34 +1032,6 @@
         )
       );
       pendingMapHistoryFocus = focusSelection;
-      scrollSelectionIntoView();
-      let cachedHistory = null;
-      if (latestState && (activeLayoutView === "saved" || activeLayoutView === "network")) {{
-        cachedHistory = cachedNodeHistory(selectedNodeId);
-      }}
-
-      if (activeLayoutView === "saved") {{
-        if (cachedHistory) {{
-          renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
-          renderSavedNodeDetails(latestState || {{}}, cachedHistory);
-        }} else {{
-          renderNodeHistoryLoading(selectedNodeId);
-        }}
-      }} else if (activeLayoutView === "network") {{
-        // Map-data panel is visible in these views.
-        renderTraffic((latestState && latestState.traffic) || {{}}, (latestState && latestState.nodes) || [], cachedHistory);
-        setMapDataMode(mapDataFocus === "activity" ? "activity" : "live");
-      }} else if (activeLayoutView === "history") {{
-        // Keep History view stable; node selection is for row highlighting/filtering
-        // and should not swap the left pane away from trend charts.
-        setMapDataMode("activity");
-      }} else {{
-        setMapDataMode("live");
-      }}
-
-      if (latestState) {{
-        renderMap(latestState.nodes || [], (latestState.traffic || {{}}).edges || [], cachedHistory);
-      }}
       if (
         activeLayoutView === "network"
         && activeNetworkSubview === "graph"
@@ -763,22 +1042,7 @@
       ) {{
         renderNetworkGraphView(latestState);
       }}
-
-      updateMapSelection(focusSelection);
-
-      // Kick an immediate history refresh so the signal plot/trail doesn't wait for the next poll.
-      void refreshSelectedNodeHistory(false);
-      applyChatChannel(activeChatChannel, false);
-      if (typeof syncChatNodeDetailsDrawer === "function") {{
-        syncChatNodeDetailsDrawer(latestState, {{
-          fetchHistory: false,
-        }});
-      }}
-      if (activeLayoutView === "games") {{
-        renderGamesView(latestState);
-      }} else if (activeLayoutView === "files") {{
-        renderFilesView(latestState);
-      }}
+      scheduleNodeSelectionUiRefresh({{ shouldFocus: focusSelection, perfToken }});
     }}
 
     function clearNodeSelection() {{

@@ -160,6 +160,17 @@
         element[propName] = nextMarkup;
         return true;
       }};
+      const detachDockedHistoryPanel = () => {{
+        const dockedHistoryPanel = document.getElementById("map-data-node");
+        const mapDataBody = document.getElementById("map-data-body");
+        if (
+          dockedHistoryPanel instanceof HTMLElement
+          && mapDataBody instanceof HTMLElement
+          && host.contains(dockedHistoryPanel)
+        ) {{
+          mapDataBody.appendChild(dockedHistoryPanel);
+        }}
+      }};
       const previousMainScroll = host.querySelector(".saved-node-main-scroll");
       const locationHost = document.getElementById("chat-node-details-location-host");
       const chatHost = document.getElementById("chat-node-details-chat-host");
@@ -191,40 +202,37 @@
         previousMainScroll instanceof HTMLElement
         && Number.isFinite(previousMainScroll.clientHeight)
       ) ? previousMainScroll.clientHeight : 0;
-      const dockedHistoryPanel = document.getElementById("map-data-node");
-      const mapDataBody = document.getElementById("map-data-body");
-      // Preserve the shared history panel node before replacing host.innerHTML.
-      if (
-        dockedHistoryPanel instanceof HTMLElement
-        && mapDataBody instanceof HTMLElement
-        && host.contains(dockedHistoryPanel)
-      ) {{
-        mapDataBody.appendChild(dockedHistoryPanel);
-      }}
 
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nodeId = resolveSavedViewNodeId(safeState);
       const loadingId = normalizeNodeId(loadingNodeId || "");
+      const drawerExpanded = (
+        typeof isChatNodeDetailsDrawerExpanded === "function"
+        && isChatNodeDetailsDrawerExpanded()
+      );
+      const activeDrawerTab = drawerExpanded
+        ? normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab)
+        : "details";
       const renderNotesInDrawer = (
         notesHost instanceof HTMLElement
-        && typeof isChatNodeDetailsDrawerExpanded === "function"
-        && isChatNodeDetailsDrawerExpanded()
+        && drawerExpanded
       );
       const renderLocationInDrawer = (
         locationHost instanceof HTMLElement
-        && typeof isChatNodeDetailsDrawerExpanded === "function"
-        && isChatNodeDetailsDrawerExpanded()
+        && drawerExpanded
       );
       const renderChatInDrawer = (
         chatHost instanceof HTMLElement
-        && typeof isChatNodeDetailsDrawerExpanded === "function"
-        && isChatNodeDetailsDrawerExpanded()
+        && drawerExpanded
       );
       const renderLinksInDrawer = (
         linksHost instanceof HTMLElement
-        && typeof isChatNodeDetailsDrawerExpanded === "function"
-        && isChatNodeDetailsDrawerExpanded()
+        && drawerExpanded
       );
+      const needsNotesSection = !renderNotesInDrawer || activeDrawerTab === "notes";
+      const needsLocationSection = !renderLocationInDrawer || activeDrawerTab === "location";
+      const needsChatSection = !renderChatInDrawer || activeDrawerTab === "chat";
+      const needsLinksSection = !renderLinksInDrawer || activeDrawerTab === "links";
 
       if (!isSelectableNodeId(nodeId)) {{
         host.dataset.nodeId = "";
@@ -232,6 +240,7 @@
         const emptyDetailsHtml = visibleFavoriteCount === 0
           ? '<div class="saved-node-details-empty">Select any node to view history and summary here. Tag nodes to build your tagged subsection.</div>'
           : '<div class="saved-node-details-empty">Select any node to view history and summary, or pick one from tagged nodes.</div>';
+        detachDockedHistoryPanel();
         setElementHtmlIfChanged(host, emptyDetailsHtml, "saved-node-details");
         setElementHtmlIfChanged(locationHost, "", "chat-node-details-location");
         setElementHtmlIfChanged(chatHost, "", "chat-node-details-chat");
@@ -267,21 +276,24 @@
       const historyPositions = Array.isArray(history && history.positions) ? history.positions : [];
       const historyNameEntries = Array.isArray(history && history.name_history) ? history.name_history : [];
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
-      const recentPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
       const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
-      const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
-      const malformedTextByNode = (typeof mapMalformedTextPayloadByNode === "function")
+      const recentPackets = needsChatSection && Array.isArray(traffic.recent_packets)
+        ? traffic.recent_packets
+        : [];
+      const edges = needsLinksSection && Array.isArray(traffic.edges) ? traffic.edges : [];
+      const latestChatTouchByNode = chatMessages.length > 0
+        ? mapLatestChatTouchInfo(chatMessages)
+        : new Map();
+      const chatTouch = latestChatTouchByNode.get(nodeId) || null;
+      const malformedTextByNode = (needsChatSection && typeof mapMalformedTextPayloadByNode === "function")
         ? mapMalformedTextPayloadByNode(recentPackets)
         : new Map();
       const malformedTextEntry = malformedTextByNode.get(nodeId) || null;
       const malformedTextCount = Math.max(0, Math.trunc(Number(malformedTextEntry && malformedTextEntry.count) || 0));
       const malformedTextLatestUnix = Number(malformedTextEntry && malformedTextEntry.latestUnix);
       const malformedTextPayloadPreview = String((malformedTextEntry && malformedTextEntry.payloadPreview) || "").trim();
-      const chatStats = computeSavedChatStats(nodeId, chatMessages);
-      const chatTouch = Number.isFinite(chatStats.lastChatUnix)
-        ? {{ unix: Math.trunc(chatStats.lastChatUnix), text: chatStats.lastChatText }}
-        : null;
-      const linkStats = computeSavedLinkStats(nodeId, edges);
+      const chatStats = needsChatSection ? computeSavedChatStats(nodeId, chatMessages) : null;
+      const linkStats = needsLinksSection ? computeSavedLinkStats(nodeId, edges) : null;
 
       const freshness = resolveNodeFreshness(node, caps, historySummary, chatTouch);
       const freshnessSource = nodeFreshnessSourceLabel(freshness.source);
@@ -362,7 +374,11 @@
         ? (Number.isFinite(capsPosUnix) ? capsPosUnix : trailPosUnix)
         : trailPosUnix;
       const latestPosTimeText = livePositionAvailable
-        ? savedDetailText((caps && caps.last_position_time) || (latestTrail && latestTrail.time))
+        ? savedDetailText(
+            Number.isFinite(capsPosUnix)
+              ? formatLocalChatTime(capsPosUnix, (latestTrail && latestTrail.time) || "n/a", nowUnix)
+              : ((latestTrail && latestTrail.time) || "n/a")
+          )
         : savedDetailText(latestTrail && latestTrail.time);
       const latestPosAgeText = savedDetailAge(latestPosTimeUnix, nowUnix);
       const positionSource = livePositionAvailable
@@ -374,10 +390,10 @@
         ? "Yes"
         : "No";
 
-      const linkAvgHops = linkStats.hopsWeight > 0
+      const linkAvgHops = linkStats && linkStats.hopsWeight > 0
         ? formatMetricValue(linkStats.hopsWeighted / linkStats.hopsWeight, 2)
         : "n/a";
-      const topPeerId = normalizeNodeId(linkStats.topPeer || "");
+      const topPeerId = normalizeNodeId((linkStats && linkStats.topPeer) || "");
       const topPeerName = topPeerId
         ? resolveSavedViewNodeName(safeState, topPeerId)
         : "";
@@ -405,79 +421,98 @@
         ["Channel Util", Number.isFinite(channelUtilValue) ? savedDetailPercent(channelUtilValue) : "n/a"],
         ["Air Util TX", Number.isFinite(airUtilTxValue) ? savedDetailPercent(airUtilTxValue) : "n/a"],
         ["GPS Capable", positionCapable],
-        ["Last Position Ping", savedDetailText((caps && caps.last_position_time) || (latestTrail && latestTrail.time))],
+        ["Last Position Ping", savedDetailText(latestPosTimeText)],
       ]);
-      const noteDraft = nodeNoteDraftById.has(nodeId)
+      const noteDraft = needsNotesSection && nodeNoteDraftById.has(nodeId)
         ? String(nodeNoteDraftById.get(nodeId) || "")
         : null;
-      const notesSection = savedNodeNotesSectionHtml(nodeId, nodeNoteEntry(nodeId), noteDraft);
+      const notesSection = needsNotesSection
+        ? savedNodeNotesSectionHtml(nodeId, nodeNoteEntry(nodeId), noteDraft)
+        : "";
 
-      const locationSection = savedDetailSectionHtml("Location", [
-        ["Last Broadcast Position", latestPosText],
-        ["Position Source", positionSource],
-        ["Position Age", latestPosAgeText],
-        ["Latest Position Time", latestPosTimeText],
-        ["Altitude", Number.isFinite(latestTrailAltitude) ? `${{formatMetricValue(latestTrailAltitude, 0)}} m` : "n/a"],
-        ["Satellites", Number.isFinite(latestTrailSats) ? String(Math.round(latestTrailSats)) : "n/a"],
-        ["Trail Start", savedDetailText(historySummary.trail_start)],
-        ["Trail End", savedDetailText(historySummary.trail_end)],
-      ], "Radio screens can show a newer local GPS fix before that fix is broadcast to this dashboard.");
+      const locationSection = needsLocationSection
+        ? savedDetailSectionHtml("Location", [
+            ["Last Broadcast Position", latestPosText],
+            ["Position Source", positionSource],
+            ["Position Age", latestPosAgeText],
+            ["Latest Position Time", latestPosTimeText],
+            ["Altitude", Number.isFinite(latestTrailAltitude) ? `${{formatMetricValue(latestTrailAltitude, 0)}} m` : "n/a"],
+            ["Satellites", Number.isFinite(latestTrailSats) ? String(Math.round(latestTrailSats)) : "n/a"],
+            ["Trail Start", savedDetailText(historySummary.trail_start)],
+            ["Trail End", savedDetailText(historySummary.trail_end)],
+          ], "Radio screens can show a newer local GPS fix before that fix is broadcast to this dashboard.")
+        : "";
 
-      const chatSectionRows = [
-        ["Messages Touching Node", String(chatStats.touches)],
-        ["Sent", String(chatStats.sent)],
-        ["Received", String(chatStats.received)],
-        ["Broadcast Sent", String(chatStats.broadcastSent)],
-        ["Direct Sent", String(chatStats.directSent)],
-        ["Reactions Sent", String(chatStats.reactionsSent)],
-        ["Active Peers", String(chatStats.peers.size)],
-        ["Last Chat", savedDetailText(chatStats.lastChatText)],
-      ];
-      if (malformedTextCount > 0) {{
-        const malformedTextLatestText = (
-          Number.isFinite(malformedTextLatestUnix) && malformedTextLatestUnix > 0
-            ? `${{formatLocalChatTime(malformedTextLatestUnix, "n/a", nowUnix)}} (${{savedDetailAge(malformedTextLatestUnix, nowUnix)}})`
-            : "n/a"
-        );
-        chatSectionRows.push(
-          ["Malformed Text Packets", `${{malformedTextCount}} recent packet${{malformedTextCount === 1 ? "" : "s"}}`],
-          ["Last Malformed Text", malformedTextLatestText],
-          ["Malformed Payload Preview", malformedTextPayloadPreview || "n/a"],
-        );
+      let chatSection = "";
+      if (needsChatSection && chatStats) {{
+        const chatSectionRows = [
+          ["Messages Touching Node", String(chatStats.touches)],
+          ["Sent", String(chatStats.sent)],
+          ["Received", String(chatStats.received)],
+          ["Broadcast Sent", String(chatStats.broadcastSent)],
+          ["Direct Sent", String(chatStats.directSent)],
+          ["Reactions Sent", String(chatStats.reactionsSent)],
+          ["Active Peers", String(chatStats.peers.size)],
+          ["Last Chat", savedDetailText(chatStats.lastChatText)],
+        ];
+        if (malformedTextCount > 0) {{
+          const malformedTextLatestText = (
+            Number.isFinite(malformedTextLatestUnix) && malformedTextLatestUnix > 0
+              ? `${{formatLocalChatTime(malformedTextLatestUnix, "n/a", nowUnix)}} (${{savedDetailAge(malformedTextLatestUnix, nowUnix)}})`
+              : "n/a"
+          );
+          chatSectionRows.push(
+            ["Malformed Text Packets", `${{malformedTextCount}} recent packet${{malformedTextCount === 1 ? "" : "s"}}`],
+            ["Last Malformed Text", malformedTextLatestText],
+            ["Malformed Payload Preview", malformedTextPayloadPreview || "n/a"],
+          );
+        }}
+        const chatSectionNote = malformedTextCount > 0
+          ? `Based on current in-memory packet/chat buffers. Warning: this node recently sent non-UTF-8 bytes on TEXT_MESSAGE_APP, which usually means a buggy or experimental sender rather than normal chat traffic.`
+          : `Based on current in-memory chat buffer (${{chatMessages.length}} messages).`;
+        chatSection = savedDetailSectionHtml("Chat (Recent Buffer)", chatSectionRows, chatSectionNote);
       }}
-      const chatSectionNote = malformedTextCount > 0
-        ? `Based on current in-memory packet/chat buffers. Warning: this node recently sent non-UTF-8 bytes on TEXT_MESSAGE_APP, which usually means a buggy or experimental sender rather than normal chat traffic.`
-        : `Based on current in-memory chat buffer (${{chatMessages.length}} messages).`;
-      const chatSection = savedDetailSectionHtml("Chat (Recent Buffer)", chatSectionRows, chatSectionNote);
 
-      const linksSection = savedDetailSectionHtml("Links", [
-        ["Directed Links", String(linkStats.links)],
-        ["Linked Peers", String(linkStats.peers.size)],
-        ["Lifetime Packets", String(Math.round(linkStats.lifetimePackets))],
-        ["Session Packets", String(Math.round(linkStats.sessionPackets))],
-        ["Avg Link Hops", linkAvgHops],
-        ["Last Link Activity", savedDetailText(linkStats.lastSeenText)],
-        ["Top Peer", topPeerValue],
-        ["Top Peer Packets", linkStats.topPeer ? String(Math.round(linkStats.topPeerPackets)) : "n/a"],
-        ["Seen Ports", linkStats.ports.size > 0 ? Array.from(linkStats.ports).slice(0, 10).join(", ") : "n/a"],
-      ]);
+      const linksSection = needsLinksSection && linkStats
+        ? savedDetailSectionHtml("Links", [
+            ["Directed Links", String(linkStats.links)],
+            ["Linked Peers", String(linkStats.peers.size)],
+            ["Lifetime Packets", String(Math.round(linkStats.lifetimePackets))],
+            ["Session Packets", String(Math.round(linkStats.sessionPackets))],
+            ["Avg Link Hops", linkAvgHops],
+            ["Last Link Activity", savedDetailText(linkStats.lastSeenText)],
+            ["Top Peer", topPeerValue],
+            ["Top Peer Packets", linkStats.topPeer ? String(Math.round(linkStats.topPeerPackets)) : "n/a"],
+            ["Seen Ports", linkStats.ports.size > 0 ? Array.from(linkStats.ports).slice(0, 10).join(", ") : "n/a"],
+          ])
+        : "";
 
-      const nextDetailsHtml = `
-        <div class="saved-node-stack">
-          <div class="saved-node-main-scroll">
-            <div class="saved-node-sections">
-              ${{nodeSection}}
-              ${{renderNotesInDrawer ? "" : notesSection}}
-              ${{renderLocationInDrawer ? "" : locationSection}}
-              ${{renderChatInDrawer ? "" : chatSection}}
-              ${{renderLinksInDrawer ? "" : linksSection}}
-            </div>
-          </div>
-          <div id="saved-node-history-splitter" class="saved-node-history-splitter" title="Drag to resize node info and history panels"></div>
-          <div id="saved-node-history-host" class="saved-node-history-host"></div>
-        </div>
+      const nextSectionsHtml = `
+        ${{nodeSection}}
+        ${{renderNotesInDrawer ? "" : notesSection}}
+        ${{renderLocationInDrawer ? "" : locationSection}}
+        ${{renderChatInDrawer ? "" : chatSection}}
+        ${{renderLinksInDrawer ? "" : linksSection}}
       `;
-      const detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsHtml, "saved-node-details");
+      let sectionsHost = host.querySelector(".saved-node-sections");
+      let detailsMarkupChanged = false;
+      if (!(sectionsHost instanceof HTMLElement)) {{
+        detachDockedHistoryPanel();
+        const nextDetailsShellHtml = `
+          <div class="saved-node-stack">
+            <div class="saved-node-main-scroll">
+              <div class="saved-node-sections"></div>
+            </div>
+            <div id="saved-node-history-splitter" class="saved-node-history-splitter" title="Drag to resize node info and history panels"></div>
+            <div id="saved-node-history-host" class="saved-node-history-host"></div>
+          </div>
+        `;
+        detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsShellHtml, "saved-node-details-shell");
+        sectionsHost = host.querySelector(".saved-node-sections");
+      }}
+      if (sectionsHost instanceof HTMLElement) {{
+        detailsMarkupChanged = setElementHtmlIfChanged(sectionsHost, nextSectionsHtml, "saved-node-sections") || detailsMarkupChanged;
+      }}
       host.dataset.nodeId = nodeId;
       const nextLocationHtml = renderLocationInDrawer ? locationSection : "";
       const nextChatHtml = renderChatInDrawer ? chatSection : "";

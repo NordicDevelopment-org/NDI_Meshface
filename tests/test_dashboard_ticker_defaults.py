@@ -79,6 +79,33 @@ def test_dashboard_js_uses_semantic_ticker_state_profiles() -> None:
     assert 'stateProfile: Number.isFinite(nodeRssi) ? "signal_rssi" : "signal_snr"' in js
     assert 'stateProfile: "wifi_rssi"' in js
 
+
+def test_dashboard_js_merges_summary_hydration_with_persisted_ticker_series() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'function mergeMetricTickerSeries(metricKey, incomingSeries, cutoffMs = Date.now() - metricTickerWindowMs) {' in js
+    assert 'const existing = Array.isArray(metricTickerSeries.get(cleanKey))' in js
+    assert 'const mergedByBucket = new Map();' in js
+    assert 'const merged = Array.from(mergedByBucket.values())' in js
+    assert 'const merged = mergeMetricTickerSeries(metricKey, series, cutoffMs);' in js
+
+
+def test_dashboard_js_flushes_ticker_series_on_page_exit() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'function persistDashboardSessionStateNow() {' in js
+    assert 'if (typeof persistMetricTickerSeriesNow === "function") {' in js
+    assert 'window.addEventListener("pagehide", () => {' in js
+    assert 'window.addEventListener("beforeunload", () => {' in js
+
 def test_render_html_uses_single_row_compact_ticker_strip() -> None:
     html = render_html(
         refresh_ms=1000,

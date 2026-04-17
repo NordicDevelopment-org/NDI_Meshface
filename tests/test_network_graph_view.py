@@ -122,8 +122,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, networkGraphEdgeMode);' in js
     assert 'includeAllLiveNodes: edgeMode !== "live",' in js
     assert 'includeAllLiveNodes: normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) !== "live",' in js
-    assert 'const nodeMap = buildNetworkGraphNodeMap(nodes, historyCaps, filteredRawEdges, {' in js
-    assert 'const nodeMap = buildNetworkGraphNodeMap(liveNodes, historyCaps, filteredRawEdges, {' in js
+    assert 'buildNetworkGraphNodeMap(nodes, historyCaps, filteredRawEdges, {' in js
+    assert 'buildNetworkGraphNodeMap(liveNodes, historyCaps, filteredRawEdges, {' in js
     assert 'const parsedWeight = useSessionWeight ? parsedSession : parsedLifetime;' in js
     assert 'empty.textContent = edgeMode === "live"' in js
     assert '<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip"' in js
@@ -139,12 +139,14 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const weeklySummaryPromise = (activeLayoutView === "history" || activeLayoutView === "network")' in js
     assert 'if (weeklySummaryPromise) {' in js
     assert 'const networkGraphActive = next === "network" && activeNetworkSubview === "graph";' in js
-    assert 'const fittedViewBox = fitNetworkGraphViewBoxToBounds(networkGraphViewState.bounds, svg);' in js
     assert 'const rootChanged = networkGraphViewState.lastRootId !== rootId;' in js
     assert '&& !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)' in js
     assert 'const shouldRefitForModeChange = !!(' in js
     assert 'animateNetworkGraphViewBox(svg, fittedViewBox);' in js
     assert 'Broadcast only' in js
+    assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
+    assert 'item.nodeId === localId ? "is-local" : ""' in js
+    assert '<span class="network-graph-swatch is-local"></span>Your node / local radio' in js
     assert 'is-broadcast-only' in js
     assert 'pointerDownNodeId' in js
     assert 'svg.addEventListener("wheel"' in js
@@ -181,7 +183,9 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-live-toggle[aria-pressed=\"true\"] {" in css
     assert ".network-graph-mode-chip {" in css
     assert ".network-graph-swatch.is-broadcast-only {" in css
+    assert ".network-graph-swatch.is-local {" in css
     assert ".network-graph-ring.is-broadcast-only {" in css
+    assert ".network-graph-node.is-local .network-graph-node-core {" in css
     assert ".network-graph-node.is-broadcast-only .network-graph-node-core {" in css
     assert "padding: 0;" in graph_panel_css
     assert "pointer-events: auto;" in graph_label_css

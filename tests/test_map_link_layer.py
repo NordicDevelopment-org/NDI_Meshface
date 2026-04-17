@@ -46,6 +46,19 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
 
     assert 'let mapLinkLayerEnabled = false;' in js
     assert 'let mapLiveActivityEnabled = true;' in js
+    assert 'const nodePacketSeriesDefaults = {' in js
+    assert 'all: false,' in js
+    assert 'chat: true,' in js
+    assert 'telemetry: true,' in js
+    assert 'position: true,' in js
+    assert 'routing: true,' in js
+    assert 'storeforward: true,' in js
+    assert 'nodeinfo: true,' in js
+    assert 'admin: true,' in js
+    assert 'encrypted: true,' in js
+    assert 'other: true,' in js
+    assert 'let nodePacketSeriesEnabled = { ...nodePacketSeriesDefaults };' in js
+    assert "function normalizeNodePacketSeries(raw) {" in js
     assert 'const mapLinkLayerStorageKey = "meshDashboardMapLinkLayerEnabledV1";' in js
     assert 'const mapLiveActivityStorageKey = "meshDashboardMapLiveActivityEnabledV1";' in js
     assert "function updateMapLinkLayerControl()" in js
@@ -53,7 +66,7 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "function updateMapLiveActivityControl()" in js
     assert "function loadMapLiveActivityPreference()" in js
     assert "function bindMapLiveActivityControl()" in js
-    assert "function estimatedMarkerStyle(isSelected, confidence = 0.5)" in js
+    assert "function estimatedMarkerStyle(isSelected, confidence = 0.5, isLocal = false)" in js
     assert "function buildMapLinkLayerOverlay(nodes, rawEdges)" in js
     assert "nodeMarkerKinds" in js
     assert "nodeMarkerConfidence" in js
@@ -109,7 +122,8 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "function mapPacketActivityNodeIds(packetEntry)" in js
     assert "function snapshotNetworkMapPacketActivityTokens(state = latestState)" in js
     assert "function seedNetworkMapPacketActivityTokens(state = latestState)" in js
-    assert 'function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45)' in js
+    assert 'function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
+    assert 'const isLocal = !!(localNodeId && normalizeNodeId(nodeId || "") === localNodeId);' in js
     assert "function scheduleMapNodeActivityFlashUpdate()" in js
     assert "function syncNetworkMapPacketActivity(state = latestState)" in js
     assert "!!mapLiveActivityEnabled" in js

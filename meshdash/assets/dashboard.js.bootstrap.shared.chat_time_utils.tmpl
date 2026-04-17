@@ -236,6 +236,32 @@
       return parseDashboardTimeToUnix(node.last_heard);
     }}
 
+    function nodeLastHeardLabel(node, fallback = "n/a", nowUnix = Math.floor(Date.now() / 1000)) {{
+      const text = String(node && node.last_heard || "").trim();
+      if (text) return text;
+      return formatLocalChatTime(nodeLastHeardUnix(node), fallback, nowUnix);
+    }}
+
+    function edgeRxUnix(edge, kind = "last") {{
+      const safeEdge = edge && typeof edge === "object" ? edge : null;
+      if (!safeEdge) return null;
+      const prefix = String(kind || "last").trim().toLowerCase() === "first" ? "first" : "last";
+      const directRaw = Number(safeEdge[`${{prefix}}_rx_unix`]);
+      if (Number.isFinite(directRaw) && directRaw > 0) {{
+        return Math.floor(directRaw);
+      }}
+      return parseDashboardTimeToUnix(safeEdge[`${{prefix}}_rx_time`]);
+    }}
+
+    function edgeRxLabel(edge, kind = "last", fallback = "n/a", nowUnix = Math.floor(Date.now() / 1000)) {{
+      const safeEdge = edge && typeof edge === "object" ? edge : null;
+      if (!safeEdge) return String(fallback == null ? "n/a" : fallback);
+      const prefix = String(kind || "last").trim().toLowerCase() === "first" ? "first" : "last";
+      const text = String(safeEdge[`${{prefix}}_rx_time`] || "").trim();
+      if (text) return text;
+      return formatLocalChatTime(edgeRxUnix(safeEdge, prefix), fallback, nowUnix);
+    }}
+
     function freshnessStatus(lastSeenUnix, nowUnix = Math.floor(Date.now() / 1000)) {{
       const ts = Number(lastSeenUnix);
       if (!Number.isFinite(ts) || ts <= 0) return "unknown";

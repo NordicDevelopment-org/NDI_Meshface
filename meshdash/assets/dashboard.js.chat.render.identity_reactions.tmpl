@@ -1,5 +1,193 @@
-    function renderChat(state) {{
+    function sortedChatPollNodeIdList(values) {{
+      const source = values && typeof values[Symbol.iterator] === "function"
+        ? Array.from(values)
+        : [];
+      return source
+        .map((value) => normalizeNodeId(value))
+        .filter((value) => !!value)
+        .sort();
+    }}
+
+    function sortedChatPollStringList(values) {{
+      const source = values && typeof values[Symbol.iterator] === "function"
+        ? Array.from(values)
+        : [];
+      return source
+        .map((value) => String(value == null ? "" : value).trim())
+        .filter((value) => !!value)
+        .sort();
+    }}
+
+    function normalizeChatPollNoticeRows(channel) {{
+      const notices = (typeof chatChangeNoticesForChannel === "function")
+        ? chatChangeNoticesForChannel(channel)
+        : [];
+      if (!Array.isArray(notices)) return [];
+      return notices
+        .map((notice) => [
+          String((notice && notice.key) || "").trim(),
+          normalizeNodeId(notice && notice.peerNodeId),
+          String((notice && (notice.focusKey || notice.key)) || "").trim(),
+          normalizeChatChannel((notice && (notice.targetChatChannel || notice.channel)) || channel),
+          String((notice && notice.targetView) || "").trim(),
+        ])
+        .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    }}
+
+    function buildChatPollStructuralSignature(state = latestState) {{
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const safeTraffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const historyCapsObj = (safeState.history_caps && typeof safeState.history_caps === "object")
+        ? safeState.history_caps
+        : {{}};
+      const recentChat = Array.isArray(safeTraffic.recent_chat) ? safeTraffic.recent_chat : [];
+      const recentFiles = Array.isArray(safeTraffic.recent_files) ? safeTraffic.recent_files : [];
+      const activeMeshFilterIndex = (typeof activeMeshChannelFilterIndex === "function")
+        ? activeMeshChannelFilterIndex()
+        : meshChannelAllIndex;
+      const macrosPreviewRows = Array.isArray(macrosPreviewLines)
+        ? macrosPreviewLines.slice(-120).map((line) => String(line == null ? "" : line))
+        : [];
+      const historyCapsRows = Object.entries(historyCapsObj)
+        .sort(([leftId], [rightId]) => String(leftId).localeCompare(String(rightId)))
+        .map(([rawNodeId, caps]) => {{
+          const safeCaps = caps && typeof caps === "object" ? caps : {{}};
+          return [
+            normalizeNodeId(rawNodeId),
+            safeCaps.has_position === true || safeCaps.hasPosition === true ? 1 : 0,
+          ];
+        }});
+      const nodesRows = nodes.map((node) => {{
+        const safeNode = node && typeof node === "object" ? node : {{}};
+        return [
+          normalizeNodeId(safeNode.id),
+          String(
+            safeNode.short_name
+            ?? safeNode.shortName
+            ?? (safeNode.user && (safeNode.user.short_name || safeNode.user.shortName))
+            ?? ""
+          ),
+          String(
+            safeNode.long_name
+            ?? safeNode.longName
+            ?? (safeNode.user && (safeNode.user.long_name || safeNode.user.longName))
+            ?? ""
+          ),
+          String(safeNode.hardware_model ?? safeNode.hardwareModel ?? ""),
+          String(safeNode.role ?? ""),
+        ];
+      }});
+      const messageRows = recentChat.map((msg) => {{
+        const safeMsg = msg && typeof msg === "object" ? msg : {{}};
+        return [
+          Number(
+            safeMsg.message_id
+            ?? safeMsg.messageId
+            ?? safeMsg.id
+            ?? 0
+          ) || 0,
+          Number(safeMsg.reply_id ?? safeMsg.replyId ?? 0) || 0,
+          normalizeNodeId(
+            safeMsg.from
+            ?? safeMsg.from_id
+            ?? safeMsg.fromId
+            ?? safeMsg.source
+            ?? safeMsg.source_id
+            ?? safeMsg.sourceId
+          ),
+          normalizeNodeId(
+            safeMsg.to
+            ?? safeMsg.to_id
+            ?? safeMsg.toId
+            ?? safeMsg.destination
+            ?? safeMsg.dest
+            ?? safeMsg.dest_id
+            ?? safeMsg.destId
+          ),
+          String(safeMsg.scope ?? ""),
+          String(safeMsg.channel ?? ""),
+          String(safeMsg.rx_time ?? safeMsg.rxTime ?? ""),
+          String(safeMsg.captured_at ?? safeMsg.capturedAt ?? ""),
+          String(safeMsg.text ?? ""),
+          safeMsg.local_echo === true || safeMsg.localEcho === true ? 1 : 0,
+          String(safeMsg.delivery_state ?? safeMsg.deliveryState ?? ""),
+          Number(safeMsg.delivery_updated_unix ?? safeMsg.deliveryUpdatedUnix ?? 0) || 0,
+          String(safeMsg.delivery_updated_at ?? safeMsg.deliveryUpdatedAt ?? ""),
+        ];
+      }});
+      const fileRows = recentFiles.map((entry) => {{
+        const safeEntry = entry && typeof entry === "object" ? entry : {{}};
+        return [
+          normalizeNodeId(
+            safeEntry.peer_node_id
+            ?? safeEntry.peerNodeId
+            ?? safeEntry.to
+            ?? safeEntry.destination
+          ),
+          String(safeEntry.file_name ?? safeEntry.fileName ?? ""),
+          String(safeEntry.phase ?? ""),
+          Number(safeEntry.percent ?? safeEntry.progress_percent ?? safeEntry.progressPercent ?? 0) || 0,
+          Number(safeEntry.updated_unix ?? safeEntry.updatedUnix ?? 0) || 0,
+        ];
+      }});
+      return JSON.stringify({{
+        activeLayoutView: String(activeLayoutView || "").trim(),
+        activeChatChannel: normalizeChatChannel(activeChatChannel || "all"),
+        selectedNodeId: normalizeNodeId(selectedNodeId || ""),
+        chatDirectActivePeerId: normalizeNodeId(chatDirectActivePeerId || ""),
+        peerDmActivePeerId: normalizeNodeId(peerDmActivePeerId || ""),
+        activeMeshFilterIndex: normalizeMeshChannelIndex(activeMeshFilterIndex),
+        chatViewMode: String(chatViewMode || "default").trim(),
+        rosterQuery: (typeof globalNodeSearchQuery === "function")
+          ? String(globalNodeSearchQuery() || "")
+          : "",
+        sortKey: normalizeChatNodeNavigatorSortKeyPref(chatNodeNavigatorSortKey),
+        sortDir: normalizeChatNodeNavigatorSortDirPref(chatNodeNavigatorSortDir),
+        metaFieldIds: Array.isArray(chatNodeNavigatorMetaFieldIds)
+          ? chatNodeNavigatorMetaFieldIds.slice()
+          : [],
+        pinDirectHistory: !!chatNodeNavigatorPinDirectHistory,
+        showIdle: !!chatNodeNavigatorShowIdle,
+        showPacketDirection: !!chatNodeNavigatorShowPacketDirection,
+        localNodeId: normalizeNodeId(resolveLocalNodeId(safeState) || ""),
+        chatLocalInfoVersion,
+        favorites: sortedChatPollNodeIdList(favoriteNodeIds),
+        muted: sortedChatPollNodeIdList(mutedNodeIds),
+        pinned: sortedChatPollNodeIdList(pinnedNodeIds),
+        whitelist: sortedChatPollNodeIdList(nodeVisibilityWhitelistIds),
+        blacklist: sortedChatPollNodeIdList(nodeVisibilityBlacklistIds),
+        manualDirectPeers: sortedChatPollNodeIdList(manualDirectPeerIds),
+        nodeNotes: sortedChatPollNodeIdList(nodeNotesById instanceof Map ? nodeNotesById.keys() : []),
+        acknowledgedAll: sortedChatPollStringList(
+          typeof chatChangeAcknowledgedKeySetForChannel === "function"
+            ? chatChangeAcknowledgedKeySetForChannel("all")
+            : []
+        ),
+        acknowledgedDirect: sortedChatPollStringList(
+          typeof chatChangeAcknowledgedKeySetForChannel === "function"
+            ? chatChangeAcknowledgedKeySetForChannel("direct")
+            : []
+        ),
+        noticesAll: normalizeChatPollNoticeRows("all"),
+        noticesDirect: normalizeChatPollNoticeRows("direct"),
+        macrosLeftViewMode: String(macrosLeftViewMode || "").trim(),
+        macrosPreviewSourceLabel: String(macrosPreviewSourceLabel || "").trim(),
+        macrosPreviewUpdatedAtUnix: Number(macrosPreviewUpdatedAtUnix || 0) || 0,
+        macrosPreviewRows,
+        nodesRows,
+        historyCapsRows,
+        messageRows,
+        fileRows,
+      }});
+    }}
+
+    function renderChat(state, options = null) {{
       syncTopbarChatContext(state);
+      const renderOptions = options && typeof options === "object" ? options : {{}};
+      const allowPollSkip = !!renderOptions.allowPollSkip;
       let renderChatPhase = "init";
       const markRenderChatPhase = (phase) => {{
         const clean = String(phase || "").trim();
@@ -63,6 +251,34 @@
         : null;
       updateNodeNameCache(nodes);
       const nowUnix = Math.floor(Date.now() / 1000);
+      const pollStructuralSignature = allowPollSkip
+        ? buildChatPollStructuralSignature(state)
+        : "";
+      const pollStructuralAgeMs = Math.max(
+        0,
+        Date.now() - (Number(chatPollStructuralRenderedAtMs) || 0)
+      );
+      if (
+        allowPollSkip
+        && pollStructuralSignature
+        && pollStructuralSignature === chatPollStructuralSignature
+        && pollStructuralAgeMs < chatPollStructuralRefreshMs
+      ) {{
+        markRenderChatPhase("poll-skip");
+        renderChatChangeSummary(nowUnix);
+        bindChatChangeSummaryControls();
+        syncChatChangeAutoDismiss();
+        if (
+          typeof syncChatNodeDetailsDrawer === "function"
+          && typeof isChatNodeDetailsDrawerExpanded === "function"
+          && isChatNodeDetailsDrawerExpanded()
+        ) {{
+          syncChatNodeDetailsDrawer(state, {{
+            fetchHistory: false,
+          }});
+        }}
+        return;
+      }}
       const localNodeId = resolveLocalNodeId(state);
       const nodesById = new Map(
         nodes.map((node) => [normalizeNodeId(node.id || ""), node])
