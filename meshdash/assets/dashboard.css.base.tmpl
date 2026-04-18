@@ -4615,12 +4615,30 @@
       align-items: center;
     }}
     .network-overview-sensor-controls-host .env-metrics-control-group {{
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       min-width: 0;
       max-width: 100%;
       border: 1px solid #d0dfd0;
       border-radius: 999px;
       background: #f7fcf7;
-      padding: 4px 9px;
+      padding: 4px 30px 4px 9px;
+    }}
+    .network-overview-sensor-controls-host .env-metrics-control-group::after {{
+      content: "";
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: translateY(-65%) rotate(45deg);
+      color: inherit;
+      pointer-events: none;
+      opacity: 0.82;
     }}
     .network-overview-sensor-controls-host .env-metrics-control-group label {{
       font-size: 10px;
@@ -4632,16 +4650,22 @@
       white-space: nowrap;
     }}
     .network-overview-sensor-controls-host .env-metrics-control-group .env-metric-select {{
+      flex: 1 1 auto;
       min-width: 118px;
       max-width: min(100%, 280px);
       border: 0;
-      border-radius: 999px;
+      border-radius: 0;
       background: transparent;
       color: #274935;
       font-size: 11px;
       line-height: 1.2;
-      padding: 2px 8px;
+      padding: 2px 0;
       min-height: 24px;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      box-shadow: none;
+      outline: none;
     }}
     .network-overview-sensor-controls-host .env-metrics-refresh-btn {{
       border-color: #bfd4c3;
@@ -4754,8 +4778,27 @@
       align-items: center;
     }}
     .network-sensors-panel .env-metrics-control-group {{
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       min-width: 0;
       max-width: 100%;
+      padding-right: 30px;
+    }}
+    .network-sensors-panel .env-metrics-control-group::after {{
+      content: "";
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: translateY(-65%) rotate(45deg);
+      color: inherit;
+      pointer-events: none;
+      opacity: 0.82;
     }}
     .network-sensors-panel .env-metrics-control-group label {{
       font-size: 10px;
@@ -4767,16 +4810,22 @@
       white-space: nowrap;
     }}
     .network-sensors-panel .env-metrics-control-group .env-metric-select {{
+      flex: 1 1 auto;
       min-width: 118px;
       max-width: min(100%, 280px);
       border: 0;
-      border-radius: 999px;
+      border-radius: 0;
       background: transparent;
       color: #274935;
       font-size: 11px;
       line-height: 1.2;
       padding: 2px 0;
       min-height: 24px;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      box-shadow: none;
+      outline: none;
     }}
     .network-sensors-panel .env-metrics-refresh-btn {{
       border-color: #bfd4c3;
