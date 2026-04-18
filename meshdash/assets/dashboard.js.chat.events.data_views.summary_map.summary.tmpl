@@ -1434,6 +1434,20 @@
         targetLabel.textContent = hasLocalIdentity ? "Node" : "Target";
       }}
       const targetMetric = document.getElementById("m-target");
+      const targetCard = document.getElementById("summary-ticker-target");
+      if (targetCard instanceof HTMLElement) {{
+        if (isCanonicalNodeId(localId)) {{
+          targetCard.dataset.nodeId = localId;
+          targetCard.tabIndex = 0;
+          targetCard.setAttribute("role", "button");
+          targetCard.setAttribute("aria-label", `Select local node ${{localName || localId}}`);
+        }} else {{
+          delete targetCard.dataset.nodeId;
+          targetCard.removeAttribute("tabindex");
+          targetCard.removeAttribute("role");
+          targetCard.removeAttribute("aria-label");
+        }}
+      }}
       if (targetMetric instanceof HTMLElement) {{
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
         const badgeEmoji = (
@@ -1472,9 +1486,15 @@
             titleParts.push(`Target ${{fullTarget}}`);
           }}
           targetMetric.title = titleParts.join(" • ");
+          if (targetCard instanceof HTMLElement) {{
+            targetCard.title = `${{titleParts.join(" • ")}} • Click to select in node list`;
+          }}
         }} else {{
           targetMetric.textContent = targetDisplay;
           targetMetric.title = fullTarget || "n/a";
+          if (targetCard instanceof HTMLElement) {{
+            targetCard.title = fullTarget || "n/a";
+          }}
         }}
       }}
       renderTargetRadioStatus(state);

@@ -168,6 +168,28 @@
       }});
     }}
 
+    function bindLocalNodeSummaryCard() {{
+      const card = document.getElementById("summary-ticker-target");
+      if (!(card instanceof HTMLElement) || card.dataset.localNodeBound === "1") return;
+      card.dataset.localNodeBound = "1";
+      const handleActivate = () => {{
+        const nodeId = normalizeNodeId(card.dataset.nodeId || "");
+        if (!isSelectableNodeId(nodeId)) return;
+        selectNode(nodeId, true, true);
+      }};
+      card.addEventListener("click", (ev) => {{
+        const target = ev.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest("button, a, input, select, textarea")) return;
+        handleActivate();
+      }});
+      card.addEventListener("keydown", (ev) => {{
+        if (ev.key !== "Enter" && ev.key !== " ") return;
+        ev.preventDefault();
+        handleActivate();
+      }});
+    }}
+
     function bindChatReactionControls() {{
       bindReactionPopover();
       const bindFeedReactionDelegates = (feedId) => {{
