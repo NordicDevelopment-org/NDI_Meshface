@@ -93,6 +93,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function animateNetworkGraphViewBox(svg, rawViewBox, options = {})' in js
     assert 'function buildNetworkGraphSceneMarkup(scene)' in js
     assert 'function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {})' in js
+    assert 'function resolveNetworkGraphNodeEmoji(item)' in js
+    assert 'settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())' in js
+    assert '"has-emoji-glyph"' in js
+    assert 'class="network-graph-node-emoji-fo"' in js
     assert 'function buildNetworkGraphNodeSignalMeta(nodeMap, recentPackets)' in js
     assert 'const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";' in js
     assert 'let networkGraphEdgeMode = "history";' in js
@@ -154,6 +158,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'Broadcast only' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'item.nodeId === localId ? "is-local" : ""' in js
+    assert 'class="network-graph-node-emoji"' in js
     assert '<span class="network-graph-swatch is-local"></span>Your node / local radio' in js
     assert 'is-broadcast-only' in js
     assert 'pointerDownNodeId' in js
@@ -194,6 +199,10 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-swatch.is-local {" in css
     assert ".network-graph-ring.is-broadcast-only {" in css
     assert ".network-graph-node.is-local .network-graph-node-core {" in css
+    assert ".network-graph-node-emoji-fo {" in css
+    assert ".network-graph-node-emoji {" in css
+    assert ".network-graph-node.is-local .network-graph-node-emoji {" in css
+    assert ".network-graph-node.is-local.has-emoji-glyph .network-graph-node-core {" in css
     assert ".network-graph-node.is-broadcast-only .network-graph-node-core {" in css
     assert "padding: 0;" in graph_panel_css
     assert "pointer-events: auto;" in graph_label_css

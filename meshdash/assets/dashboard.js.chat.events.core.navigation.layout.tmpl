@@ -1575,6 +1575,17 @@
         ].filter(Boolean).join("\n");
       }}
 
+      function resolveNetworkGraphNodeEmoji(item) {{
+        if (!item || normalizeNodeId(item.nodeId || "") !== localId) return "";
+        return (
+          typeof settingsBadgeEmojiChoiceSet !== "undefined"
+          && settingsBadgeEmojiChoiceSet instanceof Set
+          && settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())
+        )
+          ? String(settingsBadgeEmoji || "").trim()
+          : "";
+      }}
+
       function buildNetworkGraphEdgeDomKey(edge) {{
         return `${{normalizeNodeId(edge && edge.a)}}::${{normalizeNodeId(edge && edge.b)}}`;
       }}
@@ -1605,16 +1616,20 @@
       }}).join("");
 
       const nodeMarkup = items.map((item) => {{
+        const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
+        const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
+        const nodeEmoji = resolveNetworkGraphNodeEmoji(item);
         const classes = [
           "network-graph-node",
           item.nodeId === localId ? "is-local" : "",
+          (item.nodeId === localId && !!nodeEmoji) ? "has-emoji-glyph" : "",
           item.nodeId === rootId ? "is-root" : "",
           item.nodeId === selectedId ? "is-selected" : "",
           item.detached ? "is-detached" : "",
           item.broadcastOnly ? "is-broadcast-only" : "",
         ].filter(Boolean).join(" ");
-        const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
-        const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
+        const emojiBoxSize = Math.max(24, Math.round(Number(item.radius) * 2.5));
+        const emojiBoxOffset = -(emojiBoxSize / 2);
         return `
           <g
             class="${{classes}}"
@@ -1622,6 +1637,13 @@
             transform="translate(${{Number(item.x).toFixed(1)}} ${{Number(item.y).toFixed(1)}})"
           >
             <circle class="network-graph-node-core" r="${{Number(item.radius).toFixed(1)}}"></circle>
+            ${{
+              nodeEmoji
+                ? `<foreignObject class="network-graph-node-emoji-fo" x="${{emojiBoxOffset.toFixed(1)}}" y="${{emojiBoxOffset.toFixed(1)}}" width="${{emojiBoxSize.toFixed(1)}}" height="${{emojiBoxSize.toFixed(1)}}" aria-hidden="true">
+                    <div xmlns="http://www.w3.org/1999/xhtml" class="network-graph-node-emoji">${{escAttr(nodeEmoji)}}</div>
+                  </foreignObject>`
+                : ""
+            }}
             ${{
               item.showLabel
                 ? `<text class="network-graph-node-label${{(item.detached || item.broadcastOnly) ? " is-secondary" : ""}}${{item.broadcastOnly ? " is-broadcast-only" : ""}}" x="0" y="${{(Number(item.radius) + 14).toFixed(1)}}" text-anchor="middle">${{escAttr(label)}}</text>`
