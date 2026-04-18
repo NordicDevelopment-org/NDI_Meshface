@@ -172,6 +172,27 @@ def test_dashboard_js_supports_idle_toggle_in_node_navigator() -> None:
     assert 'const memberMetaRowHtml = memberMetaRowParts.length > 0' in js
 
 
+def test_dashboard_js_supports_status_dot_toggle_in_node_navigator() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "let chatNodeNavigatorShowStatusDots = true;" in js
+    assert "function normalizeChatNodeNavigatorShowStatusDotsPref(value) {" in js
+    assert 'showStatusDots: normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots),' in js
+    assert 'const nextShowStatusDots = normalizeChatNodeNavigatorShowStatusDotsPref(' in js
+    assert 'chatNodeNavigatorShowStatusDots = nextShowStatusDots;' in js
+    assert '<input type="checkbox" data-nav-toggle-id="status-dots"' in js
+    assert '<span>Status</span>' in js
+    assert 'if (toggleId === "status-dots") {' in js
+    assert 'showStatusDots: !!target.checked,' in js
+    assert 'const showStatusDots = (typeof normalizeChatNodeNavigatorShowStatusDotsPref === "function")' in js
+    assert 'const statusMarkerClass = showStatusDots ? "" : " is-hidden";' in js
+    assert 'const statusMarkerHtml = `<span class="chat-member-status status-${statusKey}${statusGlyphClass}${statusMarkerClass}"${statusMarkerAttrs}>${statusGlyph}</span>`;' in js
+
+
 def test_dashboard_js_sorts_status_using_visible_freshness_snapshot() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,

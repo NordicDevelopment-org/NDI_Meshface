@@ -35,6 +35,15 @@
       return !(clean === "0" || clean === "false" || clean === "off" || clean === "no");
     }}
 
+    function normalizeChatNodeNavigatorShowStatusDotsPref(value) {{
+      if (typeof parseBoolToken === "function") {{
+        return parseBoolToken(value, true);
+      }}
+      if (value == null) return true;
+      const clean = String(value).trim().toLowerCase();
+      return !(clean === "0" || clean === "false" || clean === "off" || clean === "no");
+    }}
+
     function normalizeChatNodeNavigatorMetaFieldIdsPref(rawIds, options = null) {{
       const opts = options && typeof options === "object" ? options : {{}};
       const fallbackToDefaults = opts.fallbackToDefaults !== false;
@@ -72,6 +81,7 @@
           sortDir: normalizeChatNodeNavigatorSortDirPref(chatNodeNavigatorSortDir),
           pinDirectHistory: normalizeChatNodeNavigatorPinDirectHistoryPref(chatNodeNavigatorPinDirectHistory),
           showIdle: normalizeChatNodeNavigatorShowIdlePref(chatNodeNavigatorShowIdle),
+          showStatusDots: normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots),
           showPacketDirection: normalizeChatNodeNavigatorShowPacketDirectionPref(chatNodeNavigatorShowPacketDirection),
           metaFields: normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds, {{
             fallbackToDefaults: false,
@@ -97,6 +107,9 @@
       const nextShowIdle = normalizeChatNodeNavigatorShowIdlePref(
         prefs.showIdle != null ? prefs.showIdle : chatNodeNavigatorShowIdle
       );
+      const nextShowStatusDots = normalizeChatNodeNavigatorShowStatusDotsPref(
+        prefs.showStatusDots != null ? prefs.showStatusDots : chatNodeNavigatorShowStatusDots
+      );
       const nextShowPacketDirection = normalizeChatNodeNavigatorShowPacketDirectionPref(
         prefs.showPacketDirection != null ? prefs.showPacketDirection : chatNodeNavigatorShowPacketDirection
       );
@@ -109,6 +122,7 @@
         || nextSortDir !== chatNodeNavigatorSortDir
         || nextPinDirectHistory !== chatNodeNavigatorPinDirectHistory
         || nextShowIdle !== chatNodeNavigatorShowIdle
+        || nextShowStatusDots !== chatNodeNavigatorShowStatusDots
         || nextShowPacketDirection !== chatNodeNavigatorShowPacketDirection
         || !chatNodeNavigatorMetaFieldIdsEqual(nextMetaFieldIds, chatNodeNavigatorMetaFieldIds)
       );
@@ -121,6 +135,7 @@
       chatNodeNavigatorSortDir = nextSortDir;
       chatNodeNavigatorPinDirectHistory = nextPinDirectHistory;
       chatNodeNavigatorShowIdle = nextShowIdle;
+      chatNodeNavigatorShowStatusDots = nextShowStatusDots;
       chatNodeNavigatorShowPacketDirection = nextShowPacketDirection;
       chatNodeNavigatorMetaFieldIds = nextMetaFieldIds;
       if (opts.persist !== false) {{
@@ -1165,11 +1180,20 @@
         const statusGlyphAttrs = statusGlyphLabel
           ? ` title="${{escAttr(statusGlyphLabel)}}" aria-label="${{escAttr(statusGlyphLabel)}}"`
           : "";
+        const showStatusDots = (typeof normalizeChatNodeNavigatorShowStatusDotsPref === "function")
+          ? normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots)
+          : !!chatNodeNavigatorShowStatusDots;
+        const statusVisibilityClass = showStatusDots ? "" : " status-hidden";
+        const statusMarkerClass = showStatusDots ? "" : " is-hidden";
+        const statusMarkerAttrs = showStatusDots
+          ? statusGlyphAttrs
+          : ' aria-hidden="true"';
+        const statusMarkerHtml = `<span class="chat-member-status status-${{statusKey}}${{statusGlyphClass}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>${{statusGlyph}}</span>`;
         const actionRowHtml = removeBtn
           ? `<span class="chat-member-actions">${{removeBtn}}</span>`
           : '<span class="chat-member-actions"></span>';
-        return `<div class="chat-member-item status-${{statusKey}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{mutedClass}}${{packetSparkClass}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-unread-direct-count="${{escAttr(unreadDirectCount)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
-          <span class="chat-member-status status-${{statusKey}}${{statusGlyphClass}}"${{statusGlyphAttrs}}>${{statusGlyph}}</span>
+        return `<div class="chat-member-item status-${{statusKey}}${{statusVisibilityClass}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{mutedClass}}${{packetSparkClass}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-unread-direct-count="${{escAttr(unreadDirectCount)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
+          ${{statusMarkerHtml}}
           <span class="chat-member-main">
             <span class="chat-member-name-row">
               <span class="chat-member-name-left">
@@ -1214,8 +1238,15 @@
           }}
         }} catch (_consoleErr) {{
         }}
-        return `<div class="chat-member-item status-unknown${{selectedNodeId === fallbackId ? " selected-node" : ""}}" data-node-id="${{escAttr(fallbackId)}}" data-node-tint-outline-seed="${{escAttr(fallbackOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(fallbackStartSeed)}}" data-node-tint-end-seed="${{escAttr(fallbackEndSeed)}}" style="${{escAttr(fallbackTintStyle)}}" title="Node navigator fallback row">
-          <span class="chat-member-status status-unknown">●</span>
+        const fallbackShowStatusDots = (typeof normalizeChatNodeNavigatorShowStatusDotsPref === "function")
+          ? normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots)
+          : !!chatNodeNavigatorShowStatusDots;
+        const fallbackStatusVisibilityClass = fallbackShowStatusDots ? "" : " status-hidden";
+        const fallbackStatusHtml = fallbackShowStatusDots
+          ? '<span class="chat-member-status status-unknown">●</span>'
+          : '<span class="chat-member-status status-unknown is-hidden" aria-hidden="true">●</span>';
+        return `<div class="chat-member-item status-unknown${{fallbackStatusVisibilityClass}}${{selectedNodeId === fallbackId ? " selected-node" : ""}}" data-node-id="${{escAttr(fallbackId)}}" data-node-tint-outline-seed="${{escAttr(fallbackOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(fallbackStartSeed)}}" data-node-tint-end-seed="${{escAttr(fallbackEndSeed)}}" style="${{escAttr(fallbackTintStyle)}}" title="Node navigator fallback row">
+          ${{fallbackStatusHtml}}
           <span class="chat-member-main">
             <span class="chat-member-name-row">
               <span class="chat-member-name-left">
@@ -1551,6 +1582,9 @@
         const showIdle = normalizeChatNodeNavigatorShowIdlePref(
           chatNodeNavigatorShowIdle
         );
+        const showStatusDots = normalizeChatNodeNavigatorShowStatusDotsPref(
+          chatNodeNavigatorShowStatusDots
+        );
         const showPacketDirection = normalizeChatNodeNavigatorShowPacketDirectionPref(
           chatNodeNavigatorShowPacketDirection
         );
@@ -1570,6 +1604,10 @@
           + `<label class="chat-node-navigator-field-option">
             <input type="checkbox" data-nav-toggle-id="idle"${{showIdle ? " checked" : ""}} />
             <span>Idle</span>
+          </label>`
+          + `<label class="chat-node-navigator-field-option">
+            <input type="checkbox" data-nav-toggle-id="status-dots"${{showStatusDots ? " checked" : ""}} />
+            <span>Status</span>
           </label>`
           + `<label class="chat-node-navigator-field-option">
             <input type="checkbox" data-nav-toggle-id="packet-direction"${{showPacketDirection ? " checked" : ""}} />
@@ -1592,6 +1630,9 @@
             }}
             if (toggleId === "idle") {{
               input.checked = showIdle;
+            }}
+            if (toggleId === "status-dots") {{
+              input.checked = showStatusDots;
             }}
             if (toggleId === "packet-direction") {{
               input.checked = showPacketDirection;
@@ -1662,6 +1703,15 @@
           if (toggleId === "idle") {{
             applyChatNodeNavigatorPreferences({{
               showIdle: !!target.checked,
+            }}, {{
+              persist: true,
+              rerender: true,
+            }});
+            return;
+          }}
+          if (toggleId === "status-dots") {{
+            applyChatNodeNavigatorPreferences({{
+              showStatusDots: !!target.checked,
             }}, {{
               persist: true,
               rerender: true,

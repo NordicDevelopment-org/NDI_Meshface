@@ -4592,6 +4592,14 @@
       grid-template-columns: 11px minmax(0, 1fr) 56px;
       align-items: stretch;
     }}
+    .chat-member-item.status-hidden {{
+      grid-template-columns: 0 minmax(0, 1fr);
+      gap: 0;
+    }}
+    .chat-member-item.status-hidden.has-packet-spark {{
+      grid-template-columns: 0 minmax(0, 1fr) 56px;
+      gap: 3px;
+    }}
     .chat-member-item.has-packet-spark .chat-member-status {{
       align-self: center;
     }}
@@ -4661,6 +4669,9 @@
       font-weight: 700;
       line-height: 1;
       color: #2aa85a;
+    }}
+    .chat-member-status.is-hidden {{
+      visibility: hidden;
     }}
     .chat-member-status.is-unread-direct {{
       display: inline-flex;
