@@ -91,6 +91,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function scheduleNetworkGraphEmptyRetry()' in js
     assert 'function animateNetworkGraphViewBox(svg, rawViewBox, options = {})' in js
     assert 'function buildNetworkGraphSceneMarkup(scene)' in js
+    assert 'class="network-graph-region' in js
     assert 'function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {})' in js
     assert 'function resolveNetworkGraphNodeEmoji(item)' in js
     assert 'function resolveMapNodeEmoji(nodeId, state = latestState)' in js
@@ -108,6 +109,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'let networkGraphLayoutMode = "radial";' in js
     assert 'function normalizeNetworkGraphEdgeMode(raw)' in js
     assert 'function normalizeNetworkGraphLayoutMode(raw)' in js
+    assert 'clean === "community"' in js
     assert 'function loadPreferredNetworkGraphEdgeMode()' in js
     assert 'function loadPreferredNetworkGraphLayoutMode()' in js
     assert 'function persistPreferredNetworkGraphEdgeMode(modeName)' in js
@@ -153,6 +155,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'syncNetworkGraphLayoutSelector();' in js
     assert 'label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"' in js
     assert '<select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout">' in js
+    assert '>Community</option>' in js
     assert 'bindNetworkGraphSummaryControls();' in js
     assert 'Avg packet hops: ${edge.avgHops == null ? "n/a" : edge.avgHops}' in js
     assert '${item.layer} hop${item.layer === 1 ? "" : "s"} away' in js
@@ -173,6 +176,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'Broadcast only' in js
     assert 'layoutMode === "tree"' in js
     assert 'layoutMode === "cluster"' in js
+    assert 'layoutMode === "community"' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'item.nodeId === localId ? "is-local" : ""' in js
     assert 'class="network-graph-node-emoji"' in js
@@ -213,6 +217,8 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-mode-chip {" in css
     assert ".network-graph-layout-control {" in css
     assert ".network-graph-layout-select {" in css
+    assert ".network-graph-region {" in css
+    assert ".network-graph-region-label {" in css
     assert ".network-graph-swatch.is-broadcast-only {" in css
     assert ".network-graph-swatch.is-local {" in css
     assert ".network-graph-ring.is-broadcast-only {" in css

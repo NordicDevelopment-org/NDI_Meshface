@@ -711,7 +711,7 @@
 
     function normalizeNetworkGraphLayoutMode(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
-      if (clean === "tree" || clean === "cluster") return clean;
+      if (clean === "tree" || clean === "cluster" || clean === "community") return clean;
       return "radial";
     }}
 
@@ -1543,8 +1543,24 @@
       const nodeMap = safeScene.nodeMap instanceof Map ? safeScene.nodeMap : new Map();
       const positions = safeScene.positions instanceof Map ? safeScene.positions : new Map();
       const rings = Array.isArray(safeScene.rings) ? safeScene.rings : [];
+      const regions = Array.isArray(safeScene.regions) ? safeScene.regions : [];
       const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
       const items = Array.isArray(safeScene.items) ? safeScene.items : [];
+
+      const regionMarkup = regions.map((region) => `
+        <g class="network-graph-region-wrap">
+          <rect
+            class="network-graph-region${{region.isRoot ? " is-root" : ""}}"
+            x="${{Number(region.x).toFixed(1)}}"
+            y="${{Number(region.y).toFixed(1)}}"
+            width="${{Number(region.width).toFixed(1)}}"
+            height="${{Number(region.height).toFixed(1)}}"
+            rx="18"
+            ry="18"
+          ></rect>
+          <text class="network-graph-region-label" x="${{(Number(region.x) + 12).toFixed(1)}}" y="${{(Number(region.y) + 18).toFixed(1)}}">${{escAttr(region.label || "")}}</text>
+        </g>
+      `).join("");
 
       const ringMarkup = rings.map((ring) => `
         <g class="network-graph-ring-wrap">
@@ -1688,6 +1704,7 @@
 
       return `
         <g class="network-graph-layers">
+          ${{regionMarkup}}
           ${{ringMarkup}}
         </g>
         <g class="network-graph-links">
@@ -1720,6 +1737,16 @@
               broadcastOnly: !!(ring && ring.broadcastOnly),
             }}))
           : [],
+        regions: Array.isArray(layout.regions)
+          ? layout.regions.map((region) => ({{
+              x: Number(region && region.x),
+              y: Number(region && region.y),
+              width: Number(region && region.width),
+              height: Number(region && region.height),
+              label: String((region && region.label) || ""),
+              isRoot: !!(region && region.isRoot),
+            }}))
+          : [],
       }};
     }}
 
@@ -1742,8 +1769,18 @@
       const items = Array.isArray(safeScene.items) ? safeScene.items : [];
       const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
       const rings = Array.isArray(safeScene.rings) ? safeScene.rings : [];
+      const regions = Array.isArray(safeScene.regions) ? safeScene.regions : [];
       let hash = 2166136261;
       hash = hashMixStr(hash, normalizeNodeId(safeScene.rootId || ""));
+      hash = hashMixInt(hash, regions.length);
+      for (const region of regions) {{
+        hash = hashMixInt(hash, Math.round(Number(region && region.x) * 10) || 0);
+        hash = hashMixInt(hash, Math.round(Number(region && region.y) * 10) || 0);
+        hash = hashMixInt(hash, Math.round(Number(region && region.width) * 10) || 0);
+        hash = hashMixInt(hash, Math.round(Number(region && region.height) * 10) || 0);
+        hash = hashMixStr(hash, String((region && region.label) || ""));
+        hash = hashMixInt(hash, region && region.isRoot ? 1 : 0);
+      }}
       hash = hashMixInt(hash, rings.length);
       for (const ring of rings) {{
         hash = hashMixInt(hash, Math.round(Number(ring && ring.radius) * 10) || 0);
@@ -1933,6 +1970,17 @@
       let minY = Number.POSITIVE_INFINITY;
       let maxX = Number.NEGATIVE_INFINITY;
       let maxY = Number.NEGATIVE_INFINITY;
+      for (const region of (Array.isArray(layout.regions) ? layout.regions : [])) {{
+        const x = Number(region && region.x);
+        const y = Number(region && region.y);
+        const width = Number(region && region.width);
+        const height = Number(region && region.height);
+        if (![x, y, width, height].every((value) => Number.isFinite(value))) continue;
+        minX = Math.min(minX, x - 12);
+        minY = Math.min(minY, y - 12);
+        maxX = Math.max(maxX, x + width + 12);
+        maxY = Math.max(maxY, y + height + 12);
+      }}
       for (const ring of (Array.isArray(layout.rings) ? layout.rings : [])) {{
         const radius = Number(ring && ring.radius);
         if (!Number.isFinite(radius) || radius <= 0) continue;
@@ -2933,6 +2981,55 @@
       return "";
     }}
 
+    function detectNetworkGraphCommunities(adjacency, degreeMeta, eligibleNodeIds) {{
+      const nodeIds = Array.isArray(eligibleNodeIds)
+        ? Array.from(new Set(eligibleNodeIds.map((nodeId) => normalizeNodeId(nodeId)).filter(Boolean)))
+        : [];
+      const labels = new Map(nodeIds.map((nodeId) => [nodeId, nodeId]));
+      const iterations = 8;
+      for (let step = 0; step < iterations; step += 1) {{
+        let changed = false;
+        const orderedNodeIds = nodeIds.slice().sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, new Map()));
+        for (const nodeId of orderedNodeIds) {{
+          const peers = adjacency.get(nodeId);
+          if (!(peers instanceof Map) || peers.size <= 0) continue;
+          const scores = new Map();
+          for (const [peerId, edge] of peers.entries()) {{
+            if (!labels.has(peerId)) continue;
+            const peerLabel = normalizeNodeId(labels.get(peerId) || peerId);
+            const weight = Math.max(1, Number(edge && edge.weight) || 0);
+            scores.set(peerLabel, (scores.get(peerLabel) || 0) + weight);
+          }}
+          if (!scores.size) continue;
+          let bestLabel = normalizeNodeId(labels.get(nodeId) || nodeId);
+          let bestScore = -1;
+          for (const [label, score] of scores.entries()) {{
+            if (
+              score > bestScore
+              || (score === bestScore && String(label) < String(bestLabel))
+            ) {{
+              bestLabel = label;
+              bestScore = score;
+            }}
+          }}
+          if (bestLabel && labels.get(nodeId) !== bestLabel) {{
+            labels.set(nodeId, bestLabel);
+            changed = true;
+          }}
+        }}
+        if (!changed) break;
+      }}
+      const communities = new Map();
+      nodeIds.forEach((nodeId) => {{
+        const label = normalizeNodeId(labels.get(nodeId) || nodeId);
+        if (!communities.has(label)) {{
+          communities.set(label, []);
+        }}
+        communities.get(label).push(nodeId);
+      }});
+      return Array.from(communities.values()).map((members) => members.slice().sort()).sort((a, b) => b.length - a.length);
+    }}
+
     function buildNetworkGraphLayout(nodeMap, combinedEdges, state) {{
       const adjacency = buildNetworkGraphAdjacency(nodeMap, combinedEdges);
       const safeState = (state && typeof state === "object") ? state : {{}};
@@ -2962,6 +3059,7 @@
           positions: new Map(),
           layers: new Map(),
           rings: [],
+          regions: [],
           edges: combinedEdges,
           signalMetaByNodeId,
           connectedCount: 0,
@@ -3168,6 +3266,7 @@
       }});
 
       const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
+      let regions = [];
       if (layoutMode === "tree") {{
         const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
         const treeTopY = 90;
@@ -3209,6 +3308,106 @@
               : (treeLeftX + (spacing * index));
             positions.set(nodeId, {{
               x: rowX,
+              y: rowY,
+              layer: maxConnectedLayer + 1 + groupIndex,
+              disconnected: true,
+              broadcastOnly: !!group.broadcastOnly,
+            }});
+          }});
+        }});
+        rings.length = 0;
+      }} else if (layoutMode === "community") {{
+        const connectedNodeIds = Array.from(layerByNodeId.keys());
+        const rawCommunities = detectNetworkGraphCommunities(adjacency, degreeMeta, connectedNodeIds);
+        const communityDescriptors = rawCommunities.map((members, index) => {{
+          const normalizedMembers = Array.isArray(members) ? members.slice() : [];
+          const hasRoot = normalizedMembers.includes(rootId);
+          const visibleMembers = normalizedMembers.filter((nodeId) => nodeId !== rootId);
+          const anchorId = hasRoot ? rootId : (normalizedMembers[0] || "");
+          const labelBase = networkGraphNodeDisplayName(anchorId, nodeMap);
+          return {{
+            id: `community-${{index + 1}}`,
+            members: normalizedMembers,
+            visibleMembers,
+            hasRoot,
+            label: hasRoot ? `Root · ${{truncateNetworkGraphLabel(labelBase, 18)}}` : truncateNetworkGraphLabel(labelBase, 20),
+            weight: Math.max(1, normalizedMembers.length),
+          }};
+        }}).sort((a, b) => (
+          Number(b.hasRoot) - Number(a.hasRoot)
+        ) || (b.members.length - a.members.length));
+        const availableLeft = -60;
+        const availableTop = 36;
+        const availableWidth = 1080;
+        const availableHeight = 820;
+        const communityCount = Math.max(1, communityDescriptors.length);
+        const columns = communityCount <= 1 ? 1 : 2;
+        const rows = Math.max(1, Math.ceil(communityCount / columns));
+        const boxGap = 42;
+        const boxWidth = Math.max(220, (availableWidth - ((columns - 1) * boxGap)) / columns);
+        const boxHeight = Math.max(170, (availableHeight - ((rows - 1) * boxGap)) / rows);
+        communityDescriptors.forEach((descriptor, descriptorIndex) => {{
+          const col = descriptorIndex % columns;
+          const row = Math.floor(descriptorIndex / columns);
+          const boxX = availableLeft + (col * (boxWidth + boxGap));
+          const boxY = availableTop + (row * (boxHeight + boxGap));
+          const innerLeft = boxX + 26;
+          const innerTop = boxY + 42;
+          const innerWidth = Math.max(120, boxWidth - 52);
+          regions.push({{
+            x: boxX,
+            y: boxY,
+            width: boxWidth,
+            height: boxHeight,
+            label: descriptor.label || `Community ${{descriptorIndex + 1}}`,
+            isRoot: !!descriptor.hasRoot,
+          }});
+          if (descriptor.hasRoot) {{
+            positions.set(rootId, {{
+              ...(positions.get(rootId) || {{}}),
+              x: boxX + (boxWidth / 2),
+              y: boxY + Math.min(boxHeight - 42, 76),
+              layer: 0,
+              disconnected: false,
+              broadcastOnly: !!((positions.get(rootId) || {{}}).broadcastOnly),
+            }});
+          }}
+          const members = descriptor.visibleMembers;
+          const columnsInBox = Math.max(2, Math.min(4, Math.round(Math.sqrt(Math.max(1, members.length)) * 0.82)));
+          members.forEach((nodeId, memberIndex) => {{
+            const memberLayer = Math.max(1, Number(layerByNodeId.get(nodeId) || 1));
+            const boxRow = Math.floor(memberIndex / columnsInBox);
+            const rowStart = boxRow * columnsInBox;
+            const rowCount = Math.min(columnsInBox, members.length - rowStart);
+            const colInRow = memberIndex % columnsInBox;
+            const offsetX = rowCount <= 1
+              ? (innerWidth / 2)
+              : ((colInRow + 0.5) * (innerWidth / rowCount));
+            const rowSpacing = Math.max(36, Math.min(56, 32 + (memberLayer * 4)));
+            positions.set(nodeId, {{
+              ...(positions.get(nodeId) || {{}}),
+              x: innerLeft + offsetX,
+              y: innerTop + (boxRow * rowSpacing),
+              layer: memberLayer,
+              disconnected: false,
+              broadcastOnly: !!((positions.get(nodeId) || {{}}).broadcastOnly),
+            }});
+          }});
+        }});
+        disconnectedGroups.forEach((group, groupIndex) => {{
+          const ids = Array.isArray(group.nodeIds) ? group.nodeIds : [];
+          const laneSide = group.broadcastOnly ? 1 : -1;
+          const laneX = 480 + (laneSide * 632);
+          const laneTopY = 54 + (groupIndex * 24);
+          const laneBottomY = 882;
+          const laneHeight = Math.max(120, laneBottomY - laneTopY);
+          const stepY = ids.length > 1 ? (laneHeight / Math.max(1, ids.length - 1)) : 0;
+          ids.forEach((nodeId, index) => {{
+            const rowY = ids.length <= 1
+              ? (laneTopY + (laneHeight / 2))
+              : (laneTopY + (stepY * index));
+            positions.set(nodeId, {{
+              x: laneX + (((index % 2 === 0) ? -1 : 1) * 26),
               y: rowY,
               layer: maxConnectedLayer + 1 + groupIndex,
               disconnected: true,
@@ -3395,7 +3594,7 @@
       }}
       const selectedId = normalizeNodeId(selectedNodeId || "");
       const visibleLabelNodeIds = new Set();
-      if (nodeMap.size <= 18 || layoutMode === "tree" || layoutMode === "cluster") {{
+      if (nodeMap.size <= 18 || layoutMode === "tree" || layoutMode === "cluster" || layoutMode === "community") {{
         for (const nodeId of positions.keys()) {{
           visibleLabelNodeIds.add(nodeId);
         }}
@@ -3462,6 +3661,7 @@
         positions,
         layers,
         rings,
+        regions,
         edges: combinedEdges,
         signalMetaByNodeId,
         connectedCount: layerByNodeId.size,
@@ -3551,7 +3751,7 @@
       const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
       const layoutModeLabel = layoutMode === "tree"
         ? "Tree"
-        : (layoutMode === "cluster" ? "Cluster" : "Radial");
+        : (layoutMode === "cluster" ? "Cluster" : (layoutMode === "community" ? "Community" : "Radial"));
       const modeLabel = edgeMode === "live" ? "Live" : "History";
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);
       const graphSourceSignature = buildNetworkGraphSourceSignature(
@@ -3635,7 +3835,7 @@
       const rootItem = layout.items.find((item) => item && item.nodeId === rootId) || null;
       const summaryParts = [
         `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip" type="button" aria-pressed="${{edgeMode === "live" ? "true" : "false"}}" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label">Mode</span><strong>${{modeLabel}}</strong></button>`,
-        `<label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option></select></label>`,
+        `<label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label>`,
         `<span class="network-graph-chip"><span class="network-graph-chip-label">Root</span><strong>${{escAttr(truncateNetworkGraphLabel(rootLabel, 28))}}</strong></span>`,
         `<span class="network-graph-chip"><span class="network-graph-chip-label">Nodes</span><strong>${{layout.items.length}}</strong></span>`,
         `<span class="network-graph-chip"><span class="network-graph-chip-label">Links</span><strong>${{combinedEdges.length}}</strong></span>`,
@@ -3740,7 +3940,7 @@
 
       legend.innerHTML = [
         `<span class="network-graph-legend-item hint">${{modeLabel}} mode: ${{edgeMode === "live" ? "current-session link topology only" : "stored link-history topology"}}</span>`,
-        `<span class="network-graph-legend-item hint">${{layoutModeLabel}} layout: ${{layoutMode === "tree" ? "hierarchical breadth-first view from the current root" : (layoutMode === "cluster" ? "grouped around first-hop neighborhoods from the current root" : "hop-distance rings around the current root")}}</span>`,
+        `<span class="network-graph-legend-item hint">${{layoutModeLabel}} layout: ${{layoutMode === "tree" ? "hierarchical breadth-first view from the current root" : (layoutMode === "cluster" ? "grouped around first-hop neighborhoods from the current root" : (layoutMode === "community" ? "community-detected regions with detached nodes split into side lanes" : "hop-distance rings around the current root"))}}</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-root"></span>Root / selected node</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-local"></span>Your node / local radio</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-real"></span>${{realLinkCount}} confirmed links</span>`,
