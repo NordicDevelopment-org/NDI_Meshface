@@ -4634,9 +4634,9 @@
     .network-overview-sensor-controls-host .env-metrics-control-group .env-metric-select {{
       min-width: 118px;
       max-width: min(100%, 280px);
-      border: 1px solid #bfd4c3;
+      border: 0;
       border-radius: 999px;
-      background: #ffffff;
+      background: transparent;
       color: #274935;
       font-size: 11px;
       line-height: 1.2;
@@ -4681,36 +4681,33 @@
       padding-top: 0;
       color: #5e6e64;
     }}
-    .network-overview-sensor-host .env-node-legend-card {{
+    .network-overview-sensor-host .env-node-legend-pill {{
       display: inline-flex;
       align-items: center;
       justify-content: flex-start;
       min-width: 0;
-      max-width: min(100%, 220px);
-      border: 1px solid #d4e1da;
+      max-width: min(100%, 190px);
+      border: 1px solid #c2d8c7;
       border-radius: 999px;
-      background: #f9fdf9;
-      color: #193a28;
-      padding: 6px 10px;
+      background: #f3faf5;
+      color: #1f5d40;
+      padding: 4px 10px;
       box-shadow: none;
       overflow: hidden;
     }}
-    .network-overview-sensor-host .env-node-legend-card .v {{
+    .network-overview-sensor-host .env-node-legend-pill .v {{
       display: inline-block;
       margin-top: 0;
       font-size: 11px;
       line-height: 1.2;
       font-weight: 600;
-      color: #193a28;
+      color: inherit;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }}
-    .network-overview-sensor-host .env-node-legend-item {{
-      text-align: left;
-    }}
-    .network-overview-sensor-host .env-node-legend-item::before {{
+    .network-overview-sensor-host .env-node-legend-pill::before {{
       content: "";
       width: 8px;
       height: 8px;
@@ -4723,12 +4720,18 @@
     .network-overview-sensor-host .env-node-legend-toggle:hover {{
       background: #eef8f1;
     }}
+    .network-overview-sensor-host .env-node-legend-toggle.is-hidden {{
+      opacity: 0.58;
+    }}
     .network-overview-sensor-host .env-node-legend-toggle:focus-visible {{
       outline: 2px solid rgba(28, 113, 216, 0.45);
       outline-offset: 2px;
     }}
     .network-overview-sensor-host .env-node-legend-more {{
       justify-content: center;
+    }}
+    .network-overview-sensor-host .env-node-legend-more::before {{
+      display: none;
     }}
     .network-overview-sensor-host .env-node-legend-more .v {{
       font-size: 12px;

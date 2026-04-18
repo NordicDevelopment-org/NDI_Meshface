@@ -381,12 +381,12 @@
       const hiddenSeries = Math.max(0, totalSeries - visibleSeries);
       host.innerHTML = [
         ...legendItems.map((item) => (
-          `<button class="overview-item env-node-legend-card env-node-legend-item env-node-legend-toggle${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? " is-hidden" : ""}}" type="button" data-env-node-toggle="1" data-node-id="${{escAttr(item.nodeId)}}" data-node-hidden="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "1" : "0"}}" aria-pressed="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "false" : "true"}}" style="--node-color:${{escAttr(item.color)}};" title="${{escAttr(`${{formatEnvironmentNodeTooltipLabel(item.nodeId, item.label)}} • click to ${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "show" : "hide"}}`)}}">
+          `<button class="history-metric-inline env-node-legend-pill env-node-legend-toggle${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? " is-hidden" : ""}}" type="button" data-env-node-toggle="1" data-node-id="${{escAttr(item.nodeId)}}" data-node-hidden="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "1" : "0"}}" aria-pressed="${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "false" : "true"}}" style="--node-color:${{escAttr(item.color)}};" title="${{escAttr(`${{formatEnvironmentNodeTooltipLabel(item.nodeId, item.label)}} • click to ${{hiddenSet.has(normalizeNodeId(item.nodeId)) ? "show" : "hide"}}`)}}">
             <span class="v">${{escAttr(item.label)}}</span>
           </button>`
         )),
         hiddenSeries > 0
-          ? `<span class="overview-item env-node-legend-card env-node-legend-more"><span class="k">Hidden nodes</span><span class="v">+${{hiddenSeries}} more</span></span>`
+          ? `<span class="history-metric-inline env-node-legend-pill env-node-legend-more"><span class="v">+${{hiddenSeries}} hidden</span></span>`
           : "",
       ].filter(Boolean).join("");
     }}
