@@ -283,26 +283,13 @@
     }}
 
     function updateMapLinkLayerControl() {{
-      const wrap = document.getElementById("map-link-wrap");
-      const toggle = document.getElementById("map-link-toggle");
       const modeWrap = document.getElementById("map-link-mode-wrap");
       const modeSelect = document.getElementById("map-link-mode");
       const inMapLinkContext = activeLayoutView === "network";
-      if (wrap instanceof HTMLElement) {{
-        wrap.hidden = !inMapLinkContext;
-        wrap.title = mapLinkLayerEnabled
-          ? "Hide the heuristic link layer for nodes without GPS."
-          : "Show the heuristic link layer for nodes without GPS.";
-      }}
-      if (toggle instanceof HTMLInputElement) {{
-        toggle.checked = mapLinkLayerEnabled;
-      }}
       if (modeWrap instanceof HTMLElement) {{
         modeWrap.hidden = !inMapLinkContext;
-        modeWrap.classList.toggle("disabled", !mapLinkLayerEnabled);
       }}
       if (modeSelect instanceof HTMLSelectElement) {{
-        modeSelect.disabled = !mapLinkLayerEnabled;
         modeSelect.value = normalizeMapLinkLayerMode(mapLinkLayerMode);
       }}
     }}
@@ -327,17 +314,10 @@
       }}
     }}
 
-    function persistMapLinkLayerPreference() {{
-      try {{
-        window.localStorage.setItem(mapLinkLayerStorageKey, mapLinkLayerEnabled ? "1" : "0");
-      }} catch (_err) {{
-      }}
-    }}
-
     function normalizeMapLinkLayerMode(value) {{
       const clean = String(value || "").trim().toLowerCase();
-      if (clean === "history" || clean === "live" || clean === "both") return clean;
-      return "both";
+      if (clean === "none" || clean === "history" || clean === "live" || clean === "both") return clean;
+      return "none";
     }}
 
     function persistMapLinkLayerModePreference() {{
@@ -368,24 +348,10 @@
       updateMapPacketLinesControl();
     }}
 
-    function loadMapLinkLayerPreference() {{
-      mapLinkLayerEnabled = false;
-      try {{
-        const stored = window.localStorage.getItem(mapLinkLayerStorageKey);
-        if (stored === "1") {{
-          mapLinkLayerEnabled = true;
-        }} else if (stored === "0") {{
-          mapLinkLayerEnabled = false;
-        }}
-      }} catch (_err) {{
-      }}
-      updateMapLinkLayerControl();
-    }}
-
     function loadMapLinkLayerModePreference() {{
-      mapLinkLayerMode = "both";
+      mapLinkLayerMode = "none";
       try {{
-        mapLinkLayerMode = normalizeMapLinkLayerMode(window.localStorage.getItem(mapLinkModeStorageKey) || "both");
+        mapLinkLayerMode = normalizeMapLinkLayerMode(window.localStorage.getItem(mapLinkModeStorageKey) || "none");
       }} catch (_err) {{
       }}
       updateMapLinkLayerControl();
@@ -421,27 +387,7 @@
     }}
 
     function bindMapLinkLayerControl() {{
-      const toggle = document.getElementById("map-link-toggle");
       const modeSelect = document.getElementById("map-link-mode");
-      if (toggle instanceof HTMLInputElement && toggle.dataset.bound !== "1") {{
-        toggle.dataset.bound = "1";
-        toggle.checked = mapLinkLayerEnabled;
-        toggle.addEventListener("change", () => {{
-          mapLinkLayerEnabled = !!toggle.checked;
-          persistMapLinkLayerPreference();
-          updateMapLinkLayerControl();
-          lastMapSignature = "";
-          lastMapGraphSignature = "";
-          lastMapRenderMode = "";
-          if (latestState && activeLayoutView === "network") {{
-            renderMap(
-              latestState.nodes || [],
-              (latestState.traffic || {{}}).edges || [],
-              null
-            );
-          }}
-        }});
-      }}
       if (modeSelect instanceof HTMLSelectElement && modeSelect.dataset.bound !== "1") {{
         modeSelect.dataset.bound = "1";
         modeSelect.value = normalizeMapLinkLayerMode(mapLinkLayerMode);

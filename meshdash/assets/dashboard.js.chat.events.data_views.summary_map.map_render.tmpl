@@ -264,7 +264,10 @@
         for (const node of (nodes || [])) {{
           byId[normalizeNodeId(node && node.id)] = node;
         }}
-        const linkOverlay = (activeLayoutView === "network" && mapLinkLayerEnabled)
+        const linkOverlay = (
+          activeLayoutView === "network"
+          && normalizeMapLinkLayerMode(mapLinkLayerMode) !== "none"
+        )
           ? buildMapLinkLayerOverlay(nodes, edges, {{ mode: mapLinkLayerMode }})
           : {{ estimates: new Map(), lines: [] }};
         const estimatedPositions = linkOverlay.estimates instanceof Map
@@ -523,7 +526,7 @@
           }}
         }}
 
-        if (activeLayoutView === "network" && mapLinkLayerEnabled) {{
+        if (activeLayoutView === "network" && normalizeMapLinkLayerMode(mapLinkLayerMode) !== "none") {{
           const seenEstimateKeys = new Set();
           for (const estimateLine of (Array.isArray(linkOverlay.lines) ? linkOverlay.lines : [])) {{
             const lineKey = String(estimateLine && estimateLine.key || "");

@@ -3,8 +3,6 @@
       supported = supportsSignalHeatmap(),
       profileLabel = ""
     ) {{
-      const wrap = document.getElementById("map-heatmap-wrap");
-      const toggle = document.getElementById("map-heatmap-toggle");
       const modeWrap = document.getElementById("map-heatmap-mode-wrap");
       const modeSelect = document.getElementById("map-heatmap-mode");
       const modeConfig = resolveSignalHeatModeConfig();
@@ -23,12 +21,16 @@
         activeLayoutView === "network"
         || activeLayoutView === "saved"
       );
-      if (wrap instanceof HTMLElement) {{
-        wrap.hidden = !inMapHeatContext;
-        wrap.classList.toggle("disabled", !supported);
+      if (modeWrap instanceof HTMLElement) {{
+        modeWrap.hidden = !inMapHeatContext;
+        modeWrap.classList.toggle("disabled", !supported);
         const profileText = profileLabel ? `Tuned for ${{profileLabel}}.` : "";
-        const modeText = ` Mode: ${{modeLabel}} (heard within ~${{maxAgeMinutes}}m).`;
-        const fadeText = ` Freshness decays over ~${{fadeMinutes}}m.`;
+        const modeText = signalHeatmapMode === "none"
+          ? " Heatmap hidden."
+          : ` Mode: ${{modeLabel}} (heard within ~${{maxAgeMinutes}}m).`;
+        const fadeText = signalHeatmapMode === "none"
+          ? ""
+          : ` Freshness decays over ~${{fadeMinutes}}m.`;
         const geoText = signalHeatDevKnobs.geoRadiusLock >= 0.5
           ? " Coverage is geo-locked (km-stable across zoom/latitude)."
           : "";
@@ -40,21 +42,10 @@
           ? `Overlay realtime signal heatmap from positioned nodes. Intensity and radius are derived from reported SNR/RSSI (freshness-faded). ${{profileText}}${{modeText}}${{fadeText}}${{savedModeText}}${{geoText}}${{devText}}`
           : "Heatmap overlay is unavailable (leaflet.heat not loaded).";
         if (Number.isFinite(pointsCount)) {{
-          wrap.title = `${{baseTitle}} Active nodes with signal+position: ${{pointsCount}}.`;
+          modeWrap.title = `${{baseTitle}} Active nodes with signal+position: ${{pointsCount}}.`;
         }} else {{
-          wrap.title = baseTitle;
+          modeWrap.title = baseTitle;
         }}
-      }}
-      if (modeWrap instanceof HTMLElement) {{
-        modeWrap.hidden = !inMapHeatContext;
-        modeWrap.classList.toggle("disabled", !supported);
-        modeWrap.title = supported
-          ? `Heatmap recency mode. ${{modeLabel}} currently keeps nodes heard within about ${{maxAgeMinutes}} minutes.`
-          : "Heatmap overlay is unavailable (leaflet.heat not loaded).";
-      }}
-      if (toggle instanceof HTMLInputElement) {{
-        toggle.checked = signalHeatmapEnabled;
-        toggle.disabled = !supported;
       }}
       if (modeSelect instanceof HTMLSelectElement) {{
         modeSelect.value = normalizeSignalHeatmapMode(signalHeatmapMode);
@@ -147,4 +138,3 @@
         }}
       }}
     }}
-

@@ -173,6 +173,14 @@
       { id: "vstrong",min: 0.84, max: 1.01, radiusMul: 2.20, blurMul: 1.34, intensityMul: 0.90 },
     ];
     const signalHeatModeDefaults = {{
+      none: {{
+        label: "None",
+        freshFullSeconds: 0,
+        freshDropSeconds: 0,
+        maxAgeSeconds: 0,
+        tailWeight: 0,
+        includeUnknownAge: false,
+      }},
       live: {{
         label: "Live only",
         freshFullSeconds: 60,
@@ -296,10 +304,8 @@
     const chatPerfStorageKey = "meshDashboardChatPerfMetricsV1";
     const themeStorageKey = "meshDashboardThemePreference";
     const tickerDensityStorageKey = "meshDashboardTickerDensityV1";
-    const signalHeatmapStorageKey = "meshDashboardSignalHeatmapEnabledV1";
     const signalHeatmapModeStorageKey = "meshDashboardSignalHeatmapModeV1";
     const mapPacketLinesStorageKey = "meshDashboardMapPacketLinesEnabledV1";
-    const mapLinkLayerStorageKey = "meshDashboardMapLinkLayerEnabledV1";
     const mapLinkModeStorageKey = "meshDashboardMapLinkModeV1";
     const mapLiveActivityStorageKey = "meshDashboardMapLiveActivityEnabledV1";
     const mapBasemapModeStorageKey = "meshDashboardMapBasemapModeV1";
