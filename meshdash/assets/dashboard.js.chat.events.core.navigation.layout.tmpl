@@ -690,7 +690,9 @@
 
     const networkDiagnosticsEnabled = !!Number({debug_mode_enabled});
     const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";
+    const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";
     let networkGraphEdgeMode = "history";
+    let networkGraphLayoutMode = "radial";
 
     function normalizeNetworkSubview(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
@@ -705,6 +707,12 @@
 
     function normalizeNetworkGraphEdgeMode(raw) {{
       return String(raw || "").trim().toLowerCase() === "live" ? "live" : "history";
+    }}
+
+    function normalizeNetworkGraphLayoutMode(raw) {{
+      const clean = String(raw || "").trim().toLowerCase();
+      if (clean === "tree" || clean === "cluster") return clean;
+      return "radial";
     }}
 
     function loadPreferredNetworkSubview() {{
@@ -737,6 +745,23 @@
       const next = normalizeNetworkGraphEdgeMode(modeName);
       try {{
         window.localStorage.setItem(networkGraphModeStorageKey, next);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadPreferredNetworkGraphLayoutMode() {{
+      try {{
+        const raw = window.localStorage.getItem(networkGraphLayoutStorageKey) || "radial";
+        return normalizeNetworkGraphLayoutMode(raw);
+      }} catch (_err) {{
+        return "radial";
+      }}
+    }}
+
+    function persistPreferredNetworkGraphLayoutMode(modeName) {{
+      const next = normalizeNetworkGraphLayoutMode(modeName);
+      try {{
+        window.localStorage.setItem(networkGraphLayoutStorageKey, next);
       }} catch (_err) {{
       }}
     }}
@@ -2291,6 +2316,24 @@
       }});
     }}
 
+    function syncNetworkGraphLayoutSelector() {{
+      const next = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
+      const select = document.getElementById("network-graph-layout-select");
+      if (!(select instanceof HTMLSelectElement)) return;
+      if (select.value !== next) {{
+        select.value = next;
+      }}
+    }}
+
+    function bindNetworkGraphLayoutSelector() {{
+      const select = document.getElementById("network-graph-layout-select");
+      if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") return;
+      select.dataset.bound = "1";
+      select.addEventListener("change", () => {{
+        setNetworkGraphLayoutMode(select.value || "radial", {{ persist: true, rerender: true }});
+      }});
+    }}
+
     function setNetworkGraphEdgeMode(modeName, options = {{}}) {{
       const next = normalizeNetworkGraphEdgeMode(modeName);
       const changed = next !== normalizeNetworkGraphEdgeMode(networkGraphEdgeMode);
@@ -2301,6 +2344,37 @@
       if (changed) {{
         networkGraphViewState.pendingEntryViewportSync = true;
         networkGraphViewState.pendingModeViewportSync = true;
+      }}
+      if (
+        changed
+        && !(options && options.rerender === false)
+        && activeLayoutView === "network"
+        && activeNetworkSubview === "graph"
+        && typeof renderNetworkGraphView === "function"
+      ) {{
+        renderNetworkGraphView(latestState);
+      }}
+      return changed;
+    }}
+
+    function setNetworkGraphLayoutMode(modeName, options = {{}}) {{
+      const next = normalizeNetworkGraphLayoutMode(modeName);
+      const changed = next !== normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
+      networkGraphLayoutMode = next;
+      syncNetworkGraphLayoutSelector();
+      if (!(options && options.persist === false)) {{
+        persistPreferredNetworkGraphLayoutMode(next);
+      }}
+      if (changed) {{
+        networkGraphViewState.renderSourceSignature = "";
+        networkGraphViewState.cachedLayout = null;
+        networkGraphViewState.lastSceneStructureSignature = "";
+        networkGraphViewState.renderedPositions = new Map();
+        networkGraphViewState.renderedLayoutSnapshot = null;
+        networkGraphViewState.pendingEntryViewportSync = true;
+        networkGraphViewState.pendingModeViewportSync = true;
+        networkGraphViewState.forceCenteredFitOnce = true;
+        networkGraphViewState.skipSceneAnimationOnce = true;
       }}
       if (
         changed
@@ -3093,9 +3167,149 @@
         }});
       }});
 
+      const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
+      if (layoutMode === "tree") {{
+        const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
+        const treeTopY = 90;
+        const treeBottomY = 540;
+        const treeLeftX = 86;
+        const treeRightX = 874;
+        const treeWidth = treeRightX - treeLeftX;
+        const treeHeight = treeBottomY - treeTopY;
+        const maxTreeLayer = sortedLayers.length ? sortedLayers[sortedLayers.length - 1] : 0;
+        for (const layer of sortedLayers) {{
+          const ids = Array.isArray(layers.get(layer)) ? Array.from(layers.get(layer)) : [];
+          const layerY = maxTreeLayer <= 0
+            ? (treeTopY + (treeHeight / 2))
+            : (treeTopY + ((treeHeight * layer) / Math.max(1, maxTreeLayer)));
+          const spacing = ids.length > 1 ? (treeWidth / Math.max(1, ids.length - 1)) : 0;
+          ids.forEach((nodeId, index) => {{
+            const layerX = ids.length <= 1
+              ? (treeLeftX + (treeWidth / 2))
+              : (treeLeftX + (spacing * index));
+            const current = positions.get(nodeId) || {{ layer }};
+            positions.set(nodeId, {{
+              ...current,
+              x: layerX,
+              y: layerY,
+              layer,
+              disconnected: false,
+              broadcastOnly: !!current.broadcastOnly,
+            }});
+          }});
+        }}
+        const detachedRowStartY = Math.min(586, treeBottomY + 54);
+        disconnectedGroups.forEach((group, groupIndex) => {{
+          const ids = Array.isArray(group.nodeIds) ? group.nodeIds : [];
+          const rowY = detachedRowStartY + (groupIndex * 46);
+          const spacing = ids.length > 1 ? (treeWidth / Math.max(1, ids.length - 1)) : 0;
+          ids.forEach((nodeId, index) => {{
+            const rowX = ids.length <= 1
+              ? (treeLeftX + (treeWidth / 2))
+              : (treeLeftX + (spacing * index));
+            positions.set(nodeId, {{
+              x: rowX,
+              y: rowY,
+              layer: maxConnectedLayer + 1 + groupIndex,
+              disconnected: true,
+              broadcastOnly: !!group.broadcastOnly,
+            }});
+          }});
+        }});
+        rings.length = 0;
+      }} else if (layoutMode === "cluster") {{
+        const rootClusterIds = Array.isArray(layers.get(1)) ? Array.from(layers.get(1)) : [];
+        const clusterMembersById = new Map();
+        if (!rootClusterIds.length) {{
+          clusterMembersById.set(rootId, [rootId]);
+        }}
+        rootClusterIds.forEach((nodeId) => {{
+          clusterMembersById.set(nodeId, [nodeId]);
+        }});
+        for (const [nodeId, layer] of layerByNodeId.entries()) {{
+          if (nodeId === rootId || layer <= 1) continue;
+          const parents = Array.isArray(parentHintsByNodeId.get(nodeId))
+            ? parentHintsByNodeId.get(nodeId)
+            : [];
+          let clusterId = "";
+          let cursorId = normalizeNodeId(parents[0] || "");
+          const visited = new Set();
+          while (cursorId && !visited.has(cursorId)) {{
+            visited.add(cursorId);
+            const cursorLayer = Number(layerByNodeId.get(cursorId));
+            if (cursorLayer === 1) {{
+              clusterId = cursorId;
+              break;
+            }}
+            const cursorParents = Array.isArray(parentHintsByNodeId.get(cursorId))
+              ? parentHintsByNodeId.get(cursorId)
+              : [];
+            cursorId = normalizeNodeId(cursorParents[0] || "");
+          }}
+          if (!clusterId) {{
+            clusterId = rootClusterIds[0] || rootId;
+          }}
+          if (!clusterMembersById.has(clusterId)) {{
+            clusterMembersById.set(clusterId, []);
+          }}
+          clusterMembersById.get(clusterId).push(nodeId);
+        }}
+        positions.set(rootId, {{
+          ...(positions.get(rootId) || {{}}),
+          x: 480,
+          y: 310,
+          layer: 0,
+          disconnected: false,
+          broadcastOnly: !!((positions.get(rootId) || {{}}).broadcastOnly),
+        }});
+        const clusterIds = Array.from(clusterMembersById.keys()).filter((nodeId) => nodeId !== rootId);
+        const clusterRadius = clusterIds.length <= 4 ? 184 : 214;
+        const clusterStartAngle = -Math.PI / 2;
+        const clusterStep = clusterIds.length > 0 ? ((Math.PI * 2) / clusterIds.length) : 0;
+        clusterIds.forEach((clusterId, clusterIndex) => {{
+          const clusterAngle = clusterStartAngle + (clusterStep * clusterIndex);
+          const clusterCenterX = 480 + (Math.cos(clusterAngle) * clusterRadius);
+          const clusterCenterY = 310 + (Math.sin(clusterAngle) * Math.min(154, clusterRadius * 0.72));
+          const members = (clusterMembersById.get(clusterId) || []).slice().sort((a, b) => (
+            Number(layerByNodeId.get(a) || 0) - Number(layerByNodeId.get(b) || 0)
+          ) || compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
+          const innerStep = members.length > 0 ? ((Math.PI * 2) / members.length) : 0;
+          members.forEach((nodeId, memberIndex) => {{
+            const memberLayer = Math.max(1, Number(layerByNodeId.get(nodeId) || 1));
+            const localRadius = Math.min(74, 24 + ((memberLayer - 1) * 18) + Math.max(0, members.length - 6) * 1.4);
+            const angle = members.length === 1 ? (-Math.PI / 2) : (-Math.PI / 2 + (innerStep * memberIndex));
+            positions.set(nodeId, {{
+              ...(positions.get(nodeId) || {{}}),
+              x: clusterCenterX + (Math.cos(angle) * localRadius),
+              y: clusterCenterY + (Math.sin(angle) * localRadius),
+              layer: memberLayer,
+              disconnected: false,
+              broadcastOnly: !!((positions.get(nodeId) || {{}}).broadcastOnly),
+            }});
+          }});
+        }});
+        const detachedRadius = Math.max(268, clusterRadius + 92);
+        disconnectedGroups.forEach((group, groupIndex) => {{
+          const ids = Array.isArray(group.nodeIds) ? group.nodeIds : [];
+          const span = Math.PI * 1.36;
+          const startAngle = Math.PI * (0.82 + (groupIndex * 0.14));
+          const step = ids.length > 1 ? (span / Math.max(1, ids.length - 1)) : 0;
+          ids.forEach((nodeId, index) => {{
+            const angle = ids.length <= 1 ? (Math.PI / 2) : (startAngle + (step * index));
+            positions.set(nodeId, {{
+              x: 480 + (Math.cos(angle) * (detachedRadius + (groupIndex * 28))),
+              y: 310 + (Math.sin(angle) * Math.min(214, detachedRadius * 0.76)),
+              layer: maxConnectedLayer + 1 + groupIndex,
+              disconnected: true,
+              broadcastOnly: !!group.broadcastOnly,
+            }});
+          }});
+        }});
+        rings.length = 0;
+      }}
       const selectedId = normalizeNodeId(selectedNodeId || "");
       const visibleLabelNodeIds = new Set();
-      if (nodeMap.size <= 18) {{
+      if (nodeMap.size <= 18 || layoutMode === "tree" || layoutMode === "cluster") {{
         for (const nodeId of positions.keys()) {{
           visibleLabelNodeIds.add(nodeId);
         }}
@@ -3155,6 +3369,7 @@
 
       return {{
         rootId,
+        layoutMode,
         adjacency,
         degreeMeta,
         items,
@@ -3177,6 +3392,7 @@
     function buildNetworkGraphSourceSignature(nodes, historyCapsRaw, rawEdges, state, edgeMode) {{
       let hash = 2166136261;
       hash = hashMixStr(hash, normalizeNetworkGraphEdgeMode(edgeMode));
+      hash = hashMixStr(hash, normalizeNetworkGraphLayoutMode(networkGraphLayoutMode));
       hash = hashMixStr(hash, normalizeNodeId(networkGraphRootNodeId || ""));
       hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || ""));
       hash = hashMixStr(hash, normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || ""));
@@ -3246,6 +3462,10 @@
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
       const rawEdges = Array.isArray(traffic.edges) ? traffic.edges : [];
       const edgeMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode);
+      const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
+      const layoutModeLabel = layoutMode === "tree"
+        ? "Tree"
+        : (layoutMode === "cluster" ? "Cluster" : "Radial");
       const modeLabel = edgeMode === "live" ? "Live" : "History";
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);
       const graphSourceSignature = buildNetworkGraphSourceSignature(
@@ -3329,6 +3549,7 @@
       const rootItem = layout.items.find((item) => item && item.nodeId === rootId) || null;
       const summaryParts = [
         `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip" type="button" aria-pressed="${{edgeMode === "live" ? "true" : "false"}}" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label">Mode</span><strong>${{modeLabel}}</strong></button>`,
+        `<label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option></select></label>`,
         `<span class="network-graph-chip"><span class="network-graph-chip-label">Root</span><strong>${{escAttr(truncateNetworkGraphLabel(rootLabel, 28))}}</strong></span>`,
         `<span class="network-graph-chip"><span class="network-graph-chip-label">Nodes</span><strong>${{layout.items.length}}</strong></span>`,
         `<span class="network-graph-chip"><span class="network-graph-chip-label">Links</span><strong>${{combinedEdges.length}}</strong></span>`,
@@ -3355,6 +3576,8 @@
         );
       }}
       summary.innerHTML = summaryParts.join("");
+      bindNetworkGraphLayoutSelector();
+      syncNetworkGraphLayoutSelector();
       bindNetworkGraphSummaryControls();
       networkGraphViewState.bounds = computeNetworkGraphBounds(layout);
       networkGraphRootNodeId = rootId;
@@ -3431,6 +3654,7 @@
 
       legend.innerHTML = [
         `<span class="network-graph-legend-item hint">${{modeLabel}} mode: ${{edgeMode === "live" ? "current-session link topology only" : "stored link-history topology"}}</span>`,
+        `<span class="network-graph-legend-item hint">${{layoutModeLabel}} layout: ${{layoutMode === "tree" ? "hierarchical breadth-first view from the current root" : (layoutMode === "cluster" ? "grouped around first-hop neighborhoods from the current root" : "hop-distance rings around the current root")}}</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-root"></span>Root / selected node</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-local"></span>Your node / local radio</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-real"></span>${{realLinkCount}} confirmed links</span>`,
@@ -4398,6 +4622,7 @@
       }} catch (_err) {{
       }}
       networkGraphEdgeMode = loadPreferredNetworkGraphEdgeMode();
+      networkGraphLayoutMode = loadPreferredNetworkGraphLayoutMode();
       activeNetworkSubview = loadPreferredNetworkSubview();
       setActiveNetworkSubview(activeNetworkSubview, {{ persist: false }});
       const preferred = normalizeLayoutView(rawPreferred);

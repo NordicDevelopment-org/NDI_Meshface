@@ -32,7 +32,6 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
     assert 'id="network-graph-back-btn"' in html
     assert 'id="network-graph-home-btn"' in html
     assert 'id="network-graph-reset-view-btn"' in html
-    assert 'id="network-graph-live-toggle"' in html
     assert 'id="network-graph-summary"' in html
     assert 'id="network-graph-legend"' in html
     assert 'id="network-diagnostics-window"' in html
@@ -104,10 +103,15 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'className: "map-node-emoji-icon"' in js
     assert 'function buildNetworkGraphNodeSignalMeta(nodeMap, recentPackets)' in js
     assert 'const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";' in js
+    assert 'const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";' in js
     assert 'let networkGraphEdgeMode = "history";' in js
+    assert 'let networkGraphLayoutMode = "radial";' in js
     assert 'function normalizeNetworkGraphEdgeMode(raw)' in js
+    assert 'function normalizeNetworkGraphLayoutMode(raw)' in js
     assert 'function loadPreferredNetworkGraphEdgeMode()' in js
+    assert 'function loadPreferredNetworkGraphLayoutMode()' in js
     assert 'function persistPreferredNetworkGraphEdgeMode(modeName)' in js
+    assert 'function persistPreferredNetworkGraphLayoutMode(modeName)' in js
     assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.42, maxScale: 5.5 });' in js
     assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
     assert 'function networkGraphAverageParentOrder(nodeId, parentHintsByNodeId, layerOrderIndexByNodeId)' in js
@@ -118,9 +122,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const pinnedNodeIds = Array.isArray(options && options.pinnedNodeIds)' in js
     assert 'function filterNetworkGraphRawEdgesByMode(rawEdges, mode = networkGraphEdgeMode)' in js
     assert 'function doesNetworkGraphViewBoxContainBounds(viewBox, bounds, paddingRatio = 0.04)' in js
-    assert 'function syncNetworkGraphModeToggle()' in js
     assert 'function bindNetworkGraphSummaryControls()' in js
+    assert 'function syncNetworkGraphLayoutSelector()' in js
+    assert 'function bindNetworkGraphLayoutSelector()' in js
     assert 'function setNetworkGraphEdgeMode(modeName, options = {})' in js
+    assert 'function setNetworkGraphLayoutMode(modeName, options = {})' in js
     assert 'function setNetworkGraphRootNode(nodeId, options = {})' in js
     assert 'function navigateNetworkGraphBack()' in js
     assert 'function focusNetworkGraphNodeFromSelection(nodeId, options = {})' in js
@@ -143,6 +149,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const parsedWeight = useSessionWeight ? parsedSession : parsedLifetime;' in js
     assert 'empty.textContent = edgeMode === "live"' in js
     assert '<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip"' in js
+    assert 'bindNetworkGraphLayoutSelector();' in js
+    assert 'syncNetworkGraphLayoutSelector();' in js
+    assert 'label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"' in js
+    assert '<select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout">' in js
     assert 'bindNetworkGraphSummaryControls();' in js
     assert 'Avg packet hops: ${edge.avgHops == null ? "n/a" : edge.avgHops}' in js
     assert '${item.layer} hop${item.layer === 1 ? "" : "s"} away' in js
@@ -161,6 +171,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'animateNetworkGraphViewBox(svg, fittedViewBox);' in js
     assert '} else if (rootChanged) {' in js
     assert 'Broadcast only' in js
+    assert 'layoutMode === "tree"' in js
+    assert 'layoutMode === "cluster"' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'item.nodeId === localId ? "is-local" : ""' in js
     assert 'class="network-graph-node-emoji"' in js
@@ -198,8 +210,9 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-stage {" in css
     assert "touch-action: none;" in css
     assert ".network-graph-stage.is-panning {" in css
-    assert ".network-graph-live-toggle[aria-pressed=\"true\"] {" in css
     assert ".network-graph-mode-chip {" in css
+    assert ".network-graph-layout-control {" in css
+    assert ".network-graph-layout-select {" in css
     assert ".network-graph-swatch.is-broadcast-only {" in css
     assert ".network-graph-swatch.is-local {" in css
     assert ".network-graph-ring.is-broadcast-only {" in css
