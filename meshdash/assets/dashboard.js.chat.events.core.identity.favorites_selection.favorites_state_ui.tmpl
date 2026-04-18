@@ -95,6 +95,7 @@
       return {{
         id: "tag-default",
         name: "Tagged",
+        emoji: "",
         color: "#2aa85a",
         vibrance: 70,
       }};
@@ -108,9 +109,10 @@
         fallbackId || fallback.id
       );
       const name = normalizeNodeTagPresetName(base.name, fallback.name);
+      const emoji = normalizeNodeTagEmoji(base.emoji ?? base.icon ?? base.badge, fallback.emoji);
       const color = normalizeNodeTagColor(base.color ?? base.hex, fallback.color);
       const vibrance = clampNodeTagVibrance(base.vibrance ?? base.saturation ?? base.intensity, fallback.vibrance);
-      return {{ id, name, color, vibrance }};
+      return {{ id, name, emoji, color, vibrance }};
     }}
 
     function syncFavoriteNodeIdsFromTags() {{
@@ -158,12 +160,11 @@
         nodeId: cleanNodeId,
         presetId: preset.id,
         preset,
-        emoji: normalizeNodeTagEmoji(nodeTagEmojiByNodeId.get(cleanNodeId), ""),
       }};
     }}
 
     function nodeTagEmojiForEntry(tagEntry) {{
-      return normalizeNodeTagEmoji(tagEntry && tagEntry.emoji, "");
+      return normalizeNodeTagEmoji(tagEntry && tagEntry.preset && tagEntry.preset.emoji, "");
     }}
 
     function nodeTagEmojiForNode(nodeId) {{
@@ -212,6 +213,7 @@
           if (!presetId) continue;
           payload[presetId] = {{
             name: normalizeNodeTagPresetName(preset.name),
+            emoji: normalizeNodeTagEmoji(preset.emoji, ""),
             color: normalizeNodeTagColor(preset.color),
             vibrance: clampNodeTagVibrance(preset.vibrance, 70),
           }};
@@ -237,23 +239,6 @@
           count += 1;
         }}
         window.localStorage.setItem(nodeTagsStorageKey, JSON.stringify(payload));
-      }} catch (_err) {{
-      }}
-    }}
-
-    function persistNodeTagEmojis() {{
-      try {{
-        const payload = {{}};
-        let count = 0;
-        for (const [rawNodeId, rawEmoji] of nodeTagEmojiByNodeId.entries()) {{
-          if (count >= 4000) break;
-          const nodeId = normalizeNodeId(rawNodeId);
-          const emoji = normalizeNodeTagEmoji(rawEmoji, "");
-          if (!isSelectableNodeId(nodeId) || !emoji) continue;
-          payload[nodeId] = emoji;
-          count += 1;
-        }}
-        window.localStorage.setItem(nodeTagEmojiStorageKey, JSON.stringify(payload));
       }} catch (_err) {{
       }}
     }}
@@ -287,6 +272,7 @@
       const opts = options && typeof options === "object" ? options : {{}};
       const preferredId = normalizeNodeTagPresetId(opts.preferredId || "", "");
       const cleanName = normalizeNodeTagPresetName(name, "Tagged");
+      const cleanEmoji = normalizeNodeTagEmoji(opts.emoji, "");
       const cleanColor = normalizeNodeTagColor(color, "#2aa85a");
       const cleanVibrance = clampNodeTagVibrance(vibrance, 70);
       let presetId = preferredId;
@@ -307,6 +293,7 @@
       const preset = {{
         id: presetId,
         name: cleanName,
+        emoji: cleanEmoji,
         color: cleanColor,
         vibrance: cleanVibrance,
       }};
@@ -334,7 +321,6 @@
       const cleanNodeId = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(cleanNodeId)) return false;
       const existed = nodeTagByNodeId.delete(cleanNodeId);
-      nodeTagEmojiByNodeId.delete(cleanNodeId);
       if (!existed) return false;
       syncFavoriteNodeIdsFromTags();
       if (!(options && options.persist === false)) {{
@@ -343,28 +329,13 @@
       return true;
     }}
 
-    function saveNodeTagEmoji(nodeId, rawEmoji, options = null) {{
-      const cleanNodeId = normalizeNodeId(nodeId);
-      if (!isSelectableNodeId(cleanNodeId)) return "";
-      const emoji = normalizeNodeTagEmoji(rawEmoji, "");
-      if (emoji) {{
-        nodeTagEmojiByNodeId.set(cleanNodeId, emoji);
-      }} else {{
-        nodeTagEmojiByNodeId.delete(cleanNodeId);
-      }}
-      if (!(options && options.persist === false)) {{
-        persistFavoriteNodes();
-      }}
-      return emoji;
-    }}
-
     function loadFavoriteNodes() {{
       favoriteNodeIds.clear();
       nodeTagByNodeId.clear();
-      nodeTagEmojiByNodeId.clear();
       nodeTagPresetsById.clear();
       let migratedLegacyFavorites = false;
       let hydratedPresets = false;
+      let migratedLegacyTagEmojis = false;
 
       try {{
         const rawPresets = window.localStorage.getItem(nodeTagPresetsStorageKey);
@@ -419,7 +390,15 @@
             const nodeId = normalizeNodeId(entry[0]);
             const emoji = normalizeNodeTagEmoji(entry[1], "");
             if (!isSelectableNodeId(nodeId) || !emoji) continue;
-            nodeTagEmojiByNodeId.set(nodeId, emoji);
+            const presetId = normalizeNodeTagPresetId(nodeTagByNodeId.get(nodeId), "");
+            if (!presetId) continue;
+            const preset = nodeTagPresetForId(presetId);
+            if (!preset || normalizeNodeTagEmoji(preset.emoji, "")) continue;
+            nodeTagPresetsById.set(presetId, {{
+              ...preset,
+              emoji,
+            }});
+            migratedLegacyTagEmojis = true;
           }}
         }}
       }} catch (_err) {{
@@ -451,7 +430,7 @@
         setActiveNodeTagPreset("", false);
       }}
 
-      if (migratedLegacyFavorites || !hydratedPresets) {{
+      if (migratedLegacyFavorites || migratedLegacyTagEmojis || !hydratedPresets) {{
         persistFavoriteNodes();
       }}
     }}
@@ -465,7 +444,10 @@
       }}
       persistNodeTagPresets();
       persistNodeTags();
-      persistNodeTagEmojis();
+      try {{
+        window.localStorage.removeItem(nodeTagEmojiStorageKey);
+      }} catch (_err) {{
+      }}
       persistActiveNodeTagPreset();
     }}
 
@@ -797,10 +779,282 @@
       applyNodeVisibilityListChange("Cleared frontend blacklist.");
     }}
 
+    function deleteNodeTagPreset(presetId, options = null) {{
+      const cleanPresetId = normalizeNodeTagPresetId(presetId, "");
+      if (!cleanPresetId || cleanPresetId === "tag-default" || !nodeTagPresetsById.has(cleanPresetId)) return false;
+      const fallbackPreset = nodeTagPresetForId("tag-default") || defaultNodeTagPreset();
+      if (!nodeTagPresetsById.has(fallbackPreset.id)) {{
+        nodeTagPresetsById.set(fallbackPreset.id, fallbackPreset);
+      }}
+      for (const [nodeId, assignedPresetId] of Array.from(nodeTagByNodeId.entries())) {{
+        if (normalizeNodeTagPresetId(assignedPresetId, "") !== cleanPresetId) continue;
+        nodeTagByNodeId.set(nodeId, fallbackPreset.id);
+      }}
+      nodeTagPresetsById.delete(cleanPresetId);
+      syncFavoriteNodeIdsFromTags();
+      if (activeNodeTagPresetId === cleanPresetId) {{
+        setActiveNodeTagPreset(fallbackPreset.id, true);
+      }}
+      if (!(options && options.persist === false)) {{
+        persistFavoriteNodes();
+      }}
+      return true;
+    }}
+
+    function settingsNodeTagPresetManagerHtml() {{
+      const presets = nodeTagPresetEntries();
+      const activePreset = nodeTagPresetForId(activeNodeTagPresetId) || nodeTagPresetForId("tag-default") || defaultNodeTagPreset();
+      const draft = settingsNodeTagPresetDraft && typeof settingsNodeTagPresetDraft === "object"
+        ? settingsNodeTagPresetDraft
+        : null;
+      const selectedPresetId = normalizeNodeTagPresetId(
+        draft && draft.selectedPresetId,
+        normalizeNodeTagPresetId(activePreset.id, "tag-default")
+      );
+      const formName = normalizeNodeTagPresetName(draft && draft.name, activePreset.name);
+      const formEmoji = normalizeNodeTagEmoji(draft && draft.emoji, activePreset.emoji);
+      const formColor = normalizeNodeTagColor(draft && draft.color, activePreset.color);
+      const formVibrance = clampNodeTagVibrance(draft && draft.vibrance, activePreset.vibrance);
+      const optionsHtml = [`<option value="">New preset</option>`].concat(
+        presets.map((preset) => {{
+          const presetId = normalizeNodeTagPresetId(preset.id, "tag-default");
+          const selectedAttr = presetId === selectedPresetId ? " selected" : "";
+          return `<option value="${{escAttr(presetId)}}"${{selectedAttr}}>${{escAttr(nodeTagDisplayLabel({{ preset }}, "Tagged"))}}</option>`;
+        }})
+      ).join("");
+      const previewPreset = {{
+        color: formColor,
+        vibrance: formVibrance,
+        emoji: formEmoji,
+      }};
+      const previewStyle = nodeTagStyleVars({{ preset: previewPreset }});
+      const previewEmoji = nodeTagChipEmojiHtml({{ preset: previewPreset }});
+      return `<div id="settings-node-tag-presets-panel" class="favorite-menu-tag-editor">
+        <div class="favorite-menu-tag-editor-row">
+          <label for="settings-node-tag-preset-select" class="favorite-menu-tag-editor-label">Preset</label>
+          <select id="settings-node-tag-preset-select" class="favorite-menu-tag-preset-select">
+            ${{optionsHtml}}
+          </select>
+        </div>
+        <div class="favorite-menu-tag-editor-row">
+          <label for="settings-node-tag-name-input" class="favorite-menu-tag-editor-label">Name</label>
+          <input id="settings-node-tag-name-input" class="favorite-menu-tag-editor-input" type="text" maxlength="40" value="${{escAttr(formName)}}" placeholder="Tag name" />
+        </div>
+        <div class="favorite-menu-tag-editor-row">
+          <label for="settings-node-tag-emoji-input" class="favorite-menu-tag-editor-label">Emoji</label>
+          <input id="settings-node-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(formEmoji)}}" placeholder="Optional emoji" />
+        </div>
+        <div class="favorite-menu-tag-editor-row favorite-menu-tag-editor-row-inline">
+          <label for="settings-node-tag-color-input" class="favorite-menu-tag-editor-label">Color</label>
+          <input id="settings-node-tag-color-input" class="favorite-menu-tag-color-input" type="color" value="${{escAttr(formColor)}}" />
+          <label for="settings-node-tag-vibrance-input" class="favorite-menu-tag-editor-label">Vibrance</label>
+          <input id="settings-node-tag-vibrance-input" class="favorite-menu-tag-vibrance-input" type="range" min="0" max="100" step="1" value="${{escAttr(formVibrance)}}" />
+          <span id="settings-node-tag-vibrance-value" class="favorite-menu-tag-vibrance-value">${{escAttr(formVibrance)}}%</span>
+          <span id="settings-node-tag-preview" class="favorite-menu-tag-chip favorite-menu-tag-chip-preview${{previewEmoji ? " has-emoji" : ""}}" style="${{escAttr(previewStyle)}}" aria-hidden="true">${{previewEmoji}}</span>
+        </div>
+        <div class="favorite-menu-tag-editor-actions">
+          <button id="settings-node-tag-save-btn" class="btn btn-secondary" type="button">Save Preset</button>
+          <button id="settings-node-tag-new-btn" class="btn btn-secondary" type="button">New Preset</button>
+          <button id="settings-node-tag-delete-btn" class="btn btn-secondary" type="button"${{selectedPresetId === "tag-default" ? " disabled" : ""}}>Delete Preset</button>
+        </div>
+        <div id="settings-node-tag-status" class="favorite-menu-tag-status"></div>
+      </div>`;
+    }}
+
+    function renderNodeTagPresetManagerUi(force = false) {{
+      const host = document.getElementById("settings-node-tag-presets-manager");
+      if (!(host instanceof HTMLElement)) return;
+      if (!force && host.contains(document.activeElement)) {{
+        bindNodeTagPresetManagerControls();
+        return;
+      }}
+      host.innerHTML = settingsNodeTagPresetManagerHtml();
+      bindNodeTagPresetManagerControls();
+    }}
+
+    function bindNodeTagPresetManagerControls() {{
+      const host = document.getElementById("settings-node-tag-presets-panel");
+      if (!(host instanceof HTMLElement) || host.dataset.boundNodeTagPresets === "1") return;
+      host.dataset.boundNodeTagPresets = "1";
+      const presetSelect = document.getElementById("settings-node-tag-preset-select");
+      const nameInput = document.getElementById("settings-node-tag-name-input");
+      const emojiInput = document.getElementById("settings-node-tag-emoji-input");
+      const colorInput = document.getElementById("settings-node-tag-color-input");
+      const vibranceInput = document.getElementById("settings-node-tag-vibrance-input");
+      const vibranceValue = document.getElementById("settings-node-tag-vibrance-value");
+      const preview = document.getElementById("settings-node-tag-preview");
+      const statusEl = document.getElementById("settings-node-tag-status");
+      const saveBtn = document.getElementById("settings-node-tag-save-btn");
+      const newBtn = document.getElementById("settings-node-tag-new-btn");
+      const deleteBtn = document.getElementById("settings-node-tag-delete-btn");
+      if (!(presetSelect instanceof HTMLSelectElement)) return;
+      if (!(nameInput instanceof HTMLInputElement)) return;
+      if (!(emojiInput instanceof HTMLInputElement)) return;
+      if (!(colorInput instanceof HTMLInputElement)) return;
+      if (!(vibranceInput instanceof HTMLInputElement)) return;
+      if (!(vibranceValue instanceof HTMLElement)) return;
+      if (!(preview instanceof HTMLElement)) return;
+      if (!(statusEl instanceof HTMLElement)) return;
+      if (!(saveBtn instanceof HTMLButtonElement)) return;
+      if (!(newBtn instanceof HTMLButtonElement)) return;
+      if (!(deleteBtn instanceof HTMLButtonElement)) return;
+
+      const setStatus = (text) => {{
+        statusEl.textContent = String(text == null ? "" : text);
+      }};
+
+      const syncDraft = () => {{
+        settingsNodeTagPresetDraft = {{
+          selectedPresetId: normalizeNodeTagPresetId(presetSelect.value || "", ""),
+          name: nameInput.value,
+          emoji: emojiInput.value,
+          color: colorInput.value,
+          vibrance: vibranceInput.value,
+        }};
+      }};
+
+      const applyPreview = () => {{
+        const emoji = normalizeNodeTagEmoji(emojiInput.value, "");
+        const color = normalizeNodeTagColor(colorInput.value, "#2aa85a");
+        const vibrance = clampNodeTagVibrance(vibranceInput.value, 70);
+        emojiInput.value = emoji;
+        vibranceValue.textContent = `${{vibrance}}%`;
+        preview.setAttribute("style", nodeTagStyleVars({{ preset: {{ color, vibrance }} }}));
+        preview.classList.toggle("has-emoji", !!emoji);
+        preview.innerHTML = emoji ? `<span class="favorite-menu-tag-chip-emoji" aria-hidden="true">${{escAttr(emoji)}}</span>` : "";
+        syncDraft();
+      }};
+
+      const loadPreset = (presetId) => {{
+        const preset = nodeTagPresetForId(presetId);
+        if (!preset) {{
+          nameInput.value = "";
+          emojiInput.value = "";
+          colorInput.value = "#2aa85a";
+          vibranceInput.value = "70";
+          deleteBtn.disabled = true;
+          applyPreview();
+          return;
+        }}
+        nameInput.value = normalizeNodeTagPresetName(preset.name, "Tagged");
+        emojiInput.value = normalizeNodeTagEmoji(preset.emoji, "");
+        colorInput.value = normalizeNodeTagColor(preset.color, "#2aa85a");
+        vibranceInput.value = String(clampNodeTagVibrance(preset.vibrance, 70));
+        deleteBtn.disabled = normalizeNodeTagPresetId(preset.id, "tag-default") === "tag-default";
+        applyPreview();
+      }};
+
+      const refreshViews = () => {{
+        renderNodeTagPresetManagerUi(true);
+        renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
+        renderStarredNodeSelect(latestState || latestRawState || {{}});
+        refreshFavoriteToggleButtons();
+        if (latestState) {{
+          renderFavorites(latestState);
+        }}
+        if (typeof syncChatNodeDetailsDrawer === "function") {{
+          syncChatNodeDetailsDrawer(latestState, {{ fetchHistory: false }});
+        }}
+      }};
+
+      const openEmojiPicker = () => {{
+        if (typeof openChatEmojiPanel !== "function") return;
+        openChatEmojiPanel("tag", null, emojiInput);
+      }};
+
+      presetSelect.addEventListener("change", () => {{
+        const presetId = normalizeNodeTagPresetId(presetSelect.value || "", "");
+        if (presetId && nodeTagPresetsById.has(presetId)) {{
+          setActiveNodeTagPreset(presetId, true);
+        }}
+        settingsNodeTagPresetDraft = null;
+        loadPreset(presetId);
+        setStatus("");
+      }});
+      nameInput.addEventListener("input", () => {{
+        applyPreview();
+        setStatus("");
+      }});
+      emojiInput.addEventListener("input", () => {{
+        applyPreview();
+        setStatus("");
+      }});
+      emojiInput.addEventListener("blur", () => {{
+        emojiInput.value = normalizeNodeTagEmoji(emojiInput.value, "");
+        applyPreview();
+      }});
+      emojiInput.addEventListener("click", openEmojiPicker);
+      emojiInput.addEventListener("focus", openEmojiPicker);
+      emojiInput.addEventListener("keydown", (ev) => {{
+        const key = String(ev.key || "");
+        if (key === "Enter" || key === "ArrowDown" || key === " ") {{
+          ev.preventDefault();
+          openEmojiPicker();
+        }}
+      }});
+      const syncColorPreview = () => {{
+        applyPreview();
+        setStatus("");
+      }};
+      colorInput.addEventListener("input", syncColorPreview);
+      colorInput.addEventListener("change", syncColorPreview);
+      const syncVibrancePreview = () => {{
+        applyPreview();
+        setStatus("");
+      }};
+      vibranceInput.addEventListener("input", syncVibrancePreview);
+      vibranceInput.addEventListener("change", syncVibrancePreview);
+      saveBtn.addEventListener("click", () => {{
+        const preferredId = normalizeNodeTagPresetId(presetSelect.value || "", "");
+        const preset = upsertNodeTagPreset(
+          nameInput.value,
+          colorInput.value,
+          vibranceInput.value,
+          {{
+            preferredId,
+            emoji: emojiInput.value,
+          }}
+        );
+        settingsNodeTagPresetDraft = {{
+          selectedPresetId: normalizeNodeTagPresetId(preset.id, ""),
+          name: preset.name,
+          emoji: preset.emoji,
+          color: preset.color,
+          vibrance: preset.vibrance,
+        }};
+        setStatus(`Preset saved: ${{preset.name}}`);
+        refreshViews();
+      }});
+      newBtn.addEventListener("click", () => {{
+        presetSelect.value = "";
+        settingsNodeTagPresetDraft = {{
+          selectedPresetId: "",
+          name: "",
+          emoji: "",
+          color: "#2aa85a",
+          vibrance: 70,
+        }};
+        loadPreset("");
+        setStatus("New preset");
+        nameInput.focus();
+      }});
+      deleteBtn.addEventListener("click", () => {{
+        const presetId = normalizeNodeTagPresetId(presetSelect.value || "", "");
+        if (!deleteNodeTagPreset(presetId, {{ persist: true }})) return;
+        setStatus("Preset deleted. Tagged nodes moved to Tagged.");
+        setActiveNodeTagPreset("tag-default", true);
+        settingsNodeTagPresetDraft = null;
+        refreshViews();
+      }});
+
+      applyPreview();
+    }}
+
     function renderNodeVisibilityListsUi(state = latestRawState || latestState) {{
+      renderNodeTagPresetManagerUi();
       const selectedHost = document.getElementById("settings-node-visibility-selected");
-      const searchInput = document.getElementById("settings-lists-node-search-input");
-      const resultsHost = document.getElementById("settings-lists-search-results");
+      const searchInput = document.getElementById("settings-nodes-node-search-input");
+      const resultsHost = document.getElementById("settings-nodes-search-results");
       const whitelistHost = document.getElementById("settings-whitelist-list");
       const blacklistHost = document.getElementById("settings-blacklist-list");
       if (!(selectedHost instanceof HTMLElement)) return;
@@ -910,10 +1164,10 @@
     }}
 
     function bindNodeVisibilityListControls() {{
-      const panel = document.querySelector('.card.settings [data-settings-tab-panel="lists"]');
+      const panel = document.querySelector('.card.settings [data-settings-tab-panel="nodes"]');
       if (!(panel instanceof HTMLElement) || panel.dataset.boundNodeVisibility === "1") return;
       panel.dataset.boundNodeVisibility = "1";
-      const searchInput = document.getElementById("settings-lists-node-search-input");
+      const searchInput = document.getElementById("settings-nodes-node-search-input");
       if (searchInput instanceof HTMLInputElement) {{
         searchInput.addEventListener("input", () => {{
           nodeVisibilitySettingsSearchQuery = String(searchInput.value || "").trim().toLowerCase();

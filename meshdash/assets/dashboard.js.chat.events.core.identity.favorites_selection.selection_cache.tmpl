@@ -38,7 +38,7 @@
         </div>
         <div class="favorite-menu-tag-editor-row">
           <label for="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-label">Emoji</label>
-          <input id="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(nodeTagEmojiForEntry(currentTag))}}" placeholder="Optional emoji" />
+          <input id="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(normalizeNodeTagEmoji(currentPreset.emoji, ""))}}" placeholder="Optional emoji" />
         </div>
         <div class="favorite-menu-tag-editor-row favorite-menu-tag-editor-row-inline">
           <label for="favorite-menu-tag-color-input" class="favorite-menu-tag-editor-label">Color</label>
@@ -110,6 +110,7 @@
         const preset = nodeTagPresetForId(presetId);
         if (!preset) return;
         nameInput.value = normalizeNodeTagPresetName(preset.name, "Tagged");
+        emojiInput.value = normalizeNodeTagEmoji(preset.emoji, "");
         colorInput.value = normalizeNodeTagColor(preset.color, "#2aa85a");
         vibranceInput.value = String(clampNodeTagVibrance(preset.vibrance, 70));
         applyPreview();
@@ -120,7 +121,10 @@
           nameInput.value,
           colorInput.value,
           vibranceInput.value,
-          {{ preferredId }}
+          {{
+            preferredId,
+            emoji: emojiInput.value,
+          }}
         );
         setActiveNodeTagPreset(preset.id, true);
         renderStarredNodeSelect(latestState || {{}});
@@ -174,17 +178,21 @@
       }}
       if (colorInput.dataset.bound !== "1") {{
         colorInput.dataset.bound = "1";
-        colorInput.addEventListener("input", () => {{
+        const syncColorPreview = () => {{
           applyPreview();
           setStatus("");
-        }});
+        }};
+        colorInput.addEventListener("input", syncColorPreview);
+        colorInput.addEventListener("change", syncColorPreview);
       }}
       if (vibranceInput.dataset.bound !== "1") {{
         vibranceInput.dataset.bound = "1";
-        vibranceInput.addEventListener("input", () => {{
+        const syncVibrancePreview = () => {{
           applyPreview();
           setStatus("");
-        }});
+        }};
+        vibranceInput.addEventListener("input", syncVibrancePreview);
+        vibranceInput.addEventListener("change", syncVibrancePreview);
       }}
       if (savePresetBtn.dataset.bound !== "1") {{
         savePresetBtn.dataset.bound = "1";
@@ -201,7 +209,6 @@
           const presetId = normalizeNodeTagPresetId(preset && preset.id, "");
           if (!presetId || !nodeTagPresetsById.has(presetId)) return;
           assignNodeTagPresetToNode(cleanNodeId, presetId, {{ persist: false }});
-          saveNodeTagEmoji(cleanNodeId, emojiInput.value, {{ persist: false }});
           persistFavoriteNodes();
           refreshFavoriteToggleButtons();
           if (latestState) {{

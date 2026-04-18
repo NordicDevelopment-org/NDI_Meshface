@@ -621,14 +621,14 @@
               Tickers
             </button>
             <button
-              id="settings-tab-lists-btn"
+              id="settings-tab-nodes-btn"
               class="settings-tab-btn workspace-pill-btn"
               type="button"
               role="tab"
               aria-selected="false"
-              data-settings-tab="lists"
+              data-settings-tab="nodes"
             >
-              Lists
+              Nodes
             </button>
             <button
               id="settings-tab-appearance-btn"
@@ -1564,11 +1564,11 @@
             </div>
           </div>
 
-          <div class="settings-panel settings-panel-wide" data-settings-tab-panel="lists" hidden>
-            <h3>Node Lists</h3>
+          <div class="settings-panel settings-panel-wide" data-settings-tab-panel="nodes" hidden>
+            <h3>Nodes</h3>
             <div class="settings-fields">
               <div class="settings-help-note">
-                Frontend-only visibility filters. If the whitelist has any entries, only those nodes appear in the dashboard. Blacklist entries are always hidden. This Lists tab still shows the full raw node catalog so you can manage hidden entries.
+                Manage shared node tag presets and frontend-only visibility filters. If the whitelist has any entries, only those nodes appear in the dashboard. Blacklist entries are always hidden. This Nodes tab still shows the full raw node catalog so you can manage hidden entries.
               </div>
               <div class="settings-help-note">
                 Tip: select a node anywhere in the dashboard first, then use the quick actions below to allow or block it.
@@ -1576,15 +1576,21 @@
               <div class="node-visibility-grid">
                 <section class="node-visibility-section">
                   <div class="node-visibility-section-head">
+                    <h4>Tag Presets</h4>
+                  </div>
+                  <div id="settings-node-tag-presets-manager"></div>
+                </section>
+                <section class="node-visibility-section">
+                  <div class="node-visibility-section-head">
                     <h4>Quick Add</h4>
                   </div>
                   <div id="settings-node-visibility-selected" class="node-visibility-card node-visibility-card-empty">
                     Select a node to manage it here.
                   </div>
-                  <label class="settings-field" for="settings-lists-node-search-input">
+                  <label class="settings-field" for="settings-nodes-node-search-input">
                     <span class="settings-label">Find node</span>
                     <input
-                      id="settings-lists-node-search-input"
+                      id="settings-nodes-node-search-input"
                       class="list-search-input"
                       type="search"
                       autocomplete="off"
@@ -1592,7 +1598,7 @@
                       placeholder="Search full node catalog by ID or name"
                     />
                   </label>
-                  <div id="settings-lists-search-results" class="node-visibility-results" aria-label="Node visibility search results"></div>
+                  <div id="settings-nodes-search-results" class="node-visibility-results" aria-label="Node visibility search results"></div>
                 </section>
                 <section class="node-visibility-section">
                   <div class="node-visibility-section-head">

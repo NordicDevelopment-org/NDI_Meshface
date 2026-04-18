@@ -197,13 +197,17 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'pinBtn.classList.toggle("active", active);' in js
     assert 'const nodeTagEmojiStorageKey = "meshDashboardNodeTagEmojiV1";' in js
     assert 'function normalizeNodeTagEmoji(value, fallback = "") {' in js
-    assert 'function saveNodeTagEmoji(nodeId, rawEmoji, options = null) {' in js
+    assert 'const emoji = normalizeNodeTagEmoji(base.emoji ?? base.icon ?? base.badge, fallback.emoji);' in js
+    assert 'emoji: normalizeNodeTagEmoji(preset.emoji, ""),' in js
     assert 'id="favorite-menu-tag-emoji-input"' in js
+    assert 'id="settings-node-tag-emoji-input"' in js
     assert 'nodeTagChipEmojiHtml(tagEntry)' in js
     assert 'tagTabChip.innerHTML = nodeTagChipEmojiHtml(tagEntry);' in js
     assert 'let chatEmojiTagTargetInput = null;' in js
     assert 'chatEmojiMode === "tag" && chatEmojiTagTargetInput instanceof HTMLInputElement' in js
     assert 'if (target.closest("#favorite-menu-tag-emoji-input")) return;' in js
+    assert 'openChatEmojiPanel("tag", null, emojiInput);' in js
+    assert 'target.closest("#settings-node-tag-emoji-input")' in js
     assert 'openChatEmojiPanel("tag", null, emojiInput);' in js
 
 

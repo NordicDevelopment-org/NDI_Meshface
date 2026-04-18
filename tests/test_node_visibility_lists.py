@@ -21,11 +21,12 @@ def test_render_html_includes_node_visibility_lists_settings_panel() -> None:
         revision_title="test",
     )
 
-    assert 'data-settings-tab="lists"' in html
-    assert 'data-settings-tab-panel="lists"' in html
+    assert 'data-settings-tab="nodes"' in html
+    assert 'data-settings-tab-panel="nodes"' in html
+    assert 'id="settings-node-tag-presets-manager"' in html
     assert 'id="settings-node-visibility-selected"' in html
-    assert 'id="settings-lists-node-search-input"' in html
-    assert 'id="settings-lists-search-results"' in html
+    assert 'id="settings-nodes-node-search-input"' in html
+    assert 'id="settings-nodes-search-results"' in html
     assert 'id="settings-whitelist-list"' in html
     assert 'id="settings-blacklist-list"' in html
 
@@ -42,6 +43,9 @@ def test_dashboard_js_includes_node_visibility_lists_runtime_and_filtering() -> 
     assert 'const nodeVisibilityBlacklistStorageKey = "meshDashboardNodeVisibilityBlacklistV1";' in js
     assert 'function applyNodeVisibilityFiltersToState(rawState)' in js
     assert 'function renderNodeVisibilityListsUi(state = latestRawState || latestState)' in js
+    assert 'function renderNodeTagPresetManagerUi(force = false) {' in js
+    assert 'function bindNodeTagPresetManagerControls() {' in js
+    assert 'host.contains(document.activeElement)' in js
     assert 'latestRawState = rawState;' in js
     assert 'const state = applyNodeVisibilityFiltersToState(rawState);' in js
     assert 'renderNodeVisibilityListsUi(latestRawState || latestState || {});' in js
