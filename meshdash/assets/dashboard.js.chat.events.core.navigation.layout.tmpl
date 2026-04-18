@@ -2335,10 +2335,24 @@
       cancelNetworkGraphViewAnimation();
       cancelNetworkGraphSceneAnimation();
       networkGraphViewState.pendingFocusTransition = null;
-      setNetworkGraphRootNode(nextId, {{
+      const changed = setNetworkGraphRootNode(nextId, {{
         pushHistory: !(options && options.pushHistory === false),
         rerender: !(options && options.rerender === false),
       }});
+      if (changed) {{
+        // Node-list root changes should rebuild from scratch so we do not keep
+        // stale scene/layout state from the previous root.
+        networkGraphViewState.renderSourceSignature = "";
+        networkGraphViewState.cachedNodeMap = null;
+        networkGraphViewState.cachedCombinedEdges = null;
+        networkGraphViewState.cachedLayout = null;
+        networkGraphViewState.lastSceneStructureSignature = "";
+        networkGraphViewState.renderedPositions = new Map();
+        networkGraphViewState.renderedLayoutSnapshot = null;
+        networkGraphViewState.forceCenteredFitOnce = true;
+        networkGraphViewState.skipSceneAnimationOnce = true;
+        networkGraphViewState.pendingEntryViewportSync = true;
+      }}
       return true;
     }}
 
@@ -2512,6 +2526,44 @@
       const bName = networkGraphNodeDisplayName(b, nodeMap).toLowerCase();
       if (aName !== bName) return aName < bName ? -1 : 1;
       return a < b ? -1 : (a > b ? 1 : 0);
+    }}
+
+    function networkGraphAverageParentOrder(nodeId, parentHintsByNodeId, layerOrderIndexByNodeId) {{
+      const parents = Array.isArray(parentHintsByNodeId && parentHintsByNodeId.get(nodeId))
+        ? parentHintsByNodeId.get(nodeId)
+        : [];
+      if (!parents.length) return Number.POSITIVE_INFINITY;
+      let total = 0;
+      let count = 0;
+      for (const parentId of parents) {{
+        const order = Number(layerOrderIndexByNodeId && layerOrderIndexByNodeId.get(parentId));
+        if (!Number.isFinite(order)) continue;
+        total += order;
+        count += 1;
+      }}
+      return count > 0 ? (total / count) : Number.POSITIVE_INFINITY;
+    }}
+
+    function compareNetworkGraphLayerIds(
+      a,
+      b,
+      layer,
+      parentHintsByNodeId,
+      layerOrderIndexByNodeId,
+      degreeMeta,
+      nodeMap
+    ) {{
+      const safeLayer = Math.max(0, Math.trunc(Number(layer) || 0));
+      if (safeLayer > 1) {{
+        const aParentOrder = networkGraphAverageParentOrder(a, parentHintsByNodeId, layerOrderIndexByNodeId);
+        const bParentOrder = networkGraphAverageParentOrder(b, parentHintsByNodeId, layerOrderIndexByNodeId);
+        if (Number.isFinite(aParentOrder) || Number.isFinite(bParentOrder)) {{
+          if (!Number.isFinite(aParentOrder)) return 1;
+          if (!Number.isFinite(bParentOrder)) return -1;
+          if (Math.abs(aParentOrder - bParentOrder) > 0.0001) return aParentOrder - bParentOrder;
+        }}
+      }}
+      return compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap);
     }}
 
     function buildNetworkGraphPlaceholderNode(nodeId, caps = null) {{
@@ -2816,6 +2868,7 @@
       }}
 
       const layerByNodeId = new Map([[rootId, 0]]);
+      const parentHintsByNodeId = new Map();
       const visitQueue = [rootId];
       for (let cursor = 0; cursor < visitQueue.length; cursor += 1) {{
         const currentId = visitQueue[cursor];
@@ -2824,9 +2877,21 @@
           .filter((peerId) => nodeMap.has(peerId))
           .sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
         for (const peerId of neighbors) {{
-          if (layerByNodeId.has(peerId)) continue;
-          layerByNodeId.set(peerId, currentLayer + 1);
-          visitQueue.push(peerId);
+          const existingLayer = Number(layerByNodeId.get(peerId));
+          if (!Number.isFinite(existingLayer)) {{
+            layerByNodeId.set(peerId, currentLayer + 1);
+            parentHintsByNodeId.set(peerId, [currentId]);
+            visitQueue.push(peerId);
+            continue;
+          }}
+          if (existingLayer !== (currentLayer + 1)) continue;
+          const existingParents = Array.isArray(parentHintsByNodeId.get(peerId))
+            ? parentHintsByNodeId.get(peerId)
+            : [];
+          if (!existingParents.includes(currentId)) {{
+            existingParents.push(currentId);
+            parentHintsByNodeId.set(peerId, existingParents);
+          }}
         }}
       }}
 
@@ -2837,8 +2902,22 @@
         }}
         layers.get(layer).push(nodeId);
       }}
-      for (const ids of layers.values()) {{
-        ids.sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
+      const layerOrderIndexByNodeId = new Map([[rootId, 0]]);
+      const orderedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
+      for (const layer of orderedLayers) {{
+        const ids = Array.isArray(layers.get(layer)) ? layers.get(layer) : [];
+        ids.sort((a, b) => compareNetworkGraphLayerIds(
+          a,
+          b,
+          layer,
+          parentHintsByNodeId,
+          layerOrderIndexByNodeId,
+          degreeMeta,
+          nodeMap
+        ));
+        ids.forEach((nodeId, index) => {{
+          layerOrderIndexByNodeId.set(nodeId, index);
+        }});
       }}
       const firstLayerCount = Array.isArray(layers.get(1)) ? layers.get(1).length : 0;
       const secondLayerCount = Array.isArray(layers.get(2)) ? layers.get(2).length : 0;
@@ -3291,10 +3370,6 @@
         && !selectionChanged
         && svg.childElementCount
       );
-      const shouldRefitForRootChange = !!(
-        rootChanged
-        && !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)
-      );
       const shouldRefitForModeChange = !!(
         networkGraphViewState.pendingModeViewportSync
         && !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)
@@ -3308,11 +3383,7 @@
         animateNetworkGraphViewBox(svg, fittedViewBox);
       }} else if (rootChanged) {{
         stopNetworkGraphPan(svg);
-        if (shouldRefitForRootChange) {{
-          animateNetworkGraphViewBox(svg, fittedViewBox);
-        }} else {{
-          recenterNetworkGraphView(svg, {{ preserveScale: true }});
-        }}
+        animateNetworkGraphViewBox(svg, fittedViewBox);
       }} else if (shouldRecenterForEntry) {{
         stopNetworkGraphPan(svg);
         recenterNetworkGraphView(svg, {{ preserveScale: true, animate: false }});

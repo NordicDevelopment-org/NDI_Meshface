@@ -924,8 +924,14 @@
         if (syncSelectionToNetworkGraph) {{
           focusNetworkGraphNodeFromSelection(normalized, {{
             pushHistory: true,
-            rerender: true,
+            rerender: false,
           }});
+          if (
+            !(networkGraphViewState && networkGraphViewState.pendingFocusTransition)
+            && typeof renderNetworkGraphView === "function"
+          ) {{
+            renderNetworkGraphView(latestState);
+          }}
           if (
             shouldFocus
             && typeof setChatNodeDetailsDrawerExpanded === "function"
@@ -963,7 +969,7 @@
       if (syncSelectionToNetworkGraph) {{
         graphSelectionHandled = focusNetworkGraphNodeFromSelection(normalized, {{
           pushHistory: true,
-          rerender: true,
+          rerender: false,
         }});
       }}
       if (typeof clearChatNodeNavigatorSelectionScrollLock === "function") {{
@@ -1036,7 +1042,6 @@
         activeLayoutView === "network"
         && activeNetworkSubview === "graph"
         && !networkGraphRootSyncInProgress
-        && !graphSelectionHandled
         && !(networkGraphViewState && networkGraphViewState.pendingFocusTransition)
         && typeof renderNetworkGraphView === "function"
       ) {{
@@ -1117,7 +1122,8 @@
         if (!(target instanceof Element)) return;
         const row = target.closest("tr.node-selectable");
         if (!(row instanceof HTMLElement)) return;
-        selectNode(row.dataset.nodeId || "", true);
+        const graphOpen = activeLayoutView === "network" && activeNetworkSubview === "graph";
+        selectNode(row.dataset.nodeId || "", true, !graphOpen);
       }});
     }}
 

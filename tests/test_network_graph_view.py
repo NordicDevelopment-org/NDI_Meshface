@@ -101,6 +101,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function persistPreferredNetworkGraphEdgeMode(modeName)' in js
     assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.42, maxScale: 5.5 });' in js
     assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
+    assert 'function networkGraphAverageParentOrder(nodeId, parentHintsByNodeId, layerOrderIndexByNodeId)' in js
+    assert 'function compareNetworkGraphLayerIds(' in js
     assert 'function buildNetworkGraphPlaceholderNode(nodeId, caps = null)' in js
     assert 'function buildNetworkGraphNodeMap(nodes, historyCapsRaw, rawEdges, options = {})' in js
     assert 'const includeAllLiveNodes = !(options && options.includeAllLiveNodes === false);' in js
@@ -113,9 +115,14 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function setNetworkGraphRootNode(nodeId, options = {})' in js
     assert 'function navigateNetworkGraphBack()' in js
     assert 'function focusNetworkGraphNodeFromSelection(nodeId, options = {})' in js
+    assert 'const graphOpen = activeLayoutView === "network" && activeNetworkSubview === "graph";' in js
+    assert 'selectNode(row.dataset.nodeId || "", true, !graphOpen);' in js
+    assert 'selectNode(nodeId, true, !graphOpen && unreadDirectCount <= 0);' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'const localNodeHasLinkPeers = localNodeAvailable' in js
     assert 'if (localNodeAvailable && (localNodeHasLinkPeers || bestDegree <= 0)) {' in js
+    assert 'const parentHintsByNodeId = new Map();' in js
+    assert 'const layerOrderIndexByNodeId = new Map([[rootId, 0]]);' in js
     assert 'Object.entries((historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {})' in js
     assert 'buildNetworkGraphPlaceholderNode(clean, historyCapsById.get(clean) || null)' in js
     assert 'const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);' in js
@@ -143,6 +150,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert '&& !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)' in js
     assert 'const shouldRefitForModeChange = !!(' in js
     assert 'animateNetworkGraphViewBox(svg, fittedViewBox);' in js
+    assert '} else if (rootChanged) {' in js
     assert 'Broadcast only' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'item.nodeId === localId ? "is-local" : ""' in js
