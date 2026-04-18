@@ -1667,6 +1667,9 @@
         const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
         const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
         const nodeEmoji = resolveNetworkGraphNodeEmoji(item);
+        const labelOffsetY = Number.isFinite(Number(item.labelOffsetY))
+          ? Number(item.labelOffsetY)
+          : (Number(item.radius) + 14);
         const isLocalNode = item.nodeId === localId;
         const isRootNode = item.nodeId === rootId;
         const isSelectedNode = item.nodeId === selectedId;
@@ -1707,7 +1710,7 @@
             }}
             ${{
               item.showLabel
-                ? `<text class="network-graph-node-label is-priority-${{labelPriority}}${{(item.detached || item.broadcastOnly) ? " is-secondary" : ""}}${{item.broadcastOnly ? " is-broadcast-only" : ""}}" x="0" y="${{(Number(item.radius) + 14).toFixed(1)}}" text-anchor="middle">${{escAttr(label)}}</text>`
+                ? `<text class="network-graph-node-label is-priority-${{labelPriority}}${{labelOffsetY < 0 ? " is-above" : " is-below"}}${{(item.detached || item.broadcastOnly) ? " is-secondary" : ""}}${{item.broadcastOnly ? " is-broadcast-only" : ""}}" x="0" y="${{labelOffsetY.toFixed(1)}}" text-anchor="middle">${{escAttr(label)}}</text>`
                 : ""
             }}
             <title>${{escAttr(buildNetworkGraphNodeTitle(item))}}</title>
@@ -3310,49 +3313,75 @@
       let regions = [];
       if (layoutMode === "tree") {{
         const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
-        const treeTopY = 90;
-        const treeBottomY = 540;
-        const treeLeftX = 86;
-        const treeRightX = 874;
+        const treeTopY = 64;
+        const treeBottomY = 744;
+        const treeLeftX = 34;
+        const treeRightX = 926;
         const treeWidth = treeRightX - treeLeftX;
         const treeHeight = treeBottomY - treeTopY;
         const maxTreeLayer = sortedLayers.length ? sortedLayers[sortedLayers.length - 1] : 0;
+        function resolveTreeRowStagger(index, count, amplitude = 12) {{
+          if (count <= 1) return 0;
+          const direction = index % 2 === 0 ? -1 : 1;
+          const band = Math.floor(index / 2) % 2;
+          return direction * (amplitude + (band * Math.max(6, amplitude * 0.7)));
+        }}
+        function resolveTreeLabelOffset(index, radius, amplitude = 16) {{
+          const direction = index % 2 === 0 ? -1 : 1;
+          return direction < 0
+            ? -(radius + amplitude)
+            : (radius + amplitude + 2);
+        }}
         for (const layer of sortedLayers) {{
           const ids = Array.isArray(layers.get(layer)) ? Array.from(layers.get(layer)) : [];
           const layerY = maxTreeLayer <= 0
             ? (treeTopY + (treeHeight / 2))
             : (treeTopY + ((treeHeight * layer) / Math.max(1, maxTreeLayer)));
-          const spacing = ids.length > 1 ? (treeWidth / Math.max(1, ids.length - 1)) : 0;
+          const layerSpread = Math.max(
+            treeWidth * 0.42,
+            Math.min(treeWidth, treeWidth * (0.46 + Math.min(0.48, ids.length / 96)))
+          );
+          const layerLeftX = treeLeftX + ((treeWidth - layerSpread) / 2);
+          const spacing = ids.length > 1 ? (layerSpread / Math.max(1, ids.length - 1)) : 0;
           ids.forEach((nodeId, index) => {{
             const layerX = ids.length <= 1
               ? (treeLeftX + (treeWidth / 2))
-              : (treeLeftX + (spacing * index));
+              : (layerLeftX + (spacing * index));
+            const staggerY = layer <= 0 ? 0 : resolveTreeRowStagger(index, ids.length, 15);
             const current = positions.get(nodeId) || {{ layer }};
             positions.set(nodeId, {{
               ...current,
               x: layerX,
-              y: layerY,
+              y: layerY + staggerY,
               layer,
               disconnected: false,
               broadcastOnly: !!current.broadcastOnly,
+              labelOffsetY: resolveTreeLabelOffset(index, current.radius || 7, 16),
             }});
           }});
         }}
-        const detachedRowStartY = Math.min(586, treeBottomY + 54);
+        const detachedRowStartY = treeBottomY + 72;
         disconnectedGroups.forEach((group, groupIndex) => {{
           const ids = Array.isArray(group.nodeIds) ? group.nodeIds : [];
-          const rowY = detachedRowStartY + (groupIndex * 46);
-          const spacing = ids.length > 1 ? (treeWidth / Math.max(1, ids.length - 1)) : 0;
+          const rowY = detachedRowStartY + (groupIndex * 58);
+          const detachedSpread = Math.max(
+            treeWidth * 0.62,
+            Math.min(treeWidth, treeWidth * (0.58 + Math.min(0.34, ids.length / 120)))
+          );
+          const detachedLeftX = treeLeftX + ((treeWidth - detachedSpread) / 2);
+          const spacing = ids.length > 1 ? (detachedSpread / Math.max(1, ids.length - 1)) : 0;
           ids.forEach((nodeId, index) => {{
             const rowX = ids.length <= 1
               ? (treeLeftX + (treeWidth / 2))
-              : (treeLeftX + (spacing * index));
+              : (detachedLeftX + (spacing * index));
+            const staggerY = resolveTreeRowStagger(index, ids.length, 13);
             positions.set(nodeId, {{
               x: rowX,
-              y: rowY,
+              y: rowY + staggerY,
               layer: maxConnectedLayer + 1 + groupIndex,
               disconnected: true,
               broadcastOnly: !!group.broadcastOnly,
+              labelOffsetY: resolveTreeLabelOffset(index, 6.5, 15),
             }});
           }});
         }});
@@ -3655,6 +3684,7 @@
           weight: meta.weight,
           signalMeta,
           radius: position.disconnected ? Math.max(5, baseRadius - 0.7) : baseRadius,
+          labelOffsetY: Number.isFinite(Number(position.labelOffsetY)) ? Number(position.labelOffsetY) : null,
           showLabel: visibleLabelNodeIds.has(nodeId),
         }};
       }});
