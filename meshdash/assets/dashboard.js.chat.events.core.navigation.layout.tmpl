@@ -1093,7 +1093,6 @@
         clearNetworkGraphEmptyRetry();
       }}
       activeNetworkSubview = next;
-      syncNetworkGraphModeToggle();
 
       const normalizedView = normalizeLayoutView(activeLayoutView);
       const showTabbedSubview = normalizedView === "network";
@@ -2247,23 +2246,6 @@
       }}
     }}
 
-    function syncNetworkGraphModeToggle() {{
-      const toggleBtn = document.getElementById("network-graph-live-toggle");
-      if (!(toggleBtn instanceof HTMLButtonElement)) return;
-      const isLiveMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) === "live";
-      toggleBtn.classList.toggle("is-active", isLiveMode);
-      toggleBtn.setAttribute("aria-pressed", isLiveMode ? "true" : "false");
-      toggleBtn.title = isLiveMode
-        ? "Showing current-session links. Click to switch back to stored history."
-        : "Showing stored history links. Click to show the current session only.";
-      toggleBtn.setAttribute(
-        "aria-label",
-        isLiveMode
-          ? "Links view is showing the current session. Click to switch to stored history."
-          : "Links view is showing stored history. Click to switch to the current session."
-      );
-    }}
-
     function bindNetworkGraphSummaryControls() {{
       const modeChip = document.getElementById("network-graph-mode-chip");
       if (!(modeChip instanceof HTMLButtonElement) || modeChip.dataset.bound === "1") return;
@@ -2280,7 +2262,6 @@
       const next = normalizeNetworkGraphEdgeMode(modeName);
       const changed = next !== normalizeNetworkGraphEdgeMode(networkGraphEdgeMode);
       networkGraphEdgeMode = next;
-      syncNetworkGraphModeToggle();
       if (!(options && options.persist === false)) {{
         persistPreferredNetworkGraphEdgeMode(next);
       }}
@@ -2422,18 +2403,6 @@
           resetNetworkGraphView(svg);
         }});
       }}
-
-      const liveToggleBtn = document.getElementById("network-graph-live-toggle");
-      if (liveToggleBtn instanceof HTMLButtonElement && liveToggleBtn.dataset.bound !== "1") {{
-        liveToggleBtn.dataset.bound = "1";
-        liveToggleBtn.addEventListener("click", () => {{
-          const nextMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) === "live"
-            ? "history"
-            : "live";
-          setNetworkGraphEdgeMode(nextMode, {{ persist: true, rerender: true }});
-        }});
-      }}
-      syncNetworkGraphModeToggle();
 
       svg.addEventListener("pointerdown", (event) => {{
         if (event.pointerType === "mouse" && event.button !== 0) return;
@@ -3241,7 +3210,6 @@
 
       clearNetworkGraphEmptyRetry();
       empty.hidden = true;
-      syncNetworkGraphModeToggle();
       const selectedId = normalizeNodeId(selectedNodeId || "");
       const rootLabel = networkGraphNodeDisplayName(rootId, nodeMap);
       const firstHopCount = Array.isArray(layout.layers.get(1)) ? layout.layers.get(1).length : 0;
