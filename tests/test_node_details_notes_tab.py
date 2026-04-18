@@ -198,15 +198,27 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'const nodeTagEmojiStorageKey = "meshDashboardNodeTagEmojiV1";' in js
     assert 'function normalizeNodeTagEmoji(value, fallback = "") {' in js
     assert 'const emoji = normalizeNodeTagEmoji(base.emoji ?? base.icon ?? base.badge, fallback.emoji);' in js
+    assert 'function nodeEmojiOverrideForNode(nodeId) {' in js
+    assert 'function nodeVisualEmojiForNode(nodeId, tagEntry = null) {' in js
+    assert 'function saveNodeEmojiOverride(nodeId, rawEmoji, options = null) {' in js
     assert 'emoji: normalizeNodeTagEmoji(preset.emoji, ""),' in js
     assert 'id="favorite-menu-tag-emoji-input"' in js
+    assert 'id="favorite-menu-node-emoji-input"' in js
     assert 'id="settings-node-tag-emoji-input"' in js
+    assert 'id="chat-node-details-icon-btn"' in js
+    assert 'id="chat-node-details-icon-chip"' in js
+    assert 'id="chat-node-details-head-icon-input"' in js
     assert 'nodeTagChipEmojiHtml(tagEntry)' in js
-    assert 'tagTabChip.innerHTML = nodeTagChipEmojiHtml(tagEntry);' in js
+    assert 'iconChip.innerHTML = nodeTagChipEmojiHtml(tagEntry, selectedId);' in js
     assert 'let chatEmojiTagTargetInput = null;' in js
     assert 'chatEmojiMode === "tag" && chatEmojiTagTargetInput instanceof HTMLInputElement' in js
+    assert 'chatEmojiMode === "tag" && tagTargetInput instanceof HTMLInputElement' in js
+    assert 'if (target.closest("#chat-node-details-icon-btn")) return;' in js
     assert 'if (target.closest("#favorite-menu-tag-emoji-input")) return;' in js
+    assert 'if (target.closest("#favorite-menu-node-emoji-input")) return;' in js
+    assert 'if (target.closest("#chat-node-details-head-icon-input")) return;' in js
     assert 'openChatEmojiPanel("tag", null, emojiInput);' in js
+    assert 'openChatEmojiPanel("tag", null, iconBtn, false, iconInput);' in js
     assert 'target.closest("#settings-node-tag-emoji-input")' in js
     assert 'openChatEmojiPanel("tag", null, emojiInput);' in js
 

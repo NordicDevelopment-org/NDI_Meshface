@@ -4257,9 +4257,61 @@
     .chat-node-details-head-main {{
       min-width: 0;
       display: grid;
-      grid-template-columns: minmax(72px, 1fr) minmax(0, 1.45fr) minmax(116px, 1fr);
+      grid-template-columns: auto minmax(72px, 1fr) minmax(0, 1.45fr) minmax(116px, 1fr);
       align-items: center;
       gap: 8px;
+    }}
+    .chat-node-details-icon-btn {{
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: 1px solid #4f6f63;
+      border-radius: 999px;
+      background: rgba(28, 50, 61, 0.94);
+      color: #b9ddd0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(173, 214, 197, 0.08);
+    }}
+    .chat-node-details-icon-btn:hover {{
+      border-color: #6d9484;
+      background: rgba(34, 59, 70, 0.98);
+      color: #d5efe4;
+    }}
+    .chat-node-details-icon-btn:focus-visible {{
+      outline: 2px solid rgba(77, 132, 102, 0.38);
+      outline-offset: 2px;
+    }}
+    .chat-node-details-icon-chip {{
+      width: 100%;
+      height: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      background: transparent;
+      filter: none;
+      color: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+    }}
+    .chat-node-details-icon-chip.is-empty {{
+      border: 0;
+      background: transparent;
+      filter: none;
+      color: inherit;
+    }}
+    .chat-node-details-icon-chip.has-emoji {{
+      padding: 0;
+    }}
+    .chat-node-details-icon-glyph {{
+      display: inline-block;
+      font-size: 13px;
+      line-height: 1;
+      transform: translateY(-0.5px);
     }}
     .chat-node-details-title {{
       min-width: 0;
@@ -4373,7 +4425,6 @@
     .chat-node-details-tab-tag-btn {{
       display: inline-flex;
       align-items: center;
-      gap: 5px;
       min-width: 0;
     }}
     .chat-node-details-head-tag-btn {{
@@ -4386,20 +4437,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }}
-    .chat-node-details-tab-tag-chip {{
-      width: 9px;
-      height: 9px;
-      flex: 0 0 auto;
-    }}
-    .chat-node-details-tab-tag-chip.has-emoji {{
-      width: auto;
-      min-width: 16px;
-      height: 16px;
-      padding: 0 3px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
     }}
     .chat-node-details-panel {{
       flex: 1 1 auto;

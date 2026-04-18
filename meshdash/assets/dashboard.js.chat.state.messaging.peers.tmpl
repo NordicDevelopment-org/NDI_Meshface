@@ -1808,8 +1808,10 @@
       const messagesTabBtn = document.getElementById("chat-node-details-tab-messages");
       const historyTabBtn = document.getElementById("chat-node-details-tab-history");
       const tagTabBtn = document.getElementById("chat-node-details-tab-tag");
+      const iconBtn = document.getElementById("chat-node-details-icon-btn");
+      const iconChip = document.getElementById("chat-node-details-icon-chip");
+      const iconInput = document.getElementById("chat-node-details-head-icon-input");
       const tagTabLabel = document.getElementById("chat-node-details-tab-tag-label");
-      const tagTabChip = document.getElementById("chat-node-details-tab-tag-chip");
       const detailsPanel = document.getElementById("chat-node-details-panel-details");
       const locationPanel = document.getElementById("chat-node-details-panel-location");
       const chatPanel = document.getElementById("chat-node-details-panel-chat");
@@ -1868,6 +1870,11 @@
           muteBtn.setAttribute("aria-pressed", "false");
           setDrawerElementTextIfChanged(muteBtn.querySelector(".chat-node-details-mute-label"), "Mute");
         }}
+        if (iconBtn instanceof HTMLButtonElement) {{
+          iconBtn.hidden = true;
+          iconBtn.disabled = true;
+          iconBtn.dataset.nodeId = "";
+        }}
         setDrawerElementHtmlIfChanged(locationHost, "", "location");
         setDrawerElementHtmlIfChanged(chatHost, "", "chat");
         setDrawerElementHtmlIfChanged(linksHost, "", "links");
@@ -1904,8 +1911,29 @@
       const tagEntry = nodeTagEntryForNode(selectedId);
       const tagPreset = tagEntry && tagEntry.preset ? tagEntry.preset : null;
       const hasTag = !!tagPreset;
+      const localNodeId = normalizeNodeId(
+        typeof resolveLocalNodeId === "function" ? resolveLocalNodeId(safeState) : ""
+      );
+      const localBadgeEmoji = (
+        selectedId
+        && selectedId === localNodeId
+        && typeof settingsBadgeEmojiChoiceSet !== "undefined"
+        && settingsBadgeEmojiChoiceSet instanceof Set
+        && settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())
+      )
+        ? String(settingsBadgeEmoji || "").trim()
+        : "";
+      const nodeEmojiOverride = (typeof nodeEmojiOverrideForNode === "function")
+        ? nodeEmojiOverrideForNode(selectedId)
+        : "";
+      const hasNodeEmojiOverride = !!nodeEmojiOverride;
+      const effectiveEmoji = localBadgeEmoji || (
+        typeof nodeVisualEmojiForNode === "function"
+          ? nodeVisualEmojiForNode(selectedId, tagEntry)
+          : ""
+      );
       const tagLabel = hasTag
-        ? nodeTagDisplayLabel(tagEntry, "Tagged")
+        ? normalizeNodeTagPresetName(tagPreset && tagPreset.name, "Tagged")
         : "+tag";
       if (tagTabLabel instanceof HTMLElement) {{
         setDrawerElementTextIfChanged(tagTabLabel, tagLabel);
@@ -1917,17 +1945,54 @@
         tagTabBtn.title = tagTitle;
         tagTabBtn.setAttribute("aria-label", tagTitle);
       }}
-      if (tagTabChip instanceof HTMLElement) {{
-        if (hasTag) {{
-          tagTabChip.classList.add("is-tagged");
-          tagTabChip.setAttribute("style", nodeTagStyleVars(tagEntry));
-          tagTabChip.classList.toggle("has-emoji", !!nodeTagEmojiForEntry(tagEntry));
-          tagTabChip.innerHTML = nodeTagChipEmojiHtml(tagEntry);
+      if (iconBtn instanceof HTMLButtonElement && iconChip instanceof HTMLElement && iconInput instanceof HTMLInputElement) {{
+        iconBtn.hidden = false;
+        iconBtn.disabled = false;
+        iconBtn.dataset.nodeId = selectedId;
+        iconInput.value = nodeEmojiOverride;
+        iconChip.className = "chat-node-details-icon-chip";
+        iconChip.removeAttribute("style");
+        if (effectiveEmoji) {{
+          iconChip.classList.add("has-emoji");
+          iconChip.classList.remove("is-empty");
+          iconChip.innerHTML = `<span class="chat-node-details-icon-glyph" aria-hidden="true">${{escAttr(effectiveEmoji)}}</span>`;
         }} else {{
-          tagTabChip.classList.remove("is-tagged");
-          tagTabChip.classList.remove("has-emoji");
-          tagTabChip.removeAttribute("style");
-          tagTabChip.innerHTML = "";
+          iconChip.classList.add("is-empty");
+          iconChip.textContent = "+";
+        }}
+        const iconTitle = hasNodeEmojiOverride
+          ? `Node icon override: ${{nodeEmojiOverride}}`
+          : (localBadgeEmoji
+            ? `Workspace badge: ${{localBadgeEmoji}}`
+            : (effectiveEmoji ? `Current tag icon: ${{effectiveEmoji}}` : "Add node icon"));
+        iconBtn.title = iconTitle;
+        iconBtn.setAttribute("aria-label", iconTitle);
+        if (iconBtn.dataset.bound !== "1") {{
+          iconBtn.dataset.bound = "1";
+          iconBtn.addEventListener("click", () => {{
+            const nodeId = normalizeNodeId(iconBtn.dataset.nodeId || "");
+            if (!nodeId || !(iconInput instanceof HTMLInputElement)) return;
+            if (typeof openChatEmojiPanel !== "function") return;
+            openChatEmojiPanel("tag", null, iconBtn, false, iconInput);
+          }});
+        }}
+        if (iconInput.dataset.bound !== "1") {{
+          iconInput.dataset.bound = "1";
+          const saveIconOverride = () => {{
+            const nodeId = normalizeNodeId(iconBtn.dataset.nodeId || "");
+            if (!nodeId) return;
+            const emoji = (typeof saveNodeEmojiOverride === "function")
+              ? saveNodeEmojiOverride(nodeId, iconInput.value, {{ persist: true }})
+              : "";
+            iconInput.value = emoji;
+            syncChatNodeDetailsDrawer(latestState, {{ fetchHistory: false }});
+            refreshFavoriteToggleButtons();
+            if (latestState) {{
+              renderFavorites(latestState);
+            }}
+          }};
+          iconInput.addEventListener("input", saveIconOverride);
+          iconInput.addEventListener("change", saveIconOverride);
         }}
       }}
       if (tagHost instanceof HTMLElement) {{

@@ -163,12 +163,24 @@
       }};
     }}
 
+    function nodeEmojiOverrideForNode(nodeId) {{
+      const cleanNodeId = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(cleanNodeId)) return "";
+      return normalizeNodeTagEmoji(nodeEmojiByNodeId.get(cleanNodeId), "");
+    }}
+
     function nodeTagEmojiForEntry(tagEntry) {{
       return normalizeNodeTagEmoji(tagEntry && tagEntry.preset && tagEntry.preset.emoji, "");
     }}
 
     function nodeTagEmojiForNode(nodeId) {{
       return nodeTagEmojiForEntry(nodeTagEntryForNode(nodeId));
+    }}
+
+    function nodeVisualEmojiForNode(nodeId, tagEntry = null) {{
+      const overrideEmoji = nodeEmojiOverrideForNode(nodeId);
+      if (overrideEmoji) return overrideEmoji;
+      return nodeTagEmojiForEntry(tagEntry || nodeTagEntryForNode(nodeId));
     }}
 
     function nodeTagDisplayLabel(tagEntry, fallback = "Tagged") {{
@@ -180,8 +192,8 @@
       return emoji ? `${emoji} ${label}` : label;
     }}
 
-    function nodeTagChipEmojiHtml(tagEntry) {{
-      const emoji = nodeTagEmojiForEntry(tagEntry);
+    function nodeTagChipEmojiHtml(tagEntry, nodeId = "") {{
+      const emoji = nodeVisualEmojiForNode(nodeId, tagEntry);
       if (!emoji) return "";
       return `<span class="favorite-menu-tag-chip-emoji" aria-hidden="true">${escAttr(emoji)}</span>`;
     }}
@@ -239,6 +251,23 @@
           count += 1;
         }}
         window.localStorage.setItem(nodeTagsStorageKey, JSON.stringify(payload));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistNodeTagEmojis() {{
+      try {{
+        const payload = {{}};
+        let count = 0;
+        for (const [rawNodeId, rawEmoji] of nodeEmojiByNodeId.entries()) {{
+          if (count >= 4000) break;
+          const nodeId = normalizeNodeId(rawNodeId);
+          const emoji = normalizeNodeTagEmoji(rawEmoji, "");
+          if (!isSelectableNodeId(nodeId) || !emoji) continue;
+          payload[nodeId] = emoji;
+          count += 1;
+        }}
+        window.localStorage.setItem(nodeTagEmojiStorageKey, JSON.stringify(payload));
       }} catch (_err) {{
       }}
     }}
@@ -329,13 +358,28 @@
       return true;
     }}
 
+    function saveNodeEmojiOverride(nodeId, rawEmoji, options = null) {{
+      const cleanNodeId = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(cleanNodeId)) return "";
+      const emoji = normalizeNodeTagEmoji(rawEmoji, "");
+      if (emoji) {{
+        nodeEmojiByNodeId.set(cleanNodeId, emoji);
+      }} else {{
+        nodeEmojiByNodeId.delete(cleanNodeId);
+      }}
+      if (!(options && options.persist === false)) {{
+        persistFavoriteNodes();
+      }}
+      return emoji;
+    }}
+
     function loadFavoriteNodes() {{
       favoriteNodeIds.clear();
       nodeTagByNodeId.clear();
       nodeTagPresetsById.clear();
+      nodeEmojiByNodeId.clear();
       let migratedLegacyFavorites = false;
       let hydratedPresets = false;
-      let migratedLegacyTagEmojis = false;
 
       try {{
         const rawPresets = window.localStorage.getItem(nodeTagPresetsStorageKey);
@@ -390,15 +434,7 @@
             const nodeId = normalizeNodeId(entry[0]);
             const emoji = normalizeNodeTagEmoji(entry[1], "");
             if (!isSelectableNodeId(nodeId) || !emoji) continue;
-            const presetId = normalizeNodeTagPresetId(nodeTagByNodeId.get(nodeId), "");
-            if (!presetId) continue;
-            const preset = nodeTagPresetForId(presetId);
-            if (!preset || normalizeNodeTagEmoji(preset.emoji, "")) continue;
-            nodeTagPresetsById.set(presetId, {{
-              ...preset,
-              emoji,
-            }});
-            migratedLegacyTagEmojis = true;
+            nodeEmojiByNodeId.set(nodeId, emoji);
           }}
         }}
       }} catch (_err) {{
@@ -430,7 +466,7 @@
         setActiveNodeTagPreset("", false);
       }}
 
-      if (migratedLegacyFavorites || migratedLegacyTagEmojis || !hydratedPresets) {{
+      if (migratedLegacyFavorites || !hydratedPresets) {{
         persistFavoriteNodes();
       }}
     }}
@@ -444,10 +480,7 @@
       }}
       persistNodeTagPresets();
       persistNodeTags();
-      try {{
-        window.localStorage.removeItem(nodeTagEmojiStorageKey);
-      }} catch (_err) {{
-      }}
+      persistNodeTagEmojis();
       persistActiveNodeTagPreset();
     }}
 

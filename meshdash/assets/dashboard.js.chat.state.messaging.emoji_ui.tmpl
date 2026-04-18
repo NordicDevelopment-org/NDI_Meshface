@@ -884,7 +884,7 @@
       panel.style.bottom = "auto";
     }}
 
-    function openChatEmojiPanel(mode = "compose", reactionTargetId = null, anchorEl = null, expandReactionPicker = false) {{
+    function openChatEmojiPanel(mode = "compose", reactionTargetId = null, anchorEl = null, expandReactionPicker = false, tagTargetInput = null) {{
       const panel = chatEmojiPanelElement();
       const chatBtn = document.getElementById("chat-emoji-btn");
       if (!(panel instanceof HTMLElement)) return;
@@ -907,6 +907,8 @@
         ? anchorEl
         : (chatBtn instanceof HTMLElement ? chatBtn : null);
       chatEmojiTagTargetInput = (
+        chatEmojiMode === "tag" && tagTargetInput instanceof HTMLInputElement
+      ) ? tagTargetInput : (
         chatEmojiMode === "tag" && anchorEl instanceof HTMLInputElement
       ) ? anchorEl : null;
       if (chatEmojiMode === "react") {{
@@ -1167,7 +1169,10 @@
           if (!(target instanceof Element)) return;
           if (target.closest("#chat-emoji-panel")) return;
           if (target.closest("#chat-emoji-btn") || target.closest("#games-emoji-btn")) return;
+          if (target.closest("#chat-node-details-icon-btn")) return;
           if (target.closest("#favorite-menu-tag-emoji-input")) return;
+          if (target.closest("#favorite-menu-node-emoji-input")) return;
+          if (target.closest("#chat-node-details-head-icon-input")) return;
           if (target.closest("#settings-node-tag-emoji-input")) return;
           if (target.closest(".chat-reaction-summary") || target.closest(".chat-react-btn")) return;
           if (chatEmojiMode === "react") {{

@@ -5,7 +5,7 @@
       const title = tagEntry && tagEntry.preset
         ? `Tag: ${{nodeTagDisplayLabel(tagEntry, "Tagged")}}`
         : "No tag";
-      const emojiHtml = tagEntry ? nodeTagChipEmojiHtml(tagEntry) : "";
+      const emojiHtml = nodeTagChipEmojiHtml(tagEntry, nodeId);
       return `<span class="favorite-menu-tag-chip ${{extraClass}}${{tagEntry ? " is-tagged" : ""}}${{emojiHtml ? " has-emoji" : ""}}"${{styleAttr}} title="${{escAttr(title)}}" aria-hidden="true">${{emojiHtml}}</span>`;
     }}
 
@@ -37,8 +37,12 @@
           <input id="favorite-menu-tag-name-input" class="favorite-menu-tag-editor-input" type="text" maxlength="40" value="${{escAttr(normalizeNodeTagPresetName(currentPreset.name, "Tagged"))}}" placeholder="Tag name" />
         </div>
         <div class="favorite-menu-tag-editor-row">
-          <label for="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-label">Emoji</label>
+          <label for="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-label">Tag Emoji</label>
           <input id="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(normalizeNodeTagEmoji(currentPreset.emoji, ""))}}" placeholder="Optional emoji" />
+        </div>
+        <div class="favorite-menu-tag-editor-row">
+          <label for="favorite-menu-node-emoji-input" class="favorite-menu-tag-editor-label">Node Icon</label>
+          <input id="favorite-menu-node-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(nodeEmojiOverrideForNode(cleanNodeId))}}" placeholder="Optional node-specific emoji" />
         </div>
         <div class="favorite-menu-tag-editor-row favorite-menu-tag-editor-row-inline">
           <label for="favorite-menu-tag-color-input" class="favorite-menu-tag-editor-label">Color</label>
@@ -51,6 +55,8 @@
         <div class="favorite-menu-tag-editor-actions">
           <button id="favorite-menu-tag-save-preset-btn" class="btn btn-secondary" type="button">Save Preset</button>
           <button id="favorite-menu-tag-assign-btn" class="btn btn-secondary" type="button">Assign</button>
+          <button id="favorite-menu-node-emoji-save-btn" class="btn btn-secondary" type="button">Save Icon</button>
+          <button id="favorite-menu-node-emoji-clear-btn" class="btn btn-secondary" type="button">Clear Icon</button>
           <button id="favorite-menu-tag-clear-btn" class="btn btn-secondary" type="button">Clear Tag</button>
         </div>
         <div id="favorite-menu-tag-status" class="favorite-menu-tag-status"></div>
@@ -65,6 +71,7 @@
       const presetSelect = document.getElementById("favorite-menu-tag-preset-select");
       const nameInput = document.getElementById("favorite-menu-tag-name-input");
       const emojiInput = document.getElementById("favorite-menu-tag-emoji-input");
+      const nodeEmojiInput = document.getElementById("favorite-menu-node-emoji-input");
       const colorInput = document.getElementById("favorite-menu-tag-color-input");
       const vibranceInput = document.getElementById("favorite-menu-tag-vibrance-input");
       const vibranceValue = document.getElementById("favorite-menu-tag-vibrance-value");
@@ -72,10 +79,13 @@
       const statusEl = document.getElementById("favorite-menu-tag-status");
       const savePresetBtn = document.getElementById("favorite-menu-tag-save-preset-btn");
       const assignBtn = document.getElementById("favorite-menu-tag-assign-btn");
+      const saveNodeEmojiBtn = document.getElementById("favorite-menu-node-emoji-save-btn");
+      const clearNodeEmojiBtn = document.getElementById("favorite-menu-node-emoji-clear-btn");
       const clearBtn = document.getElementById("favorite-menu-tag-clear-btn");
       if (!(presetSelect instanceof HTMLSelectElement)) return;
       if (!(nameInput instanceof HTMLInputElement)) return;
       if (!(emojiInput instanceof HTMLInputElement)) return;
+      if (!(nodeEmojiInput instanceof HTMLInputElement)) return;
       if (!(colorInput instanceof HTMLInputElement)) return;
       if (!(vibranceInput instanceof HTMLInputElement)) return;
       if (!(vibranceValue instanceof HTMLElement)) return;
@@ -83,6 +93,8 @@
       if (!(statusEl instanceof HTMLElement)) return;
       if (!(savePresetBtn instanceof HTMLButtonElement)) return;
       if (!(assignBtn instanceof HTMLButtonElement)) return;
+      if (!(saveNodeEmojiBtn instanceof HTMLButtonElement)) return;
+      if (!(clearNodeEmojiBtn instanceof HTMLButtonElement)) return;
       if (!(clearBtn instanceof HTMLButtonElement)) return;
 
       const setStatus = (text) => {{
@@ -93,7 +105,9 @@
         const color = normalizeNodeTagColor(colorInput.value, "#2aa85a");
         const vibrance = clampNodeTagVibrance(vibranceInput.value, 70);
         const emoji = normalizeNodeTagEmoji(emojiInput.value, "");
+        const nodeEmoji = normalizeNodeTagEmoji(nodeEmojiInput.value, "");
         emojiInput.value = emoji;
+        nodeEmojiInput.value = nodeEmoji;
         vibranceValue.textContent = `${{vibrance}}%`;
         const styleVars = nodeTagStyleVars({{
           preset: {{
@@ -102,8 +116,8 @@
           }},
         }});
         preview.setAttribute("style", styleVars);
-        preview.classList.toggle("has-emoji", !!emoji);
-        preview.innerHTML = emoji ? `<span class="favorite-menu-tag-chip-emoji" aria-hidden="true">${{escAttr(emoji)}}</span>` : "";
+        preview.classList.toggle("has-emoji", !!(nodeEmoji || emoji));
+        preview.innerHTML = (nodeEmoji || emoji) ? `<span class="favorite-menu-tag-chip-emoji" aria-hidden="true">${{escAttr(nodeEmoji || emoji)}}</span>` : "";
       }};
 
       const loadPresetIntoEditor = (presetId) => {{
@@ -111,6 +125,7 @@
         if (!preset) return;
         nameInput.value = normalizeNodeTagPresetName(preset.name, "Tagged");
         emojiInput.value = normalizeNodeTagEmoji(preset.emoji, "");
+        nodeEmojiInput.value = nodeEmojiOverrideForNode(cleanNodeId);
         colorInput.value = normalizeNodeTagColor(preset.color, "#2aa85a");
         vibranceInput.value = String(clampNodeTagVibrance(preset.vibrance, 70));
         applyPreview();
@@ -176,6 +191,34 @@
           }}
         }});
       }}
+      if (nodeEmojiInput.dataset.bound !== "1") {{
+        nodeEmojiInput.dataset.bound = "1";
+        nodeEmojiInput.addEventListener("input", () => {{
+          applyPreview();
+          setStatus("");
+        }});
+        nodeEmojiInput.addEventListener("blur", () => {{
+          nodeEmojiInput.value = normalizeNodeTagEmoji(nodeEmojiInput.value, "");
+          applyPreview();
+        }});
+        const openNodeEmojiPicker = () => {{
+          if (typeof openChatEmojiPanel !== "function") return;
+          openChatEmojiPanel("tag", null, nodeEmojiInput);
+        }};
+        nodeEmojiInput.addEventListener("click", () => {{
+          openNodeEmojiPicker();
+        }});
+        nodeEmojiInput.addEventListener("focus", () => {{
+          openNodeEmojiPicker();
+        }});
+        nodeEmojiInput.addEventListener("keydown", (ev) => {{
+          const key = String(ev.key || "");
+          if (key === "Enter" || key === "ArrowDown" || key === " ") {{
+            ev.preventDefault();
+            openNodeEmojiPicker();
+          }}
+        }});
+      }}
       if (colorInput.dataset.bound !== "1") {{
         colorInput.dataset.bound = "1";
         const syncColorPreview = () => {{
@@ -209,6 +252,8 @@
           const presetId = normalizeNodeTagPresetId(preset && preset.id, "");
           if (!presetId || !nodeTagPresetsById.has(presetId)) return;
           assignNodeTagPresetToNode(cleanNodeId, presetId, {{ persist: false }});
+          saveNodeEmojiOverride(cleanNodeId, "", {{ persist: false }});
+          nodeEmojiInput.value = "";
           persistFavoriteNodes();
           refreshFavoriteToggleButtons();
           if (latestState) {{
@@ -221,6 +266,42 @@
               fetchHistory: false,
             }});
           }}
+        }});
+      }}
+      if (saveNodeEmojiBtn.dataset.bound !== "1") {{
+        saveNodeEmojiBtn.dataset.bound = "1";
+        saveNodeEmojiBtn.addEventListener("click", () => {{
+          const emoji = saveNodeEmojiOverride(cleanNodeId, nodeEmojiInput.value, {{ persist: true }});
+          nodeEmojiInput.value = emoji;
+          applyPreview();
+          refreshFavoriteToggleButtons();
+          if (latestState) {{
+            renderFavorites(latestState);
+          }} else {{
+            renderStarredNodeSelect({{}});
+          }}
+          if (typeof syncChatNodeDetailsDrawer === "function") {{
+            syncChatNodeDetailsDrawer(latestState, {{ fetchHistory: false }});
+          }}
+          setStatus(emoji ? "Node icon saved." : "Node icon cleared.");
+        }});
+      }}
+      if (clearNodeEmojiBtn.dataset.bound !== "1") {{
+        clearNodeEmojiBtn.dataset.bound = "1";
+        clearNodeEmojiBtn.addEventListener("click", () => {{
+          saveNodeEmojiOverride(cleanNodeId, "", {{ persist: true }});
+          nodeEmojiInput.value = "";
+          applyPreview();
+          refreshFavoriteToggleButtons();
+          if (latestState) {{
+            renderFavorites(latestState);
+          }} else {{
+            renderStarredNodeSelect({{}});
+          }}
+          if (typeof syncChatNodeDetailsDrawer === "function") {{
+            syncChatNodeDetailsDrawer(latestState, {{ fetchHistory: false }});
+          }}
+          setStatus("Node icon cleared.");
         }});
       }}
       if (clearBtn.dataset.bound !== "1") {{
