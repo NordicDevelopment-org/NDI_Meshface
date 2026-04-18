@@ -3516,92 +3516,63 @@
             members,
             memberCount: members.length,
             maxLayer,
-            weight: Math.max(1.15, 0.9 + (members.length * 0.72) + Math.min(6, firstHopDegree * 0.14)),
+            weight: Math.max(1.2, 1 + Math.log2(Math.max(2, members.length + 1)) + Math.min(1.8, firstHopDegree * 0.08)),
           }};
         }}).sort((a, b) => (
           (b.memberCount - a.memberCount)
           || compareNetworkGraphNodeIds(a.clusterId, b.clusterId, degreeMeta, nodeMap)
         ));
         const clusterRadius = Math.max(
-          312,
-          Math.min(432, 286 + (clusterDescriptors.length * 2.3) + (clusterDescriptors[0] ? Math.min(72, clusterDescriptors[0].memberCount * 0.72) : 0))
+          358,
+          Math.min(492, 334 + (clusterDescriptors.length * 3.4) + (clusterDescriptors[0] ? Math.min(96, clusterDescriptors[0].memberCount * 0.8) : 0))
         );
         const totalClusterWeight = clusterDescriptors.reduce((sum, descriptor) => sum + descriptor.weight, 0) || 1;
-        const clusterRectHalfWidth = Math.max(250, Math.min(360, clusterRadius * 0.88));
-        const clusterRectHalfHeight = Math.max(186, Math.min(250, clusterRadius * 0.62));
-        const clusterRectLeft = 480 - clusterRectHalfWidth;
-        const clusterRectRight = 480 + clusterRectHalfWidth;
-        const clusterRectTop = 310 - clusterRectHalfHeight;
-        const clusterRectBottom = 310 + clusterRectHalfHeight;
-        const clusterPerimeter = (clusterRectHalfWidth * 4) + (clusterRectHalfHeight * 4);
-        let perimeterCursor = 0;
-        function resolveClusterPerimeterPosition(distance) {{
-          let remaining = ((distance % clusterPerimeter) + clusterPerimeter) % clusterPerimeter;
-          const topLength = clusterRectRight - clusterRectLeft;
-          const rightLength = clusterRectBottom - clusterRectTop;
-          const bottomLength = topLength;
-          const leftLength = rightLength;
-          if (remaining <= topLength) {{
-            return {{
-              x: clusterRectLeft + remaining,
-              y: clusterRectTop,
-              tangentX: 1,
-              tangentY: 0,
-              normalX: 0,
-              normalY: -1,
-            }};
-          }}
-          remaining -= topLength;
-          if (remaining <= rightLength) {{
-            return {{
-              x: clusterRectRight,
-              y: clusterRectTop + remaining,
-              tangentX: 0,
-              tangentY: 1,
-              normalX: 1,
-              normalY: 0,
-            }};
-          }}
-          remaining -= rightLength;
-          if (remaining <= bottomLength) {{
-            return {{
-              x: clusterRectRight - remaining,
-              y: clusterRectBottom,
-              tangentX: -1,
-              tangentY: 0,
-              normalX: 0,
-              normalY: 1,
-            }};
-          }}
-          remaining -= bottomLength;
-          return {{
-            x: clusterRectLeft,
-            y: clusterRectBottom - remaining,
-            tangentX: 0,
-            tangentY: -1,
-            normalX: -1,
-            normalY: 0,
-          }};
-        }}
+        const clusterAngularSpan = Math.PI * 2;
+        const clusterAngularStart = -Math.PI / 2;
+        let angleCursor = clusterAngularStart;
         clusterDescriptors.forEach((descriptor, clusterIndex) => {{
-          const clusterLength = clusterPerimeter * (descriptor.weight / totalClusterWeight);
-          const clusterAnchor = resolveClusterPerimeterPosition(perimeterCursor + (clusterLength / 2));
-          perimeterCursor += clusterLength;
+          const clusterArc = Math.max(
+            (Math.PI * 2) / Math.max(10, clusterDescriptors.length * 1.35),
+            clusterAngularSpan * (descriptor.weight / totalClusterWeight)
+          );
+          const clusterAngle = angleCursor + (clusterArc / 2);
+          angleCursor += clusterArc;
+          const anchorX = 480 + (Math.cos(clusterAngle) * clusterRadius);
+          const anchorY = 310 + (Math.sin(clusterAngle) * clusterRadius);
           const members = descriptor.members;
-          const tangentSpacing = 22;
-          const normalSpacing = 34;
-          const clusterColumns = Math.max(3, Math.min(8, Math.round(Math.sqrt(descriptor.memberCount) * 1.15)));
+          const tangentX = -Math.sin(clusterAngle);
+          const tangentY = Math.cos(clusterAngle);
+          const normalX = Math.cos(clusterAngle);
+          const normalY = Math.sin(clusterAngle);
+          const localArcSpan = Math.min(Math.PI * 1.08, Math.max(Math.PI * 0.48, clusterArc * 1.2));
+          const baseMemberRadius = Math.max(
+            66,
+            Math.min(148, 50 + (descriptor.memberCount * 1.95))
+          );
+          const clusterLayerNodeIds = new Map();
+          members.forEach((memberId) => {{
+            const memberLayer = Math.max(1, Number(layerByNodeId.get(memberId) || 1));
+            if (!clusterLayerNodeIds.has(memberLayer)) {{
+              clusterLayerNodeIds.set(memberLayer, []);
+            }}
+            clusterLayerNodeIds.get(memberLayer).push(memberId);
+          }});
           members.forEach((nodeId, memberIndex) => {{
             const memberLayer = Math.max(1, Number(layerByNodeId.get(nodeId) || 1));
-            const rowIndex = Math.floor(memberIndex / clusterColumns);
-            const colIndex = memberIndex % clusterColumns;
-            const rowWidth = Math.min(clusterColumns, members.length - (rowIndex * clusterColumns));
-            const tangentOffset = (colIndex - ((rowWidth - 1) / 2)) * tangentSpacing;
-            const normalOffset = 34 + (rowIndex * normalSpacing) + ((memberLayer - 1) * 12);
+            const layerRadius = baseMemberRadius + ((memberLayer - 1) * 56);
+            const layerNodeIds = clusterLayerNodeIds.get(memberLayer) || [nodeId];
+            const layerIndex = Math.max(0, layerNodeIds.indexOf(nodeId));
+            const layerCount = Math.max(1, layerNodeIds.length);
+            const layerAngle = layerCount <= 1
+              ? clusterAngle
+              : (clusterAngle - (localArcSpan / 2) + ((localArcSpan * layerIndex) / Math.max(1, layerCount - 1)));
+            const drift = (memberLayer - 1) * 16;
+            const clusterBaseX = anchorX + (normalX * drift);
+            const clusterBaseY = anchorY + (normalY * drift);
             positions.set(nodeId, {{
               ...(positions.get(nodeId) || {{}}),
-              x: clusterAnchor.x + (clusterAnchor.tangentX * tangentOffset) + (clusterAnchor.normalX * normalOffset),
-              y: clusterAnchor.y + (clusterAnchor.tangentY * tangentOffset) + (clusterAnchor.normalY * normalOffset),
+              x: clusterBaseX + (Math.cos(layerAngle) * layerRadius) + (tangentX * ((layerIndex - ((layerCount - 1) / 2)) * 4.8)),
+              y: clusterBaseY + (Math.sin(layerAngle) * layerRadius) + (tangentY * ((layerIndex - ((layerCount - 1) / 2)) * 4.8)),
               layer: memberLayer,
               disconnected: false,
               broadcastOnly: !!((positions.get(nodeId) || {{}}).broadcastOnly),
@@ -3610,21 +3581,16 @@
         }});
         disconnectedGroups.forEach((group, groupIndex) => {{
           const ids = Array.isArray(group.nodeIds) ? group.nodeIds : [];
-          const laneSide = group.broadcastOnly ? 1 : -1;
-          const laneX = 480 + (laneSide * Math.min(430, clusterRadius + 164 + (groupIndex * 26)));
-          const laneTopY = 108 + (groupIndex * 20);
-          const laneBottomY = 520;
-          const laneHeight = Math.max(120, laneBottomY - laneTopY);
-          const stepY = ids.length > 1 ? (laneHeight / Math.max(1, ids.length - 1)) : 0;
-          const columnWave = Math.min(34, Math.max(14, ids.length * 0.16));
+          const detachedArcRadius = Math.min(642, clusterRadius + 252 + (groupIndex * 40));
+          const laneCenterAngle = group.broadcastOnly ? (Math.PI * 0.08) : (Math.PI * 1.08);
+          const laneArcSpan = Math.min(Math.PI * 0.42, Math.max(Math.PI * 0.18, ids.length * 0.022));
           ids.forEach((nodeId, index) => {{
-            const rowY = ids.length <= 1
-              ? (laneTopY + (laneHeight / 2))
-              : (laneTopY + (stepY * index));
-            const columnOffset = ((index % 2 === 0) ? -1 : 1) * Math.min(columnWave, 10 + (Math.floor(index / 2) * 3.5));
+            const nodeAngle = ids.length <= 1
+              ? laneCenterAngle
+              : (laneCenterAngle - (laneArcSpan / 2) + ((laneArcSpan * index) / Math.max(1, ids.length - 1)));
             positions.set(nodeId, {{
-              x: laneX + columnOffset,
-              y: rowY,
+              x: 480 + (Math.cos(nodeAngle) * detachedArcRadius),
+              y: 310 + (Math.sin(nodeAngle) * detachedArcRadius),
               layer: maxConnectedLayer + 1 + groupIndex,
               disconnected: true,
               broadcastOnly: !!group.broadcastOnly,
