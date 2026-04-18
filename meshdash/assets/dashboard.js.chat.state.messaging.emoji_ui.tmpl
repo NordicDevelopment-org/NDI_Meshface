@@ -158,6 +158,7 @@
       chatReactionTargetId = null;
       chatReactionPickerExpanded = false;
       chatEmojiAnchorElement = null;
+      chatEmojiTagTargetInput = null;
       chatEmojiSearchQuery = "";
       if (targetPanel instanceof HTMLElement) {{
         targetPanel.hidden = true;
@@ -794,6 +795,9 @@
       if (chatEmojiAnchorElement instanceof HTMLElement && document.contains(chatEmojiAnchorElement)) {{
         return chatEmojiAnchorElement;
       }}
+      if (chatEmojiTagTargetInput instanceof HTMLElement && document.contains(chatEmojiTagTargetInput)) {{
+        return chatEmojiTagTargetInput;
+      }}
       if (activeLayoutView === "games") {{
         const gamesBtn = document.getElementById("games-emoji-btn");
         if (gamesBtn instanceof HTMLElement) return gamesBtn;
@@ -889,7 +893,9 @@
       panel.dataset.closing = "0";
       panel.dataset.closeNonce = "";
       panel.classList.remove("is-closing");
-      chatEmojiMode = mode === "react" ? "react" : "compose";
+      chatEmojiMode = mode === "react"
+        ? "react"
+        : (mode === "tag" ? "tag" : "compose");
       chatReactionPickerExpanded = chatEmojiMode === "react"
         ? !!expandReactionPicker
         : true;
@@ -900,6 +906,9 @@
       chatEmojiAnchorElement = anchorEl instanceof HTMLElement
         ? anchorEl
         : (chatBtn instanceof HTMLElement ? chatBtn : null);
+      chatEmojiTagTargetInput = (
+        chatEmojiMode === "tag" && anchorEl instanceof HTMLInputElement
+      ) ? anchorEl : null;
       if (chatEmojiMode === "react") {{
         suppressChatReactionContextTooltip(chatEmojiAnchorElement);
       }} else {{
@@ -946,6 +955,16 @@
     }}
 
     function insertEmojiAtCursor(emoji) {{
+      if (chatEmojiMode === "tag" && chatEmojiTagTargetInput instanceof HTMLInputElement) {{
+        const input = chatEmojiTagTargetInput;
+        input.value = emoji;
+        input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+        input.dispatchEvent(new Event("change", {{ bubbles: true }}));
+        input.focus({{ preventScroll: true }});
+        const end = input.value.length;
+        input.setSelectionRange(end, end);
+        return;
+      }}
       const chatInput = document.getElementById("chat-input");
       const gamesInput = document.getElementById("games-chat-input");
       const focused = document.activeElement;
@@ -1148,6 +1167,7 @@
           if (!(target instanceof Element)) return;
           if (target.closest("#chat-emoji-panel")) return;
           if (target.closest("#chat-emoji-btn") || target.closest("#games-emoji-btn")) return;
+          if (target.closest("#favorite-menu-tag-emoji-input")) return;
           if (target.closest(".chat-reaction-summary") || target.closest(".chat-react-btn")) return;
           if (chatEmojiMode === "react") {{
             chatReactionPickerSuppressOpenUntilMs = Date.now() + 160;

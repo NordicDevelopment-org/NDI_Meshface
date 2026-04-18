@@ -1905,7 +1905,7 @@
       const tagPreset = tagEntry && tagEntry.preset ? tagEntry.preset : null;
       const hasTag = !!tagPreset;
       const tagLabel = hasTag
-        ? normalizeNodeTagPresetName(tagPreset.name, "Tagged")
+        ? nodeTagDisplayLabel(tagEntry, "Tagged")
         : "+tag";
       if (tagTabLabel instanceof HTMLElement) {{
         setDrawerElementTextIfChanged(tagTabLabel, tagLabel);
@@ -1921,9 +1921,13 @@
         if (hasTag) {{
           tagTabChip.classList.add("is-tagged");
           tagTabChip.setAttribute("style", nodeTagStyleVars(tagEntry));
+          tagTabChip.classList.toggle("has-emoji", !!nodeTagEmojiForEntry(tagEntry));
+          tagTabChip.innerHTML = nodeTagChipEmojiHtml(tagEntry);
         }} else {{
           tagTabChip.classList.remove("is-tagged");
+          tagTabChip.classList.remove("has-emoji");
           tagTabChip.removeAttribute("style");
+          tagTabChip.innerHTML = "";
         }}
       }}
       if (tagHost instanceof HTMLElement) {{

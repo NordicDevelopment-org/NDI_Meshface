@@ -328,9 +328,7 @@
           );
           markerHash = hashMixStr(
             markerHash,
-            normalizeNodeId(resolveLocalNodeId(latestState || {}) || "") === normalizedId
-              ? resolveMapLocalNodeEmoji(latestState)
-              : ""
+            resolveMapNodeEmoji(normalizedId, latestState)
           );
           markerHash = hashMixInt(markerHash, isEstimated ? Math.trunc(Number(estimate && estimate.anchorCount) || 0) : 0);
           markerHash = hashMixInt(markerHash, isEstimated ? Math.trunc(Number(estimate && estimate.supportLinks) || 0) : 0);

@@ -73,6 +73,24 @@
       return String(fallback);
     }}
 
+    function normalizeNodeTagEmoji(value, fallback = "") {{
+      const fallbackEmoji = String(fallback == null ? "" : fallback).trim();
+      const raw = String(value == null ? "" : value).trim();
+      if (!raw) return fallbackEmoji;
+      const graphemes = (typeof chatSplitGraphemes === "function")
+        ? chatSplitGraphemes(raw).filter((entry) => String(entry == null ? "" : entry).trim())
+        : Array.from(raw).filter((entry) => String(entry == null ? "" : entry).trim());
+      for (const grapheme of graphemes) {{
+        const clean = String(grapheme == null ? "" : grapheme).trim();
+        if (!clean) continue;
+        const isEmoji = (typeof chatIsEmojiOnlyText === "function")
+          ? chatIsEmojiOnlyText(clean)
+          : (typeof chatInlineEmojiTokenRe !== "undefined" && chatInlineEmojiTokenRe instanceof RegExp && chatInlineEmojiTokenRe.test(clean));
+        if (isEmoji) return clean;
+      }}
+      return fallbackEmoji;
+    }}
+
     function defaultNodeTagPreset() {{
       return {{
         id: "tag-default",
@@ -140,7 +158,31 @@
         nodeId: cleanNodeId,
         presetId: preset.id,
         preset,
+        emoji: normalizeNodeTagEmoji(nodeTagEmojiByNodeId.get(cleanNodeId), ""),
       }};
+    }}
+
+    function nodeTagEmojiForEntry(tagEntry) {{
+      return normalizeNodeTagEmoji(tagEntry && tagEntry.emoji, "");
+    }}
+
+    function nodeTagEmojiForNode(nodeId) {{
+      return nodeTagEmojiForEntry(nodeTagEntryForNode(nodeId));
+    }}
+
+    function nodeTagDisplayLabel(tagEntry, fallback = "Tagged") {{
+      const preset = tagEntry && typeof tagEntry === "object" && tagEntry.preset
+        ? tagEntry.preset
+        : null;
+      const label = normalizeNodeTagPresetName(preset && preset.name, fallback);
+      const emoji = nodeTagEmojiForEntry(tagEntry);
+      return emoji ? `${emoji} ${label}` : label;
+    }}
+
+    function nodeTagChipEmojiHtml(tagEntry) {{
+      const emoji = nodeTagEmojiForEntry(tagEntry);
+      if (!emoji) return "";
+      return `<span class="favorite-menu-tag-chip-emoji" aria-hidden="true">${escAttr(emoji)}</span>`;
     }}
 
     function nodeTagStyleVars(tagEntry) {{
@@ -195,6 +237,23 @@
           count += 1;
         }}
         window.localStorage.setItem(nodeTagsStorageKey, JSON.stringify(payload));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function persistNodeTagEmojis() {{
+      try {{
+        const payload = {{}};
+        let count = 0;
+        for (const [rawNodeId, rawEmoji] of nodeTagEmojiByNodeId.entries()) {{
+          if (count >= 4000) break;
+          const nodeId = normalizeNodeId(rawNodeId);
+          const emoji = normalizeNodeTagEmoji(rawEmoji, "");
+          if (!isSelectableNodeId(nodeId) || !emoji) continue;
+          payload[nodeId] = emoji;
+          count += 1;
+        }}
+        window.localStorage.setItem(nodeTagEmojiStorageKey, JSON.stringify(payload));
       }} catch (_err) {{
       }}
     }}
@@ -275,6 +334,7 @@
       const cleanNodeId = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(cleanNodeId)) return false;
       const existed = nodeTagByNodeId.delete(cleanNodeId);
+      nodeTagEmojiByNodeId.delete(cleanNodeId);
       if (!existed) return false;
       syncFavoriteNodeIdsFromTags();
       if (!(options && options.persist === false)) {{
@@ -283,9 +343,25 @@
       return true;
     }}
 
+    function saveNodeTagEmoji(nodeId, rawEmoji, options = null) {{
+      const cleanNodeId = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(cleanNodeId)) return "";
+      const emoji = normalizeNodeTagEmoji(rawEmoji, "");
+      if (emoji) {{
+        nodeTagEmojiByNodeId.set(cleanNodeId, emoji);
+      }} else {{
+        nodeTagEmojiByNodeId.delete(cleanNodeId);
+      }}
+      if (!(options && options.persist === false)) {{
+        persistFavoriteNodes();
+      }}
+      return emoji;
+    }}
+
     function loadFavoriteNodes() {{
       favoriteNodeIds.clear();
       nodeTagByNodeId.clear();
+      nodeTagEmojiByNodeId.clear();
       nodeTagPresetsById.clear();
       let migratedLegacyFavorites = false;
       let hydratedPresets = false;
@@ -332,6 +408,24 @@
       }}
 
       try {{
+        const rawTagEmojis = window.localStorage.getItem(nodeTagEmojiStorageKey);
+        if (rawTagEmojis) {{
+          const parsed = JSON.parse(rawTagEmojis);
+          const entries = Array.isArray(parsed)
+            ? parsed
+            : (parsed && typeof parsed === "object" ? Object.entries(parsed) : []);
+          for (const entry of entries) {{
+            if (!Array.isArray(entry) || entry.length < 2) continue;
+            const nodeId = normalizeNodeId(entry[0]);
+            const emoji = normalizeNodeTagEmoji(entry[1], "");
+            if (!isSelectableNodeId(nodeId) || !emoji) continue;
+            nodeTagEmojiByNodeId.set(nodeId, emoji);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+
+      try {{
         const rawLegacyFavorites = window.localStorage.getItem(favoritesStorageKey);
         if (rawLegacyFavorites) {{
           const parsed = JSON.parse(rawLegacyFavorites);
@@ -371,6 +465,7 @@
       }}
       persistNodeTagPresets();
       persistNodeTags();
+      persistNodeTagEmojis();
       persistActiveNodeTagPreset();
     }}
 
@@ -980,7 +1075,7 @@
     function nodeTagLabelForNode(nodeId) {{
       const entry = nodeTagEntryForNode(nodeId);
       if (!entry || !entry.preset) return "";
-      return normalizeNodeTagPresetName(entry.preset.name, "Tagged");
+      return nodeTagDisplayLabel(entry, "Tagged");
     }}
 
     function isMutedNode(nodeId) {{

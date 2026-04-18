@@ -462,30 +462,34 @@
       return applyMapNodeActivityFlashStyle(baseStyle, flashStrength, kind);
     }}
 
-    function resolveMapLocalNodeEmoji(state = latestState) {{
-      return (
-        typeof settingsBadgeEmojiChoiceSet !== "undefined"
-        && settingsBadgeEmojiChoiceSet instanceof Set
-        && settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())
-      )
-        ? String(settingsBadgeEmoji || "").trim()
+    function resolveMapNodeEmoji(nodeId, state = latestState) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!cleanNodeId) return "";
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState || {{}}) || "");
+      if (cleanNodeId === localNodeId) {{
+        const localBadgeEmoji = (
+          typeof settingsBadgeEmojiChoiceSet !== "undefined"
+          && settingsBadgeEmojiChoiceSet instanceof Set
+          && settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())
+        )
+          ? String(settingsBadgeEmoji || "").trim()
+          : "";
+        if (localBadgeEmoji) return localBadgeEmoji;
+      }}
+      return (typeof nodeTagEmojiForNode === "function")
+        ? nodeTagEmojiForNode(cleanNodeId)
         : "";
     }}
 
     function mapNodeUsesEmojiMarker(nodeId, markerKind = "actual", state = latestState) {{
       if ((markerKind === "estimated" ? "estimated" : "actual") !== "actual") return false;
-      const safeState = (state && typeof state === "object") ? state : latestState;
-      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState || {{}}) || "");
-      return !!(
-        localNodeId
-        && normalizeNodeId(nodeId || "") === localNodeId
-        && resolveMapLocalNodeEmoji(safeState)
-      );
+      return !!resolveMapNodeEmoji(nodeId, state);
     }}
 
     function buildMapEmojiMarkerIcon(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState) {{
       if (!mapNodeUsesEmojiMarker(nodeId, markerKind, state)) return null;
-      const emoji = resolveMapLocalNodeEmoji(state);
+      const emoji = resolveMapNodeEmoji(nodeId, state);
       if (!emoji) return null;
       const flashStrength = mapNodeActivityFlashStrength(nodeId);
       const markerClasses = [

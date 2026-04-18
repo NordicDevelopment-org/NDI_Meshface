@@ -3,9 +3,10 @@
       const styleVars = tagEntry ? nodeTagStyleVars(tagEntry) : "";
       const styleAttr = styleVars ? ` style="${{escAttr(styleVars)}}"` : "";
       const title = tagEntry && tagEntry.preset
-        ? `Tag: ${{normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged")}}`
+        ? `Tag: ${{nodeTagDisplayLabel(tagEntry, "Tagged")}}`
         : "No tag";
-      return `<span class="favorite-menu-tag-chip ${{extraClass}}${{tagEntry ? " is-tagged" : ""}}"${{styleAttr}} title="${{escAttr(title)}}" aria-hidden="true"></span>`;
+      const emojiHtml = tagEntry ? nodeTagChipEmojiHtml(tagEntry) : "";
+      return `<span class="favorite-menu-tag-chip ${{extraClass}}${{tagEntry ? " is-tagged" : ""}}${{emojiHtml ? " has-emoji" : ""}}"${{styleAttr}} title="${{escAttr(title)}}" aria-hidden="true">${{emojiHtml}}</span>`;
     }}
 
     function favoriteMenuTagEditorHtml(nodeId) {{
@@ -35,6 +36,10 @@
           <label for="favorite-menu-tag-name-input" class="favorite-menu-tag-editor-label">Name</label>
           <input id="favorite-menu-tag-name-input" class="favorite-menu-tag-editor-input" type="text" maxlength="40" value="${{escAttr(normalizeNodeTagPresetName(currentPreset.name, "Tagged"))}}" placeholder="Tag name" />
         </div>
+        <div class="favorite-menu-tag-editor-row">
+          <label for="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-label">Emoji</label>
+          <input id="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(nodeTagEmojiForEntry(currentTag))}}" placeholder="Optional emoji" />
+        </div>
         <div class="favorite-menu-tag-editor-row favorite-menu-tag-editor-row-inline">
           <label for="favorite-menu-tag-color-input" class="favorite-menu-tag-editor-label">Color</label>
           <input id="favorite-menu-tag-color-input" class="favorite-menu-tag-color-input" type="color" value="${{escAttr(normalizeNodeTagColor(currentPreset.color, "#2aa85a"))}}" />
@@ -59,6 +64,7 @@
       if (normalizeNodeId(host.dataset.nodeId || "") !== cleanNodeId) return;
       const presetSelect = document.getElementById("favorite-menu-tag-preset-select");
       const nameInput = document.getElementById("favorite-menu-tag-name-input");
+      const emojiInput = document.getElementById("favorite-menu-tag-emoji-input");
       const colorInput = document.getElementById("favorite-menu-tag-color-input");
       const vibranceInput = document.getElementById("favorite-menu-tag-vibrance-input");
       const vibranceValue = document.getElementById("favorite-menu-tag-vibrance-value");
@@ -69,6 +75,7 @@
       const clearBtn = document.getElementById("favorite-menu-tag-clear-btn");
       if (!(presetSelect instanceof HTMLSelectElement)) return;
       if (!(nameInput instanceof HTMLInputElement)) return;
+      if (!(emojiInput instanceof HTMLInputElement)) return;
       if (!(colorInput instanceof HTMLInputElement)) return;
       if (!(vibranceInput instanceof HTMLInputElement)) return;
       if (!(vibranceValue instanceof HTMLElement)) return;
@@ -85,6 +92,8 @@
       const applyPreview = () => {{
         const color = normalizeNodeTagColor(colorInput.value, "#2aa85a");
         const vibrance = clampNodeTagVibrance(vibranceInput.value, 70);
+        const emoji = normalizeNodeTagEmoji(emojiInput.value, "");
+        emojiInput.value = emoji;
         vibranceValue.textContent = `${{vibrance}}%`;
         const styleVars = nodeTagStyleVars({{
           preset: {{
@@ -93,6 +102,8 @@
           }},
         }});
         preview.setAttribute("style", styleVars);
+        preview.classList.toggle("has-emoji", !!emoji);
+        preview.innerHTML = emoji ? `<span class="favorite-menu-tag-chip-emoji" aria-hidden="true">${{escAttr(emoji)}}</span>` : "";
       }};
 
       const loadPresetIntoEditor = (presetId) => {{
@@ -133,6 +144,34 @@
           setStatus("");
         }});
       }}
+      if (emojiInput.dataset.bound !== "1") {{
+        emojiInput.dataset.bound = "1";
+        emojiInput.addEventListener("input", () => {{
+          applyPreview();
+          setStatus("");
+        }});
+        emojiInput.addEventListener("blur", () => {{
+          emojiInput.value = normalizeNodeTagEmoji(emojiInput.value, "");
+          applyPreview();
+        }});
+        const openEmojiPicker = () => {{
+          if (typeof openChatEmojiPanel !== "function") return;
+          openChatEmojiPanel("tag", null, emojiInput);
+        }};
+        emojiInput.addEventListener("click", () => {{
+          openEmojiPicker();
+        }});
+        emojiInput.addEventListener("focus", () => {{
+          openEmojiPicker();
+        }});
+        emojiInput.addEventListener("keydown", (ev) => {{
+          const key = String(ev.key || "");
+          if (key === "Enter" || key === "ArrowDown" || key === " ") {{
+            ev.preventDefault();
+            openEmojiPicker();
+          }}
+        }});
+      }}
       if (colorInput.dataset.bound !== "1") {{
         colorInput.dataset.bound = "1";
         colorInput.addEventListener("input", () => {{
@@ -161,7 +200,9 @@
           const preset = persistPresetFromEditor(preferredId);
           const presetId = normalizeNodeTagPresetId(preset && preset.id, "");
           if (!presetId || !nodeTagPresetsById.has(presetId)) return;
-          assignNodeTagPresetToNode(cleanNodeId, presetId);
+          assignNodeTagPresetToNode(cleanNodeId, presetId, {{ persist: false }});
+          saveNodeTagEmoji(cleanNodeId, emojiInput.value, {{ persist: false }});
+          persistFavoriteNodes();
           refreshFavoriteToggleButtons();
           if (latestState) {{
             renderFavorites(latestState);
@@ -214,7 +255,7 @@
           const name = resolveEntryName(nodeId);
           const tagEntry = nodeTagEntryForNode(nodeId);
           const tagName = tagEntry && tagEntry.preset
-            ? normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged")
+            ? nodeTagDisplayLabel(tagEntry, "Tagged")
             : "Tagged";
           return {{ id: nodeId, name, tagName, tagEntry }};
         }})
@@ -304,7 +345,7 @@
         btn.classList.toggle("active", active);
         btn.setAttribute("aria-pressed", active ? "true" : "false");
         const title = active
-          ? `Clear tag (${{normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged")}})`
+          ? `Clear tag (${{nodeTagDisplayLabel(tagEntry, "Tagged")}})`
           : `Tag node with ${{activePresetLabel}}`;
         btn.title = title;
         btn.setAttribute("aria-label", title);
@@ -316,7 +357,7 @@
         }}
         const icon = btn.querySelector(".favorite-toggle-icon");
         if (icon) {{
-          icon.textContent = "";
+          icon.textContent = active ? nodeTagEmojiForEntry(tagEntry) : "";
         }}
         const cell = btn.closest && btn.closest("td");
         if (cell instanceof HTMLElement) {{
@@ -353,6 +394,7 @@
           const vibranceRatio = (clampNodeTagVibrance(tagEntry.preset.vibrance, 70) / 100).toFixed(3);
           const tintHue = nodeTagTintHue(tagEntry, autoNodeHue);
           const tagLabel = normalizeNodeTagPresetName(tagEntry.preset.name, "Tagged");
+          const tagDisplayLabel = nodeTagDisplayLabel(tagEntry, "Tagged");
           const tagStyleVars = nodeTagStyleVars(tagEntry);
           if (typeof applyNodeTintStyleVars === "function") {{
             applyNodeTintStyleVars(member, nodeId, {{
@@ -374,8 +416,8 @@
           member.style.setProperty("--node-tag-vibrance", vibranceRatio);
           if (showTagBadge) {{
             if (existingChip instanceof HTMLElement) {{
-              existingChip.textContent = tagLabel;
-              existingChip.title = `Tag: ${{tagLabel}}`;
+              existingChip.textContent = tagDisplayLabel;
+              existingChip.title = `Tag: ${{tagDisplayLabel}}`;
               if (tagStyleVars) {{
                 existingChip.setAttribute("style", tagStyleVars);
               }} else {{
@@ -384,8 +426,8 @@
             }} else if (nameLeft instanceof HTMLElement) {{
               const chip = document.createElement("span");
               chip.className = "chat-member-tag-chip";
-              chip.textContent = tagLabel;
-              chip.title = `Tag: ${{tagLabel}}`;
+              chip.textContent = tagDisplayLabel;
+              chip.title = `Tag: ${{tagDisplayLabel}}`;
               if (tagStyleVars) {{
                 chip.setAttribute("style", tagStyleVars);
               }}

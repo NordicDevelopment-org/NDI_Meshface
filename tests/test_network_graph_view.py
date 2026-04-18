@@ -94,9 +94,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function buildNetworkGraphSceneMarkup(scene)' in js
     assert 'function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {})' in js
     assert 'function resolveNetworkGraphNodeEmoji(item)' in js
-    assert 'function resolveMapLocalNodeEmoji(state = latestState)' in js
+    assert 'function resolveMapNodeEmoji(nodeId, state = latestState)' in js
     assert 'function createMapNodeMarker(lat, lon, nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
     assert 'function refreshMapNodeMarkerPresentation(marker, nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
+    assert 'return (typeof nodeTagEmojiForNode === "function")' in js
     assert 'settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())' in js
     assert '"has-emoji-glyph"' in js
     assert 'class="network-graph-node-emoji-fo"' in js
