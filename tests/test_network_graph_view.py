@@ -90,6 +90,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function clearNetworkGraphEmptyRetry()' in js
     assert 'function scheduleNetworkGraphEmptyRetry()' in js
     assert 'function animateNetworkGraphViewBox(svg, rawViewBox, options = {})' in js
+    assert 'function syncNetworkGraphTextZoom(svg, rawViewBox)' in js
     assert 'function buildNetworkGraphSceneMarkup(scene)' in js
     assert 'class="network-graph-region' in js
     assert 'function animateNetworkGraphScene(svg, fromLayout, toLayout, options = {})' in js
@@ -217,6 +218,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-mode-chip {" in css
     assert ".network-graph-layout-control {" in css
     assert ".network-graph-layout-select {" in css
+    assert "--network-graph-label-font-size: 10px;" in css
     assert ".network-graph-region {" in css
     assert ".network-graph-region-label {" in css
     assert ".network-graph-swatch.is-broadcast-only {" in css

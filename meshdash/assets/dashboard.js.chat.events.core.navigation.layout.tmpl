@@ -2135,6 +2135,27 @@
       }}, {{ aspectRatio: viewAspect }});
     }}
 
+    function syncNetworkGraphTextZoom(svg, rawViewBox) {{
+      if (!(svg instanceof SVGElement)) return;
+      const viewBox = cloneNetworkGraphViewBox(rawViewBox);
+      const zoomRatio = networkGraphViewportBase.width / Math.max(1, Number(viewBox.width) || networkGraphViewportBase.width);
+      const compensation = Math.max(0.52, Math.min(1, 1 / Math.sqrt(Math.max(1, zoomRatio))));
+      const labelSizePx = 10 * compensation;
+      const secondaryLabelSizePx = 9 * compensation;
+      const ringLabelSizePx = 10 * compensation;
+      const regionLabelSizePx = 10 * compensation;
+      const emojiSizePx = 18 * Math.max(0.62, compensation);
+      const localEmojiSizePx = 20 * Math.max(0.62, compensation);
+      const labelStrokePx = Math.max(1.5, 3 * compensation);
+      svg.style.setProperty("--network-graph-label-font-size", `${{labelSizePx.toFixed(2)}}px`);
+      svg.style.setProperty("--network-graph-secondary-label-font-size", `${{secondaryLabelSizePx.toFixed(2)}}px`);
+      svg.style.setProperty("--network-graph-ring-label-font-size", `${{ringLabelSizePx.toFixed(2)}}px`);
+      svg.style.setProperty("--network-graph-region-label-font-size", `${{regionLabelSizePx.toFixed(2)}}px`);
+      svg.style.setProperty("--network-graph-emoji-font-size", `${{emojiSizePx.toFixed(2)}}px`);
+      svg.style.setProperty("--network-graph-local-emoji-font-size", `${{localEmojiSizePx.toFixed(2)}}px`);
+      svg.style.setProperty("--network-graph-label-stroke-width", `${{labelStrokePx.toFixed(2)}}px`);
+    }}
+
     function applyNetworkGraphViewBox(svg, rawViewBox, options = {{}}) {{
       if (!(svg instanceof SVGElement)) return cloneNetworkGraphViewBox();
       if (!(options && options.skipAnimationCancel)) {{
@@ -2145,6 +2166,7 @@
         "viewBox",
         `${{next.x.toFixed(2)}} ${{next.y.toFixed(2)}} ${{next.width.toFixed(2)}} ${{next.height.toFixed(2)}}`
       );
+      syncNetworkGraphTextZoom(svg, next);
       networkGraphViewState.viewBox = cloneNetworkGraphViewBox(next);
       networkGraphViewState.initialized = true;
       return next;

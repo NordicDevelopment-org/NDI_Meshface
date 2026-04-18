@@ -5296,6 +5296,13 @@
       height: 100%;
       flex: 1 1 auto;
       user-select: none;
+      --network-graph-label-font-size: 10px;
+      --network-graph-secondary-label-font-size: 9px;
+      --network-graph-ring-label-font-size: 10px;
+      --network-graph-region-label-font-size: 10px;
+      --network-graph-emoji-font-size: 18px;
+      --network-graph-local-emoji-font-size: 20px;
+      --network-graph-label-stroke-width: 3px;
     }}
     .network-graph-stage.is-panning .network-graph-node {{
       cursor: grabbing;
@@ -5386,7 +5393,7 @@
     }}
     .network-graph-ring-label {{
       fill: #557063;
-      font-size: 10px;
+      font-size: var(--network-graph-ring-label-font-size, 10px);
       font-weight: 700;
       letter-spacing: 0.16px;
       text-transform: uppercase;
@@ -5404,7 +5411,7 @@
     }}
     .network-graph-region-label {{
       fill: #648173;
-      font-size: 10px;
+      font-size: var(--network-graph-region-label-font-size, 10px);
       font-weight: 700;
       letter-spacing: 0.18px;
       text-transform: uppercase;
@@ -5470,14 +5477,14 @@
     }}
     .network-graph-node-label {{
       fill: #284335;
-      font-size: 10px;
+      font-size: var(--network-graph-label-font-size, 10px);
       font-weight: 700;
       letter-spacing: 0.08px;
       pointer-events: auto;
       cursor: pointer;
       paint-order: stroke;
       stroke: rgba(249, 252, 249, 0.88);
-      stroke-width: 3px;
+      stroke-width: var(--network-graph-label-stroke-width, 3px);
       stroke-linejoin: round;
     }}
     .network-graph-node-emoji-fo {{
@@ -5490,7 +5497,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: var(--network-graph-emoji-font-size, 18px);
       line-height: 1;
       pointer-events: none;
       user-select: none;
@@ -5498,7 +5505,7 @@
       filter: drop-shadow(0 1px 2px rgba(7, 18, 31, 0.65));
     }}
     .network-graph-node.is-local .network-graph-node-emoji {{
-      font-size: 20px;
+      font-size: var(--network-graph-local-emoji-font-size, 20px);
       transform: translateY(-3px);
     }}
     .network-graph-node.is-local.has-emoji-glyph .network-graph-node-core {{
@@ -5508,7 +5515,7 @@
     }}
     .network-graph-node-label.is-secondary {{
       fill: #557063;
-      font-size: 9px;
+      font-size: var(--network-graph-secondary-label-font-size, 9px);
       font-weight: 600;
     }}
     .network-graph-node-label.is-broadcast-only {{
