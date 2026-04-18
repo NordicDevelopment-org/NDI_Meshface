@@ -5,6 +5,7 @@
 
     function normalizeWeeklySummaryMetric(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
+      if (clean === "sensors" || clean === "sensor" || clean === "telemetry_history") return "sensors";
       if (clean === "packets" || clean === "live_packet_count") return "packets";
       if (
         clean === "nodes"
@@ -326,6 +327,34 @@
       }}
     }}
 
+    function updateNetworkOverviewSensorMode(metricKey = networkOverviewMetric) {{
+      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const showSensors = metric === "sensors";
+      const sensorControlsHost = document.getElementById("network-overview-sensor-controls-host");
+      const sensorHost = document.getElementById("network-overview-sensor-host");
+      const chartWrap = document.getElementById("network-overview-chart-wrap");
+      const timeline = document.getElementById("network-overview-timeline");
+      const overview = document.getElementById("network-overview-overview");
+      if (sensorControlsHost instanceof HTMLElement) {{
+        sensorControlsHost.hidden = !showSensors;
+      }}
+      if (sensorHost instanceof HTMLElement) {{
+        sensorHost.hidden = !showSensors;
+      }}
+      if (chartWrap instanceof HTMLElement) {{
+        chartWrap.hidden = showSensors;
+      }}
+      if (timeline instanceof HTMLElement) {{
+        timeline.hidden = showSensors;
+      }}
+      if (overview instanceof HTMLElement) {{
+        overview.hidden = showSensors;
+      }}
+      if (typeof syncEnvironmentMetricsDock === "function") {{
+        syncEnvironmentMetricsDock(activeLayoutView, activeNetworkSubview);
+      }}
+    }}
+
     function applyNetworkOverviewMetric(metricKey, persist = true) {{
       const normalized = normalizeWeeklySummaryMetric(metricKey);
       networkOverviewMetric = normalized;
@@ -336,9 +365,16 @@
       updateNetworkOverviewLinkModeControl(normalized);
       updateNetworkOverviewNodeSeriesControls(normalized);
       updateNetworkOverviewPacketSeriesControls(normalized);
-      const cached = summaryMetricsCache.get(String(weeklySummaryHours));
-      if (cached && cached.data) {{
-        renderNetworkOverviewSummary(cached.data);
+      updateNetworkOverviewSensorMode(normalized);
+      if (normalized === "sensors") {{
+        if (typeof renderEnvironmentMetricsView === "function") {{
+          void renderEnvironmentMetricsView(false);
+        }}
+      }} else {{
+        const cached = summaryMetricsCache.get(String(weeklySummaryHours));
+        if (cached && cached.data) {{
+          renderNetworkOverviewSummary(cached.data);
+        }}
       }}
       if (!persist) return;
       try {{

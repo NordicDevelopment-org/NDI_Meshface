@@ -157,6 +157,12 @@
           if (
             activeLayoutView === "environment"
             || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
+            || (
+              activeLayoutView === "network"
+              && activeNetworkSubview === "overview"
+              && typeof normalizeWeeklySummaryMetric === "function"
+              && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
+            )
           ) {{
             void renderEnvironmentMetricsView(false);
           }}
@@ -343,7 +349,13 @@
           }}
         }}
         if (activeLayoutView === "network") {{
-          if (weeklySummary && !weeklySummary.error) {{
+          const networkOverviewUsesSensors = (
+            typeof normalizeWeeklySummaryMetric === "function"
+            && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
+          );
+          if (networkOverviewUsesSensors) {{
+            void renderEnvironmentMetricsView(false);
+          }} else if (weeklySummary && !weeklySummary.error) {{
             renderNetworkOverviewSummary(weeklySummary);
           }} else if (weeklySummary && weeklySummary.error) {{
             renderNetworkOverviewSummaryError(weeklySummary.error);
@@ -437,6 +449,12 @@
         if (
           activeLayoutView === "environment"
           || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
+          || (
+            activeLayoutView === "network"
+            && activeNetworkSubview === "overview"
+            && typeof normalizeWeeklySummaryMetric === "function"
+            && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
+          )
         ) {{
           void renderEnvironmentMetricsView(false);
         }}

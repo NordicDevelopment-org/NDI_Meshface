@@ -767,18 +767,37 @@
 
     function syncEnvironmentMetricsDock(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
       const explorer = document.querySelector(".env-metrics-explorer");
+      const controls = document.querySelector(".env-metrics-explorer .env-metrics-controls");
       const homeHost = document.getElementById("environment-metrics-home");
       const networkHost = document.getElementById("network-sensors-host");
+      const overviewHost = document.getElementById("network-overview-sensor-host");
+      const overviewControlsHost = document.getElementById("network-overview-sensor-controls-host");
       if (!(explorer instanceof HTMLElement)) return;
+      if (!(controls instanceof HTMLElement)) return;
       if (!(homeHost instanceof HTMLElement)) return;
       if (!(networkHost instanceof HTMLElement)) return;
+      if (!(overviewHost instanceof HTMLElement)) return;
+      if (!(overviewControlsHost instanceof HTMLElement)) return;
 
       const normalizedView = normalizeLayoutView(viewName);
       const normalizedSubview = normalizeNetworkSubview(subviewName);
-      const dockInNetwork = normalizedView === "network" && normalizedSubview === "sensors";
-      const targetHost = dockInNetwork ? networkHost : homeHost;
+      const dockInOverview = (
+        normalizedView === "network"
+        && normalizedSubview === "overview"
+        && typeof normalizeWeeklySummaryMetric === "function"
+        && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
+      );
+      const dockInNetwork = normalizedView === "network" && normalizedSubview === "sensors" && !dockInOverview;
+      const targetHost = dockInOverview ? overviewHost : (dockInNetwork ? networkHost : homeHost);
       if (explorer.parentElement !== targetHost) {{
         targetHost.appendChild(explorer);
+      }}
+      if (dockInOverview) {{
+        if (controls.parentElement !== overviewControlsHost) {{
+          overviewControlsHost.appendChild(controls);
+        }}
+      }} else if (controls.parentElement !== explorer) {{
+        explorer.insertBefore(controls, explorer.firstChild || null);
       }}
     }}
 
@@ -1129,6 +1148,13 @@
       if (normalizedView === "network" && next === "overview") {{
         if (typeof refreshNetworkOverviewPanels === "function") {{
           void refreshNetworkOverviewPanels(false);
+        }}
+        if (
+          typeof normalizeWeeklySummaryMetric === "function"
+          && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
+          && typeof renderEnvironmentMetricsView === "function"
+        ) {{
+          void renderEnvironmentMetricsView(false);
         }}
       }}
       if (normalizedView === "network" && next === "graph") {{

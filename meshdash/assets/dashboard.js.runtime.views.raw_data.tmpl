@@ -1474,6 +1474,12 @@
       if (
         activeLayoutView === "environment"
         || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
+        || (
+          activeLayoutView === "network"
+          && activeNetworkSubview === "overview"
+          && typeof normalizeWeeklySummaryMetric === "function"
+          && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
+        )
       ) {{
         void renderEnvironmentMetricsView(false);
       }}

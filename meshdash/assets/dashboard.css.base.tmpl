@@ -4555,6 +4555,31 @@
       min-height: 0;
       width: 100%;
     }}
+    .network-overview-sensor-host {{
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+    }}
+    .network-overview-sensor-host[hidden] {{
+      display: none !important;
+    }}
+    .network-overview-sensor-controls-host {{
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }}
+    .network-overview-sensor-controls-host[hidden] {{
+      display: none !important;
+    }}
+    #network-overview-chart-wrap[hidden],
+    #network-overview-timeline[hidden],
+    #network-overview-overview[hidden] {{
+      display: none !important;
+    }}
     .network-sensors-panel .env-metrics-explorer {{
       display: flex;
       flex-direction: column;
@@ -4568,6 +4593,154 @@
       backdrop-filter: blur(8px);
       padding: 14px;
       gap: 8px;
+    }}
+    .network-overview-sensor-host .env-metrics-explorer {{
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+      padding: 0;
+      gap: 8px;
+    }}
+    .network-overview-sensor-host .env-metrics-controls {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }}
+    .network-overview-sensor-host .env-metrics-control-group {{
+      min-width: 0;
+      max-width: 100%;
+      background: rgba(249, 253, 249, 0.92);
+      border: 1px solid rgba(188, 214, 195, 0.9);
+      border-radius: 999px;
+      padding: 3px 12px;
+    }}
+    .network-overview-sensor-host .env-metrics-control-group label {{
+      font-size: 10px;
+      line-height: 1.1;
+      letter-spacing: 0.18px;
+      text-transform: uppercase;
+      color: #3f5f4f;
+      font-weight: 700;
+      white-space: nowrap;
+    }}
+    .network-overview-sensor-host .env-metrics-control-group .env-metric-select {{
+      min-width: 118px;
+      max-width: min(100%, 280px);
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: #274935;
+      font-size: 11px;
+      line-height: 1.2;
+      padding: 2px 0;
+      min-height: 24px;
+    }}
+    .network-overview-sensor-host .env-metrics-refresh-btn {{
+      border-color: #bfd4c3;
+      background: #ffffff;
+      color: #274935;
+      box-shadow: none;
+      min-height: 30px;
+      padding: 4px 12px;
+    }}
+    .network-overview-sensor-host .env-metrics-refresh-btn:hover {{
+      background: #eef8f1;
+    }}
+    .network-overview-sensor-host #env-metrics-chart-wrap {{
+      border-color: #d7e5d2;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fbfffc 0%, #eef8f1 100%);
+      padding: 0;
+      box-shadow: none;
+    }}
+    .network-overview-sensor-host .env-metrics-grid {{
+      flex: 1 1 auto;
+      min-height: clamp(280px, 48vh, 460px);
+      height: auto;
+      max-height: none;
+    }}
+    .network-overview-sensor-host #env-metrics-timeline {{
+      height: 44px;
+      margin-top: 6px;
+      margin-bottom: 2px;
+    }}
+    .network-overview-sensor-host .env-metrics-available {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 6px;
+      margin-top: 2px;
+      padding-top: 0;
+      color: #5e6e64;
+    }}
+    .network-overview-sensor-host .env-node-legend-card {{
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      border: 1px solid #d7e3dc;
+      border-radius: 10px;
+      background: rgba(244, 249, 246, 0.94);
+      color: #244438;
+      padding: 9px 12px;
+      box-shadow: none;
+      overflow: hidden;
+    }}
+    .network-overview-sensor-host .env-node-legend-card .k {{
+      display: block;
+      font-size: 10px;
+      line-height: 1.1;
+      letter-spacing: 0.18px;
+      text-transform: uppercase;
+      color: #587064;
+    }}
+    .network-overview-sensor-host .env-node-legend-card .v {{
+      display: block;
+      margin-top: 3px;
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 700;
+      color: #203a31;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .network-overview-sensor-host .env-node-legend-item {{
+      justify-content: flex-start;
+      text-align: left;
+    }}
+    .network-overview-sensor-host .env-node-legend-item::before {{
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--node-color, #5a7c67);
+      box-shadow: 0 0 0 1px rgba(18, 39, 39, 0.18);
+      flex: 0 0 auto;
+      margin-right: 10px;
+    }}
+    .network-overview-sensor-host .env-node-legend-toggle:hover {{
+      background: #eef8f1;
+    }}
+    .network-overview-sensor-host .env-node-legend-toggle:focus-visible {{
+      outline: 2px solid rgba(28, 113, 216, 0.45);
+      outline-offset: 2px;
+    }}
+    .network-overview-sensor-host .env-node-legend-more {{
+      display: block;
+      text-align: left;
+    }}
+    .network-overview-sensor-host .env-node-legend-more .v {{
+      font-size: 13px;
     }}
     .network-sensors-panel .env-metrics-head {{
       align-items: flex-start;

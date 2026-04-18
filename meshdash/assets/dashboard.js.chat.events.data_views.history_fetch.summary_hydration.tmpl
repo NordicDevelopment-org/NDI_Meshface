@@ -213,6 +213,15 @@
 
     async function refreshNetworkOverviewPanels(force = false) {{
       if (activeLayoutView !== "network") return;
+      if (
+        typeof normalizeWeeklySummaryMetric === "function"
+        && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
+      ) {{
+        if (typeof renderEnvironmentMetricsView === "function") {{
+          void renderEnvironmentMetricsView(force);
+        }}
+        return;
+      }}
       const weeklyKey = String(weeklySummaryHours);
       if (force) {{
         summaryMetricsCache.delete(weeklyKey);
