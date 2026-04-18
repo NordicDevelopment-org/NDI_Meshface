@@ -177,10 +177,44 @@
       return nodeTagEmojiForEntry(nodeTagEntryForNode(nodeId));
     }}
 
-    function nodeVisualEmojiForNode(nodeId, tagEntry = null) {{
+    function nodeIntrinsicEmojiForNode(nodeId, node = null) {{
+      const cleanNodeId = normalizeNodeId(nodeId);
+      const candidates = [
+        preferredNodeName(node),
+        node && node.long_name,
+        node && node.short_name,
+        nodeNameCache.get(cleanNodeId),
+      ];
+      for (const candidate of candidates) {{
+        const emoji = normalizeNodeTagEmoji(candidate, "");
+        if (emoji) return emoji;
+      }}
+      return "";
+    }}
+
+    function localBadgeEmojiForNode(nodeId) {{
+      const cleanNodeId = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(cleanNodeId)) return "";
+      const localNodeId = normalizeNodeId(
+        typeof resolveLocalNodeId === "function" ? resolveLocalNodeId(latestState) : ""
+      );
+      if (!localNodeId || cleanNodeId !== localNodeId) return "";
+      if (
+        typeof settingsBadgeEmojiChoiceSet === "undefined"
+        || !(settingsBadgeEmojiChoiceSet instanceof Set)
+      ) return "";
+      const badgeEmoji = String(settingsBadgeEmoji || "").trim();
+      return settingsBadgeEmojiChoiceSet.has(badgeEmoji) ? badgeEmoji : "";
+    }}
+
+    function nodeVisualEmojiForNode(nodeId, tagEntry = null, node = null) {{
+      const localBadgeEmoji = localBadgeEmojiForNode(nodeId);
+      if (localBadgeEmoji) return localBadgeEmoji;
       const overrideEmoji = nodeEmojiOverrideForNode(nodeId);
       if (overrideEmoji) return overrideEmoji;
-      return nodeTagEmojiForEntry(tagEntry || nodeTagEntryForNode(nodeId));
+      const tagEmoji = nodeTagEmojiForEntry(tagEntry || nodeTagEntryForNode(nodeId));
+      if (tagEmoji) return tagEmoji;
+      return nodeIntrinsicEmojiForNode(nodeId, node);
     }}
 
     function nodeTagDisplayLabel(tagEntry, fallback = "Tagged") {{

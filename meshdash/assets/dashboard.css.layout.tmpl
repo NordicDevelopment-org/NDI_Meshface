@@ -4575,7 +4575,7 @@
       --chat-member-node-fg: color-mix(in srgb, var(--ink) 90%, var(--muted) 10%);
       --chat-member-node-selected-border: hsl(var(--chat-member-node-outline-hue) calc(30% * var(--chat-member-node-outline-sat-mult, 1)) calc(68% + var(--chat-member-node-outline-light-shift, 0%)));
       display: grid;
-      grid-template-columns: 11px minmax(0, 1fr);
+      grid-template-columns: 18px minmax(0, 1fr);
       gap: 6px;
       align-items: center;
       border: 0;
@@ -4589,7 +4589,7 @@
       cursor: pointer;
     }}
     .chat-member-item.has-packet-spark {{
-      grid-template-columns: 11px minmax(0, 1fr) 56px;
+      grid-template-columns: 18px minmax(0, 1fr) 56px;
       align-items: stretch;
     }}
     .chat-member-item.status-hidden {{
@@ -4662,47 +4662,46 @@
         inset 0 0 0 1px hsl(var(--chat-member-node-outline-hue) calc(34% * var(--chat-member-node-outline-sat-mult, 1)) calc(63% + var(--chat-member-node-outline-light-shift, 0%)) / 0.26);
     }}
     .chat-member-status {{
-      width: 12px;
-      min-width: 12px;
+      position: relative;
+      width: 18px;
+      min-width: 18px;
+      height: 18px;
       text-align: center;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       line-height: 1;
       color: #2aa85a;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }}
     .chat-member-status.is-hidden {{
       visibility: hidden;
     }}
-    .chat-member-status.is-unread-direct {{
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }}
-    .chat-member-status.is-direct-history {{
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }}
-    .chat-member-status-icon {{
-      display: block;
-      width: 12px;
-      height: 12px;
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1.85;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      vector-effect: non-scaling-stroke;
-    }}
-    .chat-member-status-icon-message {{
-      transform: translateY(0.15px);
-    }}
-    .chat-member-status-icon-message-alert {{
-      transform: translateY(0.1px);
-    }}
-    .chat-member-status.is-muted {{
+    .chat-member-status-dot {{
       font-size: 11px;
-      letter-spacing: -0.5px;
+      transform: translateY(-0.4px);
+    }}
+    .chat-member-status-emoji {{
+      font-size: 13px;
+      font-weight: 500;
+      isolation: isolate;
+    }}
+    .chat-member-status-ring {{
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      border: 1.5px solid currentColor;
+      background: color-mix(in srgb, var(--chat-member-node-bg, var(--panel)) 88%, transparent);
+      box-sizing: border-box;
+      opacity: 0.96;
+      z-index: 0;
+    }}
+    .chat-member-status-emoji-glyph {{
+      position: relative;
+      z-index: 1;
+      line-height: 1;
+      transform: translateY(0.2px);
     }}
     .chat-member-status.status-online {{
       color: #2aa85a;

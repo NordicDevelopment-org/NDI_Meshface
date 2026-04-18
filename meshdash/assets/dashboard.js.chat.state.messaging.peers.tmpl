@@ -1151,35 +1151,11 @@
           ? `<span class="chat-member-alert-chip" title="${{escAttr(`Malformed text payloads detected: ${{malformedTextCount}} recent packet${{malformedTextCount === 1 ? "" : "s"}} on TEXT_MESSAGE_APP. Last seen ${{malformedTextLatestText}}${{malformedTextPayloadPreview ? `. Payload: ${{malformedTextPayloadPreview}}` : ""}`)}}">bad text</span>`
           : "";
         const packetSparkClass = packetSparkWrapHtml ? " has-packet-spark" : "";
-        const unreadDirectLabel = unreadDirectCount === 1
-          ? "1 unread direct message"
-          : `${{unreadDirectCount}} unread direct messages`;
-        const directHistoryLabel = "Direct message history";
-        const unreadDirectMarkerHtml = unreadDirectCount > 0
-          ? `<svg class="chat-member-status-icon chat-member-status-icon-message chat-member-status-icon-message-alert" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M4.5 5.5h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3v-3H4.5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/>
-              <path d="M12 8.35v4.9"/>
-              <path d="M12 15.95h.01"/>
-            </svg>`
+        const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === "function")
+          ? nodeVisualEmojiForNode(nodeId, tagEntry, node)
           : "";
-        const directHistoryMarkerHtml = hasDirectHistory
-          ? `<svg class="chat-member-status-icon chat-member-status-icon-message" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M4.5 5.5h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H11l-4.5 3v-3H4.5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"/>
-              <path d="M7.5 10.25h9M7.5 13.25h6.5"/>
-            </svg>`
-          : "";
-        const statusGlyph = unreadDirectMarkerHtml || directHistoryMarkerHtml || (muted ? "‖" : "●");
-        const statusGlyphClass = unreadDirectCount > 0
-          ? " is-unread-direct"
-          : (hasDirectHistory
-              ? " is-direct-history"
-              : (muted ? " is-muted" : ""));
-        const statusGlyphLabel = unreadDirectCount > 0
-          ? unreadDirectLabel
-          : (hasDirectHistory ? directHistoryLabel : "");
-        const statusGlyphAttrs = statusGlyphLabel
-          ? ` title="${{escAttr(statusGlyphLabel)}}" aria-label="${{escAttr(statusGlyphLabel)}}"`
-          : "";
+        const hasNodeVisualEmoji = !!String(nodeVisualEmoji || "").trim();
+        const statusGlyphAttrs = ` title="${{escAttr(`Status: ${{statusLabel}}`)}}" aria-label="${{escAttr(`Status: ${{statusLabel}}`)}}"`;
         const showStatusDots = (typeof normalizeChatNodeNavigatorShowStatusDotsPref === "function")
           ? normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots)
           : !!chatNodeNavigatorShowStatusDots;
@@ -1188,7 +1164,12 @@
         const statusMarkerAttrs = showStatusDots
           ? statusGlyphAttrs
           : ' aria-hidden="true"';
-        const statusMarkerHtml = `<span class="chat-member-status status-${{statusKey}}${{statusGlyphClass}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>${{statusGlyph}}</span>`;
+        const statusMarkerHtml = hasNodeVisualEmoji
+          ? `<span class="chat-member-status chat-member-status-emoji status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>
+              <span class="chat-member-status-ring" aria-hidden="true"></span>
+              <span class="chat-member-status-emoji-glyph" aria-hidden="true">${{escAttr(nodeVisualEmoji)}}</span>
+            </span>`
+          : `<span class="chat-member-status chat-member-status-dot status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>●</span>`;
         const actionRowHtml = removeBtn
           ? `<span class="chat-member-actions">${{removeBtn}}</span>`
           : '<span class="chat-member-actions"></span>';
@@ -1243,8 +1224,8 @@
           : !!chatNodeNavigatorShowStatusDots;
         const fallbackStatusVisibilityClass = fallbackShowStatusDots ? "" : " status-hidden";
         const fallbackStatusHtml = fallbackShowStatusDots
-          ? '<span class="chat-member-status status-unknown">●</span>'
-          : '<span class="chat-member-status status-unknown is-hidden" aria-hidden="true">●</span>';
+          ? '<span class="chat-member-status chat-member-status-dot status-unknown" title="Status: Unknown" aria-label="Status: Unknown">●</span>'
+          : '<span class="chat-member-status chat-member-status-dot status-unknown is-hidden" aria-hidden="true">●</span>';
         return `<div class="chat-member-item status-unknown${{fallbackStatusVisibilityClass}}${{selectedNodeId === fallbackId ? " selected-node" : ""}}" data-node-id="${{escAttr(fallbackId)}}" data-node-tint-outline-seed="${{escAttr(fallbackOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(fallbackStartSeed)}}" data-node-tint-end-seed="${{escAttr(fallbackEndSeed)}}" style="${{escAttr(fallbackTintStyle)}}" title="Node navigator fallback row">
           ${{fallbackStatusHtml}}
           <span class="chat-member-main">
