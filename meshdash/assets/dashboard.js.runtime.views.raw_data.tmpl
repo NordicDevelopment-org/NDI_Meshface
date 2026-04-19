@@ -312,6 +312,13 @@
       }}
     }}
 
+    function resolveEnvironmentMetricsChartNodeIdFromTarget(target) {{
+      if (!(target instanceof Element)) return "";
+      const hit = target.closest("[data-node-id]");
+      if (!(hit instanceof Element)) return "";
+      return normalizeNodeId(hit.getAttribute("data-node-id") || "");
+    }}
+
     function buildEnvironmentMetricsSelectionScopeKey(metricMeta, nodeMeta) {{
       return [
         normalizeEnvMetricKey(metricMeta && metricMeta.key ? metricMeta.key : ""),
@@ -736,6 +743,7 @@
           startClientX: ev.clientX,
           startZoomStart: envMetricsChartState.zoomStart,
           startZoomEnd: envMetricsChartState.zoomEnd,
+          hitNodeId: resolveEnvironmentMetricsChartNodeIdFromTarget(ev.target),
           moved: false,
         }};
         svg.classList.add("chart-dragging");
@@ -774,6 +782,9 @@
         svg.classList.remove("chart-dragging");
         if (dragged) {{
           envMetricsChartState.suppressClickUntilMs = Date.now() + 180;
+        }} else if (ev && drag.hitNodeId) {{
+          envMetricsChartState.suppressClickUntilMs = Date.now() + 180;
+          focusEnvironmentNodeFromChart(drag.hitNodeId);
         }}
         if (ev) {{
           try {{

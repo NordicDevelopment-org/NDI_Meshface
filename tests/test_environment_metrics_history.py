@@ -117,6 +117,9 @@ def test_dashboard_js_fetches_filtered_sensor_series_from_server() -> None:
     assert 'const selectedNodeId = currentEnvironmentMetricsScopedNodeId();' in js
     assert 'function resolveEnvironmentScopedNodeMeta(nodes, nodeId) {' in js
     assert 'selectNode(cleanNodeId, false, true);' in js
+    assert 'function resolveEnvironmentMetricsChartNodeIdFromTarget(target) {' in js
+    assert 'hitNodeId: resolveEnvironmentMetricsChartNodeIdFromTarget(ev.target),' in js
+    assert 'focusEnvironmentNodeFromChart(drag.hitNodeId);' in js
     assert '<g data-node-id="${escAttr(seriesNodeId)}">${seriesPaths.join("")}</g>' in js
     assert "click to select or deselect node" in js
     assert "const envMetricsChartMaxSeries = 8;" in js
