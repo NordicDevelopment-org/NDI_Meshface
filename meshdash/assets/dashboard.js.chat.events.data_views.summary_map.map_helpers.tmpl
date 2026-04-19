@@ -487,6 +487,142 @@
       return !!resolveMapNodeEmoji(nodeId, state);
     }}
 
+    function mapNodeFieldHtml(label, value, extraClass = "") {{
+      const cleanValue = String(value == null ? "" : value).trim() || "n/a";
+      return `
+        <div class="map-node-info-row${{extraClass ? ` ${{extraClass}}` : ""}}">
+          <span class="map-node-info-label">${{escAttr(label)}}</span>
+          <span class="map-node-info-value">${{escAttr(cleanValue)}}</span>
+        </div>
+      `;
+    }}
+
+    function buildMapNodeInfoHtml(node, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const safeNode = (node && typeof node === "object") ? node : {{}};
+      const state = (opts.state && typeof opts.state === "object") ? opts.state : latestState;
+      const nowUnix = Number.isFinite(Number(opts.nowUnix))
+        ? Math.floor(Number(opts.nowUnix))
+        : Math.floor(Date.now() / 1000);
+      const normalizedId = normalizeNodeId(opts.nodeId || safeNode.id || "");
+      const fallbackId = String(safeNode.id || "").trim();
+      const displayId = normalizedId || fallbackId || "n/a";
+      const name = String(nodeLabel(safeNode) || displayId).trim() || displayId;
+      const emoji = String(opts.emoji != null ? opts.emoji : resolveMapNodeEmoji(displayId, state)).trim();
+      const lat = Number(safeNode.lat);
+      const lon = Number(safeNode.lon);
+      const hasCoords = isValidMapCoord(lat, lon);
+      const positionBadge = opts.positionBadge || resolveMapPositionBadge(safeNode, opts.caps || null, nowUnix);
+      const lastHeardText = typeof nodeLastHeardLabel === "function"
+        ? nodeLastHeardLabel(safeNode, "n/a", nowUnix)
+        : String(safeNode.last_heard || "n/a");
+      const batteryPct = safeNode.battery_level ?? safeNode.battery ?? safeNode.battery_pct;
+      const voltage = safeNode.voltage ?? safeNode.battery_voltage;
+      const hops = safeNode.hops_away ?? safeNode.hopsAway;
+      const nodeNum = safeNode.num ?? safeNode.node_num;
+      const snr = safeNode.snr;
+      const rssi = safeNode.rssi;
+      const trailCount = Number.isFinite(Number(opts.trailPointsCount))
+        ? Math.max(0, Math.trunc(Number(opts.trailPointsCount)))
+        : null;
+      const trailLatest = String(opts.trailLatest || "").trim();
+      const isEstimated = !!opts.isEstimated;
+      const confidencePct = Number.isFinite(Number(opts.confidencePct))
+        ? Math.round(Number(opts.confidencePct))
+        : null;
+      const confidenceLabel = String(opts.confidenceLabel || "").trim();
+      const qualityPct = Number.isFinite(Number(opts.qualityPct))
+        ? Math.round(Number(opts.qualityPct))
+        : null;
+      const anchorCount = Number.isFinite(Number(opts.anchorCount))
+        ? Math.max(0, Math.trunc(Number(opts.anchorCount)))
+        : null;
+      const supportLinks = Number.isFinite(Number(opts.supportLinks))
+        ? Math.max(0, Math.trunc(Number(opts.supportLinks)))
+        : null;
+      const avgHops = opts.avgHops;
+      const avgSnr = opts.avgSnr;
+      const avgRssi = opts.avgRssi;
+
+      const headerMeta = [];
+      if (emoji) headerMeta.push(`<span class="map-node-info-emoji" aria-hidden="true">${{escAttr(emoji)}}</span>`);
+      headerMeta.push(`
+        <div class="map-node-info-title-wrap">
+          <div class="map-node-info-title">${{escAttr(name)}}</div>
+          <div class="map-node-info-subtitle">${{escAttr(displayId)}}</div>
+        </div>
+      `);
+
+      const rows = [];
+      if (nodeNum != null && String(nodeNum).trim()) rows.push(mapNodeFieldHtml("Node Num", nodeNum));
+      if (snr != null && String(snr).trim()) rows.push(mapNodeFieldHtml("SNR", snr));
+      if (rssi != null && String(rssi).trim()) rows.push(mapNodeFieldHtml("RSSI", rssi));
+      if (batteryPct != null && String(batteryPct).trim()) rows.push(mapNodeFieldHtml("Battery", `${{batteryPct}}%`));
+      if (voltage != null && String(voltage).trim()) rows.push(mapNodeFieldHtml("Voltage", voltage));
+      if (hops != null && String(hops).trim()) rows.push(mapNodeFieldHtml("Hops", hops));
+      rows.push(mapNodeFieldHtml("Last Heard", lastHeardText));
+      rows.push(`
+        <div class="map-node-info-row is-position">
+          <span class="map-node-info-label">Position</span>
+          <span class="map-node-info-value">
+            <span class="map-position-badge ${{escAttr(positionBadge.className || "unknown")}}" title="${{escAttr(positionBadge.title || "")}}">${{escAttr(positionBadge.label || "Unknown")}}</span>
+          </span>
+        </div>
+      `);
+      rows.push(mapNodeFieldHtml("Coords", hasCoords ? `${{lat.toFixed(5)}}, ${{lon.toFixed(5)}}` : "No GPS fix"));
+
+      if (trailCount != null) rows.push(mapNodeFieldHtml("Trail Points", trailCount));
+      if (trailLatest) rows.push(mapNodeFieldHtml("Trail Latest", trailLatest));
+
+      if (isEstimated) {{
+        rows.push(mapNodeFieldHtml("Estimate", "Link-layer derived"));
+        if (confidenceLabel || confidencePct != null) {{
+          rows.push(mapNodeFieldHtml(
+            "Confidence",
+            confidencePct != null ? `${{confidenceLabel || "Estimate"}} (${{confidencePct}}%)` : confidenceLabel
+          ));
+        }}
+        if (anchorCount != null) rows.push(mapNodeFieldHtml("Anchors", anchorCount));
+        if (supportLinks != null) rows.push(mapNodeFieldHtml("Support Links", supportLinks));
+        if (qualityPct != null) rows.push(mapNodeFieldHtml("Link Quality", `${{qualityPct}}%`));
+        if (avgHops != null && String(avgHops).trim()) rows.push(mapNodeFieldHtml("Avg Link Hops", avgHops));
+        if (avgSnr != null && String(avgSnr).trim()) rows.push(mapNodeFieldHtml("Avg Link SNR", avgSnr));
+        if (avgRssi != null && String(avgRssi).trim()) rows.push(mapNodeFieldHtml("Avg Link RSSI", avgRssi));
+      }}
+
+      return `
+        <div class="map-node-info-card${{isEstimated ? " is-estimated" : ""}}">
+          <div class="map-node-info-header">
+            ${{headerMeta.join("")}}
+          </div>
+          <div class="map-node-info-grid">
+            ${{rows.join("")}}
+          </div>
+        </div>
+      `;
+    }}
+
+    function bindMapNodeInfoOverlays(marker, node, options = null) {{
+      if (!(marker && typeof marker.bindPopup === "function")) return;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const contentHtml = buildMapNodeInfoHtml(node, opts);
+      marker.bindPopup(contentHtml, {{
+        closeButton: true,
+        autoPan: true,
+        className: "map-node-popup",
+        maxWidth: 320,
+      }});
+      if (typeof marker.bindTooltip === "function") {{
+        marker.bindTooltip(contentHtml, {{
+          direction: "top",
+          offset: [0, -16],
+          opacity: 1,
+          sticky: true,
+          className: "map-node-tooltip",
+        }});
+      }}
+    }}
+
     function buildMapEmojiMarkerIcon(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState) {{
       if (!mapNodeUsesEmojiMarker(nodeId, markerKind, state)) return null;
       const emoji = resolveMapNodeEmoji(nodeId, state);
@@ -497,16 +633,15 @@
         isSelected ? "is-selected" : "",
         flashStrength > 0.04 ? "is-active" : "",
       ].filter(Boolean).join(" ");
-      const iconSize = isSelected ? 20 : 16;
+      const iconSize = isSelected ? 30 : 24;
       const iconAnchor = Math.round(iconSize / 2);
-      const popupAnchorY = isSelected ? -10 : -8;
+      const popupAnchorY = isSelected ? -16 : -13;
       return L.divIcon({{
         className: "map-node-emoji-icon",
         html: `
           <div
             class="${{markerClasses}}"
             style="--map-node-flash:${{Number(flashStrength.toFixed(3))}};"
-            title="${{escAttr(emoji)}}"
           >
             <span class="map-node-emoji-glyph" aria-hidden="true">${{escAttr(emoji)}}</span>
           </div>

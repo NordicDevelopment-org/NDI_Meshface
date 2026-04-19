@@ -2790,21 +2790,29 @@
       border: 0;
     }}
     .map-node-emoji-marker {{
-      width: 16px;
-      height: 16px;
+      width: 24px;
+      height: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
       border-radius: 999px;
       border: 2px solid #86a9ff;
       background: radial-gradient(circle at 50% 44%, #2a3a70 0%, #21315d 58%, #1a2749 100%);
+      transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
       box-shadow:
         0 0 0 calc(1px + (2px * var(--map-node-flash, 0))) rgba(203, 137, 255, calc(0.22 + (0.24 * var(--map-node-flash, 0)))),
         0 3px 8px rgba(10, 18, 36, 0.28);
     }}
+    .map-node-emoji-marker:hover {{
+      transform: scale(1.18);
+      border-color: #adc0ff;
+      box-shadow:
+        0 0 0 calc(2px + (3px * var(--map-node-flash, 0))) rgba(203, 137, 255, calc(0.28 + (0.26 * var(--map-node-flash, 0)))),
+        0 6px 14px rgba(10, 18, 36, 0.36);
+    }}
     .map-node-emoji-marker.is-selected {{
-      width: 20px;
-      height: 20px;
+      width: 30px;
+      height: 30px;
       border-width: 2px;
       border-color: #9db5ff;
       background: radial-gradient(circle at 50% 42%, #30427b 0%, #26376a 58%, #1e2b53 100%);
@@ -2814,15 +2822,105 @@
     }}
     .map-node-emoji-glyph {{
       display: block;
-      font-size: 12px;
+      font-size: 16px;
       line-height: 1;
       transform: translateY(-0.5px);
       user-select: none;
       pointer-events: none;
     }}
     .map-node-emoji-marker.is-selected .map-node-emoji-glyph {{
-      font-size: 14px;
+      font-size: 20px;
       transform: translateY(-0.5px);
+    }}
+    .map-node-tooltip {{
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      padding: 0;
+    }}
+    .map-node-tooltip::before {{
+      display: none;
+    }}
+    .map-node-popup .leaflet-popup-content-wrapper,
+    .map-node-popup .leaflet-popup-tip,
+    .map-node-tooltip .leaflet-tooltip-content {{
+      background: transparent;
+      box-shadow: none;
+    }}
+    .map-node-tooltip .leaflet-tooltip-content,
+    .map-node-popup .leaflet-popup-content {{
+      margin: 0;
+    }}
+    .map-node-info-card {{
+      min-width: 240px;
+      max-width: 300px;
+      padding: 10px 11px;
+      border: 1px solid color-mix(in srgb, var(--line) 74%, var(--accent) 26%);
+      border-radius: 12px;
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--panel) 92%, var(--accent) 8%) 0%, color-mix(in srgb, var(--panel) 96%, black 4%) 100%);
+      box-shadow: 0 10px 30px rgba(6, 10, 18, 0.32);
+      color: var(--ink);
+    }}
+    .map-node-info-card.is-estimated {{
+      border-color: color-mix(in srgb, #d08945 55%, var(--line) 45%);
+    }}
+    .map-node-info-header {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 9px;
+    }}
+    .map-node-info-emoji {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 50% 42%, #31457f 0%, #24335f 62%, #192544 100%);
+      border: 1px solid #9fb5ff;
+      font-size: 20px;
+      line-height: 1;
+      box-shadow: 0 4px 14px rgba(10, 18, 36, 0.28);
+    }}
+    .map-node-info-title-wrap {{
+      min-width: 0;
+      flex: 1 1 auto;
+    }}
+    .map-node-info-title {{
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.15;
+      color: color-mix(in srgb, var(--ink) 90%, white 10%);
+      word-break: break-word;
+    }}
+    .map-node-info-subtitle {{
+      margin-top: 3px;
+      font-size: 11px;
+      color: color-mix(in srgb, var(--muted) 82%, var(--ink) 18%);
+      word-break: break-all;
+    }}
+    .map-node-info-grid {{
+      display: grid;
+      grid-template-columns: minmax(70px, 92px) minmax(0, 1fr);
+      gap: 6px 10px;
+      align-items: start;
+    }}
+    .map-node-info-row {{
+      display: contents;
+    }}
+    .map-node-info-label {{
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--muted) 80%, var(--accent) 20%);
+    }}
+    .map-node-info-value {{
+      font-size: 12px;
+      line-height: 1.35;
+      color: color-mix(in srgb, var(--ink) 92%, white 8%);
+      word-break: break-word;
     }}
     .leaflet-control-zoom {{
       border: 1px solid color-mix(in srgb, var(--line) 62%, var(--accent) 38%) !important;

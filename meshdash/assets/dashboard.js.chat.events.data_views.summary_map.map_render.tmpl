@@ -204,17 +204,15 @@
             1,
             latestState
           );
-          marker.bindPopup(`
-            <b>${{nodeLabel(selectedNode)}}</b><br/>
-            ${{selectedNodeIdNormalized || selectedNode.id}}<br/>
-            Num: ${{selectedNode.num ?? "n/a"}}<br/>
-            SNR: ${{selectedNode.snr ?? "n/a"}}<br/>
-            RSSI: ${{selectedNode.rssi ?? "n/a"}}<br/>
-            Position: <span class="map-position-badge ${{posBadge.className}}" title="${{escAttr(posBadge.title)}}">${{escAttr(posBadge.label)}}</span><br/>
-            Last: ${{typeof nodeLastHeardLabel === "function" ? nodeLastHeardLabel(selectedNode, "n/a", nowUnix) : (selectedNode.last_heard || "n/a")}}<br/>
-            Trail points: ${{trailPointsCount}}<br/>
-            Trail latest: ${{trailLast}}
-          `);
+          bindMapNodeInfoOverlays(marker, selectedNode, {{
+            nodeId: selectedNodeIdNormalized,
+            nowUnix,
+            state: latestState,
+            caps: selectedCaps,
+            positionBadge: posBadge,
+            trailPointsCount: trailPointsCount,
+            trailLatest: trailLast,
+          }});
           marker.on("click", () => {{
             selectNode(normalizeNodeId(selectedNode.id || ""), true, false);
           }});
@@ -357,32 +355,33 @@
             const confidenceValue = clampMapLinkValue(Number(estimate && estimate.confidence), 0, 1);
             const confidenceLabel = mapLinkConfidenceLabel(confidenceValue);
             const qualityPct = Math.round(clampMapLinkValue(Number(estimate && estimate.avgLinkQuality), 0, 1) * 100);
-            marker.bindPopup(`
-              <b>${{nodeLabel(node)}}</b><br/>
-              ${{normalizedId || node.id}}<br/>
-              Num: ${{node.num ?? "n/a"}}<br/>
-              SNR: ${{node.snr ?? "n/a"}}<br/>
-              RSSI: ${{node.rssi ?? "n/a"}}<br/>
-              Position: Estimated by link layer<br/>
-              Confidence: ${{confidenceLabel}} (${{Math.round(confidenceValue * 100)}}%)<br/>
-              Anchors: ${{estimate && estimate.anchorCount ? estimate.anchorCount : 0}}<br/>
-              Support links: ${{estimate && estimate.supportLinks ? estimate.supportLinks : 0}}<br/>
-              Link quality: ${{qualityPct}}%<br/>
-              Avg link hops: ${{estimate && estimate.avgHops != null ? estimate.avgHops : "n/a"}}<br/>
-              Avg link SNR: ${{estimate && estimate.avgSnr != null ? estimate.avgSnr : "n/a"}}<br/>
-              Avg link RSSI: ${{estimate && estimate.avgRssi != null ? estimate.avgRssi : "n/a"}}<br/>
-              Last: ${{typeof nodeLastHeardLabel === "function" ? nodeLastHeardLabel(node, "n/a", nowUnix) : (node.last_heard || "n/a")}}
-            `);
+            bindMapNodeInfoOverlays(marker, node, {{
+              nodeId: normalizedId,
+              nowUnix,
+              state: latestState,
+              isEstimated: true,
+              positionBadge: {{
+                label: "Estimated",
+                className: "history",
+                title: "Position is inferred from nearby links rather than a direct GPS fix.",
+              }},
+              confidenceLabel,
+              confidencePct: confidenceValue * 100,
+              qualityPct,
+              anchorCount: estimate && estimate.anchorCount ? estimate.anchorCount : 0,
+              supportLinks: estimate && estimate.supportLinks ? estimate.supportLinks : 0,
+              avgHops: estimate && estimate.avgHops != null ? estimate.avgHops : null,
+              avgSnr: estimate && estimate.avgSnr != null ? estimate.avgSnr : null,
+              avgRssi: estimate && estimate.avgRssi != null ? estimate.avgRssi : null,
+            }});
           }} else {{
-            marker.bindPopup(`
-              <b>${{nodeLabel(node)}}</b><br/>
-              ${{normalizedId || node.id}}<br/>
-              Num: ${{node.num ?? "n/a"}}<br/>
-              SNR: ${{node.snr ?? "n/a"}}<br/>
-              RSSI: ${{node.rssi ?? "n/a"}}<br/>
-              Position: <span class="map-position-badge ${{posBadge.className}}" title="${{escAttr(posBadge.title)}}">${{escAttr(posBadge.label)}}</span><br/>
-              Last: ${{typeof nodeLastHeardLabel === "function" ? nodeLastHeardLabel(node, "n/a", nowUnix) : (node.last_heard || "n/a")}}
-            `);
+            bindMapNodeInfoOverlays(marker, node, {{
+              nodeId: normalizedId,
+              nowUnix,
+              state: latestState,
+              caps: nodeCaps,
+              positionBadge: posBadge,
+            }});
           }}
           marker.on("click", () => {{
             selectNode(normalizedId, true, false);

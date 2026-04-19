@@ -578,6 +578,9 @@
           const selectedNode = nodes.find((node) => (
             normalizeNodeId(node && node.id) === selectedNodeId
           ));
+          const popupAnchor = trailPts.length > 0
+            ? trailPts[trailPts.length - 1]
+            : null;
           if (selectedNode) {{
             const lat = Number(selectedNode.lat);
             const lon = Number(selectedNode.lon);
@@ -585,38 +588,51 @@
             if (!hasGps && trailPts.length === 0) {{
               return usedHistory || usedOverviewFallback;
             }}
-            const popupAnchor = trailPts.length > 0
-              ? trailPts[trailPts.length - 1]
-              : [lat, lon];
+            const targetPopupAnchor = popupAnchor || [lat, lon];
             const posLabel = hasGps
               ? `${{lat.toFixed(5)}}, ${{lon.toFixed(5)}}`
               : "No GPS fix";
-            const popupHtml = `
-              <b>${{nodeLabel(selectedNode)}}</b><br/>
-              ${{selectedNodeId || selectedNode.id || "n/a"}}<br/>
-              Num: ${{selectedNode.num ?? "n/a"}}<br/>
-              SNR: ${{selectedNode.snr ?? "n/a"}}<br/>
-              RSSI: ${{selectedNode.rssi ?? "n/a"}}<br/>
-              Position: ${{posLabel}}<br/>
-              Last: ${{selectedNode.last_heard || "n/a"}}<br/>
-              Trail points: ${{trailPts.length}}
-            `;
+            const popupHtml = buildMapNodeInfoHtml(selectedNode, {{
+              nodeId: selectedNodeId || selectedNode.id || "",
+              nowUnix: Math.floor(Date.now() / 1000),
+              state: latestState,
+              positionBadge: {{
+                label: hasGps ? "Map Position" : "No Position",
+                className: hasGps ? "live" : "unknown",
+                title: hasGps ? `Marker currently focused at ${{posLabel}}.` : "No usable position is available for this node.",
+              }},
+              trailPointsCount: trailPts.length,
+            }});
             withProgrammaticNetworkNodeInfoPopup(() => {{
-              L.popup({{ closeButton: true, autoPan: true }})
-                .setLatLng(popupAnchor)
+              L.popup({{ closeButton: true, autoPan: true, className: "map-node-popup", maxWidth: 320 }})
+                .setLatLng(targetPopupAnchor)
                 .setContent(popupHtml)
                 .openOn(map);
             }});
             requestMapResize();
-          }} else if (trailPts.length > 0) {{
+          }} else if (popupAnchor) {{
             const popupHtml = `
-              <b>History-only node</b><br/>
-              ${{selectedNodeId || "n/a"}}<br/>
-              Trail points: ${{trailPts.length}}<br/>
-              Latest trail: ${{history && history.summary ? (history.summary.trail_end || "n/a") : "n/a"}}
+              <div class="map-node-info-card">
+                <div class="map-node-info-header">
+                  <div class="map-node-info-title-wrap">
+                    <div class="map-node-info-title">History-only node</div>
+                    <div class="map-node-info-subtitle">${{escAttr(selectedNodeId || "n/a")}}</div>
+                  </div>
+                </div>
+                <div class="map-node-info-grid">
+                  <div class="map-node-info-row">
+                    <span class="map-node-info-label">Trail Points</span>
+                    <span class="map-node-info-value">${{escAttr(trailPts.length)}}</span>
+                  </div>
+                  <div class="map-node-info-row">
+                    <span class="map-node-info-label">Latest Trail</span>
+                    <span class="map-node-info-value">${{escAttr(history && history.summary ? (history.summary.trail_end || "n/a") : "n/a")}}</span>
+                  </div>
+                </div>
+              </div>
             `;
             withProgrammaticNetworkNodeInfoPopup(() => {{
-              L.popup({{ closeButton: true, autoPan: true }})
+              L.popup({{ closeButton: true, autoPan: true, className: "map-node-popup", maxWidth: 320 }})
                 .setLatLng(popupAnchor)
                 .setContent(popupHtml)
                 .openOn(map);
