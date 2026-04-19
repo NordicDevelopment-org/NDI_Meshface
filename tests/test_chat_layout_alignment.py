@@ -616,6 +616,49 @@ def test_chat_mobile_layout_stacks_feed_meta_and_header_filters() -> None:
     assert "background: transparent;" in mobile_section
 
 
+def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time() -> None:
+    css = build_dashboard_css(theme_css="")
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    item_section = css.rsplit("\n    .chat-feed-item {", 1)[1].split("}", 1)[0]
+    self_item_section = css.split(".chat-feed-item.self-authored {", 1)[1].split("}", 1)[0]
+    self_reaction_section = css.split(".chat-feed-item.self-authored .chat-reaction-row {", 1)[1].split("}", 1)[0]
+    dark_item_section = css.split('[data-theme="dark"] .card.chat .chat-feed-item {', 1)[1].split("}", 1)[0]
+    monitor_item_section = css.split(".chat-feed.chat-feed-view-monitor .chat-feed-item {", 1)[1].split("}", 1)[0]
+    mobile_section = css.split("@media (max-width: 760px) {", 1)[1]
+
+    assert "width: fit-content;" in item_section
+    assert "max-width: min(84%, 100%);" in item_section
+    assert "border-radius: 16px 16px 16px 6px;" in item_section
+    assert "margin-right: auto;" in item_section
+    assert "margin-left: auto;" in self_item_section
+    assert "margin-right: 0;" in self_item_section
+    assert "border-radius: 16px 16px 6px 16px;" in self_item_section
+    assert "justify-content: flex-end;" in self_reaction_section
+    assert ".chat-feed-item.has-node-emoji {" in css
+    assert "padding-right: 32px;" in css
+    assert ".chat-feed-item.has-node-emoji::after {" in css
+    assert 'content: attr(data-node-emoji);' in css
+    assert 'font-size: clamp(44px, 4.8vw, 72px);' in css
+    assert '[data-theme="dark"] .card.chat .chat-feed-item.has-node-emoji::after {' in css
+    assert "border: 1px solid var(--chat-feed-node-outline);" in dark_item_section
+    assert "border-radius: 16px 16px 16px 6px;" in dark_item_section
+    assert "width: 100%;" in monitor_item_section
+    assert "max-width: 100%;" in monitor_item_section
+    assert "border-radius: 0;" in monitor_item_section
+    assert "max-width: min(92%, 100%);" in mobile_section
+    assert "const isSelfAuthored = isLocalEcho || (" in js
+    assert 'const selfAuthoredClass = isSelfAuthored ? " self-authored" : "";' in js
+    assert "const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === \"function\")" in js
+    assert 'const nodeEmojiClass = nodeVisualEmoji ? " has-node-emoji" : "";' in js
+    assert 'data-node-emoji="${escAttr(nodeVisualEmoji)}"' in js
+    assert "<span class=\"chat-feed-time\"" not in js
+
+
 def test_launcher_menu_omits_header_block() -> None:
     js = Path("meshdash/assets/dashboard.js.chat.events.core.identity.node_self.tmpl").read_text()
 

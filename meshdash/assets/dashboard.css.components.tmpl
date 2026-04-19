@@ -3760,11 +3760,14 @@
         rgba(12, 18, 24, 0) 100%
       );
       background: var(--chat-feed-node-gradient), var(--chat-feed-node-bg);
-      border: 0;
-      border-bottom: 1px solid var(--chat-feed-node-outline);
-      border-radius: 0;
+      border: 1px solid var(--chat-feed-node-outline);
+      border-radius: 16px 16px 16px 6px;
       color: var(--ui-text);
       box-shadow: inset 1px 0 0 var(--chat-feed-node-outline-soft);
+    }}
+    [data-theme="dark"] .card.chat .chat-feed-item.has-node-emoji::after {{
+      opacity: 0.1;
+      filter: grayscale(0.3) saturate(0.62) blur(1.2px) brightness(1.08);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted {{
       border-left: 2px dotted rgba(var(--chat-feed-channel-rgb), 0.84);
@@ -3853,9 +3856,6 @@
       box-shadow:
         inset 2px 0 0 color-mix(in srgb, var(--workspace-shell-border-strong) 54%, var(--ui-accent) 46%),
         inset 0 0 0 1px rgba(var(--chat-feed-channel-rgb), 0.16);
-    }}
-    [data-theme="dark"] .card.chat .chat-feed-item:last-child {{
-      border-bottom: 0;
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.chat-selectable:hover:not(.channel-tinted) {{
       background: var(--chat-feed-node-gradient-hover), var(--chat-feed-node-bg-hover);

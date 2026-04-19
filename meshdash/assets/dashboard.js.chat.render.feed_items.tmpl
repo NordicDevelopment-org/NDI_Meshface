@@ -92,12 +92,6 @@
         const fromStatusKey = normalizeFreshnessKey(fromMeta.status);
         const rawTimeText = String(msg.rx_time || msg.captured_at || "").trim();
         const timeText = formatLocalChatTime(msgTimeUnix, rawTimeText || "n/a", nowUnix);
-        const localTimeTitle = Number.isFinite(msgTimeUnix)
-          ? new Date(Math.floor(msgTimeUnix) * 1000).toLocaleString()
-          : "";
-        const timeTitle = [localTimeTitle ? `Local: ${{localTimeTitle}}` : "", rawTimeText ? `Raw: ${{rawTimeText}}` : ""]
-          .filter((part) => !!part)
-          .join(" | ");
         const textHtml = chatPlainTextToHtml(msg.text || "", true);
         const textHtmlMonitor = chatPlainTextToHtml(msg.text || "", false);
         const textEmojiOnlyClass = chatIsEmojiOnlyText(msg.text || "") ? " chat-feed-text-emoji-only" : "";
@@ -219,6 +213,13 @@
         const nodeTintStyle = (typeof nodeTintStyleVars === "function")
           ? nodeTintStyleVars(tintNodeId, nodeTintOptions)
           : `--chat-feed-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeTintHueValue) || 210)))}};`;
+        const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === "function")
+          ? String(nodeVisualEmojiForNode(tintNodeId || sourceNode || nodeId, tintTagEntry, tintSeedNode) || "").trim()
+          : "";
+        const nodeEmojiClass = nodeVisualEmoji ? " has-node-emoji" : "";
+        const nodeEmojiAttr = nodeVisualEmoji
+          ? ` data-node-emoji="${{escAttr(nodeVisualEmoji)}}"`
+          : "";
         const rowTintStyleParts = [];
         if (hasMeshTint) {{
           rowTintStyleParts.push(meshChannelTintStyle(meshIdx, {{ allowAll: false }}));
@@ -359,6 +360,12 @@
             }})()
           : "";
         const isLocalEcho = msg.local_echo === true || msg.localEcho === true;
+        const isSelfAuthored = isLocalEcho || (
+          isCanonicalNodeId(sourceNode)
+          && isCanonicalNodeId(localNodeId)
+          && sourceNode === localNodeId
+        );
+        const selfAuthoredClass = isSelfAuthored ? " self-authored" : "";
         const deliveryState = normalizeDeliveryState(msg.delivery_state ?? msg.deliveryState);
         const deliveryError = String(msg.delivery_error ?? msg.deliveryError ?? "").trim();
         const deliveryAckMeta = (
@@ -484,7 +491,7 @@
         const monitorViewClass = monitorMode ? " chat-view-monitor" : "";
         if (monitorMode) {{
           const monitorNetworkTag = `<span class="chat-monitor-network-tag">[ ][MF]</span>`;
-          const monitorItemClass = `chat-feed-item chat-feed-item-monitor-exact ${{selectableClass}}${{selectedFeedClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}`;
+          const monitorItemClass = `chat-feed-item chat-feed-item-monitor-exact ${{selectableClass}}${{selfAuthoredClass}}${{selectedFeedClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}`;
           return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="${{monitorItemClass.trim()}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
             <span class="chat-entry-msg">
               ${{monitorPrefix}}
@@ -503,15 +510,13 @@
               </span>
               <span class="chat-feed-colon">:</span>
               <span class="chat-feed-text chat-feed-text-inline${{textEmojiOnlyClass}}">${{textHtml || "&nbsp;"}}</span>`;
-        const sideHtml = monitorMode
-          ? ""
-          : `<span class="chat-feed-side">
-              ${{retryButton}}
-              ${{deliveryChip}}
-              <span class="chat-feed-time" title="${{escAttr(timeTitle || timeText)}}">${{escAttr(timeText)}}</span>
-            </span>`;
+        const sideParts = [];
+        if (deliveryChip) sideParts.push(deliveryChip);
+        const sideHtml = (!monitorMode && sideParts.length > 0)
+          ? `<span class="chat-feed-side">${{sideParts.join("")}}</span>`
+          : "";
         const extraRows = monitorMode ? "" : reactionRow;
-        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{tagClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}"${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
+        return `<div data-node-id="${{escAttr(nodeId)}}" data-from-node-id="${{escAttr(sourceNode)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" data-message-id="${{escAttr(messageId || "")}}" data-message-key="${{escAttr(messageKey || "")}}" data-reply-name="${{escAttr(fromMeta.label || "Unknown node")}}" data-reply-text="${{escAttr(textCompact)}}" class="chat-feed-item ${{selectableClass}}${{selfAuthoredClass}}${{selectedFeedClass}}${{changeClass}}${{statusClass}}${{tagClass}}${{nodeEmojiClass}}${{meshTintClass}}${{meshEdgeClass}}${{monitorViewClass}}"${{nodeEmojiAttr}}${{rowTintStyleAttr}} title="${{escAttr(messageTooltip)}}">
           <div class="chat-feed-line">
             <div class="chat-feed-summary">
               ${{changeBadge}}
