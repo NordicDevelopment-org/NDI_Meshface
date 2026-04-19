@@ -639,21 +639,24 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "border-radius: 16px 16px 16px 6px;" in item_section
     assert "margin-right: auto;" in item_section
     assert "padding: 9px 12px;" in item_section
-    assert "gap: 5px;" in summary_section
-    assert "line-height: 1.42;" in summary_section
-    assert "font-size: 13px;" in author_name_section
-    assert "font-weight: 650;" in author_name_section
-    assert "font-size: 13px;" in text_section
-    assert "line-height: 1.42;" in text_section
+    assert "display: flex;" in summary_section
+    assert "align-items: flex-start;" in summary_section
+    assert "flex-wrap: wrap;" in summary_section
+    assert "gap: 4px 5px;" in summary_section
+    assert "line-height: 1.45;" in summary_section
+    assert "font-size: 14px;" in author_name_section
+    assert "font-weight: 700;" in author_name_section
+    assert "font-size: 14px;" in text_section
+    assert "line-height: 1.45;" in text_section
     assert "margin-left: auto;" in self_item_section
     assert "margin-right: 0;" in self_item_section
     assert "border-radius: 16px 16px 6px 16px;" in self_item_section
     assert "justify-content: flex-end;" in self_reaction_section
     assert ".chat-feed-item.has-node-emoji {" in css
-    assert "padding-right: 38px;" in css
+    assert "padding-right: 24px;" in css
     assert ".chat-feed-item.has-node-emoji::after {" in css
     assert 'content: attr(data-node-emoji);' in css
-    assert 'font-size: clamp(48px, 5.2vw, 78px);' in css
+    assert 'font-size: clamp(44px, 4.7vw, 70px);' in css
     assert '[data-theme="dark"] .card.chat .chat-feed-item.has-node-emoji::after {' in css
     assert "border: 1px solid var(--chat-feed-node-outline);" in dark_item_section
     assert "border-radius: 16px 16px 16px 6px;" in dark_item_section
