@@ -627,6 +627,9 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     item_section = css.rsplit("\n    .chat-feed-item {", 1)[1].split("}", 1)[0]
     self_item_section = css.split(".chat-feed-item.self-authored {", 1)[1].split("}", 1)[0]
     self_reaction_section = css.split(".chat-feed-item.self-authored .chat-reaction-row {", 1)[1].split("}", 1)[0]
+    summary_section = css.rsplit("\n    .chat-feed-summary {", 1)[1].split("}", 1)[0]
+    author_name_section = css.rsplit("\n    .chat-feed-author .chat-name {", 1)[1].split("}", 1)[0]
+    text_section = css.rsplit("\n    .chat-feed-text {", 1)[1].split("}", 1)[0]
     dark_item_section = css.split('[data-theme="dark"] .card.chat .chat-feed-item {', 1)[1].split("}", 1)[0]
     monitor_item_section = css.split(".chat-feed.chat-feed-view-monitor .chat-feed-item {", 1)[1].split("}", 1)[0]
     mobile_section = css.split("@media (max-width: 760px) {", 1)[1]
@@ -635,15 +638,22 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "max-width: min(84%, 100%);" in item_section
     assert "border-radius: 16px 16px 16px 6px;" in item_section
     assert "margin-right: auto;" in item_section
+    assert "padding: 9px 12px;" in item_section
+    assert "gap: 5px;" in summary_section
+    assert "line-height: 1.42;" in summary_section
+    assert "font-size: 13px;" in author_name_section
+    assert "font-weight: 650;" in author_name_section
+    assert "font-size: 13px;" in text_section
+    assert "line-height: 1.42;" in text_section
     assert "margin-left: auto;" in self_item_section
     assert "margin-right: 0;" in self_item_section
     assert "border-radius: 16px 16px 6px 16px;" in self_item_section
     assert "justify-content: flex-end;" in self_reaction_section
     assert ".chat-feed-item.has-node-emoji {" in css
-    assert "padding-right: 32px;" in css
+    assert "padding-right: 38px;" in css
     assert ".chat-feed-item.has-node-emoji::after {" in css
     assert 'content: attr(data-node-emoji);' in css
-    assert 'font-size: clamp(44px, 4.8vw, 72px);' in css
+    assert 'font-size: clamp(48px, 5.2vw, 78px);' in css
     assert '[data-theme="dark"] .card.chat .chat-feed-item.has-node-emoji::after {' in css
     assert "border: 1px solid var(--chat-feed-node-outline);" in dark_item_section
     assert "border-radius: 16px 16px 16px 6px;" in dark_item_section
