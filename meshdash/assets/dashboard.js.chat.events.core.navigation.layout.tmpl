@@ -768,26 +768,42 @@
 
     function syncMapControlsDock(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
       const dock = document.getElementById("map-controls-dock");
+      const graphSummary = document.getElementById("network-graph-summary");
+      const graphToolbar = document.querySelector(".network-graph-toolbar");
       const headerHost = document.getElementById("map-card-actions-host");
       const overlayHost = document.getElementById("network-map-controls-host");
-      if (!(dock instanceof HTMLElement)) return;
       if (!(headerHost instanceof HTMLElement)) return;
       if (!(overlayHost instanceof HTMLElement)) return;
 
       const normalizedView = normalizeLayoutView(viewName);
       const normalizedSubview = normalizeNetworkSubview(subviewName);
       const useOverlayDock = normalizedView === "network" && normalizedSubview === "map";
+      const useOverlayGraphSummary = normalizedView === "network" && normalizedSubview === "graph";
       const targetHost = useOverlayDock ? overlayHost : headerHost;
-      if (dock.parentElement !== targetHost) {{
+      if (dock instanceof HTMLElement && dock.parentElement !== targetHost) {{
         targetHost.appendChild(dock);
+      }}
+      if (graphSummary instanceof HTMLElement) {{
+        const graphTargetHost = (
+          useOverlayGraphSummary
+          && overlayHost instanceof HTMLElement
+        )
+          ? overlayHost
+          : (graphToolbar instanceof HTMLElement ? graphToolbar : null);
+        if (graphTargetHost instanceof HTMLElement && graphSummary.parentElement !== graphTargetHost) {{
+          graphTargetHost.appendChild(graphSummary);
+        }}
+        graphSummary.classList.toggle("is-overlay-docked", useOverlayGraphSummary);
       }}
 
       headerHost.hidden = useOverlayDock;
       headerHost.setAttribute("aria-hidden", useOverlayDock ? "true" : "false");
-      overlayHost.classList.toggle("is-hidden", !useOverlayDock || normalizedSubview !== "map");
+      const showOverlayHost = useOverlayDock || useOverlayGraphSummary;
+      overlayHost.classList.toggle("is-hidden", !showOverlayHost);
+      overlayHost.classList.toggle("is-graph-dock", useOverlayGraphSummary);
       overlayHost.setAttribute(
         "aria-hidden",
-        (!useOverlayDock || normalizedSubview !== "map") ? "true" : "false"
+        showOverlayHost ? "false" : "true"
       );
     }}
 
@@ -3903,7 +3919,7 @@
       clearNetworkGraphEmptyRetry();
       empty.hidden = true;
       const selectedId = normalizeNodeId(selectedNodeId || "");
-      summary.innerHTML = `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip" type="button" aria-pressed="${{edgeMode === "live" ? "true" : "false"}}" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label">Mode</span><strong>${{modeLabel}}</strong></button><button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip" type="button" title="Reset links view" aria-controls="network-graph-svg"><span class="network-graph-chip-label">View</span><strong>Reset</strong></button><label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label>`;
+      summary.innerHTML = `<label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label><button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip" type="button" title="Reset links view" aria-controls="network-graph-svg"><span class="network-graph-chip-label">View</span><strong>Reset</strong></button><button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip" type="button" aria-pressed="${{edgeMode === "live" ? "true" : "false"}}" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label">Mode</span><strong>${{modeLabel}}</strong></button>`;
       bindNetworkGraphLayoutSelector();
       syncNetworkGraphLayoutSelector();
       bindNetworkGraphSummaryControls();
@@ -4800,6 +4816,7 @@
         }});
       }}
       syncNodeHistoryDock();
+      syncMapControlsDock(next, activeNetworkSubview);
       syncNetworkOverviewPrimaryControls(next, activeNetworkSubview);
       syncEnvironmentMetricsDock(next, activeNetworkSubview);
       if (latestState) {{

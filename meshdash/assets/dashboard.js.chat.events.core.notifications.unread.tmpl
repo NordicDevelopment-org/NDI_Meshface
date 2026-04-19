@@ -61,6 +61,7 @@
         if (!Number.isInteger(msgId) || msgId <= 0) continue;
         messageInfoById.set(String(msgId), {{
           senderLabel: chatSenderLabelFromMessage(msg, nodesById),
+          previewText: String(msg.text ?? msg.decoded_text ?? msg.payload_text ?? "").trim(),
         }});
       }}
       for (const msg of recentChat) {{
@@ -107,6 +108,9 @@
         const reactionTargetLabel = reactionTargetInfo && typeof reactionTargetInfo === "object"
           ? String(reactionTargetInfo.senderLabel || "").trim()
           : "";
+        const reactionTargetText = reactionTargetInfo && typeof reactionTargetInfo === "object"
+          ? String(reactionTargetInfo.previewText || "").trim()
+          : "";
         const senderIsSelf = hasLocalNodeId && fromId === localNodeId;
         const directToSelf = hasLocalNodeId && channel === "direct" && toId === localNodeId;
         const referencesSelfMessage = hasLocalNodeId && !!replyId && replyTargetSenderId === localNodeId;
@@ -132,6 +136,7 @@
             {{
               ...msg,
               reaction_target_label: reactionTargetLabel,
+              reaction_target_text: reactionTargetText,
             }},
             isReaction
           ),
