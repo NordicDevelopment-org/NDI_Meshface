@@ -1668,9 +1668,14 @@
         const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
         const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
         const nodeEmoji = resolveNetworkGraphNodeEmoji(item);
-        const labelOffsetY = Number.isFinite(Number(item.labelOffsetY))
-          ? Number(item.labelOffsetY)
-          : (Number(item.radius) + 14);
+        const labelOffsetRaw = item && item.labelOffsetY;
+        const labelOffsetY = (
+          labelOffsetRaw == null
+          || labelOffsetRaw === ""
+          || !Number.isFinite(Number(labelOffsetRaw))
+        )
+          ? (Number(item.radius) + 14)
+          : Number(labelOffsetRaw);
         const isLocalNode = item.nodeId === localId;
         const isRootNode = item.nodeId === rootId;
         const isSelectedNode = item.nodeId === selectedId;
@@ -1711,7 +1716,7 @@
             }}
             ${{
               item.showLabel
-                ? `<text class="network-graph-node-label is-priority-${{labelPriority}}${{labelOffsetY < 0 ? " is-above" : " is-below"}}${{(item.detached || item.broadcastOnly) ? " is-secondary" : ""}}${{item.broadcastOnly ? " is-broadcast-only" : ""}}" x="0" y="${{labelOffsetY.toFixed(1)}}" text-anchor="middle">${{escAttr(label)}}</text>`
+                ? `<text class="network-graph-node-label is-priority-${{labelPriority}}${{labelOffsetY < 0 ? " is-above" : " is-below"}}${{(item.detached || item.broadcastOnly) ? " is-secondary" : ""}}${{item.broadcastOnly ? " is-broadcast-only" : ""}}" x="0" y="${{labelOffsetY.toFixed(1)}}" data-network-graph-label-offset-y="${{labelOffsetY.toFixed(1)}}" data-network-graph-node-radius="${{Number(item.radius).toFixed(1)}}" text-anchor="middle">${{escAttr(label)}}</text>`
                 : ""
             }}
             <title>${{escAttr(buildNetworkGraphNodeTitle(item))}}</title>
@@ -1936,6 +1941,7 @@
       );
       if (!shouldAnimate) {{
         svg.innerHTML = buildNetworkGraphSceneMarkup(toLayout);
+        syncNetworkGraphTextZoom(svg, networkGraphViewState.viewBox);
         if (onComplete) onComplete();
         return;
       }}
@@ -1969,6 +1975,7 @@
           positions,
           items: animatedItems,
         }});
+        syncNetworkGraphTextZoom(svg, networkGraphViewState.viewBox);
         if (progress >= 1) {{
           networkGraphViewState.sceneAnimationFrame = null;
           if (onComplete) onComplete();
@@ -2156,19 +2163,21 @@
       if (!(svg instanceof SVGElement)) return;
       const viewBox = cloneNetworkGraphViewBox(rawViewBox);
       const zoomRatio = networkGraphViewportBase.width / Math.max(1, Number(viewBox.width) || networkGraphViewportBase.width);
+      const zoomFactor = Math.max(1, zoomRatio);
       const labelDensity = zoomRatio >= 2.6
         ? "full"
         : zoomRatio >= 1.55
         ? "medium"
         : "overview";
-      const compensation = Math.max(0.52, Math.min(1, 1 / Math.sqrt(Math.max(1, zoomRatio))));
-      const labelSizePx = 10 * compensation;
-      const secondaryLabelSizePx = 9 * compensation;
-      const ringLabelSizePx = 10 * compensation;
-      const regionLabelSizePx = 10 * compensation;
-      const emojiSizePx = 18 * Math.max(0.62, compensation);
-      const localEmojiSizePx = 20 * Math.max(0.62, compensation);
-      const labelStrokePx = Math.max(1.5, 3 * compensation);
+      const compensation = Math.max(0.22, Math.min(1, 1 / zoomFactor));
+      const labelSizePx = 9.4 * compensation;
+      const secondaryLabelSizePx = 8.3 * compensation;
+      const ringLabelSizePx = 9.2 * compensation;
+      const regionLabelSizePx = 9.2 * compensation;
+      const emojiCompensation = Math.max(0.52, Math.min(1, 0.84 / Math.sqrt(zoomFactor)));
+      const emojiSizePx = 18 * emojiCompensation;
+      const localEmojiSizePx = 20 * emojiCompensation;
+      const labelStrokePx = Math.max(0.95, 2.15 * compensation);
       svg.style.setProperty("--network-graph-label-font-size", `${{labelSizePx.toFixed(2)}}px`);
       svg.style.setProperty("--network-graph-secondary-label-font-size", `${{secondaryLabelSizePx.toFixed(2)}}px`);
       svg.style.setProperty("--network-graph-ring-label-font-size", `${{ringLabelSizePx.toFixed(2)}}px`);
@@ -2176,6 +2185,32 @@
       svg.style.setProperty("--network-graph-emoji-font-size", `${{emojiSizePx.toFixed(2)}}px`);
       svg.style.setProperty("--network-graph-local-emoji-font-size", `${{localEmojiSizePx.toFixed(2)}}px`);
       svg.style.setProperty("--network-graph-label-stroke-width", `${{labelStrokePx.toFixed(2)}}px`);
+      const labelEls = svg.querySelectorAll(".network-graph-node-label");
+      labelEls.forEach((labelEl) => {{
+        if (!(labelEl instanceof SVGTextElement)) return;
+        const baseRadius = Math.max(0, Number(labelEl.getAttribute("data-network-graph-node-radius") || 0));
+        const rawBaseOffset = Number(
+          labelEl.getAttribute("data-network-graph-label-offset-y")
+          || labelEl.getAttribute("y")
+          || 0
+        );
+        if (!Number.isFinite(rawBaseOffset) || rawBaseOffset === 0) return;
+        const direction = rawBaseOffset < 0 ? -1 : 1;
+        const baseMagnitude = Math.abs(rawBaseOffset);
+        const baseGap = Math.max(0, baseMagnitude - baseRadius);
+        const nodeGroup = labelEl.closest(".network-graph-node");
+        const ridesUnderEmoji = !!(nodeGroup && nodeGroup.classList.contains("has-emoji-glyph"));
+        const radiusFactor = ridesUnderEmoji ? 0.58 : 0.72;
+        const pinnedGapPx = Math.max(
+          ridesUnderEmoji ? 1.8 : 2.6,
+          Math.min(ridesUnderEmoji ? 4.2 : 5.4, baseGap * 0.55)
+        );
+        const adjustedMagnitude = Math.max(
+          1.2,
+          (baseRadius * radiusFactor) + (pinnedGapPx / zoomFactor)
+        );
+        labelEl.setAttribute("y", `${{(adjustedMagnitude * direction).toFixed(2)}}`);
+      }});
       svg.dataset.labelDensity = labelDensity;
     }}
 
@@ -3685,7 +3720,13 @@
           weight: meta.weight,
           signalMeta,
           radius: position.disconnected ? Math.max(5, baseRadius - 0.7) : baseRadius,
-          labelOffsetY: Number.isFinite(Number(position.labelOffsetY)) ? Number(position.labelOffsetY) : null,
+          labelOffsetY: (
+            position.labelOffsetY == null
+            || position.labelOffsetY === ""
+            || !Number.isFinite(Number(position.labelOffsetY))
+          )
+            ? null
+            : Number(position.labelOffsetY),
           showLabel: visibleLabelNodeIds.has(nodeId),
         }};
       }});
@@ -4018,6 +4059,7 @@
         cancelNetworkGraphSceneAnimation();
         svg.innerHTML = buildNetworkGraphSceneMarkup(scene);
       }}
+      syncNetworkGraphTextZoom(svg, networkGraphViewState.viewBox);
       networkGraphViewState.lastSceneStructureSignature = sceneStructureSignature;
       if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
         markNodeSelectionPerf(perfToken, "selection.graph_render", perfStartMs, {{

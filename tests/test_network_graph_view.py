@@ -91,6 +91,17 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function scheduleNetworkGraphEmptyRetry()' in js
     assert 'function animateNetworkGraphViewBox(svg, rawViewBox, options = {})' in js
     assert 'function syncNetworkGraphTextZoom(svg, rawViewBox)' in js
+    assert 'const zoomFactor = Math.max(1, zoomRatio);' in js
+    assert 'data-network-graph-label-offset-y="${labelOffsetY.toFixed(1)}"' in js
+    assert 'data-network-graph-node-radius="${Number(item.radius).toFixed(1)}"' in js
+    assert 'const labelOffsetRaw = item && item.labelOffsetY;' in js
+    assert 'const labelEls = svg.querySelectorAll(".network-graph-node-label");' in js
+    assert 'const baseRadius = Math.max(0, Number(labelEl.getAttribute("data-network-graph-node-radius") || 0));' in js
+    assert 'const ridesUnderEmoji = !!(nodeGroup && nodeGroup.classList.contains("has-emoji-glyph"));' in js
+    assert 'const radiusFactor = ridesUnderEmoji ? 0.58 : 0.72;' in js
+    assert 'Math.min(ridesUnderEmoji ? 4.2 : 5.4, baseGap * 0.55)' in js
+    assert '(baseRadius * radiusFactor) + (pinnedGapPx / zoomFactor)' in js
+    assert 'labelEl.setAttribute("y", `${(adjustedMagnitude * direction).toFixed(2)}`);' in js
     assert 'svg.dataset.labelDensity = labelDensity;' in js
     assert 'function buildNetworkGraphSceneMarkup(scene)' in js
     assert 'class="network-graph-region' in js
@@ -183,6 +194,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'layoutMode === "community"' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'const isLocalNode = item.nodeId === localId;' in js
+    assert 'position.labelOffsetY == null' in js
     assert 'class="network-graph-node-emoji"' in js
     assert '<span class="network-graph-swatch is-local"></span>Your node / local radio' in js
     assert 'is-broadcast-only' in js
@@ -190,6 +202,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'svg.addEventListener("wheel"' in js
     assert 'cancelNetworkGraphViewAnimation();' in js
     assert 'svg.addEventListener("pointerup", finishPan);' in js
+    assert 'syncNetworkGraphTextZoom(svg, networkGraphViewState.viewBox);' in js
 
 
 def test_dashboard_js_allows_diagnostics_subview_in_debug_mode() -> None:
@@ -232,6 +245,10 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-node-emoji {" in css
     assert ".network-graph-node.is-local .network-graph-node-emoji {" in css
     assert ".network-graph-node.is-local.has-emoji-glyph .network-graph-node-core {" in css
+    assert ".network-graph-node-label.is-below {" in css
+    assert "dominant-baseline: hanging;" in css
+    assert ".network-graph-node-label.is-above {" in css
+    assert "dominant-baseline: ideographic;" in css
     assert ".map-node-emoji-marker {" in css
     assert ".map-node-emoji-glyph {" in css
     assert ".network-graph-node.is-broadcast-only .network-graph-node-core {" in css
