@@ -536,8 +536,8 @@ def test_chat_reaction_anchor_reuses_same_button_for_more_and_less_states() -> N
     assert 'openReactionPickerFromAnchor(summary, {{ expand: true, toggleExpanded: true }});' in bindings_src
     assert 'openReactionPickerFromAnchor(anchor, {{ expand: false }});' in bindings_src
     assert 'aria-label="${{escAttr(summaryAria)}}">' in feed_src
-    assert '"Add reaction"' not in feed_src
-    assert 'chat-reaction-summary-label">React<' not in feed_src
+    assert '"Add reaction"' in feed_src
+    assert 'chat-reaction-summary-label">React<' in feed_src
     assert 'title="${{escAttr(summaryTitle)}}"' not in feed_src
     assert 'title="${{escAttr(`${{reactionSummaryTitle}} • React to this message`)}}"' not in layout_src
     assert 'title="Add reaction"' not in layout_src
@@ -654,15 +654,20 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "margin-right: 0;" in self_item_section
     assert "border-radius: 16px 16px 6px 16px;" in self_item_section
     assert "justify-content: flex-end;" in self_reaction_section
+    assert "--chat-feed-node-emoji-tail-space: 24px;" in css
+    assert "--chat-feed-node-emoji-tail-inset: -6px;" in css
     assert ".chat-feed-item.has-node-emoji {" in css
-    assert "padding-right: 24px;" in css
+    assert "--chat-feed-node-emoji-tail-space: clamp(52px, 4.9vw, 74px);" in css
+    assert "--chat-feed-node-emoji-tail-inset: 8px;" in css
+    assert "padding-right: var(--chat-feed-node-emoji-tail-space);" in css
     assert ".chat-feed-item.self-authored.has-node-emoji {" in css
-    assert "padding-left: 24px;" in css
+    assert "padding-left: var(--chat-feed-node-emoji-tail-space);" in css
     assert ".chat-feed-item.has-node-emoji::after {" in css
     assert 'content: attr(data-node-emoji);' in css
     assert 'font-size: clamp(44px, 4.7vw, 70px);' in css
+    assert "right: var(--chat-feed-node-emoji-tail-inset);" in css
     assert ".chat-feed-item.self-authored.has-node-emoji::after {" in css
-    assert "left: -6px;" in css
+    assert "left: var(--chat-feed-node-emoji-tail-inset);" in css
     assert '[data-theme="dark"] .card.chat .chat-feed-item.has-node-emoji::after {' in css
     assert "border: 1px solid var(--chat-feed-node-outline);" in dark_item_section
     assert "border-radius: 16px 16px 16px 6px;" in dark_item_section

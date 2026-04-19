@@ -6253,6 +6253,8 @@
       margin-top: auto;
     }}
     .chat-feed-item {{
+      --chat-feed-node-emoji-tail-space: 24px;
+      --chat-feed-node-emoji-tail-inset: -6px;
       --chat-feed-node-hue: 145;
       --chat-feed-node-tint-start-hue: 145;
       --chat-feed-node-tint-end-hue: 176;
@@ -6300,16 +6302,18 @@
       color: color-mix(in srgb, var(--ink) 90%, var(--muted) 10%);
     }}
     .chat-feed-item.has-node-emoji {{
-      padding-right: 24px;
+      --chat-feed-node-emoji-tail-space: clamp(52px, 4.9vw, 74px);
+      --chat-feed-node-emoji-tail-inset: 8px;
+      padding-right: var(--chat-feed-node-emoji-tail-space);
     }}
     .chat-feed-item.self-authored.has-node-emoji {{
-      padding-left: 24px;
+      padding-left: var(--chat-feed-node-emoji-tail-space);
       padding-right: 12px;
     }}
     .chat-feed-item.has-node-emoji::after {{
       content: attr(data-node-emoji);
       position: absolute;
-      right: -6px;
+      right: var(--chat-feed-node-emoji-tail-inset);
       top: 50%;
       transform: translateY(-50%);
       font-size: clamp(44px, 4.7vw, 70px);
@@ -6323,7 +6327,7 @@
       z-index: 0;
     }}
     .chat-feed-item.self-authored.has-node-emoji::after {{
-      left: -6px;
+      left: var(--chat-feed-node-emoji-tail-inset);
       right: auto;
     }}
     .chat-feed-item.channel-tinted {{
