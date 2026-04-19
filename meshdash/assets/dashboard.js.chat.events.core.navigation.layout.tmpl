@@ -2434,14 +2434,25 @@
 
     function bindNetworkGraphSummaryControls() {{
       const modeChip = document.getElementById("network-graph-mode-chip");
-      if (!(modeChip instanceof HTMLButtonElement) || modeChip.dataset.bound === "1") return;
-      modeChip.dataset.bound = "1";
-      modeChip.addEventListener("click", () => {{
-        const nextMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) === "live"
-          ? "history"
-          : "live";
-        setNetworkGraphEdgeMode(nextMode, {{ persist: true, rerender: true }});
-      }});
+      if (modeChip instanceof HTMLButtonElement && modeChip.dataset.bound !== "1") {{
+        modeChip.dataset.bound = "1";
+        modeChip.addEventListener("click", () => {{
+          const nextMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) === "live"
+            ? "history"
+            : "live";
+          setNetworkGraphEdgeMode(nextMode, {{ persist: true, rerender: true }});
+        }});
+      }}
+
+      const resetBtn = document.getElementById("network-graph-reset-view-btn");
+      if (resetBtn instanceof HTMLButtonElement && resetBtn.dataset.bound !== "1") {{
+        resetBtn.dataset.bound = "1";
+        resetBtn.addEventListener("click", () => {{
+          const svg = document.getElementById("network-graph-svg");
+          if (!(svg instanceof SVGElement)) return;
+          resetNetworkGraphView(svg);
+        }});
+      }}
     }}
 
     function syncNetworkGraphLayoutSelector() {{
@@ -2626,32 +2637,6 @@
     function bindNetworkGraphInteractions(svg) {{
       if (!(svg instanceof SVGElement) || svg.dataset.bound === "1") return;
       svg.dataset.bound = "1";
-
-      const backBtn = document.getElementById("network-graph-back-btn");
-      if (backBtn instanceof HTMLButtonElement && backBtn.dataset.bound !== "1") {{
-        backBtn.dataset.bound = "1";
-        backBtn.addEventListener("click", () => {{
-          navigateNetworkGraphBack();
-        }});
-      }}
-
-      const homeBtn = document.getElementById("network-graph-home-btn");
-      if (homeBtn instanceof HTMLButtonElement && homeBtn.dataset.bound !== "1") {{
-        homeBtn.dataset.bound = "1";
-        homeBtn.addEventListener("click", () => {{
-          const homeNodeId = resolveNetworkGraphHomeNodeId(latestState);
-          if (!isSelectableNodeId(homeNodeId)) return;
-          focusNetworkGraphNode(homeNodeId, {{ pushHistory: true, focusSelection: true }});
-        }});
-      }}
-
-      const resetBtn = document.getElementById("network-graph-reset-view-btn");
-      if (resetBtn instanceof HTMLButtonElement && resetBtn.dataset.bound !== "1") {{
-        resetBtn.dataset.bound = "1";
-        resetBtn.addEventListener("click", () => {{
-          resetNetworkGraphView(svg);
-        }});
-      }}
 
       svg.addEventListener("pointerdown", (event) => {{
         if (event.pointerType === "mouse" && event.button !== 0) return;
@@ -3906,7 +3891,7 @@
       clearNetworkGraphEmptyRetry();
       empty.hidden = true;
       const selectedId = normalizeNodeId(selectedNodeId || "");
-      summary.innerHTML = `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip" type="button" aria-pressed="${{edgeMode === "live" ? "true" : "false"}}" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label">Mode</span><strong>${{modeLabel}}</strong></button><label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label>`;
+      summary.innerHTML = `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip" type="button" aria-pressed="${{edgeMode === "live" ? "true" : "false"}}" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label">Mode</span><strong>${{modeLabel}}</strong></button><button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip" type="button" title="Reset links view" aria-controls="network-graph-svg"><span class="network-graph-chip-label">View</span><strong>Reset</strong></button><label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label>`;
       bindNetworkGraphLayoutSelector();
       syncNetworkGraphLayoutSelector();
       bindNetworkGraphSummaryControls();
@@ -3993,7 +3978,7 @@
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-broadcast-only"></span>Nodes heard recently, but only via broadcast</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-detached"></span>Nodes with no current path or recent broadcast evidence</span>`,
         `<span class="network-graph-legend-item hint">Numbered hop rings show shortest graph distance from the current root, not literal packet-route hops.</span>`,
-        `<span class="network-graph-legend-item hint">Click to refocus, scroll to zoom, and use Back, Home, or Reset view from inside the graph.</span>`,
+        `<span class="network-graph-legend-item hint">Click to refocus, scroll to zoom, and use Reset view from the header controls.</span>`,
       ].join("");
       const scene = {{
         ...layout,
