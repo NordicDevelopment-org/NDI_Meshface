@@ -5281,6 +5281,9 @@
       flex-wrap: wrap;
       pointer-events: none;
     }}
+    .network-graph-toolbar.is-overlay-docked {{
+      display: none;
+    }}
     .network-graph-toolbar-actions {{
       display: inline-flex;
       align-items: center;
@@ -5438,6 +5441,11 @@
       --network-graph-emoji-font-size: 18px;
       --network-graph-local-emoji-font-size: 20px;
       --network-graph-label-stroke-width: 3px;
+    }}
+    .network-graph-stage.is-overlay-docked #network-graph-svg {{
+      height: 100%;
+      margin-top: 0;
+      --network-graph-toolbar-safe-strip: 0px;
     }}
     .network-graph-stage.is-panning .network-graph-node {{
       cursor: grabbing;

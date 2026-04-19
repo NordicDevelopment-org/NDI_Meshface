@@ -770,6 +770,12 @@
       const dock = document.getElementById("map-controls-dock");
       const graphSummary = document.getElementById("network-graph-summary");
       const graphToolbar = document.querySelector(".network-graph-toolbar");
+      const graphSvg = document.getElementById("network-graph-svg");
+      const graphStage = (
+        graphSvg instanceof Element
+        ? graphSvg.closest(".network-graph-stage")
+        : null
+      );
       const headerHost = document.getElementById("map-card-actions-host");
       const overlayHost = document.getElementById("network-map-controls-host");
       if (!(headerHost instanceof HTMLElement)) return;
@@ -794,6 +800,12 @@
           graphTargetHost.appendChild(graphSummary);
         }}
         graphSummary.classList.toggle("is-overlay-docked", useOverlayGraphSummary);
+      }}
+      if (graphToolbar instanceof HTMLElement) {{
+        graphToolbar.classList.toggle("is-overlay-docked", useOverlayGraphSummary);
+      }}
+      if (graphStage instanceof HTMLElement) {{
+        graphStage.classList.toggle("is-overlay-docked", useOverlayGraphSummary);
       }}
 
       headerHost.hidden = useOverlayDock;

@@ -129,6 +129,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function loadPreferredNetworkGraphLayoutMode()' in js
     assert 'function persistPreferredNetworkGraphEdgeMode(modeName)' in js
     assert 'function persistPreferredNetworkGraphLayoutMode(modeName)' in js
+    assert 'const graphSvg = document.getElementById("network-graph-svg");' in js
+    assert 'graphSvg instanceof Element' in js
+    assert 'graphToolbar.classList.toggle("is-overlay-docked", useOverlayGraphSummary);' in js
+    assert 'graphStage.classList.toggle("is-overlay-docked", useOverlayGraphSummary);' in js
     assert 'networkGraphEdgeMode = loadPreferredNetworkGraphEdgeMode();' in js
     assert 'persistPreferredNetworkGraphEdgeMode(networkGraphEdgeMode);' not in js
     assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.42, maxScale: 5.5 });' in js
@@ -168,7 +172,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const parsedWeight = useSessionWeight ? parsedSession : parsedLifetime;' in js
     assert 'empty.textContent = edgeMode === "live"' in js
     assert '<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip"' in js
-    assert 'summary.innerHTML = `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip"' in js
+    assert 'summary.innerHTML = `<label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select">' in js
     assert '<button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip"' in js
     assert 'bindNetworkGraphLayoutSelector();' in js
     assert 'syncNetworkGraphLayoutSelector();' in js
@@ -239,6 +243,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-stage {" in css
     assert "touch-action: none;" in css
     assert ".network-graph-stage.is-panning {" in css
+    assert ".network-graph-stage.is-overlay-docked #network-graph-svg {" in css
     assert ".network-graph-mode-chip," in css
     assert ".network-graph-action-chip {" in css
     assert ".network-graph-layout-control {" in css
@@ -264,4 +269,5 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "padding: 0;" in graph_panel_css
     assert "pointer-events: auto;" in graph_label_css
     assert "position: absolute;" in graph_toolbar_css
+    assert ".network-graph-toolbar.is-overlay-docked {" in css
     assert "display: none;" in graph_legend_css
