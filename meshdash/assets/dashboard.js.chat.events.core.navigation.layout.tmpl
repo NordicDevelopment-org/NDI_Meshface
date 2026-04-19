@@ -776,7 +776,7 @@
 
       const normalizedView = normalizeLayoutView(viewName);
       const normalizedSubview = normalizeNetworkSubview(subviewName);
-      const useOverlayDock = normalizedView === "network";
+      const useOverlayDock = normalizedView === "network" && normalizedSubview === "map";
       const targetHost = useOverlayDock ? overlayHost : headerHost;
       if (dock.parentElement !== targetHost) {{
         targetHost.appendChild(dock);
@@ -4087,13 +4087,95 @@
       const appsSubmenu = document.getElementById("layout-view-menu-apps-submenu");
       if (appsSubmenu instanceof HTMLElement) {{
         appsSubmenu.hidden = true;
+        appsSubmenu.style.removeProperty("position");
         appsSubmenu.style.removeProperty("top");
         appsSubmenu.style.removeProperty("left");
+        appsSubmenu.style.removeProperty("right");
+        appsSubmenu.style.removeProperty("bottom");
+        appsSubmenu.style.removeProperty("max-height");
+        appsSubmenu.style.removeProperty("z-index");
+        appsSubmenu.style.removeProperty("visibility");
         appsSubmenu.dataset.side = "";
       }}
       if (appsTrigger instanceof HTMLButtonElement) {{
         appsTrigger.setAttribute("aria-expanded", "false");
       }}
+    }}
+
+    function positionFloatingPanelNearAnchor(panel, anchor, options = {{}}) {{
+      if (!(panel instanceof HTMLElement) || !(anchor instanceof HTMLElement)) return false;
+      const viewportWidth = Math.max(0, window.innerWidth || document.documentElement.clientWidth || 0);
+      const viewportHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
+      if (viewportWidth <= 0 || viewportHeight <= 0) return false;
+
+      const margin = Math.max(0, Number(options.margin) || 8);
+      const gap = Math.max(0, Number(options.gap) || 8);
+      const alignX = String(options.alignX || "left").trim().toLowerCase();
+      const preferY = String(options.preferY || "below").trim().toLowerCase();
+      const minWidth = Number(options.minWidth);
+      const zIndex = Number(options.zIndex);
+
+      panel.hidden = false;
+      panel.style.position = "fixed";
+      panel.style.left = `${{margin}}px`;
+      panel.style.top = `${{margin}}px`;
+      panel.style.right = "auto";
+      panel.style.bottom = "auto";
+      panel.style.visibility = "hidden";
+      panel.style.maxHeight = `${{Math.max(80, viewportHeight - (margin * 2))}}px`;
+      if (Number.isFinite(minWidth) && minWidth > 0) {{
+        panel.style.minWidth = `${{Math.round(minWidth)}}px`;
+      }}
+      if (Number.isFinite(zIndex) && zIndex > 0) {{
+        panel.style.zIndex = String(Math.round(zIndex));
+      }}
+
+      const anchorRect = anchor.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const width = Math.max(0, Math.ceil(panelRect.width));
+      const height = Math.max(0, Math.ceil(panelRect.height));
+      const maxLeft = Math.max(margin, viewportWidth - width - margin);
+      const maxTop = Math.max(margin, viewportHeight - height - margin);
+
+      let left = anchorRect.left;
+      if (alignX === "right") {{
+        left = anchorRect.right - width;
+      }} else if (alignX === "center") {{
+        left = anchorRect.left + ((anchorRect.width - width) / 2);
+      }} else if (alignX === "after") {{
+        const preferred = anchorRect.right + gap;
+        const fallback = anchorRect.left - width - gap;
+        left = preferred;
+        if ((preferred + width + margin) > viewportWidth && fallback >= margin) {{
+          left = fallback;
+        }}
+      }} else if (alignX === "before") {{
+        const preferred = anchorRect.left - width - gap;
+        const fallback = anchorRect.right + gap;
+        left = preferred;
+        if (preferred < margin && (fallback + width + margin) <= viewportWidth) {{
+          left = fallback;
+        }}
+      }}
+
+      let top = preferY === "above"
+        ? (anchorRect.top - height - gap)
+        : (anchorRect.bottom + gap);
+      if (preferY === "above") {{
+        if (top < margin && (anchorRect.bottom + gap + height + margin) <= viewportHeight) {{
+          top = anchorRect.bottom + gap;
+        }}
+      }} else if ((top + height + margin) > viewportHeight && (anchorRect.top - gap - height) >= margin) {{
+        top = anchorRect.top - height - gap;
+      }}
+
+      left = Math.min(Math.max(margin, Math.round(left)), maxLeft);
+      top = Math.min(Math.max(margin, Math.round(top)), maxTop);
+
+      panel.style.left = `${{left}}px`;
+      panel.style.top = `${{top}}px`;
+      panel.style.visibility = "";
+      return true;
     }}
 
     function openLayoutViewSubmenu(name = "") {{
@@ -4110,32 +4192,15 @@
       syncAppsTabBar(activeLayoutView);
 
       submenu.hidden = false;
-      submenu.dataset.side = "right";
-      submenu.style.left = `${{menu.offsetWidth + 10}}px`;
-      submenu.style.top = `${{Math.max(0, trigger.offsetTop)}}px`;
+      submenu.dataset.side = "floating";
       trigger.setAttribute("aria-expanded", "true");
-
-      const menuRect = menu.getBoundingClientRect();
-      const submenuRect = submenu.getBoundingClientRect();
-      const viewportWidth = Math.max(0, window.innerWidth || document.documentElement.clientWidth || 0);
-      const viewportHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
-
-      let top = Math.max(0, trigger.offsetTop);
-      if (viewportHeight > 0) {{
-        const absoluteBottom = menuRect.top + top + submenuRect.height;
-        if (absoluteBottom > (viewportHeight - 8)) {{
-          top = Math.max(0, Math.floor(menu.clientHeight - submenuRect.height));
-        }}
-      }}
-
-      let left = menu.offsetWidth + 10;
-      if (viewportWidth > 0 && (menuRect.left + left + submenuRect.width) > (viewportWidth - 8)) {{
-        left = Math.max(0, Math.floor(menu.offsetWidth - submenuRect.width));
-        submenu.dataset.side = "overlay";
-      }}
-
-      submenu.style.top = `${{top}}px`;
-      submenu.style.left = `${{left}}px`;
+      positionFloatingPanelNearAnchor(submenu, trigger, {{
+        alignX: "after",
+        preferY: "below",
+        gap: 10,
+        margin: 8,
+        zIndex: 1360,
+      }});
     }}
 
     function toggleLayoutViewSubmenu(name = "") {{

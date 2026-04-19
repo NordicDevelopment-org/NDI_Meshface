@@ -1526,6 +1526,26 @@
       }}
       if (menu instanceof HTMLElement) {{
         menu.hidden = !chatNodeNavigatorMenuOpen;
+        if (!chatNodeNavigatorMenuOpen) {{
+          menu.style.removeProperty("position");
+          menu.style.removeProperty("top");
+          menu.style.removeProperty("left");
+          menu.style.removeProperty("right");
+          menu.style.removeProperty("bottom");
+          menu.style.removeProperty("max-height");
+          menu.style.removeProperty("z-index");
+          menu.style.removeProperty("visibility");
+          menu.style.removeProperty("width");
+        }} else if (menuBtn instanceof HTMLElement && typeof positionFloatingPanelNearAnchor === "function") {{
+          positionFloatingPanelNearAnchor(menu, menuBtn, {{
+            alignX: "right",
+            preferY: "above",
+            gap: 8,
+            margin: 8,
+            zIndex: 1360,
+            minWidth: Math.max(220, menuBtn.getBoundingClientRect().width + 180),
+          }});
+        }}
       }}
 
       if (sortSelect instanceof HTMLSelectElement) {{
@@ -1735,6 +1755,18 @@
           chatNodeNavigatorMenuOpen = false;
           renderChatNodeNavigatorMenuControls();
         }});
+      }}
+
+      if (document.body.dataset.chatNodeNavigatorMenuViewportBound !== "1") {{
+        document.body.dataset.chatNodeNavigatorMenuViewportBound = "1";
+        window.addEventListener("resize", () => {{
+          if (!chatNodeNavigatorMenuOpen) return;
+          renderChatNodeNavigatorMenuControls();
+        }});
+        window.addEventListener("scroll", () => {{
+          if (!chatNodeNavigatorMenuOpen) return;
+          renderChatNodeNavigatorMenuControls();
+        }}, true);
       }}
 
       renderChatNodeNavigatorMenuControls();
