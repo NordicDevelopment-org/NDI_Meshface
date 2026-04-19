@@ -1274,7 +1274,7 @@
       const cacheKey = String(cleanHours);
       const nowMs = Date.now();
       const cached = envMetricsCatalogCache.get(cacheKey);
-      const ttlMs = Math.max(refreshMs * 4, 15000);
+      const ttlMs = Math.max(refreshMs * 2, 8000);
       if (!forceRefresh && cached && cached.data && (nowMs - (cached.fetchedAt || 0)) < ttlMs) {{
         return cached.data;
       }}
@@ -1304,7 +1304,7 @@
       const cacheKey = [String(cleanHours), cleanMetric, cleanNodeId].join("|");
       const nowMs = Date.now();
       const cached = envMetricsSeriesCache.get(cacheKey);
-      const ttlMs = Math.max(refreshMs * 4, 15000);
+      const ttlMs = Math.max(refreshMs * 2, 6000);
       if (!forceRefresh && cached && cached.data && (nowMs - (cached.fetchedAt || 0)) < ttlMs) {{
         return cached.data;
       }}
@@ -1358,20 +1358,6 @@
         metricSelect.addEventListener("change", () => {{
           envMetricsViewState.selectedMetric = normalizeEnvMetricKey(metricSelect.value);
           void renderEnvironmentMetricsView(false);
-        }});
-      }}
-
-      const refreshBtn = document.getElementById("env-metrics-refresh-btn");
-      if (refreshBtn instanceof HTMLButtonElement && refreshBtn.dataset.bound !== "1") {{
-        refreshBtn.dataset.bound = "1";
-        refreshBtn.addEventListener("click", () => {{
-          if (typeof requestImmediatePoll === "function") {{
-            try {{
-              requestImmediatePoll(0);
-            }} catch (_err) {{
-            }}
-          }}
-          void renderEnvironmentMetricsView(true);
         }});
       }}
     }}
