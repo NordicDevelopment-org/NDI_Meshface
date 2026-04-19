@@ -1414,7 +1414,9 @@
     const networkGraphViewportBase = Object.freeze({{ x: 0, y: 0, width: 960, height: 620 }});
     const networkGraphZoomBounds = Object.freeze({{ minScale: 0.42, maxScale: 5.5 }});
     const networkGraphFitZoomOutScale = 1.22;
+    const networkGraphOverlayFitZoomOutScale = 1.03;
     const networkGraphToolbarSafeInsetTop = 78;
+    const networkGraphOverlaySafeInsetTop = 10;
     const networkGraphFocusAnimationDurationMs = 680;
     const networkGraphRootHistoryLimit = 48;
     const networkGraphBroadcastOnlyFreshnessSeconds = 2 * 60 * 60;
@@ -1437,6 +1439,13 @@
         maxX: networkGraphViewportBase.x + networkGraphViewportBase.width,
         maxY: networkGraphViewportBase.y + networkGraphViewportBase.height,
       }},
+      resetBounds: {{
+        minX: networkGraphViewportBase.x,
+        minY: networkGraphViewportBase.y,
+        maxX: networkGraphViewportBase.x + networkGraphViewportBase.width,
+        maxY: networkGraphViewportBase.y + networkGraphViewportBase.height,
+      }},
+      resetCenter: null,
       viewBox: {{ ...networkGraphViewportBase }},
       pointerId: null,
       pointerClientX: 0,
@@ -1492,6 +1501,40 @@
         maxX: networkGraphViewportBase.x + networkGraphViewportBase.width,
         maxY: networkGraphViewportBase.y + networkGraphViewportBase.height,
       }};
+    }}
+
+    function resolveNetworkGraphStage(svg = null) {{
+      if (svg instanceof SVGElement) {{
+        const stage = svg.closest(".network-graph-stage");
+        if (stage instanceof HTMLElement) return stage;
+      }}
+      const stage = document.querySelector(".network-graph-stage");
+      return stage instanceof HTMLElement ? stage : null;
+    }}
+
+    function isNetworkGraphOverlayDocked(svg = null) {{
+      const stage = resolveNetworkGraphStage(svg);
+      return !!(stage && stage.classList.contains("is-overlay-docked"));
+    }}
+
+    function resolveNetworkGraphFitZoomOutScale(svg = null) {{
+      const baseScale = Number.isFinite(networkGraphFitZoomOutScale) && networkGraphFitZoomOutScale > 1
+        ? networkGraphFitZoomOutScale
+        : 1;
+      const overlayScale = Number.isFinite(networkGraphOverlayFitZoomOutScale) && networkGraphOverlayFitZoomOutScale > 1
+        ? networkGraphOverlayFitZoomOutScale
+        : baseScale;
+      return isNetworkGraphOverlayDocked(svg) ? overlayScale : baseScale;
+    }}
+
+    function resolveNetworkGraphTopSafeInset(svg = null) {{
+      const overlayInset = Number.isFinite(networkGraphOverlaySafeInsetTop) && networkGraphOverlaySafeInsetTop >= 0
+        ? networkGraphOverlaySafeInsetTop
+        : 0;
+      const defaultInset = Number.isFinite(networkGraphToolbarSafeInsetTop) && networkGraphToolbarSafeInsetTop >= 0
+        ? networkGraphToolbarSafeInsetTop
+        : overlayInset;
+      return isNetworkGraphOverlayDocked(svg) ? overlayInset : defaultInset;
     }}
 
     function getNetworkGraphStageAspectRatio(svg = null) {{
@@ -2026,14 +2069,22 @@
       networkGraphViewState.sceneAnimationFrame = window.requestAnimationFrame(step);
     }}
 
-    function computeNetworkGraphBounds(layout) {{
+    function computeNetworkGraphBounds(layout, options = {{}}) {{
       if (!layout || !Array.isArray(layout.items) || !layout.items.length) {{
         return defaultNetworkGraphBounds();
       }}
+      const topSafeInset = Math.max(
+        0,
+        Number.isFinite(Number(options && options.topSafeInset))
+          ? Number(options && options.topSafeInset)
+          : networkGraphToolbarSafeInsetTop
+      );
+      const excludeDisconnected = !!(options && options.excludeDisconnected);
       let minX = Number.POSITIVE_INFINITY;
       let minY = Number.POSITIVE_INFINITY;
       let maxX = Number.NEGATIVE_INFINITY;
       let maxY = Number.NEGATIVE_INFINITY;
+      let includedCount = 0;
       for (const region of (Array.isArray(layout.regions) ? layout.regions : [])) {{
         const x = Number(region && region.x);
         const y = Number(region && region.y);
@@ -2044,17 +2095,21 @@
         minY = Math.min(minY, y - 12);
         maxX = Math.max(maxX, x + width + 12);
         maxY = Math.max(maxY, y + height + 12);
+        includedCount += 1;
       }}
       for (const ring of (Array.isArray(layout.rings) ? layout.rings : [])) {{
+        if (excludeDisconnected && (ring && (ring.detached || ring.broadcastOnly))) continue;
         const radius = Number(ring && ring.radius);
         if (!Number.isFinite(radius) || radius <= 0) continue;
         minX = Math.min(minX, 480 - radius - 18);
         maxX = Math.max(maxX, 480 + radius + 18);
         minY = Math.min(minY, 310 - radius - 28);
         maxY = Math.max(maxY, 310 + radius + 18);
+        includedCount += 1;
       }}
       for (const item of layout.items) {{
         if (!item) continue;
+        if (excludeDisconnected && item.disconnected) continue;
         const x = Number(item.x);
         const y = Number(item.y);
         const radius = Number(item.radius);
@@ -2066,6 +2121,13 @@
         maxX = Math.max(maxX, x + safeRadius + labelPadX);
         minY = Math.min(minY, y - safeRadius - 16);
         maxY = Math.max(maxY, y + safeRadius + labelPadY);
+        includedCount += 1;
+      }}
+      if (excludeDisconnected && includedCount <= 0) {{
+        return computeNetworkGraphBounds(layout, {{
+          ...options,
+          excludeDisconnected: false,
+        }});
       }}
       if (![minX, minY, maxX, maxY].every((value) => Number.isFinite(value))) {{
         return defaultNetworkGraphBounds();
@@ -2073,7 +2135,7 @@
       const margin = 28;
       return {{
         minX: minX - margin,
-        minY: minY - margin - networkGraphToolbarSafeInsetTop,
+        minY: minY - margin - topSafeInset,
         maxX: maxX + margin,
         maxY: maxY + margin,
       }};
@@ -2131,9 +2193,7 @@
       const centerY = (Number(safeBounds.minY) + Number(safeBounds.maxY)) / 2;
       const rawWidth = Math.max(220, Number(safeBounds.maxX) - Number(safeBounds.minX));
       const rawHeight = Math.max(160, Number(safeBounds.maxY) - Number(safeBounds.minY));
-      const fitZoomOutScale = Number.isFinite(networkGraphFitZoomOutScale) && networkGraphFitZoomOutScale > 1
-        ? networkGraphFitZoomOutScale
-        : 1;
+      const fitZoomOutScale = resolveNetworkGraphFitZoomOutScale(svg);
       const viewAspect = getNetworkGraphStageAspectRatio(svg);
       let width = rawWidth;
       let height = rawHeight;
@@ -2178,9 +2238,7 @@
           Math.abs(targetCenterY - Number(safeBounds.minY))
         ) * 2
       );
-      const fitZoomOutScale = Number.isFinite(networkGraphFitZoomOutScale) && networkGraphFitZoomOutScale > 1
-        ? networkGraphFitZoomOutScale
-        : 1;
+      const fitZoomOutScale = resolveNetworkGraphFitZoomOutScale(svg);
       const viewAspect = getNetworkGraphStageAspectRatio(svg);
       let width = rawWidth;
       let height = rawHeight;
@@ -2197,6 +2255,33 @@
         width,
         height,
       }}, {{ aspectRatio: viewAspect }});
+    }}
+
+    function resolveNetworkGraphResetViewBox(svg, options = {{}}) {{
+      const layoutMode = normalizeNetworkGraphLayoutMode(
+        options && options.layoutMode != null
+          ? options.layoutMode
+          : networkGraphLayoutMode
+      );
+      const bounds = (options && options.bounds && typeof options.bounds === "object")
+        ? options.bounds
+        : (
+            networkGraphViewState.resetBounds
+            && typeof networkGraphViewState.resetBounds === "object"
+              ? networkGraphViewState.resetBounds
+              : networkGraphViewState.bounds
+          );
+      const center = (
+        options
+        && options.center
+        && typeof options.center === "object"
+      )
+        ? options.center
+        : networkGraphViewState.resetCenter;
+      if (layoutMode === "tree") {{
+        return fitNetworkGraphViewBoxToBounds(bounds, svg);
+      }}
+      return fitNetworkGraphViewBoxToCenteredBounds(bounds, svg, center);
     }}
 
     function syncNetworkGraphTextZoom(svg, rawViewBox) {{
@@ -2335,7 +2420,7 @@
       if (!(svg instanceof SVGElement)) return;
       animateNetworkGraphViewBox(
         svg,
-        fitNetworkGraphViewBoxToCenteredBounds(networkGraphViewState.bounds, svg),
+        resolveNetworkGraphResetViewBox(svg),
         options
       );
     }}
@@ -3898,6 +3983,7 @@
         svg.innerHTML = "";
         renderNetworkGraphNavigationControls(safeState, nodeMap, "");
         networkGraphViewState.bounds = defaultNetworkGraphBounds();
+        networkGraphViewState.resetBounds = defaultNetworkGraphBounds();
         networkGraphViewState.lastRootId = "";
         networkGraphViewState.initialized = false;
         networkGraphViewState.pendingEntryViewportSync = false;
@@ -3911,6 +3997,7 @@
         networkGraphViewState.cachedCombinedEdges = null;
         networkGraphViewState.cachedLayout = null;
         networkGraphViewState.pendingFocusTransition = null;
+        networkGraphViewState.resetCenter = null;
         stopNetworkGraphPan(svg);
         applyNetworkGraphViewBox(svg, networkGraphViewportBase);
         summary.innerHTML = "";
@@ -3935,14 +4022,35 @@
       bindNetworkGraphLayoutSelector();
       syncNetworkGraphLayoutSelector();
       bindNetworkGraphSummaryControls();
-      networkGraphViewState.bounds = computeNetworkGraphBounds(layout);
+      const fullBounds = computeNetworkGraphBounds(layout, {{
+        topSafeInset: resolveNetworkGraphTopSafeInset(svg),
+      }});
+      const resetBounds = layoutMode === "tree"
+        ? computeNetworkGraphBounds(layout, {{
+            topSafeInset: resolveNetworkGraphTopSafeInset(svg),
+            excludeDisconnected: true,
+          }})
+        : fullBounds;
+      networkGraphViewState.bounds = fullBounds;
+      networkGraphViewState.resetBounds = {{
+        minX: Number(resetBounds.minX),
+        minY: Number(resetBounds.minY),
+        maxX: Number(resetBounds.maxX),
+        maxY: Number(resetBounds.maxY),
+      }};
       networkGraphRootNodeId = rootId;
       const rootPosition = layout.positions.get(rootId) || null;
-      const fittedViewBox = fitNetworkGraphViewBoxToCenteredBounds(
-        networkGraphViewState.bounds,
-        svg,
-        rootPosition || null
-      );
+      networkGraphViewState.resetCenter = rootPosition
+        ? {{
+            x: Number(rootPosition.x),
+            y: Number(rootPosition.y),
+          }}
+        : null;
+      const fittedViewBox = resolveNetworkGraphResetViewBox(svg, {{
+        bounds: resetBounds,
+        center: rootPosition || null,
+        layoutMode,
+      }});
       const shouldRecenterForEntry = !!(
         networkGraphViewState.pendingEntryViewportSync
         && rootPosition

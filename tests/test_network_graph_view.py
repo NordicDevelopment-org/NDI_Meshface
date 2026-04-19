@@ -122,6 +122,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";' in js
     assert 'let networkGraphEdgeMode = "history";' in js
     assert 'let networkGraphLayoutMode = "radial";' in js
+    assert 'const networkGraphOverlayFitZoomOutScale = 1.03;' in js
+    assert 'const networkGraphOverlaySafeInsetTop = 10;' in js
     assert 'function normalizeNetworkGraphEdgeMode(raw)' in js
     assert 'function normalizeNetworkGraphLayoutMode(raw)' in js
     assert 'clean === "community"' in js
@@ -133,6 +135,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'graphSvg instanceof Element' in js
     assert 'graphToolbar.classList.toggle("is-overlay-docked", useOverlayGraphSummary);' in js
     assert 'graphStage.classList.toggle("is-overlay-docked", useOverlayGraphSummary);' in js
+    assert 'topSafeInset: resolveNetworkGraphTopSafeInset(svg),' in js
+    assert 'networkGraphViewState.resetBounds = {' in js
+    assert 'networkGraphViewState.resetCenter = rootPosition' in js
     assert 'networkGraphEdgeMode = loadPreferredNetworkGraphEdgeMode();' in js
     assert 'persistPreferredNetworkGraphEdgeMode(networkGraphEdgeMode);' not in js
     assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.42, maxScale: 5.5 });' in js
@@ -145,6 +150,14 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const pinnedNodeIds = Array.isArray(options && options.pinnedNodeIds)' in js
     assert 'function filterNetworkGraphRawEdgesByMode(rawEdges, mode = networkGraphEdgeMode)' in js
     assert 'function doesNetworkGraphViewBoxContainBounds(viewBox, bounds, paddingRatio = 0.04)' in js
+    assert 'const excludeDisconnected = !!(options && options.excludeDisconnected);' in js
+    assert 'if (excludeDisconnected && item.disconnected) continue;' in js
+    assert 'if (excludeDisconnected && includedCount <= 0) {' in js
+    assert 'function resolveNetworkGraphResetViewBox(svg, options = {}) {' in js
+    assert 'function resolveNetworkGraphStage(svg = null) {' in js
+    assert 'function isNetworkGraphOverlayDocked(svg = null) {' in js
+    assert 'function resolveNetworkGraphFitZoomOutScale(svg = null) {' in js
+    assert 'function resolveNetworkGraphTopSafeInset(svg = null) {' in js
     assert 'function bindNetworkGraphSummaryControls()' in js
     assert 'function syncNetworkGraphLayoutSelector()' in js
     assert 'function bindNetworkGraphLayoutSelector()' in js
@@ -157,6 +170,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'selectNode(row.dataset.nodeId || "", true, !graphOpen);' in js
     assert 'selectNode(nodeId, true, !graphOpen && unreadDirectCount <= 0);' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
+    assert 'return fitNetworkGraphViewBoxToBounds(bounds, svg);' in js
     assert 'const localNodeHasLinkPeers = localNodeAvailable' in js
     assert 'if (localNodeAvailable && (localNodeHasLinkPeers || bestDegree <= 0)) {' in js
     assert 'const parentHintsByNodeId = new Map();' in js
