@@ -6302,6 +6302,10 @@
     .chat-feed-item.has-node-emoji {{
       padding-right: 24px;
     }}
+    .chat-feed-item.self-authored.has-node-emoji {{
+      padding-left: 24px;
+      padding-right: 12px;
+    }}
     .chat-feed-item.has-node-emoji::after {{
       content: attr(data-node-emoji);
       position: absolute;
@@ -6317,6 +6321,10 @@
       user-select: none;
       white-space: nowrap;
       z-index: 0;
+    }}
+    .chat-feed-item.self-authored.has-node-emoji::after {{
+      left: -6px;
+      right: auto;
     }}
     .chat-feed-item.channel-tinted {{
       --chat-feed-channel-fill: #0072b2;

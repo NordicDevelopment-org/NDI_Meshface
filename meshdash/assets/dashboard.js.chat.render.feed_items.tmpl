@@ -346,16 +346,12 @@
           .map((bucket) => `<span class="chat-reaction-summary-emoji">${{escAttr(bucket.emoji)}}</span>`)
           .join("");
         const hasReactions = reactionGroups.length > 0;
-        const reactionSummary = messageId
+        const reactionSummary = (messageId && hasReactions)
           ? (() => {{
-              const summaryAria = hasReactions
-                ? `Reactions: ${{reactionSummaryTitle}}`
-                : "Add reaction";
-              return `<button type="button" class="chat-reaction-summary${{hasReactions ? "" : " is-empty"}}" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" data-reply-id="${{escAttr(messageId)}}" aria-label="${{escAttr(summaryAria)}}">
-                <span class="chat-reaction-summary-icons">${{hasReactions ? reactionSummaryIcons : '<span class="chat-reaction-summary-emoji chat-reaction-summary-emoji-placeholder">&#9786;&#65038;</span>'}}</span>
-                ${{hasReactions
-                  ? `<span class="chat-reaction-summary-total">${{reactionTotal}}</span>`
-                  : '<span class="chat-reaction-summary-label">React</span>'}}
+              const summaryAria = `Reactions: ${{reactionSummaryTitle}}`;
+              return `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" data-reply-id="${{escAttr(messageId)}}" aria-label="${{escAttr(summaryAria)}}">
+                <span class="chat-reaction-summary-icons">${{reactionSummaryIcons}}</span>
+                <span class="chat-reaction-summary-total">${{reactionTotal}}</span>
               </button>`;
             }})()
           : "";
