@@ -3857,6 +3857,7 @@
       const combinedEdges = canReuseGraphData
         ? networkGraphViewState.cachedCombinedEdges
         : combineNetworkGraphEdges(filteredRawEdges, nodeMap, {{ mode: edgeMode }});
+      const realLinkCount = combinedEdges.filter((edge) => !!(edge && edge.isReal)).length;
       const layout = canReuseGraphData
         ? networkGraphViewState.cachedLayout
         : buildNetworkGraphLayout(nodeMap, combinedEdges, safeState);
@@ -3905,39 +3906,7 @@
       clearNetworkGraphEmptyRetry();
       empty.hidden = true;
       const selectedId = normalizeNodeId(selectedNodeId || "");
-      const rootLabel = networkGraphNodeDisplayName(rootId, nodeMap);
-      const firstHopCount = Array.isArray(layout.layers.get(1)) ? layout.layers.get(1).length : 0;
-      const realLinkCount = combinedEdges.filter((edge) => !!(edge && edge.isReal)).length;
-      const rootItem = layout.items.find((item) => item && item.nodeId === rootId) || null;
-      const summaryParts = [
-        `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip" type="button" aria-pressed="${{edgeMode === "live" ? "true" : "false"}}" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label">Mode</span><strong>${{modeLabel}}</strong></button>`,
-        `<label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label>`,
-        `<span class="network-graph-chip"><span class="network-graph-chip-label">Root</span><strong>${{escAttr(truncateNetworkGraphLabel(rootLabel, 28))}}</strong></span>`,
-        `<span class="network-graph-chip"><span class="network-graph-chip-label">Nodes</span><strong>${{layout.items.length}}</strong></span>`,
-        `<span class="network-graph-chip"><span class="network-graph-chip-label">Links</span><strong>${{combinedEdges.length}}</strong></span>`,
-        `<span class="network-graph-chip"><span class="network-graph-chip-label">Reach</span><strong>${{layout.connectedCount}}/${{layout.items.length}}</strong></span>`,
-      ];
-      if (rootItem && rootItem.broadcastOnly) {{
-        summaryParts.push(
-          `<span class="network-graph-chip"><span class="network-graph-chip-label">Root signal</span><strong>Broadcast only</strong></span>`
-        );
-      }}
-      if (firstHopCount > 0) {{
-        summaryParts.push(
-          `<span class="network-graph-chip"><span class="network-graph-chip-label">1 Hop</span><strong>${{firstHopCount}}</strong></span>`
-        );
-      }}
-      if (layout.broadcastOnlyCount > 0) {{
-        summaryParts.push(
-          `<span class="network-graph-chip"><span class="network-graph-chip-label">Broadcast only</span><strong>${{layout.broadcastOnlyCount}}</strong></span>`
-        );
-      }}
-      if (layout.disconnectedCount > 0) {{
-        summaryParts.push(
-          `<span class="network-graph-chip"><span class="network-graph-chip-label">Detached</span><strong>${{layout.disconnectedCount}}</strong></span>`
-        );
-      }}
-      summary.innerHTML = summaryParts.join("");
+      summary.innerHTML = `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip" type="button" aria-pressed="${{edgeMode === "live" ? "true" : "false"}}" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label">Mode</span><strong>${{modeLabel}}</strong></button><label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"><span class="network-graph-chip-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label>`;
       bindNetworkGraphLayoutSelector();
       syncNetworkGraphLayoutSelector();
       bindNetworkGraphSummaryControls();

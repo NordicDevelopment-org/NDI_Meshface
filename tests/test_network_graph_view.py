@@ -129,6 +129,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function loadPreferredNetworkGraphLayoutMode()' in js
     assert 'function persistPreferredNetworkGraphEdgeMode(modeName)' in js
     assert 'function persistPreferredNetworkGraphLayoutMode(modeName)' in js
+    assert 'networkGraphEdgeMode = loadPreferredNetworkGraphEdgeMode();' in js
+    assert 'persistPreferredNetworkGraphEdgeMode(networkGraphEdgeMode);' not in js
     assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.42, maxScale: 5.5 });' in js
     assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
     assert 'function networkGraphAverageParentOrder(nodeId, parentHintsByNodeId, layerOrderIndexByNodeId)' in js
@@ -166,6 +168,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const parsedWeight = useSessionWeight ? parsedSession : parsedLifetime;' in js
     assert 'empty.textContent = edgeMode === "live"' in js
     assert '<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip"' in js
+    assert 'summary.innerHTML = `<button id="network-graph-mode-chip" class="network-graph-chip network-graph-mode-chip"' in js
     assert 'bindNetworkGraphLayoutSelector();' in js
     assert 'syncNetworkGraphLayoutSelector();' in js
     assert 'label class="network-graph-layout-control network-graph-chip" for="network-graph-layout-select"' in js
@@ -177,7 +180,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'last packet hops away:' in js
     assert 'label: `${layer} hop${layer === 1 ? "" : "s"}`,' in js
     assert 'Switch Links view between stored history topology and the current session topology' in js
-    assert '<span class="network-graph-chip-label">1 Hop</span>' in js
+    assert '<span class="network-graph-chip-label">1 Hop</span>' not in js
     assert 'Numbered hop rings show shortest graph distance from the current root, not literal packet-route hops.' in js
     assert 'const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph";' in js
     assert 'const weeklySummaryPromise = (activeLayoutView === "history" || activeLayoutView === "network")' in js
@@ -188,7 +191,6 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const shouldRefitForModeChange = !!(' in js
     assert 'animateNetworkGraphViewBox(svg, fittedViewBox);' in js
     assert '} else if (rootChanged) {' in js
-    assert 'Broadcast only' in js
     assert 'layoutMode === "tree"' in js
     assert 'layoutMode === "cluster"' in js
     assert 'layoutMode === "community"' in js
