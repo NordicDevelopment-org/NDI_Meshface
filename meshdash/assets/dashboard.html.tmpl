@@ -2582,6 +2582,29 @@
                   {network_diagnostics_tab_hidden_attrs}
                 >Diagnostics</button>
               </div>
+              <div id="network-overview-primary-controls" class="history-metric-controls network-overview-primary-controls" hidden>
+                <div class="history-metric-wrap">
+                  <label for="network-overview-metric" class="history-metric-label">Metric</label>
+                  <select id="network-overview-metric" class="history-metric-select" aria-label="Network overview metric">
+                    <option value="nodes">Nodes</option>
+                    <option value="packets">Packets</option>
+                    <option value="links">Links</option>
+                    <option value="sensors">Sensors</option>
+                  </select>
+                </div>
+                <div class="history-metric-wrap">
+                  <label for="network-overview-window" class="history-metric-label">Window</label>
+                  <select id="network-overview-window" class="history-metric-select" aria-label="Network overview window">
+                    <option value="6">6h</option>
+                    <option value="12">12h</option>
+                    <option value="24">24h</option>
+                    <option value="72">72h</option>
+                    <option value="168" selected>7d</option>
+                    <option value="336">14d</option>
+                    <option value="720">30d</option>
+                  </select>
+                </div>
+              </div>
               <div id="network-map-controls-host" class="network-map-controls-host" aria-hidden="true"></div>
             </div>
             <div
@@ -2632,27 +2655,6 @@
               <div class="network-overview-panel">
                 <section class="network-overview-card">
                   <div class="history-metric-controls network-overview-controls">
-                    <div class="history-metric-wrap">
-                      <label for="network-overview-metric" class="history-metric-label">Metric</label>
-                      <select id="network-overview-metric" class="history-metric-select" aria-label="Network overview metric">
-                        <option value="nodes">Nodes</option>
-                        <option value="packets">Packets</option>
-                        <option value="links">Links</option>
-                        <option value="sensors">Sensors</option>
-                      </select>
-                    </div>
-                    <div class="history-metric-wrap">
-                      <label for="network-overview-window" class="history-metric-label">Window</label>
-                      <select id="network-overview-window" class="history-metric-select" aria-label="Network overview window">
-                        <option value="6">6h</option>
-                        <option value="12">12h</option>
-                        <option value="24">24h</option>
-                        <option value="72">72h</option>
-                        <option value="168" selected>7d</option>
-                        <option value="336">14d</option>
-                        <option value="720">30d</option>
-                      </select>
-                    </div>
                     <div id="network-overview-sensor-controls-host" class="network-overview-sensor-controls-host" hidden></div>
                     <div id="network-overview-link-mode-wrap" class="history-metric-wrap" hidden>
                       <label for="network-overview-link-mode" class="history-metric-label">Links</label>

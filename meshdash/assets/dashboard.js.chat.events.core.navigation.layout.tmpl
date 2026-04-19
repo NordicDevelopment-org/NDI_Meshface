@@ -791,6 +791,17 @@
       );
     }}
 
+    function syncNetworkOverviewPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
+      const controls = document.getElementById("network-overview-primary-controls");
+      if (!(controls instanceof HTMLElement)) return;
+
+      const normalizedView = normalizeLayoutView(viewName);
+      const normalizedSubview = normalizeNetworkSubview(subviewName);
+      const showControls = normalizedView === "network" && normalizedSubview === "overview";
+      controls.hidden = !showControls;
+      controls.setAttribute("aria-hidden", showControls ? "false" : "true");
+    }}
+
     function syncEnvironmentMetricsDock(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
       const explorer = document.querySelector(".env-metrics-explorer");
       const controls = document.querySelector(".env-metrics-explorer .env-metrics-controls");
@@ -1149,6 +1160,7 @@
       }}
 
       syncMapControlsDock(activeLayoutView, next);
+      syncNetworkOverviewPrimaryControls(activeLayoutView, next);
       syncEnvironmentMetricsDock(activeLayoutView, next);
 
       try {{
@@ -4788,6 +4800,7 @@
         }});
       }}
       syncNodeHistoryDock();
+      syncNetworkOverviewPrimaryControls(next, activeNetworkSubview);
       syncEnvironmentMetricsDock(next, activeNetworkSubview);
       if (latestState) {{
         const networkGraphActive = next === "network" && activeNetworkSubview === "graph";
