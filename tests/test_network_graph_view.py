@@ -192,6 +192,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'layoutMode === "tree"' in js
     assert 'layoutMode === "cluster"' in js
     assert 'layoutMode === "community"' in js
+    assert 'function resolveTreeLabelOffset(index, radius, amplitude = 16) {' in js
+    assert 'return radius + amplitude + 2;' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'const isLocalNode = item.nodeId === localId;' in js
     assert 'position.labelOffsetY == null' in js

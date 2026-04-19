@@ -3363,10 +3363,7 @@
           return direction * (amplitude + (band * Math.max(6, amplitude * 0.7)));
         }}
         function resolveTreeLabelOffset(index, radius, amplitude = 16) {{
-          const direction = index % 2 === 0 ? -1 : 1;
-          return direction < 0
-            ? -(radius + amplitude)
-            : (radius + amplitude + 2);
+          return radius + amplitude + 2;
         }}
         for (const layer of sortedLayers) {{
           const ids = Array.isArray(layers.get(layer)) ? Array.from(layers.get(layer)) : [];
