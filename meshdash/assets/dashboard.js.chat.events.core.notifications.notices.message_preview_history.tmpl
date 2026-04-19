@@ -66,6 +66,10 @@
     function chatChangePreviewFromMessage(msg, isReaction) {{
       const textPayload = compactChatChangePreview(msg && (msg.text ?? msg.decoded_text ?? msg.payload_text), 78);
       const kind = normalizeChatMessageKind(msg, isReaction);
+      const reactionTarget = compactChatChangePreview(
+        msg && (msg.reaction_target_label ?? msg.reactionTargetLabel),
+        48
+      );
       if (kind === "status") {{
         return textPayload || "status update";
       }}
@@ -73,7 +77,9 @@
         return textPayload || "(no text)";
       }}
       const emoji = reactionEmojiPreviewFromMessage(msg);
+      if (emoji && reactionTarget) return `reacted ${{emoji}} to ${{reactionTarget}}`;
       if (emoji) return `reacted ${{emoji}}`;
+      if (reactionTarget) return `reaction to ${{reactionTarget}}`;
       const replyId = Number(msg && (msg.reply_id ?? msg.replyId));
       if (Number.isInteger(replyId) && replyId > 0) {{
         return `reaction on #${{replyId}}`;
