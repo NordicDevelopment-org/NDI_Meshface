@@ -1374,6 +1374,7 @@
     const networkGraphViewportBase = Object.freeze({{ x: 0, y: 0, width: 960, height: 620 }});
     const networkGraphZoomBounds = Object.freeze({{ minScale: 0.42, maxScale: 5.5 }});
     const networkGraphFitZoomOutScale = 1.22;
+    const networkGraphToolbarSafeInsetTop = 78;
     const networkGraphFocusAnimationDurationMs = 680;
     const networkGraphRootHistoryLimit = 48;
     const networkGraphBroadcastOnlyFreshnessSeconds = 2 * 60 * 60;
@@ -2025,7 +2026,7 @@
       const margin = 28;
       return {{
         minX: minX - margin,
-        minY: minY - margin,
+        minY: minY - margin - networkGraphToolbarSafeInsetTop,
         maxX: maxX + margin,
         maxY: maxY + margin,
       }};
@@ -2424,6 +2425,99 @@
       select.addEventListener("change", () => {{
         setNetworkGraphLayoutMode(select.value || "radial", {{ persist: true, rerender: true }});
       }});
+    }}
+
+    function describeNetworkGraphProbeElement(element) {{
+      if (!(element instanceof Element)) return "";
+      const tag = String(element.tagName || "").toLowerCase();
+      const id = element.id ? `#${{element.id}}` : "";
+      const classList = Array.from(element.classList || []);
+      const classSuffix = classList.length ? `.${{classList.join(".")}}` : "";
+      const dataSubview = element.getAttribute("data-network-subview");
+      const dataPanel = element.getAttribute("data-network-subview-panel");
+      const dataEdge = element.getAttribute("data-network-graph-edge-key");
+      const dataNodeId = element.getAttribute("data-network-graph-node-id");
+      const hidden = element.hasAttribute("hidden") ? "[hidden]" : "";
+      return [
+        `${{tag}}${{id}}${{classSuffix}}${{hidden}}`,
+        dataSubview ? `subview=${{dataSubview}}` : "",
+        dataPanel ? `panel=${{dataPanel}}` : "",
+        dataNodeId ? `node=${{dataNodeId}}` : "",
+        dataEdge ? `edge=${{dataEdge}}` : "",
+      ].filter(Boolean).join(" ");
+    }}
+
+    function updateNetworkGraphArtifactProbeReport() {{
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search || "");
+      if (params.get("__probe") !== "graph-artifact") return;
+      const toolbar = document.querySelector(".network-graph-toolbar");
+      const tabs = document.querySelector(".network-map-subview-tabs");
+      const svg = document.getElementById("network-graph-svg");
+      if (!(toolbar instanceof HTMLElement) || !(tabs instanceof HTMLElement) || !(svg instanceof SVGElement)) return;
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const tabsRect = tabs.getBoundingClientRect();
+      if (toolbarRect.width <= 0 || tabsRect.width <= 0) return;
+      const probeXs = [-10, -6, -2, 2, 6, 10].map((offset) => Math.round(tabsRect.right + offset));
+      const probeYs = [6, 12, 18, 24].map((offset) => Math.round(tabsRect.top + offset));
+      const points = [];
+      for (const x of probeXs) {{
+        for (const y of probeYs) {{
+          const stack = (typeof document.elementsFromPoint === "function")
+            ? document.elementsFromPoint(x, y)
+            : [];
+          points.push({{
+            x,
+            y,
+            stack: stack.slice(0, 8).map(describeNetworkGraphProbeElement).filter(Boolean),
+          }});
+        }}
+      }}
+      let report = document.getElementById("network-graph-probe-report");
+      if (!(report instanceof HTMLPreElement)) {{
+        report = document.createElement("pre");
+        report.id = "network-graph-probe-report";
+        report.hidden = true;
+        document.body.appendChild(report);
+      }}
+      report.textContent = JSON.stringify({{
+        activeLayoutView,
+        activeNetworkSubview,
+        tabsRect: {{
+          left: Math.round(tabsRect.left),
+          top: Math.round(tabsRect.top),
+          right: Math.round(tabsRect.right),
+          bottom: Math.round(tabsRect.bottom),
+        }},
+        toolbarRect: {{
+          left: Math.round(toolbarRect.left),
+          top: Math.round(toolbarRect.top),
+          right: Math.round(toolbarRect.right),
+          bottom: Math.round(toolbarRect.bottom),
+        }},
+        activeTabs: Array.from(document.querySelectorAll(".network-map-subview-tab.is-active")).map(describeNetworkGraphProbeElement),
+        points,
+      }}, null, 2);
+    }}
+
+    function maybeActivateNetworkGraphArtifactProbe() {{
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams(window.location.search || "");
+      if (params.get("__probe") !== "graph-artifact") return;
+      try {{
+        window.localStorage.setItem(layoutViewStorageKey, "network");
+        window.localStorage.setItem(networkSubviewStorageKey, "graph");
+      }} catch (_err) {{
+      }}
+      applyLayoutView("network", false);
+      setActiveNetworkSubview("graph", {{ persist: false }});
+      window.setTimeout(() => {{
+        try {{
+          renderNetworkGraphView(latestState);
+        }} catch (_err) {{
+        }}
+        window.setTimeout(updateNetworkGraphArtifactProbeReport, 180);
+      }}, 180);
     }}
 
     function setNetworkGraphEdgeMode(modeName, options = {{}}) {{
