@@ -613,12 +613,126 @@
         maxWidth: 320,
       }});
       if (typeof marker.bindTooltip === "function") {{
-        marker.bindTooltip(contentHtml, {{
-          direction: "top",
-          offset: [0, -16],
-          opacity: 1,
-          sticky: true,
-          className: "map-node-tooltip",
+        const measureTooltipSize = () => {{
+          if (typeof document === "undefined" || !document.body) {{
+            return {{ width: 280, height: 220 }};
+          }}
+          const probe = document.createElement("div");
+          probe.className = "map-node-tooltip map-node-tooltip-measure";
+          probe.style.position = "fixed";
+          probe.style.left = "-10000px";
+          probe.style.top = "-10000px";
+          probe.style.visibility = "hidden";
+          probe.style.pointerEvents = "none";
+          probe.innerHTML = `<div class="leaflet-tooltip-content">${{contentHtml}}</div>`;
+          document.body.appendChild(probe);
+          const rect = probe.getBoundingClientRect();
+          probe.remove();
+          return {{
+            width: Math.max(220, Math.ceil(rect.width) || 280),
+            height: Math.max(120, Math.ceil(rect.height) || 220),
+          }};
+        }};
+        const resolveTooltipOptions = () => {{
+          const baseOptions = {{
+            direction: "top",
+            offset: [0, -16],
+            opacity: 1,
+            sticky: false,
+            className: "map-node-tooltip is-top",
+          }};
+          if (
+            typeof map === "undefined"
+            || !map
+            || typeof map.getSize !== "function"
+            || typeof map.latLngToContainerPoint !== "function"
+            || typeof marker.getLatLng !== "function"
+          ) {{
+            return baseOptions;
+          }}
+          const size = map.getSize();
+          const point = map.latLngToContainerPoint(marker.getLatLng());
+          const tip = measureTooltipSize();
+          const padTop = 14;
+          const padRight = 14;
+          const padBottom = 14;
+          const padLeft = 14;
+          const gap = 18;
+          const layouts = [
+            {{
+              direction: "top",
+              offset: [0, -16],
+              className: "map-node-tooltip is-top",
+              left: point.x - (tip.width / 2),
+              top: point.y - tip.height - gap,
+            }},
+            {{
+              direction: "bottom",
+              offset: [0, 16],
+              className: "map-node-tooltip is-bottom",
+              left: point.x - (tip.width / 2),
+              top: point.y + gap,
+            }},
+            {{
+              direction: "right",
+              offset: [16, 0],
+              className: "map-node-tooltip is-right",
+              left: point.x + gap,
+              top: point.y - (tip.height / 2),
+            }},
+            {{
+              direction: "left",
+              offset: [-16, 0],
+              className: "map-node-tooltip is-left",
+              left: point.x - tip.width - gap,
+              top: point.y - (tip.height / 2),
+            }},
+          ];
+          const overflowScore = (layout) => {{
+            const right = layout.left + tip.width;
+            const bottom = layout.top + tip.height;
+            const overLeft = Math.max(0, padLeft - layout.left);
+            const overTop = Math.max(0, padTop - layout.top);
+            const overRight = Math.max(0, right - (size.x - padRight));
+            const overBottom = Math.max(0, bottom - (size.y - padBottom));
+            return overLeft + overTop + overRight + overBottom;
+          }};
+          let best = layouts[0];
+          let bestScore = Number.POSITIVE_INFINITY;
+          for (const layout of layouts) {{
+            const score = overflowScore(layout);
+            if (score < bestScore) {{
+              best = layout;
+              bestScore = score;
+            }}
+            if (score <= 0) {{
+              best = layout;
+              bestScore = score;
+              break;
+            }}
+          }}
+          return Object.assign({{}}, baseOptions, {{
+            direction: best.direction,
+            offset: best.offset,
+            className: best.className,
+          }});
+        }};
+        const rebindTooltip = (openNow = false) => {{
+          const tooltipOptions = resolveTooltipOptions();
+          if (typeof marker.closeTooltip === "function") {{
+            marker.closeTooltip();
+          }}
+          if (typeof marker.unbindTooltip === "function") {{
+            marker.unbindTooltip();
+          }}
+          marker.bindTooltip(contentHtml, tooltipOptions);
+          if (openNow && typeof marker.openTooltip === "function") {{
+            marker.openTooltip();
+          }}
+        }};
+        rebindTooltip(false);
+        marker.on("mouseover", () => {{
+          rebindTooltip(true);
         }});
       }}
     }}
