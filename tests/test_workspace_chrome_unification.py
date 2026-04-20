@@ -317,6 +317,22 @@ def test_history_window_controls_trail_and_stay_right_anchored() -> None:
         'for="network-diagnostics-window"'
     )
     assert "margin-left: auto;" in window_wrap_section
+    assert 'id="network-overview-link-mode-wrap"' in overview_controls_section
+    assert 'id="network-overview-node-lines-wrap"' in overview_controls_section
+    assert 'id="network-overview-packet-lines-wrap"' in overview_controls_section
+    assert 'id="network-overview-sensor-controls-host"' in overview_controls_section
+    assert overview_controls_section.index('id="network-overview-link-mode-wrap"') < overview_controls_section.index(
+        'for="network-overview-window"'
+    )
+    assert overview_controls_section.index('id="network-overview-node-lines-wrap"') < overview_controls_section.index(
+        'for="network-overview-window"'
+    )
+    assert overview_controls_section.index('id="network-overview-packet-lines-wrap"') < overview_controls_section.index(
+        'for="network-overview-window"'
+    )
+    assert overview_controls_section.index('id="network-overview-sensor-controls-host"') < overview_controls_section.index(
+        'for="network-overview-window"'
+    )
 
 
 def test_select_only_history_chips_hide_redundant_labels() -> None:
@@ -336,6 +352,7 @@ def test_select_only_history_chips_hide_redundant_labels() -> None:
 
     assert 'class="history-metric-wrap history-select-chip-hide-label"' in html
     assert 'class="history-metric-wrap history-window-wrap history-select-chip-hide-label"' in html
+    assert 'class="history-metric-wrap history-select-chip-hide-label" hidden' in html
     assert 'class="history-metric-wrap history-window-wrap network-diagnostics-window-wrap history-select-chip-hide-label"' in html
     assert 'class="history-metric-wrap env-metrics-control-group history-select-chip-hide-label"' in html
     assert 'class="history-metric-wrap history-window-wrap env-metrics-control-group history-select-chip-hide-label"' in html
@@ -346,6 +363,30 @@ def test_select_only_history_chips_hide_redundant_labels() -> None:
     assert "gap: 0;" in compact_chip_section
     assert "padding-left: 8px;" in compact_chip_section
     assert "padding-right: 8px;" in compact_chip_section
+
+
+def test_network_overview_group_chips_hide_titles_in_top_strip() -> None:
+    html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
+        style_css="",
+        app_js="",
+        revision_title="rev",
+        revision_label="rev",
+        safety_label="safe",
+        packet_limit=100,
+        history_label="history",
+        refresh_ms=1000,
+    )
+    css = build_dashboard_css(theme_css="")
+
+    assert 'class="history-metric-wrap history-metric-wrap-lines history-group-chip-hide-title" hidden' in html
+    assert ".history-group-chip-hide-title > .history-metric-label {" in css
+    assert "display: none;" in css.split(".history-group-chip-hide-title > .history-metric-label {", 1)[1].split("}", 1)[0]
+    assert ".network-overview-primary-controls .history-metric-wrap-lines {" in css
+    top_lines_section = css.split(".network-overview-primary-controls .history-metric-wrap-lines {", 1)[1].split("}", 1)[0]
+    assert "flex-wrap: nowrap;" in top_lines_section
+    assert "row-gap: 0;" in top_lines_section
 
 
 def test_network_sensors_docked_explorer_reuses_overview_light_shell() -> None:
