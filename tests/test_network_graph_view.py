@@ -149,6 +149,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const includeAllLiveNodes = !(options && options.includeAllLiveNodes === false);' in js
     assert 'const pinnedNodeIds = Array.isArray(options && options.pinnedNodeIds)' in js
     assert 'function filterNetworkGraphRawEdgesByMode(rawEdges, mode = networkGraphEdgeMode)' in js
+    assert 'function collectNetworkGraphAncestorScores(nodeId, targetLayer, layerByNodeId, parentHintsByNodeId, memo = new Map())' in js
+    assert 'function resolveNetworkGraphBestClusterCandidate(candidateScores, degreeMeta, fallbackId = "")' in js
+    assert 'function chunkNetworkGraphNodeIds(nodeIds, chunkSize = 1)' in js
     assert 'function doesNetworkGraphViewBoxContainBounds(viewBox, bounds, paddingRatio = 0.04)' in js
     assert 'const excludeDisconnected = !!(options && options.excludeDisconnected);' in js
     assert 'if (excludeDisconnected && item.disconnected) continue;' in js
@@ -175,6 +178,16 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'if (localNodeAvailable && (localNodeHasLinkPeers || bestDegree <= 0)) {' in js
     assert 'const parentHintsByNodeId = new Map();' in js
     assert 'const layerOrderIndexByNodeId = new Map([[rootId, 0]]);' in js
+    assert 'const rootClusterIdSet = new Set(rootClusterIds);' in js
+    assert 'const clusterIdByNodeId = new Map([[rootId, rootId]]);' in js
+    assert 'const clusterLabelNodeIds = new Set();' in js
+    assert 'const subclusterMembersById = new Map([[clusterId, [clusterId]]]);' in js
+    assert 'const branchDescriptors = Array.from(subclusterMembersById.entries())' in js
+    assert 'const cellDescriptors = [];' in js
+    assert 'const branchWeightTotal = branchDescriptors.reduce((sum, branchDescriptor) => sum + branchDescriptor.weight, 0) || 1;' in js
+    assert 'const cellWeightTotal = cellDescriptors.reduce((sum, cellDescriptor) => sum + cellDescriptor.weight, 0) || 1;' in js
+    assert 'clusterLabelNodeIds.add(branchDescriptor.subclusterId);' in js
+    assert 'for (const nodeId of clusterLabelNodeIds) {' in js
     assert 'Object.entries((historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {})' in js
     assert 'buildNetworkGraphPlaceholderNode(clean, historyCapsById.get(clean) || null)' in js
     assert 'const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);' in js
@@ -204,6 +217,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert '<span class="network-graph-chip-label">1 Hop</span>' not in js
     assert 'Click to refocus, scroll to zoom, and use Reset view from the header controls.' in js
     assert 'Numbered hop rings show shortest graph distance from the current root, not literal packet-route hops.' in js
+    assert 'first-hop neighborhoods split into branch sub-clusters from the current root' in js
     assert 'const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph";' in js
     assert 'const weeklySummaryPromise = (activeLayoutView === "history" || activeLayoutView === "network")' in js
     assert 'if (weeklySummaryPromise) {' in js

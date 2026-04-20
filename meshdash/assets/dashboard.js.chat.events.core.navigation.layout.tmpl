@@ -3220,6 +3220,90 @@
       return Array.from(communities.values()).map((members) => members.slice().sort()).sort((a, b) => b.length - a.length);
     }}
 
+    function collectNetworkGraphAncestorScores(nodeId, targetLayer, layerByNodeId, parentHintsByNodeId, memo = new Map()) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      const desiredLayer = Math.max(0, Number(targetLayer) || 0);
+      if (!cleanNodeId || !(layerByNodeId instanceof Map) || !(parentHintsByNodeId instanceof Map)) {{
+        return new Map();
+      }}
+      const cacheKey = `${{desiredLayer}}:${{cleanNodeId}}`;
+      if (memo instanceof Map && memo.has(cacheKey)) {{
+        return new Map(memo.get(cacheKey) || []);
+      }}
+      const scores = new Map();
+      const nodeLayer = Number(layerByNodeId.get(cleanNodeId));
+      if (!Number.isFinite(nodeLayer) || nodeLayer < desiredLayer) {{
+        if (memo instanceof Map) memo.set(cacheKey, new Map(scores));
+        return new Map(scores);
+      }}
+      if (nodeLayer === desiredLayer) {{
+        scores.set(cleanNodeId, 1);
+        if (memo instanceof Map) memo.set(cacheKey, new Map(scores));
+        return new Map(scores);
+      }}
+      const parents = Array.isArray(parentHintsByNodeId.get(cleanNodeId))
+        ? parentHintsByNodeId.get(cleanNodeId)
+        : [];
+      parents.forEach((parentId) => {{
+        const parentScores = collectNetworkGraphAncestorScores(
+          parentId,
+          desiredLayer,
+          layerByNodeId,
+          parentHintsByNodeId,
+          memo
+        );
+        parentScores.forEach((score, ancestorId) => {{
+          const cleanAncestorId = normalizeNodeId(ancestorId || "");
+          if (!cleanAncestorId) return;
+          scores.set(cleanAncestorId, (scores.get(cleanAncestorId) || 0) + Math.max(1, Number(score) || 0));
+        }});
+      }});
+      if (memo instanceof Map) memo.set(cacheKey, new Map(scores));
+      return new Map(scores);
+    }}
+
+    function resolveNetworkGraphBestClusterCandidate(candidateScores, degreeMeta, fallbackId = "") {{
+      const fallback = normalizeNodeId(fallbackId || "");
+      let bestId = fallback;
+      let bestScore = -1;
+      let bestDegree = -1;
+      let bestWeight = -1;
+      for (const [candidateIdRaw, scoreRaw] of (candidateScores instanceof Map ? candidateScores.entries() : [])) {{
+        const candidateId = normalizeNodeId(candidateIdRaw || "");
+        if (!candidateId) continue;
+        const score = Math.max(0, Number(scoreRaw) || 0);
+        const meta = degreeMeta instanceof Map
+          ? (degreeMeta.get(candidateId) || {{ degree: 0, weight: 0 }})
+          : {{ degree: 0, weight: 0 }};
+        const degree = Math.max(0, Number(meta.degree) || 0);
+        const weight = Math.max(0, Number(meta.weight) || 0);
+        if (
+          score > bestScore
+          || (score === bestScore && degree > bestDegree)
+          || (score === bestScore && degree === bestDegree && weight > bestWeight)
+          || (score === bestScore && degree === bestDegree && weight === bestWeight && (!bestId || String(candidateId) < String(bestId)))
+        ) {{
+          bestId = candidateId;
+          bestScore = score;
+          bestDegree = degree;
+          bestWeight = weight;
+        }}
+      }}
+      return bestId;
+    }}
+
+    function chunkNetworkGraphNodeIds(nodeIds, chunkSize = 1) {{
+      const safeNodeIds = Array.isArray(nodeIds)
+        ? nodeIds.map((nodeId) => normalizeNodeId(nodeId)).filter(Boolean)
+        : [];
+      const safeChunkSize = Math.max(1, Math.trunc(Number(chunkSize) || 1));
+      const chunks = [];
+      for (let index = 0; index < safeNodeIds.length; index += safeChunkSize) {{
+        chunks.push(safeNodeIds.slice(index, index + safeChunkSize));
+      }}
+      return chunks;
+    }}
+
     function buildNetworkGraphLayout(nodeMap, combinedEdges, state) {{
       const adjacency = buildNetworkGraphAdjacency(nodeMap, combinedEdges);
       const safeState = (state && typeof state === "object") ? state : {{}};
@@ -3457,6 +3541,7 @@
 
       const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
       let regions = [];
+      const clusterLabelNodeIds = new Set();
       if (layoutMode === "tree") {{
         const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
         const treeTopY = 64;
@@ -3631,39 +3716,44 @@
         rings.length = 0;
       }} else if (layoutMode === "cluster") {{
         const rootClusterIds = Array.isArray(layers.get(1)) ? Array.from(layers.get(1)) : [];
+        const rootClusterIdSet = new Set(rootClusterIds);
+        const layerOneAncestorScoresMemo = new Map();
+        const layerTwoAncestorScoresMemo = new Map();
         const clusterMembersById = new Map();
+        const clusterIdByNodeId = new Map([[rootId, rootId]]);
         if (!rootClusterIds.length) {{
           clusterMembersById.set(rootId, [rootId]);
         }}
         rootClusterIds.forEach((nodeId) => {{
           clusterMembersById.set(nodeId, [nodeId]);
+          clusterIdByNodeId.set(nodeId, nodeId);
         }});
         for (const [nodeId, layer] of layerByNodeId.entries()) {{
           if (nodeId === rootId || layer <= 1) continue;
-          const parents = Array.isArray(parentHintsByNodeId.get(nodeId))
-            ? parentHintsByNodeId.get(nodeId)
-            : [];
-          let clusterId = "";
-          let cursorId = normalizeNodeId(parents[0] || "");
-          const visited = new Set();
-          while (cursorId && !visited.has(cursorId)) {{
-            visited.add(cursorId);
-            const cursorLayer = Number(layerByNodeId.get(cursorId));
-            if (cursorLayer === 1) {{
-              clusterId = cursorId;
-              break;
-            }}
-            const cursorParents = Array.isArray(parentHintsByNodeId.get(cursorId))
-              ? parentHintsByNodeId.get(cursorId)
-              : [];
-            cursorId = normalizeNodeId(cursorParents[0] || "");
-          }}
+          const clusterScores = collectNetworkGraphAncestorScores(
+            nodeId,
+            1,
+            layerByNodeId,
+            parentHintsByNodeId,
+            layerOneAncestorScoresMemo
+          );
+          const eligibleClusterScores = new Map();
+          clusterScores.forEach((score, candidateId) => {{
+            if (!rootClusterIdSet.has(candidateId)) return;
+            eligibleClusterScores.set(candidateId, (eligibleClusterScores.get(candidateId) || 0) + Math.max(1, Number(score) || 0));
+          }});
+          let clusterId = resolveNetworkGraphBestClusterCandidate(
+            eligibleClusterScores,
+            degreeMeta,
+            rootClusterIds[0] || rootId
+          );
           if (!clusterId) {{
             clusterId = rootClusterIds[0] || rootId;
           }}
           if (!clusterMembersById.has(clusterId)) {{
             clusterMembersById.set(clusterId, []);
           }}
+          clusterIdByNodeId.set(nodeId, clusterId);
           clusterMembersById.get(clusterId).push(nodeId);
         }}
         positions.set(rootId, {{
@@ -3679,6 +3769,60 @@
           const members = (clusterMembersById.get(clusterId) || []).slice().sort((a, b) => (
             Number(layerByNodeId.get(a) || 0) - Number(layerByNodeId.get(b) || 0)
           ) || compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
+          const subclusterMembersById = new Map([[clusterId, [clusterId]]]);
+          members.forEach((nodeId) => {{
+            if (nodeId === clusterId) return;
+            const subclusterScores = collectNetworkGraphAncestorScores(
+              nodeId,
+              2,
+              layerByNodeId,
+              parentHintsByNodeId,
+              layerTwoAncestorScoresMemo
+            );
+            const eligibleSubclusterScores = new Map();
+            subclusterScores.forEach((score, candidateId) => {{
+              if (clusterIdByNodeId.get(candidateId) !== clusterId) return;
+              eligibleSubclusterScores.set(candidateId, (eligibleSubclusterScores.get(candidateId) || 0) + Math.max(1, Number(score) || 0));
+            }});
+            let subclusterId = resolveNetworkGraphBestClusterCandidate(
+              eligibleSubclusterScores,
+              degreeMeta,
+              clusterId
+            );
+            if (!subclusterId) {{
+              subclusterId = clusterId;
+            }}
+            if (!subclusterMembersById.has(subclusterId)) {{
+              subclusterMembersById.set(subclusterId, []);
+            }}
+            subclusterMembersById.get(subclusterId).push(nodeId);
+          }});
+          const branchDescriptors = Array.from(subclusterMembersById.entries())
+            .filter(([subclusterId]) => subclusterId !== clusterId)
+            .map(([subclusterId, subclusterMembers]) => {{
+              const normalizedMembers = (subclusterMembers || []).slice().sort((a, b) => (
+                Number(layerByNodeId.get(a) || 0) - Number(layerByNodeId.get(b) || 0)
+              ) || compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
+              const baseLayer = normalizedMembers.reduce((minValue, memberId) => (
+                Math.min(minValue, Math.max(2, Number(layerByNodeId.get(memberId) || 2)))
+              ), Number.POSITIVE_INFINITY);
+              const maxLayer = normalizedMembers.reduce((maxValue, memberId) => (
+                Math.max(maxValue, Math.max(2, Number(layerByNodeId.get(memberId) || 2)))
+              ), 2);
+              const branchDegree = Number((degreeMeta.get(subclusterId) || {{ degree: 0 }}).degree || 0);
+              return {{
+                subclusterId,
+                members: normalizedMembers,
+                memberCount: normalizedMembers.length,
+                baseLayer: Number.isFinite(baseLayer) ? baseLayer : 2,
+                maxLayer,
+                weight: Math.max(1, 1 + Math.log2(Math.max(2, normalizedMembers.length + 1)) + Math.min(1.4, branchDegree * 0.07)),
+              }};
+            }})
+            .sort((a, b) => (
+              (b.memberCount - a.memberCount)
+              || compareNetworkGraphNodeIds(a.subclusterId, b.subclusterId, degreeMeta, nodeMap)
+            ));
           const firstHopDegree = Number((degreeMeta.get(clusterId) || {{ degree: 0 }}).degree || 0);
           const maxLayer = members.reduce((maxValue, nodeId) => (
             Math.max(maxValue, Math.max(1, Number(layerByNodeId.get(nodeId) || 1)))
@@ -3688,15 +3832,65 @@
             members,
             memberCount: members.length,
             maxLayer,
-            weight: Math.max(1.2, 1 + Math.log2(Math.max(2, members.length + 1)) + Math.min(1.8, firstHopDegree * 0.08)),
+            branchDescriptors: branchDescriptors.map((branchDescriptor) => {{
+              const descendants = branchDescriptor.members.filter((nodeId) => nodeId !== branchDescriptor.subclusterId);
+              const descendantsByLayer = new Map();
+              descendants.forEach((nodeId) => {{
+                const memberLayer = Math.max(branchDescriptor.baseLayer, Number(layerByNodeId.get(nodeId) || branchDescriptor.baseLayer));
+                if (!descendantsByLayer.has(memberLayer)) {{
+                  descendantsByLayer.set(memberLayer, []);
+                }}
+                descendantsByLayer.get(memberLayer).push(nodeId);
+              }});
+              const cellDescriptors = [];
+              Array.from(descendantsByLayer.keys()).sort((a, b) => a - b).forEach((memberLayer) => {{
+                const layerMembers = descendantsByLayer.get(memberLayer) || [];
+                const chunkSize = Math.max(
+                  4,
+                  Math.min(
+                    9,
+                    memberLayer <= (branchDescriptor.baseLayer + 1)
+                      ? 7
+                      : 6
+                  )
+                );
+                chunkNetworkGraphNodeIds(layerMembers, chunkSize).forEach((chunkMembers, chunkIndex) => {{
+                  cellDescriptors.push({{
+                    id: `${{branchDescriptor.subclusterId}}:${{memberLayer}}:${{chunkIndex}}`,
+                    layer: memberLayer,
+                    members: chunkMembers,
+                    memberCount: chunkMembers.length,
+                    weight: Math.max(1, chunkMembers.length + ((memberLayer - branchDescriptor.baseLayer) * 0.4)),
+                  }});
+                }});
+              }});
+              return {{
+                ...branchDescriptor,
+                cellDescriptors,
+                cellCount: cellDescriptors.length,
+              }};
+            }}),
+            branchCount: branchDescriptors.length,
+            weight: Math.max(
+              1.2,
+              1
+                + Math.log2(Math.max(2, members.length + 1))
+                + Math.min(1.8, firstHopDegree * 0.08)
+                + Math.min(1.5, branchDescriptors.length * 0.18)
+            ),
           }};
         }}).sort((a, b) => (
           (b.memberCount - a.memberCount)
           || compareNetworkGraphNodeIds(a.clusterId, b.clusterId, degreeMeta, nodeMap)
         ));
         const clusterRadius = Math.max(
-          358,
-          Math.min(492, 334 + (clusterDescriptors.length * 3.4) + (clusterDescriptors[0] ? Math.min(96, clusterDescriptors[0].memberCount * 0.8) : 0))
+          388,
+          Math.min(
+            584,
+            340
+              + (clusterDescriptors.length * 4.6)
+              + (clusterDescriptors[0] ? Math.min(126, (clusterDescriptors[0].memberCount * 0.88) + (clusterDescriptors[0].branchCount * 18)) : 0)
+          )
         );
         const totalClusterWeight = clusterDescriptors.reduce((sum, descriptor) => sum + descriptor.weight, 0) || 1;
         const clusterAngularSpan = Math.PI * 2;
@@ -3711,43 +3905,95 @@
           angleCursor += clusterArc;
           const anchorX = 480 + (Math.cos(clusterAngle) * clusterRadius);
           const anchorY = 310 + (Math.sin(clusterAngle) * clusterRadius);
-          const members = descriptor.members;
-          const tangentX = -Math.sin(clusterAngle);
-          const tangentY = Math.cos(clusterAngle);
           const normalX = Math.cos(clusterAngle);
           const normalY = Math.sin(clusterAngle);
-          const localArcSpan = Math.min(Math.PI * 1.08, Math.max(Math.PI * 0.48, clusterArc * 1.2));
-          const baseMemberRadius = Math.max(
-            66,
-            Math.min(148, 50 + (descriptor.memberCount * 1.95))
-          );
-          const clusterLayerNodeIds = new Map();
-          members.forEach((memberId) => {{
-            const memberLayer = Math.max(1, Number(layerByNodeId.get(memberId) || 1));
-            if (!clusterLayerNodeIds.has(memberLayer)) {{
-              clusterLayerNodeIds.set(memberLayer, []);
-            }}
-            clusterLayerNodeIds.get(memberLayer).push(memberId);
+          const clusterNodeX = anchorX - (normalX * 18);
+          const clusterNodeY = anchorY - (normalY * 18);
+          positions.set(descriptor.clusterId, {{
+            ...(positions.get(descriptor.clusterId) || {{}}),
+            x: clusterNodeX,
+            y: clusterNodeY,
+            layer: 1,
+            disconnected: false,
+            broadcastOnly: !!((positions.get(descriptor.clusterId) || {{}}).broadcastOnly),
           }});
-          members.forEach((nodeId, memberIndex) => {{
-            const memberLayer = Math.max(1, Number(layerByNodeId.get(nodeId) || 1));
-            const layerRadius = baseMemberRadius + ((memberLayer - 1) * 56);
-            const layerNodeIds = clusterLayerNodeIds.get(memberLayer) || [nodeId];
-            const layerIndex = Math.max(0, layerNodeIds.indexOf(nodeId));
-            const layerCount = Math.max(1, layerNodeIds.length);
-            const layerAngle = layerCount <= 1
-              ? clusterAngle
-              : (clusterAngle - (localArcSpan / 2) + ((localArcSpan * layerIndex) / Math.max(1, layerCount - 1)));
-            const drift = (memberLayer - 1) * 16;
-            const clusterBaseX = anchorX + (normalX * drift);
-            const clusterBaseY = anchorY + (normalY * drift);
-            positions.set(nodeId, {{
-              ...(positions.get(nodeId) || {{}}),
-              x: clusterBaseX + (Math.cos(layerAngle) * layerRadius) + (tangentX * ((layerIndex - ((layerCount - 1) / 2)) * 4.8)),
-              y: clusterBaseY + (Math.sin(layerAngle) * layerRadius) + (tangentY * ((layerIndex - ((layerCount - 1) / 2)) * 4.8)),
-              layer: memberLayer,
+          clusterLabelNodeIds.add(descriptor.clusterId);
+          const branchDescriptors = Array.isArray(descriptor.branchDescriptors) ? descriptor.branchDescriptors : [];
+          const branchWeightTotal = branchDescriptors.reduce((sum, branchDescriptor) => sum + branchDescriptor.weight, 0) || 1;
+          const branchOrbitRadius = Math.max(
+            108,
+            Math.min(248, 90 + (branchDescriptors.length * 14) + Math.min(52, descriptor.memberCount * 0.2))
+          );
+          const branchAngularSpan = Math.min(
+            Math.PI * 1.58,
+            Math.max(Math.PI * 0.82, (branchDescriptors.length * 0.42) + Math.min(Math.PI * 0.42, descriptor.memberCount * 0.022))
+          );
+          let branchWeightCursor = 0;
+          branchDescriptors.forEach((branchDescriptor, branchIndex) => {{
+            const branchShare = branchDescriptor.weight / branchWeightTotal;
+            const branchCenterRatio = branchDescriptors.length <= 1
+              ? 0.5
+              : ((branchWeightCursor + (branchDescriptor.weight / 2)) / branchWeightTotal);
+            branchWeightCursor += branchDescriptor.weight;
+            const branchAngle = clusterAngle - (branchAngularSpan / 2) + (branchAngularSpan * branchCenterRatio);
+            const branchAnchorX = clusterNodeX + (Math.cos(branchAngle) * branchOrbitRadius);
+            const branchAnchorY = clusterNodeY + (Math.sin(branchAngle) * branchOrbitRadius);
+            positions.set(branchDescriptor.subclusterId, {{
+              ...(positions.get(branchDescriptor.subclusterId) || {{}}),
+              x: branchAnchorX,
+              y: branchAnchorY,
+              layer: branchDescriptor.baseLayer,
               disconnected: false,
-              broadcastOnly: !!((positions.get(nodeId) || {{}}).broadcastOnly),
+              broadcastOnly: !!((positions.get(branchDescriptor.subclusterId) || {{}}).broadcastOnly),
+            }});
+            clusterLabelNodeIds.add(branchDescriptor.subclusterId);
+            const cellDescriptors = Array.isArray(branchDescriptor.cellDescriptors) ? branchDescriptor.cellDescriptors : [];
+            const cellWeightTotal = cellDescriptors.reduce((sum, cellDescriptor) => sum + cellDescriptor.weight, 0) || 1;
+            const cellOrbitRadius = Math.max(
+              52,
+              Math.min(144, 40 + (cellDescriptors.length * 16) + Math.min(26, branchDescriptor.memberCount * 0.16))
+            );
+            const cellAngularSpan = Math.min(
+              Math.PI * 1.46,
+              Math.max(Math.PI * 0.72, (cellDescriptors.length * 0.48) + Math.min(Math.PI * 0.26, branchDescriptor.memberCount * 0.016))
+            );
+            let cellWeightCursor = 0;
+            cellDescriptors.forEach((cellDescriptor) => {{
+              const cellCenterRatio = cellDescriptors.length <= 1
+                ? 0.5
+                : ((cellWeightCursor + (cellDescriptor.weight / 2)) / cellWeightTotal);
+              cellWeightCursor += cellDescriptor.weight;
+              const cellAngle = branchAngle - (cellAngularSpan / 2) + (cellAngularSpan * cellCenterRatio);
+              const cellAnchorX = branchAnchorX + (Math.cos(cellAngle) * cellOrbitRadius);
+              const cellAnchorY = branchAnchorY + (Math.sin(cellAngle) * cellOrbitRadius);
+              const cellMembers = Array.isArray(cellDescriptor.members) ? cellDescriptor.members : [];
+              const cellTangentX = -Math.sin(cellAngle);
+              const cellTangentY = Math.cos(cellAngle);
+              const cellNormalX = Math.cos(cellAngle);
+              const cellNormalY = Math.sin(cellAngle);
+              const memberArcSpan = Math.min(
+                Math.PI * 0.88,
+                Math.max(Math.PI * 0.18, cellMembers.length * 0.22)
+              );
+              const memberRadius = Math.max(
+                16,
+                Math.min(48, 12 + (cellMembers.length * 4.2))
+              );
+              cellMembers.forEach((nodeId, memberIndex) => {{
+                const memberCount = Math.max(1, cellMembers.length);
+                const memberAngle = memberCount <= 1
+                  ? cellAngle
+                  : (cellAngle - (memberArcSpan / 2) + ((memberArcSpan * memberIndex) / Math.max(1, memberCount - 1)));
+                const shellDrift = (Math.max(branchDescriptor.baseLayer, Number(cellDescriptor.layer) || branchDescriptor.baseLayer) - branchDescriptor.baseLayer) * 8;
+                positions.set(nodeId, {{
+                  ...(positions.get(nodeId) || {{}}),
+                  x: cellAnchorX + (cellNormalX * shellDrift) + (Math.cos(memberAngle) * memberRadius) + (cellTangentX * ((memberIndex - ((memberCount - 1) / 2)) * 2.4)),
+                  y: cellAnchorY + (cellNormalY * shellDrift) + (Math.sin(memberAngle) * memberRadius) + (cellTangentY * ((memberIndex - ((memberCount - 1) / 2)) * 2.4)),
+                  layer: Math.max(branchDescriptor.baseLayer, Number(cellDescriptor.layer) || branchDescriptor.baseLayer),
+                  disconnected: false,
+                  broadcastOnly: !!((positions.get(nodeId) || {{}}).broadcastOnly),
+                }});
+              }});
             }});
           }});
         }});
@@ -3773,8 +4019,12 @@
       }}
       const selectedId = normalizeNodeId(selectedNodeId || "");
       const visibleLabelNodeIds = new Set();
-      if (nodeMap.size <= 18 || layoutMode === "tree" || layoutMode === "cluster" || layoutMode === "community") {{
+      if (nodeMap.size <= 18 || layoutMode === "tree" || layoutMode === "community") {{
         for (const nodeId of positions.keys()) {{
+          visibleLabelNodeIds.add(nodeId);
+        }}
+      }} else if (layoutMode === "cluster") {{
+        for (const nodeId of clusterLabelNodeIds) {{
           visibleLabelNodeIds.add(nodeId);
         }}
       }} else {{
@@ -4118,7 +4368,7 @@
 
       legend.innerHTML = [
         `<span class="network-graph-legend-item hint">${{modeLabel}} mode: ${{edgeMode === "live" ? "current-session link topology only" : "stored link-history topology"}}</span>`,
-        `<span class="network-graph-legend-item hint">${{layoutModeLabel}} layout: ${{layoutMode === "tree" ? "hierarchical breadth-first view from the current root" : (layoutMode === "cluster" ? "grouped around first-hop neighborhoods from the current root" : (layoutMode === "community" ? "community-detected regions with detached nodes split into side lanes" : "hop-distance rings around the current root"))}}</span>`,
+        `<span class="network-graph-legend-item hint">${{layoutModeLabel}} layout: ${{layoutMode === "tree" ? "hierarchical breadth-first view from the current root" : (layoutMode === "cluster" ? "first-hop neighborhoods split into branch sub-clusters from the current root" : (layoutMode === "community" ? "community-detected regions with detached nodes split into side lanes" : "hop-distance rings around the current root"))}}</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-root"></span>Root / selected node</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-local"></span>Your node / local radio</span>`,
         `<span class="network-graph-legend-item"><span class="network-graph-swatch is-real"></span>${{realLinkCount}} confirmed links</span>`,
