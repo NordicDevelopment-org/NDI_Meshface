@@ -1414,7 +1414,7 @@
     const networkGraphViewportBase = Object.freeze({{ x: 0, y: 0, width: 960, height: 620 }});
     const networkGraphZoomBounds = Object.freeze({{ minScale: 0.42, maxScale: 5.5 }});
     const networkGraphFitZoomOutScale = 1.22;
-    const networkGraphOverlayFitZoomOutScale = 1.03;
+    const networkGraphOverlayFitZoomOutScale = 1.1;
     const networkGraphToolbarSafeInsetTop = 78;
     const networkGraphOverlaySafeInsetTop = 10;
     const networkGraphFocusAnimationDurationMs = 680;
@@ -2278,7 +2278,7 @@
       )
         ? options.center
         : networkGraphViewState.resetCenter;
-      if (layoutMode === "tree") {{
+      if (layoutMode === "tree" || layoutMode === "cluster" || layoutMode === "community") {{
         return fitNetworkGraphViewBoxToBounds(bounds, svg);
       }}
       return fitNetworkGraphViewBoxToCenteredBounds(bounds, svg, center);
@@ -4039,12 +4039,10 @@
           || compareNetworkGraphNodeIds(a.clusterId, b.clusterId, degreeMeta, nodeMap)
         ));
         const clusterRadius = Math.max(
-          432,
+          284,
           Math.min(
-            676,
-            372
-              + (clusterDescriptors.length * 6.4)
-              + (clusterDescriptors[0] ? Math.min(148, (clusterDescriptors[0].memberCount * 1.02) + (clusterDescriptors[0].branchCount * 22)) : 0)
+            352,
+            256 + (clusterDescriptors.length * 3.2)
           )
         );
         const totalClusterWeight = clusterDescriptors.reduce((sum, descriptor) => sum + descriptor.weight, 0) || 1;
@@ -4075,10 +4073,7 @@
           clusterLabelNodeIds.add(descriptor.clusterId);
           const branchDescriptors = Array.isArray(descriptor.branchDescriptors) ? descriptor.branchDescriptors : [];
           const branchWeightTotal = branchDescriptors.reduce((sum, branchDescriptor) => sum + branchDescriptor.weight, 0) || 1;
-          const branchOrbitRadius = Math.max(
-            128,
-            Math.min(276, 104 + (branchDescriptors.length * 16) + Math.min(68, descriptor.memberCount * 0.28))
-          );
+          const branchOrbitRadius = 132;
           const branchAngularSpan = Math.min(
             Math.PI * 1.02,
             Math.max(Math.PI * 0.56, (branchDescriptors.length * 0.26) + Math.min(Math.PI * 0.18, descriptor.memberCount * 0.012) + (Math.PI * 0.26))
@@ -4104,10 +4099,7 @@
             clusterLabelNodeIds.add(branchDescriptor.subclusterId);
             const cellDescriptors = Array.isArray(branchDescriptor.cellDescriptors) ? branchDescriptor.cellDescriptors : [];
             const cellWeightTotal = cellDescriptors.reduce((sum, cellDescriptor) => sum + cellDescriptor.weight, 0) || 1;
-            const cellOrbitRadius = Math.max(
-              64,
-              Math.min(168, 48 + (cellDescriptors.length * 18) + Math.min(32, branchDescriptor.memberCount * 0.18))
-            );
+            const cellOrbitRadius = 82;
             const cellAngularSpan = Math.min(
               Math.PI * 0.92,
               Math.max(Math.PI * 0.46, (cellDescriptors.length * 0.26) + Math.min(Math.PI * 0.12, branchDescriptor.memberCount * 0.01) + (Math.PI * 0.22))

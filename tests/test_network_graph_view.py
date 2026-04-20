@@ -122,7 +122,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";' in js
     assert 'let networkGraphEdgeMode = "history";' in js
     assert 'let networkGraphLayoutMode = "radial";' in js
-    assert 'const networkGraphOverlayFitZoomOutScale = 1.03;' in js
+    assert 'const networkGraphOverlayFitZoomOutScale = 1.1;' in js
     assert 'const networkGraphOverlaySafeInsetTop = 10;' in js
     assert 'function normalizeNetworkGraphEdgeMode(raw)' in js
     assert 'function normalizeNetworkGraphLayoutMode(raw)' in js
