@@ -1,91 +1,125 @@
-import sys
-from pathlib import Path
+from collections.abc import Callable, Sequence
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from meshdash.html_js import build_dashboard_js
+import pytest
 
 
-def test_dashboard_js_skips_redundant_chat_workspace_poll_renders() -> None:
-    js = build_dashboard_js(
-        refresh_ms=3000,
-        node_history_hours=24,
-        node_history_max_points=240,
+POLL_RENDER_SKIP_TOKEN_GROUPS: tuple[tuple[str, Sequence[str]], ...] = (
+    (
+        "poll-structural-skip",
+        (
+            'let chatPollStructuralSignature = "";',
+            "const chatPollStructuralRefreshMs = 15000;",
+            "function buildChatPollStructuralSignature(state = latestState) {",
+            'runPollStep("renderChat.workspace", () => renderChat(state, { allowPollSkip: true }));',
+            "renderChat(latestState, { allowPollSkip: true });",
+            '"/api/state?lite=1&profile=chat"',
+            '"/api/state?lite=1&profile=network"',
+            'function statePollProfile() {',
+            'if (clean === "links") return "graph";',
+            "&& pollStructuralSignature === chatPollStructuralSignature",
+            "&& pollStructuralAgeMs < chatPollStructuralRefreshMs",
+            'markRenderChatPhase("poll-skip");',
+            '!chatRenderedThisPoll304',
+            '!chatRenderedThisPoll',
+            'const stableNetworkSubviewName = (typeof normalizeNetworkSubview === "function")',
+            "window.setTimeout(() => {",
+            'hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || ""));',
+        ),
+    ),
+    (
+        "drawer-refresh-gates",
+        (
+            'syncChatNodeDetailsDrawer(state, {',
+            'const needsChatSection = !renderChatInDrawer || activeDrawerTab === "chat";',
+            'const linksSection = needsLinksSection && linkStats',
+            "renderChatChangeSummary(nowUnix);",
+            'const networkMapVisible = activeLayoutView === "network" && activeNetworkSubviewName === "map";',
+            'if (latestState && (activeLayoutView !== "network" || networkMapVisible)) {',
+            'const shouldPrefetchNodeHistory = !!(',
+            'activeTab === "history"',
+            'if (activeLayoutView === "saved" || networkMapVisible) {',
+            "function setDrawerElementTextIfChanged(element, nextText) {",
+            'function setDrawerElementHtmlIfChanged(element, nextHtml, cacheKey = "default") {',
+            "function syncDrawerTabButtonState(button, isActive) {",
+            "function syncDrawerPanelHiddenState(panel, isActive) {",
+        ),
+    ),
+    (
+        "selection-perf",
+        (
+            'const selectedId = normalizeNodeId(selectedNodeId || "");',
+            'if (selectedId && nodeMap.has(selectedId)) return selectedId;',
+            "const nodeSelectionUiState = {",
+            "const nodeSelectionPerfState = {",
+            "nodeSelectionPerfStore();",
+            '"saved-node-details-shell"',
+            '"saved-node-sections"',
+            "function beginNodeSelectionPerf(nodeId, meta = {}) {",
+            'function markNodeSelectionPerf(token, phase, startedAtMs, extra = null) {',
+            'function finishNodeSelectionPerf(token, status = "complete", extra = null) {',
+            "function scheduleNodeSelectionUiRefresh(options = null) {",
+            "function flushNodeSelectionUiRefresh() {",
+            "highlightNodeSelection(previousSelectedId, normalized);",
+            'scheduleNodeSelectionUiRefresh({ shouldFocus: focusSelection, perfToken });',
+            'markNodeSelectionPerf(perfToken, "selection.graph_render", perfStartMs',
+            'markNodeSelectionPerf(perfToken, "selection.drawer_sync", perfStartMs',
+            'markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs',
+        ),
+    ),
+    (
+        "network-graph-patch-path",
+        (
+            "function syncNetworkGraphSceneSelection(svg, options = {}) {",
+            "function buildNetworkGraphSceneStructureSignature(scene) {",
+            "function syncNetworkGraphSceneData(svg, scene) {",
+            'const portsData = (traffic.port_counts || []).slice(0, 30);',
+            'const linksData = (traffic.edges || []).slice(0, 60);',
+            'if (linksHash !== trafficLinksTableLastHash) {',
+            'if (portsHash !== trafficPortsTableLastHash) {',
+            "const canPatchSelectionOnly = !!(",
+            "const canSkipSceneRender = !!(",
+            "const canPatchSceneDataOnly = !!(",
+            "forceCenteredFitOnce: false,",
+            "skipSceneAnimationOnce: false,",
+            "const shouldForceCenteredFit = !!networkGraphViewState.forceCenteredFitOnce;",
+            "const shouldSkipSceneAnimation = !!networkGraphViewState.skipSceneAnimationOnce;",
+            "networkGraphViewState.skipSceneAnimationOnce = true;",
+            "syncNetworkGraphSceneSelection(svg, { rootId, selectedId });",
+            'data-network-graph-edge-key="${escAttr(buildNetworkGraphEdgeDomKey(edge))}"',
+            "syncNetworkGraphSceneData(svg, scene);",
+        ),
+    ),
+)
+
+
+@pytest.fixture
+def poll_dashboard_js(dashboard_js_factory: Callable[..., str]) -> str:
+    return dashboard_js_factory(refresh_ms=3000)
+
+
+@pytest.mark.parametrize(
+    ("group_name", "tokens"),
+    POLL_RENDER_SKIP_TOKEN_GROUPS,
+    ids=[group_name for group_name, _ in POLL_RENDER_SKIP_TOKEN_GROUPS],
+)
+def test_dashboard_js_skips_redundant_chat_workspace_poll_renders(
+    poll_dashboard_js: str,
+    assert_tokens_present: Callable[[str, Sequence[str]], None],
+    group_name: str,
+    tokens: Sequence[str],
+) -> None:
+    del group_name
+    assert_tokens_present(poll_dashboard_js, tokens)
+
+
+def test_dashboard_js_limits_history_only_roster_seeding_to_direct_chat(
+    poll_dashboard_js: str,
+    assert_tokens_present: Callable[[str, Sequence[str]], None],
+) -> None:
+    assert_tokens_present(
+        poll_dashboard_js,
+        (
+            'if (activeChatChannel === "direct" && historyCapsById instanceof Map) {',
+            'if (activeChatChannel === "direct" && historyCapsById && typeof historyCapsById.keys === "function") {',
+        ),
     )
-
-    assert 'let chatPollStructuralSignature = "";' in js
-    assert "const chatPollStructuralRefreshMs = 15000;" in js
-    assert "function buildChatPollStructuralSignature(state = latestState) {" in js
-    assert 'runPollStep("renderChat.workspace", () => renderChat(state, { allowPollSkip: true }));' in js
-    assert "renderChat(latestState, { allowPollSkip: true });" in js
-    assert '"/api/state?lite=1&profile=chat"' in js
-    assert '"/api/state?lite=1&profile=network"' in js
-    assert 'function statePollProfile() {' in js
-    assert 'if (clean === "links") return "graph";' in js
-    assert "&& pollStructuralSignature === chatPollStructuralSignature" in js
-    assert "&& pollStructuralAgeMs < chatPollStructuralRefreshMs" in js
-    assert 'markRenderChatPhase("poll-skip");' in js
-    assert 'syncChatNodeDetailsDrawer(state, {' in js
-    assert "!chatRenderedThisPoll304" in js
-    assert "!chatRenderedThisPoll" in js
-    assert 'const needsChatSection = !renderChatInDrawer || activeDrawerTab === "chat";' in js
-    assert 'const linksSection = needsLinksSection && linkStats' in js
-    assert "renderChatChangeSummary(nowUnix);" in js
-    assert "function syncNetworkGraphSceneSelection(svg, options = {}) {" in js
-    assert "function buildNetworkGraphSceneStructureSignature(scene) {" in js
-    assert "function syncNetworkGraphSceneData(svg, scene) {" in js
-    assert 'const selectedId = normalizeNodeId(selectedNodeId || "");' in js
-    assert 'if (selectedId && nodeMap.has(selectedId)) return selectedId;' in js
-    assert "const nodeSelectionUiState = {" in js
-    assert "const nodeSelectionPerfState = {" in js
-    assert "nodeSelectionPerfStore();" in js
-    assert '"saved-node-details-shell"' in js
-    assert '"saved-node-sections"' in js
-    assert "function beginNodeSelectionPerf(nodeId, meta = {}) {" in js
-    assert "function markNodeSelectionPerf(token, phase, startedAtMs, extra = null) {" in js
-    assert "function finishNodeSelectionPerf(token, status = \"complete\", extra = null) {" in js
-    assert "function scheduleNodeSelectionUiRefresh(options = null) {" in js
-    assert "function flushNodeSelectionUiRefresh() {" in js
-    assert 'const networkMapVisible = activeLayoutView === "network" && activeNetworkSubviewName === "map";' in js
-    assert 'if (latestState && (activeLayoutView !== "network" || networkMapVisible)) {' in js
-    assert 'const shouldPrefetchNodeHistory = !!(' in js
-    assert 'activeTab === "history"' in js
-    assert 'if (activeLayoutView === "saved" || networkMapVisible) {' in js
-    assert "function setDrawerElementTextIfChanged(element, nextText) {" in js
-    assert "function setDrawerElementHtmlIfChanged(element, nextHtml, cacheKey = \"default\") {" in js
-    assert "function syncDrawerTabButtonState(button, isActive) {" in js
-    assert "function syncDrawerPanelHiddenState(panel, isActive) {" in js
-    assert 'const portsData = (traffic.port_counts || []).slice(0, 30);' in js
-    assert 'const linksData = (traffic.edges || []).slice(0, 60);' in js
-    assert 'if (linksHash !== trafficLinksTableLastHash) {' in js
-    assert 'if (portsHash !== trafficPortsTableLastHash) {' in js
-    assert "const canPatchSelectionOnly = !!(" in js
-    assert "const canSkipSceneRender = !!(" in js
-    assert "const canPatchSceneDataOnly = !!(" in js
-    assert "forceCenteredFitOnce: false," in js
-    assert "skipSceneAnimationOnce: false," in js
-    assert "const shouldForceCenteredFit = !!networkGraphViewState.forceCenteredFitOnce;" in js
-    assert "const shouldSkipSceneAnimation = !!networkGraphViewState.skipSceneAnimationOnce;" in js
-    assert "networkGraphViewState.skipSceneAnimationOnce = true;" in js
-    assert "syncNetworkGraphSceneSelection(svg, { rootId, selectedId });" in js
-    assert 'data-network-graph-edge-key="${escAttr(buildNetworkGraphEdgeDomKey(edge))}"' in js
-    assert "syncNetworkGraphSceneData(svg, scene);" in js
-    assert "highlightNodeSelection(previousSelectedId, normalized);" in js
-    assert "scheduleNodeSelectionUiRefresh({ shouldFocus: focusSelection, perfToken });" in js
-    assert 'markNodeSelectionPerf(perfToken, "selection.graph_render", perfStartMs' in js
-    assert 'markNodeSelectionPerf(perfToken, "selection.drawer_sync", perfStartMs' in js
-    assert 'markNodeSelectionPerf(perfToken, "selection.history_refresh", perfStartMs' in js
-    assert "const stableNetworkSubviewName = (typeof normalizeNetworkSubview === \"function\")" in js
-    assert "window.setTimeout(() => {" in js
-    assert "hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || \"\"));" in js
-
-
-def test_dashboard_js_limits_history_only_roster_seeding_to_direct_chat() -> None:
-    js = build_dashboard_js(
-        refresh_ms=3000,
-        node_history_hours=24,
-        node_history_max_points=240,
-    )
-
-    assert 'if (activeChatChannel === "direct" && historyCapsById instanceof Map) {' in js
-    assert 'if (activeChatChannel === "direct" && historyCapsById && typeof historyCapsById.keys === "function") {' in js

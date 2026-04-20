@@ -451,18 +451,21 @@ def test_chat_node_search_syncs_to_live_navigator_row_bounds() -> None:
     assert 'window.addEventListener("resize", scheduleChatNodeNavigatorSearchBoundsSync);' in js_src
 
 
-def test_chat_unread_node_click_routes_into_messages_tab() -> None:
+def test_chat_unread_node_click_routes_into_messages_tab(assert_tokens_present) -> None:
     peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
 
-    assert 'const unreadDirectCount = Math.max(0, Math.trunc(Number(member.dataset.unreadDirectCount) || 0));' in peers_src
-    assert 'selectNode(nodeId, true, unreadDirectCount <= 0);' in peers_src
-    assert 'if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {' in peers_src
-    assert 'setChatNodeDetailsDrawerTab("messages", {' in peers_src
-    assert 'fetchHistory: false,' in peers_src
-    assert 'data-unread-direct-count="${{escAttr(unreadDirectCount)}}"' in peers_src
+    assert_tokens_present(peers_src, [
+        'const unreadDirectCount = Math.max(0, Math.trunc(Number(member.dataset.unreadDirectCount) || 0));',
+        'const graphOpen = activeLayoutView === "network" && activeNetworkSubview === "graph";',
+        'selectNode(nodeId, true, !graphOpen && unreadDirectCount <= 0);',
+        'if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {',
+        'setChatNodeDetailsDrawerTab("messages", {',
+        'fetchHistory: false,',
+        'data-unread-direct-count="${{escAttr(unreadDirectCount)}}"',
+    ])
 
 
-def test_chat_click_selection_keeps_same_node_selected() -> None:
+def test_chat_click_selection_keeps_same_node_selected(assert_tokens_present) -> None:
     bindings_src = Path("meshdash/assets/dashboard.js.chat.events.bindings.tmpl").read_text()
     peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
     selection_src = Path("meshdash/assets/dashboard.js.chat.events.map_selection.tmpl").read_text()
@@ -472,16 +475,15 @@ def test_chat_click_selection_keeps_same_node_selected() -> None:
     assert "const sameExactChat = (" in bindings_src
     assert "clearNodeSelection();" in bindings_src
     assert "chatFeedRepeatToggleMessageKey = messageSelectionKey;" in bindings_src
-    assert """if (!isSelectableNodeId(nodeId)) {{
-          selectNode(nodeId, true);
-          return;
-        }}
-        selectNode(nodeId, true, unreadDirectCount <= 0);
-        if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {{
-          setChatNodeDetailsDrawerTab("messages", {{
-            fetchHistory: false,
-          }});
-        }}""" in peers_src
+    assert_tokens_present(peers_src, [
+        'if (!isSelectableNodeId(nodeId)) {{',
+        'selectNode(nodeId, true, !graphOpen);',
+        'return;',
+        'selectNode(nodeId, true, !graphOpen && unreadDirectCount <= 0);',
+        'if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {{',
+        'setChatNodeDetailsDrawerTab("messages", {{',
+        'fetchHistory: false,',
+    ])
     assert 'if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
     assert 'if (typeof clearChatFeedRepeatToggleState === "function") {' in selection_src
 
@@ -576,7 +578,7 @@ def test_chat_feed_cache_tracks_chat_tail_for_reaction_rebuilds() -> None:
     assert "chatMainDirectModeEnabled: chatMainDirectModeActive," in js
 
 
-def test_chat_reaction_notices_prefer_full_names_and_target_context() -> None:
+def test_chat_reaction_notices_prefer_full_names_and_target_context(assert_tokens_present) -> None:
     unread_src = Path("meshdash/assets/dashboard.js.chat.events.core.notifications.unread.tmpl").read_text()
     preview_src = Path("meshdash/assets/dashboard.js.chat.events.core.notifications.notices.message_preview_history.tmpl").read_text()
     persist_src = Path("meshdash/assets/dashboard.js.chat.events.core.notifications.notices.persist_track.tmpl").read_text()
@@ -588,10 +590,16 @@ def test_chat_reaction_notices_prefer_full_names_and_target_context() -> None:
     assert "senderLabel: chatSenderLabelFromMessage(msg, nodesById)," in unread_src
     assert "const reactionTargetLabel = reactionTargetInfo && typeof reactionTargetInfo === \"object\"" in unread_src
     assert "reaction_target_label: reactionTargetLabel," in unread_src
-    assert "const reactionTarget = compactChatChangePreview(" in preview_src
-    assert "msg && (msg.reaction_target_label ?? msg.reactionTargetLabel)," in preview_src
-    assert "if (emoji && reactionTarget) return `reacted ${{emoji}} to ${{reactionTarget}}`;" in preview_src
-    assert "if (reactionTarget) return `reaction to ${{reactionTarget}}`;" in preview_src
+    assert_tokens_present(preview_src, [
+        "const reactionTarget = compactChatChangePreview(",
+        "msg && (msg.reaction_target_label ?? msg.reactionTargetLabel),",
+        "const reactionTargetText = compactChatChangePreview(",
+        "msg && (msg.reaction_target_text ?? msg.reactionTargetText),",
+        'return `reacted ${{emoji}} to a message from ${{reactionTarget}}: "${{reactionTargetText}}"`;',
+        "if (emoji && reactionTarget) return `reacted ${{emoji}} to a message from ${{reactionTarget}}`;",
+        'return `reaction to a message from ${{reactionTarget}}: "${{reactionTargetText}}"`;',
+        "if (reactionTarget) return `reaction to a message from ${{reactionTarget}}`;",
+    ])
     assert "version: 3," in persist_src
     assert "Number(payload.version) === 3" in persist_src
 
@@ -637,7 +645,7 @@ def test_chat_node_list_can_collapse_into_compact_rail() -> None:
     assert ".workspace-shell.chat-panel-collapsed #chat-node-navigator-menu," in css
     assert ".workspace-shell.chat-panel-collapsed .chat-member-meta-row," in css
     assert ".workspace-shell.chat-panel-collapsed #chat-peer-add-toggle-btn," in css
-    assert ".workspace-shell.chat-panel-collapsed .chat-left-bottom-bar," in css
+    assert ".workspace-shell.chat-panel-collapsed .chat-left-bottom-bar {" in css
     assert "const chatPanelCollapsedStorageKey = \"meshDashboardChatPanelCollapsedV1\";" in js
     assert "let chatPanelCollapsed = false;" in js
     assert "function applyChatPanelCollapseState() {" in js

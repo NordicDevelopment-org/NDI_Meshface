@@ -25,16 +25,15 @@ def test_dashboard_html_adds_map_link_layer_toggle() -> None:
         refresh_ms=1000,
     )
 
-    assert 'id="map-link-wrap"' in html
-    assert 'id="map-link-toggle"' in html
-    assert 'id="map-live-wrap"' in html
-    assert 'id="map-live-toggle"' in html
-    assert ">Live</span>" in html
-    assert "Link Layer" in html
+    assert 'id="map-lines-wrap"' in html
+    assert 'id="map-lines-toggle"' in html
+    assert 'id="map-link-mode-wrap"' in html
+    assert 'id="map-link-mode"' in html
+    assert ">Packet Lines</span>" in html
+    assert "Choose whether the link layer shows history links, live links, or both" in html
     assert 'class="map-control-group map-heatmap-controls"' in html
-    assert html.index('id="map-heatmap-wrap"') < html.index('id="map-heatmap-mode-wrap"')
-    assert ">Links</button>" in html
-    assert 'title="Reset links view"' in html
+    assert html.index('id="map-link-mode-wrap"') < html.index('id="map-heatmap-mode-wrap"')
+    assert ">Links</span>" in html
 
 
 def test_dashboard_js_supports_map_link_layer_overlay() -> None:
@@ -44,7 +43,7 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
         node_history_max_points=240,
     )
 
-    assert 'let mapLinkLayerEnabled = false;' in js
+    assert 'let mapLinkLayerMode = "none";' in js
     assert 'let mapLiveActivityEnabled = true;' in js
     assert 'const nodePacketSeriesDefaults = {' in js
     assert 'all: false,' in js
@@ -59,15 +58,25 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert 'other: true,' in js
     assert 'let nodePacketSeriesEnabled = { ...nodePacketSeriesDefaults };' in js
     assert "function normalizeNodePacketSeries(raw) {" in js
-    assert 'const mapLinkLayerStorageKey = "meshDashboardMapLinkLayerEnabledV1";' in js
+    assert 'const mapPacketLinesStorageKey = "meshDashboardMapPacketLinesEnabledV1";' in js
+    assert 'const mapLinkModeStorageKey = "meshDashboardMapLinkModeV1";' in js
     assert 'const mapLiveActivityStorageKey = "meshDashboardMapLiveActivityEnabledV1";' in js
+    assert "function updateMapPacketLinesControl()" in js
+    assert "function bindMapPacketLinesControl()" in js
     assert "function updateMapLinkLayerControl()" in js
+    assert "function normalizeMapLinkLayerMode(value) {" in js
+    assert "function loadMapPacketLinesPreference()" in js
+    assert "function loadMapLinkLayerModePreference()" in js
     assert "function bindMapLinkLayerControl()" in js
     assert "function updateMapLiveActivityControl()" in js
     assert "function loadMapLiveActivityPreference()" in js
     assert "function bindMapLiveActivityControl()" in js
+    assert 'mapLiveActivityEnabled = true;' in js
+    assert 'wrap.hidden = true;' in js
+    assert 'toggle.checked = true;' in js
+    assert 'toggle.disabled = true;' in js
     assert "function estimatedMarkerStyle(isSelected, confidence = 0.5, isLocal = false)" in js
-    assert "function buildMapLinkLayerOverlay(nodes, rawEdges)" in js
+    assert "function buildMapLinkLayerOverlay(nodes, rawEdges, options = null)" in js
     assert "nodeMarkerKinds" in js
     assert "nodeMarkerConfidence" in js
     assert "linkEstimateLayer" in js
@@ -129,8 +138,8 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "!!mapLiveActivityEnabled" in js
     assert "mapNodeActivityFlashById.set(nodeId, {" in js
     assert "scheduleMapNodeActivityFlashUpdate();" in js
-    assert "seedNetworkMapPacketActivityTokens(latestState);" in js
     assert "if (mapLiveActivityEnabled)" in js
+    assert "syncNetworkMapPacketActivity(state);" in js
 
 
 def test_record_direct_edge_observation_tracks_signal_metrics() -> None:

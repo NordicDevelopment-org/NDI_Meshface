@@ -189,8 +189,14 @@ def test_dashboard_js_supports_status_dot_toggle_in_node_navigator() -> None:
     assert 'if (toggleId === "status-dots") {' in js
     assert 'showStatusDots: !!target.checked,' in js
     assert 'const showStatusDots = (typeof normalizeChatNodeNavigatorShowStatusDotsPref === "function")' in js
+    assert 'const statusVisibilityClass = showStatusDots ? "" : " status-hidden";' in js
     assert 'const statusMarkerClass = showStatusDots ? "" : " is-hidden";' in js
-    assert 'const statusMarkerHtml = `<span class="chat-member-status status-${statusKey}${statusGlyphClass}${statusMarkerClass}"${statusMarkerAttrs}>${statusGlyph}</span>`;' in js
+    assert 'const statusMarkerAttrs = showStatusDots' in js
+    assert "? statusGlyphAttrs" in js
+    assert ': \' aria-hidden="true"\';' in js
+    assert 'const statusMarkerHtml = hasNodeVisualEmoji' in js
+    assert '<span class="chat-member-status chat-member-status-emoji status-${statusKey}${statusMarkerClass}"${statusMarkerAttrs}>' in js
+    assert '<span class="chat-member-status chat-member-status-dot status-${statusKey}${statusMarkerClass}"${statusMarkerAttrs}>●</span>' in js
 
 
 def test_dashboard_js_sorts_status_using_visible_freshness_snapshot() -> None:
@@ -219,18 +225,13 @@ def test_dashboard_js_marks_muted_nodes_in_navigator_rows() -> None:
     assert 'const mutedClass = muted ? " muted-node" : "";' in js
     assert '`Muted: ${muted ? "yes" : "no"}`' in js
     assert 'const hasDirectHistory = directHistoryPeerIds.has(nodeId);' in js
-    assert 'const directHistoryMarkerHtml = hasDirectHistory' in js
-    assert 'const statusGlyph = unreadDirectMarkerHtml || directHistoryMarkerHtml || (muted ? "‖" : "●");' in js
-    assert 'const statusGlyphClass = unreadDirectCount > 0' in js
-    assert '? " is-unread-direct"' in js
-    assert '? " is-direct-history"' in js
-    assert ': (muted ? " is-muted" : ""));' in js
-    assert '${statusGlyphClass}' in js
-    assert '${statusGlyph}' in js
+    assert 'if (unreadDirectCount > 0) {' in js
+    assert 'tooltipLines.splice(4, 0, `Unread direct messages: ${unreadDirectCount}`);' in js
     assert '${mutedClass}' in js
+    assert 'data-unread-direct-count="${escAttr(unreadDirectCount)}"' in js
 
 
-def test_dashboard_js_replaces_node_status_dot_with_message_icon_for_unread_directs() -> None:
+def test_dashboard_js_tracks_unread_direct_counts_and_priority_sections_in_node_navigator() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
@@ -251,12 +252,8 @@ def test_dashboard_js_replaces_node_status_dot_with_message_icon_for_unread_dire
     assert "const unreadDirectCount = Math.max(0, Math.trunc(Number(unreadDirectByPeer.get(nodeId) || 0)));" in js
     assert 'tooltipLines.splice(4, 0, `Unread direct messages: ${unreadDirectCount}`);' in js
     assert '`Pinned: ${((typeof isPinnedNode === "function") && isPinnedNode(nodeId)) ? "yes" : "no"}`' in js
-    assert 'const unreadDirectMarkerHtml = unreadDirectCount > 0' in js
-    assert 'class="chat-member-status-icon chat-member-status-icon-message chat-member-status-icon-message-alert"' in js
-    assert 'const directHistoryMarkerHtml = hasDirectHistory' in js
-    assert 'class="chat-member-status-icon chat-member-status-icon-message"' in js
-    assert 'const statusGlyph = unreadDirectMarkerHtml || directHistoryMarkerHtml || (muted ? "‖" : "●");' in js
-    assert 'const statusGlyphLabel = unreadDirectCount > 0' in js
-    assert 'const statusGlyphAttrs = statusGlyphLabel' in js
+    assert 'data-unread-direct-count="${escAttr(unreadDirectCount)}"' in js
+    assert 'const graphOpen = activeLayoutView === "network" && activeNetworkSubview === "graph";' in js
+    assert 'selectNode(nodeId, true, !graphOpen && unreadDirectCount <= 0);' in js
     assert 'unreadDirectByPeer,' in js
     assert 'directHistoryPeerIds,' in js

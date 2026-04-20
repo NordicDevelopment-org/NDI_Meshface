@@ -214,25 +214,25 @@ def test_mobile_network_and_games_shells_expand_to_single_phone_column() -> None
     assert "justify-content: stretch;" in mobile_section
 
 
-def test_network_subviews_follow_workspace_theme_tokens() -> None:
+def test_network_subviews_follow_workspace_theme_tokens(extract_css_block) -> None:
     css = build_dashboard_css(theme_css="")
 
-    overview_panel_section = css.split("[data-theme=\"dark\"] .network-overview-panel {", 1)[1].split("}", 1)[0]
-    overview_control_section = css.split("[data-theme=\"dark\"] .network-overview-panel .history-metric-wrap {", 1)[1].split("}", 1)[0]
-    overview_primary_control_section = css.split("[data-theme=\"dark\"] .network-overview-primary-controls .history-metric-wrap {", 1)[1].split("}", 1)[0]
-    overview_chart_section = css.split("[data-theme=\"dark\"] .network-overview-panel #network-overview-chart-wrap {", 1)[1].split("}", 1)[0]
-    overview_stat_section = css.split("[data-theme=\"dark\"] .network-overview-panel .overview-item {", 1)[1].split("}", 1)[0]
-    sensors_panel_section = css.split("[data-theme=\"dark\"] .network-sensors-panel .env-metrics-explorer {", 1)[1].split("}", 1)[0]
-    sensors_control_section = css.split("[data-theme=\"dark\"] .network-sensors-panel .env-metrics-control-group {", 1)[1].split("}", 1)[0]
-    sensors_chart_section = css.split("[data-theme=\"dark\"] .network-sensors-panel #env-metrics-chart-wrap {", 1)[1].split("}", 1)[0]
-    diagnostics_pane_section = css.split("[data-theme=\"dark\"] .network-diagnostics-pane {", 1)[1].split("}", 1)[0]
-    diagnostics_sender_section = css.split("[data-theme=\"dark\"] .network-diagnostics-sender {", 1)[1].split("}", 1)[0]
-    diagnostics_entry_section = css.split("[data-theme=\"dark\"] .network-diagnostics-entry {", 1)[1].split("}", 1)[0]
-    diagnostics_payload_section = css.split("[data-theme=\"dark\"] .network-diagnostics-entry-payload {", 1)[1].split("}", 1)[0]
-    graph_chip_section = css.split("[data-theme=\"dark\"] .network-graph-chip {", 1)[1].split("}", 1)[0]
-    graph_stage_section = css.split("[data-theme=\"dark\"] .network-graph-stage {", 1)[1].split("}", 1)[0]
-    graph_edge_section = css.split("[data-theme=\"dark\"] .network-graph-edge {", 1)[1].split("}", 1)[0]
-    graph_root_section = css.split("[data-theme=\"dark\"] .network-graph-node.is-root .network-graph-node-core {", 1)[1].split("}", 1)[0]
+    overview_panel_section = extract_css_block(css, '[data-theme="dark"] .network-overview-panel')
+    overview_control_section = extract_css_block(css, '[data-theme="dark"] .network-overview-panel .history-metric-wrap')
+    overview_primary_control_section = extract_css_block(css, '[data-theme="dark"] .network-overview-primary-controls .history-metric-wrap')
+    overview_chart_section = extract_css_block(css, '[data-theme="dark"] .network-overview-panel #network-overview-chart-wrap')
+    overview_stat_section = extract_css_block(css, '[data-theme="dark"] .network-overview-panel .overview-item')
+    sensors_panel_section = extract_css_block(css, '[data-theme="dark"] .network-sensors-panel .env-metrics-explorer')
+    sensors_control_section = extract_css_block(css, '[data-theme="dark"] .network-sensors-panel .env-metrics-control-group')
+    sensors_chart_section = extract_css_block(css, '[data-theme="dark"] .network-sensors-panel #env-metrics-chart-wrap')
+    diagnostics_pane_section = extract_css_block(css, '[data-theme="dark"] .network-diagnostics-pane')
+    diagnostics_sender_section = extract_css_block(css, '[data-theme="dark"] .network-diagnostics-sender')
+    diagnostics_entry_section = extract_css_block(css, '[data-theme="dark"] .network-diagnostics-entry')
+    diagnostics_payload_section = extract_css_block(css, '[data-theme="dark"] .network-diagnostics-entry-payload')
+    graph_chip_section = extract_css_block(css, '[data-theme="dark"] .network-graph-chip')
+    graph_stage_section = extract_css_block(css, '[data-theme="dark"] .network-graph-stage')
+    graph_edge_section = extract_css_block(css, '[data-theme="dark"] .network-graph-edge')
+    graph_root_section = extract_css_block(css, '[data-theme="dark"] .network-graph-node.is-root .network-graph-node-core')
 
     assert "var(--workspace-shell-bg-alt)" in overview_panel_section
     assert "var(--workspace-shell-active-bg)" in overview_panel_section
@@ -245,7 +245,7 @@ def test_network_subviews_follow_workspace_theme_tokens() -> None:
     assert "var(--workspace-shell-active-bg)" in overview_stat_section
     assert "var(--workspace-shell-border)" in sensors_panel_section
     assert "var(--workspace-shell-bg-alt)" in sensors_panel_section
-    assert "var(--workspace-shell-border-muted)" in sensors_control_section
+    assert "var(--workspace-shell-border)" in sensors_control_section
     assert "var(--workspace-shell-border)" in sensors_chart_section
     assert "var(--workspace-shell-border)" in diagnostics_pane_section
     assert "var(--workspace-shell-bg-alt)" in diagnostics_pane_section
@@ -331,16 +331,16 @@ def test_dark_text_input_variants_use_neutral_ui_tokens_for_chat_compose_control
     assert "opacity: 0.9;" in css
 
 
-def test_games_boards_follow_runtime_theme_tokens() -> None:
+def test_games_boards_follow_runtime_theme_tokens(extract_css_block) -> None:
     css = build_dashboard_css(theme_css="")
 
-    board_wrap_section = css.split(".games-board-wrap {", 1)[1].split("}", 1)[0]
-    reversi_board_section = css.split(".reversi-board {", 1)[1].split("}", 1)[0]
-    reversi_cell_section = css.split(".reversi-cell {", 1)[1].split("}", 1)[0]
-    classic_board_section = css.split(".checkers-board,\n    .chess-board {", 1)[1].split("}", 1)[0]
-    dark_board_wrap_section = css.split("[data-theme=\"dark\"] .games-board-wrap {", 1)[1].split("}", 1)[0]
-    dark_reversi_board_section = css.split("[data-theme=\"dark\"] .reversi-board {", 1)[1].split("}", 1)[0]
-    dark_classic_board_section = css.split("[data-theme=\"dark\"] .checkers-board,\n    [data-theme=\"dark\"] .chess-board {", 1)[1].split("}", 1)[0]
+    board_wrap_section = extract_css_block(css, ".games-board-wrap")
+    reversi_board_section = extract_css_block(css, ".reversi-board")
+    reversi_cell_section = extract_css_block(css, ".reversi-cell")
+    classic_board_section = extract_css_block(css, ".checkers-board,\n    .chess-board,\n    .wall-chess-board")
+    dark_board_wrap_section = extract_css_block(css, '[data-theme="dark"] .games-board-wrap')
+    dark_reversi_board_section = extract_css_block(css, '[data-theme="dark"] .reversi-board')
+    dark_classic_board_section = extract_css_block(css, '[data-theme="dark"] .checkers-board')
 
     assert "var(--ui-accent-soft, var(--accent, #2f855a))" in board_wrap_section
     assert "var(--games-board-frame)" in board_wrap_section
@@ -520,23 +520,30 @@ def test_node_navigator_menu_follows_workspace_shell_tokens() -> None:
     assert "#16261f" not in sort_btn_section
 
 
-def test_node_navigator_unread_direct_marker_reuses_status_slot_geometry() -> None:
+def test_node_navigator_status_marker_geometry_supports_dot_and_emoji_variants(extract_css_block) -> None:
     css = build_dashboard_css(theme_css="")
 
-    status_section = css.split(".chat-member-item.tagged-node.selected-node {", 1)[1].split(".chat-member-status {", 1)[1].split("}", 1)[0]
-    unread_section = css.split(".chat-member-status.is-unread-direct {", 1)[1].split("}", 1)[0]
-    history_section = css.split(".chat-member-status.is-direct-history {", 1)[1].split("}", 1)[0]
-    icon_section = css.split(".chat-member-status-icon {", 1)[1].split("}", 1)[0]
+    hidden_item_section = extract_css_block(css, ".chat-member-item.status-hidden")
+    status_section = extract_css_block(css, ".chat-member-status")
+    dot_section = extract_css_block(css, ".chat-member-status-dot")
+    emoji_section = extract_css_block(css, ".chat-member-status-emoji")
+    ring_section = extract_css_block(css, ".chat-member-status-ring")
+    glyph_section = extract_css_block(css, ".chat-member-status-emoji-glyph")
 
-    assert "min-width: 12px;" in status_section
-    assert "display: inline-flex;" in unread_section
-    assert "justify-content: center;" in unread_section
-    assert "display: inline-flex;" in history_section
-    assert "justify-content: center;" in history_section
-    assert "width: 12px;" in icon_section
-    assert "height: 12px;" in icon_section
-    assert "stroke: currentColor;" in icon_section
-    assert "vector-effect: non-scaling-stroke;" in icon_section
+    assert "grid-template-columns: 0 minmax(0, 1fr);" in hidden_item_section
+    assert "width: 18px;" in status_section
+    assert "min-width: 18px;" in status_section
+    assert "height: 18px;" in status_section
+    assert "display: inline-flex;" in status_section
+    assert "justify-content: center;" in status_section
+    assert "font-size: 11px;" in dot_section
+    assert "font-size: 13px;" in emoji_section
+    assert "isolation: isolate;" in emoji_section
+    assert "position: absolute;" in ring_section
+    assert "border-radius: 999px;" in ring_section
+    assert "border: 1.5px solid currentColor;" in ring_section
+    assert "position: relative;" in glyph_section
+    assert "transform: translateY(0.2px);" in glyph_section
 
 
 def test_history_chart_surfaces_follow_workspace_shell_tokens() -> None:

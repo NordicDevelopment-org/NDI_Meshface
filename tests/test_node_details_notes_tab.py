@@ -172,8 +172,8 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'const nextChatHtml = renderChatInDrawer ? chatSection : "";' in js
     assert 'const nextLinksHtml = renderLinksInDrawer ? linksSection : "";' in js
     assert 'const nextNotesHtml = renderNotesInDrawer ? notesSection : "";' in js
-    assert 'messagesHost.innerHTML = "";' in js
-    assert 'messagesPanel.hidden = activeTab !== "messages";' in js
+    assert 'setDrawerElementHtmlIfChanged(messagesHost, "", "messages");' in js
+    assert 'syncDrawerPanelHiddenState(messagesPanel, activeTab === "messages");' in js
     assert 'setChatNodeDetailsDrawerTab("messages"' in js
     assert 'const drawerMessagesHost = document.getElementById("chat-node-details-messages-host");' in js
     assert 'mode: "drawer"' in js
@@ -201,19 +201,18 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'function normalizeNodeTagEmoji(value, fallback = "") {' in js
     assert 'const emoji = normalizeNodeTagEmoji(base.emoji ?? base.icon ?? base.badge, fallback.emoji);' in js
     assert 'function nodeEmojiOverrideForNode(nodeId) {' in js
-    assert 'function nodeVisualEmojiForNode(nodeId, tagEntry = null) {' in js
+    assert 'function nodeVisualEmojiForNode(nodeId, tagEntry = null, node = null) {' in js
     assert 'function saveNodeEmojiOverride(nodeId, rawEmoji, options = null) {' in js
     assert 'function clearNodeTagAndEmojiForNode(nodeId, options = null) {' in js
     assert 'emoji: normalizeNodeTagEmoji(preset.emoji, ""),' in js
     assert 'id="favorite-menu-tag-emoji-input"' in js
     assert 'id="favorite-menu-node-emoji-input"' in js
     assert 'id="settings-node-tag-emoji-input"' in js
-    assert 'id="chat-node-details-icon-btn"' in js
-    assert 'id="chat-node-details-icon-chip"' in js
-    assert 'id="chat-node-details-head-icon-input"' in js
-    assert 'id="chat-node-details-reset-btn"' in js
-    assert 'nodeTagChipEmojiHtml(tagEntry)' in js
-    assert 'iconChip.innerHTML = nodeTagChipEmojiHtml(tagEntry, selectedId);' in js
+    assert 'const iconBtn = document.getElementById("chat-node-details-icon-btn");' in js
+    assert 'const iconChip = document.getElementById("chat-node-details-icon-chip");' in js
+    assert 'const iconInput = document.getElementById("chat-node-details-head-icon-input");' in js
+    assert 'iconChip.className = "chat-node-details-icon-chip";' in js
+    assert 'iconChip.innerHTML = `<span class="chat-node-details-icon-glyph" aria-hidden="true">${escAttr(effectiveEmoji)}</span>`;' in js
     assert 'let chatEmojiTagTargetInput = null;' in js
     assert 'chatEmojiMode === "tag" && chatEmojiTagTargetInput instanceof HTMLInputElement' in js
     assert 'chatEmojiMode === "tag" && tagTargetInput instanceof HTMLInputElement' in js
@@ -255,7 +254,8 @@ def test_dashboard_js_avoids_rebuilding_saved_node_details_on_unchanged_polls() 
     )
 
     assert 'noteInput.dataset.noteEditorBound === "1"' in js
-    assert 'const detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsHtml, "saved-node-details");' in js
+    assert 'detailsMarkupChanged = setElementHtmlIfChanged(host, nextDetailsShellHtml, "saved-node-details-shell");' in js
+    assert 'detailsMarkupChanged = setElementHtmlIfChanged(sectionsHost, nextSectionsHtml, "saved-node-sections") || detailsMarkupChanged;' in js
     assert 'const notesMarkupChanged = setElementHtmlIfChanged(notesHost, nextNotesHtml, "chat-node-details-notes");' in js
     assert 'if (detailsMarkupChanged || notesMarkupChanged) {' in js
     assert 'if ((detailsMarkupChanged || notesMarkupChanged) && previousNodeId === nodeId) {' in js
@@ -271,7 +271,7 @@ def test_dashboard_js_renders_top_peer_as_clickable_node_link() -> None:
 
     assert 'function savedDetailHtmlValue(html, text = "", fallback = "n/a") {' in js
     assert 'function savedDetailValueMarkup(value, fallback = "n/a") {' in js
-    assert 'const topPeerId = normalizeNodeId(linkStats.topPeer || "");' in js
+    assert 'const topPeerId = normalizeNodeId((linkStats && linkStats.topPeer) || "");' in js
     assert 'const topPeerLabel = savedDetailText(topPeerName || topPeerId, topPeerId || "n/a");' in js
     assert 'class="saved-node-inline-link"' in js
     assert 'bindSavedNodeDetailLinkButtons(host);' in js

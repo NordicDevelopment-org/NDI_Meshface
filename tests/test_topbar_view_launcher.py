@@ -29,8 +29,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
         node_history_max_points=240,
     )
 
-    assert 'class="workspace-launcher-row"' in html
-    assert 'class="workspace-launcher-row" aria-label="Dashboard views">' in html
+    assert 'class="chat-users-head"' in html
     assert 'class="workspace-launcher-shell chat-users-head-launcher-shell"' in html
     assert 'id="theme-toggle-inline-btn"' in html
     assert 'data-theme-toggle="compact"' in html
@@ -75,7 +74,6 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'class="chat-users-head-gear-icon"' in html
     assert '>View</button>' not in html
     assert '<aside class="teams-rail"' not in html
-    assert re.search(r'<div class="workspace-launcher-row"[\s\S]*id="topbar-update-ticker"', html)
     assert re.search(
         r'<div class="chat-users-head"[\s\S]*id="theme-toggle-inline-btn"[\s\S]*id="layout-view-menu-btn"[\s\S]*id="chat-panel-collapse-btn"',
         html,
@@ -102,7 +100,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert ".topbar-update-ticker {" in css
     assert ".workspace-update-ticker {" in css
     assert "flex: 1 1 auto;" in css
-    assert "--topbar-corner-reserve: 0px;" in css
+    assert "--topbar-corner-reserve: 36px;" in css
     assert "padding-right: var(--topbar-right-inset);" in css
     assert ".topbar-view-menu-btn {" in css
     assert ".topbar-view-menu-btn-main {" in css
@@ -133,7 +131,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "padding: 8px 8px 0;" in topbar_section
     assert "box-shadow: none;" in topbar_section
     assert "padding: 0;" in topbar_sub_section
-    assert "padding-right: 0;" in topbar_summary_row_padding_section
+    assert "padding-right: calc(var(--topbar-corner-reserve, 36px) + 4px);" in css
     assert "box-shadow: none;" in topbar_ticker_section
     assert "box-shadow: none;" in topbar_update_section
     assert "box-shadow: none;" in topbar_launcher_section
