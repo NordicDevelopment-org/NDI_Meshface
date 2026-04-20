@@ -152,6 +152,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function collectNetworkGraphAncestorScores(nodeId, targetLayer, layerByNodeId, parentHintsByNodeId, memo = new Map())' in js
     assert 'function resolveNetworkGraphBestClusterCandidate(candidateScores, degreeMeta, fallbackId = "")' in js
     assert 'function chunkNetworkGraphNodeIds(nodeIds, chunkSize = 1)' in js
+    assert 'function compareNetworkGraphDisconnectedCandidates(candidateA, candidateB, degreeMeta, nodeMap)' in js
+    assert 'function limitNetworkGraphDisconnectedNodeIds(' in js
     assert 'function doesNetworkGraphViewBoxContainBounds(viewBox, bounds, paddingRatio = 0.04)' in js
     assert 'const excludeDisconnected = !!(options && options.excludeDisconnected);' in js
     assert 'if (excludeDisconnected && item.disconnected) continue;' in js
@@ -181,6 +183,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const rootClusterIdSet = new Set(rootClusterIds);' in js
     assert 'const clusterIdByNodeId = new Map([[rootId, rootId]]);' in js
     assert 'const clusterLabelNodeIds = new Set();' in js
+    assert 'const preferredVisibleCount = Math.max(0, (totalDisconnectedCount * 2) - safeConnectedCount);' in js
+    assert 'const visibleCount = Math.max(preservedNodeIds.size, preferredVisibleCount);' in js
+    assert 'const disconnectedVisibility = limitNetworkGraphDisconnectedNodeIds(' in js
+    assert 'const visibleBroadcastOnlyDisconnected = Array.isArray(disconnectedVisibility.broadcastOnlyNodeIds)' in js
+    assert 'const disconnectedRingCount = (visibleBroadcastOnlyDisconnected.length ? 1 : 0) + (visibleDisconnected.length ? 1 : 0);' in js
     assert 'const subclusterMembersById = new Map([[clusterId, [clusterId]]]);' in js
     assert 'const branchDescriptors = Array.from(subclusterMembersById.entries())' in js
     assert 'const cellDescriptors = [];' in js
@@ -223,6 +230,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'if (weeklySummaryPromise) {' in js
     assert 'const networkGraphActive = next === "network" && activeNetworkSubview === "graph";' in js
     assert 'const rootChanged = networkGraphViewState.lastRootId !== rootId;' in js
+    assert 'hiddenBroadcastOnlyCount: Math.max(0, Number(disconnectedVisibility.hiddenBroadcastOnlyCount) || 0),' in js
+    assert 'hiddenDisconnectedCount: Math.max(0, Number(disconnectedVisibility.hiddenDetachedCount) || 0),' in js
     assert '&& !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)' in js
     assert 'const shouldRefitForModeChange = !!(' in js
     assert 'animateNetworkGraphViewBox(svg, fittedViewBox);' in js

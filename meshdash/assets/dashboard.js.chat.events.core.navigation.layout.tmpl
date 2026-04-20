@@ -3304,6 +3304,130 @@
       return chunks;
     }}
 
+    function compareNetworkGraphDisconnectedCandidates(candidateA, candidateB, degreeMeta, nodeMap) {{
+      const safeCandidateA = (candidateA && typeof candidateA === "object") ? candidateA : {{}};
+      const safeCandidateB = (candidateB && typeof candidateB === "object") ? candidateB : {{}};
+      const preserveDelta = Number(!!safeCandidateB.preserve) - Number(!!safeCandidateA.preserve);
+      if (preserveDelta !== 0) return preserveDelta;
+      const broadcastDelta = Number(!!safeCandidateB.broadcastOnly) - Number(!!safeCandidateA.broadcastOnly);
+      if (broadcastDelta !== 0) return broadcastDelta;
+      const signalMetaA = (safeCandidateA.signalMeta && typeof safeCandidateA.signalMeta === "object") ? safeCandidateA.signalMeta : {{}};
+      const signalMetaB = (safeCandidateB.signalMeta && typeof safeCandidateB.signalMeta === "object") ? safeCandidateB.signalMeta : {{}};
+      const livePacketDelta = Math.max(0, Number(signalMetaB.packetCount) || 0) - Math.max(0, Number(signalMetaA.packetCount) || 0);
+      if (livePacketDelta !== 0) return livePacketDelta;
+      const broadcastPacketDelta = Math.max(0, Number(signalMetaB.broadcastPacketCount) || 0) - Math.max(0, Number(signalMetaA.broadcastPacketCount) || 0);
+      if (broadcastPacketDelta !== 0) return broadcastPacketDelta;
+      const savedPacketDelta = Math.max(0, Number(signalMetaB.savedPackets) || 0) - Math.max(0, Number(signalMetaA.savedPackets) || 0);
+      if (savedPacketDelta !== 0) return savedPacketDelta;
+      const nodeA = (safeCandidateA.node && typeof safeCandidateA.node === "object") ? safeCandidateA.node : null;
+      const nodeB = (safeCandidateB.node && typeof safeCandidateB.node === "object") ? safeCandidateB.node : null;
+      const positionHintDelta = Number(!!(nodeB && nodeB.has_position)) - Number(!!(nodeA && nodeA.has_position));
+      if (positionHintDelta !== 0) return positionHintDelta;
+      const lastPositionDelta = Math.max(0, Number(nodeB && nodeB.last_position_unix) || 0) - Math.max(0, Number(nodeA && nodeA.last_position_unix) || 0);
+      if (lastPositionDelta !== 0) return lastPositionDelta;
+      const lastHeardDelta = Math.max(0, Number(signalMetaB.lastHeardUnix) || 0) - Math.max(0, Number(signalMetaA.lastHeardUnix) || 0);
+      if (lastHeardDelta !== 0) return lastHeardDelta;
+      const placeholderDelta = Number(!!(nodeA && nodeA.is_graph_placeholder)) - Number(!!(nodeB && nodeB.is_graph_placeholder));
+      if (placeholderDelta !== 0) return placeholderDelta;
+      const hopsA = Number(signalMetaA.hopsAway);
+      const hopsB = Number(signalMetaB.hopsAway);
+      const safeHopsA = Number.isFinite(hopsA) ? hopsA : Number.POSITIVE_INFINITY;
+      const safeHopsB = Number.isFinite(hopsB) ? hopsB : Number.POSITIVE_INFINITY;
+      if (safeHopsA !== safeHopsB) return safeHopsA - safeHopsB;
+      return compareNetworkGraphNodeIds(
+        normalizeNodeId(safeCandidateA.nodeId || ""),
+        normalizeNodeId(safeCandidateB.nodeId || ""),
+        degreeMeta,
+        nodeMap
+      );
+    }}
+
+    function limitNetworkGraphDisconnectedNodeIds(
+      broadcastOnlyNodeIds,
+      detachedNodeIds,
+      connectedCount,
+      nodeMap,
+      signalMetaByNodeId,
+      degreeMeta,
+      options = {{}}
+    ) {{
+      const broadcastCandidates = Array.isArray(broadcastOnlyNodeIds)
+        ? broadcastOnlyNodeIds.map((nodeId) => normalizeNodeId(nodeId)).filter(Boolean)
+        : [];
+      const detachedCandidates = Array.isArray(detachedNodeIds)
+        ? detachedNodeIds.map((nodeId) => normalizeNodeId(nodeId)).filter(Boolean)
+        : [];
+      const selectedId = normalizeNodeId(options && options.selectedId || "");
+      const localNodeId = normalizeNodeId(options && options.localNodeId || "");
+      const rootId = normalizeNodeId(options && options.rootId || "");
+      const seenNodeIds = new Set();
+      const candidates = [];
+      const appendCandidate = (nodeId, broadcastOnly) => {{
+        const cleanNodeId = normalizeNodeId(nodeId || "");
+        if (!cleanNodeId || seenNodeIds.has(cleanNodeId)) return;
+        seenNodeIds.add(cleanNodeId);
+        candidates.push({{
+          nodeId: cleanNodeId,
+          broadcastOnly: !!broadcastOnly,
+          preserve: !!(
+            cleanNodeId === selectedId
+            || cleanNodeId === localNodeId
+            || cleanNodeId === rootId
+          ),
+          node: nodeMap instanceof Map ? (nodeMap.get(cleanNodeId) || null) : null,
+          signalMeta: signalMetaByNodeId instanceof Map ? (signalMetaByNodeId.get(cleanNodeId) || null) : null,
+        }});
+      }};
+      broadcastCandidates.forEach((nodeId) => appendCandidate(nodeId, true));
+      detachedCandidates.forEach((nodeId) => appendCandidate(nodeId, false));
+      const totalDisconnectedCount = candidates.length;
+      if (totalDisconnectedCount <= 0) {{
+        return {{
+          broadcastOnlyNodeIds: [],
+          detachedNodeIds: [],
+          hiddenBroadcastOnlyCount: 0,
+          hiddenDetachedCount: 0,
+          visibleCount: 0,
+          totalCount: 0,
+        }};
+      }}
+      const safeConnectedCount = Math.max(0, Math.trunc(Number(connectedCount) || 0));
+      const preferredVisibleCount = Math.max(0, (totalDisconnectedCount * 2) - safeConnectedCount);
+      if (preferredVisibleCount >= totalDisconnectedCount) {{
+        return {{
+          broadcastOnlyNodeIds: broadcastCandidates,
+          detachedNodeIds: detachedCandidates,
+          hiddenBroadcastOnlyCount: 0,
+          hiddenDetachedCount: 0,
+          visibleCount: totalDisconnectedCount,
+          totalCount: totalDisconnectedCount,
+        }};
+      }}
+      const rankedCandidates = candidates.slice().sort((candidateA, candidateB) => (
+        compareNetworkGraphDisconnectedCandidates(candidateA, candidateB, degreeMeta, nodeMap)
+      ));
+      const preservedNodeIds = new Set(
+        rankedCandidates.filter((candidate) => !!candidate.preserve).map((candidate) => candidate.nodeId)
+      );
+      const visibleCount = Math.max(preservedNodeIds.size, preferredVisibleCount);
+      const visibleNodeIds = new Set();
+      rankedCandidates.forEach((candidate, index) => {{
+        if (index < visibleCount || candidate.preserve) {{
+          visibleNodeIds.add(candidate.nodeId);
+        }}
+      }});
+      const visibleBroadcastOnlyNodeIds = broadcastCandidates.filter((nodeId) => visibleNodeIds.has(nodeId));
+      const visibleDetachedNodeIds = detachedCandidates.filter((nodeId) => visibleNodeIds.has(nodeId));
+      return {{
+        broadcastOnlyNodeIds: visibleBroadcastOnlyNodeIds,
+        detachedNodeIds: visibleDetachedNodeIds,
+        hiddenBroadcastOnlyCount: Math.max(0, broadcastCandidates.length - visibleBroadcastOnlyNodeIds.length),
+        hiddenDetachedCount: Math.max(0, detachedCandidates.length - visibleDetachedNodeIds.length),
+        visibleCount: visibleNodeIds.size,
+        totalCount: totalDisconnectedCount,
+      }};
+    }}
+
     function buildNetworkGraphLayout(nodeMap, combinedEdges, state) {{
       const adjacency = buildNetworkGraphAdjacency(nodeMap, combinedEdges);
       const safeState = (state && typeof state === "object") ? state : {{}};
@@ -3322,6 +3446,8 @@
         }});
       }}
       const signalMetaByNodeId = buildNetworkGraphNodeSignalMeta(nodeMap, recentPackets);
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || "");
 
       const rootId = resolveNetworkGraphRootId(nodeMap, adjacency, degreeMeta, state);
       if (!rootId) {{
@@ -3339,6 +3465,8 @@
           connectedCount: 0,
           broadcastOnlyCount: 0,
           disconnectedCount: 0,
+          hiddenBroadcastOnlyCount: 0,
+          hiddenDisconnectedCount: 0,
         }};
       }}
 
@@ -3396,6 +3524,7 @@
       }}
       const firstLayerCount = Array.isArray(layers.get(1)) ? layers.get(1).length : 0;
       const secondLayerCount = Array.isArray(layers.get(2)) ? layers.get(2).length : 0;
+      const connectedCount = layerByNodeId.size;
 
       const disconnectedCandidates = Array.from(nodeMap.keys())
         .filter((nodeId) => !layerByNodeId.has(nodeId))
@@ -3416,6 +3545,25 @@
           disconnected.push(nodeId);
         }}
       }}
+      const disconnectedVisibility = limitNetworkGraphDisconnectedNodeIds(
+        broadcastOnlyDisconnected,
+        disconnected,
+        connectedCount,
+        nodeMap,
+        signalMetaByNodeId,
+        degreeMeta,
+        {{
+          selectedId,
+          localNodeId,
+          rootId,
+        }}
+      );
+      const visibleBroadcastOnlyDisconnected = Array.isArray(disconnectedVisibility.broadcastOnlyNodeIds)
+        ? disconnectedVisibility.broadcastOnlyNodeIds
+        : [];
+      const visibleDisconnected = Array.isArray(disconnectedVisibility.detachedNodeIds)
+        ? disconnectedVisibility.detachedNodeIds
+        : [];
 
       const centerX = 480;
       const centerY = 310;
@@ -3448,7 +3596,7 @@
             baseFirstRingRadius,
             Math.min(maxConnectedLayer === 1 ? 260 : 176, denseFirstRingRadius)
           );
-      const disconnectedRingCount = (broadcastOnlyDisconnected.length ? 1 : 0) + (disconnected.length ? 1 : 0);
+      const disconnectedRingCount = (visibleBroadcastOnlyDisconnected.length ? 1 : 0) + (visibleDisconnected.length ? 1 : 0);
       const outerConnectedRadius = Math.max(
         disconnectedRingCount ? 228 : 262,
         Math.min(disconnectedRingCount ? 286 : 320, firstRingRadius + Math.max(56, (maxConnectedLayer - 1) * 56))
@@ -3477,17 +3625,17 @@
       }}
 
       const disconnectedGroups = [];
-      if (broadcastOnlyDisconnected.length) {{
+      if (visibleBroadcastOnlyDisconnected.length) {{
         disconnectedGroups.push({{
-          nodeIds: broadcastOnlyDisconnected,
+          nodeIds: visibleBroadcastOnlyDisconnected,
           label: "broadcast-only",
           detached: false,
           broadcastOnly: true,
         }});
       }}
-      if (disconnected.length) {{
+      if (visibleDisconnected.length) {{
         disconnectedGroups.push({{
-          nodeIds: disconnected,
+          nodeIds: visibleDisconnected,
           label: "detached",
           detached: true,
           broadcastOnly: false,
@@ -4017,7 +4165,6 @@
         }});
         rings.length = 0;
       }}
-      const selectedId = normalizeNodeId(selectedNodeId || "");
       const visibleLabelNodeIds = new Set();
       if (nodeMap.size <= 18 || layoutMode === "tree" || layoutMode === "community") {{
         for (const nodeId of positions.keys()) {{
@@ -4100,14 +4247,16 @@
         regions,
         edges: combinedEdges,
         signalMetaByNodeId,
-        connectedCount: layerByNodeId.size,
-        broadcastOnlyCount: broadcastOnlyDisconnected.length
+        connectedCount,
+        broadcastOnlyCount: visibleBroadcastOnlyDisconnected.length
           + (
             positions.get(rootId) && positions.get(rootId).broadcastOnly
               ? 1
               : 0
           ),
-        disconnectedCount: disconnected.length,
+        disconnectedCount: visibleDisconnected.length,
+        hiddenBroadcastOnlyCount: Math.max(0, Number(disconnectedVisibility.hiddenBroadcastOnlyCount) || 0),
+        hiddenDisconnectedCount: Math.max(0, Number(disconnectedVisibility.hiddenDetachedCount) || 0),
       }};
     }}
 
