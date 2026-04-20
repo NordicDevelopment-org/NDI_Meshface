@@ -273,6 +273,52 @@ def test_network_overview_primary_controls_only_show_on_overview_subview() -> No
     assert "syncNetworkOverviewPrimaryControls(next, activeNetworkSubview);" in js
 
 
+def test_history_window_controls_trail_and_stay_right_anchored() -> None:
+    html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
+        style_css="",
+        app_js="",
+        revision_title="rev",
+        revision_label="rev",
+        safety_label="safe",
+        packet_limit=100,
+        history_label="history",
+        refresh_ms=1000,
+    )
+    css = build_dashboard_css(theme_css="")
+
+    overview_controls_section = html.split('id="network-overview-primary-controls"', 1)[1].split(
+        '<div id="network-map-controls-host"',
+        1,
+    )[0]
+    weekly_controls_section = html.split('<div class="history-metric-controls">', 1)[1].split(
+        '<div id="weekly-summary-chart-wrap">',
+        1,
+    )[0]
+    env_controls_section = html.split('<div class="env-metrics-controls">', 1)[1].split(
+        '<div class="env-metrics-grid">',
+        1,
+    )[0]
+    diagnostics_actions_section = html.split('<div class="network-diagnostics-toolbar-actions">', 1)[1].split(
+        '</div>',
+        1,
+    )[0]
+    window_wrap_section = css.split(".history-window-wrap {", 1)[1].split("}", 1)[0]
+
+    assert overview_controls_section.index('for="network-overview-metric"') < overview_controls_section.index(
+        'for="network-overview-window"'
+    )
+    assert weekly_controls_section.index('for="weekly-summary-metric"') < weekly_controls_section.index(
+        'for="weekly-summary-window"'
+    )
+    assert env_controls_section.index('for="env-metric-select"') < env_controls_section.index('for="env-window-select"')
+    assert diagnostics_actions_section.index('network-diagnostics-refresh-btn') < diagnostics_actions_section.index(
+        'for="network-diagnostics-window"'
+    )
+    assert "margin-left: auto;" in window_wrap_section
+
+
 def test_network_sensors_docked_explorer_reuses_overview_light_shell() -> None:
     css = build_dashboard_css(theme_css="")
 

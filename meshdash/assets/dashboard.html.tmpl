@@ -2600,7 +2600,7 @@
                     <option value="sensors">Sensors</option>
                   </select>
                 </div>
-                <div class="history-metric-wrap">
+                <div class="history-metric-wrap history-window-wrap">
                   <label for="network-overview-window" class="history-metric-label">Window</label>
                   <select id="network-overview-window" class="history-metric-select" aria-label="Network overview window">
                     <option value="6">6h</option>
@@ -2833,7 +2833,13 @@
                       </p>
                     </div>
                     <div class="network-diagnostics-toolbar-actions">
-                      <label class="history-metric-wrap network-diagnostics-window-wrap" for="network-diagnostics-window">
+                      <button
+                        id="network-diagnostics-refresh-btn"
+                        class="map-reset-view-btn"
+                        type="button"
+                        title="Refresh malformed text diagnostics"
+                      >Refresh</button>
+                      <label class="history-metric-wrap history-window-wrap network-diagnostics-window-wrap" for="network-diagnostics-window">
                         <span class="history-metric-label">Window</span>
                         <select id="network-diagnostics-window" class="history-metric-select" aria-label="Malformed text diagnostics window">
                           <option value="24">24h</option>
@@ -2842,12 +2848,6 @@
                           <option value="720">30d</option>
                         </select>
                       </label>
-                      <button
-                        id="network-diagnostics-refresh-btn"
-                        class="map-reset-view-btn"
-                        type="button"
-                        title="Refresh malformed text diagnostics"
-                      >Refresh</button>
                     </div>
                   </div>
                   <div id="network-diagnostics-overview" class="overview-grid network-diagnostics-overview"></div>
@@ -3132,18 +3132,6 @@
                 <div id="weekly-summary-caption" class="history-caption">Minute-level trend by saved snapshots.</div>
                 <div class="history-metric-controls">
                   <div class="history-metric-wrap">
-                    <label for="weekly-summary-window" class="history-metric-label">Window</label>
-                    <select id="weekly-summary-window" class="history-metric-select" aria-label="Weekly summary window">
-                      <option value="6">6h</option>
-                      <option value="12">12h</option>
-                      <option value="24">24h</option>
-                      <option value="72">72h</option>
-                      <option value="168" selected>7d</option>
-                      <option value="336">14d</option>
-                      <option value="720">30d</option>
-                    </select>
-                  </div>
-                  <div class="history-metric-wrap">
                     <label for="weekly-summary-metric" class="history-metric-label">Metric</label>
                     <select id="weekly-summary-metric" class="history-metric-select" aria-label="Weekly summary metric">
                       <option value="packets">Packets</option>
@@ -3189,6 +3177,18 @@
                       />
                       <span>Position</span>
                     </label>
+                  </div>
+                  <div class="history-metric-wrap history-window-wrap">
+                    <label for="weekly-summary-window" class="history-metric-label">Window</label>
+                    <select id="weekly-summary-window" class="history-metric-select" aria-label="Weekly summary window">
+                      <option value="6">6h</option>
+                      <option value="12">12h</option>
+                      <option value="24">24h</option>
+                      <option value="72">72h</option>
+                      <option value="168" selected>7d</option>
+                      <option value="336">14d</option>
+                      <option value="720">30d</option>
+                    </select>
                   </div>
                 </div>
                 <div id="weekly-summary-chart-wrap">
@@ -3331,7 +3331,13 @@
         <div id="environment-metrics-home" class="environment-metrics-home">
           <section class="env-metrics-explorer" aria-label="Sensor metrics explorer">
             <div class="env-metrics-controls">
-              <div id="env-window-wrap" class="history-metric-wrap env-metrics-control-group">
+              <div class="history-metric-wrap env-metrics-control-group">
+                <label for="env-metric-select">Metric</label>
+                <select id="env-metric-select" class="env-metric-select" aria-label="Sensor metric selector">
+                  <option value="">No environment metrics</option>
+                </select>
+              </div>
+              <div id="env-window-wrap" class="history-metric-wrap history-window-wrap env-metrics-control-group">
                 <label for="env-window-select">Window</label>
                 <select id="env-window-select" class="env-metric-select" aria-label="Sensor history window">
                   <option value="6">6h</option>
@@ -3341,12 +3347,6 @@
                   <option value="168">7d</option>
                   <option value="336">14d</option>
                   <option value="720">30d</option>
-                </select>
-              </div>
-              <div class="history-metric-wrap env-metrics-control-group">
-                <label for="env-metric-select">Metric</label>
-                <select id="env-metric-select" class="env-metric-select" aria-label="Sensor metric selector">
-                  <option value="">No environment metrics</option>
                 </select>
               </div>
             </div>
