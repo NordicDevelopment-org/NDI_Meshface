@@ -387,8 +387,16 @@
         const deliveryChip = (isLocalEcho && deliveryLabel)
           ? `<span class="chat-delivery-pill state-${{escAttr(deliveryState)}}" title="${{escAttr(deliveryTitle)}}">${{escAttr(deliveryLabel)}}</span>`
           : "";
-        const hopWatermarkInline = hasHop
-          ? `<span class="chat-hop-watermark-inline" title="${{escAttr(hopLabel)}}">${{escAttr(`${{hopNum}}h`)}}</span>`
+        const hopWatermarkTimeText = formatLocalChatTime12Hour(msgTimeUnix, rawTimeText || "n/a", nowUnix);
+        const hasHopWatermarkTime = !!(hopWatermarkTimeText && hopWatermarkTimeText !== "n/a");
+        const hopWatermarkText = hasHop
+          ? `${{hopNum}} hop${{hopWatermarkTimeText && hopWatermarkTimeText !== "n/a" ? ` ${{hopWatermarkTimeText}}` : ""}}`
+          : (hasHopWatermarkTime ? hopWatermarkTimeText : "");
+        const hopWatermarkTitle = hasHop
+          ? `${{hopLabel}}${{hasHopWatermarkTime ? ` • ${{hopWatermarkTimeText}}` : ""}}`
+          : (hasHopWatermarkTime ? `Time: ${{hopWatermarkTimeText}}` : "");
+        const hopWatermarkInline = (hasHop || hasHopWatermarkTime)
+          ? `<span class="chat-hop-watermark-inline" title="${{escAttr(hopWatermarkTitle)}}">${{escAttr(hopWatermarkText)}}</span>`
           : "";
         const portnumText = String(msg.portnum ?? packetSummary.portnum ?? "").trim() || "n/a";
         const retryReplyId = Number.isInteger(replyToId) && replyToId > 0 ? replyToId : "";

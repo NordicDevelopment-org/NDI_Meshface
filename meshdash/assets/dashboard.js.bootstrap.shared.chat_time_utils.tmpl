@@ -210,6 +210,37 @@
       return `${{mon}}/${{day}} ${{hh}}:${{mm}}:${{ss}}`;
     }}
 
+    function formatLocalChatTime12Hour(unixTs, fallback = "n/a", nowUnix = Math.floor(Date.now() / 1000)) {{
+      const ts = Number(unixTs);
+      if (!Number.isFinite(ts) || ts <= 0) {{
+        const fallbackText = String(fallback == null ? "" : fallback).trim();
+        return fallbackText || "n/a";
+      }}
+      const valueDate = new Date(Math.floor(ts) * 1000);
+      if (Number.isNaN(valueDate.getTime())) {{
+        const fallbackText = String(fallback == null ? "" : fallback).trim();
+        return fallbackText || "n/a";
+      }}
+      const nowDate = new Date(Math.floor(Number.isFinite(nowUnix) ? nowUnix : (Date.now() / 1000)) * 1000);
+      const sameLocalDay = (
+        valueDate.getFullYear() === nowDate.getFullYear()
+        && valueDate.getMonth() === nowDate.getMonth()
+        && valueDate.getDate() === nowDate.getDate()
+      );
+      const hour24 = valueDate.getHours();
+      const hour12 = hour24 % 12 || 12;
+      const mm = String(valueDate.getMinutes()).padStart(2, "0");
+      const ss = String(valueDate.getSeconds()).padStart(2, "0");
+      const meridiem = hour24 >= 12 ? "PM" : "AM";
+      const timeLabel = `${{hour12}}:${{mm}}:${{ss}} ${{meridiem}}`;
+      if (sameLocalDay) {{
+        return timeLabel;
+      }}
+      const mon = String(valueDate.getMonth() + 1).padStart(2, "0");
+      const day = String(valueDate.getDate()).padStart(2, "0");
+      return `${{mon}}/${{day}} ${{timeLabel}}`;
+    }}
+
     function formatIdleAge(unixTs, nowUnix = Math.floor(Date.now() / 1000)) {{
       const ts = Number(unixTs);
       if (!Number.isFinite(ts) || ts <= 0) return "n/a";

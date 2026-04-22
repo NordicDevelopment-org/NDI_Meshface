@@ -750,7 +750,14 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === \"function\")" in js
     assert 'const nodeEmojiClass = nodeVisualEmoji ? " has-node-emoji" : "";' in js
     assert 'data-node-emoji="${escAttr(nodeVisualEmoji)}"' in js
-    assert 'const hopWatermarkInline = hasHop' in js
+    assert "function formatLocalChatTime12Hour(" in js
+    assert 'const meridiem = hour24 >= 12 ? "PM" : "AM";' in js
+    assert 'const hasHopWatermarkTime = !!(hopWatermarkTimeText && hopWatermarkTimeText !== "n/a");' in js
+    assert 'const hopWatermarkInline = (hasHop || hasHopWatermarkTime)' in js
+    assert 'const hopWatermarkTimeText = formatLocalChatTime12Hour(msgTimeUnix, rawTimeText || "n/a", nowUnix);' in js
+    assert 'const hopWatermarkText = hasHop' in js
+    assert 'Time: ${hopWatermarkTimeText}' in js
+    assert '${hopNum} hop' in js
     assert 'if (hopWatermarkInline) reactionRowParts.push(hopWatermarkInline);' in js
     assert 'const routingMetadataLabel = hasRoutingMetadata' in js
     assert 'messageTooltipParts.push(`Routing: ${routingMetadataLabel}`);' in js
