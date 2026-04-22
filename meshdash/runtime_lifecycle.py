@@ -129,7 +129,16 @@ def close_runtime_resources(
     iface: CloseableResource,
     history_store: Optional[CloseableResource],
 ) -> None:
-    server.server_close()
-    iface.close()
+    try:
+        server.server_close()
+    except Exception:
+        pass
+    try:
+        iface.close()
+    except Exception:
+        pass
     if history_store is not None:
-        history_store.close()
+        try:
+            history_store.close()
+        except Exception:
+            pass

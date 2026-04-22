@@ -253,13 +253,19 @@
         const draft = channelDraftForIndex(idx);
         const nameValue = draft && typeof draft.name === "string"
           ? draft.name
-          : String(settings.name || "");
+          : isDisabledRole
+            ? ""
+            : String(settings.name || "");
         const uplinkEnabled = draft && typeof draft.uplink_enabled === "boolean"
           ? draft.uplink_enabled
-          : !!settings.uplink_enabled;
+          : isDisabledRole
+            ? false
+            : !!settings.uplink_enabled;
         const downlinkEnabled = draft && typeof draft.downlink_enabled === "boolean"
           ? draft.downlink_enabled
-          : !!settings.downlink_enabled;
+          : isDisabledRole
+            ? false
+            : !!settings.downlink_enabled;
         const pskValue = draft && typeof draft.psk === "string"
           ? draft.psk
           : "";
@@ -330,6 +336,8 @@
         psk.disabled = !hasLocalConfig;
         const pskHint = !hasLocalConfig
           ? "n/a"
+          : isDisabledRole
+            ? "blank = default"
           : (settings.psk && String(settings.psk) === "<redacted>")
             ? "<redacted>"
             : "leave blank to keep";

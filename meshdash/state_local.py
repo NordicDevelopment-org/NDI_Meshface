@@ -102,6 +102,70 @@ def _merge_channel_jsonable(existing: object, incoming: object, *, channel_index
     return merged
 
 
+def _refresh_local_channels(local: object) -> None:
+    request_channels = getattr(local, "requestChannels", None)
+    if not callable(request_channels):
+        return
+    try:
+        request_channels(0)
+    except TypeError:
+        request_channels()
+    wait_for = getattr(local, "waitForConfig", None)
+    if callable(wait_for):
+        try:
+            wait_for("channels")
+        except Exception:
+            pass
+
+
+def _channel_role_to_name(channel: object) -> str | None:
+    role_raw = getattr(channel, "role", None)
+    if role_raw is None:
+        return None
+    try:
+        role_value = int(role_raw)  # type: ignore[arg-type]
+    except Exception:
+        role_text = str(role_raw).strip()
+        return role_text or None
+    return {
+        0: "DISABLED",
+        1: "PRIMARY",
+        2: "SECONDARY",
+    }.get(role_value, str(role_value))
+
+
+def _collect_channels_jsonable(local: object) -> list[object]:
+    channels = getattr(local, "channels", None)
+    if channels is None:
+        return []
+
+    out: list[object] = []
+    for fallback_index, channel in enumerate(list(channels)):
+        if channel is None:
+            continue
+        try:
+            channel_index = int(getattr(channel, "index", fallback_index))
+        except Exception:
+            channel_index = fallback_index
+        if channel_index < 0:
+            channel_index = fallback_index
+
+        entry: dict[str, object] = {"index": channel_index}
+        role_name = _channel_role_to_name(channel)
+        if role_name:
+            entry["role"] = role_name
+
+        settings = to_jsonable(getattr(channel, "settings", None))
+        if isinstance(settings, Mapping):
+            entry["settings"] = dict(settings)
+        elif settings not in (None, "", [], {}):
+            entry["settings"] = settings
+
+        out.append(entry)
+
+    return _dedupe_channel_list(out)
+
+
 def _dedupe_channel_list(channels: object) -> list[object]:
     if not isinstance(channels, list):
         return []
@@ -130,19 +194,18 @@ def _dedupe_channel_list(channels: object) -> list[object]:
     return [deduped[key] for key in order]
 
 
-def collect_local_state(iface: object) -> dict[str, object]:
+def collect_local_state(iface: object, *, refresh_channels: bool = False) -> dict[str, object]:
     local = getattr(iface, "localNode", None)
     if local is None:
         local = iface.getNode("^local")
 
+    if refresh_channels:
+        _refresh_local_channels(local)
+
     state: dict[str, object] = {}
     state["local_config"] = to_jsonable(getattr(local, "localConfig", None))
     state["module_config"] = to_jsonable(getattr(local, "moduleConfig", None))
-    channels = getattr(local, "channels", None)
-    if channels is None:
-        state["channels"] = []
-    else:
-        state["channels"] = _dedupe_channel_list(list(channels))
+    state["channels"] = _collect_channels_jsonable(local)
 
     my_info = getattr(iface, "myInfo", None)
     local_node_num = _coerce_local_node_num(

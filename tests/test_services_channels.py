@@ -1,0 +1,265 @@
+import sys
+from copy import deepcopy
+from pathlib import Path
+from types import SimpleNamespace
+from types import ModuleType
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from meshdash.api_input_channels import ChannelSettingsRequest
+from meshdash.services_channels import apply_channel_settings
+
+
+class _FakeRole:
+    DISABLED = 0
+    PRIMARY = 1
+    SECONDARY = 2
+
+    @staticmethod
+    def Name(value: int) -> str:
+        return {
+            0: "DISABLED",
+            1: "PRIMARY",
+            2: "SECONDARY",
+        }.get(int(value), str(value))
+
+
+class _FakeChannelClass:
+    Role = _FakeRole
+
+
+class _FakeChannelPb2:
+    Channel = _FakeChannelClass
+
+
+class _FakeSettings:
+    def __init__(self, *, name: str = "", psk: object = None, uplink_enabled: bool = False, downlink_enabled: bool = False):
+        self.name = name
+        self.psk = psk
+        self.uplink_enabled = uplink_enabled
+        self.downlink_enabled = downlink_enabled
+
+
+class _FakeModuleSettings:
+    def __init__(self) -> None:
+        self.is_muted = False
+        self.position_precision = 0
+
+
+class _FakeChannel:
+    def __init__(self, *, index: int, role: int, name: str = "", psk: object = None) -> None:
+        self.index = index
+        self.role = role
+        self.settings = _FakeSettings(name=name, psk=psk)
+        self.module_settings = _FakeModuleSettings()
+
+
+def _clone_channels(channels: list[_FakeChannel]) -> list[_FakeChannel]:
+    return deepcopy(channels)
+
+
+class _FakeNode:
+    def __init__(self) -> None:
+        self._live_channels = [
+            _FakeChannel(index=0, role=_FakeRole.PRIMARY, psk=b"default"),
+            _FakeChannel(index=1, role=_FakeRole.SECONDARY, name="test", psk=b"default"),
+            _FakeChannel(index=2, role=_FakeRole.DISABLED),
+            _FakeChannel(index=3, role=_FakeRole.DISABLED),
+        ]
+        self.channels = _clone_channels(self._live_channels)
+        self.transaction_open = False
+        self.write_calls: list[int] = []
+        self.delete_calls: list[int] = []
+
+    def requestChannels(self, startingIndex: int = 0) -> None:  # noqa: N802
+        if startingIndex == 0:
+            self.channels = _clone_channels(self._live_channels)
+
+    def waitForConfig(self, _name: str) -> None:  # noqa: N802
+        return None
+
+    def beginSettingsTransaction(self) -> None:  # noqa: N802
+        self.transaction_open = True
+
+    def commitSettingsTransaction(self) -> None:  # noqa: N802
+        if self.transaction_open:
+            self._live_channels = _clone_channels(self.channels)
+        self.transaction_open = False
+
+    def writeChannel(self, index: int) -> None:  # noqa: N802
+        self.write_calls.append(index)
+
+    def deleteChannel(self, index: int) -> None:  # noqa: N802
+        self.delete_calls.append(index)
+        self.channels.pop(index)
+        while len(self.channels) < len(self._live_channels):
+            next_index = len(self.channels)
+            self.channels.append(_FakeChannel(index=next_index, role=_FakeRole.DISABLED))
+        for idx, channel in enumerate(self.channels):
+            channel.index = idx
+
+
+class _FakeIface:
+    def __init__(self, node: _FakeNode) -> None:
+        self.localNode = node
+
+
+class _FakeLock:
+    def __init__(self) -> None:
+        self.depth = 0
+
+    def acquire(self) -> None:
+        self.depth += 1
+
+    def release(self) -> None:
+        self.depth -= 1
+
+
+def test_upsert_channel_uses_settings_transaction_and_verifies_radio_refresh(monkeypatch) -> None:
+    node = _FakeNode()
+    iface = _FakeIface(node)
+    lock = _FakeLock()
+
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+    monkeypatch.setattr("meshdash.services_channels.fromPSK", None, raising=False)
+
+    request = ChannelSettingsRequest(
+        action="upsert",
+        channel_index=2,
+        role="SECONDARY",
+        settings={
+            "name": "Meshyface",
+            "psk": "base64:u2yfVqp2J8P+Uer6z9OnNGwORpCCSNF4GKbzYgya9jM=",
+            "uplink_enabled": False,
+            "downlink_enabled": False,
+        },
+    )
+
+    response = apply_channel_settings(
+        request,
+        iface=iface,
+        send_lock=lock,
+        show_secrets=False,
+    )
+
+    assert response["ok"] is True
+    assert response["channel_index"] == 2
+    assert response["role"] == "SECONDARY"
+    assert node.write_calls == [2]
+    assert node.transaction_open is False
+    assert node.channels[2].role == _FakeRole.SECONDARY
+    assert node.channels[2].settings.name == "Meshyface"
+
+
+def test_upsert_rejects_channel_names_longer_than_meshtastic_limit(monkeypatch) -> None:
+    node = _FakeNode()
+    iface = _FakeIface(node)
+    lock = _FakeLock()
+
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+
+    request = ChannelSettingsRequest(
+        action="upsert",
+        channel_index=2,
+        role="SECONDARY",
+        settings={"name": "Meshyface Beta"},
+    )
+
+    response = apply_channel_settings(
+        request,
+        iface=iface,
+        send_lock=lock,
+        show_secrets=False,
+    )
+
+    assert response["ok"] is False
+    assert response["error"] == "Channel name must be 10 characters or fewer"
+    assert node.write_calls == []
+
+
+def test_disable_channel_clears_last_slot_in_place(monkeypatch) -> None:
+    node = _FakeNode()
+    node._live_channels = [
+        _FakeChannel(index=0, role=_FakeRole.PRIMARY, psk=b"default"),
+        _FakeChannel(index=1, role=_FakeRole.SECONDARY, name="test", psk=b"default"),
+        _FakeChannel(index=2, role=_FakeRole.SECONDARY, name="Meshyface", psk=b"secret"),
+        _FakeChannel(index=3, role=_FakeRole.DISABLED),
+    ]
+    node.channels = _clone_channels(node._live_channels)
+    iface = _FakeIface(node)
+    lock = _FakeLock()
+
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+
+    response = apply_channel_settings(
+        ChannelSettingsRequest(action="disable", channel_index=2),
+        iface=iface,
+        send_lock=lock,
+        show_secrets=False,
+    )
+
+    assert response["ok"] is True
+    assert node.delete_calls == []
+    assert node.write_calls == [2]
+    assert node.channels[1].settings.name == "test"
+    assert node.channels[2].role == _FakeRole.DISABLED
+    assert node.channels[2].settings.name == ""
+
+
+def test_disable_last_secondary_channel_clears_slot_in_place(monkeypatch) -> None:
+    node = _FakeNode()
+    iface = _FakeIface(node)
+    lock = _FakeLock()
+
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+
+    response = apply_channel_settings(
+        ChannelSettingsRequest(action="disable", channel_index=1),
+        iface=iface,
+        send_lock=lock,
+        show_secrets=False,
+    )
+
+    assert response["ok"] is True
+    assert node.delete_calls == []
+    assert node.write_calls == [1]
+    assert node.channels[1].role == _FakeRole.DISABLED
+    assert node.channels[1].settings.name == ""
+
+
+def test_upsert_new_channel_defaults_psk_instead_of_reusing_disabled_slot_secret(monkeypatch) -> None:
+    node = _FakeNode()
+    node._live_channels = [
+        _FakeChannel(index=0, role=_FakeRole.PRIMARY, psk=b"default"),
+        _FakeChannel(index=1, role=_FakeRole.DISABLED, name="old", psk=b"stale-secret"),
+        _FakeChannel(index=2, role=_FakeRole.DISABLED),
+        _FakeChannel(index=3, role=_FakeRole.DISABLED),
+    ]
+    node.channels = _clone_channels(node._live_channels)
+    iface = _FakeIface(node)
+    lock = _FakeLock()
+
+    fake_meshtastic = ModuleType("meshtastic")
+    fake_util = ModuleType("meshtastic.util")
+    fake_util.fromPSK = lambda value: f"psk:{value}".encode("utf-8")
+    fake_meshtastic.util = fake_util
+
+    monkeypatch.setattr("meshdash.services_channels._import_channel_pb2", lambda: _FakeChannelPb2)
+    monkeypatch.setitem(sys.modules, "meshtastic", fake_meshtastic)
+    monkeypatch.setitem(sys.modules, "meshtastic.util", fake_util)
+
+    response = apply_channel_settings(
+        ChannelSettingsRequest(
+            action="upsert",
+            channel_index=1,
+            role="SECONDARY",
+            settings={"name": "fresh"},
+        ),
+        iface=iface,
+        send_lock=lock,
+        show_secrets=False,
+    )
+
+    assert response["ok"] is True
+    assert node.channels[1].settings.psk == b"psk:default"
+    assert "settings.psk" in response["applied_fields"]

@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from .api_input_channels import ChannelSettingsRequest
 
+MAX_CHANNEL_NAME_CHARS = 10
+
 
 def _get_local_node(iface: object) -> Any:
     node = getattr(iface, "localNode", None)
@@ -93,6 +95,18 @@ def _acquire_lock(lock: object) -> tuple[bool, Optional[callable]]:
         acquire()
         return True, release
     return False, None
+
+
+def _begin_settings_transaction(node: object) -> None:
+    begin_tx = getattr(node, "beginSettingsTransaction", None)
+    if callable(begin_tx):
+        begin_tx()
+
+
+def _commit_settings_transaction(node: object) -> None:
+    commit_tx = getattr(node, "commitSettingsTransaction", None)
+    if callable(commit_tx):
+        commit_tx()
 
 
 def apply_channel_settings(
@@ -219,7 +233,6 @@ def apply_channel_settings(
         if ch_role == primary_role:
             return {"ok": False, "error": "Primary channel cannot be disabled"}
 
-        # Reset fields to defaults as best-effort.
         try:
             ch.role = disabled_role
         except Exception:
@@ -227,24 +240,20 @@ def apply_channel_settings(
         try:
             if getattr(ch, "settings", None) is not None:
                 ch.settings.name = ""
-                # Downlink/uplink default false
                 if hasattr(ch.settings, "downlink_enabled"):
                     ch.settings.downlink_enabled = False
                 if hasattr(ch.settings, "uplink_enabled"):
                     ch.settings.uplink_enabled = False
-                # Reset PSK to default (public) key when possible.
                 try:
                     from meshtastic.util import fromPSK  # type: ignore
 
                     ch.settings.psk = fromPSK("default")
                 except Exception:
-                    # If util isn't available, keep existing bytes.
                     pass
         except Exception:
             pass
         try:
             if getattr(ch, "module_settings", None) is not None:
-                # Reset common module settings.
                 if hasattr(ch.module_settings, "is_muted"):
                     ch.module_settings.is_muted = False
                 if hasattr(ch.module_settings, "position_precision"):
@@ -255,12 +264,27 @@ def apply_channel_settings(
         # Write to radio with locking.
         locked, release = _acquire_lock(send_lock)
         try:
+            _begin_settings_transaction(node)
             write_channel(idx)
+            _commit_settings_transaction(node)
         except Exception as exc:
             return {"ok": False, "error": f"Write failed: {exc}"}
         finally:
             if locked and release:
                 release()
+
+        refreshed_channels = getattr(node, "channels", None)
+        if refreshed_channels is None:
+            refreshed_channels = channels
+        if idx >= len(refreshed_channels):
+            return {"ok": False, "error": "Disable verification failed: channel_index out of range after write"}
+        refreshed_channel = refreshed_channels[idx]
+        try:
+            refreshed_role = int(getattr(refreshed_channel, "role", disabled_role))
+        except Exception:
+            refreshed_role = disabled_role
+        if refreshed_role != disabled_role:
+            return {"ok": False, "error": "Disable verification failed: channel remains active", "channel_index": idx}
 
         return {
             "ok": True,
@@ -343,6 +367,11 @@ def apply_channel_settings(
     if "name" in settings:
         try:
             name = str(settings.get("name") or "").strip()
+            if len(name) > MAX_CHANNEL_NAME_CHARS:
+                return {
+                    "ok": False,
+                    "error": f"Channel name must be {MAX_CHANNEL_NAME_CHARS} characters or fewer",
+                }
             if idx != 0 and existing_role == disabled_role and not name and not bool(request.allow_experimental):
                 return {"ok": False, "error": "Channel name is required when adding a channel"}
             ch.settings.name = name
@@ -375,8 +404,24 @@ def apply_channel_settings(
                 applied_fields.append("settings.psk")
             except Exception:
                 ignored_fields.append("settings.psk")
+        elif is_creating:
+            try:
+                from meshtastic.util import fromPSK  # type: ignore
+
+                ch.settings.psk = fromPSK("default")
+                applied_fields.append("settings.psk")
+            except Exception:
+                ignored_fields.append("settings.psk")
         else:
             # Empty or redacted => preserve.
+            ignored_fields.append("settings.psk")
+    elif is_creating:
+        try:
+            from meshtastic.util import fromPSK  # type: ignore
+
+            ch.settings.psk = fromPSK("default")
+            applied_fields.append("settings.psk")
+        except Exception:
             ignored_fields.append("settings.psk")
 
     if "module_settings" in settings:
@@ -405,7 +450,9 @@ def apply_channel_settings(
     # Write to radio with locking.
     locked, release = _acquire_lock(send_lock)
     try:
+        _begin_settings_transaction(node)
         write_channel(int(idx))
+        _commit_settings_transaction(node)
     except Exception as exc:
         return {
             "ok": False,
@@ -417,12 +464,35 @@ def apply_channel_settings(
         if locked and release:
             release()
 
-    # Recompute active index post-write is expensive; return best-effort hints.
+    refreshed_channels = getattr(node, "channels", None)
+    if refreshed_channels is None:
+        refreshed_channels = channels
+    if idx >= len(refreshed_channels):
+        return {
+            "ok": False,
+            "error": "Write verification failed: channel_index out of range after write",
+            "applied_fields": applied_fields,
+            "ignored_fields": ignored_fields,
+        }
+    refreshed_channel = refreshed_channels[idx]
+    try:
+        refreshed_role_value = int(getattr(refreshed_channel, "role", disabled_role))
+    except Exception:
+        refreshed_role_value = disabled_role
+    if idx > 0 and refreshed_role_value == disabled_role:
+        return {
+            "ok": False,
+            "error": "Write verification failed: channel remained disabled on radio",
+            "channel_index": int(idx),
+            "applied_fields": applied_fields,
+            "ignored_fields": ignored_fields,
+        }
+
     return {
         "ok": True,
         "action": "upsert",
         "channel_index": int(idx),
-        "role": _role_name(channel_pb2, int(getattr(ch, "role", 0))),
+        "role": _role_name(channel_pb2, refreshed_role_value),
         "applied_fields": applied_fields,
         "ignored_fields": ignored_fields,
         "reboot_expected": True,
