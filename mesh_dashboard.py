@@ -103,6 +103,22 @@ except Exception:
 DEFAULT_APP_VERSION = _package_version or DEFAULT_APP_VERSION_FALLBACK
 
 
+class _NoopPubSub:
+    def subscribe(self, callback: object, topic: str) -> None:
+        del callback, topic
+
+
+def _dependency_guarded_open_mesh_interface(dependency_error: Exception | None):
+    if dependency_error is None:
+        return open_mesh_interface
+
+    def _open_mesh_interface_with_dependency_error(args: argparse.Namespace):
+        del args
+        raise RuntimeError(str(dependency_error)) from dependency_error
+
+    return _open_mesh_interface_with_dependency_error
+
+
 def _normalize_file_transfer_max_bytes(raw_value: object) -> int:
     try:
         parsed = int(raw_value)
@@ -441,14 +457,27 @@ def run_environment_rollup_backfill(args: argparse.Namespace) -> None:
 
 def run_dashboard(args: argparse.Namespace) -> None:
     theme_preset_settings = _build_theme_preset_settings(args)
-    _ensure_runtime_dependencies_helper(
-        meshtastic_module=meshtastic,
-        pub_module=pub,
+    runtime_dependency_error: Exception | None = None
+    try:
+        _ensure_runtime_dependencies_helper(
+            meshtastic_module=meshtastic,
+            pub_module=pub,
+        )
+    except RuntimeError as exc:
+        runtime_dependency_error = exc
+        print(
+            f"Runtime dependency unavailable ({exc}). "
+            "Starting dashboard in offline/connecting mode; restart after "
+            "installing dependencies for live radio features."
+        )
+    runtime_pub_module = pub if pub is not None else _NoopPubSub()
+    runtime_open_mesh_interface = _dependency_guarded_open_mesh_interface(
+        runtime_dependency_error
     )
     runtime_dependencies = _build_dashboard_runtime_dependencies_helper(
-        pub_module=pub,
+        pub_module=runtime_pub_module,
         mesh_target_label_fn=mesh_target_label,
-        open_mesh_interface_fn=open_mesh_interface,
+        open_mesh_interface_fn=runtime_open_mesh_interface,
         history_store_cls=HistoryStore,
         dashboard_tracker_cls=DashboardTracker,
         seed_tracker_fn=_seed_tracker_from_node_db_helper,

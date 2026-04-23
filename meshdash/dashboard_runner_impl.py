@@ -61,6 +61,32 @@ _SUMMARY_SAMPLE_STARTUP_DELAY_SECONDS = 5.0
 _SUMMARY_PERSIST_STARTUP_GRACE_SECONDS = 90
 
 
+def _attach_standalone_zork_service(state_fn: object) -> None:
+    try:
+        from .services_standalone_zork import (
+            build_standalone_zork_service as _build_standalone_zork_service,
+        )
+    except Exception:
+        return
+
+    try:
+        standalone_zork = _build_standalone_zork_service()
+    except Exception:
+        return
+
+    try:
+        setattr(state_fn, "play_standalone_zork_fn", standalone_zork.play)
+    except Exception:
+        pass
+
+    state_lite_fn = getattr(state_fn, "lite", None)
+    if callable(state_lite_fn):
+        try:
+            setattr(state_lite_fn, "play_standalone_zork_fn", standalone_zork.play)
+        except Exception:
+            pass
+
+
 def _summary_sampling_supported(context: DashboardRuntimeContext) -> bool:
     if not context.history_enabled:
         return False
@@ -261,6 +287,7 @@ def _build_offline_runtime_context(
         started_at=started_at,
         utc_now_fn=utc_now_fn,
     )
+    _attach_standalone_zork_service(state_fn)
     return DashboardRuntimeContext(
         target=target,
         iface=_NoopCloseResource(),
@@ -415,30 +442,36 @@ def run_dashboard_runtime(
     threading_http_server_cls: ThreadingHttpServerCls = ThreadingHTTPServer,
 ) -> None:
     auto_reconnect = _enable_serial_auto_reconnect(args)
-    mesh_host = str(getattr(args, "mesh_host", "") or "").strip()
-    prefer_connecting_bootstrap = bool(mesh_host)
     first_session = True
+    offline_bootstrap_error: Optional[Exception] = None
     while True:
         startup_offline = False
         startup_error: Optional[Exception] = None
-        if prefer_connecting_bootstrap and first_session:
+        if auto_reconnect and (first_session or offline_bootstrap_error is not None):
             startup_offline = True
-            startup_error = RuntimeError(
-                f"waiting for radio link on {mesh_host}:{getattr(args, 'mesh_tcp_port', '')}"
+            connecting = offline_bootstrap_error is None
+            startup_error = offline_bootstrap_error or RuntimeError(
+                f"waiting for radio link on {mesh_target_label_fn(args)}"
             )
-            print(
-                f"Starting dashboard before radio connect ({startup_error}). "
-                "Serving UI now and retrying radio link in background..."
-            )
+            if connecting:
+                print(
+                    f"Starting dashboard before radio connect ({startup_error}). "
+                    "Serving UI now and retrying radio link in background..."
+                )
+            else:
+                print(
+                    f"Radio session unavailable ({startup_error}). "
+                    "Serving offline UI and retrying radio link in background..."
+                )
             context = _build_offline_runtime_context(
                 args,
                 startup_error=startup_error,
-                connecting=True,
+                connecting=connecting,
                 mesh_target_label_fn=mesh_target_label_fn,
                 revision_info_fn=revision_info_fn,
                 utc_now_fn=utc_now_fn,
             )
-        elif auto_reconnect and first_session:
+        elif auto_reconnect:
             try:
                 context = _build_runtime_context_once(
                     args,
@@ -465,8 +498,8 @@ def run_dashboard_runtime(
                 startup_offline = True
                 startup_error = exc
                 print(
-                    f"Radio unavailable at startup ({exc}). "
-                    "Starting dashboard in connecting mode; retrying in background."
+                    f"Radio unavailable ({exc}). "
+                    "Serving offline UI and retrying radio link in background."
                 )
                 context = _build_offline_runtime_context(
                     args,
@@ -637,12 +670,15 @@ def run_dashboard_runtime(
         if interrupted:
             return
         if startup_offline and auto_reconnect and restart_requested.is_set():
+            offline_bootstrap_error = None
             time.sleep(0.5)
             continue
         if startup_offline:
             return
         if auto_reconnect and restart_requested.is_set():
-            print("Radio link lost. Restarting dashboard radio session...")
-            time.sleep(1.0)
+            reason = str(getattr(context.tracker, "radio_link_error", "") or "").strip()
+            offline_bootstrap_error = RuntimeError(reason or "radio link lost")
+            print("Radio link lost. Serving offline UI while reconnecting...")
+            time.sleep(0.5)
             continue
         return
