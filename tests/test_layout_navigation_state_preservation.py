@@ -22,17 +22,19 @@ def test_dashboard_js_keeps_layout_switches_in_app() -> None:
     assert "window.requestAnimationFrame(() => {" in switcher_block
 
 
-def test_dashboard_js_limits_apps_view_to_games_and_files() -> None:
+def test_dashboard_js_keeps_bbs_hidden_by_default() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
         node_history_max_points=240,
     )
 
+    assert 'const bbsFeatureEnabled = !!Number(0);' in js
     assert 'if (clean === "games") {' in js
-    assert 'return clean === "games" || (clean === "files" && fileTransferFeatureEnabled);' in js
-    assert '|| resolved === "bbs"' not in js
-    assert '"bbs"' not in js.split("const knownLayoutViews = new Set([", 1)[1].split("]);", 1)[0]
+    assert 'if (clean === "bbs" && bbsFeatureEnabled) {' in js
+    assert 'return clean === "games" || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);' in js
+    assert '|| (resolved === "bbs" && bbsFeatureEnabled)' in js
+    assert '"bbs"' in js.split("const knownLayoutViews = new Set([", 1)[1].split("]);", 1)[0]
     assert '"bots"' not in js.split("const knownLayoutViews = new Set([", 1)[1].split("]);", 1)[0]
 
 
@@ -64,7 +66,7 @@ def test_dashboard_js_binds_games_picker_select() -> None:
     assert 'activeGameId = normalizeActiveGameId(gamesLibrarySelect.value);' in js
 
 
-def test_dashboard_js_limits_app_channel_routing_to_games() -> None:
+def test_dashboard_js_keeps_bbs_out_of_app_channel_routing_by_default() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
@@ -75,7 +77,40 @@ def test_dashboard_js_limits_app_channel_routing_to_games() -> None:
     end = js.index("function normalizeMeshChannelAppId", start)
     routing_block = js[start:end]
 
+    assert 'if (bbsFeatureEnabled) {' in routing_block
+    assert 'id: "bbs"' in routing_block
+    assert 'label: "BBS"' in routing_block
     assert 'id: "games"' in routing_block
     assert 'label: "Games"' in routing_block
-    assert 'id: "bbs"' not in routing_block
-    assert 'label: "BBS"' not in routing_block
+
+
+def test_dashboard_js_exposes_bbs_when_enabled() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        bbs_enabled=True,
+    )
+
+    assert 'const bbsFeatureEnabled = !!Number(1);' in js
+    assert 'if (clean === "bbs" && bbsFeatureEnabled) {' in js
+    assert 'return clean === "games" || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);' in js
+    assert '|| (resolved === "bbs" && bbsFeatureEnabled)' in js
+
+
+def test_dashboard_js_exposes_bbs_in_app_channel_routing_when_enabled() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        bbs_enabled=True,
+    )
+
+    start = js.index("function meshChannelAppRoutingRows() {")
+    end = js.index("function normalizeMeshChannelAppId", start)
+    routing_block = js[start:end]
+
+    assert 'id: "bbs"' in routing_block
+    assert 'label: "BBS"' in routing_block
+    assert 'id: "games"' in routing_block
+    assert 'label: "Games"' in routing_block

@@ -11,6 +11,7 @@ def add_http_runtime_args(
     default_reset_ticker_scale_on_restart: bool = True,
     default_private_mode: bool = False,
     default_api_token: str | None = None,
+    default_bbs_enable: bool = False,
     default_file_transfer_enable: bool = False,
     default_file_transfer_max_bytes: int = 64 * 1024,
     default_accept_file_transfer_traffic_disclaimer: bool = False,
@@ -76,6 +77,15 @@ def add_http_runtime_args(
         help=(
             "Optional API token required on write endpoints via Authorization: Bearer <token> "
             "or X-API-Token header."
+        ),
+    )
+    parser.add_argument(
+        "--bbs-enable",
+        action=argparse.BooleanOptionalAction,
+        default=default_bbs_enable,
+        help=(
+            "Enable the Meshyface BBS/profile workspace for MOTDs and shared spaces "
+            f"(default: {default_bbs_enable})"
         ),
     )
     parser.add_argument(

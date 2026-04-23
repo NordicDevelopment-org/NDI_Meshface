@@ -258,17 +258,25 @@
     }}
 
     function meshChannelAppRoutingRows() {{
-      return [
-        {{
-          id: "games",
-          label: "Games",
-          description: "Reversi, Checkers, and Chess link traffic",
-        }},
-      ];
+      const rows = [];
+      if (bbsFeatureEnabled) {{
+        rows.push({{
+          id: "bbs",
+          label: "BBS",
+          description: "Profiles, MOTDs, directory announces, and board posts",
+        }});
+      }}
+      rows.push({{
+        id: "games",
+        label: "Games",
+        description: "Reversi, Checkers, and Chess link traffic",
+      }});
+      return rows;
     }}
 
     function normalizeMeshChannelAppId(rawAppId) {{
       const token = String(rawAppId == null ? "" : rawAppId).trim().toLowerCase();
+      if (token === "bbs" && bbsFeatureEnabled) return "bbs";
       if (token === "files") return "files";
       if (token === "games") return "games";
       return "";
@@ -282,10 +290,14 @@
 
     function meshChannelDefaultAppSendPrefs() {{
       const sendIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
-      return {{
+      const defaults = {{
         files: {{ mode: "global", channel_index: sendIndex }},
         games: {{ mode: "global", channel_index: sendIndex }},
       }};
+      if (bbsFeatureEnabled) {{
+        defaults.bbs = {{ mode: "global", channel_index: sendIndex }};
+      }}
+      return defaults;
     }}
 
     function coerceMeshChannelAppSendPrefs(rawPrefs) {{

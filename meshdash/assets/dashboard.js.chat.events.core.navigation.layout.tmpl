@@ -624,6 +624,9 @@
       if (clean === "games") {{
         return clean;
       }}
+      if (clean === "bbs" && bbsFeatureEnabled) {{
+        return clean;
+      }}
       if (clean === "files" && fileTransferFeatureEnabled) {{
         return clean;
       }}
@@ -632,7 +635,7 @@
 
     function isAppsLayoutView(viewName) {{
       const clean = String(viewName || "").trim().toLowerCase();
-      return clean === "games" || (clean === "files" && fileTransferFeatureEnabled);
+      return clean === "games" || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);
     }}
 
     function loadPreferredAppsLayoutView() {{
@@ -670,12 +673,13 @@
         resolved = "games";
       }}
 
-      // Public v0 rail: expose only Chat/Network/Console/Games/Files/Settings.
+      // Public v0 rail: expose only Chat/Network/Console/Games/BBS/Files/Settings.
       return (
         resolved === "chat"
         || resolved === "network"
         || resolved === "console"
         || resolved === "games"
+        || (resolved === "bbs" && bbsFeatureEnabled)
         || (resolved === "files" && fileTransferFeatureEnabled)
         || resolved === "settings"
       )
@@ -4621,9 +4625,16 @@
     }}
 
     function appsLauncherMenuMetaText() {{
-      return fileTransferFeatureEnabled
-        ? "Boards, files, and BBS"
-        : "Boards and BBS";
+      if (bbsFeatureEnabled && fileTransferFeatureEnabled) {{
+        return "Boards, profiles, and files";
+      }}
+      if (bbsFeatureEnabled) {{
+        return "Boards and profiles";
+      }}
+      if (fileTransferFeatureEnabled) {{
+        return "Boards and files";
+      }}
+      return "Boards and matches";
     }}
 
     function closeLayoutViewSubmenus() {{
@@ -4808,6 +4819,21 @@
       if (filesCard instanceof HTMLElement) {{
         filesCard.hidden = !enabled;
         filesCard.setAttribute("aria-hidden", enabled ? "false" : "true");
+      }}
+    }}
+
+    function syncBbsFeatureVisibility() {{
+      const enabled = !!bbsFeatureEnabled;
+      const bbsTabBtn = document.querySelector('#layout-view-menu .topbar-view-submenu-item[data-app-view="bbs"]');
+      if (bbsTabBtn instanceof HTMLButtonElement) {{
+        bbsTabBtn.hidden = !enabled;
+        bbsTabBtn.disabled = !enabled;
+        bbsTabBtn.setAttribute("aria-hidden", enabled ? "false" : "true");
+      }}
+      const bbsCard = document.querySelector("#dashboard-layout .card.bbs");
+      if (bbsCard instanceof HTMLElement) {{
+        bbsCard.hidden = !enabled;
+        bbsCard.setAttribute("aria-hidden", enabled ? "false" : "true");
       }}
     }}
 
@@ -5212,6 +5238,7 @@
 
       syncLayoutViewMenu(next);
       closeLayoutViewMenu();
+      syncBbsFeatureVisibility();
       syncFileTransferFeatureVisibility();
       syncAppsTabBarVisibility(next);
       syncAppsTabBar(next);

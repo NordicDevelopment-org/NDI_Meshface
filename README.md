@@ -502,6 +502,26 @@ Deploy helper example:
 the target `dashboard.env` unless you explicitly pass file-transfer flags or
 env overrides.
 
+### BBS profile workspace
+
+The BBS/profile workspace is also hidden by default. To enable it:
+
+- `--bbs-enable` or `MESH_DASH_BBS_ENABLE=1`
+
+Deploy helper example:
+
+```bash
+./scripts/deploy_meshyface.sh \
+  --target pi@meshyface.local \
+  --mesh-host meshtastic-radio.local \
+  --bbs-enable \
+  --clean-app-dir
+```
+
+`scripts/deploy_meshyface.sh` preserves the existing `MESH_DASH_BBS_ENABLE`
+value from the target `dashboard.env` unless you explicitly pass a BBS flag or
+env override.
+
 ## Configuration Reference
 
 ### Connection and transport
@@ -635,6 +655,7 @@ The deploy helper also accepts:
 - `MESH_DASH_DEPLOY_REFRESH_MS`
 - `MESH_DASH_DEPLOY_HISTORY_DB`
 - `MESH_DASH_DEPLOY_PYTHON_UNBUFFERED`
+- `MESH_DASH_DEPLOY_BBS_ENABLE`
 - `MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE`
 - `MESH_DASH_DEPLOY_FILE_TRANSFER_MAX_BYTES`
 - `MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER`

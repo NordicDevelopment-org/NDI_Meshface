@@ -176,7 +176,7 @@
       const cleanTab = String(settingsTab || "").trim().toLowerCase();
       return cleanTab === "channels";
     }}
-    const knownLayoutViews = new Set(["chat", "macros", "chatlabs", "files", "games", "history", "network", "saved", "remote", "packets", "channels", "environment", "console", "settings"]);
+    const knownLayoutViews = new Set(["chat", "macros", "chatlabs", "files", "games", "bbs", "history", "network", "saved", "remote", "packets", "channels", "environment", "console", "settings"]);
     const reversiBoardSize = 8;
     const reversiPiece = Object.freeze({{ empty: 0, black: 1, white: -1 }});
     const reversiDirections = Object.freeze([
@@ -284,6 +284,7 @@
       "zork",
     ];
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+    const bbsFeatureEnabled = !!Number({bbs_enabled});
     const fileTransferFeatureEnabled = !!Number({file_transfer_enabled});
     const fileTransferProtocolPrefix = "MF_FILE_V1";
     const fileTransferChatMaxBytes = 220;

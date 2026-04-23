@@ -24,6 +24,7 @@ def render_html(
     debug_mode: bool = False,
     light_theme_vars: dict | None = None,
     dark_theme_vars: dict | None = None,
+    bbs_enabled: bool = False,
     file_transfer_enabled: bool = False,
     file_transfer_max_bytes: int = _DEFAULT_FILE_TRANSFER_MAX_BYTES,
 ) -> str:
@@ -42,13 +43,19 @@ def render_html(
         node_history_max_points=node_history_max_points,
         reset_ticker_scale_on_restart=reset_ticker_scale_on_restart,
         debug_mode=debug_mode,
+        bbs_enabled=bbs_enabled,
         file_transfer_enabled=file_transfer_enabled,
         file_transfer_max_bytes=file_transfer_max_bytes,
     )
+    bbs_app_tab_hidden_attrs = ""
+    bbs_section_hidden_attrs = ""
     file_transfer_files_tab_hidden_attrs = ""
     file_transfer_section_hidden_attrs = ""
     network_diagnostics_tab_hidden_attrs = ""
     network_diagnostics_panel_hidden_attrs = ""
+    if not bbs_enabled:
+        bbs_app_tab_hidden_attrs = ' hidden disabled aria-hidden="true"'
+        bbs_section_hidden_attrs = ' hidden aria-hidden="true"'
     if not file_transfer_enabled:
         file_transfer_files_tab_hidden_attrs = ' hidden disabled aria-hidden="true"'
         file_transfer_section_hidden_attrs = ' hidden aria-hidden="true"'
@@ -66,6 +73,8 @@ def render_html(
         packet_limit=packet_limit,
         history_label=render_context["history_label"],
         refresh_ms=refresh_ms,
+        bbs_app_tab_hidden_attrs=bbs_app_tab_hidden_attrs,
+        bbs_section_hidden_attrs=bbs_section_hidden_attrs,
         file_transfer_files_tab_hidden_attrs=file_transfer_files_tab_hidden_attrs,
         file_transfer_section_hidden_attrs=file_transfer_section_hidden_attrs,
         network_diagnostics_tab_hidden_attrs=network_diagnostics_tab_hidden_attrs,

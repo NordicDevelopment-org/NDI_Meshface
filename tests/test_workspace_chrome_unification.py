@@ -27,7 +27,10 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert 'id="layout-view-menu-apps-submenu"' in html
     assert 'class="topbar-view-menu-item topbar-view-menu-item-has-submenu"' in html
     assert 'class="topbar-view-submenu-item is-active"' in html
-    assert 'data-app-view="bbs"' not in html
+    assert 'data-app-view="bbs"' in html
+    assert 'id="bbs-host-title-input"' in html
+    assert 'id="bbs-board-list"' in html
+    assert 'id="bbs-terminal-log"' in html
     assert 'class="settings-chrome workspace-chrome-bar"' in html
     assert 'class="settings-toolbar workspace-chrome-row"' in html
     assert 'class="settings-tabbar workspace-pillbar"' in html
@@ -89,6 +92,7 @@ def test_apps_views_move_app_switching_into_launcher_submenu() -> None:
         refresh_ms=1000,
         node_history_hours=24,
         node_history_max_points=240,
+        bbs_enabled=True,
     )
 
     assert 'data-submenu="apps"' in html
@@ -97,7 +101,7 @@ def test_apps_views_move_app_switching_into_launcher_submenu() -> None:
     assert 'id="layout-view-menu-apps-submenu"' in html
     assert 'data-app-view="games"' in html
     assert 'data-app-view="files"' in html
-    assert 'data-app-view="bbs"' not in html
+    assert 'data-app-view="bbs"' in html
     assert 'id="apps-tabs-bar"' not in html
 
     assert ".topbar-view-menu-item-has-submenu {" in css

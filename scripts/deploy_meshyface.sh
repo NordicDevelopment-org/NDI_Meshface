@@ -44,6 +44,8 @@ Options:
   --dash-port <port>       Dashboard bind port (default: 8877).
   --refresh-ms <ms>        Poll interval in ms (default: 3000).
   --history-db <path>      History DB path on target host.
+  --bbs-enable             Enable BBS/profile workspace in dashboard.env.
+  --no-bbs-enable          Disable BBS/profile workspace in dashboard.env.
   --file-transfer-enable   Enable file transfer in dashboard.env.
   --no-file-transfer-enable Disable file transfer in dashboard.env.
   --file-transfer-max-bytes <bytes>
@@ -85,6 +87,7 @@ Env overrides:
   MESH_DASH_DEPLOY_REFRESH_MS
   MESH_DASH_DEPLOY_HISTORY_DB
   MESH_DASH_DEPLOY_PYTHON_UNBUFFERED
+  MESH_DASH_DEPLOY_BBS_ENABLE
   MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE
   MESH_DASH_DEPLOY_FILE_TRANSFER_MAX_BYTES
   MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER
@@ -130,12 +133,17 @@ DASH_PORT="${MESH_DASH_DEPLOY_DASH_PORT:-8877}"
 REFRESH_MS="${MESH_DASH_DEPLOY_REFRESH_MS:-3000}"
 HISTORY_DB="${MESH_DASH_DEPLOY_HISTORY_DB:-}"
 PYTHON_UNBUFFERED="${MESH_DASH_DEPLOY_PYTHON_UNBUFFERED:-1}"
+BBS_ENABLE="${MESH_DASH_DEPLOY_BBS_ENABLE:-0}"
 FILE_TRANSFER_ENABLE="${MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE:-0}"
 FILE_TRANSFER_MAX_BYTES="${MESH_DASH_DEPLOY_FILE_TRANSFER_MAX_BYTES:-65536}"
 ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER="${MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER:-0}"
+BBS_ENABLE_SET=0
 FILE_TRANSFER_ENABLE_SET=0
 FILE_TRANSFER_MAX_BYTES_SET=0
 ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER_SET=0
+if [[ -n "${MESH_DASH_DEPLOY_BBS_ENABLE+x}" ]]; then
+  BBS_ENABLE_SET=1
+fi
 if [[ -n "${MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE+x}" ]]; then
   FILE_TRANSFER_ENABLE_SET=1
 fi
@@ -324,6 +332,16 @@ while [[ $# -gt 0 ]]; do
       require_arg "$1" "${2:-}"
       HISTORY_DB="$2"
       shift 2
+      ;;
+    --bbs-enable)
+      BBS_ENABLE=1
+      BBS_ENABLE_SET=1
+      shift
+      ;;
+    --no-bbs-enable)
+      BBS_ENABLE=0
+      BBS_ENABLE_SET=1
+      shift
       ;;
     --file-transfer-enable)
       FILE_TRANSFER_ENABLE=1
@@ -514,6 +532,13 @@ if [[ "${FILE_TRANSFER_ENABLE_SET}" -eq 0 ]]; then
   fi
 fi
 
+if [[ "${BBS_ENABLE_SET}" -eq 0 ]]; then
+  existing_bbs_enable="$(read_existing_dashboard_env_value "MESH_DASH_BBS_ENABLE")"
+  if [[ -n "${existing_bbs_enable}" ]]; then
+    BBS_ENABLE="${existing_bbs_enable}"
+  fi
+fi
+
 if [[ "${FILE_TRANSFER_MAX_BYTES_SET}" -eq 0 ]]; then
   existing_file_transfer_max_bytes="$(read_existing_dashboard_env_value "MESH_DASH_FILE_TRANSFER_MAX_BYTES")"
   if [[ -n "${existing_file_transfer_max_bytes}" ]]; then
@@ -550,6 +575,7 @@ fi
 if [[ -n "${SERIAL_PATH}" ]]; then
   echo "[deploy] mesh_serial_path=${SERIAL_PATH} dash=${DASH_HOST}:${DASH_PORT} refresh_ms=${REFRESH_MS}"
 fi
+echo "[deploy] bbs_enable=${BBS_ENABLE}"
 echo "[deploy] file_transfer_enable=${FILE_TRANSFER_ENABLE} file_transfer_max_bytes=${FILE_TRANSFER_MAX_BYTES}"
 
 if [[ "${UNINSTALL}" -eq 1 ]]; then
@@ -661,6 +687,7 @@ DASH_HOST=${DASH_HOST}
 DASH_PORT=${DASH_PORT}
 REFRESH_MS=${REFRESH_MS}
 MESH_DASH_HISTORY_DB=${HISTORY_DB}
+MESH_DASH_BBS_ENABLE=${BBS_ENABLE}
 MESH_DASH_FILE_TRANSFER_ENABLE=${FILE_TRANSFER_ENABLE}
 MESH_DASH_FILE_TRANSFER_MAX_BYTES=${FILE_TRANSFER_MAX_BYTES}
 MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=${ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER}
