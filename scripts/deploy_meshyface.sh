@@ -10,25 +10,25 @@ Usage:
 
 Examples:
   # Fast update to an already configured host
-  ./scripts/deploy_meshyface.sh j@192.168.1.241
+  ./scripts/deploy_meshyface.sh pi@meshyface.local
 
   # Full reset + redeploy
   ./scripts/deploy_meshyface.sh \
-    --target j@192.168.1.121 \
+    --target pi@meshyface.local \
     --wipe-remote-root \
     --serial-path /dev/serial/by-id/usb-...
 
   # Full uninstall + hard reboot
   ./scripts/deploy_meshyface.sh \
-    --target j@192.168.1.121 \
+    --target pi@meshyface.local \
     --uninstall \
     --hard-reboot
 
   # First-time bootstrap + deploy
   ./scripts/deploy_meshyface.sh \
-    --target j@192.168.1.29 \
+    --target pi@meshyface.local \
     --bootstrap \
-    --mesh-host 192.168.1.211
+    --mesh-host meshtastic-radio.local
 
 Options:
   --target <user@host>     SSH deploy target.
@@ -428,9 +428,9 @@ if [[ -z "${TARGET}" ]]; then
   cat >&2 <<'EOF'
 No deploy target supplied.
 
-Copy/paste one of these, then change only the last IP number:
-  ./scripts/deploy_meshyface.sh --target j@192.168.1.29
-  ./scripts/deploy_meshyface.sh --target j@192.168.1.29 --bootstrap --mesh-host 192.168.1.211
+Copy/paste one of these, then adjust the target host and radio host:
+  ./scripts/deploy_meshyface.sh --target pi@meshyface.local
+  ./scripts/deploy_meshyface.sh --target pi@meshyface.local --bootstrap --mesh-host meshtastic-radio.local
 
 You can also set MESH_DASH_DEPLOY_TARGET in your environment.
 EOF
@@ -583,6 +583,7 @@ fi
 scp_cmd \
   "${ROOT_DIR}/mesh_dashboard.py" \
   "${ROOT_DIR}/mesh_connection.py" \
+  "${ROOT_DIR}/requirements.txt" \
   "${TARGET}:${APP_DIR}/"
 
 tar \
@@ -610,7 +611,7 @@ if [[ ! -x '${REMOTE_VENV}/bin/python' || ! -x '${REMOTE_VENV}/bin/pip' ]]; then
   python3 -m venv '${REMOTE_VENV}'; \
 fi"
   ssh_cmd "${TARGET}" "'${REMOTE_VENV}/bin/pip' install --upgrade pip"
-  ssh_cmd "${TARGET}" "'${REMOTE_VENV}/bin/pip' install meshtastic pypubsub protobuf"
+  ssh_cmd "${TARGET}" "'${REMOTE_VENV}/bin/pip' install -r '${APP_DIR}/requirements.txt'"
 
   if [[ -n "${SERIAL_PATH}" ]]; then
     SERVICE_EXEC_START="${REMOTE_PYTHON} ${APP_DIR}/mesh_dashboard.py --mesh-port \${MESH_SERIAL_PATH} --http-host \${DASH_HOST} --http-port \${DASH_PORT} --refresh-ms \${REFRESH_MS}"

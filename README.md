@@ -1,14 +1,19 @@
-# Meshyface Public (core-ui)
+# Meshyface
 
 Meshyface is a chat-first Meshtastic dashboard that runs as a single Python
 service and serves a single-page web UI over HTTP.
 
-This repository is the curated public surface. The shipped frontend is the
-`core-ui` surface.
+This repository is currently the private staging home for the curated Meshyface
+app. Keep it private until the publication checklist and third-party notices are
+complete.
 
-## Current Public Surface
+During the transition from the older `mesh_py` workspace, source updates are
+published here as clean snapshots from `release/public-v0`. Once development
+moves fully into this repository, use a normal branch-to-`main` workflow here.
 
-Public `core-ui` currently exposes:
+## Current App Surface
+
+The current UI exposes:
 
 - Chat workspace for `Everyone` plus direct-peer conversations
 - Network workspace for map, topology, node details, and on-demand history views
@@ -19,14 +24,14 @@ Public `core-ui` currently exposes:
 - SQLite-backed history, search, rollups, theme persistence, and custom
   telemetry rule persistence
 
-Not part of the supported public launcher surface:
+Not part of the default launcher surface:
 
 - Dedicated Bots or Labs launcher views
-- Alternate UI profiles such as `full` or `labs-preview`
+- Network diagnostics unless `--debug-mode` is enabled
 
-The source tree still contains optional/private modules and dormant template
-sections used by other branches or slim builds. If an optional backend handler
-is missing, the corresponding endpoint returns `503`.
+The source tree still contains dormant/internal hooks and optional backend
+handlers. If an optional backend handler is not wired into the current build,
+the corresponding endpoint returns `503`.
 
 ## System Architecture
 
@@ -76,7 +81,7 @@ Key runtime notes:
 - The browser polls `/api/state`, fetches history/detail endpoints on demand,
   and POSTs write actions for chat, settings, tools, and optional apps.
 - When online map tiles fail, the UI can fall back to the bundled offline atlas
-  reference layers. The current public build still expects Leaflet JS/CSS to be
+  reference layers. The current build still expects Leaflet JS/CSS to be
   reachable from `unpkg.com` unless you vendor or proxy those assets yourself.
 
 ## Requirements
@@ -89,9 +94,8 @@ Key runtime notes:
   - TCP (`--mesh-host` + `--mesh-tcp-port`)
   - Serial USB (`--mesh-port`)
 - Python packages:
-  - `meshtastic`
-  - `pypubsub`
-  - `protobuf`
+  - install runtime packages with `python -m pip install -r requirements.txt`
+  - install test packages with `python -m pip install -r requirements-dev.txt`
 - Browser access to:
   - `https://unpkg.com/leaflet@1.9.4/...`
   - `https://unpkg.com/leaflet.heat@0.2.0/...`
@@ -112,26 +116,30 @@ unavailable.
 - `meshdash/history*.py`, `meshdash/history/` - SQLite schema, reads, writes,
   analytics, rollups, pruning
 - `scripts/deploy_meshyface.sh` - remote deploy/bootstrap helper
-- `tests/` - public-branch regression tests included in this repo
+- `requirements.txt` - runtime Python dependencies
+- `requirements-dev.txt` - runtime plus test dependencies
+- `PUBLICATION_CHECKLIST.md` - required checks before making the repo public
+- `THIRD_PARTY_NOTICES.md` - bundled/runtime third-party data and asset notes
+- `tests/` - regression tests included in this repo
 
 ## Standalone Install
 
 ### 1) Clone + venv
 
 ```bash
-git clone <your-repo-url> meshyface
+git clone https://github.com/jaronmcd/meshyface.git meshyface
 cd meshyface
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install meshtastic pypubsub protobuf
+python -m pip install -r requirements.txt
 ```
 
 ### 2A) Run with Wi-Fi/TCP radio
 
 ```bash
 python mesh_dashboard.py \
-  --mesh-host 192.168.1.69 \
+  --mesh-host meshtastic-radio.local \
   --mesh-tcp-port 4403 \
   --http-host 0.0.0.0 \
   --http-port 8877 \
@@ -156,7 +164,7 @@ If you want the dashboard to prefer a shared TCP radio when `--mesh-host` is
 not supplied and the serial path is left at its default value:
 
 ```bash
-export MESH_GATEWAY_HOST=192.168.1.69
+export MESH_GATEWAY_HOST=meshtastic-radio.local
 export MESH_GATEWAY_PORT=4403
 python mesh_dashboard.py
 ```
@@ -271,9 +279,9 @@ From this repo:
 
 ```bash
 ./scripts/deploy_meshyface.sh \
-  --target j@192.168.1.241 \
+  --target pi@meshyface.local \
   --bootstrap \
-  --mesh-host 192.168.1.69 \
+  --mesh-host meshtastic-radio.local \
   --mesh-port 4403 \
   --clean-app-dir
 ```
@@ -301,8 +309,8 @@ Important naming note:
 
 ```bash
 ./scripts/deploy_meshyface.sh \
-  --target j@192.168.1.241 \
-  --mesh-host 192.168.1.69 \
+  --target pi@meshyface.local \
+  --mesh-host meshtastic-radio.local \
   --mesh-port 4403 \
   --clean-app-dir
 ```
@@ -315,7 +323,7 @@ systemd unit plus the deploy root, then bootstraps fresh:
 
 ```bash
 ./scripts/deploy_meshyface.sh \
-  --target j@192.168.1.121 \
+  --target pi@meshyface.local \
   --wipe-remote-root \
   --serial-path /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
 ```
@@ -328,7 +336,7 @@ If you want to remove Meshyface from the Pi and stop there:
 
 ```bash
 ./scripts/deploy_meshyface.sh \
-  --target j@192.168.1.121 \
+  --target pi@meshyface.local \
   --uninstall \
   --hard-reboot
 ```
@@ -352,7 +360,7 @@ bootstrap flow works as long as the SSH user has `sudo` access:
 ./scripts/deploy_meshyface.sh \
   --target pi@raspberrypi.local \
   --bootstrap \
-  --mesh-host 192.168.1.211 \
+  --mesh-host meshtastic-radio.local \
   --mesh-port 4403 \
   --clean-app-dir
 ```
@@ -399,7 +407,7 @@ After passthrough, verify the same `ls` commands inside the container.
 ### Run as systemd service (TCP)
 
 The included `meshtastic-dashboard.service` is an example service file for a
-host laid out under `/home/j/mesh`. Adjust `User`, `Group`, paths, and serial
+host laid out under `/opt/meshyface`. Adjust `User`, `Group`, paths, and serial
 permissions to match your host.
 
 The bootstrap path in `scripts/deploy_meshyface.sh` does not copy that example
@@ -407,18 +415,18 @@ verbatim anymore. It renders a host-specific unit from the resolved deploy
 settings, including the remote root, app/config paths, venv path, service user,
 and service group.
 
-It reads env from `/home/j/mesh/config/dashboard.env`.
+It reads env from `/opt/meshyface/config/dashboard.env`.
 
 Example env:
 
 ```bash
-cat > /home/j/mesh/config/dashboard.env <<'EOF_ENV'
-MESH_HOST=192.168.1.69
+cat > /opt/meshyface/config/dashboard.env <<'EOF_ENV'
+MESH_HOST=meshtastic-radio.local
 MESH_PORT=4403
 DASH_HOST=0.0.0.0
 DASH_PORT=8877
 REFRESH_MS=3000
-MESH_DASH_HISTORY_DB=/home/j/mesh/mesh_dashboard_history.sqlite3
+MESH_DASH_HISTORY_DB=/opt/meshyface/mesh_dashboard_history.sqlite3
 MESH_DASH_FILE_TRANSFER_ENABLE=0
 MESH_DASH_FILE_TRANSFER_MAX_BYTES=65536
 MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=0
@@ -451,7 +459,7 @@ Drop-in contents:
 ```ini
 [Service]
 ExecStart=
-ExecStart=/home/j/mesh/.venv/bin/python /home/j/mesh/app/mesh_dashboard.py --mesh-port /dev/ttyACM0 --http-host ${DASH_HOST} --http-port ${DASH_PORT} --refresh-ms ${REFRESH_MS}
+ExecStart=/opt/meshyface/.venv/bin/python /opt/meshyface/app/mesh_dashboard.py --mesh-port /dev/ttyACM0 --http-host ${DASH_HOST} --http-port ${DASH_PORT} --refresh-ms ${REFRESH_MS}
 ```
 
 Then:
@@ -482,8 +490,8 @@ Deploy helper example:
 
 ```bash
 ./scripts/deploy_meshyface.sh \
-  --target j@192.168.1.241 \
-  --mesh-host 192.168.1.69 \
+  --target pi@meshyface.local \
+  --mesh-host meshtastic-radio.local \
   --file-transfer-enable \
   --file-transfer-max-bytes 512000 \
   --accept-file-transfer-traffic-disclaimer \
@@ -522,6 +530,8 @@ Related environment variables:
 - `--reset-ticker-scale-on-restart` /
   `--no-reset-ticker-scale-on-restart`
 - `--show-secrets`: reveal private keys/passwords/PSKs in raw JSON panels
+- `--debug-mode` / `--no-debug-mode`: expose debug-only dashboard surfaces such
+  as advanced network diagnostics
 - `--private-mode` / `--no-private-mode`: strip public chat slices and block
   selected public endpoints
 - `--api-token <token>`: require auth on write endpoints via
@@ -531,6 +541,9 @@ Related environment variables:
 
 - `MESH_DASH_PRIVATE_MODE`
 - `MESH_DASH_API_TOKEN`
+- `MESH_DASH_VERSION`
+- `MESH_DASH_GIT_COMMIT`
+
 ### History and analytics
 
 - `--history-db <path>`: base SQLite DB path
@@ -563,6 +576,10 @@ Built-in presets:
 
 - `default`
 - `blue`
+- `custom`
+
+Fresh installs default to `custom` unless a persisted theme settings file or
+`MESH_DASH_THEME_PRESET` selects another preset.
 
 Related environment variables:
 
@@ -607,6 +624,9 @@ The deploy helper also accepts:
 - `MESH_DASH_DEPLOY_SERVICE_USER`
 - `MESH_DASH_DEPLOY_SERVICE_GROUP`
 - `MESH_DASH_DEPLOY_CLEAN_APP_DIR`
+- `MESH_DASH_DEPLOY_WIPE_REMOTE_ROOT`
+- `MESH_DASH_DEPLOY_UNINSTALL`
+- `MESH_DASH_DEPLOY_HARD_REBOOT`
 - `MESH_DASH_DEPLOY_MESH_HOST`
 - `MESH_DASH_DEPLOY_MESH_PORT`
 - `MESH_DASH_DEPLOY_SERIAL_PATH`
@@ -659,7 +679,6 @@ The deploy helper also accepts:
 - `/api/settings/channels`
 - `/api/settings/theme`
 - `/api/settings/custom_telemetry`
-- `/api/settings/bot`
 - `/api/tools/network`
 - `/api/games/zork`
 
@@ -708,11 +727,18 @@ If the UI looks stale after deploy, hard refresh the browser with
 
 ## Testing
 
-Run the public-branch regression suite:
+Install test dependencies, then run the regression suite:
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
+
+## Publication Status
+
+This repo is intentionally still private. Before making it public, complete
+`PUBLICATION_CHECKLIST.md`, choose a project license, and resolve the bundled
+third-party data notes in `THIRD_PARTY_NOTICES.md`.
 
 ## Security
 
