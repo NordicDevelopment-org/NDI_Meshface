@@ -171,6 +171,13 @@
     let bbsPostStatusText = "";
     let bbsPostStatusError = false;
     let bbsPostStatusChannelIndex = null;
+    let bbsHostSettingsLoadedOnce = false;
+    let bbsHostSettingsFetchInFlight = false;
+    let bbsHostSettingsSaveInFlight = false;
+    let bbsHostSettingsSaveQueued = false;
+    let bbsHostSettingsDirty = false;
+    let bbsHostSettingsSaveTimer = null;
+    let bbsHostSettingsRemoteAvailable = null;
     let settingsApplyInFlight = false;
     let settingsFetchInFlight = false;
     let settingsAutoFetchAttempted = false;

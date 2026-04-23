@@ -525,15 +525,31 @@
       }};
     }}
 
+    function bbsExportHostSettings(source = bbsHostState) {{
+      const host = (source && typeof source === "object") ? source : createBbsHostState();
+      const title = sanitizeBbsWireField(host.title, bbsMaxTitleChars) || "Packet Exchange";
+      return {{
+        title,
+        board_id: normalizeBbsBoardId(host.board_id, title),
+        motd: sanitizeBbsWireField(host.motd, bbsMaxMotdChars) || "2400 baud online.",
+      }};
+    }}
+
+    function bbsHostSettingsSignature(source = null) {{
+      return JSON.stringify(bbsExportHostSettings(source));
+    }}
+
     function bbsPersistState() {{
-      const host = (bbsHostState && typeof bbsHostState === "object")
-        ? bbsHostState
-        : createBbsHostState();
+      const settings = bbsExportHostSettings(
+        (bbsHostState && typeof bbsHostState === "object")
+          ? bbsHostState
+          : createBbsHostState()
+      );
       const payload = {{
         active_board_key: String(bbsActiveBoardKey || "").trim().toLowerCase(),
-        board_id: normalizeBbsBoardId(host.board_id, host.title),
-        title: sanitizeBbsWireField(host.title, bbsMaxTitleChars) || "Packet Exchange",
-        motd: sanitizeBbsWireField(host.motd, bbsMaxMotdChars) || "2400 baud online.",
+        board_id: settings.board_id,
+        title: settings.title,
+        motd: settings.motd,
       }};
       try {{
         window.localStorage.setItem(bbsStorageKey, JSON.stringify(payload));
@@ -541,10 +557,209 @@
       }}
     }}
 
+    function clearBbsHostSettingsSaveTimer() {{
+      if (bbsHostSettingsSaveTimer !== null) {{
+        window.clearTimeout(bbsHostSettingsSaveTimer);
+        bbsHostSettingsSaveTimer = null;
+      }}
+    }}
+
+    function queueBbsHostSettingsSave(delayMs = bbsHostSettingsSaveDebounceMs) {{
+      if (!bbsFeatureEnabled || bbsHostSettingsRemoteAvailable === false) return;
+      clearBbsHostSettingsSaveTimer();
+      const waitMs = Math.max(0, Math.trunc(Number(delayMs) || 0));
+      bbsHostSettingsSaveTimer = window.setTimeout(() => {{
+        bbsHostSettingsSaveTimer = null;
+        void saveBbsHostSettings({{ silent: true }});
+      }}, waitMs);
+    }}
+
     function clearBbsAnnounceTimer() {{
       if (bbsHostAnnounceTimer !== null) {{
         clearInterval(bbsHostAnnounceTimer);
         bbsHostAnnounceTimer = null;
+      }}
+    }}
+
+    function bbsRemoveDirectoryRowByKey(boardKey) {{
+      const clean = String(boardKey || "").trim().toLowerCase();
+      if (!clean) return;
+      bbsDiscoveredBoards = (Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [])
+        .filter((row) => String(row && row.key || "").trim().toLowerCase() !== clean);
+      if (bbsActiveBoardKey === clean) {{
+        const fallback = (Array.isArray(bbsDiscoveredBoards) && bbsDiscoveredBoards.length)
+          ? String(bbsDiscoveredBoards[0].key || "").trim().toLowerCase()
+          : "";
+        bbsActiveBoardKey = fallback;
+      }}
+    }}
+
+    function syncHostedBbsDirectoryEntry(state = latestState, options = null) {{
+      if (!(bbsHostState && bbsHostState.enabled)) return;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const localId = bbsHostNodeId(state);
+      if (!isCanonicalNodeId(localId)) return;
+      const previousKey = String(opts.previousKey || "").trim().toLowerCase();
+      const nextKey = bbsBoardKey(bbsHostState.board_id, localId);
+      if (previousKey && nextKey && previousKey !== nextKey) {{
+        bbsRemoveDirectoryRowByKey(previousKey);
+      }}
+      bbsHostState.host_id = localId;
+      const hostKey = bbsUpsertDirectoryRow({{
+        board_id: bbsHostState.board_id,
+        host_id: localId,
+        title: bbsHostState.title,
+        motd: bbsHostState.motd,
+        channel_index: bbsHostState.channel_index,
+        last_seen_unix: Math.max(
+          0,
+          Math.trunc(Number(bbsHostState.started_unix) || Math.floor(Date.now() / 1000))
+        ),
+      }});
+      if (!bbsActiveBoardKey || (previousKey && bbsActiveBoardKey === previousKey)) {{
+        bbsActiveBoardKey = hostKey || nextKey || bbsActiveBoardKey;
+      }}
+    }}
+
+    function applyBbsHostSettings(settings = null, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const previousKey = (bbsHostState && bbsHostState.enabled)
+        ? bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || bbsHostNodeId(latestState))
+        : "";
+      const next = bbsExportHostSettings(settings);
+      if (!(bbsHostState && typeof bbsHostState === "object")) {{
+        bbsHostState = createBbsHostState();
+      }}
+      bbsHostState.title = next.title;
+      bbsHostState.board_id = next.board_id;
+      bbsHostState.motd = next.motd;
+      if (bbsHostState.enabled) {{
+        syncHostedBbsDirectoryEntry(latestState, {{ previousKey }});
+      }}
+      bbsPersistState();
+      if (activeLayoutView !== "bbs") return;
+      if (opts.renderView === true) {{
+        renderBbsView(latestState);
+        return;
+      }}
+      if (opts.render !== false) {{
+        renderBbsHostControls(latestState);
+      }}
+    }}
+
+    async function fetchBbsHostSettings(options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const silent = !!opts.silent;
+      if (!bbsFeatureEnabled || bbsHostSettingsRemoteAvailable === false) return false;
+      if (bbsHostSettingsFetchInFlight) return false;
+      if (bbsHostSettingsLoadedOnce && opts.force !== true) return false;
+      bbsHostSettingsFetchInFlight = true;
+      try {{
+        const resp = await fetch(bbsSettingsEndpoint, {{ cache: "no-store" }});
+        const rawText = await resp.text();
+        let payload = null;
+        try {{
+          payload = rawText ? JSON.parse(rawText) : null;
+        }} catch (_err) {{
+          payload = null;
+        }}
+        if (!resp.ok || !payload || typeof payload !== "object" || payload.ok === false) {{
+          const errMsg = payload && payload.error
+            ? String(payload.error)
+            : (rawText || `HTTP ${{resp.status}}`);
+          if (resp.status === 404 || resp.status === 503) {{
+            bbsHostSettingsRemoteAvailable = false;
+            bbsHostSettingsLoadedOnce = true;
+          }}
+          if (!silent) {{
+            appendConsoleLine(`bbs-settings-load|${{Date.now()}}|error`, `[bbs] settings load failed: ${{errMsg}}`);
+          }}
+          return false;
+        }}
+        bbsHostSettingsRemoteAvailable = true;
+        bbsHostSettingsLoadedOnce = true;
+        const settings = (payload.settings && typeof payload.settings === "object")
+          ? payload.settings
+          : payload;
+        if (!bbsHostSettingsDirty) {{
+          applyBbsHostSettings(settings, {{ renderView: activeLayoutView === "bbs" }});
+        }}
+        return true;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        if (!silent) {{
+          appendConsoleLine(`bbs-settings-load|${{Date.now()}}|error`, `[bbs] settings load error: ${{msg}}`);
+        }}
+        return false;
+      }} finally {{
+        bbsHostSettingsFetchInFlight = false;
+      }}
+    }}
+
+    async function saveBbsHostSettings(options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const silent = !!opts.silent;
+      if (!bbsFeatureEnabled || bbsHostSettingsRemoteAvailable === false) return false;
+      clearBbsHostSettingsSaveTimer();
+      const settings = bbsExportHostSettings();
+      const requestSignature = bbsHostSettingsSignature(settings);
+      if (bbsHostSettingsSaveInFlight) {{
+        bbsHostSettingsSaveQueued = true;
+        return false;
+      }}
+      bbsHostSettingsSaveInFlight = true;
+      try {{
+        const resp = await fetch(bbsSettingsEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{ settings }}),
+        }});
+        const rawText = await resp.text();
+        let payload = null;
+        try {{
+          payload = rawText ? JSON.parse(rawText) : null;
+        }} catch (_err) {{
+          payload = null;
+        }}
+        if (!resp.ok || !payload || typeof payload !== "object" || payload.ok === false) {{
+          const errMsg = payload && payload.error
+            ? String(payload.error)
+            : (rawText || `HTTP ${{resp.status}}`);
+          if (resp.status === 404 || resp.status === 503) {{
+            bbsHostSettingsRemoteAvailable = false;
+            bbsHostSettingsLoadedOnce = true;
+          }}
+          if (!silent) {{
+            appendConsoleLine(`bbs-settings-save|${{Date.now()}}|error`, `[bbs] settings save failed: ${{errMsg}}`);
+          }}
+          return false;
+        }}
+        bbsHostSettingsRemoteAvailable = true;
+        bbsHostSettingsLoadedOnce = true;
+        const savedSettings = (payload.settings && typeof payload.settings === "object")
+          ? payload.settings
+          : settings;
+        if (bbsHostSettingsSignature() === requestSignature) {{
+          bbsHostSettingsDirty = false;
+          applyBbsHostSettings(savedSettings, {{ renderView: !!opts.renderView }});
+        }} else {{
+          bbsHostSettingsSaveQueued = true;
+        }}
+        return true;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        if (!silent) {{
+          appendConsoleLine(`bbs-settings-save|${{Date.now()}}|error`, `[bbs] settings save error: ${{msg}}`);
+        }}
+        return false;
+      }} finally {{
+        bbsHostSettingsSaveInFlight = false;
+        if (bbsHostSettingsSaveQueued && bbsHostSettingsDirty && bbsHostSettingsRemoteAvailable !== false) {{
+          bbsHostSettingsSaveQueued = false;
+          queueBbsHostSettingsSave(60);
+        }} else {{
+          bbsHostSettingsSaveQueued = false;
+        }}
       }}
     }}
 
@@ -571,7 +786,17 @@
       bbsPostStatusText = "";
       bbsPostStatusError = false;
       bbsPostStatusChannelIndex = null;
+      bbsHostSettingsLoadedOnce = false;
+      bbsHostSettingsFetchInFlight = false;
+      bbsHostSettingsSaveInFlight = false;
+      bbsHostSettingsSaveQueued = false;
+      bbsHostSettingsDirty = false;
+      bbsHostSettingsRemoteAvailable = null;
+      clearBbsHostSettingsSaveTimer();
       clearBbsAnnounceTimer();
+      if (bbsFeatureEnabled) {{
+        void fetchBbsHostSettings({{ silent: true }});
+      }}
     }}
 
     function setBbsPostStatus(message, isError = false, options = null) {{
@@ -877,20 +1102,7 @@
 
     function bbsEnsureHostDirectoryEntry(state = latestState) {{
       if (!(bbsHostState && bbsHostState.enabled)) return;
-      const localId = bbsHostNodeId(state);
-      if (!isCanonicalNodeId(localId)) return;
-      bbsHostState.host_id = localId;
-      const hostKey = bbsUpsertDirectoryRow({{
-        board_id: bbsHostState.board_id,
-        host_id: localId,
-        title: bbsHostState.title,
-        motd: bbsHostState.motd,
-        channel_index: bbsHostState.channel_index,
-        last_seen_unix: Math.floor(Date.now() / 1000),
-      }});
-      if (hostKey && !bbsActiveBoardKey) {{
-        bbsActiveBoardKey = hostKey;
-      }}
+      syncHostedBbsDirectoryEntry(state);
     }}
 
     function bbsActiveBoardRow() {{
@@ -1010,6 +1222,8 @@
       }});
       bbsActiveBoardKey = hostKey || bbsBoardKey(boardId, localId);
       bbsPersistState();
+      bbsHostSettingsDirty = true;
+      void saveBbsHostSettings({{ silent: true, renderView: activeLayoutView === "bbs" }});
       armBbsAnnounceTimer();
       setBbsPostStatus(`Hosting "${{title}}".`, false, {{ channel_index: channelIndex }});
       void announceHostedBbs({{ quiet: true }});
@@ -1031,6 +1245,9 @@
         bbsRemoveDirectoryRow(boardId, hostId);
       }}
       bbsPersistState();
+      if (bbsHostSettingsDirty) {{
+        void saveBbsHostSettings({{ silent: true }});
+      }}
       if (boardId && isCanonicalNodeId(hostId)) {{
         await sendBbsProtocolMessage(
           "offline",
@@ -1410,13 +1627,25 @@
       if (titleInput instanceof HTMLInputElement && titleInput.dataset.bound !== "1") {{
         titleInput.dataset.bound = "1";
         titleInput.addEventListener("input", () => {{
+          const previousKey = (bbsHostState && bbsHostState.enabled)
+            ? bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || bbsHostNodeId(latestState))
+            : "";
           bbsHostState.title = sanitizeBbsWireField(titleInput.value, bbsMaxTitleChars) || "Packet Exchange";
           if (!sanitizeBbsWireField(bbsHostState.board_id, 24)) {{
             bbsHostState.board_id = normalizeBbsBoardId("", bbsHostState.title);
           }}
+          bbsHostSettingsDirty = true;
+          if (bbsHostState && bbsHostState.enabled) {{
+            syncHostedBbsDirectoryEntry(latestState, {{ previousKey }});
+          }}
           bbsPersistState();
+          queueBbsHostSettingsSave();
           if (activeLayoutView === "bbs") {{
-            renderBbsHostControls(latestState);
+            if (bbsHostState && bbsHostState.enabled) {{
+              renderBbsView(latestState);
+            }} else {{
+              renderBbsHostControls(latestState);
+            }}
           }}
         }});
       }}
@@ -1424,10 +1653,22 @@
       if (boardInput instanceof HTMLInputElement && boardInput.dataset.bound !== "1") {{
         boardInput.dataset.bound = "1";
         boardInput.addEventListener("input", () => {{
+          const previousKey = (bbsHostState && bbsHostState.enabled)
+            ? bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || bbsHostNodeId(latestState))
+            : "";
           bbsHostState.board_id = normalizeBbsBoardId(boardInput.value, bbsHostState.title);
+          bbsHostSettingsDirty = true;
+          if (bbsHostState && bbsHostState.enabled) {{
+            syncHostedBbsDirectoryEntry(latestState, {{ previousKey }});
+          }}
           bbsPersistState();
+          queueBbsHostSettingsSave();
           if (activeLayoutView === "bbs") {{
-            renderBbsHostControls(latestState);
+            if (bbsHostState && bbsHostState.enabled) {{
+              renderBbsView(latestState);
+            }} else {{
+              renderBbsHostControls(latestState);
+            }}
           }}
         }});
       }}
@@ -1435,10 +1676,22 @@
       if (motdInput instanceof HTMLInputElement && motdInput.dataset.bound !== "1") {{
         motdInput.dataset.bound = "1";
         motdInput.addEventListener("input", () => {{
+          const previousKey = (bbsHostState && bbsHostState.enabled)
+            ? bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || bbsHostNodeId(latestState))
+            : "";
           bbsHostState.motd = sanitizeBbsWireField(motdInput.value, bbsMaxMotdChars) || "2400 baud online.";
+          bbsHostSettingsDirty = true;
+          if (bbsHostState && bbsHostState.enabled) {{
+            syncHostedBbsDirectoryEntry(latestState, {{ previousKey }});
+          }}
           bbsPersistState();
+          queueBbsHostSettingsSave();
           if (activeLayoutView === "bbs") {{
-            renderBbsHostControls(latestState);
+            if (bbsHostState && bbsHostState.enabled) {{
+              renderBbsView(latestState);
+            }} else {{
+              renderBbsHostControls(latestState);
+            }}
           }}
         }});
       }}
@@ -1506,6 +1759,9 @@
     }}
 
     function renderBbsView(state = latestState) {{
+      if (bbsFeatureEnabled && !bbsHostSettingsLoadedOnce && !bbsHostSettingsFetchInFlight) {{
+        void fetchBbsHostSettings({{ silent: true }});
+      }}
       bindBbsControls();
       syncBbsNetworkState(state);
       renderBbsHostControls(state);

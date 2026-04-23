@@ -11,15 +11,6 @@ _CUSTOM_TELEMETRY_RULES_KEY = "custom_telemetry_rules_v1"
 _BBS_HOST_SETTINGS_KEY = "bbs_host_settings_v1"
 
 
-def _sanitize_bbs_field(value: object, max_chars: int) -> str:
-    limit = max(1, int(max_chars))
-    return (
-        str(value if value is not None else "")
-        .replace("|", " ")
-        .split()
-    )[:]
-
-
 def _sanitize_bbs_text(value: object, max_chars: int) -> str:
     limit = max(1, int(max_chars))
     return (

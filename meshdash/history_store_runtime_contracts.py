@@ -31,6 +31,8 @@ class HistoryStoreRuntimeState(HistoryStoreWriteState, Protocol):
     event_retention_seconds: int
     rollup_retention_seconds: int
     _writes_since_prune: int
+    _bbs_host_settings: dict[str, object]
+    _bbs_host_settings_updated_unix: int
     _custom_telemetry_rules: list[dict[str, object]]
     _custom_telemetry_updated_unix: int
 

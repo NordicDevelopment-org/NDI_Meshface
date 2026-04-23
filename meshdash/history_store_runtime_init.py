@@ -108,6 +108,12 @@ def initialize_history_store_runtime(
     )
     store._custom_telemetry_rules = custom_rules
     store._custom_telemetry_updated_unix = custom_rules_updated_unix
+    store._bbs_host_settings = {
+        "title": "Packet Exchange",
+        "board_id": "packet-exchange",
+        "motd": "2400 baud online.",
+    }
+    store._bbs_host_settings_updated_unix = 0
 
     # Only create a separate read connection when we're using the default
     # connection opener *and* the DB path is file-backed. In-memory SQLite
