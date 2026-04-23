@@ -3,8 +3,8 @@
 Meshyface is a chat-first Meshtastic dashboard that runs as a single Python
 service and serves a single-page web UI over HTTP.
 
-This branch (`release/public-v0`) is the curated public surface. In this branch,
-the shipped frontend is the curated `core-ui` surface.
+This repository is the curated public surface. The shipped frontend is the
+`core-ui` surface.
 
 ## Current Public Surface
 
@@ -112,7 +112,6 @@ unavailable.
 - `meshdash/history*.py`, `meshdash/history/` - SQLite schema, reads, writes,
   analytics, rollups, pruning
 - `scripts/deploy_meshyface.sh` - remote deploy/bootstrap helper
-- `scripts/release_public.sh` - allowlist-driven public release packager
 - `tests/` - public-branch regression tests included in this repo
 
 ## Standalone Install
@@ -707,18 +706,12 @@ offline atlas fallback should be used instead.
 If the UI looks stale after deploy, hard refresh the browser with
 `Ctrl+Shift+R`.
 
-## Testing And Release Workflow
+## Testing
 
 Run the public-branch regression suite:
 
 ```bash
 python -m pytest -q
-```
-
-Useful public-branch release checks:
-
-```bash
-./scripts/release_public.sh --source-branch release/public-v0 --dry-run
 ```
 
 ## Security
