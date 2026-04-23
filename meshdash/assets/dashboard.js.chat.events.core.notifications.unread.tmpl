@@ -24,9 +24,6 @@
         : {{}};
       const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
       const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
-      const activeMeshIdx = (typeof activeMeshChannelFilterIndex === "function")
-        ? activeMeshChannelFilterIndex()
-        : meshChannelAllIndex;
       const nodesLength = nodes.length;
       const recentChatLength = recentChat.length;
       const recentChatTailKey = recentChatLength > 0
@@ -40,7 +37,6 @@
         && cachedEntries.nodesRef === nodes
         && cachedEntries.recentChatRef === recentChat
         && cachedEntries.localNodeId === localNodeId
-        && cachedEntries.meshFilterIndex === activeMeshIdx
         && cachedEntries.nodesLength === nodesLength
         && cachedEntries.recentChatLength === recentChatLength
         && cachedEntries.recentChatTailKey === recentChatTailKey
@@ -54,6 +50,8 @@
       );
       const messageSenderById = new Map();
       const messageInfoById = new Map();
+      // Track all mesh channels here; visibility filtering happens later so off-channel
+      // messages can still light up the correct channel pill.
       for (const msg of recentChat) {{
         if (!msg || typeof msg !== "object") continue;
         if (isFileTransferProtocolMessage(msg)) continue;
@@ -66,7 +64,6 @@
       }}
       for (const msg of recentChat) {{
         if (!msg || typeof msg !== "object") continue;
-        if (!messageMatchesActiveMeshChannel(msg)) continue;
         if (isFileTransferProtocolMessage(msg)) continue;
         const msgId = Number(msg.message_id ?? msg.messageId ?? msg.packet_id ?? msg.packetId);
         if (!Number.isInteger(msgId) || msgId <= 0) continue;
@@ -151,7 +148,6 @@
         nodesRef: nodes,
         recentChatRef: recentChat,
         localNodeId,
-        meshFilterIndex: activeMeshIdx,
         nodesLength,
         recentChatLength,
         recentChatTailKey,
