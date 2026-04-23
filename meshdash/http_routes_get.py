@@ -43,6 +43,10 @@ _handle_custom_telemetry_settings_get_helper = _load_optional_handler(
     ".api_custom_telemetry",
     "handle_custom_telemetry_settings_get",
 )
+_handle_bbs_settings_get_helper = _load_optional_handler(
+    ".api_bbs",
+    "handle_bbs_settings_get",
+)
 
 
 def _record_state_poll_request(deps: DashboardGetRouteDependencies) -> None:
@@ -259,6 +263,21 @@ def handle_dashboard_get(
         _handle_theme_settings_get_helper(
             handler,
             get_theme_settings_fn=deps.get_theme_settings_fn,
+            write_json_response_fn=deps.write_json_response_fn,
+        )
+        return
+
+    if path == "/api/settings/bbs":
+        if not callable(_handle_bbs_settings_get_helper):
+            deps.write_json_response_fn(
+                handler,
+                status_code=503,
+                payload_obj={"ok": False, "error": "BBS settings are not enabled on this dashboard instance"},
+            )
+            return
+        _handle_bbs_settings_get_helper(
+            handler,
+            get_bbs_settings_fn=deps.get_bbs_settings_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )
         return

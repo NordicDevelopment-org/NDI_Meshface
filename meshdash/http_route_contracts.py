@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Mapping, Optional, Protocol
 
 if TYPE_CHECKING:
+    from .api_input_bbs import BbsSettingsRequest
     from .api_input_channels import ChannelSettingsRequest
     from .api_input_chat import ChatSendRequest
     from .api_input_custom_telemetry import CustomTelemetrySettingsRequest
@@ -11,6 +12,7 @@ if TYPE_CHECKING:
     from .api_input_theme import ThemeSettingsRequest
     from .api_input_zork import StandaloneZorkRequest
 else:
+    BbsSettingsRequest = object
     ChannelSettingsRequest = object
     ChatSendRequest = object
     CustomTelemetrySettingsRequest = object
@@ -69,8 +71,18 @@ class GetThemeSettingsFn(Protocol):
         ...
 
 
+class GetBbsSettingsFn(Protocol):
+    def __call__(self) -> dict[str, object]:
+        ...
+
+
 class SetThemePresetFn(Protocol):
     def __call__(self, payload: object) -> dict[str, object]:
+        ...
+
+
+class SetBbsSettingsFn(Protocol):
+    def __call__(self, settings: object) -> dict[str, object]:
         ...
 
 
@@ -147,6 +159,11 @@ class ParseChatSendRequestFn(Protocol):
 
 class ParseThemeSettingsRequestFn(Protocol):
     def __call__(self, raw_body: bytes) -> ThemeSettingsRequest:
+        ...
+
+
+class ParseBbsSettingsRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> BbsSettingsRequest:
         ...
 
 
@@ -277,6 +294,7 @@ class DashboardGetRouteDependencies:
     write_json_response_fn: WriteJsonResponseFn
     write_text_response_fn: WriteTextResponseFn
     get_theme_settings_fn: Optional[GetThemeSettingsFn] = None
+    get_bbs_settings_fn: Optional[GetBbsSettingsFn] = None
     get_custom_telemetry_settings_fn: Optional[GetCustomTelemetrySettingsFn] = None
     private_mode: bool = False
     api_metrics: Optional[ApiMetricsRecorder] = None
@@ -291,6 +309,8 @@ class DashboardPostRouteDependencies:
     write_json_response_fn: WriteJsonResponseFn
     set_theme_preset_fn: Optional[SetThemePresetFn] = None
     parse_theme_settings_request_fn: Optional[ParseThemeSettingsRequestFn] = None
+    set_bbs_settings_fn: Optional[SetBbsSettingsFn] = None
+    parse_bbs_settings_request_fn: Optional[ParseBbsSettingsRequestFn] = None
     set_custom_telemetry_settings_fn: Optional[SetCustomTelemetrySettingsFn] = None
     parse_custom_telemetry_settings_request_fn: Optional[ParseCustomTelemetrySettingsRequestFn] = None
     apply_radio_settings_fn: Optional[ApplyRadioSettingsFn] = None

@@ -274,6 +274,40 @@ def build_dashboard_runtime_context(
 
     # Optional: expose custom telemetry extraction rules persisted in history DB.
     if history_store is not None:
+        get_bbs_settings_fn = getattr(history_store, "get_bbs_settings", None)
+        set_bbs_settings_fn = getattr(history_store, "set_bbs_settings", None)
+        if callable(get_bbs_settings_fn):
+            try:
+                setattr(loaders.state_fn, "get_bbs_settings_fn", get_bbs_settings_fn)
+            except Exception:
+                pass
+            state_lite_fn = getattr(loaders.state_fn, "lite", None)
+            if callable(state_lite_fn):
+                try:
+                    setattr(state_lite_fn, "get_bbs_settings_fn", get_bbs_settings_fn)
+                except Exception:
+                    pass
+        if callable(set_bbs_settings_fn):
+            def _set_bbs_settings(request):
+                return set_bbs_settings_fn(
+                    {
+                        "title": getattr(request, "title", None),
+                        "board_id": getattr(request, "board_id", None),
+                        "motd": getattr(request, "motd", None),
+                    }
+                )
+
+            try:
+                setattr(loaders.state_fn, "set_bbs_settings_fn", _set_bbs_settings)
+            except Exception:
+                pass
+            state_lite_fn = getattr(loaders.state_fn, "lite", None)
+            if callable(state_lite_fn):
+                try:
+                    setattr(state_lite_fn, "set_bbs_settings_fn", _set_bbs_settings)
+                except Exception:
+                    pass
+
         get_custom_telemetry_settings_fn = getattr(history_store, "get_custom_telemetry_settings", None)
         set_custom_telemetry_settings_fn = getattr(history_store, "set_custom_telemetry_settings", None)
         if callable(get_custom_telemetry_settings_fn):

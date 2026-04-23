@@ -33,6 +33,8 @@ def make_http_handler(
     api_metrics = DashboardApiMetrics()
     apply_radio_settings_fn = getattr(state_fn, "apply_radio_settings_fn", None)
     apply_channel_settings_fn = getattr(state_fn, "apply_channel_settings_fn", None)
+    get_bbs_settings_fn = getattr(state_fn, "get_bbs_settings_fn", None)
+    set_bbs_settings_fn = getattr(state_fn, "set_bbs_settings_fn", None)
     get_custom_telemetry_settings_fn = getattr(state_fn, "get_custom_telemetry_settings_fn", None)
     set_custom_telemetry_settings_fn = getattr(state_fn, "set_custom_telemetry_settings_fn", None)
     play_standalone_zork_fn = getattr(state_fn, "play_standalone_zork_fn", None)
@@ -45,6 +47,7 @@ def make_http_handler(
         online_activity_fn=online_activity_fn,
         summary_metrics_fn=summary_metrics_fn,
         get_theme_settings_fn=get_theme_settings_fn,
+        get_bbs_settings_fn=get_bbs_settings_fn,
         get_custom_telemetry_settings_fn=get_custom_telemetry_settings_fn,
         private_mode=bool(private_mode),
         api_metrics=api_metrics,
@@ -54,6 +57,7 @@ def make_http_handler(
     post_deps = build_post_route_dependencies(
         send_chat_fn=send_chat_fn,
         set_theme_preset_fn=set_theme_preset_fn,
+        set_bbs_settings_fn=set_bbs_settings_fn,
         apply_radio_settings_fn=apply_radio_settings_fn,
         apply_channel_settings_fn=apply_channel_settings_fn,
         set_custom_telemetry_settings_fn=set_custom_telemetry_settings_fn,

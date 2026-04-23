@@ -38,7 +38,9 @@ from .history_store_summary import (
     save_summary_metrics as _save_summary_metrics_helper,
 )
 from .history_store_settings import (
+    load_bbs_settings as _load_bbs_settings_helper,
     load_custom_telemetry_settings as _load_custom_telemetry_settings_helper,
+    save_bbs_settings as _save_bbs_settings_helper,
     save_custom_telemetry_settings as _save_custom_telemetry_settings_helper,
 )
 
@@ -190,3 +192,9 @@ class HistoryStore:
 
     def set_custom_telemetry_settings(self, rules: object) -> dict[str, object]:
         return _save_custom_telemetry_settings_helper(self, rules=rules)
+
+    def get_bbs_settings(self) -> dict[str, object]:
+        return _load_bbs_settings_helper(self)
+
+    def set_bbs_settings(self, settings: object) -> dict[str, object]:
+        return _save_bbs_settings_helper(self, settings=settings)
