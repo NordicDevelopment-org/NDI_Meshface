@@ -1112,6 +1112,13 @@
       return rows.find((row) => String(row && row.key || "").trim().toLowerCase() === key) || null;
     }}
 
+    function bbsDirectoryRowForHost(nodeId) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!isCanonicalNodeId(cleanNodeId)) return null;
+      const rows = Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [];
+      return rows.find((row) => normalizeNodeId(row && row.host_id || "") === cleanNodeId) || null;
+    }}
+
     function bbsSelectBoard(boardKey) {{
       const clean = String(boardKey || "").trim().toLowerCase();
       if (!clean) return;
@@ -1123,6 +1130,26 @@
       if (activeLayoutView === "bbs") {{
         renderBbsView(latestState);
       }}
+    }}
+
+    function openBbsBoard(boardKey) {{
+      const clean = String(boardKey || "").trim().toLowerCase();
+      if (!bbsFeatureEnabled || !clean) return false;
+      if (!Array.isArray(bbsDiscoveredBoards) || !bbsDiscoveredBoards.some((row) => String(row && row.key || "").trim().toLowerCase() === clean)) {{
+        return false;
+      }}
+      bbsSelectBoard(clean);
+      applyLayoutView("bbs", true);
+      if (activeLayoutView === "bbs") {{
+        renderBbsView(latestState);
+      }}
+      return true;
+    }}
+
+    function openBbsBoardForHost(nodeId) {{
+      const row = bbsDirectoryRowForHost(nodeId);
+      if (!row) return false;
+      return openBbsBoard(String(row.key || "").trim().toLowerCase());
     }}
 
     function armBbsAnnounceTimer() {{

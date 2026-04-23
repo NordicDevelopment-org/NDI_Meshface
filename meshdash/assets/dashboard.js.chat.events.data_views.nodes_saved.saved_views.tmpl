@@ -147,6 +147,21 @@
       }}
     }}
 
+    function bindSavedNodeBbsButtons(root = null) {{
+      if (!(root instanceof HTMLElement)) return;
+      for (const btn of root.querySelectorAll(".saved-node-inline-link[data-bbs-node-id]")) {{
+        if (!(btn instanceof HTMLButtonElement) || btn.dataset.bound === "1") continue;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const nodeId = normalizeNodeId(btn.dataset.bbsNodeId || "");
+          if (!isSelectableNodeId(nodeId)) return;
+          openBbsBoardForHost(nodeId);
+        }});
+      }}
+    }}
+
     function renderSavedNodeDetails(state, nodeHistory = null, loadingNodeId = "") {{
       const host = document.getElementById("saved-node-details");
       if (!(host instanceof HTMLElement)) return;
@@ -407,8 +422,15 @@
       const nodeDisplayName = node
         ? nodeLabel(node)
         : (nodeNameCache.get(nodeId) || nodeId || "n/a");
-
-      const nodeSection = savedDetailSectionHtml("Node", [
+      const bbsBoard = bbsFeatureEnabled ? bbsDirectoryRowForHost(nodeId) : null;
+      const bbsTitle = bbsBoard
+        ? (sanitizeBbsWireField(bbsBoard.title, bbsMaxTitleChars)
+          || sanitizeBbsWireField(bbsBoard.board_id, 24)
+          || "Space")
+        : "";
+      const bbsBoardId = bbsBoard ? sanitizeBbsWireField(bbsBoard.board_id, 24) : "";
+      const bbsLabel = bbsBoardId ? `${{bbsTitle}} (${{bbsBoardId}})` : bbsTitle;
+      const nodeSectionRows = [
         ["Display Name", nodeDisplayName],
         ["Node ID", nodeId],
         ["Node Num", node && node.num != null ? String(node.num) : "n/a"],
@@ -422,7 +444,18 @@
         ["Air Util TX", Number.isFinite(airUtilTxValue) ? savedDetailPercent(airUtilTxValue) : "n/a"],
         ["GPS Capable", positionCapable],
         ["Last Position Ping", savedDetailText(latestPosTimeText)],
-      ]);
+      ];
+      if (bbsFeatureEnabled) {{
+        const bbsValue = bbsBoard
+          ? savedDetailHtmlValue(
+              `<button type="button" class="saved-node-inline-link" data-bbs-node-id="${{escAttr(nodeId)}}" title="${{escAttr(`Open BBS space for ${{nodeDisplayName}}` )}}" aria-label="${{escAttr(`Open BBS space for ${{nodeDisplayName}}` )}}">${{escAttr(bbsTitle)}}</button>`,
+              bbsLabel,
+            )
+          : "n/a";
+        nodeSectionRows.push(["BBS Space", bbsValue]);
+      }}
+
+      const nodeSection = savedDetailSectionHtml("Node", nodeSectionRows);
       const noteDraft = needsNotesSection && nodeNoteDraftById.has(nodeId)
         ? String(nodeNoteDraftById.get(nodeId) || "")
         : null;
@@ -524,6 +557,8 @@
       const notesMarkupChanged = setElementHtmlIfChanged(notesHost, nextNotesHtml, "chat-node-details-notes");
       bindSavedNodeDetailLinkButtons(host);
       bindSavedNodeDetailLinkButtons(linksHost);
+      bindSavedNodeBbsButtons(host);
+      bindSavedNodeBbsButtons(linksHost);
       if (detailsMarkupChanged || notesMarkupChanged) {{
         bindSavedNodeNotesEditor(nodeId);
       }}

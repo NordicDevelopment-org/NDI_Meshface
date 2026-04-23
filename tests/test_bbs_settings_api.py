@@ -228,6 +228,8 @@ def test_dashboard_js_includes_bbs_settings_sync_flow() -> None:
     assert 'const bbsHostSettingsSaveDebounceMs = 360;' in js
     assert "async function fetchBbsHostSettings(options = null) {" in js
     assert "async function saveBbsHostSettings(options = null) {" in js
+    assert "function openBbsBoardForHost(nodeId) {" in js
     assert 'body: JSON.stringify({ settings }),' in js
     assert 'queueBbsHostSettingsSave();' in js
     assert 'void fetchBbsHostSettings({ silent: true });' in js
+    assert 'data-bbs-node-id="' in js
