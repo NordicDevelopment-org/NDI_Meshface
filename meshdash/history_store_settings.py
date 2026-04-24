@@ -2,6 +2,7 @@ import json
 import re
 import time
 
+from .helpers_node_names import normalize_node_id_text as _normalize_node_id_text
 from .history_env_metrics import (
     normalize_custom_telemetry_rules as _normalize_custom_telemetry_rules,
 )
@@ -9,6 +10,8 @@ from .history_store_runtime_contracts import HistoryStoreReadState, HistoryStore
 
 _CUSTOM_TELEMETRY_RULES_KEY = "custom_telemetry_rules_v1"
 _BBS_HOST_SETTINGS_KEY = "bbs_host_settings_v1"
+_BBS_HOST_POSTS_KEY = "bbs_host_posts_v1"
+_BBS_HOST_MAX_POSTS = 260
 
 
 def _sanitize_bbs_text(value: object, max_chars: int) -> str:
@@ -41,6 +44,69 @@ def _normalize_bbs_host_settings(payload: object) -> dict[str, object]:
         "board_id": board_id,
         "motd": motd,
     }
+
+
+def _is_canonical_node_id(value: object) -> bool:
+    text = _normalize_node_id_text(value)
+    return bool(text.startswith("!") and len(text) == 9)
+
+
+def _normalize_bbs_post(payload: object) -> dict[str, object] | None:
+    source = payload if isinstance(payload, dict) else {}
+    entry_id = _sanitize_bbs_text(
+        source.get("entry_id", source.get("entryId")),
+        60,
+    )
+    author_id = _normalize_node_id_text(
+        source.get("author_id", source.get("authorId")),
+    )
+    if not _is_canonical_node_id(author_id):
+        author_id = ""
+    author_name = _sanitize_bbs_text(
+        source.get("author_name", source.get("authorName")),
+        48,
+    )
+    text = _sanitize_bbs_text(source.get("text"), 220)
+    try:
+        unix_value = int(source.get("unix") or 0)
+    except Exception:
+        unix_value = 0
+    unix_value = max(0, unix_value)
+    if not text:
+        return None
+    if not entry_id:
+        entry_id = f"bbs-{unix_value:x}-{abs(hash((author_id, author_name, text))) & 0xFFFFFFFF:08x}"
+    return {
+        "entry_id": entry_id,
+        "author_id": author_id,
+        "author_name": author_name or author_id or "anon",
+        "text": text,
+        "unix": unix_value,
+    }
+
+
+def _normalize_bbs_posts(payload: object) -> list[dict[str, object]]:
+    source_rows = payload if isinstance(payload, list) else []
+    normalized_rows: list[dict[str, object]] = []
+    seen_entry_ids: set[str] = set()
+    for row in source_rows:
+        normalized = _normalize_bbs_post(row)
+        if not normalized:
+            continue
+        entry_id = str(normalized.get("entry_id") or "").strip()
+        if not entry_id or entry_id in seen_entry_ids:
+            continue
+        seen_entry_ids.add(entry_id)
+        normalized_rows.append(normalized)
+    normalized_rows.sort(
+        key=lambda row: (
+            int(row.get("unix") or 0),
+            str(row.get("entry_id") or ""),
+        )
+    )
+    if len(normalized_rows) > _BBS_HOST_MAX_POSTS:
+        normalized_rows = normalized_rows[-_BBS_HOST_MAX_POSTS:]
+    return normalized_rows
 
 
 def _load_custom_telemetry_rules_unlocked(
@@ -109,6 +175,38 @@ def load_bbs_settings(
     return {
         "ok": True,
         "settings": settings,
+        "updated_unix": int(updated_unix),
+    }
+
+
+def load_bbs_posts(
+    store: HistoryStoreReadState,
+) -> dict[str, object]:
+    with store._lock:
+        row = store._conn.execute(
+            """
+            SELECT value_json, updated_unix
+            FROM dashboard_settings
+            WHERE key = ?
+            """,
+            (_BBS_HOST_POSTS_KEY,),
+        ).fetchone()
+        if not row:
+            posts: list[dict[str, object]] = []
+            updated_unix = 0
+        else:
+            value_json = row[0] if len(row) > 0 else "[]"
+            updated_unix = int(row[1] if len(row) > 1 and row[1] is not None else 0)
+            try:
+                parsed = json.loads(str(value_json or "[]"))
+            except Exception:
+                parsed = []
+            posts = _normalize_bbs_posts(parsed)
+        setattr(store, "_bbs_host_posts", list(posts))
+        setattr(store, "_bbs_host_posts_updated_unix", int(updated_unix))
+    return {
+        "ok": True,
+        "posts": posts,
         "updated_unix": int(updated_unix),
     }
 
@@ -184,5 +282,65 @@ def save_bbs_settings(
     return {
         "ok": True,
         "settings": normalized_settings,
+        "updated_unix": int(updated_unix),
+    }
+
+
+def append_bbs_post(
+    store: HistoryStoreWriteState,
+    *,
+    post: object,
+) -> dict[str, object]:
+    payload = post
+    if hasattr(payload, "text") or hasattr(payload, "author_name") or hasattr(payload, "entry_id"):
+        payload = {
+            "entry_id": getattr(payload, "entry_id", None),
+            "author_id": getattr(payload, "author_id", None),
+            "author_name": getattr(payload, "author_name", None),
+            "text": getattr(payload, "text", None),
+            "unix": getattr(payload, "unix", None),
+        }
+    if isinstance(payload, dict) and "post" in payload and isinstance(payload.get("post"), dict):
+        payload = payload.get("post")
+    normalized_post = _normalize_bbs_post(payload)
+    if normalized_post is None:
+        raise ValueError("BBS post text is required")
+    updated_unix = max(int(time.time()), int(normalized_post.get("unix") or 0))
+    with store._lock:
+        existing_row = store._conn.execute(
+            """
+            SELECT value_json
+            FROM dashboard_settings
+            WHERE key = ?
+            """,
+            (_BBS_HOST_POSTS_KEY,),
+        ).fetchone()
+        try:
+            existing_parsed = json.loads(str(existing_row[0] or "[]")) if existing_row else []
+        except Exception:
+            existing_parsed = []
+        rows = _normalize_bbs_posts(existing_parsed)
+        entry_id = str(normalized_post.get("entry_id") or "").strip()
+        if not any(str(row.get("entry_id") or "").strip() == entry_id for row in rows):
+            rows.append(normalized_post)
+        rows = _normalize_bbs_posts(rows)
+        value_json = json.dumps(rows, separators=(",", ":"))
+        store._conn.execute(
+            """
+            INSERT INTO dashboard_settings(key, value_json, updated_unix)
+            VALUES(?, ?, ?)
+            ON CONFLICT(key) DO UPDATE
+            SET value_json = excluded.value_json,
+                updated_unix = excluded.updated_unix
+            """,
+            (_BBS_HOST_POSTS_KEY, value_json, updated_unix),
+        )
+        setattr(store, "_bbs_host_posts", list(rows))
+        setattr(store, "_bbs_host_posts_updated_unix", int(updated_unix))
+        store._conn.commit()
+    return {
+        "ok": True,
+        "post": normalized_post,
+        "posts": rows,
         "updated_unix": int(updated_unix),
     }

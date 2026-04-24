@@ -34,7 +34,11 @@ def make_http_handler(
     apply_radio_settings_fn = getattr(state_fn, "apply_radio_settings_fn", None)
     apply_channel_settings_fn = getattr(state_fn, "apply_channel_settings_fn", None)
     get_bbs_settings_fn = getattr(state_fn, "get_bbs_settings_fn", None)
+    get_bbs_host_runtime_fn = getattr(state_fn, "get_bbs_host_runtime_fn", None)
     set_bbs_settings_fn = getattr(state_fn, "set_bbs_settings_fn", None)
+    start_bbs_host_fn = getattr(state_fn, "start_bbs_host_fn", None)
+    stop_bbs_host_fn = getattr(state_fn, "stop_bbs_host_fn", None)
+    append_bbs_host_post_fn = getattr(state_fn, "append_bbs_host_post_fn", None)
     get_custom_telemetry_settings_fn = getattr(state_fn, "get_custom_telemetry_settings_fn", None)
     set_custom_telemetry_settings_fn = getattr(state_fn, "set_custom_telemetry_settings_fn", None)
     play_standalone_zork_fn = getattr(state_fn, "play_standalone_zork_fn", None)
@@ -48,6 +52,7 @@ def make_http_handler(
         summary_metrics_fn=summary_metrics_fn,
         get_theme_settings_fn=get_theme_settings_fn,
         get_bbs_settings_fn=get_bbs_settings_fn,
+        get_bbs_host_runtime_fn=get_bbs_host_runtime_fn,
         get_custom_telemetry_settings_fn=get_custom_telemetry_settings_fn,
         private_mode=bool(private_mode),
         api_metrics=api_metrics,
@@ -58,6 +63,9 @@ def make_http_handler(
         send_chat_fn=send_chat_fn,
         set_theme_preset_fn=set_theme_preset_fn,
         set_bbs_settings_fn=set_bbs_settings_fn,
+        start_bbs_host_fn=start_bbs_host_fn,
+        stop_bbs_host_fn=stop_bbs_host_fn,
+        append_bbs_host_post_fn=append_bbs_host_post_fn,
         apply_radio_settings_fn=apply_radio_settings_fn,
         apply_channel_settings_fn=apply_channel_settings_fn,
         set_custom_telemetry_settings_fn=set_custom_telemetry_settings_fn,

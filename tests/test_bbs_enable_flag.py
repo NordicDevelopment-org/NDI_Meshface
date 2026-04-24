@@ -50,6 +50,8 @@ def test_render_html_shows_bbs_workspace_when_enabled() -> None:
     assert '<section class="card bbs" aria-label="BBS">' in html
     assert 'id="bbs-host-title-input"' in html
     assert 'id="bbs-terminal-log"' in html
+    assert 'Open Selected' in html
+    assert 'id="bbs-host-announce-btn"' not in html
 
 
 def test_dashboard_parser_supports_bbs_enable_flag_and_env_default() -> None:

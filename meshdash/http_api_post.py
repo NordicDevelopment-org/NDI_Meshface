@@ -11,6 +11,9 @@ from .http_route_contracts import (
     ApplyChannelSettingsFn,
     DashboardPostRouteDependencies,
     PlayStandaloneZorkFn,
+    AppendBbsHostPostFn,
+    StartBbsHostFn,
+    StopBbsHostFn,
     RunNetworkToolFn,
     SendChatFn,
     SetBbsSettingsFn,
@@ -50,6 +53,7 @@ parse_radio_settings_request = _load_optional_callable(".api_input_radio", "pars
 parse_channel_settings_request = _load_optional_callable(".api_input_channels", "parse_channel_settings_request")
 parse_theme_settings_request = _load_optional_callable(".api_input_theme", "parse_theme_settings_request")
 parse_bbs_settings_request = _load_optional_callable(".api_input_bbs", "parse_bbs_settings_request")
+parse_bbs_host_request = _load_optional_callable(".api_input_bbs", "parse_bbs_host_request")
 parse_custom_telemetry_settings_request = _load_optional_callable(
     ".api_input_custom_telemetry",
     "parse_custom_telemetry_settings_request",
@@ -66,6 +70,9 @@ def build_post_route_dependencies(
     send_chat_fn: SendChatFn | None,
     set_theme_preset_fn: SetThemePresetFn | None = None,
     set_bbs_settings_fn: SetBbsSettingsFn | None = None,
+    start_bbs_host_fn: StartBbsHostFn | None = None,
+    stop_bbs_host_fn: StopBbsHostFn | None = None,
+    append_bbs_host_post_fn: AppendBbsHostPostFn | None = None,
     apply_radio_settings_fn: ApplyRadioSettingsFn | None = None,
     apply_channel_settings_fn: ApplyChannelSettingsFn | None = None,
     set_custom_telemetry_settings_fn: SetCustomTelemetrySettingsFn | None = None,
@@ -91,6 +98,10 @@ def build_post_route_dependencies(
         parse_theme_settings_request_fn=parse_theme_settings_request,
         set_bbs_settings_fn=set_bbs_settings_fn,
         parse_bbs_settings_request_fn=parse_bbs_settings_request,
+        start_bbs_host_fn=start_bbs_host_fn,
+        stop_bbs_host_fn=stop_bbs_host_fn,
+        append_bbs_host_post_fn=append_bbs_host_post_fn,
+        parse_bbs_host_request_fn=parse_bbs_host_request,
         set_custom_telemetry_settings_fn=set_custom_telemetry_settings_fn,
         parse_custom_telemetry_settings_request_fn=parse_custom_telemetry_settings_request,
         apply_radio_settings_fn=apply_radio_settings_fn,

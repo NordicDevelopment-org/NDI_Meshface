@@ -47,6 +47,10 @@ _handle_bbs_settings_get_helper = _load_optional_handler(
     ".api_bbs",
     "handle_bbs_settings_get",
 )
+_handle_bbs_host_get_helper = _load_optional_handler(
+    ".api_bbs",
+    "handle_bbs_host_get",
+)
 
 
 def _record_state_poll_request(deps: DashboardGetRouteDependencies) -> None:
@@ -215,6 +219,21 @@ def handle_dashboard_get(
                 payload_obj={"ok": False, "error": f"state poll failed: {exc}"},
                 no_store=True,
             )
+        return
+
+    if path == "/api/bbs/host":
+        if not callable(_handle_bbs_host_get_helper):
+            deps.write_json_response_fn(
+                handler,
+                status_code=503,
+                payload_obj={"ok": False, "error": "BBS host runtime is not enabled on this dashboard instance"},
+            )
+            return
+        _handle_bbs_host_get_helper(
+            handler,
+            get_bbs_host_runtime_fn=deps.get_bbs_host_runtime_fn,
+            write_json_response_fn=deps.write_json_response_fn,
+        )
         return
 
     # Raw/debug payloads are fetched on-demand (Data view) so the primary

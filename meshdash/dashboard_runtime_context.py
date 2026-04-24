@@ -353,6 +353,89 @@ def build_dashboard_runtime_context(
             except Exception:
                 pass
 
+    if bool(getattr(args, "bbs_enable", False)):
+        try:
+            from .services_bbs_host import build_bbs_host_service as _build_bbs_host_service
+        except Exception:
+            _build_bbs_host_service = None
+
+        if _build_bbs_host_service is not None:
+            get_bbs_settings_for_host = getattr(history_store, "get_bbs_settings", None)
+            set_bbs_settings_for_host = getattr(history_store, "set_bbs_settings", None)
+            get_bbs_posts_for_host = getattr(history_store, "get_bbs_posts", None)
+            append_bbs_post_for_host = getattr(history_store, "append_bbs_post", None)
+            def _get_chat_delivery_state(message_id: object):
+                clean_message_id = to_int_fn(message_id)
+                if clean_message_id is None or clean_message_id <= 0:
+                    return None
+                tracker_lock = getattr(tracker, "_lock", None)
+                recent_chat = getattr(tracker, "recent_chat", None)
+                if recent_chat is None:
+                    return None
+
+                def _scan_recent_chat():
+                    for entry in reversed(recent_chat):
+                        if not isinstance(entry, dict):
+                            continue
+                        if entry.get("local_echo") is not True:
+                            continue
+                        entry_message_id = to_int_fn(
+                            entry.get("message_id")
+                            or entry.get("messageId")
+                            or entry.get("packet_id")
+                            or entry.get("packetId")
+                        )
+                        if entry_message_id != clean_message_id:
+                            continue
+                        return {
+                            "delivery_state": str(entry.get("delivery_state") or "").strip().lower(),
+                            "delivery_updated_unix": to_int_fn(
+                                entry.get("delivery_updated_unix") or entry.get("deliveryUpdatedUnix")
+                            )
+                            or 0,
+                        }
+                    return None
+
+                if hasattr(tracker_lock, "__enter__") and hasattr(tracker_lock, "__exit__"):
+                    with tracker_lock:
+                        return _scan_recent_chat()
+                return _scan_recent_chat()
+
+            bbs_host_service = _build_bbs_host_service(
+                local_node_id_fn=lambda: get_local_node_id_fn(iface),
+                send_chat_fn=loaders.send_chat_fn,
+                get_bbs_settings_fn=(
+                    get_bbs_settings_for_host if callable(get_bbs_settings_for_host) else None
+                ),
+                set_bbs_settings_fn=(
+                    set_bbs_settings_for_host if callable(set_bbs_settings_for_host) else None
+                ),
+                get_bbs_posts_fn=(
+                    get_bbs_posts_for_host if callable(get_bbs_posts_for_host) else None
+                ),
+                append_bbs_post_fn=(
+                    append_bbs_post_for_host if callable(append_bbs_post_for_host) else None
+                ),
+                get_delivery_state_fn=_get_chat_delivery_state,
+            )
+            subscribe_fn(bbs_host_service.on_receive, "meshtastic.receive")
+            try:
+                setattr(loaders.state_fn, "get_bbs_host_runtime_fn", bbs_host_service.get_runtime)
+                setattr(loaders.state_fn, "start_bbs_host_fn", bbs_host_service.start)
+                setattr(loaders.state_fn, "stop_bbs_host_fn", bbs_host_service.stop)
+                setattr(loaders.state_fn, "append_bbs_host_post_fn", bbs_host_service.append_post)
+            except Exception:
+                pass
+            state_lite_fn = getattr(loaders.state_fn, "lite", None)
+            if callable(state_lite_fn):
+                try:
+                    setattr(state_lite_fn, "get_bbs_host_runtime_fn", bbs_host_service.get_runtime)
+                    setattr(state_lite_fn, "start_bbs_host_fn", bbs_host_service.start)
+                    setattr(state_lite_fn, "stop_bbs_host_fn", bbs_host_service.stop)
+                    setattr(state_lite_fn, "append_bbs_host_post_fn", bbs_host_service.append_post)
+                except Exception:
+                    pass
+
     search_history_packets_fn = getattr(history_store, "search_packets", None)
     if callable(search_history_packets_fn):
         def _search_history_packets(

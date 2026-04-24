@@ -114,6 +114,8 @@ def initialize_history_store_runtime(
         "motd": "2400 baud online.",
     }
     store._bbs_host_settings_updated_unix = 0
+    store._bbs_host_posts = []
+    store._bbs_host_posts_updated_unix = 0
 
     # Only create a separate read connection when we're using the default
     # connection opener *and* the DB path is file-backed. In-memory SQLite

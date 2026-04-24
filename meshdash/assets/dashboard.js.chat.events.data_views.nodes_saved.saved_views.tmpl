@@ -157,7 +157,7 @@
           ev.stopPropagation();
           const nodeId = normalizeNodeId(btn.dataset.bbsNodeId || "");
           if (!isSelectableNodeId(nodeId)) return;
-          openBbsBoardForHost(nodeId);
+          void openBbsBoardForHost(nodeId);
         }});
       }}
     }}
@@ -430,6 +430,10 @@
         : "";
       const bbsBoardId = bbsBoard ? sanitizeBbsWireField(bbsBoard.board_id, 24) : "";
       const bbsLabel = bbsBoardId ? `${{bbsTitle}} (${{bbsBoardId}})` : bbsTitle;
+      const bbsButtonTitle = bbsBoard
+        ? `Open BBS space for ${{nodeDisplayName}}`
+        : `Request BBS space from ${{nodeDisplayName}} via direct message`;
+      const bbsButtonLabel = bbsBoard ? bbsTitle : "Request via PM";
       const nodeSectionRows = [
         ["Display Name", nodeDisplayName],
         ["Node ID", nodeId],
@@ -446,12 +450,10 @@
         ["Last Position Ping", savedDetailText(latestPosTimeText)],
       ];
       if (bbsFeatureEnabled) {{
-        const bbsValue = bbsBoard
-          ? savedDetailHtmlValue(
-              `<button type="button" class="saved-node-inline-link" data-bbs-node-id="${{escAttr(nodeId)}}" title="${{escAttr(`Open BBS space for ${{nodeDisplayName}}` )}}" aria-label="${{escAttr(`Open BBS space for ${{nodeDisplayName}}` )}}">${{escAttr(bbsTitle)}}</button>`,
-              bbsLabel,
-            )
-          : "n/a";
+        const bbsValue = savedDetailHtmlValue(
+          `<button type="button" class="saved-node-inline-link" data-bbs-node-id="${{escAttr(nodeId)}}" title="${{escAttr(bbsButtonTitle)}}" aria-label="${{escAttr(bbsButtonTitle)}}">${{escAttr(bbsButtonLabel)}}</button>`,
+          bbsBoard ? bbsLabel : "Request via PM",
+        );
         nodeSectionRows.push(["BBS Space", bbsValue]);
       }}
 

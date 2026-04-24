@@ -7,6 +7,7 @@ from .http_handler_contracts import DashboardHttpHandler
 from .http_responses import write_html_response, write_json_response, write_text_response
 from .http_route_contracts import (
     ApiMetricsRecorder,
+    GetBbsHostRuntimeFn,
     GetBbsSettingsFn,
     DashboardGetRouteDependencies,
     GetCustomTelemetrySettingsFn,
@@ -36,6 +37,7 @@ def build_get_route_dependencies(
     summary_metrics_fn: SummaryMetricsHistoryFn | None = None,
     get_theme_settings_fn: GetThemeSettingsFn | None = None,
     get_bbs_settings_fn: GetBbsSettingsFn | None = None,
+    get_bbs_host_runtime_fn: GetBbsHostRuntimeFn | None = None,
     get_custom_telemetry_settings_fn: GetCustomTelemetrySettingsFn | None = None,
     private_mode: bool = False,
     api_metrics: ApiMetricsRecorder | None = None,
@@ -59,6 +61,7 @@ def build_get_route_dependencies(
         write_text_response_fn=write_text_response,
         get_theme_settings_fn=get_theme_settings_fn,
         get_bbs_settings_fn=get_bbs_settings_fn,
+        get_bbs_host_runtime_fn=get_bbs_host_runtime_fn,
         get_custom_telemetry_settings_fn=get_custom_telemetry_settings_fn,
         private_mode=bool(private_mode),
         api_metrics=api_metrics,

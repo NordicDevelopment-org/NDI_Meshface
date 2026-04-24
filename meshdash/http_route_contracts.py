@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Mapping, Optional, Protocol
 
 if TYPE_CHECKING:
-    from .api_input_bbs import BbsSettingsRequest
+    from .api_input_bbs import BbsHostRequest, BbsSettingsRequest
     from .api_input_channels import ChannelSettingsRequest
     from .api_input_chat import ChatSendRequest
     from .api_input_custom_telemetry import CustomTelemetrySettingsRequest
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .api_input_theme import ThemeSettingsRequest
     from .api_input_zork import StandaloneZorkRequest
 else:
+    BbsHostRequest = object
     BbsSettingsRequest = object
     ChannelSettingsRequest = object
     ChatSendRequest = object
@@ -76,6 +77,11 @@ class GetBbsSettingsFn(Protocol):
         ...
 
 
+class GetBbsHostRuntimeFn(Protocol):
+    def __call__(self) -> dict[str, object]:
+        ...
+
+
 class SetThemePresetFn(Protocol):
     def __call__(self, payload: object) -> dict[str, object]:
         ...
@@ -83,6 +89,21 @@ class SetThemePresetFn(Protocol):
 
 class SetBbsSettingsFn(Protocol):
     def __call__(self, settings: object) -> dict[str, object]:
+        ...
+
+
+class StartBbsHostFn(Protocol):
+    def __call__(self, request: BbsHostRequest) -> dict[str, object]:
+        ...
+
+
+class StopBbsHostFn(Protocol):
+    def __call__(self) -> dict[str, object]:
+        ...
+
+
+class AppendBbsHostPostFn(Protocol):
+    def __call__(self, request: BbsHostRequest) -> dict[str, object]:
         ...
 
 
@@ -164,6 +185,11 @@ class ParseThemeSettingsRequestFn(Protocol):
 
 class ParseBbsSettingsRequestFn(Protocol):
     def __call__(self, raw_body: bytes) -> BbsSettingsRequest:
+        ...
+
+
+class ParseBbsHostRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> BbsHostRequest:
         ...
 
 
@@ -295,6 +321,7 @@ class DashboardGetRouteDependencies:
     write_text_response_fn: WriteTextResponseFn
     get_theme_settings_fn: Optional[GetThemeSettingsFn] = None
     get_bbs_settings_fn: Optional[GetBbsSettingsFn] = None
+    get_bbs_host_runtime_fn: Optional[GetBbsHostRuntimeFn] = None
     get_custom_telemetry_settings_fn: Optional[GetCustomTelemetrySettingsFn] = None
     private_mode: bool = False
     api_metrics: Optional[ApiMetricsRecorder] = None
@@ -311,6 +338,10 @@ class DashboardPostRouteDependencies:
     parse_theme_settings_request_fn: Optional[ParseThemeSettingsRequestFn] = None
     set_bbs_settings_fn: Optional[SetBbsSettingsFn] = None
     parse_bbs_settings_request_fn: Optional[ParseBbsSettingsRequestFn] = None
+    start_bbs_host_fn: Optional[StartBbsHostFn] = None
+    stop_bbs_host_fn: Optional[StopBbsHostFn] = None
+    append_bbs_host_post_fn: Optional[AppendBbsHostPostFn] = None
+    parse_bbs_host_request_fn: Optional[ParseBbsHostRequestFn] = None
     set_custom_telemetry_settings_fn: Optional[SetCustomTelemetrySettingsFn] = None
     parse_custom_telemetry_settings_request_fn: Optional[ParseCustomTelemetrySettingsRequestFn] = None
     apply_radio_settings_fn: Optional[ApplyRadioSettingsFn] = None

@@ -564,6 +564,42 @@
       }}
     }}
 
+    function clearBbsPendingProfileRequestTimer() {{
+      if (bbsPendingProfileRequestTimer !== null) {{
+        window.clearTimeout(bbsPendingProfileRequestTimer);
+        bbsPendingProfileRequestTimer = null;
+      }}
+    }}
+
+    function clearBbsPendingProfileRequest() {{
+      bbsPendingProfileHostId = "";
+      bbsPendingProfileRequestToken = "";
+      clearBbsPendingProfileRequestTimer();
+    }}
+
+    function setBbsPendingProfileRequest(hostId, requestToken) {{
+      const cleanHostId = normalizeNodeId(hostId || "");
+      const cleanToken = sanitizeBbsWireField(requestToken, 40);
+      clearBbsPendingProfileRequest();
+      if (!isCanonicalNodeId(cleanHostId) || !cleanToken) return;
+      bbsPendingProfileHostId = cleanHostId;
+      bbsPendingProfileRequestToken = cleanToken;
+      bbsPendingProfileRequestTimer = window.setTimeout(() => {{
+        if (bbsPendingProfileHostId !== cleanHostId || bbsPendingProfileRequestToken !== cleanToken) {{
+          return;
+        }}
+        clearBbsPendingProfileRequest();
+        setBbsPostStatus(`No BBS reply from ${{bbsDisplayNodeLabel(cleanHostId, latestState)}} yet.`, true);
+        if (activeLayoutView === "bbs") {{
+          renderBbsView(latestState);
+        }}
+      }}, bbsProfileRequestTimeoutMs);
+    }}
+
+    function bbsGenerateRequestToken() {{
+      return `${{Date.now().toString(36)}}${{Math.random().toString(36).slice(2, 8)}}`.slice(0, 18);
+    }}
+
     function queueBbsHostSettingsSave(delayMs = bbsHostSettingsSaveDebounceMs) {{
       if (!bbsFeatureEnabled || bbsHostSettingsRemoteAvailable === false) return;
       clearBbsHostSettingsSaveTimer();
@@ -644,6 +680,59 @@
       }}
       if (opts.render !== false) {{
         renderBbsHostControls(latestState);
+      }}
+    }}
+
+    function applyBbsHostRuntime(host = null, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const previousKey = bbsBoardKey(
+        bbsHostState && bbsHostState.board_id,
+        bbsHostState && (bbsHostState.host_id || bbsHostNodeId(latestState))
+      );
+      const next = createBbsHostState(host);
+      if (bbsHostSettingsDirty && opts.preserveSettings !== false) {{
+        const currentSettings = bbsExportHostSettings();
+        next.title = currentSettings.title;
+        next.board_id = currentSettings.board_id;
+        next.motd = currentSettings.motd;
+      }}
+      bbsHostState = next;
+      const payloadPosts = Array.isArray(opts.posts) ? opts.posts : [];
+      const hostKey = bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id);
+      const latestPostUnix = payloadPosts.reduce((maxUnix, row) => {{
+        const unixValue = Math.max(0, Math.trunc(Number(row && row.unix) || 0));
+        return unixValue > maxUnix ? unixValue : maxUnix;
+      }}, 0);
+      if (hostKey) {{
+        bbsUpsertDirectoryRow({{
+          board_id: bbsHostState.board_id,
+          host_id: bbsHostState.host_id,
+          title: bbsHostState.title,
+          motd: bbsHostState.motd,
+          channel_index: bbsHostState.channel_index,
+          last_seen_unix: Math.max(
+            0,
+            Math.trunc(Number(bbsHostState.started_unix) || 0),
+            latestPostUnix
+          ),
+        }});
+        bbsReplaceBoardPosts(hostKey, payloadPosts);
+        if (!bbsActiveBoardKey || (previousKey && bbsActiveBoardKey === previousKey)) {{
+          bbsActiveBoardKey = hostKey;
+        }}
+      }} else if (previousKey) {{
+        bbsRemoveDirectoryRowByKey(previousKey);
+      }}
+      bbsPersistState();
+      if (activeLayoutView !== "bbs") return;
+      if (opts.renderView === true) {{
+        renderBbsView(latestState);
+        return;
+      }}
+      if (opts.render !== false) {{
+        renderBbsHostControls(latestState);
+        renderBbsDirectory(latestState);
+        renderBbsTerminal(latestState);
       }}
     }}
 
@@ -763,6 +852,119 @@
       }}
     }}
 
+    async function fetchBbsHostRuntime(options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const silent = !!opts.silent;
+      if (!bbsFeatureEnabled || bbsHostRuntimeRemoteAvailable === false) return false;
+      if (bbsHostRuntimeFetchInFlight) return false;
+      if (bbsHostRuntimeLoadedOnce && opts.force !== true) return false;
+      bbsHostRuntimeFetchInFlight = true;
+      try {{
+        const resp = await fetch(bbsHostEndpoint, {{ cache: "no-store" }});
+        const rawText = await resp.text();
+        let payload = null;
+        try {{
+          payload = rawText ? JSON.parse(rawText) : null;
+        }} catch (_err) {{
+          payload = null;
+        }}
+        if (!resp.ok || !payload || typeof payload !== "object" || payload.ok === false) {{
+          const errMsg = payload && payload.error
+            ? String(payload.error)
+            : (rawText || `HTTP ${{resp.status}}`);
+          if (resp.status === 404 || resp.status === 503) {{
+            bbsHostRuntimeRemoteAvailable = false;
+            bbsHostRuntimeLoadedOnce = true;
+          }}
+          if (!silent) {{
+            appendConsoleLine(`bbs-host-load|${{Date.now()}}|error`, `[bbs] host load failed: ${{errMsg}}`);
+          }}
+          return false;
+        }}
+        bbsHostRuntimeRemoteAvailable = true;
+        bbsHostRuntimeLoadedOnce = true;
+        const host = (payload.host && typeof payload.host === "object")
+          ? payload.host
+          : payload;
+        const posts = Array.isArray(payload.posts) ? payload.posts : [];
+        applyBbsHostRuntime(host, {{
+          posts,
+          preserveSettings: bbsHostSettingsDirty,
+          renderView: activeLayoutView === "bbs",
+        }});
+        return true;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        if (!silent) {{
+          appendConsoleLine(`bbs-host-load|${{Date.now()}}|error`, `[bbs] host load error: ${{msg}}`);
+        }}
+        return false;
+      }} finally {{
+        bbsHostRuntimeFetchInFlight = false;
+      }}
+    }}
+
+    async function postBbsHostCommand(action, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const cleanAction = String(action || "").trim().toLowerCase();
+      if (!bbsFeatureEnabled || !cleanAction || bbsHostRuntimeRemoteAvailable === false) return null;
+      const body = {{ action: cleanAction }};
+      if (cleanAction === "start") {{
+        body.channel_index = normalizeMeshChannelIndex(
+          opts.channel_index == null ? meshChannelEffectiveSendIndexForApp("bbs") : opts.channel_index
+        );
+        body.settings = bbsExportHostSettings(opts.settings || bbsHostState);
+      }} else if (cleanAction === "post") {{
+        body.text = String(opts.text == null ? "" : opts.text);
+        body.author_name = String(opts.author_name == null ? "" : opts.author_name);
+        body.entry_id = String(opts.entry_id == null ? "" : opts.entry_id);
+      }}
+      try {{
+        const resp = await fetch(bbsHostEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(body),
+        }});
+        const rawText = await resp.text();
+        let payload = null;
+        try {{
+          payload = rawText ? JSON.parse(rawText) : null;
+        }} catch (_err) {{
+          payload = null;
+        }}
+        if (!resp.ok || !payload || typeof payload !== "object" || payload.ok === false) {{
+          const errMsg = payload && payload.error
+            ? String(payload.error)
+            : (rawText || `HTTP ${{resp.status}}`);
+          if (resp.status === 404 || resp.status === 503) {{
+            bbsHostRuntimeRemoteAvailable = false;
+            bbsHostRuntimeLoadedOnce = true;
+          }}
+          setBbsPostStatus(errMsg || "BBS host request failed.", true);
+          return null;
+        }}
+        bbsHostRuntimeRemoteAvailable = true;
+        bbsHostRuntimeLoadedOnce = true;
+        const host = (payload.host && typeof payload.host === "object")
+          ? payload.host
+          : payload;
+        const posts = Array.isArray(payload.posts) ? payload.posts : [];
+        if (cleanAction === "start") {{
+          bbsHostSettingsDirty = false;
+        }}
+        applyBbsHostRuntime(host, {{
+          posts,
+          preserveSettings: cleanAction !== "start" && bbsHostSettingsDirty,
+          renderView: activeLayoutView === "bbs",
+        }});
+        return payload;
+      }} catch (err) {{
+        const msg = err instanceof Error ? err.message : String(err || "unknown error");
+        setBbsPostStatus(msg || "BBS host request failed.", true);
+        return null;
+      }}
+    }}
+
     function loadBbsState() {{
       let stored = null;
       try {{
@@ -786,58 +988,31 @@
       bbsPostStatusText = "";
       bbsPostStatusError = false;
       bbsPostStatusChannelIndex = null;
-      bbsHostSettingsLoadedOnce = false;
-      bbsHostSettingsFetchInFlight = false;
-      bbsHostSettingsSaveInFlight = false;
-      bbsHostSettingsSaveQueued = false;
-      bbsHostSettingsDirty = false;
-      bbsHostSettingsRemoteAvailable = null;
-      clearBbsHostSettingsSaveTimer();
-      clearBbsAnnounceTimer();
-      if (bbsFeatureEnabled) {{
-        void fetchBbsHostSettings({{ silent: true }});
-      }}
+        bbsHostSettingsLoadedOnce = false;
+        bbsHostSettingsFetchInFlight = false;
+        bbsHostSettingsSaveInFlight = false;
+        bbsHostSettingsSaveQueued = false;
+        bbsHostSettingsDirty = false;
+        bbsHostSettingsRemoteAvailable = null;
+        bbsHostRuntimeLoadedOnce = false;
+        bbsHostRuntimeFetchInFlight = false;
+        bbsHostRuntimeRemoteAvailable = null;
+        clearBbsPendingProfileRequest();
+        clearBbsHostSettingsSaveTimer();
+        clearBbsAnnounceTimer();
+        if (bbsFeatureEnabled) {{
+          void fetchBbsHostSettings({{ silent: true }});
+          void fetchBbsHostRuntime({{ silent: true }});
+        }}
     }}
 
     function setBbsPostStatus(message, isError = false, options = null) {{
       bbsPostStatusText = String(message == null ? "" : message).trim();
       bbsPostStatusError = !!isError;
-      const hasChannelIndex = !!(
-        options
-        && typeof options === "object"
-        && options.channel_index !== null
-        && options.channel_index !== undefined
-        && String(options.channel_index).trim() !== ""
-      );
-      const rawChannelIndex = hasChannelIndex ? Number(options.channel_index) : NaN;
-      if (!bbsPostStatusError && Number.isInteger(rawChannelIndex) && rawChannelIndex >= 0) {{
-        bbsPostStatusChannelIndex = Math.trunc(rawChannelIndex);
-      }} else {{
-        bbsPostStatusChannelIndex = null;
-      }}
       const statusEl = document.getElementById("bbs-post-status");
       if (!(statusEl instanceof HTMLElement)) return;
       statusEl.classList.toggle("is-error", bbsPostStatusError);
-      if (
-        bbsPostStatusError
-        || !Number.isInteger(bbsPostStatusChannelIndex)
-        || bbsPostStatusChannelIndex < 0
-      ) {{
-        statusEl.textContent = bbsPostStatusText;
-        return;
-      }}
-      const channelIndex = normalizeMeshChannelIndex(bbsPostStatusChannelIndex);
-      const channelLabel = meshChannelLabelForIndex(channelIndex, {{ compact: true, allowAll: false }});
-      const channelBadge = meshChannelBadgeHtml(
-        channelIndex,
-        channelLabel,
-        {{
-          allowAll: false,
-          extraClass: "bbs-channel-badge",
-          title: meshChannelLabelForIndex(channelIndex, {{ verbose: true, allowAll: false }}),
-        }}
-      );
-      statusEl.innerHTML = `${{escAttr(bbsPostStatusText)}} • ${{channelBadge}}`;
+      statusEl.textContent = bbsPostStatusText;
     }}
 
     function bbsHostNodeId(state = latestState) {{
@@ -1046,6 +1221,17 @@
       return true;
     }}
 
+    function bbsReplaceBoardPosts(boardKey, posts = []) {{
+      const cleanKey = String(boardKey || "").trim().toLowerCase();
+      if (!cleanKey) return [];
+      bbsBoardPostsByKey.set(cleanKey, []);
+      const sourceRows = Array.isArray(posts) ? posts : [];
+      for (const row of sourceRows) {{
+        bbsAppendBoardPost(cleanKey, row);
+      }}
+      return bbsPostsForBoard(cleanKey);
+    }}
+
     function bbsGenerateEntryId() {{
       const now = Date.now().toString(36);
       const rand = Math.random().toString(36).slice(2, 8);
@@ -1119,6 +1305,21 @@
       return rows.find((row) => normalizeNodeId(row && row.host_id || "") === cleanNodeId) || null;
     }}
 
+    function bbsRequestTargetNodeId(state = latestState) {{
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (isSelectableNodeId(selectedId)) return selectedId;
+      const remoteSelectedId = normalizeNodeId(remoteTargetNodeId || "");
+      if (isSelectableNodeId(remoteSelectedId)) return remoteSelectedId;
+      const activeRow = bbsActiveBoardRow();
+      const activeHostId = normalizeNodeId(activeRow && activeRow.host_id || "");
+      if (isSelectableNodeId(activeHostId)) return activeHostId;
+      const localId = bbsHostNodeId(state);
+      if (bbsHostState && bbsHostState.enabled && isCanonicalNodeId(localId)) {{
+        return localId;
+      }}
+      return "";
+    }}
+
     function bbsSelectBoard(boardKey) {{
       const clean = String(boardKey || "").trim().toLowerCase();
       if (!clean) return;
@@ -1146,10 +1347,120 @@
       return true;
     }}
 
-    function openBbsBoardForHost(nodeId) {{
+    async function requestBbsSpaceForNode(nodeId, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const silent = !!opts.silent;
+      const openView = opts.openView !== false;
+      const preserveCurrent = !!opts.preserveCurrent;
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(cleanNodeId)) {{
+        if (!silent) {{
+          setBbsPostStatus("Select a node before requesting a BBS space.", true);
+        }}
+        return false;
+      }}
+      if (isSelfNodeId(cleanNodeId, latestState)) {{
+        if (!(bbsHostState && bbsHostState.enabled)) {{
+          if (!silent) {{
+            setBbsPostStatus("Your local BBS space is offline. Host it first.", true);
+          }}
+          return false;
+        }}
+        syncHostedBbsDirectoryEntry(latestState);
+        bbsActiveBoardKey = bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || bbsHostNodeId(latestState));
+        clearBbsPendingProfileRequest();
+        bbsPersistState();
+        if (openView) {{
+          applyLayoutView("bbs", true);
+          if (activeLayoutView === "bbs") {{
+            renderBbsView(latestState);
+          }}
+        }}
+        if (!silent) {{
+          setBbsPostStatus(`Opened local BBS space "${{bbsHostState.title}}".`);
+        }}
+        return true;
+      }}
+
+      const cachedRow = bbsDirectoryRowForHost(cleanNodeId);
+      if (cachedRow && preserveCurrent !== false) {{
+        bbsActiveBoardKey = String(cachedRow.key || "").trim().toLowerCase();
+      }} else if (!preserveCurrent) {{
+        bbsActiveBoardKey = "";
+      }}
+      const requestToken = bbsGenerateRequestToken();
+      setBbsPendingProfileRequest(cleanNodeId, requestToken);
+      bbsPersistState();
+      if (openView) {{
+        applyLayoutView("bbs", true);
+        if (activeLayoutView === "bbs") {{
+          renderBbsView(latestState);
+        }}
+      }}
+      const channelIndex = meshChannelEffectiveSendIndexForApp("bbs");
+      const sent = await sendBbsProtocolMessage(
+        "open",
+        [requestToken],
+        {{
+          destination: cleanNodeId,
+          channel_index: channelIndex,
+          quiet: true,
+        }}
+      );
+      if (!sent) {{
+        clearBbsPendingProfileRequest();
+        if (!silent) {{
+          setBbsPostStatus(`Could not request BBS space from ${{bbsDisplayNodeLabel(cleanNodeId, latestState)}}.`, true);
+        }}
+        if (activeLayoutView === "bbs") {{
+          renderBbsView(latestState);
+        }}
+        return false;
+      }}
+      if (!silent) {{
+        setBbsPostStatus(
+          `Requesting BBS space from ${{bbsDisplayNodeLabel(cleanNodeId, latestState)}}...`,
+          false,
+          {{ channel_index: channelIndex }}
+        );
+      }}
+      return true;
+    }}
+
+    async function respondToBbsOpenRequest(nodeId, requestToken, channelIndex, state = latestState) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      const cleanToken = sanitizeBbsWireField(requestToken, 40);
+      if (!isCanonicalNodeId(cleanNodeId) || !cleanToken) return false;
+      if (!(bbsHostState && bbsHostState.enabled)) return false;
+      const localId = bbsHostNodeId(state);
+      if (!isCanonicalNodeId(localId)) return false;
+      const settings = bbsExportHostSettings();
+      bbsHostState.title = settings.title;
+      bbsHostState.board_id = settings.board_id;
+      bbsHostState.motd = settings.motd;
+      bbsHostState.host_id = localId;
+      syncHostedBbsDirectoryEntry(state);
+      return sendBbsProtocolMessage(
+        "profile",
+        [cleanToken, settings.board_id, localId, settings.title, settings.motd],
+        {{
+          destination: cleanNodeId,
+          channel_index: normalizeMeshChannelIndex(channelIndex),
+          quiet: true,
+        }}
+      );
+    }}
+
+    async function openBbsBoardForHost(nodeId) {{
       const row = bbsDirectoryRowForHost(nodeId);
-      if (!row) return false;
-      return openBbsBoard(String(row.key || "").trim().toLowerCase());
+      if (row) {{
+        const opened = openBbsBoard(String(row.key || "").trim().toLowerCase());
+        if (!isSelfNodeId(nodeId, latestState)) {{
+          void requestBbsSpaceForNode(nodeId, {{ silent: true, openView: false, preserveCurrent: true }});
+        }}
+        return opened;
+      }}
+      return requestBbsSpaceForNode(nodeId, {{ silent: false, openView: true, preserveCurrent: false }});
     }}
 
     function armBbsAnnounceTimer() {{
@@ -1230,30 +1541,22 @@
         bbsMaxMotdChars
       ) || "2400 baud online.";
       const channelIndex = meshChannelEffectiveSendIndexForApp("bbs");
-      bbsHostState = createBbsHostState({{
-        enabled: true,
-        board_id: boardId,
-        title,
-        motd,
-        started_unix: Math.floor(Date.now() / 1000),
+      const payload = await postBbsHostCommand("start", {{
         channel_index: channelIndex,
-        host_id: localId,
+        settings: {{ title, board_id: boardId, motd }},
       }});
-      const hostKey = bbsUpsertDirectoryRow({{
-        board_id: boardId,
-        host_id: localId,
-        title,
-        motd,
-        channel_index: channelIndex,
-        last_seen_unix: bbsHostState.started_unix,
-      }});
-      bbsActiveBoardKey = hostKey || bbsBoardKey(boardId, localId);
-      bbsPersistState();
-      bbsHostSettingsDirty = true;
-      void saveBbsHostSettings({{ silent: true, renderView: activeLayoutView === "bbs" }});
-      armBbsAnnounceTimer();
-      setBbsPostStatus(`Hosting "${{title}}".`, false, {{ channel_index: channelIndex }});
-      void announceHostedBbs({{ quiet: true }});
+      if (!payload || payload.ok !== true) {{
+        if (activeLayoutView === "bbs") {{
+          renderBbsView(latestState);
+        }}
+        return;
+      }}
+      const hostKey = bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || localId);
+      if (hostKey) {{
+        bbsActiveBoardKey = hostKey;
+        bbsPersistState();
+      }}
+      setBbsPostStatus(`Hosting "${{title}}" for direct BBS requests.`, false, {{ channel_index: channelIndex }});
       if (activeLayoutView === "bbs") {{
         renderBbsView(latestState);
       }}
@@ -1262,31 +1565,18 @@
 
     async function stopBbsHosting() {{
       if (!(bbsHostState && bbsHostState.enabled)) return;
-      const boardId = normalizeBbsBoardId(bbsHostState.board_id, bbsHostState.title);
-      const hostId = normalizeNodeId(bbsHostState.host_id || bbsHostNodeId(latestState));
       const channelIndex = normalizeMeshChannelIndex(bbsHostState.channel_index);
-      bbsHostState.enabled = false;
-      bbsHostState.started_unix = 0;
-      clearBbsAnnounceTimer();
-      if (boardId && isCanonicalNodeId(hostId)) {{
-        bbsRemoveDirectoryRow(boardId, hostId);
+      const payload = await postBbsHostCommand("stop");
+      if (!payload || payload.ok !== true) {{
+        if (activeLayoutView === "bbs") {{
+          renderBbsView(latestState);
+        }}
+        return;
       }}
-      bbsPersistState();
       if (bbsHostSettingsDirty) {{
         void saveBbsHostSettings({{ silent: true }});
       }}
-      if (boardId && isCanonicalNodeId(hostId)) {{
-        await sendBbsProtocolMessage(
-          "offline",
-          [boardId, hostId],
-          {{
-            destination: "^all",
-            channel_index: channelIndex,
-            quiet: true,
-          }}
-        );
-      }}
-      setBbsPostStatus("BBS host is now offline.");
+      setBbsPostStatus("BBS host is now offline.", false, {{ channel_index: channelIndex }});
       if (activeLayoutView === "bbs") {{
         renderBbsView(latestState);
       }}
@@ -1295,10 +1585,15 @@
 
     function renderBbsDirectory(state = latestState) {{
       const listEl = document.getElementById("bbs-board-list");
+      const requestBtn = document.getElementById("bbs-refresh-directory-btn");
+      const requestTargetId = bbsRequestTargetNodeId(state);
+      if (requestBtn instanceof HTMLButtonElement) {{
+        requestBtn.disabled = !isSelectableNodeId(requestTargetId);
+      }}
       if (!(listEl instanceof HTMLElement)) return;
       const rows = Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [];
       if (!rows.length) {{
-        listEl.innerHTML = '<div class="bbs-board-empty">No boards discovered yet. Start hosting to publish one.</div>';
+        listEl.innerHTML = '<div class="bbs-board-empty">No spaces loaded yet. Select a node and request its space.</div>';
         return;
       }}
       const activeKey = String(bbsActiveBoardKey || "").trim().toLowerCase();
@@ -1311,18 +1606,6 @@
         const hostLabel = bbsDisplayNodeLabel(hostId, state);
         const motd = sanitizeBbsWireField(row && row.motd, bbsMaxMotdChars);
         const seenUnix = Math.max(0, Math.trunc(Number(row && row.last_seen_unix) || 0));
-        const chRaw = Number(row && row.channel_index);
-        const channelIndex = Number.isInteger(chRaw) && chRaw >= 0 ? Math.trunc(chRaw) : 0;
-        const channelLabel = meshChannelLabelForIndex(channelIndex, {{ compact: true, allowAll: false }});
-        const channelBadge = meshChannelBadgeHtml(
-          channelIndex,
-          channelLabel,
-          {{
-            allowAll: false,
-            extraClass: "bbs-channel-badge",
-            title: meshChannelLabelForIndex(channelIndex, {{ verbose: true, allowAll: false }}),
-          }}
-        );
         const roleLabel = isSelfNodeId(hostId, state) ? "local" : "remote";
         return `<button
           type="button"
@@ -1332,7 +1615,7 @@
           aria-selected="${{isActive ? "true" : "false"}}"
         >
           <span class="bbs-board-main">${{escAttr(title)}}</span>
-          <span class="bbs-board-meta">${{escAttr(boardId)}} • host ${{escAttr(hostLabel)}} (${{escAttr(roleLabel)}}) • ${{channelBadge}} • seen ${{escAttr(formatLocalChatTime(seenUnix, "n/a"))}}</span>
+          <span class="bbs-board-meta">${{escAttr(boardId)}} • host ${{escAttr(hostLabel)}} (${{escAttr(roleLabel)}}) • loaded ${{escAttr(formatLocalChatTime(seenUnix, "n/a"))}}</span>
           <span class="bbs-board-motd">${{escAttr(motd || "No banner set.")}}</span>
         </button>`;
       }}).join("");
@@ -1347,20 +1630,28 @@
       const activeRow = bbsActiveBoardRow();
       if (!(logEl instanceof HTMLElement)) return;
       if (!activeRow) {{
+        const pendingHostId = normalizeNodeId(bbsPendingProfileHostId || "");
+        const pendingLabel = isCanonicalNodeId(pendingHostId)
+          ? bbsDisplayNodeLabel(pendingHostId, state)
+          : "";
         if (titleEl instanceof HTMLElement) {{
-          titleEl.textContent = "No board selected";
+          titleEl.textContent = pendingLabel ? `Awaiting ${{pendingLabel}}` : "No space selected";
         }}
         if (metaEl instanceof HTMLElement) {{
-          metaEl.textContent = "Host a board or pick one from the dial directory.";
+          metaEl.textContent = pendingLabel
+            ? `Waiting for a direct BBS reply from ${{pendingLabel}}.`
+            : "Select a node and request its space.";
         }}
         if (inputEl instanceof HTMLInputElement) {{
           inputEl.disabled = true;
-          inputEl.placeholder = "Select a board before posting...";
+          inputEl.placeholder = pendingLabel ? "Waiting for profile reply..." : "Profile space will open here...";
         }}
         if (sendBtn instanceof HTMLButtonElement) {{
           sendBtn.disabled = true;
         }}
-        logEl.textContent = "*** CONNECT 2400 ***\nReady.\n";
+        logEl.textContent = pendingLabel
+          ? `*** CONNECT 2400 ***\nDialing ${{pendingLabel}}...\nAwaiting direct profile reply.\n`
+          : "*** CONNECT 2400 ***\nSelect a node and request its space.\n";
         return;
       }}
       if (titleEl instanceof HTMLElement) {{
@@ -1369,18 +1660,7 @@
       }}
       if (metaEl instanceof HTMLElement) {{
         const motd = sanitizeBbsWireField(activeRow.motd, bbsMaxMotdChars) || "No banner set.";
-        const channelIndex = normalizeMeshChannelIndex(activeRow.channel_index);
-        const channelLabel = meshChannelLabelForIndex(channelIndex, {{ compact: true, allowAll: false }});
-        const channelBadge = meshChannelBadgeHtml(
-          channelIndex,
-          channelLabel,
-          {{
-            allowAll: false,
-            extraClass: "bbs-channel-badge",
-            title: meshChannelLabelForIndex(channelIndex, {{ verbose: true, allowAll: false }}),
-          }}
-        );
-        metaEl.innerHTML = `${{escAttr(motd)}} | ${{channelBadge}}`;
+        metaEl.textContent = motd;
       }}
       if (inputEl instanceof HTMLInputElement) {{
         inputEl.disabled = false;
@@ -1420,8 +1700,6 @@
       const motdInput = document.getElementById("bbs-host-motd-input");
       const startBtn = document.getElementById("bbs-host-start-btn");
       const stopBtn = document.getElementById("bbs-host-stop-btn");
-      const announceBtn = document.getElementById("bbs-host-announce-btn");
-      const hostChannel = document.getElementById("bbs-host-channel");
       const hostStatus = document.getElementById("bbs-host-status");
       if (titleInput instanceof HTMLInputElement && document.activeElement !== titleInput) {{
         if (titleInput.value !== String(bbsHostState.title || "")) {{
@@ -1440,63 +1718,24 @@
       }}
       const localId = bbsHostNodeId(state);
       const hostEnabled = !!(bbsHostState && bbsHostState.enabled);
-      const effectiveChannelRaw = hostEnabled
-        ? normalizeMeshChannelIndex(bbsHostState.channel_index)
-        : meshChannelEffectiveSendIndexForApp("bbs");
-      const effectiveChannelIndex = Number.isInteger(effectiveChannelRaw) && effectiveChannelRaw >= 0
-        ? Math.trunc(effectiveChannelRaw)
-        : 0;
       if (startBtn instanceof HTMLButtonElement) {{
         startBtn.disabled = hostEnabled || !isCanonicalNodeId(localId);
       }}
       if (stopBtn instanceof HTMLButtonElement) {{
         stopBtn.disabled = !hostEnabled;
       }}
-      if (announceBtn instanceof HTMLButtonElement) {{
-        announceBtn.disabled = !hostEnabled;
-      }}
-      if (hostChannel instanceof HTMLElement) {{
-        const channelLabel = meshChannelLabelForIndex(
-          effectiveChannelIndex,
-          {{ compact: true, allowAll: false }}
-        );
-        const channelBadge = meshChannelBadgeHtml(
-          effectiveChannelIndex,
-          channelLabel,
-          {{
-            allowAll: false,
-            extraClass: "bbs-channel-badge",
-            title: meshChannelLabelForIndex(effectiveChannelIndex, {{ verbose: true, allowAll: false }}),
-          }}
-        );
-        hostChannel.innerHTML = hostEnabled
-          ? `Hosting + broadcast channel: ${{channelBadge}}`
-          : `Next host + broadcast channel: ${{channelBadge}}`;
-      }}
       if (hostStatus instanceof HTMLElement) {{
         if (!isCanonicalNodeId(localId)) {{
           hostStatus.textContent = "Waiting for local node identity before hosting can start.";
         }} else if (!hostEnabled) {{
-          hostStatus.textContent = "Offline. Fill out board details and click Host Board.";
+          hostStatus.textContent = "Offline. Fill out your space and click Host Space. Nothing is advertised on the mesh.";
         }} else {{
-          const channelIndex = effectiveChannelIndex;
-          const channelLabel = meshChannelLabelForIndex(
-            channelIndex,
-            {{ compact: true, allowAll: false }}
-          );
-          const channelBadge = meshChannelBadgeHtml(
-            channelIndex,
-            channelLabel,
-            {{
-              allowAll: false,
-              extraClass: "bbs-channel-badge",
-              title: meshChannelLabelForIndex(channelIndex, {{ verbose: true, allowAll: false }}),
-            }}
-          );
-          hostStatus.innerHTML = `Online as "${{escAttr(bbsHostState.title)}}" (${{escAttr(bbsHostState.board_id)}}) on ${{channelBadge}}. Beacon every ${{Math.round(bbsHostAnnounceIntervalMs / 1000)}}s.`;
+          hostStatus.textContent = `Online as "${{bbsHostState.title}}" (${{
+            bbsHostState.board_id
+          }}). Replies only to direct BBS requests.`;
         }}
       }}
-      setBbsPostStatus(bbsPostStatusText, bbsPostStatusError, {{ channel_index: bbsPostStatusChannelIndex }});
+      setBbsPostStatus(bbsPostStatusText, bbsPostStatusError);
     }}
 
     function syncBbsNetworkState(state = latestState) {{
@@ -1522,6 +1761,45 @@
         if (!toAll) {{
           if (!isCanonicalNodeId(localId)) continue;
           if (!isCanonicalNodeId(toId) || toId !== localId) continue;
+        }}
+        if (parsed.type === "open") {{
+          const requestToken = sanitizeBbsWireField(parsed.parts[2], 40);
+          if (!requestToken) continue;
+          if (!isCanonicalNodeId(localId) || !isCanonicalNodeId(fromId) || toId !== localId) continue;
+          continue;
+        }}
+        if (parsed.type === "profile") {{
+          const requestToken = sanitizeBbsWireField(parsed.parts[2], 40);
+          const boardId = normalizeBbsBoardId(parsed.parts[3] || "");
+          const hostId = normalizeNodeId(parsed.parts[4] || fromId);
+          if (!boardId || !isCanonicalNodeId(hostId)) continue;
+          const title = sanitizeBbsWireField(parsed.parts[5], bbsMaxTitleChars) || boardId;
+          const motd = sanitizeBbsWireField(parsed.parts[6], bbsMaxMotdChars);
+          const key = bbsUpsertDirectoryRow({{
+            board_id: boardId,
+            host_id: hostId,
+            title,
+            motd,
+            channel_index: messageMeshChannelIndex(msg),
+            last_seen_unix: bbsProtocolMessageUnix(msg),
+          }});
+          if (
+            requestToken
+            && bbsPendingProfileRequestToken
+            && requestToken === bbsPendingProfileRequestToken
+            && (!bbsPendingProfileHostId || bbsPendingProfileHostId === hostId)
+          ) {{
+            clearBbsPendingProfileRequest();
+            bbsActiveBoardKey = key || bbsBoardKey(boardId, hostId);
+            setBbsPostStatus(
+              `Loaded BBS space from ${{bbsDisplayNodeLabel(hostId, safeState)}}.`,
+              false,
+              {{ channel_index: messageMeshChannelIndex(msg) }}
+            );
+          }} else if (!bbsActiveBoardKey && key) {{
+            bbsActiveBoardKey = key;
+          }}
+          continue;
         }}
         if (parsed.type === "announce") {{
           const boardId = normalizeBbsBoardId(parsed.parts[2] || "");
@@ -1553,6 +1831,9 @@
           const boardId = normalizeBbsBoardId(parsed.parts[2] || "");
           const hostId = normalizeNodeId(parsed.parts[3] || fromId);
           if (!boardId || !isCanonicalNodeId(hostId)) continue;
+          if (isCanonicalNodeId(localId) && hostId === localId && !(bbsHostState && bbsHostState.enabled)) {{
+            continue;
+          }}
           const key = bbsUpsertDirectoryRow({{
             board_id: boardId,
             host_id: hostId,
@@ -1579,11 +1860,9 @@
           continue;
         }}
       }}
-      const nowUnix = Math.floor(Date.now() / 1000);
-      bbsPruneDirectoryRows(nowUnix);
       bbsEnsureHostDirectoryEntry(safeState);
       const activeExists = !!bbsActiveBoardRow();
-      if (!activeExists) {{
+      if (!activeExists && !bbsPendingProfileRequestToken) {{
         if (bbsHostState && bbsHostState.enabled) {{
           bbsActiveBoardKey = bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id);
         }}
@@ -1618,6 +1897,34 @@
       const channelIndex = Number.isInteger(channelRaw) && channelRaw >= 0
         ? channelRaw
         : meshChannelEffectiveSendIndexForApp("bbs");
+      if (isSelfNodeId(activeRow.host_id, latestState) && !(bbsHostState && bbsHostState.enabled)) {{
+        setBbsPostStatus("Your local BBS space is offline. Host it first.", true);
+        return;
+      }}
+      if (isSelfNodeId(activeRow.host_id, latestState) && bbsHostState && bbsHostState.enabled) {{
+        const payload = await postBbsHostCommand("post", {{
+          text,
+          author_name: authorName,
+          entry_id: entryId,
+        }});
+        if (!payload || payload.ok !== true) return;
+        const savedPost = (payload.post && typeof payload.post === "object")
+          ? payload.post
+          : {{
+              entry_id: entryId,
+              author_id: localId,
+              author_name: authorName,
+              text,
+              unix: Math.floor(Date.now() / 1000),
+            }};
+        bbsAppendBoardPost(activeRow.key, savedPost);
+        input.value = "";
+        setBbsPostStatus(`Saved post to ${{activeRow.title || activeRow.board_id}}.`, false, {{ channel_index: channelIndex }});
+        if (activeLayoutView === "bbs") {{
+          renderBbsTerminal(latestState);
+        }}
+        return;
+      }}
       const sent = await sendBbsProtocolMessage(
         "post",
         [
@@ -1629,7 +1936,7 @@
           text,
         ],
         {{
-          destination: "^all",
+          destination: activeRow.host_id,
           channel_index: channelIndex,
           quiet: false,
         }}
@@ -1737,21 +2044,20 @@
           void stopBbsHosting();
         }});
       }}
-      const announceBtn = document.getElementById("bbs-host-announce-btn");
-      if (announceBtn instanceof HTMLButtonElement && announceBtn.dataset.bound !== "1") {{
-        announceBtn.dataset.bound = "1";
-        announceBtn.addEventListener("click", () => {{
-          void announceHostedBbs({{ quiet: false }});
-        }});
-      }}
       const refreshBtn = document.getElementById("bbs-refresh-directory-btn");
       if (refreshBtn instanceof HTMLButtonElement && refreshBtn.dataset.bound !== "1") {{
         refreshBtn.dataset.bound = "1";
         refreshBtn.addEventListener("click", () => {{
-          if (bbsHostState && bbsHostState.enabled) {{
-            void announceHostedBbs({{ quiet: true }});
+          const requestTargetId = bbsRequestTargetNodeId(latestState);
+          if (!isSelectableNodeId(requestTargetId)) {{
+            setBbsPostStatus("Select a node before requesting a BBS space.", true);
+            return;
           }}
-          requestImmediatePoll(0);
+          void requestBbsSpaceForNode(requestTargetId, {{
+            silent: false,
+            openView: true,
+            preserveCurrent: false,
+          }});
         }});
       }}
       const boardList = document.getElementById("bbs-board-list");
@@ -1788,6 +2094,9 @@
     function renderBbsView(state = latestState) {{
       if (bbsFeatureEnabled && !bbsHostSettingsLoadedOnce && !bbsHostSettingsFetchInFlight) {{
         void fetchBbsHostSettings({{ silent: true }});
+      }}
+      if (bbsFeatureEnabled && !bbsHostRuntimeLoadedOnce && !bbsHostRuntimeFetchInFlight) {{
+        void fetchBbsHostRuntime({{ silent: true }});
       }}
       bindBbsControls();
       syncBbsNetworkState(state);
