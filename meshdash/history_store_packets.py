@@ -42,10 +42,39 @@ from .history_time import (
 
 _LOCAL_NOISE_PORTS = {"ADMIN_APP"}
 _LOCAL_TELEMETRY_PORT = "TELEMETRY_APP"
+_SEARCH_EXCERPT_MAX_CHARS = 180
 
 
 def _is_hex_text(value: str) -> bool:
     return bool(value) and all(ch in "0123456789abcdefABCDEF" for ch in value)
+
+
+def _search_excerpt(
+    haystack: object,
+    needle_lower: str,
+    *,
+    max_chars: int = _SEARCH_EXCERPT_MAX_CHARS,
+) -> str:
+    text = str(haystack or "")
+    if not text or not needle_lower:
+        return ""
+    lowered = text.lower()
+    hit = lowered.find(needle_lower)
+    if hit < 0:
+        return ""
+    clean_max = max(40, int(max_chars))
+    context = max(20, min(clean_max // 2, 80))
+    start = max(0, hit - context)
+    end = min(len(text), hit + len(needle_lower) + context)
+    snippet = " ".join(text[start:end].split())
+    if start > 0:
+        snippet = f"... {snippet}"
+    if end < len(text):
+        snippet = f"{snippet} ..."
+    if len(snippet) > clean_max:
+        clipped = snippet[: clean_max - 4].rstrip()
+        snippet = f"{clipped} ..."
+    return snippet
 
 
 def _canonical_node_id(value: object) -> str:
@@ -692,6 +721,7 @@ def search_packets(
                 chat = _safe_json_loads(message_json, {})
                 if not isinstance(chat, dict):
                     chat = {}
+                match_excerpt = _search_excerpt(message_json, needle_lower)
                 entries.append(
                     {
                         "separator": False,
@@ -699,6 +729,8 @@ def search_packets(
                         "match": idx in selected_match_set,
                         "chat_row_id": int(_to_int(row.get("row_id")) or 0) or None,
                         "created_unix": int(_to_int(row.get("created_unix")) or 0) or None,
+                        "match_scope": "chat" if idx in selected_match_set and match_excerpt else "",
+                        "match_excerpt": match_excerpt if idx in selected_match_set else "",
                         "chat": chat,
                     }
                 )
@@ -712,6 +744,20 @@ def search_packets(
             packet = _safe_json_loads(packet_json, {})
             if not isinstance(packet, dict):
                 packet = {}
+            summary_excerpt = _search_excerpt(summary_json, needle_lower)
+            packet_excerpt = _search_excerpt(packet_json, needle_lower)
+            if clean_scope == "summary":
+                match_scope = "summary" if summary_excerpt else ""
+                match_excerpt = summary_excerpt
+            elif clean_scope == "packet":
+                match_scope = "packet" if packet_excerpt else ""
+                match_excerpt = packet_excerpt
+            elif summary_excerpt:
+                match_scope = "summary"
+                match_excerpt = summary_excerpt
+            else:
+                match_scope = "packet" if packet_excerpt else ""
+                match_excerpt = packet_excerpt
             entries.append(
                 {
                     "separator": False,
@@ -719,6 +765,8 @@ def search_packets(
                     "match": idx in selected_match_set,
                     "packet_row_id": int(_to_int(row.get("row_id")) or 0) or None,
                     "created_unix": int(_to_int(row.get("created_unix")) or 0) or None,
+                    "match_scope": match_scope if idx in selected_match_set else "",
+                    "match_excerpt": match_excerpt if idx in selected_match_set else "",
                     "summary": summary,
                     "packet": packet,
                 }

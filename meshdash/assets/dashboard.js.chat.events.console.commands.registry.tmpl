@@ -235,6 +235,8 @@
               ? entry.chat
               : {{}};
             const isMatch = entry.match === true;
+            const matchScope = String(entry.match_scope || "").trim().toLowerCase();
+            const matchExcerpt = String(entry.match_excerpt || "").trim();
             const packetLines = isChatEntry
               ? formatConsoleLine({{
                   summary: {{
@@ -292,6 +294,17 @@
               appendConsoleLine(
                 `grep|${{runId}}|${{packetKey}}|${{i}}|${{fallbackLineCounter}}`,
                 `${{prefix}}${{sourcePrefix}}${{lineRaw}}`,
+                packetMs,
+                false,
+                {{ timestampMode: "grep" }},
+              );
+            }}
+            if (isMatch && matchExcerpt) {{
+              const matchLabel = matchScope || (isChatEntry ? "chat" : "packet");
+              fallbackLineCounter += 1;
+              appendConsoleLine(
+                `grep|${{runId}}|${{packetKey}}|match|${{fallbackLineCounter}}`,
+                `  match[${{matchLabel}}] "${{matchExcerpt.replace(/\"/g, "'")}}"`,
                 packetMs,
                 false,
                 {{ timestampMode: "grep" }},
