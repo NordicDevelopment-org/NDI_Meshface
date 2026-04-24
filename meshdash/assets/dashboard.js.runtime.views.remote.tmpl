@@ -617,17 +617,26 @@
       }}
     }}
 
-    function bbsRemoveDirectoryRowByKey(boardKey) {{
+    function bbsRemoveDirectoryRowByKey(boardKey, options = null) {{
       const clean = String(boardKey || "").trim().toLowerCase();
-      if (!clean) return;
-      bbsDiscoveredBoards = (Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [])
-        .filter((row) => String(row && row.key || "").trim().toLowerCase() !== clean);
+      if (!clean) return null;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const rows = Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [];
+      const removedRow = rows.find((row) => String(row && row.key || "").trim().toLowerCase() === clean) || null;
+      bbsDiscoveredBoards = rows.filter((row) => String(row && row.key || "").trim().toLowerCase() !== clean);
+      if (opts.clearPosts !== false) {{
+        bbsBoardPostsByKey.delete(clean);
+      }}
       if (bbsActiveBoardKey === clean) {{
         const fallback = (Array.isArray(bbsDiscoveredBoards) && bbsDiscoveredBoards.length)
           ? String(bbsDiscoveredBoards[0].key || "").trim().toLowerCase()
           : "";
         bbsActiveBoardKey = fallback;
       }}
+      if (removedRow && opts.persist !== false) {{
+        bbsPersistState();
+      }}
+      return removedRow;
     }}
 
     function syncHostedBbsDirectoryEntry(state = latestState, options = null) {{
@@ -1084,17 +1093,10 @@
       return key;
     }}
 
-    function bbsRemoveDirectoryRow(boardId, hostId) {{
+    function bbsRemoveDirectoryRow(boardId, hostId, options = null) {{
       const key = bbsBoardKey(boardId, hostId);
-      if (!key) return;
-      bbsDiscoveredBoards = (Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [])
-        .filter((row) => String(row && row.key || "").trim().toLowerCase() !== key);
-      if (bbsActiveBoardKey === key) {{
-        const fallback = (Array.isArray(bbsDiscoveredBoards) && bbsDiscoveredBoards.length)
-          ? String(bbsDiscoveredBoards[0].key || "").trim().toLowerCase()
-          : "";
-        bbsActiveBoardKey = fallback;
-      }}
+      if (!key) return null;
+      return bbsRemoveDirectoryRowByKey(key, options);
     }}
 
     function bbsPruneDirectoryRows(nowUnix = Math.floor(Date.now() / 1000)) {{
@@ -1111,7 +1113,21 @@
         return age <= bbsBoardStaleSeconds;
       }});
       if (nextRows.length !== rows.length) {{
+        const nextKeys = new Set(nextRows.map((row) => String(row && row.key || "").trim().toLowerCase()).filter(Boolean));
+        for (const row of rows) {{
+          const key = String(row && row.key || "").trim().toLowerCase();
+          if (key && !nextKeys.has(key)) {{
+            bbsBoardPostsByKey.delete(key);
+          }}
+        }}
         bbsDiscoveredBoards = nextRows;
+        const activeKey = String(bbsActiveBoardKey || "").trim().toLowerCase();
+        if (activeKey && !nextKeys.has(activeKey)) {{
+          bbsActiveBoardKey = nextRows.length
+            ? String(nextRows[0].key || "").trim().toLowerCase()
+            : "";
+        }}
+        bbsPersistState();
       }}
     }}
 
@@ -1328,6 +1344,38 @@
       }}
       bbsActiveBoardKey = clean;
       bbsPersistState();
+      if (activeLayoutView === "bbs") {{
+        renderBbsView(latestState);
+      }}
+    }}
+
+    function forgetSelectedBbsBoard() {{
+      const activeRow = bbsActiveBoardRow();
+      if (!activeRow) {{
+        setBbsPostStatus("Select a loaded space to forget.", true);
+        if (activeLayoutView === "bbs") {{
+          renderBbsDirectory(latestState);
+          renderBbsTerminal(latestState);
+        }}
+        return;
+      }}
+      const key = String(activeRow && activeRow.key || "").trim().toLowerCase();
+      const hostedKey = (bbsHostState && bbsHostState.enabled)
+        ? bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || bbsHostNodeId(latestState))
+        : "";
+      if (key && hostedKey && key === hostedKey) {{
+        setBbsPostStatus("Use Go Offline to remove your hosted local space.", true);
+        return;
+      }}
+      const title = sanitizeBbsWireField(activeRow && activeRow.title, bbsMaxTitleChars)
+        || sanitizeBbsWireField(activeRow && activeRow.board_id, 24)
+        || "space";
+      const removed = bbsRemoveDirectoryRowByKey(key);
+      if (!removed) {{
+        setBbsPostStatus("Selected space was already gone.", false);
+      }} else {{
+        setBbsPostStatus(`Forgot loaded space "${{title}}".`, false);
+      }}
       if (activeLayoutView === "bbs") {{
         renderBbsView(latestState);
       }}
@@ -1584,11 +1632,25 @@
     }}
 
     function renderBbsDirectory(state = latestState) {{
+      bbsPruneDirectoryRows();
       const listEl = document.getElementById("bbs-board-list");
       const requestBtn = document.getElementById("bbs-refresh-directory-btn");
+      const forgetBtn = document.getElementById("bbs-forget-directory-btn");
       const requestTargetId = bbsRequestTargetNodeId(state);
+      const activeRow = bbsActiveBoardRow();
+      const activeKey = String(bbsActiveBoardKey || "").trim().toLowerCase();
+      const hostedKey = (bbsHostState && bbsHostState.enabled)
+        ? bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || bbsHostNodeId(state))
+        : "";
       if (requestBtn instanceof HTMLButtonElement) {{
         requestBtn.disabled = !isSelectableNodeId(requestTargetId);
+      }}
+      if (forgetBtn instanceof HTMLButtonElement) {{
+        const activeIsHostedLocal = !!(activeKey && hostedKey && activeKey === hostedKey);
+        forgetBtn.disabled = !activeRow || activeIsHostedLocal;
+        forgetBtn.title = activeIsHostedLocal
+          ? "Use Go Offline to remove your hosted local space"
+          : "Forget the selected loaded space";
       }}
       if (!(listEl instanceof HTMLElement)) return;
       const rows = Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [];
@@ -1596,7 +1658,6 @@
         listEl.innerHTML = '<div class="bbs-board-empty">No spaces loaded yet. Select a node and request its space.</div>';
         return;
       }}
-      const activeKey = String(bbsActiveBoardKey || "").trim().toLowerCase();
       listEl.innerHTML = rows.map((row) => {{
         const key = String(row && row.key || "").trim().toLowerCase();
         const isActive = key && activeKey && key === activeKey;
@@ -2058,6 +2119,13 @@
             openView: true,
             preserveCurrent: false,
           }});
+        }});
+      }}
+      const forgetBtn = document.getElementById("bbs-forget-directory-btn");
+      if (forgetBtn instanceof HTMLButtonElement && forgetBtn.dataset.bound !== "1") {{
+        forgetBtn.dataset.bound = "1";
+        forgetBtn.addEventListener("click", () => {{
+          forgetSelectedBbsBoard();
         }});
       }}
       const boardList = document.getElementById("bbs-board-list");

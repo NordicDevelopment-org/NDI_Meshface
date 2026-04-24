@@ -51,6 +51,8 @@ def test_render_html_shows_bbs_workspace_when_enabled() -> None:
     assert 'id="bbs-host-title-input"' in html
     assert 'id="bbs-terminal-log"' in html
     assert 'Open Selected' in html
+    assert 'id="bbs-forget-directory-btn"' in html
+    assert 'Forget Selected' in html
     assert 'id="bbs-host-announce-btn"' not in html
 
 

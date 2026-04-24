@@ -463,6 +463,8 @@ def test_dashboard_js_includes_bbs_settings_sync_flow() -> None:
     assert "async function fetchBbsHostRuntime(options = null) {" in js
     assert "async function postBbsHostCommand(action, options = null) {" in js
     assert "function bbsReplaceBoardPosts(boardKey, posts = []) {" in js
+    assert "function forgetSelectedBbsBoard() {" in js
+    assert 'document.getElementById("bbs-forget-directory-btn")' in js
     assert "async function requestBbsSpaceForNode(nodeId, options = null) {" in js
     assert "async function respondToBbsOpenRequest(nodeId, requestToken, channelIndex, state = latestState) {" in js
     assert "function openBbsBoardForHost(nodeId) {" in js
