@@ -203,9 +203,8 @@ def test_dashboard_js_routes_drawer_tabs_into_their_panels() -> None:
     assert 'function nodeEmojiOverrideForNode(nodeId) {' in js
     assert 'function localNameEmojiForNode(nodeId, node = null) {' in js
     assert 'function localVisualEmojiForNode(nodeId, node = null) {' in js
-    assert 'const nameEmoji = localNameEmojiForNode(nodeId, node);' in js
-    assert 'if (nameEmoji) return nameEmoji;' in js
-    assert 'return localBadgeEmojiForNode(nodeId);' in js
+    assert 'return localNameEmojiForNode(nodeId, node);' in js
+    assert 'function localBadgeEmojiForNode(nodeId)' not in js
     assert 'function nodeVisualEmojiForNode(nodeId, tagEntry = null, node = null) {' in js
     assert 'function saveNodeEmojiOverride(nodeId, rawEmoji, options = null) {' in js
     assert 'function clearNodeTagAndEmojiForNode(nodeId, options = null) {' in js

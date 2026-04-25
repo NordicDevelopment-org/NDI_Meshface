@@ -200,21 +200,6 @@
       return "";
     }}
 
-    function localBadgeEmojiForNode(nodeId) {{
-      const cleanNodeId = normalizeNodeId(nodeId);
-      if (!isSelectableNodeId(cleanNodeId)) return "";
-      const localNodeId = normalizeNodeId(
-        typeof resolveLocalNodeId === "function" ? resolveLocalNodeId(latestState) : ""
-      );
-      if (!localNodeId || cleanNodeId !== localNodeId) return "";
-      if (
-        typeof settingsBadgeEmojiChoiceSet === "undefined"
-        || !(settingsBadgeEmojiChoiceSet instanceof Set)
-      ) return "";
-      const badgeEmoji = String(settingsBadgeEmoji || "").trim();
-      return settingsBadgeEmojiChoiceSet.has(badgeEmoji) ? badgeEmoji : "";
-    }}
-
     function localNameEmojiForNode(nodeId, node = null) {{
       const cleanNodeId = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(cleanNodeId)) return "";
@@ -226,9 +211,7 @@
     }}
 
     function localVisualEmojiForNode(nodeId, node = null) {{
-      const nameEmoji = localNameEmojiForNode(nodeId, node);
-      if (nameEmoji) return nameEmoji;
-      return localBadgeEmojiForNode(nodeId);
+      return localNameEmojiForNode(nodeId, node);
     }}
 
     function nodeVisualEmojiForNode(nodeId, tagEntry = null, node = null) {{

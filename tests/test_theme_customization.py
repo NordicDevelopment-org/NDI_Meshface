@@ -249,7 +249,7 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert 'id="theme-custom-tint-intensity-value"' in html
     assert 'id="theme-custom-color-depth"' in html
     assert 'id="theme-custom-color-depth-value"' in html
-    assert 'id="settings-appearance-badge-emoji"' in html
+    assert 'id="settings-appearance-badge-emoji"' not in html
     assert 'id="theme-live-preview"' in html
     assert 'id="theme-live-preview-status"' in html
     assert '<option value="custom">custom</option>' in html
@@ -264,7 +264,7 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert "Tint-backed utility chrome" in html
     assert "Tint color drives the shared shell tint used by help notes, console chrome" in html
     assert "Tint intensity scales that shared tint from neutral up to a clearly visible wash" in html
-    assert "Badge shows in the workspace launcher square" in html
+    assert "Badge shows in the workspace launcher square" not in html
     assert "Off leaves untagged node and chat surfaces neutral" in html
 
     assert 'let themePresetSelected = "custom";' in js
@@ -273,14 +273,14 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert 'let themeCustomTintColor = "#9a9996";' in js
     assert "let themeCustomTintIntensity = 50;" in js
     assert "let themeCustomColorDepth = 50;" in js
-    assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' in js
+    assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' not in js
     assert "function formatThemePresetLabel(name) {" in js
     assert 'return "green";' in js
     assert "function normalizeThemeCustomSettings(rawSettings) {" in js
     assert "function normalizeThemeCustomLineColor(raw, fallback = \"#9a9996\") {" in js
     assert "function normalizeThemeCustomTintColor(raw, fallback = \"#9a9996\") {" in js
     assert "function normalizeThemeCustomTintIntensity(raw) {" in js
-    assert "function normalizeSettingsBadgeEmoji(value) {" in js
+    assert "function normalizeSettingsBadgeEmoji(value) {" not in js
     assert "function setThemeLivePreviewStatus(message = \"Updates while you drag.\", resetDelayMs = 0) {" in js
     assert "function buildCurrentThemeCustomOptions(extraOptions = null) {" in js
     assert "function queueLiveThemePreview() {" in js
@@ -292,7 +292,7 @@ def test_theme_customization_controls_are_rendered_and_wired() -> None:
     assert 'presetName: opts.presetName == null ? "custom" : opts.presetName' in js
     assert "function bindThemeCustomControls() {" in js
     assert 'runBootStep("bindThemeCustomControls", () => bindThemeCustomControls());' in js
-    assert 'controlId === "settings-appearance-badge-emoji"' in js
+    assert 'controlId === "settings-appearance-badge-emoji"' not in js
     assert 'controlId === "theme-custom-base-color"' in js
     assert 'controlId === "theme-custom-line-color"' in js
     assert 'controlId === "theme-custom-tint-color"' in js

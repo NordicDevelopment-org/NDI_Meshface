@@ -158,7 +158,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "function shouldCloseLayoutViewMenuForScrollTarget(target = null) {" in js
     assert 'document.getElementById("settings-about-version")' in js
     assert 'document.getElementById("settings-about-commit")' in js
-    assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' in js
+    assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' not in js
     assert 'document.getElementById("layout-view-menu-head-mark")' not in js
     assert 'document.getElementById("layout-view-menu-head-version")' not in js
     assert 'document.getElementById("layout-view-menu-head-commit")' not in js

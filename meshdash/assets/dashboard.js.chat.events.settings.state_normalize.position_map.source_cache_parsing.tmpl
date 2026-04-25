@@ -44,16 +44,9 @@
       return shouldUseUniqueNodeColorsForScope("member", tagActive);
     }}
 
-    function normalizeSettingsBadgeEmoji(value) {{
-      const clean = String(value || "").trim();
-      if (!clean) return "";
-      return settingsBadgeEmojiChoiceSet.has(clean) ? clean : "";
-    }}
-
     function loadSettingsAppearancePreferences() {{
       settingsUniqueNodeColorsEnabled = false;
       settingsUniqueChatColorsEnabled = false;
-      settingsBadgeEmoji = "";
       try {{
         settingsUniqueNodeColorsEnabled = parseBoolToken(
           window.localStorage.getItem(settingsUniqueNodeColorsStorageKey),
@@ -62,9 +55,6 @@
         settingsUniqueChatColorsEnabled = parseBoolToken(
           window.localStorage.getItem(settingsUniqueChatColorsStorageKey),
           settingsUniqueNodeColorsEnabled
-        );
-        settingsBadgeEmoji = normalizeSettingsBadgeEmoji(
-          window.localStorage.getItem(settingsBadgeEmojiStorageKey)
         );
       }} catch (_err) {{
       }}
@@ -80,10 +70,6 @@
           settingsUniqueChatColorsStorageKey,
           settingsUniqueChatColorsEnabled ? "1" : "0"
         );
-        window.localStorage.setItem(
-          settingsBadgeEmojiStorageKey,
-          normalizeSettingsBadgeEmoji(settingsBadgeEmoji)
-        );
       }} catch (_err) {{
       }}
     }}
@@ -96,10 +82,6 @@
       const chatToggle = document.getElementById("settings-appearance-unique-chat-colors");
       if (chatToggle instanceof HTMLInputElement) {{
         chatToggle.checked = !!settingsUniqueChatColorsEnabled;
-      }}
-      const badgeSelect = document.getElementById("settings-appearance-badge-emoji");
-      if (badgeSelect instanceof HTMLSelectElement) {{
-        badgeSelect.value = normalizeSettingsBadgeEmoji(settingsBadgeEmoji);
       }}
       const consoleTimestampsToggle = document.getElementById("console-timestamps");
       if (consoleTimestampsToggle instanceof HTMLInputElement) {{
@@ -163,31 +145,6 @@
           renderChatLabsView(latestState);
         }}
       }}
-    }}
-
-    function setSettingsBadgeEmoji(value, options = null) {{
-      const opts = options && typeof options === "object" ? options : {{}};
-      const normalized = normalizeSettingsBadgeEmoji(value);
-      const changed = settingsBadgeEmoji !== normalized;
-      settingsBadgeEmoji = normalized;
-      if (opts.persist !== false) {{
-        persistSettingsAppearancePreferences();
-      }}
-      syncSettingsAppearanceControls();
-      if (typeof renderSelfRadioPill === "function") {{
-        renderSelfRadioPill(latestState);
-      }}
-      if (typeof syncLayoutViewLauncherButtonState === "function") {{
-        syncLayoutViewLauncherButtonState(activeLayoutView);
-      }}
-      if (opts.announce && typeof setSettingsStatusText === "function") {{
-        setSettingsStatusText(
-          settingsBadgeEmoji
-            ? `Workspace badge set to ${{settingsBadgeEmoji}}.`
-            : "Workspace badge reset to the short-name mark."
-        );
-      }}
-      return changed;
     }}
 
     function normalizeSettingsTimeSyncTimezone(value) {{

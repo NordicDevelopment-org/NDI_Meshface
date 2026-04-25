@@ -1456,19 +1456,19 @@
         )
           ? localVisualEmojiForNode(localId, localNode || localOwner)
           : "";
-        const badgeEmoji = String(localVisualEmoji || "").trim();
+        const localIconEmoji = String(localVisualEmoji || "").trim();
         targetMetric.classList.remove("target-node-value", "node-ticker-value");
         targetMetric.replaceChildren();
         if (hasLocalIdentity) {{
           targetMetric.classList.add("target-node-value", "node-ticker-value");
           const nameRow = document.createElement("div");
           nameRow.className = "target-node-name";
-          if (badgeEmoji) {{
-            const badgeMark = document.createElement("span");
-            badgeMark.className = "target-node-mark";
-            badgeMark.textContent = badgeEmoji;
-            badgeMark.setAttribute("aria-hidden", "true");
-            nameRow.appendChild(badgeMark);
+          if (localIconEmoji) {{
+            const iconMark = document.createElement("span");
+            iconMark.className = "target-node-mark";
+            iconMark.textContent = localIconEmoji;
+            iconMark.setAttribute("aria-hidden", "true");
+            nameRow.appendChild(iconMark);
           }}
           const nameText = document.createElement("span");
           nameText.className = "target-node-name-text";
