@@ -2358,8 +2358,57 @@
           180deg,
           color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, black 16%) 0%,
           color-mix(in srgb, var(--workspace-shell-bg) 88%, black 12%) 100%
-        );
+      );
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--ui-accent) 22%, transparent);
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs {{
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs-sidebar {{
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs-main {{
+      background: transparent;
+      color: var(--workspace-shell-text);
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs-main::before,
+    [data-theme="dark"] .layout.view-bbs .bbs-main::after {{
+      content: none;
+      display: none;
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs-terminal-head {{
+      border-color: var(--workspace-shell-border);
+      background: var(--workspace-shell-bg-alt);
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs-terminal-log {{
+      border-color: var(--workspace-shell-border);
+      background: var(--workspace-shell-bg);
+      color: var(--workspace-shell-text);
+      text-shadow: none;
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs-compose-row {{
+      border-color: color-mix(in srgb, var(--ui-border) 62%, transparent);
+      background: var(--ui-panel);
+      background-image: none;
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs-compose-row .bbs-post-input {{
+      background: var(--workspace-shell-bg-alt);
+      border-color: var(--workspace-shell-border-strong);
+      color: var(--workspace-shell-text);
+      box-shadow: none;
+    }}
+    [data-theme="dark"] .layout.view-bbs .bbs-compose-row .bbs-post-input:focus {{
+      border-color: var(--ui-accent);
+      background: var(--workspace-shell-bg-alt);
+      box-shadow: inset 0 0 0 1px var(--ui-accent);
     }}
     [data-theme="dark"] .remote-sidebar {{
       border-color: #236744;

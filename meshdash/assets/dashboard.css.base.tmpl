@@ -3519,6 +3519,27 @@
       min-height: 0;
       height: 100%;
       flex: 1 1 auto;
+      align-items: stretch;
+    }}
+    .layout.view-bbs .bbs-shell {{
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
+      align-items: stretch;
+    }}
+    .layout.view-bbs .bbs > h2 {{
+      display: none;
+    }}
+    .layout.view-bbs .bbs-sidebar {{
+      min-height: 0;
+      height: 100%;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      overflow: auto;
     }}
     .bbs-sidebar {{
       display: flex;
@@ -3773,6 +3794,61 @@
       position: relative;
       z-index: 1;
     }}
+    .layout.view-bbs .bbs-main {{
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto auto;
+      align-content: stretch;
+      align-items: stretch;
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
+      gap: 8px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ink);
+      box-shadow: none;
+    }}
+    .layout.view-bbs .bbs-main::before,
+    .layout.view-bbs .bbs-main::after {{
+      content: none;
+      display: none;
+    }}
+    .layout.view-bbs .bbs-terminal-head {{
+      grid-row: 1;
+      border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--panel) 88%, var(--bg) 12%);
+      padding: 8px 10px;
+      box-shadow: none;
+    }}
+    .layout.view-bbs .bbs-terminal-log {{
+      grid-row: 2;
+      align-self: stretch;
+      justify-self: stretch;
+      min-height: 0;
+      height: auto;
+      max-height: none;
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--panel) 92%, var(--bg) 8%);
+      padding: 12px;
+      box-shadow: none;
+    }}
+    .layout.view-bbs .bbs-compose-row {{
+      grid-row: 3;
+      align-self: end;
+      border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%);
+      padding: 6px 8px;
+    }}
+    .layout.view-bbs .bbs-post-status {{
+      grid-row: 4;
+      margin: 0;
+    }}
     .bbs-terminal-head {{
       border-bottom: 1px solid color-mix(in srgb, var(--surface-tint-border-strong, #b8cab9) 62%, var(--ui-accent, #2f855a) 38%);
       padding: 12px 14px 10px;
@@ -3861,6 +3937,19 @@
       border-color: color-mix(in srgb, var(--ui-accent, #2f855a) 60%, #9ac5aa);
       background: #ffffff;
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--ui-accent, #2f855a) 16%, transparent);
+    }}
+    .layout.view-bbs .bbs-post-input {{
+      border-radius: 7px;
+      padding: 5px 7px;
+      min-height: 27px;
+      background: #f9fdf9;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    }}
+    .layout.view-bbs .bbs-post-input:focus {{
+      outline: none;
+      border-color: #9ac5aa;
+      background: #ffffff;
+      box-shadow: inset 0 0 0 1px #9ac5aa;
     }}
     @media (max-width: 1100px) {{
       .bbs-shell {{

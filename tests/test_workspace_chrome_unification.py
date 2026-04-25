@@ -141,6 +141,69 @@ def test_workspace_main_gap_stays_uniform_and_lets_apps_views_use_full_width() -
     assert "grid-column: 1;" in apps_layout_section
 
 
+def test_bbs_terminal_uses_full_workspace_height(extract_css_block) -> None:
+    css = build_dashboard_css(theme_css="")
+
+    bbs_card_section = extract_css_block(css, ".layout.view-bbs .bbs")
+    bbs_body_section = extract_css_block(css, ".layout.view-bbs .bbs .body")
+    bbs_sidebar_section = extract_css_block(css, ".layout.view-bbs .bbs-sidebar")
+    bbs_shell_section = extract_css_block(css, ".bbs-shell")
+    bbs_view_shell_section = extract_css_block(css, ".layout.view-bbs .bbs-shell")
+    bbs_main_section = extract_css_block(css, ".layout.view-bbs .bbs-main")
+    bbs_main_overlay_section = extract_css_block(css, ".layout.view-bbs .bbs-main::before")
+    bbs_head_section = extract_css_block(css, ".layout.view-bbs .bbs-terminal-head")
+    bbs_log_section = extract_css_block(css, ".layout.view-bbs .bbs-terminal-log")
+    bbs_compose_section = extract_css_block(css, ".layout.view-bbs .bbs-compose-row")
+    bbs_input_section = extract_css_block(css, ".layout.view-bbs .bbs-post-input")
+    dark_bbs_card_section = extract_css_block(css, '[data-theme="dark"] .layout.view-bbs .bbs')
+    dark_bbs_log_section = extract_css_block(css, '[data-theme="dark"] .layout.view-bbs .bbs-terminal-log')
+    dark_bbs_compose_section = extract_css_block(css, '[data-theme="dark"] .layout.view-bbs .bbs-compose-row')
+
+    assert "flex-direction: column;" in bbs_card_section
+    assert "height: 100%;" in bbs_card_section
+    assert "overflow: hidden;" in bbs_card_section
+    assert ".layout.view-bbs .bbs > h2 {" in css
+    assert "display: none;" in css.split(".layout.view-bbs .bbs > h2 {", 1)[1].split("}", 1)[0]
+    assert "flex: 1 1 auto;" in bbs_body_section
+    assert "background: transparent;" in bbs_sidebar_section
+    assert "height: 100%;" in bbs_sidebar_section
+    assert "overflow: auto;" in bbs_sidebar_section
+    assert "border: 0;" in bbs_sidebar_section
+    assert "align-items: stretch;" in bbs_shell_section
+    assert "flex: 1 1 auto;" in bbs_view_shell_section
+    assert "height: 100%;" in bbs_view_shell_section
+    assert "overflow: hidden;" in bbs_view_shell_section
+    assert "display: grid;" in bbs_main_section
+    assert "grid-template-rows: auto minmax(0, 1fr) auto auto;" in bbs_main_section
+    assert "align-items: stretch;" in bbs_main_section
+    assert "min-height: 0;" in bbs_main_section
+    assert "height: 100%;" in bbs_main_section
+    assert "overflow: hidden;" in bbs_main_section
+    assert "gap: 8px;" in bbs_main_section
+    assert "border: 0;" in bbs_main_section
+    assert "background: transparent;" in bbs_main_section
+    assert "box-shadow: none;" in bbs_main_section
+    assert "content: none;" in bbs_main_overlay_section
+    assert "border-radius: 10px;" in bbs_head_section
+    assert "background: color-mix(in srgb, var(--panel) 88%, var(--bg) 12%)" in bbs_head_section
+    assert "align-self: stretch;" in bbs_log_section
+    assert "justify-self: stretch;" in bbs_log_section
+    assert "min-height: 0;" in bbs_log_section
+    assert "height: auto;" in bbs_log_section
+    assert "max-height: none;" in bbs_log_section
+    assert "width: 100%;" in bbs_log_section
+    assert "box-sizing: border-box;" in bbs_log_section
+    assert "border-radius: 10px;" in bbs_log_section
+    assert "background: color-mix(in srgb, var(--panel) 92%, var(--bg) 8%)" in bbs_log_section
+    assert "align-self: end;" in bbs_compose_section
+    assert "border-radius: 10px;" in bbs_compose_section
+    assert "background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%)" in bbs_compose_section
+    assert 'font-family: "IBM Plex Sans", "Segoe UI", sans-serif;' in bbs_input_section
+    assert "background: transparent;" in dark_bbs_card_section
+    assert "background: var(--workspace-shell-bg);" in dark_bbs_log_section
+    assert "background: var(--ui-panel);" in dark_bbs_compose_section
+
+
 def test_network_view_keeps_map_frame_and_removes_body_shell() -> None:
     css = build_dashboard_css(theme_css="")
     body_section = css.split(".layout.view-network .map .body {", 1)[1].split("}", 1)[0]
