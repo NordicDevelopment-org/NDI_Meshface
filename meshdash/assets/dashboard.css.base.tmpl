@@ -829,19 +829,48 @@
       outline: 2px solid rgba(214, 238, 223, 0.92);
       outline-offset: 2px;
     }}
-    .topbar .summary-ticker-item-target {{
+    .topbar .summary-ticker-item-self,
+    .topbar .summary-ticker-item-radio {{
       grid-column: span 1;
       grid-template-rows: auto;
       row-gap: 0;
       align-items: center;
     }}
-    .topbar .summary-ticker-item-target > .value {{
+    .topbar .summary-ticker-item-self {{
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+    }}
+    .topbar .summary-ticker-item-self.has-node-emoji::after {{
+      content: attr(data-node-emoji);
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: clamp(34px, 3.5vw, 52px);
+      line-height: 1;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+      opacity: 0.08;
+      filter: grayscale(0.18) saturate(0.76) blur(1.1px);
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+      z-index: 0;
+    }}
+    .topbar .summary-ticker-item-self > .label,
+    .topbar .summary-ticker-item-self > .value {{
+      position: relative;
+      z-index: 1;
+    }}
+    .topbar .summary-ticker-item-self > .value,
+    .topbar .summary-ticker-item-radio > .value {{
       grid-column: 2 / span 2;
       grid-row: 1;
       font-size: 14px;
       line-height: 1.05;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value {{
+    .topbar .summary-ticker-item-self .value.self-node-value,
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value {{
       grid-column: 2 / span 2;
       grid-row: 1;
       white-space: nowrap;
@@ -854,7 +883,7 @@
       line-height: 1.05;
       min-width: 0;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name {{
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-name {{
       min-width: 0;
       flex: 1 1 auto;
       display: inline-flex;
@@ -866,65 +895,86 @@
       white-space: nowrap;
       overflow: hidden;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-name-text {{
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-status.chat-member-status {{
+      flex: 0 0 auto;
+      width: 18px;
+      min-width: 18px;
+      height: 18px;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-status.chat-member-status-emoji {{
+      font-size: 13px;
+      transform: translateY(-0.5px);
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-name .self-node-name-text {{
       min-width: 0;
       flex: 1 1 auto;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status {{
       flex: 0 0 auto;
       display: inline-flex;
       align-items: center;
       gap: 4px;
       max-width: 100%;
-      font-size: 8px;
+      font-size: 12px;
+      font-weight: 800;
       line-height: 1.1;
-      letter-spacing: 0.16px;
-      text-transform: uppercase;
+      letter-spacing: 0;
       white-space: nowrap;
       color: color-mix(in srgb, var(--muted) 80%, var(--accent-2) 20%);
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status::before {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status::before {{
       content: "";
       display: inline-block;
-      width: 5px;
-      height: 5px;
+      width: 6px;
+      height: 6px;
       border-radius: 999px;
       background: #f2ce7a;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-online {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-online {{
       color: color-mix(in srgb, var(--ink) 76%, var(--accent) 24%);
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-online::before {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-online::before {{
       background: #79e6ac;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-warn {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-warn {{
       color: #7d4a11;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-warn::before {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-warn::before {{
       background: #f2ce7a;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-stale {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-stale {{
       color: #7d4a11;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-stale::before {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-stale::before {{
       background: #f2ce7a;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-lost {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-lost {{
       color: #8a2323;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-lost::before {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-lost::before {{
       background: #ff9e9e;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-unknown {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-unknown {{
       color: color-mix(in srgb, var(--muted) 76%, #8a641c 24%);
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status.status-unknown::before {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-unknown::before {{
       background: #f2ce7a;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-id {{
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-detail {{
+      min-width: 0;
+      flex: 1 1 auto;
+      font-size: 11px;
+      font-weight: 650;
+      line-height: 1.1;
+      color: color-mix(in srgb, var(--muted) 84%, var(--ink) 16%);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-id {{
       min-width: 0;
       font-size: 9px;
       line-height: 1.1;
@@ -1029,7 +1079,8 @@
       font-size: 14px;
       letter-spacing: -0.08px;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value {{
+    .topbar .summary-ticker-item-self .value.self-node-value,
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value {{
       grid-column: 2 / span 2;
       grid-row: 1;
       white-space: nowrap;
@@ -1042,7 +1093,7 @@
       line-height: 1.05;
       min-width: 0;
     }}
-    .topbar .summary-ticker-item-target .value.target-node-value .target-node-name {{
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-name {{
       min-width: 0;
       flex: 1 1 auto;
       display: inline-flex;
@@ -1196,22 +1247,25 @@
       row-gap: 4px;
       align-items: start;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target {{
+    .topbar.ticker-expanded .summary-ticker-item-self,
+    .topbar.ticker-expanded .summary-ticker-item-radio {{
       grid-column: span 1;
       grid-template-rows: auto auto;
       row-gap: 4px;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target > .value {{
+    .topbar.ticker-expanded .summary-ticker-item-self > .value,
+    .topbar.ticker-expanded .summary-ticker-item-radio > .value {{
       grid-column: 1 / span 3;
       grid-row: 2;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target .value.target-node-value {{
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value,
+    .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value {{
       grid-column: 1 / span 3;
       grid-row: 2;
       gap: 3px;
       line-height: 1.2;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target .value.target-node-value .target-node-name {{
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-name {{
       font-size: 18px;
       line-height: 1.08;
       flex-wrap: wrap;
@@ -1219,11 +1273,11 @@
       overflow: visible;
       white-space: normal;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target .value.target-node-value .target-node-name .target-node-status {{
+    .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status {{
       font-size: 10px;
-      letter-spacing: 0.24px;
+      letter-spacing: 0;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target .value.target-node-value .target-node-id {{
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-id {{
       font-size: 11px;
       line-height: 1.15;
       flex-basis: 100%;
@@ -1265,7 +1319,8 @@
     .topbar.ticker-expanded .summary-ticker-item .value.node-ticker-value .node-ticker-val {{
       font-size: 14px;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target .value.target-node-value {{
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value,
+    .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value {{
       white-space: normal;
       overflow: visible;
       flex-direction: column;
@@ -1273,14 +1328,15 @@
       gap: 3px;
       line-height: 1.2;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target .value.target-node-value .target-node-name {{
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-name {{
       flex: 0 1 auto;
       display: inline-flex;
       flex-wrap: wrap;
-      align-items: baseline;
+      align-items: center;
       row-gap: 3px;
     }}
-    .topbar.ticker-expanded .summary-ticker-item-target .value.target-node-value .target-node-id {{
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-id,
+    .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-detail {{
       flex-basis: 100%;
       max-width: 100%;
     }}
@@ -4535,7 +4591,8 @@
     .metric-ticker.trend-down .metric-ticker-chart path {{ stroke: #b54a4a; }}
     .metric-ticker.trend-flat .metric-ticker-delta {{ color: #52685a; }}
     .metric-ticker.trend-flat .metric-ticker-chart path {{ stroke: #90a89a; }}
-    #m-target {{
+    #m-self,
+    #m-radio {{
       display: block;
       overflow: hidden;
       text-overflow: ellipsis;

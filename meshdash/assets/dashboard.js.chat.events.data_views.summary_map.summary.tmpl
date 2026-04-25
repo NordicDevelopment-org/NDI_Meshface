@@ -1429,47 +1429,89 @@
         || (isCanonicalNodeId(localId) ? String(nodeNameCache.get(localId) || "").trim() : "");
       const hasLocalIdentity = !!localName || isCanonicalNodeId(localId);
       const targetDisplay = compactTargetMetric(targetValue);
-      const targetLabel = document.querySelector("#summary-ticker-target [data-ticker-label]");
-      if (targetLabel instanceof HTMLElement) {{
-        targetLabel.textContent = hasLocalIdentity ? "Active" : "Target";
+      let selfStatusKey = "unknown";
+      if (isCanonicalNodeId(localId)) {{
+        const traffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
+        const historyCapsById = new Map(
+          Object.entries((state.history_caps && typeof state.history_caps === "object") ? state.history_caps : {{}})
+            .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+            .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+        );
+        const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+        const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
+        const freshness = resolveNodeFreshness(
+          localNode,
+          historyCapsById.get(localId) || null,
+          null,
+          latestChatTouchByNode.get(localId) || null
+        );
+        selfStatusKey = normalizeFreshnessKey(freshnessStatus(freshness.unix, Math.floor(Date.now() / 1000)));
       }}
-      const targetMetric = document.getElementById("m-target");
-      const targetCard = document.getElementById("summary-ticker-target");
-      if (targetCard instanceof HTMLElement) {{
+      const selfStatusLabel = selfStatusKey === "online"
+        ? "Online"
+        : (selfStatusKey === "warn" ? "Aging" : (selfStatusKey === "stale" ? "Stale" : "Unknown"));
+      const selfMetric = document.getElementById("m-self");
+      const selfCard = document.getElementById("summary-ticker-self");
+      if (selfCard instanceof HTMLElement) {{
         if (isCanonicalNodeId(localId)) {{
-          targetCard.dataset.nodeId = localId;
-          targetCard.tabIndex = 0;
-          targetCard.setAttribute("role", "button");
-          targetCard.setAttribute("aria-label", `Select local node ${{localName || localId}}`);
+          selfCard.dataset.nodeId = localId;
+          selfCard.tabIndex = 0;
+          selfCard.setAttribute("role", "button");
+          selfCard.setAttribute("aria-label", `Select local node ${{localName || localId}}`);
         }} else {{
-          delete targetCard.dataset.nodeId;
-          targetCard.removeAttribute("tabindex");
-          targetCard.removeAttribute("role");
-          targetCard.removeAttribute("aria-label");
+          delete selfCard.dataset.nodeId;
+          selfCard.removeAttribute("tabindex");
+          selfCard.removeAttribute("role");
+          selfCard.removeAttribute("aria-label");
         }}
       }}
-      if (targetMetric instanceof HTMLElement) {{
+      if (selfMetric instanceof HTMLElement) {{
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
-        targetMetric.classList.remove("target-node-value", "node-ticker-value");
-        targetMetric.replaceChildren();
+        selfMetric.classList.remove("self-node-value", "node-ticker-value");
+        selfMetric.replaceChildren();
         if (hasLocalIdentity) {{
-          targetMetric.classList.add("target-node-value", "node-ticker-value");
+          selfMetric.classList.add("self-node-value", "node-ticker-value");
+          const selfEmoji = (typeof nodeVisualEmojiForNode === "function")
+            ? String(nodeVisualEmojiForNode(localId, null, localNode) || "").trim()
+            : "";
+          const displayName = (selfEmoji && typeof stripNodeVisualEmojiFromLabel === "function")
+            ? stripNodeVisualEmojiFromLabel(localName || "Local node", selfEmoji)
+            : (localName || "Local node");
+          if (selfCard instanceof HTMLElement) {{
+            selfCard.classList.toggle("has-node-emoji", !!selfEmoji);
+            if (selfEmoji) {{
+              selfCard.dataset.nodeEmoji = selfEmoji;
+            }} else {{
+              delete selfCard.dataset.nodeEmoji;
+            }}
+          }}
           const nameRow = document.createElement("div");
-          nameRow.className = "target-node-name";
+          nameRow.className = "self-node-name";
+          if (selfEmoji) {{
+            const statusText = document.createElement("span");
+            statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${{selfStatusKey}}`;
+            statusText.title = `Status: ${{selfStatusLabel}}`;
+            statusText.setAttribute("aria-label", `Status: ${{selfStatusLabel}}`);
+            const statusRing = document.createElement("span");
+            statusRing.className = "chat-member-status-ring";
+            statusRing.setAttribute("aria-hidden", "true");
+            const statusGlyph = document.createElement("span");
+            statusGlyph.className = "chat-member-status-emoji-glyph";
+            statusGlyph.setAttribute("aria-hidden", "true");
+            statusGlyph.textContent = selfEmoji;
+            statusText.appendChild(statusRing);
+            statusText.appendChild(statusGlyph);
+            nameRow.appendChild(statusText);
+          }}
           const nameText = document.createElement("span");
-          nameText.className = "target-node-name-text";
-          nameText.textContent = localName || "Local node";
+          nameText.className = "self-node-name-text";
+          nameText.textContent = displayName;
           nameRow.appendChild(nameText);
-          const statusText = document.createElement("span");
-          statusText.className = "target-node-status status-unknown";
-          statusText.id = "m-target-status-inline";
-          statusText.textContent = "Unknown";
-          nameRow.appendChild(statusText);
           const idText = document.createElement("span");
-          idText.className = "target-node-id";
+          idText.className = "self-node-id";
           idText.textContent = isCanonicalNodeId(localId) ? localId : "ID unavailable";
           nameRow.appendChild(idText);
-          targetMetric.appendChild(nameRow);
+          selfMetric.appendChild(nameRow);
           const titleParts = [localName || "Local node"];
           if (isCanonicalNodeId(localId)) {{
             titleParts.push(localId);
@@ -1478,26 +1520,30 @@
             titleParts.push(`Target ${{fullTarget}}`);
           }}
           const metricBaseTitle = titleParts.join(" • ");
-          targetMetric.dataset.baseTitle = metricBaseTitle;
-          targetMetric.title = metricBaseTitle;
-          if (targetCard instanceof HTMLElement) {{
+          selfMetric.dataset.baseTitle = metricBaseTitle;
+          selfMetric.title = metricBaseTitle;
+          if (selfCard instanceof HTMLElement) {{
             const cardBaseTitle = `${{metricBaseTitle}} • Click to select in node list`;
-            targetCard.dataset.baseTitle = cardBaseTitle;
-            targetCard.title = cardBaseTitle;
+            selfCard.dataset.baseTitle = cardBaseTitle;
+            selfCard.title = cardBaseTitle;
           }}
         }} else {{
-          targetMetric.textContent = targetDisplay;
+          if (selfCard instanceof HTMLElement) {{
+            selfCard.classList.remove("has-node-emoji");
+            delete selfCard.dataset.nodeEmoji;
+          }}
+          selfMetric.textContent = targetDisplay;
           const metricBaseTitle = fullTarget || "n/a";
-          targetMetric.dataset.baseTitle = metricBaseTitle;
-          targetMetric.title = metricBaseTitle;
-          if (targetCard instanceof HTMLElement) {{
+          selfMetric.dataset.baseTitle = metricBaseTitle;
+          selfMetric.title = metricBaseTitle;
+          if (selfCard instanceof HTMLElement) {{
             const cardBaseTitle = fullTarget || "n/a";
-            targetCard.dataset.baseTitle = cardBaseTitle;
-            targetCard.title = cardBaseTitle;
+            selfCard.dataset.baseTitle = cardBaseTitle;
+            selfCard.title = cardBaseTitle;
           }}
         }}
       }}
-      renderTargetRadioStatus(state);
+      renderRadioStatus(state);
       setText("m-nodes", s.node_count ?? 0);
       setText("m-online-nodes", s.online_node_count ?? 0);
       const rawLivePacketTotal = Number(s.live_packet_count);

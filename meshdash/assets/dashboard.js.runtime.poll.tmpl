@@ -497,7 +497,7 @@
         lastPollError = msg;
         lastPollErrorUnix = Math.floor(Date.now() / 1000);
         setText("updated-at", `error: ${{msg}}`);
-        renderTargetRadioStatus(latestState || {{}});
+        renderRadioStatus(latestState || {{}});
         appendConsoleLine(`error|${{Date.now()}}|${{msg}}`, `[poll error] ${{msg}}`);
       }}
     }}

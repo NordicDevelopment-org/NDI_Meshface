@@ -3466,29 +3466,33 @@
     [data-theme="dark"] .topbar .summary-ticker-item .metric-ticker-chart path {{
       stroke: var(--ticker-card-accent);
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status {{
+    [data-theme="dark"] .topbar .summary-ticker-item-self.has-node-emoji::after {{
+      opacity: 0.07;
+      filter: grayscale(0.22) saturate(0.72) blur(1.1px) brightness(1.08);
+    }}
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status {{
       color: var(--ui-text-soft);
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-online {{
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-online {{
       color: var(--workspace-shell-active-text);
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-warn,
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-stale,
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-unknown {{
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-warn,
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-stale,
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-unknown {{
       color: #f4deb2;
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-lost {{
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-lost {{
       color: #f3c8c8;
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-online::before {{
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-online::before {{
       background: #79e6ac;
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-warn::before,
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-stale::before,
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-unknown::before {{
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-warn::before,
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-stale::before,
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-unknown::before {{
       background: #f2ce7a;
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item .target-node-status.status-lost::before {{
+    [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status.status-lost::before {{
       background: #ff9e9e;
     }}
     [data-theme="dark"] .teams-rail {{
@@ -7344,7 +7348,8 @@
       .nodes .scroll {{ max-height: 360px; }}
     }}
     @media (max-width: 1400px) {{
-      .topbar .summary-ticker-item-target {{
+      .topbar .summary-ticker-item-self,
+      .topbar .summary-ticker-item-radio {{
         grid-column: span 1;
       }}
     }}

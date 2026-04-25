@@ -424,7 +424,8 @@
     const metricTickerMaxPoints = 240;
     const metricTickerSeries = new Map();
     const tickerCatalog = [
-      {{ id: "target", defaultLabel: "Target", metric: false }},
+      {{ id: "self", defaultLabel: "Self", metric: false }},
+      {{ id: "radio", defaultLabel: "Radio", metric: false }},
       {{ id: "known_nodes", defaultLabel: "Known Nodes", metric: true }},
       {{ id: "online_nodes", defaultLabel: "Nodes Online", metric: true }},
       {{ id: "packets_per_min", defaultLabel: "Packets / min", metric: true }},
@@ -441,7 +442,8 @@
     const tickerCatalogById = new Map(tickerCatalog.map((entry) => [entry.id, entry]));
     const tickerMetricIds = new Set(tickerCatalog.filter((entry) => entry.metric).map((entry) => entry.id));
     const tickerDefaultOrder = [
-      "target",
+      "self",
+      "radio",
       "known_nodes",
       "online_nodes",
       "packets_per_min",
@@ -463,7 +465,8 @@
       tickerCatalog.map((entry) => [entry.id, false])
     );
     for (const id of [
-      "target",
+      "self",
+      "radio",
       "known_nodes",
       "online_nodes",
       "packets_per_min",

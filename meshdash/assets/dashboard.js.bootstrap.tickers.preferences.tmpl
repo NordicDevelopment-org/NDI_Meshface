@@ -545,7 +545,15 @@
 
     function normalizeTickerId(value) {{
       const key = String(value || "").trim().toLowerCase();
+      if (key === "target") return "self";
       return tickerCatalogById.has(key) ? key : "";
+    }}
+
+    function tickerPreferenceRawValue(rawObject, id) {{
+      const raw = rawObject && typeof rawObject === "object" ? rawObject : {{}};
+      if (Object.prototype.hasOwnProperty.call(raw, id)) return raw[id];
+      if (id === "self" && Object.prototype.hasOwnProperty.call(raw, "target")) return raw.target;
+      return undefined;
     }}
 
     function defaultTickerOneshotPreferences() {{
@@ -583,6 +591,12 @@
         seen.add(id);
         order.push(id);
       }}
+      if (seen.has("self") && !seen.has("radio")) {{
+        const selfIndex = order.indexOf("self");
+        const insertAt = selfIndex >= 0 ? selfIndex + 1 : order.length;
+        order.splice(insertAt, 0, "radio");
+        seen.add("radio");
+      }}
       for (const id of tickerDefaultOrder) {{
         if (seen.has(id)) continue;
         seen.add(id);
@@ -593,11 +607,12 @@
       const enabled = {{}};
       for (const id of tickerDefaultOrder) {{
         const fallbackEnabled = parseBoolToken(base.enabled[id], true);
-        if (!(id in enabledRaw)) {{
+        const rawEnabledValue = tickerPreferenceRawValue(enabledRaw, id);
+        if (rawEnabledValue === undefined) {{
           enabled[id] = fallbackEnabled;
           continue;
         }}
-        enabled[id] = parseBoolToken(enabledRaw[id], fallbackEnabled);
+        enabled[id] = parseBoolToken(rawEnabledValue, fallbackEnabled);
       }}
 
       const labelsRaw = raw.labels && typeof raw.labels === "object" ? raw.labels : {{}};
@@ -608,6 +623,7 @@
         const text = String(rawValue == null ? "" : rawValue).trim().slice(0, 26);
         if (!text) continue;
         const defaultLabel = String((tickerCatalogById.get(id) && tickerCatalogById.get(id).defaultLabel) || id);
+        if (id === "self" && text === "Target") continue;
         if (text === defaultLabel) continue;
         labels[id] = text;
       }}

@@ -17,13 +17,15 @@ def test_dashboard_js_uses_curated_default_ticker_layout() -> None:
     )
 
     assert re.search(
-        r'const tickerDefaultOrder = \[\s*"target",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*"battery",',
+        r'const tickerDefaultOrder = \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*"battery",',
         js,
     )
     assert re.search(
-        r'for \(const id of \[\s*"target",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*\]\)',
+        r'for \(const id of \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*\]\)',
         js,
     )
+    assert 'if (key === "target") return "self";' in js
+    assert 'if (seen.has("self") && !seen.has("radio")) {' in js
     assert 'enabled: { ...tickerDefaultEnabled },' in js
     assert "prefs.enabled[id] = !!defaults.enabled[id];" in js
 
@@ -192,30 +194,34 @@ def test_render_html_exposes_live_update_ticker_toggle_in_settings() -> None:
     assert "sideways scrolling live-update bar" in html
 
 
-def test_dashboard_js_renders_local_identity_in_target_ticker() -> None:
+def test_dashboard_js_renders_local_identity_in_self_ticker() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
         node_history_max_points=240,
     )
 
-    assert 'targetLabel.textContent = hasLocalIdentity ? "Active" : "Target";' in js
-    assert 'targetMetric.classList.add("target-node-value", "node-ticker-value");' in js
-    assert 'nameRow.className = "target-node-name";' in js
-    assert 'nameText.className = "target-node-name-text";' in js
-    assert 'iconMark.className = "target-node-mark";' not in js
-    assert 'statusText.className = "target-node-status status-unknown";' in js
-    assert 'statusText.id = "m-target-status-inline";' in js
-    assert 'idText.className = "target-node-id";' in js
-    assert "nameRow.appendChild(statusText);" in js
+    assert 'const selfMetric = document.getElementById("m-self");' in js
+    assert 'const selfCard = document.getElementById("summary-ticker-self");' in js
+    assert 'selfMetric.classList.add("self-node-value", "node-ticker-value");' in js
+    assert 'nameRow.className = "self-node-name";' in js
+    assert 'statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${selfStatusKey}`;' in js
+    assert 'statusRing.className = "chat-member-status-ring";' in js
+    assert 'statusGlyph.className = "chat-member-status-emoji-glyph";' in js
+    assert 'selfCard.classList.toggle("has-node-emoji", !!selfEmoji);' in js
+    assert "selfCard.dataset.nodeEmoji = selfEmoji;" in js
+    assert 'nameText.className = "self-node-name-text";' in js
+    assert 'statusText.className = "target-node-status status-unknown";' not in js
+    assert 'statusText.id = "m-target-status-inline";' not in js
+    assert 'idText.className = "self-node-id";' in js
     assert "nameRow.appendChild(idText);" in js
-    assert 'targetMetric.dataset.baseTitle = metricBaseTitle;' in js
-    assert 'targetCard.dataset.baseTitle = cardBaseTitle;' in js
-    assert 'targetMetric.textContent = targetDisplay;' in js
-    assert 'targetLabel.textContent = el instanceof HTMLElement ? inlineText : "Target";' in js
+    assert 'selfMetric.dataset.baseTitle = metricBaseTitle;' in js
+    assert 'selfCard.dataset.baseTitle = cardBaseTitle;' in js
+    assert 'selfMetric.textContent = targetDisplay;' in js
+    assert "renderRadioStatus(state);" in js
 
 
-def test_render_html_styles_local_identity_target_ticker() -> None:
+def test_render_html_styles_local_identity_self_ticker() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -229,19 +235,25 @@ def test_render_html_styles_local_identity_target_ticker() -> None:
         revision_title="test",
     )
 
-    assert ".topbar .summary-ticker-item-target .value.target-node-value {" in html
-    assert ".target-node-name {" in html
-    assert ".target-node-mark {" not in html
-    assert ".target-node-name-text {" in html
-    assert ".target-node-status {" in html
-    assert ".target-node-id {" in html
-    assert 'id="m-target-radio-status"' not in html
+    assert 'id="summary-ticker-self"' in html
+    assert 'data-ticker-id="self"' in html
+    assert 'id="summary-ticker-radio"' in html
+    assert 'data-ticker-id="radio"' in html
+    assert ".topbar .summary-ticker-item-self .value.self-node-value" in html
+    assert ".topbar .summary-ticker-item-self.has-node-emoji::after" in html
+    assert "content: attr(data-node-emoji);" in html
+    assert ".self-node-name {" in html
+    assert ".self-node-status.chat-member-status {" in html
+    assert ".self-node-name-text {" in html
+    assert ".self-node-id {" in html
+    assert ".radio-ticker-status {" in html
+    assert ".radio-ticker-detail {" in html
 
 
-def test_target_ticker_id_uses_muted_light_mode_text() -> None:
+def test_self_ticker_id_uses_muted_light_mode_text() -> None:
     css = build_dashboard_css(theme_css="")
     target_id_section = css.split(
-        ".topbar .summary-ticker-item-target .value.target-node-value .target-node-id {",
+        ".topbar .summary-ticker-item-self .value.self-node-value .self-node-id {",
         1,
     )[1].split("}", 1)[0]
 
@@ -249,18 +261,18 @@ def test_target_ticker_id_uses_muted_light_mode_text() -> None:
     assert "rgba(230, 248, 237, 0.84)" not in target_id_section
 
 
-def test_target_ticker_id_is_inline_in_compact_mode_and_stacked_when_expanded() -> None:
+def test_self_ticker_id_is_inline_in_compact_mode_and_stacked_when_expanded() -> None:
     css = build_dashboard_css(theme_css="")
     target_item_section = css.split(
-        ".topbar .summary-ticker-item-target {",
+        ".topbar .summary-ticker-item-self,",
         1,
     )[1].split("}", 1)[0]
     compact_section = css.split(
-        ".topbar .summary-ticker-item-target .value.target-node-value {",
+        ".topbar .summary-ticker-item-self .value.self-node-value,",
         2,
     )[2].split("}", 1)[0]
     expanded_section = css.split(
-        ".topbar.ticker-expanded .summary-ticker-item-target .value.target-node-value {",
+        ".topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value,",
         2,
     )[2].split("}", 1)[0]
 
@@ -272,7 +284,7 @@ def test_target_ticker_id_is_inline_in_compact_mode_and_stacked_when_expanded() 
     assert "align-items: flex-start;" in expanded_section
 
 
-def test_target_ticker_status_is_inline_and_pill_is_gone() -> None:
+def test_radio_ticker_status_is_split_from_self_identity() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -291,6 +303,9 @@ def test_target_ticker_status_is_inline_and_pill_is_gone() -> None:
         node_history_max_points=240,
     )
 
-    assert "target-radio-status" not in html
+    assert 'id="m-radio"' in html
     assert "m-target-radio-status" not in js
-    assert 'const el = document.getElementById("m-target-status-inline");' in js
+    assert 'const radioMetric = document.getElementById("m-radio");' in js
+    assert 'const radioCard = document.getElementById("summary-ticker-radio");' in js
+    assert 'statusEl.className = `radio-ticker-status status-${key}`;' in js
+    assert 'const el = document.getElementById("m-target-status-inline");' not in js

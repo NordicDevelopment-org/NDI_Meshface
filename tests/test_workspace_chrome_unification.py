@@ -859,7 +859,7 @@ def test_topbar_tickers_follow_workspace_shell_and_semantic_states() -> None:
     neutral_section = css.split("[data-theme=\"dark\"] .topbar .summary-ticker-item.metric-state-neutral {", 1)[1].split("}", 1)[0]
     bad_section = css.split("[data-theme=\"dark\"] .topbar .summary-ticker-item.metric-state-bad {", 1)[1].split("}", 1)[0]
     chart_section = css.split("[data-theme=\"dark\"] .topbar .summary-ticker-item .metric-ticker-chart path {", 1)[1].split("}", 1)[0]
-    target_status_section = css.split("[data-theme=\"dark\"] .topbar .summary-ticker-item .target-node-status {", 1)[1].split("}", 1)[0]
+    radio_status_section = css.split("[data-theme=\"dark\"] .topbar .summary-ticker-item .radio-ticker-status {", 1)[1].split("}", 1)[0]
 
     assert "var(--floating-stage-bg)" in topbar_section
     assert "border-bottom: 0;" in topbar_section
@@ -876,7 +876,7 @@ def test_topbar_tickers_follow_workspace_shell_and_semantic_states() -> None:
     assert "var(--workspace-shell-text-soft)" in neutral_section
     assert "#cf6f6f" in bad_section
     assert "var(--ticker-card-accent)" in chart_section
-    assert "var(--ui-text-soft)" in target_status_section
+    assert "var(--ui-text-soft)" in radio_status_section
 
 
 def test_topbar_controls_share_workspace_shell_tokens() -> None:
