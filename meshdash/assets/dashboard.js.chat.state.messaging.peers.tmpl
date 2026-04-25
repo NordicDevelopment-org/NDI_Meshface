@@ -1155,18 +1155,12 @@
           ? nodeVisualEmojiForNode(nodeId, tagEntry, node)
           : "";
         const cleanNodeVisualEmoji = String(nodeVisualEmoji || "").trim();
-        const displayNameEmoji = (typeof normalizeNodeTagEmoji === "function")
-          ? normalizeNodeTagEmoji((item && item.name) || "", "")
-          : "";
-        const isLocalNode = (typeof isSelfNodeId === "function")
-          ? isSelfNodeId(nodeId)
-          : false;
         const showStatusDots = (typeof normalizeChatNodeNavigatorShowStatusDotsPref === "function")
           ? normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots)
           : !!chatNodeNavigatorShowStatusDots;
-        const hasNodeVisualEmoji = !!cleanNodeVisualEmoji && (!displayNameEmoji || isLocalNode);
+        const hasNodeVisualEmoji = !!cleanNodeVisualEmoji;
         const rawMemberDisplayName = String((item && item.name) || nodeId || "Unknown node").trim() || "Unknown node";
-        const memberDisplayName = (hasNodeVisualEmoji && isLocalNode && showStatusDots && typeof stripNodeVisualEmojiFromLabel === "function")
+        const memberDisplayName = (hasNodeVisualEmoji && showStatusDots && typeof stripNodeVisualEmojiFromLabel === "function")
           ? stripNodeVisualEmojiFromLabel(rawMemberDisplayName, cleanNodeVisualEmoji)
           : rawMemberDisplayName;
         const statusGlyphAttrs = ` title="${{escAttr(`Status: ${{statusLabel}}`)}}" aria-label="${{escAttr(`Status: ${{statusLabel}}`)}}"`;
