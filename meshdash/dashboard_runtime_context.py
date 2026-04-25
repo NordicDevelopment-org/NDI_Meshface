@@ -418,6 +418,12 @@ def build_dashboard_runtime_context(
                 ),
                 get_delivery_state_fn=_get_chat_delivery_state,
             )
+            restore_bbs_host_runtime = getattr(bbs_host_service, "restore_persisted_runtime", None)
+            if callable(restore_bbs_host_runtime):
+                try:
+                    restore_bbs_host_runtime()
+                except Exception:
+                    pass
             subscribe_fn(bbs_host_service.on_receive, "meshtastic.receive")
             try:
                 setattr(loaders.state_fn, "get_bbs_host_runtime_fn", bbs_host_service.get_runtime)

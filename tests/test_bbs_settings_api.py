@@ -72,6 +72,9 @@ def test_bbs_settings_store_round_trips_normalized_values() -> None:
         "title": "My Packet Exchange",
         "board_id": "my-packet-exchange",
         "motd": "hello mesh world",
+        "enabled": False,
+        "channel_index": 0,
+        "started_unix": 0,
     }
 
     loaded = load_bbs_settings(store)
@@ -79,6 +82,43 @@ def test_bbs_settings_store_round_trips_normalized_values() -> None:
     assert loaded["ok"] is True
     assert loaded["settings"] == saved["settings"]
     assert int(loaded["updated_unix"]) > 0
+
+
+def test_bbs_settings_store_preserves_runtime_fields_when_settings_change() -> None:
+    conn = sqlite3.connect(":memory:")
+    initialize_history_schema(conn)
+    store = _make_store(conn)
+
+    online = save_bbs_settings(
+        store,
+        settings={
+            "title": "zorkworld",
+            "board_id": "zork-world",
+            "motd": "welcome",
+            "enabled": True,
+            "channel_index": 4,
+            "started_unix": 1234,
+        },
+    )
+
+    saved = save_bbs_settings(
+        store,
+        settings={
+            "title": "zorkworld 2",
+            "board_id": "zork-world-2",
+            "motd": "still here",
+        },
+    )
+
+    assert online["settings"]["enabled"] is True
+    assert saved["settings"] == {
+        "title": "zorkworld 2",
+        "board_id": "zork-world-2",
+        "motd": "still here",
+        "enabled": True,
+        "channel_index": 4,
+        "started_unix": 1234,
+    }
 
 
 def test_bbs_post_store_round_trips_and_truncates() -> None:
@@ -463,6 +503,23 @@ def test_dashboard_js_includes_bbs_settings_sync_flow() -> None:
     assert "async function fetchBbsHostRuntime(options = null) {" in js
     assert "async function postBbsHostCommand(action, options = null) {" in js
     assert "function bbsReplaceBoardPosts(boardKey, posts = []) {" in js
+    assert "function bbsLatestPostCursorForBoard(boardKey) {" in js
+    assert "replica_version: 2," in js
+    assert "const canRestoreBoardReplica = storedReplicaVersion >= 2;" in js
+    assert "payload.posts_by_key = postsByKey;" in js
+    assert "if (Array.isArray(cachedPosts) && cachedPosts.length > 0) return true;" in js
+    assert "function bbsResolvePendingLoadFromContent(hostId, boardKey, state = latestState) {" in js
+    assert "const bbsSnapshotTransferKeysImported = new Set();" in js
+    assert 'source.kind !== "easyface-bbs-snapshot-v1"' in js
+    assert "function syncBbsSnapshotTransfers(state = latestState) {" in js
+    assert 'fileName.startsWith("bbs-snapshot-")' in js
+    assert 'setFileTransferInboundDecisionByKey(key, "accepted", {' in js
+    assert "syncBbsSnapshotTransfers(safeState);" in js
+    assert 'String(bbsPostStatusText || "").startsWith("No BBS reply from ")' in js
+    assert "openFields.push(requestBoardId, requestSinceUnix, requestTailEntryId);" in js
+    assert "const wireUnix = bbsPostUnixFromWire(parsed.parts[8]);" in js
+    assert 'if (parsed.type === "batch") {' in js
+    assert "function bbsDecodeBatchPayload(rawPayload) {" in js
     assert "function forgetSelectedBbsBoard() {" in js
     assert 'document.getElementById("bbs-forget-directory-btn")' in js
     assert "async function requestBbsSpaceForNode(nodeId, options = null) {" in js
@@ -482,3 +539,13 @@ def test_dashboard_js_includes_bbs_settings_sync_flow() -> None:
     assert 'Replies only to direct BBS requests.' in js
     assert "Profile reply channel:" not in js
     assert "Direct reply channel:" not in js
+
+    address_gate = (
+        'if (!toAll) {\n'
+        '          if (!isCanonicalNodeId(localId)) continue;\n'
+        '          if (!isCanonicalNodeId(toId) || toId !== localId) continue;\n'
+        '        }'
+    )
+    dedupe_marker = "const dedupeKey = bbsProtocolMessageKey(msg, parsed);"
+    assert address_gate in js
+    assert js.index(address_gate) < js.index(dedupe_marker)

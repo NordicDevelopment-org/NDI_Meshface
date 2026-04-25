@@ -31,18 +31,69 @@ def _normalize_bbs_board_id(value: object, fallback: object = "") -> str:
     return text[:24]
 
 
-def _normalize_bbs_host_settings(payload: object) -> dict[str, object]:
+def _coerce_bool(value: object, *, fallback: bool = False) -> bool:
+    if value is None:
+        return bool(fallback)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on", "enabled", "online"}:
+        return True
+    if text in {"0", "false", "no", "off", "disabled", "offline"}:
+        return False
+    return bool(fallback)
+
+
+def _normalize_bbs_channel_index(value: object, *, fallback: int = 0) -> int:
+    try:
+        candidate = int(value)
+    except Exception:
+        return max(0, int(fallback))
+    if candidate < 0:
+        return max(0, int(fallback))
+    return candidate
+
+
+def _normalize_bbs_host_settings(
+    payload: object,
+    *,
+    previous: object = None,
+) -> dict[str, object]:
     source = payload if isinstance(payload, dict) else {}
+    previous_source = previous if isinstance(previous, dict) else {}
     title = _sanitize_bbs_text(source.get("title"), 42) or "Packet Exchange"
     board_id = _normalize_bbs_board_id(
         source.get("board_id", source.get("boardId")),
         title,
     )
     motd = _sanitize_bbs_text(source.get("motd"), 120) or "2400 baud online."
+    enabled_raw = source.get(
+        "enabled",
+        source.get("host_enabled", source.get("hostEnabled")),
+    )
+    channel_raw = source.get("channel_index", source.get("channelIndex"))
+    started_raw = source.get("started_unix", source.get("startedUnix"))
+    enabled = _coerce_bool(
+        enabled_raw,
+        fallback=_coerce_bool(previous_source.get("enabled"), fallback=False),
+    )
+    channel_index = _normalize_bbs_channel_index(
+        channel_raw,
+        fallback=_normalize_bbs_channel_index(previous_source.get("channel_index"), fallback=0),
+    )
+    try:
+        started_unix = max(0, int(started_raw if started_raw is not None else previous_source.get("started_unix") or 0))
+    except Exception:
+        started_unix = max(0, int(previous_source.get("started_unix") or 0))
     return {
         "title": title,
         "board_id": board_id,
         "motd": motd,
+        "enabled": enabled,
+        "channel_index": channel_index,
+        "started_unix": started_unix if enabled else 0,
     }
 
 
@@ -262,10 +313,26 @@ def save_bbs_settings(
         }
     if isinstance(payload, dict) and "settings" in payload and isinstance(payload.get("settings"), dict):
         payload = payload.get("settings")
-    normalized_settings = _normalize_bbs_host_settings(payload)
     updated_unix = int(time.time())
-    value_json = json.dumps(normalized_settings, separators=(",", ":"))
     with store._lock:
+        existing_row = store._conn.execute(
+            """
+            SELECT value_json
+            FROM dashboard_settings
+            WHERE key = ?
+            """,
+            (_BBS_HOST_SETTINGS_KEY,),
+        ).fetchone()
+        try:
+            existing_parsed = json.loads(str(existing_row[0] or "{}")) if existing_row else {}
+        except Exception:
+            existing_parsed = {}
+        previous_settings = _normalize_bbs_host_settings(existing_parsed)
+        normalized_settings = _normalize_bbs_host_settings(
+            payload,
+            previous=previous_settings,
+        )
+        value_json = json.dumps(normalized_settings, separators=(",", ":"))
         store._conn.execute(
             """
             INSERT INTO dashboard_settings(key, value_json, updated_unix)

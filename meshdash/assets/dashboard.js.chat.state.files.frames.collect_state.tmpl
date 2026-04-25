@@ -160,6 +160,21 @@
 
         if (frame.kind === "meta") {{
           transfer.fileName = normalizeFileTransferName(frame.fileName || transfer.fileName || "mesh-file.bin");
+          if (
+            transfer.requiresInboundAccept
+            && transfer.inboundDecision !== "accepted"
+            && String(transfer.fileName || "").startsWith("bbs-snapshot-")
+            && String(transfer.fileName || "").endsWith(".json")
+          ) {{
+            setFileTransferInboundDecisionByKey(key, "accepted", {{
+              transferId: frame.transferId,
+              senderId: fromId,
+              receiverId: toId,
+              fileName: transfer.fileName,
+              totalChunks: frame.totalChunks,
+            }});
+            transfer.inboundDecision = "accepted";
+          }}
           transfer.fileSize = Math.max(0, Math.trunc(Number(frame.fileSize) || 0));
           transfer.originalFileSize = Math.max(0, Math.trunc(Number(frame.originalFileSize != null ? frame.originalFileSize : frame.fileSize) || 0));
           transfer.codec = normalizeFileTransferCompressionCodec(frame.codec || fileTransferCompressionCodecRaw);

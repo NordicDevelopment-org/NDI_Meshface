@@ -15,6 +15,7 @@ POLL_RENDER_SKIP_TOKEN_GROUPS: tuple[tuple[str, Sequence[str]], ...] = (
             '"/api/state?lite=1&profile=chat"',
             '"/api/state?lite=1&profile=network"',
             'function statePollProfile() {',
+            'if (activeLayoutView === "bbs") {',
             'if (clean === "links") return "graph";',
             "&& pollStructuralSignature === chatPollStructuralSignature",
             "&& pollStructuralAgeMs < chatPollStructuralRefreshMs",

@@ -546,14 +546,66 @@
           : createBbsHostState()
       );
       const payload = {{
+        replica_version: 2,
         active_board_key: String(bbsActiveBoardKey || "").trim().toLowerCase(),
         board_id: settings.board_id,
         title: settings.title,
         motd: settings.motd,
       }};
+      const boardRows = (Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [])
+        .filter((row) => row && typeof row === "object")
+        .slice(0, bbsBoardDirectoryMaxRows)
+        .map((row) => {{
+          const boardId = normalizeBbsBoardId(row.board_id || row.boardId || "");
+          const hostId = normalizeNodeId(row.host_id || row.hostId || "");
+          const key = bbsBoardKey(boardId, hostId);
+          if (!key) return null;
+          return {{
+            key,
+            board_id: boardId,
+            host_id: hostId,
+            title: sanitizeBbsWireField(row.title, bbsMaxTitleChars) || boardId,
+            motd: sanitizeBbsWireField(row.motd, bbsMaxMotdChars),
+            last_seen_unix: Math.max(0, Math.trunc(Number(row.last_seen_unix) || 0)),
+            channel_index: normalizeMeshChannelIndex(row.channel_index ?? row.channelIndex),
+            post_count: Math.max(0, Math.trunc(Number(row.post_count ?? row.postCount) || 0)),
+            latest_unix: Math.max(0, Math.trunc(Number(row.latest_unix ?? row.latestUnix) || 0)),
+            latest_entry_id: sanitizeBbsWireField(row.latest_entry_id ?? row.latestEntryId, 60),
+          }};
+        }})
+        .filter(Boolean);
+      const postsByKey = {{}};
+      for (const row of boardRows) {{
+        const key = String(row && row.key || "").trim().toLowerCase();
+        if (!key) continue;
+        const rows = bbsBoardPostsByKey instanceof Map ? bbsBoardPostsByKey.get(key) : null;
+        if (!Array.isArray(rows) || !rows.length) continue;
+        postsByKey[key] = rows
+          .filter((post) => post && typeof post === "object")
+          .slice(-bbsBoardMaxPosts)
+          .map((post) => ({{
+            entry_id: sanitizeBbsWireField(post.entry_id ?? post.entryId, 60),
+            author_id: normalizeNodeId(post.author_id ?? post.authorId ?? ""),
+            author_name: sanitizeBbsWireField(post.author_name ?? post.authorName, 48),
+            text: sanitizeBbsWireField(post.text, bbsMaxPostChars),
+            unix: Math.max(0, Math.trunc(Number(post.unix) || 0)),
+          }}))
+          .filter((post) => post.text);
+      }}
+      payload.boards = boardRows;
+      payload.posts_by_key = postsByKey;
       try {{
         window.localStorage.setItem(bbsStorageKey, JSON.stringify(payload));
       }} catch (_err) {{
+        try {{
+          window.localStorage.setItem(bbsStorageKey, JSON.stringify({{
+            active_board_key: payload.active_board_key,
+            board_id: payload.board_id,
+            title: payload.title,
+            motd: payload.motd,
+          }}));
+        }} catch (_fallbackErr) {{
+        }}
       }}
     }}
 
@@ -992,6 +1044,40 @@
       bbsActiveBoardKey = activeKeyRaw.slice(0, 96);
       bbsDiscoveredBoards = [];
       bbsBoardPostsByKey.clear();
+      const storedReplicaVersion = Math.trunc(Number(source.replica_version) || Number(source.replicaVersion) || 0);
+      const canRestoreBoardReplica = storedReplicaVersion >= 2;
+      const storedBoards = canRestoreBoardReplica && Array.isArray(source.boards) ? source.boards : [];
+      for (const row of storedBoards.slice(0, bbsBoardDirectoryMaxRows)) {{
+        if (!row || typeof row !== "object") continue;
+        bbsUpsertDirectoryRow({{
+          board_id: row.board_id || row.boardId,
+          host_id: row.host_id || row.hostId,
+          title: row.title,
+          motd: row.motd,
+          channel_index: row.channel_index ?? row.channelIndex,
+          last_seen_unix: row.last_seen_unix ?? row.lastSeenUnix,
+          post_count: row.post_count ?? row.postCount,
+          latest_unix: row.latest_unix ?? row.latestUnix,
+          latest_entry_id: row.latest_entry_id ?? row.latestEntryId,
+        }});
+      }}
+      const storedPostsByKey = (
+        source.posts_by_key && typeof source.posts_by_key === "object"
+      ) ? source.posts_by_key : (
+        source.postsByKey && typeof source.postsByKey === "object" ? source.postsByKey : null
+      );
+      if (canRestoreBoardReplica && storedPostsByKey) {{
+        const knownKeys = new Set(
+          (Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [])
+            .map((row) => String(row && row.key || "").trim().toLowerCase())
+            .filter(Boolean)
+        );
+        for (const [keyRaw, posts] of Object.entries(storedPostsByKey)) {{
+          const key = String(keyRaw || "").trim().toLowerCase();
+          if (!key || !knownKeys.has(key) || !Array.isArray(posts)) continue;
+          bbsReplaceBoardPosts(key, posts);
+        }}
+      }}
       bbsSeenMessageKeys = new Set();
       bbsSeenMessageOrder = [];
       bbsPostStatusText = "";
@@ -1035,6 +1121,30 @@
       return reversiNodeLabel(clean, state);
     }}
 
+    function bbsResolvePendingLoadFromContent(hostId, boardKey, state = latestState) {{
+      const cleanHostId = normalizeNodeId(hostId || "");
+      const cleanKey = String(boardKey || "").trim().toLowerCase();
+      if (!isCanonicalNodeId(cleanHostId) || !cleanKey) return false;
+      const pendingForHost = !!(
+        bbsPendingProfileRequestToken
+        && (!bbsPendingProfileHostId || bbsPendingProfileHostId === cleanHostId)
+      );
+      const staleNoReplyStatus = !!(
+        bbsPostStatusError
+        && String(bbsPostStatusText || "").startsWith("No BBS reply from ")
+      );
+      if (!pendingForHost && !staleNoReplyStatus) return false;
+      if (pendingForHost) {{
+        clearBbsPendingProfileRequest();
+      }}
+      bbsActiveBoardKey = cleanKey;
+      setBbsPostStatus(
+        `Loaded BBS messages from ${{bbsDisplayNodeLabel(cleanHostId, state)}}.`,
+        false
+      );
+      return true;
+    }}
+
     function bbsUpsertDirectoryRow(row = {{}}) {{
       const boardId = normalizeBbsBoardId(row.board_id || row.boardId || "");
       const hostId = normalizeNodeId(row.host_id || row.hostId || "");
@@ -1048,6 +1158,12 @@
       const channelIndex = Number.isInteger(channelRaw) && channelRaw >= 0
         ? Math.trunc(channelRaw)
         : 0;
+      const postCountRaw = Number(row.post_count ?? row.postCount);
+      const postCount = Number.isFinite(postCountRaw) && postCountRaw >= 0
+        ? Math.trunc(postCountRaw)
+        : null;
+      const latestUnix = Math.max(0, Math.trunc(Number(row.latest_unix ?? row.latestUnix) || 0));
+      const latestEntryId = sanitizeBbsWireField(row.latest_entry_id ?? row.latestEntryId, 60);
       const nextRows = [];
       let merged = false;
       for (const current of (Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [])) {{
@@ -1066,6 +1182,11 @@
           motd: motdCandidate || sanitizeBbsWireField(current.motd, bbsMaxMotdChars),
           last_seen_unix: Math.max(Math.trunc(Number(current.last_seen_unix) || 0), seenUnix),
           channel_index: channelIndex,
+          post_count: postCount === null
+            ? Math.max(0, Math.trunc(Number(current.post_count ?? current.postCount) || 0))
+            : postCount,
+          latest_unix: Math.max(0, Math.trunc(Number(current.latest_unix ?? current.latestUnix) || 0), latestUnix),
+          latest_entry_id: latestEntryId || sanitizeBbsWireField(current.latest_entry_id ?? current.latestEntryId, 60),
         }});
         merged = true;
       }}
@@ -1078,6 +1199,9 @@
           motd: motdCandidate,
           last_seen_unix: seenUnix,
           channel_index: channelIndex,
+          post_count: postCount === null ? 0 : postCount,
+          latest_unix: latestUnix,
+          latest_entry_id: latestEntryId,
         }});
       }}
       const localId = bbsHostNodeId(latestState);
@@ -1091,6 +1215,26 @@
       }});
       bbsDiscoveredBoards = nextRows.slice(0, bbsBoardDirectoryMaxRows);
       return key;
+    }}
+
+    function bbsUpdateBoardPostSummary(boardKey) {{
+      const cleanKey = String(boardKey || "").trim().toLowerCase();
+      if (!cleanKey || !Array.isArray(bbsDiscoveredBoards)) return;
+      const rows = bbsBoardPostsByKey.get(cleanKey);
+      if (!Array.isArray(rows) || !rows.length) return;
+      const latest = rows[rows.length - 1] || {{}};
+      const latestUnix = Math.max(0, Math.trunc(Number(latest.unix) || 0));
+      const latestEntryId = sanitizeBbsWireField(latest.entry_id ?? latest.entryId, 60);
+      bbsDiscoveredBoards = bbsDiscoveredBoards.map((row) => {{
+        const rowKey = String(row && row.key || "").trim().toLowerCase();
+        if (rowKey !== cleanKey) return row;
+        return {{
+          ...row,
+          post_count: Math.max(rows.length, Math.trunc(Number(row.post_count ?? row.postCount) || 0)),
+          latest_unix: Math.max(latestUnix, Math.trunc(Number(row.latest_unix ?? row.latestUnix) || 0)),
+          latest_entry_id: latestEntryId || sanitizeBbsWireField(row.latest_entry_id ?? row.latestEntryId, 60),
+        }};
+      }});
     }}
 
     function bbsRemoveDirectoryRow(boardId, hostId, options = null) {{
@@ -1109,6 +1253,8 @@
         const rowKey = String(row.key || "").trim().toLowerCase();
         if (!rowKey) return false;
         if (hostKey && rowKey === hostKey) return true;
+        const cachedPosts = bbsBoardPostsByKey.get(rowKey);
+        if (Array.isArray(cachedPosts) && cachedPosts.length > 0) return true;
         const age = nowUnix - Math.max(0, Math.trunc(Number(row.last_seen_unix) || 0));
         return age <= bbsBoardStaleSeconds;
       }});
@@ -1205,6 +1351,157 @@
       return rows;
     }}
 
+    function bbsPostUnixFromWire(value) {{
+      const num = Number(value);
+      if (!Number.isFinite(num) || num <= 0) return 0;
+      return Math.trunc(num);
+    }}
+
+    function bbsDecodeBatchPayload(rawPayload) {{
+      let text = String(rawPayload || "").trim();
+      if (!text) return [];
+      text = text.replace(/-/g, "+").replace(/_/g, "/");
+      while (text.length % 4 !== 0) text += "=";
+      let jsonText = "";
+      try {{
+        jsonText = atob(text);
+      }} catch (_err) {{
+        return [];
+      }}
+      try {{
+        const parsed = JSON.parse(jsonText);
+        return Array.isArray(parsed) ? parsed : [];
+      }} catch (_err) {{
+        return [];
+      }}
+    }}
+
+    function bbsPostFromBatchRow(row, fallbackAuthorId = "") {{
+      if (!Array.isArray(row)) return null;
+      const entryId = sanitizeBbsWireField(row[0], 60);
+      const authorId = normalizeNodeId(row[1] || fallbackAuthorId || "");
+      const authorName = sanitizeBbsWireField(row[2], 48);
+      const text = sanitizeBbsWireField(row[3], bbsMaxPostChars);
+      const unix = bbsPostUnixFromWire(row[4]);
+      if (!entryId || !text) return null;
+      return {{
+        entry_id: entryId,
+        author_id: authorId,
+        author_name: authorName || bbsDisplayNodeLabel(authorId || fallbackAuthorId, latestState),
+        text,
+        unix,
+      }};
+    }}
+
+    function bbsDecodeUtf8Bytes(bytes) {{
+      if (!(bytes instanceof Uint8Array)) return "";
+      try {{
+        if (typeof TextDecoder !== "undefined") {{
+          return new TextDecoder("utf-8").decode(bytes);
+        }}
+      }} catch (_err) {{
+      }}
+      let out = "";
+      for (const byte of bytes) {{
+        out += String.fromCharCode(byte);
+      }}
+      try {{
+        return decodeURIComponent(escape(out));
+      }} catch (_err) {{
+        return out;
+      }}
+    }}
+
+    function bbsApplySnapshotPayload(payload, state = latestState) {{
+      const source = (payload && typeof payload === "object") ? payload : null;
+      if (!source || source.kind !== "easyface-bbs-snapshot-v1") return false;
+      const boardId = normalizeBbsBoardId(source.board_id || source.boardId || "");
+      const hostId = normalizeNodeId(source.host_id || source.hostId || "");
+      if (!boardId || !isCanonicalNodeId(hostId)) return false;
+      const posts = Array.isArray(source.posts) ? source.posts : [];
+      const key = bbsUpsertDirectoryRow({{
+        board_id: boardId,
+        host_id: hostId,
+        title: source.title,
+        motd: source.motd,
+        post_count: source.post_count ?? source.postCount,
+        latest_unix: source.latest_unix ?? source.latestUnix,
+        latest_entry_id: source.latest_entry_id ?? source.latestEntryId,
+        last_seen_unix: source.latest_unix ?? source.latestUnix ?? Math.floor(Date.now() / 1000),
+      }});
+      if (!key) return false;
+      let appended = 0;
+      for (const row of posts) {{
+        const post = bbsPostFromBatchRow(row, hostId);
+        if (!post) continue;
+        if (bbsAppendBoardPost(key, post)) appended += 1;
+      }}
+      if (!bbsResolvePendingLoadFromContent(hostId, key, state) && !bbsActiveBoardKey) {{
+        bbsActiveBoardKey = key;
+      }}
+      bbsPersistState();
+      if (appended > 0) {{
+        setBbsPostStatus(
+          `Loaded BBS snapshot from ${{bbsDisplayNodeLabel(hostId, state)}}.`,
+          false
+        );
+      }}
+      return true;
+    }}
+
+    function syncBbsSnapshotTransfers(state = latestState) {{
+      if (typeof buildFileTransferRows !== "function") return false;
+      let rows = [];
+      try {{
+        rows = buildFileTransferRows(state);
+      }} catch (_err) {{
+        return false;
+      }}
+      if (!Array.isArray(rows) || !rows.length) return false;
+      let changed = false;
+      for (const row of rows) {{
+        if (!row || typeof row !== "object") continue;
+        const key = String(row.key || row.transferId || "").trim();
+        const fileName = String(row.fileName || "").trim().toLowerCase();
+        if (!key || bbsSnapshotTransferKeysImported.has(key)) continue;
+        if (!row.canDownload || !(row.bytes instanceof Uint8Array)) continue;
+        if (!fileName.startsWith("bbs-snapshot-") || !fileName.endsWith(".json")) continue;
+        const text = bbsDecodeUtf8Bytes(row.bytes);
+        if (!text) continue;
+        let payload = null;
+        try {{
+          payload = JSON.parse(text);
+        }} catch (_err) {{
+          continue;
+        }}
+        if (bbsApplySnapshotPayload(payload, state)) {{
+          bbsSnapshotTransferKeysImported.add(key);
+          changed = true;
+        }}
+      }}
+      return changed;
+    }}
+
+    function bbsLatestPostCursorForBoard(boardKey) {{
+      const cleanKey = String(boardKey || "").trim().toLowerCase();
+      if (!cleanKey) return {{ board_id: "", since_unix: 0, tail_entry_id: "" }};
+      const rows = bbsPostsForBoard(cleanKey)
+        .filter((row) => row && typeof row === "object")
+        .slice()
+        .sort((a, b) => {{
+          const unixDelta = (Number(a && a.unix) || 0) - (Number(b && b.unix) || 0);
+          if (unixDelta !== 0) return unixDelta;
+          return String(a && a.entry_id || "").localeCompare(String(b && b.entry_id || ""));
+        }});
+      const latest = rows.length ? rows[rows.length - 1] : null;
+      if (!latest) return {{ board_id: "", since_unix: 0, tail_entry_id: "" }};
+      return {{
+        board_id: "",
+        since_unix: Math.max(0, Math.trunc(Number(latest.unix) || 0)),
+        tail_entry_id: sanitizeBbsWireField(latest.entry_id, 60),
+      }};
+    }}
+
     function bbsAppendBoardPost(boardKey, post = {{}}) {{
       const cleanKey = String(boardKey || "").trim().toLowerCase();
       if (!cleanKey) return false;
@@ -1212,19 +1509,29 @@
       if (!text) return false;
       const rows = bbsPostsForBoard(cleanKey);
       const entryId = sanitizeBbsWireField(post.entry_id ?? post.entryId, 60);
-      if (entryId && rows.some((row) => String(row && row.entry_id || "") === entryId)) {{
-        return false;
-      }}
       const authorId = normalizeNodeId(post.author_id ?? post.authorId ?? "");
       const fallbackAuthor = isCanonicalNodeId(authorId) ? authorId : "anonymous";
       const authorName = sanitizeBbsWireField(post.author_name ?? post.authorName, 48) || fallbackAuthor;
-      rows.push({{
+      const unixValue = Math.max(0, Math.trunc(Number(post.unix) || Math.floor(Date.now() / 1000)));
+      const nextPost = {{
         entry_id: entryId || `local-${{Date.now().toString(36)}}`,
         author_id: isCanonicalNodeId(authorId) ? authorId : "",
         author_name: authorName,
         text,
-        unix: Math.max(0, Math.trunc(Number(post.unix) || Math.floor(Date.now() / 1000))),
-      }});
+        unix: unixValue,
+      }};
+      const existingIdx = entryId
+        ? rows.findIndex((row) => String(row && row.entry_id || "") === entryId)
+        : -1;
+      if (existingIdx >= 0) {{
+        rows[existingIdx] = {{
+          ...rows[existingIdx],
+          ...nextPost,
+          entry_id: entryId,
+        }};
+      }} else {{
+        rows.push(nextPost);
+      }}
       rows.sort((a, b) => {{
         const unixDelta = (Number(a && a.unix) || 0) - (Number(b && b.unix) || 0);
         if (unixDelta !== 0) return unixDelta;
@@ -1234,6 +1541,7 @@
         rows.splice(0, rows.length - bbsBoardMaxPosts);
       }}
       bbsBoardPostsByKey.set(cleanKey, rows);
+      bbsUpdateBoardPostSummary(cleanKey);
       return true;
     }}
 
@@ -1436,7 +1744,17 @@
       }} else if (!preserveCurrent) {{
         bbsActiveBoardKey = "";
       }}
+      const cursorRow = cachedRow || null;
+      const cursorKey = cursorRow ? String(cursorRow.key || "").trim().toLowerCase() : "";
+      const cursor = cursorKey ? bbsLatestPostCursorForBoard(cursorKey) : {{ since_unix: 0, tail_entry_id: "" }};
+      const requestBoardId = cursorRow ? normalizeBbsBoardId(cursorRow.board_id || cursorRow.boardId || "") : "";
+      const requestSinceUnix = Math.max(0, Math.trunc(Number(cursor.since_unix) || 0));
+      const requestTailEntryId = sanitizeBbsWireField(cursor.tail_entry_id, 60);
       const requestToken = bbsGenerateRequestToken();
+      const openFields = [requestToken];
+      if (requestBoardId || requestSinceUnix > 0 || requestTailEntryId) {{
+        openFields.push(requestBoardId, requestSinceUnix, requestTailEntryId);
+      }}
       setBbsPendingProfileRequest(cleanNodeId, requestToken);
       bbsPersistState();
       if (openView) {{
@@ -1448,7 +1766,7 @@
       const channelIndex = meshChannelEffectiveSendIndexForApp("bbs");
       const sent = await sendBbsProtocolMessage(
         "open",
-        [requestToken],
+        openFields,
         {{
           destination: cleanNodeId,
           channel_index: channelIndex,
@@ -1739,7 +2057,12 @@
         "----------------------------------------",
       ];
       if (!rows.length) {{
-        lines.push("No posts yet. Type a message to start the thread.");
+        const expectedCount = Math.max(0, Math.trunc(Number(activeRow.post_count ?? activeRow.postCount) || 0));
+        if (expectedCount > 0) {{
+          lines.push(`Waiting for ${{expectedCount}} post${{expectedCount === 1 ? "" : "s"}} from history sync.`);
+        }} else {{
+          lines.push("No posts yet. Type a message to start the thread.");
+        }}
       }} else {{
         for (const row of rows) {{
           if (!row || typeof row !== "object") continue;
@@ -1812,8 +2135,6 @@
         if (msg.local_echo === true || msg.localEcho === true) continue;
         const parsed = parseBbsProtocolMessage(bbsProtocolMessageText(msg));
         if (!parsed) continue;
-        const dedupeKey = bbsProtocolMessageKey(msg, parsed);
-        if (!bbsRememberMessageKey(dedupeKey)) continue;
         const fromId = normalizeNodeId(msg.from || "");
         const toRaw = String(msg.to ?? msg.destination ?? "").trim();
         const toToken = toRaw.toLowerCase();
@@ -1823,6 +2144,8 @@
           if (!isCanonicalNodeId(localId)) continue;
           if (!isCanonicalNodeId(toId) || toId !== localId) continue;
         }}
+        const dedupeKey = bbsProtocolMessageKey(msg, parsed);
+        if (!bbsRememberMessageKey(dedupeKey)) continue;
         if (parsed.type === "open") {{
           const requestToken = sanitizeBbsWireField(parsed.parts[2], 40);
           if (!requestToken) continue;
@@ -1836,6 +2159,9 @@
           if (!boardId || !isCanonicalNodeId(hostId)) continue;
           const title = sanitizeBbsWireField(parsed.parts[5], bbsMaxTitleChars) || boardId;
           const motd = sanitizeBbsWireField(parsed.parts[6], bbsMaxMotdChars);
+          const postCount = Math.max(0, Math.trunc(Number(parsed.parts[7]) || 0));
+          const latestUnix = bbsPostUnixFromWire(parsed.parts[8]);
+          const latestEntryId = sanitizeBbsWireField(parsed.parts[9], 60);
           const key = bbsUpsertDirectoryRow({{
             board_id: boardId,
             host_id: hostId,
@@ -1843,6 +2169,9 @@
             motd,
             channel_index: messageMeshChannelIndex(msg),
             last_seen_unix: bbsProtocolMessageUnix(msg),
+            post_count: postCount,
+            latest_unix: latestUnix,
+            latest_entry_id: latestEntryId,
           }});
           if (
             requestToken
@@ -1888,6 +2217,43 @@
           bbsRemoveDirectoryRow(boardId, hostId);
           continue;
         }}
+        if (parsed.type === "batch") {{
+          const boardId = normalizeBbsBoardId(parsed.parts[2] || "");
+          const hostId = normalizeNodeId(parsed.parts[3] || fromId);
+          if (!boardId || !isCanonicalNodeId(hostId)) continue;
+          if (isCanonicalNodeId(localId) && hostId === localId && !(bbsHostState && bbsHostState.enabled)) {{
+            continue;
+          }}
+          const rows = bbsDecodeBatchPayload(parsed.parts[4]);
+          if (!rows.length) continue;
+          const posts = rows
+            .map((row) => bbsPostFromBatchRow(row, fromId))
+            .filter(Boolean);
+          if (!posts.length) continue;
+          const packetUnix = bbsProtocolMessageUnix(msg);
+          const latestPostUnix = posts.reduce((maxUnix, post) => {{
+            const unixValue = Math.max(0, Math.trunc(Number(post && post.unix) || 0));
+            return unixValue > maxUnix ? unixValue : maxUnix;
+          }}, 0);
+          const key = bbsUpsertDirectoryRow({{
+            board_id: boardId,
+            host_id: hostId,
+            title: "",
+            motd: "",
+            channel_index: messageMeshChannelIndex(msg),
+            last_seen_unix: latestPostUnix || packetUnix,
+          }});
+          for (const post of posts) {{
+            bbsAppendBoardPost(key, {{
+              ...post,
+              unix: Math.max(0, Math.trunc(Number(post.unix) || 0)) || packetUnix,
+            }});
+          }}
+          if (!bbsResolvePendingLoadFromContent(hostId, key, safeState) && !bbsActiveBoardKey && key) {{
+            bbsActiveBoardKey = key;
+          }}
+          continue;
+        }}
         if (parsed.type === "post") {{
           const boardId = normalizeBbsBoardId(parsed.parts[2] || "");
           const hostId = normalizeNodeId(parsed.parts[3] || fromId);
@@ -1895,32 +2261,35 @@
           if (isCanonicalNodeId(localId) && hostId === localId && !(bbsHostState && bbsHostState.enabled)) {{
             continue;
           }}
+          const packetUnix = bbsProtocolMessageUnix(msg);
           const key = bbsUpsertDirectoryRow({{
             board_id: boardId,
             host_id: hostId,
             title: "",
             motd: "",
             channel_index: messageMeshChannelIndex(msg),
-            last_seen_unix: bbsProtocolMessageUnix(msg),
+            last_seen_unix: packetUnix,
           }});
           const entryId = sanitizeBbsWireField(parsed.parts[4], 60);
           const authorId = normalizeNodeId(parsed.parts[5] || fromId);
           const authorName = sanitizeBbsWireField(parsed.parts[6], 48);
           const text = sanitizeBbsWireField(parsed.parts[7], bbsMaxPostChars);
           if (!text) continue;
+          const wireUnix = bbsPostUnixFromWire(parsed.parts[8]);
           bbsAppendBoardPost(key, {{
             entry_id: entryId,
             author_id: authorId,
             author_name: authorName || bbsDisplayNodeLabel(authorId || fromId, safeState),
             text,
-            unix: bbsProtocolMessageUnix(msg),
+            unix: wireUnix || packetUnix,
           }});
-          if (!bbsActiveBoardKey && key) {{
+          if (!bbsResolvePendingLoadFromContent(hostId, key, safeState) && !bbsActiveBoardKey && key) {{
             bbsActiveBoardKey = key;
           }}
           continue;
         }}
       }}
+      syncBbsSnapshotTransfers(safeState);
       bbsEnsureHostDirectoryEntry(safeState);
       const activeExists = !!bbsActiveBoardRow();
       if (!activeExists && !bbsPendingProfileRequestToken) {{
@@ -1980,6 +2349,7 @@
             }};
         bbsAppendBoardPost(activeRow.key, savedPost);
         input.value = "";
+        bbsPersistState();
         setBbsPostStatus(`Saved post to ${{activeRow.title || activeRow.board_id}}.`, false, {{ channel_index: channelIndex }});
         if (activeLayoutView === "bbs") {{
           renderBbsTerminal(latestState);
@@ -1995,6 +2365,7 @@
           localId,
           authorName,
           text,
+          Math.floor(Date.now() / 1000),
         ],
         {{
           destination: activeRow.host_id,
@@ -2011,6 +2382,7 @@
         unix: Math.floor(Date.now() / 1000),
       }});
       input.value = "";
+      bbsPersistState();
       setBbsPostStatus(`Posted to ${{activeRow.title || activeRow.board_id}}.`, false, {{ channel_index: channelIndex }});
       if (activeLayoutView === "bbs") {{
         renderBbsTerminal(latestState);

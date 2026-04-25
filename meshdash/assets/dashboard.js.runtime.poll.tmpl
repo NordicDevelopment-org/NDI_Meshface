@@ -49,6 +49,9 @@
         && typeof normalizeChatNodeDetailsDrawerTab === "function"
         && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "links"
       );
+      if (activeLayoutView === "bbs") {{
+        return "chat";
+      }}
       if (isChatWorkspaceLayoutView(activeLayoutView) && !drawerLinksActive) {{
         return "chat";
       }}
