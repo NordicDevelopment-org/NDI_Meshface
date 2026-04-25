@@ -1450,13 +1450,13 @@
       }}
       if (targetMetric instanceof HTMLElement) {{
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
-        const badgeEmoji = (
-          typeof settingsBadgeEmojiChoiceSet !== "undefined"
-          && settingsBadgeEmojiChoiceSet instanceof Set
-          && settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())
+        const localVisualEmoji = (
+          typeof localVisualEmojiForNode === "function"
+          && isCanonicalNodeId(localId)
         )
-          ? String(settingsBadgeEmoji || "").trim()
+          ? localVisualEmojiForNode(localId, localNode || localOwner)
           : "";
+        const badgeEmoji = String(localVisualEmoji || "").trim();
         targetMetric.classList.remove("target-node-value", "node-ticker-value");
         targetMetric.replaceChildren();
         if (hasLocalIdentity) {{

@@ -1707,18 +1707,8 @@
       function resolveNetworkGraphNodeEmoji(item) {{
         const nodeId = normalizeNodeId(item && item.nodeId || "");
         if (!nodeId) return "";
-        if (nodeId === localId) {{
-          const localBadgeEmoji = (
-            typeof settingsBadgeEmojiChoiceSet !== "undefined"
-            && settingsBadgeEmojiChoiceSet instanceof Set
-            && settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())
-          )
-            ? String(settingsBadgeEmoji || "").trim()
-            : "";
-          if (localBadgeEmoji) return localBadgeEmoji;
-        }}
         return (typeof nodeVisualEmojiForNode === "function")
-          ? nodeVisualEmojiForNode(nodeId)
+          ? nodeVisualEmojiForNode(nodeId, null, item && item.node)
           : "";
       }}
 

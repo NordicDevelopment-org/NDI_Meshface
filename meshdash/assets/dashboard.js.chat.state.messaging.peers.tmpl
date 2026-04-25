@@ -1983,6 +1983,14 @@
       const localNodeId = normalizeNodeId(
         typeof resolveLocalNodeId === "function" ? resolveLocalNodeId(safeState) : ""
       );
+      const selectedNode = Array.isArray(safeState && safeState.nodes)
+        ? (safeState.nodes.find((entry) => normalizeNodeId(entry && entry.id) === selectedId) || null)
+        : null;
+      const localNameEmoji = (
+        typeof localNameEmojiForNode === "function"
+        ? localNameEmojiForNode(selectedId, selectedNode)
+        : ""
+      );
       const localBadgeEmoji = (
         selectedId
         && selectedId === localNodeId
@@ -1997,9 +2005,14 @@
         : "";
       const hasNodeEmojiOverride = !!nodeEmojiOverride;
       const hasResettableVisualState = hasTag || hasNodeEmojiOverride;
-      const effectiveEmoji = localBadgeEmoji || (
+      const localVisualEmoji = (
+        typeof localVisualEmojiForNode === "function"
+        ? localVisualEmojiForNode(selectedId, selectedNode)
+        : (localNameEmoji || localBadgeEmoji)
+      );
+      const effectiveEmoji = localVisualEmoji || (
         typeof nodeVisualEmojiForNode === "function"
-          ? nodeVisualEmojiForNode(selectedId, tagEntry)
+          ? nodeVisualEmojiForNode(selectedId, tagEntry, selectedNode)
           : ""
       );
       const tagLabel = hasTag
@@ -2069,9 +2082,11 @@
         }}
         const iconTitle = hasNodeEmojiOverride
           ? `Node icon override: ${{nodeEmojiOverride}}`
-          : (localBadgeEmoji
+          : (localNameEmoji
+            ? `Name icon: ${{localNameEmoji}}`
+            : (localBadgeEmoji
             ? `Workspace badge: ${{localBadgeEmoji}}`
-            : (effectiveEmoji ? `Current tag icon: ${{effectiveEmoji}}` : "Add node icon"));
+            : (effectiveEmoji ? `Current tag icon: ${{effectiveEmoji}}` : "Add node icon")));
         iconBtn.title = iconTitle;
         iconBtn.setAttribute("aria-label", iconTitle);
         if (iconBtn.dataset.bound !== "1") {{

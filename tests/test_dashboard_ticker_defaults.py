@@ -202,6 +202,7 @@ def test_dashboard_js_renders_local_identity_in_target_ticker() -> None:
     assert 'targetLabel.textContent = hasLocalIdentity ? "Active" : "Target";' in js
     assert 'targetMetric.classList.add("target-node-value", "node-ticker-value");' in js
     assert 'nameRow.className = "target-node-name";' in js
+    assert "localVisualEmojiForNode(localId, localNode || localOwner)" in js
     assert 'badgeMark.className = "target-node-mark";' in js
     assert 'nameText.className = "target-node-name-text";' in js
     assert 'statusText.className = "target-node-status status-unknown";' in js

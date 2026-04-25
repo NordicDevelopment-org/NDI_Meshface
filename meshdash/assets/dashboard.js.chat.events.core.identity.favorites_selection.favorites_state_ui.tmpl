@@ -179,10 +179,18 @@
 
     function nodeIntrinsicEmojiForNode(nodeId, node = null) {{
       const cleanNodeId = normalizeNodeId(nodeId);
+      const localNodeId = normalizeNodeId(
+        typeof resolveLocalNodeId === "function" ? resolveLocalNodeId(latestState) : ""
+      );
+      const localOwner = cleanNodeId && cleanNodeId === localNodeId && typeof localNodeUserFromState === "function"
+        ? localNodeUserFromState(latestState)
+        : null;
       const candidates = [
         preferredNodeName(node),
         node && node.long_name,
         node && node.short_name,
+        localOwner && localOwner.long_name,
+        localOwner && localOwner.short_name,
         nodeNameCache.get(cleanNodeId),
       ];
       for (const candidate of candidates) {{
@@ -207,9 +215,25 @@
       return settingsBadgeEmojiChoiceSet.has(badgeEmoji) ? badgeEmoji : "";
     }}
 
+    function localNameEmojiForNode(nodeId, node = null) {{
+      const cleanNodeId = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(cleanNodeId)) return "";
+      const localNodeId = normalizeNodeId(
+        typeof resolveLocalNodeId === "function" ? resolveLocalNodeId(latestState) : ""
+      );
+      if (!localNodeId || cleanNodeId !== localNodeId) return "";
+      return nodeIntrinsicEmojiForNode(cleanNodeId, node);
+    }}
+
+    function localVisualEmojiForNode(nodeId, node = null) {{
+      const nameEmoji = localNameEmojiForNode(nodeId, node);
+      if (nameEmoji) return nameEmoji;
+      return localBadgeEmojiForNode(nodeId);
+    }}
+
     function nodeVisualEmojiForNode(nodeId, tagEntry = null, node = null) {{
-      const localBadgeEmoji = localBadgeEmojiForNode(nodeId);
-      if (localBadgeEmoji) return localBadgeEmoji;
+      const localVisualEmoji = localVisualEmojiForNode(nodeId, node);
+      if (localVisualEmoji) return localVisualEmoji;
       const overrideEmoji = nodeEmojiOverrideForNode(nodeId);
       if (overrideEmoji) return overrideEmoji;
       const tagEmoji = nodeTagEmojiForEntry(tagEntry || nodeTagEntryForNode(nodeId));
