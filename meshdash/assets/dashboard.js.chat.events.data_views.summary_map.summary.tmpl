@@ -1450,26 +1450,12 @@
       }}
       if (targetMetric instanceof HTMLElement) {{
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
-        const localVisualEmoji = (
-          typeof localVisualEmojiForNode === "function"
-          && isCanonicalNodeId(localId)
-        )
-          ? localVisualEmojiForNode(localId, localNode || localOwner)
-          : "";
-        const localIconEmoji = String(localVisualEmoji || "").trim();
         targetMetric.classList.remove("target-node-value", "node-ticker-value");
         targetMetric.replaceChildren();
         if (hasLocalIdentity) {{
           targetMetric.classList.add("target-node-value", "node-ticker-value");
           const nameRow = document.createElement("div");
           nameRow.className = "target-node-name";
-          if (localIconEmoji) {{
-            const iconMark = document.createElement("span");
-            iconMark.className = "target-node-mark";
-            iconMark.textContent = localIconEmoji;
-            iconMark.setAttribute("aria-hidden", "true");
-            nameRow.appendChild(iconMark);
-          }}
           const nameText = document.createElement("span");
           nameText.className = "target-node-name-text";
           nameText.textContent = localName || "Local node";

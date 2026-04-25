@@ -1154,7 +1154,10 @@
         const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === "function")
           ? nodeVisualEmojiForNode(nodeId, tagEntry, node)
           : "";
-        const hasNodeVisualEmoji = !!String(nodeVisualEmoji || "").trim();
+        const displayNameEmoji = (typeof normalizeNodeTagEmoji === "function")
+          ? normalizeNodeTagEmoji((item && item.name) || "", "")
+          : "";
+        const hasNodeVisualEmoji = !!String(nodeVisualEmoji || "").trim() && !displayNameEmoji;
         const statusGlyphAttrs = ` title="${{escAttr(`Status: ${{statusLabel}}`)}}" aria-label="${{escAttr(`Status: ${{statusLabel}}`)}}"`;
         const showStatusDots = (typeof normalizeChatNodeNavigatorShowStatusDotsPref === "function")
           ? normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots)

@@ -202,9 +202,8 @@ def test_dashboard_js_renders_local_identity_in_target_ticker() -> None:
     assert 'targetLabel.textContent = hasLocalIdentity ? "Active" : "Target";' in js
     assert 'targetMetric.classList.add("target-node-value", "node-ticker-value");' in js
     assert 'nameRow.className = "target-node-name";' in js
-    assert "localVisualEmojiForNode(localId, localNode || localOwner)" in js
-    assert 'iconMark.className = "target-node-mark";' in js
     assert 'nameText.className = "target-node-name-text";' in js
+    assert 'iconMark.className = "target-node-mark";' not in js
     assert 'statusText.className = "target-node-status status-unknown";' in js
     assert 'statusText.id = "m-target-status-inline";' in js
     assert 'idText.className = "target-node-id";' in js
@@ -232,7 +231,7 @@ def test_render_html_styles_local_identity_target_ticker() -> None:
 
     assert ".topbar .summary-ticker-item-target .value.target-node-value {" in html
     assert ".target-node-name {" in html
-    assert ".target-node-mark {" in html
+    assert ".target-node-mark {" not in html
     assert ".target-node-name-text {" in html
     assert ".target-node-status {" in html
     assert ".target-node-id {" in html
