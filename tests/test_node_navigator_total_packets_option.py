@@ -195,7 +195,10 @@ def test_dashboard_js_supports_status_dot_toggle_in_node_navigator() -> None:
     assert "? statusGlyphAttrs" in js
     assert ': \' aria-hidden="true"\';' in js
     assert 'const displayNameEmoji = (typeof normalizeNodeTagEmoji === "function")' in js
-    assert 'const hasNodeVisualEmoji = !!String(nodeVisualEmoji || "").trim() && !displayNameEmoji;' in js
+    assert 'const isLocalNode = (typeof isSelfNodeId === "function")' in js
+    assert 'const hasNodeVisualEmoji = !!cleanNodeVisualEmoji && (!displayNameEmoji || isLocalNode);' in js
+    assert "function stripNodeVisualEmojiFromLabel(value, emoji) {" in js
+    assert "stripNodeVisualEmojiFromLabel(rawMemberDisplayName, cleanNodeVisualEmoji)" in js
     assert 'const statusMarkerHtml = hasNodeVisualEmoji' in js
     assert '<span class="chat-member-status chat-member-status-emoji status-${statusKey}${statusMarkerClass}"${statusMarkerAttrs}>' in js
     assert '<span class="chat-member-status chat-member-status-dot status-${statusKey}${statusMarkerClass}"${statusMarkerAttrs}>●</span>' in js

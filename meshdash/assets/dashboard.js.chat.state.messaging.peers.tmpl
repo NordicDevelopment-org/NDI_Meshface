@@ -1154,14 +1154,22 @@
         const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === "function")
           ? nodeVisualEmojiForNode(nodeId, tagEntry, node)
           : "";
+        const cleanNodeVisualEmoji = String(nodeVisualEmoji || "").trim();
         const displayNameEmoji = (typeof normalizeNodeTagEmoji === "function")
           ? normalizeNodeTagEmoji((item && item.name) || "", "")
           : "";
-        const hasNodeVisualEmoji = !!String(nodeVisualEmoji || "").trim() && !displayNameEmoji;
-        const statusGlyphAttrs = ` title="${{escAttr(`Status: ${{statusLabel}}`)}}" aria-label="${{escAttr(`Status: ${{statusLabel}}`)}}"`;
+        const isLocalNode = (typeof isSelfNodeId === "function")
+          ? isSelfNodeId(nodeId)
+          : false;
         const showStatusDots = (typeof normalizeChatNodeNavigatorShowStatusDotsPref === "function")
           ? normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots)
           : !!chatNodeNavigatorShowStatusDots;
+        const hasNodeVisualEmoji = !!cleanNodeVisualEmoji && (!displayNameEmoji || isLocalNode);
+        const rawMemberDisplayName = String((item && item.name) || nodeId || "Unknown node").trim() || "Unknown node";
+        const memberDisplayName = (hasNodeVisualEmoji && isLocalNode && showStatusDots && typeof stripNodeVisualEmojiFromLabel === "function")
+          ? stripNodeVisualEmojiFromLabel(rawMemberDisplayName, cleanNodeVisualEmoji)
+          : rawMemberDisplayName;
+        const statusGlyphAttrs = ` title="${{escAttr(`Status: ${{statusLabel}}`)}}" aria-label="${{escAttr(`Status: ${{statusLabel}}`)}}"`;
         const statusVisibilityClass = showStatusDots ? "" : " status-hidden";
         const statusMarkerClass = showStatusDots ? "" : " is-hidden";
         const statusMarkerAttrs = showStatusDots
@@ -1170,7 +1178,7 @@
         const statusMarkerHtml = hasNodeVisualEmoji
           ? `<span class="chat-member-status chat-member-status-emoji status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>
               <span class="chat-member-status-ring" aria-hidden="true"></span>
-              <span class="chat-member-status-emoji-glyph" aria-hidden="true">${{escAttr(nodeVisualEmoji)}}</span>
+              <span class="chat-member-status-emoji-glyph" aria-hidden="true">${{escAttr(cleanNodeVisualEmoji)}}</span>
             </span>`
           : `<span class="chat-member-status chat-member-status-dot status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>●</span>`;
         const actionRowHtml = removeBtn
@@ -1181,7 +1189,7 @@
           <span class="chat-member-main">
             <span class="chat-member-name-row">
               <span class="chat-member-name-left">
-                <span class="chat-member-name status-${{statusKey}}">${{escAttr((item && item.name) || nodeId || "Unknown node")}}</span>
+                <span class="chat-member-name status-${{statusKey}}">${{escAttr(memberDisplayName)}}</span>
                 ${{tagChipHtml}}
                 ${{malformedTextChipHtml}}
               </span>

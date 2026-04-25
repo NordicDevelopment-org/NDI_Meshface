@@ -91,6 +91,27 @@
       return fallbackEmoji;
     }}
 
+    function stripNodeVisualEmojiFromLabel(value, emoji) {{
+      const raw = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+      const cleanEmoji = normalizeNodeTagEmoji(emoji, "");
+      if (!raw || !cleanEmoji) return raw;
+      const graphemes = (typeof chatSplitGraphemes === "function")
+        ? chatSplitGraphemes(raw)
+        : Array.from(raw);
+      let removed = false;
+      const kept = [];
+      for (const grapheme of graphemes) {{
+        const text = String(grapheme == null ? "" : grapheme);
+        if (!removed && normalizeNodeTagEmoji(text, "") === cleanEmoji) {{
+          removed = true;
+          continue;
+        }}
+        kept.push(text);
+      }}
+      const next = kept.join("").replace(/\s+/g, " ").trim();
+      return next || raw;
+    }}
+
     function defaultNodeTagPreset() {{
       return {{
         id: "tag-default",
