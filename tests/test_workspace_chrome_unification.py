@@ -28,9 +28,12 @@ def test_workspace_views_share_map_style_chrome_primitives() -> None:
     assert 'class="topbar-view-menu-item topbar-view-menu-item-has-submenu"' in html
     assert 'class="topbar-view-submenu-item is-active"' in html
     assert 'data-app-view="bbs"' in html
+    assert 'class="bbs-config-strip"' in html
+    assert "Host Your Space" not in html
     assert 'id="bbs-host-title-input"' in html
     assert 'id="bbs-board-list"' in html
     assert 'id="bbs-terminal-log"' in html
+    assert html.index('class="bbs-config-strip"') < html.index('id="bbs-terminal-title"')
     assert 'class="settings-chrome workspace-chrome-bar"' in html
     assert 'class="settings-toolbar workspace-chrome-row"' in html
     assert 'class="settings-tabbar workspace-pillbar"' in html
@@ -146,9 +149,11 @@ def test_bbs_terminal_uses_full_workspace_height(extract_css_block) -> None:
 
     bbs_card_section = extract_css_block(css, ".layout.view-bbs .bbs")
     bbs_body_section = extract_css_block(css, ".layout.view-bbs .bbs .body")
-    bbs_sidebar_section = extract_css_block(css, ".layout.view-bbs .bbs-sidebar")
     bbs_shell_section = extract_css_block(css, ".bbs-shell")
     bbs_view_shell_section = extract_css_block(css, ".layout.view-bbs .bbs-shell")
+    bbs_config_section = extract_css_block(css, ".bbs-config-strip")
+    bbs_host_section = extract_css_block(css, ".bbs-panel.bbs-host-panel")
+    bbs_view_config_section = extract_css_block(css, ".layout.view-bbs .bbs-config-strip")
     bbs_main_section = extract_css_block(css, ".layout.view-bbs .bbs-main")
     bbs_main_overlay_section = extract_css_block(css, ".layout.view-bbs .bbs-main::before")
     bbs_head_section = extract_css_block(css, ".layout.view-bbs .bbs-terminal-head")
@@ -165,16 +170,16 @@ def test_bbs_terminal_uses_full_workspace_height(extract_css_block) -> None:
     assert ".layout.view-bbs .bbs > h2 {" in css
     assert "display: none;" in css.split(".layout.view-bbs .bbs > h2 {", 1)[1].split("}", 1)[0]
     assert "flex: 1 1 auto;" in bbs_body_section
-    assert "background: transparent;" in bbs_sidebar_section
-    assert "height: 100%;" in bbs_sidebar_section
-    assert "overflow: auto;" in bbs_sidebar_section
-    assert "border: 0;" in bbs_sidebar_section
+    assert "grid-template-columns: minmax(360px, 1.2fr) minmax(280px, 0.8fr);" in bbs_config_section
+    assert "grid-template-columns: repeat(3, minmax(118px, 1fr)) auto;" in bbs_host_section
+    assert "grid-row: 1;" in bbs_view_config_section
+    assert "grid-template-columns: minmax(0, 1fr);" in bbs_shell_section
     assert "align-items: stretch;" in bbs_shell_section
     assert "flex: 1 1 auto;" in bbs_view_shell_section
     assert "height: 100%;" in bbs_view_shell_section
     assert "overflow: hidden;" in bbs_view_shell_section
     assert "display: grid;" in bbs_main_section
-    assert "grid-template-rows: auto minmax(0, 1fr) auto auto;" in bbs_main_section
+    assert "grid-template-rows: auto auto minmax(0, 1fr) auto auto;" in bbs_main_section
     assert "align-items: stretch;" in bbs_main_section
     assert "min-height: 0;" in bbs_main_section
     assert "height: 100%;" in bbs_main_section
@@ -184,6 +189,7 @@ def test_bbs_terminal_uses_full_workspace_height(extract_css_block) -> None:
     assert "background: transparent;" in bbs_main_section
     assert "box-shadow: none;" in bbs_main_section
     assert "content: none;" in bbs_main_overlay_section
+    assert "grid-row: 2;" in bbs_head_section
     assert "border-radius: 10px;" in bbs_head_section
     assert "background: color-mix(in srgb, var(--panel) 88%, var(--bg) 12%)" in bbs_head_section
     assert "align-self: stretch;" in bbs_log_section
