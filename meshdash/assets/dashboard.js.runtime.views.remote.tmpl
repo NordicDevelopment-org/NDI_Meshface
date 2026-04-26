@@ -1187,6 +1187,14 @@
       return reversiNodeLabel(clean, state);
     }}
 
+    function bbsDisplayNodeIdentity(nodeId, state = latestState) {{
+      const clean = normalizeNodeId(nodeId || "");
+      const label = String(bbsDisplayNodeLabel(clean, state) || "").trim();
+      if (!isCanonicalNodeId(clean)) return label || clean || "unknown";
+      if (label && label.toLowerCase().includes(clean.toLowerCase())) return label;
+      return `${{label || clean}} (${{clean}})`;
+    }}
+
     function bbsIsOfflineLocalBoard(hostId, state = latestState) {{
       const localId = bbsHostNodeId(state);
       const cleanHostId = normalizeNodeId(hostId || "");
@@ -2036,14 +2044,34 @@
       const listEl = document.getElementById("bbs-board-list");
       const requestBtn = document.getElementById("bbs-refresh-directory-btn");
       const forgetBtn = document.getElementById("bbs-forget-directory-btn");
+      const targetEl = document.getElementById("bbs-directory-target");
       const requestTargetId = bbsRequestTargetNodeId(state);
+      const hasRequestTarget = isSelectableNodeId(requestTargetId);
+      const requestTargetName = hasRequestTarget ? bbsDisplayNodeLabel(requestTargetId, state) : "";
+      const requestTargetIdentity = hasRequestTarget ? bbsDisplayNodeIdentity(requestTargetId, state) : "";
       const activeRow = bbsActiveBoardRow();
       const activeKey = String(bbsActiveBoardKey || "").trim().toLowerCase();
       const hostedKey = (bbsHostState && bbsHostState.enabled)
         ? bbsBoardKey(bbsHostState.board_id, bbsHostState.host_id || bbsHostNodeId(state))
         : "";
       if (requestBtn instanceof HTMLButtonElement) {{
-        requestBtn.disabled = !isSelectableNodeId(requestTargetId);
+        requestBtn.disabled = !hasRequestTarget;
+        requestBtn.textContent = hasRequestTarget ? `Open ${{requestTargetName || "Node"}}` : "Open Node";
+        const requestTitle = hasRequestTarget
+          ? `Request BBS space from ${{requestTargetIdentity}}`
+          : "Select a node to choose the BBS request target";
+        requestBtn.title = requestTitle;
+        requestBtn.setAttribute("aria-label", requestTitle);
+      }}
+      if (targetEl instanceof HTMLElement) {{
+        const targetText = hasRequestTarget
+          ? `Request target: ${{requestTargetIdentity}}`
+          : "Request target: no node selected";
+        targetEl.textContent = targetText;
+        targetEl.title = hasRequestTarget
+          ? `Open will request the BBS space hosted by ${{requestTargetIdentity}}.`
+          : "Select a node to choose the BBS request target.";
+        targetEl.classList.toggle("is-empty", !hasRequestTarget);
       }}
       if (forgetBtn instanceof HTMLButtonElement) {{
         const activeIsHostedLocal = !!(activeKey && hostedKey && activeKey === hostedKey);
@@ -2055,7 +2083,10 @@
       if (!(listEl instanceof HTMLElement)) return;
       const rows = Array.isArray(bbsDiscoveredBoards) ? bbsDiscoveredBoards : [];
       if (!rows.length) {{
-        listEl.innerHTML = '<div class="bbs-board-empty">No spaces loaded yet. Select a node and request its space.</div>';
+        const emptyText = hasRequestTarget
+          ? `No spaces loaded yet. Open ${{requestTargetIdentity}} to request its BBS space.`
+          : "No spaces loaded yet. Select a node and request its space.";
+        listEl.innerHTML = `<div class="bbs-board-empty">${{escAttr(emptyText)}}</div>`;
         return;
       }}
       listEl.innerHTML = rows.map((row) => {{
@@ -2065,6 +2096,7 @@
         const boardId = sanitizeBbsWireField(row && row.board_id, 24) || "unknown";
         const hostId = normalizeNodeId(row && row.host_id || "");
         const hostLabel = bbsDisplayNodeLabel(hostId, state);
+        const hostIdentity = bbsDisplayNodeIdentity(hostId, state);
         const motd = sanitizeBbsWireField(row && row.motd, bbsMaxMotdChars);
         const seenUnix = Math.max(0, Math.trunc(Number(row && row.last_seen_unix) || 0));
         const roleLabel = isSelfNodeId(hostId, state) ? "local" : "remote";
@@ -2076,7 +2108,7 @@
           aria-selected="${{isActive ? "true" : "false"}}"
         >
           <span class="bbs-board-main">${{escAttr(title)}}</span>
-          <span class="bbs-board-meta">${{escAttr(boardId)}} • host ${{escAttr(hostLabel)}} (${{escAttr(roleLabel)}}) • loaded ${{escAttr(formatLocalChatTime(seenUnix, "n/a"))}}</span>
+          <span class="bbs-board-meta">${{escAttr(boardId)}} • host ${{escAttr(hostIdentity || hostLabel)}} (${{escAttr(roleLabel)}}) • loaded ${{escAttr(formatLocalChatTime(seenUnix, "n/a"))}}</span>
           <span class="bbs-board-motd">${{escAttr(motd || "No banner set.")}}</span>
         </button>`;
       }}).join("");
@@ -2095,24 +2127,35 @@
         const pendingLabel = isCanonicalNodeId(pendingHostId)
           ? bbsDisplayNodeLabel(pendingHostId, state)
           : "";
+        const requestTargetId = bbsRequestTargetNodeId(state);
+        const requestTargetName = isSelectableNodeId(requestTargetId)
+          ? bbsDisplayNodeLabel(requestTargetId, state)
+          : "";
+        const requestTargetLabel = isSelectableNodeId(requestTargetId)
+          ? bbsDisplayNodeIdentity(requestTargetId, state)
+          : "";
         if (titleEl instanceof HTMLElement) {{
           titleEl.textContent = pendingLabel ? `Awaiting ${{pendingLabel}}` : "No space selected";
         }}
         if (metaEl instanceof HTMLElement) {{
           metaEl.textContent = pendingLabel
             ? `Waiting for a direct BBS reply from ${{pendingLabel}}.`
-            : "Select a node and request its space.";
+            : (requestTargetLabel ? `Ready to request ${{requestTargetLabel}}.` : "Select a node and request its space.");
         }}
         if (inputEl instanceof HTMLInputElement) {{
           inputEl.disabled = true;
-          inputEl.placeholder = pendingLabel ? "Waiting for profile reply..." : "Profile space will open here...";
+          inputEl.placeholder = pendingLabel
+            ? "Waiting for profile reply..."
+            : (requestTargetLabel ? `Open ${{requestTargetLabel}} first...` : "Profile space will open here...");
         }}
         if (sendBtn instanceof HTMLButtonElement) {{
           sendBtn.disabled = true;
         }}
         logEl.textContent = pendingLabel
           ? `*** CONNECT 2400 ***\nDialing ${{pendingLabel}}...\nAwaiting direct profile reply.\n`
-          : "*** CONNECT 2400 ***\nSelect a node and request its space.\n";
+          : (requestTargetLabel
+            ? `*** CONNECT 2400 ***\nSelected request target: ${{requestTargetLabel}}.\nClick Open ${{requestTargetName || "Node"}} to request its space.\n`
+            : "*** CONNECT 2400 ***\nSelect a node and request its space.\n");
         return;
       }}
       if (titleEl instanceof HTMLElement) {{

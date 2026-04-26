@@ -515,6 +515,9 @@ def test_dashboard_js_includes_bbs_settings_sync_flow() -> None:
     assert "if (Array.isArray(cachedPosts) && cachedPosts.length > 0) return true;" in js
     assert "function bbsResolvePendingLoadFromContent(hostId, boardKey, state = latestState) {" in js
     assert "function bbsIsOfflineLocalBoard(hostId, state = latestState) {" in js
+    assert "function bbsDisplayNodeIdentity(nodeId, state = latestState) {" in js
+    assert 'document.getElementById("bbs-directory-target")' in js
+    assert "requestBtn.textContent = hasRequestTarget ? `Open ${requestTargetName || \"Node\"}` : \"Open Node\";" in js
     assert 'if (bbsIsOfflineLocalBoard(hostId) && row.force !== true) return "";' in js
     assert 'if (bbsForgottenBoardKeys.has(key) && row.force !== true) return "";' in js
     assert "bbsForgetDirectoryKey(key);" in js

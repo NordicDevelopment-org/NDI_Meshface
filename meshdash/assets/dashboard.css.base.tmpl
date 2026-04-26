@@ -3593,8 +3593,30 @@
     .bbs-directory-panel .bbs-actions {{
       align-items: center;
     }}
-    .bbs-directory-panel .bbs-panel-title {{
+    .bbs-directory-heading {{
       margin-right: auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }}
+    .bbs-directory-target {{
+      max-width: min(42vw, 420px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 11px;
+      line-height: 1.25;
+      color: color-mix(in srgb, var(--ink, #183223) 64%, var(--ui-accent, #2f855a) 36%);
+    }}
+    .bbs-directory-target.is-empty {{
+      color: color-mix(in srgb, var(--ink, #183223) 44%, var(--surface-tint-border-strong, #b8cab9) 56%);
+    }}
+    .bbs-directory-panel #bbs-refresh-directory-btn {{
+      max-width: min(22vw, 190px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }}
     .layout.view-bbs .bbs-directory-panel .bbs-board-list {{
       min-height: 0;
