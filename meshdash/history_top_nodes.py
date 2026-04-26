@@ -10,6 +10,13 @@ from .sql_contracts import SqlConnection, SqlRows
 
 _DEFAULT_LIMIT = 10
 _MAX_LIMIT = 50
+_ALL_CATEGORY_ID = "all"
+_ALL_CATEGORY_META = {
+    "id": _ALL_CATEGORY_ID,
+    "label": "All Categories",
+    "unit": "",
+    "source": "history",
+}
 
 TOP_NODE_CATEGORIES: tuple[dict[str, str], ...] = (
     {
@@ -126,6 +133,9 @@ _PORT_CATEGORY_TO_PORTNUM = {
 def normalize_top_node_category(raw_category: object) -> str:
     clean = str(raw_category or "").strip().lower().replace("-", "_")
     aliases = {
+        "everything": _ALL_CATEGORY_ID,
+        "all_categories": _ALL_CATEGORY_ID,
+        "all_lists": _ALL_CATEGORY_ID,
         "packets": "saved_packets",
         "stored_packets": "saved_packets",
         "saved": "saved_packets",
@@ -152,6 +162,8 @@ def normalize_top_node_category(raw_category: object) -> str:
         "other": "other_packets",
     }
     clean = aliases.get(clean, clean)
+    if clean == _ALL_CATEGORY_ID:
+        return _ALL_CATEGORY_ID
     return clean if clean in _CATEGORY_BY_ID else "saved_packets"
 
 
@@ -423,7 +435,7 @@ def build_top_nodes_payload(
 ) -> dict[str, object]:
     clean_category = normalize_top_node_category(category)
     clean_limit = _clean_limit(limit)
-    category_meta = dict(_CATEGORY_BY_ID[clean_category])
+    category_meta = dict(_CATEGORY_BY_ID.get(clean_category, _ALL_CATEGORY_META))
     items: list[dict[str, object]] = []
     for row in rows:
         item = _item_from_row(row, len(items) + 1)
@@ -439,8 +451,39 @@ def build_top_nodes_payload(
         "unit": category_meta.get("unit") or "",
         "source": category_meta.get("source") or "history",
         "limit": clean_limit,
-        "categories": [dict(entry) for entry in TOP_NODE_CATEGORIES],
+        "categories": [dict(_ALL_CATEGORY_META), *[dict(entry) for entry in TOP_NODE_CATEGORIES]],
         "items": items,
+    }
+
+
+def build_top_nodes_groups_payload(
+    *,
+    groups: Iterable[dict[str, object]],
+    limit: object = _DEFAULT_LIMIT,
+) -> dict[str, object]:
+    clean_limit = _clean_limit(limit)
+    clean_groups: list[dict[str, object]] = []
+    item_count = 0
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        clean_group = dict(group)
+        clean_group.pop("categories", None)
+        items = clean_group.get("items")
+        if isinstance(items, list):
+            item_count += len(items)
+        clean_groups.append(clean_group)
+    return {
+        "ok": True,
+        "category": _ALL_CATEGORY_ID,
+        "category_label": _ALL_CATEGORY_META["label"],
+        "unit": "",
+        "source": "history",
+        "limit": clean_limit,
+        "categories": [dict(_ALL_CATEGORY_META), *[dict(entry) for entry in TOP_NODE_CATEGORIES]],
+        "groups": clean_groups,
+        "item_count": item_count,
+        "items": [],
     }
 
 
@@ -458,6 +501,23 @@ def load_top_nodes(
         read_lock = store._lock
     else:
         read_lock = getattr(store, "_read_lock", None) or store._lock
+    if clean_category == _ALL_CATEGORY_ID:
+        groups: list[dict[str, object]] = []
+        with read_lock:
+            for entry in TOP_NODE_CATEGORIES:
+                entry_id = entry["id"]
+                rows = _fetch_category_rows(read_conn, entry_id, clean_limit)
+                groups.append(
+                    build_top_nodes_payload(
+                        category=entry_id,
+                        rows=rows,
+                        limit=clean_limit,
+                    )
+                )
+        return build_top_nodes_groups_payload(
+            groups=groups,
+            limit=clean_limit,
+        )
     with read_lock:
         rows = _fetch_category_rows(read_conn, clean_category, clean_limit)
     return build_top_nodes_payload(

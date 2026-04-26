@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from meshdash.history_schema import initialize_history_schema
 from meshdash.history_top_nodes import load_top_nodes
+from meshdash.html_css import build_dashboard_css
 from meshdash.html_js import build_dashboard_js
 from meshdash.html_sections import build_html_shell
 
@@ -69,6 +70,47 @@ def test_top_nodes_saved_packets_and_chat_categories_use_history_rollups() -> No
     ]
 
 
+def test_top_nodes_all_category_returns_grouped_ranked_lists() -> None:
+    conn = sqlite3.connect(":memory:")
+    initialize_history_schema(conn)
+    store = _make_store(conn)
+
+    conn.executemany(
+        """
+        INSERT INTO node_saved_counts(node_id, saved_packets, saved_points, saved_last_seen_unix)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            ("!11111111", 12, 5, 1000),
+            ("!22222222", 30, 9, 1100),
+        ],
+    )
+    conn.executemany(
+        """
+        INSERT INTO packet_events(created_unix, from_id, to_id, portnum)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            (100, "!11111111", "^all", "TEXT_MESSAGE_APP"),
+            (101, "!11111111", "!22222222", "TEXT_MESSAGE_APP"),
+            (102, "!22222222", "^all", "TELEMETRY_APP"),
+        ],
+    )
+    conn.commit()
+
+    payload = load_top_nodes(store, category="all", limit=10)
+    assert payload["category"] == "all"
+    assert payload["category_label"] == "All Categories"
+    assert payload["categories"][0]["id"] == "all"
+
+    groups = {group["category"]: group for group in payload["groups"]}
+    assert groups["saved_packets"]["items"][0]["node_id"] == "!22222222"
+    assert groups["saved_packets"]["items"][0]["value"] == 30
+    assert groups["chat_packets"]["items"][0]["node_id"] == "!11111111"
+    assert groups["chat_packets"]["items"][0]["value"] == 2
+    assert payload["item_count"] >= 3
+
+
 def test_top_nodes_links_count_unique_peers_and_link_packets() -> None:
     conn = sqlite3.connect(":memory:")
     initialize_history_schema(conn)
@@ -126,8 +168,40 @@ def test_dashboard_js_wires_network_top_nodes_fetch_and_render() -> None:
     )
 
     assert 'const networkTopNodesCategoryStorageKey = "meshDashboardNetworkTopNodesCategoryV1";' in js
-    assert 'let networkTopNodesCategory = "saved_packets";' in js
+    assert 'let networkTopNodesCategory = "all";' in js
+    assert '{ id: "all", label: "All Categories", unit: "" }' in js
     assert 'function normalizeNetworkTopNodesCategory(raw) {' in js
+    assert 'function networkTopNodesPayloadHasItems(payload) {' in js
+    assert 'function networkTopNodesRowsHtml(items, payload, state = latestState) {' in js
+    assert 'class="network-top-nodes-group"' in js
+    assert 'const displayGroups = groups.length > 0' in js
+    assert 'function networkTopNodesGroupHtml(group, state = latestState, options = {}) {' in js
+    assert 'const showGroupHeaders = category === "all" || displayGroups.length > 1;' in js
+    assert 'networkTopNodesGroupHtml(group, state, { showHeader: showGroupHeaders })' in js
     assert 'function renderNetworkTopNodes(state = latestState, options = {}) {' in js
     assert "/api/history/top_nodes?category=" in js
     assert 'if (normalizedView === "network" && next === "top10") {' in js
+
+
+def test_dashboard_css_keeps_top_node_bar_below_row_text() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    assert ".network-top-node-bar" in css
+    assert "position: relative;" in css
+    assert "display: block;" in css
+    assert "width: 100%;" in css
+    assert "min-height: 4px;" in css
+    assert "margin-top: 7px;" in css
+
+
+def test_dashboard_js_places_top_node_bar_inside_text_column() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    bar_idx = js.index('class="network-top-node-bar"')
+    value_idx = js.index('class="network-top-node-value"', bar_idx)
+    main_close_idx = js.rindex("</span>", 0, value_idx)
+    assert bar_idx < main_close_idx < value_idx

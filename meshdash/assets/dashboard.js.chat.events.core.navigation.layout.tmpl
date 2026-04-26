@@ -873,6 +873,7 @@
     }}
 
     const networkTopNodesCategoryDefs = Object.freeze([
+      {{ id: "all", label: "All Categories", unit: "" }},
       {{ id: "saved_packets", label: "Saved Packets", unit: "packets" }},
       {{ id: "active_hours", label: "Active Hours", unit: "hours" }},
       {{ id: "chat_packets", label: "Chats", unit: "chats" }},
@@ -897,6 +898,9 @@
     function normalizeNetworkTopNodesCategory(raw) {{
       const clean = String(raw || "").trim().toLowerCase().replace(/[-\s]+/g, "_");
       const aliases = {{
+        everything: "all",
+        all_categories: "all",
+        all_lists: "all",
         packets: "saved_packets",
         stored_packets: "saved_packets",
         saved: "saved_packets",
@@ -931,9 +935,10 @@
 
     function loadPreferredNetworkTopNodesCategory() {{
       try {{
-        return normalizeNetworkTopNodesCategory(window.localStorage.getItem(networkTopNodesCategoryStorageKey));
+        const stored = window.localStorage.getItem(networkTopNodesCategoryStorageKey);
+        return stored ? normalizeNetworkTopNodesCategory(stored) : "all";
       }} catch (_err) {{
-        return "saved_packets";
+        return "all";
       }}
     }}
 
@@ -1101,6 +1106,27 @@
       const cleanCategory = normalizeNetworkTopNodesCategory(category);
       const def = networkTopNodesCategoryDef(cleanCategory);
       const safeState = (state && typeof state === "object") ? state : {{}};
+      if (cleanCategory === "all") {{
+        const groups = networkTopNodesCategoryDefs
+          .filter((entry) => entry && entry.id && entry.id !== "all")
+          .map((entry) => buildLocalNetworkTopNodesPayload(entry.id, safeState));
+        const itemCount = groups.reduce((sum, group) => {{
+          const items = Array.isArray(group && group.items) ? group.items : [];
+          return sum + items.length;
+        }}, 0);
+        return {{
+          ok: true,
+          category: cleanCategory,
+          category_label: def.label,
+          unit: def.unit,
+          source: "current state",
+          limit: 10,
+          groups,
+          item_count: itemCount,
+          items: [],
+          fallback: true,
+        }};
+      }}
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
       const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
@@ -1287,33 +1313,22 @@
       return pieces.join(" - ");
     }}
 
-    function renderNetworkTopNodesPayload(payload, state = latestState, options = {{}}) {{
-      const safePayload = (payload && typeof payload === "object") ? payload : buildLocalNetworkTopNodesPayload(networkTopNodesCategory, state);
-      const summary = document.getElementById("network-top-nodes-summary");
-      const list = document.getElementById("network-top-nodes-list");
-      const status = document.getElementById("network-top-nodes-status");
-      if (!(summary instanceof HTMLElement) || !(list instanceof HTMLElement)) return;
+    function networkTopNodesPayloadHasItems(payload) {{
+      const safePayload = (payload && typeof payload === "object") ? payload : {{}};
+      const items = Array.isArray(safePayload.items) ? safePayload.items : [];
+      if (items.length > 0) return true;
+      const groups = Array.isArray(safePayload.groups) ? safePayload.groups : [];
+      return groups.some((group) => Array.isArray(group && group.items) && group.items.length > 0);
+    }}
+
+    function networkTopNodesRowsHtml(items, payload, state = latestState) {{
+      const safeItems = Array.isArray(items) ? items : [];
+      const safePayload = (payload && typeof payload === "object") ? payload : {{}};
       const category = normalizeNetworkTopNodesCategory(safePayload.category || networkTopNodesCategory);
       const def = networkTopNodesCategoryDef(category);
-      const label = String(safePayload.category_label || def.label || "Top Nodes");
       const unit = String(safePayload.unit || def.unit || "");
-      const items = Array.isArray(safePayload.items) ? safePayload.items : [];
-      const source = String(safePayload.source || (safePayload.fallback ? "current state" : "history")).trim();
-      const errorText = String(options.error || safePayload.error || "").trim();
-      const loading = !!options.loading;
-      const maxValue = items.reduce((max, item) => Math.max(max, Number(item && item.value) || 0), 0);
-
-      if (status instanceof HTMLElement) {{
-        status.textContent = loading ? "Loading..." : (errorText ? "Current state fallback" : "");
-      }}
-      summary.innerHTML = `<span><strong>${{escAttr(label)}}</strong> - ${{escAttr(source)}}${{errorText ? ` - ${{escAttr(errorText)}}` : ""}}</span><span>${{escAttr(String(items.length))}} / 10</span>`;
-
-      if (!items.length) {{
-        list.innerHTML = `<div class="network-top-nodes-empty">No ${{escAttr(label.toLowerCase())}} activity yet.</div>`;
-        return;
-      }}
-
-      const rows = items.map((item, index) => {{
+      const maxValue = safeItems.reduce((max, item) => Math.max(max, Number(item && item.value) || 0), 0);
+      return safeItems.map((item, index) => {{
         const nodeId = normalizeNodeId(item && item.node_id);
         const rank = Math.max(1, Math.trunc(Number(item && item.rank) || (index + 1)));
         const value = Math.max(0, Math.trunc(Number(item && item.value) || 0));
@@ -1327,15 +1342,89 @@
             <span class="network-top-node-name">${{escAttr(name)}}</span>
             <span class="network-top-node-id">${{escAttr(nodeId)}}</span>
             ${{meta ? `<span class="network-top-node-meta">${{escAttr(meta)}}</span>` : ""}}
+            <span class="network-top-node-bar" aria-hidden="true"><span style="--top-node-bar:${{pct.toFixed(1)}}%;"></span></span>
           </span>
           <span class="network-top-node-value">
             <strong>${{escAttr(networkTopNodesNumberText(value))}}</strong>
             <span class="network-top-node-unit">${{escAttr(unitText)}}</span>
           </span>
-          <span class="network-top-node-bar" aria-hidden="true"><span style="--top-node-bar:${{pct.toFixed(1)}}%;"></span></span>
         </button>`;
-      }});
-      list.innerHTML = rows.join("");
+      }}).join("");
+    }}
+
+    function networkTopNodesGroupHtml(group, state = latestState, options = {{}}) {{
+      const safeGroup = (group && typeof group === "object") ? group : {{}};
+      const safeOptions = (options && typeof options === "object") ? options : {{}};
+      const category = normalizeNetworkTopNodesCategory(safeGroup.category || "saved_packets");
+      const def = networkTopNodesCategoryDef(category);
+      const label = String(safeGroup.category_label || def.label || "Top Nodes");
+      const source = String(safeGroup.source || "").trim();
+      const limit = Math.max(1, Math.trunc(Number(safeGroup.limit) || 10));
+      const items = Array.isArray(safeGroup.items) ? safeGroup.items : [];
+      const showHeader = safeOptions.showHeader !== false;
+      if (!items.length) return "";
+      return `<section class="network-top-nodes-group" data-top-node-category="${{escAttr(category)}}">
+        ${{showHeader ? `<div class="network-top-nodes-group-head">
+          <span class="network-top-nodes-group-title">
+            <strong>${{escAttr(label)}}</strong>
+            ${{source ? `<span class="network-top-nodes-group-source">${{escAttr(source)}}</span>` : ""}}
+          </span>
+          <span class="network-top-nodes-group-count">${{escAttr(String(items.length))}} / ${{escAttr(String(limit))}}</span>
+        </div>` : ""}}
+        <div class="network-top-nodes-group-list">${{networkTopNodesRowsHtml(items, safeGroup, state)}}</div>
+      </section>`;
+    }}
+
+    function renderNetworkTopNodesPayload(payload, state = latestState, options = {{}}) {{
+      const safePayload = (payload && typeof payload === "object") ? payload : buildLocalNetworkTopNodesPayload(networkTopNodesCategory, state);
+      const summary = document.getElementById("network-top-nodes-summary");
+      const list = document.getElementById("network-top-nodes-list");
+      const status = document.getElementById("network-top-nodes-status");
+      if (!(summary instanceof HTMLElement) || !(list instanceof HTMLElement)) return;
+      const category = normalizeNetworkTopNodesCategory(safePayload.category || networkTopNodesCategory);
+      const def = networkTopNodesCategoryDef(category);
+      const label = String(safePayload.category_label || def.label || "Top Nodes");
+      const items = Array.isArray(safePayload.items) ? safePayload.items : [];
+      const groups = Array.isArray(safePayload.groups)
+        ? safePayload.groups.filter((group) => Array.isArray(group && group.items) && group.items.length > 0)
+        : [];
+      const displayGroups = groups.length > 0
+        ? groups
+        : (items.length > 0 ? [safePayload] : []);
+      const source = String(safePayload.source || (safePayload.fallback ? "current state" : "history")).trim();
+      const errorText = String(options.error || safePayload.error || "").trim();
+      const loading = !!options.loading;
+
+      if (status instanceof HTMLElement) {{
+        status.textContent = loading ? "Loading..." : (errorText ? "Current state fallback" : "");
+      }}
+
+      if (category === "all" || displayGroups.length > 0) {{
+        const itemCount = displayGroups.reduce((sum, group) => {{
+          const groupItems = Array.isArray(group && group.items) ? group.items : [];
+          return sum + groupItems.length;
+        }}, 0);
+        const groupLabel = displayGroups.length === 1 ? "list" : "lists";
+        summary.innerHTML = `<span><strong>${{escAttr(label)}}</strong> - ${{escAttr(source)}}${{errorText ? ` - ${{escAttr(errorText)}}` : ""}}</span><span>${{escAttr(String(displayGroups.length))}} ${{escAttr(groupLabel)}} - ${{escAttr(String(itemCount))}} entries</span>`;
+        if (!displayGroups.length) {{
+          list.innerHTML = `<div class="network-top-nodes-empty">No top node activity yet.</div>`;
+          return;
+        }}
+        const showGroupHeaders = category === "all" || displayGroups.length > 1;
+        list.innerHTML = displayGroups
+          .map((group) => networkTopNodesGroupHtml(group, state, {{ showHeader: showGroupHeaders }}))
+          .join("");
+        return;
+      }}
+
+      summary.innerHTML = `<span><strong>${{escAttr(label)}}</strong> - ${{escAttr(source)}}${{errorText ? ` - ${{escAttr(errorText)}}` : ""}}</span><span>${{escAttr(String(items.length))}} / 10</span>`;
+
+      if (!items.length) {{
+        list.innerHTML = `<div class="network-top-nodes-empty">No ${{escAttr(label.toLowerCase())}} activity yet.</div>`;
+        return;
+      }}
+
+      list.innerHTML = networkTopNodesRowsHtml(items, safePayload, state);
     }}
 
     async function fetchNetworkTopNodesPayload(category, force = false) {{
@@ -1393,8 +1482,7 @@
         .then((payload) => {{
           if (activeLayoutView !== "network" || activeNetworkSubview !== "top10") return;
           if (normalizeNetworkTopNodesCategory(networkTopNodesCategory) !== normalizeNetworkTopNodesCategory(payload && payload.category)) return;
-          const payloadItems = Array.isArray(payload && payload.items) ? payload.items : [];
-          if (!payloadItems.length && Array.isArray(localPayload.items) && localPayload.items.length > 0) {{
+          if (!networkTopNodesPayloadHasItems(payload) && networkTopNodesPayloadHasItems(localPayload)) {{
             renderNetworkTopNodesPayload(localPayload, latestState || state);
             return;
           }}

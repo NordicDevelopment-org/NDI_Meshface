@@ -5709,13 +5709,19 @@
       .network-top-node-row {{
         grid-template-columns: 34px minmax(0, 1fr);
       }}
+      .network-top-node-rank {{
+        grid-column: 1;
+        grid-row: 1;
+      }}
+      .network-top-node-main {{
+        grid-column: 2;
+        grid-row: 1;
+      }}
       .network-top-node-value {{
         grid-column: 2;
+        grid-row: 2;
         align-items: flex-start;
         text-align: left;
-      }}
-      .network-top-node-bar {{
-        grid-column: 1 / 3;
       }}
       .network-graph-panel {{
         padding: 0;
@@ -5988,12 +5994,68 @@
       gap: 8px;
       min-height: 0;
     }}
+    .network-top-nodes-group {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+      padding-top: 10px;
+      border-top: 1px solid rgba(188, 214, 195, 0.72);
+    }}
+    .network-top-nodes-group:first-child {{
+      padding-top: 0;
+      border-top: 0;
+    }}
+    .network-top-nodes-group-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+      padding: 0 2px;
+      color: color-mix(in srgb, var(--muted) 72%, var(--ink) 28%);
+      font-size: 11px;
+      line-height: 1.25;
+    }}
+    .network-top-nodes-group-title {{
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      min-width: 0;
+    }}
+    .network-top-nodes-group-title strong {{
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .network-top-nodes-group-source,
+    .network-top-nodes-group-count {{
+      overflow: hidden;
+      color: color-mix(in srgb, var(--muted) 74%, var(--ink) 26%);
+      font-size: 10px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .network-top-nodes-group-count {{
+      flex: 0 0 auto;
+    }}
+    .network-top-nodes-group-list {{
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      min-width: 0;
+    }}
     .network-top-node-row {{
       display: grid;
       grid-template-columns: 38px minmax(0, 1fr) minmax(96px, auto);
       align-items: center;
-      gap: 10px;
-      min-height: 52px;
+      column-gap: 10px;
+      row-gap: 7px;
+      min-height: 60px;
       padding: 8px 10px;
       border: 1px solid rgba(188, 214, 195, 0.82);
       border-radius: 8px;
@@ -6016,6 +6078,8 @@
       outline-offset: 1px;
     }}
     .network-top-node-rank {{
+      grid-column: 1;
+      grid-row: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -6029,6 +6093,8 @@
       line-height: 1;
     }}
     .network-top-node-main {{
+      grid-column: 2;
+      grid-row: 1;
       min-width: 0;
     }}
     .network-top-node-name {{
@@ -6062,6 +6128,8 @@
       line-height: 1.2;
     }}
     .network-top-node-value {{
+      grid-column: 3;
+      grid-row: 1;
       display: flex;
       flex-direction: column;
       align-items: flex-end;
@@ -6087,9 +6155,11 @@
     }}
     .network-top-node-bar {{
       position: relative;
-      grid-column: 2 / 4;
+      display: block;
       width: 100%;
       height: 4px;
+      min-height: 4px;
+      margin-top: 7px;
       border-radius: 999px;
       background: rgba(166, 190, 173, 0.28);
       overflow: hidden;
