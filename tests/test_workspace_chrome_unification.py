@@ -158,10 +158,12 @@ def test_bbs_terminal_uses_full_workspace_height(extract_css_block) -> None:
     bbs_view_directory_section = extract_css_block(css, ".layout.view-bbs .bbs-directory-panel")
     bbs_view_directory_list_section = extract_css_block(css, ".layout.view-bbs .bbs-directory-panel .bbs-board-list")
     bbs_main_section = extract_css_block(css, ".layout.view-bbs .bbs-main")
+    bbs_main_status_section = extract_css_block(css, ".layout.view-bbs .bbs-main:has(.bbs-post-status:not(:empty))")
     bbs_main_overlay_section = extract_css_block(css, ".layout.view-bbs .bbs-main::before")
     bbs_head_section = extract_css_block(css, ".layout.view-bbs .bbs-terminal-head")
     bbs_log_section = extract_css_block(css, ".layout.view-bbs .bbs-terminal-log")
     bbs_compose_section = extract_css_block(css, ".layout.view-bbs .bbs-compose-row")
+    bbs_compose_button_section = extract_css_block(css, ".layout.view-bbs .bbs-compose-row .btn")
     bbs_input_section = extract_css_block(css, ".layout.view-bbs .bbs-post-input")
     dark_bbs_card_section = extract_css_block(css, '[data-theme="dark"] .layout.view-bbs .bbs')
     dark_bbs_log_section = extract_css_block(css, '[data-theme="dark"] .layout.view-bbs .bbs-terminal-log')
@@ -191,7 +193,8 @@ def test_bbs_terminal_uses_full_workspace_height(extract_css_block) -> None:
     assert "overflow: hidden;" in bbs_view_shell_section
     assert "display: grid;" in bbs_main_section
     assert "grid-template-columns: minmax(0, 1fr) clamp(320px, 28vw, 520px);" in bbs_main_section
-    assert "grid-template-rows: auto auto minmax(0, 1fr) auto auto;" in bbs_main_section
+    assert "grid-template-rows: auto auto minmax(0, 1fr) auto;" in bbs_main_section
+    assert "grid-template-rows: auto auto minmax(0, 1fr) auto auto;" in bbs_main_status_section
     assert "align-items: stretch;" in bbs_main_section
     assert "min-height: 0;" in bbs_main_section
     assert "height: 100%;" in bbs_main_section
@@ -219,6 +222,8 @@ def test_bbs_terminal_uses_full_workspace_height(extract_css_block) -> None:
     assert "align-self: end;" in bbs_compose_section
     assert "border-radius: 10px;" in bbs_compose_section
     assert "background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%)" in bbs_compose_section
+    assert "padding: 6px 8px;" in bbs_compose_section
+    assert "height: 28px;" in bbs_compose_button_section
     assert 'font-family: "IBM Plex Sans", "Segoe UI", sans-serif;' in bbs_input_section
     assert "background: transparent;" in dark_bbs_card_section
     assert "background: var(--workspace-shell-bg);" in dark_bbs_log_section

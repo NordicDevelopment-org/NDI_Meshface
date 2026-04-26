@@ -3838,7 +3838,7 @@
     .layout.view-bbs .bbs-main {{
       display: grid;
       grid-template-columns: minmax(0, 1fr) clamp(320px, 28vw, 520px);
-      grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
       align-content: stretch;
       align-items: stretch;
       min-height: 0;
@@ -3850,6 +3850,9 @@
       background: transparent;
       color: var(--ink);
       box-shadow: none;
+    }}
+    .layout.view-bbs .bbs-main:has(.bbs-post-status:not(:empty)) {{
+      grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     }}
     .layout.view-bbs .bbs-main::before,
     .layout.view-bbs .bbs-main::after {{
@@ -3899,6 +3902,11 @@
       border-radius: 10px;
       background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%);
       padding: 6px 8px;
+    }}
+    .layout.view-bbs .bbs-compose-row .btn {{
+      min-height: 28px;
+      height: 28px;
+      padding-block: 0;
     }}
     .layout.view-bbs .bbs-post-status {{
       grid-column: 1 / -1;
@@ -4013,6 +4021,9 @@
       }}
       .layout.view-bbs .bbs-main {{
         grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+      }}
+      .layout.view-bbs .bbs-main:has(.bbs-post-status:not(:empty)) {{
         grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
       }}
       .bbs-config-strip {{
