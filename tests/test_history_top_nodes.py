@@ -1,0 +1,133 @@
+import sqlite3
+import sys
+import threading
+from pathlib import Path
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from meshdash.history_schema import initialize_history_schema
+from meshdash.history_top_nodes import load_top_nodes
+from meshdash.html_js import build_dashboard_js
+from meshdash.html_sections import build_html_shell
+
+
+def _make_store(conn: sqlite3.Connection) -> SimpleNamespace:
+    return SimpleNamespace(
+        _conn=conn,
+        _read_conn=None,
+        _read_lock=None,
+        _lock=threading.Lock(),
+    )
+
+
+def test_top_nodes_saved_packets_and_chat_categories_use_history_rollups() -> None:
+    conn = sqlite3.connect(":memory:")
+    initialize_history_schema(conn)
+    store = _make_store(conn)
+
+    conn.executemany(
+        """
+        INSERT INTO node_saved_counts(node_id, saved_packets, saved_points, saved_last_seen_unix)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            ("!11111111", 12, 5, 1000),
+            ("!22222222", 30, 9, 1100),
+            ("^all", 99, 99, 1200),
+        ],
+    )
+    conn.executemany(
+        """
+        INSERT INTO packet_events(created_unix, from_id, to_id, portnum)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            (100, "!11111111", "^all", "TEXT_MESSAGE_APP"),
+            (101, "!11111111", "!22222222", "TEXT_MESSAGE_APP"),
+            (102, "!22222222", "^all", "TELEMETRY_APP"),
+        ],
+    )
+    conn.commit()
+
+    saved = load_top_nodes(store, category="saved_packets", limit=10)
+    assert [item["node_id"] for item in saved["items"]] == ["!22222222", "!11111111"]
+    assert saved["items"][0]["value"] == 30
+    assert saved["items"][0]["secondary_value"] == 9
+
+    chats = load_top_nodes(store, category="chats", limit=10)
+    assert chats["category"] == "chat_packets"
+    assert chats["items"] == [
+        {
+            "rank": 1,
+            "node_id": "!11111111",
+            "value": 2,
+            "secondary_value": 2,
+            "last_seen_unix": 101,
+            "last_seen": chats["items"][0]["last_seen"],
+        }
+    ]
+
+
+def test_top_nodes_links_count_unique_peers_and_link_packets() -> None:
+    conn = sqlite3.connect(":memory:")
+    initialize_history_schema(conn)
+    store = _make_store(conn)
+
+    conn.executemany(
+        """
+        INSERT INTO connections(
+          from_id, to_id, first_seen_unix, last_seen_unix, seen_count, portnums_json
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        [
+            ("!11111111", "!22222222", 100, 200, 7, "[]"),
+            ("!33333333", "!11111111", 110, 230, 4, "[]"),
+            ("!22222222", "!33333333", 120, 240, 3, "[]"),
+        ],
+    )
+    conn.commit()
+
+    links = load_top_nodes(store, category="links", limit=10)
+    rows_by_id = {item["node_id"]: item for item in links["items"]}
+    assert rows_by_id["!11111111"]["value"] == 2
+    assert rows_by_id["!11111111"]["secondary_value"] == 11
+
+    link_packets = load_top_nodes(store, category="link_packets", limit=10)
+    assert link_packets["items"][0]["node_id"] == "!11111111"
+    assert link_packets["items"][0]["value"] == 11
+    assert link_packets["items"][0]["secondary_value"] == 2
+
+
+def test_dashboard_adds_network_top10_subview() -> None:
+    html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
+        style_css="",
+        app_js="",
+        revision_title="rev",
+        revision_label="rev",
+        safety_label="safe",
+        packet_limit=100,
+        history_label="history",
+        refresh_ms=1000,
+    )
+
+    assert 'data-network-subview="top10"' in html
+    assert 'id="network-map-panel-top10"' in html
+    assert 'id="network-top-nodes-category"' in html
+
+
+def test_dashboard_js_wires_network_top_nodes_fetch_and_render() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'const networkTopNodesCategoryStorageKey = "meshDashboardNetworkTopNodesCategoryV1";' in js
+    assert 'let networkTopNodesCategory = "saved_packets";' in js
+    assert 'function normalizeNetworkTopNodesCategory(raw) {' in js
+    assert 'function renderNetworkTopNodes(state = latestState, options = {}) {' in js
+    assert "/api/history/top_nodes?category=" in js
+    assert 'if (normalizedView === "network" && next === "top10") {' in js

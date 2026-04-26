@@ -37,6 +37,9 @@ from .history_store_summary import (
     load_summary_metrics as _load_summary_metrics_helper,
     save_summary_metrics as _save_summary_metrics_helper,
 )
+from .history_top_nodes import (
+    load_top_nodes as _load_top_nodes_helper,
+)
 from .history_store_settings import (
     append_bbs_post as _append_bbs_post_helper,
     load_bbs_posts as _load_bbs_posts_helper,
@@ -159,6 +162,9 @@ class HistoryStore:
 
     def load_summary_metrics(self, window_hours: int) -> dict[str, object]:
         return _load_summary_metrics_helper(self, window_hours)
+
+    def load_top_nodes(self, category: object = "saved_packets", limit: object = 10) -> dict[str, object]:
+        return _load_top_nodes_helper(self, category=category, limit=limit)
 
     def save_connection_event(
         self,

@@ -4914,6 +4914,12 @@
       padding-bottom: 14px;
       padding-left: 18px;
     }}
+    #network-map-panel-top10 > .network-overview-panel {{
+      padding-top: 56px;
+      padding-right: 18px;
+      padding-bottom: 14px;
+      padding-left: 18px;
+    }}
     #network-map-panel-sensors > .network-overview-panel {{
       padding-top: 56px;
       padding-right: 18px;
@@ -5700,6 +5706,17 @@
       max-width: min(100%, 420px);
     }}
     @media (max-width: 900px) {{
+      .network-top-node-row {{
+        grid-template-columns: 34px minmax(0, 1fr);
+      }}
+      .network-top-node-value {{
+        grid-column: 2;
+        align-items: flex-start;
+        text-align: left;
+      }}
+      .network-top-node-bar {{
+        grid-column: 1 / 3;
+      }}
       .network-graph-panel {{
         padding: 0;
       }}
@@ -5912,6 +5929,189 @@
       background: rgba(249, 253, 249, 0.92);
       box-shadow: 0 14px 34px rgba(22, 40, 30, 0.08);
       backdrop-filter: blur(8px);
+    }}
+    .network-top-nodes-card {{
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+      padding: 14px;
+      border: 1px solid rgba(188, 214, 195, 0.9);
+      border-radius: 8px;
+      background: rgba(249, 253, 249, 0.94);
+      box-shadow: 0 14px 34px rgba(22, 40, 30, 0.08);
+      backdrop-filter: blur(8px);
+    }}
+    .network-top-nodes-toolbar {{
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }}
+    .network-top-nodes-toolbar .history-metric-wrap {{
+      width: auto;
+      min-width: 196px;
+    }}
+    .network-top-nodes-toolbar .history-metric-select {{
+      min-width: 164px;
+    }}
+    .network-top-nodes-refresh-btn {{
+      flex: 0 0 auto;
+    }}
+    .network-top-nodes-status {{
+      min-height: 16px;
+      color: color-mix(in srgb, var(--muted) 72%, var(--ink) 28%);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.25;
+    }}
+    .network-top-nodes-summary {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 28px;
+      color: color-mix(in srgb, var(--muted) 70%, var(--ink) 30%);
+      font-size: 12px;
+      line-height: 1.35;
+    }}
+    .network-top-nodes-summary strong {{
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 800;
+    }}
+    .network-top-nodes-list {{
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      min-height: 0;
+    }}
+    .network-top-node-row {{
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) minmax(96px, auto);
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 8px 10px;
+      border: 1px solid rgba(188, 214, 195, 0.82);
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, rgba(91, 181, 127, 0.12), rgba(255, 255, 255, 0) 40%),
+        rgba(255, 255, 255, 0.72);
+      overflow: hidden;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }}
+    .network-top-node-row:hover {{
+      border-color: color-mix(in srgb, var(--line) 45%, var(--accent) 55%);
+      background:
+        linear-gradient(90deg, rgba(91, 181, 127, 0.18), rgba(255, 255, 255, 0) 46%),
+        rgba(255, 255, 255, 0.84);
+    }}
+    .network-top-node-row:focus-visible {{
+      outline: 2px solid color-mix(in srgb, var(--accent) 58%, var(--panel) 42%);
+      outline-offset: 1px;
+    }}
+    .network-top-node-rank {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 26%, white 74%);
+      color: color-mix(in srgb, var(--ink) 72%, var(--accent) 28%);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+    }}
+    .network-top-node-main {{
+      min-width: 0;
+    }}
+    .network-top-node-name {{
+      display: block;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .network-top-node-id {{
+      display: block;
+      overflow: hidden;
+      color: color-mix(in srgb, var(--muted) 76%, var(--ink) 24%);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 10px;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .network-top-node-meta {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+      color: color-mix(in srgb, var(--muted) 76%, var(--ink) 24%);
+      font-size: 10px;
+      line-height: 1.2;
+    }}
+    .network-top-node-value {{
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
+      text-align: right;
+    }}
+    .network-top-node-value strong {{
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1;
+    }}
+    .network-top-node-unit {{
+      overflow: hidden;
+      max-width: 120px;
+      color: color-mix(in srgb, var(--muted) 74%, var(--ink) 26%);
+      font-size: 10px;
+      line-height: 1.15;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .network-top-node-bar {{
+      position: relative;
+      grid-column: 2 / 4;
+      width: 100%;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(166, 190, 173, 0.28);
+      overflow: hidden;
+    }}
+    .network-top-node-bar > span {{
+      display: block;
+      height: 100%;
+      width: var(--top-node-bar, 0%);
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    }}
+    .network-top-nodes-empty {{
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 220px;
+      border: 1px dashed rgba(129, 168, 145, 0.72);
+      border-radius: 8px;
+      color: color-mix(in srgb, var(--muted) 78%, var(--ink) 22%);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
     }}
     .network-overview-card-header {{
       display: flex;

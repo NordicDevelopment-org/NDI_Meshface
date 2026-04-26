@@ -702,9 +702,10 @@
       const clean = String(raw || "").trim().toLowerCase();
       if (clean === "details") return "overview";
       if (clean === "links") return "graph";
+      if (clean === "top" || clean === "top10" || clean === "top_10") return "top10";
       if (clean === "diag") return networkDiagnosticsEnabled ? "diagnostics" : "map";
       if (clean === "sensors") return "overview";
-      if (clean === "overview" || clean === "graph") return clean;
+      if (clean === "overview" || clean === "graph" || clean === "top10") return clean;
       if (clean === "diagnostics") return networkDiagnosticsEnabled ? "diagnostics" : "map";
       return "map";
     }}
@@ -869,6 +870,548 @@
       }} else if (controls.parentElement !== explorer) {{
         explorer.insertBefore(controls, explorer.firstChild || null);
       }}
+    }}
+
+    const networkTopNodesCategoryDefs = Object.freeze([
+      {{ id: "saved_packets", label: "Saved Packets", unit: "packets" }},
+      {{ id: "active_hours", label: "Active Hours", unit: "hours" }},
+      {{ id: "chat_packets", label: "Chats", unit: "chats" }},
+      {{ id: "gps_positions", label: "GPS Positions", unit: "positions" }},
+      {{ id: "environment_metrics", label: "Metrics", unit: "samples" }},
+      {{ id: "links", label: "Links", unit: "links" }},
+      {{ id: "link_packets", label: "Link Packets", unit: "packets" }},
+      {{ id: "telemetry_packets", label: "Telemetry", unit: "packets" }},
+      {{ id: "position_packets", label: "Position Packets", unit: "packets" }},
+      {{ id: "routing_packets", label: "Routing", unit: "packets" }},
+      {{ id: "nodeinfo_packets", label: "Node Info", unit: "packets" }},
+      {{ id: "direct_packets", label: "Direct Sends", unit: "packets" }},
+      {{ id: "storeforward_packets", label: "Store/Fwd", unit: "packets" }},
+      {{ id: "admin_packets", label: "Admin", unit: "packets" }},
+      {{ id: "encrypted_packets", label: "Encrypted", unit: "packets" }},
+      {{ id: "other_packets", label: "Other Packets", unit: "packets" }},
+    ]);
+    const networkTopNodesCategoryById = new Map(
+      networkTopNodesCategoryDefs.map((entry) => [entry.id, entry])
+    );
+
+    function normalizeNetworkTopNodesCategory(raw) {{
+      const clean = String(raw || "").trim().toLowerCase().replace(/[-\s]+/g, "_");
+      const aliases = {{
+        packets: "saved_packets",
+        stored_packets: "saved_packets",
+        saved: "saved_packets",
+        uptime: "active_hours",
+        active: "active_hours",
+        chat: "chat_packets",
+        chats: "chat_packets",
+        gps: "gps_positions",
+        positions: "gps_positions",
+        position: "position_packets",
+        metrics: "environment_metrics",
+        metric: "environment_metrics",
+        telemetry: "telemetry_packets",
+        link: "links",
+        routing: "routing_packets",
+        nodeinfo: "nodeinfo_packets",
+        node_info: "nodeinfo_packets",
+        direct: "direct_packets",
+        store_forward: "storeforward_packets",
+        storefwd: "storeforward_packets",
+        encrypted: "encrypted_packets",
+        other: "other_packets",
+      }};
+      const normalized = aliases[clean] || clean;
+      return networkTopNodesCategoryById.has(normalized) ? normalized : "saved_packets";
+    }}
+
+    function networkTopNodesCategoryDef(category) {{
+      const clean = normalizeNetworkTopNodesCategory(category);
+      return networkTopNodesCategoryById.get(clean) || networkTopNodesCategoryDefs[0];
+    }}
+
+    function loadPreferredNetworkTopNodesCategory() {{
+      try {{
+        return normalizeNetworkTopNodesCategory(window.localStorage.getItem(networkTopNodesCategoryStorageKey));
+      }} catch (_err) {{
+        return "saved_packets";
+      }}
+    }}
+
+    function persistPreferredNetworkTopNodesCategory(category) {{
+      const clean = normalizeNetworkTopNodesCategory(category);
+      try {{
+        window.localStorage.setItem(networkTopNodesCategoryStorageKey, clean);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function ensureNetworkTopNodesCategoryOptions() {{
+      const select = document.getElementById("network-top-nodes-category");
+      if (!(select instanceof HTMLSelectElement)) return;
+      const optionsSignature = networkTopNodesCategoryDefs.map((entry) => entry.id).join("|");
+      if (select.dataset.optionsSignature !== optionsSignature) {{
+        select.innerHTML = networkTopNodesCategoryDefs
+          .map((entry) => `<option value="${{escAttr(entry.id)}}">${{escAttr(entry.label)}}</option>`)
+          .join("");
+        select.dataset.optionsSignature = optionsSignature;
+      }}
+      const clean = normalizeNetworkTopNodesCategory(networkTopNodesCategory);
+      if (select.value !== clean) {{
+        select.value = clean;
+      }}
+    }}
+
+    function bindNetworkTopNodesControls() {{
+      ensureNetworkTopNodesCategoryOptions();
+      const select = document.getElementById("network-top-nodes-category");
+      if (select instanceof HTMLSelectElement && select.dataset.bound !== "1") {{
+        select.dataset.bound = "1";
+        select.addEventListener("change", () => {{
+          networkTopNodesCategory = normalizeNetworkTopNodesCategory(select.value);
+          persistPreferredNetworkTopNodesCategory(networkTopNodesCategory);
+          renderNetworkTopNodes(latestState, {{ force: false }});
+        }});
+      }}
+      const refreshBtn = document.getElementById("network-top-nodes-refresh-btn");
+      if (refreshBtn instanceof HTMLButtonElement && refreshBtn.dataset.bound !== "1") {{
+        refreshBtn.dataset.bound = "1";
+        refreshBtn.addEventListener("click", () => {{
+          renderNetworkTopNodes(latestState, {{ force: true }});
+        }});
+      }}
+      const list = document.getElementById("network-top-nodes-list");
+      if (list instanceof HTMLElement && list.dataset.bound !== "1") {{
+        list.dataset.bound = "1";
+        list.addEventListener("click", (event) => {{
+          const target = event.target instanceof Element ? event.target : null;
+          const row = target ? target.closest("[data-top-node-id]") : null;
+          if (!(row instanceof HTMLElement)) return;
+          const nodeId = normalizeNodeId(row.dataset.topNodeId || "");
+          if (!isSelectableNodeId(nodeId)) return;
+          selectNode(nodeId, true, true);
+        }});
+      }}
+    }}
+
+    function networkTopNodesPacketType(portnumRaw) {{
+      const portnum = String(portnumRaw || "").trim().toUpperCase();
+      if (!portnum) return "encrypted";
+      if (portnum === "TEXT_MESSAGE_APP") return "chat";
+      if (portnum === "TELEMETRY_APP") return "telemetry";
+      if (portnum === "POSITION_APP") return "position";
+      if (portnum === "ROUTING_APP") return "routing";
+      if (portnum === "STORE_FORWARD_APP") return "storeforward";
+      if (portnum === "NODEINFO_APP") return "nodeinfo";
+      if (portnum === "ADMIN_APP") return "admin";
+      return "other";
+    }}
+
+    function networkTopNodesPacketSummary(entry) {{
+      const safeEntry = (entry && typeof entry === "object") ? entry : {{}};
+      const summary = (safeEntry.summary && typeof safeEntry.summary === "object") ? safeEntry.summary : {{}};
+      const packet = (safeEntry.packet && typeof safeEntry.packet === "object") ? safeEntry.packet : safeEntry;
+      const decoded = (packet.decoded && typeof packet.decoded === "object") ? packet.decoded : {{}};
+      const fromId = normalizeNodeId(
+        summary.from
+        ?? summary.from_id
+        ?? summary.fromId
+        ?? packet.fromId
+        ?? packet.from_id
+        ?? packet.from
+        ?? ""
+      );
+      const toId = normalizeNodeId(
+        summary.to
+        ?? summary.to_id
+        ?? summary.toId
+        ?? packet.toId
+        ?? packet.to_id
+        ?? packet.to
+        ?? packet.destination
+        ?? ""
+      );
+      const portnum = String(
+        summary.portnum
+        ?? decoded.portnum
+        ?? packet.portnum
+        ?? ""
+      ).trim();
+      const unixRaw = Number(
+        summary.rx_time_unix
+        ?? summary.time_unix
+        ?? packet.rxTime
+        ?? packet.rx_time
+        ?? 0
+      );
+      const lastSeenUnix = Number.isFinite(unixRaw) && unixRaw > 0 ? Math.trunc(unixRaw) : 0;
+      return {{
+        fromId,
+        toId,
+        portnum,
+        packetType: networkTopNodesPacketType(portnum),
+        lastSeenUnix,
+      }};
+    }}
+
+    function networkTopNodesAddCount(map, nodeId, amount = 1, options = {{}}) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(clean)) return null;
+      const increment = Math.max(0, Math.trunc(Number(amount) || 0));
+      if (increment <= 0) return null;
+      let item = map.get(clean);
+      if (!item) {{
+        item = {{
+          node_id: clean,
+          value: 0,
+          secondary_value: 0,
+          last_seen_unix: 0,
+        }};
+        map.set(clean, item);
+      }}
+      item.value += increment;
+      const secondary = Math.max(0, Math.trunc(Number(options.secondaryValue) || 0));
+      if (secondary > 0) {{
+        item.secondary_value = Math.max(Math.trunc(Number(item.secondary_value) || 0), secondary);
+      }}
+      const lastSeen = Math.trunc(Number(options.lastSeenUnix) || 0);
+      if (lastSeen > 0) {{
+        item.last_seen_unix = Math.max(Math.trunc(Number(item.last_seen_unix) || 0), lastSeen);
+      }}
+      return item;
+    }}
+
+    function networkTopNodesItemsFromMap(map, limit = 10) {{
+      return Array.from(map.values())
+        .filter((item) => Number(item && item.value) > 0)
+        .sort((a, b) => {{
+          const valueDiff = (Number(b.value) || 0) - (Number(a.value) || 0);
+          if (Math.abs(valueDiff) > 1e-9) return valueDiff;
+          const timeDiff = (Number(b.last_seen_unix) || 0) - (Number(a.last_seen_unix) || 0);
+          if (timeDiff) return timeDiff;
+          return String(a.node_id || "").localeCompare(String(b.node_id || ""));
+        }})
+        .slice(0, Math.max(1, Math.trunc(Number(limit) || 10)))
+        .map((item, idx) => ({{
+          ...item,
+          rank: idx + 1,
+        }}));
+    }}
+
+    function buildLocalNetworkTopNodesPayload(category, state = latestState) {{
+      const cleanCategory = normalizeNetworkTopNodesCategory(category);
+      const def = networkTopNodesCategoryDef(cleanCategory);
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
+      const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      const packets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const counts = new Map();
+
+      if (cleanCategory === "saved_packets") {{
+        for (const node of nodes) {{
+          networkTopNodesAddCount(counts, node && node.id, node && node.saved_packets, {{
+            secondaryValue: node && node.saved_points,
+            lastSeenUnix: node && node.last_heard_unix,
+          }});
+        }}
+      }} else if (cleanCategory === "gps_positions") {{
+        for (const node of nodes) {{
+          const hasPosition = Number.isFinite(Number(node && node.lat)) && Number.isFinite(Number(node && node.lon));
+          if (!hasPosition) continue;
+          networkTopNodesAddCount(counts, node && node.id, 1, {{
+            lastSeenUnix: node && node.last_heard_unix,
+          }});
+        }}
+      }} else if (cleanCategory === "links" || cleanCategory === "link_packets") {{
+        const peersByNode = new Map();
+        const linkPacketsByNode = new Map();
+        const lastSeenByNode = new Map();
+        const addPeer = (nodeId, peerId, packetCount, lastSeenUnix) => {{
+          const cleanNode = normalizeNodeId(nodeId || "");
+          const cleanPeer = normalizeNodeId(peerId || "");
+          if (!isSelectableNodeId(cleanNode) || !isSelectableNodeId(cleanPeer)) return;
+          if (!peersByNode.has(cleanNode)) peersByNode.set(cleanNode, new Set());
+          peersByNode.get(cleanNode).add(cleanPeer);
+          linkPacketsByNode.set(
+            cleanNode,
+            Math.max(0, Math.trunc(Number(linkPacketsByNode.get(cleanNode)) || 0)) + Math.max(0, Math.trunc(Number(packetCount) || 0))
+          );
+          const lastSeen = Math.trunc(Number(lastSeenUnix) || 0);
+          if (lastSeen > 0) {{
+            lastSeenByNode.set(cleanNode, Math.max(Math.trunc(Number(lastSeenByNode.get(cleanNode)) || 0), lastSeen));
+          }}
+        }};
+        for (const edge of edges) {{
+          const fromId = edge && edge.from;
+          const toId = edge && edge.to;
+          const packetCount = edge && (edge.lifetime_count ?? edge.count ?? edge.session_count);
+          const lastSeen = edge && (edge.last_rx_unix ?? edge.last_seen_unix ?? edge.last_unix);
+          addPeer(fromId, toId, packetCount, lastSeen);
+          addPeer(toId, fromId, packetCount, lastSeen);
+        }}
+        for (const [nodeId, peers] of peersByNode.entries()) {{
+          const packetCount = Math.max(0, Math.trunc(Number(linkPacketsByNode.get(nodeId)) || 0));
+          networkTopNodesAddCount(
+            counts,
+            nodeId,
+            cleanCategory === "links" ? peers.size : packetCount,
+            {{
+              secondaryValue: cleanCategory === "links" ? packetCount : peers.size,
+              lastSeenUnix: lastSeenByNode.get(nodeId),
+            }}
+          );
+        }}
+      }} else {{
+        const categoryTypeById = {{
+          chat_packets: "chat",
+          telemetry_packets: "telemetry",
+          position_packets: "position",
+          routing_packets: "routing",
+          nodeinfo_packets: "nodeinfo",
+          storeforward_packets: "storeforward",
+          admin_packets: "admin",
+          encrypted_packets: "encrypted",
+          other_packets: "other",
+          environment_metrics: "telemetry",
+        }};
+        const targetType = categoryTypeById[cleanCategory] || "";
+        for (const entry of packets) {{
+          const summary = networkTopNodesPacketSummary(entry);
+          if (!isSelectableNodeId(summary.fromId)) continue;
+          if (cleanCategory === "direct_packets") {{
+            if (!isSelectableNodeId(summary.toId) || summary.toId === summary.fromId) continue;
+            networkTopNodesAddCount(counts, summary.fromId, 1, {{
+              secondaryValue: 1,
+              lastSeenUnix: summary.lastSeenUnix,
+            }});
+            continue;
+          }}
+          if (targetType && summary.packetType !== targetType) continue;
+          networkTopNodesAddCount(counts, summary.fromId, 1, {{
+            lastSeenUnix: summary.lastSeenUnix,
+          }});
+        }}
+      }}
+
+      return {{
+        ok: true,
+        category: cleanCategory,
+        category_label: def.label,
+        unit: def.unit,
+        source: "current state",
+        limit: 10,
+        items: networkTopNodesItemsFromMap(counts, 10),
+        fallback: true,
+      }};
+    }}
+
+    function networkTopNodesNodeMap(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const out = new Map();
+      for (const node of nodes) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (isSelectableNodeId(nodeId) && !out.has(nodeId)) {{
+          out.set(nodeId, node);
+        }}
+      }}
+      return out;
+    }}
+
+    function networkTopNodesDisplayName(nodeId, state = latestState) {{
+      const clean = normalizeNodeId(nodeId || "");
+      const node = networkTopNodesNodeMap(state).get(clean) || null;
+      const cached = (nodeNameCache instanceof Map) ? String(nodeNameCache.get(clean) || "").trim() : "";
+      return String(preferredNodeName(node) || cached || clean || "Unknown node");
+    }}
+
+    function networkTopNodesTimeText(unixValue) {{
+      const parsed = Math.trunc(Number(unixValue) || 0);
+      if (parsed <= 0) return "";
+      if (typeof formatLocalChatTime === "function") {{
+        return formatLocalChatTime(parsed, "n/a");
+      }}
+      try {{
+        return new Date(parsed * 1000).toLocaleString();
+      }} catch (_err) {{
+        return "";
+      }}
+    }}
+
+    function networkTopNodesNumberText(value) {{
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return "0";
+      try {{
+        return Math.trunc(parsed).toLocaleString();
+      }} catch (_err) {{
+        return String(Math.trunc(parsed));
+      }}
+    }}
+
+    function networkTopNodesUnitText(unit, value) {{
+      const clean = String(unit || "").trim();
+      if (!clean) return "";
+      const count = Math.trunc(Number(value) || 0);
+      if (count === 1) {{
+        if (clean === "hours") return "hour";
+        if (clean === "packets") return "packet";
+        if (clean === "chats") return "chat";
+        if (clean === "positions") return "position";
+        if (clean === "samples") return "sample";
+        if (clean === "links") return "link";
+      }}
+      return clean;
+    }}
+
+    function networkTopNodesMetaText(item, payload) {{
+      const pieces = [];
+      const secondary = Math.trunc(Number(item && item.secondary_value) || 0);
+      const category = normalizeNetworkTopNodesCategory(payload && payload.category);
+      if (secondary > 0) {{
+        if (category === "saved_packets") {{
+          pieces.push(`${{networkTopNodesNumberText(secondary)}} metric points`);
+        }} else if (category === "links") {{
+          pieces.push(`${{networkTopNodesNumberText(secondary)}} link packets`);
+        }} else if (category === "link_packets") {{
+          pieces.push(`${{networkTopNodesNumberText(secondary)}} linked nodes`);
+        }} else if (category === "environment_metrics") {{
+          pieces.push(`${{networkTopNodesNumberText(secondary)}} metric types`);
+        }} else if (category === "direct_packets") {{
+          pieces.push(`${{networkTopNodesNumberText(secondary)}} targets`);
+        }}
+      }}
+      const seenText = networkTopNodesTimeText(item && item.last_seen_unix);
+      if (seenText) {{
+        pieces.push(`last ${{seenText}}`);
+      }}
+      return pieces.join(" - ");
+    }}
+
+    function renderNetworkTopNodesPayload(payload, state = latestState, options = {{}}) {{
+      const safePayload = (payload && typeof payload === "object") ? payload : buildLocalNetworkTopNodesPayload(networkTopNodesCategory, state);
+      const summary = document.getElementById("network-top-nodes-summary");
+      const list = document.getElementById("network-top-nodes-list");
+      const status = document.getElementById("network-top-nodes-status");
+      if (!(summary instanceof HTMLElement) || !(list instanceof HTMLElement)) return;
+      const category = normalizeNetworkTopNodesCategory(safePayload.category || networkTopNodesCategory);
+      const def = networkTopNodesCategoryDef(category);
+      const label = String(safePayload.category_label || def.label || "Top Nodes");
+      const unit = String(safePayload.unit || def.unit || "");
+      const items = Array.isArray(safePayload.items) ? safePayload.items : [];
+      const source = String(safePayload.source || (safePayload.fallback ? "current state" : "history")).trim();
+      const errorText = String(options.error || safePayload.error || "").trim();
+      const loading = !!options.loading;
+      const maxValue = items.reduce((max, item) => Math.max(max, Number(item && item.value) || 0), 0);
+
+      if (status instanceof HTMLElement) {{
+        status.textContent = loading ? "Loading..." : (errorText ? "Current state fallback" : "");
+      }}
+      summary.innerHTML = `<span><strong>${{escAttr(label)}}</strong> - ${{escAttr(source)}}${{errorText ? ` - ${{escAttr(errorText)}}` : ""}}</span><span>${{escAttr(String(items.length))}} / 10</span>`;
+
+      if (!items.length) {{
+        list.innerHTML = `<div class="network-top-nodes-empty">No ${{escAttr(label.toLowerCase())}} activity yet.</div>`;
+        return;
+      }}
+
+      const rows = items.map((item, index) => {{
+        const nodeId = normalizeNodeId(item && item.node_id);
+        const rank = Math.max(1, Math.trunc(Number(item && item.rank) || (index + 1)));
+        const value = Math.max(0, Math.trunc(Number(item && item.value) || 0));
+        const pct = maxValue > 0 ? Math.max(3, Math.min(100, (value / maxValue) * 100)) : 0;
+        const name = networkTopNodesDisplayName(nodeId, state);
+        const meta = networkTopNodesMetaText(item, safePayload);
+        const unitText = networkTopNodesUnitText(unit, value);
+        return `<button class="network-top-node-row" type="button" data-top-node-id="${{escAttr(nodeId)}}" title="${{escAttr(`${{name}} (${{nodeId}})`)}}">
+          <span class="network-top-node-rank">#${{escAttr(rank)}}</span>
+          <span class="network-top-node-main">
+            <span class="network-top-node-name">${{escAttr(name)}}</span>
+            <span class="network-top-node-id">${{escAttr(nodeId)}}</span>
+            ${{meta ? `<span class="network-top-node-meta">${{escAttr(meta)}}</span>` : ""}}
+          </span>
+          <span class="network-top-node-value">
+            <strong>${{escAttr(networkTopNodesNumberText(value))}}</strong>
+            <span class="network-top-node-unit">${{escAttr(unitText)}}</span>
+          </span>
+          <span class="network-top-node-bar" aria-hidden="true"><span style="--top-node-bar:${{pct.toFixed(1)}}%;"></span></span>
+        </button>`;
+      }});
+      list.innerHTML = rows.join("");
+    }}
+
+    async function fetchNetworkTopNodesPayload(category, force = false) {{
+      const clean = normalizeNetworkTopNodesCategory(category);
+      const cached = networkTopNodesCache instanceof Map ? networkTopNodesCache.get(clean) : null;
+      const now = Date.now();
+      if (
+        !force
+        && cached
+        && cached.payload
+        && (now - Number(cached.fetchedAtMs || 0)) < Math.max(30000, refreshMs * 10)
+      ) {{
+        return cached.payload;
+      }}
+      const resp = await fetch(`/api/history/top_nodes?category=${{encodeURIComponent(clean)}}&limit=10`, {{ cache: "no-store" }});
+      const payload = await resp.json();
+      if (!resp.ok || !payload || payload.ok === false) {{
+        const message = payload && payload.error ? String(payload.error) : `HTTP ${{resp.status}}`;
+        throw new Error(message);
+      }}
+      if (networkTopNodesCache instanceof Map) {{
+        networkTopNodesCache.set(clean, {{
+          payload,
+          fetchedAtMs: now,
+        }});
+      }}
+      return payload;
+    }}
+
+    function renderNetworkTopNodes(state = latestState, options = {{}}) {{
+      bindNetworkTopNodesControls();
+      networkTopNodesCategory = normalizeNetworkTopNodesCategory(networkTopNodesCategory);
+      ensureNetworkTopNodesCategoryOptions();
+      const select = document.getElementById("network-top-nodes-category");
+      if (select instanceof HTMLSelectElement && select.value !== networkTopNodesCategory) {{
+        select.value = networkTopNodesCategory;
+      }}
+      const localPayload = buildLocalNetworkTopNodesPayload(networkTopNodesCategory, state);
+      renderNetworkTopNodesPayload(localPayload, state, {{
+        loading: true,
+      }});
+      const force = !!(options && options.force);
+      const requestCategory = networkTopNodesCategory;
+      if (
+        networkTopNodesHydrateInFlight
+        && normalizeNetworkTopNodesCategory(networkTopNodesHydrateInFlight.category) === requestCategory
+      ) {{
+        return;
+      }}
+      const requestToken = {{
+        category: requestCategory,
+      }};
+      networkTopNodesHydrateInFlight = requestToken;
+      requestToken.promise = fetchNetworkTopNodesPayload(requestCategory, force)
+        .then((payload) => {{
+          if (activeLayoutView !== "network" || activeNetworkSubview !== "top10") return;
+          if (normalizeNetworkTopNodesCategory(networkTopNodesCategory) !== normalizeNetworkTopNodesCategory(payload && payload.category)) return;
+          const payloadItems = Array.isArray(payload && payload.items) ? payload.items : [];
+          if (!payloadItems.length && Array.isArray(localPayload.items) && localPayload.items.length > 0) {{
+            renderNetworkTopNodesPayload(localPayload, latestState || state);
+            return;
+          }}
+          renderNetworkTopNodesPayload(payload, latestState || state);
+        }})
+        .catch((err) => {{
+          if (activeLayoutView !== "network" || activeNetworkSubview !== "top10") return;
+          const message = err instanceof Error ? err.message : String(err || "history unavailable");
+          renderNetworkTopNodesPayload(localPayload, latestState || state, {{
+            error: message,
+          }});
+        }})
+        .finally(() => {{
+          if (networkTopNodesHydrateInFlight === requestToken) {{
+            networkTopNodesHydrateInFlight = null;
+          }}
+        }});
     }}
 
     function formatMalformedDiagnosticsTimestamp(unixValue) {{
@@ -1231,6 +1774,9 @@
         if (typeof renderNetworkGraphView === "function") {{
           renderNetworkGraphView(latestState);
         }}
+      }}
+      if (normalizedView === "network" && next === "top10") {{
+        renderNetworkTopNodes(latestState);
       }}
       if (normalizedView === "network" && next === "diagnostics") {{
         void refreshNetworkDiagnosticsPanel(false);
@@ -5361,6 +5907,7 @@
       syncEnvironmentMetricsDock(next, activeNetworkSubview);
       if (latestState) {{
         const networkGraphActive = next === "network" && activeNetworkSubview === "graph";
+        const networkTopNodesActive = next === "network" && activeNetworkSubview === "top10";
         let cachedNodeHistory = null;
         const viewHistoryNodeId = next === "saved"
           ? resolveSavedViewNodeId(latestState)
@@ -5388,6 +5935,9 @@
           renderNodes(latestState.nodes || []);
           if (networkGraphActive && typeof renderNetworkGraphView === "function") {{
             renderNetworkGraphView(latestState);
+          }}
+          if (networkTopNodesActive) {{
+            renderNetworkTopNodes(latestState);
           }}
           if (activeNetworkSubview === "diagnostics") {{
             void refreshNetworkDiagnosticsPanel(false);
@@ -5579,6 +6129,7 @@
       }}
       networkGraphEdgeMode = loadPreferredNetworkGraphEdgeMode();
       networkGraphLayoutMode = loadPreferredNetworkGraphLayoutMode();
+      networkTopNodesCategory = loadPreferredNetworkTopNodesCategory();
       activeNetworkSubview = loadPreferredNetworkSubview();
       setActiveNetworkSubview(activeNetworkSubview, {{ persist: false }});
       const preferred = normalizeLayoutView(rawPreferred);

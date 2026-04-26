@@ -131,10 +131,14 @@
             renderMap(nodes304, traffic304.edges || [], cachedHistory304);
           }}
           const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph";
+          const networkTopNodesActive304 = activeLayoutView === "network" && activeNetworkSubview === "top10";
           if (activeLayoutView === "network") {{
             renderNodes(nodes304);
             if (networkGraphActive304 && typeof renderNetworkGraphView === "function") {{
               renderNetworkGraphView(latestState);
+            }}
+            if (networkTopNodesActive304 && typeof renderNetworkTopNodes === "function") {{
+              renderNetworkTopNodes(latestState);
             }}
           }}
           if (trafficVisible304) {{
@@ -294,6 +298,7 @@
           && isSelectableNodeId(historyTargetId);
         const cachedHistory = historyRelevant ? cachedNodeHistory(historyTargetId) : null;
         const networkGraphActive = activeLayoutView === "network" && activeNetworkSubview === "graph";
+        const networkTopNodesActive = activeLayoutView === "network" && activeNetworkSubview === "top10";
 
         if (mapVisible && !mapBootstrapFocusDone) {{
           const bootstrap = applyMapBootstrapFocus(state.nodes || [], state);
@@ -331,6 +336,9 @@
           renderNodes(state.nodes || []);
           if (networkGraphActive && typeof renderNetworkGraphView === "function") {{
             renderNetworkGraphView(state);
+          }}
+          if (networkTopNodesActive && typeof renderNetworkTopNodes === "function") {{
+            renderNetworkTopNodes(state);
           }}
         }}
 

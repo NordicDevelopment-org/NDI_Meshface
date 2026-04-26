@@ -354,6 +354,38 @@ def handle_dashboard_get(
         deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
         return
 
+    if path == "/api/history/top_nodes":
+        query_obj = parse_qs(query or "")
+        category = str(
+            query_obj.get("category", [""])[0]
+            or query_obj.get("cat", [""])[0]
+            or "saved_packets"
+        ).strip()
+        limit = deps.to_int_fn(query_obj.get("limit", [""])[0])
+        top_nodes_fn = getattr(deps.state_fn, "top_nodes_fn", None)
+        if callable(top_nodes_fn):
+            try:
+                response_obj = top_nodes_fn(
+                    category=category or "saved_packets",
+                    limit=limit or 10,
+                )
+            except Exception as exc:
+                response_obj = {
+                    "ok": False,
+                    "error": str(exc or "top nodes failed"),
+                    "category": category or "saved_packets",
+                    "items": [],
+                }
+        else:
+            response_obj = {
+                "ok": False,
+                "error": "top nodes history unavailable on this node",
+                "category": category or "saved_packets",
+                "items": [],
+            }
+        deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
+        return
+
     if path == "/api/history/environment":
         query_obj = parse_qs(query or "")
         hours_override = deps.to_int_fn(

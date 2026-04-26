@@ -2681,6 +2681,14 @@ Ready.
                   type="button"
                   role="tab"
                   aria-selected="false"
+                  aria-controls="network-map-panel-top10"
+                  data-network-subview="top10"
+                >Top 10</button>
+                <button
+                  class="network-map-subview-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
                   aria-controls="network-map-panel-diagnostics"
                   data-network-subview="diagnostics"
                   {network_diagnostics_tab_hidden_attrs}
@@ -2906,6 +2914,33 @@ Ready.
                   </div>
                   <div id="network-overview-timeline" class="signal-timeline" aria-label="Network overview trend timeline"></div>
                   <div id="network-overview-overview" class="overview-grid"></div>
+                </section>
+              </div>
+            </div>
+            <div
+              id="network-map-panel-top10"
+              class="network-map-subview-panel"
+              role="tabpanel"
+              data-network-subview-panel="top10"
+              hidden
+            >
+              <div class="network-overview-panel network-top-nodes-panel">
+                <section class="network-top-nodes-card">
+                  <div class="network-top-nodes-toolbar">
+                    <label class="history-metric-wrap history-select-chip-hide-label" for="network-top-nodes-category">
+                      <span class="history-metric-label">Category</span>
+                      <select id="network-top-nodes-category" class="history-metric-select" aria-label="Top 10 category"></select>
+                    </label>
+                    <button
+                      id="network-top-nodes-refresh-btn"
+                      class="map-reset-view-btn network-top-nodes-refresh-btn"
+                      type="button"
+                      title="Refresh top nodes"
+                    >Refresh</button>
+                    <span id="network-top-nodes-status" class="network-top-nodes-status" aria-live="polite"></span>
+                  </div>
+                  <div id="network-top-nodes-summary" class="network-top-nodes-summary"></div>
+                  <div id="network-top-nodes-list" class="network-top-nodes-list"></div>
                 </section>
               </div>
             </div>

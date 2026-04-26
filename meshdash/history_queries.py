@@ -4,7 +4,7 @@ from .history_summary_sampling import (
     summary_metrics_bucket_unix as _summary_metrics_bucket_unix,
 )
 
-_PACKET_TYPE_CASE_SQL = """
+PACKET_TYPE_CASE_SQL = """
 CASE
   WHEN trim(COALESCE(portnum, '')) = '' THEN 'encrypted'
   WHEN upper(trim(portnum)) = 'TEXT_MESSAGE_APP' THEN 'chat'
@@ -17,6 +17,8 @@ CASE
   ELSE 'other'
 END
 """.strip()
+
+_PACKET_TYPE_CASE_SQL = PACKET_TYPE_CASE_SQL
 
 
 def fetch_recent_packet_rows(conn: SqlConnection, limit: int) -> SqlRows:
