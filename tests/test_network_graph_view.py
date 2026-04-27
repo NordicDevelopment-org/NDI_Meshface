@@ -122,6 +122,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function buildNetworkGraphNodeSignalMeta(nodeMap, recentPackets)' in js
     assert 'const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";' in js
     assert 'const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";' in js
+    assert 'const networkGraphTagRouteVisibilityStorageKey = "meshDashboardNetworkGraphTagRouteVisibilityV1";' in js
     assert 'let networkGraphEdgeMode = "history";' in js
     assert 'let networkGraphLayoutMode = "radial";' in js
     assert 'const networkGraphOverlayFitZoomOutScale = 1.1;' in js
@@ -131,8 +132,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'clean === "community"' in js
     assert 'function loadPreferredNetworkGraphEdgeMode()' in js
     assert 'function loadPreferredNetworkGraphLayoutMode()' in js
+    assert 'function loadPreferredNetworkGraphHiddenTagRoutePresetIds()' in js
     assert 'function persistPreferredNetworkGraphEdgeMode(modeName)' in js
     assert 'function persistPreferredNetworkGraphLayoutMode(modeName)' in js
+    assert 'function persistPreferredNetworkGraphHiddenTagRoutePresetIds(hiddenIds)' in js
     assert 'const graphSvg = document.getElementById("network-graph-svg");' in js
     assert 'graphSvg instanceof Element' in js
     assert 'graphToolbar.classList.toggle("is-overlay-docked", useOverlayGraphSummary);' in js
@@ -228,9 +231,6 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'label: `${layer} hop${layer === 1 ? "" : "s"}`,' in js
     assert 'Switch Links view between stored history topology and the current session topology' in js
     assert '<span class="network-graph-chip-label">1 Hop</span>' not in js
-    assert 'Click to refocus, scroll to zoom, and use Reset view from the header controls.' in js
-    assert 'Numbered hop rings show shortest graph distance from the current root, not literal packet-route hops.' in js
-    assert 'first-hop neighborhoods split into branch sub-clusters from the current root' in js
     assert 'const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph";' in js
     assert 'const weeklySummaryPromise = (activeLayoutView === "history" || activeLayoutView === "network")' in js
     assert 'if (weeklySummaryPromise) {' in js
@@ -249,7 +249,30 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'return radius + amplitude + 2;' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'const isLocalNode = item.nodeId === localId;' in js
+    assert 'const isTaggedNode = !!(tagEntry && tagEntry.preset);' in js
+    assert 'isTaggedNode ? "is-tagged" : ""' in js
+    assert 'nodeEl.classList.toggle("is-tagged", isTaggedNode);' in js
+    assert 'nodeEl.setAttribute("style", tagStyleVars);' in js
     assert 'function resolveNetworkGraphShortestPathEdgeKeys(edges, fromNodeId, toNodeId) {' in js
+    assert 'function resolveNetworkGraphTaggedItems(items) {' in js
+    assert 'function resolveNetworkGraphTaggedRouteSegments(edges, items, rootId, routeAnchorId = "") {' in js
+    assert 'const routeStartId = (' in js
+    assert 'sourceId: routeStartId,' in js
+    assert 'function resolveNetworkGraphTagRouteLegendItems(edges, items, rootId, routeAnchorId = "") {' in js
+    assert 'function buildNetworkGraphTagRouteOverlayMarkup(scene) {' in js
+    assert 'function renderNetworkGraphTagRouteLegend(scene) {' in js
+    assert 'function bindNetworkGraphTagRouteLegendControls(legend, scene) {' in js
+    assert 'const stackOffset = Math.max(-11, Math.min(11, (stackIndex - ((stackCount - 1) / 2)) * 2.8));' in js
+    assert 'class="network-graph-tag-route"' in js
+    assert 'data-network-graph-tag-preset-id="${escAttr(segment.presetId)}"' in js
+    assert 'data-network-graph-tag-edge-key="${escAttr(segment.edgeKey)}"' in js
+    assert 'data-network-graph-tag-filter-id="${escAttr(item.presetId)}"' in js
+    assert 'const disabledAttr = hasRoutes ? "" : " disabled";' in js
+    assert 'No current ${item.label} routes from this view' in js
+    assert 'localId,' in js
+    assert '<g class="network-graph-tag-routes">' in js
+    assert 'syncNetworkGraphTagRouteLayer(svg, safeScene);' in js
+    assert 'renderNetworkGraphTagRouteLegend(scene);' in js
     assert 'const edgeRenderItems = edges.map((edge, index) => ({' in js
     assert 'return pathDelta || (itemA.index - itemB.index);' in js
     assert 'localPathEdgeKeys.has(edgeKey) ? "is-local-path" : ""' in js
@@ -257,8 +280,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'localPathEdgeEls.forEach((edgeEl) => linkLayer.appendChild(edgeEl));' in js
     assert 'position.labelOffsetY == null' in js
     assert 'class="network-graph-node-emoji"' in js
-    assert '<span class="network-graph-swatch is-local"></span>Your node / local radio' in js
-    assert '<span class="network-graph-swatch is-local-path"></span>Shortest root-to-your-node path' in js
+    assert '<div class="network-graph-tag-legend-title">Tag routes</div>' in js
     assert 'is-broadcast-only' in js
     assert 'pointerDownNodeId' in js
     assert 'svg.addEventListener("wheel"' in js
@@ -304,6 +326,10 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "[data-theme=\"dark\"] .network-graph-mode-control {" in css
     assert "[data-theme=\"dark\"] .network-graph-layout-select," in css
     assert "[data-theme=\"dark\"] .network-graph-mode-select {" in css
+    assert "position: absolute;" in graph_legend_css
+    assert "bottom: 14px;" in graph_legend_css
+    assert "pointer-events: auto;" in graph_legend_css
+    assert ".network-graph-legend[hidden] {" in css
     assert "--network-graph-label-font-size: 10px;" in css
     assert ".network-graph-region {" in css
     assert ".network-graph-region-label {" in css
@@ -312,10 +338,26 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-swatch.is-local {" in css
     assert ".network-graph-edge.is-local-path {" in css
     assert "stroke: var(--theme-base-color, var(--accent, #2f855a));" in css
+    assert ".network-graph-tag-routes {" in css
+    assert ".network-graph-tag-route {" in css
+    assert "stroke: var(--network-graph-tag-route-color, var(--node-tag-color, #2aa85a));" in css
+    assert ".network-graph-tag-filter-input {" in css
+    assert ".network-graph-tag-filter.is-empty {" in css
+    assert "appearance: none;" in css
+    assert "border: 2px solid var(--network-graph-tag-route-color, #2aa85a);" in css
+    assert "accent-color: var(--network-graph-tag-route-color, #2aa85a);" in css
+    assert ".network-graph-tag-filter-input:checked {" in css
+    assert ".network-graph-tag-filter-input:disabled {" in css
     assert "[data-theme=\"dark\"] .network-graph-edge.is-local-path {" in css
     assert "stroke: var(--theme-base-color, var(--ui-accent));" in css
+    assert "[data-theme=\"dark\"] .network-graph-tag-route {" in css
+    assert "[data-theme=\"dark\"] .network-graph-tag-filter {" in css
     assert ".network-graph-ring.is-broadcast-only {" in css
     assert ".network-graph-node.is-local .network-graph-node-core {" in css
+    assert ".network-graph-node.is-tagged .network-graph-node-core {" in css
+    assert "stroke: var(--node-tag-color, #2aa85a);" in css
+    assert "[data-theme=\"dark\"] .network-graph-node.is-tagged .network-graph-node-core {" in css
+    assert "stroke: var(--node-tag-color, #3fb950);" in css
     assert ".network-graph-node-emoji-fo {" in css
     assert ".network-graph-node-emoji {" in css
     assert ".network-graph-node.is-local .network-graph-node-emoji {" in css
@@ -331,4 +373,3 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "pointer-events: auto;" in graph_label_css
     assert "position: absolute;" in graph_toolbar_css
     assert ".network-graph-toolbar.is-overlay-docked {" in css
-    assert "display: none;" in graph_legend_css

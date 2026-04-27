@@ -695,6 +695,7 @@
     const networkDiagnosticsEnabled = !!Number({debug_mode_enabled});
     const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";
     const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";
+    const networkGraphTagRouteVisibilityStorageKey = "meshDashboardNetworkGraphTagRouteVisibilityV1";
     let networkGraphEdgeMode = "history";
     let networkGraphLayoutMode = "radial";
 
@@ -718,6 +719,18 @@
       const clean = String(raw || "").trim().toLowerCase();
       if (clean === "tree" || clean === "cluster" || clean === "community") return clean;
       return "radial";
+    }}
+
+    function normalizeNetworkGraphTagRoutePresetId(raw) {{
+      if (typeof normalizeNodeTagPresetId === "function") {{
+        return normalizeNodeTagPresetId(raw, "");
+      }}
+      return String(raw || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 48);
     }}
 
     function loadPreferredNetworkSubview() {{
@@ -767,6 +780,28 @@
       const next = normalizeNetworkGraphLayoutMode(modeName);
       try {{
         window.localStorage.setItem(networkGraphLayoutStorageKey, next);
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadPreferredNetworkGraphHiddenTagRoutePresetIds() {{
+      try {{
+        const raw = window.localStorage.getItem(networkGraphTagRouteVisibilityStorageKey) || "[]";
+        const parsed = JSON.parse(raw);
+        const values = Array.isArray(parsed) ? parsed : [];
+        return new Set(values.map((value) => normalizeNetworkGraphTagRoutePresetId(value)).filter(Boolean));
+      }} catch (_err) {{
+        return new Set();
+      }}
+    }}
+
+    function persistPreferredNetworkGraphHiddenTagRoutePresetIds(hiddenIds) {{
+      try {{
+        const values = Array.from(hiddenIds instanceof Set ? hiddenIds : [])
+          .map((value) => normalizeNetworkGraphTagRoutePresetId(value))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+        window.localStorage.setItem(networkGraphTagRouteVisibilityStorageKey, JSON.stringify(values));
       }} catch (_err) {{
       }}
     }}
@@ -2067,6 +2102,7 @@
       cachedNodeMap: null,
       cachedCombinedEdges: null,
       cachedLayout: null,
+      hiddenTagRoutePresetIds: loadPreferredNetworkGraphHiddenTagRoutePresetIds(),
       pendingEntryViewportSync: false,
       pendingModeViewportSync: false,
       forceCenteredFitOnce: false,
@@ -2268,12 +2304,11 @@
       return networkGraphEdgeKeyBetween(edge && edge.a, edge && edge.b);
     }}
 
-    function resolveNetworkGraphShortestPathEdgeKeys(edges, fromNodeId, toNodeId) {{
+    function resolveNetworkGraphShortestPathSegments(edges, fromNodeId, toNodeId) {{
       const startId = normalizeNodeId(fromNodeId || "");
       const targetId = normalizeNodeId(toNodeId || "");
-      const pathEdgeKeys = new Set();
       if (!isSelectableNodeId(startId) || !isSelectableNodeId(targetId) || startId === targetId) {{
-        return pathEdgeKeys;
+        return [];
       }}
       const adjacency = new Map();
       for (const edge of (Array.isArray(edges) ? edges : [])) {{
@@ -2286,7 +2321,7 @@
         adjacency.get(a).push({{ peerId: b, edgeKey }});
         adjacency.get(b).push({{ peerId: a, edgeKey }});
       }}
-      if (!adjacency.has(startId) || !adjacency.has(targetId)) return pathEdgeKeys;
+      if (!adjacency.has(startId) || !adjacency.has(targetId)) return [];
 
       const parents = new Map([[startId, null]]);
       const queue = [startId];
@@ -2304,16 +2339,318 @@
           queue.push(peerId);
         }}
       }}
-      if (!parents.has(targetId)) return pathEdgeKeys;
+      if (!parents.has(targetId)) return [];
 
       let currentId = targetId;
+      const pathSegments = [];
       while (currentId && currentId !== startId) {{
         const parent = parents.get(currentId);
         if (!parent || !parent.nodeId || !parent.edgeKey) break;
-        pathEdgeKeys.add(parent.edgeKey);
+        pathSegments.unshift({{
+          edgeKey: parent.edgeKey,
+          fromNodeId: parent.nodeId,
+          toNodeId: currentId,
+        }});
         currentId = parent.nodeId;
       }}
+      return pathSegments;
+    }}
+
+    function resolveNetworkGraphShortestPathEdgeKeys(edges, fromNodeId, toNodeId) {{
+      const pathEdgeKeys = new Set();
+      for (const segment of resolveNetworkGraphShortestPathSegments(edges, fromNodeId, toNodeId)) {{
+        if (segment && segment.edgeKey) {{
+          pathEdgeKeys.add(segment.edgeKey);
+        }}
+      }}
       return pathEdgeKeys;
+    }}
+
+    function resolveNetworkGraphTaggedItems(items) {{
+      return (Array.isArray(items) ? items : [])
+        .map((item) => {{
+          const nodeId = normalizeNodeId(item && item.nodeId);
+          const tagEntry = (typeof nodeTagEntryForNode === "function")
+            ? nodeTagEntryForNode(nodeId)
+            : null;
+          if (!isSelectableNodeId(nodeId) || !(tagEntry && tagEntry.preset)) return null;
+          const color = (typeof normalizeNodeTagColor === "function")
+            ? normalizeNodeTagColor(tagEntry.preset.color, "#2aa85a")
+            : "#2aa85a";
+          const label = (typeof nodeTagDisplayLabel === "function")
+            ? nodeTagDisplayLabel(tagEntry, "Tagged")
+            : "Tagged";
+          const presetId = normalizeNetworkGraphTagRoutePresetId(
+            tagEntry.presetId
+            || (tagEntry.preset && tagEntry.preset.id)
+            || label
+          );
+          if (!presetId) return null;
+          return {{ nodeId, presetId, color, label }};
+        }})
+        .filter(Boolean)
+        .sort((itemA, itemB) => (
+          String(itemA.label || "").localeCompare(String(itemB.label || ""))
+          || String(itemA.nodeId || "").localeCompare(String(itemB.nodeId || ""))
+        ));
+    }}
+
+    function resolveNetworkGraphTaggedRouteSegments(edges, items, rootId, routeAnchorId = "") {{
+      const cleanRootId = normalizeNodeId(rootId || "");
+      if (!isSelectableNodeId(cleanRootId)) return [];
+      const cleanRouteAnchorId = normalizeNodeId(routeAnchorId || "");
+      const taggedItems = resolveNetworkGraphTaggedItems(items);
+      const segmentsByEdgeKey = new Map();
+      for (const taggedItem of taggedItems) {{
+        const routeStartId = (
+          taggedItem.nodeId === cleanRootId
+          && isSelectableNodeId(cleanRouteAnchorId)
+          && cleanRouteAnchorId !== taggedItem.nodeId
+        )
+          ? cleanRouteAnchorId
+          : cleanRootId;
+        if (routeStartId === taggedItem.nodeId) continue;
+        const pathSegments = resolveNetworkGraphShortestPathSegments(edges, routeStartId, taggedItem.nodeId);
+        for (const segment of pathSegments) {{
+          if (!segment || !segment.edgeKey) continue;
+          if (!segmentsByEdgeKey.has(segment.edgeKey)) {{
+            segmentsByEdgeKey.set(segment.edgeKey, []);
+          }}
+          segmentsByEdgeKey.get(segment.edgeKey).push({{
+            ...segment,
+            sourceId: routeStartId,
+            targetId: taggedItem.nodeId,
+            presetId: taggedItem.presetId,
+            color: taggedItem.color,
+            label: taggedItem.label,
+          }});
+        }}
+      }}
+      const routeSegments = [];
+      for (const stack of segmentsByEdgeKey.values()) {{
+        const stackCount = stack.length;
+        stack.forEach((segment, stackIndex) => {{
+          routeSegments.push({{
+            ...segment,
+            stackCount,
+            stackIndex,
+          }});
+        }});
+      }}
+      return routeSegments;
+    }}
+
+    function networkGraphTagRoutePresetIsVisible(presetId) {{
+      const cleanPresetId = normalizeNetworkGraphTagRoutePresetId(presetId);
+      if (!cleanPresetId) return true;
+      const hiddenIds = networkGraphViewState.hiddenTagRoutePresetIds instanceof Set
+        ? networkGraphViewState.hiddenTagRoutePresetIds
+        : new Set();
+      return !hiddenIds.has(cleanPresetId);
+    }}
+
+    function resolveNetworkGraphTagRouteLegendItems(edges, items, rootId, routeAnchorId = "") {{
+      const byPresetId = new Map();
+      for (const taggedItem of resolveNetworkGraphTaggedItems(items)) {{
+        const presetId = normalizeNetworkGraphTagRoutePresetId(taggedItem && taggedItem.presetId);
+        if (!presetId) continue;
+        if (!byPresetId.has(presetId)) {{
+          byPresetId.set(presetId, {{
+            presetId,
+            label: String(taggedItem.label || "Tagged"),
+            color: String(taggedItem.color || "#2aa85a"),
+            nodeIds: new Set(),
+            routeTargetIds: new Set(),
+          }});
+        }}
+        const item = byPresetId.get(presetId);
+        if (item && taggedItem.nodeId) {{
+          item.nodeIds.add(normalizeNodeId(taggedItem.nodeId));
+        }}
+      }}
+      for (const segment of resolveNetworkGraphTaggedRouteSegments(edges, items, rootId, routeAnchorId)) {{
+        const presetId = normalizeNetworkGraphTagRoutePresetId(segment && segment.presetId);
+        if (!presetId) continue;
+        if (!byPresetId.has(presetId)) {{
+          byPresetId.set(presetId, {{
+            presetId,
+            label: String(segment.label || "Tagged"),
+            color: String(segment.color || "#2aa85a"),
+            nodeIds: new Set(),
+            routeTargetIds: new Set(),
+          }});
+        }}
+        const item = byPresetId.get(presetId);
+        if (item && segment.targetId) {{
+          item.routeTargetIds.add(normalizeNodeId(segment.targetId));
+        }}
+      }}
+      return Array.from(byPresetId.values())
+        .map((item) => ({{
+          presetId: item.presetId,
+          label: item.label,
+          color: item.color,
+          count: item.nodeIds.size,
+          routeCount: item.routeTargetIds.size,
+          visible: item.routeTargetIds.size > 0 && networkGraphTagRoutePresetIsVisible(item.presetId),
+        }}))
+        .sort((itemA, itemB) => (
+          String(itemA.label || "").localeCompare(String(itemB.label || ""))
+          || String(itemA.presetId || "").localeCompare(String(itemB.presetId || ""))
+        ));
+    }}
+
+    function buildNetworkGraphTagRouteOverlayMarkup(scene) {{
+      const safeScene = (scene && typeof scene === "object") ? scene : {{}};
+      const rootId = normalizeNodeId(safeScene.rootId || "");
+      const nodeMap = safeScene.nodeMap instanceof Map ? safeScene.nodeMap : new Map();
+      const positions = safeScene.positions instanceof Map ? safeScene.positions : new Map();
+      const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
+      const items = Array.isArray(safeScene.items) ? safeScene.items : [];
+      const routeAnchorId = normalizeNodeId(
+        safeScene.localId
+        || safeScene.routeAnchorId
+        || resolveLocalNodeId(latestState || {{}})
+        || ""
+      );
+      const edgeByKey = new Map(edges.map((edge) => [buildNetworkGraphEdgeDomKey(edge), edge]));
+      return resolveNetworkGraphTaggedRouteSegments(edges, items, rootId, routeAnchorId).filter((segment) => (
+        networkGraphTagRoutePresetIsVisible(segment && segment.presetId)
+      )).map((segment) => {{
+        const edge = edgeByKey.get(segment.edgeKey);
+        if (!edge) return "";
+        const fromPos = positions.get(edge.a);
+        const toPos = positions.get(edge.b);
+        if (!fromPos || !toPos) return "";
+        const x1Raw = Number(fromPos.x);
+        const y1Raw = Number(fromPos.y);
+        const x2Raw = Number(toPos.x);
+        const y2Raw = Number(toPos.y);
+        const dx = x2Raw - x1Raw;
+        const dy = y2Raw - y1Raw;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        const unitX = dx / length;
+        const unitY = dy / length;
+        const normalX = -unitY;
+        const normalY = unitX;
+        const stackCount = Math.max(1, Math.trunc(Number(segment.stackCount) || 1));
+        const stackIndex = Math.max(0, Math.trunc(Number(segment.stackIndex) || 0));
+        const stackOffset = Math.max(-11, Math.min(11, (stackIndex - ((stackCount - 1) / 2)) * 2.8));
+        const endpointInset = Math.min(7, Math.max(2, length * 0.07));
+        const x1 = x1Raw + (unitX * endpointInset) + (normalX * stackOffset);
+        const y1 = y1Raw + (unitY * endpointInset) + (normalY * stackOffset);
+        const x2 = x2Raw - (unitX * endpointInset) + (normalX * stackOffset);
+        const y2 = y2Raw - (unitY * endpointInset) + (normalY * stackOffset);
+        const color = String(segment.color || "#2aa85a");
+        const width = Math.max(1.35, Math.min(2.2, 1.9 - (Math.min(6, stackCount - 1) * 0.08)));
+        const sourceId = normalizeNodeId(segment.sourceId || rootId || "");
+        const sourceLabel = sourceId ? networkGraphNodeDisplayName(sourceId, nodeMap) : "Root";
+        const targetLabel = networkGraphNodeDisplayName(segment.targetId, nodeMap);
+        const title = [
+          `Tag route: ${{segment.label || "Tagged"}}`,
+          `${{sourceLabel}} -> ${{targetLabel}}`,
+        ].join("\\n");
+        return `
+          <line
+            class="network-graph-tag-route"
+            data-network-graph-tag-preset-id="${{escAttr(segment.presetId)}}"
+            data-network-graph-tag-target-id="${{escAttr(segment.targetId)}}"
+            data-network-graph-tag-edge-key="${{escAttr(segment.edgeKey)}}"
+            x1="${{x1.toFixed(1)}}"
+            y1="${{y1.toFixed(1)}}"
+            x2="${{x2.toFixed(1)}}"
+            y2="${{y2.toFixed(1)}}"
+            style="--network-graph-tag-route-color:${{escAttr(color)}};stroke-width:${{width.toFixed(2)}}"
+          >
+            <title>${{escAttr(title)}}</title>
+          </line>
+        `;
+      }}).join("");
+    }}
+
+    function syncNetworkGraphTagRouteLayer(svg, scene) {{
+      if (!(svg instanceof SVGElement)) return;
+      const tagRouteLayer = svg.querySelector(".network-graph-tag-routes");
+      if (tagRouteLayer instanceof SVGElement) {{
+        tagRouteLayer.innerHTML = buildNetworkGraphTagRouteOverlayMarkup(scene);
+      }}
+    }}
+
+    function bindNetworkGraphTagRouteLegendControls(legend, scene) {{
+      if (!(legend instanceof HTMLElement)) return;
+      const inputs = legend.querySelectorAll("[data-network-graph-tag-filter-id]");
+      inputs.forEach((input) => {{
+        if (!(input instanceof HTMLInputElement) || input.dataset.boundTagRouteFilter === "1") return;
+        input.dataset.boundTagRouteFilter = "1";
+        input.addEventListener("change", () => {{
+          const presetId = normalizeNetworkGraphTagRoutePresetId(input.dataset.networkGraphTagFilterId || "");
+          if (!presetId) return;
+          if (!(networkGraphViewState.hiddenTagRoutePresetIds instanceof Set)) {{
+            networkGraphViewState.hiddenTagRoutePresetIds = new Set();
+          }}
+          if (input.checked) {{
+            networkGraphViewState.hiddenTagRoutePresetIds.delete(presetId);
+          }} else {{
+            networkGraphViewState.hiddenTagRoutePresetIds.add(presetId);
+          }}
+          persistPreferredNetworkGraphHiddenTagRoutePresetIds(networkGraphViewState.hiddenTagRoutePresetIds);
+          const graphSvg = document.getElementById("network-graph-svg");
+          if (graphSvg instanceof SVGElement) {{
+            syncNetworkGraphTagRouteLayer(graphSvg, scene);
+          }}
+          renderNetworkGraphTagRouteLegend(scene);
+        }});
+      }});
+    }}
+
+    function renderNetworkGraphTagRouteLegend(scene) {{
+      const legend = document.getElementById("network-graph-legend");
+      if (!(legend instanceof HTMLElement)) return;
+      const safeScene = (scene && typeof scene === "object") ? scene : {{}};
+      const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
+      const items = Array.isArray(safeScene.items) ? safeScene.items : [];
+      const rootId = normalizeNodeId(safeScene.rootId || "");
+      const routeAnchorId = normalizeNodeId(
+        safeScene.localId
+        || safeScene.routeAnchorId
+        || resolveLocalNodeId(latestState || {{}})
+        || ""
+      );
+      const tagItems = resolveNetworkGraphTagRouteLegendItems(edges, items, rootId, routeAnchorId);
+      if (!tagItems.length) {{
+        legend.innerHTML = "";
+        legend.hidden = true;
+        return;
+      }}
+      legend.hidden = false;
+      legend.innerHTML = `
+        <div class="network-graph-tag-legend-title">Tag routes</div>
+        <div class="network-graph-tag-filter-list">
+          ${{
+            tagItems.map((item) => {{
+              const hasRoutes = Number(item.routeCount || 0) > 0;
+              const checkedAttr = item.visible ? " checked" : "";
+              const disabledAttr = hasRoutes ? "" : " disabled";
+              const countLabel = item.count > 1 ? ` <span class="network-graph-tag-filter-count">${{item.count}}</span>` : "";
+              const title = hasRoutes
+                ? `Toggle ${{item.label}} tag routes`
+                : `No current ${{item.label}} routes from this view`;
+              return `<label class="network-graph-tag-filter${{item.visible ? "" : " is-muted"}}${{hasRoutes ? "" : " is-empty"}}" style="--network-graph-tag-route-color:${{escAttr(item.color)}};" title="${{escAttr(title)}}">
+                <input
+                  class="network-graph-tag-filter-input"
+                  type="checkbox"
+                  data-network-graph-tag-filter-id="${{escAttr(item.presetId)}}"
+                  aria-label="${{escAttr(`Show ${{item.label}} tag routes`)}}"
+                  ${{checkedAttr}}
+                  ${{disabledAttr}}
+                />
+                <span class="network-graph-tag-filter-name">${{escAttr(item.label)}}</span>${{countLabel}}
+              </label>`;
+            }}).join("")
+          }}
+        </div>
+      `;
+      bindNetworkGraphTagRouteLegendControls(legend, safeScene);
     }}
 
     function buildNetworkGraphSceneMarkup(scene) {{
@@ -2442,10 +2779,19 @@
         `;
       }}).join("");
 
+      const tagRouteOverlayMarkup = buildNetworkGraphTagRouteOverlayMarkup(safeScene);
+
       const nodeMarkup = items.map((item) => {{
         const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
         const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
         const nodeEmoji = resolveNetworkGraphNodeEmoji(item);
+        const tagEntry = (typeof nodeTagEntryForNode === "function")
+          ? nodeTagEntryForNode(item.nodeId)
+          : null;
+        const isTaggedNode = !!(tagEntry && tagEntry.preset);
+        const tagStyleVars = (isTaggedNode && typeof nodeTagStyleVars === "function")
+          ? nodeTagStyleVars(tagEntry)
+          : "";
         const labelOffsetRaw = item && item.labelOffsetY;
         const labelOffsetY = (
           labelOffsetRaw == null
@@ -2472,6 +2818,7 @@
           nodeEmoji ? "has-emoji-glyph" : "",
           isRootNode ? "is-root" : "",
           isSelectedNode ? "is-selected" : "",
+          isTaggedNode ? "is-tagged" : "",
           item.detached ? "is-detached" : "",
           item.broadcastOnly ? "is-broadcast-only" : "",
           `label-priority-${{labelPriority}}`,
@@ -2482,6 +2829,7 @@
           <g
             class="${{classes}}"
             data-network-graph-node-id="${{escAttr(item.nodeId)}}"
+            ${{tagStyleVars ? `style="${{escAttr(tagStyleVars)}}"` : ""}}
             transform="translate(${{Number(item.x).toFixed(1)}} ${{Number(item.y).toFixed(1)}})"
           >
             <circle class="network-graph-node-core" r="${{Number(item.radius).toFixed(1)}}"></circle>
@@ -2509,6 +2857,9 @@
         </g>
         <g class="network-graph-links">
           ${{edgeMarkup}}
+        </g>
+        <g class="network-graph-tag-routes">
+          ${{tagRouteOverlayMarkup}}
         </g>
         <g class="network-graph-nodes">
           ${{nodeMarkup}}
@@ -2668,6 +3019,7 @@
       if (linkLayer instanceof SVGElement && localPathEdgeEls.length) {{
         localPathEdgeEls.forEach((edgeEl) => linkLayer.appendChild(edgeEl));
       }}
+      syncNetworkGraphTagRouteLayer(svg, safeScene);
 
       const itemByNodeId = new Map(items.map((item) => [normalizeNodeId(item && item.nodeId), item]));
       const nodeEls = svg.querySelectorAll("[data-network-graph-node-id]");
@@ -2676,6 +3028,21 @@
         const nodeId = normalizeNodeId(nodeEl.getAttribute("data-network-graph-node-id") || "");
         const item = itemByNodeId.get(nodeId);
         if (!item) return;
+        const tagEntry = (typeof nodeTagEntryForNode === "function")
+          ? nodeTagEntryForNode(item.nodeId)
+          : null;
+        const isTaggedNode = !!(tagEntry && tagEntry.preset);
+        nodeEl.classList.toggle("is-tagged", isTaggedNode);
+        if (isTaggedNode && typeof nodeTagStyleVars === "function") {{
+          const tagStyleVars = nodeTagStyleVars(tagEntry);
+          if (tagStyleVars) {{
+            nodeEl.setAttribute("style", tagStyleVars);
+          }} else {{
+            nodeEl.removeAttribute("style");
+          }}
+        }} else {{
+          nodeEl.removeAttribute("style");
+        }}
         const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
         const statusLine = item.broadcastOnly
           ? (
@@ -5044,10 +5411,6 @@
       const rawEdges = Array.isArray(traffic.edges) ? traffic.edges : [];
       const edgeMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode);
       const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
-      const layoutModeLabel = layoutMode === "tree"
-        ? "Tree"
-        : (layoutMode === "cluster" ? "Cluster" : (layoutMode === "community" ? "Community" : "Radial"));
-      const modeLabel = edgeMode === "live" ? "Live" : "History";
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);
       const graphSourceSignature = buildNetworkGraphSourceSignature(
         nodes,
@@ -5076,7 +5439,6 @@
       const combinedEdges = canReuseGraphData
         ? networkGraphViewState.cachedCombinedEdges
         : combineNetworkGraphEdges(filteredRawEdges, nodeMap, {{ mode: edgeMode }});
-      const realLinkCount = combinedEdges.filter((edge) => !!(edge && edge.isReal)).length;
       const layout = canReuseGraphData
         ? networkGraphViewState.cachedLayout
         : buildNetworkGraphLayout(nodeMap, combinedEdges, safeState);
@@ -5111,6 +5473,7 @@
         applyNetworkGraphViewBox(svg, networkGraphViewportBase);
         summary.innerHTML = "";
         legend.innerHTML = "";
+        legend.hidden = true;
         empty.textContent = edgeMode === "live"
           ? "No live node links recorded in this session yet."
           : "No node links recorded yet.";
@@ -5127,6 +5490,7 @@
       clearNetworkGraphEmptyRetry();
       empty.hidden = true;
       const selectedId = normalizeNodeId(selectedNodeId || "");
+      const localId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
       summary.innerHTML = `<div class="network-graph-summary-main"><label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select"><span class="network-graph-chip-label history-metric-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select history-metric-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label><button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip" type="button" title="Reset links view" aria-controls="network-graph-svg"><span class="network-graph-chip-label">View</span><strong>Reset</strong></button></div><div class="network-graph-summary-side"><label class="network-graph-mode-control history-metric-wrap history-select-chip-hide-label" for="network-graph-mode-select" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label history-metric-label">Mode</span><select id="network-graph-mode-select" class="network-graph-mode-select history-metric-select" aria-label="Network links source"><option value="history"${{edgeMode === "history" ? " selected" : ""}}>History</option><option value="live"${{edgeMode === "live" ? " selected" : ""}}>Live</option></select></label></div>`;
       bindNetworkGraphLayoutSelector();
       syncNetworkGraphLayoutSelector();
@@ -5226,26 +5590,15 @@
       networkGraphViewState.renderedPositions = new Map(layout.positions);
       networkGraphViewState.renderedLayoutSnapshot = cloneNetworkGraphLayoutSnapshot(layout);
 
-      legend.innerHTML = [
-        `<span class="network-graph-legend-item hint">${{modeLabel}} mode: ${{edgeMode === "live" ? "current-session link topology only" : "stored link-history topology"}}</span>`,
-        `<span class="network-graph-legend-item hint">${{layoutModeLabel}} layout: ${{layoutMode === "tree" ? "hierarchical breadth-first view from the current root" : (layoutMode === "cluster" ? "first-hop neighborhoods split into branch sub-clusters from the current root" : (layoutMode === "community" ? "community-detected regions with detached nodes split into side lanes" : "hop-distance rings around the current root"))}}</span>`,
-        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-root"></span>Root / selected node</span>`,
-        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-local"></span>Your node / local radio</span>`,
-        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-local-path"></span>Shortest root-to-your-node path</span>`,
-        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-real"></span>${{realLinkCount}} confirmed links</span>`,
-        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-observed"></span>${{Math.max(0, combinedEdges.length - realLinkCount)}} observed links</span>`,
-        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-broadcast-only"></span>Nodes heard recently, but only via broadcast</span>`,
-        `<span class="network-graph-legend-item"><span class="network-graph-swatch is-detached"></span>Nodes with no current path or recent broadcast evidence</span>`,
-        `<span class="network-graph-legend-item hint">Numbered hop rings show shortest graph distance from the current root, not literal packet-route hops.</span>`,
-        `<span class="network-graph-legend-item hint">Click to refocus, scroll to zoom, and use Reset view from the header controls.</span>`,
-      ].join("");
       const scene = {{
         ...layout,
         rootId,
         selectedId,
+        localId,
         nodeMap,
         edges: combinedEdges,
       }};
+      renderNetworkGraphTagRouteLegend(scene);
       const sceneStructureSignature = buildNetworkGraphSceneStructureSignature(scene);
       const canPatchSceneDataOnly = !!(
         previousLayoutSnapshot
@@ -5261,6 +5614,7 @@
         syncNetworkGraphSceneData(svg, scene);
       }} else if (canSkipSceneRender) {{
         cancelNetworkGraphSceneAnimation();
+        syncNetworkGraphSceneData(svg, scene);
       }} else if (canPatchSceneDataOnly) {{
         cancelNetworkGraphSceneAnimation();
         syncNetworkGraphSceneSelection(svg, {{ rootId, selectedId }});

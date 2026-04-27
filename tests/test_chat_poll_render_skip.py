@@ -86,7 +86,7 @@ POLL_RENDER_SKIP_TOKEN_GROUPS: tuple[tuple[str, Sequence[str]], ...] = (
             "const shouldSkipSceneAnimation = !!networkGraphViewState.skipSceneAnimationOnce;",
             "networkGraphViewState.skipSceneAnimationOnce = true;",
             "syncNetworkGraphSceneSelection(svg, { rootId, selectedId });",
-            'data-network-graph-edge-key="${escAttr(buildNetworkGraphEdgeDomKey(edge))}"',
+            'data-network-graph-edge-key="${escAttr(edgeKey)}"',
             "syncNetworkGraphSceneData(svg, scene);",
         ),
     ),

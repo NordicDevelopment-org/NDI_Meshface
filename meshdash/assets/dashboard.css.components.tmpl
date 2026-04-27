@@ -5557,7 +5557,19 @@
       color: var(--workspace-shell-text-soft);
     }}
     [data-theme="dark"] .network-graph-legend {{
+      border-color: color-mix(in srgb, var(--workspace-shell-border) 78%, transparent);
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, black 12%);
+      color: var(--workspace-shell-text);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.34);
+    }}
+    [data-theme="dark"] .network-graph-tag-legend-title {{
       color: var(--workspace-shell-text-soft);
+    }}
+    [data-theme="dark"] .network-graph-tag-filter {{
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-graph-tag-filter-count {{
+      color: color-mix(in srgb, var(--workspace-shell-text) 76%, var(--network-graph-tag-route-color, #3fb950) 24%);
     }}
     [data-theme="dark"] .network-graph-swatch {{
       background: color-mix(in srgb, var(--workspace-shell-border-muted) 58%, transparent);
@@ -5612,6 +5624,9 @@
       stroke: var(--theme-base-color, var(--ui-accent));
       opacity: 1;
     }}
+    [data-theme="dark"] .network-graph-tag-route {{
+      opacity: 0.98;
+    }}
     [data-theme="dark"] .network-graph-node-core {{
       fill: color-mix(in srgb, var(--workspace-shell-bg-alt) 94%, black 6%);
       stroke: var(--workspace-shell-border-muted);
@@ -5645,6 +5660,14 @@
     [data-theme="dark"] .network-graph-node.is-root.is-broadcast-only .network-graph-node-core {{
       fill: rgba(47, 35, 14, 0.98);
       stroke: rgba(230, 177, 74, 0.98);
+    }}
+    [data-theme="dark"] .network-graph-node.is-tagged .network-graph-node-core {{
+      fill: color-mix(in srgb, var(--workspace-shell-bg-alt) 78%, var(--node-tag-color, #3fb950) 22%);
+      stroke: var(--node-tag-color, #3fb950);
+      stroke-width: 2.6;
+    }}
+    [data-theme="dark"] .network-graph-node.is-tagged.is-selected .network-graph-node-core {{
+      stroke-width: 3;
     }}
     [data-theme="dark"] .network-graph-node-label {{
       fill: var(--workspace-shell-text);
