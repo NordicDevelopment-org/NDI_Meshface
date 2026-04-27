@@ -168,8 +168,8 @@ def test_slim_recent_packets_caps_lite_buffer_length() -> None:
     slimmed = _slim_recent_packets(recent_packets)
 
     assert len(slimmed) == 120
-    assert slimmed[0]["summary"]["packet_id"] == 0
-    assert slimmed[-1]["summary"]["packet_id"] == 119
+    assert slimmed[0]["summary"]["packet_id"] == 30
+    assert slimmed[-1]["summary"]["packet_id"] == 149
 
 
 def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:

@@ -460,7 +460,10 @@ def _slim_packet_summary(summary: object) -> dict[str, object]:
 def _slim_recent_packets(recent_packets: list[dict[str, object]]) -> list[dict[str, object]]:
     max_packets = 120
     slimmed: list[dict[str, object]] = []
-    for entry in recent_packets[:max_packets]:
+    # The tracker buffer is chronological; lite state needs the newest packet
+    # frames so protocol side channels such as file-transfer/BBS snapshots can
+    # complete from the current poll window.
+    for entry in recent_packets[-max_packets:]:
         if not isinstance(entry, Mapping):
             continue
         slim_entry: dict[str, object] = {}
