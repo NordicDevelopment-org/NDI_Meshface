@@ -16,9 +16,11 @@ moves fully into this repository, use a normal branch-to-`main` workflow here.
 The current UI exposes:
 
 - Chat workspace for `Everyone` plus direct-peer conversations
-- Network workspace for map, topology, node details, and on-demand history views
+- Network workspace for map, topology, Top 10 rankings, node details, and
+  on-demand history views
 - Console workspace for live packet/log output
-- Apps workspace with Games, plus a Files tab when file transfer is enabled
+- Apps workspace with Games, plus BBS and Files tabs when those features are
+  enabled
 - Settings workspace with radio, device, connectivity, location, channels,
   tickers, lists, appearance, and about panes
 - SQLite-backed history, search, rollups, theme persistence, and custom
@@ -27,6 +29,8 @@ The current UI exposes:
 Not part of the default launcher surface:
 
 - Dedicated Bots or Labs launcher views
+- BBS unless `--bbs-enable` is set
+- Files unless file transfer is enabled and the traffic disclaimer is accepted
 - Network diagnostics unless `--debug-mode` is enabled
 
 The source tree still contains dormant/internal hooks and optional backend
@@ -43,7 +47,7 @@ flowchart LR
   Server["ThreadingHTTPServer<br/>HTML shell + JSON API"]
   Assets["Python template assembly<br/>meshdash/html* + meshdash/assets/*"]
   State["State loaders<br/>live snapshot + history readers"]
-  Services["Write services<br/>chat, settings, tools, games"]
+  Services["Write services<br/>chat, settings, tools, games, optional BBS/files"]
   Tracker["DashboardTracker<br/>live receive path + in-memory buffers"]
   History["HistoryStore / SQLite (WAL)<br/>chat, packets, rollups, settings"]
   Radio["Meshtastic interface<br/>serial or TCP"]
@@ -79,7 +83,7 @@ Key runtime notes:
   summary rollups, and custom telemetry settings to SQLite using WAL mode for
   concurrent reads and writes.
 - The browser polls `/api/state`, fetches history/detail endpoints on demand,
-  and POSTs write actions for chat, settings, tools, and optional apps.
+  and POSTs write actions for chat, settings, tools, games, and optional BBS.
 - When online map tiles fail, the UI can fall back to the bundled offline atlas
   reference layers. The current build still expects Leaflet JS/CSS to be
   reachable from `unpkg.com` unless you vendor or proxy those assets yourself.
@@ -220,6 +224,8 @@ other's history.
   `mesh_dashboard_theme_settings.json` by default, or the file supplied via
   `--theme-settings-file`.
 - Custom telemetry rules are stored in the history SQLite database.
+- BBS host settings and local BBS posts are stored in the history SQLite
+  database when BBS is enabled.
 
 ### One-shot backfill mode
 
@@ -556,11 +562,13 @@ Related environment variables:
   selected public endpoints
 - `--api-token <token>`: require auth on write endpoints via
   `Authorization: Bearer <token>` or `X-API-Token`
+- `--bbs-enable` / `--no-bbs-enable`: expose or hide the BBS/profile workspace
 
 Related environment variables:
 
 - `MESH_DASH_PRIVATE_MODE`
 - `MESH_DASH_API_TOKEN`
+- `MESH_DASH_BBS_ENABLE`
 - `MESH_DASH_VERSION`
 - `MESH_DASH_GIT_COMMIT`
 
@@ -626,9 +634,15 @@ The bundled service/deploy flow commonly uses:
 
 - `MESH_HOST`
 - `MESH_PORT` for the TCP radio port used by the service file
+- `MESH_SERIAL_PATH` for generated serial-mode service units
 - `DASH_HOST`
 - `DASH_PORT`
 - `REFRESH_MS`
+- `MESH_DASH_HISTORY_DB`
+- `MESH_DASH_BBS_ENABLE`
+- `MESH_DASH_FILE_TRANSFER_ENABLE`
+- `MESH_DASH_FILE_TRANSFER_MAX_BYTES`
+- `MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER`
 - `PYTHONUNBUFFERED`
 
 The deploy helper also accepts:
@@ -682,6 +696,7 @@ The deploy helper also accepts:
 - `/api/history/node`
 - `/api/history/online`
 - `/api/history/summary`
+- `/api/history/top_nodes`
 - `/api/history/environment`
 - `/api/history/malformed`
 - `/api/history/search`
@@ -689,6 +704,8 @@ The deploy helper also accepts:
 ### UI support endpoints
 
 - `/api/settings/theme`
+- `/api/settings/bbs`
+- `/api/bbs/host`
 - `/api/settings/custom_telemetry`
 - `/api/offline/atlas`
 - `/api/chat/emoji-catalog`
@@ -699,6 +716,8 @@ The deploy helper also accepts:
 - `/api/settings/radio`
 - `/api/settings/channels`
 - `/api/settings/theme`
+- `/api/settings/bbs`
+- `/api/bbs/host`
 - `/api/settings/custom_telemetry`
 - `/api/tools/network`
 - `/api/games/zork`
