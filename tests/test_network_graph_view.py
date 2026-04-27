@@ -123,11 +123,15 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";' in js
     assert 'const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";' in js
     assert 'const networkGraphTagRouteVisibilityStorageKey = "meshDashboardNetworkGraphTagRouteVisibilityV1";' in js
-    assert 'let networkGraphEdgeMode = "history";' in js
+    assert 'const networkGraphHistoryEdgeCache = new Map();' in js
+    assert 'const networkGraphHistoryCapsCache = new Map();' in js
+    assert 'const networkGraphHistoryEdgeRequests = new Map();' in js
+    assert 'let networkGraphEdgeMode = "7d";' in js
     assert 'let networkGraphLayoutMode = "radial";' in js
     assert 'const networkGraphOverlayFitZoomOutScale = 1.1;' in js
     assert 'const networkGraphOverlaySafeInsetTop = 10;' in js
     assert 'function normalizeNetworkGraphEdgeMode(raw)' in js
+    assert 'function networkGraphEdgeModeUsesHistoryFetch(modeName)' in js
     assert 'function normalizeNetworkGraphLayoutMode(raw)' in js
     assert 'clean === "community"' in js
     assert 'function loadPreferredNetworkGraphEdgeMode()' in js
@@ -153,7 +157,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function buildNetworkGraphNodeMap(nodes, historyCapsRaw, rawEdges, options = {})' in js
     assert 'const includeAllLiveNodes = !(options && options.includeAllLiveNodes === false);' in js
     assert 'const pinnedNodeIds = Array.isArray(options && options.pinnedNodeIds)' in js
+    assert 'function networkGraphRawEdgesForMode(rawEdges, modeName = networkGraphEdgeMode)' in js
+    assert 'function networkGraphHistoryCapsForMode(historyCapsRaw, modeName = networkGraphEdgeMode)' in js
     assert 'function filterNetworkGraphRawEdgesByMode(rawEdges, mode = networkGraphEdgeMode)' in js
+    assert 'fetch(`/api/history/links?${params.toString()}`' in js
+    assert 'networkGraphHistoryCapsCache.set(mode, historyCaps);' in js
     assert 'function collectNetworkGraphAncestorScores(nodeId, targetLayer, layerByNodeId, parentHintsByNodeId, memo = new Map())' in js
     assert 'function resolveNetworkGraphBestClusterCandidate(candidateScores, degreeMeta, fallbackId = "")' in js
     assert 'function chunkNetworkGraphNodeIds(nodeIds, chunkSize = 1)' in js
@@ -209,7 +217,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'buildNetworkGraphNodeMap(nodes, historyCaps, filteredRawEdges, {' in js
     assert 'buildNetworkGraphNodeMap(liveNodes, historyCaps, filteredRawEdges, {' in js
     assert 'const parsedWeight = useSessionWeight ? parsedSession : parsedLifetime;' in js
-    assert 'empty.textContent = edgeMode === "live"' in js
+    assert 'Loading ${networkGraphEdgeModeLabel(edgeMode)} link history...' in js
     assert 'summary.innerHTML = `<div class="network-graph-summary-main"><label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select">' in js
     assert '<button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip"' in js
     assert 'bindNetworkGraphLayoutSelector();' in js
@@ -219,6 +227,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert '<select id="network-graph-layout-select" class="network-graph-layout-select history-metric-select" aria-label="Network links layout">' in js
     assert '<label class="network-graph-mode-control history-metric-wrap history-select-chip-hide-label" for="network-graph-mode-select"' in js
     assert '<select id="network-graph-mode-select" class="network-graph-mode-select history-metric-select" aria-label="Network links source">' in js
+    assert '<span class="network-graph-chip-label history-metric-label">Links</span>' in js
+    assert 'id: "7d", label: "7d"' in js
+    assert 'id: "max", label: "Max"' in js
     assert '>Community</option>' in js
     assert 'bindNetworkGraphSummaryControls();' in js
     assert 'syncNetworkGraphModeSelector();' in js
@@ -229,7 +240,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert '${item.layer} hop${item.layer === 1 ? "" : "s"} away' in js
     assert 'last packet hops away:' in js
     assert 'label: `${layer} hop${layer === 1 ? "" : "s"}`,' in js
-    assert 'Switch Links view between stored history topology and the current session topology' in js
+    assert 'Choose the link history window for the Links view' in js
     assert '<span class="network-graph-chip-label">1 Hop</span>' not in js
     assert 'const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph";' in js
     assert 'const weeklySummaryPromise = (activeLayoutView === "history" || activeLayoutView === "network")' in js

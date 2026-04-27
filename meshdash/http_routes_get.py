@@ -386,6 +386,39 @@ def handle_dashboard_get(
         deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
         return
 
+    if path == "/api/history/links":
+        query_obj = parse_qs(query or "")
+        window = str(
+            query_obj.get("window", [""])[0]
+            or query_obj.get("range", [""])[0]
+            or query_obj.get("mode", [""])[0]
+            or "7d"
+        ).strip()
+        limit = deps.to_int_fn(query_obj.get("limit", [""])[0])
+        link_edges_fn = getattr(deps.state_fn, "link_edges_fn", None)
+        if callable(link_edges_fn):
+            try:
+                response_obj = link_edges_fn(
+                    window=window or "7d",
+                    limit=limit or 1200,
+                )
+            except Exception as exc:
+                response_obj = {
+                    "ok": False,
+                    "error": str(exc or "link history failed"),
+                    "window": window or "7d",
+                    "edges": [],
+                }
+        else:
+            response_obj = {
+                "ok": False,
+                "error": "link history unavailable on this node",
+                "window": window or "7d",
+                "edges": [],
+            }
+        deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
+        return
+
     if path == "/api/history/environment":
         query_obj = parse_qs(query or "")
         hours_override = deps.to_int_fn(

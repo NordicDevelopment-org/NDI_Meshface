@@ -73,6 +73,7 @@ def _copy_state_fn_attrs(target_fn: object, source_fn: object) -> None:
         "raw_local_state",
         "raw_nodes_full",
         "top_nodes_fn",
+        "link_edges_fn",
         "_sensitive_field_names",
     ):
         attr = getattr(source_fn, name, None)
@@ -241,6 +242,12 @@ def build_dashboard_runtime_loaders_with_dependencies(
     if callable(top_nodes_fn):
         try:
             setattr(state_fn, "top_nodes_fn", top_nodes_fn)
+        except Exception:
+            pass
+    link_edges_fn = getattr(dependencies.history_store, "load_link_edges", None)
+    if callable(link_edges_fn):
+        try:
+            setattr(state_fn, "link_edges_fn", link_edges_fn)
         except Exception:
             pass
 

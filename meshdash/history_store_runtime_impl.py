@@ -18,6 +18,9 @@ from .history_store_connections import (
     load_connections as _load_connections_helper,
     save_connection_event as _save_connection_event_wrapper_helper,
 )
+from .history_store_link_edges import (
+    load_link_edges as _load_link_edges_helper,
+)
 from .history_store_nodes import (
     load_node_capabilities as _load_node_capabilities_helper,
     load_node_history as _load_node_history_helper,
@@ -147,6 +150,9 @@ class HistoryStore:
 
     def load_connections(self) -> list[dict[str, object]]:
         return _load_connections_helper(self)
+
+    def load_link_edges(self, window: object = "7d", limit: object = 1200) -> dict[str, object]:
+        return _load_link_edges_helper(self, window=window, limit=limit)
 
     def load_node_history(self, node_id: str, window_hours: int, max_points: int) -> dict[str, object]:
         return _load_node_history_helper(self, node_id, window_hours, max_points)

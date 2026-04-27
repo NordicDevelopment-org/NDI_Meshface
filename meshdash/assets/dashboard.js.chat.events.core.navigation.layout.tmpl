@@ -696,7 +696,21 @@
     const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";
     const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";
     const networkGraphTagRouteVisibilityStorageKey = "meshDashboardNetworkGraphTagRouteVisibilityV1";
-    let networkGraphEdgeMode = "history";
+    const networkGraphHistoryEdgeCache = new Map();
+    const networkGraphHistoryCapsCache = new Map();
+    const networkGraphHistoryEdgeRequests = new Map();
+    const networkGraphEdgeModeDefs = Object.freeze([
+      {{ id: "live", label: "Live" }},
+      {{ id: "6h", label: "6h" }},
+      {{ id: "12h", label: "12h" }},
+      {{ id: "24h", label: "24h" }},
+      {{ id: "72h", label: "72h" }},
+      {{ id: "7d", label: "7d" }},
+      {{ id: "14d", label: "14d" }},
+      {{ id: "30d", label: "30d" }},
+      {{ id: "max", label: "Max" }},
+    ]);
+    let networkGraphEdgeMode = "7d";
     let networkGraphLayoutMode = "radial";
 
     function normalizeNetworkSubview(raw) {{
@@ -712,7 +726,27 @@
     }}
 
     function normalizeNetworkGraphEdgeMode(raw) {{
-      return String(raw || "").trim().toLowerCase() === "live" ? "live" : "history";
+      const clean = String(raw || "").trim().toLowerCase().replace(/\s+/g, "");
+      const aliases = {{
+        "": "7d",
+        history: "7d",
+        week: "7d",
+        "1w": "7d",
+        all: "max",
+        full: "max",
+      }};
+      const resolved = aliases[clean] || clean;
+      return networkGraphEdgeModeDefs.some((entry) => entry.id === resolved) ? resolved : "7d";
+    }}
+
+    function networkGraphEdgeModeLabel(modeName) {{
+      const clean = normalizeNetworkGraphEdgeMode(modeName);
+      const match = networkGraphEdgeModeDefs.find((entry) => entry.id === clean);
+      return match ? match.label : "7d";
+    }}
+
+    function networkGraphEdgeModeUsesHistoryFetch(modeName) {{
+      return normalizeNetworkGraphEdgeMode(modeName) !== "live";
     }}
 
     function normalizeNetworkGraphLayoutMode(raw) {{
@@ -752,10 +786,10 @@
 
     function loadPreferredNetworkGraphEdgeMode() {{
       try {{
-        const raw = window.localStorage.getItem(networkGraphModeStorageKey) || "history";
+        const raw = window.localStorage.getItem(networkGraphModeStorageKey) || "7d";
         return normalizeNetworkGraphEdgeMode(raw);
       }} catch (_err) {{
-        return "history";
+        return "7d";
       }}
     }}
 
@@ -3690,7 +3724,7 @@
       if (modeSelect instanceof HTMLSelectElement && modeSelect.dataset.bound !== "1") {{
         modeSelect.dataset.bound = "1";
         modeSelect.addEventListener("change", () => {{
-          setNetworkGraphEdgeMode(modeSelect.value || "history", {{ persist: true, rerender: true }});
+          setNetworkGraphEdgeMode(modeSelect.value || "7d", {{ persist: true, rerender: true }});
         }});
       }}
 
@@ -3741,6 +3775,8 @@
         persistPreferredNetworkGraphEdgeMode(next);
       }}
       if (changed) {{
+        ensureNetworkGraphHistoryEdges(next);
+        invalidateNetworkGraphRenderCache();
         networkGraphViewState.pendingEntryViewportSync = true;
         networkGraphViewState.pendingModeViewportSync = true;
       }}
@@ -3860,13 +3896,17 @@
 
     function navigateNetworkGraphBack() {{
       const liveNodes = (latestState && Array.isArray(latestState.nodes)) ? latestState.nodes : [];
-      const historyCaps = (latestState && latestState.history_caps && typeof latestState.history_caps === "object")
+      const historyCapsRaw = (latestState && latestState.history_caps && typeof latestState.history_caps === "object")
         ? latestState.history_caps
         : {{}};
+      const historyCaps = networkGraphHistoryCapsForMode(historyCapsRaw, networkGraphEdgeMode);
       const traffic = (latestState && latestState.traffic && typeof latestState.traffic === "object")
         ? latestState.traffic
         : {{}};
-      const rawEdges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      const rawEdges = networkGraphRawEdgesForMode(
+        Array.isArray(traffic.edges) ? traffic.edges : [],
+        networkGraphEdgeMode
+      );
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, networkGraphEdgeMode);
       const nodeMap = buildNetworkGraphNodeMap(liveNodes, historyCaps, filteredRawEdges, {{
         includeAllLiveNodes: normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) !== "live",
@@ -4084,6 +4124,8 @@
         last_position_unix: lastPositionUnix,
         last_position_time: formatLocalChatTime(lastPositionUnix, String((safeCaps && safeCaps.last_position_time) || ""), Math.floor(Date.now() / 1000)),
         hops_away: lastHops,
+        short_name: String((safeCaps && safeCaps.last_short_name) || "").trim() || undefined,
+        long_name: String((safeCaps && safeCaps.last_long_name) || "").trim() || undefined,
         is_graph_placeholder: true,
       }};
     }}
@@ -4136,6 +4178,90 @@
       }}
 
       return nodeMap;
+    }}
+
+    function networkGraphHistoryEdgeLimit(modeName) {{
+      const mode = normalizeNetworkGraphEdgeMode(modeName);
+      if (mode === "max") return 2500;
+      if (mode === "30d" || mode === "14d") return 1800;
+      return 1200;
+    }}
+
+    function invalidateNetworkGraphRenderCache() {{
+      networkGraphViewState.renderSourceSignature = "";
+      networkGraphViewState.cachedNodeMap = null;
+      networkGraphViewState.cachedCombinedEdges = null;
+      networkGraphViewState.cachedLayout = null;
+      networkGraphViewState.lastSceneStructureSignature = "";
+      networkGraphViewState.renderedPositions = new Map();
+      networkGraphViewState.renderedLayoutSnapshot = null;
+    }}
+
+    function ensureNetworkGraphHistoryEdges(modeName) {{
+      const mode = normalizeNetworkGraphEdgeMode(modeName);
+      if (!networkGraphEdgeModeUsesHistoryFetch(mode)) return;
+      if (networkGraphHistoryEdgeCache.has(mode) || networkGraphHistoryEdgeRequests.has(mode)) return;
+
+      const params = new URLSearchParams();
+      params.set("window", mode);
+      params.set("limit", String(networkGraphHistoryEdgeLimit(mode)));
+      const request = fetch(`/api/history/links?${{params.toString()}}`, {{ cache: "no-store" }})
+        .then((resp) => resp.ok ? resp.json() : Promise.reject(new Error(`HTTP ${{resp.status}}`)))
+        .then((payload) => {{
+          const edges = (payload && Array.isArray(payload.edges)) ? payload.edges : [];
+          const historyCaps = (payload && payload.history_caps && typeof payload.history_caps === "object")
+            ? payload.history_caps
+            : {{}};
+          networkGraphHistoryEdgeCache.set(mode, edges);
+          networkGraphHistoryCapsCache.set(mode, historyCaps);
+          invalidateNetworkGraphRenderCache();
+          if (
+            activeLayoutView === "network"
+            && activeNetworkSubview === "graph"
+            && normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) === mode
+            && typeof renderNetworkGraphView === "function"
+          ) {{
+            renderNetworkGraphView(latestState);
+          }}
+        }})
+        .catch((_err) => {{
+          networkGraphHistoryEdgeCache.set(mode, []);
+          networkGraphHistoryCapsCache.set(mode, {{}});
+          invalidateNetworkGraphRenderCache();
+          if (
+            activeLayoutView === "network"
+            && activeNetworkSubview === "graph"
+            && normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) === mode
+            && typeof renderNetworkGraphView === "function"
+          ) {{
+            renderNetworkGraphView(latestState);
+          }}
+        }})
+        .finally(() => {{
+          networkGraphHistoryEdgeRequests.delete(mode);
+        }});
+      networkGraphHistoryEdgeRequests.set(mode, request);
+    }}
+
+    function networkGraphRawEdgesForMode(rawEdges, modeName = networkGraphEdgeMode) {{
+      const mode = normalizeNetworkGraphEdgeMode(modeName);
+      const safeEdges = Array.isArray(rawEdges) ? rawEdges : [];
+      if (!networkGraphEdgeModeUsesHistoryFetch(mode)) return safeEdges;
+      ensureNetworkGraphHistoryEdges(mode);
+      return networkGraphHistoryEdgeCache.has(mode)
+        ? (networkGraphHistoryEdgeCache.get(mode) || [])
+        : safeEdges;
+    }}
+
+    function networkGraphHistoryCapsForMode(historyCapsRaw, modeName = networkGraphEdgeMode) {{
+      const mode = normalizeNetworkGraphEdgeMode(modeName);
+      const baseCaps = (historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {{}};
+      if (!networkGraphEdgeModeUsesHistoryFetch(mode) || !networkGraphHistoryCapsCache.has(mode)) {{
+        return baseCaps;
+      }}
+      const extraCaps = networkGraphHistoryCapsCache.get(mode);
+      if (!extraCaps || typeof extraCaps !== "object") return baseCaps;
+      return Object.assign({{}}, extraCaps, baseCaps);
     }}
 
     function filterNetworkGraphRawEdgesByMode(rawEdges, mode = networkGraphEdgeMode) {{
@@ -5477,12 +5603,16 @@
 
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
-      const historyCaps = (safeState.history_caps && typeof safeState.history_caps === "object")
+      const historyCapsRaw = (safeState.history_caps && typeof safeState.history_caps === "object")
         ? safeState.history_caps
         : {{}};
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
-      const rawEdges = Array.isArray(traffic.edges) ? traffic.edges : [];
       const edgeMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode);
+      const historyCaps = networkGraphHistoryCapsForMode(historyCapsRaw, edgeMode);
+      const rawEdges = networkGraphRawEdgesForMode(
+        Array.isArray(traffic.edges) ? traffic.edges : [],
+        edgeMode
+      );
       const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);
       const graphSourceSignature = buildNetworkGraphSourceSignature(
@@ -5547,9 +5677,16 @@
         summary.innerHTML = "";
         legend.innerHTML = "";
         legend.hidden = true;
-        empty.textContent = edgeMode === "live"
-          ? "No live node links recorded in this session yet."
-          : "No node links recorded yet.";
+        const loadingHistoryEdges = (
+          networkGraphEdgeModeUsesHistoryFetch(edgeMode)
+          && networkGraphHistoryEdgeRequests.has(edgeMode)
+          && !networkGraphHistoryEdgeCache.has(edgeMode)
+        );
+        empty.textContent = loadingHistoryEdges
+          ? `Loading ${{networkGraphEdgeModeLabel(edgeMode)}} link history...`
+          : (edgeMode === "live"
+              ? "No live node links recorded in this session yet."
+              : `No node links recorded for ${{networkGraphEdgeModeLabel(edgeMode)}}.`);
         empty.hidden = false;
         scheduleNetworkGraphEmptyRetry();
         if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
@@ -5564,7 +5701,10 @@
       empty.hidden = true;
       const selectedId = normalizeNodeId(selectedNodeId || "");
       const localId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
-      summary.innerHTML = `<div class="network-graph-summary-main"><label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select"><span class="network-graph-chip-label history-metric-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select history-metric-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label><button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip" type="button" title="Reset links view" aria-controls="network-graph-svg"><span class="network-graph-chip-label">View</span><strong>Reset</strong></button></div><div class="network-graph-summary-side"><label class="network-graph-mode-control history-metric-wrap history-select-chip-hide-label" for="network-graph-mode-select" title="Switch Links view between stored history topology and the current session topology"><span class="network-graph-chip-label history-metric-label">Mode</span><select id="network-graph-mode-select" class="network-graph-mode-select history-metric-select" aria-label="Network links source"><option value="history"${{edgeMode === "history" ? " selected" : ""}}>History</option><option value="live"${{edgeMode === "live" ? " selected" : ""}}>Live</option></select></label></div>`;
+      const edgeModeOptionsHtml = networkGraphEdgeModeDefs
+        .map((entry) => `<option value="${{entry.id}}"${{edgeMode === entry.id ? " selected" : ""}}>${{entry.label}}</option>`)
+        .join("");
+      summary.innerHTML = `<div class="network-graph-summary-main"><label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select"><span class="network-graph-chip-label history-metric-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select history-metric-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label><button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip" type="button" title="Reset links view" aria-controls="network-graph-svg"><span class="network-graph-chip-label">View</span><strong>Reset</strong></button></div><div class="network-graph-summary-side"><label class="network-graph-mode-control history-metric-wrap history-select-chip-hide-label" for="network-graph-mode-select" title="Choose the link history window for the Links view"><span class="network-graph-chip-label history-metric-label">Links</span><select id="network-graph-mode-select" class="network-graph-mode-select history-metric-select" aria-label="Network links source">${{edgeModeOptionsHtml}}</select></label></div>`;
       bindNetworkGraphLayoutSelector();
       syncNetworkGraphLayoutSelector();
       bindNetworkGraphSummaryControls();
