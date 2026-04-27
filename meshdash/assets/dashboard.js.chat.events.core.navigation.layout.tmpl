@@ -2867,7 +2867,23 @@
 
       const tagRouteOverlayMarkup = buildNetworkGraphTagRouteOverlayMarkup(safeScene);
 
-      const nodeMarkup = items.map((item) => {{
+      function networkGraphNodeRenderPriority(item) {{
+        const nodeId = normalizeNodeId(item && item.nodeId || "");
+        let priority = networkGraphNodeDisplayPriority(nodeId, nodeMap);
+        if (nodeId === rootId) priority += 4;
+        if (nodeId === localId) priority += 5;
+        if (nodeId === selectedId) priority += 6;
+        return priority;
+      }}
+
+      const nodeRenderItems = items.map((item, index) => ({{ item, index }})).sort((itemA, itemB) => {{
+        const priorityDelta = networkGraphNodeRenderPriority(itemA.item) - networkGraphNodeRenderPriority(itemB.item);
+        if (priorityDelta !== 0) return priorityDelta;
+        return itemA.index - itemB.index;
+      }});
+
+      const nodeMarkup = nodeRenderItems.map((renderItem) => {{
+        const item = renderItem.item;
         const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
         const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
         const nodeEmoji = resolveNetworkGraphNodeEmoji(item);
@@ -4052,7 +4068,46 @@
 
     }}
 
+    function networkGraphNodeHasTag(nodeId) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean || typeof nodeTagEntryForNode !== "function") return false;
+      try {{
+        const tagEntry = nodeTagEntryForNode(clean);
+        return !!(tagEntry && tagEntry.preset);
+      }} catch (_err) {{
+        return false;
+      }}
+    }}
+
+    function networkGraphNodeHasVisualIcon(nodeId, nodeMap) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean || typeof nodeVisualEmojiForNode !== "function") return false;
+      const node = nodeMap instanceof Map ? (nodeMap.get(clean) || null) : null;
+      try {{
+        return !!String(nodeVisualEmojiForNode(clean, null, node) || "").trim();
+      }} catch (_err) {{
+        return false;
+      }}
+    }}
+
+    function networkGraphNodeDisplayPriority(nodeId, nodeMap) {{
+      if (networkGraphNodeHasTag(nodeId)) return 2;
+      return networkGraphNodeHasVisualIcon(nodeId, nodeMap) ? 1 : 0;
+    }}
+
+    function networkGraphNodeGroupDisplayPriority(nodeIds, nodeMap) {{
+      const values = Array.isArray(nodeIds) ? nodeIds : [];
+      let best = 0;
+      for (const nodeId of values) {{
+        best = Math.max(best, networkGraphNodeDisplayPriority(nodeId, nodeMap));
+        if (best >= 2) break;
+      }}
+      return best;
+    }}
+
     function compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap) {{
+      const priorityDelta = networkGraphNodeDisplayPriority(b, nodeMap) - networkGraphNodeDisplayPriority(a, nodeMap);
+      if (priorityDelta !== 0) return priorityDelta;
       const aMeta = degreeMeta.get(a) || {{ degree: 0, weight: 0 }};
       const bMeta = degreeMeta.get(b) || {{ degree: 0, weight: 0 }};
       if (bMeta.degree !== aMeta.degree) return bMeta.degree - aMeta.degree;
@@ -4591,6 +4646,8 @@
       if (preserveDelta !== 0) return preserveDelta;
       const broadcastDelta = Number(!!safeCandidateB.broadcastOnly) - Number(!!safeCandidateA.broadcastOnly);
       if (broadcastDelta !== 0) return broadcastDelta;
+      const priorityDelta = networkGraphNodeDisplayPriority(safeCandidateB.nodeId, nodeMap) - networkGraphNodeDisplayPriority(safeCandidateA.nodeId, nodeMap);
+      if (priorityDelta !== 0) return priorityDelta;
       const signalMetaA = (safeCandidateA.signalMeta && typeof safeCandidateA.signalMeta === "object") ? safeCandidateA.signalMeta : {{}};
       const signalMetaB = (safeCandidateB.signalMeta && typeof safeCandidateB.signalMeta === "object") ? safeCandidateB.signalMeta : {{}};
       const livePacketDelta = Math.max(0, Number(signalMetaB.packetCount) || 0) - Math.max(0, Number(signalMetaA.packetCount) || 0);
@@ -5048,7 +5105,11 @@
         const communityDescriptors = rawCommunities.map((members, index) => {{
           const normalizedMembers = Array.isArray(members) ? members.slice() : [];
           const hasRoot = normalizedMembers.includes(rootId);
-          const visibleMembers = normalizedMembers.filter((nodeId) => nodeId !== rootId);
+          const visibleMembers = normalizedMembers
+            .filter((nodeId) => nodeId !== rootId)
+            .sort((a, b) => (
+              Number(layerByNodeId.get(a) || 0) - Number(layerByNodeId.get(b) || 0)
+            ) || compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
           const anchorId = hasRoot ? rootId : (normalizedMembers[0] || "");
           const labelBase = networkGraphNodeDisplayName(anchorId, nodeMap);
           return {{
@@ -5061,6 +5122,9 @@
           }};
         }}).sort((a, b) => (
           Number(b.hasRoot) - Number(a.hasRoot)
+        ) || (
+          networkGraphNodeGroupDisplayPriority(b.members, nodeMap)
+          - networkGraphNodeGroupDisplayPriority(a.members, nodeMap)
         ) || (b.members.length - a.members.length));
         const availableLeft = -60;
         const availableTop = 36;
@@ -5248,7 +5312,11 @@
               }};
             }})
             .sort((a, b) => (
-              (b.memberCount - a.memberCount)
+              (
+                networkGraphNodeGroupDisplayPriority(b.members, nodeMap)
+                - networkGraphNodeGroupDisplayPriority(a.members, nodeMap)
+              )
+              || (b.memberCount - a.memberCount)
               || compareNetworkGraphNodeIds(a.subclusterId, b.subclusterId, degreeMeta, nodeMap)
             ));
           const firstHopDegree = Number((degreeMeta.get(clusterId) || {{ degree: 0 }}).degree || 0);
@@ -5308,7 +5376,11 @@
             ),
           }};
         }}).sort((a, b) => (
-          (b.memberCount - a.memberCount)
+          (
+            networkGraphNodeGroupDisplayPriority(b.members, nodeMap)
+            - networkGraphNodeGroupDisplayPriority(a.members, nodeMap)
+          )
+          || (b.memberCount - a.memberCount)
           || compareNetworkGraphNodeIds(a.clusterId, b.clusterId, degreeMeta, nodeMap)
         ));
         const clusterRadius = Math.max(

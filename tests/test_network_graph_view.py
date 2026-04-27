@@ -151,6 +151,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'persistPreferredNetworkGraphEdgeMode(networkGraphEdgeMode);' not in js
     assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.42, maxScale: 5.5 });' in js
     assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
+    assert 'function networkGraphNodeDisplayPriority(nodeId, nodeMap)' in js
+    assert 'function networkGraphNodeGroupDisplayPriority(nodeIds, nodeMap)' in js
     assert 'function networkGraphAverageParentOrder(nodeId, parentHintsByNodeId, layerOrderIndexByNodeId)' in js
     assert 'function compareNetworkGraphLayerIds(' in js
     assert 'function buildNetworkGraphPlaceholderNode(nodeId, caps = null)' in js
@@ -207,7 +209,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const branchWeightTotal = branchDescriptors.reduce((sum, branchDescriptor) => sum + branchDescriptor.weight, 0) || 1;' in js
     assert 'const cellWeightTotal = cellDescriptors.reduce((sum, cellDescriptor) => sum + cellDescriptor.weight, 0) || 1;' in js
     assert 'clusterLabelNodeIds.add(branchDescriptor.subclusterId);' in js
+    assert 'networkGraphNodeGroupDisplayPriority(b.members, nodeMap)' in js
     assert 'for (const nodeId of clusterLabelNodeIds) {' in js
+    assert 'function networkGraphNodeRenderPriority(item)' in js
+    assert 'const nodeRenderItems = items.map((item, index) => ({ item, index })).sort' in js
     assert 'Object.entries((historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {})' in js
     assert 'buildNetworkGraphPlaceholderNode(clean, historyCapsById.get(clean) || null)' in js
     assert 'const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);' in js
