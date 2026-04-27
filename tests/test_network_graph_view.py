@@ -249,9 +249,16 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'return radius + amplitude + 2;' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'const isLocalNode = item.nodeId === localId;' in js
+    assert 'function resolveNetworkGraphShortestPathEdgeKeys(edges, fromNodeId, toNodeId) {' in js
+    assert 'const edgeRenderItems = edges.map((edge, index) => ({' in js
+    assert 'return pathDelta || (itemA.index - itemB.index);' in js
+    assert 'localPathEdgeKeys.has(edgeKey) ? "is-local-path" : ""' in js
+    assert 'edgeEl.classList.toggle("is-local-path", isLocalPathEdge);' in js
+    assert 'localPathEdgeEls.forEach((edgeEl) => linkLayer.appendChild(edgeEl));' in js
     assert 'position.labelOffsetY == null' in js
     assert 'class="network-graph-node-emoji"' in js
     assert '<span class="network-graph-swatch is-local"></span>Your node / local radio' in js
+    assert '<span class="network-graph-swatch is-local-path"></span>Shortest root-to-your-node path' in js
     assert 'is-broadcast-only' in js
     assert 'pointerDownNodeId' in js
     assert 'svg.addEventListener("wheel"' in js
@@ -301,7 +308,12 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-region {" in css
     assert ".network-graph-region-label {" in css
     assert ".network-graph-swatch.is-broadcast-only {" in css
+    assert ".network-graph-swatch.is-local-path {" in css
     assert ".network-graph-swatch.is-local {" in css
+    assert ".network-graph-edge.is-local-path {" in css
+    assert "stroke: var(--theme-base-color, var(--accent, #2f855a));" in css
+    assert "[data-theme=\"dark\"] .network-graph-edge.is-local-path {" in css
+    assert "stroke: var(--theme-base-color, var(--ui-accent));" in css
     assert ".network-graph-ring.is-broadcast-only {" in css
     assert ".network-graph-node.is-local .network-graph-node-core {" in css
     assert ".network-graph-node-emoji-fo {" in css

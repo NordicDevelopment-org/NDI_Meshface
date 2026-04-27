@@ -5566,6 +5566,9 @@
     [data-theme="dark"] .network-graph-swatch.is-root {{
       background: var(--workspace-shell-active-text);
     }}
+    [data-theme="dark"] .network-graph-swatch.is-local-path {{
+      background: var(--theme-base-color, var(--ui-accent));
+    }}
     [data-theme="dark"] .network-graph-swatch.is-local {{
       background: rgba(167, 134, 255, 0.82);
     }}
@@ -5603,7 +5606,11 @@
       stroke: color-mix(in srgb, var(--workspace-shell-border-muted) 62%, transparent);
     }}
     [data-theme="dark"] .network-graph-edge.is-root-link {{
-      stroke: var(--ui-accent);
+      stroke: color-mix(in srgb, var(--workspace-shell-border-strong) 58%, var(--ui-accent) 42%);
+    }}
+    [data-theme="dark"] .network-graph-edge.is-local-path {{
+      stroke: var(--theme-base-color, var(--ui-accent));
+      opacity: 1;
     }}
     [data-theme="dark"] .network-graph-node-core {{
       fill: color-mix(in srgb, var(--workspace-shell-bg-alt) 94%, black 6%);

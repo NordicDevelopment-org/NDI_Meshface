@@ -75,6 +75,8 @@ def test_theme_settings_support_generated_custom_theme_state() -> None:
     }
     assert "custom" in response["available_presets"]
     assert response["presets"]["custom"] == expected_custom
+    assert response["presets"]["custom"]["light"]["--theme-base-color"] == "#1d4ed8"
+    assert response["presets"]["custom"]["dark"]["--theme-base-color"] == "#1d4ed8"
     assert response["presets"]["custom"]["dark"]["--workspace-shell-border"] != default_line_custom["dark"]["--workspace-shell-border"]
     assert settings.selected_preset_name() == "custom"
     assert settings.selected_preset_tokens() == expected_custom
