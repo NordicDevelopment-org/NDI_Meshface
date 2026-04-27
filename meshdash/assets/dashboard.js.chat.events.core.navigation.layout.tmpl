@@ -2411,6 +2411,7 @@
           : cleanRootId;
         if (routeStartId === taggedItem.nodeId) continue;
         const pathSegments = resolveNetworkGraphShortestPathSegments(edges, routeStartId, taggedItem.nodeId);
+        const hopCount = pathSegments.length;
         for (const segment of pathSegments) {{
           if (!segment || !segment.edgeKey) continue;
           if (!segmentsByEdgeKey.has(segment.edgeKey)) {{
@@ -2420,6 +2421,7 @@
             ...segment,
             sourceId: routeStartId,
             targetId: taggedItem.nodeId,
+            hopCount,
             presetId: taggedItem.presetId,
             color: taggedItem.color,
             label: taggedItem.label,
@@ -2546,10 +2548,13 @@
         const sourceId = normalizeNodeId(segment.sourceId || rootId || "");
         const sourceLabel = sourceId ? networkGraphNodeDisplayName(sourceId, nodeMap) : "Root";
         const targetLabel = networkGraphNodeDisplayName(segment.targetId, nodeMap);
+        const hopCount = Math.max(0, Math.trunc(Number(segment.hopCount) || 0));
+        const hopLabel = hopCount === 1 ? "1 graph hop" : `${{hopCount}} graph hops`;
         const title = [
           `Tag route: ${{segment.label || "Tagged"}}`,
           `${{sourceLabel}} -> ${{targetLabel}}`,
-        ].join("\\n");
+          hopLabel,
+        ].join("\n");
         return `
           <line
             class="network-graph-tag-route"

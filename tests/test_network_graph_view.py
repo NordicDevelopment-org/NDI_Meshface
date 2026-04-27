@@ -258,6 +258,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function resolveNetworkGraphTaggedRouteSegments(edges, items, rootId, routeAnchorId = "") {' in js
     assert 'const routeStartId = (' in js
     assert 'sourceId: routeStartId,' in js
+    assert 'hopCount,' in js
+    assert 'const hopLabel = hopCount === 1 ? "1 graph hop" : `${hopCount} graph hops`;' in js
+    assert '].join("\\n");' in js
+    assert '].join("\\\\n");' not in js
     assert 'function resolveNetworkGraphTagRouteLegendItems(edges, items, rootId, routeAnchorId = "") {' in js
     assert 'function buildNetworkGraphTagRouteOverlayMarkup(scene) {' in js
     assert 'function renderNetworkGraphTagRouteLegend(scene) {' in js
@@ -341,6 +345,8 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-tag-routes {" in css
     assert ".network-graph-tag-route {" in css
     assert "stroke: var(--network-graph-tag-route-color, var(--node-tag-color, #2aa85a));" in css
+    assert "pointer-events: stroke;" in css
+    assert "cursor: help;" in css
     assert ".network-graph-tag-filter-input {" in css
     assert ".network-graph-tag-filter.is-empty {" in css
     assert "appearance: none;" in css
