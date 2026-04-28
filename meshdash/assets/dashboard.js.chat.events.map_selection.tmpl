@@ -1003,6 +1003,9 @@
       renderSelectionStatus();
       renderSavedNodeSearchDropdown(latestState);
       highlightNodeSelection(previousSelectedId, normalized);
+      if (latestState) {{
+        renderSummary(latestState);
+      }}
       if (
         typeof renderEnvironmentMetricsView === "function"
         && (
@@ -1099,6 +1102,9 @@
       persistSelection();
       renderSelectionStatus();
       renderSavedNodeSearchDropdown(latestState);
+      if (latestState) {{
+        renderSummary(latestState);
+      }}
       if (
         typeof renderEnvironmentMetricsView === "function"
         && (

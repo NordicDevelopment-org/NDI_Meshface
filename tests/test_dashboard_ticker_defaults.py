@@ -194,7 +194,7 @@ def test_render_html_exposes_live_update_ticker_toggle_in_settings() -> None:
     assert "sideways scrolling live-update bar" in html
 
 
-def test_dashboard_js_renders_local_identity_in_self_ticker() -> None:
+def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
@@ -203,13 +203,16 @@ def test_dashboard_js_renders_local_identity_in_self_ticker() -> None:
 
     assert 'const selfMetric = document.getElementById("m-self");' in js
     assert 'const selfCard = document.getElementById("summary-ticker-self");' in js
-    assert "function resolveSelfNodeCityLocation(state, localNode, localOwner, localId)" in js
+    assert "function resolveSelfNodeCityLocation(state, node, owner, nodeId)" in js
     assert "function resolveSelfNodeNearestCityLabel(location)" in js
+    assert 'const selectedTickerId = normalizeNodeId(selectedNodeId || "");' in js
+    assert "const tickerNodeId = isSelectableNodeId(selectedTickerId) ? selectedTickerId : localId;" in js
+    assert 'selfCard.setAttribute("aria-label", `Select node ${tickerNodeName || tickerNodeId}`);' in js
     assert "nearestOfflineCityHintFromCoords(" in js
     assert 'source: "linked",' in js
     assert 'selfMetric.classList.add("self-node-value", "node-ticker-value");' in js
     assert 'nameRow.className = "self-node-name";' in js
-    assert 'statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${selfStatusKey}`;' in js
+    assert 'statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${tickerStatusKey}`;' in js
     assert 'statusRing.className = "chat-member-status-ring";' in js
     assert 'statusGlyph.className = "chat-member-status-emoji-glyph";' in js
     assert 'selfCard.classList.toggle("has-node-emoji", !!selfEmoji);' in js
@@ -227,7 +230,7 @@ def test_dashboard_js_renders_local_identity_in_self_ticker() -> None:
     assert "renderRadioStatus(state);" in js
 
 
-def test_render_html_styles_local_identity_self_ticker() -> None:
+def test_render_html_styles_node_identity_ticker() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -243,6 +246,7 @@ def test_render_html_styles_local_identity_self_ticker() -> None:
 
     assert 'id="summary-ticker-self"' in html
     assert 'data-ticker-id="self"' in html
+    assert '<div class="label" data-ticker-label>Node</div>' in html
     assert 'id="summary-ticker-radio"' in html
     assert 'data-ticker-id="radio"' in html
     assert ".topbar .summary-ticker-item-self .value.self-node-value" in html

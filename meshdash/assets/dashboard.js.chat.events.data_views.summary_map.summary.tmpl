@@ -1429,29 +1429,29 @@
       return null;
     }}
 
-    function selfNodeLinkedLocationGraphKey(nodes, edges, localId) {{
+    function selfNodeLinkedLocationGraphKey(nodes, edges, nodeId) {{
       if (typeof buildMapGraphSignature === "function") {{
         try {{
-          return `${{localId}}:${{buildMapGraphSignature(nodes, edges, {{ includeTemporalEdgeFade: false }})}}`;
+          return `${{nodeId}}:${{buildMapGraphSignature(nodes, edges, {{ includeTemporalEdgeFade: false }})}}`;
         }} catch (_err) {{
           // Fall through to the lightweight key below.
         }}
       }}
-      return `${{localId}}:${{Array.isArray(nodes) ? nodes.length : 0}}:${{Array.isArray(edges) ? edges.length : 0}}`;
+      return `${{nodeId}}:${{Array.isArray(nodes) ? nodes.length : 0}}:${{Array.isArray(edges) ? edges.length : 0}}`;
     }}
 
-    function selfNodeLinkedLocationFromState(state, localId) {{
+    function selfNodeLinkedLocationFromState(state, nodeId) {{
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
       const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
-      if (!isSelectableNodeId(localId) || nodes.length === 0 || edges.length === 0) {{
+      if (!isSelectableNodeId(nodeId) || nodes.length === 0 || edges.length === 0) {{
         return null;
       }}
       if (typeof buildMapLinkLayerOverlay !== "function") {{
         return null;
       }}
-      const cacheKey = selfNodeLinkedLocationGraphKey(nodes, edges, localId);
+      const cacheKey = selfNodeLinkedLocationGraphKey(nodes, edges, nodeId);
       if (cacheKey && cacheKey === selfNodeLinkedLocationCacheKey) {{
         return selfNodeLinkedLocationCacheValue;
       }}
@@ -1460,7 +1460,7 @@
       try {{
         const overlay = buildMapLinkLayerOverlay(nodes, edges, {{ mode: "both" }});
         const estimates = overlay && overlay.estimates instanceof Map ? overlay.estimates : null;
-        const estimate = estimates ? estimates.get(localId) : null;
+        const estimate = estimates ? estimates.get(nodeId) : null;
         const lat = Number(estimate && estimate.lat);
         const lon = Number(estimate && estimate.lon);
         if (selfNodeCityCoordinateIsValid(lat, lon)) {{
@@ -1480,18 +1480,20 @@
       return linkedLocation;
     }}
 
-    function resolveSelfNodeCityLocation(state, localNode, localOwner, localId) {{
+    function resolveSelfNodeCityLocation(state, node, owner, nodeId) {{
       const safeState = (state && typeof state === "object") ? state : {{}};
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      const localId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      const canUseLocalState = isCanonicalNodeId(localId) && cleanNodeId === localId;
       const gpsLocation = selfNodeGpsLocationFromEntries(
-        localNode,
-        localOwner,
-        safeState.local_state,
-        safeState.localState
+        node,
+        owner,
+        ...(canUseLocalState ? [safeState.local_state, safeState.localState] : [])
       );
       if (gpsLocation) {{
         return gpsLocation;
       }}
-      return selfNodeLinkedLocationFromState(safeState, localId);
+      return selfNodeLinkedLocationFromState(safeState, cleanNodeId);
     }}
 
     function selfNodeNearestCityCacheKey(location) {{
@@ -1596,47 +1598,53 @@
       const localId = normalizeNodeId(resolveLocalNodeId(state) || "");
       const localNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === localId) || null;
       const localOwner = localNodeUserFromState(state);
-      const localLongName = String(
-        (localOwner && localOwner.long_name) || (localNode && localNode.long_name) || ""
+      const selectedTickerId = normalizeNodeId(selectedNodeId || "");
+      const tickerNodeId = isSelectableNodeId(selectedTickerId) ? selectedTickerId : localId;
+      const tickerNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === tickerNodeId) || null;
+      const tickerIsLocal = isCanonicalNodeId(localId) && tickerNodeId === localId;
+      const tickerOwner = tickerIsLocal ? localOwner : null;
+      const tickerLongName = String(
+        (tickerOwner && tickerOwner.long_name) || (tickerNode && tickerNode.long_name) || ""
       ).trim();
-      const localShortName = String(
-        (localOwner && localOwner.short_name) || (localNode && localNode.short_name) || ""
+      const tickerShortName = String(
+        (tickerOwner && tickerOwner.short_name) || (tickerNode && tickerNode.short_name) || ""
       ).trim();
-      const localName = preferredNodeName(localNode)
-        || localLongName
-        || localShortName
-        || (isCanonicalNodeId(localId) ? String(nodeNameCache.get(localId) || "").trim() : "");
-      const hasLocalIdentity = !!localName || isCanonicalNodeId(localId);
+      const tickerNodeName = preferredNodeName(tickerNode)
+        || tickerLongName
+        || tickerShortName
+        || (isSelectableNodeId(tickerNodeId) ? String(nodeNameCache.get(tickerNodeId) || "").trim() : "");
+      const tickerFallbackName = tickerIsLocal ? "Local node" : "Selected node";
+      const hasTickerIdentity = !!tickerNodeName || isSelectableNodeId(tickerNodeId);
       const targetDisplay = compactTargetMetric(targetValue);
-      let selfStatusKey = "unknown";
-      if (isCanonicalNodeId(localId)) {{
-        const traffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
-        const historyCapsById = new Map(
-          Object.entries((state.history_caps && typeof state.history_caps === "object") ? state.history_caps : {{}})
-            .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
-            .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
-        );
-        const chatMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
-        const latestChatTouchByNode = mapLatestChatTouchInfo(chatMessages);
-        const freshness = resolveNodeFreshness(
-          localNode,
-          historyCapsById.get(localId) || null,
+      const tickerTraffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
+      const tickerHistoryCapsById = new Map(
+        Object.entries((state.history_caps && typeof state.history_caps === "object") ? state.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
+      const tickerChatMessages = Array.isArray(tickerTraffic.recent_chat) ? tickerTraffic.recent_chat : [];
+      const tickerLatestChatTouchByNode = mapLatestChatTouchInfo(tickerChatMessages);
+      let tickerStatusKey = "unknown";
+      if (isSelectableNodeId(tickerNodeId)) {{
+        const tickerFreshness = resolveNodeFreshness(
+          tickerNode,
+          tickerHistoryCapsById.get(tickerNodeId) || null,
           null,
-          latestChatTouchByNode.get(localId) || null
+          tickerLatestChatTouchByNode.get(tickerNodeId) || null
         );
-        selfStatusKey = normalizeFreshnessKey(freshnessStatus(freshness.unix, Math.floor(Date.now() / 1000)));
+        tickerStatusKey = normalizeFreshnessKey(freshnessStatus(tickerFreshness.unix, Math.floor(Date.now() / 1000)));
       }}
-      const selfStatusLabel = selfStatusKey === "online"
+      const tickerStatusLabel = tickerStatusKey === "online"
         ? "Online"
-        : (selfStatusKey === "warn" ? "Aging" : (selfStatusKey === "stale" ? "Stale" : "Unknown"));
+        : (tickerStatusKey === "warn" ? "Aging" : (tickerStatusKey === "stale" ? "Stale" : "Unknown"));
       const selfMetric = document.getElementById("m-self");
       const selfCard = document.getElementById("summary-ticker-self");
       if (selfCard instanceof HTMLElement) {{
-        if (isCanonicalNodeId(localId)) {{
-          selfCard.dataset.nodeId = localId;
+        if (isSelectableNodeId(tickerNodeId)) {{
+          selfCard.dataset.nodeId = tickerNodeId;
           selfCard.tabIndex = 0;
           selfCard.setAttribute("role", "button");
-          selfCard.setAttribute("aria-label", `Select local node ${{localName || localId}}`);
+          selfCard.setAttribute("aria-label", `Select node ${{tickerNodeName || tickerNodeId}}`);
         }} else {{
           delete selfCard.dataset.nodeId;
           selfCard.removeAttribute("tabindex");
@@ -1649,14 +1657,14 @@
         selfMetric.classList.remove("self-node-value", "node-ticker-value", "has-self-node-city");
         delete selfMetric.dataset.cityRequestKey;
         selfMetric.replaceChildren();
-        if (hasLocalIdentity) {{
+        if (hasTickerIdentity) {{
           selfMetric.classList.add("self-node-value", "node-ticker-value");
           const selfEmoji = (typeof nodeVisualEmojiForNode === "function")
-            ? String(nodeVisualEmojiForNode(localId, null, localNode) || "").trim()
+            ? String(nodeVisualEmojiForNode(tickerNodeId, null, tickerNode) || "").trim()
             : "";
           const displayName = (selfEmoji && typeof stripNodeVisualEmojiFromLabel === "function")
-            ? stripNodeVisualEmojiFromLabel(localName || "Local node", selfEmoji)
-            : (localName || "Local node");
+            ? stripNodeVisualEmojiFromLabel(tickerNodeName || tickerFallbackName, selfEmoji)
+            : (tickerNodeName || tickerFallbackName);
           if (selfCard instanceof HTMLElement) {{
             selfCard.classList.toggle("has-node-emoji", !!selfEmoji);
             if (selfEmoji) {{
@@ -1669,9 +1677,9 @@
           nameRow.className = "self-node-name";
           if (selfEmoji) {{
             const statusText = document.createElement("span");
-            statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${{selfStatusKey}}`;
-            statusText.title = `Status: ${{selfStatusLabel}}`;
-            statusText.setAttribute("aria-label", `Status: ${{selfStatusLabel}}`);
+            statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${{tickerStatusKey}}`;
+            statusText.title = `Status: ${{tickerStatusLabel}}`;
+            statusText.setAttribute("aria-label", `Status: ${{tickerStatusLabel}}`);
             const statusRing = document.createElement("span");
             statusRing.className = "chat-member-status-ring";
             statusRing.setAttribute("aria-hidden", "true");
@@ -1689,20 +1697,20 @@
           nameRow.appendChild(nameText);
           const idText = document.createElement("span");
           idText.className = "self-node-id";
-          idText.textContent = isCanonicalNodeId(localId) ? localId : "ID unavailable";
+          idText.textContent = isSelectableNodeId(tickerNodeId) ? tickerNodeId : "ID unavailable";
           nameRow.appendChild(idText);
           selfMetric.appendChild(nameRow);
           const cityText = document.createElement("div");
           cityText.className = "self-node-city";
           cityText.hidden = true;
           selfMetric.appendChild(cityText);
-          const cityLocation = resolveSelfNodeCityLocation(state, localNode, localOwner, localId);
+          const cityLocation = resolveSelfNodeCityLocation(state, tickerNode, tickerOwner, tickerNodeId);
           const cityCacheKey = selfNodeNearestCityCacheKey(cityLocation);
-          const titleParts = [localName || "Local node"];
-          if (isCanonicalNodeId(localId)) {{
-            titleParts.push(localId);
+          const titleParts = [tickerNodeName || tickerFallbackName];
+          if (isSelectableNodeId(tickerNodeId)) {{
+            titleParts.push(tickerNodeId);
           }}
-          if (fullTarget) {{
+          if (tickerIsLocal && fullTarget) {{
             titleParts.push(`Target ${{fullTarget}}`);
           }}
           const metricBaseTitle = titleParts.join(" • ");
