@@ -1599,9 +1599,11 @@
       const localNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === localId) || null;
       const localOwner = localNodeUserFromState(state);
       const selectedTickerId = normalizeNodeId(selectedNodeId || "");
-      const tickerNodeId = isSelectableNodeId(selectedTickerId) ? selectedTickerId : localId;
+      const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId);
+      const tickerNodeId = hasSelectedTickerNode ? selectedTickerId : localId;
       const tickerNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === tickerNodeId) || null;
       const tickerIsLocal = isCanonicalNodeId(localId) && tickerNodeId === localId;
+      const tickerShowsSelf = !hasSelectedTickerNode || tickerIsLocal;
       const tickerOwner = tickerIsLocal ? localOwner : null;
       const tickerLongName = String(
         (tickerOwner && tickerOwner.long_name) || (tickerNode && tickerNode.long_name) || ""
@@ -1616,30 +1618,13 @@
       const tickerFallbackName = tickerIsLocal ? "Local node" : "Selected node";
       const hasTickerIdentity = !!tickerNodeName || isSelectableNodeId(tickerNodeId);
       const targetDisplay = compactTargetMetric(targetValue);
-      const tickerTraffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
-      const tickerHistoryCapsById = new Map(
-        Object.entries((state.history_caps && typeof state.history_caps === "object") ? state.history_caps : {{}})
-          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
-          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
-      );
-      const tickerChatMessages = Array.isArray(tickerTraffic.recent_chat) ? tickerTraffic.recent_chat : [];
-      const tickerLatestChatTouchByNode = mapLatestChatTouchInfo(tickerChatMessages);
-      let tickerStatusKey = "unknown";
-      if (isSelectableNodeId(tickerNodeId)) {{
-        const tickerFreshness = resolveNodeFreshness(
-          tickerNode,
-          tickerHistoryCapsById.get(tickerNodeId) || null,
-          null,
-          tickerLatestChatTouchByNode.get(tickerNodeId) || null
-        );
-        tickerStatusKey = normalizeFreshnessKey(freshnessStatus(tickerFreshness.unix, Math.floor(Date.now() / 1000)));
-      }}
-      const tickerStatusLabel = tickerStatusKey === "online"
-        ? "Online"
-        : (tickerStatusKey === "warn" ? "Aging" : (tickerStatusKey === "stale" ? "Stale" : "Unknown"));
       const selfMetric = document.getElementById("m-self");
       const selfCard = document.getElementById("summary-ticker-self");
       if (selfCard instanceof HTMLElement) {{
+        const selfLabel = selfCard.querySelector("[data-ticker-label]");
+        if (selfLabel instanceof HTMLElement) {{
+          selfLabel.textContent = tickerShowsSelf ? "Self" : "Node";
+        }}
         if (isSelectableNodeId(tickerNodeId)) {{
           selfCard.dataset.nodeId = tickerNodeId;
           selfCard.tabIndex = 0;
@@ -1675,22 +1660,6 @@
           }}
           const nameRow = document.createElement("div");
           nameRow.className = "self-node-name";
-          if (selfEmoji) {{
-            const statusText = document.createElement("span");
-            statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${{tickerStatusKey}}`;
-            statusText.title = `Status: ${{tickerStatusLabel}}`;
-            statusText.setAttribute("aria-label", `Status: ${{tickerStatusLabel}}`);
-            const statusRing = document.createElement("span");
-            statusRing.className = "chat-member-status-ring";
-            statusRing.setAttribute("aria-hidden", "true");
-            const statusGlyph = document.createElement("span");
-            statusGlyph.className = "chat-member-status-emoji-glyph";
-            statusGlyph.setAttribute("aria-hidden", "true");
-            statusGlyph.textContent = selfEmoji;
-            statusText.appendChild(statusRing);
-            statusText.appendChild(statusGlyph);
-            nameRow.appendChild(statusText);
-          }}
           const nameText = document.createElement("span");
           nameText.className = "self-node-name-text";
           nameText.textContent = displayName;

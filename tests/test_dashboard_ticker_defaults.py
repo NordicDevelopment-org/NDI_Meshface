@@ -206,15 +206,17 @@ def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> Non
     assert "function resolveSelfNodeCityLocation(state, node, owner, nodeId)" in js
     assert "function resolveSelfNodeNearestCityLabel(location)" in js
     assert 'const selectedTickerId = normalizeNodeId(selectedNodeId || "");' in js
-    assert "const tickerNodeId = isSelectableNodeId(selectedTickerId) ? selectedTickerId : localId;" in js
+    assert "const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId);" in js
+    assert "const tickerNodeId = hasSelectedTickerNode ? selectedTickerId : localId;" in js
+    assert "const tickerShowsSelf = !hasSelectedTickerNode || tickerIsLocal;" in js
+    assert 'selfLabel.textContent = tickerShowsSelf ? "Self" : "Node";' in js
     assert 'selfCard.setAttribute("aria-label", `Select node ${tickerNodeName || tickerNodeId}`);' in js
     assert "nearestOfflineCityHintFromCoords(" in js
     assert 'source: "linked",' in js
     assert 'selfMetric.classList.add("self-node-value", "node-ticker-value");' in js
     assert 'nameRow.className = "self-node-name";' in js
-    assert 'statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${tickerStatusKey}`;' in js
-    assert 'statusRing.className = "chat-member-status-ring";' in js
-    assert 'statusGlyph.className = "chat-member-status-emoji-glyph";' in js
+    assert "nameRow.appendChild(statusText);" not in js
+    assert 'statusGlyph.className = "chat-member-status-emoji-glyph";' not in js
     assert 'selfCard.classList.toggle("has-node-emoji", !!selfEmoji);' in js
     assert "selfCard.dataset.nodeEmoji = selfEmoji;" in js
     assert 'nameText.className = "self-node-name-text";' in js
@@ -246,7 +248,7 @@ def test_render_html_styles_node_identity_ticker() -> None:
 
     assert 'id="summary-ticker-self"' in html
     assert 'data-ticker-id="self"' in html
-    assert '<div class="label" data-ticker-label>Node</div>' in html
+    assert '<div class="label" data-ticker-label>Self</div>' in html
     assert 'id="summary-ticker-radio"' in html
     assert 'data-ticker-id="radio"' in html
     assert ".topbar .summary-ticker-item-self .value.self-node-value" in html
