@@ -986,6 +986,25 @@
       flex: 0 0 auto;
       max-width: 86px;
     }}
+    .topbar .summary-ticker-item-self .value.self-node-value.has-self-node-city {{
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.has-self-node-city .self-node-name {{
+      width: 100%;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-city {{
+      min-width: 0;
+      max-width: 100%;
+      font-size: 10px;
+      font-weight: 720;
+      line-height: 1.08;
+      color: color-mix(in srgb, var(--muted) 78%, var(--accent) 22%);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
     .topbar .summary-ticker-item .label {{
       grid-column: 1;
       grid-row: 1;
@@ -1283,6 +1302,12 @@
       flex-basis: 100%;
       max-width: 100%;
     }}
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-city {{
+      font-size: 11px;
+      line-height: 1.15;
+      flex-basis: 100%;
+      max-width: 100%;
+    }}
     .topbar.ticker-expanded .summary-ticker-item .label {{
       grid-column: 1;
       grid-row: 1;
@@ -1336,6 +1361,7 @@
       row-gap: 3px;
     }}
     .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-id,
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-city,
     .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-detail {{
       flex-basis: 100%;
       max-width: 100%;

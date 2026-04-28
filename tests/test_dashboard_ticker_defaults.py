@@ -203,6 +203,10 @@ def test_dashboard_js_renders_local_identity_in_self_ticker() -> None:
 
     assert 'const selfMetric = document.getElementById("m-self");' in js
     assert 'const selfCard = document.getElementById("summary-ticker-self");' in js
+    assert "function resolveSelfNodeCityLocation(state, localNode, localOwner, localId)" in js
+    assert "function resolveSelfNodeNearestCityLabel(location)" in js
+    assert "nearestOfflineCityHintFromCoords(" in js
+    assert 'source: "linked",' in js
     assert 'selfMetric.classList.add("self-node-value", "node-ticker-value");' in js
     assert 'nameRow.className = "self-node-name";' in js
     assert 'statusText.className = `self-node-status chat-member-status chat-member-status-emoji status-${selfStatusKey}`;' in js
@@ -215,6 +219,8 @@ def test_dashboard_js_renders_local_identity_in_self_ticker() -> None:
     assert 'statusText.id = "m-target-status-inline";' not in js
     assert 'idText.className = "self-node-id";' in js
     assert "nameRow.appendChild(idText);" in js
+    assert 'cityText.className = "self-node-city";' in js
+    assert 'selfMetric.dataset.cityRequestKey = cityRequestKey;' in js
     assert 'selfMetric.dataset.baseTitle = metricBaseTitle;' in js
     assert 'selfCard.dataset.baseTitle = cardBaseTitle;' in js
     assert 'selfMetric.textContent = targetDisplay;' in js
@@ -246,6 +252,8 @@ def test_render_html_styles_local_identity_self_ticker() -> None:
     assert ".self-node-status.chat-member-status {" in html
     assert ".self-node-name-text {" in html
     assert ".self-node-id {" in html
+    assert ".self-node-city {" in html
+    assert ".value.self-node-value.has-self-node-city" in html
     assert ".radio-ticker-status {" in html
     assert ".radio-ticker-detail {" in html
 

@@ -12,6 +12,11 @@
     let envAggregateTickerHydrated = false;
     let envAggregateTickerLastHydratedMs = 0;
     let envAggregateTickerHydrateInFlight = null;
+    const selfNodeNearestCityCache = new Map();
+    const selfNodeNearestCityCacheMaxEntries = 96;
+    let selfNodeNearestCityRenderSeq = 0;
+    let selfNodeLinkedLocationCacheKey = "";
+    let selfNodeLinkedLocationCacheValue = null;
     const envAggregateTickerMetricDefs = Object.freeze([
       {{
         id: "temperature",
@@ -1383,6 +1388,180 @@
       return true;
     }}
 
+    function selfNodeCityCoordinateIsValid(latRaw, lonRaw) {{
+      const lat = Number(latRaw);
+      const lon = Number(lonRaw);
+      if (typeof isValidMapCoord === "function") {{
+        return isValidMapCoord(lat, lon);
+      }}
+      if (typeof isValidLatLonRange === "function") {{
+        return isValidLatLonRange(lat, lon) && !(Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9);
+      }}
+      return Number.isFinite(lat) && Number.isFinite(lon)
+        && lat >= -90 && lat <= 90
+        && lon >= -180 && lon <= 180
+        && !(Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9);
+    }}
+
+    function selfNodeGpsLocationFromEntries(...entries) {{
+      for (const entry of entries) {{
+        if (!entry || typeof entry !== "object") continue;
+        const coords = (typeof nodeCoordsFromStateEntry === "function")
+          ? nodeCoordsFromStateEntry(entry)
+          : null;
+        if (coords && selfNodeCityCoordinateIsValid(coords.lat, coords.lon)) {{
+          return {{
+            lat: Number(coords.lat),
+            lon: Number(coords.lon),
+            source: "gps",
+          }};
+        }}
+        const lat = Number(entry.lat ?? entry.latitude);
+        const lon = Number(entry.lon ?? entry.lng ?? entry.longitude);
+        if (selfNodeCityCoordinateIsValid(lat, lon)) {{
+          return {{
+            lat,
+            lon,
+            source: "gps",
+          }};
+        }}
+      }}
+      return null;
+    }}
+
+    function selfNodeLinkedLocationGraphKey(nodes, edges, localId) {{
+      if (typeof buildMapGraphSignature === "function") {{
+        try {{
+          return `${{localId}}:${{buildMapGraphSignature(nodes, edges, {{ includeTemporalEdgeFade: false }})}}`;
+        }} catch (_err) {{
+          // Fall through to the lightweight key below.
+        }}
+      }}
+      return `${{localId}}:${{Array.isArray(nodes) ? nodes.length : 0}}:${{Array.isArray(edges) ? edges.length : 0}}`;
+    }}
+
+    function selfNodeLinkedLocationFromState(state, localId) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
+      const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      if (!isSelectableNodeId(localId) || nodes.length === 0 || edges.length === 0) {{
+        return null;
+      }}
+      if (typeof buildMapLinkLayerOverlay !== "function") {{
+        return null;
+      }}
+      const cacheKey = selfNodeLinkedLocationGraphKey(nodes, edges, localId);
+      if (cacheKey && cacheKey === selfNodeLinkedLocationCacheKey) {{
+        return selfNodeLinkedLocationCacheValue;
+      }}
+
+      let linkedLocation = null;
+      try {{
+        const overlay = buildMapLinkLayerOverlay(nodes, edges, {{ mode: "both" }});
+        const estimates = overlay && overlay.estimates instanceof Map ? overlay.estimates : null;
+        const estimate = estimates ? estimates.get(localId) : null;
+        const lat = Number(estimate && estimate.lat);
+        const lon = Number(estimate && estimate.lon);
+        if (selfNodeCityCoordinateIsValid(lat, lon)) {{
+          linkedLocation = {{
+            lat,
+            lon,
+            source: "linked",
+            confidence: Number(estimate && estimate.confidence),
+          }};
+        }}
+      }} catch (_err) {{
+        linkedLocation = null;
+      }}
+
+      selfNodeLinkedLocationCacheKey = cacheKey;
+      selfNodeLinkedLocationCacheValue = linkedLocation;
+      return linkedLocation;
+    }}
+
+    function resolveSelfNodeCityLocation(state, localNode, localOwner, localId) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const gpsLocation = selfNodeGpsLocationFromEntries(
+        localNode,
+        localOwner,
+        safeState.local_state,
+        safeState.localState
+      );
+      if (gpsLocation) {{
+        return gpsLocation;
+      }}
+      return selfNodeLinkedLocationFromState(safeState, localId);
+    }}
+
+    function selfNodeNearestCityCacheKey(location) {{
+      if (!location || typeof location !== "object") return "";
+      const lat = Number(location.lat);
+      const lon = Number(location.lon);
+      if (!selfNodeCityCoordinateIsValid(lat, lon)) return "";
+      const source = location.source === "linked" ? "linked" : "gps";
+      return `${{source}}:${{Math.round(lat * 1000)}}:${{Math.round(lon * 1000)}}`;
+    }}
+
+    function formatSelfNodeNearestCityLabel(place, location) {{
+      const cleanPlace = String(place == null ? "" : place).replace(/\\s+/g, " ").trim();
+      if (!cleanPlace) return "";
+      return location && location.source === "linked" ? `${{cleanPlace}} (linked)` : cleanPlace;
+    }}
+
+    async function resolveSelfNodeNearestCityLabel(location) {{
+      const cacheKey = selfNodeNearestCityCacheKey(location);
+      if (!cacheKey) return "";
+      if (selfNodeNearestCityCache.has(cacheKey)) {{
+        return selfNodeNearestCityCache.get(cacheKey) || "";
+      }}
+      let label = "";
+      if (typeof nearestOfflineCityHintFromCoords === "function") {{
+        try {{
+          const place = await nearestOfflineCityHintFromCoords(
+            Number(location.lat),
+            Number(location.lon),
+            botCityHintMaxDistanceKm
+          );
+          label = formatSelfNodeNearestCityLabel(place, location);
+        }} catch (_err) {{
+          label = "";
+        }}
+      }}
+      selfNodeNearestCityCache.set(cacheKey, label);
+      while (selfNodeNearestCityCache.size > selfNodeNearestCityCacheMaxEntries) {{
+        const oldestKey = selfNodeNearestCityCache.keys().next().value;
+        selfNodeNearestCityCache.delete(oldestKey);
+      }}
+      return label;
+    }}
+
+    function applySelfNodeNearestCityLine(selfMetric, selfCard, cityText, label, location) {{
+      const cleanLabel = String(label == null ? "" : label).replace(/\\s+/g, " ").trim();
+      if (!(cityText instanceof HTMLElement) || !(selfMetric instanceof HTMLElement)) return;
+      cityText.textContent = cleanLabel;
+      cityText.hidden = !cleanLabel;
+      selfMetric.classList.toggle("has-self-node-city", !!cleanLabel);
+      if (!cleanLabel) return;
+
+      const sourceLabel = location && location.source === "linked" ? "linked map position" : "GPS position";
+      const cityTitle = `Nearest city from ${{sourceLabel}}: ${{cleanLabel}}`;
+      const metricBaseTitle = String(selfMetric.dataset.baseTitle || "").trim();
+      selfMetric.title = metricBaseTitle ? `${{metricBaseTitle}} • ${{cityTitle}}` : cityTitle;
+      if (selfCard instanceof HTMLElement) {{
+        const cardBaseTitle = String(selfCard.dataset.baseTitle || "").trim();
+        selfCard.title = cardBaseTitle ? `${{cardBaseTitle}} • ${{cityTitle}}` : cityTitle;
+      }}
+    }}
+
+    async function updateSelfNodeNearestCityLine(selfMetric, selfCard, cityText, location, requestKey) {{
+      const label = await resolveSelfNodeNearestCityLabel(location);
+      if (!(selfMetric instanceof HTMLElement) || selfMetric.dataset.cityRequestKey !== requestKey) {{
+        return;
+      }}
+      applySelfNodeNearestCityLine(selfMetric, selfCard, cityText, label, location);
+    }}
+
     function renderSummary(state) {{
       syncTopbarChatContext(state);
       const s = state.summary || {{}};
@@ -1467,7 +1646,8 @@
       }}
       if (selfMetric instanceof HTMLElement) {{
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
-        selfMetric.classList.remove("self-node-value", "node-ticker-value");
+        selfMetric.classList.remove("self-node-value", "node-ticker-value", "has-self-node-city");
+        delete selfMetric.dataset.cityRequestKey;
         selfMetric.replaceChildren();
         if (hasLocalIdentity) {{
           selfMetric.classList.add("self-node-value", "node-ticker-value");
@@ -1512,6 +1692,12 @@
           idText.textContent = isCanonicalNodeId(localId) ? localId : "ID unavailable";
           nameRow.appendChild(idText);
           selfMetric.appendChild(nameRow);
+          const cityText = document.createElement("div");
+          cityText.className = "self-node-city";
+          cityText.hidden = true;
+          selfMetric.appendChild(cityText);
+          const cityLocation = resolveSelfNodeCityLocation(state, localNode, localOwner, localId);
+          const cityCacheKey = selfNodeNearestCityCacheKey(cityLocation);
           const titleParts = [localName || "Local node"];
           if (isCanonicalNodeId(localId)) {{
             titleParts.push(localId);
@@ -1526,6 +1712,21 @@
             const cardBaseTitle = `${{metricBaseTitle}} • Click to select in node list`;
             selfCard.dataset.baseTitle = cardBaseTitle;
             selfCard.title = cardBaseTitle;
+          }}
+          if (cityCacheKey) {{
+            const cityRequestKey = `${{cityCacheKey}}:${{++selfNodeNearestCityRenderSeq}}`;
+            selfMetric.dataset.cityRequestKey = cityRequestKey;
+            if (selfNodeNearestCityCache.has(cityCacheKey)) {{
+              applySelfNodeNearestCityLine(
+                selfMetric,
+                selfCard,
+                cityText,
+                selfNodeNearestCityCache.get(cityCacheKey) || "",
+                cityLocation
+              );
+            }} else {{
+              void updateSelfNodeNearestCityLine(selfMetric, selfCard, cityText, cityLocation, cityRequestKey);
+            }}
           }}
         }} else {{
           if (selfCard instanceof HTMLElement) {{
