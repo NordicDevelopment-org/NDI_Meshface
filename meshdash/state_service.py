@@ -299,6 +299,7 @@ def _slim_history_caps(
             continue
         slim_caps: dict[str, object] = {}
         for key in (
+            "first_seen_unix",
             "last_seen_unix",
             "has_position",
             "last_position_unix",
@@ -311,7 +312,7 @@ def _slim_history_caps(
             if value is not None:
                 slim_caps[key] = value
         if include_text_times:
-            for key in ("last_seen", "last_position_time"):
+            for key in ("first_seen", "last_seen", "last_position_time"):
                 value = caps.get(key)
                 if value is not None:
                     slim_caps[key] = value
@@ -328,6 +329,7 @@ def _slim_nodes_for_chat(nodes: list[dict[str, object]]) -> list[dict[str, objec
         "hardware_model",
         "hops_away",
         "id",
+        "first_seen_unix",
         "last_heard_unix",
         "lat",
         "lon",

@@ -122,6 +122,16 @@
       }};
     }}
 
+    function autoNewNodeTagPreset() {{
+      return {{
+        id: "auto-new-node",
+        name: "New",
+        emoji: "",
+        color: "#f2c94c",
+        vibrance: 84,
+      }};
+    }}
+
     function normalizeNodeTagPreset(rawPreset, fallbackId = "tag-default") {{
       const base = (rawPreset && typeof rawPreset === "object") ? rawPreset : {{}};
       const fallback = defaultNodeTagPreset();
@@ -164,13 +174,14 @@
     function nodeTagPresetForId(presetId) {{
       const cleanPresetId = normalizeNodeTagPresetId(presetId);
       if (!cleanPresetId) return null;
+      if (cleanPresetId === "auto-new-node") return autoNewNodeTagPreset();
       const entry = nodeTagPresetsById.get(cleanPresetId);
       return entry && typeof entry === "object"
         ? normalizeNodeTagPreset(entry, cleanPresetId)
         : null;
     }}
 
-    function nodeTagEntryForNode(nodeId) {{
+    function manualNodeTagEntryForNode(nodeId) {{
       const cleanNodeId = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(cleanNodeId)) return null;
       const presetId = normalizeNodeTagPresetId(nodeTagByNodeId.get(cleanNodeId), "");
@@ -182,6 +193,52 @@
         presetId: preset.id,
         preset,
       }};
+    }}
+
+    function nodeFirstDiscoveredUnix(nodeId, state = latestState) {{
+      const cleanNodeId = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(cleanNodeId)) return 0;
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const historyCapsRaw = (safeState.history_caps && typeof safeState.history_caps === "object")
+        ? safeState.history_caps
+        : {{}};
+      const caps = historyCapsRaw[cleanNodeId];
+      const capsFirstSeen = Number(caps && caps.first_seen_unix);
+      if (Number.isFinite(capsFirstSeen) && capsFirstSeen > 0) {{
+        return Math.trunc(capsFirstSeen);
+      }}
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const node = nodes.find((entry) => normalizeNodeId(entry && entry.id) === cleanNodeId) || null;
+      const nodeFirstSeen = Number(node && node.first_seen_unix);
+      if (Number.isFinite(nodeFirstSeen) && nodeFirstSeen > 0) {{
+        return Math.trunc(nodeFirstSeen);
+      }}
+      return 0;
+    }}
+
+    function nodeIsAutoNewByFirstDiscovery(nodeId, state = latestState, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const firstSeenUnix = nodeFirstDiscoveredUnix(nodeId, state);
+      if (!(firstSeenUnix > 0)) return false;
+      const safeNow = Number.isFinite(Number(nowUnix)) ? Math.trunc(Number(nowUnix)) : Math.floor(Date.now() / 1000);
+      const ageSeconds = Math.max(0, safeNow - firstSeenUnix);
+      return ageSeconds < (24 * 60 * 60);
+    }}
+
+    function autoNodeTagEntryForNode(nodeId, state = latestState) {{
+      const cleanNodeId = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(cleanNodeId)) return null;
+      if (!nodeIsAutoNewByFirstDiscovery(cleanNodeId, state)) return null;
+      const preset = autoNewNodeTagPreset();
+      return {{
+        nodeId: cleanNodeId,
+        presetId: preset.id,
+        preset,
+        automatic: true,
+      }};
+    }}
+
+    function nodeTagEntryForNode(nodeId) {{
+      return manualNodeTagEntryForNode(nodeId) || autoNodeTagEntryForNode(nodeId);
     }}
 
     function nodeEmojiOverrideForNode(nodeId) {{
@@ -1470,7 +1527,7 @@
     function favoriteToggleButtonHtml(nodeId, extraClass = "") {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return "";
-      const tagEntry = nodeTagEntryForNode(normalized);
+      const tagEntry = manualNodeTagEntryForNode(normalized);
       const active = !!tagEntry;
       const activePresetId = normalizeNodeTagPresetId(activeNodeTagPresetId || "tag-default", "tag-default");
       const activePreset = nodeTagPresetForId(activePresetId);

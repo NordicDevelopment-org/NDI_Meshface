@@ -45,6 +45,12 @@ def apply_node_historical_names(
             row["long_name"] = next_long_name
         if next_short_name:
             row["short_name"] = next_short_name
+        first_seen_unix = caps.get("first_seen_unix")
+        if first_seen_unix is not None:
+            row["first_seen_unix"] = first_seen_unix
+        first_seen = caps.get("first_seen")
+        if first_seen is not None:
+            row["first_seen"] = first_seen
 
 
 def collect_local_state_safe(

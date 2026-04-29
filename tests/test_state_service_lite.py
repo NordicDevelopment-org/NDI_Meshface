@@ -55,6 +55,8 @@ def test_slim_recent_packets_drops_raw_packet_blob_but_keeps_ui_fields() -> None
 def test_slim_history_caps_keeps_only_relevant_nodes_and_fields() -> None:
     history_caps = {
         "!node-a": {
+            "first_seen_unix": 5,
+            "first_seen": "2026-04-15 00:00:05Z",
             "last_seen_unix": 10,
             "last_seen": "2026-04-15 00:00:10Z",
             "has_position": True,
@@ -82,6 +84,8 @@ def test_slim_history_caps_keeps_only_relevant_nodes_and_fields() -> None:
     )
 
     assert set(slimmed) == {"!node-a"}
+    assert slimmed["!node-a"]["first_seen_unix"] == 5
+    assert slimmed["!node-a"]["first_seen"] == "2026-04-15 00:00:05Z"
     assert slimmed["!node-a"]["battery_level"] == 90
     assert slimmed["!node-a"]["last_short_name"] == "ALFA"
     assert slimmed["!node-a"]["last_long_name"] == "Alpha Prime"
@@ -91,6 +95,8 @@ def test_slim_history_caps_keeps_only_relevant_nodes_and_fields() -> None:
 def test_slim_history_caps_chat_profile_drops_duplicate_text_times() -> None:
     history_caps = {
         "!node-a": {
+            "first_seen_unix": 5,
+            "first_seen": "2026-04-15 00:00:05Z",
             "last_seen_unix": 10,
             "last_seen": "2026-04-15 00:00:10Z",
             "has_position": True,
@@ -119,6 +125,8 @@ def test_slim_history_caps_chat_profile_drops_duplicate_text_times() -> None:
     assert slimmed["!node-a"]["last_short_name"] == "ALFA"
     assert slimmed["!node-a"]["last_long_name"] == "Alpha Prime"
     assert "last_seen" not in slimmed["!node-a"]
+    assert "first_seen" not in slimmed["!node-a"]
+    assert slimmed["!node-a"]["first_seen_unix"] == 5
     assert "last_position_time" not in slimmed["!node-a"]
 
 
@@ -140,6 +148,8 @@ def test_apply_node_historical_names_prefers_custom_history_over_generic_live_na
         rows,
         {
             "!a038f788": {
+                "first_seen_unix": 1776514000,
+                "first_seen": "2026-04-18 12:06:40Z",
                 "last_short_name": "NAH",
                 "last_long_name": "NOT A HACKER",
             },
@@ -152,6 +162,8 @@ def test_apply_node_historical_names_prefers_custom_history_over_generic_live_na
 
     assert rows[0]["short_name"] == "NAH"
     assert rows[0]["long_name"] == "NOT A HACKER"
+    assert rows[0]["first_seen_unix"] == 1776514000
+    assert rows[0]["first_seen"] == "2026-04-18 12:06:40Z"
     assert rows[1]["short_name"] == "KEEP"
     assert rows[1]["long_name"] == "Current Custom Name"
 
@@ -181,6 +193,7 @@ def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:
                 "long_name": "Alpha",
                 "saved_last_seen": "2026-04-15 00:00:10Z",
                 "is_licensed": True,
+                "first_seen_unix": 5,
                 "last_heard": "2026-04-15 00:00:10Z",
                 "last_heard_unix": 10,
                 "role": "CLIENT",
@@ -193,6 +206,7 @@ def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:
             "id": "!node-a",
             "short_name": "A",
             "long_name": "Alpha",
+            "first_seen_unix": 5,
             "last_heard_unix": 10,
             "role": "CLIENT",
         }

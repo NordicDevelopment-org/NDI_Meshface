@@ -395,7 +395,7 @@ def fetch_node_saved_count_rows(conn: SqlConnection) -> SqlRows:
 def fetch_node_capability_rows(conn: SqlConnection) -> SqlRows:
     return conn.execute(
         """
-        SELECT node_id, last_seen_unix, has_position, last_position_unix,
+        SELECT node_id, first_seen_unix, last_seen_unix, has_position, last_position_unix,
                last_hops, battery_level, battery_updated_unix,
                last_short_name, last_long_name, names_updated_unix
         FROM node_capabilities

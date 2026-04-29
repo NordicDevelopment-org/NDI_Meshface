@@ -25,17 +25,20 @@ def backfill_node_capabilities(
     if not table_has_rows:
         metric_rows = conn.execute(
             """
-            SELECT node_id, MAX(last_seen_unix)
+            SELECT node_id, MIN(last_seen_unix), MAX(last_seen_unix)
             FROM node_metrics_1m
             GROUP BY node_id
             """
         ).fetchall()
-        for node_id, last_seen_unix in metric_rows:
+        for node_id, first_seen_unix, last_seen_unix in metric_rows:
             clean_node_id = str(node_id or "").strip()
+            first_seen = to_int_fn(first_seen_unix)
             seen = to_int_fn(last_seen_unix)
             if not clean_node_id or seen is None:
                 continue
             merged.setdefault(clean_node_id, {})
+            if first_seen is not None and first_seen > 0:
+                merged[clean_node_id]["first_seen_unix"] = first_seen
             merged[clean_node_id]["last_seen_unix"] = seen
 
         position_rows = conn.execute(
@@ -53,6 +56,7 @@ def backfill_node_capabilities(
             node = merged.setdefault(clean_node_id, {})
             node["has_position"] = True
             node["last_position_unix"] = pos_unix
+            node["first_seen_unix"] = min(to_int_fn(node.get("first_seen_unix")) or pos_unix, pos_unix)
             node["last_seen_unix"] = max(to_int_fn(node.get("last_seen_unix")) or pos_unix, pos_unix)
 
         hop_rows = conn.execute(
@@ -78,6 +82,7 @@ def backfill_node_capabilities(
             if hops is not None and hops >= 0:
                 node["last_hops"] = hops
             if seen is not None:
+                node["first_seen_unix"] = min(to_int_fn(node.get("first_seen_unix")) or seen, seen)
                 node["last_seen_unix"] = max(to_int_fn(node.get("last_seen_unix")) or seen, seen)
 
         for node_id, values in merged.items():
@@ -88,13 +93,14 @@ def backfill_node_capabilities(
             conn.execute(
                 """
                 INSERT OR REPLACE INTO node_capabilities(
-                  node_id, last_seen_unix, has_position, last_position_unix,
+                  node_id, first_seen_unix, last_seen_unix, has_position, last_position_unix,
                   last_hops, battery_level, battery_updated_unix,
                   last_short_name, last_long_name, names_updated_unix
-                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     node_id,
+                    to_int_fn(values.get("first_seen_unix")) or seen,
                     seen,
                     has_position,
                     to_int_fn(values.get("last_position_unix")),

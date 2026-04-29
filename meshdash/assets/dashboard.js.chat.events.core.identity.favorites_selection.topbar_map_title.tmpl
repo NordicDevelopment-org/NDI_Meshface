@@ -231,7 +231,9 @@
         return;
       }}
 
-      const tagEntry = nodeTagEntryForNode(nodeId);
+      const tagEntry = typeof manualNodeTagEntryForNode === "function"
+        ? manualNodeTagEntryForNode(nodeId)
+        : nodeTagEntryForNode(nodeId);
       const active = !!tagEntry;
       btn.dataset.nodeId = nodeId;
       btn.classList.toggle("active", active);

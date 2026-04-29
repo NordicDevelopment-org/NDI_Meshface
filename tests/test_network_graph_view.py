@@ -272,6 +272,12 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'isTaggedNode ? "is-tagged" : ""' in js
     assert 'nodeEl.classList.toggle("is-tagged", isTaggedNode);' in js
     assert 'nodeEl.setAttribute("style", tagStyleVars);' in js
+    assert 'function autoNewNodeTagPreset() {' in js
+    assert 'id: "auto-new-node",' in js
+    assert 'function nodeFirstDiscoveredUnix(nodeId, state = latestState) {' in js
+    assert 'function nodeIsAutoNewByFirstDiscovery(nodeId, state = latestState, nowUnix = Math.floor(Date.now() / 1000)) {' in js
+    assert 'function autoNodeTagEntryForNode(nodeId, state = latestState) {' in js
+    assert 'return manualNodeTagEntryForNode(nodeId) || autoNodeTagEntryForNode(nodeId);' in js
     assert 'selectedTagRouteKey: "",' in js
     assert 'function resolveNetworkGraphShortestPathEdgeKeys(edges, fromNodeId, toNodeId) {' in js
     assert 'function networkGraphSelfPathIsVisible() {' in js

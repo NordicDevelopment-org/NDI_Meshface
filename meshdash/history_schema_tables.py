@@ -74,6 +74,7 @@ TABLE_SCHEMA_STATEMENTS = [
     """
     CREATE TABLE IF NOT EXISTS node_capabilities (
       node_id TEXT PRIMARY KEY,
+      first_seen_unix INTEGER,
       last_seen_unix INTEGER NOT NULL,
       has_position INTEGER NOT NULL DEFAULT 0,
       last_position_unix INTEGER,

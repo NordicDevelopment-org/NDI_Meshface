@@ -35,6 +35,7 @@ def build_node_capability_insert_values(
     return (
         node_id,
         event_unix,
+        event_unix,
         1 if has_position else 0,
         event_unix if has_position else None,
         clean_hops,
@@ -57,6 +58,7 @@ def merge_node_capability_row(
     clean_long_name: str,
 ) -> dict[str, object]:
     (
+        first_seen_unix,
         last_seen_unix,
         row_has_position,
         row_last_position_unix,
@@ -67,6 +69,10 @@ def merge_node_capability_row(
         row_last_long_name,
         row_names_updated_unix,
     ) = row
+    merged_first_seen = min(
+        _to_int(first_seen_unix) or _to_int(last_seen_unix) or event_unix,
+        event_unix,
+    )
     merged_last_seen = max(_to_int(last_seen_unix) or event_unix, event_unix)
     merged_has_position = bool(_to_int(row_has_position)) or has_position
 
@@ -92,6 +98,7 @@ def merge_node_capability_row(
             merged_names_updated_unix = int(event_unix)
 
     return {
+        "first_seen_unix": merged_first_seen,
         "last_seen_unix": merged_last_seen,
         "has_position": merged_has_position,
         "last_position_unix": merged_last_position_unix,

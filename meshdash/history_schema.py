@@ -62,6 +62,15 @@ def _ensure_summary_metrics_compat_columns(conn: SqlConnection) -> None:
 
 def _ensure_node_capabilities_compat_columns(conn: SqlConnection) -> None:
     columns = _table_column_names(conn, "node_capabilities")
+    first_seen_missing = "first_seen_unix" not in columns
+    if first_seen_missing:
+        conn.execute(
+            """
+            ALTER TABLE node_capabilities
+            ADD COLUMN first_seen_unix INTEGER
+            """
+        )
+        columns.add("first_seen_unix")
     if "last_short_name" not in columns:
         conn.execute(
             """
@@ -83,6 +92,34 @@ def _ensure_node_capabilities_compat_columns(conn: SqlConnection) -> None:
             """
             ALTER TABLE node_capabilities
             ADD COLUMN names_updated_unix INTEGER
+            """
+        )
+    if first_seen_missing:
+        conn.execute(
+            """
+            UPDATE node_capabilities
+            SET first_seen_unix = (
+              SELECT MIN(candidate_unix)
+              FROM (
+                SELECT MIN(last_seen_unix) AS candidate_unix
+                FROM node_metrics_1m
+                WHERE node_id = node_capabilities.node_id
+                UNION ALL
+                SELECT MIN(created_unix) AS candidate_unix
+                FROM node_positions
+                WHERE node_id = node_capabilities.node_id
+                UNION ALL
+                SELECT MIN(created_unix) AS candidate_unix
+                FROM packet_events
+                WHERE from_id = node_capabilities.node_id
+                UNION ALL
+                SELECT last_seen_unix AS candidate_unix
+                FROM node_capabilities AS fallback_caps
+                WHERE fallback_caps.node_id = node_capabilities.node_id
+              )
+              WHERE candidate_unix IS NOT NULL AND candidate_unix > 0
+            )
+            WHERE first_seen_unix IS NULL OR first_seen_unix <= 0
             """
         )
 

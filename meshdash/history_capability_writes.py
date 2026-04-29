@@ -28,7 +28,7 @@ def upsert_node_capability(
 
     row = conn.execute(
         """
-        SELECT last_seen_unix, has_position, last_position_unix,
+        SELECT first_seen_unix, last_seen_unix, has_position, last_position_unix,
                last_hops, battery_level, battery_updated_unix,
                last_short_name, last_long_name, names_updated_unix
         FROM node_capabilities
@@ -41,10 +41,10 @@ def upsert_node_capability(
         conn.execute(
             """
             INSERT INTO node_capabilities(
-              node_id, last_seen_unix, has_position, last_position_unix,
+              node_id, first_seen_unix, last_seen_unix, has_position, last_position_unix,
               last_hops, battery_level, battery_updated_unix,
               last_short_name, last_long_name, names_updated_unix
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             _build_node_capability_insert_values(
                 node_id=node_id,
@@ -71,7 +71,8 @@ def upsert_node_capability(
     conn.execute(
         """
         UPDATE node_capabilities
-        SET last_seen_unix = ?,
+        SET first_seen_unix = ?,
+            last_seen_unix = ?,
             has_position = ?,
             last_position_unix = ?,
             last_hops = ?,
@@ -83,6 +84,7 @@ def upsert_node_capability(
         WHERE node_id = ?
         """,
         (
+            merged["first_seen_unix"],
             merged["last_seen_unix"],
             1 if merged["has_position"] else 0,
             merged["last_position_unix"],

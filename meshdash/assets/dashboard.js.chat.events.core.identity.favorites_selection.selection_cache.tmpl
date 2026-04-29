@@ -12,7 +12,9 @@
     function favoriteMenuTagEditorHtml(nodeId) {{
       const cleanNodeId = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(cleanNodeId)) return "";
-      const currentTag = nodeTagEntryForNode(cleanNodeId);
+      const currentTag = typeof manualNodeTagEntryForNode === "function"
+        ? manualNodeTagEntryForNode(cleanNodeId)
+        : nodeTagEntryForNode(cleanNodeId);
       const currentPreset = currentTag && currentTag.preset
         ? currentTag.preset
         : nodeTagPresetForId(activeNodeTagPresetId) || defaultNodeTagPreset();
@@ -428,7 +430,9 @@
       for (const btn of document.querySelectorAll(".favorite-toggle-btn")) {{
         if (!(btn instanceof HTMLButtonElement)) continue;
         const nodeId = normalizeNodeId(btn.dataset.nodeId || "");
-        const tagEntry = nodeTagEntryForNode(nodeId);
+        const tagEntry = typeof manualNodeTagEntryForNode === "function"
+          ? manualNodeTagEntryForNode(nodeId)
+          : nodeTagEntryForNode(nodeId);
         const active = !!tagEntry;
         btn.classList.toggle("active", active);
         btn.setAttribute("aria-pressed", active ? "true" : "false");
@@ -682,7 +686,10 @@
     function toggleFavoriteNode(nodeId, forceActive = null) {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return;
-      const targetActive = forceActive == null ? !nodeTagEntryForNode(normalized) : !!forceActive;
+      const currentManualTag = typeof manualNodeTagEntryForNode === "function"
+        ? manualNodeTagEntryForNode(normalized)
+        : nodeTagEntryForNode(normalized);
+      const targetActive = forceActive == null ? !currentManualTag : !!forceActive;
       if (targetActive) {{
         const preferredPresetId = normalizeNodeTagPresetId(activeNodeTagPresetId || "tag-default", "tag-default");
         const fallbackPreset = nodeTagPresetForId(preferredPresetId) || nodeTagPresetForId("tag-default") || defaultNodeTagPreset();
