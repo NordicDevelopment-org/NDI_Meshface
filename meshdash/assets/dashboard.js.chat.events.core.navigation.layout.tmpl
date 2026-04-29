@@ -696,6 +696,7 @@
     const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";
     const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";
     const networkGraphTagRouteVisibilityStorageKey = "meshDashboardNetworkGraphTagRouteVisibilityV1";
+    const networkGraphSelfPathVisibilityStorageKey = "meshDashboardNetworkGraphSelfPathVisibilityV1";
     const networkGraphHistoryEdgeCache = new Map();
     const networkGraphHistoryCapsCache = new Map();
     const networkGraphHistoryEdgeRequests = new Map();
@@ -836,6 +837,22 @@
           .filter(Boolean)
           .sort((a, b) => a.localeCompare(b));
         window.localStorage.setItem(networkGraphTagRouteVisibilityStorageKey, JSON.stringify(values));
+      }} catch (_err) {{
+      }}
+    }}
+
+    function loadPreferredNetworkGraphSelfPathVisible() {{
+      try {{
+        const raw = window.localStorage.getItem(networkGraphSelfPathVisibilityStorageKey);
+        return raw == null ? true : raw !== "0";
+      }} catch (_err) {{
+        return true;
+      }}
+    }}
+
+    function persistPreferredNetworkGraphSelfPathVisible(isVisible) {{
+      try {{
+        window.localStorage.setItem(networkGraphSelfPathVisibilityStorageKey, isVisible ? "1" : "0");
       }} catch (_err) {{
       }}
     }}
@@ -2137,6 +2154,7 @@
       cachedCombinedEdges: null,
       cachedLayout: null,
       hiddenTagRoutePresetIds: loadPreferredNetworkGraphHiddenTagRoutePresetIds(),
+      selfPathVisible: loadPreferredNetworkGraphSelfPathVisible(),
       selectedTagRouteKey: "",
       pendingEntryViewportSync: false,
       pendingModeViewportSync: false,
@@ -2401,6 +2419,46 @@
       return pathEdgeKeys;
     }}
 
+    function networkGraphSelfPathIsVisible() {{
+      return networkGraphViewState.selfPathVisible !== false;
+    }}
+
+    function resolveNetworkGraphSelfPathInfo(scene) {{
+      const safeScene = (scene && typeof scene === "object") ? scene : {{}};
+      const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
+      const localId = normalizeNodeId(
+        safeScene.localId
+        || resolveLocalNodeId(latestState || {{}})
+        || ""
+      );
+      const selectedId = normalizeNodeId(safeScene.selectedId || selectedNodeId || "");
+      const targetId = isSelectableNodeId(selectedId) ? selectedId : "";
+      const shouldOffer = !!(
+        isSelectableNodeId(localId)
+        && isSelectableNodeId(targetId)
+        && localId !== targetId
+      );
+      const segments = shouldOffer
+        ? resolveNetworkGraphShortestPathSegments(edges, localId, targetId)
+        : [];
+      const edgeKeys = new Set();
+      segments.forEach((segment) => {{
+        if (segment && segment.edgeKey) {{
+          edgeKeys.add(segment.edgeKey);
+        }}
+      }});
+      return {{
+        sourceId: localId,
+        targetId,
+        offered: shouldOffer,
+        available: shouldOffer && segments.length > 0,
+        visible: shouldOffer && segments.length > 0 && networkGraphSelfPathIsVisible(),
+        hopCount: segments.length,
+        segments,
+        edgeKeys,
+      }};
+    }}
+
     function resolveNetworkGraphTaggedItems(items) {{
       return (Array.isArray(items) ? items : [])
         .map((item) => {{
@@ -2620,6 +2678,63 @@
       }}).join("");
     }}
 
+    function buildNetworkGraphSelfPathOverlayMarkup(scene) {{
+      const safeScene = (scene && typeof scene === "object") ? scene : {{}};
+      const nodeMap = safeScene.nodeMap instanceof Map ? safeScene.nodeMap : new Map();
+      const positions = safeScene.positions instanceof Map ? safeScene.positions : new Map();
+      const pathInfo = resolveNetworkGraphSelfPathInfo(safeScene);
+      if (!pathInfo.visible) return "";
+      const sourceLabel = networkGraphNodeDisplayName(pathInfo.sourceId, nodeMap);
+      const targetLabel = networkGraphNodeDisplayName(pathInfo.targetId, nodeMap);
+      const hopLabel = pathInfo.hopCount === 1 ? "1 graph hop" : `${{pathInfo.hopCount}} graph hops`;
+      const title = [
+        "Self path",
+        `${{sourceLabel}} -> ${{targetLabel}}`,
+        hopLabel,
+      ].join("\n");
+      return pathInfo.segments.map((segment, index) => {{
+        const fromPos = positions.get(segment && segment.fromNodeId);
+        const toPos = positions.get(segment && segment.toNodeId);
+        if (!fromPos || !toPos) return "";
+        const x1Raw = Number(fromPos.x);
+        const y1Raw = Number(fromPos.y);
+        const x2Raw = Number(toPos.x);
+        const y2Raw = Number(toPos.y);
+        const dx = x2Raw - x1Raw;
+        const dy = y2Raw - y1Raw;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        const endpointInset = Math.min(8, Math.max(2, length * 0.06));
+        const unitX = dx / length;
+        const unitY = dy / length;
+        const x1 = x1Raw + (unitX * endpointInset);
+        const y1 = y1Raw + (unitY * endpointInset);
+        const x2 = x2Raw - (unitX * endpointInset);
+        const y2 = y2Raw - (unitY * endpointInset);
+        return `
+          <line
+            class="network-graph-self-path-segment is-halo"
+            data-network-graph-self-path-edge-key="${{escAttr(segment.edgeKey)}}"
+            data-network-graph-self-path-index="${{index}}"
+            x1="${{x1.toFixed(1)}}"
+            y1="${{y1.toFixed(1)}}"
+            x2="${{x2.toFixed(1)}}"
+            y2="${{y2.toFixed(1)}}"
+          ></line>
+          <line
+            class="network-graph-self-path-segment"
+            data-network-graph-self-path-edge-key="${{escAttr(segment.edgeKey)}}"
+            data-network-graph-self-path-index="${{index}}"
+            x1="${{x1.toFixed(1)}}"
+            y1="${{y1.toFixed(1)}}"
+            x2="${{x2.toFixed(1)}}"
+            y2="${{y2.toFixed(1)}}"
+          >
+            <title>${{escAttr(title)}}</title>
+          </line>
+        `;
+      }}).join("");
+    }}
+
     function syncNetworkGraphSelectedTagRoute(svg) {{
       if (!(svg instanceof SVGElement)) return;
       const routeEls = svg.querySelectorAll("[data-network-graph-tag-route-key]");
@@ -2662,6 +2777,14 @@
       }}
     }}
 
+    function syncNetworkGraphSelfPathLayer(svg, scene) {{
+      if (!(svg instanceof SVGElement)) return;
+      const selfPathLayer = svg.querySelector(".network-graph-self-path");
+      if (selfPathLayer instanceof SVGElement) {{
+        selfPathLayer.innerHTML = buildNetworkGraphSelfPathOverlayMarkup(scene);
+      }}
+    }}
+
     function bindNetworkGraphTagRouteLegendControls(legend, scene) {{
       if (!(legend instanceof HTMLElement)) return;
       const inputs = legend.querySelectorAll("[data-network-graph-tag-filter-id]");
@@ -2687,6 +2810,19 @@
           renderNetworkGraphTagRouteLegend(scene);
         }});
       }});
+      const selfPathInput = legend.querySelector("[data-network-graph-self-path-toggle]");
+      if (selfPathInput instanceof HTMLInputElement && selfPathInput.dataset.boundSelfPathToggle !== "1") {{
+        selfPathInput.dataset.boundSelfPathToggle = "1";
+        selfPathInput.addEventListener("change", () => {{
+          networkGraphViewState.selfPathVisible = !!selfPathInput.checked;
+          persistPreferredNetworkGraphSelfPathVisible(networkGraphViewState.selfPathVisible);
+          const graphSvg = document.getElementById("network-graph-svg");
+          if (graphSvg instanceof SVGElement) {{
+            syncNetworkGraphSceneData(graphSvg, scene);
+          }}
+          renderNetworkGraphTagRouteLegend(scene);
+        }});
+      }}
     }}
 
     function renderNetworkGraphTagRouteLegend(scene) {{
@@ -2703,15 +2839,38 @@
         || ""
       );
       const tagItems = resolveNetworkGraphTagRouteLegendItems(edges, items, rootId, routeAnchorId);
-      if (!tagItems.length) {{
+      const selfPathInfo = resolveNetworkGraphSelfPathInfo(safeScene);
+      if (!tagItems.length && !selfPathInfo.offered) {{
         legend.innerHTML = "";
         legend.hidden = true;
         return;
       }}
       legend.hidden = false;
+      const selfPathRow = selfPathInfo.offered
+        ? (() => {{
+          const checkedAttr = networkGraphSelfPathIsVisible() ? " checked" : "";
+          const disabledAttr = selfPathInfo.available ? "" : " disabled";
+          const countLabel = selfPathInfo.available ? ` <span class="network-graph-tag-filter-count">${{selfPathInfo.hopCount}}</span>` : "";
+          const title = selfPathInfo.available
+            ? "Toggle self to selected node path"
+            : "No current path from self to selected node";
+          return `<label class="network-graph-tag-filter network-graph-self-path-filter${{selfPathInfo.visible ? "" : " is-muted"}}${{selfPathInfo.available ? "" : " is-empty"}}" style="--network-graph-tag-route-color:var(--network-graph-self-path-color, var(--theme-base-color, var(--accent, #2f855a)));" title="${{escAttr(title)}}">
+            <input
+              class="network-graph-tag-filter-input"
+              type="checkbox"
+              data-network-graph-self-path-toggle="1"
+              aria-label="Show self to selected node path"
+              ${{checkedAttr}}
+              ${{disabledAttr}}
+            />
+            <span class="network-graph-tag-filter-name">Self path</span>${{countLabel}}
+          </label>`;
+        }})()
+        : "";
       legend.innerHTML = `
-        <div class="network-graph-tag-legend-title">Tag routes</div>
+        <div class="network-graph-tag-legend-title">Routes</div>
         <div class="network-graph-tag-filter-list">
+          ${{selfPathRow}}
           ${{
             tagItems.map((item) => {{
               const hasRoutes = Number(item.routeCount || 0) > 0;
@@ -2750,7 +2909,8 @@
       const regions = Array.isArray(safeScene.regions) ? safeScene.regions : [];
       const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
       const items = Array.isArray(safeScene.items) ? safeScene.items : [];
-      const localPathEdgeKeys = resolveNetworkGraphShortestPathEdgeKeys(edges, rootId, localId);
+      const selfPathInfo = resolveNetworkGraphSelfPathInfo(safeScene);
+      const localPathEdgeKeys = selfPathInfo.visible ? selfPathInfo.edgeKeys : new Set();
 
       const regionMarkup = regions.map((region) => `
         <g class="network-graph-region-wrap">
@@ -2866,6 +3026,7 @@
       }}).join("");
 
       const tagRouteOverlayMarkup = buildNetworkGraphTagRouteOverlayMarkup(safeScene);
+      const selfPathOverlayMarkup = buildNetworkGraphSelfPathOverlayMarkup(safeScene);
 
       function networkGraphNodeRenderPriority(item) {{
         const nodeId = normalizeNodeId(item && item.nodeId || "");
@@ -2962,6 +3123,9 @@
         </g>
         <g class="network-graph-tag-routes">
           ${{tagRouteOverlayMarkup}}
+        </g>
+        <g class="network-graph-self-path">
+          ${{selfPathOverlayMarkup}}
         </g>
         <g class="network-graph-nodes">
           ${{nodeMarkup}}
@@ -3068,7 +3232,8 @@
       const nodeMap = safeScene.nodeMap instanceof Map ? safeScene.nodeMap : new Map();
       const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
       const items = Array.isArray(safeScene.items) ? safeScene.items : [];
-      const localPathEdgeKeys = resolveNetworkGraphShortestPathEdgeKeys(edges, rootId, localId);
+      const selfPathInfo = resolveNetworkGraphSelfPathInfo(safeScene);
+      const localPathEdgeKeys = selfPathInfo.visible ? selfPathInfo.edgeKeys : new Set();
 
       const buildEdgeTitle = (edge) => {{
         const fromLabel = networkGraphNodeDisplayName(edge.a, nodeMap);
@@ -3122,6 +3287,7 @@
         localPathEdgeEls.forEach((edgeEl) => linkLayer.appendChild(edgeEl));
       }}
       syncNetworkGraphTagRouteLayer(svg, safeScene);
+      syncNetworkGraphSelfPathLayer(svg, safeScene);
 
       const itemByNodeId = new Map(items.map((item) => [normalizeNodeId(item && item.nodeId), item]));
       const nodeEls = svg.querySelectorAll("[data-network-graph-node-id]");

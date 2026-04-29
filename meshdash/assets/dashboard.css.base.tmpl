@@ -6229,6 +6229,25 @@
         drop-shadow(0 0 2px rgba(255, 255, 255, 0.92))
         drop-shadow(0 0 9px var(--network-graph-tag-route-color, #2aa85a));
     }}
+    .network-graph-self-path {{
+      pointer-events: none;
+    }}
+    .network-graph-self-path-segment {{
+      fill: none;
+      stroke: var(--network-graph-self-path-color, var(--theme-base-color, var(--accent, #2f855a)));
+      stroke-linecap: round;
+      stroke-width: 4.4;
+      opacity: 0.98;
+      filter:
+        drop-shadow(0 0 2px rgba(255, 255, 255, 0.92))
+        drop-shadow(0 0 10px color-mix(in srgb, var(--network-graph-self-path-color, var(--theme-base-color, var(--accent, #2f855a))) 68%, transparent));
+    }}
+    .network-graph-self-path-segment.is-halo {{
+      stroke: rgba(245, 250, 246, 0.76);
+      stroke-width: 8.8;
+      opacity: 0.72;
+      filter: none;
+    }}
     .network-graph-node {{
       cursor: pointer;
     }}

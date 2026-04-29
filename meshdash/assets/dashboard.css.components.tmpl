@@ -5636,6 +5636,16 @@
     [data-theme="dark"] .network-graph-tag-route {{
       opacity: 0.98;
     }}
+    [data-theme="dark"] .network-graph-self-path-segment {{
+      filter:
+        drop-shadow(0 0 2px color-mix(in srgb, var(--workspace-shell-bg) 76%, transparent))
+        drop-shadow(0 0 10px color-mix(in srgb, var(--network-graph-self-path-color, var(--theme-base-color, var(--ui-accent))) 72%, transparent));
+    }}
+    [data-theme="dark"] .network-graph-self-path-segment.is-halo {{
+      stroke: color-mix(in srgb, var(--workspace-shell-bg) 82%, black 18%);
+      opacity: 0.82;
+      filter: none;
+    }}
     [data-theme="dark"] .network-graph-node-core {{
       fill: color-mix(in srgb, var(--workspace-shell-bg-alt) 94%, black 6%);
       stroke: var(--workspace-shell-border-muted);

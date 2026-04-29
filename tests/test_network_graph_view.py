@@ -123,6 +123,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const networkGraphModeStorageKey = "meshDashboardNetworkGraphModeV1";' in js
     assert 'const networkGraphLayoutStorageKey = "meshDashboardNetworkGraphLayoutV1";' in js
     assert 'const networkGraphTagRouteVisibilityStorageKey = "meshDashboardNetworkGraphTagRouteVisibilityV1";' in js
+    assert 'const networkGraphSelfPathVisibilityStorageKey = "meshDashboardNetworkGraphSelfPathVisibilityV1";' in js
     assert 'const networkGraphHistoryEdgeCache = new Map();' in js
     assert 'const networkGraphHistoryCapsCache = new Map();' in js
     assert 'const networkGraphHistoryEdgeRequests = new Map();' in js
@@ -137,9 +138,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function loadPreferredNetworkGraphEdgeMode()' in js
     assert 'function loadPreferredNetworkGraphLayoutMode()' in js
     assert 'function loadPreferredNetworkGraphHiddenTagRoutePresetIds()' in js
+    assert 'function loadPreferredNetworkGraphSelfPathVisible()' in js
     assert 'function persistPreferredNetworkGraphEdgeMode(modeName)' in js
     assert 'function persistPreferredNetworkGraphLayoutMode(modeName)' in js
     assert 'function persistPreferredNetworkGraphHiddenTagRoutePresetIds(hiddenIds)' in js
+    assert 'function persistPreferredNetworkGraphSelfPathVisible(isVisible)' in js
     assert 'const graphSvg = document.getElementById("network-graph-svg");' in js
     assert 'graphSvg instanceof Element' in js
     assert 'graphToolbar.classList.toggle("is-overlay-docked", useOverlayGraphSummary);' in js
@@ -271,6 +274,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'nodeEl.setAttribute("style", tagStyleVars);' in js
     assert 'selectedTagRouteKey: "",' in js
     assert 'function resolveNetworkGraphShortestPathEdgeKeys(edges, fromNodeId, toNodeId) {' in js
+    assert 'function networkGraphSelfPathIsVisible() {' in js
+    assert 'function resolveNetworkGraphSelfPathInfo(scene) {' in js
+    assert 'selfPathVisible: loadPreferredNetworkGraphSelfPathVisible(),' in js
     assert 'function resolveNetworkGraphTaggedItems(items) {' in js
     assert 'function buildNetworkGraphTagRouteKey(presetId, sourceId, targetId) {' in js
     assert 'function resolveNetworkGraphTaggedRouteSegments(edges, items, rootId, routeAnchorId = "") {' in js
@@ -283,7 +289,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert '].join("\\\\n");' not in js
     assert 'function resolveNetworkGraphTagRouteLegendItems(edges, items, rootId, routeAnchorId = "") {' in js
     assert 'function buildNetworkGraphTagRouteOverlayMarkup(scene) {' in js
+    assert 'function buildNetworkGraphSelfPathOverlayMarkup(scene) {' in js
     assert 'function syncNetworkGraphSelectedTagRoute(svg) {' in js
+    assert 'function syncNetworkGraphSelfPathLayer(svg, scene) {' in js
     assert 'function renderNetworkGraphTagRouteLegend(scene) {' in js
     assert 'function bindNetworkGraphTagRouteLegendControls(legend, scene) {' in js
     assert 'const stackOffset = Math.max(-11, Math.min(11, (stackIndex - ((stackCount - 1) / 2)) * 2.8));' in js
@@ -296,6 +304,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'No current ${item.label} routes from this view' in js
     assert 'localId,' in js
     assert '<g class="network-graph-tag-routes">' in js
+    assert '<g class="network-graph-self-path">' in js
+    assert 'data-network-graph-self-path-toggle="1"' in js
+    assert 'networkGraphViewState.selfPathVisible = !!selfPathInput.checked;' in js
+    assert 'syncNetworkGraphSelfPathLayer(svg, safeScene);' in js
     assert 'syncNetworkGraphTagRouteLayer(svg, safeScene);' in js
     assert 'function resolveNetworkGraphTagRouteKeyFromTarget(target) {' in js
     assert 'networkGraphViewState.selectedTagRouteKey = networkGraphViewState.selectedTagRouteKey === routeKey' in js
@@ -308,7 +320,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'localPathEdgeEls.forEach((edgeEl) => linkLayer.appendChild(edgeEl));' in js
     assert 'position.labelOffsetY == null' in js
     assert 'class="network-graph-node-emoji"' in js
-    assert '<div class="network-graph-tag-legend-title">Tag routes</div>' in js
+    assert '<div class="network-graph-tag-legend-title">Routes</div>' in js
     assert 'is-broadcast-only' in js
     assert 'pointerDownNodeId' in js
     assert 'svg.addEventListener("wheel"' in js
@@ -376,6 +388,9 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "opacity: 0.08;" in css
     assert "stroke-width: 6.4 !important;" in css
     assert "drop-shadow(0 0 9px var(--network-graph-tag-route-color, #2aa85a));" in css
+    assert ".network-graph-self-path {" in css
+    assert ".network-graph-self-path-segment {" in css
+    assert ".network-graph-self-path-segment.is-halo {" in css
     assert ".network-graph-tag-filter-input {" in css
     assert ".network-graph-tag-filter.is-empty {" in css
     assert "appearance: none;" in css
@@ -386,6 +401,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "[data-theme=\"dark\"] .network-graph-edge.is-local-path {" in css
     assert "stroke: var(--theme-base-color, var(--ui-accent));" in css
     assert "[data-theme=\"dark\"] .network-graph-tag-route {" in css
+    assert "[data-theme=\"dark\"] .network-graph-self-path-segment {" in css
     assert "[data-theme=\"dark\"] .network-graph-tag-filter {" in css
     assert ".network-graph-ring.is-broadcast-only {" in css
     assert ".network-graph-node.is-local .network-graph-node-core {" in css
