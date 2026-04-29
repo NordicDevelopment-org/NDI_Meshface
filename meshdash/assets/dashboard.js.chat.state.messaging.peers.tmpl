@@ -1163,8 +1163,8 @@
           ? autoNodeTagEntryForNode(nodeId)
           : null;
         const rawMemberDisplayName = String((item && item.name) || nodeId || "Unknown node").trim() || "Unknown node";
-        const statusHasBuiltInIcon = !!(autoNewStatusEntry && typeof nodeTagIconPathForEntry === "function" && nodeTagIconPathForEntry(autoNewStatusEntry));
-        const memberDisplayName = (hasNodeVisualEmoji && showStatusDots && !statusHasBuiltInIcon && typeof stripNodeVisualEmojiFromLabel === "function")
+        const statusOverridesNodeVisualEmoji = !!autoNewStatusEntry;
+        const memberDisplayName = (hasNodeVisualEmoji && showStatusDots && !statusOverridesNodeVisualEmoji && typeof stripNodeVisualEmojiFromLabel === "function")
           ? stripNodeVisualEmojiFromLabel(rawMemberDisplayName, cleanNodeVisualEmoji)
           : rawMemberDisplayName;
         const statusGlyphLabel = autoNewStatusEntry
@@ -1176,11 +1176,8 @@
         const statusMarkerAttrs = showStatusDots
           ? statusGlyphAttrs
           : ' aria-hidden="true"';
-        const autoNewStatusIconHtml = (autoNewStatusEntry && typeof nodeTagIconSvgHtml === "function")
-          ? nodeTagIconSvgHtml(autoNewStatusEntry, "chat-member-status-new-icon")
-          : "";
         const statusMarkerHtml = autoNewStatusEntry
-          ? `<span class="chat-member-status chat-member-status-new status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>${{autoNewStatusIconHtml || "NEW"}}</span>`
+          ? `<span class="chat-member-status chat-member-status-new status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}><span class="chat-member-status-new-text" aria-hidden="true">NEW</span></span>`
           : hasNodeVisualEmoji
           ? `<span class="chat-member-status chat-member-status-emoji status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>
               <span class="chat-member-status-ring" aria-hidden="true"></span>

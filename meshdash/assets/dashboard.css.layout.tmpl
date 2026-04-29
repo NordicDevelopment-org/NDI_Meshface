@@ -4727,16 +4727,29 @@
       transform: translateY(-0.4px);
     }}
     .chat-member-status-new {{
-      font-size: 8px;
-      font-weight: 800;
+      font-size: 7px;
+      font-weight: 900;
+      border: 1.5px solid currentColor;
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--chat-member-node-bg, var(--panel)) 88%, transparent);
+      box-sizing: border-box;
+      text-shadow:
+        0 0 2px color-mix(in srgb, var(--chat-member-node-bg, var(--panel)) 86%, #000000 14%),
+        0 0 3px color-mix(in srgb, currentColor 38%, transparent);
       transform: translateY(-0.2px);
     }}
-    .chat-member-status-new-icon {{
+    .chat-member-status-new-text {{
       display: block;
-      width: 16px;
-      height: 16px;
-      fill: currentColor;
-      flex: 0 0 auto;
+      color: #ffffff;
+      font-family: "IBM Plex Mono", "Roboto Mono", monospace;
+      font-size: 7px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.55px;
+      text-shadow:
+        0 0 2px rgba(0, 0, 0, 0.95),
+        0 0 4px currentColor;
+      transform: translateY(0.1px) scaleX(0.78);
     }}
     .chat-member-status-emoji {{
       font-size: 13px;

@@ -744,7 +744,7 @@ def test_node_navigator_status_marker_geometry_supports_dot_and_emoji_variants(e
     status_section = extract_css_block(css, ".chat-member-status")
     dot_section = extract_css_block(css, ".chat-member-status-dot")
     new_section = extract_css_block(css, ".chat-member-status-new")
-    new_icon_section = extract_css_block(css, ".chat-member-status-new-icon")
+    new_text_section = extract_css_block(css, ".chat-member-status-new-text")
     emoji_section = extract_css_block(css, ".chat-member-status-emoji")
     ring_section = extract_css_block(css, ".chat-member-status-ring")
     glyph_section = extract_css_block(css, ".chat-member-status-emoji-glyph")
@@ -756,11 +756,20 @@ def test_node_navigator_status_marker_geometry_supports_dot_and_emoji_variants(e
     assert "display: inline-flex;" in status_section
     assert "justify-content: center;" in status_section
     assert "font-size: 11px;" in dot_section
-    assert "font-size: 8px;" in new_section
-    assert "font-weight: 800;" in new_section
-    assert "width: 16px;" in new_icon_section
-    assert "height: 16px;" in new_icon_section
-    assert "fill: currentColor;" in new_icon_section
+    assert "font-size: 7px;" in new_section
+    assert "font-weight: 900;" in new_section
+    assert "border: 1.5px solid currentColor;" in new_section
+    assert "border-radius: 3px;" in new_section
+    assert "background: color-mix(in srgb, var(--chat-member-node-bg, var(--panel)) 88%, transparent);" in new_section
+    assert "box-sizing: border-box;" in new_section
+    assert "text-shadow:" in new_section
+    assert "color: #ffffff;" in new_text_section
+    assert "font-family: \"IBM Plex Mono\", \"Roboto Mono\", monospace;" in new_text_section
+    assert "font-size: 7px;" in new_text_section
+    assert "font-weight: 900;" in new_text_section
+    assert "letter-spacing: -0.55px;" in new_text_section
+    assert "0 0 2px rgba(0, 0, 0, 0.95)," in new_text_section
+    assert "transform: translateY(0.1px) scaleX(0.78);" in new_text_section
     assert "font-size: 13px;" in emoji_section
     assert "isolation: isolate;" in emoji_section
     assert "position: absolute;" in ring_section
