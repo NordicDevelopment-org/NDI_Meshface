@@ -1145,7 +1145,7 @@
         const tagClass = tagActive ? " tagged-node" : "";
         const mutedClass = muted ? " muted-node" : "";
         const tagChipHtml = (showTagBadge && tagActive)
-          ? `<span class="chat-member-tag-chip" style="${{escAttr(tagStyleVars)}}" title="Tag: ${{escAttr(tagLabel)}}">${{escAttr(tagLabel)}}</span>`
+          ? `<span class="chat-member-tag-chip" style="${{escAttr(tagStyleVars)}}" title="Tag: ${{escAttr(tagLabel)}}">${{typeof nodeTagIconSvgHtml === "function" ? nodeTagIconSvgHtml(tagEntry, "chat-member-tag-chip-icon") : ""}}<span class="chat-member-tag-chip-label">${{escAttr(tagLabel)}}</span></span>`
           : "";
         const malformedTextChipHtml = malformedTextCount > 0
           ? `<span class="chat-member-alert-chip" title="${{escAttr(`Malformed text payloads detected: ${{malformedTextCount}} recent packet${{malformedTextCount === 1 ? "" : "s"}} on TEXT_MESSAGE_APP. Last seen ${{malformedTextLatestText}}${{malformedTextPayloadPreview ? `. Payload: ${{malformedTextPayloadPreview}}` : ""}`)}}">bad text</span>`
@@ -1159,17 +1159,30 @@
           ? normalizeChatNodeNavigatorShowStatusDotsPref(chatNodeNavigatorShowStatusDots)
           : !!chatNodeNavigatorShowStatusDots;
         const hasNodeVisualEmoji = !!cleanNodeVisualEmoji;
+        const autoNewStatusEntry = (typeof autoNodeTagEntryForNode === "function")
+          ? autoNodeTagEntryForNode(nodeId)
+          : null;
         const rawMemberDisplayName = String((item && item.name) || nodeId || "Unknown node").trim() || "Unknown node";
-        const memberDisplayName = (hasNodeVisualEmoji && showStatusDots && typeof stripNodeVisualEmojiFromLabel === "function")
+        const tagHasBuiltInIcon = !!(tagEntry && typeof nodeTagIconPathForEntry === "function" && nodeTagIconPathForEntry(tagEntry));
+        const statusHasBuiltInIcon = !!(autoNewStatusEntry && typeof nodeTagIconPathForEntry === "function" && nodeTagIconPathForEntry(autoNewStatusEntry));
+        const memberDisplayName = (hasNodeVisualEmoji && showStatusDots && !tagHasBuiltInIcon && !statusHasBuiltInIcon && typeof stripNodeVisualEmojiFromLabel === "function")
           ? stripNodeVisualEmojiFromLabel(rawMemberDisplayName, cleanNodeVisualEmoji)
           : rawMemberDisplayName;
-        const statusGlyphAttrs = ` title="${{escAttr(`Status: ${{statusLabel}}`)}}" aria-label="${{escAttr(`Status: ${{statusLabel}}`)}}"`;
+        const statusGlyphLabel = autoNewStatusEntry
+          ? `New node: ${{statusLabel}}`
+          : `Status: ${{statusLabel}}`;
+        const statusGlyphAttrs = ` title="${{escAttr(statusGlyphLabel)}}" aria-label="${{escAttr(statusGlyphLabel)}}"`;
         const statusVisibilityClass = showStatusDots ? "" : " status-hidden";
         const statusMarkerClass = showStatusDots ? "" : " is-hidden";
         const statusMarkerAttrs = showStatusDots
           ? statusGlyphAttrs
           : ' aria-hidden="true"';
-        const statusMarkerHtml = hasNodeVisualEmoji
+        const autoNewStatusIconHtml = (autoNewStatusEntry && typeof nodeTagIconSvgHtml === "function")
+          ? nodeTagIconSvgHtml(autoNewStatusEntry, "chat-member-status-new-icon")
+          : "";
+        const statusMarkerHtml = autoNewStatusEntry
+          ? `<span class="chat-member-status chat-member-status-new status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>${{autoNewStatusIconHtml || "NEW"}}</span>`
+          : hasNodeVisualEmoji
           ? `<span class="chat-member-status chat-member-status-emoji status-${{statusKey}}${{statusMarkerClass}}"${{statusMarkerAttrs}}>
               <span class="chat-member-status-ring" aria-hidden="true"></span>
               <span class="chat-member-status-emoji-glyph" aria-hidden="true">${{escAttr(cleanNodeVisualEmoji)}}</span>

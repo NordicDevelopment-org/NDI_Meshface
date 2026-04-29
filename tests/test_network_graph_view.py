@@ -274,6 +274,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'nodeEl.setAttribute("style", tagStyleVars);' in js
     assert 'function autoNewNodeTagPreset() {' in js
     assert 'id: "auto-new-node",' in js
+    assert 'const nodeTagBuiltInIconPaths = {' in js
+    assert '"auto-new-node": "M20,4C21.11,4 22,4.89 22,6' in js
+    assert 'function nodeTagIconPathForEntry(tagEntry) {' in js
+    assert 'function nodeTagIconSvgHtml(tagEntry, className = "node-tag-inline-icon") {' in js
     assert 'function nodeFirstDiscoveredUnix(nodeId, state = latestState) {' in js
     assert 'function nodeIsAutoNewByFirstDiscovery(nodeId, state = latestState, nowUnix = Math.floor(Date.now() / 1000)) {' in js
     assert 'function autoNodeTagEntryForNode(nodeId, state = latestState) {' in js
@@ -300,6 +304,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function syncNetworkGraphSelfPathLayer(svg, scene) {' in js
     assert 'function renderNetworkGraphTagRouteLegend(scene) {' in js
     assert 'function bindNetworkGraphTagRouteLegendControls(legend, scene) {' in js
+    assert 'nodeTagIconSvgHtml(tagEntry, "network-graph-tag-filter-icon")' in js
+    assert 'iconHtml: String(taggedItem.iconHtml || ""),' in js
+    assert '<span class="network-graph-tag-filter-name">${item.iconHtml || ""}<span class="network-graph-tag-filter-label">${escAttr(item.label)}</span></span>' in js
     assert 'const stackOffset = Math.max(-11, Math.min(11, (stackIndex - ((stackCount - 1) / 2)) * 2.8));' in js
     assert 'class="network-graph-tag-route"' in js
     assert 'data-network-graph-tag-route-key="${escAttr(segment.routeKey)}"' in js
@@ -404,6 +411,9 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "accent-color: var(--network-graph-tag-route-color, #2aa85a);" in css
     assert ".network-graph-tag-filter-input:checked {" in css
     assert ".network-graph-tag-filter-input:disabled {" in css
+    assert ".network-graph-tag-filter-icon {" in css
+    assert "fill: currentColor;" in css
+    assert ".network-graph-tag-filter-label {" in css
     assert "[data-theme=\"dark\"] .network-graph-edge.is-local-path {" in css
     assert "stroke: var(--theme-base-color, var(--ui-accent));" in css
     assert "[data-theme=\"dark\"] .network-graph-tag-route {" in css

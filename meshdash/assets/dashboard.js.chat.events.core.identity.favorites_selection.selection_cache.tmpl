@@ -6,7 +6,10 @@
         ? `Tag: ${{nodeTagDisplayLabel(tagEntry, "Tagged")}}`
         : "No tag";
       const emojiHtml = nodeTagChipEmojiHtml(tagEntry, nodeId);
-      return `<span class="favorite-menu-tag-chip ${{extraClass}}${{tagEntry ? " is-tagged" : ""}}${{emojiHtml ? " has-emoji" : ""}}"${{styleAttr}} title="${{escAttr(title)}}" aria-hidden="true">${{emojiHtml}}</span>`;
+      const iconClass = tagEntry && typeof nodeTagIconPathForEntry === "function" && nodeTagIconPathForEntry(tagEntry)
+        ? " has-icon"
+        : "";
+      return `<span class="favorite-menu-tag-chip ${{extraClass}}${{tagEntry ? " is-tagged" : ""}}${{emojiHtml ? " has-emoji" : ""}}${{iconClass}}"${{styleAttr}} title="${{escAttr(title)}}" aria-hidden="true">${{emojiHtml}}</span>`;
     }}
 
     function favoriteMenuTagEditorHtml(nodeId) {{

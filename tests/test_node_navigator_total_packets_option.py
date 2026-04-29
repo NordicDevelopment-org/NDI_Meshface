@@ -197,10 +197,16 @@ def test_dashboard_js_supports_status_dot_toggle_in_node_navigator() -> None:
     assert 'const displayNameEmoji = (typeof normalizeNodeTagEmoji === "function")' not in js
     assert 'const isLocalNode = (typeof isSelfNodeId === "function")' not in js
     assert 'const hasNodeVisualEmoji = !!cleanNodeVisualEmoji;' in js
+    assert 'const autoNewStatusEntry = (typeof autoNodeTagEntryForNode === "function")' in js
     assert "function stripNodeVisualEmojiFromLabel(value, emoji) {" in js
-    assert "hasNodeVisualEmoji && showStatusDots && typeof stripNodeVisualEmojiFromLabel === \"function\"" in js
+    assert "const tagHasBuiltInIcon = !!(tagEntry && typeof nodeTagIconPathForEntry === \"function\" && nodeTagIconPathForEntry(tagEntry));" in js
+    assert "const statusHasBuiltInIcon = !!(autoNewStatusEntry && typeof nodeTagIconPathForEntry === \"function\" && nodeTagIconPathForEntry(autoNewStatusEntry));" in js
+    assert "hasNodeVisualEmoji && showStatusDots && !tagHasBuiltInIcon && !statusHasBuiltInIcon && typeof stripNodeVisualEmojiFromLabel === \"function\"" in js
     assert "stripNodeVisualEmojiFromLabel(rawMemberDisplayName, cleanNodeVisualEmoji)" in js
-    assert 'const statusMarkerHtml = hasNodeVisualEmoji' in js
+    assert 'nodeTagIconSvgHtml(tagEntry, "chat-member-tag-chip-icon")' in js
+    assert 'nodeTagIconSvgHtml(autoNewStatusEntry, "chat-member-status-new-icon")' in js
+    assert 'const statusMarkerHtml = autoNewStatusEntry' in js
+    assert '<span class="chat-member-status chat-member-status-new status-${statusKey}${statusMarkerClass}"${statusMarkerAttrs}>' in js
     assert '<span class="chat-member-status chat-member-status-emoji status-${statusKey}${statusMarkerClass}"${statusMarkerAttrs}>' in js
     assert '<span class="chat-member-status chat-member-status-dot status-${statusKey}${statusMarkerClass}"${statusMarkerAttrs}>●</span>' in js
 

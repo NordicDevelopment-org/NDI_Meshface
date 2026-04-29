@@ -743,6 +743,8 @@ def test_node_navigator_status_marker_geometry_supports_dot_and_emoji_variants(e
     hidden_item_section = extract_css_block(css, ".chat-member-item.status-hidden")
     status_section = extract_css_block(css, ".chat-member-status")
     dot_section = extract_css_block(css, ".chat-member-status-dot")
+    new_section = extract_css_block(css, ".chat-member-status-new")
+    new_icon_section = extract_css_block(css, ".chat-member-status-new-icon")
     emoji_section = extract_css_block(css, ".chat-member-status-emoji")
     ring_section = extract_css_block(css, ".chat-member-status-ring")
     glyph_section = extract_css_block(css, ".chat-member-status-emoji-glyph")
@@ -754,6 +756,11 @@ def test_node_navigator_status_marker_geometry_supports_dot_and_emoji_variants(e
     assert "display: inline-flex;" in status_section
     assert "justify-content: center;" in status_section
     assert "font-size: 11px;" in dot_section
+    assert "font-size: 8px;" in new_section
+    assert "font-weight: 800;" in new_section
+    assert "width: 16px;" in new_icon_section
+    assert "height: 16px;" in new_icon_section
+    assert "fill: currentColor;" in new_icon_section
     assert "font-size: 13px;" in emoji_section
     assert "isolation: isolate;" in emoji_section
     assert "position: absolute;" in ring_section

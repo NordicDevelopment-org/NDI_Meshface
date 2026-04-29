@@ -2473,13 +2473,16 @@
           const label = (typeof nodeTagDisplayLabel === "function")
             ? nodeTagDisplayLabel(tagEntry, "Tagged")
             : "Tagged";
+          const iconHtml = (typeof nodeTagIconSvgHtml === "function")
+            ? nodeTagIconSvgHtml(tagEntry, "network-graph-tag-filter-icon")
+            : "";
           const presetId = normalizeNetworkGraphTagRoutePresetId(
             tagEntry.presetId
             || (tagEntry.preset && tagEntry.preset.id)
             || label
           );
           if (!presetId) return null;
-          return {{ nodeId, presetId, color, label }};
+          return {{ nodeId, presetId, color, label, iconHtml }};
         }})
         .filter(Boolean)
         .sort((itemA, itemB) => (
@@ -2565,11 +2568,15 @@
             presetId,
             label: String(taggedItem.label || "Tagged"),
             color: String(taggedItem.color || "#2aa85a"),
+            iconHtml: String(taggedItem.iconHtml || ""),
             nodeIds: new Set(),
             routeTargetIds: new Set(),
           }});
         }}
         const item = byPresetId.get(presetId);
+        if (item && taggedItem.iconHtml && !item.iconHtml) {{
+          item.iconHtml = String(taggedItem.iconHtml || "");
+        }}
         if (item && taggedItem.nodeId) {{
           item.nodeIds.add(normalizeNodeId(taggedItem.nodeId));
         }}
@@ -2582,6 +2589,7 @@
             presetId,
             label: String(segment.label || "Tagged"),
             color: String(segment.color || "#2aa85a"),
+            iconHtml: "",
             nodeIds: new Set(),
             routeTargetIds: new Set(),
           }});
@@ -2596,6 +2604,7 @@
           presetId: item.presetId,
           label: item.label,
           color: item.color,
+          iconHtml: item.iconHtml,
           count: item.nodeIds.size,
           routeCount: item.routeTargetIds.size,
           visible: item.routeTargetIds.size > 0 && networkGraphTagRoutePresetIsVisible(item.presetId),
@@ -2889,7 +2898,7 @@
                   ${{checkedAttr}}
                   ${{disabledAttr}}
                 />
-                <span class="network-graph-tag-filter-name">${{escAttr(item.label)}}</span>${{countLabel}}
+                <span class="network-graph-tag-filter-name">${{item.iconHtml || ""}}<span class="network-graph-tag-filter-label">${{escAttr(item.label)}}</span></span>${{countLabel}}
               </label>`;
             }}).join("")
           }}

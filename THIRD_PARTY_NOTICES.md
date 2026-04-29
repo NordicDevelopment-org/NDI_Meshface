@@ -5,6 +5,10 @@ reviewed before the repository is made public.
 
 ## Bundled Data
 
+- `meshdash/assets/dashboard.js.chat.events.core.identity.favorites_selection.favorites_state_ui.tmpl`
+  embeds the `mdiNewBox` SVG path from Material Design Icons / `@mdi/js`
+  for the automatic "New" node tag icon. Material Design Icons are distributed
+  under Apache License 2.0.
 - `meshdash/assets/offline_atlas_na.min.json` includes Natural Earth base layers
   and GeoNames city data. The file metadata identifies Natural Earth as Public
   Domain and GeoNames as CC BY 4.0.
