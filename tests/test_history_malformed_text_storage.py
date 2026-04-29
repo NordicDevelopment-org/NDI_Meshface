@@ -20,7 +20,7 @@ def test_save_packet_record_persists_malformed_text_payloads() -> None:
         conn,
         {
             "summary": {
-                "from": "!aca96ba8",
+                "from": "!cc000001",
                 "from_long_name": "Weird Sender",
                 "portnum": "TEXT_MESSAGE_APP",
                 "packet_id": 7394,
@@ -30,7 +30,7 @@ def test_save_packet_record_persists_malformed_text_payloads() -> None:
             },
             "packet": {
                 "id": 7394,
-                "fromId": "!aca96ba8",
+                "fromId": "!cc000001",
                 "decoded": {
                     "portnum": "TEXT_MESSAGE_APP",
                     "payload": "fe9ef9f2dbf9ffffe2fe80cbef",
@@ -49,7 +49,7 @@ def test_save_packet_record_persists_malformed_text_payloads() -> None:
 
     assert row is not None
     assert int(row[0]) == 1
-    assert row[1] == "!aca96ba8"
+    assert row[1] == "!cc000001"
     assert row[2] == "Weird Sender"
     assert row[3] == "TEXT_MESSAGE_APP"
     assert int(row[4]) == 7394
@@ -65,7 +65,7 @@ def test_save_packet_record_skips_normal_text_messages() -> None:
         conn,
         {
             "summary": {
-                "from": "!aca96ba8",
+                "from": "!cc000001",
                 "portnum": "TEXT_MESSAGE_APP",
                 "packet_id": 7401,
                 "rx_time_unix": 1775760001,
@@ -74,7 +74,7 @@ def test_save_packet_record_skips_normal_text_messages() -> None:
             },
             "packet": {
                 "id": 7401,
-                "fromId": "!aca96ba8",
+                "fromId": "!cc000001",
                 "decoded": {
                     "portnum": "TEXT_MESSAGE_APP",
                     "text": "hello",
@@ -136,8 +136,8 @@ def test_load_malformed_text_history_groups_senders_and_filters_node() -> None:
         ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
-            (900, 1, "!aca96ba8", "Weird Sender", "TEXT_MESSAGE_APP", 101, 910, "e98ffe07"),
-            (920, 2, "!aca96ba8", "Weird Sender", "TEXT_MESSAGE_APP", 102, 930, "fe9ef9f2dbf9ffff"),
+            (900, 1, "!cc000001", "Weird Sender", "TEXT_MESSAGE_APP", 101, 910, "e98ffe07"),
+            (920, 2, "!cc000001", "Weird Sender", "TEXT_MESSAGE_APP", 102, 930, "fe9ef9f2dbf9ffff"),
             (940, 3, "!bbbb0001", "Another Sender", "TEXT_MESSAGE_APP", 103, 950, "ccdd0011"),
         ],
     )
@@ -157,15 +157,15 @@ def test_load_malformed_text_history_groups_senders_and_filters_node() -> None:
     assert payload["summary"]["total_packets"] == 3
     assert payload["summary"]["distinct_senders"] == 2
     assert len(payload["senders"]) == 2
-    assert payload["senders"][0]["from_id"] == "!aca96ba8"
+    assert payload["senders"][0]["from_id"] == "!cc000001"
     assert payload["senders"][0]["count"] == 2
     assert payload["senders"][0]["last_payload_preview"] == "fe9ef9f2dbf9ffff"
     assert len(payload["entries"]) == 2
     assert payload["entries"][0]["from_id"] == "!bbbb0001"
 
     with patch("meshdash.history_store_malformed_text.time.time", return_value=1000):
-        filtered = load_malformed_text_history(store, window_hours=1, limit=10, node_id="!aca96ba8")
+        filtered = load_malformed_text_history(store, window_hours=1, limit=10, node_id="!cc000001")
 
     assert filtered["summary"]["total_packets"] == 2
     assert filtered["summary"]["distinct_senders"] == 1
-    assert all(entry["from_id"] == "!aca96ba8" for entry in filtered["entries"])
+    assert all(entry["from_id"] == "!cc000001" for entry in filtered["entries"])

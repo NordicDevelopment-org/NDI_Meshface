@@ -66,7 +66,7 @@ def test_bbs_host_service_replies_to_direct_open_requests() -> None:
         {
             "entry_id": "post-1",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "hello board",
             "unix": 101,
         }
@@ -114,7 +114,7 @@ def test_bbs_host_service_replies_to_direct_open_requests() -> None:
     assert snapshot["board_id"] == "node-space"
     assert snapshot["host_id"] == "!12345678"
     assert snapshot["post_count"] == 1
-    assert snapshot["posts"] == [["post-1", "!12345678", "Zorkbot", "hello board", 101]]
+    assert snapshot["posts"] == [["post-1", "!12345678", "Demo Relay", "hello board", 101]]
 
 
 def test_bbs_host_service_open_cursor_sends_only_missing_posts() -> None:
@@ -123,21 +123,21 @@ def test_bbs_host_service_open_cursor_sends_only_missing_posts() -> None:
         {
             "entry_id": "post-1",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "first",
             "unix": 100,
         },
         {
             "entry_id": "post-2",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "second",
             "unix": 101,
         },
         {
             "entry_id": "post-3",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "third",
             "unix": 102,
         },
@@ -173,7 +173,7 @@ def test_bbs_host_service_open_cursor_sends_only_missing_posts() -> None:
     texts = _sent_texts(sent_messages)
     assert texts[0] == "bbs1|profile|token123|node-space|!12345678|Node Space|hello world|3|102|post-3"
     snapshot = _decode_snapshot_from_sent(sent_messages)
-    assert snapshot["posts"] == [["post-3", "!12345678", "Zorkbot", "third", 102]]
+    assert snapshot["posts"] == [["post-3", "!12345678", "Demo Relay", "third", 102]]
 
 
 def test_bbs_host_service_batches_short_history_posts() -> None:
@@ -182,21 +182,21 @@ def test_bbs_host_service_batches_short_history_posts() -> None:
         {
             "entry_id": "post-1",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "first",
             "unix": 100,
         },
         {
             "entry_id": "post-2",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "second",
             "unix": 101,
         },
         {
             "entry_id": "post-3",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "third",
             "unix": 102,
         },
@@ -361,7 +361,7 @@ def test_bbs_host_service_persists_posts_from_direct_messages_and_local_control_
     posted = service.append_post(
         SimpleNamespace(
             text="local reply",
-            author_name="zorkbot",
+            author_name="demo relay",
             entry_id="local-1",
         )
     )
@@ -375,7 +375,7 @@ def test_bbs_host_service_persists_posts_from_direct_messages_and_local_control_
     assert [row["unix"] for row in stored_posts] == [333, 333]
     assert [row["text"] for row in sent_messages] == [
         "bbs1|post|node-space|!12345678|remote-1|!01020304|Remote|cant see the posts|333",
-        "bbs1|post|node-space|!12345678|local-1|!12345678|zorkbot|local reply|333",
+        "bbs1|post|node-space|!12345678|local-1|!12345678|demo relay|local reply|333",
     ]
 
 
@@ -385,7 +385,7 @@ def test_bbs_host_service_fanouts_new_posts_to_clients_after_open() -> None:
         {
             "entry_id": "old-1",
             "author_id": "!12345678",
-            "author_name": "zorkbot",
+            "author_name": "demo relay",
             "text": "older post",
             "unix": 100,
         }
@@ -427,7 +427,7 @@ def test_bbs_host_service_fanouts_new_posts_to_clients_after_open() -> None:
     posted = service.append_post(
         SimpleNamespace(
             text="fresh post",
-            author_name="zorkbot",
+            author_name="demo relay",
             entry_id="fresh-1",
         )
     )
@@ -437,8 +437,8 @@ def test_bbs_host_service_fanouts_new_posts_to_clients_after_open() -> None:
     texts = _sent_texts(sent_messages)
     assert texts[0] == "bbs1|profile|token123|node-space|!12345678|Node Space|hello world|1|100|old-1"
     snapshot = _decode_snapshot_from_sent(sent_messages)
-    assert snapshot["posts"] == [["old-1", "!12345678", "zorkbot", "older post", 100]]
-    assert texts[-1] == "bbs1|post|node-space|!12345678|fresh-1|!12345678|zorkbot|fresh post|444"
+    assert snapshot["posts"] == [["old-1", "!12345678", "demo relay", "older post", 100]]
+    assert texts[-1] == "bbs1|post|node-space|!12345678|fresh-1|!12345678|demo relay|fresh post|444"
 
 
 def test_bbs_host_service_streams_history_snapshot_without_delivery_wait() -> None:
@@ -449,7 +449,7 @@ def test_bbs_host_service_streams_history_snapshot_without_delivery_wait() -> No
         {
             "entry_id": "post-1",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "hello board",
             "unix": 101,
         }
@@ -525,7 +525,7 @@ def test_bbs_host_service_does_not_retry_unsettled_history_snapshot() -> None:
         {
             "entry_id": "post-1",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "hello board",
             "unix": 101,
         }
@@ -591,7 +591,7 @@ def test_bbs_host_service_requeues_missing_snapshot_chunks_from_file_ack() -> No
         {
             "entry_id": f"post-{idx}",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": f"message {idx}",
             "unix": 100 + idx,
         }

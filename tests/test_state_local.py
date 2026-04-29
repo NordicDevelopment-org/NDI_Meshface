@@ -22,7 +22,7 @@ class _FakeNode:
             _FakeChannel(index=1, role=2, settings={"name": "Meshyface", "psk": b"secret"}),
             _FakeChannel(index=2, role=0, settings={}),
         ]
-        self.nodeNum = 0x3369D0B8
+        self.nodeNum = 0x1234ABCD
         self.position = {"latitude": 44.0, "longitude": -93.0}
         self.request_channels_calls: list[int] = []
         self.wait_for_config_calls: list[str] = []
@@ -37,11 +37,11 @@ class _FakeNode:
 class _FakeIface:
     def __init__(self) -> None:
         self.localNode = _FakeNode()
-        self.myInfo = {"my_node_num": 0x3369D0B8}
+        self.myInfo = {"my_node_num": 0x1234ABCD}
         self.nodesByNum = {
-            0x3369D0B8: {
-                "num": 0x3369D0B8,
-                "user": {"id": "!3369d0b8", "longName": "zorkbot"},
+            0x1234ABCD: {
+                "num": 0x1234ABCD,
+                "user": {"id": "!1234abcd", "longName": "Demo Relay"},
             }
         }
 

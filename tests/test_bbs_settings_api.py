@@ -131,7 +131,7 @@ def test_bbs_post_store_round_trips_and_truncates() -> None:
         post={
             "entry_id": "post-1",
             "author_id": "!12345678",
-            "author_name": "Zorkbot",
+            "author_name": "Demo Relay",
             "text": "  hello   board  ",
             "unix": 123,
         },
@@ -141,7 +141,7 @@ def test_bbs_post_store_round_trips_and_truncates() -> None:
     assert appended["post"] == {
         "entry_id": "post-1",
         "author_id": "!12345678",
-        "author_name": "Zorkbot",
+        "author_name": "Demo Relay",
         "text": "hello board",
         "unix": 123,
     }
@@ -379,7 +379,7 @@ def test_handle_dashboard_post_dispatches_bbs_host_post_action() -> None:
         {
             "action": "post",
             "text": "hello",
-            "author_name": "zorkbot",
+            "author_name": "demo relay",
             "entry_id": "post-1",
         }
     ).encode("utf-8")
@@ -420,7 +420,7 @@ def test_handle_dashboard_post_dispatches_bbs_host_post_action() -> None:
                 "host": {"enabled": True},
                 "post": {
                     "entry_id": "post-1",
-                    "author_name": "zorkbot",
+                    "author_name": "demo relay",
                     "text": "hello",
                 },
             },

@@ -202,7 +202,7 @@ preferring the local node id when available, and then rewrites the DB path to:
 Examples:
 
 - `mesh_dashboard_history.sqlite3` ->
-  `mesh_dashboard_history.radio-02ed9b7c.sqlite3`
+  `mesh_dashboard_history.radio-1234abcd.sqlite3`
 - `mesh_dashboard_history.sqlite3` ->
   `mesh_dashboard_history.radio-192-168-1-69-4403-tcp.sqlite3`
 

@@ -133,9 +133,9 @@ def test_slim_history_caps_chat_profile_drops_duplicate_text_times() -> None:
 def test_apply_node_historical_names_prefers_custom_history_over_generic_live_name() -> None:
     rows = [
         {
-            "id": "!a038f788",
-            "short_name": "f788",
-            "long_name": "Meshtastic f788",
+            "id": "!aa000001",
+            "short_name": "0001",
+            "long_name": "Meshtastic 0001",
         },
         {
             "id": "!12345678",
@@ -147,11 +147,11 @@ def test_apply_node_historical_names_prefers_custom_history_over_generic_live_na
     apply_node_historical_names(
         rows,
         {
-            "!a038f788": {
+            "!aa000001": {
                 "first_seen_unix": 1776514000,
                 "first_seen": "2026-04-18 12:06:40Z",
-                "last_short_name": "NAH",
-                "last_long_name": "NOT A HACKER",
+                "last_short_name": "ALFA",
+                "last_long_name": "Alpha Relay",
             },
             "!12345678": {
                 "last_short_name": "OLD",
@@ -160,8 +160,8 @@ def test_apply_node_historical_names_prefers_custom_history_over_generic_live_na
         },
     )
 
-    assert rows[0]["short_name"] == "NAH"
-    assert rows[0]["long_name"] == "NOT A HACKER"
+    assert rows[0]["short_name"] == "ALFA"
+    assert rows[0]["long_name"] == "Alpha Relay"
     assert rows[0]["first_seen_unix"] == 1776514000
     assert rows[0]["first_seen"] == "2026-04-18 12:06:40Z"
     assert rows[1]["short_name"] == "KEEP"

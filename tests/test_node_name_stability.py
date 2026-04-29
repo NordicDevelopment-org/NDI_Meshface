@@ -71,12 +71,12 @@ def test_history_schema_backfills_node_first_seen_for_existing_capabilities() ->
           summary_json TEXT NOT NULL
         );
         INSERT INTO node_capabilities(node_id, last_seen_unix, has_position)
-        VALUES('!a038f788', 1776515000, 0);
+        VALUES('!aa000001', 1776515000, 0);
         INSERT INTO node_metrics_1m(
           bucket_unix, node_id, packet_count, snr_sum, snr_count, rssi_sum, rssi_count,
           hops_sum, hops_count, last_seen_unix
         )
-        VALUES(1776514800, '!a038f788', 1, 0, 0, 0, 0, 0, 0, 1776514783);
+        VALUES(1776514800, '!aa000001', 1, 0, 0, 0, 0, 0, 0, 1776514783);
         """
     )
 
@@ -84,7 +84,7 @@ def test_history_schema_backfills_node_first_seen_for_existing_capabilities() ->
 
     rows = fetch_node_capability_rows(conn)
     decoded = decode_node_capabilities_rows(rows)
-    assert decoded["!a038f788"]["first_seen_unix"] == 1776514783
+    assert decoded["!aa000001"]["first_seen_unix"] == 1776514783
 
 
 def test_save_packet_event_and_rollups_persists_latest_node_names_in_capabilities() -> None:
@@ -92,22 +92,22 @@ def test_save_packet_event_and_rollups_persists_latest_node_names_in_capabilitie
     initialize_history_schema(conn)
 
     summary = {
-        "from": "!a038f788",
-        "to": "!08b3cb6d",
+        "from": "!aa000001",
+        "to": "!bb000002",
         "portnum": "NODEINFO_APP",
         "rx_time_unix": 1776514783,
         "hops": 2,
     }
     packet = {
-        "fromId": "!a038f788",
-        "toId": "!08b3cb6d",
+        "fromId": "!aa000001",
+        "toId": "!bb000002",
         "rxTime": 1776514783,
         "decoded": {
             "portnum": "NODEINFO_APP",
             "user": {
-                "id": "!a038f788",
-                "longName": "NOT A HACKER",
-                "shortName": "NAH",
+                "id": "!aa000001",
+                "longName": "Alpha Relay",
+                "shortName": "ALFA",
             },
         },
     }
@@ -116,10 +116,10 @@ def test_save_packet_event_and_rollups_persists_latest_node_names_in_capabilitie
 
     rows = fetch_node_capability_rows(conn)
     decoded = decode_node_capabilities_rows(rows)
-    assert decoded["!a038f788"]["first_seen_unix"] == 1776514783
-    assert decoded["!a038f788"]["last_long_name"] == "NOT A HACKER"
-    assert decoded["!a038f788"]["last_short_name"] == "NAH"
-    assert decoded["!a038f788"]["names_updated_unix"] == 1776514783
+    assert decoded["!aa000001"]["first_seen_unix"] == 1776514783
+    assert decoded["!aa000001"]["last_long_name"] == "Alpha Relay"
+    assert decoded["!aa000001"]["last_short_name"] == "ALFA"
+    assert decoded["!aa000001"]["names_updated_unix"] == 1776514783
 
 
 def test_backfill_node_capabilities_recovers_names_for_existing_history() -> None:
@@ -133,25 +133,25 @@ def test_backfill_node_capabilities_recovers_names_for_existing_history() -> Non
           last_hops, battery_level, battery_updated_unix
         ) VALUES(?, ?, ?, ?, ?, ?, ?)
         """,
-        ("!a038f788", 1776514000, 0, None, 2, None, None),
+        ("!aa000001", 1776514000, 0, None, 2, None, None),
     )
 
     summary = {
         "captured_at": "2026-04-18 12:19:44Z",
-        "from": "!a038f788",
-        "to": "!08b3cb6d",
+        "from": "!aa000001",
+        "to": "!bb000002",
         "portnum": "NODEINFO_APP",
         "rx_time_unix": 1776514783,
     }
     packet = {
-        "fromId": "!a038f788",
-        "toId": "!08b3cb6d",
+        "fromId": "!aa000001",
+        "toId": "!bb000002",
         "decoded": {
             "portnum": "NODEINFO_APP",
             "user": {
-                "id": "!a038f788",
-                "longName": "NOT A HACKER",
-                "shortName": "NAH",
+                "id": "!aa000001",
+                "longName": "Alpha Relay",
+                "shortName": "ALFA",
             },
         },
     }
@@ -165,7 +165,7 @@ def test_backfill_node_capabilities_recovers_names_for_existing_history() -> Non
 
     rows = fetch_node_capability_rows(conn)
     decoded = decode_node_capabilities_rows(rows)
-    assert decoded["!a038f788"]["first_seen_unix"] == 1776514000
-    assert decoded["!a038f788"]["last_long_name"] == "NOT A HACKER"
-    assert decoded["!a038f788"]["last_short_name"] == "NAH"
-    assert decoded["!a038f788"]["names_updated_unix"] == 1776514784
+    assert decoded["!aa000001"]["first_seen_unix"] == 1776514000
+    assert decoded["!aa000001"]["last_long_name"] == "Alpha Relay"
+    assert decoded["!aa000001"]["last_short_name"] == "ALFA"
+    assert decoded["!aa000001"]["names_updated_unix"] == 1776514784
