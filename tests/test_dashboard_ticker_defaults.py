@@ -261,6 +261,7 @@ def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> Non
     assert "const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId);" in js
     assert "const tickerNodeId = hasSelectedTickerNode ? selectedTickerId : localId;" in js
     assert "const tickerShowsSelf = !hasSelectedTickerNode || tickerIsLocal;" in js
+    assert 'selfCard.classList.toggle("has-selected-node", hasSelectedTickerNode);' in js
     assert 'selfLabel.textContent = tickerShowsSelf ? "Self" : "Node";' in js
     assert "if (isSelectableNodeId(tickerNodeId) && !tickerShowsSelf)" in js
     assert 'selfCard.setAttribute("aria-label", `Select node ${tickerNodeName || tickerNodeId}`);' in js
@@ -311,6 +312,9 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert 'id="ticker-rate-radio"' in html
     assert 'id="ticker-chart-radio"' in html
     assert ".topbar .summary-ticker-item-self .value.self-node-value" in html
+    assert ".topbar .summary-ticker-item-self.has-selected-node {" in html
+    assert ".topbar .summary-ticker-item-self.has-selected-node::before" in html
+    assert '[data-theme="dark"] .topbar .summary-ticker-item-self.has-selected-node {' in html
     assert ".topbar .summary-ticker-item-self.has-node-emoji::after" in html
     assert "content: attr(data-node-emoji);" in html
     assert ".self-node-name {" in html

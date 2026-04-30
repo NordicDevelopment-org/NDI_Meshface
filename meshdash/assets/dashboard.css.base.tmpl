@@ -841,6 +841,33 @@
       isolation: isolate;
       overflow: hidden;
     }}
+    .topbar .summary-ticker-item-self.has-selected-node {{
+      border-color: transparent;
+      background:
+        linear-gradient(var(--panel), var(--panel)) padding-box,
+        conic-gradient(
+          from 150deg,
+          color-mix(in srgb, var(--accent) 78%, white 22%),
+          color-mix(in srgb, var(--accent-2) 72%, white 28%),
+          color-mix(in srgb, #73b7ff 78%, white 22%),
+          color-mix(in srgb, var(--accent) 78%, white 22%)
+        ) border-box;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
+        0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
+    }}
+    .topbar .summary-ticker-item-self.has-selected-node::before {{
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background:
+        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 24%, transparent) 0, transparent 46%),
+        linear-gradient(105deg, transparent 0, color-mix(in srgb, var(--accent-2) 12%, transparent) 42%, transparent 78%);
+      opacity: 0.82;
+      pointer-events: none;
+      z-index: 0;
+    }}
     .topbar .summary-ticker-item-self.has-node-emoji::after {{
       content: attr(data-node-emoji);
       position: absolute;
