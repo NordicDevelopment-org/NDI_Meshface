@@ -765,6 +765,21 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "<span class=\"chat-feed-time\"" not in js
 
 
+def test_chat_feed_search_is_reapplied_after_feed_render() -> None:
+    css = build_dashboard_css(theme_css="")
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert ".chat-feed-item.chat-feed-search-hidden {" in css
+    assert "display: none !important;" in css
+    assert "feed.__meshChatFeedSearchRows = [];" in js
+    assert 'if (typeof applyChatFeedSearchFilter === "function") {' in js
+    assert "applyChatFeedSearchFilter();" in js
+
+
 def test_launcher_menu_omits_header_block() -> None:
     js = Path("meshdash/assets/dashboard.js.chat.events.core.identity.node_self.tmpl").read_text()
 

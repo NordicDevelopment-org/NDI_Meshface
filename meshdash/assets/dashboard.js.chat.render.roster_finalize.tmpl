@@ -104,7 +104,13 @@
             ? feedItems.join("")
             : `<div class="chat-feed-empty">${{emptyText}}</div>`;
         }}
-        setElementHtmlIfChanged(feed, nextFeedHtml, "chat-feed");
+        const feedMarkupChanged = setElementHtmlIfChanged(feed, nextFeedHtml, "chat-feed");
+        if (feedMarkupChanged) {{
+          feed.__meshChatFeedSearchRows = [];
+        }}
+        if (typeof applyChatFeedSearchFilter === "function") {{
+          applyChatFeedSearchFilter();
+        }}
       }}
       markRenderChatPhase("change-summary");
       renderChatChangeSummary(nowUnix);
