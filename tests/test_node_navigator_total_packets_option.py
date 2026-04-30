@@ -18,6 +18,18 @@ def test_dashboard_js_labels_saved_history_field_as_total_packets() -> None:
     assert 'id: "saved", label: "Total Packets"' in js
 
 
+def test_dashboard_js_uses_persisted_node_packet_trends_for_roster_ticker() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "function buildChatNodeNavigatorPacketTrendMapsFromPayload" in js
+    assert "safeState.traffic.node_packet_trends" in js
+    assert "nodePacketTrendsRef: nodePacketTrends" in js
+
+
 def test_render_html_uses_packets_header_for_nodes_table() -> None:
     html = render_html(
         refresh_ms=1000,

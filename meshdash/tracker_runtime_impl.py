@@ -91,6 +91,25 @@ class DashboardTracker:
     def load_node_capabilities(self) -> dict[str, dict[str, object]]:
         return _load_tracker_node_capabilities_for_tracker_helper(self)
 
+    def load_node_packet_trends(
+        self,
+        *,
+        local_node_id: str = "",
+        window_seconds: int = 3600,
+        bucket_count: int = 24,
+        recent_window_seconds: int = 300,
+    ) -> dict[str, object]:
+        history_store = getattr(self, "_history_store", None)
+        load_fn = getattr(history_store, "load_node_packet_trends", None)
+        if not callable(load_fn):
+            return {}
+        return load_fn(
+            local_node_id=local_node_id,
+            window_seconds=window_seconds,
+            bucket_count=bucket_count,
+            recent_window_seconds=recent_window_seconds,
+        )
+
     def record_local_chat(
         self,
         text: str,

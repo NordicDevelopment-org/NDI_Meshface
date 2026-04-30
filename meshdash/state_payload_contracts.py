@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping, Optional
 
 StateRow = dict[str, object]
@@ -13,6 +13,7 @@ class StateTrafficPayload:
     port_counts: list[dict[str, object]]
     recent_packets: list[dict[str, object]]
     recent_chat: list[dict[str, object]]
+    node_packet_trends: dict[str, object] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -20,6 +21,7 @@ class StateTrafficPayload:
             "port_counts": self.port_counts,
             "recent_packets": self.recent_packets,
             "recent_chat": self.recent_chat,
+            "node_packet_trends": self.node_packet_trends,
         }
 
 
@@ -79,17 +81,20 @@ def coerce_state_traffic_payload(
     port_counts_raw = value.get("port_counts") or []
     recent_packets_raw = value.get("recent_packets") or []
     recent_chat_raw = value.get("recent_chat") or []
+    node_packet_trends_raw = value.get("node_packet_trends") or {}
 
     edges = edges_raw if isinstance(edges_raw, list) else []
     port_counts = port_counts_raw if isinstance(port_counts_raw, list) else []
     recent_packets = recent_packets_raw if isinstance(recent_packets_raw, list) else []
     recent_chat = recent_chat_raw if isinstance(recent_chat_raw, list) else []
+    node_packet_trends = node_packet_trends_raw if isinstance(node_packet_trends_raw, dict) else {}
 
     return StateTrafficPayload(
         edges=edges,
         port_counts=port_counts,
         recent_packets=recent_packets,
         recent_chat=recent_chat,
+        node_packet_trends=node_packet_trends,
     )
 
 

@@ -487,15 +487,77 @@
       return "trend-flat";
     }}
 
+    function buildChatNodeNavigatorPacketTrendMapsFromPayload(trendPayload) {{
+      const payload = (trendPayload && typeof trendPayload === "object") ? trendPayload : null;
+      const packetTickerByNode = new Map();
+      const packetSparklineByNode = new Map();
+      const nodesPayload = payload && payload.nodes && typeof payload.nodes === "object"
+        ? payload.nodes
+        : null;
+      if (!nodesPayload) {{
+        return null;
+      }}
+      const windowSec = Math.max(
+        60,
+        Math.trunc(Number(payload.window_seconds ?? payload.windowSeconds ?? 3600) || 3600)
+      );
+      const bucketCount = Math.max(
+        1,
+        Math.trunc(Number(payload.bucket_count ?? payload.bucketCount ?? 24) || 24)
+      );
+      for (const [rawNodeId, rawNodeTrend] of Object.entries(nodesPayload)) {{
+        const nodeId = normalizeNodeId(rawNodeId);
+        if (!isSelectableNodeId(nodeId)) continue;
+        const trend = rawNodeTrend && typeof rawNodeTrend === "object" ? rawNodeTrend : {{}};
+        const buckets = Array.isArray(trend.buckets)
+          ? trend.buckets.slice(0, bucketCount).map((value) => Math.max(0, Math.trunc(Number(value) || 0)))
+          : [];
+        while (buckets.length < bucketCount) {{
+          buckets.push(0);
+        }}
+        const txTotal = Math.max(0, Math.trunc(Number(trend.txTotal ?? trend.tx_total ?? 0) || 0));
+        const txRecent5m = Math.max(0, Math.trunc(Number(trend.txRecent5m ?? trend.tx_recent_5m ?? 0) || 0));
+        const rxTotal = Math.max(0, Math.trunc(Number(trend.rxTotal ?? trend.rx_total ?? 0) || 0));
+        const rxRecent5m = Math.max(0, Math.trunc(Number(trend.rxRecent5m ?? trend.rx_recent_5m ?? 0) || 0));
+        const lastTxUnix = Number(trend.lastTxUnix ?? trend.last_tx_unix);
+        const lastRxUnix = Number(trend.lastRxUnix ?? trend.last_rx_unix);
+        const lastPacketUnix = Number(trend.lastPacketUnix ?? trend.last_packet_unix);
+        packetTickerByNode.set(nodeId, {{
+          total: Math.max(0, Math.trunc(Number(trend.total) || (txTotal + rxTotal))),
+          recent5m: Math.max(0, Math.trunc(Number(trend.recent5m ?? trend.recent_5m) || (txRecent5m + rxRecent5m))),
+          txTotal,
+          txRecent5m,
+          rxTotal,
+          rxRecent5m,
+          lastPacketUnix: Number.isFinite(lastPacketUnix) && lastPacketUnix > 0
+            ? lastPacketUnix
+            : latestUnixTimestamp(lastTxUnix, lastRxUnix),
+          lastTxUnix: Number.isFinite(lastTxUnix) && lastTxUnix > 0 ? lastTxUnix : null,
+          lastRxUnix: Number.isFinite(lastRxUnix) && lastRxUnix > 0 ? lastRxUnix : null,
+        }});
+        packetSparklineByNode.set(nodeId, {{
+          buckets,
+          windowSec,
+          bucketCount,
+        }});
+      }}
+      return {{ packetTickerByNode, packetSparklineByNode }};
+    }}
+
     function buildChatNodeNavigatorPacketTrendMaps(
       rawPackets = [],
       localNodeId = "",
-      nowUnix = Math.floor(Date.now() / 1000)
+      nowUnix = Math.floor(Date.now() / 1000),
+      trendPayload = null
     ) {{
       const packetTickerByNode = new Map();
       const packetSparklineByNode = new Map();
       if (!nodeNavigatorPacketTrendEnabled()) {{
         return {{ packetTickerByNode, packetSparklineByNode }};
+      }}
+      const persistedMaps = buildChatNodeNavigatorPacketTrendMapsFromPayload(trendPayload);
+      if (persistedMaps) {{
+        return persistedMaps;
       }}
 
       const packetSparklineWindowSec = 60 * 60;
@@ -1376,7 +1438,10 @@
               ? (safeState.traffic || {{}}).recent_packets
               : [],
             resolveLocalNodeId(safeState),
-            nowUnix
+            nowUnix,
+            (safeState.traffic && typeof safeState.traffic === "object")
+              ? safeState.traffic.node_packet_trends
+              : null
           );
       const malformedTextByNode = opts.malformedTextByNode instanceof Map
         ? opts.malformedTextByNode

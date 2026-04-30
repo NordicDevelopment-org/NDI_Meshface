@@ -1,5 +1,8 @@
       const rawMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
       const rawPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const nodePacketTrends = traffic && typeof traffic.node_packet_trends === "object"
+        ? traffic.node_packet_trends
+        : null;
       const localInfoMessages = Array.isArray(chatLocalInfoRows) ? chatLocalInfoRows : [];
       const rawMessagesLength = rawMessages.length;
       const rawMessagesTailKey = rawMessagesLength > 0
@@ -52,6 +55,7 @@
         && chatDerivedCache.localInfoVersion === chatLocalInfoVersion
         && chatDerivedCache.nodesRef === nodes
         && chatDerivedCache.historyCapsRef === historyCapsObj
+        && chatDerivedCache.nodePacketTrendsRef === nodePacketTrends
         && chatDerivedCache.localNodeId === localNodeId
         && chatDerivedCache.meshChannelIndex === normalizeMeshChannelIndex(activeMeshChannelIndex)
         && chatDerivedCache.activeChatChannel === activeChatChannelKey
@@ -73,13 +77,28 @@
         const packetMaps = buildPacketSummaryAndRoutingAckMaps(rawPackets);
         const packetSummaryByIdLocal = packetMaps.packetSummaryById;
         const deliveryAckByRequestIdLocal = packetMaps.deliveryAckByRequestId;
-        const packetTickerByNodeLocal = new Map();
-        const packetSparklineByNodeLocal = new Map();
+        let packetTickerByNodeLocal = new Map();
+        let packetSparklineByNodeLocal = new Map();
         const includeNodePacketTrend = nodeNavigatorPacketTrendEnabled();
         const packetSparklineWindowSec = 60 * 60;
         const packetSparklineBucketCount = 24;
         const packetSparklineBucketSpanSec = packetSparklineWindowSec / packetSparklineBucketCount;
-        if (includeNodePacketTrend) {{
+        if (includeNodePacketTrend && typeof buildChatNodeNavigatorPacketTrendMapsFromPayload === "function") {{
+          const persistedPacketMaps = buildChatNodeNavigatorPacketTrendMapsFromPayload(nodePacketTrends);
+          if (persistedPacketMaps) {{
+            packetTickerByNodeLocal = persistedPacketMaps.packetTickerByNode instanceof Map
+              ? persistedPacketMaps.packetTickerByNode
+              : new Map();
+            packetSparklineByNodeLocal = persistedPacketMaps.packetSparklineByNode instanceof Map
+              ? persistedPacketMaps.packetSparklineByNode
+              : new Map();
+          }}
+        }}
+        if (
+          includeNodePacketTrend
+          && packetTickerByNodeLocal.size <= 0
+          && packetSparklineByNodeLocal.size <= 0
+        ) {{
           const ensurePacketBucket = (nodeId) => {{
             if (!isSelectableNodeId(nodeId)) return null;
             let bucket = packetTickerByNodeLocal.get(nodeId);
@@ -377,6 +396,7 @@
         derived = {{
           rawMessagesRef: rawMessages,
           rawPacketsRef: rawPackets,
+          nodePacketTrendsRef: nodePacketTrends,
           rawMessagesLength,
           rawMessagesTailKey,
           rawPacketsLength,

@@ -162,6 +162,28 @@ def _tracker_radio_link_error(tracker: object) -> Optional[str]:
     return f"radio link lost{age_text}"
 
 
+def _load_tracker_node_packet_trends_safe(
+    tracker: object,
+    *,
+    local_node_id: str,
+) -> dict[str, object]:
+    load_fn = getattr(tracker, "load_node_packet_trends", None)
+    if not callable(load_fn):
+        return {}
+    try:
+        payload = load_fn(
+            local_node_id=local_node_id,
+            window_seconds=3600,
+            bucket_count=24,
+            recent_window_seconds=300,
+        )
+    except Exception:
+        return {}
+    if not isinstance(payload, Mapping):
+        return {}
+    return dict(payload)
+
+
 def _chat_entry_sort_unix(entry: object) -> Optional[int]:
     if not isinstance(entry, Mapping):
         return None
@@ -904,11 +926,16 @@ def build_dashboard_state_typed(
         recent_chat=tracker_data.recent_chat,
         recent_packets=tracker_data.recent_packets,
     )
+    node_packet_trends = _load_tracker_node_packet_trends_safe(
+        tracker,
+        local_node_id=local_node_id,
+    )
     traffic_payload = StateTrafficPayload(
         edges=tracker_data.edges,
         port_counts=tracker_data.port_counts,
         recent_packets=tracker_data.recent_packets,
         recent_chat=merged_recent_chat,
+        node_packet_trends=node_packet_trends,
     )
     state_payload = DashboardStatePayload(
         generated_at=utc_now_fn(),
@@ -1062,6 +1089,7 @@ def build_dashboard_state_lite(
         port_counts=state_payload.traffic.port_counts,
         recent_packets=slim_recent_packets,
         recent_chat=slim_recent_chat,
+        node_packet_trends=state_payload.traffic.node_packet_trends,
     )
     state = DashboardStatePayload(
         generated_at=state_payload.generated_at,

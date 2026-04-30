@@ -27,6 +27,9 @@ from .history_store_nodes import (
     load_node_saved_counts as _load_node_saved_counts_helper,
     load_online_activity as _load_online_activity_helper,
 )
+from .history_node_packet_trends import (
+    load_node_packet_trends as _load_node_packet_trends_helper,
+)
 from .history_store_packets import (
     load_environment_metrics_history as _load_environment_metrics_history_helper,
     load_recent_packets as _load_recent_packets_helper,
@@ -165,6 +168,22 @@ class HistoryStore:
 
     def load_node_capabilities(self) -> dict[str, dict[str, object]]:
         return _load_node_capabilities_helper(self)
+
+    def load_node_packet_trends(
+        self,
+        *,
+        local_node_id: str = "",
+        window_seconds: int = 3600,
+        bucket_count: int = 24,
+        recent_window_seconds: int = 300,
+    ) -> dict[str, object]:
+        return _load_node_packet_trends_helper(
+            self,
+            local_node_id=local_node_id,
+            window_seconds=window_seconds,
+            bucket_count=bucket_count,
+            recent_window_seconds=recent_window_seconds,
+        )
 
     def load_summary_metrics(self, window_hours: int) -> dict[str, object]:
         return _load_summary_metrics_helper(self, window_hours)
