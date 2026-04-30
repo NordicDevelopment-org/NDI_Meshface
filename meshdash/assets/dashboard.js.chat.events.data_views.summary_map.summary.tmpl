@@ -1726,6 +1726,14 @@
       renderRadioStatus(state);
       setText("m-nodes", s.node_count ?? 0);
       setText("m-online-nodes", s.online_node_count ?? 0);
+      const autoNewNodeCount = (typeof countAutoNewNodes === "function")
+        ? countAutoNewNodes(state)
+        : 0;
+      setText("m-new-nodes", autoNewNodeCount);
+      const newNodesMetric = document.getElementById("m-new-nodes");
+      if (newNodesMetric instanceof HTMLElement) {{
+        newNodesMetric.title = `${{formatTickerNumber(autoNewNodeCount, 0)}} node${{autoNewNodeCount === 1 ? "" : "s"}} first seen in the last 24 hours`;
+      }}
       const rawLivePacketTotal = Number(s.live_packet_count);
       const livePacketTotal = Number.isFinite(rawLivePacketTotal) ? rawLivePacketTotal : 0;
       if (resetTickerScaleOnRestart) {{
@@ -1741,6 +1749,7 @@
       const batteryDisplayText = [batteryPctText, batteryVoltText].filter(Boolean).join(" · ") || "n/a";
       const showKnownNodesTrend = tickerTrendEnabled("known_nodes");
       const showOnlineNodesTrend = tickerTrendEnabled("online_nodes");
+      const showNewNodesTrend = tickerTrendEnabled("new_nodes");
       const showPacketsTrend = tickerTrendEnabled("packets_per_min");
       const showChannelUtilTrend = tickerTrendEnabled("channel_util");
       const showBatteryTrend = tickerTrendEnabled("battery");
@@ -1780,6 +1789,18 @@
       const onlineNodesTicker = document.getElementById("ticker-online-nodes");
       if (onlineNodesTicker instanceof HTMLElement && !showOnlineNodesTrend) {{
         onlineNodesTicker.hidden = true;
+      }}
+      updateMetricTicker("new_nodes", autoNewNodeCount, {{
+        containerId: "ticker-new-nodes",
+        deltaId: "ticker-delta-new-nodes",
+        rateId: "ticker-rate-new-nodes",
+        chartId: "ticker-chart-new-nodes",
+        digits: 0,
+        stateProfile: "count_delta",
+      }});
+      const newNodesTicker = document.getElementById("ticker-new-nodes");
+      if (newNodesTicker instanceof HTMLElement && !showNewNodesTrend) {{
+        newNodesTicker.hidden = true;
       }}
       appendMetricTickerPoint("live_packets", livePacketTotal);
       const livePacketSeries = metricTickerSeries.get("live_packets") || [];

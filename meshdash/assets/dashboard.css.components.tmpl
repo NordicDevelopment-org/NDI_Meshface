@@ -7651,8 +7651,11 @@
       .topbar .summary-ticker-item {{
         scroll-snap-align: start;
       }}
-      .topbar.ticker-expanded .sub .summary-ticker-row {{
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      .topbar.ticker-expanded .summary-ticker-item {{
+        flex-basis: min(150px, 100%);
+      }}
+      .topbar.ticker-expanded.ticker-wrap-balanced .summary-ticker-item {{
+        flex-basis: min(150px, 100%);
       }}
       .topbar.ticker-expanded .summary-ticker-item .value {{
         font-size: 18px;

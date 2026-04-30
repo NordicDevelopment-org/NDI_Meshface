@@ -241,6 +241,28 @@
       }};
     }}
 
+    function countAutoNewNodes(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const nodeIds = new Set();
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      for (const node of nodes) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (isSelectableNodeId(nodeId)) nodeIds.add(nodeId);
+      }}
+      const historyCapsRaw = (safeState.history_caps && typeof safeState.history_caps === "object")
+        ? safeState.history_caps
+        : {{}};
+      for (const rawNodeId of Object.keys(historyCapsRaw)) {{
+        const nodeId = normalizeNodeId(rawNodeId);
+        if (isSelectableNodeId(nodeId)) nodeIds.add(nodeId);
+      }}
+      let count = 0;
+      for (const nodeId of nodeIds) {{
+        if (autoNodeTagEntryForNode(nodeId, safeState)) count += 1;
+      }}
+      return count;
+    }}
+
     function nodeTagEntryForNode(nodeId) {{
       return manualNodeTagEntryForNode(nodeId) || autoNodeTagEntryForNode(nodeId);
     }}

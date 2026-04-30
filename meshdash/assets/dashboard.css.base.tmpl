@@ -1252,19 +1252,24 @@
       transition: border-color 120ms ease, background 120ms ease;
     }}
     .topbar.ticker-expanded .sub .summary-ticker-row {{
-      grid-auto-flow: row;
-      grid-auto-columns: auto;
-      grid-template-columns: repeat(auto-fit, minmax(208px, 1fr));
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
       gap: 7px;
       overflow: visible;
     }}
     .topbar.ticker-expanded .summary-ticker-item {{
+      flex: 1 1 min(208px, 100%);
+      min-width: 0;
       border-radius: 10px;
       padding: 8px 10px;
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto auto auto;
       row-gap: 4px;
       align-items: start;
+    }}
+    .topbar.ticker-expanded.ticker-wrap-balanced .summary-ticker-item {{
+      flex-basis: min(330px, 100%);
     }}
     .topbar.ticker-expanded .summary-ticker-item-self,
     .topbar.ticker-expanded .summary-ticker-item-radio {{

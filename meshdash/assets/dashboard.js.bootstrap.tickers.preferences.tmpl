@@ -864,11 +864,16 @@
       }}
 
       let orderIndex = 0;
+      let visibleTickerCount = 0;
       for (const id of orderedIds) {{
         const item = row.querySelector(`.summary-ticker-item[data-ticker-id="${{id}}"]`);
         if (!(item instanceof HTMLElement)) continue;
         item.style.order = String(orderIndex);
-        item.hidden = !tickerEnabled(id);
+        const isEnabled = tickerEnabled(id);
+        item.hidden = !isEnabled;
+        if (isEnabled) {{
+          visibleTickerCount += 1;
+        }}
         const labelEl = item.querySelector("[data-ticker-label]");
         if (labelEl instanceof HTMLElement) {{
           const defaultLabel = String((tickerCatalogById.get(id) && tickerCatalogById.get(id).defaultLabel) || id);
@@ -878,6 +883,9 @@
           labelEl.textContent = tickerLabelText(id) || defaultLabel;
         }}
         orderIndex += 1;
+      }}
+      if (topbarElement instanceof HTMLElement) {{
+        topbarElement.classList.toggle("ticker-wrap-balanced", visibleTickerCount > 8);
       }}
       requestTopbarLayoutMetricsSync();
       syncTopbarUpdateTickerVisibilityPreference();

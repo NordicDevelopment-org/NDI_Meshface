@@ -17,11 +17,11 @@ def test_dashboard_js_uses_curated_default_ticker_layout() -> None:
     )
 
     assert re.search(
-        r'const tickerDefaultOrder = \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*"battery",',
+        r'const tickerDefaultOrder = \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"new_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*"battery",',
         js,
     )
     assert re.search(
-        r'for \(const id of \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*\]\)',
+        r'for \(const id of \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"new_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*\]\)',
         js,
     )
     assert 'if (key === "target") return "self";' in js
@@ -80,6 +80,42 @@ def test_dashboard_js_uses_semantic_ticker_state_profiles() -> None:
     assert 'stateProfile: "battery_pct"' in js
     assert 'stateProfile: Number.isFinite(nodeRssi) ? "signal_rssi" : "signal_snr"' in js
     assert 'stateProfile: "wifi_rssi"' in js
+
+
+def test_dashboard_js_counts_auto_new_nodes_for_ticker() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert '{ id: "new_nodes", defaultLabel: "New Nodes", metric: true }' in js
+    assert 'function countAutoNewNodes(state = latestState) {' in js
+    assert 'if (autoNodeTagEntryForNode(nodeId, safeState)) count += 1;' in js
+    assert 'const autoNewNodeCount = (typeof countAutoNewNodes === "function")' in js
+    assert 'setText("m-new-nodes", autoNewNodeCount);' in js
+    assert 'updateMetricTicker("new_nodes", autoNewNodeCount, {' in js
+    assert 'containerId: "ticker-new-nodes",' in js
+
+
+def test_render_html_exposes_auto_new_nodes_ticker() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+
+    assert 'id="summary-ticker-new-nodes"' in html
+    assert 'data-ticker-id="new_nodes"' in html
+    assert '<div class="label" data-ticker-label>New Nodes</div>' in html
+    assert 'id="ticker-chart-new-nodes"' in html
 
 
 def test_dashboard_js_merges_summary_hydration_with_persisted_ticker_series() -> None:
@@ -141,9 +177,12 @@ def test_render_html_uses_single_row_compact_ticker_strip() -> None:
         html,
     )
     assert re.search(
-        r"\.topbar\.ticker-expanded \.sub \.summary-ticker-row \{\s*grid-auto-flow: row;\s*grid-auto-columns: auto;\s*grid-template-columns: repeat\(auto-fit, minmax\(208px, 1fr\)\);",
+        r"\.topbar\.ticker-expanded \.sub \.summary-ticker-row \{\s*display: flex;\s*flex-wrap: wrap;\s*align-items: stretch;",
         html,
     )
+    assert "flex: 1 1 min(208px, 100%);" in html
+    assert ".topbar.ticker-expanded.ticker-wrap-balanced .summary-ticker-item {" in html
+    assert "flex-basis: min(330px, 100%);" in html
     assert re.search(
         r"\.topbar \.summary-ticker-item \{\s*border: 1px solid .*?\s*background: var\(--panel\);\s*border-radius: 7px;\s*padding: 4px 7px;\s*min-width: 0;\s*color: var\(--ink\);\s*display: grid;\s*grid-template-columns: minmax\(54px, auto\) minmax\(0, 1fr\) auto;\s*grid-template-rows: auto;",
         html,
@@ -152,6 +191,19 @@ def test_render_html_uses_single_row_compact_ticker_strip() -> None:
         r"\.topbar \.summary-ticker-item \.metric-ticker-chart \{\s*width: 72px;\s*height: 16px;",
         html,
     )
+
+
+def test_dashboard_js_balances_wrapped_tickers_only_when_needed() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "let visibleTickerCount = 0;" in js
+    assert "if (isEnabled) {" in js
+    assert "visibleTickerCount += 1;" in js
+    assert 'topbarElement.classList.toggle("ticker-wrap-balanced", visibleTickerCount > 8);' in js
 
 
 def test_render_html_widens_ticker_cards_for_phone_swipe_scrolling() -> None:
