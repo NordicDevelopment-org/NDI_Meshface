@@ -305,6 +305,11 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert '<div class="label" data-ticker-label>Self</div>' in html
     assert 'id="summary-ticker-radio"' in html
     assert 'data-ticker-id="radio"' in html
+    assert 'id="m-radio-status"' in html
+    assert 'id="ticker-radio"' in html
+    assert 'id="ticker-delta-radio"' in html
+    assert 'id="ticker-rate-radio"' in html
+    assert 'id="ticker-chart-radio"' in html
     assert ".topbar .summary-ticker-item-self .value.self-node-value" in html
     assert ".topbar .summary-ticker-item-self.has-node-emoji::after" in html
     assert "content: attr(data-node-emoji);" in html
@@ -315,6 +320,8 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert ".self-node-city {" in html
     assert ".value.self-node-value.has-self-node-city" in html
     assert ".radio-ticker-status {" in html
+    assert ".radio-ticker-status-line {" in html
+    assert ".radio-ticker-traffic {" in html
     assert ".radio-ticker-detail {" in html
 
 
@@ -367,7 +374,7 @@ def test_self_ticker_id_is_inline_in_compact_mode_and_stacked_when_expanded() ->
     assert "align-items: flex-start;" in expanded_section
 
 
-def test_radio_ticker_status_is_split_from_self_identity() -> None:
+def test_radio_ticker_uses_rx_tx_metric() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -387,8 +394,57 @@ def test_radio_ticker_status_is_split_from_self_identity() -> None:
     )
 
     assert 'id="m-radio"' in html
+    assert 'id="m-radio-status"' in html
+    assert 'id="ticker-radio"' in html
+    assert '{ id: "radio", defaultLabel: "Radio", metric: true }' in js
     assert "m-target-radio-status" not in js
     assert 'const radioMetric = document.getElementById("m-radio");' in js
+    assert 'const radioStatusLine = document.getElementById("m-radio-status");' in js
     assert 'const radioCard = document.getElementById("summary-ticker-radio");' in js
-    assert 'statusEl.className = `radio-ticker-status status-${key}`;' in js
+    assert "const trafficMetricText = `RX ${trafficSnap.rxRecent} · TX ${trafficSnap.txRecent}`;" in js
+    assert "const trafficMetricTotal = trafficSnap.rxRecent + trafficSnap.txRecent;" in js
+    assert 'trafficEl.className = "radio-ticker-traffic";' in js
+    assert 'trafficEl.textContent = trafficMetricText;' in js
+    assert 'trafficEl.setAttribute("aria-label", `Radio ${inlineText}; ${trafficMetricText}`);' in js
+    assert "radioMetric.title = joinTitleParts(trafficMetricText, inlineText, detailText, detailTitle);" in js
+    assert 'radioStatusLine.className = `radio-ticker-status-line status-${key}`;' in js
+    assert "radioStatusLine.textContent = inlineText;" in js
+    assert 'radioStatusLine.setAttribute("aria-label", `Radio status ${inlineText}`);' in js
+    assert "radioMetric.appendChild(statusEl);" not in js
+    assert 'updateMetricTicker("radio_rx_tx_recent", trafficMetricTotal, {' in js
+    assert 'containerId: "ticker-radio",' in js
+    assert 'deltaId: "ticker-delta-radio",' in js
+    assert 'rateId: "ticker-rate-radio",' in js
+    assert 'chartId: "ticker-chart-radio",' in js
+    assert 'stateProfile: "traffic_delta",' in js
     assert 'const el = document.getElementById("m-target-status-inline");' not in js
+
+
+def test_radio_rx_tx_aligns_with_compact_link_value_and_status_is_prominent() -> None:
+    css = build_dashboard_css(theme_css="")
+    radio_expanded_section = css.rsplit(
+        ".topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value {",
+        1,
+    )[1].split("}", 1)[0]
+    status_section = css.split(
+        ".topbar .summary-ticker-item-radio .radio-ticker-status-line {",
+        1,
+    )[1].split("}", 1)[0]
+    expanded_status_section = css.split(
+        ".topbar.ticker-expanded .summary-ticker-item-radio .radio-ticker-status-line {",
+        1,
+    )[1].split("}", 1)[0]
+    link_expanded_section = css.split(
+        ".topbar.ticker-expanded .summary-ticker-item#summary-ticker-node .value.node-ticker-value.is-compact {",
+        1,
+    )[1].split("}", 1)[0]
+
+    assert "grid-column: 2;" in radio_expanded_section
+    assert "grid-row: 1;" in radio_expanded_section
+    assert "font-size: 18px;" in radio_expanded_section
+    assert "line-height: 1.1;" in radio_expanded_section
+    assert "text-align: right;" in radio_expanded_section
+    assert "grid-column: 1;" in status_section
+    assert "font-size: 11px;" in status_section
+    assert "font-size: 14px;" in expanded_status_section
+    assert "font-size: 18px;" in link_expanded_section

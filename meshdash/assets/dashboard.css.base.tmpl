@@ -883,6 +883,16 @@
       line-height: 1.05;
       min-width: 0;
     }}
+    .topbar .summary-ticker-item-radio > .value,
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value {{
+      grid-column: 2;
+      display: block;
+      justify-self: stretch;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
     .topbar .summary-ticker-item-self .value.self-node-value .self-node-name {{
       min-width: 0;
       flex: 1 1 auto;
@@ -963,6 +973,17 @@
     .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status.status-unknown::before {{
       background: #f2ce7a;
     }}
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-traffic {{
+      display: inline-block;
+      max-width: 100%;
+      font-size: inherit;
+      font-weight: 700;
+      line-height: inherit;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
     .topbar .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-detail {{
       min-width: 0;
       flex: 1 1 auto;
@@ -1017,6 +1038,49 @@
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 84px;
+    }}
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line {{
+      grid-column: 1;
+      grid-row: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      max-width: 100%;
+      font-size: 11px;
+      font-weight: 850;
+      line-height: 1.1;
+      color: color-mix(in srgb, var(--muted) 78%, var(--accent-2) 22%);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line[hidden] {{
+      display: none !important;
+    }}
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line::before {{
+      content: "";
+      flex: 0 0 auto;
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #f2ce7a;
+    }}
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line.status-online {{
+      color: color-mix(in srgb, var(--accent) 86%, white 14%);
+    }}
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line.status-online::before {{
+      background: #79e6ac;
+    }}
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line.status-warn,
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line.status-stale {{
+      color: #f2ce7a;
+    }}
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line.status-lost {{
+      color: #ff9e9e;
+    }}
+    .topbar .summary-ticker-item-radio .radio-ticker-status-line.status-lost::before {{
+      background: #ff9e9e;
     }}
     .topbar .summary-ticker-item .value {{
       grid-column: 2;
@@ -1111,6 +1175,15 @@
       gap: 6px;
       line-height: 1.05;
       min-width: 0;
+    }}
+    .topbar .summary-ticker-item-radio .value.radio-ticker-value {{
+      grid-column: 2;
+      display: block;
+      justify-self: stretch;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }}
     .topbar .summary-ticker-item-self .value.self-node-value .self-node-name {{
       min-width: 0;
@@ -1277,6 +1350,9 @@
       grid-template-rows: auto auto;
       row-gap: 4px;
     }}
+    .topbar.ticker-expanded .summary-ticker-item-radio {{
+      grid-template-rows: auto auto auto;
+    }}
     .topbar.ticker-expanded .summary-ticker-item-self > .value,
     .topbar.ticker-expanded .summary-ticker-item-radio > .value {{
       grid-column: 1 / span 3;
@@ -1300,6 +1376,10 @@
     .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-status {{
       font-size: 10px;
       letter-spacing: 0;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-traffic {{
+      font-size: inherit;
+      line-height: inherit;
     }}
     .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-id {{
       font-size: 11px;
@@ -1357,6 +1437,26 @@
       align-items: flex-start;
       gap: 3px;
       line-height: 1.2;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value {{
+      display: block;
+      grid-column: 2;
+      grid-row: 1;
+      font-size: 18px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-radio .radio-ticker-status-line {{
+      font-size: 14px;
+      line-height: 1.1;
+      gap: 6px;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-radio .radio-ticker-status-line::before {{
+      width: 8px;
+      height: 8px;
     }}
     .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value .self-node-name {{
       flex: 0 1 auto;
@@ -4846,6 +4946,10 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }}
+    #m-radio.radio-ticker-value {{
+      display: block;
+      text-align: right;
     }}
     .summary-updated-row {{
       margin-top: 0;

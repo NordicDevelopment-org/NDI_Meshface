@@ -114,6 +114,16 @@
       const trafficSnap = buildRadioTrafficSnapshot(traffic, localId, nowUnix, 120);
       const trafficText = `RX ${{trafficSnap.rxRecent}} / TX ${{trafficSnap.txRecent}} (2m)`;
       const trafficCompactText = `RX ${{trafficSnap.rxRecent}} TX ${{trafficSnap.txRecent}}`;
+      const trafficMetricText = `RX ${{trafficSnap.rxRecent}} · TX ${{trafficSnap.txRecent}}`;
+      const trafficMetricTotal = trafficSnap.rxRecent + trafficSnap.txRecent;
+      const trafficMetricPayload = {{
+        rxRecent: trafficSnap.rxRecent,
+        txRecent: trafficSnap.txRecent,
+        trafficMetricText,
+        trafficMetricTotal,
+        trafficWindowSeconds: trafficSnap.windowSeconds,
+        lastPacketUnix: trafficSnap.lastPacketUnix,
+      }};
       const lastActivityText = Number.isFinite(trafficSnap.lastPacketUnix)
         ? savedDetailAge(trafficSnap.lastPacketUnix, nowUnix)
         : "n/a";
@@ -139,6 +149,7 @@
       if (trackerReportsConnecting) {{
         const detail = errorSummary || "waiting for radio link";
         return {{
+          ...trafficMetricPayload,
           key: "warn",
           inlineText: "Connecting",
           text: `Connecting · ${{lastActivityCompact}} · ${{trafficCompactText}}${{ipCompactSuffix}}`,
@@ -149,6 +160,7 @@
       if (!isCanonicalNodeId(localId)) {{
         const detail = errorSummary || "local radio id unavailable";
         return {{
+          ...trafficMetricPayload,
           key: "lost",
           inlineText: "Lost",
           text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{ipCompactSuffix}}`,
@@ -183,6 +195,7 @@
       if (pollLikelyLost) {{
         const detail = errorSummary || "state polling failed";
         return {{
+          ...trafficMetricPayload,
           key: "lost",
           inlineText: "Lost",
           text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{ipCompactSuffix}}`,
@@ -194,6 +207,7 @@
       if (trackerReportsLost) {{
         const detail = errorSummary || trackerError;
         return {{
+          ...trafficMetricPayload,
           key: "lost",
           inlineText: "Lost",
           text: `Lost · ${{lastActivityCompact}} · ${{trafficCompactText}}${{ipCompactSuffix}}`,
@@ -216,6 +230,7 @@
         ? `last seen ${{savedDetailAge(statusFreshnessUnix, nowUnix)}}${{statusUsesTraffic ? " (packet activity)" : ""}}`
         : "last seen n/a";
       return {{
+        ...trafficMetricPayload,
         key,
         inlineText: label,
         text,
@@ -226,15 +241,21 @@
     function radioStatusDetailText(status, inlineText) {{
       const text = String(status && status.text ? status.text : "").trim();
       const prefix = String(inlineText || "").trim();
+      const withoutTraffic = (value) => String(value || "")
+        .split(" · ")
+        .map((part) => part.trim())
+        .filter((part) => part && !/^RX\s+\d+\s+TX\s+\d+$/i.test(part))
+        .join(" · ");
       if (prefix && text.startsWith(`${{prefix}} · `)) {{
-        return text.slice(prefix.length + 3).trim();
+        return withoutTraffic(text.slice(prefix.length + 3).trim());
       }}
       if (prefix && text === prefix) return "";
-      return text;
+      return withoutTraffic(text);
     }}
 
     function renderRadioStatus(state = latestState) {{
       const radioMetric = document.getElementById("m-radio");
+      const radioStatusLine = document.getElementById("m-radio-status");
       const radioCard = document.getElementById("summary-ticker-radio");
       const status = buildTargetRadioStatus(state);
       const cleanKey = String(status && status.key ? status.key : "unknown").toLowerCase();
@@ -245,6 +266,18 @@
         : (status && status.text ? String(status.text) : "Unknown");
       const detailText = radioStatusDetailText(status, inlineText);
       const detailTitle = status && status.title ? String(status.title) : "Radio status unavailable";
+      const rxRecent = Math.max(0, Math.trunc(Number(status && status.rxRecent) || 0));
+      const txRecent = Math.max(0, Math.trunc(Number(status && status.txRecent) || 0));
+      const rawTrafficMetricTotal = Number(status && status.trafficMetricTotal);
+      const trafficMetricTotal = Math.max(0, Math.trunc(
+        Number.isFinite(rawTrafficMetricTotal) ? rawTrafficMetricTotal : (rxRecent + txRecent)
+      ));
+      const trafficMetricText = String(
+        status && status.trafficMetricText
+          ? status.trafficMetricText
+          : `RX ${{rxRecent}} · TX ${{txRecent}}`
+      );
+      const trafficWindowSeconds = Math.max(30, Math.trunc(Number(status && status.trafficWindowSeconds) || 120));
       const joinTitleParts = (...parts) => parts
         .map((part) => String(part == null ? "" : part).trim())
         .filter(Boolean)
@@ -252,24 +285,51 @@
       if (radioMetric instanceof HTMLElement) {{
         radioMetric.classList.add("radio-ticker-value");
         radioMetric.replaceChildren();
-        const statusEl = document.createElement("span");
-        statusEl.className = `radio-ticker-status status-${{key}}`;
-        statusEl.textContent = inlineText;
-        statusEl.title = detailTitle;
-        statusEl.setAttribute("aria-label", `Radio status ${{inlineText}}`);
-        radioMetric.appendChild(statusEl);
-        if (detailText) {{
-          const detailEl = document.createElement("span");
-          detailEl.className = "radio-ticker-detail";
-          detailEl.textContent = detailText;
-          radioMetric.appendChild(detailEl);
-        }}
-        radioMetric.dataset.baseTitle = inlineText;
-        radioMetric.title = joinTitleParts(inlineText, detailTitle);
+        const trafficEl = document.createElement("span");
+        trafficEl.className = "radio-ticker-traffic";
+        trafficEl.textContent = trafficMetricText;
+        trafficEl.title = joinTitleParts(
+          `${{trafficMetricText}} in the last ${{Math.round(trafficWindowSeconds / 60)}} minutes`,
+          inlineText,
+          detailTitle
+        );
+        trafficEl.setAttribute("aria-label", `Radio ${{inlineText}}; ${{trafficMetricText}}`);
+        radioMetric.appendChild(trafficEl);
+        radioMetric.dataset.baseTitle = trafficMetricText;
+        radioMetric.title = joinTitleParts(trafficMetricText, inlineText, detailText, detailTitle);
+      }}
+      if (radioStatusLine instanceof HTMLElement) {{
+        radioStatusLine.hidden = false;
+        radioStatusLine.className = `radio-ticker-status-line status-${{key}}`;
+        radioStatusLine.textContent = inlineText;
+        radioStatusLine.title = joinTitleParts(inlineText, detailText, detailTitle);
+        radioStatusLine.setAttribute("aria-label", `Radio status ${{inlineText}}`);
       }}
       if (radioCard instanceof HTMLElement) {{
         radioCard.dataset.radioStatus = key;
         radioCard.title = joinTitleParts("Radio", detailTitle);
+        const radioLabel = radioCard.querySelector("[data-ticker-label]");
+        if (radioLabel instanceof HTMLElement) {{
+          delete radioLabel.dataset.radioStatusText;
+          radioLabel.title = detailTitle;
+        }}
+      }}
+      if (typeof updateMetricTicker === "function") {{
+        updateMetricTicker("radio_rx_tx_recent", trafficMetricTotal, {{
+          containerId: "ticker-radio",
+          deltaId: "ticker-delta-radio",
+          rateId: "ticker-rate-radio",
+          chartId: "ticker-chart-radio",
+          digits: 0,
+          stateProfile: "traffic_delta",
+          windowMs: 30 * 60 * 1000,
+          maxPoints: 180,
+        }});
+        const radioTicker = document.getElementById("ticker-radio");
+        const radioTrendVisible = typeof tickerTrendEnabled !== "function" || tickerTrendEnabled("radio");
+        if (radioTicker instanceof HTMLElement && !radioTrendVisible) {{
+          radioTicker.hidden = true;
+        }}
       }}
     }}
 
