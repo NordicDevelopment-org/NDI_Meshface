@@ -206,8 +206,11 @@ def test_dashboard_js_wires_network_top_nodes_fetch_and_render() -> None:
     assert 'function networkTopNodesNodeLocation(nodeId, state = latestState, item = null) {' in js
     assert 'function hydrateNetworkTopNodeCities(root) {' in js
     assert 'function networkTopNodesPayloadHasItems(payload) {' in js
+    assert 'function networkTopNodesVisualEmoji(nodeId, state = latestState) {' in js
     assert 'function networkTopNodesRowsHtml(items, payload, state = latestState) {' in js
     assert 'class="network-top-node-city"' in js
+    assert 'class="network-top-node-row${nodeEmoji ? " has-node-emoji" : ""}"' in js
+    assert 'data-node-emoji="${escAttr(nodeEmoji)}"' in js
     assert 'class="network-top-nodes-group"' in js
     assert 'const displayGroups = groups.length > 0' in js
     assert 'function networkTopNodesGroupHtml(group, state = latestState, options = {}) {' in js
@@ -225,6 +228,8 @@ def test_dashboard_css_keeps_top_node_bar_below_row_text() -> None:
     assert ".network-top-node-bar" in css
     assert ".network-top-node-city" in css
     assert ".network-top-node-city[hidden]" in css
+    assert ".network-top-node-row.has-node-emoji::after" in css
+    assert '[data-theme="dark"] .network-top-node-row.has-node-emoji::after' in css
     assert "position: relative;" in css
     assert "display: block;" in css
     assert "width: 100%;" in css

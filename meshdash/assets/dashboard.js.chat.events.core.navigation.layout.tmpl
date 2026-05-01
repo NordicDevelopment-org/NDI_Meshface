@@ -1587,6 +1587,17 @@
       return groups.some((group) => Array.isArray(group && group.items) && group.items.length > 0);
     }}
 
+    function networkTopNodesVisualEmoji(nodeId, state = latestState) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!clean || typeof nodeVisualEmojiForNode !== "function") return "";
+      const node = networkTopNodesNodeMap(state).get(clean) || null;
+      try {{
+        return String(nodeVisualEmojiForNode(clean, null, node) || "").trim();
+      }} catch (_err) {{
+        return "";
+      }}
+    }}
+
     function networkTopNodesRowsHtml(items, payload, state = latestState) {{
       const safeItems = Array.isArray(items) ? items : [];
       const safePayload = (payload && typeof payload === "object") ? payload : {{}};
@@ -1608,7 +1619,8 @@
         const cityHtml = cityKey
           ? `<span class="network-top-node-city" data-top-node-city-key="${{escAttr(cityKey)}}" data-top-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-top-node-city-lon="${{escAttr(location.lon.toFixed(6))}}"${{cityText ? "" : " hidden"}}>${{escAttr(cityText)}}</span>`
           : "";
-        return `<button class="network-top-node-row" type="button" data-top-node-id="${{escAttr(nodeId)}}" title="${{escAttr(`${{name}} (${{nodeId}})`)}}">
+        const nodeEmoji = networkTopNodesVisualEmoji(nodeId, state);
+        return `<button class="network-top-node-row${{nodeEmoji ? " has-node-emoji" : ""}}" type="button" data-top-node-id="${{escAttr(nodeId)}}"${{nodeEmoji ? ` data-node-emoji="${{escAttr(nodeEmoji)}}"` : ""}} title="${{escAttr(`${{name}} (${{nodeId}})`)}}">
           <span class="network-top-node-rank">#${{escAttr(rank)}}</span>
           <span class="network-top-node-main">
             <span class="network-top-node-name">${{escAttr(name)}}</span>

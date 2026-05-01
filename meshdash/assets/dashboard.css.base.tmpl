@@ -6958,6 +6958,7 @@
       min-width: 0;
     }}
     .network-top-node-row {{
+      position: relative;
       display: grid;
       grid-template-columns: 38px minmax(0, 1fr) minmax(96px, auto);
       align-items: center;
@@ -6974,6 +6975,29 @@
       font: inherit;
       text-align: left;
       cursor: pointer;
+    }}
+    .network-top-node-row.has-node-emoji::after {{
+      content: attr(data-node-emoji);
+      position: absolute;
+      right: clamp(110px, 16%, 220px);
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--ink);
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+      font-size: clamp(34px, 4.8vw, 62px);
+      line-height: 1;
+      opacity: 0.065;
+      filter: grayscale(0.18) saturate(0.76) blur(1.1px);
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+      z-index: 0;
+    }}
+    .network-top-node-rank,
+    .network-top-node-main,
+    .network-top-node-value {{
+      position: relative;
+      z-index: 1;
     }}
     .network-top-node-row:hover {{
       border-color: color-mix(in srgb, var(--line) 45%, var(--accent) 55%);
