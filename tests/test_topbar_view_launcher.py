@@ -206,6 +206,8 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'document.getElementById("layout-view-menu-head-commit")' not in js
     assert 'document.getElementById("chat-users-head-version")' not in js
     assert 'document.getElementById("chat-users-head-commit")' not in js
+    assert "Packet buffer:" not in html
+    assert "Refresh:" not in html
     assert 'target.closest("#layout-view-menu .topbar-view-menu-item")' in js
     assert 'document.getElementById("layout-view-menu-btn-label")' in js
     assert 'const launcherLabelText = document.getElementById("layout-view-menu-btn-label-text");' in js
