@@ -221,6 +221,13 @@
         renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
       }} else if (next === "appearance") {{
         syncSettingsAppearanceControls();
+      }} else if (next === "system") {{
+        if (typeof renderSettingsDeviceInfo === "function") {{
+          renderSettingsDeviceInfo(latestState || {{}});
+        }}
+        if (typeof hydrateSettingsDeviceInfo === "function") {{
+          void hydrateSettingsDeviceInfo(false);
+        }}
       }}
     }}
 

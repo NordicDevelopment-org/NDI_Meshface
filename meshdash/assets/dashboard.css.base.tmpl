@@ -7488,6 +7488,68 @@
       gap: 10px;
       min-height: 0;
     }}
+    .settings-about-panel {{
+      order: 0;
+    }}
+    .settings-device-info-panel {{
+      order: 1;
+    }}
+    .settings-device-info-grid {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap: 8px;
+      min-width: 0;
+    }}
+    .settings-device-info-item {{
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+      min-height: 58px;
+      padding: 8px 10px;
+      border: 1px solid #d7e5d2;
+      border-radius: 8px;
+      background: #f8fbf7;
+    }}
+    .settings-device-info-item-wide {{
+      grid-column: span 2;
+    }}
+    .settings-device-info-value {{
+      min-width: 0;
+      color: #0f2018;
+      font-size: 12px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
+    .settings-device-info-value.is-empty {{
+      color: #6a7f73;
+    }}
+    .settings-device-info-mono {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+    }}
+    @media (max-width: 1280px) {{
+      .settings-device-info-grid {{
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+      }}
+    }}
+    @media (max-width: 900px) {{
+      .settings-device-info-grid {{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }}
+      .settings-device-info-item-wide {{
+        grid-column: span 2;
+      }}
+    }}
+    @media (max-width: 620px) {{
+      .settings-device-info-grid {{
+        grid-template-columns: 1fr;
+      }}
+      .settings-device-info-item-wide {{
+        grid-column: auto;
+      }}
+    }}
     .node-visibility-grid {{
       display: grid;
       grid-template-columns: minmax(260px, 1.15fr) minmax(220px, 1fr) minmax(220px, 1fr);

@@ -57,6 +57,13 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'class="topbar-view-submenu-item is-active"' in html
     assert 'id="settings-about-version"' in html
     assert 'id="settings-about-commit"' in html
+    assert 'class="settings-panel settings-panel-wide settings-about-panel" data-settings-tab-panel="system"' in html
+    assert 'class="settings-panel settings-panel-wide settings-device-info-panel" data-settings-tab-panel="system"' in html
+    assert 'id="settings-device-info-grid"' in html
+    assert 'id="settings-device-info-firmware"' in html
+    assert 'id="settings-device-info-hardware"' in html
+    assert 'id="settings-device-info-public-key"' in html
+    assert 'id="settings-device-info-wifi"' in html
     assert 'data-view="chat"' in html
     assert 'data-view="network"' in html
     assert 'data-view="apps"' in html
@@ -144,6 +151,10 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
         css,
     )
     assert ".workspace-shell.has-topbar-update-ticker {" in css
+    assert ".settings-device-info-grid {" in css
+    assert "grid-template-columns: repeat(4, minmax(160px, 1fr));" in css
+    assert "[data-theme=\"dark\"] .settings-device-info-item {" in css
+    assert ".settings-device-info-mono {" in css
     assert "row-gap: 8px;" in css
     assert re.search(
         r"\.workspace-shell\.chat-panel-open \{[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);",
@@ -158,6 +169,15 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "function shouldCloseLayoutViewMenuForScrollTarget(target = null) {" in js
     assert 'document.getElementById("settings-about-version")' in js
     assert 'document.getElementById("settings-about-commit")' in js
+    assert "function renderSettingsDeviceInfo(state = latestState) {" in js
+    assert "function hydrateSettingsDeviceInfo(force = false) {" in js
+    assert 'fetchSettingsDeviceInfoJson("/api/raw/my_info")' in js
+    assert 'fetchSettingsDeviceInfoJson("/api/raw/metadata")' in js
+    assert 'fetchSettingsDeviceInfoJson("/api/raw/local_state")' in js
+    assert 'setSettingsDeviceInfoValue("settings-device-info-firmware"' in js
+    assert 'setSettingsDeviceInfoValue("settings-device-info-hardware"' in js
+    assert 'setSettingsDeviceInfoValue("settings-device-info-public-key"' in js
+    assert 'next === "system"' in js
     assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' not in js
     assert 'document.getElementById("layout-view-menu-head-mark")' not in js
     assert 'document.getElementById("layout-view-menu-head-version")' not in js

@@ -1,3 +1,317 @@
+    const settingsDeviceInfoRawTtlMs = 60000;
+    const settingsDeviceInfoRawCache = {{
+      myInfo: null,
+      metadata: null,
+      localState: null,
+      errors: {{}},
+      fetchedAt: 0,
+    }};
+    let settingsDeviceInfoHydratePromise = null;
+
+    function settingsDeviceInfoObject(value) {{
+      return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    }}
+
+    function settingsDeviceInfoPathValue(root, path) {{
+      if (!root || typeof root !== "object") return null;
+      let current = root;
+      for (const rawPart of String(path || "").split(".")) {{
+        const part = String(rawPart || "").trim();
+        if (!part || !current || typeof current !== "object" || !(part in current)) {{
+          return null;
+        }}
+        current = current[part];
+      }}
+      return current;
+    }}
+
+    function settingsDeviceInfoFirst(roots, paths) {{
+      const rootList = Array.isArray(roots) ? roots : [roots];
+      const pathList = Array.isArray(paths) ? paths : [paths];
+      for (const root of rootList) {{
+        if (!root || typeof root !== "object") continue;
+        for (const path of pathList) {{
+          const value = settingsDeviceInfoPathValue(root, path);
+          if (value == null) continue;
+          if (typeof value === "string" && !value.trim()) continue;
+          return value;
+        }}
+      }}
+      return null;
+    }}
+
+    function settingsDeviceInfoText(value) {{
+      if (value == null) return "";
+      if (typeof value === "boolean") return value ? "yes" : "no";
+      const text = String(value).trim();
+      return text;
+    }}
+
+    function setSettingsDeviceInfoValue(id, value) {{
+      const el = document.getElementById(id);
+      if (!(el instanceof HTMLElement)) return;
+      const text = settingsDeviceInfoText(value);
+      el.textContent = text || "n/a";
+      el.classList.toggle("is-empty", !text);
+      if (text) {{
+        el.title = text;
+      }} else {{
+        el.removeAttribute("title");
+      }}
+    }}
+
+    function settingsDeviceInfoLocalNodeRow(state, localState, myInfo) {{
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const localNodeInfo = settingsDeviceInfoObject(
+        settingsDeviceInfoFirst([localState], ["local_node_info", "localNodeInfo"])
+      );
+      const user = settingsDeviceInfoObject(settingsDeviceInfoFirst([localNodeInfo], ["user"]));
+      const directId = settingsDeviceInfoText(
+        settingsDeviceInfoFirst([safeState, user], ["local_node_id", "localNodeId", "id"])
+      );
+      const cleanDirectId = typeof normalizeNodeId === "function" ? normalizeNodeId(directId) : directId;
+      if (cleanDirectId) {{
+        const byId = nodes.find((node) => {{
+          const nodeId = settingsDeviceInfoText(settingsDeviceInfoFirst([node], ["id"]));
+          return (typeof normalizeNodeId === "function" ? normalizeNodeId(nodeId) : nodeId) === cleanDirectId;
+        }});
+        if (byId && typeof byId === "object") return byId;
+      }}
+      const rawNum = settingsDeviceInfoFirst([localNodeInfo, localState, myInfo], [
+        "num",
+        "local_node_num",
+        "localNodeNum",
+        "my_node_num",
+        "myNodeNum",
+      ]);
+      const nodeNum = Number(rawNum);
+      if (Number.isFinite(nodeNum)) {{
+        const byNum = nodes.find((node) => Number(settingsDeviceInfoFirst([node], ["num", "node_num", "nodeNum"])) === nodeNum);
+        if (byNum && typeof byNum === "object") return byNum;
+      }}
+      return null;
+    }}
+
+    function formatSettingsDeviceInfoUptime(seconds) {{
+      const numeric = Number(seconds);
+      if (!Number.isFinite(numeric) || numeric < 0) return "";
+      if (typeof formatUptimeHms === "function") {{
+        return formatUptimeHms(numeric);
+      }}
+      const whole = Math.trunc(numeric);
+      const days = Math.floor(whole / 86400);
+      const hours = Math.floor((whole % 86400) / 3600);
+      const minutes = Math.floor((whole % 3600) / 60);
+      if (days > 0) return `${{days}}d ${{hours}}h ${{minutes}}m`;
+      if (hours > 0) return `${{hours}}h ${{minutes}}m`;
+      return `${{minutes}}m`;
+    }}
+
+    function formatSettingsDeviceInfoLastHeard(value) {{
+      const numeric = Number(value);
+      if (Number.isFinite(numeric) && numeric > 0) {{
+        if (typeof formatLocalChatTime === "function") {{
+          return formatLocalChatTime(numeric);
+        }}
+        return new Date(numeric * 1000).toISOString();
+      }}
+      return settingsDeviceInfoText(value);
+    }}
+
+    function settingsDeviceInfoConnectionText(state, metadata, kind) {{
+      const summary = settingsDeviceInfoObject(settingsDeviceInfoFirst([state], ["summary"])) || {{}};
+      const radio = settingsDeviceInfoObject(settingsDeviceInfoFirst([summary], ["radio_connection"])) || {{}};
+      const details = settingsDeviceInfoObject(settingsDeviceInfoFirst([radio], [kind])) || {{}};
+      const parts = [];
+      if (kind === "wifi") {{
+        const connected = settingsDeviceInfoFirst([details], ["is_connected", "connected"]);
+        if (connected === true) parts.push("connected");
+        if (connected === false) parts.push("disconnected");
+        const ip = settingsDeviceInfoText(settingsDeviceInfoFirst([details], ["ip_address", "ipAddress", "ip"]));
+        const ssid = settingsDeviceInfoText(settingsDeviceInfoFirst([details], ["ssid"]));
+        const rssi = settingsDeviceInfoFirst([details], ["rssi_dbm", "rssiDbm", "rssi"]);
+        if (ip) parts.push(ip);
+        if (ssid) parts.push(ssid);
+        if (rssi != null && settingsDeviceInfoText(rssi)) parts.push(`${{rssi}} dBm`);
+        if (!parts.length) {{
+          const hasWifi = settingsDeviceInfoFirst([metadata], ["hasWifi", "has_wifi"]);
+          if (hasWifi === true) parts.push("available");
+          if (hasWifi === false) parts.push("not available");
+        }}
+      }} else if (kind === "bluetooth") {{
+        const pin = settingsDeviceInfoText(settingsDeviceInfoFirst([details], ["pin", "fixed_pin", "fixedPin"]));
+        const hasBluetooth = settingsDeviceInfoFirst([metadata], ["hasBluetooth", "has_bluetooth"]);
+        if (hasBluetooth === true) parts.push("available");
+        if (hasBluetooth === false) parts.push("not available");
+        if (pin) parts.push(`PIN ${{pin}}`);
+      }} else if (kind === "serial") {{
+        const baud = settingsDeviceInfoText(settingsDeviceInfoFirst([details], ["baud", "baud_rate", "baudRate"]));
+        if (baud) parts.push(`${{baud}} baud`);
+      }}
+      return parts.join(" | ");
+    }}
+
+    function renderSettingsDeviceInfo(state = latestState) {{
+      const grid = document.getElementById("settings-device-info-grid");
+      if (!(grid instanceof HTMLElement)) return;
+
+      const safeState = state && typeof state === "object" ? state : {{}};
+      const localState = settingsDeviceInfoObject(settingsDeviceInfoRawCache.localState)
+        || (typeof settingsLocalStateFrom === "function" ? settingsLocalStateFrom(safeState) : null)
+        || settingsDeviceInfoObject(settingsDeviceInfoFirst([safeState], ["local_state", "localState"]))
+        || {{}};
+      const myInfo = settingsDeviceInfoObject(settingsDeviceInfoRawCache.myInfo)
+        || settingsDeviceInfoObject(settingsDeviceInfoFirst([safeState], ["my_info", "myInfo"]))
+        || {{}};
+      const metadata = settingsDeviceInfoObject(settingsDeviceInfoRawCache.metadata)
+        || settingsDeviceInfoObject(settingsDeviceInfoFirst([safeState], ["metadata"]))
+        || {{}};
+      const localNodeInfo = settingsDeviceInfoObject(
+        settingsDeviceInfoFirst([localState], ["local_node_info", "localNodeInfo"])
+      ) || {{}};
+      const user = settingsDeviceInfoObject(settingsDeviceInfoFirst([localNodeInfo], ["user"])) || {{}};
+      const nodeRow = settingsDeviceInfoLocalNodeRow(safeState, localState, myInfo) || {{}};
+      const deviceMetrics = settingsDeviceInfoObject(
+        settingsDeviceInfoFirst([localNodeInfo], ["deviceMetrics", "device_metrics"])
+      ) || {{}};
+      const localConfig = settingsDeviceInfoObject(settingsDeviceInfoFirst([localState], ["local_config", "localConfig"])) || {{}};
+      const lora = settingsDeviceInfoObject(settingsDeviceInfoFirst([localConfig], ["lora"]))
+        || (typeof loraConfigFromState === "function" ? loraConfigFromState(safeState) : null)
+        || {{}};
+      const device = settingsDeviceInfoObject(settingsDeviceInfoFirst([localConfig], ["device"]))
+        || (typeof deviceConfigFromState === "function" ? deviceConfigFromState(safeState) : null)
+        || {{}};
+      const security = settingsDeviceInfoObject(settingsDeviceInfoFirst([localConfig], ["security"])) || {{}};
+      const summary = settingsDeviceInfoObject(settingsDeviceInfoFirst([safeState], ["summary"])) || {{}};
+
+      const nodeId = settingsDeviceInfoFirst([safeState, user, nodeRow], ["local_node_id", "localNodeId", "id"]);
+      setSettingsDeviceInfoValue("settings-device-info-long-name", settingsDeviceInfoFirst([user, nodeRow], ["longName", "long_name"]));
+      setSettingsDeviceInfoValue("settings-device-info-short-name", settingsDeviceInfoFirst([user, nodeRow], ["shortName", "short_name"]));
+      setSettingsDeviceInfoValue("settings-device-info-node-id", nodeId);
+      setSettingsDeviceInfoValue("settings-device-info-node-num", settingsDeviceInfoFirst([myInfo, localState, localNodeInfo, nodeRow], [
+        "my_node_num",
+        "myNodeNum",
+        "local_node_num",
+        "localNodeNum",
+        "num",
+      ]));
+      setSettingsDeviceInfoValue("settings-device-info-hardware", settingsDeviceInfoFirst([metadata, user, nodeRow], [
+        "hw_model",
+        "hwModel",
+        "hardware_model",
+        "hardwareModel",
+      ]));
+      setSettingsDeviceInfoValue("settings-device-info-firmware", settingsDeviceInfoFirst([metadata], [
+        "firmware_version",
+        "firmwareVersion",
+        "firmware",
+      ]));
+      setSettingsDeviceInfoValue("settings-device-info-pio-env", settingsDeviceInfoFirst([myInfo, metadata], ["pio_env", "pioEnv"]));
+      setSettingsDeviceInfoValue("settings-device-info-state-version", settingsDeviceInfoFirst([metadata], [
+        "device_state_version",
+        "deviceStateVersion",
+      ]));
+      setSettingsDeviceInfoValue("settings-device-info-reboot-count", settingsDeviceInfoFirst([myInfo], ["reboot_count", "rebootCount"]));
+      setSettingsDeviceInfoValue("settings-device-info-nodedb-count", settingsDeviceInfoFirst([myInfo], ["nodedb_count", "nodeDbCount"]));
+      setSettingsDeviceInfoValue("settings-device-info-device-id", settingsDeviceInfoFirst([myInfo], ["device_id", "deviceId"]));
+      setSettingsDeviceInfoValue("settings-device-info-mac", settingsDeviceInfoFirst([user], ["macaddr", "macAddr", "mac"]));
+      setSettingsDeviceInfoValue("settings-device-info-role", settingsDeviceInfoFirst([device, nodeRow], ["role"]));
+      setSettingsDeviceInfoValue("settings-device-info-public-key", settingsDeviceInfoFirst([user, security], [
+        "publicKey",
+        "public_key",
+      ]));
+      setSettingsDeviceInfoValue("settings-device-info-region", settingsDeviceInfoFirst([lora], ["region"]));
+      setSettingsDeviceInfoValue("settings-device-info-modem-preset", settingsDeviceInfoFirst([summary, lora], [
+        "modem_preset",
+        "modemPreset",
+      ]));
+      setSettingsDeviceInfoValue("settings-device-info-wifi", settingsDeviceInfoConnectionText(safeState, metadata, "wifi"));
+      setSettingsDeviceInfoValue("settings-device-info-bluetooth", settingsDeviceInfoConnectionText(safeState, metadata, "bluetooth"));
+      setSettingsDeviceInfoValue("settings-device-info-serial", settingsDeviceInfoConnectionText(safeState, metadata, "serial"));
+
+      const capabilities = [];
+      if (settingsDeviceInfoFirst([metadata], ["hasWifi", "has_wifi"]) === true) capabilities.push("Wi-Fi");
+      if (settingsDeviceInfoFirst([metadata], ["hasBluetooth", "has_bluetooth"]) === true) capabilities.push("Bluetooth");
+      if (settingsDeviceInfoFirst([metadata], ["hasPKC", "has_pkc"]) === true) capabilities.push("PKC");
+      if (settingsDeviceInfoFirst([metadata], ["canShutdown", "can_shutdown"]) === true) capabilities.push("shutdown");
+      if (settingsDeviceInfoFirst([user], ["isUnmessagable", "is_unmessagable"]) === true) capabilities.push("unmessagable");
+      setSettingsDeviceInfoValue("settings-device-info-capabilities", capabilities.join(", "));
+      setSettingsDeviceInfoValue("settings-device-info-position-flags", settingsDeviceInfoFirst([metadata, lora, localConfig.position], [
+        "position_flags",
+        "positionFlags",
+      ]));
+      setSettingsDeviceInfoValue("settings-device-info-excluded-modules", settingsDeviceInfoFirst([metadata], [
+        "excluded_modules",
+        "excludedModules",
+      ]));
+
+      const battery = settingsDeviceInfoFirst([deviceMetrics, nodeRow], ["batteryLevel", "battery_level"]);
+      setSettingsDeviceInfoValue("settings-device-info-battery", battery == null ? "" : `${{battery}}%`);
+      const voltage = settingsDeviceInfoFirst([deviceMetrics, nodeRow], ["voltage"]);
+      setSettingsDeviceInfoValue("settings-device-info-voltage", voltage == null ? "" : `${{voltage}} V`);
+      setSettingsDeviceInfoValue("settings-device-info-uptime", formatSettingsDeviceInfoUptime(
+        settingsDeviceInfoFirst([deviceMetrics, summary], ["uptimeSeconds", "uptime_seconds"])
+      ));
+      setSettingsDeviceInfoValue("settings-device-info-last-heard", formatSettingsDeviceInfoLastHeard(
+        settingsDeviceInfoFirst([localNodeInfo, nodeRow], ["lastHeard", "last_heard_unix", "last_heard"])
+      ));
+
+      const errors = Object.values(settingsDeviceInfoRawCache.errors || {{}}).filter(Boolean);
+      const statusText = errors.length
+        ? `Some radio details could not be fetched: ${{errors.join("; ")}}`
+        : (settingsDeviceInfoRawCache.fetchedAt
+          ? "Radio identity, firmware, hardware, and connection details from live raw endpoints."
+          : "Radio identity, firmware, hardware, and connection details from the current dashboard state.");
+      setText("settings-device-info-status", statusText);
+    }}
+
+    async function fetchSettingsDeviceInfoJson(url) {{
+      const resp = await fetch(url, {{ cache: "no-store" }});
+      if (!resp.ok) throw new Error(`${{url}} ${{resp.status}}`);
+      return await resp.json();
+    }}
+
+    async function hydrateSettingsDeviceInfo(force = false) {{
+      const grid = document.getElementById("settings-device-info-grid");
+      if (!(grid instanceof HTMLElement)) return null;
+      const nowMs = Date.now();
+      if (
+        !force
+        && settingsDeviceInfoRawCache.fetchedAt > 0
+        && (nowMs - settingsDeviceInfoRawCache.fetchedAt) < settingsDeviceInfoRawTtlMs
+      ) {{
+        renderSettingsDeviceInfo(latestState || {{}});
+        return settingsDeviceInfoRawCache;
+      }}
+      if (settingsDeviceInfoHydratePromise) return settingsDeviceInfoHydratePromise;
+      setText("settings-device-info-status", "Fetching live radio identity, firmware, hardware, and connection details...");
+      settingsDeviceInfoHydratePromise = (async () => {{
+        const results = await Promise.allSettled([
+          fetchSettingsDeviceInfoJson("/api/raw/my_info"),
+          fetchSettingsDeviceInfoJson("/api/raw/metadata"),
+          fetchSettingsDeviceInfoJson("/api/raw/local_state"),
+        ]);
+        const keys = ["myInfo", "metadata", "localState"];
+        const errors = {{}};
+        results.forEach((result, idx) => {{
+          const key = keys[idx];
+          if (result.status === "fulfilled") {{
+            settingsDeviceInfoRawCache[key] = result.value;
+          }} else {{
+            errors[key] = result.reason && result.reason.message ? result.reason.message : String(result.reason || "unknown error");
+          }}
+        }});
+        settingsDeviceInfoRawCache.errors = errors;
+        settingsDeviceInfoRawCache.fetchedAt = Date.now();
+        renderSettingsDeviceInfo(latestState || {{}});
+        return settingsDeviceInfoRawCache;
+      }})().finally(() => {{
+        settingsDeviceInfoHydratePromise = null;
+      }});
+      return settingsDeviceInfoHydratePromise;
+    }}
+
     function renderSettings(state, force = false) {{
       if (!force && settingsDirty) return;
       refreshSettingsSectionEditors(state);
@@ -351,6 +665,10 @@
       }});
       syncSettingsTimeSyncControls();
       syncSettingsAppearanceControls();
+      renderSettingsDeviceInfo(state);
+      if (activeSettingsTab === "system") {{
+        void hydrateSettingsDeviceInfo(false);
+      }}
     }}
 
     function markSettingsDirty(message = "Unsaved settings changes") {{
