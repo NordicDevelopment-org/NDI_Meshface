@@ -780,7 +780,7 @@ def test_chat_feed_search_is_reapplied_after_feed_render() -> None:
     assert "applyChatFeedSearchFilter();" in js
 
 
-def test_chat_slash_macro_menu_is_hidden_under_composer() -> None:
+def test_chat_macro_menu_removes_novelty_face_shortcuts_only() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
@@ -788,14 +788,23 @@ def test_chat_slash_macro_menu_is_hidden_under_composer() -> None:
     )
 
     assert "function renderChatMacroHelpPreview" in js
-    assert "previewEl.hidden = true;" in js
-    assert "Macro Menu - click a command to insert" not in js
-    assert "Macro Help (${sourceLabel}) - click a command to insert" not in js
+    assert "Macro Menu - click a command to insert" in js
+    assert "Macro Help (${sourceLabel}) - click a command to insert" in js
     assert '"/shrug"' not in js
     assert '"/tableflip"' not in js
-    assert '"/1337 <text>"' not in js
-    assert '"/backwards <text>"' not in js
-    assert '"/disemvowel <text>"' not in js
+    assert '"/flip"' not in js
+    assert '"/unflip"' not in js
+    assert '"/give"' not in js
+    assert '"/lenny"' not in js
+    assert '"/cheer"' not in js
+    assert '"/search <text>"' in js
+    assert '"/1337 <text>"' in js
+    assert '"/backwards <text>"' in js
+    assert '"/scrambled <text>"' in js
+    assert '"/upsidedown <text>"' in js
+    assert '"/disemvowel <text>"' in js
+    assert '"/special <text>"' in js
+    assert '"/glyph <text> (alias)"' in js
 
 
 def test_launcher_menu_omits_header_block() -> None:
