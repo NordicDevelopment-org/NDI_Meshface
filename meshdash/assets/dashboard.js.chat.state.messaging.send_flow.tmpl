@@ -13,13 +13,13 @@
     const chatTextMacroMap = Object.freeze({{
     }});
     const CHAT_MACRO_HELP_COMMANDS = Object.freeze([
-      Object.freeze({{ label: "/search <text>", command: "/search", needsArg: true }}),
-      Object.freeze({{ label: "/1337 <text>", command: "/1337", needsArg: true }}),
-      Object.freeze({{ label: "/backwards <text>", command: "/backwards", needsArg: true }}),
-      Object.freeze({{ label: "/scrambled <text>", command: "/scrambled", needsArg: true }}),
-      Object.freeze({{ label: "/upsidedown <text>", command: "/upsidedown", needsArg: true }}),
-      Object.freeze({{ label: "/disemvowel <text>", command: "/disemvowel", needsArg: true }}),
-      Object.freeze({{ label: "/glyph <text>", command: "/glyph", needsArg: true }}),
+      Object.freeze({{ label: "//search <text>", command: "//search", needsArg: true }}),
+      Object.freeze({{ label: "//1337 <text>", command: "//1337", needsArg: true }}),
+      Object.freeze({{ label: "//backwards <text>", command: "//backwards", needsArg: true }}),
+      Object.freeze({{ label: "//scrambled <text>", command: "//scrambled", needsArg: true }}),
+      Object.freeze({{ label: "//upsidedown <text>", command: "//upsidedown", needsArg: true }}),
+      Object.freeze({{ label: "//disemvowel <text>", command: "//disemvowel", needsArg: true }}),
+      Object.freeze({{ label: "//glyph <text>", command: "//glyph", needsArg: true }}),
     ]);
     const chatLeetSpeakMap = Object.freeze({{
       a: "4",
@@ -259,11 +259,11 @@
     function parseChatFeedSearchCommand(rawText) {{
       const value = String(rawText == null ? "" : rawText);
       const trimmedStart = value.replace(/^\s+/, "");
-      const match = trimmedStart.match(/^\/search(?:\s+([\s\S]*))?$/i);
+      const match = trimmedStart.match(/^\/\/search(?:\s+([\s\S]*))?$/i);
       if (!match) return null;
       return {{
         kind: "search",
-        source: "/search",
+        source: "//search",
         text: "",
         query: String(match[1] == null ? "" : match[1]).trim(),
       }};
@@ -332,23 +332,20 @@
       return parsedSearch;
     }}
 
-    function renderChatMacroHelpPreview(previewEl, source = "/help", rawFilter = "") {{
+    function renderChatMacroHelpPreview(previewEl, source = "//help", rawFilter = "") {{
       if (!(previewEl instanceof HTMLElement)) return;
       previewEl.textContent = "";
-      const sourceLabel = String(source || "/help");
+      const sourceLabel = String(source || "//help");
       const filterTokenRaw = String(rawFilter == null ? "" : rawFilter).trim();
       const firstToken = filterTokenRaw ? String(filterTokenRaw.split(/\s+/, 1)[0] || "") : "";
-      let filter = firstToken.toLowerCase();
-      if (filter.startsWith("/")) {{
-        filter = filter.slice(1);
-      }}
+      let filter = firstToken.toLowerCase().replace(/^\/+/, "");
       if (filter === "help" || filter === "macros") {{
         filter = "";
       }}
 
       const title = document.createElement("div");
       title.className = "chat-macro-help-title";
-      if (sourceLabel === "/") {{
+      if (sourceLabel === "//") {{
         title.textContent = "Macro Menu - click a command to insert";
       }} else {{
         title.textContent = `Macro Help (${{sourceLabel}}) - click a command to insert`;
@@ -380,7 +377,8 @@
       if (renderedCount <= 0) {{
         const empty = document.createElement("div");
         empty.className = "chat-macro-help-empty";
-        empty.textContent = `No commands match "/${{filter || firstToken || ""}}"`;
+        const emptyToken = filter || String(firstToken || "").replace(/^\/+/, "") || "";
+        empty.textContent = `No commands match "//${{emptyToken}}"`;
         list.appendChild(empty);
       }}
       previewEl.appendChild(list);
@@ -395,7 +393,7 @@
         return searchCommand;
       }}
       const lowered = text.toLowerCase();
-      if (lowered === "/macros" || lowered === "/help") {{
+      if (lowered === "//macros" || lowered === "//help") {{
         return {{
           kind: "help",
           text: "",
@@ -410,7 +408,7 @@
           source: lowered,
         }};
       }}
-      const transformMatch = text.match(/^\/(1337|backwards|scrambled|upsidedown|disemvowel|glyph)(?:\s+([\s\S]+))?$/i);
+      const transformMatch = text.match(/^\/\/(1337|backwards|scrambled|upsidedown|disemvowel|glyph)(?:\s+([\s\S]+))?$/i);
       if (!transformMatch) return null;
       const transformId = String(transformMatch[1] || "").toLowerCase();
       const payload = String(transformMatch[2] == null ? "" : transformMatch[2]);
@@ -431,7 +429,7 @@
       return {{
         kind: "transform",
         text: transformedText,
-        source: `/${{transformId}}`,
+        source: `//${{transformId}}`,
         inputText: payload,
         transform: transformId,
       }};
@@ -439,7 +437,7 @@
 
     function chatMacroHelpText() {{
       const labels = CHAT_MACRO_HELP_COMMANDS.map((entry) => String(entry && entry.label || "").trim()).filter(Boolean);
-      return `Macros: ${{labels.join(", ")}} · use /macros or /help`;
+      return `Macros: ${{labels.join(", ")}} · use //macros or //help`;
     }}
 
     function renderChatTextMacroPreview(rawText) {{
@@ -454,14 +452,14 @@
         if (query) {{
           setChatMacroPreviewText(previewEl, `Filtering visible chat for "${{query}}"`);
         }} else {{
-          setChatMacroPreviewText(previewEl, "Chat search mode: type text after /search");
+          setChatMacroPreviewText(previewEl, "Chat search mode: type text after //search");
         }}
         previewEl.hidden = false;
         return macro || searchCommand;
       }}
       if (!macro) {{
-        if (trimmed.startsWith("/")) {{
-          renderChatMacroHelpPreview(previewEl, "/", trimmed);
+        if (trimmed.startsWith("//")) {{
+          renderChatMacroHelpPreview(previewEl, "//", trimmed);
           return null;
         }}
         previewEl.hidden = true;
@@ -469,7 +467,7 @@
         return null;
       }}
       if (macro.kind === "help") {{
-        renderChatMacroHelpPreview(previewEl, String(macro.source || "/help"), trimmed);
+        renderChatMacroHelpPreview(previewEl, String(macro.source || "//help"), trimmed);
         return macro;
       }}
       const source = String(macro.source || "macro");
@@ -1640,7 +1638,7 @@
       }}
       const macro = parseChatTextMacro(rawText);
       if (macro && macro.kind === "search") {{
-        setChatSendStatus("Chat search is active. Remove /search to send a message.");
+        setChatSendStatus("Chat search is active. Remove //search to send a message.");
         if (hadFocus) {{
           restoreChatInputFocus(input);
         }}

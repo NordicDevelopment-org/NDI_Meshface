@@ -797,14 +797,22 @@ def test_chat_macro_menu_removes_novelty_face_shortcuts_only() -> None:
     assert '"/give"' not in js
     assert '"/lenny"' not in js
     assert '"/cheer"' not in js
-    assert '"/search <text>"' in js
-    assert '"/1337 <text>"' in js
-    assert '"/backwards <text>"' in js
-    assert '"/scrambled <text>"' in js
-    assert '"/upsidedown <text>"' in js
-    assert '"/disemvowel <text>"' in js
+    assert '"/search <text>"' not in js
+    assert '"/1337 <text>"' not in js
+    assert '"/glyph <text>"' not in js
+    assert '"//search <text>"' in js
+    assert '"//1337 <text>"' in js
+    assert '"//backwards <text>"' in js
+    assert '"//scrambled <text>"' in js
+    assert '"//upsidedown <text>"' in js
+    assert '"//disemvowel <text>"' in js
     assert '"/special <text>"' not in js
-    assert '"/glyph <text>"' in js
+    assert '"//special <text>"' not in js
+    assert '"//glyph <text>"' in js
+    assert 'trimmed.startsWith("//")' in js
+    assert 'trimmed.startsWith("/")' not in js
+    assert "Chat search mode: type text after //search" in js
+    assert "Chat search mode: type text after /search" not in js
 
 
 def test_launcher_menu_omits_header_block() -> None:
