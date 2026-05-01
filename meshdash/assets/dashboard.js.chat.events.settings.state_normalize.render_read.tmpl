@@ -17,13 +17,31 @@
     const settingsDatabaseInfoValueIds = [
       "settings-database-info-path",
       "settings-database-info-total-size",
+      "settings-database-info-size",
+      "settings-database-info-wal-size",
       "settings-database-info-total-rows",
+      "settings-database-info-health",
       "settings-database-info-packets",
       "settings-database-info-packet-events",
       "settings-database-info-chat",
+      "settings-database-info-connections",
+      "settings-database-info-node-capabilities",
+      "settings-database-info-node-saved-counts",
+      "settings-database-info-node-positions",
+      "settings-database-info-node-metrics",
+      "settings-database-info-link-metrics",
+      "settings-database-info-summary-metrics",
+      "settings-database-info-environment-metrics",
+      "settings-database-info-malformed-text",
+      "settings-database-info-settings",
       "settings-database-info-oldest-packet",
       "settings-database-info-newest-packet",
       "settings-database-info-retention",
+      "settings-database-info-event-retention",
+      "settings-database-info-rollup-retention",
+      "settings-database-info-pages",
+      "settings-database-info-freelist",
+      "settings-database-info-generated",
     ];
 
     function settingsDeviceInfoObject(value) {{
@@ -404,6 +422,186 @@
       return range[keyName];
     }}
 
+    function settingsDatabaseInfoPercent(value, maxValue) {{
+      const numeric = Number(value);
+      const maxNumeric = Number(maxValue);
+      if (!Number.isFinite(numeric) || !Number.isFinite(maxNumeric) || maxNumeric <= 0) return "";
+      const percent = Math.max(0, Math.min(999, (numeric / maxNumeric) * 100));
+      return `${{percent.toFixed(percent >= 10 ? 0 : 1)}}%`;
+    }}
+
+    function settingsDatabaseInfoNumericPercent(value, maxValue) {{
+      const numeric = Number(value);
+      const maxNumeric = Number(maxValue);
+      if (!Number.isFinite(numeric) || !Number.isFinite(maxNumeric) || maxNumeric <= 0) return null;
+      return Math.max(0, Math.min(999, (numeric / maxNumeric) * 100));
+    }}
+
+    function formatSettingsDatabaseWindowDays(seconds) {{
+      const numeric = Number(seconds);
+      if (!Number.isFinite(numeric) || numeric < 0) return "";
+      const days = numeric / 86400;
+      if (days >= 10) return `${{Math.round(days).toLocaleString()}}d`;
+      if (days >= 1) return `${{days.toFixed(1)}}d`;
+      const hours = numeric / 3600;
+      if (hours >= 1) return `${{hours.toFixed(1)}}h`;
+      return `${{Math.max(0, Math.round(numeric / 60)).toLocaleString()}}m`;
+    }}
+
+    function settingsDatabaseInfoWindowSeconds(stats, tableName) {{
+      const first = Number(settingsDatabaseInfoRangeValue(stats, tableName, "first_unix"));
+      const last = Number(settingsDatabaseInfoRangeValue(stats, tableName, "last_unix"));
+      if (!Number.isFinite(first) || first <= 0 || !Number.isFinite(last) || last <= 0 || last < first) return null;
+      return last - first;
+    }}
+
+    function settingsDatabaseCapacityStatusLabel(percent) {{
+      if (!Number.isFinite(percent)) return "";
+      const clean = Math.max(0, Math.min(999, percent));
+      return `${{clean.toFixed(clean >= 10 ? 0 : 1)}}%`;
+    }}
+
+    function clearSettingsDatabaseCapacity() {{
+      const status = document.getElementById("settings-database-capacity-status");
+      if (status) status.textContent = "n/a";
+      for (const key of ["packets", "events"]) {{
+        const fill = document.getElementById(`settings-database-capacity-${{key}}-fill`);
+        const value = document.getElementById(`settings-database-capacity-${{key}}-text`);
+        if (fill instanceof HTMLElement) {{
+          fill.style.width = "0%";
+          fill.classList.remove("warn", "danger");
+        }}
+        if (value instanceof HTMLElement) {{
+          value.textContent = "n/a";
+          value.removeAttribute("title");
+        }}
+      }}
+    }}
+
+    function renderSettingsDatabaseCapacityRow(key, label, stats, retentionSeconds, rowCount, maxRows) {{
+      const fill = document.getElementById(`settings-database-capacity-${{key}}-fill`);
+      const value = document.getElementById(`settings-database-capacity-${{key}}-text`);
+      const windowSeconds = settingsDatabaseInfoWindowSeconds(stats, key === "events" ? "packet_events" : "packets");
+      const windowPercent = settingsDatabaseInfoNumericPercent(windowSeconds, retentionSeconds);
+      const rowPercent = settingsDatabaseInfoNumericPercent(rowCount, maxRows);
+      const width = Number.isFinite(windowPercent) ? Math.max(0, Math.min(100, windowPercent)) : 0;
+      const windowText = windowSeconds == null ? "" : formatSettingsDatabaseWindowDays(windowSeconds);
+      const targetText = Number(retentionSeconds) > 0 ? formatSettingsDatabaseWindowDays(retentionSeconds) : "unlimited";
+      const rowText = Number.isFinite(rowPercent) ? `${{settingsDatabaseCapacityStatusLabel(rowPercent)}} row cap` : "";
+      const text = windowText
+        ? `${{windowText}} / ${{targetText}}${{rowText ? ` | ${{rowText}}` : ""}}`
+        : (rowText || "n/a");
+
+      if (fill instanceof HTMLElement) {{
+        fill.style.width = `${{width.toFixed(1)}}%`;
+        fill.classList.remove("warn", "danger");
+        if (Number.isFinite(rowPercent) && rowPercent >= 90) {{
+          fill.classList.add("danger");
+        }} else if (Number.isFinite(rowPercent) && rowPercent >= 75) {{
+          fill.classList.add("warn");
+        }}
+      }}
+      if (value instanceof HTMLElement) {{
+        value.textContent = text;
+        value.title = `${{label}} history window: ${{text}}`;
+      }}
+      return {{
+        label,
+        percent: Number.isFinite(windowPercent) ? windowPercent : null,
+      }};
+    }}
+
+    function renderSettingsDatabaseCapacity(stats, policy) {{
+      const packetResult = renderSettingsDatabaseCapacityRow(
+        "packets",
+        "Packets",
+        stats,
+        settingsDeviceInfoFirst([policy], ["retention_seconds", "retentionSeconds"]),
+        settingsDatabaseInfoTableCount(stats, "packets"),
+        settingsDeviceInfoFirst([policy], ["max_rows", "maxRows"])
+      );
+      const eventResult = renderSettingsDatabaseCapacityRow(
+        "events",
+        "Events",
+        stats,
+        settingsDeviceInfoFirst([policy], ["event_retention_seconds", "eventRetentionSeconds"]),
+        settingsDatabaseInfoTableCount(stats, "packet_events"),
+        settingsDeviceInfoFirst([policy], ["event_max_rows", "eventMaxRows"])
+      );
+      const status = document.getElementById("settings-database-capacity-status");
+      if (status instanceof HTMLElement) {{
+        const choices = [packetResult, eventResult].filter((entry) => Number.isFinite(entry.percent));
+        if (!choices.length) {{
+          status.textContent = "n/a";
+        }} else {{
+          choices.sort((a, b) => Number(b.percent) - Number(a.percent));
+          status.textContent = `${{choices[0].label}} ${{settingsDatabaseCapacityStatusLabel(choices[0].percent)}} of configured window`;
+        }}
+      }}
+    }}
+
+    function settingsDatabaseInfoHealthText(stats, policy) {{
+      const packets = Number(settingsDatabaseInfoTableCount(stats, "packets"));
+      const packetMax = Number(settingsDeviceInfoFirst([policy], ["max_rows", "maxRows"]));
+      const events = Number(settingsDatabaseInfoTableCount(stats, "packet_events"));
+      const eventMax = Number(settingsDeviceInfoFirst([policy], ["event_max_rows", "eventMaxRows"]));
+      const totalSize = Number(settingsDeviceInfoFirst([stats], ["total_size_bytes", "totalSizeBytes"]));
+      const newestPacket = Number(settingsDatabaseInfoRangeValue(stats, "packets", "last_unix"));
+      const generated = Number(settingsDeviceInfoFirst([stats], ["generated_unix", "generatedUnix"]));
+      const notes = [];
+
+      if (Number.isFinite(packets) && packets <= 0) {{
+        notes.push("no packet history");
+      }} else if (Number.isFinite(packetMax) && packetMax > 0 && Number.isFinite(packets)) {{
+        const packetPercent = settingsDatabaseInfoPercent(packets, packetMax);
+        if (packets >= packetMax * 0.98) {{
+          notes.push("packet cap active");
+        }} else if (packetPercent) {{
+          notes.push(`${{packetPercent}} packet cap`);
+        }}
+      }}
+
+      if (Number.isFinite(eventMax) && eventMax > 0 && Number.isFinite(events) && events >= eventMax * 0.98) {{
+        notes.push("event cap active");
+      }}
+
+      if (Number.isFinite(totalSize) && totalSize >= 1024 * 1024 * 1024) {{
+        notes.push("large DB");
+      }}
+
+      if (
+        Number.isFinite(newestPacket)
+        && newestPacket > 0
+        && Number.isFinite(generated)
+        && generated > newestPacket
+        && (generated - newestPacket) > 3600
+      ) {{
+        notes.push("no recent packets");
+      }}
+
+      if (!notes.length) return "OK";
+      return `OK | ${{notes.join(" | ")}}`;
+    }}
+
+    function settingsDatabaseInfoPages(stats) {{
+      const pageCount = Number(settingsDeviceInfoFirst([stats], ["page_count", "pageCount"]));
+      const pageSize = Number(settingsDeviceInfoFirst([stats], ["page_size", "pageSize"]));
+      if (!Number.isFinite(pageCount) || pageCount < 0) return "";
+      if (!Number.isFinite(pageSize) || pageSize <= 0) {{
+        return `${{Math.trunc(pageCount).toLocaleString()}} pages`;
+      }}
+      return `${{Math.trunc(pageCount).toLocaleString()}} x ${{formatSettingsDatabaseBytes(pageSize)}}`;
+    }}
+
+    function settingsDatabaseInfoFreelist(stats) {{
+      const freelistCount = Number(settingsDeviceInfoFirst([stats], ["freelist_count", "freelistCount"]));
+      const pageSize = Number(settingsDeviceInfoFirst([stats], ["page_size", "pageSize"]));
+      if (!Number.isFinite(freelistCount) || freelistCount < 0) return "";
+      const countText = `${{Math.trunc(freelistCount).toLocaleString()}} pages`;
+      if (!Number.isFinite(pageSize) || pageSize <= 0) return countText;
+      return `${{countText}} | ${{formatSettingsDatabaseBytes(freelistCount * pageSize)}}`;
+    }}
+
     function renderSettingsDatabaseInfo(payload = settingsDatabaseInfoCache.payload) {{
       const grid = document.getElementById("settings-database-info-grid");
       if (!(grid instanceof HTMLElement)) return;
@@ -417,22 +615,41 @@
 
       if (stats.ok === false || stats.enabled === false) {{
         clearSettingsDatabaseInfoValues();
+        clearSettingsDatabaseCapacity();
         const errorText = settingsDeviceInfoText(settingsDeviceInfoFirst([stats], ["error"]));
         setText("settings-database-info-status", errorText || "History database stats are unavailable on this dashboard instance.");
         return;
       }}
 
       const policy = settingsDeviceInfoObject(settingsDeviceInfoFirst([stats], ["policy"])) || {{}};
+      renderSettingsDatabaseCapacity(stats, policy);
       setSettingsDatabaseInfoValue("settings-database-info-path", settingsDeviceInfoFirst([stats], ["path"]));
       setSettingsDatabaseInfoValue("settings-database-info-total-size", formatSettingsDatabaseBytes(
         settingsDeviceInfoFirst([stats], ["total_size_bytes", "totalSizeBytes"])
       ));
+      setSettingsDatabaseInfoValue("settings-database-info-size", formatSettingsDatabaseBytes(
+        settingsDeviceInfoFirst([stats], ["size_bytes", "sizeBytes"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-wal-size", formatSettingsDatabaseBytes(
+        settingsDeviceInfoFirst([stats], ["wal_size_bytes", "walSizeBytes"])
+      ));
       setSettingsDatabaseInfoValue("settings-database-info-total-rows", formatSettingsDatabaseNumber(
         settingsDeviceInfoFirst([stats], ["total_rows", "totalRows"])
       ));
+      setSettingsDatabaseInfoValue("settings-database-info-health", settingsDatabaseInfoHealthText(stats, policy));
       setSettingsDatabaseInfoValue("settings-database-info-packets", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "packets")));
       setSettingsDatabaseInfoValue("settings-database-info-packet-events", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "packet_events")));
       setSettingsDatabaseInfoValue("settings-database-info-chat", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "chat")));
+      setSettingsDatabaseInfoValue("settings-database-info-connections", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "connections")));
+      setSettingsDatabaseInfoValue("settings-database-info-node-capabilities", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "node_capabilities")));
+      setSettingsDatabaseInfoValue("settings-database-info-node-saved-counts", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "node_saved_counts")));
+      setSettingsDatabaseInfoValue("settings-database-info-node-positions", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "node_positions")));
+      setSettingsDatabaseInfoValue("settings-database-info-node-metrics", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "node_metrics_1m")));
+      setSettingsDatabaseInfoValue("settings-database-info-link-metrics", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "link_metrics_1m")));
+      setSettingsDatabaseInfoValue("settings-database-info-summary-metrics", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "summary_metrics_1m")));
+      setSettingsDatabaseInfoValue("settings-database-info-environment-metrics", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "environment_metrics_1m")));
+      setSettingsDatabaseInfoValue("settings-database-info-malformed-text", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "malformed_text_payloads")));
+      setSettingsDatabaseInfoValue("settings-database-info-settings", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "dashboard_settings")));
       setSettingsDatabaseInfoValue("settings-database-info-oldest-packet", formatSettingsDatabaseEpoch(
         settingsDatabaseInfoRangeValue(stats, "packets", "first_unix")
       ));
@@ -442,6 +659,19 @@
       setSettingsDatabaseInfoValue("settings-database-info-retention", formatSettingsDatabaseDuration(
         settingsDeviceInfoFirst([policy], ["retention_seconds", "retentionSeconds"]),
         settingsDeviceInfoFirst([policy], ["max_rows", "maxRows"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-event-retention", formatSettingsDatabaseDuration(
+        settingsDeviceInfoFirst([policy], ["event_retention_seconds", "eventRetentionSeconds"]),
+        settingsDeviceInfoFirst([policy], ["event_max_rows", "eventMaxRows"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-rollup-retention", formatSettingsDatabaseDuration(
+        settingsDeviceInfoFirst([policy], ["rollup_retention_seconds", "rollupRetentionSeconds"]),
+        null
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-pages", settingsDatabaseInfoPages(stats));
+      setSettingsDatabaseInfoValue("settings-database-info-freelist", settingsDatabaseInfoFreelist(stats));
+      setSettingsDatabaseInfoValue("settings-database-info-generated", formatSettingsDatabaseEpoch(
+        settingsDeviceInfoFirst([stats], ["generated_unix", "generatedUnix"])
       ));
 
       const totalRows = formatSettingsDatabaseNumber(settingsDeviceInfoFirst([stats], ["total_rows", "totalRows"]));

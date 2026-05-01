@@ -65,9 +65,15 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'id="settings-device-info-public-key"' in html
     assert 'id="settings-device-info-wifi"' in html
     assert 'class="settings-panel settings-panel-wide settings-database-info-panel" data-settings-tab-panel="system"' in html
+    assert 'id="settings-database-capacity"' in html
+    assert 'id="settings-database-capacity-packets-fill"' in html
+    assert 'id="settings-database-capacity-events-fill"' in html
     assert 'id="settings-database-info-grid"' in html
     assert 'id="settings-database-info-total-rows"' in html
+    assert 'id="settings-database-info-health"' in html
     assert 'id="settings-database-info-path"' in html
+    assert 'class="settings-database-advanced"' in html
+    assert 'id="settings-database-info-wal-size"' in html
     assert 'data-view="chat"' in html
     assert 'data-view="network"' in html
     assert 'data-view="apps"' in html
@@ -160,6 +166,9 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "[data-theme=\"dark\"] .settings-device-info-item {" in css
     assert ".settings-device-info-mono {" in css
     assert ".settings-database-info-panel {" in css
+    assert ".settings-database-capacity {" in css
+    assert ".settings-database-capacity-fill.warn {" in css
+    assert ".settings-database-advanced > summary {" in css
     assert "row-gap: 8px;" in css
     assert re.search(
         r"\.workspace-shell\.chat-panel-open \{[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);",
@@ -186,6 +195,10 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'setSettingsDeviceInfoValue("settings-device-info-hardware"' in js
     assert 'setSettingsDeviceInfoValue("settings-device-info-public-key"' in js
     assert 'setSettingsDatabaseInfoValue("settings-database-info-total-rows"' in js
+    assert 'setSettingsDatabaseInfoValue("settings-database-info-health"' in js
+    assert "function renderSettingsDatabaseCapacity(stats, policy) {" in js
+    assert 'document.getElementById(`settings-database-capacity-${key}-fill`)' in js
+    assert "function settingsDatabaseInfoHealthText(stats, policy) {" in js
     assert 'next === "system"' in js
     assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' not in js
     assert 'document.getElementById("layout-view-menu-head-mark")' not in js

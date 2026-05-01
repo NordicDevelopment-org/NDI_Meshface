@@ -7497,6 +7497,92 @@
     .settings-database-info-panel {{
       order: 2;
     }}
+    .settings-database-capacity {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #d7e5d2;
+      border-radius: 8px;
+      background: #f8fbf7;
+      min-width: 0;
+    }}
+    .settings-database-capacity-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }}
+    .settings-database-capacity-status {{
+      color: #204231;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }}
+    .settings-database-capacity-bars {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 8px;
+      min-width: 0;
+    }}
+    .settings-database-capacity-row {{
+      display: grid;
+      grid-template-columns: minmax(56px, max-content) minmax(72px, 1fr) minmax(96px, max-content);
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }}
+    .settings-database-capacity-label,
+    .settings-database-capacity-value {{
+      min-width: 0;
+      color: #204231;
+      font-size: 11px;
+      line-height: 1.25;
+      white-space: nowrap;
+    }}
+    .settings-database-capacity-value {{
+      color: #0f2018;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      text-align: right;
+    }}
+    .settings-database-capacity-track {{
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #d9e9de;
+    }}
+    .settings-database-capacity-fill {{
+      display: block;
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: #58b878;
+      transition: width 220ms ease, background-color 220ms ease;
+    }}
+    .settings-database-capacity-fill.warn {{
+      background: #c4952e;
+    }}
+    .settings-database-capacity-fill.danger {{
+      background: #c95656;
+    }}
+    .settings-database-advanced {{
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }}
+    .settings-database-advanced > summary {{
+      cursor: pointer;
+      color: #204231;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.2;
+      padding: 2px 0;
+    }}
+    .settings-database-advanced-grid {{
+      margin-top: 8px;
+    }}
     .settings-device-info-grid {{
       display: grid;
       grid-template-columns: repeat(4, minmax(160px, 1fr));
@@ -7536,6 +7622,9 @@
       .settings-device-info-grid {{
         grid-template-columns: repeat(3, minmax(150px, 1fr));
       }}
+      .settings-database-capacity-bars {{
+        grid-template-columns: 1fr;
+      }}
     }}
     @media (max-width: 900px) {{
       .settings-device-info-grid {{
@@ -7551,6 +7640,21 @@
       }}
       .settings-device-info-item-wide {{
         grid-column: auto;
+      }}
+      .settings-database-capacity-head {{
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+      }}
+      .settings-database-capacity-status {{
+        white-space: normal;
+      }}
+      .settings-database-capacity-row {{
+        grid-template-columns: minmax(56px, max-content) minmax(72px, 1fr);
+      }}
+      .settings-database-capacity-value {{
+        grid-column: 1 / -1;
+        text-align: left;
       }}
     }}
     .node-visibility-grid {{
