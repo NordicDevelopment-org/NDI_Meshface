@@ -1171,9 +1171,18 @@
       return item;
     }}
 
-    function networkTopNodesItemsFromMap(map, limit = 10) {{
+    function networkTopNodesExcludedLocalIds(state = latestState) {{
+      const localId = normalizeNodeId(resolveLocalNodeId(state) || "");
+      return isCanonicalNodeId(localId) ? new Set([localId]) : new Set();
+    }}
+
+    function networkTopNodesItemsFromMap(map, limit = 10, excludedNodeIds = null) {{
+      const excluded = excludedNodeIds instanceof Set ? excludedNodeIds : new Set();
       return Array.from(map.values())
-        .filter((item) => Number(item && item.value) > 0)
+        .filter((item) => {{
+          const nodeId = normalizeNodeId(item && item.node_id);
+          return Number(item && item.value) > 0 && !excluded.has(nodeId);
+        }})
         .sort((a, b) => {{
           const valueDiff = (Number(b.value) || 0) - (Number(a.value) || 0);
           if (Math.abs(valueDiff) > 1e-9) return valueDiff;
@@ -1218,6 +1227,7 @@
       const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
       const packets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
       const counts = new Map();
+      const excludedNodeIds = networkTopNodesExcludedLocalIds(safeState);
 
       if (cleanCategory === "saved_packets") {{
         for (const node of nodes) {{
@@ -1312,7 +1322,7 @@
         unit: def.unit,
         source: "current state",
         limit: 10,
-        items: networkTopNodesItemsFromMap(counts, 10),
+        items: networkTopNodesItemsFromMap(counts, 10, excludedNodeIds),
         fallback: true,
       }};
     }}
@@ -1335,6 +1345,107 @@
       const node = networkTopNodesNodeMap(state).get(clean) || null;
       const cached = (nodeNameCache instanceof Map) ? String(nodeNameCache.get(clean) || "").trim() : "";
       return String(preferredNodeName(node) || cached || clean || "Unknown node");
+    }}
+
+    function networkTopNodesPathValue(source, path) {{
+      if (!source || typeof source !== "object") return null;
+      const parts = String(path || "").split(".").filter(Boolean);
+      let current = source;
+      for (const part of parts) {{
+        if (!current || typeof current !== "object") return null;
+        current = current[part];
+      }}
+      return current;
+    }}
+
+    function networkTopNodesCoordValue(source, paths) {{
+      const safePaths = Array.isArray(paths) ? paths : [];
+      for (const path of safePaths) {{
+        const parsed = Number(networkTopNodesPathValue(source, path));
+        if (Number.isFinite(parsed)) return parsed;
+      }}
+      return null;
+    }}
+
+    function networkTopNodesLocationIsValid(lat, lon) {{
+      if (typeof isValidLatLonRange === "function" && !isValidLatLonRange(lat, lon)) return false;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+      if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return false;
+      if (Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9) return false;
+      return true;
+    }}
+
+    function networkTopNodesNodeLocation(nodeId, state = latestState, item = null) {{
+      const clean = normalizeNodeId(nodeId || "");
+      const node = networkTopNodesNodeMap(state).get(clean) || null;
+      const sources = [item, node].filter((source) => source && typeof source === "object");
+      const latPaths = ["lat", "latitude", "position.lat", "position.latitude", "location.lat", "location.latitude"];
+      const lonPaths = ["lon", "lng", "longitude", "position.lon", "position.lng", "position.longitude", "location.lon", "location.lng", "location.longitude"];
+      for (const source of sources) {{
+        const lat = networkTopNodesCoordValue(source, latPaths);
+        const lon = networkTopNodesCoordValue(source, lonPaths);
+        if (networkTopNodesLocationIsValid(lat, lon)) {{
+          return {{ lat: Number(lat), lon: Number(lon) }};
+        }}
+      }}
+      return null;
+    }}
+
+    function networkTopNodesCityCacheKey(location) {{
+      if (!location || typeof location !== "object") return "";
+      const lat = Number(location.lat);
+      const lon = Number(location.lon);
+      if (!networkTopNodesLocationIsValid(lat, lon)) return "";
+      return `${{lat.toFixed(4)}},${{lon.toFixed(4)}}`;
+    }}
+
+    function networkTopNodesCityText(location) {{
+      const key = networkTopNodesCityCacheKey(location);
+      if (!key || !(networkTopNodesCityCache instanceof Map)) return "";
+      return String(networkTopNodesCityCache.get(key) || "").trim();
+    }}
+
+    function applyNetworkTopNodeCitySpan(span, text) {{
+      if (!(span instanceof HTMLElement)) return;
+      const clean = String(text || "").trim();
+      span.textContent = clean;
+      span.hidden = !clean;
+    }}
+
+    function hydrateNetworkTopNodeCities(root) {{
+      if (!(root instanceof HTMLElement)) return;
+      const spans = Array.from(root.querySelectorAll("[data-top-node-city-key]"));
+      if (!spans.length) return;
+      for (const span of spans) {{
+        if (!(span instanceof HTMLElement)) continue;
+        const key = String(span.dataset.topNodeCityKey || "").trim();
+        if (!key) continue;
+        if (networkTopNodesCityCache instanceof Map && networkTopNodesCityCache.has(key)) {{
+          applyNetworkTopNodeCitySpan(span, networkTopNodesCityCache.get(key));
+          continue;
+        }}
+        const lat = Number(span.dataset.topNodeCityLat);
+        const lon = Number(span.dataset.topNodeCityLon);
+        if (!networkTopNodesLocationIsValid(lat, lon) || typeof nearestOfflineCityHintFromCoords !== "function") {{
+          if (networkTopNodesCityCache instanceof Map) networkTopNodesCityCache.set(key, "");
+          applyNetworkTopNodeCitySpan(span, "");
+          continue;
+        }}
+        nearestOfflineCityHintFromCoords(lat, lon)
+          .then((city) => {{
+            const text = String(city || "").trim();
+            if (networkTopNodesCityCache instanceof Map) networkTopNodesCityCache.set(key, text);
+            if (span.isConnected && String(span.dataset.topNodeCityKey || "").trim() === key) {{
+              applyNetworkTopNodeCitySpan(span, text);
+            }}
+          }})
+          .catch(() => {{
+            if (networkTopNodesCityCache instanceof Map) networkTopNodesCityCache.set(key, "");
+            if (span.isConnected && String(span.dataset.topNodeCityKey || "").trim() === key) {{
+              applyNetworkTopNodeCitySpan(span, "");
+            }}
+          }});
+      }}
     }}
 
     function networkTopNodesTimeText(unixValue) {{
@@ -1422,11 +1533,18 @@
         const name = networkTopNodesDisplayName(nodeId, state);
         const meta = networkTopNodesMetaText(item, safePayload);
         const unitText = networkTopNodesUnitText(unit, value);
+        const location = networkTopNodesNodeLocation(nodeId, state, item);
+        const cityKey = networkTopNodesCityCacheKey(location);
+        const cityText = networkTopNodesCityText(location);
+        const cityHtml = cityKey
+          ? `<span class="network-top-node-city" data-top-node-city-key="${{escAttr(cityKey)}}" data-top-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-top-node-city-lon="${{escAttr(location.lon.toFixed(6))}}"${{cityText ? "" : " hidden"}}>${{escAttr(cityText)}}</span>`
+          : "";
         return `<button class="network-top-node-row" type="button" data-top-node-id="${{escAttr(nodeId)}}" title="${{escAttr(`${{name}} (${{nodeId}})`)}}">
           <span class="network-top-node-rank">#${{escAttr(rank)}}</span>
           <span class="network-top-node-main">
             <span class="network-top-node-name">${{escAttr(name)}}</span>
             <span class="network-top-node-id">${{escAttr(nodeId)}}</span>
+            ${{cityHtml}}
             ${{meta ? `<span class="network-top-node-meta">${{escAttr(meta)}}</span>` : ""}}
             <span class="network-top-node-bar" aria-hidden="true"><span style="--top-node-bar:${{pct.toFixed(1)}}%;"></span></span>
           </span>
@@ -1500,6 +1618,7 @@
         list.innerHTML = displayGroups
           .map((group) => networkTopNodesGroupHtml(group, state, {{ showHeader: showGroupHeaders }}))
           .join("");
+        hydrateNetworkTopNodeCities(list);
         return;
       }}
 
@@ -1511,6 +1630,7 @@
       }}
 
       list.innerHTML = networkTopNodesRowsHtml(items, safePayload, state);
+      hydrateNetworkTopNodeCities(list);
     }}
 
     async function fetchNetworkTopNodesPayload(category, force = false) {{

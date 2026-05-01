@@ -111,6 +111,35 @@ def test_top_nodes_all_category_returns_grouped_ranked_lists() -> None:
     assert payload["item_count"] >= 3
 
 
+def test_top_nodes_can_exclude_local_node_from_rankings() -> None:
+    conn = sqlite3.connect(":memory:")
+    initialize_history_schema(conn)
+    store = _make_store(conn)
+
+    conn.executemany(
+        """
+        INSERT INTO node_saved_counts(node_id, saved_packets, saved_points, saved_last_seen_unix)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            ("!self0001", 1000, 20, 1200),
+            ("!11111111", 12, 5, 1000),
+            ("!22222222", 30, 9, 1100),
+        ],
+    )
+    conn.commit()
+
+    payload = load_top_nodes(
+        store,
+        category="saved_packets",
+        limit=2,
+        exclude_node_ids=["!SELF0001"],
+    )
+
+    assert [item["node_id"] for item in payload["items"]] == ["!22222222", "!11111111"]
+    assert [item["rank"] for item in payload["items"]] == [1, 2]
+
+
 def test_top_nodes_links_count_unique_peers_and_link_packets() -> None:
     conn = sqlite3.connect(":memory:")
     initialize_history_schema(conn)
@@ -169,15 +198,22 @@ def test_dashboard_js_wires_network_top_nodes_fetch_and_render() -> None:
 
     assert 'const networkTopNodesCategoryStorageKey = "meshDashboardNetworkTopNodesCategoryV1";' in js
     assert 'let networkTopNodesCategory = "all";' in js
+    assert 'let networkTopNodesCityCache = new Map();' in js
     assert '{ id: "all", label: "All Categories", unit: "" }' in js
     assert 'function normalizeNetworkTopNodesCategory(raw) {' in js
+    assert 'function networkTopNodesExcludedLocalIds(state = latestState) {' in js
+    assert 'items: networkTopNodesItemsFromMap(counts, 10, excludedNodeIds)' in js
+    assert 'function networkTopNodesNodeLocation(nodeId, state = latestState, item = null) {' in js
+    assert 'function hydrateNetworkTopNodeCities(root) {' in js
     assert 'function networkTopNodesPayloadHasItems(payload) {' in js
     assert 'function networkTopNodesRowsHtml(items, payload, state = latestState) {' in js
+    assert 'class="network-top-node-city"' in js
     assert 'class="network-top-nodes-group"' in js
     assert 'const displayGroups = groups.length > 0' in js
     assert 'function networkTopNodesGroupHtml(group, state = latestState, options = {}) {' in js
     assert 'const showGroupHeaders = category === "all" || displayGroups.length > 1;' in js
     assert 'networkTopNodesGroupHtml(group, state, { showHeader: showGroupHeaders })' in js
+    assert 'hydrateNetworkTopNodeCities(list);' in js
     assert 'function renderNetworkTopNodes(state = latestState, options = {}) {' in js
     assert "/api/history/top_nodes?category=" in js
     assert 'if (normalizedView === "network" && next === "top10") {' in js
@@ -187,6 +223,8 @@ def test_dashboard_css_keeps_top_node_bar_below_row_text() -> None:
     css = build_dashboard_css(theme_css="")
 
     assert ".network-top-node-bar" in css
+    assert ".network-top-node-city" in css
+    assert ".network-top-node-city[hidden]" in css
     assert "position: relative;" in css
     assert "display: block;" in css
     assert "width: 100%;" in css

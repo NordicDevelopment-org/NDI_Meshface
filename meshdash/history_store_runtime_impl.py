@@ -191,8 +191,18 @@ class HistoryStore:
     def load_summary_metrics(self, window_hours: int) -> dict[str, object]:
         return _load_summary_metrics_helper(self, window_hours)
 
-    def load_top_nodes(self, category: object = "saved_packets", limit: object = 10) -> dict[str, object]:
-        return _load_top_nodes_helper(self, category=category, limit=limit)
+    def load_top_nodes(
+        self,
+        category: object = "saved_packets",
+        limit: object = 10,
+        exclude_node_ids: object = None,
+    ) -> dict[str, object]:
+        return _load_top_nodes_helper(
+            self,
+            category=category,
+            limit=limit,
+            exclude_node_ids=exclude_node_ids,
+        )
 
     def database_stats(self) -> dict[str, object]:
         return _load_database_stats_helper(self)

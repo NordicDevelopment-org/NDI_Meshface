@@ -174,6 +174,27 @@ def _clean_limit(limit: object) -> int:
     return max(1, min(_MAX_LIMIT, int(parsed)))
 
 
+def _clean_node_id(node_id: object) -> str:
+    return str(node_id or "").strip()
+
+
+def _clean_excluded_node_ids(excluded_node_ids: object = None) -> set[str]:
+    if excluded_node_ids is None:
+        return set()
+    if isinstance(excluded_node_ids, str):
+        candidates: Iterable[object] = [excluded_node_ids]
+    else:
+        try:
+            candidates = list(excluded_node_ids)  # type: ignore[arg-type]
+        except Exception:
+            candidates = [excluded_node_ids]
+    return {
+        clean.lower()
+        for clean in (_clean_node_id(candidate) for candidate in candidates)
+        if clean
+    }
+
+
 def _valid_node_clause(column_name: str = "node_id") -> str:
     return (
         f"trim(COALESCE({column_name}, '')) <> '' "
@@ -432,15 +453,20 @@ def build_top_nodes_payload(
     category: object,
     rows: Iterable[object],
     limit: object = _DEFAULT_LIMIT,
+    exclude_node_ids: object = None,
 ) -> dict[str, object]:
     clean_category = normalize_top_node_category(category)
     clean_limit = _clean_limit(limit)
+    excluded = _clean_excluded_node_ids(exclude_node_ids)
     category_meta = dict(_CATEGORY_BY_ID.get(clean_category, _ALL_CATEGORY_META))
     items: list[dict[str, object]] = []
     for row in rows:
         item = _item_from_row(row, len(items) + 1)
         if item is None:
             continue
+        if _clean_node_id(item.get("node_id")).lower() in excluded:
+            continue
+        item["rank"] = len(items) + 1
         items.append(item)
         if len(items) >= clean_limit:
             break
@@ -492,9 +518,12 @@ def load_top_nodes(
     *,
     category: object = "saved_packets",
     limit: object = _DEFAULT_LIMIT,
+    exclude_node_ids: object = None,
 ) -> dict[str, object]:
     clean_category = normalize_top_node_category(category)
     clean_limit = _clean_limit(limit)
+    excluded = _clean_excluded_node_ids(exclude_node_ids)
+    fetch_limit = clean_limit + len(excluded)
     read_conn = getattr(store, "_read_conn", None)
     if read_conn is None or read_conn is store._conn:
         read_conn = store._conn
@@ -506,12 +535,13 @@ def load_top_nodes(
         with read_lock:
             for entry in TOP_NODE_CATEGORIES:
                 entry_id = entry["id"]
-                rows = _fetch_category_rows(read_conn, entry_id, clean_limit)
+                rows = _fetch_category_rows(read_conn, entry_id, fetch_limit)
                 groups.append(
                     build_top_nodes_payload(
                         category=entry_id,
                         rows=rows,
                         limit=clean_limit,
+                        exclude_node_ids=excluded,
                     )
                 )
         return build_top_nodes_groups_payload(
@@ -519,9 +549,10 @@ def load_top_nodes(
             limit=clean_limit,
         )
     with read_lock:
-        rows = _fetch_category_rows(read_conn, clean_category, clean_limit)
+        rows = _fetch_category_rows(read_conn, clean_category, fetch_limit)
     return build_top_nodes_payload(
         category=clean_category,
         rows=rows,
         limit=clean_limit,
+        exclude_node_ids=excluded,
     )

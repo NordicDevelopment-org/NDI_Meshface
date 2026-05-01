@@ -83,6 +83,50 @@ def _state_snapshot_for_ops(state_fn: object) -> object:
     return {}
 
 
+def _clean_top_nodes_excluded_node_id(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _mapping_value(root: Mapping[str, object], *keys: str) -> object:
+    for key in keys:
+        if key in root:
+            return root.get(key)
+    return None
+
+
+def _top_nodes_excluded_local_node_ids(state_fn: object) -> list[str]:
+    try:
+        snapshot = _state_snapshot_for_ops(state_fn)
+    except Exception:
+        snapshot = {}
+    if not isinstance(snapshot, Mapping):
+        return []
+
+    candidates: list[object] = [
+        _mapping_value(snapshot, "local_node_id", "localNodeId"),
+    ]
+    my_info = _mapping_value(snapshot, "my_info", "myInfo")
+    if isinstance(my_info, Mapping):
+        candidates.append(_mapping_value(my_info, "id", "node_id", "nodeId"))
+    local_state = _mapping_value(snapshot, "local_state", "localState")
+    if isinstance(local_state, Mapping):
+        local_node_info = _mapping_value(local_state, "local_node_info", "localNodeInfo")
+        if isinstance(local_node_info, Mapping):
+            user = _mapping_value(local_node_info, "user")
+            if isinstance(user, Mapping):
+                candidates.append(_mapping_value(user, "id", "node_id", "nodeId"))
+
+    seen: set[str] = set()
+    excluded: list[str] = []
+    for candidate in candidates:
+        clean = _clean_top_nodes_excluded_node_id(candidate)
+        if not clean or clean.lower() in seen:
+            continue
+        seen.add(clean.lower())
+        excluded.append(clean)
+    return excluded
+
+
 def _summary_from_state_payload(payload: object) -> Mapping[str, object]:
     if not isinstance(payload, Mapping):
         return {}
@@ -388,6 +432,7 @@ def handle_dashboard_get(
                 response_obj = top_nodes_fn(
                     category=category or "saved_packets",
                     limit=limit or 10,
+                    exclude_node_ids=_top_nodes_excluded_local_node_ids(deps.state_fn),
                 )
             except Exception as exc:
                 response_obj = {
