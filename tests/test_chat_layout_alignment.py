@@ -780,6 +780,24 @@ def test_chat_feed_search_is_reapplied_after_feed_render() -> None:
     assert "applyChatFeedSearchFilter();" in js
 
 
+def test_chat_slash_macro_menu_is_hidden_under_composer() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "function renderChatMacroHelpPreview" in js
+    assert "previewEl.hidden = true;" in js
+    assert "Macro Menu - click a command to insert" not in js
+    assert "Macro Help (${sourceLabel}) - click a command to insert" not in js
+    assert '"/shrug"' not in js
+    assert '"/tableflip"' not in js
+    assert '"/1337 <text>"' not in js
+    assert '"/backwards <text>"' not in js
+    assert '"/disemvowel <text>"' not in js
+
+
 def test_launcher_menu_omits_header_block() -> None:
     js = Path("meshdash/assets/dashboard.js.chat.events.core.identity.node_self.tmpl").read_text()
 
