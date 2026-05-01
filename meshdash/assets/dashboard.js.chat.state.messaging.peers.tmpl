@@ -1164,8 +1164,8 @@
         );
         const malformedTextPayloadPreview = String((malformedTextEntry && malformedTextEntry.payloadPreview) || "").trim();
         const packetTickerDetail = packetTotal > 0
-          ? `Radio packets: RX ${{packetRxRecent5m}} / TX ${{packetTxRecent5m}} in 5m, RX ${{packetRxTotal}} / TX ${{packetTxTotal}} total, last any ${{packetLastText}}, last RX ${{packetLastRxText}}, last TX ${{packetLastTxText}}. Trend window: ${{packetSparklineWindowMin}}m`
-          : "Radio packets: none in current packet buffer";
+          ? `Observed packet activity: ${{packetRxRecent5m + packetTxRecent5m}} in 5m, ${{packetTotal}} total, last observed ${{packetLastText}}. Trend window: ${{packetSparklineWindowMin}}m`
+          : "Observed packet activity: none in current packet buffer";
         const tooltipLines = [
           `${{(item && item.name) || nodeId}} (${{(item && item.id) || nodeId}})`,
           `Status: ${{statusLabel}}`,
@@ -1223,15 +1223,13 @@
         const idleRowHtml = showIdle
           ? `<span class="chat-member-idle-time" title="${{escAttr(idleRowTitle)}}">Idle: ${{escAttr(idleText)}}</span>`
           : "";
-        let packetDirectionHtml = "";
         let packetSparkWrapHtml = "";
         if (showPacketTrendRow) {{
           const packetSparklinePath = buildChatNodeNavigatorPacketSparklinePath(packetSparklineBuckets, 56, 12);
           const packetSparklineTrend = classifyChatNodeNavigatorPacketSparklineTrend(packetSparklineBuckets);
           const packetRowTitle = packetTotal > 0
-            ? `Packet trend: last ${{packetSparklineWindowMin}}m. RX ${{packetRxRecent5m}} / TX ${{packetTxRecent5m}} in last 5m, RX ${{packetRxTotal}} / TX ${{packetTxTotal}} total. Last any ${{packetLastText}}. Last RX ${{packetLastRxText}}. Last TX ${{packetLastTxText}}`
-            : `No packets from this node in the current packet buffer. Trend window: ${{packetSparklineWindowMin}}m`;
-          packetDirectionHtml = `<span class="chat-member-packet-direction" title="Per-node radio packet direction in last 5 minutes">RX ${{packetRxRecent5m}} · TX ${{packetTxRecent5m}}</span>`;
+            ? `Packet activity trend: last ${{packetSparklineWindowMin}}m. ${{packetRxRecent5m + packetTxRecent5m}} observed in last 5m, ${{packetTotal}} total. Last observed ${{packetLastText}}`
+            : `No observed packets for this node in the current packet buffer. Trend window: ${{packetSparklineWindowMin}}m`;
           packetSparkWrapHtml = `<span class="chat-member-packet-spark-wrap">
             <span class="chat-member-packet-trend metric-ticker ${{packetSparklineTrend}}" title="${{escAttr(packetRowTitle)}}">
               <svg class="metric-ticker-chart chat-member-packet-sparkline" viewBox="0 0 56 12" preserveAspectRatio="none" aria-hidden="true" focusable="false">
@@ -1250,7 +1248,6 @@
           : "";
         if (showCity && memberCityHtml) memberMetaRowParts.push(memberCityHtml);
         if (idleRowHtml) memberMetaRowParts.push(idleRowHtml);
-        if (packetDirectionHtml) memberMetaRowParts.push(packetDirectionHtml);
         const memberMetaRowHtml = memberMetaRowParts.length > 0
           ? `<span class="chat-member-meta-row">${{memberMetaRowParts.join("")}}</span>`
           : "";
@@ -1819,7 +1816,7 @@
           </label>`
           + `<label class="chat-node-navigator-field-option">
             <input type="checkbox" data-nav-toggle-id="packet-direction"${{showPacketDirection ? " checked" : ""}} />
-            <span>TX/RX + Plot</span>
+            <span>Packet plot</span>
           </label>`;
         if (fieldsHost.__meshFieldsHtml !== fieldsHtml) {{
           fieldsHost.innerHTML = fieldsHtml;

@@ -3,6 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from meshdash.html_css import build_dashboard_css
 from meshdash.html_js import build_dashboard_js
 from meshdash.html_template import render_html
 
@@ -224,6 +225,24 @@ def test_dashboard_js_supports_idle_toggle_in_node_navigator() -> None:
     assert 'const idleRowHtml = showIdle' in js
     assert 'const memberMetaRowParts = [];' in js
     assert 'const memberMetaRowHtml = memberMetaRowParts.length > 0' in js
+
+
+def test_dashboard_js_labels_node_packet_plot_without_rx_tx_text() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+    css = build_dashboard_css(theme_css="")
+
+    assert '<input type="checkbox" data-nav-toggle-id="packet-direction"' in js
+    assert "<span>Packet plot</span>" in js
+    assert "TX/RX + Plot" not in js
+    assert "packetDirectionHtml" not in js
+    assert "chat-member-packet-direction" not in js
+    assert "Observed packet activity:" in js
+    assert "Packet activity trend:" in js
+    assert ".chat-member-packet-direction" not in css
 
 
 def test_dashboard_js_supports_status_dot_toggle_in_node_navigator() -> None:
