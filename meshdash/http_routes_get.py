@@ -278,6 +278,26 @@ def handle_dashboard_get(
         deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
         return
 
+    if path == "/api/system/database":
+        database_stats_fn = getattr(deps.state_fn, "database_stats_fn", None)
+        if callable(database_stats_fn):
+            try:
+                response_obj = database_stats_fn()
+            except Exception as exc:
+                response_obj = {
+                    "ok": False,
+                    "enabled": True,
+                    "error": str(exc or "database stats failed"),
+                }
+        else:
+            response_obj = {
+                "ok": False,
+                "enabled": False,
+                "error": "history database unavailable on this dashboard instance",
+            }
+        deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
+        return
+
     if path == "/api/settings/theme":
         _handle_theme_settings_get_helper(
             handler,

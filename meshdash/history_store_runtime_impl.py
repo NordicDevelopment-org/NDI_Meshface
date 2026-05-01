@@ -54,6 +54,9 @@ from .history_store_settings import (
     save_bbs_settings as _save_bbs_settings_helper,
     save_custom_telemetry_settings as _save_custom_telemetry_settings_helper,
 )
+from .history_store_database_stats import (
+    load_database_stats as _load_database_stats_helper,
+)
 
 
 class HistoryStore:
@@ -190,6 +193,9 @@ class HistoryStore:
 
     def load_top_nodes(self, category: object = "saved_packets", limit: object = 10) -> dict[str, object]:
         return _load_top_nodes_helper(self, category=category, limit=limit)
+
+    def database_stats(self) -> dict[str, object]:
+        return _load_database_stats_helper(self)
 
     def save_connection_event(
         self,

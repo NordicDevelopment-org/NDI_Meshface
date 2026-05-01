@@ -64,6 +64,10 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'id="settings-device-info-hardware"' in html
     assert 'id="settings-device-info-public-key"' in html
     assert 'id="settings-device-info-wifi"' in html
+    assert 'class="settings-panel settings-panel-wide settings-database-info-panel" data-settings-tab-panel="system"' in html
+    assert 'id="settings-database-info-grid"' in html
+    assert 'id="settings-database-info-total-rows"' in html
+    assert 'id="settings-database-info-path"' in html
     assert 'data-view="chat"' in html
     assert 'data-view="network"' in html
     assert 'data-view="apps"' in html
@@ -155,6 +159,7 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "grid-template-columns: repeat(4, minmax(160px, 1fr));" in css
     assert "[data-theme=\"dark\"] .settings-device-info-item {" in css
     assert ".settings-device-info-mono {" in css
+    assert ".settings-database-info-panel {" in css
     assert "row-gap: 8px;" in css
     assert re.search(
         r"\.workspace-shell\.chat-panel-open \{[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);",
@@ -171,12 +176,16 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert 'document.getElementById("settings-about-commit")' in js
     assert "function renderSettingsDeviceInfo(state = latestState) {" in js
     assert "function hydrateSettingsDeviceInfo(force = false) {" in js
+    assert "function renderSettingsDatabaseInfo(payload = settingsDatabaseInfoCache.payload) {" in js
+    assert "function hydrateSettingsDatabaseInfo(force = false) {" in js
     assert 'fetchSettingsDeviceInfoJson("/api/raw/my_info")' in js
     assert 'fetchSettingsDeviceInfoJson("/api/raw/metadata")' in js
     assert 'fetchSettingsDeviceInfoJson("/api/raw/local_state")' in js
+    assert 'fetchSettingsDeviceInfoJson("/api/system/database")' in js
     assert 'setSettingsDeviceInfoValue("settings-device-info-firmware"' in js
     assert 'setSettingsDeviceInfoValue("settings-device-info-hardware"' in js
     assert 'setSettingsDeviceInfoValue("settings-device-info-public-key"' in js
+    assert 'setSettingsDatabaseInfoValue("settings-database-info-total-rows"' in js
     assert 'next === "system"' in js
     assert 'const settingsBadgeEmojiStorageKey = "meshDashboardSettingsBadgeEmojiV1";' not in js
     assert 'document.getElementById("layout-view-menu-head-mark")' not in js

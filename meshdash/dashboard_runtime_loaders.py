@@ -74,6 +74,7 @@ def _copy_state_fn_attrs(target_fn: object, source_fn: object) -> None:
         "raw_nodes_full",
         "top_nodes_fn",
         "link_edges_fn",
+        "database_stats_fn",
         "_sensitive_field_names",
     ):
         attr = getattr(source_fn, name, None)

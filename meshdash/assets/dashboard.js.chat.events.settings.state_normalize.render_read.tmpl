@@ -7,6 +7,41 @@
       fetchedAt: 0,
     }};
     let settingsDeviceInfoHydratePromise = null;
+    const settingsDatabaseInfoTtlMs = 30000;
+    const settingsDatabaseInfoCache = {{
+      payload: null,
+      error: "",
+      fetchedAt: 0,
+    }};
+    let settingsDatabaseInfoHydratePromise = null;
+    const settingsDatabaseInfoValueIds = [
+      "settings-database-info-path",
+      "settings-database-info-total-size",
+      "settings-database-info-size",
+      "settings-database-info-wal-size",
+      "settings-database-info-total-rows",
+      "settings-database-info-packets",
+      "settings-database-info-packet-events",
+      "settings-database-info-chat",
+      "settings-database-info-connections",
+      "settings-database-info-node-capabilities",
+      "settings-database-info-node-saved-counts",
+      "settings-database-info-node-positions",
+      "settings-database-info-node-metrics",
+      "settings-database-info-link-metrics",
+      "settings-database-info-summary-metrics",
+      "settings-database-info-environment-metrics",
+      "settings-database-info-malformed-text",
+      "settings-database-info-settings",
+      "settings-database-info-oldest-packet",
+      "settings-database-info-newest-packet",
+      "settings-database-info-retention",
+      "settings-database-info-event-retention",
+      "settings-database-info-rollup-retention",
+      "settings-database-info-pages",
+      "settings-database-info-freelist",
+      "settings-database-info-generated",
+    ];
 
     function settingsDeviceInfoObject(value) {{
       return value && typeof value === "object" && !Array.isArray(value) ? value : null;
@@ -310,6 +345,214 @@
         settingsDeviceInfoHydratePromise = null;
       }});
       return settingsDeviceInfoHydratePromise;
+    }}
+
+    function setSettingsDatabaseInfoValue(id, value) {{
+      setSettingsDeviceInfoValue(id, value);
+    }}
+
+    function clearSettingsDatabaseInfoValues() {{
+      settingsDatabaseInfoValueIds.forEach((id) => setSettingsDatabaseInfoValue(id, ""));
+    }}
+
+    function formatSettingsDatabaseNumber(value) {{
+      if (value == null || (typeof value === "string" && !value.trim())) return "";
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return "";
+      return Math.trunc(numeric).toLocaleString();
+    }}
+
+    function formatSettingsDatabaseBytes(value) {{
+      if (value == null || (typeof value === "string" && !value.trim())) return "";
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric < 0) return "";
+      if (numeric === 0) return "0 B";
+      const units = ["B", "KB", "MB", "GB", "TB"];
+      let unitIdx = 0;
+      let bytes = numeric;
+      while (bytes >= 1024 && unitIdx < units.length - 1) {{
+        bytes /= 1024;
+        unitIdx += 1;
+      }}
+      const digits = unitIdx === 0 || bytes >= 100 ? 0 : (bytes >= 10 ? 1 : 2);
+      return `${{bytes.toFixed(digits)}} ${{units[unitIdx]}}`;
+    }}
+
+    function formatSettingsDatabaseEpoch(value) {{
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return "";
+      if (typeof formatLocalChatTime === "function") {{
+        return formatLocalChatTime(numeric);
+      }}
+      try {{
+        return new Date(numeric * 1000).toLocaleString();
+      }} catch (_err) {{
+        return "";
+      }}
+    }}
+
+    function formatSettingsDatabaseDuration(seconds, maxRows) {{
+      const parts = [];
+      const hasSeconds = !(seconds == null || (typeof seconds === "string" && !seconds.trim()));
+      const cleanSeconds = Number(seconds);
+      if (hasSeconds && Number.isFinite(cleanSeconds)) {{
+        if (cleanSeconds <= 0) {{
+          parts.push("unlimited");
+        }} else {{
+          const days = Math.max(1, Math.round(cleanSeconds / 86400));
+          parts.push(`${{days.toLocaleString()}}d`);
+        }}
+      }}
+      const cleanMaxRows = Number(maxRows);
+      if (Number.isFinite(cleanMaxRows) && cleanMaxRows > 0) {{
+        parts.push(`max ${{Math.trunc(cleanMaxRows).toLocaleString()}} rows`);
+      }}
+      return parts.join(" | ");
+    }}
+
+    function settingsDatabaseInfoTableCount(stats, tableName) {{
+      const counts = settingsDeviceInfoObject(settingsDeviceInfoFirst([stats], ["table_counts", "tableCounts"])) || {{}};
+      return counts[tableName];
+    }}
+
+    function settingsDatabaseInfoRangeValue(stats, tableName, keyName) {{
+      const ranges = settingsDeviceInfoObject(settingsDeviceInfoFirst([stats], ["ranges"])) || {{}};
+      const range = settingsDeviceInfoObject(ranges[tableName]) || {{}};
+      return range[keyName];
+    }}
+
+    function settingsDatabaseInfoPages(stats) {{
+      const pageCount = Number(settingsDeviceInfoFirst([stats], ["page_count", "pageCount"]));
+      const pageSize = Number(settingsDeviceInfoFirst([stats], ["page_size", "pageSize"]));
+      if (!Number.isFinite(pageCount) || pageCount < 0) return "";
+      if (!Number.isFinite(pageSize) || pageSize <= 0) {{
+        return `${{Math.trunc(pageCount).toLocaleString()}} pages`;
+      }}
+      return `${{Math.trunc(pageCount).toLocaleString()}} x ${{formatSettingsDatabaseBytes(pageSize)}}`;
+    }}
+
+    function settingsDatabaseInfoFreelist(stats) {{
+      const freelistCount = Number(settingsDeviceInfoFirst([stats], ["freelist_count", "freelistCount"]));
+      const pageSize = Number(settingsDeviceInfoFirst([stats], ["page_size", "pageSize"]));
+      if (!Number.isFinite(freelistCount) || freelistCount < 0) return "";
+      const countText = `${{Math.trunc(freelistCount).toLocaleString()}} pages`;
+      if (!Number.isFinite(pageSize) || pageSize <= 0) return countText;
+      return `${{countText}} | ${{formatSettingsDatabaseBytes(freelistCount * pageSize)}}`;
+    }}
+
+    function renderSettingsDatabaseInfo(payload = settingsDatabaseInfoCache.payload) {{
+      const grid = document.getElementById("settings-database-info-grid");
+      if (!(grid instanceof HTMLElement)) return;
+      const stats = settingsDeviceInfoObject(payload);
+      if (!stats) {{
+        if (settingsDatabaseInfoCache.error) {{
+          setText("settings-database-info-status", `Database stats could not be fetched: ${{settingsDatabaseInfoCache.error}}`);
+        }}
+        return;
+      }}
+
+      if (stats.ok === false || stats.enabled === false) {{
+        clearSettingsDatabaseInfoValues();
+        const errorText = settingsDeviceInfoText(settingsDeviceInfoFirst([stats], ["error"]));
+        setText("settings-database-info-status", errorText || "History database stats are unavailable on this dashboard instance.");
+        return;
+      }}
+
+      const policy = settingsDeviceInfoObject(settingsDeviceInfoFirst([stats], ["policy"])) || {{}};
+      setSettingsDatabaseInfoValue("settings-database-info-path", settingsDeviceInfoFirst([stats], ["path"]));
+      setSettingsDatabaseInfoValue("settings-database-info-total-size", formatSettingsDatabaseBytes(
+        settingsDeviceInfoFirst([stats], ["total_size_bytes", "totalSizeBytes"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-size", formatSettingsDatabaseBytes(
+        settingsDeviceInfoFirst([stats], ["size_bytes", "sizeBytes"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-wal-size", formatSettingsDatabaseBytes(
+        settingsDeviceInfoFirst([stats], ["wal_size_bytes", "walSizeBytes"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-total-rows", formatSettingsDatabaseNumber(
+        settingsDeviceInfoFirst([stats], ["total_rows", "totalRows"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-packets", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "packets")));
+      setSettingsDatabaseInfoValue("settings-database-info-packet-events", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "packet_events")));
+      setSettingsDatabaseInfoValue("settings-database-info-chat", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "chat")));
+      setSettingsDatabaseInfoValue("settings-database-info-connections", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "connections")));
+      setSettingsDatabaseInfoValue("settings-database-info-node-capabilities", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "node_capabilities")));
+      setSettingsDatabaseInfoValue("settings-database-info-node-saved-counts", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "node_saved_counts")));
+      setSettingsDatabaseInfoValue("settings-database-info-node-positions", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "node_positions")));
+      setSettingsDatabaseInfoValue("settings-database-info-node-metrics", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "node_metrics_1m")));
+      setSettingsDatabaseInfoValue("settings-database-info-link-metrics", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "link_metrics_1m")));
+      setSettingsDatabaseInfoValue("settings-database-info-summary-metrics", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "summary_metrics_1m")));
+      setSettingsDatabaseInfoValue("settings-database-info-environment-metrics", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "environment_metrics_1m")));
+      setSettingsDatabaseInfoValue("settings-database-info-malformed-text", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "malformed_text_payloads")));
+      setSettingsDatabaseInfoValue("settings-database-info-settings", formatSettingsDatabaseNumber(settingsDatabaseInfoTableCount(stats, "dashboard_settings")));
+      setSettingsDatabaseInfoValue("settings-database-info-oldest-packet", formatSettingsDatabaseEpoch(
+        settingsDatabaseInfoRangeValue(stats, "packets", "first_unix")
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-newest-packet", formatSettingsDatabaseEpoch(
+        settingsDatabaseInfoRangeValue(stats, "packets", "last_unix")
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-retention", formatSettingsDatabaseDuration(
+        settingsDeviceInfoFirst([policy], ["retention_seconds", "retentionSeconds"]),
+        settingsDeviceInfoFirst([policy], ["max_rows", "maxRows"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-event-retention", formatSettingsDatabaseDuration(
+        settingsDeviceInfoFirst([policy], ["event_retention_seconds", "eventRetentionSeconds"]),
+        settingsDeviceInfoFirst([policy], ["event_max_rows", "eventMaxRows"])
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-rollup-retention", formatSettingsDatabaseDuration(
+        settingsDeviceInfoFirst([policy], ["rollup_retention_seconds", "rollupRetentionSeconds"]),
+        null
+      ));
+      setSettingsDatabaseInfoValue("settings-database-info-pages", settingsDatabaseInfoPages(stats));
+      setSettingsDatabaseInfoValue("settings-database-info-freelist", settingsDatabaseInfoFreelist(stats));
+      setSettingsDatabaseInfoValue("settings-database-info-generated", formatSettingsDatabaseEpoch(
+        settingsDeviceInfoFirst([stats], ["generated_unix", "generatedUnix"])
+      ));
+
+      const totalRows = formatSettingsDatabaseNumber(settingsDeviceInfoFirst([stats], ["total_rows", "totalRows"]));
+      const totalSize = formatSettingsDatabaseBytes(settingsDeviceInfoFirst([stats], ["total_size_bytes", "totalSizeBytes"]));
+      const summaryBits = [];
+      if (totalRows) summaryBits.push(`${{totalRows}} rows`);
+      if (totalSize) summaryBits.push(totalSize);
+      setText("settings-database-info-status", summaryBits.length
+        ? `Dashboard history SQLite database: ${{summaryBits.join(" | ")}}.`
+        : "Dashboard history SQLite database stats.");
+    }}
+
+    async function hydrateSettingsDatabaseInfo(force = false) {{
+      const grid = document.getElementById("settings-database-info-grid");
+      if (!(grid instanceof HTMLElement)) return null;
+      const nowMs = Date.now();
+      if (
+        !force
+        && settingsDatabaseInfoCache.payload
+        && settingsDatabaseInfoCache.fetchedAt > 0
+        && (nowMs - settingsDatabaseInfoCache.fetchedAt) < settingsDatabaseInfoTtlMs
+      ) {{
+        renderSettingsDatabaseInfo(settingsDatabaseInfoCache.payload);
+        return settingsDatabaseInfoCache.payload;
+      }}
+      if (settingsDatabaseInfoHydratePromise) return settingsDatabaseInfoHydratePromise;
+      setText("settings-database-info-status", "Fetching dashboard history database stats...");
+      settingsDatabaseInfoHydratePromise = fetchSettingsDeviceInfoJson("/api/system/database")
+        .then((payload) => {{
+          settingsDatabaseInfoCache.payload = payload;
+          settingsDatabaseInfoCache.error = "";
+          settingsDatabaseInfoCache.fetchedAt = Date.now();
+          renderSettingsDatabaseInfo(payload);
+          return payload;
+        }})
+        .catch((err) => {{
+          settingsDatabaseInfoCache.error = err && err.message ? err.message : String(err || "unknown error");
+          settingsDatabaseInfoCache.fetchedAt = Date.now();
+          setText("settings-database-info-status", `Database stats could not be fetched: ${{settingsDatabaseInfoCache.error}}`);
+          renderSettingsDatabaseInfo(settingsDatabaseInfoCache.payload);
+          return settingsDatabaseInfoCache.payload;
+        }})
+        .finally(() => {{
+          settingsDatabaseInfoHydratePromise = null;
+        }});
+      return settingsDatabaseInfoHydratePromise;
     }}
 
     function renderSettings(state, force = false) {{
@@ -666,8 +909,10 @@
       syncSettingsTimeSyncControls();
       syncSettingsAppearanceControls();
       renderSettingsDeviceInfo(state);
+      renderSettingsDatabaseInfo();
       if (activeSettingsTab === "system") {{
         void hydrateSettingsDeviceInfo(false);
+        void hydrateSettingsDatabaseInfo(false);
       }}
     }}
 

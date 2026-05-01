@@ -274,6 +274,19 @@ def build_dashboard_runtime_context(
 
     # Optional: expose custom telemetry extraction rules persisted in history DB.
     if history_store is not None:
+        database_stats_fn = getattr(history_store, "database_stats", None)
+        if callable(database_stats_fn):
+            try:
+                setattr(loaders.state_fn, "database_stats_fn", database_stats_fn)
+            except Exception:
+                pass
+            state_lite_fn = getattr(loaders.state_fn, "lite", None)
+            if callable(state_lite_fn):
+                try:
+                    setattr(state_lite_fn, "database_stats_fn", database_stats_fn)
+                except Exception:
+                    pass
+
         get_bbs_settings_fn = getattr(history_store, "get_bbs_settings", None)
         set_bbs_settings_fn = getattr(history_store, "set_bbs_settings", None)
         if callable(get_bbs_settings_fn):
