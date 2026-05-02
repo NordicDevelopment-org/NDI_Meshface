@@ -142,6 +142,9 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     dark_chat_input_hover_section = css.rsplit("[data-theme=\"dark\"] #chat-input:hover {", 1)[1].split("}", 1)[0]
     dark_chat_input_focus_section = css.rsplit("[data-theme=\"dark\"] #chat-input:focus {", 1)[1].split("}", 1)[0]
     dark_bottom_bar_section = css.rsplit("[data-theme=\"dark\"] .chat-left-bottom-bar {", 1)[1].split("}", 1)[0]
+    dark_chat_compose_input_section = css.split("[data-theme=\"dark\"] .chat-left-bottom-bar .list-search-input,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat #chat-input {", 1)[1].split("}", 1)[0]
+    dark_chat_compose_input_hover_section = css.split("[data-theme=\"dark\"] .chat-left-bottom-bar .list-search-input:hover,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat #chat-input:hover {", 1)[1].split("}", 1)[0]
+    dark_chat_compose_input_focus_section = css.split("[data-theme=\"dark\"] .chat-left-bottom-bar .list-search-input:focus,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat #chat-input:focus {", 1)[1].split("}", 1)[0]
     dark_send_btn_section = css.split("[data-theme=\"dark\"] #chat-emoji-btn,\n    [data-theme=\"dark\"] #chat-send-btn {", 1)[1].split("}", 1)[0]
 
     assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in compose_shell_section
@@ -170,8 +173,8 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     assert "var(--workspace-shell-active-bg)" in dark_channel_badge_section
     assert "var(--workspace-shell-text-soft)" in dark_channel_badge_section
     assert "var(--workspace-shell-active-text)" in dark_channel_badge_active_section
-    assert "background: var(--ui-panel) !important;" in dark_bottom_bar_section
-    assert "var(--ui-border)" in dark_bottom_bar_section
+    assert "background: var(--workspace-shell-bg) !important;" in dark_bottom_bar_section
+    assert "var(--workspace-shell-border-muted)" in dark_bottom_bar_section
     assert "[data-theme=\"dark\"] #chat-emoji-btn," in css
     assert "[data-theme=\"dark\"] #chat-send-btn {" in css
     assert "background: var(--ui-panel);" in dark_input_section
@@ -190,10 +193,15 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     assert "color-mix(in srgb, var(--ui-accent) 34%, transparent)" in dark_chat_input_focus_section
     assert "border-color: var(--ui-accent);" in dark_chat_input_focus_section
     assert "background: var(--ui-panel-alt);" in dark_chat_input_focus_section
-    assert "background: var(--ui-panel) !important;" in dark_send_btn_section
-    assert "border-color: var(--ui-border) !important;" in dark_send_btn_section
-    assert "color: var(--ui-text) !important;" in dark_send_btn_section
-    assert "var(--workspace-shell-border)" not in dark_send_btn_section
+    assert "background: var(--workspace-shell-bg-alt);" in dark_chat_compose_input_section
+    assert "border-color: var(--workspace-shell-border-muted);" in dark_chat_compose_input_section
+    assert "background: var(--workspace-shell-hover-bg);" in dark_chat_compose_input_hover_section
+    assert "border-color: var(--workspace-shell-border);" in dark_chat_compose_input_hover_section
+    assert "background: var(--workspace-shell-bg-alt);" in dark_chat_compose_input_focus_section
+    assert "border-color: var(--workspace-shell-border-strong);" in dark_chat_compose_input_focus_section
+    assert "background: var(--workspace-shell-bg-alt) !important;" in dark_send_btn_section
+    assert "border-color: var(--workspace-shell-border-muted) !important;" in dark_send_btn_section
+    assert "color: var(--workspace-shell-text) !important;" in dark_send_btn_section
     assert ".list-search-input,\n    #chat-input {" in css
     assert "#chat-input:hover {" in css
     assert "[data-theme=\"dark\"] #chat-input:hover {" in css
@@ -284,17 +292,16 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     dark_tinted_compose_shell_section = css.split("[data-theme=\"dark\"] .chat-compose-shell.channel-tinted,\n    [data-theme=\"dark\"] .card.chat .chat-compose-shell.channel-tinted,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell.channel-tinted {", 1)[1].split("}", 1)[0]
     dark_bottom_bar_section = css.rsplit("[data-theme=\"dark\"] .chat-left-bottom-bar {", 1)[1].split("}", 1)[0]
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell {" in css
-    assert "background: var(--ui-panel);" in dark_compose_shell_section
+    assert "background: var(--workspace-shell-bg);" in dark_compose_shell_section
     assert "background-image: none;" in dark_compose_shell_section
-    assert "color-mix(in srgb, var(--ui-border) 62%, transparent)" in dark_compose_shell_section
+    assert "border-color: var(--workspace-shell-border-muted);" in dark_compose_shell_section
     assert "rgba(var(--chat-send-channel-rgb), 0.1)" in dark_tinted_compose_shell_section
-    assert "rgba(16, 26, 36, 0.99) 34%" in dark_tinted_compose_shell_section
+    assert "color-mix(in srgb, var(--workspace-shell-bg) 96%, var(--workspace-shell-bg-alt) 4%) 34%" in dark_tinted_compose_shell_section
     assert "border-color: rgba(var(--chat-send-channel-rgb), 0.38) !important;" in dark_tinted_compose_shell_section
     assert "box-shadow: inset 0 0 0 1px rgba(var(--chat-send-channel-rgb), 0.08);" in dark_tinted_compose_shell_section
-    assert "var(--workspace-shell-border)" not in dark_tinted_compose_shell_section
     assert "[data-theme=\"dark\"] .chat-left-bottom-bar {" in css
-    assert "background: var(--ui-panel) !important;" in dark_bottom_bar_section
-    assert "var(--ui-border)" in dark_bottom_bar_section
+    assert "background: var(--workspace-shell-bg) !important;" in dark_bottom_bar_section
+    assert "var(--workspace-shell-border-muted)" in dark_bottom_bar_section
     assert "[data-theme=\"dark\"] .chat-panel-splitter {" in css
     assert "[data-theme=\"dark\"] .chat-member-pane {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-feed-item {" in css

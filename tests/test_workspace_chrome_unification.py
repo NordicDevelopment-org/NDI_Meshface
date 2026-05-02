@@ -526,16 +526,20 @@ def test_network_subview_charts_pull_runtime_theme_vars() -> None:
     assert 'themeColor("--ui-accent"' in js
 
 
-def test_dark_text_input_variants_use_neutral_ui_tokens_for_chat_compose_controls() -> None:
+def test_dark_chat_compose_controls_use_workspace_shell_tokens() -> None:
     css = build_dashboard_css(theme_css="")
 
     search_input_section = css.rsplit("[data-theme=\"dark\"] .list-search-input,", 1)[1].split("}", 1)[0]
+    chat_compose_input_section = css.split("[data-theme=\"dark\"] .chat-left-bottom-bar .list-search-input,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat #chat-input {", 1)[1].split("}", 1)[0]
     shared_text_inputs_section = css.split("[data-theme=\"dark\"] .chat-peer-input,", 1)[1].split("}", 1)[0]
     shared_focus_section = css.split("[data-theme=\"dark\"] .chat-peer-input:focus,", 1)[1].split("}", 1)[0]
 
     assert "var(--ui-panel)" in search_input_section
     assert "var(--ui-border)" in search_input_section
     assert "var(--ui-text)" in search_input_section
+    assert "var(--workspace-shell-bg-alt)" in chat_compose_input_section
+    assert "var(--workspace-shell-border-muted)" in chat_compose_input_section
+    assert "var(--workspace-shell-text)" in chat_compose_input_section
     assert "[data-theme=\"dark\"] .settings-textarea," in css
     assert "[data-theme=\"dark\"] .chat-input," in css
     assert "var(--ui-panel)" in shared_text_inputs_section
