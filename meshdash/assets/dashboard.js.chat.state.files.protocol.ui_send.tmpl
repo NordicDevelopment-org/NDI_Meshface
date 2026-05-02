@@ -496,12 +496,49 @@
       }}
     }}
 
-    function syncFileTransferDestinationInput() {{
+    function extractFileTransferDestinationId(rawDestination) {{
+      const clean = normalizeNodeId(rawDestination || "");
+      if (isCanonicalNodeId(clean)) return clean;
+      const text = String(rawDestination == null ? "" : rawDestination);
+      const bangMatch = text.match(/![0-9a-f]{{8}}/i);
+      if (bangMatch) {{
+        const fromBang = normalizeNodeId(bangMatch[0]);
+        if (isCanonicalNodeId(fromBang)) return fromBang;
+      }}
+      return "";
+    }}
+
+    function fileTransferDestinationDisplayLabel(nodeId, state = latestState) {{
+      const clean = normalizeNodeId(nodeId || "");
+      if (!isCanonicalNodeId(clean)) return "";
+      const safeState = state && typeof state === "object" ? state : latestState;
+      const nodes = Array.isArray(safeState && safeState.nodes) ? safeState.nodes : [];
+      const node = nodes.find((entry) => normalizeNodeId(entry && entry.id) === clean) || null;
+      const preferred = preferredNodeName(node) || nodeNameCache.get(clean) || "";
+      return preferred ? `${{preferred}} (${{clean}})` : clean;
+    }}
+
+    function syncFileTransferDestinationInput(state = latestState) {{
       const input = document.getElementById("files-destination-input");
       if (!(input instanceof HTMLInputElement)) return;
       const clean = normalizeNodeId(fileTransferDestinationId || "");
-      if (input.value !== clean) {{
-        input.value = clean;
+      const label = fileTransferDestinationDisplayLabel(clean, state);
+      if (input.value !== label) {{
+        input.value = label;
+      }}
+      input.dataset.nodeId = clean;
+      input.title = label && label !== clean ? clean : "";
+      input.setAttribute("aria-label", label ? `Destination node ${{label}}` : "Destination node");
+    }}
+
+    function syncFileTransferDestinationInputFromText() {{
+      const input = document.getElementById("files-destination-input");
+      if (!(input instanceof HTMLInputElement)) return;
+      const clean = extractFileTransferDestinationId(input.value || "");
+      fileTransferDestinationId = clean;
+      input.dataset.nodeId = clean;
+      if (!clean) {{
+        input.title = "";
       }}
     }}
 
@@ -516,19 +553,21 @@
 
     function syncFileTransferDestinationFromSelectedNode(state = latestState, options = null) {{
       const selectedSeed = fileTransferInviteSeedPeerId(state);
-      if (!isCanonicalNodeId(selectedSeed)) return "";
+      if (!isCanonicalNodeId(selectedSeed)) {{
+        syncFileTransferDestinationInput(state);
+        return "";
+      }}
       if (normalizeNodeId(fileTransferDestinationId || "") !== selectedSeed) {{
         setFileTransferDestination(selectedSeed, options);
       }} else {{
-        syncFileTransferDestinationInput();
+        syncFileTransferDestinationInput(state);
       }}
       return selectedSeed;
     }}
 
     function setFileTransferDestination(rawDestination, options = null) {{
       const persist = !(options && options.persist === false);
-      const clean = normalizeNodeId(rawDestination || "");
-      fileTransferDestinationId = isCanonicalNodeId(clean) ? clean : "";
+      fileTransferDestinationId = extractFileTransferDestinationId(rawDestination || "");
       syncFileTransferDestinationInput();
       if (persist) {{
         persistFileTransferDestinationPreference();
@@ -548,7 +587,10 @@
     function resolveFileTransferDestination() {{
       const input = document.getElementById("files-destination-input");
       const rawInput = input instanceof HTMLInputElement ? input.value : "";
-      let destination = normalizeNodeId(rawInput || fileTransferDestinationId || "");
+      let destination = extractFileTransferDestinationId(rawInput);
+      if (!isCanonicalNodeId(destination)) {{
+        destination = normalizeNodeId(fileTransferDestinationId || "");
+      }}
       if (!isCanonicalNodeId(destination)) {{
         destination = fileTransferInviteSeedPeerId(latestState);
       }}
@@ -912,9 +954,11 @@
       if (destinationInput instanceof HTMLInputElement && destinationInput.dataset.bound !== "1") {{
         destinationInput.dataset.bound = "1";
         destinationInput.addEventListener("input", () => {{
-          const clean = normalizeNodeId(destinationInput.value || "");
-          fileTransferDestinationId = isCanonicalNodeId(clean) ? clean : "";
+          syncFileTransferDestinationInputFromText();
           persistFileTransferDestinationPreference();
+        }});
+        destinationInput.addEventListener("change", () => {{
+          syncFileTransferDestinationInput();
         }});
       }}
       const useSelectedBtn = document.getElementById("files-use-selected-btn");

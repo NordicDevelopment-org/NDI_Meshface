@@ -138,6 +138,13 @@ def test_dashboard_js_exposes_files_in_app_channel_routing_when_enabled() -> Non
     assert 'label: "Games"' in routing_block
 
 
+def test_dashboard_html_labels_files_destination_as_node() -> None:
+    html_template = (Path(__file__).resolve().parents[1] / "meshdash/assets/dashboard.html.tmpl").read_text()
+
+    assert '<span class="files-label">Destination Node</span>' in html_template
+    assert 'placeholder="Select a node or enter !1234abcd"' in html_template
+
+
 def test_dashboard_js_syncs_files_destination_from_node_selection() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
@@ -154,6 +161,10 @@ def test_dashboard_js_syncs_files_destination_from_node_selection() -> None:
     render_block = js[render_start:render_end]
 
     assert "function syncFileTransferDestinationFromSelectedNode(state = latestState, options = null) {" in js
+    assert "function fileTransferDestinationDisplayLabel(nodeId, state = latestState) {" in js
+    assert "return preferred ? `${preferred} (${clean})` : clean;" in js
+    assert "let destination = extractFileTransferDestinationId(rawInput);" in js
+    assert 'destination = normalizeNodeId(fileTransferDestinationId || "");' in js
     assert 'if (activeLayoutView === "files" && typeof syncFileTransferDestinationFromSelectedNode === "function") {' in select_block
     assert "syncFileTransferDestinationFromSelectedNode(latestState, { persist: true });" in select_block
     assert "const selectedSeed = syncFileTransferDestinationFromSelectedNode(state, { persist: true });" in render_block
