@@ -188,26 +188,11 @@ Run `python mesh_dashboard.py --help` for the authoritative runtime flag list.
 
 ## Data And Storage
 
-### Profiled history databases
+### Shared history database
 
-`--history-db` is the base path, not always the final on-disk filename.
-
-At startup the dashboard derives a profile key from the connected radio,
-preferring the local node id when available, and then rewrites the DB path to:
-
-```text
-<base>.radio-<profile-key>.sqlite3
-```
-
-Examples:
-
-- `mesh_dashboard_history.sqlite3` ->
-  `mesh_dashboard_history.radio-1234abcd.sqlite3`
-- `mesh_dashboard_history.sqlite3` ->
-  `mesh_dashboard_history.radio-192-168-1-69-4403-tcp.sqlite3`
-
-This allows multiple radios to share one base path without trampling each
-other's history.
+`--history-db` is the final on-disk SQLite filename. The dashboard no longer
+adds a connected-radio suffix, so any radio plugged into the dashboard
+contributes to the same persisted packet, chat, node, and rollup history.
 
 ### History modes
 
@@ -246,8 +231,8 @@ python mesh_dashboard.py \
   --backfill-environment-rollups-reset
 ```
 
-If you pass the base history path and multiple profiled DBs exist, backfill
-selects the most recently modified matching profiled DB.
+Backfill uses the exact `--history-db` path. To backfill an older per-radio
+database, pass that profiled `.radio-...` filename explicitly.
 
 ## Links View Semantics
 

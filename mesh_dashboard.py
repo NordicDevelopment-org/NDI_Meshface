@@ -1,5 +1,4 @@
 import argparse
-import glob
 import os
 from typing import Optional
 
@@ -417,27 +416,15 @@ def _build_make_http_handler_with_theme_settings(
 
 def _resolve_backfill_history_db_path(raw_history_db: object) -> tuple[str, list[str]]:
     resolved = os.path.abspath(os.path.expanduser(str(raw_history_db or DEFAULT_HISTORY_DB)))
-    if ".radio-" in os.path.basename(resolved):
-        return resolved, []
-    root, ext = os.path.splitext(resolved)
-    candidate_pattern = f"{root}.radio-*{ext}"
-    candidates = [path for path in glob.glob(candidate_pattern) if os.path.isfile(path)]
-    if not candidates:
-        return resolved, []
-    candidates.sort(key=lambda path: os.path.getmtime(path), reverse=True)
-    return candidates[0], candidates
+    return resolved, []
 
 
 def run_environment_rollup_backfill(args: argparse.Namespace) -> None:
-    selected_db_path, candidates = _resolve_backfill_history_db_path(getattr(args, "history_db", ""))
+    selected_db_path, _candidates = _resolve_backfill_history_db_path(
+        getattr(args, "history_db", "")
+    )
     reset_existing = bool(getattr(args, "backfill_environment_rollups_reset", False))
-    if candidates:
-        print(
-            f"Backfill DB selected: {selected_db_path} "
-            f"(found {len(candidates)} profiled DB candidate(s))."
-        )
-    else:
-        print(f"Backfill DB selected: {selected_db_path}")
+    print(f"Backfill DB selected: {selected_db_path}")
     conn = _open_and_initialize_history_connection_helper(
         db_path=selected_db_path,
         retention_seconds=max(0, int(getattr(args, "history_retention_days", 0))) * 86400,

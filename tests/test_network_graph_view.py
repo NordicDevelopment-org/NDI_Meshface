@@ -131,8 +131,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function resolveMapNodeEmoji(nodeId, state = latestState)' in js
     assert 'function createMapNodeMarker(lat, lon, nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
     assert 'function refreshMapNodeMarkerPresentation(marker, nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
-    assert 'return (typeof nodeVisualEmojiForNode === "function")' in js
-    assert "nodeVisualEmojiForNode(nodeId, null, item && item.node)" in js
+    assert 'function networkGraphVisibleNodeEmojiForNode(nodeId, node = null)' in js
+    assert "networkGraphVisibleNodeEmojiForNode(nodeId, item && item.node)" in js
     assert "nodeVisualEmojiForNode(cleanNodeId, null, node)" in js
     assert 'settingsBadgeEmojiChoiceSet.has(String(settingsBadgeEmoji || "").trim())' not in js
     assert '"has-emoji-glyph"' in js
@@ -340,8 +340,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'data-network-graph-tag-preset-id="${escAttr(segment.presetId)}"' in js
     assert 'data-network-graph-tag-edge-key="${escAttr(segment.edgeKey)}"' in js
     assert 'data-network-graph-tag-filter-id="${escAttr(item.presetId)}"' in js
-    assert 'const disabledAttr = hasRoutes ? "" : " disabled";' in js
-    assert 'No current ${item.label} routes from this view' in js
+    assert 'const canToggle = Number(item.count || 0) > 0 || hasRoutes;' in js
+    assert 'const disabledAttr = canToggle ? "" : " disabled";' in js
+    assert 'Toggle ${item.label} node highlighting; no current routes from this view' in js
     assert 'localId,' in js
     assert '<g class="network-graph-tag-routes">' in js
     assert '<g class="network-graph-self-path">' in js

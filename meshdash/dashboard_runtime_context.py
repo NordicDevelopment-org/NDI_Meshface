@@ -55,8 +55,8 @@ from .dashboard_setup import (
 )
 from .send_chat_contracts import SendLock
 from .history_profile import (
-    build_profiled_history_db_path,
-    resolve_history_profile_key,
+    build_shared_history_db_path,
+    resolve_history_local_node_id,
 )
 from .fault_recorder import FaultRecorder
 
@@ -125,22 +125,24 @@ def build_dashboard_runtime_context(
     print_fn(f"Connecting to {target} ...")
     iface = open_mesh_interface_fn(args)
 
-    history_db_base_path = resolve_history_db_path_fn(args.history_db)
-    history_profile_key = resolve_history_profile_key(
+    history_db_path = build_shared_history_db_path(
+        resolve_history_db_path_fn(args.history_db)
+    )
+    history_local_node_id = resolve_history_local_node_id(
         iface=iface,
         get_local_node_id_fn=get_local_node_id_fn,
-        mesh_target_label=target,
         wait_for_id_seconds=2.0,
-    )
-    history_db_path = build_profiled_history_db_path(
-        history_db_base_path,
-        profile_key=history_profile_key,
     )
     history_store: Optional[HistoryStoreLike] = open_optional_history_store_fn(
         args,
         history_store_cls=history_store_cls,
         history_db_path=history_db_path,
     )
+    if history_store is not None and history_local_node_id:
+        try:
+            setattr(history_store, "local_node_id", history_local_node_id)
+        except Exception:
+            pass
 
     tracker = dashboard_tracker_cls(packet_limit=args.packet_limit, history_store=history_store)
     send_lock = lock_factory()

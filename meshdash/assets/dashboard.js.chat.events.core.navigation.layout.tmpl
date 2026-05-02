@@ -3583,6 +3583,47 @@
       return !hiddenIds.has(cleanPresetId);
     }}
 
+    function networkGraphTagEntryPresetId(tagEntry) {{
+      return normalizeNetworkGraphTagRoutePresetId(
+        (tagEntry && tagEntry.presetId)
+        || (tagEntry && tagEntry.preset && tagEntry.preset.id)
+        || (tagEntry && tagEntry.preset && tagEntry.preset.name)
+        || ""
+      );
+    }}
+
+    function networkGraphVisibleTagEntryForNode(nodeId) {{
+      const tagEntry = (typeof nodeTagEntryForNode === "function")
+        ? nodeTagEntryForNode(nodeId)
+        : null;
+      if (!(tagEntry && tagEntry.preset)) return null;
+      const presetId = networkGraphTagEntryPresetId(tagEntry);
+      return networkGraphTagRoutePresetIsVisible(presetId) ? tagEntry : null;
+    }}
+
+    function networkGraphVisibleNodeEmojiForNode(nodeId, node = null) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!cleanNodeId) return "";
+      const tagEntry = networkGraphVisibleTagEntryForNode(cleanNodeId);
+      if (tagEntry && typeof nodeVisualEmojiForNode === "function") {{
+        return String(nodeVisualEmojiForNode(cleanNodeId, tagEntry, node) || "").trim();
+      }}
+      const localEmoji = typeof localVisualEmojiForNode === "function"
+        ? String(localVisualEmojiForNode(cleanNodeId, node) || "").trim()
+        : "";
+      if (localEmoji) return localEmoji;
+      const overrideEmoji = typeof nodeEmojiOverrideForNode === "function"
+        ? String(nodeEmojiOverrideForNode(cleanNodeId) || "").trim()
+        : "";
+      if (overrideEmoji) return overrideEmoji;
+      if (typeof nodeIntrinsicEmojiForNode === "function") {{
+        return String(nodeIntrinsicEmojiForNode(cleanNodeId, node) || "").trim();
+      }}
+      return typeof nodeVisualEmojiForNode === "function"
+        ? String(nodeVisualEmojiForNode(cleanNodeId, null, node) || "").trim()
+        : "";
+    }}
+
     function resolveNetworkGraphTagRouteLegendItems(edges, items, rootId, routeAnchorId = "") {{
       const byPresetId = new Map();
       for (const taggedItem of resolveNetworkGraphTaggedItems(items)) {{
@@ -3632,7 +3673,7 @@
           iconHtml: item.iconHtml,
           count: item.nodeIds.size,
           routeCount: item.routeTargetIds.size,
-          visible: item.routeTargetIds.size > 0 && networkGraphTagRoutePresetIsVisible(item.presetId),
+          visible: networkGraphTagRoutePresetIsVisible(item.presetId),
         }}))
         .sort((itemA, itemB) => (
           String(itemA.label || "").localeCompare(String(itemB.label || ""))
@@ -3839,7 +3880,7 @@
           persistPreferredNetworkGraphHiddenTagRoutePresetIds(networkGraphViewState.hiddenTagRoutePresetIds);
           const graphSvg = document.getElementById("network-graph-svg");
           if (graphSvg instanceof SVGElement) {{
-            syncNetworkGraphTagRouteLayer(graphSvg, scene);
+            syncNetworkGraphSceneData(graphSvg, scene);
           }}
           renderNetworkGraphTagRouteLegend(scene);
         }});
@@ -3908,13 +3949,16 @@
           ${{
             tagItems.map((item) => {{
               const hasRoutes = Number(item.routeCount || 0) > 0;
+              const canToggle = Number(item.count || 0) > 0 || hasRoutes;
               const checkedAttr = item.visible ? " checked" : "";
-              const disabledAttr = hasRoutes ? "" : " disabled";
+              const disabledAttr = canToggle ? "" : " disabled";
               const countLabel = item.count > 1 ? ` <span class="network-graph-tag-filter-count">${{item.count}}</span>` : "";
               const title = hasRoutes
-                ? `Toggle ${{item.label}} tag routes`
-                : `No current ${{item.label}} routes from this view`;
-              return `<label class="network-graph-tag-filter${{item.visible ? "" : " is-muted"}}${{hasRoutes ? "" : " is-empty"}}" style="--network-graph-tag-route-color:${{escAttr(item.color)}};" title="${{escAttr(title)}}">
+                ? `Toggle ${{item.label}} nodes and routes`
+                : canToggle
+                ? `Toggle ${{item.label}} node highlighting; no current routes from this view`
+                : `No current ${{item.label}} nodes or routes from this view`;
+              return `<label class="network-graph-tag-filter${{item.visible ? "" : " is-muted"}}${{canToggle ? "" : " is-empty"}}" style="--network-graph-tag-route-color:${{escAttr(item.color)}};" title="${{escAttr(title)}}">
                 <input
                   class="network-graph-tag-filter-input"
                   type="checkbox"
@@ -4018,9 +4062,7 @@
       function resolveNetworkGraphNodeEmoji(item) {{
         const nodeId = normalizeNodeId(item && item.nodeId || "");
         if (!nodeId) return "";
-        return (typeof nodeVisualEmojiForNode === "function")
-          ? nodeVisualEmojiForNode(nodeId, null, item && item.node)
-          : "";
+        return networkGraphVisibleNodeEmojiForNode(nodeId, item && item.node);
       }}
 
       const edgeRenderItems = edges.map((edge, index) => ({{
@@ -4082,9 +4124,7 @@
         const displayName = networkGraphNodeDisplayName(item.nodeId, nodeMap);
         const label = truncateNetworkGraphLabel(displayName, item.layer === 0 ? 28 : 16);
         const nodeEmoji = resolveNetworkGraphNodeEmoji(item);
-        const tagEntry = (typeof nodeTagEntryForNode === "function")
-          ? nodeTagEntryForNode(item.nodeId)
-          : null;
+        const tagEntry = networkGraphVisibleTagEntryForNode(item.nodeId);
         const isTaggedNode = !!(tagEntry && tagEntry.preset);
         const tagStyleVars = (isTaggedNode && typeof nodeTagStyleVars === "function")
           ? nodeTagStyleVars(tagEntry)
@@ -4330,9 +4370,7 @@
         const nodeId = normalizeNodeId(nodeEl.getAttribute("data-network-graph-node-id") || "");
         const item = itemByNodeId.get(nodeId);
         if (!item) return;
-        const tagEntry = (typeof nodeTagEntryForNode === "function")
-          ? nodeTagEntryForNode(item.nodeId)
-          : null;
+        const tagEntry = networkGraphVisibleTagEntryForNode(item.nodeId);
         const isTaggedNode = !!(tagEntry && tagEntry.preset);
         nodeEl.classList.toggle("is-tagged", isTaggedNode);
         if (isTaggedNode && typeof nodeTagStyleVars === "function") {{
@@ -5270,9 +5308,9 @@
 
     function networkGraphNodeHasTag(nodeId) {{
       const clean = normalizeNodeId(nodeId || "");
-      if (!clean || typeof nodeTagEntryForNode !== "function") return false;
+      if (!clean) return false;
       try {{
-        const tagEntry = nodeTagEntryForNode(clean);
+        const tagEntry = networkGraphVisibleTagEntryForNode(clean);
         return !!(tagEntry && tagEntry.preset);
       }} catch (_err) {{
         return false;
@@ -5284,7 +5322,7 @@
       if (!clean || typeof nodeVisualEmojiForNode !== "function") return false;
       const node = nodeMap instanceof Map ? (nodeMap.get(clean) || null) : null;
       try {{
-        return !!String(nodeVisualEmojiForNode(clean, null, node) || "").trim();
+        return !!networkGraphVisibleNodeEmojiForNode(clean, node);
       }} catch (_err) {{
         return false;
       }}

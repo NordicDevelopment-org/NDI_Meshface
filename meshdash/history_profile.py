@@ -25,6 +25,48 @@ def _key_from_local_node_id(local_node_id: object) -> str:
     return _slugify(lowered)
 
 
+def _canonical_local_node_id(local_node_id: object) -> str:
+    key = _key_from_local_node_id(local_node_id)
+    if re.fullmatch(r"[0-9a-fA-F]{8}", key):
+        return f"!{key.lower()}"
+    return ""
+
+
+def resolve_history_local_node_id(
+    *,
+    iface: object,
+    get_local_node_id_fn: object,
+    wait_for_id_seconds: float = 0.0,
+    poll_interval_seconds: float = 0.2,
+    now_unix_fn=time.time,
+    sleep_fn=time.sleep,
+) -> str:
+    if not callable(get_local_node_id_fn):
+        return ""
+
+    wait_seconds = max(0.0, float(wait_for_id_seconds or 0.0))
+    poll_seconds = max(0.05, float(poll_interval_seconds or 0.0))
+    deadline = now_unix_fn() + wait_seconds
+
+    while True:
+        try:
+            local_node_id = str(get_local_node_id_fn(iface) or "").strip()
+        except Exception:
+            local_node_id = ""
+
+        clean_local_node_id = _canonical_local_node_id(local_node_id)
+        if clean_local_node_id:
+            return clean_local_node_id
+        if wait_seconds <= 0.0:
+            break
+        now = now_unix_fn()
+        if now >= deadline:
+            break
+        sleep_fn(min(poll_seconds, max(0.0, deadline - now)))
+
+    return ""
+
+
 def resolve_history_profile_key(
     *,
     iface: object,
@@ -61,6 +103,10 @@ def resolve_history_profile_key(
     if target_key:
         return target_key
     return "unknown"
+
+
+def build_shared_history_db_path(history_db_path: str) -> str:
+    return str(history_db_path or "").strip()
 
 
 def _is_memory_or_uri_path(db_path: str) -> bool:
