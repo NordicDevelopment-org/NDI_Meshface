@@ -985,6 +985,9 @@
         return;
       }}
       selectedNodeId = normalized;
+      if (activeLayoutView === "files" && typeof syncFileTransferDestinationFromSelectedNode === "function") {{
+        syncFileTransferDestinationFromSelectedNode(latestState, {{ persist: true }});
+      }}
       let graphSelectionHandled = false;
       if (syncSelectionToNetworkGraph) {{
         graphSelectionHandled = focusNetworkGraphNodeFromSelection(normalized, {{

@@ -490,13 +490,7 @@
     }}
 
     function renderFilesView(state = latestState) {{
-      const selectedSeed = fileTransferInviteSeedPeerId(state);
-      if (
-        isCanonicalNodeId(selectedSeed)
-        && normalizeNodeId(fileTransferDestinationId || "") !== selectedSeed
-      ) {{
-        setFileTransferDestination(selectedSeed, {{ persist: true }});
-      }}
+      const selectedSeed = syncFileTransferDestinationFromSelectedNode(state, {{ persist: true }});
 
       const useSelectedBtn = document.getElementById("files-use-selected-btn");
       if (useSelectedBtn instanceof HTMLButtonElement) {{

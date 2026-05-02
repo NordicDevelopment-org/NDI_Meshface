@@ -514,6 +514,17 @@
       return selectedId;
     }}
 
+    function syncFileTransferDestinationFromSelectedNode(state = latestState, options = null) {{
+      const selectedSeed = fileTransferInviteSeedPeerId(state);
+      if (!isCanonicalNodeId(selectedSeed)) return "";
+      if (normalizeNodeId(fileTransferDestinationId || "") !== selectedSeed) {{
+        setFileTransferDestination(selectedSeed, options);
+      }} else {{
+        syncFileTransferDestinationInput();
+      }}
+      return selectedSeed;
+    }}
+
     function setFileTransferDestination(rawDestination, options = null) {{
       const persist = !(options && options.persist === false);
       const clean = normalizeNodeId(rawDestination || "");
@@ -531,10 +542,7 @@
       }} catch (_err) {{
       }}
       setFileTransferDestination(stored, {{ persist: false }});
-      const selectedSeed = fileTransferInviteSeedPeerId(latestState);
-      if (isCanonicalNodeId(selectedSeed)) {{
-        setFileTransferDestination(selectedSeed, {{ persist: true }});
-      }}
+      syncFileTransferDestinationFromSelectedNode(latestState, {{ persist: true }});
     }}
 
     function resolveFileTransferDestination() {{

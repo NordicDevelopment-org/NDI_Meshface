@@ -136,3 +136,24 @@ def test_dashboard_js_exposes_files_in_app_channel_routing_when_enabled() -> Non
     assert 'if (token === "files" && fileTransferFeatureEnabled) return "files";' in js
     assert 'id: "games"' in routing_block
     assert 'label: "Games"' in routing_block
+
+
+def test_dashboard_js_syncs_files_destination_from_node_selection() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        file_transfer_enabled=True,
+    )
+
+    select_start = js.index("function selectNode(nodeId, shouldFocus = true, toggleIfSelected = true) {")
+    select_end = js.index("function clearNodeSelection()", select_start)
+    select_block = js[select_start:select_end]
+    render_start = js.index("function renderFilesView(state = latestState) {")
+    render_end = js.index('const useSelectedBtn = document.getElementById("files-use-selected-btn");', render_start)
+    render_block = js[render_start:render_end]
+
+    assert "function syncFileTransferDestinationFromSelectedNode(state = latestState, options = null) {" in js
+    assert 'if (activeLayoutView === "files" && typeof syncFileTransferDestinationFromSelectedNode === "function") {' in select_block
+    assert "syncFileTransferDestinationFromSelectedNode(latestState, { persist: true });" in select_block
+    assert "const selectedSeed = syncFileTransferDestinationFromSelectedNode(state, { persist: true });" in render_block
