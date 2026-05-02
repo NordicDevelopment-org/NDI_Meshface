@@ -6684,6 +6684,155 @@
       font-weight: 800;
       line-height: 1.25;
     }}
+    .network-route-scope {{
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+      border: 1px solid rgba(188, 214, 195, 0.82);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 252, 248, 0.72)),
+        color-mix(in srgb, var(--panel) 88%, var(--bg) 12%);
+      overflow: hidden;
+    }}
+    .network-route-scope-head {{
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 28px;
+      padding: 7px 10px 0;
+      color: color-mix(in srgb, var(--muted) 74%, var(--ink) 26%);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.25;
+    }}
+    .network-route-scope-head > span:first-child {{
+      color: var(--ink);
+      font-size: 12px;
+    }}
+    .network-route-scope-head > span:nth-child(2) {{
+      min-width: 0;
+      overflow: hidden;
+      text-align: right;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .network-route-scope-reset-btn {{
+      min-height: 24px;
+      padding: 3px 8px;
+      border: 1px solid color-mix(in srgb, var(--line) 78%, var(--accent) 22%);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel) 84%, var(--accent) 16%);
+      color: color-mix(in srgb, var(--ink) 72%, var(--accent) 28%);
+      font: inherit;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.1;
+      cursor: pointer;
+    }}
+    .network-route-scope-reset-btn:hover {{
+      border-color: color-mix(in srgb, var(--line) 48%, var(--accent) 52%);
+      background: color-mix(in srgb, var(--panel) 76%, var(--accent) 24%);
+    }}
+    .network-route-scope-reset-btn:focus-visible {{
+      outline: 2px solid color-mix(in srgb, var(--accent) 58%, var(--panel) 42%);
+      outline-offset: 2px;
+    }}
+    .network-route-scope-svg {{
+      display: block;
+      width: 100%;
+      height: clamp(196px, 24vh, 270px);
+      min-height: 196px;
+      background:
+        linear-gradient(90deg, rgba(91, 181, 127, 0.08), rgba(255, 255, 255, 0) 42%),
+        rgba(255, 255, 255, 0.42);
+      cursor: grab;
+      touch-action: none;
+    }}
+    .network-route-scope-svg.is-panning {{
+      cursor: grabbing;
+    }}
+    .network-route-scope-edge {{
+      fill: none;
+      stroke: rgba(103, 137, 114, 0.58);
+      stroke-dasharray: 6 8;
+      stroke-linecap: round;
+      stroke-width: var(--route-scope-edge-width, 2px);
+      cursor: pointer;
+      pointer-events: stroke;
+      vector-effect: non-scaling-stroke;
+    }}
+    .network-route-scope-edge:hover,
+    .network-route-scope-edge:focus-visible {{
+      stroke: color-mix(in srgb, var(--accent) 64%, var(--ink) 36%);
+      outline: none;
+    }}
+    .network-route-scope-edge.is-route {{
+      stroke: color-mix(in srgb, var(--accent) 82%, var(--accent-2) 18%);
+      stroke-dasharray: none;
+    }}
+    .network-route-scope-edge.is-alternate {{
+      stroke: rgba(176, 139, 55, 0.68);
+      stroke-dasharray: 4 7;
+    }}
+    .network-route-scope-node {{
+      cursor: pointer;
+      outline: none;
+      user-select: none;
+    }}
+    .network-route-scope-node-hit {{
+      fill: transparent;
+      pointer-events: all;
+    }}
+    .network-route-scope-node-core {{
+      fill: color-mix(in srgb, var(--panel) 82%, var(--accent) 18%);
+      stroke: color-mix(in srgb, var(--line) 52%, var(--accent) 48%);
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+    }}
+    .network-route-scope-node.is-context .network-route-scope-node-core {{
+      fill: rgba(255, 255, 255, 0.78);
+      stroke: rgba(131, 163, 141, 0.76);
+      stroke-width: 1.4;
+    }}
+    .network-route-scope-node.is-from .network-route-scope-node-core,
+    .network-route-scope-node.is-to .network-route-scope-node-core {{
+      fill: color-mix(in srgb, var(--accent) 34%, white 66%);
+      stroke: color-mix(in srgb, var(--accent) 70%, var(--accent-2) 30%);
+      stroke-width: 2.4;
+    }}
+    .network-route-scope-node:hover .network-route-scope-node-core,
+    .network-route-scope-node:focus-visible .network-route-scope-node-core {{
+      stroke: color-mix(in srgb, var(--accent) 70%, var(--ink) 30%);
+      filter: drop-shadow(0 4px 10px rgba(49, 117, 77, 0.22));
+    }}
+    .network-route-scope-node-index {{
+      fill: color-mix(in srgb, var(--ink) 76%, var(--accent) 24%);
+      font-size: 12px;
+      font-weight: 900;
+      line-height: 1;
+      pointer-events: none;
+      text-anchor: middle;
+    }}
+    .network-route-scope-node-label,
+    .network-route-scope-node-id {{
+      fill: color-mix(in srgb, var(--muted) 46%, var(--ink) 54%);
+      font-size: 10px;
+      font-weight: 800;
+      pointer-events: none;
+      text-anchor: middle;
+    }}
+    .network-route-scope-node-label {{
+      fill: var(--ink);
+      font-size: 11px;
+    }}
+    .network-route-scope-node-id {{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 8.5px;
+      opacity: 0.78;
+    }}
     .network-route-hop-list {{
       display: grid;
       grid-template-columns: 1fr;
@@ -6851,6 +7000,22 @@
       .network-route-result-head {{
         align-items: flex-start;
         flex-direction: column;
+      }}
+      .network-route-scope-head {{
+        align-items: flex-start;
+        grid-template-columns: 1fr auto;
+      }}
+      .network-route-scope-head > span:nth-child(2) {{
+        grid-column: 1 / -1;
+        grid-row: 2;
+        text-align: left;
+      }}
+      .network-route-scope-reset-btn {{
+        grid-column: 2;
+        grid-row: 1;
+      }}
+      .network-route-scope-svg {{
+        height: 230px;
       }}
       .network-route-edge {{
         padding-left: 0;

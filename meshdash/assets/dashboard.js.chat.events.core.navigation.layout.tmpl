@@ -701,6 +701,13 @@
     const networkRoutesFromStorageKey = "meshDashboardNetworkRoutesFromV1";
     const networkRoutesToStorageKey = "meshDashboardNetworkRoutesToV1";
     const networkRoutesWindowStorageKey = "meshDashboardNetworkRoutesWindowV1";
+    const networkRoutesScopeViewBoxDefault = Object.freeze({{ x: 0, y: 0, width: 920, height: 270 }});
+    const networkRoutesScopeViewState = {{
+      signature: "",
+      viewBox: null,
+    }};
+    let networkRoutesScopePointerDrag = null;
+    let networkRoutesScopeSuppressClick = false;
     const networkGraphHistoryEdgeCache = new Map();
     const networkGraphHistoryCapsCache = new Map();
     const networkGraphHistoryEdgeRequests = new Map();
@@ -1897,13 +1904,42 @@
       const result = document.getElementById("network-routes-result");
       if (result instanceof HTMLElement && result.dataset.bound !== "1") {{
         result.dataset.bound = "1";
+        const activateRouteNodeTarget = (target) => {{
+          const row = target instanceof Element ? target.closest("[data-route-node-id]") : null;
+          if (!(row instanceof Element)) return false;
+          const nodeId = normalizeNodeId(row.getAttribute("data-route-node-id") || "");
+          if (!isSelectableNodeId(nodeId)) return false;
+          selectNode(nodeId, true, true);
+          return true;
+        }};
+        const activateRouteEdgeTarget = (target) => {{
+          const edgeEl = target instanceof Element ? target.closest("[data-route-edge-a][data-route-edge-b]") : null;
+          if (!(edgeEl instanceof Element)) return false;
+          const sourceId = normalizeNodeId(edgeEl.getAttribute("data-route-edge-a") || "");
+          const targetId = normalizeNodeId(edgeEl.getAttribute("data-route-edge-b") || "");
+          if (!isSelectableNodeId(sourceId) || !isSelectableNodeId(targetId) || sourceId === targetId) return false;
+          networkRoutesFromNodeId = sourceId;
+          networkRoutesToNodeId = targetId;
+          persistPreferredNetworkRoutesNodeId(networkRoutesFromStorageKey, networkRoutesFromNodeId);
+          persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
+          renderNetworkRoutes(latestState);
+          return true;
+        }};
         result.addEventListener("click", (event) => {{
           const target = event.target instanceof Element ? event.target : null;
-          const row = target ? target.closest("[data-route-node-id]") : null;
-          if (!(row instanceof HTMLElement)) return;
-          const nodeId = normalizeNodeId(row.dataset.routeNodeId || "");
-          if (!isSelectableNodeId(nodeId)) return;
-          selectNode(nodeId, true, true);
+          if (networkRoutesScopeSuppressClick) {{
+            networkRoutesScopeSuppressClick = false;
+            return;
+          }}
+          if (activateRouteEdgeTarget(target)) return;
+          activateRouteNodeTarget(target);
+        }});
+        result.addEventListener("keydown", (event) => {{
+          if (!(event instanceof KeyboardEvent) || (event.key !== "Enter" && event.key !== " ")) return;
+          const target = event.target instanceof Element ? event.target : null;
+          if (activateRouteEdgeTarget(target) || activateRouteNodeTarget(target)) {{
+            event.preventDefault();
+          }}
         }});
       }}
     }}
@@ -2133,6 +2169,380 @@
       }}).join("")}}</ol>`;
     }}
 
+    function buildNetworkRoutesScopedLinks(route, data) {{
+      const nodeMap = data && data.nodeMap instanceof Map ? data.nodeMap : new Map();
+      const adjacency = data && data.adjacency instanceof Map ? data.adjacency : new Map();
+      const path = (Array.isArray(route && route.path) ? route.path : [])
+        .map((nodeId) => normalizeNodeId(nodeId || ""))
+        .filter((nodeId) => isSelectableNodeId(nodeId) && nodeMap.has(nodeId));
+      const routeEdgesRaw = Array.isArray(route && route.edges) ? route.edges : [];
+      const pathIndex = new Map(path.map((nodeId, index) => [nodeId, index]));
+      const routeEdgeKeys = new Set();
+      const routeEdges = [];
+      for (let index = 0; index < Math.max(0, path.length - 1); index += 1) {{
+        const a = path[index];
+        const b = path[index + 1];
+        const edge = routeEdgesRaw[index] || ((adjacency.get(a) || new Map()).get(b)) || null;
+        const key = networkGraphEdgeKeyBetween(a, b);
+        if (!key) continue;
+        routeEdgeKeys.add(key);
+        routeEdges.push({{
+          key,
+          a,
+          b,
+          edge,
+          kind: "route",
+          routeIndex: index,
+        }});
+      }}
+
+      const candidateKeys = new Set();
+      const contextCandidates = [];
+      for (const nodeId of path) {{
+        const peers = adjacency.get(nodeId);
+        if (!(peers instanceof Map)) continue;
+        for (const [peerIdRaw, edge] of peers.entries()) {{
+          const peerId = normalizeNodeId(peerIdRaw || "");
+          if (!isSelectableNodeId(peerId) || !nodeMap.has(peerId)) continue;
+          const key = networkGraphEdgeKeyBetween(nodeId, peerId);
+          if (!key || routeEdgeKeys.has(key) || candidateKeys.has(key)) continue;
+          candidateKeys.add(key);
+          contextCandidates.push({{
+            key,
+            a: nodeId,
+            b: peerId,
+            edge,
+            kind: pathIndex.has(peerId) ? "alternate" : "context",
+            routeIndex: pathIndex.has(nodeId) ? pathIndex.get(nodeId) : 0,
+          }});
+        }}
+      }}
+      contextCandidates.sort((left, right) => {{
+        const leftWeight = Math.max(0, Number(left && left.edge && left.edge.weight) || 0);
+        const rightWeight = Math.max(0, Number(right && right.edge && right.edge.weight) || 0);
+        return (rightWeight - leftWeight) || String(left && left.key || "").localeCompare(String(right && right.key || ""));
+      }});
+      const contextEdges = contextCandidates.slice(0, 12);
+      const nodeIds = new Set(path);
+      for (const item of contextEdges) {{
+        const a = normalizeNodeId(item && item.a || "");
+        const b = normalizeNodeId(item && item.b || "");
+        if (isSelectableNodeId(a) && nodeMap.has(a)) nodeIds.add(a);
+        if (isSelectableNodeId(b) && nodeMap.has(b)) nodeIds.add(b);
+      }}
+      return {{
+        path,
+        pathIndex,
+        routeEdgeKeys,
+        routeEdges,
+        contextEdges,
+        edges: routeEdges.concat(contextEdges),
+        nodeIds: Array.from(nodeIds),
+      }};
+    }}
+
+    function networkRoutesScopedPositionMap(scoped) {{
+      const width = 920;
+      const height = 270;
+      const path = Array.isArray(scoped && scoped.path) ? scoped.path : [];
+      const pathIndex = scoped && scoped.pathIndex instanceof Map ? scoped.pathIndex : new Map();
+      const positions = new Map();
+      const pathCount = Math.max(1, path.length);
+      const left = 68;
+      const right = width - 68;
+      const routeY = 138;
+      for (let index = 0; index < path.length; index += 1) {{
+        const nodeId = path[index];
+        const x = pathCount <= 1
+          ? (width / 2)
+          : left + ((right - left) * (index / Math.max(1, pathCount - 1)));
+        positions.set(nodeId, {{ x, y: routeY }});
+      }}
+
+      const contextAnchorByNodeId = new Map();
+      for (const item of (Array.isArray(scoped && scoped.contextEdges) ? scoped.contextEdges : [])) {{
+        const a = normalizeNodeId(item && item.a || "");
+        const b = normalizeNodeId(item && item.b || "");
+        const aOnRoute = pathIndex.has(a);
+        const bOnRoute = pathIndex.has(b);
+        if (aOnRoute && !bOnRoute && !contextAnchorByNodeId.has(b)) contextAnchorByNodeId.set(b, a);
+        if (bOnRoute && !aOnRoute && !contextAnchorByNodeId.has(a)) contextAnchorByNodeId.set(a, b);
+      }}
+
+      const orderByAnchor = new Map();
+      const contextIds = Array.from(contextAnchorByNodeId.keys()).sort((a, b) => {{
+        const anchorA = contextAnchorByNodeId.get(a);
+        const anchorB = contextAnchorByNodeId.get(b);
+        const indexA = pathIndex.has(anchorA) ? pathIndex.get(anchorA) : 0;
+        const indexB = pathIndex.has(anchorB) ? pathIndex.get(anchorB) : 0;
+        return (indexA - indexB) || a.localeCompare(b);
+      }});
+      for (const nodeId of contextIds) {{
+        const anchorId = contextAnchorByNodeId.get(nodeId);
+        const anchor = positions.get(anchorId) || {{ x: width / 2, y: routeY }};
+        const order = orderByAnchor.get(anchorId) || 0;
+        orderByAnchor.set(anchorId, order + 1);
+        const above = order % 2 === 0;
+        const lane = Math.floor(order / 2);
+        const direction = lane % 2 === 0 ? 1 : -1;
+        const offset = direction * (34 + (Math.floor(lane / 2) * 28));
+        const x = Math.max(42, Math.min(width - 42, anchor.x + offset));
+        const y = above ? 62 : (height - 42);
+        positions.set(nodeId, {{ x, y }});
+      }}
+      return {{ width, height, positions }};
+    }}
+
+    function networkRoutesScopeViewBoxFrom(rawViewBox, fallback = networkRoutesScopeViewBoxDefault) {{
+      const fallbackBox = (fallback && typeof fallback === "object") ? fallback : networkRoutesScopeViewBoxDefault;
+      if (typeof rawViewBox === "string") {{
+        const pieces = rawViewBox.trim().split(/\s+/).map((piece) => Number(piece));
+        if (pieces.length >= 4 && pieces.every((piece) => Number.isFinite(piece))) {{
+          return {{
+            x: pieces[0],
+            y: pieces[1],
+            width: Math.max(1, pieces[2]),
+            height: Math.max(1, pieces[3]),
+          }};
+        }}
+      }}
+      if (rawViewBox && typeof rawViewBox === "object") {{
+        const x = Number(rawViewBox.x);
+        const y = Number(rawViewBox.y);
+        const width = Number(rawViewBox.width);
+        const height = Number(rawViewBox.height);
+        if ([x, y, width, height].every((piece) => Number.isFinite(piece)) && width > 0 && height > 0) {{
+          return {{ x, y, width, height }};
+        }}
+      }}
+      return {{
+        x: Number(fallbackBox.x) || 0,
+        y: Number(fallbackBox.y) || 0,
+        width: Math.max(1, Number(fallbackBox.width) || networkRoutesScopeViewBoxDefault.width),
+        height: Math.max(1, Number(fallbackBox.height) || networkRoutesScopeViewBoxDefault.height),
+      }};
+    }}
+
+    function networkRoutesScopeViewBoxText(viewBox) {{
+      const clean = networkRoutesScopeViewBoxFrom(viewBox);
+      return `${{clean.x.toFixed(1)}} ${{clean.y.toFixed(1)}} ${{clean.width.toFixed(1)}} ${{clean.height.toFixed(1)}}`;
+    }}
+
+    function setNetworkRoutesScopeViewBox(svg, rawViewBox) {{
+      if (!(svg instanceof SVGSVGElement)) return;
+      const defaultViewBox = networkRoutesScopeViewBoxFrom(svg.getAttribute("data-route-scope-default-viewbox"));
+      const viewBox = networkRoutesScopeViewBoxFrom(rawViewBox, defaultViewBox);
+      svg.setAttribute("viewBox", networkRoutesScopeViewBoxText(viewBox));
+      networkRoutesScopeViewState.viewBox = viewBox;
+    }}
+
+    function resetNetworkRoutesScopeView(svg) {{
+      if (!(svg instanceof SVGSVGElement)) return;
+      const defaultViewBox = networkRoutesScopeViewBoxFrom(svg.getAttribute("data-route-scope-default-viewbox"));
+      setNetworkRoutesScopeViewBox(svg, defaultViewBox);
+    }}
+
+    function zoomNetworkRoutesScopeView(svg, event) {{
+      if (!(svg instanceof SVGSVGElement) || !event) return;
+      const rect = svg.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+      const defaultViewBox = networkRoutesScopeViewBoxFrom(svg.getAttribute("data-route-scope-default-viewbox"));
+      const current = networkRoutesScopeViewBoxFrom(svg.getAttribute("viewBox"), defaultViewBox);
+      const rawDelta = Number(event.deltaY);
+      const zoomFactor = rawDelta < 0 ? 0.82 : 1.22;
+      const minWidth = Math.max(80, defaultViewBox.width * 0.34);
+      const maxWidth = Math.max(defaultViewBox.width, defaultViewBox.width * 2.6);
+      const nextWidth = Math.max(minWidth, Math.min(maxWidth, current.width * zoomFactor));
+      const nextHeight = nextWidth * (defaultViewBox.height / Math.max(1, defaultViewBox.width));
+      const cursorX = Math.max(0, Math.min(1, (Number(event.clientX) - rect.left) / rect.width));
+      const cursorY = Math.max(0, Math.min(1, (Number(event.clientY) - rect.top) / rect.height));
+      const anchorX = current.x + (cursorX * current.width);
+      const anchorY = current.y + (cursorY * current.height);
+      setNetworkRoutesScopeViewBox(svg, {{
+        x: anchorX - (cursorX * nextWidth),
+        y: anchorY - (cursorY * nextHeight),
+        width: nextWidth,
+        height: nextHeight,
+      }});
+    }}
+
+    function bindNetworkRoutesScopeInteractions(root = document) {{
+      const scope = root instanceof Element ? root.querySelector(".network-route-scope") : document.querySelector(".network-route-scope");
+      if (!(scope instanceof HTMLElement) || scope.dataset.bound === "1") return;
+      scope.dataset.bound = "1";
+      const svg = scope.querySelector(".network-route-scope-svg");
+      if (!(svg instanceof SVGSVGElement)) return;
+
+      const resetBtn = scope.querySelector("[data-route-scope-reset]");
+      if (resetBtn instanceof HTMLButtonElement) {{
+        resetBtn.addEventListener("click", () => resetNetworkRoutesScopeView(svg));
+      }}
+      svg.addEventListener("wheel", (event) => {{
+        event.preventDefault();
+        zoomNetworkRoutesScopeView(svg, event);
+      }}, {{ passive: false }});
+      svg.addEventListener("pointerdown", (event) => {{
+        if (Number(event.button) !== 0) return;
+        const currentViewBox = networkRoutesScopeViewBoxFrom(svg.getAttribute("viewBox"));
+        networkRoutesScopePointerDrag = {{
+          pointerId: Number(event.pointerId),
+          startClientX: Number(event.clientX),
+          startClientY: Number(event.clientY),
+          startViewBox: currentViewBox,
+          moved: false,
+        }};
+        svg.classList.add("is-panning");
+        try {{
+          svg.setPointerCapture(event.pointerId);
+        }} catch (_err) {{
+        }}
+      }});
+      svg.addEventListener("pointermove", (event) => {{
+        const drag = networkRoutesScopePointerDrag;
+        if (!drag || Number(event.pointerId) !== Number(drag.pointerId)) return;
+        const rect = svg.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) return;
+        const dx = Number(event.clientX) - Number(drag.startClientX);
+        const dy = Number(event.clientY) - Number(drag.startClientY);
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {{
+          drag.moved = true;
+        }}
+        const start = networkRoutesScopeViewBoxFrom(drag.startViewBox);
+        setNetworkRoutesScopeViewBox(svg, {{
+          x: start.x - ((dx / rect.width) * start.width),
+          y: start.y - ((dy / rect.height) * start.height),
+          width: start.width,
+          height: start.height,
+        }});
+      }});
+      const finishDrag = (event) => {{
+        const drag = networkRoutesScopePointerDrag;
+        if (!drag || (event && Number(event.pointerId) !== Number(drag.pointerId))) return;
+        networkRoutesScopePointerDrag = null;
+        svg.classList.remove("is-panning");
+        try {{
+          svg.releasePointerCapture(drag.pointerId);
+        }} catch (_err) {{
+        }}
+        if (drag.moved) {{
+          networkRoutesScopeSuppressClick = true;
+          window.setTimeout(() => {{
+            networkRoutesScopeSuppressClick = false;
+          }}, 0);
+        }}
+      }};
+      svg.addEventListener("pointerup", finishDrag);
+      svg.addEventListener("pointercancel", finishDrag);
+      svg.addEventListener("lostpointercapture", finishDrag);
+    }}
+
+    function networkRoutesScopeHtml(route, data, fromNodeId, toNodeId) {{
+      const scoped = buildNetworkRoutesScopedLinks(route, data);
+      if (!scoped.path.length) return "";
+      const nodeMap = data && data.nodeMap instanceof Map ? data.nodeMap : new Map();
+      const localNodeId = normalizeNodeId(data && data.localNodeId || "");
+      const fromId = normalizeNodeId(fromNodeId || "");
+      const toId = normalizeNodeId(toNodeId || "");
+      const layout = networkRoutesScopedPositionMap(scoped);
+      const positions = layout.positions instanceof Map ? layout.positions : new Map();
+      const defaultViewBox = {{ x: 0, y: 0, width: layout.width, height: layout.height }};
+      const scopeSignature = [
+        fromId,
+        toId,
+        scoped.path.join(">"),
+        scoped.edges.map((item) => String(item && item.key || "")).join("|"),
+      ].join("::");
+      if (networkRoutesScopeViewState.signature !== scopeSignature) {{
+        networkRoutesScopeViewState.signature = scopeSignature;
+        networkRoutesScopeViewState.viewBox = defaultViewBox;
+      }}
+      const viewBox = networkRoutesScopeViewBoxFrom(networkRoutesScopeViewState.viewBox, defaultViewBox);
+      const maxWeight = scoped.edges.reduce((max, item) => Math.max(max, Number(item && item.edge && item.edge.weight) || 0), 0);
+      const edgeHtml = scoped.edges.map((item) => {{
+        const a = positions.get(item && item.a);
+        const b = positions.get(item && item.b);
+        if (!a || !b) return "";
+        const kind = String(item && item.kind || "context");
+        const sourceId = normalizeNodeId(item && item.a || "");
+        const targetId = normalizeNodeId(item && item.b || "");
+        const weight = Math.max(0, Number(item && item.edge && item.edge.weight) || 0);
+        const pct = maxWeight > 0 ? Math.max(0.2, Math.min(1, weight / maxWeight)) : 0.3;
+        const width = kind === "route" ? (3.8 + (pct * 4.2)) : (1.2 + (pct * 2.2));
+        const title = networkRoutesEdgeMetaText(item && item.edge) || "observed link";
+        const sourceName = networkGraphNodeDisplayName(sourceId, nodeMap);
+        const targetName = networkGraphNodeDisplayName(targetId, nodeMap);
+        return `<line class="network-route-scope-edge is-${{escAttr(kind)}}"
+          data-route-edge-a="${{escAttr(sourceId)}}"
+          data-route-edge-b="${{escAttr(targetId)}}"
+          tabindex="0"
+          role="button"
+          aria-label="${{escAttr(`Focus link ${{sourceName}} to ${{targetName}}`)}}"
+          x1="${{a.x.toFixed(1)}}"
+          y1="${{a.y.toFixed(1)}}"
+          x2="${{b.x.toFixed(1)}}"
+          y2="${{b.y.toFixed(1)}}"
+          style="--route-scope-edge-width:${{width.toFixed(1)}};"
+        ><title>${{escAttr(title)}}</title></line>`;
+      }}).join("");
+      const denseRoute = scoped.path.length > 6;
+      const nodeHtml = scoped.nodeIds.map((nodeId) => {{
+        const clean = normalizeNodeId(nodeId || "");
+        const point = positions.get(clean);
+        if (!point) return "";
+        const isRoute = scoped.pathIndex.has(clean);
+        const isFrom = clean && clean === fromId;
+        const isTo = clean && clean === toId;
+        const isLocal = clean && clean === localNodeId;
+        const index = scoped.pathIndex.has(clean) ? scoped.pathIndex.get(clean) : -1;
+        const name = networkGraphNodeDisplayName(clean, nodeMap);
+        const labelMax = denseRoute && !isFrom && !isTo ? 9 : (isRoute ? 14 : 11);
+        const label = truncateNetworkGraphLabel(name, labelMax);
+        const idLabel = clean.length > 8 ? clean.slice(-8) : clean;
+        const radius = isFrom || isTo ? 18 : (isRoute ? 15 : 10);
+        const classes = [
+          "network-route-scope-node",
+          isRoute ? "is-route" : "is-context",
+          isFrom ? "is-from" : "",
+          isTo ? "is-to" : "",
+          isLocal ? "is-local" : "",
+        ].filter(Boolean).join(" ");
+        const title = `${{name}} (${{clean}})`;
+        return `<g class="${{escAttr(classes)}}"
+          data-route-node-id="${{escAttr(clean)}}"
+          tabindex="0"
+          role="button"
+          aria-label="${{escAttr(`Explore ${{title}}`)}}"
+          transform="translate(${{point.x.toFixed(1)}} ${{point.y.toFixed(1)}})"
+        >
+          <title>${{escAttr(title)}}</title>
+          <circle class="network-route-scope-node-hit" r="${{escAttr(String(radius + 10))}}"></circle>
+          <circle class="network-route-scope-node-core" r="${{escAttr(String(radius))}}"></circle>
+          ${{isRoute ? `<text class="network-route-scope-node-index" y="4">${{escAttr(String(index + 1))}}</text>` : ""}}
+          <text class="network-route-scope-node-label" y="${{escAttr(String(radius + 14))}}">${{escAttr(label)}}</text>
+          <text class="network-route-scope-node-id" y="${{escAttr(String(radius + 26))}}">${{escAttr(idLabel)}}</text>
+        </g>`;
+      }}).join("");
+      const contextCount = scoped.contextEdges.length;
+      const routeEdgeCount = scoped.routeEdges.length;
+      const nodeCount = scoped.nodeIds.length;
+      return `<section class="network-route-scope" data-route-scope-signature="${{escAttr(scopeSignature)}}" aria-label="Route scoped links">
+        <div class="network-route-scope-head">
+          <span>Route scope</span>
+          <span>${{escAttr(String(nodeCount))}} nodes &middot; ${{escAttr(String(routeEdgeCount))}} route links &middot; ${{escAttr(String(contextCount))}} side links</span>
+          <button class="network-route-scope-reset-btn" type="button" data-route-scope-reset="1" title="Reset route scope view">Reset</button>
+        </div>
+        <svg class="network-route-scope-svg"
+          viewBox="${{escAttr(networkRoutesScopeViewBoxText(viewBox))}}"
+          data-route-scope-default-viewbox="${{escAttr(networkRoutesScopeViewBoxText(defaultViewBox))}}"
+          role="img"
+          aria-label="Route scoped links from selected endpoints"
+        >
+          <g class="network-route-scope-links">${{edgeHtml}}</g>
+          <g class="network-route-scope-nodes">${{nodeHtml}}</g>
+        </svg>
+      </section>`;
+    }}
+
     function renderNetworkRoutes(state = latestState, options = {{}}) {{
       bindNetworkRoutesControls();
       networkRoutesMode = normalizeNetworkRoutesMode(networkRoutesMode);
@@ -2196,7 +2606,8 @@
       result.innerHTML = `<div class="network-route-result-head">
         <span>${{escAttr(String(route.path.length))}} nodes</span>
         <span>${{escAttr(networkTopNodesNumberText(totalWeight))}} observed packets</span>
-      </div>${{networkRoutesPathHtml(route, data.nodeMap, data.localNodeId)}}`;
+      </div>${{networkRoutesScopeHtml(route, data, networkRoutesFromNodeId, networkRoutesToNodeId)}}${{networkRoutesPathHtml(route, data.nodeMap, data.localNodeId)}}`;
+      bindNetworkRoutesScopeInteractions(result);
     }}
 
     function formatMalformedDiagnosticsTimestamp(unixValue) {{

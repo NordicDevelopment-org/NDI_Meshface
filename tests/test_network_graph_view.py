@@ -80,6 +80,16 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function normalizeNetworkRoutesMode(raw)' in js
     assert 'function renderNetworkRoutes(state = latestState, options = {})' in js
     assert 'function networkRoutesFindInferredPath(fromNodeId, toNodeId, adjacency)' in js
+    assert 'function buildNetworkRoutesScopedLinks(route, data)' in js
+    assert 'function networkRoutesScopeHtml(route, data, fromNodeId, toNodeId)' in js
+    assert 'function bindNetworkRoutesScopeInteractions(root = document)' in js
+    assert 'const networkRoutesScopeViewState = {' in js
+    assert 'class="network-route-scope"' in js
+    assert 'class="network-route-scope-svg"' in js
+    assert 'data-route-edge-a="${escAttr(sourceId)}"' in js
+    assert 'data-route-scope-reset="1"' in js
+    assert 'zoomNetworkRoutesScopeView(svg, event);' in js
+    assert 'contextCandidates.slice(0, 12)' in js
     assert 'Live trace is not wired yet.' in js
     assert 'function refreshNetworkDiagnosticsPanel(force = false)' in js
     assert 'fetch(`/api/history/malformed?${params.toString()}`' in js
@@ -394,12 +404,20 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-mode-select {" in css
     assert ".network-routes-card {" in css
     assert ".network-routes-mode-btn {" in css
+    assert ".network-route-scope {" in css
+    assert ".network-route-scope-reset-btn {" in css
+    assert ".network-route-scope-svg.is-panning {" in css
+    assert ".network-route-scope-edge.is-route {" in css
+    assert ".network-route-scope-node-hit {" in css
     assert ".network-route-hop-list {" in css
     assert ".network-route-edge-bar {" in css
     route_css = css[css.index(".network-routes-card {"):css.index(".network-top-nodes-toolbar {")]
     assert "rgba(249, 253, 249, 0.94)" in route_css
     assert "rgba(255, 255, 255, 0.72)" in route_css
     assert '[data-theme="dark"] .network-routes-card {' in css
+    assert '[data-theme="dark"] .network-route-scope {' in css
+    assert '[data-theme="dark"] .network-route-scope-reset-btn {' in css
+    assert '[data-theme="dark"] .network-route-scope-edge.is-route {' in css
     assert '[data-theme="dark"] .network-route-hop {' in css
     assert '[data-theme="dark"] .network-route-hop-index {' in css
     assert "[data-theme=\"dark\"] .network-graph-layout-control," in css

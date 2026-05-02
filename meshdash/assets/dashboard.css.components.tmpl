@@ -5393,6 +5393,65 @@
       background: color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, black 12%);
       box-shadow: var(--workspace-shell-shadow);
     }}
+    [data-theme="dark"] .network-route-scope {{
+      border-color: var(--workspace-shell-border-muted);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--workspace-shell-bg-alt) 86%, var(--workspace-shell-active-bg) 14%), color-mix(in srgb, var(--workspace-shell-bg) 94%, black 6%));
+    }}
+    [data-theme="dark"] .network-route-scope-svg {{
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--ui-accent) 12%, transparent), transparent 44%),
+        color-mix(in srgb, var(--workspace-shell-bg) 88%, black 12%);
+    }}
+    [data-theme="dark"] .network-route-scope-reset-btn {{
+      border-color: var(--workspace-shell-border-muted);
+      background: color-mix(in srgb, var(--workspace-shell-active-bg) 82%, var(--workspace-shell-bg-alt) 18%);
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-route-scope-reset-btn:hover {{
+      border-color: color-mix(in srgb, var(--ui-accent) 44%, var(--workspace-shell-border) 56%);
+      background: color-mix(in srgb, var(--workspace-shell-hover-bg) 78%, var(--ui-accent) 22%);
+    }}
+    [data-theme="dark"] .network-route-scope-edge {{
+      stroke: color-mix(in srgb, var(--workspace-shell-text-soft) 44%, transparent);
+    }}
+    [data-theme="dark"] .network-route-scope-edge:hover,
+    [data-theme="dark"] .network-route-scope-edge:focus-visible {{
+      stroke: color-mix(in srgb, var(--ui-accent) 70%, white 30%);
+    }}
+    [data-theme="dark"] .network-route-scope-edge.is-route {{
+      stroke: color-mix(in srgb, var(--ui-accent) 78%, var(--workspace-shell-active-text) 22%);
+    }}
+    [data-theme="dark"] .network-route-scope-edge.is-alternate {{
+      stroke: rgba(218, 178, 92, 0.68);
+    }}
+    [data-theme="dark"] .network-route-scope-node-core {{
+      fill: color-mix(in srgb, var(--workspace-shell-active-bg) 78%, var(--workspace-shell-bg-alt) 22%);
+      stroke: color-mix(in srgb, var(--workspace-shell-border-strong) 72%, var(--ui-accent) 28%);
+    }}
+    [data-theme="dark"] .network-route-scope-node.is-context .network-route-scope-node-core {{
+      fill: color-mix(in srgb, var(--workspace-shell-bg-alt) 84%, black 16%);
+      stroke: var(--workspace-shell-border-muted);
+    }}
+    [data-theme="dark"] .network-route-scope-node.is-from .network-route-scope-node-core,
+    [data-theme="dark"] .network-route-scope-node.is-to .network-route-scope-node-core {{
+      fill: color-mix(in srgb, var(--ui-accent) 26%, var(--workspace-shell-bg-alt) 74%);
+      stroke: color-mix(in srgb, var(--ui-accent) 68%, var(--workspace-shell-active-text) 32%);
+    }}
+    [data-theme="dark"] .network-route-scope-node:hover .network-route-scope-node-core,
+    [data-theme="dark"] .network-route-scope-node:focus-visible .network-route-scope-node-core {{
+      stroke: color-mix(in srgb, var(--ui-accent) 76%, white 24%);
+      filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--ui-accent) 24%, transparent));
+    }}
+    [data-theme="dark"] .network-route-scope-node-index {{
+      fill: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-route-scope-node-label {{
+      fill: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-route-scope-node-id {{
+      fill: var(--workspace-shell-text-soft);
+    }}
     [data-theme="dark"] .network-routes-mode-group {{
       border-color: var(--workspace-shell-border-muted);
       background: color-mix(in srgb, var(--workspace-shell-active-bg) 82%, var(--workspace-shell-bg-alt) 18%);
@@ -5425,6 +5484,7 @@
     [data-theme="dark"] .network-top-node-unit,
     [data-theme="dark"] .network-routes-status,
     [data-theme="dark"] .network-routes-summary,
+    [data-theme="dark"] .network-route-scope-head,
     [data-theme="dark"] .network-routes-node-control,
     [data-theme="dark"] .network-route-result-head,
     [data-theme="dark"] .network-route-hop-main > span,
@@ -5437,6 +5497,7 @@
     [data-theme="dark"] .network-top-node-name,
     [data-theme="dark"] .network-top-node-value strong,
     [data-theme="dark"] .network-routes-summary strong,
+    [data-theme="dark"] .network-route-scope-head > span:first-child,
     [data-theme="dark"] .network-route-hop-main strong {{
       color: var(--workspace-shell-text);
     }}
