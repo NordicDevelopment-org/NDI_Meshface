@@ -66,7 +66,7 @@ def test_dashboard_js_binds_games_picker_select() -> None:
     assert 'activeGameId = normalizeActiveGameId(gamesLibrarySelect.value);' in js
 
 
-def test_dashboard_js_keeps_bbs_out_of_app_channel_routing_by_default() -> None:
+def test_dashboard_js_keeps_gated_apps_out_of_app_channel_routing_by_default() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
@@ -80,6 +80,9 @@ def test_dashboard_js_keeps_bbs_out_of_app_channel_routing_by_default() -> None:
     assert 'if (bbsFeatureEnabled) {' in routing_block
     assert 'id: "bbs"' in routing_block
     assert 'label: "BBS"' in routing_block
+    assert 'if (fileTransferFeatureEnabled) {' in routing_block
+    assert 'id: "files"' in routing_block
+    assert 'label: "Files"' in routing_block
     assert 'id: "games"' in routing_block
     assert 'label: "Games"' in routing_block
 
@@ -112,5 +115,24 @@ def test_dashboard_js_exposes_bbs_in_app_channel_routing_when_enabled() -> None:
 
     assert 'id: "bbs"' in routing_block
     assert 'label: "BBS"' in routing_block
+    assert 'id: "games"' in routing_block
+    assert 'label: "Games"' in routing_block
+
+
+def test_dashboard_js_exposes_files_in_app_channel_routing_when_enabled() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        file_transfer_enabled=True,
+    )
+
+    start = js.index("function meshChannelAppRoutingRows() {")
+    end = js.index("function normalizeMeshChannelAppId", start)
+    routing_block = js[start:end]
+
+    assert 'id: "files"' in routing_block
+    assert 'label: "Files"' in routing_block
+    assert 'if (token === "files" && fileTransferFeatureEnabled) return "files";' in js
     assert 'id: "games"' in routing_block
     assert 'label: "Games"' in routing_block

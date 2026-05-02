@@ -111,8 +111,8 @@ def add_http_runtime_args(
         action=argparse.BooleanOptionalAction,
         default=default_accept_file_transfer_traffic_disclaimer,
         help=(
-            "Acknowledge that enabling file transfer can significantly increase "
-            "mesh airtime and congestion. "
+            "Acknowledge that enabling BBS or file transfer can significantly "
+            "increase mesh airtime and congestion. "
             f"(default: {default_accept_file_transfer_traffic_disclaimer})"
         ),
     )

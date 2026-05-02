@@ -131,36 +131,45 @@ def _normalize_file_transfer_max_bytes(raw_value: object) -> int:
     )
 
 
-def _validate_file_transfer_startup_args(
+def _validate_sideband_traffic_startup_args(
     args: argparse.Namespace,
     *,
     parser: argparse.ArgumentParser,
 ) -> None:
-    enabled = bool(getattr(args, "file_transfer_enable", False))
+    bbs_enabled = bool(getattr(args, "bbs_enable", False))
+    file_transfer_enabled = bool(getattr(args, "file_transfer_enable", False))
     normalized_max_bytes = _normalize_file_transfer_max_bytes(
         getattr(args, "file_transfer_max_bytes", DEFAULT_FILE_TRANSFER_MAX_BYTES)
     )
     setattr(args, "file_transfer_max_bytes", normalized_max_bytes)
-    if not enabled:
+    enabled_features = []
+    if bbs_enabled:
+        enabled_features.append("BBS")
+    if file_transfer_enabled:
+        enabled_features.append("file transfer")
+    if not enabled_features:
         return
     accepted = bool(
         getattr(args, "accept_file_transfer_traffic_disclaimer", False)
     )
     if not accepted:
+        feature_label = " and ".join(enabled_features)
         parser.error(
-            "File transfer remains disabled until you acknowledge mesh traffic risk. "
-            "Re-run with both --file-transfer-enable and "
+            "Requested sideband features remain disabled until you acknowledge "
+            f"mesh traffic risk ({feature_label}). "
+            "Re-run with the requested feature enable flag and "
             "--accept-file-transfer-traffic-disclaimer, or set "
             "MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=1."
         )
     print(
-        "Warning: file transfer is enabled. Large transfers can consume significant "
-        "mesh airtime and degrade network responsiveness."
+        f"Warning: {', '.join(enabled_features)} enabled. Sideband traffic can "
+        "consume significant mesh airtime and degrade network responsiveness."
     )
-    print(
-        f"File transfer size cap: {normalized_max_bytes} bytes "
-        f"(clamped to {MIN_FILE_TRANSFER_MAX_BYTES}-{MAX_FILE_TRANSFER_MAX_BYTES})."
-    )
+    if file_transfer_enabled:
+        print(
+            f"File transfer size cap: {normalized_max_bytes} bytes "
+            f"(clamped to {MIN_FILE_TRANSFER_MAX_BYTES}-{MAX_FILE_TRANSFER_MAX_BYTES})."
+        )
 
 
 def _apply_default_gateway(args: argparse.Namespace) -> None:
@@ -576,7 +585,7 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
-    _validate_file_transfer_startup_args(args, parser=parser)
+    _validate_sideband_traffic_startup_args(args, parser=parser)
     if bool(getattr(args, "backfill_environment_rollups", False)):
         run_environment_rollup_backfill(args)
         return

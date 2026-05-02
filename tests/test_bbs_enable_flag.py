@@ -2,8 +2,11 @@ import argparse
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from mesh_dashboard import _validate_sideband_traffic_startup_args
 from meshdash.cli import build_dashboard_parser
 from meshdash.html_template import render_html
 
@@ -99,6 +102,37 @@ def test_dashboard_parser_supports_bbs_enable_flag_and_env_default() -> None:
 
     explicit_enable_args = parser.parse_args(["--bbs-enable"])
     assert explicit_enable_args.bbs_enable is True
+
+
+def test_bbs_enable_requires_traffic_disclaimer() -> None:
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(
+        bbs_enable=True,
+        file_transfer_enable=False,
+        file_transfer_max_bytes=64 * 1024,
+        accept_file_transfer_traffic_disclaimer=False,
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        _validate_sideband_traffic_startup_args(args, parser=parser)
+
+    assert exc.value.code == 2
+
+
+def test_bbs_enable_accepts_traffic_disclaimer(capsys: pytest.CaptureFixture[str]) -> None:
+    parser = argparse.ArgumentParser()
+    args = argparse.Namespace(
+        bbs_enable=True,
+        file_transfer_enable=False,
+        file_transfer_max_bytes=64 * 1024,
+        accept_file_transfer_traffic_disclaimer=True,
+    )
+
+    _validate_sideband_traffic_startup_args(args, parser=parser)
+
+    out = capsys.readouterr().out
+    assert "BBS enabled" in out
+    assert "File transfer size cap" not in out
 
 
 def _add_mesh_connection_args(

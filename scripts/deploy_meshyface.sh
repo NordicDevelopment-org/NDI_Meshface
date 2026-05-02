@@ -44,14 +44,14 @@ Options:
   --dash-port <port>       Dashboard bind port (default: 8877).
   --refresh-ms <ms>        Poll interval in ms (default: 3000).
   --history-db <path>      History DB path on target host.
-  --bbs-enable             Enable BBS/profile workspace in dashboard.env.
+  --bbs-enable             Enable BBS/profile workspace in dashboard.env (requires disclaimer).
   --no-bbs-enable          Disable BBS/profile workspace in dashboard.env.
-  --file-transfer-enable   Enable file transfer in dashboard.env.
+  --file-transfer-enable   Enable file transfer in dashboard.env (requires disclaimer).
   --no-file-transfer-enable Disable file transfer in dashboard.env.
   --file-transfer-max-bytes <bytes>
                            Max file transfer size written to dashboard.env.
   --accept-file-transfer-traffic-disclaimer
-                           Acknowledge mesh airtime/congestion risk when enabling transfers.
+                           Acknowledge mesh airtime/congestion risk when enabling BBS/files.
   --no-accept-file-transfer-traffic-disclaimer
                            Clear disclaimer acceptance in dashboard.env.
   --service <name>         Systemd service name (default: meshtastic-dashboard).
@@ -558,8 +558,8 @@ if ! [[ "${FILE_TRANSFER_MAX_BYTES}" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-if is_truthy "${FILE_TRANSFER_ENABLE}" && ! is_truthy "${ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER}"; then
-  echo "file transfer enablement requires disclaimer acceptance." >&2
+if { is_truthy "${FILE_TRANSFER_ENABLE}" || is_truthy "${BBS_ENABLE}"; } && ! is_truthy "${ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER}"; then
+  echo "BBS/file-transfer enablement requires disclaimer acceptance." >&2
   echo "Re-run with --accept-file-transfer-traffic-disclaimer or set" >&2
   echo "MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=1." >&2
   exit 2

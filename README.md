@@ -29,7 +29,7 @@ The current UI exposes:
 Not part of the default launcher surface:
 
 - Dedicated Bots or Labs launcher views
-- BBS unless `--bbs-enable` is set
+- BBS unless `--bbs-enable` is set and the traffic disclaimer is accepted
 - Files unless file transfer is enabled and the traffic disclaimer is accepted
 - Network diagnostics unless `--debug-mode` is enabled
 
@@ -73,7 +73,7 @@ flowchart LR
 
 Key runtime notes:
 
-- `mesh_dashboard.py` owns CLI/env parsing, file-transfer safety validation,
+- `mesh_dashboard.py` owns CLI/env parsing, sideband traffic safety validation,
   default-gateway fallback, and startup mode selection.
 - `mesh_connection.py` opens either a Meshtastic serial interface or TCP
   interface.
@@ -433,6 +433,7 @@ DASH_HOST=0.0.0.0
 DASH_PORT=8877
 REFRESH_MS=3000
 MESH_DASH_HISTORY_DB=/opt/meshyface/mesh_dashboard_history.sqlite3
+MESH_DASH_BBS_ENABLE=0
 MESH_DASH_FILE_TRANSFER_ENABLE=0
 MESH_DASH_FILE_TRANSFER_MAX_BYTES=65536
 MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=0
@@ -478,15 +479,17 @@ sudo systemctl restart meshtastic-dashboard
 Also ensure the service user can access the serial device, usually via the
 `dialout` group.
 
-### File transfer safety gate
+### BBS and file transfer safety gate
 
-File transfer is hidden/disabled by default. To enable it you must set both:
+BBS and file transfer are hidden/disabled by default. Each must be enabled at
+startup and both require the traffic disclaimer:
 
 - `--file-transfer-enable` or `MESH_DASH_FILE_TRANSFER_ENABLE=1`
+- `--bbs-enable` or `MESH_DASH_BBS_ENABLE=1`
 - `--accept-file-transfer-traffic-disclaimer` or
   `MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=1`
 
-Optional size cap:
+Optional file-transfer size cap:
 
 - `--file-transfer-max-bytes <bytes>` or
   `MESH_DASH_FILE_TRANSFER_MAX_BYTES=<bytes>`
@@ -504,15 +507,17 @@ Deploy helper example:
   --clean-app-dir
 ```
 
-`scripts/deploy_meshyface.sh` preserves existing file-transfer env values from
-the target `dashboard.env` unless you explicitly pass file-transfer flags or
-env overrides.
+`scripts/deploy_meshyface.sh` preserves existing BBS/file-transfer env values
+from the target `dashboard.env` unless you explicitly pass feature flags or env
+overrides.
 
 ### BBS profile workspace
 
 The BBS/profile workspace is also hidden by default. To enable it:
 
 - `--bbs-enable` or `MESH_DASH_BBS_ENABLE=1`
+- `--accept-file-transfer-traffic-disclaimer` or
+  `MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=1`
 
 Deploy helper example:
 
@@ -521,12 +526,13 @@ Deploy helper example:
   --target pi@meshyface.local \
   --mesh-host meshtastic-radio.local \
   --bbs-enable \
+  --accept-file-transfer-traffic-disclaimer \
   --clean-app-dir
 ```
 
-`scripts/deploy_meshyface.sh` preserves the existing `MESH_DASH_BBS_ENABLE`
-value from the target `dashboard.env` unless you explicitly pass a BBS flag or
-env override.
+`scripts/deploy_meshyface.sh` preserves the existing BBS and disclaimer values
+from the target `dashboard.env` unless you explicitly pass feature flags or env
+overrides.
 
 ## Configuration Reference
 
@@ -563,6 +569,7 @@ Related environment variables:
 - `--api-token <token>`: require auth on write endpoints via
   `Authorization: Bearer <token>` or `X-API-Token`
 - `--bbs-enable` / `--no-bbs-enable`: expose or hide the BBS/profile workspace
+  when `--accept-file-transfer-traffic-disclaimer` is also set
 
 Related environment variables:
 
@@ -615,8 +622,9 @@ Related environment variables:
 - `MESH_DASH_THEME_PRESET`
 - `MESH_DASH_THEME_SETTINGS_FILE`
 
-### File transfer
+### BBS and file transfer
 
+- `--bbs-enable` / `--no-bbs-enable`
 - `--file-transfer-enable` / `--no-file-transfer-enable`
 - `--file-transfer-max-bytes <bytes>`
 - `--accept-file-transfer-traffic-disclaimer` /
@@ -788,5 +796,5 @@ third-party data notes in `THIRD_PARTY_NOTICES.md`.
 - Use `--private-mode` and/or `--api-token` for stricter write-path control.
 - `--show-secrets` exposes sensitive values in raw JSON panels; do not enable
   it casually on shared displays.
-- File transfer can consume significant mesh airtime. Keep it disabled unless
-  you have explicitly accepted that tradeoff.
+- BBS and file transfer can consume significant mesh airtime. Keep them
+  disabled unless you have explicitly accepted that tradeoff.
