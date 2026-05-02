@@ -6405,6 +6405,9 @@
       --chat-feed-node-emoji-tail-inset: 8px;
       padding-right: var(--chat-feed-node-emoji-tail-space);
     }}
+    .chat-feed-item.has-node-emoji.has-node-watermark-text {{
+      --chat-feed-node-emoji-tail-space: clamp(62px, 6.2vw, 92px);
+    }}
     .chat-feed-item.self-authored.has-node-emoji {{
       padding-left: var(--chat-feed-node-emoji-tail-space);
       padding-right: 12px;
@@ -6424,6 +6427,14 @@
       user-select: none;
       white-space: nowrap;
       z-index: 0;
+    }}
+    .chat-feed-item.has-node-emoji.has-node-watermark-text::after {{
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      font-size: clamp(20px, 2.35vw, 34px);
+      font-weight: 650;
+      letter-spacing: 0.055em;
+      opacity: 0.065;
+      filter: blur(0.9px);
     }}
     .chat-feed-item.self-authored.has-node-emoji::after {{
       left: var(--chat-feed-node-emoji-tail-inset);

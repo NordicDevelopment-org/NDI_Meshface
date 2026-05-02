@@ -213,10 +213,19 @@
         const nodeTintStyle = (typeof nodeTintStyleVars === "function")
           ? nodeTintStyleVars(tintNodeId, nodeTintOptions)
           : `--chat-feed-node-hue:${{Math.max(0, Math.min(359, Math.trunc(Number(nodeTintHueValue) || 210)))}};`;
-        const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === "function")
-          ? String(nodeVisualEmojiForNode(tintNodeId || sourceNode || nodeId, tintTagEntry, tintSeedNode) || "").trim()
+        const nodeVisualEmoji = (typeof nodeVisualWatermarkForNode === "function")
+          ? String(nodeVisualWatermarkForNode(tintNodeId || sourceNode || nodeId, tintTagEntry, tintSeedNode) || "").trim()
+          : ((typeof nodeVisualEmojiForNode === "function")
+            ? String(nodeVisualEmojiForNode(tintNodeId || sourceNode || nodeId, tintTagEntry, tintSeedNode) || "").trim()
+            : "");
+        const nodeWatermarkTextClass = (
+          nodeVisualEmoji
+          && typeof nodeVisualWatermarkIsText === "function"
+          && nodeVisualWatermarkIsText(nodeVisualEmoji)
+        )
+          ? " has-node-watermark-text"
           : "";
-        const nodeEmojiClass = nodeVisualEmoji ? " has-node-emoji" : "";
+        const nodeEmojiClass = nodeVisualEmoji ? ` has-node-emoji${{nodeWatermarkTextClass}}` : "";
         const nodeEmojiAttr = nodeVisualEmoji
           ? ` data-node-emoji="${{escAttr(nodeVisualEmoji)}}"`
           : "";

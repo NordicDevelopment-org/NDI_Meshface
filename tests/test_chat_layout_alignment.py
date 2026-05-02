@@ -723,12 +723,16 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "--chat-feed-node-emoji-tail-space: clamp(52px, 4.9vw, 74px);" in css
     assert "--chat-feed-node-emoji-tail-inset: 8px;" in css
     assert "padding-right: var(--chat-feed-node-emoji-tail-space);" in css
+    assert ".chat-feed-item.has-node-emoji.has-node-watermark-text {" in css
+    assert "--chat-feed-node-emoji-tail-space: clamp(62px, 6.2vw, 92px);" in css
     assert ".chat-feed-item.self-authored.has-node-emoji {" in css
     assert "padding-left: var(--chat-feed-node-emoji-tail-space);" in css
     assert ".chat-feed-item.has-node-emoji::after {" in css
     assert 'content: attr(data-node-emoji);' in css
     assert 'font-size: clamp(44px, 4.7vw, 70px);' in css
     assert "right: var(--chat-feed-node-emoji-tail-inset);" in css
+    assert ".chat-feed-item.has-node-emoji.has-node-watermark-text::after {" in css
+    assert 'font-size: clamp(20px, 2.35vw, 34px);' in css
     assert ".chat-feed-item.self-authored.has-node-emoji::after {" in css
     assert "left: var(--chat-feed-node-emoji-tail-inset);" in css
     assert '[data-theme="dark"] .card.chat .chat-feed-item.has-node-emoji::after {' in css
@@ -747,8 +751,10 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "max-width: min(92%, 100%);" in mobile_section
     assert "const isSelfAuthored = isLocalEcho || (" in js
     assert 'const selfAuthoredClass = isSelfAuthored ? " self-authored" : "";' in js
-    assert "const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === \"function\")" in js
-    assert 'const nodeEmojiClass = nodeVisualEmoji ? " has-node-emoji" : "";' in js
+    assert "const nodeVisualEmoji = (typeof nodeVisualWatermarkForNode === \"function\")" in js
+    assert "const nodeWatermarkTextClass = (" in js
+    assert "nodeVisualWatermarkIsText(nodeVisualEmoji)" in js
+    assert 'const nodeEmojiClass = nodeVisualEmoji ? ` has-node-emoji${nodeWatermarkTextClass}` : "";' in js
     assert 'data-node-emoji="${escAttr(nodeVisualEmoji)}"' in js
     assert "function formatLocalChatTime12Hour(" in js
     assert 'const meridiem = hour24 >= 12 ? "PM" : "AM";' in js

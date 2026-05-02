@@ -1589,10 +1589,16 @@
 
     function networkTopNodesVisualEmoji(nodeId, state = latestState) {{
       const clean = normalizeNodeId(nodeId || "");
-      if (!clean || typeof nodeVisualEmojiForNode !== "function") return "";
+      if (!clean) return "";
       const node = networkTopNodesNodeMap(state).get(clean) || null;
       try {{
-        return String(nodeVisualEmojiForNode(clean, null, node) || "").trim();
+        if (typeof nodeVisualWatermarkForNode === "function") {{
+          return String(nodeVisualWatermarkForNode(clean, null, node) || "").trim();
+        }}
+        if (typeof nodeVisualEmojiForNode === "function") {{
+          return String(nodeVisualEmojiForNode(clean, null, node) || "").trim();
+        }}
+        return "";
       }} catch (_err) {{
         return "";
       }}
@@ -1620,7 +1626,15 @@
           ? `<span class="network-top-node-city" data-top-node-city-key="${{escAttr(cityKey)}}" data-top-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-top-node-city-lon="${{escAttr(location.lon.toFixed(6))}}"${{cityText ? "" : " hidden"}}>${{escAttr(cityText)}}</span>`
           : "";
         const nodeEmoji = networkTopNodesVisualEmoji(nodeId, state);
-        return `<button class="network-top-node-row${{nodeEmoji ? " has-node-emoji" : ""}}" type="button" data-top-node-id="${{escAttr(nodeId)}}"${{nodeEmoji ? ` data-node-emoji="${{escAttr(nodeEmoji)}}"` : ""}} title="${{escAttr(`${{name}} (${{nodeId}})`)}}">
+        const nodeWatermarkTextClass = (
+          nodeEmoji
+          && typeof nodeVisualWatermarkIsText === "function"
+          && nodeVisualWatermarkIsText(nodeEmoji)
+        )
+          ? " has-node-watermark-text"
+          : "";
+        const nodeEmojiClass = nodeEmoji ? ` has-node-emoji${{nodeWatermarkTextClass}}` : "";
+        return `<button class="network-top-node-row${{nodeEmojiClass}}" type="button" data-top-node-id="${{escAttr(nodeId)}}"${{nodeEmoji ? ` data-node-emoji="${{escAttr(nodeEmoji)}}"` : ""}} title="${{escAttr(`${{name}} (${{nodeId}})`)}}">
           <span class="network-top-node-rank">#${{escAttr(rank)}}</span>
           <span class="network-top-node-main">
             <span class="network-top-node-name">${{escAttr(name)}}</span>

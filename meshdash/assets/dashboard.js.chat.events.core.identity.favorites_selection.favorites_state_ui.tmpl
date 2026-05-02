@@ -293,6 +293,22 @@
       return `<svg class="${{escAttr(className)}}" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="${{escAttr(path)}}"></path></svg>`;
     }}
 
+    function nodeTagWatermarkTextForEntry(tagEntry) {{
+      const presetId = normalizeNodeTagPresetId(
+        (tagEntry && tagEntry.presetId)
+        || (tagEntry && tagEntry.preset && tagEntry.preset.id)
+        || "",
+        ""
+      );
+      if (presetId === "auto-new-node") return "NEW";
+      return "";
+    }}
+
+    function nodeVisualWatermarkIsText(value) {{
+      const clean = String(value == null ? "" : value).trim();
+      return /^[A-Z0-9]{{2,8}}$/.test(clean);
+    }}
+
     function nodeTagEmojiForNode(nodeId) {{
       return nodeTagEmojiForEntry(nodeTagEntryForNode(nodeId));
     }}
@@ -341,6 +357,19 @@
       if (overrideEmoji) return overrideEmoji;
       const tagEmoji = nodeTagEmojiForEntry(tagEntry || nodeTagEntryForNode(nodeId));
       if (tagEmoji) return tagEmoji;
+      return nodeIntrinsicEmojiForNode(nodeId, node);
+    }}
+
+    function nodeVisualWatermarkForNode(nodeId, tagEntry = null, node = null) {{
+      const localVisualEmoji = localVisualEmojiForNode(nodeId, node);
+      if (localVisualEmoji) return localVisualEmoji;
+      const overrideEmoji = nodeEmojiOverrideForNode(nodeId);
+      if (overrideEmoji) return overrideEmoji;
+      const resolvedTagEntry = tagEntry || nodeTagEntryForNode(nodeId);
+      const tagEmoji = nodeTagEmojiForEntry(resolvedTagEntry);
+      if (tagEmoji) return tagEmoji;
+      const tagWatermark = nodeTagWatermarkTextForEntry(resolvedTagEntry);
+      if (tagWatermark) return tagWatermark;
       return nodeIntrinsicEmojiForNode(nodeId, node);
     }}
 
