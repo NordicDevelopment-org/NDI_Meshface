@@ -218,6 +218,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'selectNode(nodeId, true, true);' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'return fitNetworkGraphViewBoxToBounds(bounds, svg);' in js
+    assert 'const selectedNodeHasLinkPeers = selectedNodeAvailable' in js
+    assert 'if (selectedNodeAvailable && selectedNodeHasLinkPeers) return selectedId;' in js
+    assert 'if (graphRootAvailable && graphRootHasLinkPeers) return graphRootId;' in js
     assert 'const localNodeHasLinkPeers = localNodeAvailable' in js
     assert 'if (localNodeAvailable && (localNodeHasLinkPeers || bestDegree <= 0)) {' in js
     assert 'const parentHintsByNodeId = new Map();' in js

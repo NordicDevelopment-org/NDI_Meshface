@@ -83,6 +83,7 @@
       }};
       const linkedNodes = new Set();
       let realLinksFromEdges = 0;
+      let liveLinksFromEdges = 0;
       let lifetimePackets = 0;
       let sessionPackets = 0;
       let hopsWeighted = 0;
@@ -108,8 +109,11 @@
           ? sessionCount
           : 0;
         sessionPackets += parsedSession;
+        if (parsedSession > 0) {{
+          liveLinksFromEdges += 1;
+        }}
 
-        if (edge && (edge.is_real === true || edge.real === true || edge.isReal === true || parsedSession > 0)) {{
+        if (edge && (edge.is_real === true || edge.real === true || edge.isReal === true)) {{
           realLinksFromEdges += 1;
         }}
 
@@ -137,18 +141,30 @@
       }}
 
       const summaryLinkCount = cleanCount(summary.edge_count ?? summary.link_count ?? summary.links);
-      const summaryRealLinkCount = cleanCount(summary.real_edge_count ?? summary.live_link_count ?? summary.real_links);
+      const summaryRealLinkCount = cleanCount(summary.real_edge_count ?? summary.real_links ?? summary.confirmed_link_count);
+      const summaryLiveLinkCount = cleanCount(
+        summary.live_edge_count
+        ?? summary.live_link_count
+        ?? summary.session_edge_count
+        ?? summary.session_link_count
+      );
       const linkCount = summaryLinkCount != null ? summaryLinkCount : edges.length;
       const realLinkCount = summaryRealLinkCount != null ? summaryRealLinkCount : realLinksFromEdges;
+      const liveLinkCount = summaryLiveLinkCount != null ? summaryLiveLinkCount : liveLinksFromEdges;
       const linkText = formatTickerNumber(linkCount, 0);
       const realLinkText = formatTickerNumber(realLinkCount, 0);
-      const text = `${{linkText}} · ${{realLinkText}} live`;
+      const liveLinkText = formatTickerNumber(liveLinkCount, 0);
+      const secondaryLinkCount = liveLinkCount > 0 ? liveLinkCount : realLinkCount;
+      const secondaryLinkText = formatTickerNumber(secondaryLinkCount, 0);
+      const secondaryLinkLabel = liveLinkCount > 0 ? "live" : "confirmed";
+      const text = `${{linkText}} · ${{secondaryLinkText}} ${{secondaryLinkLabel}}`;
       const avgHopsText = hopsWeight > 0
         ? formatTickerNumber(hopsWeighted / hopsWeight, 1)
         : "n/a";
       const titleParts = [
         `${{linkText}} directed link${{linkCount === 1 ? "" : "s"}}`,
-        `${{realLinkText}} live link${{realLinkCount === 1 ? "" : "s"}}`,
+        `${{liveLinkText}} live link${{liveLinkCount === 1 ? "" : "s"}}`,
+        `${{realLinkText}} confirmed link${{realLinkCount === 1 ? "" : "s"}}`,
         `${{formatTickerNumber(linkedNodes.size, 0)}} linked node${{linkedNodes.size === 1 ? "" : "s"}}`,
         `${{formatTickerNumber(lifetimePackets, 0)}} lifetime packet${{Math.round(lifetimePackets) === 1 ? "" : "s"}}`,
         `${{formatTickerNumber(sessionPackets, 0)}} session packet${{Math.round(sessionPackets) === 1 ? "" : "s"}}`,
@@ -164,6 +180,7 @@
         title: titleParts.join(" | "),
         link_count: linkCount,
         real_link_count: realLinkCount,
+        live_link_count: liveLinkCount,
         linked_node_count: linkedNodes.size,
         lifetime_packets: lifetimePackets,
         session_packets: sessionPackets,

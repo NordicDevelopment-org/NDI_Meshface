@@ -140,7 +140,9 @@ def test_dashboard_exposes_mesh_links_ticker() -> None:
     assert '{ id: "links", defaultLabel: "Links", metric: true }' in js
     assert 'function buildLinksTickerSummary(state = latestState) {' in js
     assert 'summary.edge_count ?? summary.link_count ?? summary.links' in js
-    assert 'summary.real_edge_count ?? summary.live_link_count ?? summary.real_links' in js
+    assert 'summary.real_edge_count ?? summary.real_links ?? summary.confirmed_link_count' in js
+    assert 'summary.live_edge_count' in js
+    assert 'const text = `${linkText} · ${secondaryLinkText} ${secondaryLinkLabel}`;' in js
     assert 'updateMetricTicker("links", linksMetricValue, {' in js
     assert 'containerId: "ticker-links",' in js
     assert 'id="summary-ticker-links"' in html
