@@ -448,156 +448,27 @@
     }}
     .topbar:not(.ticker-expanded) .summary-ticker-item[data-ticker-id]:not([data-ticker-id="self"]):hover,
     .topbar:not(.ticker-expanded) .summary-ticker-item[data-ticker-id]:not([data-ticker-id="self"]):focus-visible {{
-      border-color: color-mix(in srgb, var(--accent) 48%, var(--line) 52%);
-      background: color-mix(in srgb, var(--panel) 90%, var(--accent) 10%);
+      border-color: color-mix(in srgb, var(--line) 78%, var(--ink) 22%);
+      background: color-mix(in srgb, var(--panel) 93%, var(--line) 7%);
       outline: none;
     }}
-    .topbar:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open {{
-      border-color: color-mix(in srgb, var(--accent) 58%, var(--line) 42%);
-      background: color-mix(in srgb, var(--panel) 84%, var(--accent) 16%);
-    }}
-    .summary-ticker-detail-tray {{
-      width: 100%;
-      min-width: 0;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(168px, 32vw) auto;
-      align-items: stretch;
-      gap: 10px;
-      border: 1px solid color-mix(in srgb, var(--line) 80%, var(--accent) 20%);
-      border-radius: 8px;
-      background: linear-gradient(90deg, color-mix(in srgb, var(--panel) 90%, var(--accent) 10%), color-mix(in srgb, var(--panel) 96%, var(--accent-2) 4%));
-      color: var(--ink);
-      padding: 8px 10px;
-      min-height: 58px;
-      overflow: hidden;
-      box-shadow: none;
-    }}
-    .summary-ticker-detail-tray[hidden],
-    .topbar.ticker-expanded .summary-ticker-detail-tray {{
-      display: none !important;
-    }}
-    .summary-ticker-detail-copy {{
-      min-width: 0;
-      display: grid;
-      grid-template-columns: minmax(84px, max-content) minmax(0, 1fr);
-      grid-template-rows: auto auto;
-      align-items: baseline;
-      column-gap: 12px;
-      row-gap: 5px;
-    }}
-    .summary-ticker-detail-label {{
-      grid-column: 1;
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-density-toggle,
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item:not(.is-compact-detail-open) {{
       grid-row: 1;
-      color: color-mix(in srgb, var(--muted) 88%, var(--accent-2) 12%);
-      font-size: 10px;
-      font-weight: 750;
-      line-height: 1.1;
-      letter-spacing: 0.34px;
-      text-transform: uppercase;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }}
-    .summary-ticker-detail-value {{
-      grid-column: 2;
-      grid-row: 1;
-      min-width: 0;
-      color: var(--ink);
-      font-size: 20px;
-      font-weight: 760;
-      line-height: 1.1;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }}
-    .summary-ticker-detail-meta {{
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open {{
       grid-column: 1 / -1;
       grid-row: 2;
       min-width: 0;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      overflow: hidden;
-      max-height: 38px;
-    }}
-    .summary-ticker-detail-meta[hidden] {{
-      display: none !important;
-    }}
-    .summary-ticker-detail-chip {{
-      min-width: 0;
-      max-width: min(38ch, 100%);
-      border: 1px solid color-mix(in srgb, var(--line) 78%, var(--accent) 22%);
-      border-radius: 999px;
-      padding: 2px 7px;
-      background: color-mix(in srgb, var(--panel) 88%, var(--accent) 12%);
-      color: color-mix(in srgb, var(--ink) 90%, var(--muted) 10%);
-      font-size: 10px;
-      font-weight: 680;
-      line-height: 1.15;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }}
-    .summary-ticker-detail-chart-wrap {{
-      min-width: 0;
-      align-self: stretch;
-      display: grid;
+      border-radius: 10px;
+      padding: 8px 10px;
       grid-template-columns: minmax(0, 1fr);
-      align-items: center;
-      border-left: 1px solid color-mix(in srgb, var(--line) 76%, transparent 24%);
-      padding-left: 10px;
+      grid-template-rows: auto auto auto;
+      row-gap: 4px;
+      align-items: start;
     }}
-    .summary-ticker-detail-chart-wrap[hidden] {{
-      display: none !important;
-    }}
-    .summary-ticker-detail-chart {{
-      width: 100%;
-      height: 42px;
-      display: block;
-      overflow: visible;
-    }}
-    .summary-ticker-detail-chart path {{
-      fill: none;
-      stroke: var(--accent);
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      vector-effect: non-scaling-stroke;
-    }}
-    .summary-ticker-detail-chart-wrap.trend-up .summary-ticker-detail-chart path {{
-      stroke: color-mix(in srgb, var(--accent) 88%, white 12%);
-    }}
-    .summary-ticker-detail-chart-wrap.trend-down .summary-ticker-detail-chart path {{
-      stroke: color-mix(in srgb, var(--danger) 74%, white 26%);
-    }}
-    .summary-ticker-detail-chart-wrap.trend-flat .summary-ticker-detail-chart path {{
-      stroke: color-mix(in srgb, var(--line) 82%, var(--accent-2) 18%);
-    }}
-    .summary-ticker-detail-close {{
-      appearance: none;
-      -webkit-appearance: none;
-      align-self: start;
-      width: 28px;
-      height: 28px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--line) 78%, var(--accent) 22%);
-      background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%);
-      color: var(--ink);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      font: inherit;
-      font-size: 18px;
-      line-height: 1;
-      cursor: pointer;
-    }}
-    .summary-ticker-detail-close:hover,
-    .summary-ticker-detail-close:focus-visible {{
-      border-color: color-mix(in srgb, var(--accent) 58%, var(--line) 42%);
-      background: color-mix(in srgb, var(--panel) 84%, var(--accent) 16%);
-      outline: none;
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item-radio.is-compact-detail-open {{
+      grid-template-rows: auto auto auto auto;
     }}
     .topbar-update-ticker[hidden] {{
       display: none !important;
@@ -1743,6 +1614,115 @@
       height: 30px;
     }}
     .topbar.ticker-expanded .summary-ticker-item .metric-ticker-chart path {{
+      stroke-width: 1.6;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open > .label {{
+      position: static;
+      left: auto;
+      right: auto;
+      bottom: auto;
+      z-index: auto;
+      grid-column: 1;
+      grid-row: 1;
+      max-width: 100%;
+      color: var(--ui-text-soft, color-mix(in srgb, var(--muted) 88%, var(--accent-2) 12%));
+      font-size: 10px;
+      line-height: 1.2;
+      letter-spacing: 0.5px;
+      text-align: left;
+      white-space: normal;
+      pointer-events: auto;
+      user-select: auto;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open > .value {{
+      grid-column: 1;
+      grid-row: 2;
+      color: var(--ui-text, var(--ink));
+      font-size: 20px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .value.node-ticker-value {{
+      font-size: 15px;
+      line-height: 1.25;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      display: flex;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .value.node-ticker-value.is-compact {{
+      font-size: 20px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .value.wifi-ticker-value {{
+      font-size: 14px;
+      line-height: 1.25;
+      gap: 2px;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .time-ticker-value {{
+      font-size: 13px;
+      gap: 6px;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item-radio.is-compact-detail-open > .value,
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item-radio.is-compact-detail-open .value.radio-ticker-value {{
+      grid-column: 1;
+      grid-row: 2;
+      display: block;
+      font-size: 18px;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item-radio.is-compact-detail-open .radio-ticker-status-line {{
+      grid-column: 1;
+      grid-row: 3;
+      font-size: 14px;
+      line-height: 1.1;
+      gap: 6px;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .metric-ticker {{
+      grid-column: 1;
+      grid-row: 3;
+      justify-self: stretch;
+      display: grid;
+      grid-template-columns: auto minmax(90px, 1fr);
+      grid-template-rows: auto auto;
+      column-gap: 8px;
+      row-gap: 2px;
+      align-items: center;
+      width: 100%;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item-radio.is-compact-detail-open .metric-ticker {{
+      grid-row: 4;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .metric-ticker-delta {{
+      grid-column: 1;
+      grid-row: 1;
+      font-size: 12px;
+      font-weight: 700;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .metric-ticker-rate {{
+      grid-column: 1;
+      grid-row: 2;
+      display: inline;
+      font-size: 10px;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .metric-ticker-chart {{
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      width: 100%;
+      height: 30px;
+    }}
+    .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .metric-ticker-chart path {{
       stroke-width: 1.6;
     }}
     .topbar .sub .sub-text {{

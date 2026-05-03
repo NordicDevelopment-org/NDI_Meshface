@@ -148,7 +148,11 @@
       container.hidden = false;
 
       chart.innerHTML = "";
-      const expandedTickerView = topbarElement instanceof HTMLElement && topbarElement.classList.contains("ticker-expanded");
+      const tickerItem = container.closest(".summary-ticker-item");
+      const compactDetailTickerView = tickerItem instanceof HTMLElement
+        && tickerItem.classList.contains("is-compact-detail-open");
+      const expandedTickerView = topbarElement instanceof HTMLElement
+        && (topbarElement.classList.contains("ticker-expanded") || compactDetailTickerView);
       const chartWidth = expandedTickerView ? 184 : 72;
       const chartHeight = expandedTickerView ? 44 : 16;
       const chartPad = expandedTickerView ? 3 : 1.5;

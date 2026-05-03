@@ -150,7 +150,7 @@ def test_dashboard_exposes_mesh_links_ticker() -> None:
     assert 'id="ticker-chart-links"' in html
 
 
-def test_compact_tickers_can_open_full_width_detail_tray() -> None:
+def test_compact_tickers_expand_selected_card_in_place() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -170,21 +170,63 @@ def test_compact_tickers_can_open_full_width_detail_tray() -> None:
     )
     css = build_dashboard_css(theme_css="")
 
-    assert 'id="summary-ticker-detail-tray"' in html
-    assert 'id="summary-ticker-detail-label"' in html
-    assert 'id="summary-ticker-detail-value"' in html
-    assert 'id="summary-ticker-detail-chart"' in html
-    assert 'id="summary-ticker-detail-close"' in html
+    assert 'id="summary-ticker-detail-tray"' not in html
     assert 'function bindCompactTickerDetailTrayControls() {' in js
     assert 'function toggleCompactTickerDetail(id) {' in js
     assert 'return !!id && id !== "self";' in js
-    assert 'topbarElement.classList.contains("ticker-expanded")' in js
+    assert 'topbarElement.classList.add("has-compact-ticker-detail");' in js
+    assert 'item.classList.toggle("is-compact-detail-open", expandable && id === activeCompactTickerDetailId);' in js
+    assert "const compactTickerCount = activeTickerConsumesRow ? visibleTickerCount - 1 : visibleTickerCount;" in js
+    assert "syncCompactTickerColumnCount(row);" in js
+    assert "renderSummary(latestState);" in js
+    assert "const compactDetailTickerView = tickerItem instanceof HTMLElement" in js
+    assert 'topbarElement.classList.contains("ticker-expanded") || compactDetailTickerView' in js
     assert 'row.addEventListener("click", (ev) => {' in js
     assert 'row.addEventListener("keydown", (ev) => {' in js
     assert 'refreshCompactTickerDetailTray();' in js
-    assert ".summary-ticker-detail-tray {" in css
-    assert "grid-template-columns: minmax(0, 1fr) minmax(168px, 32vw) auto;" in css
-    assert ".topbar.ticker-expanded .summary-ticker-detail-tray {" in css
+    assert ".summary-ticker-detail-tray {" not in css
+    assert ".topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open {" in css
+    assert "grid-column: 1 / -1;" in css
+    assert "grid-row: 2;" in css
+    compact_detail_base = re.search(
+        r"\.topbar\.has-compact-ticker-detail:not\(\.ticker-expanded\) \.summary-ticker-item\.is-compact-detail-open \{\s*(.*?)\s*\}",
+        css,
+        re.S,
+    )
+    assert compact_detail_base is not None
+    assert "background:" not in compact_detail_base.group(1)
+    assert "border-color:" not in compact_detail_base.group(1)
+    assert "box-shadow:" not in compact_detail_base.group(1)
+    assert "[data-theme=\"dark\"] .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open {" in css
+    assert "background: var(--ui-panel);" in css
+    assert "border-color: var(--workspace-shell-border);" in css
+    assert "color: var(--ui-text);" in css
+    assert "box-shadow: none;" in css
+    assert '[data-theme="dark"] .topbar:not(.ticker-expanded) .summary-ticker-item[data-ticker-id]:not([data-ticker-id="self"]):hover,' in css
+    assert '[data-theme="dark"] .topbar:not(.ticker-expanded) .summary-ticker-item[data-ticker-id]:not([data-ticker-id="self"]):focus-visible {' in css
+    assert "background: color-mix(in srgb, var(--ui-panel-alt) 88%, var(--workspace-shell-hover-bg) 12%);" in css
+    assert "border-color: var(--workspace-shell-border-strong);" in css
+    assert '[data-theme="dark"] .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open:hover,' in css
+    assert '[data-theme="dark"] .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open:focus-visible {' in css
+    assert ".topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .metric-ticker {" in css
+
+
+def test_metric_state_classes_only_set_ticker_accents() -> None:
+    css = build_dashboard_css(theme_css="")
+
+    for state in ("neutral", "good", "warn", "bad"):
+        block = re.search(
+            rf'\[data-theme="dark"\] \.topbar \.summary-ticker-item\.metric-state-{state} \{{\s*(.*?)\s*\}}',
+            css,
+            re.S,
+        )
+        assert block is not None
+        body = block.group(1)
+        assert "--ticker-card-accent:" in body
+        assert "--ticker-card-accent-soft:" in body
+        assert "background:" not in body
+        assert "border-color:" not in body
+        assert "box-shadow:" not in body
 
 
 def test_dashboard_js_merges_summary_hydration_with_persisted_ticker_series() -> None:
@@ -278,7 +320,7 @@ def test_dashboard_js_balances_wrapped_tickers_only_when_needed() -> None:
     assert "let visibleTickerCount = 0;" in js
     assert "if (isEnabled) {" in js
     assert "visibleTickerCount += 1;" in js
-    assert 'row.style.setProperty("--summary-visible-ticker-count", String(Math.max(1, visibleTickerCount)));' in js
+    assert "syncCompactTickerColumnCount(row);" in js
     assert 'topbarElement.classList.toggle("ticker-wrap-balanced", visibleTickerCount > 8);' in js
 
 
