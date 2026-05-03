@@ -28,6 +28,7 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert ".chat-left-roster-shell {" in css
     assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
     assert "background: color-mix(in srgb, var(--panel) 92%, var(--bg) 8%);" in css
+    assert "box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
     assert ".layout.view-chat .chat {" in css
     assert "background: transparent;" in css
     assert "border: 0;" in css
@@ -71,6 +72,7 @@ def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
     assert "border-radius: 10px;" in css
     assert "background: color-mix(in srgb, var(--panel) 92%, var(--bg) 8%);" in css
+    assert "box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in css
     assert ".layout.view-chat .chat-card-head.workspace-chrome-bar {" in css
     assert "margin: 0;" in css
     assert "padding: 8px 10px;" in css
@@ -271,6 +273,8 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "border-color: transparent !important;" in css
     assert "[data-theme=\"dark\"] .chat-left-head-shell {" in css
     assert "[data-theme=\"dark\"] .chat-left-roster-shell {" in css
+    dark_roster_section = css.rsplit("[data-theme=\"dark\"] .chat-left-roster-shell {", 1)[1].split("}", 1)[0]
+    assert "box-shadow: inset 0 -1px 0 var(--workspace-shell-border);" in dark_roster_section
     assert "[data-theme=\"dark\"] .card.chat .body {" in css
     assert "[data-theme=\"dark\"] .card.chat .chat-shell {" in css
     assert "background: #08120d;" in css
@@ -288,6 +292,7 @@ def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     assert "[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-log-scroll {" in css
     assert "background: var(--workspace-shell-bg);" in css
     assert "border-color: var(--workspace-shell-border);" in css
+    assert "box-shadow: inset 0 -1px 0 var(--workspace-shell-border);" in css
     dark_compose_shell_section = css.rsplit("[data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell {", 1)[1].split("}", 1)[0]
     dark_tinted_compose_shell_section = css.split("[data-theme=\"dark\"] .chat-compose-shell.channel-tinted,\n    [data-theme=\"dark\"] .card.chat .chat-compose-shell.channel-tinted,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat .chat-compose-shell.channel-tinted {", 1)[1].split("}", 1)[0]
     dark_bottom_bar_section = css.rsplit("[data-theme=\"dark\"] .chat-left-bottom-bar {", 1)[1].split("}", 1)[0]
