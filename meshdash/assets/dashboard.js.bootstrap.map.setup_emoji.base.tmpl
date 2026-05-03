@@ -435,6 +435,7 @@
       {{ id: "battery", defaultLabel: "Battery", metric: true }},
       {{ id: "wifi", defaultLabel: "Wi-Fi", metric: true }},
       {{ id: "node", defaultLabel: "Signal", metric: true }},
+      {{ id: "links", defaultLabel: "Links", metric: true }},
       {{ id: "chat_channels", defaultLabel: "Chat Channels", metric: false }},
       {{ id: "chat_roster", defaultLabel: "Roster Health", metric: false }},
       {{ id: "gps", defaultLabel: "GPS", metric: false }},
@@ -452,6 +453,7 @@
       "packets_per_min",
       "channel_util",
       "node",
+      "links",
       "battery",
       "wifi",
       "gps",
@@ -476,6 +478,7 @@
       "packets_per_min",
       "channel_util",
       "node",
+      "links",
     ]) {{
       if (!tickerCatalogById.has(id)) continue;
       tickerDefaultEnabled[id] = true;

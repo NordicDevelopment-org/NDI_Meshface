@@ -67,6 +67,111 @@
       }};
     }}
 
+    function buildLinksTickerSummary(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const summary = (safeState.summary && typeof safeState.summary === "object")
+        ? safeState.summary
+        : {{}};
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      const cleanCount = (rawValue) => {{
+        const num = Number(rawValue);
+        if (!Number.isFinite(num)) return null;
+        return Math.max(0, Math.trunc(num));
+      }};
+      const linkedNodes = new Set();
+      let realLinksFromEdges = 0;
+      let lifetimePackets = 0;
+      let sessionPackets = 0;
+      let hopsWeighted = 0;
+      let hopsWeight = 0;
+      let lastSeenUnix = null;
+      let lastSeenText = "n/a";
+      const ports = new Set();
+
+      for (const edge of edges) {{
+        const fromId = normalizeNodeId(edge && edge.from);
+        const toId = normalizeNodeId(edge && edge.to);
+        if (isSelectableNodeId(fromId)) linkedNodes.add(fromId);
+        if (isSelectableNodeId(toId)) linkedNodes.add(toId);
+
+        const lifetimeCount = Number(edge && (edge.lifetime_count ?? edge.count));
+        const parsedLifetime = Number.isFinite(lifetimeCount) && lifetimeCount > 0
+          ? lifetimeCount
+          : 0;
+        lifetimePackets += parsedLifetime;
+
+        const sessionCount = Number(edge && (edge.session_count ?? edge.count));
+        const parsedSession = Number.isFinite(sessionCount) && sessionCount > 0
+          ? sessionCount
+          : 0;
+        sessionPackets += parsedSession;
+
+        if (edge && (edge.is_real === true || edge.real === true || edge.isReal === true || parsedSession > 0)) {{
+          realLinksFromEdges += 1;
+        }}
+
+        const avgHops = Number(edge && edge.avg_hops);
+        const avgHopsWeight = parsedLifetime > 0 ? parsedLifetime : 1;
+        if (Number.isFinite(avgHops)) {{
+          hopsWeighted += avgHops * avgHopsWeight;
+          hopsWeight += avgHopsWeight;
+        }}
+
+        const edgeLastUnix = (typeof edgeRxUnix === "function")
+          ? edgeRxUnix(edge, "last")
+          : Number(edge && edge.last_rx_unix);
+        if (Number.isFinite(edgeLastUnix) && (!Number.isFinite(lastSeenUnix) || edgeLastUnix > lastSeenUnix)) {{
+          lastSeenUnix = Math.trunc(edgeLastUnix);
+          lastSeenText = (typeof edgeRxLabel === "function")
+            ? String(edgeRxLabel(edge, "last", "n/a") || "n/a")
+            : String((edge && edge.last_rx_time) || "n/a");
+        }}
+
+        for (const port of (edge && Array.isArray(edge.portnums) ? edge.portnums : [])) {{
+          const cleanPort = String(port || "").trim();
+          if (cleanPort) ports.add(cleanPort);
+        }}
+      }}
+
+      const summaryLinkCount = cleanCount(summary.edge_count ?? summary.link_count ?? summary.links);
+      const summaryRealLinkCount = cleanCount(summary.real_edge_count ?? summary.live_link_count ?? summary.real_links);
+      const linkCount = summaryLinkCount != null ? summaryLinkCount : edges.length;
+      const realLinkCount = summaryRealLinkCount != null ? summaryRealLinkCount : realLinksFromEdges;
+      const linkText = formatTickerNumber(linkCount, 0);
+      const realLinkText = formatTickerNumber(realLinkCount, 0);
+      const text = `${{linkText}} · ${{realLinkText}} live`;
+      const avgHopsText = hopsWeight > 0
+        ? formatTickerNumber(hopsWeighted / hopsWeight, 1)
+        : "n/a";
+      const titleParts = [
+        `${{linkText}} directed link${{linkCount === 1 ? "" : "s"}}`,
+        `${{realLinkText}} live link${{realLinkCount === 1 ? "" : "s"}}`,
+        `${{formatTickerNumber(linkedNodes.size, 0)}} linked node${{linkedNodes.size === 1 ? "" : "s"}}`,
+        `${{formatTickerNumber(lifetimePackets, 0)}} lifetime packet${{Math.round(lifetimePackets) === 1 ? "" : "s"}}`,
+        `${{formatTickerNumber(sessionPackets, 0)}} session packet${{Math.round(sessionPackets) === 1 ? "" : "s"}}`,
+        `avg hops ${{avgHopsText}}`,
+        `last activity ${{lastSeenText || "n/a"}}`,
+      ];
+      if (ports.size > 0) {{
+        titleParts.push(`ports ${{Array.from(ports).slice(0, 8).join(", ")}}`);
+      }}
+
+      return {{
+        text,
+        title: titleParts.join(" | "),
+        link_count: linkCount,
+        real_link_count: realLinkCount,
+        linked_node_count: linkedNodes.size,
+        lifetime_packets: lifetimePackets,
+        session_packets: sessionPackets,
+        avg_hops: hopsWeight > 0 ? hopsWeighted / hopsWeight : null,
+        last_seen_unix: lastSeenUnix,
+      }};
+    }}
+
     function buildSystemTickerSummary(state = latestState) {{
       const safeState = (state && typeof state === "object") ? state : {{}};
       const localState = settingsLocalStateFrom(safeState);
@@ -237,4 +342,3 @@
           : "System metrics not exposed by this radio/feed",
       }};
     }}
-

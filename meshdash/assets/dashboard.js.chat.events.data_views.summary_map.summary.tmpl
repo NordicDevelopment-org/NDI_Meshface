@@ -1757,6 +1757,7 @@
       const showPressureTrend = tickerTrendEnabled("pressure");
       const showWifiTrend = tickerTrendEnabled("wifi");
       const showNodeTrend = tickerTrendEnabled("node");
+      const showLinksTrend = tickerTrendEnabled("links");
       const batteryTrendWindowMs = batteryTrendWindowHours() * 60 * 60 * 1000;
       setText("m-battery", batteryDisplayText);
       const batteryMetricValueEl = document.getElementById("m-battery");
@@ -1949,6 +1950,34 @@
         const nodeMetricTicker = document.getElementById("ticker-node-signal");
         if (nodeMetricTicker instanceof HTMLElement) {{
           nodeMetricTicker.hidden = true;
+        }}
+      }}
+      const linksTicker = buildLinksTickerSummary(state);
+      setText("m-links", linksTicker && linksTicker.text ? String(linksTicker.text) : "n/a");
+      const linksMetric = document.getElementById("m-links");
+      if (linksMetric instanceof HTMLElement) {{
+        linksMetric.title = linksTicker && linksTicker.title
+          ? String(linksTicker.title)
+          : "Link summary unavailable";
+      }}
+      const linksMetricValue = Number(linksTicker && linksTicker.link_count);
+      if (Number.isFinite(linksMetricValue)) {{
+        updateMetricTicker("links", linksMetricValue, {{
+          containerId: "ticker-links",
+          deltaId: "ticker-delta-links",
+          rateId: "ticker-rate-links",
+          chartId: "ticker-chart-links",
+          digits: 0,
+          stateProfile: "count_delta",
+        }});
+        const linksMetricTicker = document.getElementById("ticker-links");
+        if (linksMetricTicker instanceof HTMLElement && !showLinksTrend) {{
+          linksMetricTicker.hidden = true;
+        }}
+      }} else {{
+        const linksMetricTicker = document.getElementById("ticker-links");
+        if (linksMetricTicker instanceof HTMLElement) {{
+          linksMetricTicker.hidden = true;
         }}
       }}
       const chatChannelsTickerEl = document.getElementById("m-chat-channels");

@@ -17,11 +17,11 @@ def test_dashboard_js_uses_curated_default_ticker_layout() -> None:
     )
 
     assert re.search(
-        r'const tickerDefaultOrder = \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"new_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*"battery",',
+        r'const tickerDefaultOrder = \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"new_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*"links",\s*"battery",',
         js,
     )
     assert re.search(
-        r'for \(const id of \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"new_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*\]\)',
+        r'for \(const id of \[\s*"self",\s*"radio",\s*"known_nodes",\s*"online_nodes",\s*"new_nodes",\s*"packets_per_min",\s*"channel_util",\s*"node",\s*"links",\s*\]\)',
         js,
     )
     assert 'if (key === "target") return "self";' in js
@@ -116,6 +116,38 @@ def test_render_html_exposes_auto_new_nodes_ticker() -> None:
     assert 'data-ticker-id="new_nodes"' in html
     assert '<div class="label" data-ticker-label>New Nodes</div>' in html
     assert 'id="ticker-chart-new-nodes"' in html
+
+
+def test_dashboard_exposes_mesh_links_ticker() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert '{ id: "links", defaultLabel: "Links", metric: true }' in js
+    assert 'function buildLinksTickerSummary(state = latestState) {' in js
+    assert 'summary.edge_count ?? summary.link_count ?? summary.links' in js
+    assert 'summary.real_edge_count ?? summary.live_link_count ?? summary.real_links' in js
+    assert 'updateMetricTicker("links", linksMetricValue, {' in js
+    assert 'containerId: "ticker-links",' in js
+    assert 'id="summary-ticker-links"' in html
+    assert 'data-ticker-id="links"' in html
+    assert '<div class="label" data-ticker-label>Links</div>' in html
+    assert 'id="m-links"' in html
+    assert 'id="ticker-chart-links"' in html
 
 
 def test_dashboard_js_merges_summary_hydration_with_persisted_ticker_series() -> None:
