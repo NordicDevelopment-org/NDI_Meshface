@@ -263,9 +263,9 @@ def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> Non
     assert "const tickerShowsSelf = !hasSelectedTickerNode || tickerIsLocal;" in js
     assert 'selfCard.classList.toggle("has-selected-node", hasSelectedTickerNode);' in js
     assert 'selfLabel.textContent = tickerShowsSelf ? "Self" : "Node";' in js
-    assert "if (isSelectableNodeId(tickerNodeId) && !tickerShowsSelf)" in js
+    assert "if (isSelectableNodeId(tickerNodeId))" in js
     assert 'selfCard.setAttribute("aria-label", `Select node ${tickerNodeName || tickerNodeId}`);' in js
-    assert "const cardBaseTitle = tickerShowsSelf" in js
+    assert 'const cardBaseTitle = `${metricBaseTitle} • Click to select in node list`;' in js
     assert "nearestOfflineCityHintFromCoords(" in js
     assert 'source: "linked",' in js
     assert 'selfMetric.classList.add("self-node-value", "node-ticker-value");' in js
