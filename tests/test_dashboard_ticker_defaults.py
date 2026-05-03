@@ -578,6 +578,10 @@ def test_radio_rx_tx_aligns_with_compact_link_value_and_status_is_prominent() ->
         ".topbar.ticker-expanded .summary-ticker-item-radio .radio-ticker-status-line {",
         1,
     )[1].split("}", 1)[0]
+    signal_compact_expanded_section = css.split(
+        ".topbar.ticker-expanded .summary-ticker-item .value.node-ticker-value.is-compact {",
+        1,
+    )[1].split("}", 1)[0]
     link_expanded_section = css.split(
         ".topbar.ticker-expanded .summary-ticker-item#summary-ticker-node .value.node-ticker-value.is-compact {",
         1,
@@ -591,4 +595,5 @@ def test_radio_rx_tx_aligns_with_compact_link_value_and_status_is_prominent() ->
     assert "grid-column: 1;" in status_section
     assert "font-size: 11px;" in status_section
     assert "font-size: 14px;" in expanded_status_section
+    assert "grid-row: 2;" in signal_compact_expanded_section
     assert "font-size: 18px;" in link_expanded_section
