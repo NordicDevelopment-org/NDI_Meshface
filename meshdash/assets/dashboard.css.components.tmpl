@@ -7847,15 +7847,13 @@
         font-size: 9px;
       }}
       .topbar .sub .summary-ticker-row {{
+        grid-template-columns: var(--topbar-corner-reserve, 30px) repeat(var(--summary-visible-ticker-count, 10), minmax(168px, 82vw));
         grid-auto-columns: minmax(168px, 82vw);
         padding-bottom: 2px;
         scroll-snap-type: x proximity;
         -webkit-overflow-scrolling: touch;
       }}
       .summary-ticker-density-toggle {{
-        top: 0;
-        right: 0;
-        bottom: 0;
         width: var(--topbar-corner-reserve, 30px);
         min-width: var(--topbar-corner-reserve, 30px);
         max-width: var(--topbar-corner-reserve, 30px);

@@ -1127,6 +1127,7 @@
         }}
         orderIndex += 1;
       }}
+      row.style.setProperty("--summary-visible-ticker-count", String(Math.max(1, visibleTickerCount)));
       if (topbarElement instanceof HTMLElement) {{
         topbarElement.classList.toggle("ticker-wrap-balanced", visibleTickerCount > 8);
       }}

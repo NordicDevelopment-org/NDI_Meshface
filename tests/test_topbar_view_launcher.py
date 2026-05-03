@@ -148,7 +148,8 @@ def test_workspace_view_launcher_replaces_legacy_rail_nav() -> None:
     assert "padding: 8px 8px 0;" in topbar_section
     assert "box-shadow: none;" in topbar_section
     assert "padding: 0;" in topbar_sub_section
-    assert "padding-right: calc(var(--topbar-corner-reserve, 36px) + 4px);" in css
+    assert "--summary-visible-ticker-count: 10;" in css
+    assert "padding-right: 0;" in css
     assert "box-shadow: none;" in topbar_ticker_section
     assert "box-shadow: none;" in topbar_update_section
     assert "box-shadow: none;" in topbar_launcher_section

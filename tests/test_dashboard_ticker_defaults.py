@@ -242,7 +242,7 @@ def test_render_html_uses_single_row_compact_ticker_strip() -> None:
     )
 
     assert re.search(
-        r"\.topbar \.sub \.summary-ticker-row \{\s*display: grid;\s*grid-auto-flow: column;\s*grid-auto-columns: minmax\(124px, 1fr\);\s*gap: 5px;",
+        r"\.topbar \.sub \.summary-ticker-row \{\s*display: grid;\s*grid-auto-flow: column;\s*grid-template-columns: var\(--topbar-corner-reserve, 36px\) repeat\(var\(--summary-visible-ticker-count, 10\), minmax\(0, 1fr\)\);\s*grid-auto-columns: minmax\(0, 1fr\);\s*gap: 5px;",
         html,
     )
     assert re.search(
@@ -278,6 +278,7 @@ def test_dashboard_js_balances_wrapped_tickers_only_when_needed() -> None:
     assert "let visibleTickerCount = 0;" in js
     assert "if (isEnabled) {" in js
     assert "visibleTickerCount += 1;" in js
+    assert 'row.style.setProperty("--summary-visible-ticker-count", String(Math.max(1, visibleTickerCount)));' in js
     assert 'topbarElement.classList.toggle("ticker-wrap-balanced", visibleTickerCount > 8);' in js
 
 
@@ -296,6 +297,7 @@ def test_render_html_widens_ticker_cards_for_phone_swipe_scrolling() -> None:
     )
 
     assert "@media (max-width: 760px) {" in html
+    assert "grid-template-columns: var(--topbar-corner-reserve, 30px) repeat(var(--summary-visible-ticker-count, 10), minmax(168px, 82vw));" in html
     assert "grid-auto-columns: minmax(168px, 82vw);" in html
     assert "scroll-snap-type: x proximity;" in html
     assert ".topbar .summary-ticker-item {" in html
