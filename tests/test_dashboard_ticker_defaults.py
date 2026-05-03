@@ -400,6 +400,10 @@ def test_radio_ticker_uses_rx_tx_metric() -> None:
     assert 'id="m-radio-status"' in html
     assert 'id="ticker-radio"' in html
     assert '{ id: "radio", defaultLabel: "Radio", metric: true }' in js
+    assert '{ id: "node", defaultLabel: "Signal", metric: true }' in js
+    assert 'id="summary-ticker-node"' in html
+    assert '<div class="label" data-ticker-label>Signal</div>' in html
+    assert '<span class="settings-label">Signal rows</span>' in html
     assert "m-target-radio-status" not in js
     assert 'const radioMetric = document.getElementById("m-radio");' in js
     assert 'const radioStatusLine = document.getElementById("m-radio-status");' in js
