@@ -5643,6 +5643,36 @@
     [data-theme="dark"] .network-sensors-panel .env-metrics-available {{
       color: var(--workspace-shell-text-soft);
     }}
+    [data-theme="dark"] .network-sensors-panel .env-node-legend-pill {{
+      border-color: color-mix(in srgb, var(--node-color, var(--workspace-shell-border)) 68%, var(--workspace-shell-border) 32%);
+      border-left-color: var(--node-color, var(--workspace-shell-border-strong));
+      background:
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--node-color, var(--workspace-shell-active-bg)) 24%, var(--workspace-shell-bg-alt) 76%),
+          color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, black 12%) 70%
+        );
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-sensors-panel .env-node-legend-pill::before {{
+      box-shadow:
+        0 0 0 1px rgba(225, 242, 232, 0.22),
+        0 0 12px color-mix(in srgb, var(--node-color, var(--workspace-shell-border-strong)) 42%, transparent);
+    }}
+    [data-theme="dark"] .network-sensors-panel .env-node-legend-pill .v {{
+      color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-sensors-panel .env-node-legend-toggle:hover {{
+      background:
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--node-color, var(--workspace-shell-active-bg)) 32%, var(--workspace-shell-hover-bg) 68%),
+          var(--workspace-shell-hover-bg) 72%
+        );
+    }}
+    [data-theme="dark"] .network-sensors-panel .env-node-legend-toggle.is-hidden {{
+      background: color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, black 12%);
+    }}
     [data-theme="dark"] .network-diagnostics-summary-note {{
       color: var(--workspace-shell-text-soft);
     }}

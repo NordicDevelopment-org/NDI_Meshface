@@ -505,7 +505,8 @@ def test_network_sensors_top_level_explorer_reuses_light_shell() -> None:
 
     explorer_section = css.split(".network-sensors-panel .env-metrics-explorer {", 1)[1].split("}", 1)[0]
     chart_section = css.split(".network-sensors-panel #env-metrics-chart-wrap {", 1)[1].split("}", 1)[0]
-    legend_section = css.split(".network-sensors-panel .env-node-legend-card {", 1)[1].split("}", 1)[0]
+    legend_section = css.split(".network-sensors-panel .env-node-legend-pill {", 1)[1].split("}", 1)[0]
+    legend_dot_section = css.split(".network-sensors-panel .env-node-legend-pill::before {", 1)[1].split("}", 1)[0]
 
     assert "border: 1px solid rgba(188, 214, 195, 0.9);" in explorer_section
     assert "background: rgba(249, 253, 249, 0.92);" in explorer_section
@@ -518,9 +519,11 @@ def test_network_sensors_top_level_explorer_reuses_light_shell() -> None:
     assert "padding: 0;" in chart_section
     assert "rgba(18, 29, 39, 0.98)" not in chart_section
 
-    assert "border: 1px solid #d7e5d2;" in legend_section
-    assert "background: #f9fdf9;" in legend_section
+    assert "border: 1px solid color-mix(in srgb, var(--node-color, #d7e5d2) 70%, #d7e5d2 30%);" in legend_section
+    assert "border-left: 4px solid var(--node-color, #7aa38a);" in legend_section
+    assert "color-mix(in srgb, var(--node-color, #7aa38a) 22%, #f9fdf9 78%)" in legend_section
     assert "color: #193a28;" in legend_section
+    assert "background: var(--node-color, #7aa38a);" in legend_dot_section
 
 
 def test_network_subview_charts_pull_runtime_theme_vars() -> None:
