@@ -35,6 +35,47 @@
       0x24EA, 0x2460, 0x2461, 0x2462, 0x2463, 0x2464, 0x2465, 0x2466,
       0x2467, 0x2468,
     ]);
+    const chatUnicodeSmallCapsCodepoints = Object.freeze([
+      0x1D00, 0x0299, 0x1D04, 0x1D05, 0x1D07, 0xA730, 0x0262,
+      0x029C, 0x026A, 0x1D0A, 0x1D0B, 0x029F, 0x1D0D, 0x0274,
+      0x1D0F, 0x1D18, 0xA7AF, 0x0280, 0xA731, 0x1D1B, 0x1D1C,
+      0x1D20, 0x1D21, 0x0078, 0x028F, 0x1D22,
+    ]);
+    const chatUnicodeSuperscriptCodepoints = Object.freeze([
+      0x1D43, 0x1D47, 0x1D9C, 0x1D48, 0x1D49, 0x1DA0, 0x1D4D,
+      0x02B0, 0x2071, 0x02B2, 0x1D4F, 0x02E1, 0x1D50, 0x207F,
+      0x1D52, 0x1D56, 0, 0x02B3, 0x02E2, 0x1D57, 0x1D58,
+      0x1D5B, 0x02B7, 0x02E3, 0x02B8, 0x1DBB,
+    ]);
+    const chatUnicodeSuperscriptDigitCodepoints = Object.freeze([
+      0x2070, 0x00B9, 0x00B2, 0x00B3, 0x2074, 0x2075, 0x2076,
+      0x2077, 0x2078, 0x2079,
+    ]);
+    const chatUnicodeParenthesizedDigitCodepoints = Object.freeze([
+      0, 0x2474, 0x2475, 0x2476, 0x2477, 0x2478, 0x2479,
+      0x247A, 0x247B, 0x247C,
+    ]);
+    const chatUnicodeUpsideDownPairs = Object.freeze([
+      [0x61, 0x0250], [0x62, 0x0071], [0x63, 0x0254], [0x64, 0x0070],
+      [0x65, 0x01DD], [0x66, 0x025F], [0x67, 0x0183], [0x68, 0x0265],
+      [0x69, 0x1D09], [0x6A, 0x027E], [0x6B, 0x029E], [0x6C, 0x006C],
+      [0x6D, 0x026F], [0x6E, 0x0075], [0x6F, 0x006F], [0x70, 0x0064],
+      [0x71, 0x0062], [0x72, 0x0279], [0x73, 0x0073], [0x74, 0x0287],
+      [0x75, 0x006E], [0x76, 0x028C], [0x77, 0x028D], [0x78, 0x0078],
+      [0x79, 0x028E], [0x7A, 0x007A], [0x41, 0x2200], [0x42, 0x10412],
+      [0x43, 0x0186], [0x44, 0x15E1], [0x45, 0x018E], [0x46, 0x2132],
+      [0x47, 0x2141], [0x48, 0x0048], [0x49, 0x0049], [0x4A, 0x017F],
+      [0x4B, 0x22CA], [0x4C, 0x2142], [0x4D, 0x0057], [0x4E, 0x004E],
+      [0x4F, 0x004F], [0x50, 0x0500], [0x51, 0x038C], [0x52, 0x1D1A],
+      [0x53, 0x0053], [0x54, 0x22A5], [0x55, 0x2229], [0x56, 0x039B],
+      [0x57, 0x004D], [0x58, 0x0058], [0x59, 0x2144], [0x5A, 0x005A],
+      [0x31, 0x0196], [0x32, 0x1105], [0x33, 0x0190], [0x34, 0x3123],
+      [0x35, 0x03DB], [0x36, 0x0039], [0x37, 0x3125], [0x38, 0x0038],
+      [0x39, 0x0036], [0x2E, 0x02D9], [0x2C, 0x0027], [0x27, 0x002C],
+      [0x22, 0x201E], [0x21, 0x00A1], [0x3F, 0x00BF], [0x28, 0x0029],
+      [0x29, 0x0028], [0x5B, 0x005D], [0x5D, 0x005B], [0x7B, 0x007D],
+      [0x7D, 0x007B], [0x3C, 0x003E], [0x3E, 0x003C],
+    ]);
 
     function chatUnicodeMapFromStart(alphabet, startCodepoint) {{
       const map = {{}};
@@ -59,6 +100,19 @@
       return map;
     }}
 
+    function chatUnicodeMapFromCodepointPairs(pairs) {{
+      const map = {{}};
+      const list = Array.isArray(pairs) ? pairs : [];
+      for (const pair of list) {{
+        if (!Array.isArray(pair) || pair.length < 2) continue;
+        const from = Number(pair[0]);
+        const to = Number(pair[1]);
+        if (!Number.isInteger(from) || from <= 0 || !Number.isInteger(to) || to <= 0) continue;
+        map[String.fromCodePoint(from)] = String.fromCodePoint(to);
+      }}
+      return map;
+    }}
+
     function chatUnicodeMergeMaps(...maps) {{
       const out = {{}};
       for (const rawMap of maps) {{
@@ -70,10 +124,22 @@
       return out;
     }}
 
+    const chatUnicodeSmallCapsMap = chatUnicodeMergeMaps(
+      chatUnicodeMapFromCodepoints(chatUnicodeAsciiLower, chatUnicodeSmallCapsCodepoints),
+      chatUnicodeMapFromCodepoints(chatUnicodeAsciiUpper, chatUnicodeSmallCapsCodepoints),
+    );
+    const chatUnicodeSuperscriptMap = chatUnicodeMergeMaps(
+      chatUnicodeMapFromCodepoints(chatUnicodeAsciiLower, chatUnicodeSuperscriptCodepoints),
+      chatUnicodeMapFromCodepoints(chatUnicodeAsciiUpper, chatUnicodeSuperscriptCodepoints),
+      chatUnicodeMapFromCodepoints(chatUnicodeAsciiDigits, chatUnicodeSuperscriptDigitCodepoints),
+    );
+    const chatUnicodeUpsideDownMap = chatUnicodeMapFromCodepointPairs(chatUnicodeUpsideDownPairs);
+
     const chatUnicodeStyles = Object.freeze([
       {{
         id: "fraktur",
         label: "Fraktur",
+        group: "fancy",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromCodepoints(chatUnicodeAsciiUpper, chatUnicodeFrakturUpperCodepoints),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D51E),
@@ -82,6 +148,7 @@
       {{
         id: "bold-fraktur",
         label: "Bold Fraktur",
+        group: "fancy",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D56C),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D586),
@@ -90,6 +157,7 @@
       {{
         id: "double-struck",
         label: "Double",
+        group: "fancy",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromCodepoints(chatUnicodeAsciiUpper, chatUnicodeDoubleUpperCodepoints),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D552),
@@ -99,6 +167,7 @@
       {{
         id: "monospace",
         label: "Mono",
+        group: "fancy",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D670),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D68A),
@@ -108,6 +177,7 @@
       {{
         id: "sans-bold",
         label: "Sans Bold",
+        group: "math",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D5D4),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D5EE),
@@ -117,6 +187,7 @@
       {{
         id: "serif-bold",
         label: "Serif Bold",
+        group: "math",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D400),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D41A),
@@ -126,6 +197,7 @@
       {{
         id: "serif-italic",
         label: "Serif Italic",
+        group: "math",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D434),
           chatUnicodeMapFromCodepoints(chatUnicodeAsciiLower, chatUnicodeItalicLowerCodepoints),
@@ -134,6 +206,7 @@
       {{
         id: "bold-italic",
         label: "Bold Italic",
+        group: "math",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D468),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D482),
@@ -142,6 +215,7 @@
       {{
         id: "script",
         label: "Script",
+        group: "fancy",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromCodepoints(chatUnicodeAsciiUpper, chatUnicodeScriptUpperCodepoints),
           chatUnicodeMapFromCodepoints(chatUnicodeAsciiLower, chatUnicodeScriptLowerCodepoints),
@@ -150,6 +224,7 @@
       {{
         id: "bold-script",
         label: "Bold Script",
+        group: "fancy",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D4D0),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D4EA),
@@ -158,6 +233,7 @@
       {{
         id: "sans-italic",
         label: "Sans Italic",
+        group: "math",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D608),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D622),
@@ -166,14 +242,45 @@
       {{
         id: "sans-bold-italic",
         label: "Sans Bold Italic",
+        group: "math",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D63C),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D656),
         ),
       }},
       {{
+        id: "sans-regular",
+        label: "Sans Regular",
+        group: "math",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D5A0),
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D5BA),
+          chatUnicodeMapFromStart(chatUnicodeAsciiDigits, 0x1D7E2),
+        ),
+      }},
+      {{
+        id: "small-caps",
+        label: "Small Caps",
+        group: "compact",
+        map: chatUnicodeSmallCapsMap,
+      }},
+      {{
+        id: "superscript",
+        label: "Superscript",
+        group: "compact",
+        map: chatUnicodeSuperscriptMap,
+      }},
+      {{
+        id: "upside-down",
+        label: "Upside Down",
+        group: "compact",
+        map: chatUnicodeUpsideDownMap,
+        reverse: true,
+      }},
+      {{
         id: "fullwidth",
         label: "Fullwidth",
+        group: "boxed",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0xFF21),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0xFF41),
@@ -184,13 +291,62 @@
       {{
         id: "circled",
         label: "Circled",
+        group: "boxed",
         map: chatUnicodeMergeMaps(
           chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x24B6),
           chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x24D0),
           chatUnicodeMapFromCodepoints(chatUnicodeAsciiDigits, chatUnicodeCircledDigitCodepoints),
         ),
       }},
+      {{
+        id: "parenthesized",
+        label: "Parenthesized",
+        group: "boxed",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x249C),
+          chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x249C),
+          chatUnicodeMapFromCodepoints(chatUnicodeAsciiDigits, chatUnicodeParenthesizedDigitCodepoints),
+        ),
+      }},
+      {{
+        id: "squared",
+        label: "Squared",
+        group: "boxed",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1F130),
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1F130),
+        ),
+      }},
+      {{
+        id: "negative-squared",
+        label: "Negative Squared",
+        group: "boxed",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1F170),
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1F170),
+        ),
+      }},
+      {{
+        id: "strikethrough",
+        label: "Strikethrough",
+        group: "marks",
+        combiningMark: 0x0336,
+      }},
+      {{
+        id: "underline",
+        label: "Underline",
+        group: "marks",
+        combiningMark: 0x0332,
+      }},
     ]);
+    const chatUnicodeGroups = Object.freeze([
+      {{ id: "math", label: "Math" }},
+      {{ id: "fancy", label: "Fancy" }},
+      {{ id: "compact", label: "Compact" }},
+      {{ id: "boxed", label: "Boxed" }},
+      {{ id: "marks", label: "Marks" }},
+    ]);
+    let chatUnicodeActiveGroup = "math";
 
     function chatUnicodeStyleById(styleId) {{
       const cleanId = String(styleId || "").trim();
@@ -198,13 +354,32 @@
       return chatUnicodeStyles.find((style) => style.id === cleanId) || null;
     }}
 
+    function normalizeChatUnicodeGroup(groupId) {{
+      const cleanId = String(groupId || "").trim();
+      if (chatUnicodeGroups.some((group) => group.id === cleanId)) return cleanId;
+      return chatUnicodeGroups[0] ? chatUnicodeGroups[0].id : "math";
+    }}
+
     function transformChatUnicodeText(rawText, styleId) {{
       const style = chatUnicodeStyleById(styleId);
       const text = String(rawText == null ? "" : rawText);
-      if (!style || !style.map) return text;
-      return Array.from(text)
-        .map((ch) => Object.prototype.hasOwnProperty.call(style.map, ch) ? style.map[ch] : ch)
-        .join("");
+      if (!style) return text;
+      const map = style.map && typeof style.map === "object" ? style.map : {{}};
+      let chars = Array.from(text);
+      if (style.reverse) {{
+        chars = chars.reverse();
+      }}
+      const transformed = chars.map((ch) => (
+        Object.prototype.hasOwnProperty.call(map, ch) ? map[ch] : ch
+      ));
+      const combiningMark = Number(style.combiningMark);
+      if (Number.isInteger(combiningMark) && combiningMark > 0) {{
+        const mark = String.fromCodePoint(combiningMark);
+        return transformed
+          .map((ch) => (/^\s$/u.test(ch) ? ch : `${{ch}}${{mark}}`))
+          .join("");
+      }}
+      return transformed.join("");
     }}
 
     function chatUnicodePanelElement() {{
@@ -242,11 +417,31 @@
       if (!(panel instanceof HTMLElement)) return;
       const input = document.getElementById("chat-input");
       const sourceText = chatUnicodeSourceText(input);
+      const activeGroup = normalizeChatUnicodeGroup(panel.dataset.activeGroup || chatUnicodeActiveGroup);
+      chatUnicodeActiveGroup = activeGroup;
+      panel.dataset.activeGroup = activeGroup;
+
+      const menu = document.createElement("div");
+      menu.className = "chat-unicode-menu";
+      menu.setAttribute("role", "tablist");
+      menu.setAttribute("aria-label", "Unicode style category");
+      for (const group of chatUnicodeGroups) {{
+        const menuBtn = document.createElement("button");
+        menuBtn.type = "button";
+        menuBtn.className = "chat-unicode-menu-btn";
+        menuBtn.dataset.unicodeGroup = group.id;
+        menuBtn.setAttribute("role", "tab");
+        menuBtn.setAttribute("aria-selected", group.id === activeGroup ? "true" : "false");
+        menuBtn.classList.toggle("active", group.id === activeGroup);
+        menuBtn.textContent = group.label;
+        menu.appendChild(menuBtn);
+      }}
+
       const options = document.createElement("div");
       options.className = "chat-unicode-options";
       options.setAttribute("role", "listbox");
       options.setAttribute("aria-label", "Unicode text style");
-      for (const style of chatUnicodeStyles) {{
+      for (const style of chatUnicodeStyles.filter((style) => style.group === activeGroup)) {{
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "chat-unicode-option";
@@ -262,7 +457,7 @@
         btn.append(label, preview);
         options.appendChild(btn);
       }}
-      panel.replaceChildren(options);
+      panel.replaceChildren(menu, options);
     }}
 
     function setChatUnicodeExpanded(expanded) {{
@@ -363,6 +558,13 @@
         panel.addEventListener("click", (ev) => {{
           const target = ev.target;
           if (!(target instanceof Element)) return;
+          const groupBtn = target.closest(".chat-unicode-menu-btn");
+          if (groupBtn instanceof HTMLButtonElement) {{
+            chatUnicodeActiveGroup = normalizeChatUnicodeGroup(groupBtn.dataset.unicodeGroup || "");
+            panel.dataset.activeGroup = chatUnicodeActiveGroup;
+            renderChatUnicodePanel();
+            return;
+          }}
           const option = target.closest(".chat-unicode-option");
           if (!(option instanceof HTMLButtonElement)) return;
           applyChatUnicodeStyle(option.dataset.unicodeStyle || "");

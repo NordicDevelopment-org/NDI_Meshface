@@ -420,6 +420,38 @@
     .chat-unicode-panel[hidden] {{
       display: none !important;
     }}
+    .chat-unicode-menu {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      padding-bottom: 1px;
+      background: #fbfefb;
+    }}
+    .chat-unicode-menu-btn {{
+      border: 1px solid #c9dbcc;
+      border-radius: 999px;
+      background: #f1f9f4;
+      color: #2f5d45;
+      min-height: 24px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.2;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: none;
+      appearance: none;
+      -webkit-appearance: none;
+    }}
+    .chat-unicode-menu-btn:hover,
+    .chat-unicode-menu-btn.active {{
+      background: #e3f4ea;
+      border-color: #9cc9ad;
+      color: #184a32;
+    }}
     .chat-unicode-options {{
       display: flex;
       flex-direction: column;
@@ -3027,6 +3059,8 @@
     [data-theme="dark"] #chat-unicode-btn,
     [data-theme="dark"] #chat-emoji-btn,
     [data-theme="dark"] .chat-unicode-panel,
+    [data-theme="dark"] .chat-unicode-menu,
+    [data-theme="dark"] .chat-unicode-menu-btn,
     [data-theme="dark"] .chat-unicode-option,
     [data-theme="dark"] .chat-emoji-panel,
     [data-theme="dark"] .chat-emoji-filter,
@@ -3135,6 +3169,8 @@
     [data-theme="dark"] #chat-send-btn:hover,
     [data-theme="dark"] #chat-unicode-btn:hover,
     [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] .chat-unicode-menu-btn:hover,
+    [data-theme="dark"] .chat-unicode-menu-btn.active,
     [data-theme="dark"] .chat-unicode-option:hover,
     [data-theme="dark"] .chat-emoji-item:hover {{
       background: #2f4a3c;
@@ -3258,6 +3294,8 @@
     [data-theme="dark"] .chat-left-bottom-bar,
     [data-theme="dark"] .chat-reply-context,
     [data-theme="dark"] .chat-unicode-panel,
+    [data-theme="dark"] .chat-unicode-menu,
+    [data-theme="dark"] .chat-unicode-menu-btn,
     [data-theme="dark"] .chat-unicode-option,
     [data-theme="dark"] .chat-emoji-panel,
     [data-theme="dark"] .chat-emoji-filter,
@@ -3296,6 +3334,8 @@
     [data-theme="dark"] #chat-send-btn:hover,
     [data-theme="dark"] #chat-unicode-btn:hover,
     [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] .chat-unicode-menu-btn:hover,
+    [data-theme="dark"] .chat-unicode-menu-btn.active,
     [data-theme="dark"] .chat-unicode-option:hover,
     [data-theme="dark"] .chat-emoji-item:hover {{
       background: #0d1d13;
@@ -3779,6 +3819,8 @@
     [data-theme="dark"] #chat-unicode-btn,
     [data-theme="dark"] #chat-emoji-btn,
     [data-theme="dark"] .chat-unicode-panel,
+    [data-theme="dark"] .chat-unicode-menu,
+    [data-theme="dark"] .chat-unicode-menu-btn,
     [data-theme="dark"] .chat-unicode-option,
     [data-theme="dark"] .chat-emoji-panel,
     [data-theme="dark"] .chat-emoji-filter,
@@ -4668,6 +4710,8 @@
     [data-theme="dark"] #chat-send-btn:hover,
     [data-theme="dark"] #chat-unicode-btn:hover,
     [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] .chat-unicode-menu-btn:hover,
+    [data-theme="dark"] .chat-unicode-menu-btn.active,
     [data-theme="dark"] .chat-unicode-option:hover,
     [data-theme="dark"] .chat-emoji-item:hover,
     [data-theme="dark"] .console-controls button:hover {{

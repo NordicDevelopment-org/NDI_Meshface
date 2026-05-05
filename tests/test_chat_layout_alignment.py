@@ -385,6 +385,8 @@ def test_chat_unicode_generator_wires_composer_styles() -> None:
     assert "function transformChatUnicodeText(rawText, styleId) {" in js
     assert "function applyChatUnicodeStyle(styleId) {" in js
     assert "function bindChatUnicodeGenerator() {" in js
+    assert "const chatUnicodeGroups = Object.freeze([" in js
+    assert "function normalizeChatUnicodeGroup(groupId) {" in js
     assert 'id: "fraktur"' in js
     assert 'id: "bold-fraktur"' in js
     assert 'id: "double-struck"' in js
@@ -399,6 +401,18 @@ def test_chat_unicode_generator_wires_composer_styles() -> None:
     assert 'id: "sans-bold-italic"' in js
     assert 'id: "fullwidth"' in js
     assert 'id: "circled"' in js
+    assert 'id: "sans-regular"' in js
+    assert 'id: "small-caps"' in js
+    assert 'id: "superscript"' in js
+    assert 'id: "upside-down"' in js
+    assert 'id: "parenthesized"' in js
+    assert 'id: "squared"' in js
+    assert 'id: "negative-squared"' in js
+    assert 'id: "strikethrough"' in js
+    assert 'id: "underline"' in js
+    assert 'id: "compact", label: "Compact"' in js
+    assert 'id: "boxed", label: "Boxed"' in js
+    assert 'id: "marks", label: "Marks"' in js
     assert "0x1D51E" in js
     assert "0x1D586" in js
     assert "0x1D7F6" in js
@@ -407,8 +421,17 @@ def test_chat_unicode_generator_wires_composer_styles() -> None:
     assert "0x1D4D0" in js
     assert "0xFF21" in js
     assert "0x24D0" in js
+    assert "0x1D5A0" in js
+    assert "0x1D00" in js
+    assert "0x2070" in js
+    assert "0x1F130" in js
+    assert "0x1F170" in js
+    assert "0x0336" in js
+    assert "0x0332" in js
     assert "#chat-unicode-btn" in css
     assert ".chat-unicode-panel {" in css
+    assert ".chat-unicode-menu {" in css
+    assert ".chat-unicode-menu-btn {" in css
     assert ".chat-unicode-option {" in css
     assert "max-height: min(64vh, 520px);" in css
 
