@@ -407,9 +407,12 @@ def test_chat_unicode_generator_wires_composer_styles() -> None:
     assert 'id: "upside-down"' in js
     assert 'id: "parenthesized"' in js
     assert 'id: "squared"' in js
+    assert 'id: "negative-circled"' in js
     assert 'id: "negative-squared"' in js
+    assert 'id: "slash-overlay"' in js
     assert 'id: "strikethrough"' in js
     assert 'id: "underline"' in js
+    assert 'id: "overline"' in js
     assert 'id: "compact", label: "Compact"' in js
     assert 'id: "boxed", label: "Boxed"' in js
     assert 'id: "marks", label: "Marks"' in js
@@ -425,9 +428,12 @@ def test_chat_unicode_generator_wires_composer_styles() -> None:
     assert "0x1D00" in js
     assert "0x2070" in js
     assert "0x1F130" in js
+    assert "0x1F150" in js
     assert "0x1F170" in js
+    assert "0x0338" in js
     assert "0x0336" in js
     assert "0x0332" in js
+    assert "0x0305" in js
     assert "#chat-unicode-btn" in css
     assert ".chat-unicode-panel {" in css
     assert ".chat-unicode-menu {" in css
