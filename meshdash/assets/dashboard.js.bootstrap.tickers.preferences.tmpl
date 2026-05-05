@@ -215,7 +215,7 @@
 
     function normalizeWeeklySummaryMetric(raw) {{
       const clean = String(raw || "").trim().toLowerCase();
-      if (clean === "sensors" || clean === "sensor" || clean === "telemetry_history") return "sensors";
+      if (clean === "sensors" || clean === "sensor" || clean === "telemetry_history") return "nodes";
       if (clean === "packets" || clean === "live_packet_count") return "packets";
       if (
         clean === "nodes"
@@ -554,64 +554,15 @@
       }}
     }}
 
-    function updateNetworkOverviewSensorMode(metricKey = networkOverviewMetric) {{
-      const metric = normalizeWeeklySummaryMetric(metricKey);
-      const showSensors = metric === "sensors";
-      const sensorControlsHost = document.getElementById("network-overview-sensor-controls-host");
-      const sensorHost = document.getElementById("network-overview-sensor-host");
-      const chartWrap = document.getElementById("network-overview-chart-wrap");
-      const timeline = document.getElementById("network-overview-timeline");
-      const overview = document.getElementById("network-overview-overview");
-      const envWindowWrap = document.getElementById("env-window-wrap");
-      if (sensorControlsHost instanceof HTMLElement) {{
-        sensorControlsHost.hidden = !showSensors;
-      }}
-      if (sensorHost instanceof HTMLElement) {{
-        sensorHost.hidden = !showSensors;
-      }}
-      if (chartWrap instanceof HTMLElement) {{
-        chartWrap.hidden = showSensors;
-      }}
-      if (timeline instanceof HTMLElement) {{
-        timeline.hidden = showSensors;
-      }}
-      if (overview instanceof HTMLElement) {{
-        overview.hidden = showSensors;
-      }}
-      if (envWindowWrap instanceof HTMLElement) {{
-        envWindowWrap.hidden = (
-          showSensors
-          && activeLayoutView === "network"
-          && activeNetworkSubview === "overview"
-        );
-      }}
-      if (typeof syncEnvironmentMetricsDock === "function") {{
-        syncEnvironmentMetricsDock(activeLayoutView, activeNetworkSubview);
-      }}
-    }}
-
     function applyNetworkOverviewWindow(hours, persist = true) {{
       networkOverviewWindowHours = normalizeSummaryWindowHours(hours);
       const select = document.getElementById("network-overview-window");
       if (select instanceof HTMLSelectElement && select.value !== String(networkOverviewWindowHours)) {{
         select.value = String(networkOverviewWindowHours);
       }}
-      if (networkOverviewMetric === "sensors") {{
-        if (typeof envMetricsViewState !== "undefined") {{
-          envMetricsViewState.selectedWindowHours = normalizeEnvHistoryHours(networkOverviewWindowHours);
-        }}
-        const envSelect = document.getElementById("env-window-select");
-        if (envSelect instanceof HTMLSelectElement) {{
-          envSelect.value = String(normalizeEnvHistoryHours(networkOverviewWindowHours));
-        }}
-        if (typeof renderEnvironmentMetricsView === "function") {{
-          void renderEnvironmentMetricsView(false);
-        }}
-      }} else {{
-        const cached = summaryMetricsCache.get(String(networkOverviewWindowHours));
-        if (cached && cached.data) {{
-          renderNetworkOverviewSummary(cached.data);
-        }}
+      const cached = summaryMetricsCache.get(String(networkOverviewWindowHours));
+      if (cached && cached.data) {{
+        renderNetworkOverviewSummary(cached.data);
       }}
       if (!persist) return;
       try {{
@@ -630,23 +581,9 @@
       updateNetworkOverviewLinkModeControl(normalized);
       updateNetworkOverviewNodeSeriesControls(normalized);
       updateNetworkOverviewPacketSeriesControls(normalized);
-      updateNetworkOverviewSensorMode(normalized);
-      if (normalized === "sensors") {{
-        if (typeof envMetricsViewState !== "undefined") {{
-          envMetricsViewState.selectedWindowHours = normalizeEnvHistoryHours(networkOverviewWindowHours);
-        }}
-        const envSelect = document.getElementById("env-window-select");
-        if (envSelect instanceof HTMLSelectElement) {{
-          envSelect.value = String(normalizeEnvHistoryHours(networkOverviewWindowHours));
-        }}
-        if (typeof renderEnvironmentMetricsView === "function") {{
-          void renderEnvironmentMetricsView(false);
-        }}
-      }} else {{
-        const cached = summaryMetricsCache.get(String(networkOverviewWindowHours));
-        if (cached && cached.data) {{
-          renderNetworkOverviewSummary(cached.data);
-        }}
+      const cached = summaryMetricsCache.get(String(networkOverviewWindowHours));
+      if (cached && cached.data) {{
+        renderNetworkOverviewSummary(cached.data);
       }}
       if (!persist) return;
       try {{

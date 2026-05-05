@@ -736,8 +736,7 @@
       if (clean === "route" || clean === "routes") return "routes";
       if (clean === "top" || clean === "top10" || clean === "top_10") return "top10";
       if (clean === "diag") return networkDiagnosticsEnabled ? "diagnostics" : "map";
-      if (clean === "sensors") return "overview";
-      if (clean === "overview" || clean === "graph" || clean === "routes" || clean === "top10") return clean;
+      if (clean === "overview" || clean === "graph" || clean === "routes" || clean === "top10" || clean === "sensors") return clean;
       if (clean === "diagnostics") return networkDiagnosticsEnabled ? "diagnostics" : "map";
       return "map";
     }}
@@ -1001,35 +1000,24 @@
       const explorer = document.querySelector(".env-metrics-explorer");
       const controls = document.querySelector(".env-metrics-explorer .env-metrics-controls");
       const homeHost = document.getElementById("environment-metrics-home");
-      const overviewHost = document.getElementById("network-overview-sensor-host");
-      const overviewControlsHost = document.getElementById("network-overview-sensor-controls-host");
+      const networkHost = document.getElementById("network-sensors-host");
       const envWindowWrap = document.getElementById("env-window-wrap");
       if (!(explorer instanceof HTMLElement)) return;
       if (!(controls instanceof HTMLElement)) return;
       if (!(homeHost instanceof HTMLElement)) return;
-      if (!(overviewHost instanceof HTMLElement)) return;
-      if (!(overviewControlsHost instanceof HTMLElement)) return;
+      if (!(networkHost instanceof HTMLElement)) return;
 
       const normalizedView = normalizeLayoutView(viewName);
       const normalizedSubview = normalizeNetworkSubview(subviewName);
-      const dockInOverview = (
-        normalizedView === "network"
-        && normalizedSubview === "overview"
-        && typeof normalizeWeeklySummaryMetric === "function"
-        && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
-      );
-      const targetHost = dockInOverview ? overviewHost : homeHost;
+      const dockInNetworkSensors = normalizedView === "network" && normalizedSubview === "sensors";
+      const targetHost = dockInNetworkSensors ? networkHost : homeHost;
       if (envWindowWrap instanceof HTMLElement) {{
-        envWindowWrap.hidden = dockInOverview;
+        envWindowWrap.hidden = false;
       }}
       if (explorer.parentElement !== targetHost) {{
         targetHost.appendChild(explorer);
       }}
-      if (dockInOverview) {{
-        if (controls.parentElement !== overviewControlsHost) {{
-          overviewControlsHost.appendChild(controls);
-        }}
-      }} else if (controls.parentElement !== explorer) {{
+      if (controls.parentElement !== explorer) {{
         explorer.insertBefore(controls, explorer.firstChild || null);
       }}
     }}
@@ -2958,13 +2946,6 @@
         if (typeof refreshNetworkOverviewPanels === "function") {{
           void refreshNetworkOverviewPanels(false);
         }}
-        if (
-          typeof normalizeWeeklySummaryMetric === "function"
-          && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
-          && typeof renderEnvironmentMetricsView === "function"
-        ) {{
-          void renderEnvironmentMetricsView(false);
-        }}
       }}
       if (normalizedView === "network" && next === "graph") {{
         if (typeof renderNetworkGraphView === "function") {{
@@ -2976,6 +2957,11 @@
       }}
       if (normalizedView === "network" && next === "top10") {{
         renderNetworkTopNodes(latestState);
+      }}
+      if (normalizedView === "network" && next === "sensors") {{
+        if (typeof renderEnvironmentMetricsView === "function") {{
+          void renderEnvironmentMetricsView(false);
+        }}
       }}
       if (normalizedView === "network" && next === "diagnostics") {{
         void refreshNetworkDiagnosticsPanel(false);

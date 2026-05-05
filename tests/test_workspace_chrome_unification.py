@@ -393,6 +393,10 @@ def test_history_window_controls_trail_and_stay_right_anchored() -> None:
         '<div id="network-map-controls-host"',
         1,
     )[0]
+    network_tabs_section = html.split('<div class="network-map-subview-tabs"', 1)[1].split(
+        '</div>',
+        1,
+    )[0]
     weekly_controls_section = html.split('<div class="history-metric-controls">', 1)[1].split(
         '<div id="weekly-summary-chart-wrap">',
         1,
@@ -421,7 +425,16 @@ def test_history_window_controls_trail_and_stay_right_anchored() -> None:
     assert 'id="network-overview-link-mode-wrap"' in overview_controls_section
     assert 'id="network-overview-node-lines-wrap"' in overview_controls_section
     assert 'id="network-overview-packet-lines-wrap"' in overview_controls_section
-    assert 'id="network-overview-sensor-controls-host"' in overview_controls_section
+    assert '<option value="sensors">Sensors</option>' not in overview_controls_section
+    assert 'data-network-subview="sensors"' in network_tabs_section
+    assert 'id="network-map-panel-sensors"' in html
+    assert 'id="network-sensors-host"' in html
+    assert network_tabs_section.index('data-network-subview="sensors"') < network_tabs_section.index(
+        'data-network-subview="top10"'
+    )
+    assert network_tabs_section.index('data-network-subview="top10"') < network_tabs_section.index(
+        'data-network-subview="diagnostics"'
+    )
     assert overview_controls_section.index('id="network-overview-link-mode-wrap"') < overview_controls_section.index(
         'for="network-overview-window"'
     )
@@ -429,9 +442,6 @@ def test_history_window_controls_trail_and_stay_right_anchored() -> None:
         'for="network-overview-window"'
     )
     assert overview_controls_section.index('id="network-overview-packet-lines-wrap"') < overview_controls_section.index(
-        'for="network-overview-window"'
-    )
-    assert overview_controls_section.index('id="network-overview-sensor-controls-host"') < overview_controls_section.index(
         'for="network-overview-window"'
     )
 
@@ -490,7 +500,7 @@ def test_network_overview_group_chips_hide_titles_in_top_strip() -> None:
     assert "row-gap: 0;" in top_lines_section
 
 
-def test_network_sensors_docked_explorer_reuses_overview_light_shell() -> None:
+def test_network_sensors_top_level_explorer_reuses_light_shell() -> None:
     css = build_dashboard_css(theme_css="")
 
     explorer_section = css.split(".network-sensors-panel .env-metrics-explorer {", 1)[1].split("}", 1)[0]

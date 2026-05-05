@@ -167,12 +167,7 @@
           }}
           if (
             activeLayoutView === "environment"
-            || (
-              activeLayoutView === "network"
-              && activeNetworkSubview === "overview"
-              && typeof normalizeWeeklySummaryMetric === "function"
-              && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
-            )
+            || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
           ) {{
             void renderEnvironmentMetricsView(false);
           }}
@@ -304,6 +299,7 @@
         const networkGraphActive = activeLayoutView === "network" && activeNetworkSubview === "graph";
         const networkRoutesActive = activeLayoutView === "network" && activeNetworkSubview === "routes";
         const networkTopNodesActive = activeLayoutView === "network" && activeNetworkSubview === "top10";
+        const networkSensorsActive = activeLayoutView === "network" && activeNetworkSubview === "sensors";
 
         if (mapVisible && !mapBootstrapFocusDone) {{
           const bootstrap = applyMapBootstrapFocus(state.nodes || [], state);
@@ -322,7 +318,10 @@
         const activeSummaryWindowHours = activeLayoutView === "network"
           ? networkOverviewWindowHours
           : weeklySummaryWindowHours;
-        const weeklySummaryPromise = (activeLayoutView === "history" || activeLayoutView === "network")
+        const weeklySummaryPromise = (
+          activeLayoutView === "history"
+          || (activeLayoutView === "network" && !networkSensorsActive)
+        )
           ? fetchSummaryMetrics(activeSummaryWindowHours).catch((summaryErr) => ({{
               error: summaryErr instanceof Error
                 ? summaryErr.message
@@ -372,14 +371,8 @@
             renderWeeklySummaryLoading();
           }}
         }}
-        if (activeLayoutView === "network") {{
-          const networkOverviewUsesSensors = (
-            typeof normalizeWeeklySummaryMetric === "function"
-            && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
-          );
-          if (networkOverviewUsesSensors) {{
-            void renderEnvironmentMetricsView(false);
-          }} else if (weeklySummary && !weeklySummary.error) {{
+        if (activeLayoutView === "network" && !networkSensorsActive) {{
+          if (weeklySummary && !weeklySummary.error) {{
             renderNetworkOverviewSummary(weeklySummary);
           }} else if (weeklySummary && weeklySummary.error) {{
             renderNetworkOverviewSummaryError(weeklySummary.error);
@@ -472,12 +465,7 @@
 
         if (
           activeLayoutView === "environment"
-          || (
-            activeLayoutView === "network"
-            && activeNetworkSubview === "overview"
-            && typeof normalizeWeeklySummaryMetric === "function"
-            && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
-          )
+          || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
         ) {{
           void renderEnvironmentMetricsView(false);
         }}

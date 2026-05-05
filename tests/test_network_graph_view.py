@@ -26,6 +26,9 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
     assert 'id="network-map-panel-graph"' in html
     assert 'data-network-subview="routes"' in html
     assert 'id="network-map-panel-routes"' in html
+    assert 'data-network-subview="sensors"' in html
+    assert 'id="network-map-panel-sensors"' in html
+    assert 'id="network-sensors-host"' in html
     assert 'id="network-routes-from"' in html
     assert 'id="network-routes-to"' in html
     assert 'data-network-route-mode="inferred"' in html
@@ -76,6 +79,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'if (clean === "diag") return networkDiagnosticsEnabled ? "diagnostics" : "map";' in js
     assert 'if (clean === "diagnostics") return networkDiagnosticsEnabled ? "diagnostics" : "map";' in js
     assert 'if (clean === "route" || clean === "routes") return "routes";' in js
+    assert '|| clean === "top10" || clean === "sensors") return clean;' in js
     assert 'function renderNetworkGraphView(state = latestState)' in js
     assert 'function normalizeNetworkRoutesMode(raw)' in js
     assert 'function renderNetworkRoutes(state = latestState, options = {})' in js
@@ -279,7 +283,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert '<span class="network-graph-chip-label">1 Hop</span>' not in js
     assert 'const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph";' in js
     assert 'const networkRoutesActive304 = activeLayoutView === "network" && activeNetworkSubview === "routes";' in js
-    assert 'const weeklySummaryPromise = (activeLayoutView === "history" || activeLayoutView === "network")' in js
+    assert 'const networkSensorsActive = activeLayoutView === "network" && activeNetworkSubview === "sensors";' in js
+    assert '|| (activeLayoutView === "network" && !networkSensorsActive)' in js
     assert 'if (weeklySummaryPromise) {' in js
     assert 'const networkGraphActive = next === "network" && activeNetworkSubview === "graph";' in js
     assert 'const networkRoutesActive = next === "network" && activeNetworkSubview === "routes";' in js

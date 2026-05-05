@@ -2953,6 +2953,14 @@ Ready.
                   type="button"
                   role="tab"
                   aria-selected="false"
+                  aria-controls="network-map-panel-sensors"
+                  data-network-subview="sensors"
+                >Sensors</button>
+                <button
+                  class="network-map-subview-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
                   aria-controls="network-map-panel-top10"
                   data-network-subview="top10"
                 >Top 10</button>
@@ -2973,10 +2981,8 @@ Ready.
                     <option value="nodes">Nodes</option>
                     <option value="packets">Packets</option>
                     <option value="links">Links</option>
-                    <option value="sensors">Sensors</option>
                   </select>
                 </div>
-                <div id="network-overview-sensor-controls-host" class="network-overview-sensor-controls-host" hidden></div>
                 <div id="network-overview-link-mode-wrap" class="history-metric-wrap history-select-chip-hide-label" hidden>
                   <label for="network-overview-link-mode" class="history-metric-label">Links</label>
                   <select id="network-overview-link-mode" class="history-metric-select" aria-label="Network overview link mode">
@@ -3242,7 +3248,6 @@ Ready.
             >
               <div class="network-overview-panel">
                 <section class="network-overview-card">
-                  <div id="network-overview-sensor-host" class="network-overview-sensor-host" hidden></div>
                   <div id="network-overview-chart-wrap">
                     <svg id="network-overview-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Network overview trend"></svg>
                     <div id="network-overview-empty" class="signal-empty" hidden>No weekly summary history yet.</div>
@@ -3250,6 +3255,17 @@ Ready.
                   <div id="network-overview-timeline" class="signal-timeline" aria-label="Network overview trend timeline"></div>
                   <div id="network-overview-overview" class="overview-grid"></div>
                 </section>
+              </div>
+            </div>
+            <div
+              id="network-map-panel-sensors"
+              class="network-map-subview-panel"
+              role="tabpanel"
+              data-network-subview-panel="sensors"
+              hidden
+            >
+              <div class="network-overview-panel network-sensors-panel">
+                <div id="network-sensors-host" class="network-sensors-host"></div>
               </div>
             </div>
             <div

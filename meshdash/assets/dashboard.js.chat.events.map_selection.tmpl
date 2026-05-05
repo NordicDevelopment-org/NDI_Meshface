@@ -973,12 +973,7 @@
         typeof renderEnvironmentMetricsView === "function"
         && (
           activeLayoutView === "environment"
-          || (
-            activeLayoutView === "network"
-            && activeNetworkSubview === "overview"
-            && typeof normalizeWeeklySummaryMetric === "function"
-            && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
-          )
+          || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
         )
       ) {{
         void renderEnvironmentMetricsView(false);
@@ -1072,12 +1067,7 @@
         typeof renderEnvironmentMetricsView === "function"
         && (
           activeLayoutView === "environment"
-          || (
-            activeLayoutView === "network"
-            && activeNetworkSubview === "overview"
-            && typeof normalizeWeeklySummaryMetric === "function"
-            && normalizeWeeklySummaryMetric(networkOverviewMetric) === "sensors"
-          )
+          || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
         )
       ) {{
         void renderEnvironmentMetricsView(false);
