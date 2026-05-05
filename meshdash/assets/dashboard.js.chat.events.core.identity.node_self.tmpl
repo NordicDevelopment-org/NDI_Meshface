@@ -1,3 +1,292 @@
+    const chatUnicodeAsciiUpper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const chatUnicodeAsciiLower = "abcdefghijklmnopqrstuvwxyz";
+    const chatUnicodeAsciiDigits = "0123456789";
+    const chatUnicodeFrakturUpperCodepoints = Object.freeze([
+      0x1D504, 0x1D505, 0x212D, 0x1D507, 0x1D508, 0x1D509, 0x1D50A,
+      0x210C, 0x2111, 0x1D50D, 0x1D50E, 0x1D50F, 0x1D510, 0x1D511,
+      0x1D512, 0x1D513, 0x1D514, 0x211C, 0x1D516, 0x1D517, 0x1D518,
+      0x1D519, 0x1D51A, 0x1D51B, 0x1D51C, 0x2128,
+    ]);
+    const chatUnicodeDoubleUpperCodepoints = Object.freeze([
+      0x1D538, 0x1D539, 0x2102, 0x1D53B, 0x1D53C, 0x1D53D, 0x1D53E,
+      0x210D, 0x1D540, 0x1D541, 0x1D542, 0x1D543, 0x1D544, 0x2115,
+      0x1D546, 0x2119, 0x211A, 0x211D, 0x1D54A, 0x1D54B, 0x1D54C,
+      0x1D54D, 0x1D54E, 0x1D54F, 0x1D550, 0x2124,
+    ]);
+
+    function chatUnicodeMapFromStart(alphabet, startCodepoint) {{
+      const map = {{}};
+      const base = Number(startCodepoint);
+      if (!Number.isFinite(base)) return map;
+      Array.from(String(alphabet || "")).forEach((ch, index) => {{
+        map[ch] = String.fromCodePoint(base + index);
+      }});
+      return map;
+    }}
+
+    function chatUnicodeMapFromCodepoints(alphabet, codepoints) {{
+      const map = {{}};
+      const chars = Array.from(String(alphabet || ""));
+      const points = Array.isArray(codepoints) ? codepoints : [];
+      chars.forEach((ch, index) => {{
+        const point = Number(points[index]);
+        if (Number.isInteger(point) && point > 0) {{
+          map[ch] = String.fromCodePoint(point);
+        }}
+      }});
+      return map;
+    }}
+
+    function chatUnicodeMergeMaps(...maps) {{
+      const out = {{}};
+      for (const rawMap of maps) {{
+        if (!rawMap || typeof rawMap !== "object") continue;
+        for (const ch of Object.keys(rawMap)) {{
+          out[ch] = rawMap[ch];
+        }}
+      }}
+      return out;
+    }}
+
+    const chatUnicodeStyles = Object.freeze([
+      {{
+        id: "fraktur",
+        label: "Fraktur",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromCodepoints(chatUnicodeAsciiUpper, chatUnicodeFrakturUpperCodepoints),
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D51E),
+        ),
+      }},
+      {{
+        id: "bold-fraktur",
+        label: "Bold Fraktur",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D56C),
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D586),
+        ),
+      }},
+      {{
+        id: "double-struck",
+        label: "Double",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromCodepoints(chatUnicodeAsciiUpper, chatUnicodeDoubleUpperCodepoints),
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D552),
+          chatUnicodeMapFromStart(chatUnicodeAsciiDigits, 0x1D7D8),
+        ),
+      }},
+      {{
+        id: "monospace",
+        label: "Mono",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D670),
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D68A),
+          chatUnicodeMapFromStart(chatUnicodeAsciiDigits, 0x1D7F6),
+        ),
+      }},
+      {{
+        id: "sans-bold",
+        label: "Sans Bold",
+        map: chatUnicodeMergeMaps(
+          chatUnicodeMapFromStart(chatUnicodeAsciiUpper, 0x1D5D4),
+          chatUnicodeMapFromStart(chatUnicodeAsciiLower, 0x1D5EE),
+          chatUnicodeMapFromStart(chatUnicodeAsciiDigits, 0x1D7EC),
+        ),
+      }},
+    ]);
+
+    function chatUnicodeStyleById(styleId) {{
+      const cleanId = String(styleId || "").trim();
+      if (!cleanId) return null;
+      return chatUnicodeStyles.find((style) => style.id === cleanId) || null;
+    }}
+
+    function transformChatUnicodeText(rawText, styleId) {{
+      const style = chatUnicodeStyleById(styleId);
+      const text = String(rawText == null ? "" : rawText);
+      if (!style || !style.map) return text;
+      return Array.from(text)
+        .map((ch) => Object.prototype.hasOwnProperty.call(style.map, ch) ? style.map[ch] : ch)
+        .join("");
+    }}
+
+    function chatUnicodePanelElement() {{
+      const panel = document.getElementById("chat-unicode-panel");
+      return panel instanceof HTMLElement ? panel : null;
+    }}
+
+    function chatUnicodeButtonElement() {{
+      const btn = document.getElementById("chat-unicode-btn");
+      return btn instanceof HTMLButtonElement ? btn : null;
+    }}
+
+    function chatUnicodeSelectionRange(input) {{
+      const value = input instanceof HTMLInputElement ? String(input.value || "") : "";
+      const startRaw = input instanceof HTMLInputElement ? input.selectionStart : null;
+      const endRaw = input instanceof HTMLInputElement ? input.selectionEnd : null;
+      const start = Number.isFinite(startRaw) ? Math.max(0, Math.min(value.length, startRaw)) : value.length;
+      const end = Number.isFinite(endRaw) ? Math.max(0, Math.min(value.length, endRaw)) : value.length;
+      return {{
+        start: Math.min(start, end),
+        end: Math.max(start, end),
+      }};
+    }}
+
+    function chatUnicodeSourceText(input) {{
+      if (!(input instanceof HTMLInputElement)) return "mesh test";
+      const value = String(input.value || "");
+      const range = chatUnicodeSelectionRange(input);
+      const selected = range.start !== range.end ? value.slice(range.start, range.end) : "";
+      return selected || value || "mesh test";
+    }}
+
+    function renderChatUnicodePanel() {{
+      const panel = chatUnicodePanelElement();
+      if (!(panel instanceof HTMLElement)) return;
+      const input = document.getElementById("chat-input");
+      const sourceText = chatUnicodeSourceText(input);
+      const options = document.createElement("div");
+      options.className = "chat-unicode-options";
+      options.setAttribute("role", "listbox");
+      options.setAttribute("aria-label", "Unicode text style");
+      for (const style of chatUnicodeStyles) {{
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chat-unicode-option";
+        btn.dataset.unicodeStyle = style.id;
+        btn.setAttribute("role", "option");
+        btn.setAttribute("aria-label", `${{style.label}} Unicode text`);
+        const label = document.createElement("span");
+        label.className = "chat-unicode-label";
+        label.textContent = style.label;
+        const preview = document.createElement("span");
+        preview.className = "chat-unicode-preview";
+        preview.textContent = transformChatUnicodeText(sourceText, style.id);
+        btn.append(label, preview);
+        options.appendChild(btn);
+      }}
+      panel.replaceChildren(options);
+    }}
+
+    function setChatUnicodeExpanded(expanded) {{
+      const btn = chatUnicodeButtonElement();
+      if (btn instanceof HTMLButtonElement) {{
+        btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+      }}
+    }}
+
+    function closeChatUnicodePanel() {{
+      const panel = chatUnicodePanelElement();
+      if (panel instanceof HTMLElement) {{
+        panel.hidden = true;
+      }}
+      setChatUnicodeExpanded(false);
+    }}
+
+    function openChatUnicodePanel() {{
+      const panel = chatUnicodePanelElement();
+      if (!(panel instanceof HTMLElement)) return;
+      if (typeof closeChatEmojiPanel === "function") {{
+        closeChatEmojiPanel();
+      }}
+      renderChatUnicodePanel();
+      panel.hidden = false;
+      setChatUnicodeExpanded(true);
+    }}
+
+    function applyChatUnicodeStyle(styleId) {{
+      const style = chatUnicodeStyleById(styleId);
+      const input = document.getElementById("chat-input");
+      if (!style || !(input instanceof HTMLInputElement) || input.disabled) return;
+      const value = String(input.value || "");
+      const range = chatUnicodeSelectionRange(input);
+      const hasSelection = range.start !== range.end;
+      const source = hasSelection ? value.slice(range.start, range.end) : value;
+      if (!source) {{
+        if (typeof setChatSendStatus === "function") {{
+          setChatSendStatus("Type text before styling.", false);
+        }}
+        input.focus({{ preventScroll: true }});
+        return;
+      }}
+      const transformed = transformChatUnicodeText(source, style.id);
+      input.value = hasSelection
+        ? `${{value.slice(0, range.start)}}${{transformed}}${{value.slice(range.end)}}`
+        : transformed;
+      const cursor = hasSelection ? range.start + transformed.length : input.value.length;
+      input.focus({{ preventScroll: true }});
+      input.setSelectionRange(cursor, cursor);
+      input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+      if (typeof renderChatTextMacroPreview === "function") {{
+        renderChatTextMacroPreview(input.value);
+      }}
+      if (typeof setChatSendStatus === "function") {{
+        setChatSendStatus(`${{style.label}} text applied.`, false);
+      }}
+      closeChatUnicodePanel();
+    }}
+
+    function bindChatUnicodeGenerator() {{
+      const btn = chatUnicodeButtonElement();
+      const panel = chatUnicodePanelElement();
+      const input = document.getElementById("chat-input");
+      if (!(btn instanceof HTMLButtonElement) || !(panel instanceof HTMLElement)) return;
+
+      if (btn.dataset.unicodeBound !== "1") {{
+        btn.dataset.unicodeBound = "1";
+        btn.addEventListener("click", (ev) => {{
+          ev.preventDefault();
+          if (panel.hidden) {{
+            openChatUnicodePanel();
+          }} else {{
+            closeChatUnicodePanel();
+          }}
+        }});
+      }}
+
+      if (input instanceof HTMLInputElement && input.dataset.unicodeBound !== "1") {{
+        input.dataset.unicodeBound = "1";
+        const refreshOpenPanel = () => {{
+          const activePanel = chatUnicodePanelElement();
+          if (activePanel instanceof HTMLElement && !activePanel.hidden) {{
+            renderChatUnicodePanel();
+          }}
+        }};
+        input.addEventListener("input", refreshOpenPanel);
+        input.addEventListener("select", refreshOpenPanel);
+        input.addEventListener("keyup", refreshOpenPanel);
+        input.addEventListener("mouseup", refreshOpenPanel);
+      }}
+
+      if (panel.dataset.bound !== "1") {{
+        panel.dataset.bound = "1";
+        panel.addEventListener("pointerdown", (ev) => {{
+          ev.preventDefault();
+        }});
+        panel.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          const option = target.closest(".chat-unicode-option");
+          if (!(option instanceof HTMLButtonElement)) return;
+          applyChatUnicodeStyle(option.dataset.unicodeStyle || "");
+        }});
+      }}
+
+      if (document.body.dataset.chatUnicodeCloseBound !== "1") {{
+        document.body.dataset.chatUnicodeCloseBound = "1";
+        document.addEventListener("pointerdown", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          if (target.closest("#chat-unicode-panel") || target.closest("#chat-unicode-btn")) return;
+          closeChatUnicodePanel();
+        }});
+        document.addEventListener("keydown", (ev) => {{
+          if (ev.key === "Escape") {{
+            closeChatUnicodePanel();
+          }}
+        }});
+      }}
+    }}
+
     function bindChatComposer() {{
       const btn = document.getElementById("chat-send-btn");
       if (btn instanceof HTMLButtonElement && btn.dataset.bound !== "1") {{
@@ -58,6 +347,7 @@
       }}
 
       renderChatReplyContext();
+      bindChatUnicodeGenerator();
       bindEmojiPicker();
       bindMacrosStudioControls();
     }}

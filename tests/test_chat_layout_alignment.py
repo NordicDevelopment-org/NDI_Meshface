@@ -147,7 +147,7 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     dark_chat_compose_input_section = css.split("[data-theme=\"dark\"] .chat-left-bottom-bar .list-search-input,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat #chat-input {", 1)[1].split("}", 1)[0]
     dark_chat_compose_input_hover_section = css.split("[data-theme=\"dark\"] .chat-left-bottom-bar .list-search-input:hover,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat #chat-input:hover {", 1)[1].split("}", 1)[0]
     dark_chat_compose_input_focus_section = css.split("[data-theme=\"dark\"] .chat-left-bottom-bar .list-search-input:focus,\n    [data-theme=\"dark\"] .layout.view-chat .card.chat #chat-input:focus {", 1)[1].split("}", 1)[0]
-    dark_send_btn_section = css.split("[data-theme=\"dark\"] #chat-emoji-btn,\n    [data-theme=\"dark\"] #chat-send-btn {", 1)[1].split("}", 1)[0]
+    dark_send_btn_section = css.split("[data-theme=\"dark\"] #chat-emoji-btn,\n    [data-theme=\"dark\"] #chat-unicode-btn,\n    [data-theme=\"dark\"] #chat-send-btn {", 1)[1].split("}", 1)[0]
 
     assert "border: 1px solid color-mix(in srgb, var(--line) 88%, var(--ink) 12%);" in compose_shell_section
     assert "background: color-mix(in srgb, var(--panel) 78%, var(--bg) 22%);" in compose_shell_section
@@ -178,6 +178,7 @@ def test_light_mode_chat_channel_controls_keep_dark_text_on_light_shells() -> No
     assert "background: var(--workspace-shell-bg) !important;" in dark_bottom_bar_section
     assert "var(--workspace-shell-border-muted)" in dark_bottom_bar_section
     assert "[data-theme=\"dark\"] #chat-emoji-btn," in css
+    assert "[data-theme=\"dark\"] #chat-unicode-btn," in css
     assert "[data-theme=\"dark\"] #chat-send-btn {" in css
     assert "background: var(--ui-panel);" in dark_input_section
     assert "border-color: var(--ui-border);" in dark_input_section
@@ -353,9 +354,48 @@ def test_chat_compose_controls_order_matches_current_layout() -> None:
     channel_idx = html.index('id="chat-send-channel-menu-btn"')
     input_idx = html.index('id="chat-input"')
     send_idx = html.index('id="chat-send-btn"')
+    unicode_idx = html.index('id="chat-unicode-btn"')
     emoji_idx = html.index('id="chat-emoji-btn"')
 
-    assert channel_idx < input_idx < send_idx < emoji_idx
+    assert channel_idx < input_idx < send_idx < unicode_idx < emoji_idx
+
+
+def test_chat_unicode_generator_wires_composer_styles() -> None:
+    html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
+        style_css="",
+        app_js="",
+        revision_title="rev",
+        revision_label="rev",
+        safety_label="safe",
+        packet_limit=100,
+        history_label="history",
+        refresh_ms=1000,
+    )
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+    css = build_dashboard_css(theme_css="")
+
+    assert 'id="chat-unicode-btn"' in html
+    assert 'id="chat-unicode-panel"' in html
+    assert "function transformChatUnicodeText(rawText, styleId) {" in js
+    assert "function applyChatUnicodeStyle(styleId) {" in js
+    assert "function bindChatUnicodeGenerator() {" in js
+    assert 'id: "fraktur"' in js
+    assert 'id: "bold-fraktur"' in js
+    assert 'id: "double-struck"' in js
+    assert 'id: "monospace"' in js
+    assert 'id: "sans-bold"' in js
+    assert "0x1D51E" in js
+    assert "0x1D586" in js
+    assert "0x1D7F6" in js
+    assert "#chat-unicode-btn" in css
+    assert ".chat-unicode-panel {" in css
+    assert ".chat-unicode-option {" in css
 
 
 def test_chat_ui_flags_nodes_with_malformed_text_payloads() -> None:

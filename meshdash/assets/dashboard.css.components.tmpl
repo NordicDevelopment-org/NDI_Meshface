@@ -341,7 +341,8 @@
       opacity: 0.6;
       cursor: default;
     }}
-    #chat-emoji-btn {{
+    #chat-emoji-btn,
+    #chat-unicode-btn {{
       border: 1px solid #9cc9ad;
       background: #f1f9f4;
       background-image: none;
@@ -360,10 +361,17 @@
       appearance: none;
       -webkit-appearance: none;
     }}
-    #chat-emoji-btn:hover {{
+    #chat-unicode-btn {{
+      min-width: 31px;
+      font-size: 12px;
+      font-weight: 700;
+    }}
+    #chat-emoji-btn:hover,
+    #chat-unicode-btn:hover {{
       background: #e6f2ea;
     }}
-    #chat-emoji-btn:disabled {{
+    #chat-emoji-btn:disabled,
+    #chat-unicode-btn:disabled {{
       opacity: 0.6;
       cursor: default;
     }}
@@ -390,6 +398,66 @@
     }}
     .chat-emoji-panel.is-closing {{
       pointer-events: none;
+    }}
+    .chat-unicode-panel {{
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 6px);
+      width: min(360px, 96vw);
+      border: 1px solid #c9dbcc;
+      border-radius: 8px;
+      background: #fbfefb;
+      box-shadow: 0 8px 20px rgba(16, 36, 24, 0.18);
+      padding: 6px;
+      z-index: 82;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }}
+    .chat-unicode-panel[hidden] {{
+      display: none !important;
+    }}
+    .chat-unicode-options {{
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }}
+    .chat-unicode-option {{
+      border: 1px solid #d9e7da;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #214e37;
+      padding: 5px 7px;
+      display: grid;
+      grid-template-columns: minmax(78px, 0.45fr) minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      text-align: left;
+      cursor: pointer;
+      min-height: 30px;
+      box-shadow: none;
+      appearance: none;
+      -webkit-appearance: none;
+    }}
+    .chat-unicode-option:hover {{
+      background: #ecf5ef;
+      border-color: #b4d0bd;
+    }}
+    .chat-unicode-label {{
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    .chat-unicode-preview {{
+      min-width: 0;
+      font-size: 13px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }}
     .chat-emoji-toolbar {{
       display: flex;
@@ -2953,7 +3021,10 @@
     [data-theme="dark"] .chat-reply-context,
     [data-theme="dark"] .chat-send-channel-wrap,
     [data-theme="dark"] #chat-send-btn,
+    [data-theme="dark"] #chat-unicode-btn,
     [data-theme="dark"] #chat-emoji-btn,
+    [data-theme="dark"] .chat-unicode-panel,
+    [data-theme="dark"] .chat-unicode-option,
     [data-theme="dark"] .chat-emoji-panel,
     [data-theme="dark"] .chat-emoji-filter,
     [data-theme="dark"] .chat-emoji-item {{
@@ -3059,7 +3130,9 @@
       color: #aac8ba;
     }}
     [data-theme="dark"] #chat-send-btn:hover,
+    [data-theme="dark"] #chat-unicode-btn:hover,
     [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] .chat-unicode-option:hover,
     [data-theme="dark"] .chat-emoji-item:hover {{
       background: #2f4a3c;
       border-color: #5b866f;
@@ -3181,6 +3254,8 @@
     [data-theme="dark"] .chat-compose-shell,
     [data-theme="dark"] .chat-left-bottom-bar,
     [data-theme="dark"] .chat-reply-context,
+    [data-theme="dark"] .chat-unicode-panel,
+    [data-theme="dark"] .chat-unicode-option,
     [data-theme="dark"] .chat-emoji-panel,
     [data-theme="dark"] .chat-emoji-filter,
     [data-theme="dark"] .chat-emoji-item,
@@ -3216,7 +3291,9 @@
     [data-theme="dark"] .chat-react-btn:hover,
     [data-theme="dark"] .chat-retry-btn:hover,
     [data-theme="dark"] #chat-send-btn:hover,
+    [data-theme="dark"] #chat-unicode-btn:hover,
     [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] .chat-unicode-option:hover,
     [data-theme="dark"] .chat-emoji-item:hover {{
       background: #0d1d13;
       border-color: #38af72;
@@ -3268,6 +3345,7 @@
     [data-theme="dark"] .chat-retry-btn,
     [data-theme="dark"] .chat-send-channel-wrap,
     [data-theme="dark"] #chat-send-btn,
+    [data-theme="dark"] #chat-unicode-btn,
     [data-theme="dark"] #chat-emoji-btn,
     [data-theme="dark"] .list-search-input,
     [data-theme="dark"] #chat-input,
@@ -3695,7 +3773,10 @@
     [data-theme="dark"] .chat-reply-context,
     [data-theme="dark"] .chat-send-channel-wrap,
     [data-theme="dark"] #chat-send-btn,
+    [data-theme="dark"] #chat-unicode-btn,
     [data-theme="dark"] #chat-emoji-btn,
+    [data-theme="dark"] .chat-unicode-panel,
+    [data-theme="dark"] .chat-unicode-option,
     [data-theme="dark"] .chat-emoji-panel,
     [data-theme="dark"] .chat-emoji-filter,
     [data-theme="dark"] .chat-emoji-item,
@@ -4582,7 +4663,9 @@
     [data-theme="dark"] .chat-react-btn:hover,
     [data-theme="dark"] .chat-retry-btn:hover,
     [data-theme="dark"] #chat-send-btn:hover,
+    [data-theme="dark"] #chat-unicode-btn:hover,
     [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] .chat-unicode-option:hover,
     [data-theme="dark"] .chat-emoji-item:hover,
     [data-theme="dark"] .console-controls button:hover {{
       background: #253140;
@@ -5993,6 +6076,7 @@
       -webkit-appearance: none;
     }}
     [data-theme="dark"] #chat-emoji-btn,
+    [data-theme="dark"] #chat-unicode-btn,
     [data-theme="dark"] #chat-send-btn {{
       background: var(--workspace-shell-bg-alt) !important;
       background-image: none !important;
@@ -6003,6 +6087,7 @@
       -webkit-appearance: none;
     }}
     [data-theme="dark"] #chat-emoji-btn:hover,
+    [data-theme="dark"] #chat-unicode-btn:hover,
     [data-theme="dark"] #chat-send-btn:hover {{
       background: var(--workspace-shell-hover-bg) !important;
       border-color: var(--workspace-shell-border) !important;
