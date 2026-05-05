@@ -390,12 +390,27 @@ def test_chat_unicode_generator_wires_composer_styles() -> None:
     assert 'id: "double-struck"' in js
     assert 'id: "monospace"' in js
     assert 'id: "sans-bold"' in js
+    assert 'id: "serif-bold"' in js
+    assert 'id: "serif-italic"' in js
+    assert 'id: "bold-italic"' in js
+    assert 'id: "script"' in js
+    assert 'id: "bold-script"' in js
+    assert 'id: "sans-italic"' in js
+    assert 'id: "sans-bold-italic"' in js
+    assert 'id: "fullwidth"' in js
+    assert 'id: "circled"' in js
     assert "0x1D51E" in js
     assert "0x1D586" in js
     assert "0x1D7F6" in js
+    assert "0x1D400" in js
+    assert "0x210E" in js
+    assert "0x1D4D0" in js
+    assert "0xFF21" in js
+    assert "0x24D0" in js
     assert "#chat-unicode-btn" in css
     assert ".chat-unicode-panel {" in css
     assert ".chat-unicode-option {" in css
+    assert "max-height: min(64vh, 520px);" in css
 
 
 def test_chat_ui_flags_nodes_with_malformed_text_payloads() -> None:
