@@ -28,3 +28,4 @@ class TrackerReceiveRuntimeState(Protocol):
 
 class TrackerSnapshotRuntimeState(TrackerReceiveRuntimeState, Protocol):
     live_packet_count: int
+    state_revision: int

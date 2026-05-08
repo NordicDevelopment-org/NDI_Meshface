@@ -11,6 +11,10 @@ from .tracker_runtime_init_contracts import (
 )
 
 
+def _bump_tracker_state_revision(tracker: TrackerInitRuntimeState) -> None:
+    tracker.state_revision = int(getattr(tracker, "state_revision", 0) or 0) + 1
+
+
 def initialize_dashboard_tracker_runtime(
     tracker: TrackerInitRuntimeState,
     *,
@@ -30,6 +34,7 @@ def initialize_dashboard_tracker_runtime(
     tracker._history_store = history_store
     tracker._chat_delivery_timeout_seconds = int(default_chat_delivery_timeout_seconds)
     tracker.live_packet_count = 0
+    tracker.state_revision = 0
 
     buffers = initialize_tracker_buffers_fn(packet_limit)
     tracker.edges = buffers.edges
@@ -46,6 +51,7 @@ def initialize_dashboard_tracker_runtime(
         parse_utc_text_to_unix_fn=parse_utc_text_to_unix_fn,
         utc_now_fn=utc_now_fn,
         now_unix_fn=now_unix_fn,
+        on_change_fn=lambda: _bump_tracker_state_revision(tracker),
     )
     tracker._set_delivery_state_fn = delivery_callbacks.set_delivery_state
     tracker._extract_delivery_update_fn = delivery_callbacks.extract_delivery_update

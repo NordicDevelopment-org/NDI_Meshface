@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Callable, Protocol
 
 from .runtime_types import (
     ExtractDeliveryUpdateFn,
@@ -29,6 +29,7 @@ class TrackerInitRuntimeState(Protocol):
     _history_store: TrackerRuntimeHistoryStore | None
     _chat_delivery_timeout_seconds: int
     live_packet_count: int
+    state_revision: int
     edges: dict[EdgeKey, EdgeRow]
     _historical_edges: dict[EdgeKey, EdgeRow]
     port_counts: PortCounter
@@ -55,6 +56,7 @@ class BuildTrackerDeliveryCallbacksFn(Protocol):
         parse_utc_text_to_unix_fn: ParseUtcTextToUnixFn,
         utc_now_fn: UtcNowFn,
         now_unix_fn: NowUnixFn,
+        on_change_fn: Callable[[], None] | None = None,
     ) -> TrackerDeliveryCallbacks:
         ...
 

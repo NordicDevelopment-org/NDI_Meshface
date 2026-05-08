@@ -50,7 +50,7 @@ def record_tracker_local_chat(
     now_unix_fn: NowUnixFn,
     to_int_fn: ToIntFn,
     emoji_from_codepoint_fn: EmojiFromCodepointFn,
-) -> None:
+) -> bool:
     entry = build_tracker_local_entry_fn(
         text=text,
         from_id=from_id,
@@ -70,8 +70,8 @@ def record_tracker_local_chat(
         emoji_from_codepoint_fn=emoji_from_codepoint_fn,
     )
     if entry is None:
-        return
-    append_local_chat_entry_fn(
+        return False
+    return append_local_chat_entry_fn(
         recent_chat=recent_chat,
         history_store=history_store,
         entry=entry,
@@ -93,8 +93,8 @@ def record_tracker_local_chat_for_tracker(
     ack_requested: bool,
     retry_of: Optional[int],
     now_unix_fn: NowUnixFn = time.time,
-) -> None:
-    record_tracker_local_chat(
+) -> bool:
+    return record_tracker_local_chat(
         text=text,
         from_id=from_id,
         to_id=to_id,

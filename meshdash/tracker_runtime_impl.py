@@ -70,12 +70,16 @@ class DashboardTracker:
         self.radio_link_changed_unix: Optional[int] = None
         self.radio_link_error: Optional[str] = None
 
+    def _bump_state_revision_unlocked(self) -> None:
+        self.state_revision = int(getattr(self, "state_revision", 0) or 0) + 1
+
     def on_receive(self, packet: dict[str, object], interface: object) -> None:
         with self._lock:
             if not self._accept_packets:
                 return
             self.live_packet_count += 1
             self._record_packet_unlocked(packet, interface, include_live_count=True)
+            self._bump_state_revision_unlocked()
 
     def stop_receiving(self) -> None:
         with self._lock:
@@ -125,7 +129,7 @@ class DashboardTracker:
         retry_of: Optional[int] = None,
     ) -> None:
         with self._lock:
-            _record_tracker_local_chat_for_tracker_helper(
+            changed = _record_tracker_local_chat_for_tracker_helper(
                 self,
                 text=text,
                 from_id=from_id,
@@ -140,10 +144,13 @@ class DashboardTracker:
                 retry_of=retry_of,
                 now_unix_fn=time.time,
             )
+            if changed:
+                self._bump_state_revision_unlocked()
 
     def seed_packet(self, packet: dict[str, object], interface: object) -> None:
         with self._lock:
             self._record_packet_unlocked(packet, interface, include_live_count=False)
+            self._bump_state_revision_unlocked()
 
     def _record_packet_unlocked(
         self, packet: dict[str, object], interface: object, include_live_count: bool
@@ -165,6 +172,7 @@ class DashboardTracker:
         self.radio_link_changed_unix = int(time.time())
         clean_error = str(error).strip() if error else ""
         self.radio_link_error = clean_error or None
+        self._bump_state_revision_unlocked()
 
     def bootstrap_connection_state(self, iface: object) -> None:
         connected_attr = getattr(iface, "isConnected", None)
