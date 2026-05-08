@@ -234,7 +234,7 @@ def test_bbs_host_service_batches_short_history_posts() -> None:
     )
     assert len(sent_messages) > 2
     assert str(sent_messages[1]["text"]).startswith("MF_FILE_V1|M|")
-    assert all(len(str(row["text"]).encode("utf-8")) <= 220 for row in sent_messages)
+    assert all(len(str(row["text"]).encode("utf-8")) <= 200 for row in sent_messages)
     snapshot = _decode_snapshot_from_sent(sent_messages)
     assert [row[3] for row in snapshot["posts"]] == ["first", "second", "third"]
 

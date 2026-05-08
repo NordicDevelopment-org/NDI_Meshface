@@ -149,6 +149,35 @@
       Y: "Ɏ",
       Z: "Ž",
     }});
+    const chatComposerMaxBytes = Math.max(
+      1,
+      Math.trunc(Number(typeof chatMessageMaxBytes !== "undefined" ? chatMessageMaxBytes : 200) || 200)
+    );
+
+    function chatComposerByteLength(value) {{
+      const raw = String(value == null ? "" : value);
+      if (typeof TextEncoder !== "undefined") {{
+        try {{
+          return new TextEncoder().encode(raw).length;
+        }} catch (_err) {{
+        }}
+      }}
+      try {{
+        const encoded = encodeURIComponent(raw);
+        let count = 0;
+        for (let i = 0; i < encoded.length; i += 1) {{
+          if (encoded[i] === "%" && i + 2 < encoded.length) {{
+            count += 1;
+            i += 2;
+          }} else {{
+            count += 1;
+          }}
+        }}
+        return count;
+      }} catch (_err) {{
+        return raw.length;
+      }}
+    }}
 
     function toLeetSpeak(rawText) {{
       const value = String(rawText == null ? "" : rawText);
@@ -1657,6 +1686,14 @@
       const text = (macro && (macro.kind === "replace" || macro.kind === "transform"))
         ? macro.text
         : rawText;
+      const textBytes = chatComposerByteLength(text);
+      if (textBytes > chatComposerMaxBytes) {{
+        setChatSendStatus(`Message is too long (${{textBytes}} bytes). Limit is ${{chatComposerMaxBytes}} bytes.`, true);
+        if (hadFocus) {{
+          restoreChatInputFocus(input);
+        }}
+        return;
+      }}
       let destination = "^all";
       if (chatMainDirectModeEnabled && activeChatChannel === "direct") {{
         const directPeer = resolvedDirectPeerForComposer();

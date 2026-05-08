@@ -2,6 +2,7 @@ import json
 import re
 import time
 
+from .config import DEFAULT_CHAT_MAX_BYTES
 from .helpers_node_names import normalize_node_id_text as _normalize_node_id_text
 from .history_env_metrics import (
     normalize_custom_telemetry_rules as _normalize_custom_telemetry_rules,
@@ -12,6 +13,7 @@ _CUSTOM_TELEMETRY_RULES_KEY = "custom_telemetry_rules_v1"
 _BBS_HOST_SETTINGS_KEY = "bbs_host_settings_v1"
 _BBS_HOST_POSTS_KEY = "bbs_host_posts_v1"
 _BBS_HOST_MAX_POSTS = 260
+_BBS_MAX_POST_CHARS = DEFAULT_CHAT_MAX_BYTES
 
 
 def _sanitize_bbs_text(value: object, max_chars: int) -> str:
@@ -117,7 +119,7 @@ def _normalize_bbs_post(payload: object) -> dict[str, object] | None:
         source.get("author_name", source.get("authorName")),
         48,
     )
-    text = _sanitize_bbs_text(source.get("text"), 220)
+    text = _sanitize_bbs_text(source.get("text"), _BBS_MAX_POST_CHARS)
     try:
         unix_value = int(source.get("unix") or 0)
     except Exception:

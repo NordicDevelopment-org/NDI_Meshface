@@ -228,6 +228,11 @@
       return "packets";
     }}
 
+    function normalizeNetworkOverviewMetric(raw) {{
+      const normalized = normalizeWeeklySummaryMetric(raw);
+      return normalized === "links" ? "nodes" : normalized;
+    }}
+
     function normalizeWeeklySummaryNodesCompare(raw) {{
       if (raw === true || raw === 1) return true;
       const clean = String(raw || "").trim().toLowerCase();
@@ -497,7 +502,7 @@
     }}
 
     function updateNetworkOverviewNodeSeriesControls(metricKey = networkOverviewMetric) {{
-      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const metric = normalizeNetworkOverviewMetric(metricKey);
       const showLines = metric === "nodes";
       const wrap = document.getElementById("network-overview-node-lines-wrap");
       if (wrap instanceof HTMLElement) {{
@@ -519,7 +524,7 @@
     }}
 
     function updateNetworkOverviewLinkModeControl(metricKey = networkOverviewMetric) {{
-      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const metric = normalizeNetworkOverviewMetric(metricKey);
       const showControl = metric === "links";
       const wrap = document.getElementById("network-overview-link-mode-wrap");
       const select = document.getElementById("network-overview-link-mode");
@@ -533,7 +538,7 @@
     }}
 
     function updateNetworkOverviewPacketSeriesControls(metricKey = networkOverviewMetric) {{
-      const metric = normalizeWeeklySummaryMetric(metricKey);
+      const metric = normalizeNetworkOverviewMetric(metricKey);
       const showLines = metric === "packets";
       const wrap = document.getElementById("network-overview-packet-lines-wrap");
       if (wrap instanceof HTMLElement) {{
@@ -572,7 +577,7 @@
     }}
 
     function applyNetworkOverviewMetric(metricKey, persist = true) {{
-      const normalized = normalizeWeeklySummaryMetric(metricKey);
+      const normalized = normalizeNetworkOverviewMetric(metricKey);
       networkOverviewMetric = normalized;
       const select = document.getElementById("network-overview-metric");
       if (select instanceof HTMLSelectElement && select.value !== normalized) {{

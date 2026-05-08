@@ -618,6 +618,7 @@
       const input = document.getElementById("chat-input");
       if (input instanceof HTMLInputElement && input.dataset.bound !== "1") {{
         input.dataset.bound = "1";
+        input.maxLength = chatComposerMaxBytes;
         input.addEventListener("input", () => {{
           if (typeof renderChatTextMacroPreview === "function") {{
             renderChatTextMacroPreview(input.value);

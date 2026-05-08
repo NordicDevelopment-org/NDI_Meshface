@@ -121,7 +121,7 @@ def test_runtime_serves_offline_page_before_first_radio_open(tmp_path) -> None:
         render_html_fn=lambda **_kwargs: "<html></html>",
         make_http_handler_fn=lambda *_args, **_kwargs: object,
         guess_lan_ipv4_fn=lambda: None,
-        default_chat_max_bytes=220,
+        default_chat_max_bytes=200,
         threading_http_server_cls=_OneShotServer,
     )
 

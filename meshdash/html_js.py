@@ -1,5 +1,6 @@
 from .html_assets import render_asset_template as _render_asset_template_helper
 from .config import (
+    DEFAULT_CHAT_MAX_BYTES as _DEFAULT_CHAT_MAX_BYTES,
     DEFAULT_FILE_TRANSFER_MAX_BYTES as _DEFAULT_FILE_TRANSFER_MAX_BYTES,
     MAX_FILE_TRANSFER_MAX_BYTES as _MAX_FILE_TRANSFER_MAX_BYTES,
     MIN_FILE_TRANSFER_MAX_BYTES as _MIN_FILE_TRANSFER_MAX_BYTES,
@@ -188,6 +189,7 @@ def build_dashboard_js(
         parsed_file_transfer_max_bytes = int(file_transfer_max_bytes)
     except (TypeError, ValueError):
         parsed_file_transfer_max_bytes = int(_DEFAULT_FILE_TRANSFER_MAX_BYTES)
+    normalized_chat_max_bytes = max(1, int(_DEFAULT_CHAT_MAX_BYTES))
     normalized_file_transfer_max_bytes = max(
         int(_MIN_FILE_TRANSFER_MAX_BYTES),
         min(int(_MAX_FILE_TRANSFER_MAX_BYTES), parsed_file_transfer_max_bytes),
@@ -201,6 +203,7 @@ def build_dashboard_js(
         ),
         "debug_mode_enabled": 1 if bool(debug_mode) else 0,
         "bbs_enabled": 1 if bool(bbs_enabled) else 0,
+        "chat_max_bytes": normalized_chat_max_bytes,
         "file_transfer_enabled": 1 if bool(file_transfer_enabled) else 0,
         "file_transfer_max_bytes": normalized_file_transfer_max_bytes,
     }

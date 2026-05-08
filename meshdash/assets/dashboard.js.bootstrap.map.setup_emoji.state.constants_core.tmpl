@@ -285,9 +285,10 @@
     ];
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
     const bbsFeatureEnabled = !!Number({bbs_enabled});
+    const chatMessageMaxBytes = Math.max(1, Math.trunc(Number({chat_max_bytes}) || 0));
     const fileTransferFeatureEnabled = !!Number({file_transfer_enabled});
     const fileTransferProtocolPrefix = "MF_FILE_V1";
-    const fileTransferChatMaxBytes = 220;
+    const fileTransferChatMaxBytes = chatMessageMaxBytes;
     const fileTransferMaxFileBytes = Math.max(1024, Math.trunc(Number({file_transfer_max_bytes}) || 0));
     const fileTransferChunkBytes = 64;
     const fileTransferCompressionCodecRaw = "raw";
@@ -375,7 +376,7 @@
     const bbsStorageKey = "meshDashboardBbsV1";
     const bbsMaxTitleChars = 42;
     const bbsMaxMotdChars = 120;
-    const bbsMaxPostChars = 220;
+    const bbsMaxPostChars = chatMessageMaxBytes;
     const knownDeliveryStates = new Set(["pending", "sent", "acked", "nak", "timeout", "error"]);
     const botCityHintMaxDistanceKm = 120;
     const requesterPositionMaxAgeSeconds = 24 * 3600;

@@ -106,7 +106,7 @@ def test_runtime_uses_same_history_db_for_different_local_radios(tmp_path) -> No
             build_online_activity_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
             build_summary_metrics_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
             build_send_chat_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
-            default_chat_max_bytes=220,
+            default_chat_max_bytes=200,
             resolve_history_db_path_fn=lambda path: path,
             build_dashboard_runtime_loaders_fn=_loaders,
         )

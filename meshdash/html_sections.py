@@ -1,4 +1,5 @@
 from .html_assets import render_asset_template as _render_asset_template_helper
+from .config import DEFAULT_CHAT_MAX_BYTES as _DEFAULT_CHAT_MAX_BYTES
 
 
 def _short_mark(label: str) -> str:
@@ -30,7 +31,12 @@ def build_html_shell(
     file_transfer_section_hidden_attrs: str = "",
     network_diagnostics_tab_hidden_attrs: str = ' hidden disabled aria-hidden="true"',
     network_diagnostics_panel_hidden_attrs: str = ' hidden aria-hidden="true"',
+    chat_max_bytes: int = _DEFAULT_CHAT_MAX_BYTES,
 ) -> str:
+    try:
+        normalized_chat_max_bytes = max(1, int(chat_max_bytes))
+    except (TypeError, ValueError):
+        normalized_chat_max_bytes = int(_DEFAULT_CHAT_MAX_BYTES)
     return _render_asset_template_helper(
         "dashboard.html.tmpl",
         app_title=app_title,
@@ -44,6 +50,7 @@ def build_html_shell(
         packet_limit=packet_limit,
         history_label=history_label,
         refresh_ms=refresh_ms,
+        chat_max_bytes=normalized_chat_max_bytes,
         bbs_app_tab_hidden_attrs=bbs_app_tab_hidden_attrs,
         bbs_section_hidden_attrs=bbs_section_hidden_attrs,
         file_transfer_files_tab_hidden_attrs=file_transfer_files_tab_hidden_attrs,

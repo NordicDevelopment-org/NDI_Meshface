@@ -370,6 +370,8 @@ def test_network_overview_primary_controls_only_show_on_overview_subview() -> No
     assert 'function syncNetworkOverviewPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview) {' in js
     assert 'const controls = document.getElementById("network-overview-primary-controls");' in js
     assert 'const showControls = normalizedView === "network" && normalizedSubview === "overview";' in js
+    assert "function normalizeNetworkOverviewMetric(raw) {" in js
+    assert 'return normalized === "links" ? "nodes" : normalized;' in js
     assert "syncNetworkOverviewPrimaryControls(activeLayoutView, next);" in js
     assert "syncNetworkOverviewPrimaryControls(next, activeNetworkSubview);" in js
 
@@ -422,10 +424,11 @@ def test_history_window_controls_trail_and_stay_right_anchored() -> None:
         'for="network-diagnostics-window"'
     )
     assert "margin-left: auto;" in window_wrap_section
-    assert 'id="network-overview-link-mode-wrap"' in overview_controls_section
     assert 'id="network-overview-node-lines-wrap"' in overview_controls_section
     assert 'id="network-overview-packet-lines-wrap"' in overview_controls_section
+    assert '<option value="links">Links</option>' not in overview_controls_section
     assert '<option value="sensors">Sensors</option>' not in overview_controls_section
+    assert '<option value="links">Links</option>' in weekly_controls_section
     assert 'data-network-subview="sensors"' in network_tabs_section
     assert 'id="network-map-panel-sensors"' in html
     assert 'id="network-sensors-host"' in html
@@ -434,9 +437,6 @@ def test_history_window_controls_trail_and_stay_right_anchored() -> None:
     )
     assert network_tabs_section.index('data-network-subview="top10"') < network_tabs_section.index(
         'data-network-subview="diagnostics"'
-    )
-    assert overview_controls_section.index('id="network-overview-link-mode-wrap"') < overview_controls_section.index(
-        'for="network-overview-window"'
     )
     assert overview_controls_section.index('id="network-overview-node-lines-wrap"') < overview_controls_section.index(
         'for="network-overview-window"'
@@ -463,7 +463,6 @@ def test_select_only_history_chips_hide_redundant_labels() -> None:
 
     assert 'class="history-metric-wrap history-select-chip-hide-label"' in html
     assert 'class="history-metric-wrap history-window-wrap history-select-chip-hide-label"' in html
-    assert 'class="history-metric-wrap history-select-chip-hide-label" hidden' in html
     assert 'class="history-metric-wrap history-window-wrap network-diagnostics-window-wrap history-select-chip-hide-label"' in html
     assert 'class="history-metric-wrap env-metrics-control-group history-select-chip-hide-label"' in html
     assert 'class="history-metric-wrap history-window-wrap env-metrics-control-group history-select-chip-hide-label"' in html

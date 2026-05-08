@@ -7,6 +7,7 @@ import time
 from collections import deque
 from collections.abc import Mapping
 
+from .config import DEFAULT_CHAT_MAX_BYTES
 from .helpers import to_int as _to_int
 from .helpers_node_names import normalize_node_id_text as _normalize_node_id_text
 from .nodes_identity import get_local_node_num as _get_local_node_num
@@ -14,7 +15,8 @@ from .nodes_identity import get_local_node_num as _get_local_node_num
 _BBS_PROTOCOL_VERSION = "bbs1"
 _BBS_MAX_POST_HISTORY_REPLY = 32
 _BBS_MAX_POST_SYNC_REPLY = 260
-_BBS_MAX_WIRE_BYTES = 220
+_BBS_MAX_WIRE_BYTES = DEFAULT_CHAT_MAX_BYTES
+_BBS_MAX_POST_CHARS = DEFAULT_CHAT_MAX_BYTES
 _BBS_MAX_SUBSCRIBERS = 24
 _BBS_SUBSCRIBER_TTL_SECONDS = 20 * 60
 _BBS_SEND_SPACING_SECONDS = 0.45
@@ -106,7 +108,7 @@ def _generate_post_entry_id(now_unix: int, author_id: str, text: str) -> str:
 
 def _normalize_post_payload(payload: object) -> dict[str, object] | None:
     source = payload if isinstance(payload, Mapping) else {}
-    text = _sanitize_bbs_text(source.get("text"), 220)
+    text = _sanitize_bbs_text(source.get("text"), _BBS_MAX_POST_CHARS)
     if not text:
         return None
     author_id = _normalize_node_id_text(source.get("author_id", source.get("authorId")))
@@ -239,7 +241,7 @@ def _encode_protocol_message(message_type: object, *fields: object) -> str:
         return ""
     encoded = [_BBS_PROTOCOL_VERSION, clean_type]
     for field in fields:
-        encoded.append(_sanitize_bbs_text(field, 220))
+        encoded.append(_sanitize_bbs_text(field, _BBS_MAX_POST_CHARS))
     return "|".join(encoded)
 
 
@@ -273,7 +275,7 @@ def _compact_batch_row(post: Mapping[str, object]) -> list[object]:
         _sanitize_bbs_text(post.get("entry_id"), 60),
         _normalize_node_id_text(post.get("author_id")),
         _sanitize_bbs_text(post.get("author_name"), 48),
-        _sanitize_bbs_text(post.get("text"), 220),
+        _sanitize_bbs_text(post.get("text"), _BBS_MAX_POST_CHARS),
         _positive_unix(post.get("unix")),
     ]
 

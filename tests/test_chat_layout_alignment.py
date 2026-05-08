@@ -263,6 +263,16 @@ def test_chat_compose_notices_float_above_composer_shell() -> None:
     assert "@keyframes chatNoticeTickerScroll {" in css
 
 
+def test_chat_composer_uses_200_byte_mesh_limit(dashboard_html: str, dashboard_js: str) -> None:
+    assert 'id="chat-input"' in dashboard_html
+    assert 'maxlength="200"' in dashboard_html
+    assert "const chatMessageMaxBytes = Math.max(1, Math.trunc(Number(200) || 0));" in dashboard_js
+    assert "const fileTransferChatMaxBytes = chatMessageMaxBytes;" in dashboard_js
+    assert "const bbsMaxPostChars = chatMessageMaxBytes;" in dashboard_js
+    assert "function chatComposerByteLength(value) {" in dashboard_js
+    assert "Message is too long (${textBytes} bytes). Limit is ${chatComposerMaxBytes} bytes." in dashboard_js
+
+
 def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     css = build_dashboard_css(theme_css="")
 
