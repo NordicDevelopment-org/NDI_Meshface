@@ -257,7 +257,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'buildNetworkGraphNodeMap(liveNodes, historyCaps, filteredRawEdges, {' in js
     assert 'const parsedWeight = useSessionWeight ? parsedSession : parsedLifetime;' in js
     assert 'Loading ${networkGraphEdgeModeLabel(edgeMode)} link history...' in js
-    assert 'summary.innerHTML = `<div class="network-graph-summary-main"><label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select">' in js
+    assert 'const summaryHtml = `<div class="network-graph-summary-main"><label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select">' in js
+    assert 'if (summary.__meshNetworkGraphSummaryHtml !== summaryHtml) {' in js
+    assert "summary.__meshNetworkGraphSummaryHtml = summaryHtml;" in js
     assert '<button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip"' in js
     assert 'bindNetworkGraphLayoutSelector();' in js
     assert 'syncNetworkGraphLayoutSelector();' in js
