@@ -120,10 +120,31 @@
 
     function hopCountOfChatPacket(msg) {{
       if (!msg || typeof msg !== "object") return null;
-      const direct = nonNegativeIntegerOrNull(msg.hops);
+      const direct = nonNegativeIntegerOrNull(firstNestedValue(msg, [
+        "hops",
+        "hop_count",
+        "hopCount",
+        "routing.hops",
+        "routing.hop_count",
+        "routing.hopCount",
+      ]));
       if (direct != null) return direct;
-      const hopStart = optionalFiniteNumber(msg.hop_start ?? msg.hopStart);
-      const hopLimit = optionalFiniteNumber(msg.hop_limit ?? msg.hopLimit);
+      const hopStart = firstFiniteNestedNumber(msg, [
+        "hop_start",
+        "hopStart",
+        "hopstart",
+        "routing.hop_start",
+        "routing.hopStart",
+        "routing.hopstart",
+      ]);
+      const hopLimit = firstFiniteNestedNumber(msg, [
+        "hop_limit",
+        "hopLimit",
+        "hoplimit",
+        "routing.hop_limit",
+        "routing.hopLimit",
+        "routing.hoplimit",
+      ]);
       if (hopStart != null && hopLimit != null) {{
         const derived = Math.trunc(hopStart) - Math.trunc(hopLimit);
         if (derived >= 0) return derived;

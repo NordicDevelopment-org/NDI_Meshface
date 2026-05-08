@@ -273,6 +273,17 @@ def test_chat_composer_uses_200_byte_mesh_limit(dashboard_html: str, dashboard_j
     assert "Message is too long (${textBytes} bytes). Limit is ${chatComposerMaxBytes} bytes." in dashboard_js
 
 
+def test_chat_hop_count_uses_nested_routing_metadata(dashboard_js: str) -> None:
+    assert 'function hopCountOfChatPacket(msg) {' in dashboard_js
+    assert 'const direct = nonNegativeIntegerOrNull(firstNestedValue(msg, [' in dashboard_js
+    assert '"routing.hops",' in dashboard_js
+    assert '"routing.hopStart",' in dashboard_js
+    assert '"routing.hopLimit",' in dashboard_js
+    assert 'const derived = Math.trunc(hopStart) - Math.trunc(hopLimit);' in dashboard_js
+    assert 'messageTooltipParts.push(`Hops: ${hopTitle === "Hop count" ? hopLabel : `${hopLabel} (${hopTitle})`}`);' in dashboard_js
+    assert 'messageTooltipParts.push(`Routing: ${routingMetadataLabel}`);' in dashboard_js
+
+
 def test_dark_chat_palette_matches_green_workspace_theme() -> None:
     css = build_dashboard_css(theme_css="")
 
