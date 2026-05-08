@@ -590,16 +590,25 @@ def test_radio_rx_tx_aligns_with_compact_link_value_and_status_is_prominent() ->
         ".topbar.ticker-expanded .summary-ticker-item#summary-ticker-node .value.node-ticker-value.is-compact {",
         1,
     )[1].split("}", 1)[0]
+    radio_item_expanded_section = css.rsplit(
+        ".topbar.ticker-expanded .summary-ticker-item-radio {",
+        1,
+    )[1].split("}", 1)[0]
 
-    assert "grid-column: 2;" in radio_expanded_section
-    assert "grid-row: 2;" in radio_expanded_section
+    assert "grid-template-columns: auto minmax(0, 1fr) auto;" in radio_item_expanded_section
+    assert "grid-template-rows: auto auto;" in radio_item_expanded_section
+    assert "grid-column: 3;" in radio_expanded_section
+    assert "grid-row: 1;" in radio_expanded_section
     assert "justify-self: end;" in radio_expanded_section
     assert "font-size: 18px;" in radio_expanded_section
     assert "line-height: 1.1;" in radio_expanded_section
     assert "text-align: right;" in radio_expanded_section
     assert "grid-column: 1;" in status_section
     assert "font-size: 11px;" in status_section
+    assert "grid-column: 2;" in expanded_status_section
+    assert "grid-row: 1;" in expanded_status_section
     assert "font-size: 14px;" in expanded_status_section
     assert "grid-column: 1 / -1;" in radio_metric_expanded_section
+    assert "grid-row: 2;" in radio_metric_expanded_section
     assert "grid-row: 2;" in signal_compact_expanded_section
     assert "font-size: 18px;" in link_expanded_section
