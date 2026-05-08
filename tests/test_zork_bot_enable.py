@@ -51,8 +51,16 @@ def test_dashboard_tracker_answers_direct_zork_when_enabled() -> None:
     combined_text = " ".join(str(row["text"]) for row in iface.sent)
     assert "zork: session started" in combined_text
     assert iface.sent[0]["kwargs"]["destinationId"] == "!01020304"
+    assert iface.sent[0]["kwargs"]["wantAck"] is True
     assert iface.sent[0]["kwargs"]["channelIndex"] == 2
     assert iface.sent[0]["kwargs"]["replyId"] == 111
+    replies = [
+        row
+        for row in tracker.recent_chat
+        if isinstance(row, dict) and row.get("from") == "!12345678" and row.get("to") == "!01020304"
+    ]
+    assert replies
+    assert replies[0].get("ack_requested") is True
 
 
 def test_dashboard_tracker_ignores_broadcast_zork_when_enabled() -> None:

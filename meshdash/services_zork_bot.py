@@ -218,7 +218,7 @@ class ZorkBotService:
                     channel_index=channel_index,
                     message_id=_sent_packet_id(sent_packet),
                     reply_id=reply_id,
-                    ack_requested=False,
+                    ack_requested=True,
                 )
         return True
 
@@ -286,7 +286,7 @@ class ZorkBotService:
                 return send_text_fn(
                     text,
                     destinationId=destination_id,
-                    wantAck=False,
+                    wantAck=True,
                     channelIndex=channel_index,
                     replyId=reply_id if reply_id and reply_id > 0 else None,
                 )
@@ -294,7 +294,7 @@ class ZorkBotService:
                 return send_text_fn(
                     text,
                     destinationId=destination_id,
-                    wantAck=False,
+                    wantAck=True,
                     channelIndex=channel_index,
                 )
 
