@@ -74,13 +74,63 @@ class DashboardTracker:
     def _bump_state_revision_unlocked(self) -> None:
         self.state_revision = int(getattr(self, "state_revision", 0) or 0) + 1
 
-    def enable_zork_bot(self, *, send_lock: object | None = None) -> bool:
+    def enable_zork_bot(
+        self,
+        *,
+        send_lock: object | None = None,
+        reply_segment_delay_seconds: float | None = None,
+        reply_ack_wait_seconds: float | None = None,
+        reply_ack_poll_seconds: float | None = None,
+        reply_retry_limit: int | None = None,
+        reply_async: bool | None = None,
+        sleep_fn: object | None = None,
+    ) -> bool:
         try:
             from .services_zork_bot import build_zork_bot_service
         except Exception:
             return False
-        self._zork_bot_service = build_zork_bot_service(send_lock=send_lock)
+        kwargs = {"send_lock": send_lock, "get_delivery_state_fn": self.get_delivery_state}
+        if reply_segment_delay_seconds is not None:
+            kwargs["reply_segment_delay_seconds"] = reply_segment_delay_seconds
+        if reply_ack_wait_seconds is not None:
+            kwargs["reply_ack_wait_seconds"] = reply_ack_wait_seconds
+        if reply_ack_poll_seconds is not None:
+            kwargs["reply_ack_poll_seconds"] = reply_ack_poll_seconds
+        if reply_retry_limit is not None:
+            kwargs["reply_retry_limit"] = reply_retry_limit
+        if reply_async is not None:
+            kwargs["reply_async"] = reply_async
+        if callable(sleep_fn):
+            kwargs["sleep_fn"] = sleep_fn
+        self._zork_bot_service = build_zork_bot_service(**kwargs)
         return True
+
+    def get_delivery_state(self, message_id: object) -> Optional[dict[str, object]]:
+        clean_message_id = _to_int(message_id)
+        if clean_message_id is None or clean_message_id <= 0:
+            return None
+        with self._lock:
+            for entry in reversed(self.recent_chat):
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("local_echo") is not True:
+                    continue
+                entry_message_id = _to_int(
+                    entry.get("message_id")
+                    or entry.get("messageId")
+                    or entry.get("packet_id")
+                    or entry.get("packetId")
+                )
+                if entry_message_id != clean_message_id:
+                    continue
+                return {
+                    "delivery_state": str(entry.get("delivery_state") or "").strip().lower(),
+                    "delivery_updated_unix": _to_int(
+                        entry.get("delivery_updated_unix") or entry.get("deliveryUpdatedUnix")
+                    )
+                    or 0,
+                }
+        return None
 
     def on_receive(self, packet: dict[str, object], interface: object) -> None:
         zork_bot_service = None

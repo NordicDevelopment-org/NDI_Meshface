@@ -17,6 +17,11 @@ from .tracker_ingest import _normalize_packet_node_id
 _BROADCAST_NUM = 0xFFFFFFFF
 _REPLY_TEXT_RESERVE_BYTES = 36
 _MAX_REPLY_SEGMENTS = 8
+_LIVE_REPLY_SEGMENT_DELAY_SECONDS = 2.0
+_LIVE_REPLY_ACK_WAIT_SECONDS = 8.0
+_LIVE_REPLY_ACK_POLL_SECONDS = 0.5
+_LIVE_REPLY_RETRY_LIMIT = 1
+_ACKED_DELIVERY_STATES = {"ack", "acked", "delivered"}
 
 
 def _normalize_node_id(value: object) -> str:
@@ -153,10 +158,24 @@ class ZorkBotService:
         game: ZorkGame | None = None,
         send_lock: object | None = None,
         now_unix_fn: Callable[[], float] = time.time,
+        reply_segment_delay_seconds: float = _LIVE_REPLY_SEGMENT_DELAY_SECONDS,
+        reply_ack_wait_seconds: float = _LIVE_REPLY_ACK_WAIT_SECONDS,
+        reply_ack_poll_seconds: float = _LIVE_REPLY_ACK_POLL_SECONDS,
+        reply_retry_limit: int = _LIVE_REPLY_RETRY_LIMIT,
+        reply_async: bool = True,
+        sleep_fn: Callable[[float], None] = time.sleep,
+        get_delivery_state_fn: Callable[[object], object] | None = None,
     ) -> None:
         self._game = game or ZorkGame()
         self._send_lock = send_lock if send_lock is not None else threading.Lock()
         self._now_unix_fn = now_unix_fn
+        self._reply_segment_delay_seconds = max(0.0, float(reply_segment_delay_seconds))
+        self._reply_ack_wait_seconds = max(0.0, float(reply_ack_wait_seconds))
+        self._reply_ack_poll_seconds = max(0.05, float(reply_ack_poll_seconds))
+        self._reply_retry_limit = max(0, int(reply_retry_limit))
+        self._reply_async = bool(reply_async)
+        self._sleep_fn = sleep_fn
+        self._get_delivery_state_fn = get_delivery_state_fn
         self._lock = threading.Lock()
 
     def handle_packet(
@@ -202,25 +221,171 @@ class ZorkBotService:
 
         channel_index = _packet_channel_index(packet)
         reply_id = _packet_id(packet)
-        for segment in segments:
-            sent_packet = self._send_text(
+        if self._reply_async:
+            thread = threading.Thread(
+                target=self._send_live_reply_segments,
+                kwargs={
+                    "iface": iface,
+                    "segments": segments,
+                    "destination_id": from_id,
+                    "local_node_id": local_node_id,
+                    "channel_index": channel_index,
+                    "reply_id": reply_id,
+                    "record_local_chat_fn": record_local_chat_fn,
+                },
+                daemon=True,
+            )
+            thread.start()
+            return True
+
+        self._send_live_reply_segments(
+            iface=iface,
+            segments=segments,
+            destination_id=from_id,
+            local_node_id=local_node_id,
+            channel_index=channel_index,
+            reply_id=reply_id,
+            record_local_chat_fn=record_local_chat_fn,
+        )
+        return True
+
+    def _send_live_reply_segments(
+        self,
+        *,
+        iface: object,
+        segments: list[str],
+        destination_id: str,
+        local_node_id: str,
+        channel_index: int,
+        reply_id: Optional[int],
+        record_local_chat_fn: RecordLocalChatFn | None = None,
+    ) -> None:
+        sent_segments: list[tuple[str, Optional[int]]] = []
+        for index, segment in enumerate(segments):
+            if index > 0:
+                self._sleep_between_live_segments()
+            sent_message_id = self._send_live_reply_segment(
                 iface,
                 text=segment,
-                destination_id=from_id,
+                destination_id=destination_id,
+                local_node_id=local_node_id,
                 channel_index=channel_index,
                 reply_id=reply_id,
+                record_local_chat_fn=record_local_chat_fn,
             )
-            if record_local_chat_fn is not None:
-                record_local_chat_fn(
+            sent_segments.append((segment, sent_message_id))
+        self._retry_unacked_live_segments(
+            iface,
+            sent_segments=sent_segments,
+            destination_id=destination_id,
+            local_node_id=local_node_id,
+            channel_index=channel_index,
+            reply_id=reply_id,
+            record_local_chat_fn=record_local_chat_fn,
+        )
+
+    def _sleep_between_live_segments(self) -> None:
+        if self._reply_segment_delay_seconds > 0:
+            self._sleep_fn(self._reply_segment_delay_seconds)
+
+    def _send_live_reply_segment(
+        self,
+        iface: object,
+        *,
+        text: str,
+        destination_id: str,
+        local_node_id: str,
+        channel_index: int,
+        reply_id: Optional[int],
+        record_local_chat_fn: RecordLocalChatFn | None = None,
+        retry_of: Optional[int] = None,
+    ) -> Optional[int]:
+        sent_packet = self._send_text(
+            iface,
+            text=text,
+            destination_id=destination_id,
+            channel_index=channel_index,
+            reply_id=reply_id,
+        )
+        sent_message_id = _sent_packet_id(sent_packet)
+        if record_local_chat_fn is not None:
+            record_local_chat_fn(
+                text=text,
+                from_id=local_node_id,
+                to_id=destination_id,
+                channel_index=channel_index,
+                message_id=sent_message_id,
+                reply_id=reply_id,
+                ack_requested=True,
+                retry_of=retry_of,
+            )
+        return sent_message_id
+
+    def _retry_unacked_live_segments(
+        self,
+        iface: object,
+        *,
+        sent_segments: list[tuple[str, Optional[int]]],
+        destination_id: str,
+        local_node_id: str,
+        channel_index: int,
+        reply_id: Optional[int],
+        record_local_chat_fn: RecordLocalChatFn | None = None,
+    ) -> None:
+        if self._reply_retry_limit <= 0 or self._get_delivery_state_fn is None:
+            return
+        pending = [(text, message_id) for text, message_id in sent_segments if message_id]
+        if not pending:
+            return
+        for _attempt in range(self._reply_retry_limit):
+            self._wait_for_live_reply_acks(pending)
+            retry_segments = [
+                (text, message_id)
+                for text, message_id in pending
+                if not self._delivery_is_acked(message_id)
+            ]
+            if not retry_segments:
+                return
+            for index, (segment, original_message_id) in enumerate(retry_segments):
+                if index > 0:
+                    self._sleep_between_live_segments()
+                self._send_live_reply_segment(
+                    iface,
                     text=segment,
-                    from_id=local_node_id,
-                    to_id=from_id,
+                    destination_id=destination_id,
+                    local_node_id=local_node_id,
                     channel_index=channel_index,
-                    message_id=_sent_packet_id(sent_packet),
                     reply_id=reply_id,
-                    ack_requested=True,
+                    record_local_chat_fn=record_local_chat_fn,
+                    retry_of=original_message_id,
                 )
-        return True
+            return
+
+    def _wait_for_live_reply_acks(self, pending: list[tuple[str, int]]) -> None:
+        if self._reply_ack_wait_seconds <= 0:
+            return
+        deadline = time.monotonic() + self._reply_ack_wait_seconds
+        while time.monotonic() < deadline:
+            if all(self._delivery_is_acked(message_id) for _text, message_id in pending):
+                return
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            self._sleep_fn(min(self._reply_ack_poll_seconds, remaining))
+
+    def _delivery_is_acked(self, message_id: object) -> bool:
+        getter = self._get_delivery_state_fn
+        if getter is None:
+            return False
+        try:
+            state = getter(message_id)
+        except Exception:
+            return False
+        if isinstance(state, dict):
+            raw_state = state.get("delivery_state") or state.get("state")
+        else:
+            raw_state = state
+        return str(raw_state or "").strip().lower() in _ACKED_DELIVERY_STATES
 
     def handle_local_chat(
         self,
@@ -303,8 +468,25 @@ def build_zork_bot_service(
     *,
     send_lock: object | None = None,
     now_unix_fn: Callable[[], float] = time.time,
+    reply_segment_delay_seconds: float = _LIVE_REPLY_SEGMENT_DELAY_SECONDS,
+    reply_ack_wait_seconds: float = _LIVE_REPLY_ACK_WAIT_SECONDS,
+    reply_ack_poll_seconds: float = _LIVE_REPLY_ACK_POLL_SECONDS,
+    reply_retry_limit: int = _LIVE_REPLY_RETRY_LIMIT,
+    reply_async: bool = True,
+    sleep_fn: Callable[[float], None] = time.sleep,
+    get_delivery_state_fn: Callable[[object], object] | None = None,
 ) -> ZorkBotService:
-    return ZorkBotService(send_lock=send_lock, now_unix_fn=now_unix_fn)
+    return ZorkBotService(
+        send_lock=send_lock,
+        now_unix_fn=now_unix_fn,
+        reply_segment_delay_seconds=reply_segment_delay_seconds,
+        reply_ack_wait_seconds=reply_ack_wait_seconds,
+        reply_ack_poll_seconds=reply_ack_poll_seconds,
+        reply_retry_limit=reply_retry_limit,
+        reply_async=reply_async,
+        sleep_fn=sleep_fn,
+        get_delivery_state_fn=get_delivery_state_fn,
+    )
 
 
 __all__ = ["ZorkBotService", "build_zork_bot_service"]

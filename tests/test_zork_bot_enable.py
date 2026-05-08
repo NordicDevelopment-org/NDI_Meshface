@@ -43,7 +43,11 @@ def test_dashboard_tracker_does_not_answer_zork_when_disabled() -> None:
 def test_dashboard_tracker_answers_direct_zork_when_enabled() -> None:
     tracker = DashboardTracker(packet_limit=25)
     iface = _FakeInterface()
-    assert tracker.enable_zork_bot() is True
+    assert tracker.enable_zork_bot(
+        reply_segment_delay_seconds=0,
+        reply_retry_limit=0,
+        reply_async=False,
+    ) is True
 
     tracker.on_receive(_direct_text_packet("zork"), iface)
 
@@ -66,7 +70,11 @@ def test_dashboard_tracker_answers_direct_zork_when_enabled() -> None:
 def test_dashboard_tracker_ignores_broadcast_zork_when_enabled() -> None:
     tracker = DashboardTracker(packet_limit=25)
     iface = _FakeInterface()
-    assert tracker.enable_zork_bot() is True
+    assert tracker.enable_zork_bot(
+        reply_segment_delay_seconds=0,
+        reply_retry_limit=0,
+        reply_async=False,
+    ) is True
 
     tracker.on_receive(_direct_text_packet("zork", to=0xFFFFFFFF), iface)
 
@@ -75,7 +83,11 @@ def test_dashboard_tracker_ignores_broadcast_zork_when_enabled() -> None:
 
 def test_dashboard_tracker_answers_local_direct_zork_without_radio_send() -> None:
     tracker = DashboardTracker(packet_limit=25)
-    assert tracker.enable_zork_bot() is True
+    assert tracker.enable_zork_bot(
+        reply_segment_delay_seconds=0,
+        reply_retry_limit=0,
+        reply_async=False,
+    ) is True
 
     tracker.record_local_chat(
         text="zork",
@@ -87,3 +99,45 @@ def test_dashboard_tracker_answers_local_direct_zork_without_radio_send() -> Non
 
     texts = [str(row.get("text") or "") for row in tracker.recent_chat if isinstance(row, dict)]
     assert any("zork: session started" in text for text in texts)
+
+
+def test_dashboard_tracker_paces_multi_part_zork_replies() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    sleeps: list[float] = []
+    assert tracker.enable_zork_bot(
+        reply_segment_delay_seconds=1.25,
+        reply_retry_limit=0,
+        reply_async=False,
+        sleep_fn=sleeps.append,
+    ) is True
+
+    tracker.on_receive(_direct_text_packet("zork"), iface)
+
+    assert len(iface.sent) == 2
+    assert sleeps == [1.25]
+
+
+def test_dashboard_tracker_retries_unacked_zork_reply_segments() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    assert tracker.enable_zork_bot(
+        reply_segment_delay_seconds=0,
+        reply_ack_wait_seconds=0,
+        reply_retry_limit=1,
+        reply_async=False,
+    ) is True
+
+    tracker.on_receive(_direct_text_packet("zork"), iface)
+
+    assert len(iface.sent) == 4
+    original_ids = {
+        row["packet"].id
+        for row in iface.sent[:2]
+    }
+    retry_entries = [
+        row
+        for row in tracker.recent_chat
+        if isinstance(row, dict) and row.get("retry_of") in original_ids
+    ]
+    assert len(retry_entries) == 2
