@@ -222,6 +222,55 @@ class ZorkBotService:
                 )
         return True
 
+    def handle_local_chat(
+        self,
+        *,
+        text: object,
+        from_id: object,
+        to_id: object,
+        local_node_id: object,
+        channel_index: int = 0,
+        reply_id: Optional[int] = None,
+        record_local_chat_fn: RecordLocalChatFn | None = None,
+    ) -> bool:
+        clean_text = str(text or "").strip()
+        if not clean_text:
+            return False
+        clean_local = _normalize_node_id(local_node_id)
+        clean_to = _normalize_node_id(to_id)
+        clean_from = _normalize_node_id(from_id) or clean_local
+        if not clean_local or not clean_to:
+            return False
+
+        peer_id = clean_from if clean_from.startswith("!") else clean_local
+        now_unix = int(self._now_unix_fn())
+        with self._lock:
+            result = self._game.try_handle_message(
+                text=clean_text,
+                from_id=peer_id,
+                to_id=clean_to,
+                local_node_id=clean_local,
+                now_unix=now_unix,
+                enabled=True,
+            )
+        if not getattr(result, "handled", False):
+            return False
+
+        if record_local_chat_fn is None:
+            return True
+
+        for segment in _reply_segments(getattr(result, "reply_text", "") or ""):
+            record_local_chat_fn(
+                text=segment,
+                from_id=clean_local,
+                to_id=peer_id,
+                channel_index=channel_index,
+                message_id=None,
+                reply_id=reply_id,
+                ack_requested=False,
+            )
+        return True
+
     def _send_text(
         self,
         iface: object,

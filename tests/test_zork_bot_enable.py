@@ -63,3 +63,19 @@ def test_dashboard_tracker_ignores_broadcast_zork_when_enabled() -> None:
     tracker.on_receive(_direct_text_packet("zork", to=0xFFFFFFFF), iface)
 
     assert iface.sent == []
+
+
+def test_dashboard_tracker_answers_local_direct_zork_without_radio_send() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    assert tracker.enable_zork_bot() is True
+
+    tracker.record_local_chat(
+        text="zork",
+        from_id="!12345678",
+        to_id="!12345678",
+        channel_index=0,
+        message_id=222,
+    )
+
+    texts = [str(row.get("text") or "") for row in tracker.recent_chat if isinstance(row, dict)]
+    assert any("zork: session started" in text for text in texts)

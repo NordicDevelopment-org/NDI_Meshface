@@ -148,6 +148,8 @@ class DashboardTracker:
         ack_requested: bool = False,
         retry_of: Optional[int] = None,
     ) -> None:
+        zork_bot_service = None
+        should_offer_to_zork = False
         with self._lock:
             changed = _record_tracker_local_chat_for_tracker_helper(
                 self,
@@ -166,6 +168,28 @@ class DashboardTracker:
             )
             if changed:
                 self._bump_state_revision_unlocked()
+                zork_bot_service = self._zork_bot_service
+                should_offer_to_zork = not bool(is_reaction)
+        if should_offer_to_zork and zork_bot_service is not None:
+            local_node_id = ""
+            from_text = str(from_id or "").strip()
+            to_text = str(to_id or "").strip()
+            if from_text.startswith("!"):
+                local_node_id = from_text
+            elif to_text.startswith("!"):
+                local_node_id = to_text
+            try:
+                zork_bot_service.handle_local_chat(
+                    text=text,
+                    from_id=from_id,
+                    to_id=to_id,
+                    local_node_id=local_node_id,
+                    channel_index=channel_index,
+                    reply_id=message_id,
+                    record_local_chat_fn=self.record_local_chat,
+                )
+            except Exception:
+                pass
 
     def seed_packet(self, packet: dict[str, object], interface: object) -> None:
         with self._lock:
