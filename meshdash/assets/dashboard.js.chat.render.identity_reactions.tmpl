@@ -407,6 +407,99 @@
       }}
     }}
 
+    function chatReplyJumpFrame() {{
+      return new Promise((resolve) => {{
+        window.requestAnimationFrame(() => resolve());
+      }});
+    }}
+
+    function findChatFeedItemByMessageId(messageIdRaw) {{
+      const messageId = parsePositiveMessageId(messageIdRaw);
+      if (!messageId) return null;
+      const feed = document.getElementById("chat-feed");
+      if (!(feed instanceof HTMLElement)) return null;
+      const messageIdText = String(messageId);
+      const escapedId = (window.CSS && typeof window.CSS.escape === "function")
+        ? window.CSS.escape(messageIdText)
+        : messageIdText.replace(/["\\]/g, "\\$&");
+      const item = feed.querySelector(`.chat-feed-item[data-message-id="${{escapedId}}"]`);
+      return item instanceof HTMLElement ? item : null;
+    }}
+
+    function focusChatFeedItemByMessageId(messageIdRaw) {{
+      const messageId = parsePositiveMessageId(messageIdRaw);
+      if (!messageId) return false;
+      let item = findChatFeedItemByMessageId(messageId);
+      if (!(item instanceof HTMLElement)) return false;
+      if (item.hidden || item.classList.contains("chat-feed-search-hidden")) {{
+        chatFeedSearchQuery = "";
+        if (typeof applyChatFeedSearchFilter === "function") {{
+          applyChatFeedSearchFilter();
+        }}
+        item = findChatFeedItemByMessageId(messageId);
+      }}
+      if (!(item instanceof HTMLElement) || item.hidden) return false;
+      chatStickToBottom = false;
+      item.scrollIntoView({{ behavior: "smooth", block: "center" }});
+      if (typeof focusChatFeedItem === "function") {{
+        focusChatFeedItem(item);
+      }} else {{
+        item.classList.add("change-focus");
+        window.setTimeout(() => item.classList.remove("change-focus"), 1600);
+      }}
+      return true;
+    }}
+
+    async function jumpToOriginalChatMessage(messageIdRaw) {{
+      const messageId = parsePositiveMessageId(messageIdRaw);
+      if (!messageId) return false;
+      if (chatReplyJumpInFlight) {{
+        if (typeof setChatSendStatus === "function") {{
+          setChatSendStatus("Already finding an original chat message.");
+        }}
+        return false;
+      }}
+      if (focusChatFeedItemByMessageId(messageId)) return true;
+
+      chatReplyJumpInFlight = true;
+      if (typeof setChatSendStatus === "function") {{
+        setChatSendStatus(`Finding original packet #${{messageId}}...`);
+      }}
+      try {{
+        for (let attempt = 0; attempt < 12; attempt += 1) {{
+          const viewKey = chatHistoryViewKeyFor(activeChatChannel, chatDirectActivePeerId);
+          const beforeRows = chatHistoryRows.length;
+          const beforeLimit = chatHistoryVisibleLimitForView(viewKey);
+          const beforeExhausted = chatHistoryExhaustedByView.has(viewKey);
+          await loadOlderChatMessagesForCurrentView();
+          await chatReplyJumpFrame();
+          if (focusChatFeedItemByMessageId(messageId)) {{
+            if (typeof setChatSendStatus === "function") {{
+              setChatSendStatus(`Opened original packet #${{messageId}}.`);
+            }}
+            return true;
+          }}
+          const afterRows = chatHistoryRows.length;
+          const afterLimit = chatHistoryVisibleLimitForView(viewKey);
+          const afterExhausted = chatHistoryExhaustedByView.has(viewKey);
+          const noProgress = (
+            beforeRows === afterRows
+            && beforeLimit === afterLimit
+            && beforeExhausted === afterExhausted
+          );
+          if (afterExhausted && noProgress) break;
+          if (chatHistoryLoadError) break;
+        }}
+      }} finally {{
+        chatReplyJumpInFlight = false;
+      }}
+      if (typeof setChatSendStatus === "function") {{
+        const errorSuffix = chatHistoryLoadError ? ` ${{chatHistoryLoadError}}` : "";
+        setChatSendStatus(`Original packet #${{messageId}} is not in the loaded chat view.${{errorSuffix}}`, true);
+      }}
+      return false;
+    }}
+
     function renderChat(state, options = null) {{
       syncTopbarChatContext(state);
       const renderOptions = options && typeof options === "object" ? options : {{}};

@@ -59,6 +59,17 @@
         const item = target.closest(".chat-feed-item");
         if (!(item instanceof HTMLElement) || !feed.contains(item)) return;
 
+        const replyInline = target.closest(".chat-reply-inline");
+        if (replyInline instanceof HTMLElement && feed.contains(replyInline)) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const targetId = Number(replyInline.dataset.replyTargetId || "");
+          if (Number.isInteger(targetId) && targetId > 0) {{
+            void jumpToOriginalChatMessage(targetId);
+          }}
+          return;
+        }}
+
         const retryBtn = target.closest(".chat-retry-btn");
         if (retryBtn instanceof HTMLButtonElement) {{
           ev.preventDefault();

@@ -487,11 +487,14 @@
           messageTooltipParts.push(`Message: ${{textCompact}}`);
         }}
         const messageTooltip = messageTooltipParts.join("\n");
+        const replyInlineTitle = Number.isInteger(replyToId) && replyToId > 0
+          ? `Jump to original packet #${{replyToId}}`
+          : "Original packet is unavailable";
         const replyInline = replyInlineLabel
-          ? `<span class="chat-reply-inline${{replyInlineMissing ? " missing" : ""}}">
+          ? `<button type="button" class="chat-reply-inline${{replyInlineMissing ? " missing" : ""}}" data-reply-target-id="${{escAttr(replyToId || "")}}" title="${{escAttr(replyInlineTitle)}}" aria-label="${{escAttr(replyInlineTitle)}}">
               <span class="chat-reply-inline-label">↪ ${{escAttr(replyInlineLabel)}}</span>
               <span class="chat-reply-inline-text">${{escAttr(replyInlineText)}}</span>
-            </span>`
+            </button>`
           : "";
         const monitorMode = chatViewMode === "monitor";
         const sourceNodeEntry = nodesById.get(normalizeNodeId(sourceNode)) || null;

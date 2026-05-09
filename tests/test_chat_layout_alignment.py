@@ -931,6 +931,26 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "<span class=\"chat-feed-time\"" not in js
 
 
+def test_chat_reply_preview_links_jump_to_original_packet() -> None:
+    css = build_dashboard_css(theme_css="")
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    reply_button_section = css.split("button.chat-reply-inline {", 1)[1].split("}", 1)[0]
+
+    assert "appearance: none;" in reply_button_section
+    assert "background: transparent;" in reply_button_section
+    assert "cursor: pointer;" in reply_button_section
+    assert "data-reply-target-id=\"${escAttr(replyToId || \"\")}\"" in js
+    assert "async function jumpToOriginalChatMessage(messageIdRaw)" in js
+    assert "function focusChatFeedItemByMessageId(messageIdRaw)" in js
+    assert "await loadOlderChatMessagesForCurrentView();" in js
+    assert "void jumpToOriginalChatMessage(targetId);" in js
+
+
 def test_chat_feed_search_is_reapplied_after_feed_render() -> None:
     css = build_dashboard_css(theme_css="")
     js = build_dashboard_js(

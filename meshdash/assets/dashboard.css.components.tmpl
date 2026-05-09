@@ -7405,6 +7405,241 @@
       background: #0f1d16;
       color: #e9f5ee;
     }}
+    .bots {{
+      --bots-panel-bg: var(--surface-tint-bg, #f7fcf7);
+      --bots-panel-bg-alt: var(--surface-tint-bg-soft, #f4faf3);
+      --bots-panel-bg-strong: color-mix(in srgb, var(--surface-tint-bg, #f7fcf7) 72%, #ffffff);
+      --bots-panel-hover-bg: var(--surface-tint-bg-hover, #e7f0ea);
+      --bots-panel-active-bg: color-mix(in srgb, var(--surface-tint-bg-hover, #e7f0ea) 72%, #ffffff);
+      --bots-divider-bg: var(--surface-tint-divider-bg, linear-gradient(180deg, #f4faf3, #edf5ea));
+      --bots-border: var(--surface-tint-border, #d2e1d0);
+      --bots-border-strong: var(--surface-tint-border-strong, #b8cab9);
+      --bots-text: var(--surface-tint-text, #2b4a37);
+      --bots-text-strong: color-mix(in srgb, var(--ink, #112015) 72%, var(--accent, #2f855a) 28%);
+      --bots-text-soft: var(--surface-tint-text-soft, #4a6958);
+      --bots-active: var(--accent, #2f855a);
+      --bots-active-text: var(--accent-2, #1f6f53);
+      --bots-active-bg: color-mix(in srgb, var(--accent, #2f855a) 13%, var(--surface-tint-bg, #f7fcf7));
+      --bots-code-bg: var(--surface-tint-bg-alt, #edf6ec);
+      --bots-danger-text: #8f4234;
+      --bots-warning-bg: #fff8e8;
+      --bots-warning-border: #d3a856;
+      --bots-warning-text: #7a5a1f;
+    }}
+    [data-theme="dark"] .bots {{
+      --bots-panel-bg: color-mix(in srgb, var(--workspace-shell-bg) 78%, var(--ui-panel));
+      --bots-panel-bg-alt: color-mix(in srgb, var(--workspace-shell-bg-alt) 82%, var(--ui-panel));
+      --bots-panel-bg-strong: color-mix(in srgb, var(--workspace-shell-bg-alt) 70%, var(--ui-panel-alt));
+      --bots-panel-hover-bg: color-mix(in srgb, var(--workspace-shell-hover-bg) 80%, var(--ui-panel-alt));
+      --bots-panel-active-bg: color-mix(in srgb, var(--workspace-shell-active-bg) 88%, transparent);
+      --bots-divider-bg: linear-gradient(180deg, var(--workspace-shell-bg-alt), var(--workspace-shell-bg));
+      --bots-border: color-mix(in srgb, var(--workspace-shell-border-muted) 82%, var(--ui-border));
+      --bots-border-strong: color-mix(in srgb, var(--workspace-shell-border-strong) 82%, var(--ui-border));
+      --bots-text: var(--workspace-shell-text);
+      --bots-text-strong: color-mix(in srgb, var(--workspace-shell-text) 88%, white 12%);
+      --bots-text-soft: var(--workspace-shell-text-soft);
+      --bots-active: var(--ui-accent);
+      --bots-active-text: var(--workspace-shell-active-text);
+      --bots-active-bg: color-mix(in srgb, var(--workspace-shell-active-bg) 86%, transparent);
+      --bots-code-bg: color-mix(in srgb, var(--workspace-shell-bg-alt) 80%, var(--ui-panel-alt));
+      --bots-danger-text: #e3aa9f;
+      --bots-warning-bg: #2d2715;
+      --bots-warning-border: #8d7232;
+      --bots-warning-text: #f3dfad;
+    }}
+    .bots-panel,
+    [data-theme="dark"] .bots-panel {{
+      background: var(--bots-panel-bg);
+      border-color: var(--bots-border);
+      color: var(--bots-text);
+    }}
+    .bots-panel h3,
+    [data-theme="dark"] .bots-panel h3 {{
+      color: var(--bots-text-strong);
+    }}
+    .bots-main-splitter,
+    .bots-command-splitter,
+    [data-theme="dark"] .bots-main-splitter,
+    [data-theme="dark"] .bots-command-splitter {{
+      border-color: var(--bots-border);
+      background: var(--bots-divider-bg);
+    }}
+    .bots-main-splitter::before,
+    .bots-command-splitter::before,
+    [data-theme="dark"] .bots-main-splitter::before,
+    [data-theme="dark"] .bots-command-splitter::before {{
+      background: var(--bots-border-strong);
+    }}
+    .bots-main-splitter:hover::before,
+    .bots-main-splitter.active::before,
+    .bots-command-splitter:hover::before,
+    .bots-command-splitter.active::before,
+    [data-theme="dark"] .bots-main-splitter:hover::before,
+    [data-theme="dark"] .bots-main-splitter.active::before,
+    [data-theme="dark"] .bots-command-splitter:hover::before,
+    [data-theme="dark"] .bots-command-splitter.active::before {{
+      background: var(--bots-active);
+    }}
+    .bots-setting-note,
+    .bots-command-config-name,
+    .bots-command-config-description,
+    .bots-command-config-label,
+    .bots-command-item-order,
+    .bots-command-description,
+    .bots-history-stats,
+    .bots-history-meta,
+    .bots-session-meta,
+    .bots-sniffer-filter-label,
+    .bots .chat-bot-toggle-wrap,
+    .bots .chat-bot-cheatsheet-title,
+    .bots .chat-bot-cheatsheet-row,
+    [data-theme="dark"] .bots-setting-note,
+    [data-theme="dark"] .bots-command-config-name,
+    [data-theme="dark"] .bots-command-config-description,
+    [data-theme="dark"] .bots-command-config-label,
+    [data-theme="dark"] .bots-command-item-order,
+    [data-theme="dark"] .bots-command-description,
+    [data-theme="dark"] .bots-history-stats,
+    [data-theme="dark"] .bots-history-meta,
+    [data-theme="dark"] .bots-session-meta,
+    [data-theme="dark"] .bots-sniffer-filter-label,
+    [data-theme="dark"] .bots .chat-bot-toggle-wrap,
+    [data-theme="dark"] .bots .chat-bot-cheatsheet-title,
+    [data-theme="dark"] .bots .chat-bot-cheatsheet-row {{
+      color: var(--bots-text-soft);
+    }}
+    .bots-setting-note code,
+    .bots .chat-bot-cheatsheet-row code,
+    [data-theme="dark"] .bots-setting-note code,
+    [data-theme="dark"] .bots .chat-bot-cheatsheet-row code {{
+      background: var(--bots-code-bg);
+      border-color: var(--bots-border);
+      color: var(--bots-text-strong);
+    }}
+    .bots-command-list,
+    .bots-command-config,
+    .bots-session-list,
+    .bots-history-list,
+    .bots .chat-bot-cheatsheet,
+    [data-theme="dark"] .bots-command-list,
+    [data-theme="dark"] .bots-command-config,
+    [data-theme="dark"] .bots-session-list,
+    [data-theme="dark"] .bots-history-list,
+    [data-theme="dark"] .bots .chat-bot-cheatsheet {{
+      background: var(--bots-panel-bg-alt);
+      border-color: var(--bots-border);
+    }}
+    .bots-command-config-section,
+    [data-theme="dark"] .bots-command-config-section {{
+      border-top-color: var(--bots-border);
+    }}
+    .bots-command-item,
+    .bots-session-item,
+    .bots-history-empty,
+    .bots-history-item,
+    [data-theme="dark"] .bots-command-item,
+    [data-theme="dark"] .bots-session-item,
+    [data-theme="dark"] .bots-history-empty,
+    [data-theme="dark"] .bots-history-item {{
+      background: var(--bots-panel-bg);
+      border-color: var(--bots-border);
+      color: var(--bots-text);
+    }}
+    .bots-command-item:hover,
+    [data-theme="dark"] .bots-command-item:hover {{
+      background: var(--bots-panel-hover-bg);
+      border-color: var(--bots-border-strong);
+    }}
+    .bots-command-item:focus-visible,
+    [data-theme="dark"] .bots-command-item:focus-visible {{
+      outline-color: var(--bots-active);
+    }}
+    .bots-command-item.is-active,
+    [data-theme="dark"] .bots-command-item.is-active {{
+      background: var(--bots-panel-active-bg);
+      border-color: var(--bots-border-strong);
+      color: var(--bots-active-text);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--bots-active) 32%, transparent);
+    }}
+    .bots-command-config-usage,
+    .bots-command-usage,
+    .bots-session-peer,
+    .bots-history-command,
+    .bots-history-response strong,
+    [data-theme="dark"] .bots-command-config-usage,
+    [data-theme="dark"] .bots-command-usage,
+    [data-theme="dark"] .bots-session-peer,
+    [data-theme="dark"] .bots-history-command,
+    [data-theme="dark"] .bots-history-response strong {{
+      color: var(--bots-text-strong);
+    }}
+    .bots-command-kind,
+    .bots-history-status-pill,
+    [data-theme="dark"] .bots-command-kind,
+    [data-theme="dark"] .bots-history-status-pill {{
+      background: var(--bots-active-bg);
+      border-color: var(--bots-border);
+      color: var(--bots-text);
+    }}
+    .bots-command-state,
+    [data-theme="dark"] .bots-command-state {{
+      color: var(--bots-text-soft);
+    }}
+    .bots-command-state.is-enabled,
+    [data-theme="dark"] .bots-command-state.is-enabled,
+    .bots .chat-bot-toggle-wrap input[type="checkbox"],
+    [data-theme="dark"] .bots .chat-bot-toggle-wrap input[type="checkbox"] {{
+      color: var(--bots-active-text);
+      accent-color: var(--bots-active);
+    }}
+    .bots-history-status-pill.responded,
+    [data-theme="dark"] .bots-history-status-pill.responded {{
+      background: var(--bots-active-bg);
+      border-color: var(--bots-border-strong);
+      color: var(--bots-active-text);
+    }}
+    .bots-command-state.is-disabled,
+    [data-theme="dark"] .bots-command-state.is-disabled {{
+      color: var(--bots-danger-text);
+    }}
+    .bots-review-tab,
+    [data-theme="dark"] .bots-review-tab {{
+      background: var(--bots-panel-bg-alt);
+      border-color: var(--bots-border);
+      color: var(--bots-text-soft);
+    }}
+    .bots-review-tab.is-active,
+    [data-theme="dark"] .bots-review-tab.is-active {{
+      background: var(--bots-panel-active-bg);
+      border-color: var(--bots-border-strong);
+      color: var(--bots-active-text);
+    }}
+    .bots-history-status-pill.pending,
+    [data-theme="dark"] .bots-history-status-pill.pending {{
+      border-color: var(--bots-warning-border);
+      background: var(--bots-warning-bg);
+      color: var(--bots-warning-text);
+    }}
+    .bots-history-response,
+    [data-theme="dark"] .bots-history-response {{
+      border-left-color: var(--bots-border-strong);
+      color: var(--bots-text);
+    }}
+    .bots-command-config-textarea,
+    .bots-sniffer-command-input,
+    [data-theme="dark"] .bots-command-config-textarea,
+    [data-theme="dark"] .bots-sniffer-command-input {{
+      background: var(--bots-panel-bg-strong);
+      border-color: var(--bots-border);
+      color: var(--bots-text);
+    }}
+    .bots-command-config-textarea:focus,
+    .bots-sniffer-command-input:focus,
+    [data-theme="dark"] .bots-command-config-textarea:focus,
+    [data-theme="dark"] .bots-sniffer-command-input:focus {{
+      border-color: var(--bots-border-strong);
+      outline-color: var(--bots-border-strong);
+    }}
     [data-theme="dark"] .chat-change-title {{
       color: #c7e8d6;
     }}
