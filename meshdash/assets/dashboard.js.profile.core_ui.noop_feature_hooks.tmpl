@@ -368,7 +368,9 @@
           return;
         }}
         if (fromLocal && replyId !== null) {{
-          addReply(replyId, item);
+          if (requestByMessageId.has(replyId) || isZorkBotResponseText(text)) {{
+            addReply(replyId, item);
+          }}
           return;
         }}
         if (fromLocal && isZorkBotResponseText(text)) {{
