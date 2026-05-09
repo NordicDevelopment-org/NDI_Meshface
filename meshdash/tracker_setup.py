@@ -5,6 +5,7 @@ from .file_transfer_protocol import is_file_transfer_protocol_chat_entry
 from .game_protocol import is_game_protocol_chat_entry
 from .tracker_bootstrap import TrackerHistoryBootstrap
 from .tracker_bootstrap_contracts import TrackerBootstrapHistoryStore
+from .tracker_buffer_limits import recent_chat_buffer_limit
 from .tracker_snapshot_build_contracts import EdgeKey, EdgeRow
 from .tracker_storage_contracts import RecentChatBuffer, RecentPacketBuffer
 from .tracker_runtime_init_contracts import BuildHistoricalEdgesFn, LoadTrackerHistoryBootstrapFn
@@ -25,7 +26,7 @@ def initialize_tracker_buffers(packet_limit: int) -> TrackerBuffers:
         historical_edges={},
         port_counts=Counter(),
         recent_packets=deque(maxlen=packet_limit),
-        recent_chat=deque(maxlen=packet_limit),
+        recent_chat=deque(maxlen=recent_chat_buffer_limit(packet_limit)),
     )
 
 

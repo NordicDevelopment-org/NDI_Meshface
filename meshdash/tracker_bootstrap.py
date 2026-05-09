@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .tracker_bootstrap_contracts import BuildHistoricalEdgesFn, TrackerBootstrapHistoryStore
+from .tracker_buffer_limits import recent_chat_buffer_limit
 from .tracker_snapshot_build_contracts import EdgeKey, EdgeRow
 
 @dataclass(frozen=True)
@@ -17,7 +18,7 @@ def load_tracker_history_bootstrap(
     build_historical_edges_fn: BuildHistoricalEdgesFn,
 ) -> TrackerHistoryBootstrap:
     recent_packets = list(history_store.load_recent_packets(packet_limit))
-    recent_chat = list(history_store.load_recent_chat(packet_limit))
+    recent_chat = list(history_store.load_recent_chat(recent_chat_buffer_limit(packet_limit)))
     historical_edges = build_historical_edges_fn(history_store.load_connections())
     return TrackerHistoryBootstrap(
         recent_packets=recent_packets,
