@@ -94,7 +94,8 @@ def _offline_city_rows() -> tuple[dict[str, object], ...]:
         state = str(props.get("adm1name") or "").strip()
         country = str(props.get("adm0name") or "").strip()
         population = _to_float(props.get("population")) or 0.0
-        rank = _to_float(props.get("scalerank")) or 9.0
+        rank_value = _to_float(props.get("scalerank"))
+        rank = rank_value if rank_value is not None else 9.0
         rows.append(
             {
                 "name": name,
@@ -142,11 +143,12 @@ def nearest_city(lat: object, lon: object) -> Optional[dict[str, object]]:
 
     if best is None or best_distance_km is None:
         return None
+    best_rank = _to_float(best.get("rank"))
     return {
         "name": str(best.get("name") or "").strip(),
         "state": str(best.get("state") or "").strip(),
         "country": str(best.get("country") or "").strip(),
         "distance_km": round(float(best_distance_km), 1),
         "population": int(_to_float(best.get("population")) or 0),
-        "rank": int(_to_float(best.get("rank")) or 9),
+        "rank": int(best_rank if best_rank is not None else 9),
     }

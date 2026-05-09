@@ -85,8 +85,10 @@ Key runtime notes:
 - The browser polls `/api/state`, fetches history/detail endpoints on demand,
   and POSTs write actions for chat, settings, tools, games, and optional BBS.
 - When online map tiles fail, the UI can fall back to the bundled offline atlas
-  reference layers. The current build still expects Leaflet JS/CSS to be
-  reachable from `unpkg.com` unless you vendor or proxy those assets yourself.
+  reference layers. The atlas includes a coarse global basemap plus higher
+  detail around North America. The current build still expects Leaflet JS/CSS
+  to be reachable from `unpkg.com` unless you vendor or proxy those assets
+  yourself.
 
 ## Requirements
 
@@ -753,7 +755,8 @@ groups
 If the UI loads but the map styling or map logic is broken, verify that the
 browser can reach the Leaflet CDN assets. If the map base layer is blank but
 the rest of the UI is healthy, the tile servers may be unreachable and the
-offline atlas fallback should be used instead.
+offline atlas fallback should be used instead. The bundled atlas can be rebuilt
+with `python scripts/build_offline_atlas.py --source-dir /path/to/natural-earth-zips`.
 
 If the UI looks stale after deploy, hard refresh the browser with
 `Ctrl+Shift+R`.

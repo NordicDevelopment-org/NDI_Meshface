@@ -9,9 +9,10 @@ reviewed before the repository is made public.
   embeds the `mdiNewBox` SVG path from Material Design Icons / `@mdi/js`
   for the automatic "New" node tag icon. Material Design Icons are distributed
   under Apache License 2.0.
-- `meshdash/assets/offline_atlas_na.min.json` includes Natural Earth base layers
-  and GeoNames city data. The file metadata identifies Natural Earth as Public
-  Domain and GeoNames as CC BY 4.0.
+- `meshdash/assets/offline_atlas_na.min.json` includes Natural Earth global
+  110m base layers, Natural Earth/North America detail layers, and GeoNames
+  city data. The file metadata identifies Natural Earth as Public Domain and
+  GeoNames as CC BY 4.0.
 - `meshdash/assets/chat_emoji_catalog.min.json` bundles an emoji catalog
   generated from Unicode `emoji-test.txt`. The current payload identifies
   Unicode Emoji version `17.0`, dated `2025-08-04, 20:55:31 GMT`. Before public
