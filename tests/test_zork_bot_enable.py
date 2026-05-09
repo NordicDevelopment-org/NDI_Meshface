@@ -184,3 +184,21 @@ def test_zork_bot_waits_for_each_segment_ack_before_advancing() -> None:
     assert str(iface.sent[1]["text"]).startswith("[2/2]")
     assert iface.sent[2]["text"] == iface.sent[1]["text"]
     assert records[2]["retry_of"] == iface.sent[1]["packet"].id
+
+
+def test_zork_bot_default_retry_policy_sends_one_repeat_per_segment() -> None:
+    iface = _FakeInterface()
+    service = ZorkBotService(
+        game=_FakeGame("alpha " * 45),
+        reply_segment_delay_seconds=0,
+        reply_ack_wait_seconds=0,
+        reply_async=False,
+        get_delivery_state_fn=lambda _message_id: "pending",
+    )
+
+    handled = service.handle_packet(_direct_text_packet("zork"), iface)
+
+    assert handled is True
+    assert len(iface.sent) == 2
+    assert iface.sent[0]["text"] == iface.sent[1]["text"]
+    assert str(iface.sent[0]["text"]).startswith("[1/2]")
