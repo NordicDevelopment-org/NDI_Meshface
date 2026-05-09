@@ -22,8 +22,10 @@ class _FakeInterface:
 class _FakeGame:
     def __init__(self, reply_text: str) -> None:
         self.reply_text = reply_text
+        self.calls: list[dict[str, object]] = []
 
-    def try_handle_message(self, **_kwargs: object) -> object:
+    def try_handle_message(self, **kwargs: object) -> object:
+        self.calls.append(dict(kwargs))
         return SimpleNamespace(handled=True, reply_text=self.reply_text)
 
 
@@ -150,6 +152,25 @@ def test_dashboard_tracker_ignores_non_exact_public_zork_trigger() -> None:
     tracker.on_receive(_direct_text_packet("zork please", to=0xFFFFFFFF), iface)
     tracker.on_receive(_direct_text_packet("zrok", to=0xFFFFFFFF, packet_id=112), iface)
 
+    assert iface.sent == []
+
+
+def test_zork_bot_service_never_passes_non_zork_public_chat_to_game() -> None:
+    iface = _FakeInterface()
+    game = _FakeGame("should not send")
+    service = ZorkBotService(
+        game=game,
+        reply_segment_delay_seconds=0,
+        reply_retry_limit=0,
+        reply_async=False,
+    )
+
+    handled = service.handle_packet(_direct_text_packet("I just moved to mpls", to=0xFFFFFFFF), iface)
+    handled_inventory = service.handle_packet(_direct_text_packet("i", to=0xFFFFFFFF, packet_id=112), iface)
+
+    assert handled is False
+    assert handled_inventory is False
+    assert game.calls == []
     assert iface.sent == []
 
 

@@ -58,6 +58,12 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert 'return !!(runtime && runtime.available && runtime.enabled);' in js
     assert 'function buildBotTickerSummary(state = latestState) {' in js
     assert 'function renderBotTickerSummary(state = latestState) {' in js
+    assert 'function isZorkBotPublicStartText(text) {' in js
+    assert 'return String(text || "").trim().toLowerCase() === "zork";' in js
+    assert 'const isPublicStart = toAll && isZorkBotPublicStartText(text);' in js
+    assert 'const isDirectCommand = toLocal && isZorkBotCommandText(text);' in js
+    assert 'const isCommand = isPublicStart || isDirectCommand;' in js
+    assert 'isZorkBotCommandText(text) && (toLocal || toAll)' not in js
     assert 'const isEnabled = tickerEnabled(id) && tickerAvailable(id, state);' in js
     assert 'renderBotTickerSummary(state);' in js
     assert 'function syncTickerRuntimeAvailability(state = latestState) {' in js

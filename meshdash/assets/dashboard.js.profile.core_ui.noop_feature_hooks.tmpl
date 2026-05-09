@@ -264,6 +264,10 @@
       return zorkBotCommandHeads.has(zorkBotTextHead(text));
     }}
 
+    function isZorkBotPublicStartText(text) {{
+      return String(text || "").trim().toLowerCase() === "zork";
+    }}
+
     function isZorkBotResponseText(text) {{
       const clean = String(text || "").trim();
       const body = clean.replace(/^\[(\d+)\/(\d+)\]\s*/i, "");
@@ -318,7 +322,9 @@
         const fromLocal = !!localId && from === localId;
         const toLocal = !!localId && to === localId;
         const toAll = to === "^all";
-        const isCommand = isZorkBotCommandText(text) && (toLocal || toAll);
+        const isPublicStart = toAll && isZorkBotPublicStartText(text);
+        const isDirectCommand = toLocal && isZorkBotCommandText(text);
+        const isCommand = isPublicStart || isDirectCommand;
         const item = {{
           row,
           index,

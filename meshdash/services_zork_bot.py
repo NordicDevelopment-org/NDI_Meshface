@@ -207,8 +207,12 @@ class ZorkBotService:
         if from_id.lower() == local_node_id.lower():
             return False
 
+        public_start = _is_public_start_trigger(text=text, to_id=to_id)
+        if to_id.strip().lower() == "^all" and not public_start:
+            return False
+
         now_unix = int(self._now_unix_fn())
-        game_to_id = local_node_id if _is_public_start_trigger(text=text, to_id=to_id) else to_id
+        game_to_id = local_node_id if public_start else to_id
         with self._lock:
             result = self._game.try_handle_message(
                 text=text,
