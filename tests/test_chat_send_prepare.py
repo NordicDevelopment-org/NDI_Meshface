@@ -34,3 +34,17 @@ def test_prepare_chat_send_input_rejects_message_above_200_bytes() -> None:
         match=r"Message is too long \(201 bytes\). Limit is 200 bytes\.",
     ):
         _prepare("x" * 201)
+
+
+def test_prepare_chat_send_input_rejects_local_double_slash_commands() -> None:
+    with pytest.raises(
+        ValueError,
+        match=r"Messages starting with // are local commands and cannot be sent",
+    ):
+        _prepare("//zork")
+
+    with pytest.raises(
+        ValueError,
+        match=r"Messages starting with // are local commands and cannot be sent",
+    ):
+        _prepare("   //search zork")

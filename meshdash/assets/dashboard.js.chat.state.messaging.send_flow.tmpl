@@ -458,6 +458,16 @@
       }};
     }}
 
+    function chatTextStartsWithLocalCommandPrefix(rawText) {{
+      return String(rawText == null ? "" : rawText).trimStart().startsWith("//");
+    }}
+
+    function chatLocalCommandName(rawText) {{
+      const clean = String(rawText == null ? "" : rawText).trimStart();
+      const match = clean.match(/^\/\/([^\s]*)/);
+      return match ? String(match[1] || "").trim() : "";
+    }}
+
     function chatMacroHelpText() {{
       const labels = CHAT_MACRO_HELP_COMMANDS.map((entry) => String(entry && entry.label || "").trim()).filter(Boolean);
       return `Macros: ${{labels.join(", ")}} · use //macros or //help`;
@@ -1683,9 +1693,26 @@
         }}
         return;
       }}
+      if (!macro && chatTextStartsWithLocalCommandPrefix(rawText)) {{
+        const commandName = chatLocalCommandName(rawText);
+        const commandLabel = commandName ? `//${{commandName}}` : "//";
+        setChatSendStatus(`Unknown local command ${{commandLabel}}. Nothing was sent.`, true);
+        renderChatTextMacroPreview(rawText);
+        if (hadFocus) {{
+          restoreChatInputFocus(input);
+        }}
+        return;
+      }}
       const text = (macro && (macro.kind === "replace" || macro.kind === "transform"))
         ? macro.text
         : rawText;
+      if (chatTextStartsWithLocalCommandPrefix(text)) {{
+        setChatSendStatus("Messages starting with // are local commands and were not sent.", true);
+        if (hadFocus) {{
+          restoreChatInputFocus(input);
+        }}
+        return;
+      }}
       const textBytes = chatComposerByteLength(text);
       if (textBytes > chatComposerMaxBytes) {{
         setChatSendStatus(`Message is too long (${{textBytes}} bytes). Limit is ${{chatComposerMaxBytes}} bytes.`, true);

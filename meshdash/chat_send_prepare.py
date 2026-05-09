@@ -38,6 +38,8 @@ def prepare_chat_send_input(
         raise ValueError("Emoji reactions must not include text")
     if not clean_text.strip() and not has_reaction:
         raise ValueError("Message cannot be empty")
+    if clean_text.lstrip().startswith("//"):
+        raise ValueError("Messages starting with // are local commands and cannot be sent")
 
     if clean_text:
         payload_bytes = clean_text.encode("utf-8")

@@ -996,7 +996,10 @@ def test_chat_macro_menu_removes_novelty_face_shortcuts_only() -> None:
     assert '"//special <text>"' not in js
     assert '"//glyph <text>"' not in js
     assert "text.match(/^\\/\\/(1337|backwards|scrambled|upsidedown|disemvowel|glyph)" in js
+    assert "function chatTextStartsWithLocalCommandPrefix(rawText)" in js
     assert 'trimmed.startsWith("//")' in js
+    assert "Unknown local command" in js
+    assert "Messages starting with // are local commands and were not sent." in js
     assert 'trimmed.startsWith("/")' not in js
     assert "Chat search mode: type text after //search" in js
     assert "Chat search mode: type text after /search" not in js
