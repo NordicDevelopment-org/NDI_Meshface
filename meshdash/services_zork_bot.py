@@ -469,9 +469,44 @@ class ZorkBotService:
             return 0
         with self._lock:
             try:
+                prune_fn = getattr(self._game, "prune_expired_sessions", None)
+                if callable(prune_fn):
+                    prune_fn(int(self._now_unix_fn()))
                 return max(0, int(count_fn()))
             except Exception:
                 return 0
+
+    def session_summaries(self) -> list[dict[str, object]]:
+        summary_fn = getattr(self._game, "session_summaries", None)
+        if not callable(summary_fn):
+            return []
+        with self._lock:
+            try:
+                sessions = summary_fn(int(self._now_unix_fn()))
+            except Exception:
+                return []
+        return sessions if isinstance(sessions, list) else []
+
+    def end_session(self, peer_id: object) -> bool:
+        end_fn = getattr(self._game, "end_session", None)
+        if not callable(end_fn):
+            return False
+        with self._lock:
+            try:
+                return bool(end_fn(str(peer_id or "")))
+            except Exception:
+                return False
+
+    def clear_sessions(self) -> bool:
+        clear_fn = getattr(self._game, "clear_sessions", None)
+        if not callable(clear_fn):
+            return False
+        with self._lock:
+            try:
+                clear_fn()
+            except Exception:
+                return False
+        return True
 
 
 def build_zork_bot_service(

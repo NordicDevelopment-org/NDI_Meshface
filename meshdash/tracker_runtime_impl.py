@@ -136,6 +136,7 @@ class DashboardTracker:
         with self._lock:
             service = self._zork_bot_service
         active_session_count = 0
+        sessions: list[dict[str, object]] = []
         if service is not None:
             active_session_count_fn = getattr(service, "active_session_count", None)
             if callable(active_session_count_fn):
@@ -143,16 +144,63 @@ class DashboardTracker:
                     active_session_count = max(0, int(active_session_count_fn()))
                 except Exception:
                     active_session_count = 0
+            session_summaries_fn = getattr(service, "session_summaries", None)
+            if callable(session_summaries_fn):
+                try:
+                    session_summaries = session_summaries_fn()
+                    if isinstance(session_summaries, list):
+                        sessions = [
+                            dict(row)
+                            for row in session_summaries
+                            if isinstance(row, dict)
+                        ]
+                except Exception:
+                    sessions = []
         enabled = service is not None
         return {
             "available": True,
             "zork": {
                 "enabled": enabled,
                 "active_session_count": active_session_count,
+                "sessions": sessions,
                 "public_start_enabled": enabled,
                 "direct_message_enabled": enabled,
             },
         }
+
+    def manage_zork_bot(self, action: object, *, peer_id: object = None) -> dict[str, object]:
+        clean_action = str(action or "").strip().lower().replace("-", "_")
+        with self._lock:
+            service = self._zork_bot_service
+        if service is None:
+            runtime = self.get_zork_bot_runtime()
+            runtime.update({"ok": False, "error": "Zork bot is disabled"})
+            return runtime
+
+        changed = False
+        if clean_action == "end_session":
+            end_session_fn = getattr(service, "end_session", None)
+            if not callable(end_session_fn):
+                runtime = self.get_zork_bot_runtime()
+                runtime.update({"ok": False, "error": "Zork session management is unavailable"})
+                return runtime
+            changed = bool(end_session_fn(peer_id))
+        elif clean_action == "clear_sessions":
+            clear_sessions_fn = getattr(service, "clear_sessions", None)
+            if not callable(clear_sessions_fn):
+                runtime = self.get_zork_bot_runtime()
+                runtime.update({"ok": False, "error": "Zork session management is unavailable"})
+                return runtime
+            changed = bool(clear_sessions_fn())
+        else:
+            raise ValueError("Unsupported Zork bot action")
+
+        if changed:
+            with self._lock:
+                self._bump_state_revision_unlocked()
+        runtime = self.get_zork_bot_runtime()
+        runtime.update({"ok": True, "changed": changed})
+        return runtime
 
     def get_delivery_state(self, message_id: object) -> Optional[dict[str, object]]:
         clean_message_id = _to_int(message_id)

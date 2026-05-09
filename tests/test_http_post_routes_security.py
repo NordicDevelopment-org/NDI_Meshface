@@ -131,3 +131,57 @@ def test_handle_dashboard_post_toggles_zork_bot_runtime() -> None:
             },
         )
     ]
+
+
+def test_handle_dashboard_post_manages_zork_bot_sessions() -> None:
+    body = json.dumps({"action": "end_session", "peer_id": "!01020304"}).encode("utf-8")
+    handler = _FakeHandler(body, headers={"Content-Length": str(len(body))})
+    calls: list[tuple[int, object]] = []
+    actions: list[tuple[object, object]] = []
+
+    def _write_json_response(handler, *, status_code, payload_obj, **kwargs):
+        calls.append((status_code, payload_obj))
+
+    def _manage_zork_bot(action: object, *, peer_id: object = None) -> dict[str, object]:
+        actions.append((action, peer_id))
+        return {
+            "ok": True,
+            "changed": True,
+            "available": True,
+            "zork": {
+                "enabled": True,
+                "active_session_count": 0,
+                "sessions": [],
+            },
+        }
+
+    deps = build_post_route_dependencies(
+        send_chat_fn=None,
+        manage_zork_bot_fn=_manage_zork_bot,
+        to_int_fn=to_int,
+    )
+    deps = type(deps)(
+        **{
+            **deps.__dict__,
+            "write_json_response_fn": _write_json_response,
+        }
+    )
+
+    handle_dashboard_post(handler, path="/api/bots/zork", deps=deps)
+
+    assert actions == [("end_session", "!01020304")]
+    assert calls == [
+        (
+            200,
+            {
+                "ok": True,
+                "changed": True,
+                "available": True,
+                "zork": {
+                    "enabled": True,
+                    "active_session_count": 0,
+                    "sessions": [],
+                },
+            },
+        )
+    ]

@@ -4,7 +4,9 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ZorkBotToggleRequest:
-    enabled: bool
+    enabled: bool | None
+    action: str = ""
+    peer_id: object = None
 
 
 def _parse_enabled(value: object) -> bool:
@@ -31,7 +33,16 @@ def parse_zork_bot_toggle_request(raw_body: bytes) -> ZorkBotToggleRequest:
     settings = payload.get("settings")
     if isinstance(settings, dict):
         payload = settings
-    return ZorkBotToggleRequest(enabled=_parse_enabled(payload.get("enabled")))
+    has_enabled = "enabled" in payload
+    enabled = _parse_enabled(payload.get("enabled")) if has_enabled else None
+    action = str(payload.get("action") or "").strip().lower().replace("-", "_")
+    if not action and has_enabled:
+        action = "enable" if enabled else "disable"
+    return ZorkBotToggleRequest(
+        enabled=enabled,
+        action=action,
+        peer_id=payload.get("peer_id", payload.get("peerId")),
+    )
 
 
 __all__ = ["ZorkBotToggleRequest", "parse_zork_bot_toggle_request"]

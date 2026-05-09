@@ -76,6 +76,32 @@ def test_dashboard_tracker_answers_direct_zork_when_enabled() -> None:
     assert replies[0].get("ack_requested") is True
 
 
+def test_dashboard_tracker_lists_and_manages_zork_sessions() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    assert tracker.enable_zork_bot(
+        reply_segment_delay_seconds=0,
+        reply_retry_limit=0,
+        reply_async=False,
+    ) is True
+
+    tracker.on_receive(_direct_text_packet("zork"), iface)
+
+    runtime = tracker.get_zork_bot_runtime()
+    sessions = runtime["zork"]["sessions"]
+    assert runtime["zork"]["active_session_count"] == 1
+    assert len(sessions) == 1
+    assert sessions[0]["peer_id"] == "!01020304"
+    assert sessions[0]["room_name"] == "West of House"
+
+    ended = tracker.manage_zork_bot("end_session", peer_id="!01020304")
+
+    assert ended["ok"] is True
+    assert ended["changed"] is True
+    assert ended["zork"]["active_session_count"] == 0
+    assert ended["zork"]["sessions"] == []
+
+
 def test_dashboard_tracker_can_toggle_zork_bot_runtime() -> None:
     tracker = DashboardTracker(packet_limit=25)
     iface = _FakeInterface()

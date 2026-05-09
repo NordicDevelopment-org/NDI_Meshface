@@ -99,6 +99,11 @@ class SetZorkBotEnabledFn(Protocol):
         ...
 
 
+class ManageZorkBotFn(Protocol):
+    def __call__(self, action: object, *, peer_id: object = None) -> dict[str, object]:
+        ...
+
+
 class StartBbsHostFn(Protocol):
     def __call__(self, request: BbsHostRequest) -> dict[str, object]:
         ...
@@ -351,6 +356,7 @@ class DashboardPostRouteDependencies:
     set_bbs_settings_fn: Optional[SetBbsSettingsFn] = None
     parse_bbs_settings_request_fn: Optional[ParseBbsSettingsRequestFn] = None
     set_zork_bot_enabled_fn: Optional[SetZorkBotEnabledFn] = None
+    manage_zork_bot_fn: Optional[ManageZorkBotFn] = None
     parse_zork_bot_toggle_request_fn: Optional[ParseZorkBotToggleRequestFn] = None
     start_bbs_host_fn: Optional[StartBbsHostFn] = None
     stop_bbs_host_fn: Optional[StopBbsHostFn] = None

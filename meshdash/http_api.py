@@ -37,6 +37,7 @@ def make_http_handler(
     get_bbs_host_runtime_fn = getattr(state_fn, "get_bbs_host_runtime_fn", None)
     set_bbs_settings_fn = getattr(state_fn, "set_bbs_settings_fn", None)
     set_zork_bot_enabled_fn = getattr(state_fn, "set_zork_bot_enabled_fn", None)
+    manage_zork_bot_fn = getattr(state_fn, "manage_zork_bot_fn", None)
     start_bbs_host_fn = getattr(state_fn, "start_bbs_host_fn", None)
     stop_bbs_host_fn = getattr(state_fn, "stop_bbs_host_fn", None)
     append_bbs_host_post_fn = getattr(state_fn, "append_bbs_host_post_fn", None)
@@ -65,6 +66,7 @@ def make_http_handler(
         set_theme_preset_fn=set_theme_preset_fn,
         set_bbs_settings_fn=set_bbs_settings_fn,
         set_zork_bot_enabled_fn=set_zork_bot_enabled_fn,
+        manage_zork_bot_fn=manage_zork_bot_fn,
         start_bbs_host_fn=start_bbs_host_fn,
         stop_bbs_host_fn=stop_bbs_host_fn,
         append_bbs_host_post_fn=append_bbs_host_post_fn,

@@ -222,6 +222,7 @@ def handle_dashboard_post(
         _handle_zork_bot_toggle_post_helper(
             handler,
             set_zork_bot_enabled_fn=deps.set_zork_bot_enabled_fn,
+            manage_zork_bot_fn=deps.manage_zork_bot_fn,
             to_int_fn=deps.to_int_fn,
             validate_content_length_fn=deps.validate_content_length_fn,
             parse_zork_bot_toggle_request_fn=parse_zork_bot_toggle_request_fn,

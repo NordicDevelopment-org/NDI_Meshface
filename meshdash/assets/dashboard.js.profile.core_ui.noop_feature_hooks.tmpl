@@ -208,6 +208,7 @@
       const hasRuntimePayload = Object.prototype.hasOwnProperty.call(bots, "zork");
       const hasEnabled = Object.prototype.hasOwnProperty.call(zork, "enabled");
       const enabled = hasEnabled ? !!zork.enabled : !!zorkFeatureEnabled;
+      const sessions = Array.isArray(zork.sessions) ? zork.sessions : [];
       const rawSessions = Number(zork.active_session_count ?? zork.activeSessionCount ?? 0);
       const available = Object.prototype.hasOwnProperty.call(bots, "available")
         ? !!bots.available
@@ -215,7 +216,8 @@
       return {{
         available,
         enabled,
-        activeSessionCount: Number.isFinite(rawSessions) ? Math.max(0, Math.floor(rawSessions)) : 0,
+        activeSessionCount: Number.isFinite(rawSessions) ? Math.max(0, Math.floor(rawSessions)) : sessions.length,
+        sessions,
         publicStartEnabled: !!(zork.public_start_enabled ?? zork.publicStartEnabled ?? enabled),
         directMessageEnabled: !!(zork.direct_message_enabled ?? zork.directMessageEnabled ?? enabled),
       }};
@@ -444,6 +446,57 @@
       }}).join("");
     }}
 
+    function zorkBotSessionUnix(session, key) {{
+      if (!session || typeof session !== "object") return 0;
+      const camelKey = key.replace(/_([a-z])/g, (_match, ch) => String(ch || "").toUpperCase());
+      const value = Number(session[key] ?? session[camelKey] ?? 0);
+      return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+    }}
+
+    function renderZorkBotSessions(state, runtime) {{
+      const list = document.getElementById("bots-zork-session-list");
+      const clearBtn = document.getElementById("bots-zork-clear-sessions-btn");
+      if (!(list instanceof HTMLElement)) return;
+      const sessions = Array.isArray(runtime.sessions) ? runtime.sessions : [];
+      if (clearBtn instanceof HTMLButtonElement) {{
+        clearBtn.disabled = zorkBotToggleInFlight || !runtime.enabled || sessions.length <= 0;
+      }}
+      if (sessions.length <= 0) {{
+        list.innerHTML = '<div class="bots-history-empty">No active Zork sessions.</div>';
+        return;
+      }}
+      const nowUnix = Math.floor(Date.now() / 1000);
+      list.innerHTML = sessions.map((session) => {{
+        const peerId = normalizeNodeId(session && (session.peer_id || session.peerId || "")) || "";
+        const roomName = String((session && (session.room_name || session.roomName || session.room)) || "Unknown room");
+        const moves = Number(session && session.moves);
+        const moveText = Number.isFinite(moves) ? Math.max(0, Math.floor(moves)) : 0;
+        const inventoryCount = Number(session && (session.inventory_count ?? session.inventoryCount));
+        const inventoryText = Number.isFinite(inventoryCount) ? Math.max(0, Math.floor(inventoryCount)) : 0;
+        const updatedUnix = zorkBotSessionUnix(session, "updated_unix");
+        const expiresUnix = zorkBotSessionUnix(session, "expires_unix");
+        const updatedText = formatLocalChatTime(updatedUnix, "n/a", nowUnix);
+        const expiresText = expiresUnix > 0
+          ? formatLocalChatTime(expiresUnix, "n/a", nowUnix)
+          : "n/a";
+        return `
+          <div class="bots-session-item">
+            <div class="bots-session-main">
+              <div class="bots-session-peer">${{escAttr(zorkBotNodeLabel(peerId, state))}}</div>
+              <div class="bots-session-meta">
+                <span>${{escAttr(roomName)}}</span>
+                <span>${{moveText}} moves</span>
+                <span>${{inventoryText}} carried</span>
+                <span>last ${{escAttr(updatedText)}}</span>
+                <span>expires ${{escAttr(expiresText)}}</span>
+              </div>
+            </div>
+            <button class="btn btn-secondary bots-sniffer-btn" type="button" data-zork-session-action="end_session" data-peer-id="${{escAttr(peerId)}}">End</button>
+          </div>
+        `;
+      }}).join("");
+    }}
+
     function syncZorkBotControls(runtime) {{
       const enableBtn = document.getElementById("bots-zork-enable-btn");
       const disableBtn = document.getElementById("bots-zork-disable-btn");
@@ -494,6 +547,36 @@
       }}
     }}
 
+    async function manageZorkBotFromUi(action, peerId = "") {{
+      if (zorkBotToggleInFlight) return;
+      zorkBotToggleInFlight = true;
+      setZorkBotToggleStatus(action === "clear_sessions" ? "Clearing sessions..." : "Ending session...");
+      renderBotsView(latestState);
+      try {{
+        const body = {{ action }};
+        if (peerId) {{
+          body.peer_id = peerId;
+        }}
+        const resp = await fetch(zorkBotEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify(body),
+        }});
+        const payload = await resp.json().catch(() => ({{}}));
+        if (!resp.ok || !payload.ok) {{
+          throw new Error(payload && payload.error ? payload.error : `update failed (${{resp.status}})`);
+        }}
+        setZorkBotToggleStatus(action === "clear_sessions" ? "Sessions cleared" : "Session ended");
+        forceStateReloadOnce = true;
+        await poll();
+      }} catch (err) {{
+        setZorkBotToggleStatus(`Update failed: ${{err.message || err}}`, true);
+      }} finally {{
+        zorkBotToggleInFlight = false;
+        renderBotsView(latestState);
+      }}
+    }}
+
     function bindZorkBotControls() {{
       const enableBtn = document.getElementById("bots-zork-enable-btn");
       if (enableBtn instanceof HTMLButtonElement && enableBtn.dataset.bound !== "1") {{
@@ -509,6 +592,28 @@
           void setZorkBotEnabledFromUi(false);
         }});
       }}
+      const clearBtn = document.getElementById("bots-zork-clear-sessions-btn");
+      if (clearBtn instanceof HTMLButtonElement && clearBtn.dataset.bound !== "1") {{
+        clearBtn.dataset.bound = "1";
+        clearBtn.addEventListener("click", () => {{
+          void manageZorkBotFromUi("clear_sessions");
+        }});
+      }}
+      const sessionList = document.getElementById("bots-zork-session-list");
+      if (sessionList instanceof HTMLElement && sessionList.dataset.bound !== "1") {{
+        sessionList.dataset.bound = "1";
+        sessionList.addEventListener("click", (event) => {{
+          const target = event.target instanceof Element
+            ? event.target.closest("[data-zork-session-action]")
+            : null;
+          if (!(target instanceof HTMLElement)) return;
+          const action = String(target.dataset.zorkSessionAction || "").trim();
+          const peerId = String(target.dataset.peerId || "").trim();
+          if (action === "end_session" && peerId) {{
+            void manageZorkBotFromUi(action, peerId);
+          }}
+        }});
+      }}
     }}
 
     function renderBotsView(state = latestState) {{
@@ -522,6 +627,7 @@
       setZorkBotStatusClass(document.getElementById("bots-zork-detail-state"), runtime.enabled);
       bindZorkBotControls();
       syncZorkBotControls(runtime);
+      renderZorkBotSessions(state, runtime);
       renderZorkBotActivity(state, runtime);
     }}
 

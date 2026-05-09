@@ -401,6 +401,50 @@ class ZorkGame:
     def clear_sessions(self) -> None:
         self._sessions.clear()
 
+    def end_session(self, from_id: str) -> bool:
+        peer_id = str(from_id or "").strip().lower()
+        if not peer_id:
+            return False
+        return self._sessions.pop(peer_id, None) is not None
+
+    def session_summaries(self, now_unix: int | None = None) -> list[dict[str, object]]:
+        if now_unix is not None:
+            self._prune_sessions(int(now_unix))
+        sessions: list[dict[str, object]] = []
+        for peer_id, session in sorted(
+            self._sessions.items(),
+            key=lambda item: int(item[1].get("updated_unix") or 0),
+            reverse=True,
+        ):
+            room_id = str(session.get("room") or START_ROOM).strip().upper() or START_ROOM
+            inventory = self._session_inventory(session)
+            seen_rooms = {
+                str(value).strip().upper()
+                for value in (session.get("seen_rooms") or [])
+                if str(value).strip()
+            }
+            total_treasures, recovered, carried, secured = self._treasure_progress(session)
+            updated_unix = int(session.get("updated_unix") or 0)
+            summary = {
+                "peer_id": peer_id,
+                "room": room_id,
+                "room_name": room_name(room_id),
+                "moves": int(session.get("moves") or 0),
+                "started_unix": int(session.get("started_unix") or 0),
+                "updated_unix": updated_unix,
+                "expires_unix": updated_unix + GAME_SESSION_TTL_SECONDS if updated_unix else 0,
+                "inventory_count": len(inventory),
+                "seen_room_count": len(seen_rooms),
+                "treasures": {
+                    "total": total_treasures,
+                    "recovered": recovered,
+                    "carried": carried,
+                    "secured": secured,
+                },
+            }
+            sessions.append(summary)
+        return sessions
+
     def prune_expired_sessions(self, now_unix: int) -> None:
         self._prune_sessions(int(now_unix))
 

@@ -228,6 +228,7 @@ def build_dashboard_runtime_context(
             pass
 
     set_zork_bot_enabled = getattr(tracker, "set_zork_bot_enabled", None)
+    manage_zork_bot = getattr(tracker, "manage_zork_bot", None)
     if callable(set_zork_bot_enabled):
         def _set_zork_bot_enabled_fn(enabled):  # type: ignore[no-redef]
             return set_zork_bot_enabled(bool(enabled), send_lock=send_lock)
@@ -240,6 +241,21 @@ def build_dashboard_runtime_context(
         if callable(state_lite_fn):
             try:
                 setattr(state_lite_fn, "set_zork_bot_enabled_fn", _set_zork_bot_enabled_fn)
+            except Exception:
+                pass
+
+    if callable(manage_zork_bot):
+        def _manage_zork_bot_fn(action, *, peer_id=None):  # type: ignore[no-redef]
+            return manage_zork_bot(action, peer_id=peer_id)
+
+        try:
+            setattr(loaders.state_fn, "manage_zork_bot_fn", _manage_zork_bot_fn)
+        except Exception:
+            pass
+        state_lite_fn = getattr(loaders.state_fn, "lite", None)
+        if callable(state_lite_fn):
+            try:
+                setattr(state_lite_fn, "manage_zork_bot_fn", _manage_zork_bot_fn)
             except Exception:
                 pass
 
