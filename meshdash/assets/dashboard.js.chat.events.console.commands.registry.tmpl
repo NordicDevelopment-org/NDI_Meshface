@@ -514,6 +514,41 @@
         run: runNodeLookupCommand,
       }});
       registerConsoleCommand({{
+        name: "ping",
+        usage: "ping <id|name|num> [--dest=<id>] [--ch-index=<n>] [--hop-limit=<n>] [timeout=<ms>]",
+        description: "Request a NodeInfo response from one node.",
+        supportsVerbosity: false,
+        run: runConsolePingCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--ping",
+        usage: "--ping <id|name|num> [--dest=<id>] [--ch-index=<n>] [--hop-limit=<n>] [timeout=<ms>]",
+        description: "Meshtastic-style alias for ping.",
+        supportsVerbosity: false,
+        run: runConsolePingCommand,
+      }});
+      registerConsoleCommand({{
+        name: "request-position",
+        usage: "request-position <id|name|num> [--dest=<id>] [--ch-index=<n>] [timeout=<ms>]",
+        description: "Ask one node to reply with its position.",
+        supportsVerbosity: false,
+        run: runConsoleRequestPositionCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--request-position",
+        usage: "--request-position <id|name|num> [--dest=<id>] [--ch-index=<n>] [timeout=<ms>]",
+        description: "Meshtastic-style alias for request-position.",
+        supportsVerbosity: false,
+        run: runConsoleRequestPositionCommand,
+      }});
+      registerConsoleCommand({{
+        name: "where",
+        usage: "where <id|name|num> [--dest=<id>] [--ch-index=<n>] [timeout=<ms>]",
+        description: "Alias for request-position.",
+        supportsVerbosity: false,
+        run: runConsoleRequestPositionCommand,
+      }});
+      registerConsoleCommand({{
         name: "traceroute",
         usage: "traceroute <id|name|num> [--dest=<id>] [--ch-index=<n>] [--hop-limit=<n>] [timeout=<ms>]",
         description: "Trace a route to one node over the mesh.",

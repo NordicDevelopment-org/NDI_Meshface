@@ -20,6 +20,7 @@ class _FakeChannelPb2:
 
 
 class _FakePortNum:
+    NODEINFO_APP = 4
     POSITION_APP = 3
     TRACEROUTE_APP = 70
 
@@ -53,6 +54,31 @@ class _FakePosition:
 
 class _FakeMeshPb2:
     Position = _FakePosition
+
+
+class _FakeUser:
+    def __init__(self) -> None:
+        self.id = ""
+        self.long_name = ""
+        self.short_name = ""
+        self.hw_model = 0
+        self.role = 0
+
+    def SerializeToString(self) -> bytes:
+        return b"nodeinfo-request"
+
+    def ParseFromString(self, payload: bytes) -> None:
+        if payload == b"good-nodeinfo":
+            self.id = "!abcd1234"
+            self.long_name = "Alpha Ridge"
+            self.short_name = "ALP"
+            self.hw_model = 12
+            self.role = 1
+        elif payload == b"minimal-nodeinfo":
+            self.id = "!abcd1234"
+
+
+_FakeMeshPb2.User = _FakeUser
 
 
 class _FakeRouteDiscovery:
@@ -170,6 +196,87 @@ def test_run_network_tool_request_position_success(monkeypatch: pytest.MonkeyPat
     assert response["result"]["altitude"] == 251
     assert response["result"]["precision_bits"] == 32
     assert "lat=44.980000 lon=-93.260000" in response["console_lines"][0]
+
+
+def test_run_network_tool_ping_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+    )
+    iface = _FakeIface(
+        {
+            "decoded": {
+                "portnum": "NODEINFO_APP",
+                "payload": b"good-nodeinfo",
+            }
+        }
+    )
+
+    response = run_network_tool(
+        NetworkToolRequest(command="ping", destination="!abcd1234", hop_limit=3),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "ping"
+    assert response["destination"] == "!abcd1234"
+    assert response["hop_limit"] == 3
+    assert response["sent_packet_id"] == 1234
+    assert response["result"]["id"] == "!abcd1234"
+    assert response["result"]["long_name"] == "Alpha Ridge"
+    assert response["result"]["short_name"] == "ALP"
+    assert response["result"]["hw_model"] == 12
+    assert response["result"]["role"] == 1
+    assert response["console_lines"] == [
+        "[ping] !abcd1234 | nodeinfo response | id=!abcd1234 | long=Alpha Ridge | short=ALP | hw=12 | role=1"
+    ]
+    assert iface.send_calls[0]["portNum"] == _FakePortNum.NODEINFO_APP
+    assert iface.send_calls[0]["hopLimit"] == 3
+
+
+def test_run_network_tool_ping_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="ping", destination="!abcd1234", timeout_ms=50),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is False
+    assert response["error"] == "Timed out waiting for ping response"
+    assert response["console_lines"] == ["[ping] !abcd1234 | timed out waiting for response"]
+
+
+def test_run_network_tool_ping_handles_no_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+    )
+    iface = _FakeIface(
+        {
+            "decoded": {
+                "routing": {
+                    "errorReason": "NO_RESPONSE",
+                }
+            }
+        }
+    )
+
+    response = run_network_tool(
+        NetworkToolRequest(command="ping", destination="!abcd1234"),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is False
+    assert response["error"] == "Destination did not respond"
+    assert response["console_lines"] == ["[ping] !abcd1234 | destination did not respond"]
 
 
 def test_run_network_tool_request_position_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:

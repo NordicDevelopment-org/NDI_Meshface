@@ -815,77 +815,113 @@
       return lines;
     }}
 
-    async function runConsoleTracerouteCommand(ctx) {{
+    function parseConsoleNetworkIntOption(options, names, label, minValue, commandLabel) {{
+      const optionNames = Array.isArray(names) ? names : [names];
+      let rawValue = null;
+      for (const name of optionNames) {{
+        if (Object.prototype.hasOwnProperty.call(options || {{}}, name)) {{
+          rawValue = options[name];
+          break;
+        }}
+      }}
+      if (rawValue == null) return {{ ok: true, value: null }};
+      const clean = String(rawValue).trim();
+      if (!clean) return {{ ok: true, value: null }};
+      const numeric = Number(clean);
+      if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {{
+        return {{ ok: false, error: `[${{commandLabel}}] invalid ${{label}}: ${{clean}}` }};
+      }}
+      if (numeric < minValue) {{
+        return {{ ok: false, error: `[${{commandLabel}}] ${{label}} must be >= ${{minValue}}` }};
+      }}
+      return {{ ok: true, value: Math.trunc(numeric) }};
+    }}
+
+    function resolveConsoleNetworkCommandDestination(rawTarget, state, commandLabel) {{
+      const normalizedDirectId = normalizeNodeId(rawTarget);
+      if (isCanonicalNodeId(normalizedDirectId)) {{
+        return {{ ok: true, destination: normalizedDirectId }};
+      }}
+
+      const lookup = resolveConsoleNodeTarget(rawTarget, state);
+      const matches = Array.isArray(lookup && lookup.matches) ? lookup.matches : [];
+      if (matches.length < 1) {{
+        const quotedTarget = /[\s"]/.test(rawTarget) ? JSON.stringify(rawTarget) : rawTarget;
+        return {{
+          ok: false,
+          lines: [
+            `[${{commandLabel}}] unknown target: ${{rawTarget}}`,
+            `[${{commandLabel}}] try: nodes ${{quotedTarget}}`,
+          ],
+        }};
+      }}
+      if (matches.length > 1) {{
+        const show = matches.slice(0, 10);
+        const lines = [`[${{commandLabel}}] ambiguous target "${{rawTarget}}". Matches:`];
+        for (const row of show) {{
+          lines.push(`  ${{formatConsoleNodeLookupListLine(row)}}`);
+        }}
+        if (matches.length > show.length) {{
+          lines.push(`  ... ${{matches.length - show.length}} more match(es).`);
+        }}
+        lines.push(`[${{commandLabel}}] retry with a more specific id, name, or node number.`);
+        return {{ ok: false, lines }};
+      }}
+      return {{
+        ok: true,
+        destination: String(matches[0] && matches[0].id ? matches[0].id : "").trim(),
+      }};
+    }}
+
+    async function runConsoleNetworkNodeCommand(ctx, config) {{
       const options = (ctx && ctx.options && typeof ctx.options === "object")
         ? ctx.options
         : {{}};
       const args = Array.isArray(ctx && ctx.args) ? ctx.args : [];
-      const parseIntOption = (rawValue, label, minValue) => {{
-        if (rawValue == null) return {{ ok: true, value: null }};
-        const clean = String(rawValue).trim();
-        if (!clean) return {{ ok: true, value: null }};
-        const numeric = Number(clean);
-        if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {{
-          return {{ ok: false, error: `[traceroute] invalid ${{label}}: ${{clean}}` }};
-        }}
-        if (numeric < minValue) {{
-          return {{ ok: false, error: `[traceroute] ${{label}} must be >= ${{minValue}}` }};
-        }}
-        return {{ ok: true, value: Math.trunc(numeric) }};
-      }};
+      const commandLabel = String(config && config.label ? config.label : "network").trim() || "network";
+      const networkCommand = String(config && config.command ? config.command : commandLabel).trim();
+      const missingExample = String(config && config.example ? config.example : `${{commandLabel}} !abcd1234`);
+      const allowHopLimit = !!(config && config.allowHopLimit);
 
-      const channelIndexParsed = parseIntOption(
-        options["ch-index"] ?? options.ch_index ?? options["channel-index"] ?? options.channel_index,
+      const channelIndexParsed = parseConsoleNetworkIntOption(
+        options,
+        ["ch-index", "ch_index", "channel-index", "channel_index"],
         "ch-index",
         0,
+        commandLabel,
       );
       if (!channelIndexParsed.ok) return channelIndexParsed.error;
-      const hopLimitParsed = parseIntOption(options["hop-limit"] ?? options.hop_limit, "hop-limit", 1);
+      const hopLimitParsed = allowHopLimit
+        ? parseConsoleNetworkIntOption(options, ["hop-limit", "hop_limit"], "hop-limit", 1, commandLabel)
+        : {{ ok: true, value: null }};
       if (!hopLimitParsed.ok) return hopLimitParsed.error;
-      const timeoutParsed = parseIntOption(options.timeout ?? options.timeout_ms, "timeout", 1);
+      const timeoutParsed = parseConsoleNetworkIntOption(
+        options,
+        ["timeout", "timeout_ms"],
+        "timeout",
+        1,
+        commandLabel,
+      );
       if (!timeoutParsed.ok) return timeoutParsed.error;
 
       const explicitDest = String(options.dest ?? options.destination ?? "").trim();
       const rawTarget = String(explicitDest || args.join(" ")).trim();
       if (!rawTarget) {{
-        return "[traceroute] missing target. Example: traceroute !abcd1234";
+        return `[${{commandLabel}}] missing target. Example: ${{missingExample}}`;
       }}
 
-      let destination = "";
-      const normalizedDirectId = normalizeNodeId(rawTarget);
-      if (isCanonicalNodeId(normalizedDirectId)) {{
-        destination = normalizedDirectId;
-      }} else {{
-        const lookup = resolveConsoleNodeTarget(rawTarget, ctx && ctx.state);
-        const matches = Array.isArray(lookup && lookup.matches) ? lookup.matches : [];
-        if (matches.length < 1) {{
-          const quotedTarget = /[\s"]/.test(rawTarget) ? JSON.stringify(rawTarget) : rawTarget;
-          return [
-            `[traceroute] unknown target: ${{rawTarget}}`,
-            `[traceroute] try: nodes ${{quotedTarget}}`,
-          ];
-        }}
-        if (matches.length > 1) {{
-          const show = matches.slice(0, 10);
-          const lines = [`[traceroute] ambiguous target "${{rawTarget}}". Matches:`];
-          for (const row of show) {{
-            lines.push(`  ${{formatConsoleNodeLookupListLine(row)}}`);
-          }}
-          if (matches.length > show.length) {{
-            lines.push(`  ... ${{matches.length - show.length}} more match(es).`);
-          }}
-          lines.push("[traceroute] retry with a more specific id, name, or node number.");
-          return lines;
-        }}
-        destination = String(matches[0] && matches[0].id ? matches[0].id : "").trim();
+      const resolved = resolveConsoleNetworkCommandDestination(rawTarget, ctx && ctx.state, commandLabel);
+      if (!resolved.ok) {{
+        return Array.isArray(resolved.lines) ? resolved.lines : `[${{commandLabel}}] invalid target: ${{rawTarget}}`;
       }}
+      const destination = String(resolved.destination || "").trim();
 
       if (!isCanonicalNodeId(destination)) {{
-        return `[traceroute] invalid destination: ${{destination || rawTarget}}`;
+        return `[${{commandLabel}}] invalid destination: ${{destination || rawTarget}}`;
       }}
 
       const body = {{
-        command: "traceroute",
+        command: networkCommand,
         destination,
       }};
       if (channelIndexParsed.value != null) {{
@@ -905,7 +941,7 @@
               .map((line) => String(line == null ? "" : line).trimEnd())
               .filter((line) => !!line)
           : [];
-        return lines.length ? lines : [`[traceroute] ${{destination}} | request completed`];
+        return lines.length ? lines : [`[${{commandLabel}}] ${{destination}} | request completed`];
       }} catch (err) {{
         const payload = (err && typeof err === "object") ? err.payload : null;
         const lines = Array.isArray(payload && payload.console_lines)
@@ -918,6 +954,33 @@
         }}
         throw err;
       }}
+    }}
+
+    async function runConsolePingCommand(ctx) {{
+      return runConsoleNetworkNodeCommand(ctx, {{
+        command: "ping",
+        label: "ping",
+        example: "ping !abcd1234",
+        allowHopLimit: true,
+      }});
+    }}
+
+    async function runConsoleRequestPositionCommand(ctx) {{
+      return runConsoleNetworkNodeCommand(ctx, {{
+        command: "request-position",
+        label: "position",
+        example: "request-position !abcd1234",
+        allowHopLimit: false,
+      }});
+    }}
+
+    async function runConsoleTracerouteCommand(ctx) {{
+      return runConsoleNetworkNodeCommand(ctx, {{
+        command: "traceroute",
+        label: "traceroute",
+        example: "traceroute !abcd1234",
+        allowHopLimit: true,
+      }});
     }}
 
     function parseConsoleLiveLayerCsv(rawValue) {{

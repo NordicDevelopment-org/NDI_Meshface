@@ -50,6 +50,25 @@ def test_dashboard_js_registers_console_traceroute_commands() -> None:
     assert "postNetworkToolCommand" in js
 
 
+def test_dashboard_js_registers_console_ping_and_position_commands() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'name: "ping"' in js
+    assert 'usage: "ping <id|name|num>' in js
+    assert 'name: "--ping"' in js
+    assert 'name: "request-position"' in js
+    assert 'usage: "request-position <id|name|num>' in js
+    assert 'name: "--request-position"' in js
+    assert 'name: "where"' in js
+    assert "runConsolePingCommand" in js
+    assert "runConsoleRequestPositionCommand" in js
+    assert "runConsoleNetworkNodeCommand" in js
+
+
 def test_dashboard_js_includes_console_tab_autocomplete() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,

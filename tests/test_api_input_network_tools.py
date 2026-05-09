@@ -39,6 +39,21 @@ def test_parse_network_tool_request_normalizes_traceroute_command() -> None:
     assert request.timeout_ms == 12000
 
 
+def test_parse_network_tool_request_normalizes_ping_command() -> None:
+    raw = (
+        b'{"command":"--ping","destination":"!abcd1234",'
+        b'"channel_index":"1","hop_limit":"4","timeout":"8000"}'
+    )
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "ping"
+    assert request.destination == "!abcd1234"
+    assert request.channel_index == 1
+    assert request.hop_limit == 4
+    assert request.timeout_ms == 8000
+
+
 def test_parse_network_tool_request_normalizes_telemetry_type_alias() -> None:
     raw = b'{"command":"request-telemetry","destination":"!abcd1234","type":"power"}'
 

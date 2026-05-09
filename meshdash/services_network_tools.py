@@ -126,6 +126,180 @@ def _not_implemented_response(
     return payload
 
 
+def _nodeinfo_field(user: object, field_name: str) -> object:
+    if isinstance(user, dict):
+        value = user.get(field_name)
+        if value is not None:
+            return value
+        pieces = field_name.split("_")
+        camel_name = pieces[0] + "".join(piece[:1].upper() + piece[1:] for piece in pieces[1:])
+        return user.get(camel_name)
+    return getattr(user, field_name, None)
+
+
+def _run_ping(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    channel_pb2, mesh_pb2, portnums_pb2 = _load_meshtastic_modules()
+    channel_index = request.channel_index if request.channel_index is not None else 0
+    timeout_ms = request.timeout_ms if request.timeout_ms is not None else 8000
+    if not _channel_is_enabled(iface, channel_index, channel_pb2):
+        return _error_response(
+            request,
+            summary_label="ping",
+            detail=f"Channel {channel_index} is not enabled on the local node",
+        )
+
+    nodeinfo_request = mesh_pb2.User()
+    try:
+        sent_packet_id, response_packet = _send_mesh_request(
+            iface=iface,
+            send_lock=send_lock,
+            message=nodeinfo_request,
+            destination=destination,
+            port_num=portnums_pb2.PortNum.NODEINFO_APP,
+            channel_index=channel_index,
+            timeout_ms=timeout_ms,
+            hop_limit=request.hop_limit,
+            to_int_fn=to_int_fn,
+        )
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="ping",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="ping",
+            detail=f"Ping failed: {exc}",
+        )
+
+    if response_packet is None:
+        return {
+            "ok": False,
+            "command": "ping",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "error": "Timed out waiting for ping response",
+            "console_lines": [f"[ping] {destination} | timed out waiting for response"],
+        }
+
+    routing_error = _routing_error_reason(response_packet)
+    if routing_error == "NO_RESPONSE":
+        return {
+            "ok": False,
+            "command": "ping",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "error": "Destination did not respond",
+            "console_lines": [f"[ping] {destination} | destination did not respond"],
+        }
+    if routing_error:
+        return {
+            "ok": False,
+            "command": "ping",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "error": f"Ping failed: {routing_error}",
+            "console_lines": [f"[ping] {destination} | error={routing_error}"],
+        }
+
+    decoded = response_packet.get("decoded") if isinstance(response_packet, dict) else None
+    if not isinstance(decoded, dict) or not _portnum_matches(decoded.get("portnum"), "NODEINFO_APP"):
+        return {
+            "ok": False,
+            "command": "ping",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "error": "Invalid ping response payload",
+            "console_lines": [f"[ping] {destination} | invalid response payload"],
+        }
+
+    nodeinfo: object = decoded.get("user")
+    if not isinstance(nodeinfo, dict):
+        payload = decoded.get("payload")
+        if not isinstance(payload, (bytes, bytearray)):
+            return {
+                "ok": False,
+                "command": "ping",
+                "destination": destination,
+                "channel_index": channel_index,
+                "hop_limit": request.hop_limit,
+                "sent_packet_id": sent_packet_id,
+                "error": "Ping response payload missing",
+                "console_lines": [f"[ping] {destination} | response payload missing"],
+            }
+        nodeinfo = mesh_pb2.User()
+        try:
+            nodeinfo.ParseFromString(bytes(payload))
+        except Exception as exc:
+            return {
+                "ok": False,
+                "command": "ping",
+                "destination": destination,
+                "channel_index": channel_index,
+                "hop_limit": request.hop_limit,
+                "sent_packet_id": sent_packet_id,
+                "error": f"Malformed ping response: {exc}",
+                "console_lines": [f"[ping] {destination} | malformed response payload"],
+            }
+
+    node_id = str(_nodeinfo_field(nodeinfo, "id") or "").strip()
+    long_name = str(_nodeinfo_field(nodeinfo, "long_name") or "").strip()
+    short_name = str(_nodeinfo_field(nodeinfo, "short_name") or "").strip()
+    hw_model_raw = _nodeinfo_field(nodeinfo, "hw_model")
+    role_raw = _nodeinfo_field(nodeinfo, "role")
+    hw_model = to_int_fn(hw_model_raw)
+    role = to_int_fn(role_raw)
+
+    console_parts = [f"[ping] {destination}", "nodeinfo response"]
+    if node_id:
+        console_parts.append(f"id={node_id}")
+    if long_name:
+        console_parts.append(f"long={long_name}")
+    if short_name:
+        console_parts.append(f"short={short_name}")
+    if hw_model not in (None, 0):
+        console_parts.append(f"hw={hw_model}")
+    if role not in (None, 0):
+        console_parts.append(f"role={role}")
+
+    return {
+        "ok": True,
+        "command": "ping",
+        "destination": destination,
+        "channel_index": channel_index,
+        "hop_limit": request.hop_limit,
+        "sent_packet_id": sent_packet_id,
+        "result": {
+            "id": node_id or None,
+            "long_name": long_name or None,
+            "short_name": short_name or None,
+            "hw_model": hw_model,
+            "role": role,
+        },
+        "console_lines": [" | ".join(console_parts)],
+    }
+
+
 def _run_request_position(
     request: NetworkToolRequest,
     *,
@@ -564,6 +738,13 @@ def run_network_tool(
                 "[nodes] handled frontend-only in v1. Use the console nodes aliases instead.",
             ],
         }
+    if request.command == "ping":
+        return _run_ping(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
     if request.command == "request_position":
         return _run_request_position(
             request,

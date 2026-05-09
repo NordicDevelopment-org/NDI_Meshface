@@ -7,6 +7,13 @@ from .helpers import to_int
 _COMMAND_ALIASES = {
     "nodes": "nodes",
     "--nodes": "nodes",
+    "ping": "ping",
+    "--ping": "ping",
+    "nodeinfo": "ping",
+    "--nodeinfo": "ping",
+    "request-nodeinfo": "ping",
+    "--request-nodeinfo": "ping",
+    "request_nodeinfo": "ping",
     "traceroute": "traceroute",
     "--traceroute": "traceroute",
     "request-position": "request_position",
