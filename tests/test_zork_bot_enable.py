@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from meshdash.services_zork_bot import ZorkBotService
 from meshdash.tracker_runtime_impl import DashboardTracker
 
 
@@ -16,6 +17,14 @@ class _FakeInterface:
         packet = SimpleNamespace(id=700 + len(self.sent))
         self.sent.append({"text": text, "kwargs": dict(kwargs), "packet": packet})
         return packet
+
+
+class _FakeGame:
+    def __init__(self, reply_text: str) -> None:
+        self.reply_text = reply_text
+
+    def try_handle_message(self, **_kwargs: object) -> object:
+        return SimpleNamespace(handled=True, reply_text=self.reply_text)
 
 
 def _direct_text_packet(text: str, *, to: int = 0x12345678, packet_id: int = 111) -> dict[str, object]:
@@ -130,14 +139,48 @@ def test_dashboard_tracker_retries_unacked_zork_reply_segments() -> None:
 
     tracker.on_receive(_direct_text_packet("zork"), iface)
 
-    assert len(iface.sent) == 4
-    original_ids = {
-        row["packet"].id
-        for row in iface.sent[:2]
-    }
+    assert len(iface.sent) == 2
+    assert iface.sent[0]["text"] == iface.sent[1]["text"]
+    assert str(iface.sent[0]["text"]).startswith("[1/2]")
+    original_id = iface.sent[0]["packet"].id
     retry_entries = [
         row
         for row in tracker.recent_chat
-        if isinstance(row, dict) and row.get("retry_of") in original_ids
+        if isinstance(row, dict) and row.get("retry_of") == original_id
     ]
-    assert len(retry_entries) == 2
+    assert len(retry_entries) == 1
+
+
+def test_zork_bot_waits_for_each_segment_ack_before_advancing() -> None:
+    iface = _FakeInterface()
+    delivery_states: dict[int, str] = {}
+    records: list[dict[str, object]] = []
+    service = ZorkBotService(
+        game=_FakeGame("alpha " * 45),
+        reply_segment_delay_seconds=0,
+        reply_ack_wait_seconds=0,
+        reply_retry_limit=1,
+        reply_async=False,
+        get_delivery_state_fn=lambda message_id: delivery_states.get(int(message_id)),
+    )
+
+    def record_local_chat_fn(**kwargs: object) -> None:
+        records.append(dict(kwargs))
+        message_id = kwargs.get("message_id")
+        if not isinstance(message_id, int):
+            return
+        text = str(kwargs.get("text") or "")
+        delivery_states[message_id] = "acked" if text.startswith("[1/") else "sent"
+
+    handled = service.handle_packet(
+        _direct_text_packet("zork"),
+        iface,
+        record_local_chat_fn=record_local_chat_fn,
+    )
+
+    assert handled is True
+    assert len(iface.sent) == 3
+    assert str(iface.sent[0]["text"]).startswith("[1/2]")
+    assert str(iface.sent[1]["text"]).startswith("[2/2]")
+    assert iface.sent[2]["text"] == iface.sent[1]["text"]
+    assert records[2]["retry_of"] == iface.sent[1]["packet"].id
