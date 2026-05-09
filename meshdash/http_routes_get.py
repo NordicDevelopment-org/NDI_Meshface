@@ -16,6 +16,9 @@ from .api_history import (
     build_online_activity_response as _build_online_activity_response_helper,
     build_summary_metrics_response as _build_summary_metrics_response_helper,
 )
+from .api_history_chat import (
+    build_chat_history_response as _build_chat_history_response_helper,
+)
 from .api_system import (
     handle_state_get as _handle_state_get_helper,
 )
@@ -415,6 +418,36 @@ def handle_dashboard_get(
             parse_online_activity_request_fn=deps.parse_online_activity_request_fn,
             empty_summary_metrics_fn=deps.empty_summary_metrics_fn,
         )
+        deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
+        return
+
+    if path == "/api/history/chat":
+        if deps.private_mode:
+            _record_private_mode_block(deps)
+            deps.write_json_response_fn(
+                handler,
+                status_code=403,
+                payload_obj={"ok": False, "error": "Chat history is disabled in private mode"},
+                no_store=True,
+            )
+            return
+        query_obj = parse_qs(query or "")
+        chat_history_fn = getattr(deps.state_fn, "chat_history_fn", None)
+        try:
+            response_obj = _build_chat_history_response_helper(
+                query_obj=query_obj,
+                chat_history_fn=chat_history_fn,
+                to_int_fn=deps.to_int_fn,
+            )
+        except Exception as exc:
+            response_obj = {
+                "ok": False,
+                "enabled": True,
+                "error": str(exc or "chat history failed"),
+                "messages": [],
+                "count": 0,
+                "has_more": False,
+            }
         deps.write_json_response_fn(handler, status_code=200, payload_obj=response_obj, no_store=True)
         return
 

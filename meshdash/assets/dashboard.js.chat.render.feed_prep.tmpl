@@ -1,4 +1,5 @@
-      const rawMessages = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const rawMessagesLive = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const rawMessages = mergedChatMessagesForRender(rawMessagesLive);
       const rawPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
       const nodePacketTrends = traffic && typeof traffic.node_packet_trends === "object"
         ? traffic.node_packet_trends
@@ -60,6 +61,7 @@
         && chatDerivedCache.meshChannelIndex === normalizeMeshChannelIndex(activeMeshChannelIndex)
         && chatDerivedCache.activeChatChannel === activeChatChannelKey
         && chatDerivedCache.chatMainDirectModeEnabled === chatMainDirectModeActive
+        && chatDerivedCache.chatHistoryRowsVersion === chatHistoryRowsVersion
         && chatDerivedCache.rawMessagesLength === rawMessagesLength
         && chatDerivedCache.rawMessagesTailKey === rawMessagesTailKey
         && chatDerivedCache.rawPacketsLength === rawPacketsLength
@@ -407,6 +409,7 @@
           meshChannelIndex: normalizeMeshChannelIndex(activeMeshChannelIndex),
           activeChatChannel: activeChatChannelKey,
           chatMainDirectModeEnabled: chatMainDirectModeActive,
+          chatHistoryRowsVersion,
           reactionBuckets: reactionBucketsLocal,
           baseMessages: baseMessagesLocal,
           messageIndex: messageIndexLocal,
@@ -555,9 +558,19 @@
         const directMessages = directMessagesByPeer.get(directSelectedId);
         return Array.isArray(directMessages) ? directMessages : [];
       }})();
-      const visibleMessages = messages.length > chatFeedMaxEntries
-        ? messages.slice(-chatFeedMaxEntries)
+      const chatHistoryViewKey = chatHistoryViewKeyFor(activeChatChannel, directSelectedId);
+      const chatHistoryVisibleLimit = chatHistoryVisibleLimitForView(chatHistoryViewKey);
+      const visibleMessages = messages.length > chatHistoryVisibleLimit
+        ? messages.slice(-chatHistoryVisibleLimit)
         : messages;
+      const chatHistoryHiddenOlderCount = Math.max(0, messages.length - visibleMessages.length);
+      rememberChatHistoryCursorForView(chatHistoryViewKey, messages);
+      const chatHistoryLoadControlHtml = buildChatHistoryLoadControlHtml({{
+        viewKey: chatHistoryViewKey,
+        hiddenOlderCount: chatHistoryHiddenOlderCount,
+        totalCount: messages.length,
+        visibleCount: visibleMessages.length,
+      }});
       const showAllMeshChannels = activeMeshChannelFilterIndex() === meshChannelAllIndex;
       const activeSendMeshIdx = activeMeshChannelSendIndex();
       const activeChangeFocusKeys = chatChangeFocusKeysForChannel(activeChatChannel);

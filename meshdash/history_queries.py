@@ -161,6 +161,90 @@ def fetch_recent_chat_rows(conn: SqlConnection, limit: int) -> SqlRows:
     ).fetchall()
 
 
+def fetch_chat_page_rows(
+    conn: SqlConnection,
+    *,
+    limit: int,
+    before_id: int | None = None,
+    before_unix: int | None = None,
+    scope: str | None = None,
+    peer_id: str | None = None,
+) -> SqlRows:
+    from_expr = """
+      lower(COALESCE(
+        NULLIF(json_extract(message_json, '$.from'), ''),
+        NULLIF(json_extract(message_json, '$.from_id'), ''),
+        NULLIF(json_extract(message_json, '$.fromId'), ''),
+        NULLIF(json_extract(message_json, '$.source'), ''),
+        NULLIF(json_extract(message_json, '$.source_id'), ''),
+        NULLIF(json_extract(message_json, '$.sourceId'), ''),
+        ''
+      ))
+    """
+    to_expr = """
+      lower(COALESCE(
+        NULLIF(json_extract(message_json, '$.to'), ''),
+        NULLIF(json_extract(message_json, '$.to_id'), ''),
+        NULLIF(json_extract(message_json, '$.toId'), ''),
+        NULLIF(json_extract(message_json, '$.destination'), ''),
+        NULLIF(json_extract(message_json, '$.dest'), ''),
+        NULLIF(json_extract(message_json, '$.dest_id'), ''),
+        NULLIF(json_extract(message_json, '$.destId'), ''),
+        ''
+      ))
+    """
+    scope_expr = "lower(COALESCE(json_extract(message_json, '$.scope'), ''))"
+    direct_condition = (
+        f"({scope_expr} IN ('direct', 'dm', 'private') "
+        f"OR ({to_expr} NOT IN ('', '^all', 'all', 'broadcast')))"
+    )
+    public_condition = (
+        f"({to_expr} IN ('', '^all', 'all', 'broadcast') "
+        f"AND {scope_expr} NOT IN ('direct', 'dm', 'private'))"
+    )
+
+    where_clauses = [
+        "lower(COALESCE(json_extract(message_json, '$.text'), '')) NOT LIKE ?",
+        "lower(COALESCE(json_extract(message_json, '$.text'), '')) NOT LIKE ?",
+        "lower(COALESCE(json_extract(message_json, '$.text'), '')) NOT LIKE ?",
+        "lower(COALESCE(json_extract(message_json, '$.text'), '')) NOT LIKE ?",
+    ]
+    params: list[object] = [
+        'mf_file_v1|%',
+        'rv1|%',
+        'ck1|%',
+        'ch1|%',
+    ]
+
+    if isinstance(before_id, int) and before_id > 0:
+        where_clauses.append("id < ?")
+        params.append(before_id)
+    elif isinstance(before_unix, int) and before_unix > 0:
+        where_clauses.append("created_unix <= ?")
+        params.append(before_unix)
+
+    clean_scope = str(scope or "").strip().lower()
+    if clean_scope in {"direct", "dm", "private"}:
+        where_clauses.append(direct_condition)
+    elif clean_scope in {"all", "public", "broadcast", "channel"}:
+        where_clauses.append(public_condition)
+
+    clean_peer_id = str(peer_id or "").strip().lower()
+    if clean_peer_id:
+        where_clauses.append(f"({from_expr} = ? OR {to_expr} = ?)")
+        params.extend([clean_peer_id, clean_peer_id])
+
+    params.append(max(1, int(limit)))
+    sql = f"""
+        SELECT id, created_unix, message_json
+        FROM chat
+        WHERE {' AND '.join(where_clauses)}
+        ORDER BY id DESC
+        LIMIT ?
+        """
+    return conn.execute(sql, tuple(params)).fetchall()
+
+
 def fetch_connection_rows(conn: SqlConnection) -> SqlRows:
     return conn.execute(
         """

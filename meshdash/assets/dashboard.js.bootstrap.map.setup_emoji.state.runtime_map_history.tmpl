@@ -103,6 +103,16 @@
     let chatLocalInfoVersion = 0;
     const chatLocalInfoMaxRows = 24;
     let chatDerivedCache = null;
+    const chatHistoryRows = [];
+    const chatHistoryRowKeys = new Set();
+    const chatHistoryVisibleLimitByView = new Map();
+    const chatHistoryCursorByView = new Map();
+    const chatHistoryExhaustedByView = new Set();
+    let chatHistoryRowsVersion = 0;
+    let chatHistoryMergedMessagesCache = null;
+    let chatHistoryLoadInFlight = false;
+    let chatHistoryLoadError = "";
+    let chatHistoryScrollRestore = null;
     let chatPollStructuralSignature = "";
     let chatPollStructuralRenderedAtMs = 0;
     const chatPollStructuralRefreshMs = 15000;

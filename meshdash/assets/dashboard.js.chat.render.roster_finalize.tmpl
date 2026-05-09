@@ -100,8 +100,9 @@
             ? macroPreviewRows.join("")
             : '<div class="chat-feed-empty">Generate ASCII in MACROS Studio on the right to preview line-by-line output here.</div>';
         }} else {{
+          const historyControlHtml = chatHistoryLoadControlHtml || "";
           nextFeedHtml = feedItems.length > 0
-            ? feedItems.join("")
+            ? `${{historyControlHtml}}${{feedItems.join("")}}`
             : `<div class="chat-feed-empty">${{emptyText}}</div>`;
         }}
         const feedMarkupChanged = setElementHtmlIfChanged(feed, nextFeedHtml, "chat-feed");
@@ -1048,6 +1049,7 @@
       syncChatNodeDetailsDrawer(state, {{
         fetchHistory: false,
       }});
+      restoreChatHistoryScrollPosition();
       if (pendingSelectionScroll) {{
         scrollSelectionIntoView();
       }} else if (chatScroller instanceof HTMLElement && shouldStickBottom) {{

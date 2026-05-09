@@ -26,6 +26,21 @@ def decode_recent_chat_rows(rows: Iterable[HistoryRow]) -> list[HistoryPayload]:
     return out
 
 
+def decode_chat_page_rows(rows: Iterable[HistoryRow]) -> list[HistoryPayload]:
+    out: list[HistoryPayload] = []
+    for row in reversed(list(rows)):
+        if len(row) < 3:
+            continue
+        history_id, created_unix, message_json = row[:3]
+        entry = _safe_json_loads(message_json, {})
+        if not isinstance(entry, dict) or _is_file_transfer_protocol_chat_entry(entry):
+            continue
+        entry["_history_id"] = _to_int(history_id)
+        entry["_history_created_unix"] = _to_int(created_unix)
+        out.append(entry)
+    return out
+
+
 def decode_connections_rows(rows: Iterable[HistoryRow]) -> list[HistoryPayload]:
     out: list[HistoryPayload] = []
     for row in rows:

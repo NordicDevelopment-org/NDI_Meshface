@@ -184,6 +184,229 @@
       }});
     }}
 
+    function chatHistoryMessageKey(msg) {{
+      const key = (typeof chatMessageKey === "function") ? String(chatMessageKey(msg) || "") : "";
+      if (key) return key;
+      const historyId = Number(msg && (msg._history_id ?? msg.history_id));
+      if (Number.isInteger(historyId) && historyId > 0) return `history:${{historyId}}`;
+      return "";
+    }}
+
+    function mergedChatMessagesForRender(liveMessages) {{
+      const liveRows = Array.isArray(liveMessages) ? liveMessages : [];
+      if (chatHistoryRows.length <= 0) return liveRows;
+      if (
+        chatHistoryMergedMessagesCache
+        && chatHistoryMergedMessagesCache.liveRef === liveRows
+        && chatHistoryMergedMessagesCache.version === chatHistoryRowsVersion
+      ) {{
+        return chatHistoryMergedMessagesCache.rows;
+      }}
+      const keyedRows = new Map();
+      const unkeyedRows = [];
+      const addRow = (row) => {{
+        if (!(row && typeof row === "object")) return;
+        const key = chatHistoryMessageKey(row);
+        if (key) {{
+          keyedRows.set(key, row);
+        }} else {{
+          unkeyedRows.push(row);
+        }}
+      }};
+      for (const row of chatHistoryRows) addRow(row);
+      for (const row of liveRows) addRow(row);
+      const rows = Array.from(keyedRows.values()).concat(unkeyedRows);
+      chatHistoryMergedMessagesCache = {{
+        liveRef: liveRows,
+        version: chatHistoryRowsVersion,
+        rows,
+      }};
+      return rows;
+    }}
+
+    function chatHistoryViewKeyFor(channel, peerId = "") {{
+      const scope = String(channel || "").trim().toLowerCase() === "direct" ? "direct" : "all";
+      const meshIdx = (typeof activeMeshChannelFilterIndex === "function")
+        ? activeMeshChannelFilterIndex()
+        : meshChannelAllIndex;
+      const meshKey = Number.isInteger(meshIdx) ? String(meshIdx) : "all";
+      if (scope === "direct") {{
+        const cleanPeerId = normalizeNodeId(peerId || chatDirectActivePeerId || selectedNodeId || "");
+        return isCanonicalNodeId(cleanPeerId) ? `direct:${{cleanPeerId}}:${{meshKey}}` : `direct::${{meshKey}}`;
+      }}
+      return `all:${{meshKey}}`;
+    }}
+
+    function chatHistoryVisibleLimitForView(viewKey) {{
+      const cleanKey = String(viewKey || "").trim();
+      const current = Number(chatHistoryVisibleLimitByView.get(cleanKey));
+      if (Number.isInteger(current) && current > 0) {{
+        return Math.max(chatFeedMaxEntries, current);
+      }}
+      return chatFeedMaxEntries;
+    }}
+
+    function increaseChatHistoryVisibleLimit(viewKey, amount = chatHistoryPageSize) {{
+      const cleanKey = String(viewKey || "").trim();
+      if (!cleanKey) return;
+      const current = chatHistoryVisibleLimitForView(cleanKey);
+      const delta = Math.max(1, Math.trunc(Number(amount) || chatHistoryPageSize));
+      chatHistoryVisibleLimitByView.set(cleanKey, current + delta);
+    }}
+
+    function rememberChatHistoryCursorForView(viewKey, messages) {{
+      const cleanKey = String(viewKey || "").trim();
+      if (!cleanKey) return;
+      const rows = Array.isArray(messages) ? messages : [];
+      if (rows.length <= 0) {{
+        chatHistoryCursorByView.delete(cleanKey);
+        return;
+      }}
+      const oldest = rows[0];
+      const historyId = Number(oldest && (oldest._history_id ?? oldest.history_id));
+      const beforeId = Number.isInteger(historyId) && historyId > 0 ? historyId : null;
+      const beforeUnix = latestUnixTimestamp(
+        oldest && oldest._history_created_unix,
+        oldest && oldest.rx_time_unix,
+        oldest && oldest.created_unix,
+        oldest && oldest.rx_time,
+        oldest && oldest.captured_at
+      );
+      chatHistoryCursorByView.set(cleanKey, {{
+        beforeId,
+        beforeUnix: Number.isFinite(beforeUnix) && beforeUnix > 0 ? Math.floor(beforeUnix) : null,
+      }});
+    }}
+
+    function buildChatHistoryLoadControlHtml({{ viewKey, hiddenOlderCount, totalCount, visibleCount }}) {{
+      const cleanKey = String(viewKey || "").trim();
+      if (!cleanKey) return "";
+      const hiddenCount = Math.max(0, Math.trunc(Number(hiddenOlderCount) || 0));
+      const exhausted = chatHistoryExhaustedByView.has(cleanKey);
+      const canLoad = hiddenCount > 0 || !exhausted;
+      if (!canLoad) return "";
+      const loading = !!chatHistoryLoadInFlight;
+      const label = loading
+        ? "Loading older..."
+        : (hiddenCount > 0 ? "Show older" : "Load older");
+      const detail = chatHistoryLoadError
+        ? `<span class="chat-history-load-error">${{escAttr(chatHistoryLoadError)}}</span>`
+        : `<span>${{escAttr(String(visibleCount || 0))}} of ${{escAttr(String(totalCount || 0))}} shown</span>`;
+      return `<div class="chat-history-load-row" data-history-view-key="${{escAttr(cleanKey)}}">
+        <button type="button" class="chat-history-load-btn" data-history-view-key="${{escAttr(cleanKey)}}" data-hidden-count="${{escAttr(String(hiddenCount))}}"${{loading ? " disabled" : ""}}>${{escAttr(label)}}</button>
+        <span class="chat-history-load-detail">${{detail}}</span>
+      </div>`;
+    }}
+
+    function captureChatHistoryScrollRestore() {{
+      const scroller = getChatScroller();
+      if (!(scroller instanceof HTMLElement)) return null;
+      return {{
+        top: scroller.scrollTop,
+        height: scroller.scrollHeight,
+      }};
+    }}
+
+    function restoreChatHistoryScrollPosition() {{
+      const restore = chatHistoryScrollRestore;
+      chatHistoryScrollRestore = null;
+      const scroller = getChatScroller();
+      if (!(scroller instanceof HTMLElement) || !restore) return;
+      const oldTop = Number(restore.top) || 0;
+      const oldHeight = Number(restore.height) || 0;
+      window.requestAnimationFrame(() => {{
+        const delta = Math.max(0, scroller.scrollHeight - oldHeight);
+        scroller.scrollTop = oldTop + delta;
+        chatStickToBottom = false;
+      }});
+    }}
+
+    function appendChatHistoryRows(rows) {{
+      const source = Array.isArray(rows) ? rows : [];
+      let added = 0;
+      for (const row of source) {{
+        if (!(row && typeof row === "object")) continue;
+        const key = chatHistoryMessageKey(row);
+        if (key && chatHistoryRowKeys.has(key)) continue;
+        if (key) chatHistoryRowKeys.add(key);
+        chatHistoryRows.push(row);
+        added += 1;
+      }}
+      while (chatHistoryRows.length > chatHistoryLoadedMaxEntries) {{
+        const removed = chatHistoryRows.shift();
+        const key = chatHistoryMessageKey(removed);
+        if (key) chatHistoryRowKeys.delete(key);
+      }}
+      if (added > 0) {{
+        chatHistoryRowsVersion += 1;
+        chatHistoryMergedMessagesCache = null;
+        chatDerivedCache = null;
+      }}
+      return added;
+    }}
+
+    async function loadOlderChatMessagesForCurrentView() {{
+      if (chatHistoryLoadInFlight) return;
+      const viewKey = chatHistoryViewKeyFor(activeChatChannel, chatDirectActivePeerId);
+      const cursor = chatHistoryCursorByView.get(viewKey) || {{}};
+      const feed = document.getElementById("chat-feed");
+      const escapedViewKey = (window.CSS && typeof window.CSS.escape === "function")
+        ? window.CSS.escape(viewKey)
+        : viewKey.replace(/["\\]/g, "\\$&");
+      const loadRow = feed instanceof HTMLElement
+        ? feed.querySelector(`.chat-history-load-row[data-history-view-key="${{escapedViewKey}}"]`)
+        : null;
+      const hiddenCount = loadRow instanceof HTMLElement
+        ? Math.max(0, Math.trunc(Number(loadRow.querySelector(".chat-history-load-btn")?.dataset.hiddenCount || 0) || 0))
+        : 0;
+
+      chatHistoryScrollRestore = captureChatHistoryScrollRestore();
+      chatStickToBottom = false;
+      if (hiddenCount > 0) {{
+        increaseChatHistoryVisibleLimit(viewKey, Math.min(chatHistoryPageSize, hiddenCount));
+        if (latestState) renderChat(latestState);
+        return;
+      }}
+
+      const params = new URLSearchParams();
+      params.set("limit", String(chatHistoryPageSize));
+      params.set("scope", activeChatChannel === "direct" ? "direct" : "all");
+      if (activeChatChannel === "direct" && isCanonicalNodeId(chatDirectActivePeerId)) {{
+        params.set("peer_id", chatDirectActivePeerId);
+      }}
+      const beforeId = Number(cursor.beforeId);
+      const beforeUnix = Number(cursor.beforeUnix);
+      if (Number.isInteger(beforeId) && beforeId > 0) {{
+        params.set("before_id", String(beforeId));
+      }} else if (Number.isFinite(beforeUnix) && beforeUnix > 0) {{
+        params.set("before_unix", String(Math.floor(beforeUnix)));
+      }}
+
+      chatHistoryLoadInFlight = true;
+      chatHistoryLoadError = "";
+      if (latestState) renderChat(latestState);
+      try {{
+        const resp = await fetch(`/api/history/chat?${{params.toString()}}`, {{ cache: "no-store" }});
+        const payload = await resp.json();
+        if (!resp.ok || !payload || payload.ok !== true) {{
+          throw new Error((payload && payload.error) || `history request failed (${{resp.status}})`);
+        }}
+        const rows = Array.isArray(payload.messages) ? payload.messages : [];
+        const added = appendChatHistoryRows(rows);
+        if (rows.length < chatHistoryPageSize || payload.has_more === false) {{
+          chatHistoryExhaustedByView.add(viewKey);
+        }}
+        if (added > 0) {{
+          increaseChatHistoryVisibleLimit(viewKey, Math.max(chatHistoryPageSize, added));
+        }}
+      }} catch (err) {{
+        chatHistoryLoadError = err instanceof Error ? (err.message || String(err)) : String(err || "history request failed");
+      }} finally {{
+        chatHistoryLoadInFlight = false;
+        if (latestState) renderChat(latestState);
+      }}
+    }}
+
     function renderChat(state, options = null) {{
       syncTopbarChatContext(state);
       const renderOptions = options && typeof options === "object" ? options : {{}};

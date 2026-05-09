@@ -251,6 +251,12 @@ def build_dashboard_runtime_loaders_with_dependencies(
             setattr(state_fn, "link_edges_fn", link_edges_fn)
         except Exception:
             pass
+    chat_history_fn = getattr(dependencies.history_store, "load_chat_page", None)
+    if callable(chat_history_fn):
+        try:
+            setattr(state_fn, "chat_history_fn", chat_history_fn)
+        except Exception:
+            pass
 
     send_chat_fn = dependencies.build_send_chat_loader_fn(
         iface=dependencies.iface,

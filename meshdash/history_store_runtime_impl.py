@@ -10,6 +10,7 @@ from .history_store_runtime_maintenance import (
     reset_history_store as _reset_history_store_helper,
 )
 from .history_store_chat import (
+    load_chat_page as _load_chat_page_helper,
     load_recent_chat as _load_recent_chat_helper,
     save_chat as _save_chat_helper,
     update_chat as _update_chat_helper,
@@ -153,6 +154,24 @@ class HistoryStore:
 
     def load_recent_chat(self, limit: int) -> list[dict[str, object]]:
         return _load_recent_chat_helper(self, limit)
+
+    def load_chat_page(
+        self,
+        *,
+        limit: int,
+        before_id: int | None = None,
+        before_unix: int | None = None,
+        scope: str | None = None,
+        peer_id: str | None = None,
+    ) -> list[dict[str, object]]:
+        return _load_chat_page_helper(
+            self,
+            limit=limit,
+            before_id=before_id,
+            before_unix=before_unix,
+            scope=scope,
+            peer_id=peer_id,
+        )
 
     def load_connections(self) -> list[dict[str, object]]:
         return _load_connections_helper(self)

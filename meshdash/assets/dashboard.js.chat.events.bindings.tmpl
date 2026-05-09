@@ -49,6 +49,13 @@
       feed.addEventListener("click", (ev) => {{
         const target = ev.target;
         if (!(target instanceof Element)) return;
+        const historyBtn = target.closest(".chat-history-load-btn");
+        if (historyBtn instanceof HTMLButtonElement && feed.contains(historyBtn)) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          void loadOlderChatMessagesForCurrentView();
+          return;
+        }}
         const item = target.closest(".chat-feed-item");
         if (!(item instanceof HTMLElement) || !feed.contains(item)) return;
 
