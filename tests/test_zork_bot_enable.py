@@ -76,6 +76,22 @@ def test_dashboard_tracker_answers_direct_zork_when_enabled() -> None:
     assert replies[0].get("ack_requested") is True
 
 
+def test_dashboard_tracker_can_toggle_zork_bot_runtime() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+
+    enabled = tracker.set_zork_bot_enabled(True, send_lock=None)
+    assert enabled["ok"] is True
+    assert enabled["zork"]["enabled"] is True
+    assert enabled["zork"]["active_session_count"] == 0
+
+    disabled = tracker.set_zork_bot_enabled(False)
+    assert disabled["ok"] is True
+    assert disabled["zork"]["enabled"] is False
+    tracker.on_receive(_direct_text_packet("zork", packet_id=112), iface)
+    assert iface.sent == []
+
+
 def test_dashboard_tracker_answers_public_zork_trigger_with_direct_session() -> None:
     tracker = DashboardTracker(packet_limit=25)
     iface = _FakeInterface()

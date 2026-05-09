@@ -81,3 +81,53 @@ def test_handle_dashboard_post_keeps_standalone_zork_route_available() -> None:
             },
         )
     ]
+
+
+def test_handle_dashboard_post_toggles_zork_bot_runtime() -> None:
+    body = json.dumps({"enabled": False}).encode("utf-8")
+    handler = _FakeHandler(body, headers={"Content-Length": str(len(body))})
+    calls: list[tuple[int, object]] = []
+    toggles: list[bool] = []
+
+    def _write_json_response(handler, *, status_code, payload_obj, **kwargs):
+        calls.append((status_code, payload_obj))
+
+    def _set_zork_bot_enabled(enabled: bool) -> dict[str, object]:
+        toggles.append(enabled)
+        return {
+            "ok": True,
+            "available": True,
+            "zork": {
+                "enabled": enabled,
+                "active_session_count": 0,
+            },
+        }
+
+    deps = build_post_route_dependencies(
+        send_chat_fn=None,
+        set_zork_bot_enabled_fn=_set_zork_bot_enabled,
+        to_int_fn=to_int,
+    )
+    deps = type(deps)(
+        **{
+            **deps.__dict__,
+            "write_json_response_fn": _write_json_response,
+        }
+    )
+
+    handle_dashboard_post(handler, path="/api/bots/zork", deps=deps)
+
+    assert toggles == [False]
+    assert calls == [
+        (
+            200,
+            {
+                "ok": True,
+                "available": True,
+                "zork": {
+                    "enabled": False,
+                    "active_session_count": 0,
+                },
+            },
+        )
+    ]

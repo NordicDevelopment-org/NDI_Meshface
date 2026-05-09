@@ -102,8 +102,57 @@ class DashboardTracker:
             kwargs["reply_async"] = reply_async
         if callable(sleep_fn):
             kwargs["sleep_fn"] = sleep_fn
-        self._zork_bot_service = build_zork_bot_service(**kwargs)
+        service = build_zork_bot_service(**kwargs)
+        with self._lock:
+            self._zork_bot_service = service
+            self._bump_state_revision_unlocked()
         return True
+
+    def disable_zork_bot(self) -> bool:
+        with self._lock:
+            if self._zork_bot_service is None:
+                return True
+            self._zork_bot_service = None
+            self._bump_state_revision_unlocked()
+        return True
+
+    def set_zork_bot_enabled(
+        self,
+        enabled: object,
+        *,
+        send_lock: object | None = None,
+    ) -> dict[str, object]:
+        if bool(enabled):
+            with self._lock:
+                already_enabled = self._zork_bot_service is not None
+            ok = True if already_enabled else self.enable_zork_bot(send_lock=send_lock)
+        else:
+            ok = self.disable_zork_bot()
+        runtime = self.get_zork_bot_runtime()
+        runtime["ok"] = bool(ok)
+        return runtime
+
+    def get_zork_bot_runtime(self) -> dict[str, object]:
+        with self._lock:
+            service = self._zork_bot_service
+        active_session_count = 0
+        if service is not None:
+            active_session_count_fn = getattr(service, "active_session_count", None)
+            if callable(active_session_count_fn):
+                try:
+                    active_session_count = max(0, int(active_session_count_fn()))
+                except Exception:
+                    active_session_count = 0
+        enabled = service is not None
+        return {
+            "available": True,
+            "zork": {
+                "enabled": enabled,
+                "active_session_count": active_session_count,
+                "public_start_enabled": enabled,
+                "direct_message_enabled": enabled,
+            },
+        }
 
     def get_delivery_state(self, message_id: object) -> Optional[dict[str, object]]:
         clean_message_id = _to_int(message_id)

@@ -463,6 +463,16 @@ class ZorkBotService:
                     channelIndex=channel_index,
                 )
 
+    def active_session_count(self) -> int:
+        count_fn = getattr(self._game, "active_session_count", None)
+        if not callable(count_fn):
+            return 0
+        with self._lock:
+            try:
+                return max(0, int(count_fn()))
+            except Exception:
+                return 0
+
 
 def build_zork_bot_service(
     *,

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Mapping, Optional, Protocol
 
 if TYPE_CHECKING:
+    from .api_input_bots import ZorkBotToggleRequest
     from .api_input_bbs import BbsHostRequest, BbsSettingsRequest
     from .api_input_channels import ChannelSettingsRequest
     from .api_input_chat import ChatSendRequest
@@ -23,6 +24,7 @@ else:
     RadioSettingsRequest = object
     ThemeSettingsRequest = object
     StandaloneZorkRequest = object
+    ZorkBotToggleRequest = object
 from .http_handler_contracts import DashboardHttpHandler
 from .state_payload_contracts import DashboardStatePayload
 
@@ -89,6 +91,11 @@ class SetThemePresetFn(Protocol):
 
 class SetBbsSettingsFn(Protocol):
     def __call__(self, settings: object) -> dict[str, object]:
+        ...
+
+
+class SetZorkBotEnabledFn(Protocol):
+    def __call__(self, enabled: bool) -> dict[str, object]:
         ...
 
 
@@ -218,6 +225,11 @@ class ParseNetworkToolRequestFn(Protocol):
         ...
 
 
+class ParseZorkBotToggleRequestFn(Protocol):
+    def __call__(self, raw_body: bytes) -> ZorkBotToggleRequest:
+        ...
+
+
 class ApplyRadioSettingsFn(Protocol):
     def __call__(self, request: RadioSettingsRequest) -> dict[str, object]:
         ...
@@ -338,6 +350,8 @@ class DashboardPostRouteDependencies:
     parse_theme_settings_request_fn: Optional[ParseThemeSettingsRequestFn] = None
     set_bbs_settings_fn: Optional[SetBbsSettingsFn] = None
     parse_bbs_settings_request_fn: Optional[ParseBbsSettingsRequestFn] = None
+    set_zork_bot_enabled_fn: Optional[SetZorkBotEnabledFn] = None
+    parse_zork_bot_toggle_request_fn: Optional[ParseZorkBotToggleRequestFn] = None
     start_bbs_host_fn: Optional[StartBbsHostFn] = None
     stop_bbs_host_fn: Optional[StopBbsHostFn] = None
     append_bbs_host_post_fn: Optional[AppendBbsHostPostFn] = None

@@ -59,9 +59,9 @@ def build_html_shell(
         bots_zork_state_label="Enabled" if zork_enabled else "Disabled",
         bots_zork_state_class="is-enabled" if zork_enabled else "is-disabled",
         bots_zork_hint=(
-            "Direct-message this node with zork to start a session. The Console zork command is also available."
+            "Public chat zork starts a private session. Direct messages continue gameplay."
             if zork_enabled
-            else "Start the dashboard with --zork-enable or MESH_DASH_ZORK_ENABLE=1 to turn on live replies."
+            else "Live replies are disabled. Enable Zork here to answer public starts and direct messages."
         ),
         network_diagnostics_tab_hidden_attrs=network_diagnostics_tab_hidden_attrs,
         network_diagnostics_panel_hidden_attrs=network_diagnostics_panel_hidden_attrs,

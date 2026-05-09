@@ -921,6 +921,14 @@ def build_dashboard_state_typed(
     summary["online_node_window_seconds"] = _ONLINE_NODE_WINDOW_SECONDS
     if isinstance(radio_connection_status, Mapping) and radio_connection_status:
         summary["radio_connection"] = dict(radio_connection_status)
+    get_zork_bot_runtime_fn = getattr(tracker, "get_zork_bot_runtime", None)
+    if callable(get_zork_bot_runtime_fn):
+        try:
+            bots_runtime = get_zork_bot_runtime_fn()
+            if isinstance(bots_runtime, Mapping):
+                summary["bots"] = dict(bots_runtime)
+        except Exception:
+            pass
 
     merged_recent_chat = _merge_recent_chat_entries(
         recent_chat=tracker_data.recent_chat,

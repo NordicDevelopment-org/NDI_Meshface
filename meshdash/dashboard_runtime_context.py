@@ -227,6 +227,22 @@ def build_dashboard_runtime_context(
         except Exception:
             pass
 
+    set_zork_bot_enabled = getattr(tracker, "set_zork_bot_enabled", None)
+    if callable(set_zork_bot_enabled):
+        def _set_zork_bot_enabled_fn(enabled):  # type: ignore[no-redef]
+            return set_zork_bot_enabled(bool(enabled), send_lock=send_lock)
+
+        try:
+            setattr(loaders.state_fn, "set_zork_bot_enabled_fn", _set_zork_bot_enabled_fn)
+        except Exception:
+            pass
+        state_lite_fn = getattr(loaders.state_fn, "lite", None)
+        if callable(state_lite_fn):
+            try:
+                setattr(state_lite_fn, "set_zork_bot_enabled_fn", _set_zork_bot_enabled_fn)
+            except Exception:
+                pass
+
     # Optional: attach radio settings application hook.
     # We hang this off state_fn to avoid threading new dependencies through the
     # entire server wiring. (Same trick as state_fn.lite.)

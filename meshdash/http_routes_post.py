@@ -9,6 +9,7 @@ _TOKEN_PROTECTED_WRITE_PATHS = {
     "/api/chat/send",
     "/api/games/zork",
     "/api/tools/network",
+    "/api/bots/zork",
     "/api/bbs/host",
     "/api/settings/radio",
     "/api/settings/channels",
@@ -20,6 +21,7 @@ _PRIVATE_MODE_BLOCKED_POST_PATHS = {
     "/api/chat/send",
     "/api/games/zork",
     "/api/tools/network",
+    "/api/bots/zork",
 }
 
 
@@ -63,6 +65,10 @@ _handle_standalone_zork_post_helper = _load_optional_handler(
 _handle_network_tool_post_helper = _load_optional_handler(
     ".api_network_tools",
     "handle_network_tool_post",
+)
+_handle_zork_bot_toggle_post_helper = _load_optional_handler(
+    ".api_bots",
+    "handle_zork_bot_toggle_post",
 )
 
 
@@ -200,6 +206,25 @@ def handle_dashboard_post(
             to_int_fn=deps.to_int_fn,
             validate_content_length_fn=deps.validate_content_length_fn,
             parse_network_tool_request_fn=parse_network_tool_request_fn,
+            write_json_response_fn=deps.write_json_response_fn,
+        )
+        return
+
+    if path == "/api/bots/zork":
+        parse_zork_bot_toggle_request_fn = deps.parse_zork_bot_toggle_request_fn
+        if parse_zork_bot_toggle_request_fn is None or not callable(_handle_zork_bot_toggle_post_helper):
+            deps.write_json_response_fn(
+                handler,
+                status_code=503,
+                payload_obj={"ok": False, "error": "Zork bot runtime is not enabled on this dashboard instance"},
+            )
+            return
+        _handle_zork_bot_toggle_post_helper(
+            handler,
+            set_zork_bot_enabled_fn=deps.set_zork_bot_enabled_fn,
+            to_int_fn=deps.to_int_fn,
+            validate_content_length_fn=deps.validate_content_length_fn,
+            parse_zork_bot_toggle_request_fn=parse_zork_bot_toggle_request_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )
         return
