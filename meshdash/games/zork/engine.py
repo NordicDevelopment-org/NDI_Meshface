@@ -12,6 +12,7 @@ from .world import INITIAL_OBJECT_LOCATIONS, OBJECTS, ROOMS, START_ROOM, object_
 GAME_SESSION_TTL_SECONDS = 45 * 60
 # Set to 0 to disable truncation and let transport-layer chunking handle limits.
 MAX_REPLY_CHARS = 0
+START_HELP_HINT = "Type 'help' for the command set."
 
 BASELINE_OBJECT_LOCATIONS = {
     code: ("SAFEBOX" if code in {"CROWN", "CARD"} and location == "SAFE" else location)
@@ -4775,7 +4776,7 @@ class ZorkGame:
             summary = self._room_summary(session, START_ROOM, explicit_look=True)
             return BotAppResult(
                 handled=True,
-                reply_text=self._compact(f"zork: session started. {summary}"),
+                reply_text=self._compact(f"zork: session started. {summary} {START_HELP_HINT}"),
                 command_name=self.SPEC.name,
             )
 

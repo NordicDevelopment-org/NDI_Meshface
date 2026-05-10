@@ -65,6 +65,8 @@ def test_dashboard_tracker_answers_direct_zork_when_enabled() -> None:
     assert iface.sent
     combined_text = " ".join(str(row["text"]) for row in iface.sent)
     assert "zork: session started" in combined_text
+    assert "Type 'help' for the command set." in combined_text
+    assert str(iface.sent[-1]["text"]).endswith("Type 'help' for the command set.")
     assert iface.sent[0]["kwargs"]["destinationId"] == "!01020304"
     assert iface.sent[0]["kwargs"]["wantAck"] is True
     assert iface.sent[0]["kwargs"]["channelIndex"] == 2
@@ -134,6 +136,8 @@ def test_dashboard_tracker_answers_public_zork_trigger_with_direct_session() -> 
     assert iface.sent
     combined_text = " ".join(str(row["text"]) for row in iface.sent)
     assert "zork: session started" in combined_text
+    assert "Type 'help' for the command set." in combined_text
+    assert str(iface.sent[-1]["text"]).endswith("Type 'help' for the command set.")
     assert iface.sent[0]["kwargs"]["destinationId"] == "!01020304"
     assert iface.sent[0]["kwargs"]["wantAck"] is True
     assert iface.sent[0]["kwargs"]["channelIndex"] == 2
@@ -192,6 +196,7 @@ def test_dashboard_tracker_answers_local_direct_zork_without_radio_send() -> Non
 
     texts = [str(row.get("text") or "") for row in tracker.recent_chat if isinstance(row, dict)]
     assert any("zork: session started" in text for text in texts)
+    assert any(text.endswith("Type 'help' for the command set.") for text in texts)
 
 
 def test_dashboard_tracker_paces_multi_part_zork_replies() -> None:
