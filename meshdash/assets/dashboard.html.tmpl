@@ -2559,7 +2559,7 @@ Ready.
               <h3>Bot Catalog</h3>
               <div class="bots-setting-note">Available bot apps are shown here. Runtime replies only run while a bot is enabled.</div>
               <div class="bots-command-list" role="listbox" aria-label="Bot catalog">
-                <button id="bots-zork-command-item" class="bots-command-item is-active {bots_zork_state_class}" type="button" role="option" aria-selected="true">
+                <button id="bots-zork-command-item" class="bots-command-item is-active {bots_zork_state_class}" type="button" role="option" aria-selected="true" data-bot-command="zork">
                   <span class="bots-command-item-order">01</span>
                   <span class="bots-command-copy">
                     <span class="bots-command-heading">
@@ -2570,7 +2570,7 @@ Ready.
                   </span>
                   <span id="bots-zork-list-state" class="bots-command-state {bots_zork_state_class}">{bots_zork_state_label}</span>
                 </button>
-                <button id="bots-adventure-command-item" class="bots-command-item {bots_adventure_state_class}" type="button" role="option" aria-selected="false">
+                <button id="bots-adventure-command-item" class="bots-command-item {bots_adventure_state_class}" type="button" role="option" aria-selected="false" data-bot-command="adventure">
                   <span class="bots-command-item-order">02</span>
                   <span class="bots-command-copy">
                     <span class="bots-command-heading">
@@ -2592,18 +2592,18 @@ Ready.
           <div class="bots-panel bots-history-panel">
             <div class="bots-history-head">
               <div class="bots-review-head-copy">
-                <h3>Zork</h3>
-                <div class="bots-setting-note">Command: <code>zork</code></div>
+                <h3 id="bots-detail-title">Zork</h3>
+                <div id="bots-detail-command-note" class="bots-setting-note">Command: <code>zork</code></div>
               </div>
             </div>
             <div class="bots-command-config">
               <div class="bots-command-config-head">
                 <div class="bots-command-config-title-row">
-                  <span class="bots-command-config-usage">zork</span>
+                  <span id="bots-detail-usage" class="bots-command-config-usage">zork</span>
                   <span class="bots-command-kind">game</span>
                   <span id="bots-zork-detail-state" class="bots-command-state {bots_zork_state_class}">{bots_zork_state_label}</span>
                 </div>
-                <div class="bots-command-config-name">Playable Zork Bot</div>
+                <div id="bots-detail-name" class="bots-command-config-name">Playable Zork Bot</div>
                 <div id="bots-zork-description" class="bots-command-config-description">{bots_zork_hint}</div>
               </div>
               <div id="bots-zork-routing-note" class="bots-setting-note">Public chat <code>zork</code> starts a private session. Gameplay commands stay in direct messages.</div>

@@ -68,9 +68,15 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert 'Activity stats reset at' in js
     assert 'id="bots-zork-reset-activity-btn"' in html
     assert 'id="bots-adventure-command-item"' in html
+    assert 'data-bot-command="adventure"' in html
     assert 'id="bots-adventure-list-state"' in html
+    assert 'id="bots-detail-title"' in html
     assert 'function adventureBotRuntimeFromState(state = latestState) {' in js
+    assert 'let selectedBotCommand = "zork";' in js
+    assert 'function selectBotCatalogCommand(command) {' in js
+    assert 'renderSelectedBotDetail(state, {' in js
     assert 'setZorkBotStatusClass(document.getElementById("bots-adventure-list-state"), adventureRuntime.enabled);' in js
+    assert 'adventureItem.classList.toggle("is-active", selectedCommand === "adventure");' in js
     assert 'No Zork activity since the reset.' in js
     assert 'function isZorkBotPublicStartText(text) {' in js
     assert 'return String(text || "").trim().toLowerCase() === "zork";' in js

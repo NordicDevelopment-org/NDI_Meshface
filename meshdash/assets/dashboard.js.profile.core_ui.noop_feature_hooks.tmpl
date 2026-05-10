@@ -196,6 +196,32 @@
       "push", "pull", "turn", "attack", "kill", "score", "help", "restart",
     ]);
     let zorkBotToggleInFlight = false;
+    const botCatalogSpecs = {{
+      zork: {{
+        command: "zork",
+        title: "Zork",
+        name: "Playable Zork Bot",
+        enabledDescription: "Public chat zork starts a private session. Direct messages continue gameplay.",
+        disabledDescription: "Live replies are disabled. Enable Zork here to answer public starts and direct messages.",
+        enabledRouteHtml: 'Public chat <code>zork</code> starts a private session. Gameplay commands stay in direct messages.',
+        disabledRouteHtml: "Zork is not answering mesh traffic while disabled.",
+      }},
+      adventure: {{
+        command: "adventure",
+        title: "Adventure",
+        name: "Playable Colossal Cave Bot",
+        enabledDescription: "Public chat adventure starts a private session. Direct messages continue gameplay.",
+        disabledDescription: "Live replies are disabled. Enable Adventure here to answer public starts and direct messages.",
+        enabledRouteHtml: 'Public chat <code>adventure</code> or <code>adv</code> starts a private session. Gameplay commands stay in direct messages.',
+        disabledRouteHtml: "Adventure is not answering mesh traffic while disabled.",
+      }},
+    }};
+    let selectedBotCommand = "zork";
+
+    function normalizeBotCatalogCommand(command) {{
+      const clean = String(command || "").trim().toLowerCase();
+      return Object.prototype.hasOwnProperty.call(botCatalogSpecs, clean) ? clean : "zork";
+    }}
 
     function zorkBotActivityResetCutoffUnix() {{
       try {{
@@ -272,6 +298,12 @@
         publicStartEnabled: !!(adventure.public_start_enabled ?? adventure.publicStartEnabled ?? enabled),
         directMessageEnabled: !!(adventure.direct_message_enabled ?? adventure.directMessageEnabled ?? enabled),
       }};
+    }}
+
+    function botRuntimeFromState(command, state = latestState) {{
+      return normalizeBotCatalogCommand(command) === "adventure"
+        ? adventureBotRuntimeFromState(state)
+        : zorkBotRuntimeFromState(state);
     }}
 
     function setZorkBotStatusClass(element, enabled) {{
@@ -627,16 +659,19 @@
       return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
     }}
 
-    function renderZorkBotSessions(state, runtime) {{
+    function renderZorkBotSessions(state, runtime, command = "zork") {{
       const list = document.getElementById("bots-zork-session-list");
       const clearBtn = document.getElementById("bots-zork-clear-sessions-btn");
       if (!(list instanceof HTMLElement)) return;
+      const selectedCommand = normalizeBotCatalogCommand(command);
+      const spec = botCatalogSpecs[selectedCommand] || botCatalogSpecs.zork;
       const sessions = Array.isArray(runtime.sessions) ? runtime.sessions : [];
       if (clearBtn instanceof HTMLButtonElement) {{
-        clearBtn.disabled = zorkBotToggleInFlight || !runtime.enabled || sessions.length <= 0;
+        clearBtn.hidden = selectedCommand !== "zork";
+        clearBtn.disabled = selectedCommand !== "zork" || zorkBotToggleInFlight || !runtime.enabled || sessions.length <= 0;
       }}
       if (sessions.length <= 0) {{
-        list.innerHTML = '<div class="bots-history-empty">No active Zork sessions.</div>';
+        list.innerHTML = `<div class="bots-history-empty">No active ${{escAttr(spec.title)}} sessions.</div>`;
         return;
       }}
       const nowUnix = Math.floor(Date.now() / 1000);
@@ -647,12 +682,21 @@
         const moveText = Number.isFinite(moves) ? Math.max(0, Math.floor(moves)) : 0;
         const inventoryCount = Number(session && (session.inventory_count ?? session.inventoryCount));
         const inventoryText = Number.isFinite(inventoryCount) ? Math.max(0, Math.floor(inventoryCount)) : 0;
+        const treasure = (session && typeof session.treasures === "object") ? session.treasures : null;
+        const treasureTotal = Number(treasure && treasure.total);
+        const treasureRecovered = Number(treasure && treasure.recovered);
+        const treasureText = Number.isFinite(treasureTotal) && treasureTotal > 0
+          ? `<span>${{Math.max(0, Math.floor(Number.isFinite(treasureRecovered) ? treasureRecovered : 0))}}/${{Math.max(0, Math.floor(treasureTotal))}} treasures</span>`
+          : "";
         const updatedUnix = zorkBotSessionUnix(session, "updated_unix");
         const expiresUnix = zorkBotSessionUnix(session, "expires_unix");
         const updatedText = formatLocalChatTime(updatedUnix, "n/a", nowUnix);
         const expiresText = expiresUnix > 0
           ? formatLocalChatTime(expiresUnix, "n/a", nowUnix)
           : "n/a";
+        const endButtonHtml = selectedCommand === "zork"
+          ? `<button class="btn btn-secondary bots-sniffer-btn" type="button" data-zork-session-action="end_session" data-peer-id="${{escAttr(peerId)}}">End</button>`
+          : "";
         return `
           <div class="bots-session-item">
             <div class="bots-session-main">
@@ -661,17 +705,20 @@
                 <span>${{escAttr(roomName)}}</span>
                 <span>${{moveText}} moves</span>
                 <span>${{inventoryText}} carried</span>
+                ${{treasureText}}
                 <span>last ${{escAttr(updatedText)}}</span>
                 <span>expires ${{escAttr(expiresText)}}</span>
               </div>
             </div>
-            <button class="btn btn-secondary bots-sniffer-btn" type="button" data-zork-session-action="end_session" data-peer-id="${{escAttr(peerId)}}">End</button>
+            ${{endButtonHtml}}
           </div>
         `;
       }}).join("");
     }}
 
-    function syncZorkBotControls(runtime) {{
+    function syncZorkBotControls(runtime, command = "zork") {{
+      const selectedCommand = normalizeBotCatalogCommand(command);
+      const spec = botCatalogSpecs[selectedCommand] || botCatalogSpecs.zork;
       const enableBtn = document.getElementById("bots-zork-enable-btn");
       const disableBtn = document.getElementById("bots-zork-disable-btn");
       const canToggle = !!runtime.available && !zorkBotToggleInFlight;
@@ -683,15 +730,11 @@
       }}
       const note = document.getElementById("bots-zork-routing-note");
       if (note instanceof HTMLElement) {{
-        note.innerHTML = runtime.enabled
-          ? 'Public chat <code>zork</code> starts a private session. Gameplay commands stay in direct messages.'
-          : 'Zork is not answering mesh traffic while disabled.';
+        note.innerHTML = runtime.enabled ? spec.enabledRouteHtml : spec.disabledRouteHtml;
       }}
       const description = document.getElementById("bots-zork-description");
       if (description instanceof HTMLElement) {{
-        description.textContent = runtime.enabled
-          ? "Public chat zork starts a private session. Direct messages continue gameplay."
-          : "Live replies are disabled. Enable Zork here to answer public starts and direct messages.";
+        description.textContent = runtime.enabled ? spec.enabledDescription : spec.disabledDescription;
       }}
     }}
 
@@ -758,7 +801,63 @@
       renderBotTickerSummary(latestState);
     }}
 
+    function selectBotCatalogCommand(command) {{
+      const clean = normalizeBotCatalogCommand(command);
+      if (selectedBotCommand === clean) return;
+      selectedBotCommand = clean;
+      renderBotsView(latestState);
+    }}
+
+    function renderSelectedBotDetail(state, runtimes) {{
+      selectedBotCommand = normalizeBotCatalogCommand(selectedBotCommand);
+      const spec = botCatalogSpecs[selectedBotCommand] || botCatalogSpecs.zork;
+      const runtime = runtimes && runtimes[selectedBotCommand]
+        ? runtimes[selectedBotCommand]
+        : botRuntimeFromState(selectedBotCommand, state);
+      const title = document.getElementById("bots-detail-title");
+      if (title instanceof HTMLElement) {{
+        title.textContent = spec.title;
+      }}
+      const commandNote = document.getElementById("bots-detail-command-note");
+      if (commandNote instanceof HTMLElement) {{
+        commandNote.innerHTML = `Command: <code>${{escAttr(spec.command)}}</code>`;
+      }}
+      const usage = document.getElementById("bots-detail-usage");
+      if (usage instanceof HTMLElement) {{
+        usage.textContent = spec.command;
+      }}
+      const name = document.getElementById("bots-detail-name");
+      if (name instanceof HTMLElement) {{
+        name.textContent = spec.name;
+      }}
+      setZorkBotStatusClass(document.getElementById("bots-zork-detail-state"), runtime.enabled);
+      syncZorkBotControls(runtime, selectedBotCommand);
+      renderZorkBotSessions(state, runtime, selectedBotCommand);
+      if (selectedBotCommand === "zork") {{
+        renderZorkBotActivity(state, runtime);
+        return;
+      }}
+      const stats = document.getElementById("bots-zork-activity-stats");
+      const list = document.getElementById("bots-zork-activity-list");
+      if (stats instanceof HTMLElement) {{
+        stats.innerHTML = [
+          `<span>Sessions ${{runtime.activeSessionCount}}</span>`,
+          `<span>Runtime ${{runtime.enabled ? "enabled" : "disabled"}}</span>`,
+        ].join("");
+      }}
+      if (list instanceof HTMLElement) {{
+        list.innerHTML = '<div class="bots-history-empty">No Adventure activity in the current chat window yet.</div>';
+      }}
+    }}
+
     function bindZorkBotControls() {{
+      for (const item of document.querySelectorAll("[data-bot-command]")) {{
+        if (!(item instanceof HTMLElement) || item.dataset.boundBotSelect === "1") continue;
+        item.dataset.boundBotSelect = "1";
+        item.addEventListener("click", () => {{
+          selectBotCatalogCommand(item.dataset.botCommand || "");
+        }});
+      }}
       const enableBtn = document.getElementById("bots-zork-enable-btn");
       if (enableBtn instanceof HTMLButtonElement && enableBtn.dataset.bound !== "1") {{
         enableBtn.dataset.bound = "1";
@@ -807,23 +906,28 @@
     function renderBotsView(state = latestState) {{
       const runtime = zorkBotRuntimeFromState(state);
       const adventureRuntime = adventureBotRuntimeFromState(state);
+      const selectedCommand = normalizeBotCatalogCommand(selectedBotCommand);
       const item = document.getElementById("bots-zork-command-item");
       if (item instanceof HTMLElement) {{
         item.classList.toggle("is-enabled", runtime.enabled);
         item.classList.toggle("is-disabled", !runtime.enabled);
+        item.classList.toggle("is-active", selectedCommand === "zork");
+        item.setAttribute("aria-selected", selectedCommand === "zork" ? "true" : "false");
       }}
       const adventureItem = document.getElementById("bots-adventure-command-item");
       if (adventureItem instanceof HTMLElement) {{
         adventureItem.classList.toggle("is-enabled", adventureRuntime.enabled);
         adventureItem.classList.toggle("is-disabled", !adventureRuntime.enabled);
+        adventureItem.classList.toggle("is-active", selectedCommand === "adventure");
+        adventureItem.setAttribute("aria-selected", selectedCommand === "adventure" ? "true" : "false");
       }}
       setZorkBotStatusClass(document.getElementById("bots-zork-list-state"), runtime.enabled);
       setZorkBotStatusClass(document.getElementById("bots-adventure-list-state"), adventureRuntime.enabled);
-      setZorkBotStatusClass(document.getElementById("bots-zork-detail-state"), runtime.enabled);
       bindZorkBotControls();
-      syncZorkBotControls(runtime);
-      renderZorkBotSessions(state, runtime);
-      renderZorkBotActivity(state, runtime);
+      renderSelectedBotDetail(state, {{
+        zork: runtime,
+        adventure: adventureRuntime,
+      }});
     }}
 
     function syncBackendBotRequestHistory(_state = latestState) {{
