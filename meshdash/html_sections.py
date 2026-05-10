@@ -29,6 +29,8 @@ def build_html_shell(
     bbs_section_hidden_attrs: str = "",
     file_transfer_files_tab_hidden_attrs: str = "",
     file_transfer_section_hidden_attrs: str = "",
+    bots_app_tab_hidden_attrs: str = "",
+    bots_section_hidden_attrs: str = "",
     games_enabled: bool = False,
     network_diagnostics_tab_hidden_attrs: str = ' hidden disabled aria-hidden="true"',
     network_diagnostics_panel_hidden_attrs: str = ' hidden aria-hidden="true"',
@@ -56,6 +58,8 @@ def build_html_shell(
         bbs_section_hidden_attrs=bbs_section_hidden_attrs,
         file_transfer_files_tab_hidden_attrs=file_transfer_files_tab_hidden_attrs,
         file_transfer_section_hidden_attrs=file_transfer_section_hidden_attrs,
+        bots_app_tab_hidden_attrs=bots_app_tab_hidden_attrs,
+        bots_section_hidden_attrs=bots_section_hidden_attrs,
         bots_zork_state_label="Enabled" if games_enabled else "Disabled",
         bots_zork_state_class="is-enabled" if games_enabled else "is-disabled",
         bots_zork_hint=(

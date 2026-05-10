@@ -273,11 +273,13 @@
           description: "Chunked direct-message file transfer traffic",
         }});
       }}
-      rows.push({{
-        id: "bots",
-        label: "Bots",
-        description: "Managed bot command and reply traffic",
-      }});
+      if (gamesFeatureEnabled) {{
+        rows.push({{
+          id: "bots",
+          label: "Bots",
+          description: "Managed bot command and reply traffic",
+        }});
+      }}
       rows.push({{
         id: "games",
         label: "Games",
@@ -290,7 +292,7 @@
       const token = String(rawAppId == null ? "" : rawAppId).trim().toLowerCase();
       if (token === "bbs" && bbsFeatureEnabled) return "bbs";
       if (token === "files" && fileTransferFeatureEnabled) return "files";
-      if (token === "bots") return "bots";
+      if (token === "bots" && gamesFeatureEnabled) return "bots";
       if (token === "games") return "games";
       return "";
     }}
@@ -304,9 +306,11 @@
     function meshChannelDefaultAppSendPrefs() {{
       const sendIndex = normalizeMeshChannelIndex(activeMeshSendChannelIndex);
       const defaults = {{
-        bots: {{ mode: "global", channel_index: sendIndex }},
         games: {{ mode: "global", channel_index: sendIndex }},
       }};
+      if (gamesFeatureEnabled) {{
+        defaults.bots = {{ mode: "global", channel_index: sendIndex }};
+      }}
       if (bbsFeatureEnabled) {{
         defaults.bbs = {{ mode: "global", channel_index: sendIndex }};
       }}

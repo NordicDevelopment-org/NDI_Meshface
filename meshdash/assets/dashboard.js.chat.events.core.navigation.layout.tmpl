@@ -624,7 +624,7 @@
       if (clean === "games") {{
         return clean;
       }}
-      if (clean === "bots") {{
+      if (clean === "bots" && gamesFeatureEnabled) {{
         return clean;
       }}
       if (clean === "bbs" && bbsFeatureEnabled) {{
@@ -638,7 +638,7 @@
 
     function isAppsLayoutView(viewName) {{
       const clean = String(viewName || "").trim().toLowerCase();
-      return clean === "games" || clean === "bots" || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);
+      return clean === "games" || (clean === "bots" && gamesFeatureEnabled) || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);
     }}
 
     function loadPreferredAppsLayoutView() {{
@@ -675,6 +675,9 @@
       if (resolved === "files" && !fileTransferFeatureEnabled) {{
         resolved = "games";
       }}
+      if (resolved === "bots" && !gamesFeatureEnabled) {{
+        resolved = "games";
+      }}
 
       // Public v0 rail: expose only Chat/Network/Console/Games/BBS/Files/Settings.
       return (
@@ -682,7 +685,7 @@
         || resolved === "network"
         || resolved === "console"
         || resolved === "games"
-        || resolved === "bots"
+        || (resolved === "bots" && gamesFeatureEnabled)
         || (resolved === "bbs" && bbsFeatureEnabled)
         || (resolved === "files" && fileTransferFeatureEnabled)
         || resolved === "settings"
@@ -7238,6 +7241,18 @@
     }}
 
     function appsLauncherMenuMetaText() {{
+      if (!gamesFeatureEnabled && !bbsFeatureEnabled && !fileTransferFeatureEnabled) {{
+        return "Games";
+      }}
+      if (!gamesFeatureEnabled && bbsFeatureEnabled && fileTransferFeatureEnabled) {{
+        return "Boards and files";
+      }}
+      if (!gamesFeatureEnabled && bbsFeatureEnabled) {{
+        return "Boards";
+      }}
+      if (!gamesFeatureEnabled && fileTransferFeatureEnabled) {{
+        return "Files";
+      }}
       if (bbsFeatureEnabled && fileTransferFeatureEnabled) {{
         return "Bots, boards, and files";
       }}

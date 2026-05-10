@@ -173,6 +173,35 @@ def test_handle_dashboard_post_toggles_zork_bot_runtime() -> None:
     ]
 
 
+def test_handle_dashboard_post_rejects_zork_bot_toggle_when_runtime_unavailable() -> None:
+    body = json.dumps({"enabled": True}).encode("utf-8")
+    handler = _FakeHandler(body, headers={"Content-Length": str(len(body))})
+    calls: list[tuple[int, object]] = []
+
+    def _write_json_response(handler, *, status_code, payload_obj, **kwargs):
+        calls.append((status_code, payload_obj))
+
+    deps = build_post_route_dependencies(
+        send_chat_fn=None,
+        to_int_fn=to_int,
+    )
+    deps = type(deps)(
+        **{
+            **deps.__dict__,
+            "write_json_response_fn": _write_json_response,
+        }
+    )
+
+    handle_dashboard_post(handler, path="/api/bots/zork", deps=deps)
+
+    assert calls == [
+        (
+            400,
+            {"ok": False, "error": "Zork bot runtime toggle is unavailable"},
+        )
+    ]
+
+
 def test_handle_dashboard_post_manages_zork_bot_sessions() -> None:
     body = json.dumps({"action": "end_session", "peer_id": "!01020304"}).encode("utf-8")
     handler = _FakeHandler(body, headers={"Content-Length": str(len(body))})

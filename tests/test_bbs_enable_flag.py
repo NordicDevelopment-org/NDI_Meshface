@@ -32,6 +32,12 @@ def test_render_html_hides_bbs_workspace_by_default() -> None:
         r'<button[\s\S]*data-app-view="bbs"[\s\S]*hidden disabled aria-hidden="true"'
     )
     assert '<section class="card bbs" aria-label="BBS" hidden aria-hidden="true">' in html
+    assert re_search(
+        html,
+        r'<button[\s\S]*data-app-view="bots"[\s\S]*hidden disabled aria-hidden="true"',
+    )
+    assert '<section class="card bots" aria-label="Bots" hidden aria-hidden="true">' in html
+    assert ".topbar-view-submenu-item[hidden]" in html
 
 
 def test_render_html_shows_bbs_workspace_when_enabled() -> None:
@@ -78,6 +84,8 @@ def test_render_html_exposes_games_flag_when_enabled() -> None:
 
     assert 'const gamesFeatureEnabled = !!Number(1);' in html
     assert 'if (gamesFeatureEnabled) {' in html
+    assert 'data-app-view="bots"' in html
+    assert '<section class="card bots" aria-label="Bots">' in html
 
 
 def test_dashboard_parser_supports_bbs_enable_flag_and_env_default() -> None:

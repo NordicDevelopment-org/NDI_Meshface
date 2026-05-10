@@ -240,8 +240,9 @@ def build_dashboard_runtime_context(
         except Exception:
             pass
 
-    set_zork_bot_enabled = getattr(tracker, "set_zork_bot_enabled", None)
-    manage_zork_bot = getattr(tracker, "manage_zork_bot", None)
+    games_runtime_enabled = bool(getattr(args, "games_enable", False))
+    set_zork_bot_enabled = getattr(tracker, "set_zork_bot_enabled", None) if games_runtime_enabled else None
+    manage_zork_bot = getattr(tracker, "manage_zork_bot", None) if games_runtime_enabled else None
     if callable(set_zork_bot_enabled):
         def _set_zork_bot_enabled_fn(enabled):  # type: ignore[no-redef]
             return set_zork_bot_enabled(bool(enabled), send_lock=send_lock)

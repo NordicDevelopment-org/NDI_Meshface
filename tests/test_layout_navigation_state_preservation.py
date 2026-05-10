@@ -31,10 +31,10 @@ def test_dashboard_js_keeps_bbs_hidden_by_default() -> None:
 
     assert 'const bbsFeatureEnabled = !!Number(0);' in js
     assert 'if (clean === "games") {' in js
-    assert 'if (clean === "bots") {' in js
+    assert 'if (clean === "bots" && gamesFeatureEnabled) {' in js
     assert 'if (clean === "bbs" && bbsFeatureEnabled) {' in js
-    assert 'return clean === "games" || clean === "bots" || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);' in js
-    assert '|| resolved === "bots"' in js
+    assert 'return clean === "games" || (clean === "bots" && gamesFeatureEnabled) || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);' in js
+    assert '|| (resolved === "bots" && gamesFeatureEnabled)' in js
     assert '|| (resolved === "bbs" && bbsFeatureEnabled)' in js
     assert '"bbs"' in js.split("const knownLayoutViews = new Set([", 1)[1].split("]);", 1)[0]
     assert '"bots"' in js.split("const knownLayoutViews = new Set([", 1)[1].split("]);", 1)[0]
@@ -85,6 +85,7 @@ def test_dashboard_js_keeps_gated_apps_out_of_app_channel_routing_by_default() -
     assert 'if (fileTransferFeatureEnabled) {' in routing_block
     assert 'id: "files"' in routing_block
     assert 'label: "Files"' in routing_block
+    assert 'if (gamesFeatureEnabled) {' in routing_block
     assert 'id: "bots"' in routing_block
     assert 'label: "Bots"' in routing_block
     assert 'id: "games"' in routing_block
@@ -101,8 +102,8 @@ def test_dashboard_js_exposes_bbs_when_enabled() -> None:
 
     assert 'const bbsFeatureEnabled = !!Number(1);' in js
     assert 'if (clean === "bbs" && bbsFeatureEnabled) {' in js
-    assert 'return clean === "games" || clean === "bots" || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);' in js
-    assert '|| resolved === "bots"' in js
+    assert 'return clean === "games" || (clean === "bots" && gamesFeatureEnabled) || (clean === "bbs" && bbsFeatureEnabled) || (clean === "files" && fileTransferFeatureEnabled);' in js
+    assert '|| (resolved === "bots" && gamesFeatureEnabled)' in js
     assert '|| (resolved === "bbs" && bbsFeatureEnabled)' in js
 
 
@@ -141,7 +142,7 @@ def test_dashboard_js_exposes_files_in_app_channel_routing_when_enabled() -> Non
     assert 'id: "files"' in routing_block
     assert 'label: "Files"' in routing_block
     assert 'if (token === "files" && fileTransferFeatureEnabled) return "files";' in js
-    assert 'if (token === "bots") return "bots";' in js
+    assert 'if (token === "bots" && gamesFeatureEnabled) return "bots";' in js
     assert 'id: "games"' in routing_block
     assert 'label: "Games"' in routing_block
 
