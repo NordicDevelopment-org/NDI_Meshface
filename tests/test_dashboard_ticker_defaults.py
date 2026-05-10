@@ -58,6 +58,8 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert 'return !!(runtime && runtime.available && runtime.enabled);' in js
     assert 'function buildBotTickerSummary(state = latestState) {' in js
     assert 'function renderBotTickerSummary(state = latestState) {' in js
+    assert 'tickerItem.classList.toggle("has-active-bot-sessions", summary.activeSessionCount > 0);' in js
+    assert 'tickerItem.classList.toggle("has-pending-bot-activity", summary.pendingCount > 0);' in js
     assert 'const zorkBotActivityResetStorageKey = "meshDashboardZorkActivityResetCutoffUnixV1";' in js
     assert 'function zorkBotActivityResetCutoffUnix() {' in js
     assert 'function setZorkBotActivityResetCutoffUnix(value) {' in js
@@ -363,7 +365,11 @@ def test_render_html_uses_single_row_compact_ticker_strip() -> None:
     )
     assert "flex: 1 1 min(208px, 100%);" in html
     assert ".topbar.ticker-expanded.ticker-wrap-balanced .summary-ticker-item {" in html
-    assert "flex-basis: min(330px, 100%);" in html
+    assert "flex-basis: min(300px, 100%);" in html
+    assert ".topbar.ticker-expanded .summary-ticker-item-bots {" in html
+    assert "flex-grow: 0;" in html
+    assert ".topbar.ticker-expanded .summary-ticker-item-bots .value.bot-ticker-value {" in html
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in html
     assert re.search(
         r"\.topbar \.summary-ticker-item \{\s*border: 1px solid .*?\s*background: var\(--panel\);\s*border-radius: 7px;\s*padding: 4px 7px;\s*min-width: 0;\s*color: var\(--ink\);\s*position: relative;\s*display: grid;\s*grid-template-columns: minmax\(0, 1fr\) auto;\s*grid-template-rows: auto;",
         html,
@@ -501,9 +507,14 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert 'id="ticker-rate-radio"' in html
     assert 'id="ticker-chart-radio"' in html
     assert ".topbar .summary-ticker-item-self .value.self-node-value" in html
-    assert ".topbar .summary-ticker-item-self.has-selected-node {" in html
-    assert ".topbar .summary-ticker-item-self.has-selected-node::before" in html
-    assert '[data-theme="dark"] .topbar .summary-ticker-item-self.has-selected-node {' in html
+    assert ".topbar .summary-ticker-item-self.has-selected-node," in html
+    assert ".topbar .summary-ticker-item-bots.has-active-bot-sessions," in html
+    assert ".topbar .summary-ticker-item-bots.has-pending-bot-activity {" in html
+    assert ".topbar .summary-ticker-item-self.has-selected-node::before," in html
+    assert ".topbar .summary-ticker-item-bots.has-active-bot-sessions::before," in html
+    assert ".topbar .summary-ticker-item-bots.has-pending-bot-activity::before {" in html
+    assert '[data-theme="dark"] .topbar .summary-ticker-item-self.has-selected-node,' in html
+    assert '[data-theme="dark"] .topbar .summary-ticker-item-bots.has-active-bot-sessions,' in html
     assert ".topbar .summary-ticker-item-self.has-node-emoji::after" in html
     assert "content: attr(data-node-emoji);" in html
     assert ".self-node-name {" in html

@@ -881,7 +881,9 @@
       isolation: isolate;
       overflow: hidden;
     }}
-    .topbar .summary-ticker-item-self.has-selected-node {{
+    .topbar .summary-ticker-item-self.has-selected-node,
+    .topbar .summary-ticker-item-bots.has-active-bot-sessions,
+    .topbar .summary-ticker-item-bots.has-pending-bot-activity {{
       border-color: transparent;
       background:
         linear-gradient(var(--panel), var(--panel)) padding-box,
@@ -896,7 +898,9 @@
         0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
         0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
     }}
-    .topbar .summary-ticker-item-self.has-selected-node::before {{
+    .topbar .summary-ticker-item-self.has-selected-node::before,
+    .topbar .summary-ticker-item-bots.has-active-bot-sessions::before,
+    .topbar .summary-ticker-item-bots.has-pending-bot-activity::before {{
       content: "";
       position: absolute;
       inset: 0;
@@ -925,7 +929,9 @@
       z-index: 0;
     }}
     .topbar .summary-ticker-item-self > .label,
-    .topbar .summary-ticker-item-self > .value {{
+    .topbar .summary-ticker-item-self > .value,
+    .topbar .summary-ticker-item-bots > .label,
+    .topbar .summary-ticker-item-bots > .value {{
       position: relative;
       z-index: 1;
     }}
@@ -1437,7 +1443,11 @@
       max-width: var(--topbar-corner-reserve, 36px);
     }}
     .topbar.ticker-expanded.ticker-wrap-balanced .summary-ticker-item {{
-      flex-basis: min(330px, 100%);
+      flex-basis: min(300px, 100%);
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-bots {{
+      flex-grow: 0;
+      flex-basis: min(300px, 100%);
     }}
     .topbar.ticker-expanded .summary-ticker-item-self,
     .topbar.ticker-expanded .summary-ticker-item-radio {{
@@ -1526,6 +1536,25 @@
     }}
     .topbar.ticker-expanded .summary-ticker-item .value.node-ticker-value .node-ticker-val {{
       font-size: 14px;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-bots .value.bot-ticker-value {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 12px;
+      row-gap: 2px;
+      align-items: start;
+      font-size: 12px;
+      line-height: 1.15;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-bots .value.bot-ticker-value .bot-ticker-row {{
+      min-width: 0;
+      gap: 4px;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-bots .value.bot-ticker-value .node-ticker-key {{
+      font-size: 9px;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-bots .value.bot-ticker-value .node-ticker-val {{
+      font-size: 12px;
     }}
     .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value,
     .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value {{
