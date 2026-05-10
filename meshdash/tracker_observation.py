@@ -33,6 +33,8 @@ def apply_tracker_observation(
 
     apply_routing_delivery_update_fn(
         decoded,
+        from_id=from_id,
+        to_id=to_id,
         extract_update_fn=extract_update_fn,
         set_delivery_state_fn=set_delivery_state_fn,
     )

@@ -46,12 +46,21 @@ def build_tracker_delivery_callbacks(
         except Exception:
             return
 
-    def _set_delivery_state(message_id: object, state: str, error: Optional[str] = None) -> bool:
+    def _set_delivery_state(
+        message_id: object,
+        state: str,
+        error: Optional[str] = None,
+        *,
+        ack_from_id: object = None,
+        ack_to_id: object = None,
+    ) -> bool:
         changed = _set_tracker_delivery_state_helper(
             recent_chat,
             message_id=message_id,
             state=state,
             error=error,
+            ack_from_id=ack_from_id,
+            ack_to_id=ack_to_id,
             to_int_fn=to_int_fn,
             utc_now_fn=utc_now_fn,
             now_unix_fn=now_unix_fn,

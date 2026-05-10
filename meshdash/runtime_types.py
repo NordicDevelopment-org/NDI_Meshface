@@ -389,6 +389,9 @@ class SetDeliveryStateFn(Protocol):
         message_id: object,
         state: str,
         error: Optional[str] = None,
+        *,
+        ack_from_id: object = None,
+        ack_to_id: object = None,
     ) -> bool:
         ...
 
@@ -398,6 +401,8 @@ class ApplyRoutingDeliveryUpdateFn(Protocol):
         self,
         decoded: object,
         *,
+        from_id: object = None,
+        to_id: object = None,
         extract_update_fn: ExtractDeliveryUpdateFn,
         set_delivery_state_fn: SetDeliveryStateFn,
     ) -> bool:
