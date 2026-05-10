@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from importlib import import_module
+from pathlib import Path
 from urllib.parse import parse_qs
 
 from .api_metrics import (
@@ -54,6 +55,48 @@ _handle_bbs_host_get_helper = _load_optional_handler(
     ".api_bbs",
     "handle_bbs_host_get",
 )
+
+_VENDOR_ASSETS_DIR = Path(__file__).with_name("assets") / "vendor"
+_VENDOR_ASSETS: Mapping[str, tuple[str, str]] = {
+    "/assets/vendor/leaflet-1.9.4.css": ("leaflet-1.9.4.css", "text/css; charset=utf-8"),
+    "/assets/vendor/leaflet-1.9.4.js": ("leaflet-1.9.4.js", "application/javascript; charset=utf-8"),
+    "/assets/vendor/leaflet-heat-0.2.0.js": ("leaflet-heat-0.2.0.js", "application/javascript; charset=utf-8"),
+    "/assets/vendor/images/layers.png": ("images/layers.png", "image/png"),
+    "/assets/vendor/images/layers-2x.png": ("images/layers-2x.png", "image/png"),
+    "/assets/vendor/images/marker-icon.png": ("images/marker-icon.png", "image/png"),
+    "/assets/vendor/images/marker-icon-2x.png": ("images/marker-icon-2x.png", "image/png"),
+    "/assets/vendor/images/marker-shadow.png": ("images/marker-shadow.png", "image/png"),
+}
+
+
+def _write_vendor_asset_response(
+    handler: DashboardHttpHandler,
+    *,
+    path: str,
+) -> bool:
+    asset = _VENDOR_ASSETS.get(path)
+    if asset is None:
+        return False
+    filename, content_type = asset
+    try:
+        payload = (_VENDOR_ASSETS_DIR / filename).read_bytes()
+    except OSError:
+        handler.send_response(404)
+        handler.send_header("Content-Type", "text/plain; charset=utf-8")
+        handler.send_header("Cache-Control", "no-store")
+        handler.send_header("Content-Length", "9")
+        handler.end_headers()
+        handler.wfile.write(b"Not Found")
+        return True
+
+    handler.send_response(200)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Cache-Control", "public, max-age=86400")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("Content-Length", str(len(payload)))
+    handler.end_headers()
+    handler.wfile.write(payload)
+    return True
 
 
 def _record_state_poll_request(deps: DashboardGetRouteDependencies) -> None:
@@ -195,6 +238,9 @@ def handle_dashboard_get(
 ) -> None:
     if path in ("/", "/index.html"):
         deps.write_html_response_fn(handler, html_text=deps.html_text, no_store=True)
+        return
+
+    if _write_vendor_asset_response(handler, path=path):
         return
 
     if path == "/api/version":

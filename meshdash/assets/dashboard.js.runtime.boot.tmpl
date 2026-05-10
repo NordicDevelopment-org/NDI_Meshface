@@ -11,6 +11,13 @@
       }}
     }}
 
+    if (typeof window !== "undefined") {{
+      window.__meshDashboardBootComplete = true;
+      if (typeof window.__meshDashboardMarkBooted === "function") {{
+        window.__meshDashboardMarkBooted();
+      }}
+    }}
+
     function runBootStep(stepName, callback) {{
       try {{
         return callback();
