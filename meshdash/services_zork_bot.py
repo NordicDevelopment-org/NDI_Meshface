@@ -167,6 +167,14 @@ def _reply_segments(text: object, *, max_bytes: int = DEFAULT_CHAT_MAX_BYTES) ->
     return [f"[{index}/{total}] {chunk}" for index, chunk in enumerate(chunks, start=1)]
 
 
+def _game_command_name(game: object, result: object | None = None) -> str:
+    raw = getattr(result, "command_name", None) if result is not None else None
+    if not raw:
+        spec = getattr(game, "SPEC", None)
+        raw = getattr(spec, "name", None)
+    return str(raw or "zork").strip().lower() or "zork"
+
+
 class ZorkBotService:
     def __init__(
         self,
@@ -251,6 +259,7 @@ class ZorkBotService:
         if not segments:
             return True
 
+        bot_command = _game_command_name(self._game, result)
         channel_index = _packet_channel_index(packet)
         reply_id = _packet_id(packet)
         if self._reply_async:
@@ -263,6 +272,7 @@ class ZorkBotService:
                     "local_node_id": local_node_id,
                     "channel_index": channel_index,
                     "reply_id": reply_id,
+                    "bot_command": bot_command,
                     "record_local_chat_fn": record_local_chat_fn,
                 },
                 daemon=True,
@@ -277,6 +287,7 @@ class ZorkBotService:
             local_node_id=local_node_id,
             channel_index=channel_index,
             reply_id=reply_id,
+            bot_command=bot_command,
             record_local_chat_fn=record_local_chat_fn,
         )
         return True
@@ -290,6 +301,7 @@ class ZorkBotService:
         local_node_id: str,
         channel_index: int,
         reply_id: Optional[int],
+        bot_command: str,
         record_local_chat_fn: RecordLocalChatFn | None = None,
     ) -> None:
         for index, segment in enumerate(segments):
@@ -302,6 +314,7 @@ class ZorkBotService:
                 local_node_id=local_node_id,
                 channel_index=channel_index,
                 reply_id=reply_id,
+                bot_command=bot_command,
                 record_local_chat_fn=record_local_chat_fn,
             ):
                 return
@@ -319,6 +332,7 @@ class ZorkBotService:
         local_node_id: str,
         channel_index: int,
         reply_id: Optional[int],
+        bot_command: str,
         record_local_chat_fn: RecordLocalChatFn | None = None,
     ) -> bool:
         attempt_message_ids: list[int] = []
@@ -331,6 +345,7 @@ class ZorkBotService:
                 local_node_id=local_node_id,
                 channel_index=channel_index,
                 reply_id=reply_id,
+                bot_command=bot_command,
                 record_local_chat_fn=record_local_chat_fn,
                 retry_of=original_message_id if attempt_index > 0 else None,
             )
@@ -357,6 +372,7 @@ class ZorkBotService:
         local_node_id: str,
         channel_index: int,
         reply_id: Optional[int],
+        bot_command: str,
         record_local_chat_fn: RecordLocalChatFn | None = None,
         retry_of: Optional[int] = None,
     ) -> Optional[int]:
@@ -378,6 +394,7 @@ class ZorkBotService:
                 reply_id=reply_id,
                 ack_requested=True,
                 retry_of=retry_of,
+                bot_command=bot_command,
             )
         return sent_message_id
 
@@ -450,6 +467,7 @@ class ZorkBotService:
         if record_local_chat_fn is None:
             return True
 
+        bot_command = _game_command_name(self._game, result)
         for segment in _reply_segments(getattr(result, "reply_text", "") or ""):
             record_local_chat_fn(
                 text=segment,
@@ -459,6 +477,7 @@ class ZorkBotService:
                 message_id=None,
                 reply_id=reply_id,
                 ack_requested=False,
+                bot_command=bot_command,
             )
         return True
 

@@ -55,7 +55,8 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert 'id="m-bots-ticker"' in html
     assert '{ id: "bots", defaultLabel: "Bots", metric: false }' in js
     assert 'function botTickerAvailableForState(state = latestState) {' in js
-    assert 'return !!(runtime && runtime.available && runtime.enabled);' in js
+    assert 'const zorkRuntime = zorkBotRuntimeFromState(state);' in js
+    assert 'const adventureRuntime = adventureBotRuntimeFromState(state);' in js
     assert 'function buildBotTickerSummary(state = latestState) {' in js
     assert 'function renderBotTickerSummary(state = latestState) {' in js
     assert 'tickerItem.classList.toggle("has-active-bot-sessions", summary.activeSessionCount > 0);' in js
@@ -77,14 +78,17 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert 'renderSelectedBotDetail(state, {' in js
     assert 'setZorkBotStatusClass(document.getElementById("bots-adventure-list-state"), adventureRuntime.enabled);' in js
     assert 'adventureItem.classList.toggle("is-active", selectedCommand === "adventure");' in js
-    assert 'No Zork activity since the reset.' in js
+    assert 'function buildBotActivity(command = "zork", state = latestState, runtime = null) {' in js
+    assert 'botCommand: botCommandFromActivityRow(row),' in js
+    assert 'No ${escAttr(spec.title)} activity since the reset.' in js
     assert 'function isZorkBotPublicStartText(text) {' in js
-    assert 'return String(text || "").trim().toLowerCase() === "zork";' in js
-    assert 'const isPublicStart = toAll && isZorkBotPublicStartText(text);' in js
-    assert 'const isDirectCommand = toLocal && isZorkBotCommandText(text);' in js
-    assert 'const isCommand = isPublicStart || isDirectCommand;' in js
+    assert 'return isBotPublicStartText("zork", text);' in js
+    assert 'const isPublicStart = item.toAll && isBotPublicStartText(selectedCommand, item.text);' in js
+    assert 'const isDirectStart = item.toLocal && isBotPublicStartText(selectedCommand, item.text);' in js
+    assert 'const isDirectSessionCommand = item.toLocal && (linkedReplies.length > 0 || sessionPeers.has(item.from));' in js
+    assert 'const isCommand = isPublicStart || isDirectStart || isDirectSessionCommand;' in js
     assert 'isZorkBotCommandText(text) && (toLocal || toAll)' not in js
-    assert 'if (requestByMessageId.has(replyId) || isZorkBotResponseText(text)) {' in js
+    assert 'if (replyCommand !== selectedCommand) return;' in js
     assert re.search(r"if \\(fromLocal && replyId !== null\\) \\{\\s*addReply\\(replyId, item\\);", js) is None
     assert 'const isEnabled = tickerEnabled(id) && tickerAvailable(id, state);' in js
     assert 'renderBotTickerSummary(state);' in js

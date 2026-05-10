@@ -104,8 +104,13 @@ def test_adventure_bot_uses_shared_ack_transport() -> None:
         reply_async=False,
     )
     iface = _FakeInterface()
+    records: list[dict[str, object]] = []
 
-    handled = service.handle_packet(_direct_text_packet("adventure"), iface)
+    handled = service.handle_packet(
+        _direct_text_packet("adventure"),
+        iface,
+        record_local_chat_fn=lambda **kwargs: records.append(dict(kwargs)),
+    )
 
     assert handled is True
     assert iface.sent
@@ -113,6 +118,8 @@ def test_adventure_bot_uses_shared_ack_transport() -> None:
     assert iface.sent[0]["kwargs"]["wantAck"] is True
     assert iface.sent[0]["kwargs"]["replyId"] == 111
     assert "adventure: session started" in " ".join(str(row["text"]) for row in iface.sent)
+    assert records
+    assert {row.get("bot_command") for row in records} == {"adventure"}
 
 
 def test_dashboard_tracker_answers_direct_adventure_when_enabled() -> None:

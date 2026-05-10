@@ -195,6 +195,10 @@
       "get", "drop", "read", "examine", "x", "enter", "exit", "climb", "move",
       "push", "pull", "turn", "attack", "kill", "score", "help", "restart",
     ]);
+    const botPublicStartHeadsByCommand = {{
+      zork: new Set(["zork"]),
+      adventure: new Set(["adventure", "adv"]),
+    }};
     let zorkBotToggleInFlight = false;
     const botCatalogSpecs = {{
       zork: {{
@@ -343,18 +347,48 @@
       return clean.split(/\s+/, 1)[0] || "";
     }}
 
+    function botPublicStartHeads(command) {{
+      return botPublicStartHeadsByCommand[normalizeBotCatalogCommand(command)] || botPublicStartHeadsByCommand.zork;
+    }}
+
+    function isBotPublicStartText(command, text) {{
+      const clean = String(text || "").trim().toLowerCase();
+      return !!clean && botPublicStartHeads(command).has(clean);
+    }}
+
     function isZorkBotCommandText(text) {{
       return zorkBotCommandHeads.has(zorkBotTextHead(text));
     }}
 
     function isZorkBotPublicStartText(text) {{
-      return String(text || "").trim().toLowerCase() === "zork";
+      return isBotPublicStartText("zork", text);
+    }}
+
+    function botCommandFromActivityRow(row) {{
+      const raw = zorkBotChatField(row, ["bot_command", "botCommand", "command_name", "commandName"], "");
+      const clean = String(raw || "").trim().toLowerCase();
+      return Object.prototype.hasOwnProperty.call(botCatalogSpecs, clean) ? clean : "";
+    }}
+
+    function botResponseCommandFromText(text) {{
+      const clean = String(text || "").trim().replace(/^\[(\d+)\/(\d+)\]\s*/i, "");
+      if (/^zork:/i.test(clean)) return "zork";
+      if (/^adventure:/i.test(clean)) return "adventure";
+      return "";
     }}
 
     function isZorkBotResponseText(text) {{
-      const clean = String(text || "").trim();
-      const body = clean.replace(/^\[(\d+)\/(\d+)\]\s*/i, "");
-      return /^zork:/i.test(body);
+      return botResponseCommandFromText(text) === "zork";
+    }}
+
+    function botSessionPeerSet(runtime) {{
+      const peers = new Set();
+      const sessions = Array.isArray(runtime && runtime.sessions) ? runtime.sessions : [];
+      for (const session of sessions) {{
+        const peerId = normalizeNodeId(session && (session.peer_id || session.peerId || ""));
+        if (peerId) peers.add(peerId);
+      }}
+      return peers;
     }}
 
     function zorkBotNodeLabel(nodeId, state = latestState) {{
@@ -373,20 +407,24 @@
       return formatLocalChatTime(unix, rawTime || "n/a", nowUnix);
     }}
 
-    function buildZorkBotActivity(state = latestState) {{
+    function buildBotActivity(command = "zork", state = latestState, runtime = null) {{
+      const selectedCommand = normalizeBotCatalogCommand(command);
       const safeState = (state && typeof state === "object") ? state : {{}};
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
       const rows = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
+      const selectedRuntime = (runtime && typeof runtime === "object")
+        ? runtime
+        : botRuntimeFromState(selectedCommand, safeState);
+      const sessionPeers = botSessionPeerSet(selectedRuntime);
       const localId = normalizeNodeId(resolveLocalNodeId(safeState) || safeState.local_node_id || "");
       const resetCutoffUnix = zorkBotActivityResetCutoffUnix();
-      const requests = [];
-      const requestByMessageId = new Map();
+      const items = [];
       const repliesByRequestId = new Map();
       const orphanReplies = [];
 
       const addReply = (replyId, reply) => {{
         if (replyId === null) {{
-          if (isZorkBotResponseText(reply.text)) orphanReplies.push(reply);
+          orphanReplies.push(reply);
           return;
         }}
         if (!repliesByRequestId.has(replyId)) {{
@@ -408,10 +446,7 @@
         const fromLocal = !!localId && from === localId;
         const toLocal = !!localId && to === localId;
         const toAll = to === "^all";
-        const isPublicStart = toAll && isZorkBotPublicStartText(text);
-        const isDirectCommand = toLocal && isZorkBotCommandText(text);
-        const isCommand = isPublicStart || isDirectCommand;
-        const item = {{
+        items.push({{
           row,
           index,
           text,
@@ -420,20 +455,37 @@
           messageId,
           replyId,
           timeUnix,
-        }};
-        if (isCommand && (!fromLocal || toLocal)) {{
+          fromLocal,
+          toLocal,
+          toAll,
+          botCommand: botCommandFromActivityRow(row),
+        }});
+      }});
+
+      items.forEach((item) => {{
+        if (!item.fromLocal) return;
+        let replyCommand = item.botCommand || botResponseCommandFromText(item.text);
+        if (!replyCommand && sessionPeers.has(item.to)) {{
+          replyCommand = selectedCommand;
+        }}
+        if (replyCommand !== selectedCommand) return;
+        addReply(item.replyId, item);
+      }});
+
+      const requests = [];
+      const requestByMessageId = new Map();
+      items.forEach((item) => {{
+        if (item.fromLocal) return;
+        const linkedReplies = item.messageId !== null
+          ? (repliesByRequestId.get(item.messageId) || [])
+          : [];
+        const isPublicStart = item.toAll && isBotPublicStartText(selectedCommand, item.text);
+        const isDirectStart = item.toLocal && isBotPublicStartText(selectedCommand, item.text);
+        const isDirectSessionCommand = item.toLocal && (linkedReplies.length > 0 || sessionPeers.has(item.from));
+        const isCommand = isPublicStart || isDirectStart || isDirectSessionCommand;
+        if (isCommand) {{
           requests.push(item);
-          if (messageId !== null) requestByMessageId.set(messageId, item);
-          return;
-        }}
-        if (fromLocal && replyId !== null) {{
-          if (requestByMessageId.has(replyId) || isZorkBotResponseText(text)) {{
-            addReply(replyId, item);
-          }}
-          return;
-        }}
-        if (fromLocal && isZorkBotResponseText(text)) {{
-          orphanReplies.push(item);
+          if (item.messageId !== null) requestByMessageId.set(item.messageId, item);
         }}
       }});
 
@@ -487,26 +539,62 @@
       }};
     }}
 
+    function buildZorkBotActivity(state = latestState) {{
+      return buildBotActivity("zork", state, zorkBotRuntimeFromState(state));
+    }}
+
     function botTickerAvailableForState(state = latestState) {{
-      const runtime = zorkBotRuntimeFromState(state);
-      return !!(runtime && runtime.available && runtime.enabled);
+      const zorkRuntime = zorkBotRuntimeFromState(state);
+      const adventureRuntime = adventureBotRuntimeFromState(state);
+      return !!(
+        (zorkRuntime && zorkRuntime.available && zorkRuntime.enabled)
+        || (adventureRuntime && adventureRuntime.available && adventureRuntime.enabled)
+      );
     }}
 
     function buildBotTickerSummary(state = latestState) {{
-      const runtime = zorkBotRuntimeFromState(state);
-      const activity = buildZorkBotActivity(state);
-      const sessions = Array.isArray(runtime.sessions) ? runtime.sessions : [];
-      const activeSessionCount = Math.max(
-        0,
-        Math.trunc(Number(runtime.activeSessionCount) || sessions.length || 0)
-      );
-      const requestCount = Math.max(0, Math.trunc(Number(activity.requestCount) || 0));
-      const replyCount = Math.max(0, Math.trunc(Number(activity.replyCount) || 0));
-      const pendingCount = (Array.isArray(activity.activities) ? activity.activities : [])
-        .filter((entry) => entry && entry.status !== "responded")
-        .length;
+      const runtimes = {{
+        zork: zorkBotRuntimeFromState(state),
+        adventure: adventureBotRuntimeFromState(state),
+      }};
+      const activitiesByCommand = {{
+        zork: buildBotActivity("zork", state, runtimes.zork),
+        adventure: buildBotActivity("adventure", state, runtimes.adventure),
+      }};
+      const commands = ["zork", "adventure"];
+      const enabledCommands = commands.filter((command) => {{
+        const runtime = runtimes[command];
+        return !!(runtime && runtime.available && runtime.enabled);
+      }});
+      const sessionsByCommand = Object.fromEntries(commands.map((command) => {{
+        const runtime = runtimes[command] || {{}};
+        return [command, Array.isArray(runtime.sessions) ? runtime.sessions : []];
+      }}));
+      const activeSessionCount = commands.reduce((total, command) => {{
+        const runtime = runtimes[command] || {{}};
+        const sessions = sessionsByCommand[command] || [];
+        const rawCount = Math.trunc(Number(runtime.activeSessionCount) || sessions.length || 0);
+        return total + Math.max(0, rawCount);
+      }}, 0);
+      const requestCount = commands.reduce((total, command) => {{
+        const activity = activitiesByCommand[command] || {{}};
+        return total + Math.max(0, Math.trunc(Number(activity.requestCount) || 0));
+      }}, 0);
+      const replyCount = commands.reduce((total, command) => {{
+        const activity = activitiesByCommand[command] || {{}};
+        return total + Math.max(0, Math.trunc(Number(activity.replyCount) || 0));
+      }}, 0);
+      const pendingCount = commands.reduce((total, command) => {{
+        const activity = activitiesByCommand[command] || {{}};
+        return total + (Array.isArray(activity.activities) ? activity.activities : [])
+          .filter((entry) => entry && entry.status !== "responded")
+          .length;
+      }}, 0);
       const nowUnix = Math.floor(Date.now() / 1000);
-      const latestActivity = (Array.isArray(activity.activities) ? activity.activities : [])[0] || null;
+      const latestActivity = commands
+        .flatMap((command) => Array.isArray(activitiesByCommand[command].activities) ? activitiesByCommand[command].activities : [])
+        .sort((a, b) => Number(b && b.sortUnix || 0) - Number(a && a.sortUnix || 0))[0] || null;
+      const sessions = commands.flatMap((command) => sessionsByCommand[command] || []);
       const lastUnix = Math.max(
         Number(latestActivity && latestActivity.sortUnix) || 0,
         ...sessions.map((session) => zorkBotSessionUnix(session, "updated_unix"))
@@ -526,7 +614,7 @@
         : "0 active";
       const activityValue = `${{requestCount}} / ${{replyCount}}`;
       const rows = [
-        {{ key: "Zork", value: "On" }},
+        {{ key: "Games", value: enabledCommands.length > 0 ? enabledCommands.map((command) => botCatalogSpecs[command].title).join(" + ") : "Off" }},
         {{ key: "Sess", value: sessionValue }},
       ];
       if (sessionLabels.length > 0) {{
@@ -544,7 +632,7 @@
         .map((row) => `<div class="node-ticker-row bot-ticker-row"><span class="node-ticker-key">${{escAttr(row.key)}}:</span><span class="node-ticker-val">${{escAttr(row.value)}}</span></div>`)
         .join("");
       const titleParts = [
-        "Zork bot enabled",
+        enabledCommands.length > 0 ? `${{enabledCommands.map((command) => botCatalogSpecs[command].title).join(" + ")}} enabled` : "Game bots disabled",
         `${{activeSessionCount}} active session${{activeSessionCount === 1 ? "" : "s"}}`,
         `${{requestCount}} request${{requestCount === 1 ? "" : "s"}}`,
         `${{replyCount}} repl${{replyCount === 1 ? "y" : "ies"}}`,
@@ -553,8 +641,8 @@
         "Click to open Bots",
       ];
       return {{
-        available: !!runtime.available,
-        enabled: !!runtime.enabled,
+        available: commands.some((command) => !!(runtimes[command] && runtimes[command].available)),
+        enabled: enabledCommands.length > 0,
         activeSessionCount,
         requestCount,
         replyCount,
@@ -593,12 +681,14 @@
       }});
     }}
 
-    function renderZorkBotActivity(state, runtime) {{
+    function renderBotActivity(command, state, runtime) {{
+      const selectedCommand = normalizeBotCatalogCommand(command);
+      const spec = botCatalogSpecs[selectedCommand] || botCatalogSpecs.zork;
       const stats = document.getElementById("bots-zork-activity-stats");
       const list = document.getElementById("bots-zork-activity-list");
       if (!(stats instanceof HTMLElement) || !(list instanceof HTMLElement)) return;
       const nowUnix = Math.floor(Date.now() / 1000);
-      const activity = buildZorkBotActivity(state);
+      const activity = buildBotActivity(selectedCommand, state, runtime);
       const last = activity.activities[0] || null;
       const lastTime = last
         ? formatLocalChatTime(Number(last.sortUnix || 0), "recent", nowUnix)
@@ -615,8 +705,8 @@
 
       if (activity.activities.length <= 0) {{
         list.innerHTML = activity.resetCutoffUnix > 0
-          ? '<div class="bots-history-empty">No Zork activity since the reset.</div>'
-          : '<div class="bots-history-empty">No Zork activity in the current chat window yet.</div>';
+          ? `<div class="bots-history-empty">No ${{escAttr(spec.title)}} activity since the reset.</div>`
+          : `<div class="bots-history-empty">No ${{escAttr(spec.title)}} activity in the current chat window yet.</div>`;
         return;
       }}
 
@@ -650,6 +740,10 @@
           </div>
         `;
       }}).join("");
+    }}
+
+    function renderZorkBotActivity(state, runtime) {{
+      renderBotActivity("zork", state, runtime);
     }}
 
     function zorkBotSessionUnix(session, key) {{
@@ -833,21 +927,7 @@
       setZorkBotStatusClass(document.getElementById("bots-zork-detail-state"), runtime.enabled);
       syncZorkBotControls(runtime, selectedBotCommand);
       renderZorkBotSessions(state, runtime, selectedBotCommand);
-      if (selectedBotCommand === "zork") {{
-        renderZorkBotActivity(state, runtime);
-        return;
-      }}
-      const stats = document.getElementById("bots-zork-activity-stats");
-      const list = document.getElementById("bots-zork-activity-list");
-      if (stats instanceof HTMLElement) {{
-        stats.innerHTML = [
-          `<span>Sessions ${{runtime.activeSessionCount}}</span>`,
-          `<span>Runtime ${{runtime.enabled ? "enabled" : "disabled"}}</span>`,
-        ].join("");
-      }}
-      if (list instanceof HTMLElement) {{
-        list.innerHTML = '<div class="bots-history-empty">No Adventure activity in the current chat window yet.</div>';
-      }}
+      renderBotActivity(selectedBotCommand, state, runtime);
     }}
 
     function bindZorkBotControls() {{

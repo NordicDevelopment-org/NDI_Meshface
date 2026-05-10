@@ -382,6 +382,7 @@ class DashboardTracker:
         is_reaction: bool = False,
         ack_requested: bool = False,
         retry_of: Optional[int] = None,
+        bot_command: Optional[str] = None,
     ) -> None:
         bot_services: list[object] = []
         should_offer_to_zork = False
@@ -399,6 +400,7 @@ class DashboardTracker:
                 is_reaction=is_reaction,
                 ack_requested=ack_requested,
                 retry_of=retry_of,
+                bot_command=bot_command,
                 now_unix_fn=time.time,
             )
             if changed:
