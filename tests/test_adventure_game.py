@@ -54,9 +54,11 @@ def test_adventure_game_starts_and_uses_original_data() -> None:
     enter = _play(game, "enter", 2)
 
     assert "adventure: session started" in start
-    assert "COLOSSAL CAVE" in start
-    assert "WELL HOUSE" in enter
-    assert "THERE IS A SHINY BRASS LAMP NEARBY" in enter
+    assert "Colossal Cave" in start
+    assert "COLOSSAL CAVE" not in start
+    assert "well house" in enter
+    assert "WELL HOUSE" not in enter
+    assert "There is a shiny brass lamp nearby" in enter
 
 
 def test_adventure_game_takes_items_and_unlocks_grate() -> None:
@@ -78,8 +80,8 @@ def test_adventure_game_takes_items_and_unlocks_grate() -> None:
 
     assert replies[2] == "OK"
     assert replies[3] == "OK"
-    assert "THE GRATE IS NOW UNLOCKED" in replies[-2]
-    assert "BENEATH A 3X3 STEEL GRATE" in replies[-1]
+    assert "The grate is now unlocked" in replies[-2]
+    assert "beneath a 3x3 steel grate" in replies[-1]
 
 
 def test_standalone_adventure_service_plays_console_session() -> None:
@@ -92,7 +94,7 @@ def test_standalone_adventure_service_plays_console_session() -> None:
     assert start["active_session"] is True
     assert "adventure: session started" in str(start["reply_text"])
     assert follow_up["ok"] is True
-    assert "WELL HOUSE" in str(follow_up["reply_text"])
+    assert "well house" in str(follow_up["reply_text"])
 
 
 def test_adventure_bot_uses_shared_ack_transport() -> None:

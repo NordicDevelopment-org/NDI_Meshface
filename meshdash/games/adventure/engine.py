@@ -88,6 +88,29 @@ def _compact(text: object) -> str:
     return " ".join(str(text or "").strip().split())
 
 
+def _proper_case_adventure_text(text: object) -> str:
+    compact = _compact(text)
+    if compact.upper() == "OK":
+        return compact
+    letters = re.findall(r"[A-Za-z]", compact)
+    if not letters:
+        return compact
+    uppercase_count = sum(1 for ch in letters if ch.isupper())
+    lowercase_count = sum(1 for ch in letters if ch.islower())
+    if uppercase_count < max(3, lowercase_count * 2):
+        return compact
+
+    lowered = compact.lower()
+    lowered = re.sub(r"\bi\b", "I", lowered)
+
+    def _capitalize_sentence(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{match.group(2)}{match.group(3).upper()}"
+
+    formatted = re.sub(r"(^|[.!?]\s+)([\"'(\[]*)([a-z])", _capitalize_sentence, lowered)
+    formatted = re.sub(r"\s+([,.;:!?])", r"\1", formatted)
+    return re.sub(r"\bcolossal cave\b", "Colossal Cave", formatted)
+
+
 def _clean_words(text: object) -> list[str]:
     return [
         part[:5].upper()
@@ -201,14 +224,14 @@ class AdventureGame:
     def _room_name(self, loc: int) -> str:
         short = self._world.short_descriptions.get(loc)
         if short:
-            return short.rstrip(".")
+            return _proper_case_adventure_text(short.rstrip("."))
         long_desc = self._world.long_descriptions.get(loc, "")
         if not long_desc:
             return f"Room {loc}"
-        return long_desc.split(".")[0].strip() or f"Room {loc}"
+        return _proper_case_adventure_text(long_desc.split(".")[0].strip()) or f"Room {loc}"
 
     def _message(self, msg_id: int, fallback: str = "") -> str:
-        return self._world.messages.get(int(msg_id), fallback)
+        return _proper_case_adventure_text(self._world.messages.get(int(msg_id), fallback))
 
     def _prop(self, session: dict[str, object], obj_id: int) -> int:
         props = session.get("props")
@@ -257,7 +280,9 @@ class AdventureGame:
 
     def _object_text(self, session: dict[str, object], obj_id: int) -> str:
         msg_id = self._object_message_id(session, obj_id)
-        return self._world.object_texts.get(msg_id, OBJECT_NAMES.get(obj_id, f"object {obj_id}"))
+        return _proper_case_adventure_text(
+            self._world.object_texts.get(msg_id, OBJECT_NAMES.get(obj_id, f"object {obj_id}"))
+        )
 
     def _describe_location(
         self,
@@ -280,9 +305,9 @@ class AdventureGame:
             text = self._world.long_descriptions.get(loc, self._room_name(loc))
         else:
             text = self._world.short_descriptions.get(loc, self._room_name(loc))
-        parts = [_compact(text)]
+        parts = [_proper_case_adventure_text(text)]
         for obj_id in self._visible_object_ids(session, loc):
-            obj_text = _compact(self._object_text(session, obj_id))
+            obj_text = self._object_text(session, obj_id)
             if obj_text:
                 parts.append(obj_text)
         return _compact(" ".join(parts))
@@ -367,7 +392,9 @@ class AdventureGame:
             self._write_session(session, now_unix=now_unix)
             return BotAppResult(
                 handled=True,
-                reply_text=self._world.long_descriptions.get(target, self._room_name(target)),
+                reply_text=_proper_case_adventure_text(
+                    self._world.long_descriptions.get(target, self._room_name(target))
+                ),
                 command_name=self.SPEC.name,
             )
 
