@@ -19,6 +19,7 @@ def _app_names(apps: list[object]) -> list[str]:
 def test_build_builtin_bot_apps_includes_internal_zork():
     names = _app_names(build_builtin_bot_apps(env={}))
     assert "zork" in names
+    assert "adventure" in names
 
 
 def test_build_builtin_bot_apps_loads_external_plugin_modules(tmp_path, monkeypatch):

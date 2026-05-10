@@ -1603,6 +1603,27 @@
       return payload;
     }}
 
+    async function postStandaloneAdventureCommand(text, sessionId = "") {{
+      const body = {{
+        text: String(text == null ? "" : text),
+      }};
+      const cleanSessionId = String(sessionId == null ? "" : sessionId).trim();
+      if (cleanSessionId) {{
+        body.session_id = cleanSessionId;
+      }}
+      const resp = await fetch("/api/games/adventure", {{
+        method: "POST",
+        headers: {{ "Content-Type": "application/json" }},
+        body: JSON.stringify(body),
+      }});
+      const payload = await resp.json().catch(() => ({{}}));
+      if (!resp.ok || !payload.ok) {{
+        const msg = payload && payload.error ? payload.error : `standalone adventure failed (${{resp.status}})`;
+        throw new Error(msg);
+      }}
+      return payload;
+    }}
+
     async function postNetworkToolCommand(body) {{
       const resp = await fetch("/api/tools/network", {{
         method: "POST",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Iterable
 from typing import Callable, Optional
 
 from .config import DEFAULT_CHAT_MAX_BYTES
@@ -87,8 +88,18 @@ def _sent_packet_id(sent_packet: object) -> Optional[int]:
     return parsed if parsed is not None and parsed > 0 else None
 
 
-def _is_public_start_trigger(*, text: str, to_id: str) -> bool:
-    return str(to_id or "").strip().lower() == "^all" and text.strip().lower() == _PUBLIC_START_TRIGGER
+def _is_public_start_trigger(
+    *,
+    text: str,
+    to_id: str,
+    public_start_triggers: Iterable[str],
+) -> bool:
+    trigger = str(text or "").strip().lower()
+    return str(to_id or "").strip().lower() == "^all" and trigger in {
+        str(value or "").strip().lower()
+        for value in public_start_triggers
+        if str(value or "").strip()
+    }
 
 
 def _utf8_len(text: str) -> int:
@@ -170,6 +181,7 @@ class ZorkBotService:
         reply_async: bool = True,
         sleep_fn: Callable[[float], None] = time.sleep,
         get_delivery_state_fn: Callable[[object], object] | None = None,
+        public_start_triggers: Iterable[str] | None = None,
     ) -> None:
         self._game = game or ZorkGame()
         self._send_lock = send_lock if send_lock is not None else threading.Lock()
@@ -181,6 +193,12 @@ class ZorkBotService:
         self._reply_async = bool(reply_async)
         self._sleep_fn = sleep_fn
         self._get_delivery_state_fn = get_delivery_state_fn
+        triggers = tuple(
+            str(value or "").strip().lower()
+            for value in (public_start_triggers or (_PUBLIC_START_TRIGGER,))
+            if str(value or "").strip()
+        )
+        self._public_start_triggers = triggers or (_PUBLIC_START_TRIGGER,)
         self._lock = threading.Lock()
 
     def handle_packet(
@@ -207,7 +225,11 @@ class ZorkBotService:
         if from_id.lower() == local_node_id.lower():
             return False
 
-        public_start = _is_public_start_trigger(text=text, to_id=to_id)
+        public_start = _is_public_start_trigger(
+            text=text,
+            to_id=to_id,
+            public_start_triggers=self._public_start_triggers,
+        )
         if to_id.strip().lower() == "^all" and not public_start:
             return False
 

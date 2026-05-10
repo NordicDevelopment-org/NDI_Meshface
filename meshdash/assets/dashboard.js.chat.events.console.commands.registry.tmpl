@@ -562,7 +562,7 @@
         supportsVerbosity: false,
         run: runConsoleTracerouteCommand,
       }});
-      if (zorkFeatureEnabled) {{
+      if (gamesFeatureEnabled) {{
         registerConsoleCommand({{
           name: "zork",
           usage: "zork",
@@ -586,6 +586,38 @@
                 : ""
             );
             const replyText = normalizeStandaloneZorkReplyText(replyTextRaw);
+            if (replyText.trim()) {{
+              lines.push(replyText);
+            }}
+            if (payload && payload.active_session === false) {{
+              stopConsoleInteractiveSession("game ended", false);
+            }}
+            return lines;
+          }},
+        }});
+        registerConsoleCommand({{
+          name: "adventure",
+          usage: "adventure",
+          description: "Start a standalone local Colossal Cave Adventure session in Console.",
+          run: async (ctx) => {{
+            if (consoleInteractiveSession) {{
+              return "[adventure] already running. Press Ctrl+C to stop.";
+            }}
+            clearConsoleOutput({{ renderNow: false }});
+            const payload = await postStandaloneAdventureCommand("adventure");
+            consoleInteractiveSession = {{
+              name: "adventure",
+              mode: "standalone",
+              sessionId: String(payload && payload.session_id ? payload.session_id : "").trim(),
+            }};
+            syncConsoleCommandInputState();
+            const lines = [];
+            const replyTextRaw = String(
+              payload && Object.prototype.hasOwnProperty.call(payload, "reply_text")
+                ? (payload.reply_text ?? "")
+                : ""
+            );
+            const replyText = normalizeStandaloneAdventureReplyText(replyTextRaw);
             if (replyText.trim()) {{
               lines.push(replyText);
             }}

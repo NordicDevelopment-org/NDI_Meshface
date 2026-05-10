@@ -52,7 +52,7 @@ class RenderHtmlFn(Protocol):
         dark_theme_vars: dict | None = None,
         bbs_enabled: bool = False,
         file_transfer_enabled: bool = False,
-        zork_enabled: bool = False,
+        games_enabled: bool = False,
         file_transfer_max_bytes: int = 64 * 1024,
     ) -> str:
         ...

@@ -14,6 +14,7 @@ DEFAULT_ENABLED_MANAGED_BOT_COMMAND_NAMES = (
     "joke",
     "pull",
     "zork",
+    "adventure",
 )
 
 
@@ -52,6 +53,12 @@ MANAGED_BOT_COMMAND_SPECS = (
         name="zork",
         usage="zork",
         description="start the peer-to-peer text adventure",
+        kind="game",
+    ),
+    BotCommandSpec(
+        name="adventure",
+        usage="adventure",
+        description="start Colossal Cave Adventure",
         kind="game",
     ),
     BotCommandSpec(

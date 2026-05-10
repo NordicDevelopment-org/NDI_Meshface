@@ -44,6 +44,7 @@ def make_http_handler(
     get_custom_telemetry_settings_fn = getattr(state_fn, "get_custom_telemetry_settings_fn", None)
     set_custom_telemetry_settings_fn = getattr(state_fn, "set_custom_telemetry_settings_fn", None)
     play_standalone_zork_fn = getattr(state_fn, "play_standalone_zork_fn", None)
+    play_standalone_adventure_fn = getattr(state_fn, "play_standalone_adventure_fn", None)
     run_network_tool_fn = getattr(state_fn, "run_network_tool_fn", None)
     clean_api_token = str(api_token or "").strip() or None
     get_deps = build_get_route_dependencies(
@@ -74,6 +75,7 @@ def make_http_handler(
         apply_channel_settings_fn=apply_channel_settings_fn,
         set_custom_telemetry_settings_fn=set_custom_telemetry_settings_fn,
         play_standalone_zork_fn=play_standalone_zork_fn,
+        play_standalone_adventure_fn=play_standalone_adventure_fn,
         run_network_tool_fn=run_network_tool_fn,
         api_token=clean_api_token,
         private_mode=bool(private_mode),

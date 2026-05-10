@@ -52,7 +52,7 @@ def _dashboard_args(tmp_path):
         theme_settings_file=str(tmp_path / "theme.json"),
         file_transfer_enable=False,
         file_transfer_max_bytes=65536,
-        zork_enable=False,
+        games_enable=False,
     )
 
 
@@ -142,12 +142,14 @@ def test_offline_runtime_keeps_standalone_zork_disabled_by_default(tmp_path) -> 
     )
 
     play_fn = getattr(context.state_fn, "play_standalone_zork_fn", None)
+    adventure_play_fn = getattr(context.state_fn, "play_standalone_adventure_fn", None)
     assert play_fn is None
+    assert adventure_play_fn is None
 
 
 def test_offline_runtime_enables_standalone_zork_when_requested(tmp_path) -> None:
     args = _dashboard_args(tmp_path)
-    args.zork_enable = True
+    args.games_enable = True
     context = _build_offline_runtime_context(
         args,
         startup_error=RuntimeError("radio absent"),
@@ -158,7 +160,9 @@ def test_offline_runtime_enables_standalone_zork_when_requested(tmp_path) -> Non
     )
 
     play_fn = getattr(context.state_fn, "play_standalone_zork_fn", None)
+    adventure_play_fn = getattr(context.state_fn, "play_standalone_adventure_fn", None)
     assert callable(play_fn)
+    assert callable(adventure_play_fn)
 
     start = play_fn(text="zork", session_id="offline-zork")  # type: ignore[misc]
     assert start["ok"] is True
@@ -168,3 +172,8 @@ def test_offline_runtime_enables_standalone_zork_when_requested(tmp_path) -> Non
     follow_up = play_fn(text="look", session_id="offline-zork")  # type: ignore[misc]
     assert follow_up["ok"] is True
     assert follow_up["active_session"] is True
+
+    adventure_start = adventure_play_fn(text="adventure", session_id="offline-adventure")  # type: ignore[misc]
+    assert adventure_start["ok"] is True
+    assert adventure_start["active_session"] is True
+    assert adventure_start["session_id"] == "offline-adventure"

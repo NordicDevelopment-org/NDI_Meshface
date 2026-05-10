@@ -29,7 +29,7 @@ def build_html_shell(
     bbs_section_hidden_attrs: str = "",
     file_transfer_files_tab_hidden_attrs: str = "",
     file_transfer_section_hidden_attrs: str = "",
-    zork_enabled: bool = False,
+    games_enabled: bool = False,
     network_diagnostics_tab_hidden_attrs: str = ' hidden disabled aria-hidden="true"',
     network_diagnostics_panel_hidden_attrs: str = ' hidden aria-hidden="true"',
     chat_max_bytes: int = _DEFAULT_CHAT_MAX_BYTES,
@@ -56,13 +56,15 @@ def build_html_shell(
         bbs_section_hidden_attrs=bbs_section_hidden_attrs,
         file_transfer_files_tab_hidden_attrs=file_transfer_files_tab_hidden_attrs,
         file_transfer_section_hidden_attrs=file_transfer_section_hidden_attrs,
-        bots_zork_state_label="Enabled" if zork_enabled else "Disabled",
-        bots_zork_state_class="is-enabled" if zork_enabled else "is-disabled",
+        bots_zork_state_label="Enabled" if games_enabled else "Disabled",
+        bots_zork_state_class="is-enabled" if games_enabled else "is-disabled",
         bots_zork_hint=(
             "Public chat zork starts a private session. Direct messages continue gameplay."
-            if zork_enabled
+            if games_enabled
             else "Live replies are disabled. Enable Zork here to answer public starts and direct messages."
         ),
+        bots_adventure_state_label="Enabled" if games_enabled else "Disabled",
+        bots_adventure_state_class="is-enabled" if games_enabled else "is-disabled",
         network_diagnostics_tab_hidden_attrs=network_diagnostics_tab_hidden_attrs,
         network_diagnostics_panel_hidden_attrs=network_diagnostics_panel_hidden_attrs,
     )

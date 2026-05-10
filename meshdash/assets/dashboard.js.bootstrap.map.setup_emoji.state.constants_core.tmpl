@@ -252,7 +252,7 @@
     ];
     const knownChatNotificationScopes = new Set(["all", "self"]);
     const knownWhoisCommandPrefixes = new Set(["whois", "!whois", "#whois"]);
-    const zorkFeatureEnabled = !!Number({zork_enabled});
+    const gamesFeatureEnabled = !!Number({games_enabled});
     const knownBotSingleWordCommands = new Set([
       "cmd", "!cmd", "#cmd",
       "help", "!help", "#help",
@@ -261,6 +261,7 @@
       "joke", "!joke", "#joke",
       "pull", "!pull", "#pull",
       "zork", "!zork", "#zork",
+      "adventure", "!adventure", "#adventure",
     ]);
     const knownBotArgumentCommands = new Set([
       "whois", "!whois", "#whois",
@@ -283,12 +284,16 @@
       "wx",
       "lheard",
       "zork",
+      "adventure",
     ];
-    if (!zorkFeatureEnabled) {{
+    if (!gamesFeatureEnabled) {{
       knownBotSingleWordCommands.delete("zork");
       knownBotSingleWordCommands.delete("!zork");
       knownBotSingleWordCommands.delete("#zork");
-      defaultBotTrafficSnifferCommandHeads = defaultBotTrafficSnifferCommandHeads.filter((head) => head !== "zork");
+      knownBotSingleWordCommands.delete("adventure");
+      knownBotSingleWordCommands.delete("!adventure");
+      knownBotSingleWordCommands.delete("#adventure");
+      defaultBotTrafficSnifferCommandHeads = defaultBotTrafficSnifferCommandHeads.filter((head) => head !== "zork" && head !== "adventure");
     }}
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
     const bbsFeatureEnabled = !!Number({bbs_enabled});

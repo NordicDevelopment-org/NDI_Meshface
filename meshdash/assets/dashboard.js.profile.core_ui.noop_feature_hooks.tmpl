@@ -231,12 +231,12 @@
       const zork = (bots.zork && typeof bots.zork === "object") ? bots.zork : {{}};
       const hasRuntimePayload = Object.prototype.hasOwnProperty.call(bots, "zork");
       const hasEnabled = Object.prototype.hasOwnProperty.call(zork, "enabled");
-      const enabled = hasEnabled ? !!zork.enabled : !!zorkFeatureEnabled;
+      const enabled = hasEnabled ? !!zork.enabled : !!gamesFeatureEnabled;
       const sessions = Array.isArray(zork.sessions) ? zork.sessions : [];
       const rawSessions = Number(zork.active_session_count ?? zork.activeSessionCount ?? 0);
       const available = Object.prototype.hasOwnProperty.call(bots, "available")
         ? !!bots.available
-        : (hasRuntimePayload || !!zorkFeatureEnabled);
+        : (hasRuntimePayload || !!gamesFeatureEnabled);
       return {{
         available,
         enabled,
@@ -244,6 +244,33 @@
         sessions,
         publicStartEnabled: !!(zork.public_start_enabled ?? zork.publicStartEnabled ?? enabled),
         directMessageEnabled: !!(zork.direct_message_enabled ?? zork.directMessageEnabled ?? enabled),
+      }};
+    }}
+
+    function adventureBotRuntimeFromState(state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const summary = (safeState.summary && typeof safeState.summary === "object")
+        ? safeState.summary
+        : {{}};
+      const bots = (summary.bots && typeof summary.bots === "object")
+        ? summary.bots
+        : ((safeState.bots && typeof safeState.bots === "object") ? safeState.bots : {{}});
+      const adventure = (bots.adventure && typeof bots.adventure === "object") ? bots.adventure : {{}};
+      const hasRuntimePayload = Object.prototype.hasOwnProperty.call(bots, "adventure");
+      const hasEnabled = Object.prototype.hasOwnProperty.call(adventure, "enabled");
+      const enabled = hasEnabled ? !!adventure.enabled : !!gamesFeatureEnabled;
+      const sessions = Array.isArray(adventure.sessions) ? adventure.sessions : [];
+      const rawSessions = Number(adventure.active_session_count ?? adventure.activeSessionCount ?? 0);
+      const available = Object.prototype.hasOwnProperty.call(bots, "available")
+        ? !!bots.available
+        : (hasRuntimePayload || !!gamesFeatureEnabled);
+      return {{
+        available,
+        enabled,
+        activeSessionCount: Number.isFinite(rawSessions) ? Math.max(0, Math.floor(rawSessions)) : sessions.length,
+        sessions,
+        publicStartEnabled: !!(adventure.public_start_enabled ?? adventure.publicStartEnabled ?? enabled),
+        directMessageEnabled: !!(adventure.direct_message_enabled ?? adventure.directMessageEnabled ?? enabled),
       }};
     }}
 
@@ -779,12 +806,19 @@
 
     function renderBotsView(state = latestState) {{
       const runtime = zorkBotRuntimeFromState(state);
+      const adventureRuntime = adventureBotRuntimeFromState(state);
       const item = document.getElementById("bots-zork-command-item");
       if (item instanceof HTMLElement) {{
         item.classList.toggle("is-enabled", runtime.enabled);
         item.classList.toggle("is-disabled", !runtime.enabled);
       }}
+      const adventureItem = document.getElementById("bots-adventure-command-item");
+      if (adventureItem instanceof HTMLElement) {{
+        adventureItem.classList.toggle("is-enabled", adventureRuntime.enabled);
+        adventureItem.classList.toggle("is-disabled", !adventureRuntime.enabled);
+      }}
       setZorkBotStatusClass(document.getElementById("bots-zork-list-state"), runtime.enabled);
+      setZorkBotStatusClass(document.getElementById("bots-adventure-list-state"), adventureRuntime.enabled);
       setZorkBotStatusClass(document.getElementById("bots-zork-detail-state"), runtime.enabled);
       bindZorkBotControls();
       syncZorkBotControls(runtime);

@@ -18,9 +18,16 @@ reviewed before the repository is made public.
   Unicode Emoji version `17.0`, dated `2025-08-04, 20:55:31 GMT`. Before public
   release, document the exact generation command/input URL and confirm the
   applicable Unicode data license or terms.
-- `meshdash/games/zork/upstream_1977/zork-master/zork/dung.56` bundles upstream
-  Zork data. Its redistribution status is not documented in this repository;
-  confirm permission or remove it before public release.
+- `meshdash/games/zork/upstream_1977/zork-master/zork/dung.56` bundles Zork
+  data sourced from `https://github.com/MITDDC/zork`, the MIT Libraries
+  Department of Distinctive Collections repository for a 1977 version of Zork.
+  The source repository includes rights and license details; review them before
+  public release.
+- `meshdash/games/adventure/data/77-03-31_adventure.dat` bundles Colossal Cave
+  Adventure data copied from `https://github.com/wh0am1-dev/adventure`. The
+  source repository describes the material as original Fortran source collected
+  for educational purposes, but does not document redistribution terms; confirm
+  permission or remove it before public release.
 
 ## Runtime Network Assets
 

@@ -31,6 +31,7 @@ Not part of the default launcher surface:
 - Dedicated Bots or Labs launcher views
 - BBS unless `--bbs-enable` is set and the traffic disclaimer is accepted
 - Files unless file transfer is enabled and the traffic disclaimer is accepted
+- Text-game console/bot endpoints unless `--games-enable` is set
 - Network diagnostics unless `--debug-mode` is enabled
 
 The source tree still contains dormant/internal hooks and optional backend
@@ -421,6 +422,7 @@ DASH_PORT=8877
 REFRESH_MS=3000
 MESH_DASH_HISTORY_DB=/opt/meshyface/mesh_dashboard_history.sqlite3
 MESH_DASH_BBS_ENABLE=0
+MESH_DASH_GAMES_ENABLE=0
 MESH_DASH_FILE_TRANSFER_ENABLE=0
 MESH_DASH_FILE_TRANSFER_MAX_BYTES=65536
 MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=0
@@ -557,12 +559,15 @@ Related environment variables:
   `Authorization: Bearer <token>` or `X-API-Token`
 - `--bbs-enable` / `--no-bbs-enable`: expose or hide the BBS/profile workspace
   when `--accept-file-transfer-traffic-disclaimer` is also set
+- `--games-enable` / `--no-games-enable`: enable playable Zork and Adventure
+  console endpoints plus mesh bot replies
 
 Related environment variables:
 
 - `MESH_DASH_PRIVATE_MODE`
 - `MESH_DASH_API_TOKEN`
 - `MESH_DASH_BBS_ENABLE`
+- `MESH_DASH_GAMES_ENABLE`
 - `MESH_DASH_VERSION`
 - `MESH_DASH_GIT_COMMIT`
 
@@ -635,6 +640,7 @@ The bundled service/deploy flow commonly uses:
 - `REFRESH_MS`
 - `MESH_DASH_HISTORY_DB`
 - `MESH_DASH_BBS_ENABLE`
+- `MESH_DASH_GAMES_ENABLE`
 - `MESH_DASH_FILE_TRANSFER_ENABLE`
 - `MESH_DASH_FILE_TRANSFER_MAX_BYTES`
 - `MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER`
@@ -716,6 +722,7 @@ The deploy helper also accepts:
 - `/api/settings/custom_telemetry`
 - `/api/tools/network`
 - `/api/games/zork`
+- `/api/games/adventure`
 
 Write-path rules:
 

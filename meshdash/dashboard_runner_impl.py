@@ -87,6 +87,32 @@ def _attach_standalone_zork_service(state_fn: object) -> None:
             pass
 
 
+def _attach_standalone_adventure_service(state_fn: object) -> None:
+    try:
+        from .services_standalone_adventure import (
+            build_standalone_adventure_service as _build_standalone_adventure_service,
+        )
+    except Exception:
+        return
+
+    try:
+        standalone_adventure = _build_standalone_adventure_service()
+    except Exception:
+        return
+
+    try:
+        setattr(state_fn, "play_standalone_adventure_fn", standalone_adventure.play)
+    except Exception:
+        pass
+
+    state_lite_fn = getattr(state_fn, "lite", None)
+    if callable(state_lite_fn):
+        try:
+            setattr(state_lite_fn, "play_standalone_adventure_fn", standalone_adventure.play)
+        except Exception:
+            pass
+
+
 def _summary_sampling_supported(context: DashboardRuntimeContext) -> bool:
     if not context.history_enabled:
         return False
@@ -287,8 +313,9 @@ def _build_offline_runtime_context(
         started_at=started_at,
         utc_now_fn=utc_now_fn,
     )
-    if bool(getattr(args, "zork_enable", False)):
+    if bool(getattr(args, "games_enable", False)):
         _attach_standalone_zork_service(state_fn)
+        _attach_standalone_adventure_service(state_fn)
     return DashboardRuntimeContext(
         target=target,
         iface=_NoopCloseResource(),

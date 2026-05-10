@@ -70,6 +70,7 @@ class DashboardTracker:
         self.radio_link_changed_unix: Optional[int] = None
         self.radio_link_error: Optional[str] = None
         self._zork_bot_service = None
+        self._adventure_bot_service = None
 
     def _bump_state_revision_unlocked(self) -> None:
         self.state_revision = int(getattr(self, "state_revision", 0) or 0) + 1
@@ -108,11 +109,53 @@ class DashboardTracker:
             self._bump_state_revision_unlocked()
         return True
 
+    def enable_adventure_bot(
+        self,
+        *,
+        send_lock: object | None = None,
+        reply_segment_delay_seconds: float | None = None,
+        reply_ack_wait_seconds: float | None = None,
+        reply_ack_poll_seconds: float | None = None,
+        reply_retry_limit: int | None = None,
+        reply_async: bool | None = None,
+        sleep_fn: object | None = None,
+    ) -> bool:
+        try:
+            from .services_adventure_bot import build_adventure_bot_service
+        except Exception:
+            return False
+        kwargs = {"send_lock": send_lock, "get_delivery_state_fn": self.get_delivery_state}
+        if reply_segment_delay_seconds is not None:
+            kwargs["reply_segment_delay_seconds"] = reply_segment_delay_seconds
+        if reply_ack_wait_seconds is not None:
+            kwargs["reply_ack_wait_seconds"] = reply_ack_wait_seconds
+        if reply_ack_poll_seconds is not None:
+            kwargs["reply_ack_poll_seconds"] = reply_ack_poll_seconds
+        if reply_retry_limit is not None:
+            kwargs["reply_retry_limit"] = reply_retry_limit
+        if reply_async is not None:
+            kwargs["reply_async"] = reply_async
+        if callable(sleep_fn):
+            kwargs["sleep_fn"] = sleep_fn
+        service = build_adventure_bot_service(**kwargs)
+        with self._lock:
+            self._adventure_bot_service = service
+            self._bump_state_revision_unlocked()
+        return True
+
     def disable_zork_bot(self) -> bool:
         with self._lock:
             if self._zork_bot_service is None:
                 return True
             self._zork_bot_service = None
+            self._bump_state_revision_unlocked()
+        return True
+
+    def disable_adventure_bot(self) -> bool:
+        with self._lock:
+            if self._adventure_bot_service is None:
+                return True
+            self._adventure_bot_service = None
             self._bump_state_revision_unlocked()
         return True
 
@@ -125,9 +168,18 @@ class DashboardTracker:
         if bool(enabled):
             with self._lock:
                 already_enabled = self._zork_bot_service is not None
-            ok = True if already_enabled else self.enable_zork_bot(send_lock=send_lock)
+                adventure_already_enabled = self._adventure_bot_service is not None
+            zork_ok = True if already_enabled else self.enable_zork_bot(send_lock=send_lock)
+            adventure_ok = (
+                True
+                if adventure_already_enabled
+                else self.enable_adventure_bot(send_lock=send_lock)
+            )
+            ok = bool(zork_ok and adventure_ok)
         else:
-            ok = self.disable_zork_bot()
+            zork_ok = self.disable_zork_bot()
+            adventure_ok = self.disable_adventure_bot()
+            ok = bool(zork_ok and adventure_ok)
         runtime = self.get_zork_bot_runtime()
         runtime["ok"] = bool(ok)
         return runtime
@@ -135,6 +187,7 @@ class DashboardTracker:
     def get_zork_bot_runtime(self) -> dict[str, object]:
         with self._lock:
             service = self._zork_bot_service
+            adventure_service = self._adventure_bot_service
         active_session_count = 0
         sessions: list[dict[str, object]] = []
         if service is not None:
@@ -157,6 +210,28 @@ class DashboardTracker:
                 except Exception:
                     sessions = []
         enabled = service is not None
+        adventure_active_session_count = 0
+        adventure_sessions: list[dict[str, object]] = []
+        if adventure_service is not None:
+            active_session_count_fn = getattr(adventure_service, "active_session_count", None)
+            if callable(active_session_count_fn):
+                try:
+                    adventure_active_session_count = max(0, int(active_session_count_fn()))
+                except Exception:
+                    adventure_active_session_count = 0
+            session_summaries_fn = getattr(adventure_service, "session_summaries", None)
+            if callable(session_summaries_fn):
+                try:
+                    session_summaries = session_summaries_fn()
+                    if isinstance(session_summaries, list):
+                        adventure_sessions = [
+                            dict(row)
+                            for row in session_summaries
+                            if isinstance(row, dict)
+                        ]
+                except Exception:
+                    adventure_sessions = []
+        adventure_enabled = adventure_service is not None
         return {
             "available": True,
             "zork": {
@@ -165,6 +240,13 @@ class DashboardTracker:
                 "sessions": sessions,
                 "public_start_enabled": enabled,
                 "direct_message_enabled": enabled,
+            },
+            "adventure": {
+                "enabled": adventure_enabled,
+                "active_session_count": adventure_active_session_count,
+                "sessions": adventure_sessions,
+                "public_start_enabled": adventure_enabled,
+                "direct_message_enabled": adventure_enabled,
             },
         }
 
@@ -230,21 +312,27 @@ class DashboardTracker:
         return None
 
     def on_receive(self, packet: dict[str, object], interface: object) -> None:
-        zork_bot_service = None
+        bot_services: list[object] = []
         with self._lock:
             if not self._accept_packets:
                 return
             self.live_packet_count += 1
             self._record_packet_unlocked(packet, interface, include_live_count=True)
             self._bump_state_revision_unlocked()
-            zork_bot_service = self._zork_bot_service
-        if zork_bot_service is not None:
+            bot_services = [
+                service
+                for service in (self._zork_bot_service, self._adventure_bot_service)
+                if service is not None
+            ]
+        for bot_service in bot_services:
             try:
-                zork_bot_service.handle_packet(
+                handled = bot_service.handle_packet(
                     packet,
                     interface,
                     record_local_chat_fn=self.record_local_chat,
                 )
+                if handled:
+                    break
             except Exception:
                 pass
 
@@ -295,7 +383,7 @@ class DashboardTracker:
         ack_requested: bool = False,
         retry_of: Optional[int] = None,
     ) -> None:
-        zork_bot_service = None
+        bot_services: list[object] = []
         should_offer_to_zork = False
         with self._lock:
             changed = _record_tracker_local_chat_for_tracker_helper(
@@ -315,9 +403,13 @@ class DashboardTracker:
             )
             if changed:
                 self._bump_state_revision_unlocked()
-                zork_bot_service = self._zork_bot_service
+                bot_services = [
+                    service
+                    for service in (self._zork_bot_service, self._adventure_bot_service)
+                    if service is not None
+                ]
                 should_offer_to_zork = not bool(is_reaction)
-        if should_offer_to_zork and zork_bot_service is not None:
+        if should_offer_to_zork and bot_services:
             local_node_id = ""
             from_text = str(from_id or "").strip()
             to_text = str(to_id or "").strip()
@@ -325,18 +417,21 @@ class DashboardTracker:
                 local_node_id = from_text
             elif to_text.startswith("!"):
                 local_node_id = to_text
-            try:
-                zork_bot_service.handle_local_chat(
-                    text=text,
-                    from_id=from_id,
-                    to_id=to_id,
-                    local_node_id=local_node_id,
-                    channel_index=channel_index,
-                    reply_id=message_id,
-                    record_local_chat_fn=self.record_local_chat,
-                )
-            except Exception:
-                pass
+            for bot_service in bot_services:
+                try:
+                    handled = bot_service.handle_local_chat(
+                        text=text,
+                        from_id=from_id,
+                        to_id=to_id,
+                        local_node_id=local_node_id,
+                        channel_index=channel_index,
+                        reply_id=message_id,
+                        record_local_chat_fn=self.record_local_chat,
+                    )
+                    if handled:
+                        break
+                except Exception:
+                    pass
 
     def seed_packet(self, packet: dict[str, object], interface: object) -> None:
         with self._lock:

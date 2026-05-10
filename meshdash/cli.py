@@ -88,10 +88,10 @@ def build_dashboard_parser(
     default_bbs_enable: bool = False,
     env_bbs_enable: Optional[str] = None,
     default_file_transfer_enable: bool = False,
-    default_zork_enable: bool = False,
+    default_games_enable: bool = False,
     default_file_transfer_max_bytes: int = 64 * 1024,
     env_file_transfer_enable: Optional[str] = None,
-    env_zork_enable: Optional[str] = None,
+    env_games_enable: Optional[str] = None,
     env_file_transfer_max_bytes: Optional[str] = None,
     env_accept_file_transfer_traffic_disclaimer: Optional[str] = None,
 ) -> argparse.ArgumentParser:
@@ -111,9 +111,9 @@ def build_dashboard_parser(
         env_file_transfer_enable,
         default_file_transfer_enable,
     )
-    resolved_zork_enable = parse_env_bool(
-        env_zork_enable,
-        default_zork_enable,
+    resolved_games_enable = parse_env_bool(
+        env_games_enable,
+        default_games_enable,
     )
     resolved_file_transfer_max_bytes = parse_env_int(
         env_file_transfer_max_bytes,
@@ -144,7 +144,7 @@ def build_dashboard_parser(
         default_api_token=resolved_api_token,
         default_bbs_enable=resolved_bbs_enable,
         default_file_transfer_enable=resolved_file_transfer_enable,
-        default_zork_enable=resolved_zork_enable,
+        default_games_enable=resolved_games_enable,
         default_file_transfer_max_bytes=resolved_file_transfer_max_bytes,
         default_accept_file_transfer_traffic_disclaimer=resolved_accept_file_transfer_traffic_disclaimer,
     )

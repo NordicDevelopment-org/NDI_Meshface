@@ -4,8 +4,9 @@
       if (mode === "standalone") {{
         const sessionId = String(payload.sessionId ?? payload.session_id ?? "").trim();
         if (!sessionId) return null;
+        const name = String(payload.name || "zork").trim().toLowerCase() || "zork";
         return {{
-          name: "zork",
+          name,
           mode: "standalone",
           sessionId,
         }};
@@ -20,8 +21,9 @@
         if (mode === "standalone") {{
           const sessionId = String(consoleInteractiveSession.sessionId || "").trim();
           if (sessionId) {{
+            const name = String(consoleInteractiveSession.name || "zork").trim().toLowerCase() || "zork";
             interactiveSession = {{
-              name: "zork",
+              name,
               mode: "standalone",
               sessionId,
             }};
@@ -114,13 +116,19 @@
     function isStandaloneConsoleSessionExpiredMessage(value) {{
       const text = String(value == null ? "" : value).trim();
       if (!text) return false;
-      return /no active standalone zork session/i.test(text);
+      return /no active standalone (zork|adventure) session/i.test(text);
     }}
 
     function normalizeStandaloneZorkReplyText(value) {{
       const text = String(value == null ? "" : value).trim();
       if (!text) return "";
       return text.replace(/^zork:\s*session started\.\s*/i, "").trim();
+    }}
+
+    function normalizeStandaloneAdventureReplyText(value) {{
+      const text = String(value == null ? "" : value).trim();
+      if (!text) return "";
+      return text.replace(/^adventure:\s*session started\.\s*/i, "").trim();
     }}
 
     function wildcardPatternToRegExp(pattern) {{

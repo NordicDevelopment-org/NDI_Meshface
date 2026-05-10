@@ -26,7 +26,7 @@ def test_render_html_hides_bbs_workspace_by_default() -> None:
     )
 
     assert 'const bbsFeatureEnabled = !!Number(0);' in html
-    assert 'const zorkFeatureEnabled = !!Number(0);' in html
+    assert 'const gamesFeatureEnabled = !!Number(0);' in html
     assert re_search(
         html,
         r'<button[\s\S]*data-app-view="bbs"[\s\S]*hidden disabled aria-hidden="true"'
@@ -61,7 +61,7 @@ def test_render_html_shows_bbs_workspace_when_enabled() -> None:
     assert 'id="bbs-host-announce-btn"' not in html
 
 
-def test_render_html_exposes_zork_flag_when_enabled() -> None:
+def test_render_html_exposes_games_flag_when_enabled() -> None:
     html = render_html(
         refresh_ms=1000,
         packet_limit=200,
@@ -73,11 +73,11 @@ def test_render_html_exposes_zork_flag_when_enabled() -> None:
         node_history_max_points=240,
         revision_label="test",
         revision_title="test",
-        zork_enabled=True,
+        games_enabled=True,
     )
 
-    assert 'const zorkFeatureEnabled = !!Number(1);' in html
-    assert 'if (zorkFeatureEnabled) {' in html
+    assert 'const gamesFeatureEnabled = !!Number(1);' in html
+    assert 'if (gamesFeatureEnabled) {' in html
 
 
 def test_dashboard_parser_supports_bbs_enable_flag_and_env_default() -> None:
@@ -124,7 +124,7 @@ def test_dashboard_parser_supports_bbs_enable_flag_and_env_default() -> None:
     assert explicit_enable_args.bbs_enable is True
 
 
-def test_dashboard_parser_supports_zork_enable_flag_and_env_default() -> None:
+def test_dashboard_parser_supports_games_enable_flag_and_env_default() -> None:
     parser = build_dashboard_parser(
         add_mesh_connection_args_fn=_add_mesh_connection_args,
         default_mesh_port="/dev/ttyUSB0",
@@ -152,22 +152,22 @@ def test_dashboard_parser_supports_zork_enable_flag_and_env_default() -> None:
         default_bbs_enable=False,
         env_bbs_enable=None,
         default_file_transfer_enable=False,
-        default_zork_enable=False,
+        default_games_enable=False,
         default_file_transfer_max_bytes=64 * 1024,
         env_file_transfer_enable=None,
-        env_zork_enable="1",
+        env_games_enable="1",
         env_file_transfer_max_bytes=None,
         env_accept_file_transfer_traffic_disclaimer=None,
     )
 
     env_default_args = parser.parse_args([])
-    assert env_default_args.zork_enable is True
+    assert env_default_args.games_enable is True
 
-    explicit_disable_args = parser.parse_args(["--no-zork-enable"])
-    assert explicit_disable_args.zork_enable is False
+    explicit_disable_args = parser.parse_args(["--no-games-enable"])
+    assert explicit_disable_args.games_enable is False
 
-    explicit_enable_args = parser.parse_args(["--zork-enable"])
-    assert explicit_enable_args.zork_enable is True
+    explicit_enable_args = parser.parse_args(["--games-enable"])
+    assert explicit_enable_args.games_enable is True
 
 
 def test_bbs_enable_requires_traffic_disclaimer() -> None:

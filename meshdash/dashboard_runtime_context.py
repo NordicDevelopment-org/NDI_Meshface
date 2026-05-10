@@ -68,6 +68,13 @@ def _build_standalone_zork_service():
     return _impl()
 
 
+def _build_standalone_adventure_service():
+    # Lazy import so slim public builds can omit game modules.
+    from .services_standalone_adventure import build_standalone_adventure_service as _impl
+
+    return _impl()
+
+
 @dataclass(frozen=True)
 class DashboardRuntimeContext:
     target: str
@@ -146,11 +153,17 @@ def build_dashboard_runtime_context(
 
     tracker = dashboard_tracker_cls(packet_limit=args.packet_limit, history_store=history_store)
     send_lock = lock_factory()
-    if bool(getattr(args, "zork_enable", False)):
+    if bool(getattr(args, "games_enable", False)):
         enable_zork_bot = getattr(tracker, "enable_zork_bot", None)
         if callable(enable_zork_bot):
             try:
                 enable_zork_bot(send_lock=send_lock)
+            except Exception:
+                pass
+        enable_adventure_bot = getattr(tracker, "enable_adventure_bot", None)
+        if callable(enable_adventure_bot):
+            try:
+                enable_adventure_bot(send_lock=send_lock)
             except Exception:
                 pass
     subscribe_fn(tracker.on_receive, "meshtastic.receive")
@@ -391,11 +404,16 @@ def build_dashboard_runtime_context(
                     pass
 
     standalone_zork = None
-    if bool(getattr(args, "zork_enable", False)):
+    standalone_adventure = None
+    if bool(getattr(args, "games_enable", False)):
         try:
             standalone_zork = _build_standalone_zork_service()
         except Exception:
             standalone_zork = None
+        try:
+            standalone_adventure = _build_standalone_adventure_service()
+        except Exception:
+            standalone_adventure = None
 
     if standalone_zork is not None:
         try:
@@ -406,6 +424,18 @@ def build_dashboard_runtime_context(
         if callable(state_lite_fn):
             try:
                 setattr(state_lite_fn, "play_standalone_zork_fn", standalone_zork.play)
+            except Exception:
+                pass
+
+    if standalone_adventure is not None:
+        try:
+            setattr(loaders.state_fn, "play_standalone_adventure_fn", standalone_adventure.play)
+        except Exception:
+            pass
+        state_lite_fn = getattr(loaders.state_fn, "lite", None)
+        if callable(state_lite_fn):
+            try:
+                setattr(state_lite_fn, "play_standalone_adventure_fn", standalone_adventure.play)
             except Exception:
                 pass
 
