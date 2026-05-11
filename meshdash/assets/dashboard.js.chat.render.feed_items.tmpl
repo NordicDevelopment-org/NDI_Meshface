@@ -277,6 +277,7 @@
           : "";
         const canReply = Number.isInteger(messageId) && messageId > 0;
         const replyToId = replyIdOf(msg);
+        let replyInlineJumpTargetId = Number.isInteger(replyToId) && replyToId > 0 ? replyToId : null;
         let replyTooltipSummary = "";
         let replyTooltipPreview = "";
         let replyInlineLabel = "";
@@ -287,10 +288,19 @@
           if (parentMsg) {{
             const parentFromMeta = chatEndpointParts(endpointsForMessage(parentMsg).fromId);
             const parentLabel = parentFromMeta.label || "Unknown node";
-            const parentPreview = (
-              compactInlineMessage(parentMsg.text || "", 110)
-              || emojiOf(parentMsg)
-            );
+            const parentTextRaw = String(
+              parentMsg.text
+              ?? parentMsg.decoded_text
+              ?? parentMsg.payload_text
+              ?? ""
+            ).trim();
+            const parentPreview = parentTextRaw
+              ? compactInlineMessage(parentTextRaw, 110)
+              : (emojiOf(parentMsg) || compactInlineMessage("", 110));
+            const parentReactionTargetId = isReactionMessage(parentMsg) ? replyIdOf(parentMsg) : null;
+            if (Number.isInteger(parentReactionTargetId) && parentReactionTargetId > 0) {{
+              replyInlineJumpTargetId = parentReactionTargetId;
+            }}
             replyTooltipSummary = `Replying to ${{parentLabel}}`;
             replyTooltipPreview = parentPreview;
             replyInlineLabel = parentLabel;
@@ -487,11 +497,11 @@
           messageTooltipParts.push(`Message: ${{textCompact}}`);
         }}
         const messageTooltip = messageTooltipParts.join("\n");
-        const replyInlineTitle = Number.isInteger(replyToId) && replyToId > 0
-          ? `Jump to original packet #${{replyToId}}`
+        const replyInlineTitle = Number.isInteger(replyInlineJumpTargetId) && replyInlineJumpTargetId > 0
+          ? `Jump to original packet #${{replyInlineJumpTargetId}}`
           : "Original packet is unavailable";
         const replyInline = replyInlineLabel
-          ? `<button type="button" class="chat-reply-inline${{replyInlineMissing ? " missing" : ""}}" data-reply-target-id="${{escAttr(replyToId || "")}}" title="${{escAttr(replyInlineTitle)}}" aria-label="${{escAttr(replyInlineTitle)}}">
+          ? `<button type="button" class="chat-reply-inline${{replyInlineMissing ? " missing" : ""}}" data-reply-target-id="${{escAttr(replyInlineJumpTargetId || "")}}" title="${{escAttr(replyInlineTitle)}}" aria-label="${{escAttr(replyInlineTitle)}}">
               <span class="chat-reply-inline-label">↪ ${{escAttr(replyInlineLabel)}}</span>
               <span class="chat-reply-inline-text">${{escAttr(replyInlineText)}}</span>
             </button>`

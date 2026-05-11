@@ -944,11 +944,28 @@ def test_chat_reply_preview_links_jump_to_original_packet() -> None:
     assert "appearance: none;" in reply_button_section
     assert "background: transparent;" in reply_button_section
     assert "cursor: pointer;" in reply_button_section
-    assert "data-reply-target-id=\"${escAttr(replyToId || \"\")}\"" in js
+    assert "let replyInlineJumpTargetId = Number.isInteger(replyToId) && replyToId > 0 ? replyToId : null;" in js
+    assert "data-reply-target-id=\"${escAttr(replyInlineJumpTargetId || \"\")}\"" in js
     assert "async function jumpToOriginalChatMessage(messageIdRaw)" in js
     assert "function focusChatFeedItemByMessageId(messageIdRaw)" in js
     assert "await loadOlderChatMessagesForCurrentView();" in js
     assert "void jumpToOriginalChatMessage(targetId);" in js
+
+
+def test_chat_reply_preview_uses_reaction_emoji_for_empty_parent_text() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const parentTextRaw = String(" in js
+    assert "parentMsg.decoded_text" in js
+    assert "parentMsg.payload_text" in js
+    assert "? compactInlineMessage(parentTextRaw, 110)" in js
+    assert ": (emojiOf(parentMsg) || compactInlineMessage(\"\", 110));" in js
+    assert "const parentReactionTargetId = isReactionMessage(parentMsg) ? replyIdOf(parentMsg) : null;" in js
+    assert "replyInlineJumpTargetId = parentReactionTargetId;" in js
 
 
 def test_chat_feed_search_is_reapplied_after_feed_render() -> None:
