@@ -1006,6 +1006,29 @@
       controls.setAttribute("aria-hidden", showControls ? "false" : "true");
     }}
 
+    function syncNetworkRoutesPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
+      const toolbar = document.querySelector(".network-routes-toolbar");
+      const card = document.querySelector(".network-routes-card");
+      const controlsHost = document.getElementById("network-routes-primary-controls");
+      if (!(toolbar instanceof HTMLElement)) return;
+      if (!(card instanceof HTMLElement)) return;
+      if (!(controlsHost instanceof HTMLElement)) return;
+
+      const normalizedView = normalizeLayoutView(viewName);
+      const normalizedSubview = normalizeNetworkSubview(subviewName);
+      const dockInNetworkRoutes = normalizedView === "network" && normalizedSubview === "routes";
+      const targetHost = dockInNetworkRoutes ? controlsHost : card;
+      if (toolbar.parentElement !== targetHost) {{
+        if (targetHost === card) {{
+          card.insertBefore(toolbar, card.firstChild || null);
+        }} else {{
+          controlsHost.appendChild(toolbar);
+        }}
+      }}
+      controlsHost.hidden = !dockInNetworkRoutes;
+      controlsHost.setAttribute("aria-hidden", dockInNetworkRoutes ? "false" : "true");
+    }}
+
     function syncEnvironmentMetricsDock(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
       const explorer = document.querySelector(".env-metrics-explorer");
       const controls = document.querySelector(".env-metrics-controls");
@@ -2939,6 +2962,7 @@
 
       syncMapControlsDock(activeLayoutView, next);
       syncNetworkOverviewPrimaryControls(activeLayoutView, next);
+      syncNetworkRoutesPrimaryControls(activeLayoutView, next);
       syncEnvironmentMetricsDock(activeLayoutView, next);
 
       try {{
@@ -8008,6 +8032,7 @@
       syncNodeHistoryDock();
       syncMapControlsDock(next, activeNetworkSubview);
       syncNetworkOverviewPrimaryControls(next, activeNetworkSubview);
+      syncNetworkRoutesPrimaryControls(next, activeNetworkSubview);
       syncEnvironmentMetricsDock(next, activeNetworkSubview);
       if (latestState) {{
         const networkGraphActive = next === "network" && activeNetworkSubview === "graph";

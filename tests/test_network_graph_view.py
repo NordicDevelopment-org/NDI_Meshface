@@ -26,6 +26,7 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
     assert 'id="network-map-panel-graph"' in html
     assert 'data-network-subview="routes"' in html
     assert 'id="network-map-panel-routes"' in html
+    assert 'id="network-routes-primary-controls"' in html
     assert 'data-network-subview="sensors"' in html
     assert 'id="network-map-panel-sensors"' in html
     assert 'id="network-sensors-host"' in html
@@ -113,6 +114,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const controls = document.querySelector(".env-metrics-controls");' in js
     assert 'const networkControlsHost = document.getElementById("network-sensors-primary-controls");' in js
     assert 'const controlsTarget = dockInNetworkSensors ? networkControlsHost : explorer;' in js
+    assert 'function syncNetworkRoutesPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview)' in js
+    assert 'const controlsHost = document.getElementById("network-routes-primary-controls");' in js
+    assert 'const dockInNetworkRoutes = normalizedView === "network" && normalizedSubview === "routes";' in js
     assert 'runBootStep("bindMapFullscreenControl", () => bindMapFullscreenControl());' in js
     assert 'requestMapResizeStabilized();' in js
     assert 'activeNetworkSubview === "graph"' in js
@@ -429,11 +433,14 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-mode-control {" in css
     assert ".map-fullscreen-toggle-btn {" in css
     assert ".network-fullscreen-toggle-btn {" in css
-    assert ".network-sensors-primary-controls {" in css
+    assert ".network-routes-primary-controls," in css
+    assert ".network-routes-primary-controls .network-routes-toolbar {" in css
+    assert ".network-sensors-primary-controls {" in css or ".network-sensors-primary-controls," in css
     assert ".network-sensors-primary-controls .env-metric-select {" in css
     assert ".network-map-subviews:fullscreen {" in css
     assert ".layout.view-network #network-map-panel-overview .network-overview-card {" in css
     assert ".layout.view-network #network-map-panel-overview #network-overview-chart-wrap {" in css
+    assert ".layout.view-network #network-map-panel-routes .network-routes-card {" in css
     assert ".layout.view-network #network-map-panel-sensors .env-metrics-explorer {" in css
     assert ".layout.view-network #network-map-panel-sensors #env-metrics-chart-wrap {" in css
     assert "border: 0;" in css
