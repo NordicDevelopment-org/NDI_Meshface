@@ -1008,28 +1008,37 @@
 
     function syncEnvironmentMetricsDock(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
       const explorer = document.querySelector(".env-metrics-explorer");
-      const controls = document.querySelector(".env-metrics-explorer .env-metrics-controls");
+      const controls = document.querySelector(".env-metrics-controls");
       const homeHost = document.getElementById("environment-metrics-home");
       const networkHost = document.getElementById("network-sensors-host");
+      const networkControlsHost = document.getElementById("network-sensors-primary-controls");
       const envWindowWrap = document.getElementById("env-window-wrap");
       if (!(explorer instanceof HTMLElement)) return;
       if (!(controls instanceof HTMLElement)) return;
       if (!(homeHost instanceof HTMLElement)) return;
       if (!(networkHost instanceof HTMLElement)) return;
+      if (!(networkControlsHost instanceof HTMLElement)) return;
 
       const normalizedView = normalizeLayoutView(viewName);
       const normalizedSubview = normalizeNetworkSubview(subviewName);
       const dockInNetworkSensors = normalizedView === "network" && normalizedSubview === "sensors";
       const targetHost = dockInNetworkSensors ? networkHost : homeHost;
+      const controlsTarget = dockInNetworkSensors ? networkControlsHost : explorer;
       if (envWindowWrap instanceof HTMLElement) {{
         envWindowWrap.hidden = false;
       }}
       if (explorer.parentElement !== targetHost) {{
         targetHost.appendChild(explorer);
       }}
-      if (controls.parentElement !== explorer) {{
-        explorer.insertBefore(controls, explorer.firstChild || null);
+      if (controls.parentElement !== controlsTarget) {{
+        if (controlsTarget === explorer) {{
+          explorer.insertBefore(controls, explorer.firstChild || null);
+        }} else {{
+          controlsTarget.appendChild(controls);
+        }}
       }}
+      networkControlsHost.hidden = !dockInNetworkSensors;
+      networkControlsHost.setAttribute("aria-hidden", dockInNetworkSensors ? "false" : "true");
     }}
 
     const networkTopNodesCategoryDefs = Object.freeze([

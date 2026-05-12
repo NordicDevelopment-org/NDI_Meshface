@@ -29,6 +29,7 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
     assert 'data-network-subview="sensors"' in html
     assert 'id="network-map-panel-sensors"' in html
     assert 'id="network-sensors-host"' in html
+    assert 'id="network-sensors-primary-controls"' in html
     assert 'id="network-routes-from"' in html
     assert 'id="network-routes-to"' in html
     assert 'data-network-route-mode="inferred"' in html
@@ -109,6 +110,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'Enter full screen network view' in js
     assert 'function toggleNetworkMapFullscreen()' in js
     assert 'function bindMapFullscreenControl()' in js
+    assert 'const controls = document.querySelector(".env-metrics-controls");' in js
+    assert 'const networkControlsHost = document.getElementById("network-sensors-primary-controls");' in js
+    assert 'const controlsTarget = dockInNetworkSensors ? networkControlsHost : explorer;' in js
     assert 'runBootStep("bindMapFullscreenControl", () => bindMapFullscreenControl());' in js
     assert 'requestMapResizeStabilized();' in js
     assert 'activeNetworkSubview === "graph"' in js
@@ -425,6 +429,8 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-mode-control {" in css
     assert ".map-fullscreen-toggle-btn {" in css
     assert ".network-fullscreen-toggle-btn {" in css
+    assert ".network-sensors-primary-controls {" in css
+    assert ".network-sensors-primary-controls .env-metric-select {" in css
     assert ".network-map-subviews:fullscreen {" in css
     assert ".layout.view-network #network-map-panel-overview .network-overview-card {" in css
     assert ".layout.view-network #network-map-panel-overview #network-overview-chart-wrap {" in css

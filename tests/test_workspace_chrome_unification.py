@@ -309,7 +309,8 @@ def test_mobile_network_and_games_shells_expand_to_single_phone_column() -> None
     assert "height: 100%;" in mobile_section
     assert ".layout.view-network .map," in mobile_section
     assert ".network-map-subview-tabs," in mobile_section
-    assert ".network-overview-primary-controls {" in mobile_section
+    assert ".network-overview-primary-controls," in mobile_section
+    assert ".network-sensors-primary-controls {" in mobile_section
     assert "overflow-x: auto;" in mobile_section
     assert "flex-wrap: nowrap;" in mobile_section
     assert ".games-main {" in mobile_section
@@ -351,6 +352,8 @@ def test_network_subviews_follow_workspace_theme_tokens(extract_css_block) -> No
     assert "var(--workspace-shell-bg-alt)" in sensors_panel_section
     assert "var(--workspace-shell-border)" in sensors_control_section
     assert "var(--workspace-shell-border)" in sensors_chart_section
+    assert '[data-theme="dark"] .network-sensors-primary-controls .history-metric-wrap' in css
+    assert '[data-theme="dark"] .network-sensors-primary-controls .env-metric-select' in css
     assert "var(--workspace-shell-border)" in diagnostics_pane_section
     assert "var(--workspace-shell-bg-alt)" in diagnostics_pane_section
     assert "var(--workspace-shell-border-muted)" in diagnostics_sender_section
@@ -377,6 +380,10 @@ def test_network_overview_primary_controls_only_show_on_overview_subview() -> No
     assert 'return normalized === "links" ? "nodes" : normalized;' in js
     assert "syncNetworkOverviewPrimaryControls(activeLayoutView, next);" in js
     assert "syncNetworkOverviewPrimaryControls(next, activeNetworkSubview);" in js
+    assert 'const networkControlsHost = document.getElementById("network-sensors-primary-controls");' in js
+    assert 'const dockInNetworkSensors = normalizedView === "network" && normalizedSubview === "sensors";' in js
+    assert 'const controlsTarget = dockInNetworkSensors ? networkControlsHost : explorer;' in js
+    assert 'networkControlsHost.hidden = !dockInNetworkSensors;' in js
 
 
 def test_history_window_controls_trail_and_stay_right_anchored() -> None:
@@ -435,6 +442,7 @@ def test_history_window_controls_trail_and_stay_right_anchored() -> None:
     assert 'data-network-subview="sensors"' in network_tabs_section
     assert 'id="network-map-panel-sensors"' in html
     assert 'id="network-sensors-host"' in html
+    assert 'id="network-sensors-primary-controls"' in html
     assert network_tabs_section.index('data-network-subview="sensors"') < network_tabs_section.index(
         'data-network-subview="top10"'
     )
