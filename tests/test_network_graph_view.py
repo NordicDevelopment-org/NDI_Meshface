@@ -219,8 +219,14 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'activePointers: new Map(),' in js
     assert 'pinchStartDistance: 0,' in js
     assert 'pinching: false,' in js
+    assert 'const graphCenterX = Number(bounds.minX) + (spanWidth / 2);' in js
+    assert 'const graphCenterY = Number(bounds.minY) + (spanHeight / 2);' in js
+    assert 'const zoomedOutX = next.width >= (spanWidth * 1.06);' in js
+    assert 'const zoomedOutY = next.height >= (spanHeight * 1.06);' in js
     assert 'const panSlackX = Math.max(260, next.width * 0.9, spanWidth * 0.38);' in js
     assert 'const panSlackY = Math.max(220, next.height * 0.9, spanHeight * 0.38);' in js
+    assert 'next.x = zoomedOutX' in js
+    assert 'next.y = zoomedOutY' in js
     assert 'function getNetworkGraphActivePointers()' in js
     assert 'function beginNetworkGraphPinch(svg)' in js
     assert 'function updateNetworkGraphPinch(svg)' in js

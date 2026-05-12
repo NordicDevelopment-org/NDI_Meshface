@@ -4645,6 +4645,10 @@
       const bounds = networkGraphViewState.bounds || defaultNetworkGraphBounds();
       const spanWidth = Math.max(1, Number(bounds.maxX) - Number(bounds.minX));
       const spanHeight = Math.max(1, Number(bounds.maxY) - Number(bounds.minY));
+      const graphCenterX = Number(bounds.minX) + (spanWidth / 2);
+      const graphCenterY = Number(bounds.minY) + (spanHeight / 2);
+      const zoomedOutX = next.width >= (spanWidth * 1.06);
+      const zoomedOutY = next.height >= (spanHeight * 1.06);
       const panSlackX = Math.max(260, next.width * 0.9, spanWidth * 0.38);
       const panSlackY = Math.max(220, next.height * 0.9, spanHeight * 0.38);
       const padX = Math.max(42, next.width * 0.14, panSlackX);
@@ -4653,12 +4657,16 @@
       const maxX = Number(bounds.maxX) + padX - next.width;
       const minY = Number(bounds.minY) - padY;
       const maxY = Number(bounds.maxY) + padY - next.height;
-      next.x = minX <= maxX
+      next.x = zoomedOutX
+        ? (graphCenterX - (next.width / 2))
+        : minX <= maxX
         ? Math.min(maxX, Math.max(minX, next.x))
-        : ((Number(bounds.minX) + (spanWidth / 2)) - (next.width / 2));
-      next.y = minY <= maxY
+        : (graphCenterX - (next.width / 2));
+      next.y = zoomedOutY
+        ? (graphCenterY - (next.height / 2))
+        : minY <= maxY
         ? Math.min(maxY, Math.max(minY, next.y))
-        : ((Number(bounds.minY) + (spanHeight / 2)) - (next.height / 2));
+        : (graphCenterY - (next.height / 2));
       return next;
     }}
 
