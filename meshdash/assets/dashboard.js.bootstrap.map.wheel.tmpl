@@ -26,15 +26,17 @@
       if (mapFrameElement) {{
         if (guardEnabled) {{
           mapFrameElement.classList.toggle("map-wheel-active", mapWheelZoomActive);
+          mapFrameElement.removeAttribute("title");
           mapFrameElement.setAttribute(
-            "title",
+            "aria-label",
             mapWheelZoomActive
               ? "Map wheel zoom active. Click outside map (or press Esc) to return wheel scrolling to page."
               : "Click map to enable wheel zoom."
           );
         }} else {{
           mapFrameElement.classList.remove("map-wheel-active");
-          mapFrameElement.setAttribute("title", "Scroll wheel zoom is enabled.");
+          mapFrameElement.removeAttribute("title");
+          mapFrameElement.setAttribute("aria-label", "Map scroll wheel zoom enabled.");
         }}
       }}
     }}

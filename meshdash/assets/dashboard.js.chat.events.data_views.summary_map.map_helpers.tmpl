@@ -596,6 +596,7 @@
     function bindMapNodeInfoOverlays(marker, node, options = null) {{
       if (!(marker && typeof marker.bindPopup === "function")) return;
       const opts = (options && typeof options === "object") ? options : {{}};
+      const overlayNodeId = normalizeNodeId(opts.nodeId || (node && node.id) || "");
       const contentHtml = buildMapNodeInfoHtml(node, opts);
       marker.bindPopup(contentHtml, {{
         closeButton: true,
@@ -603,7 +604,33 @@
         className: "map-node-popup",
         maxWidth: 320,
       }});
-      if (typeof marker.bindTooltip === "function") {{
+      const closeHoverTooltip = () => {{
+        if (typeof marker.closeTooltip === "function") {{
+          marker.closeTooltip();
+        }}
+      }};
+      const removeHoverTooltip = () => {{
+        closeHoverTooltip();
+        if (typeof marker.unbindTooltip === "function") {{
+          marker.unbindTooltip();
+        }}
+      }};
+      const popupIsOpen = () => {{
+        try {{
+          return !!(typeof marker.isPopupOpen === "function" && marker.isPopupOpen());
+        }} catch (_err) {{
+          return false;
+        }}
+      }};
+      const hoverTooltipSuppressed = () => {{
+        const selectedId = (typeof selectedNodeId !== "undefined")
+          ? normalizeNodeId(selectedNodeId || "")
+          : "";
+        return !!opts.suppressHoverTooltip || popupIsOpen() || !!(overlayNodeId && selectedId === overlayNodeId);
+      }};
+      marker.on("popupopen", removeHoverTooltip);
+      marker.on("click", removeHoverTooltip);
+      if (typeof marker.bindTooltip === "function" && !hoverTooltipSuppressed()) {{
         const measureTooltipSize = () => {{
           if (typeof document === "undefined" || !document.body) {{
             return {{ width: 280, height: 220 }};
@@ -723,6 +750,10 @@
         }};
         rebindTooltip(false);
         marker.on("mouseover", () => {{
+          if (hoverTooltipSuppressed()) {{
+            removeHoverTooltip();
+            return;
+          }}
           rebindTooltip(true);
         }});
       }}
@@ -775,6 +806,14 @@
 
     function refreshMapNodeMarkerPresentation(marker, nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState) {{
       if (!(marker && typeof marker === "object")) return;
+      if (isSelected) {{
+        if (typeof marker.closeTooltip === "function") {{
+          marker.closeTooltip();
+        }}
+        if (typeof marker.unbindTooltip === "function") {{
+          marker.unbindTooltip();
+        }}
+      }}
       if (mapNodeUsesEmojiMarker(nodeId, markerKind, state)) {{
         if (typeof marker.setIcon === "function") {{
           marker.setIcon(buildMapEmojiMarkerIcon(nodeId, isSelected, markerKind, markerConfidence, state));

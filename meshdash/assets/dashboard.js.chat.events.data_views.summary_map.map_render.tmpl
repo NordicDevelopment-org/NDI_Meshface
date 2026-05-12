@@ -368,6 +368,7 @@
             positionBadge: posBadge,
             trailPointsCount: trailPointsCount,
             trailLatest: trailLast,
+            suppressHoverTooltip: true,
           }});
           marker.on("click", () => {{
             selectNode(normalizeNodeId(selectedNode.id || ""), true, true);
@@ -529,6 +530,7 @@
               avgHops: estimate && estimate.avgHops != null ? estimate.avgHops : null,
               avgSnr: estimate && estimate.avgSnr != null ? estimate.avgSnr : null,
               avgRssi: estimate && estimate.avgRssi != null ? estimate.avgRssi : null,
+              suppressHoverTooltip: isSelected,
             }});
           }} else {{
             bindMapNodeInfoOverlays(marker, node, {{
@@ -537,6 +539,7 @@
               state: latestState,
               caps: nodeCaps,
               positionBadge: posBadge,
+              suppressHoverTooltip: isSelected,
             }});
           }}
           marker.on("click", () => {{

@@ -102,6 +102,43 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "Links view is already centered on the local node" in js
 
 
+def test_dashboard_js_suppresses_map_hover_tooltip_while_popup_is_open() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "const closeHoverTooltip = () => {" in js
+    assert "const removeHoverTooltip = () => {" in js
+    assert 'return !!(typeof marker.isPopupOpen === "function" && marker.isPopupOpen());' in js
+    assert "const overlayNodeId = normalizeNodeId(opts.nodeId || (node && node.id) || \"\");" in js
+    assert "const hoverTooltipSuppressed = () => {" in js
+    assert "!!opts.suppressHoverTooltip || popupIsOpen() || !!(overlayNodeId && selectedId === overlayNodeId)" in js
+    assert 'marker.on("popupopen", removeHoverTooltip);' in js
+    assert 'marker.on("click", removeHoverTooltip);' in js
+    assert 'if (typeof marker.bindTooltip === "function" && !hoverTooltipSuppressed()) {' in js
+    assert "if (hoverTooltipSuppressed()) {" in js
+    assert "removeHoverTooltip();\n            return;" in js
+    assert "if (isSelected) {" in js
+    assert "marker.unbindTooltip();" in js
+    assert "suppressHoverTooltip: true," in js
+    assert "suppressHoverTooltip: isSelected," in js
+
+
+def test_dashboard_js_does_not_show_native_map_wheel_title_tooltip() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'mapFrameElement.removeAttribute("title");' in js
+    assert 'mapFrameElement.setAttribute(\n            "aria-label",' in js
+    assert 'mapFrameElement.setAttribute("aria-label", "Map scroll wheel zoom enabled.");' in js
+    assert 'mapFrameElement.setAttribute("title", "Scroll wheel zoom is enabled.");' not in js
+
+
 def test_dashboard_css_positions_map_link_legend_below_zoom() -> None:
     css = build_dashboard_css(theme_css="")
 
