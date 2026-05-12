@@ -258,10 +258,14 @@ def test_network_map_controls_follow_theme_tokens() -> None:
     css = build_dashboard_css(theme_css="")
 
     heatmap_input_section = css.split(".map-heatmap-wrap input {", 1)[1].split("}", 1)[0]
+    heatmap_mode_wrap_section = css.split(".map-heatmap-mode-wrap {", 1)[1].split("}", 1)[0]
+    heatmap_mode_section = css.split(".map-heatmap-mode {", 1)[1].split("}", 1)[0]
     reset_section = css.split(".map-reset-view-btn {", 1)[1].split("}", 1)[0]
     zoom_section = css.split(".leaflet-control-zoom {", 1)[1].split("}", 1)[0]
     tabs_section = css.split(".network-map-subview-tabs {", 1)[1].split("}", 1)[0]
     dark_heatmap_section = css.split("[data-theme=\"dark\"] .map-heatmap-wrap {", 1)[1].split("}", 1)[0]
+    dark_heatmap_mode_wrap_section = css.split("[data-theme=\"dark\"] .map-heatmap-mode-wrap {", 1)[1].split("}", 1)[0]
+    dark_heatmap_mode_section = css.split("[data-theme=\"dark\"] .map-heatmap-mode {", 1)[1].split("}", 1)[0]
     dark_zoom_section = css.split("[data-theme=\"dark\"] .leaflet-control-zoom {", 1)[1].split("}", 1)[0]
     dark_status_section = css.split("[data-theme=\"dark\"] .map-basemap-status {", 1)[1].split("}", 1)[0]
     dark_leaflet_section = css.rsplit("[data-theme=\"dark\"] .leaflet-container {", 1)[1].split("}", 1)[0]
@@ -269,10 +273,14 @@ def test_network_map_controls_follow_theme_tokens() -> None:
     dark_leaflet_overlay_section = css.split("[data-theme=\"dark\"] .map-frame:not(.map-basemap-offline) .leaflet-container::before {", 1)[1].split("}", 1)[0]
 
     assert "accent-color: var(--accent);" in heatmap_input_section
+    assert "border: 1px solid transparent;" in heatmap_mode_wrap_section
+    assert "border: 1px solid transparent;" in heatmap_mode_section
     assert "var(--accent)" in reset_section
     assert "var(--line)" in zoom_section
     assert "var(--accent)" in tabs_section
     assert "var(--workspace-shell-border)" in dark_heatmap_section
+    assert "border-color: transparent;" in dark_heatmap_mode_wrap_section
+    assert "border-color: transparent;" in dark_heatmap_mode_section
     assert "var(--workspace-shell-bg-alt)" in dark_zoom_section
     assert "var(--workspace-shell-text-soft)" in dark_status_section
     assert "var(--ui-bg-elev)" in dark_leaflet_section
@@ -541,8 +549,10 @@ def test_select_only_history_chips_hide_redundant_labels() -> None:
     assert "display: none;" in css.split(".history-select-chip-hide-label > .history-metric-label,", 1)[1].split("}", 1)[0]
     compact_chip_section = css.split(".history-select-chip-hide-label {", 1)[1].split("}", 1)[0]
     assert "gap: 0;" in compact_chip_section
+    assert "border-color: transparent;" in compact_chip_section
     assert "padding-left: 8px;" in compact_chip_section
     assert "padding-right: 8px;" in compact_chip_section
+    assert "box-shadow: none;" in compact_chip_section
 
 
 def test_network_overview_group_chips_hide_titles_in_top_strip() -> None:
@@ -569,6 +579,12 @@ def test_network_overview_group_chips_hide_titles_in_top_strip() -> None:
     assert "row-gap: 0;" in top_lines_section
     assert "border-color: transparent;" in top_lines_section
     assert "background: transparent;" in top_lines_section
+    dark_top_lines_section = css.split(
+        '[data-theme="dark"] .network-overview-primary-controls .history-metric-wrap-lines {', 1
+    )[1].split("}", 1)[0]
+    assert "border-color: transparent;" in dark_top_lines_section
+    assert "background: transparent;" in dark_top_lines_section
+    assert "box-shadow: none;" in dark_top_lines_section
 
 
 def test_network_sensors_top_level_explorer_reuses_light_shell() -> None:
