@@ -978,6 +978,15 @@
       ) {{
         void renderEnvironmentMetricsView(false);
       }}
+      if (
+        activeLayoutView === "network"
+        && activeNetworkSubview === "routes"
+        && typeof syncNetworkRoutesFromSelectedNode === "function"
+        && typeof renderNetworkRoutes === "function"
+      ) {{
+        syncNetworkRoutesFromSelectedNode();
+        renderNetworkRoutes(latestState);
+      }}
       markNodeSelectionPerf(perfToken, "selection.dispatch", dispatchStartedAtMs, {{
         previousSelectedId,
       }});

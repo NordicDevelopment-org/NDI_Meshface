@@ -96,6 +96,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function buildNetworkRoutesScopedLinks(route, data)' in js
     assert 'function networkRoutesScopeHtml(route, data, fromNodeId, toNodeId)' in js
     assert 'function bindNetworkRoutesScopeInteractions(root = document)' in js
+    assert 'function syncNetworkRoutesFromSelectedNode()' in js
+    assert 'const selectedId = normalizeNodeId(selectedNodeId || "");' in js
+    assert 'networkRoutesFromNodeId = selectedId;' in js
+    assert 'const nextTo = previousFrom && previousFrom !== selectedId ? previousFrom : "";' in js
+    assert 'networkRoutesToNodeId = nextTo;' in js
     assert 'const networkRoutesScopeViewState = {' in js
     assert 'class="network-route-scope"' in js
     assert 'class="network-route-scope-svg"' in js
@@ -246,6 +251,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function focusNetworkGraphNodeFromSelection(nodeId, options = {})' in js
     assert 'selectNode(row.dataset.nodeId || "", true, true);' in js
     assert 'selectNode(nodeId, true, true);' in js
+    assert 'activeLayoutView === "network"\n        && activeNetworkSubview === "routes"' in js
+    assert 'syncNetworkRoutesFromSelectedNode();\n        renderNetworkRoutes(latestState);' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'return fitNetworkGraphViewBoxToBounds(bounds, svg);' in js
     assert 'const selectedNodeHasLinkPeers = selectedNodeAvailable' in js

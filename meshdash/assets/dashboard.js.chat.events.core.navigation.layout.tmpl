@@ -2062,6 +2062,23 @@
       return {{ fromId, toId }};
     }}
 
+    function syncNetworkRoutesFromSelectedNode() {{
+      const selectedId = normalizeNodeId(selectedNodeId || "");
+      if (!isSelectableNodeId(selectedId)) return false;
+      const previousFrom = normalizeNodeId(networkRoutesFromNodeId || "");
+      const previousTo = normalizeNodeId(networkRoutesToNodeId || "");
+      let changed = previousFrom !== selectedId;
+      networkRoutesFromNodeId = selectedId;
+      if (!previousTo || previousTo === selectedId) {{
+        const nextTo = previousFrom && previousFrom !== selectedId ? previousFrom : "";
+        if (nextTo) {{
+          networkRoutesToNodeId = nextTo;
+          changed = changed || previousTo !== nextTo;
+        }}
+      }}
+      return changed;
+    }}
+
     function networkRoutesOptionLabel(nodeId, nodeMap, localNodeId = "") {{
       const clean = normalizeNodeId(nodeId || "");
       const name = networkGraphNodeDisplayName(clean, nodeMap);
@@ -3006,6 +3023,7 @@
         }}
       }}
       if (normalizedView === "network" && next === "routes") {{
+        syncNetworkRoutesFromSelectedNode();
         renderNetworkRoutes(latestState);
       }}
       if (normalizedView === "network" && next === "top10") {{
