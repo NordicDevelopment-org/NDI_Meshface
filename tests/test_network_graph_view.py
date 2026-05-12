@@ -215,7 +215,19 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'networkRoutesMode = loadPreferredNetworkRoutesMode();' in js
     assert 'networkRoutesWindow = loadPreferredNetworkRoutesWindow();' in js
     assert 'persistPreferredNetworkGraphEdgeMode(networkGraphEdgeMode);' not in js
-    assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.42, maxScale: 5.5 });' in js
+    assert 'const networkGraphZoomBounds = Object.freeze({ minScale: 0.22, maxScale: 12 });' in js
+    assert 'activePointers: new Map(),' in js
+    assert 'pinchStartDistance: 0,' in js
+    assert 'pinching: false,' in js
+    assert 'const panSlackX = Math.max(260, next.width * 0.9, spanWidth * 0.38);' in js
+    assert 'const panSlackY = Math.max(220, next.height * 0.9, spanHeight * 0.38);' in js
+    assert 'function getNetworkGraphActivePointers()' in js
+    assert 'function beginNetworkGraphPinch(svg)' in js
+    assert 'function updateNetworkGraphPinch(svg)' in js
+    assert 'const zoomFactor = Math.max(0.05, startDistance / currentDistance);' in js
+    assert 'event.pointerType !== "mouse" && activePointers.size >= 2' in js
+    assert 'if (networkGraphViewState.pinching) {' in js
+    assert 'updateNetworkGraphPinch(svg)' in js
     assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
     assert 'function networkGraphNodeDisplayPriority(nodeId, nodeMap)' in js
     assert 'function networkGraphNodeGroupDisplayPriority(nodeIds, nodeMap)' in js
@@ -441,6 +453,8 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "grid-row: 1;" in css
     assert ".network-graph-stage {" in css
     assert "touch-action: none;" in css
+    graph_svg_css = css[css.index("#network-graph-svg {"):css.index("#network-graph-empty.signal-empty {")]
+    assert "touch-action: none;" in graph_svg_css
     assert ".network-graph-stage.is-panning {" in css
     assert ".network-graph-stage.is-overlay-docked #network-graph-svg {" in css
     assert ".network-graph-mode-chip," in css

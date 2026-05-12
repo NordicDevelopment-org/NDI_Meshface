@@ -3224,7 +3224,7 @@
     }}
 
     const networkGraphViewportBase = Object.freeze({{ x: 0, y: 0, width: 960, height: 620 }});
-    const networkGraphZoomBounds = Object.freeze({{ minScale: 0.42, maxScale: 5.5 }});
+    const networkGraphZoomBounds = Object.freeze({{ minScale: 0.22, maxScale: 12 }});
     const networkGraphFitZoomOutScale = 1.22;
     const networkGraphOverlayFitZoomOutScale = 1.1;
     const networkGraphToolbarSafeInsetTop = 78;
@@ -3266,6 +3266,13 @@
       pointerClientX: 0,
       pointerClientY: 0,
       pointerViewBox: null,
+      activePointers: new Map(),
+      pinchStartDistance: 0,
+      pinchStartCenterClientX: 0,
+      pinchStartCenterClientY: 0,
+      pinchStartViewBox: null,
+      pinchStartGraphPoint: null,
+      pinching: false,
       pointerDownNodeId: "",
       captureActive: false,
       dragging: false,
@@ -4638,8 +4645,10 @@
       const bounds = networkGraphViewState.bounds || defaultNetworkGraphBounds();
       const spanWidth = Math.max(1, Number(bounds.maxX) - Number(bounds.minX));
       const spanHeight = Math.max(1, Number(bounds.maxY) - Number(bounds.minY));
-      const padX = Math.max(42, next.width * 0.14);
-      const padY = Math.max(34, next.height * 0.14);
+      const panSlackX = Math.max(260, next.width * 0.9, spanWidth * 0.38);
+      const panSlackY = Math.max(220, next.height * 0.9, spanHeight * 0.38);
+      const padX = Math.max(42, next.width * 0.14, panSlackX);
+      const padY = Math.max(34, next.height * 0.14, panSlackY);
       const minX = Number(bounds.minX) - padX;
       const maxX = Number(bounds.maxX) + padX - next.width;
       const minY = Number(bounds.minY) - padY;
@@ -4924,25 +4933,36 @@
 
     function stopNetworkGraphPan(svg) {{
       const pointerId = networkGraphViewState.pointerId;
+      const activePointers = getNetworkGraphActivePointers();
+      const releasePointerIds = new Set(Array.from(activePointers.keys()));
+      if (pointerId != null) releasePointerIds.add(pointerId);
       if (
         svg instanceof SVGElement
         && networkGraphViewState.captureActive
-        && pointerId != null
         && typeof svg.hasPointerCapture === "function"
-        && svg.hasPointerCapture(pointerId)
       ) {{
-        try {{
-          svg.releasePointerCapture(pointerId);
-        }} catch (_err) {{
-        }}
+        releasePointerIds.forEach((releasePointerId) => {{
+          if (releasePointerId == null || !svg.hasPointerCapture(releasePointerId)) return;
+          try {{
+            svg.releasePointerCapture(releasePointerId);
+          }} catch (_err) {{
+          }}
+        }});
       }}
       if (svg instanceof SVGElement && svg.parentElement instanceof HTMLElement) {{
         svg.parentElement.classList.remove("is-panning");
       }}
+      activePointers.clear();
       networkGraphViewState.pointerId = null;
       networkGraphViewState.pointerClientX = 0;
       networkGraphViewState.pointerClientY = 0;
       networkGraphViewState.pointerViewBox = null;
+      networkGraphViewState.pinchStartDistance = 0;
+      networkGraphViewState.pinchStartCenterClientX = 0;
+      networkGraphViewState.pinchStartCenterClientY = 0;
+      networkGraphViewState.pinchStartViewBox = null;
+      networkGraphViewState.pinchStartGraphPoint = null;
+      networkGraphViewState.pinching = false;
       networkGraphViewState.pointerDownNodeId = "";
       networkGraphViewState.captureActive = false;
       networkGraphViewState.dragging = false;
@@ -4984,6 +5004,96 @@
         x: viewBox.x + (unitX * viewBox.width),
         y: viewBox.y + (unitY * viewBox.height),
       }};
+    }}
+
+    function getNetworkGraphActivePointers() {{
+      if (!(networkGraphViewState.activePointers instanceof Map)) {{
+        networkGraphViewState.activePointers = new Map();
+      }}
+      return networkGraphViewState.activePointers;
+    }}
+
+    function firstTwoNetworkGraphPointers() {{
+      return Array.from(getNetworkGraphActivePointers().values()).slice(0, 2);
+    }}
+
+    function networkGraphPointerDistance(a, b) {{
+      if (!a || !b) return 0;
+      return Math.hypot(
+        Number(b.clientX) - Number(a.clientX),
+        Number(b.clientY) - Number(a.clientY)
+      );
+    }}
+
+    function networkGraphPointerCenter(a, b) {{
+      if (!a || !b) return null;
+      return {{
+        clientX: (Number(a.clientX) + Number(b.clientX)) / 2,
+        clientY: (Number(a.clientY) + Number(b.clientY)) / 2,
+      }};
+    }}
+
+    function beginNetworkGraphPinch(svg) {{
+      if (!(svg instanceof SVGElement)) return false;
+      const [firstPointer, secondPointer] = firstTwoNetworkGraphPointers();
+      const startDistance = networkGraphPointerDistance(firstPointer, secondPointer);
+      const center = networkGraphPointerCenter(firstPointer, secondPointer);
+      if (!(startDistance > 6) || !center) return false;
+      const graphPoint = resolveNetworkGraphPointerPosition(svg, center.clientX, center.clientY);
+      if (!graphPoint) return false;
+      cancelNetworkGraphViewAnimation();
+      cancelNetworkGraphSceneAnimation();
+      networkGraphViewState.pendingFocusTransition = null;
+      networkGraphViewState.pointerId = null;
+      networkGraphViewState.pointerViewBox = null;
+      networkGraphViewState.pointerDownNodeId = "";
+      networkGraphViewState.pinchStartDistance = startDistance;
+      networkGraphViewState.pinchStartCenterClientX = center.clientX;
+      networkGraphViewState.pinchStartCenterClientY = center.clientY;
+      networkGraphViewState.pinchStartViewBox = cloneNetworkGraphViewBox(networkGraphViewState.viewBox);
+      networkGraphViewState.pinchStartGraphPoint = graphPoint;
+      networkGraphViewState.pinching = true;
+      networkGraphViewState.dragging = true;
+      networkGraphViewState.captureActive = true;
+      if (svg.parentElement instanceof HTMLElement) {{
+        svg.parentElement.classList.add("is-panning");
+      }}
+      if (typeof svg.setPointerCapture === "function") {{
+        getNetworkGraphActivePointers().forEach((_pointer, pointerId) => {{
+          try {{
+            svg.setPointerCapture(pointerId);
+          }} catch (_err) {{
+          }}
+        }});
+      }}
+      return true;
+    }}
+
+    function updateNetworkGraphPinch(svg) {{
+      if (!(svg instanceof SVGElement) || !networkGraphViewState.pinching) return false;
+      const [firstPointer, secondPointer] = firstTwoNetworkGraphPointers();
+      const currentDistance = networkGraphPointerDistance(firstPointer, secondPointer);
+      const currentCenter = networkGraphPointerCenter(firstPointer, secondPointer);
+      const startDistance = Number(networkGraphViewState.pinchStartDistance);
+      const startViewBox = cloneNetworkGraphViewBox(networkGraphViewState.pinchStartViewBox);
+      const startPoint = networkGraphViewState.pinchStartGraphPoint;
+      if (!(currentDistance > 6) || !(startDistance > 6) || !currentCenter || !startPoint) return false;
+      const rect = svg.getBoundingClientRect();
+      if (!(rect.width > 0) || !(rect.height > 0)) return false;
+      const ratioX = (Number(startPoint.x) - startViewBox.x) / startViewBox.width;
+      const ratioY = (Number(startPoint.y) - startViewBox.y) / startViewBox.height;
+      const zoomFactor = Math.max(0.05, startDistance / currentDistance);
+      const nextWidth = startViewBox.width * zoomFactor;
+      const nextHeight = startViewBox.height * zoomFactor;
+      const centerDx = currentCenter.clientX - networkGraphViewState.pinchStartCenterClientX;
+      const centerDy = currentCenter.clientY - networkGraphViewState.pinchStartCenterClientY;
+      applyNetworkGraphViewBox(svg, {{
+        x: Number(startPoint.x) - (ratioX * nextWidth) - ((centerDx / rect.width) * nextWidth),
+        y: Number(startPoint.y) - (ratioY * nextHeight) - ((centerDy / rect.height) * nextHeight),
+        width: nextWidth,
+        height: nextHeight,
+      }});
+      return true;
     }}
 
     function pushNetworkGraphRootHistory(nodeId) {{
@@ -5264,6 +5374,16 @@
 
       svg.addEventListener("pointerdown", (event) => {{
         if (event.pointerType === "mouse" && event.button !== 0) return;
+        const activePointers = getNetworkGraphActivePointers();
+        activePointers.set(event.pointerId, {{
+          clientX: event.clientX,
+          clientY: event.clientY,
+        }});
+        if (event.pointerType !== "mouse" && activePointers.size >= 2) {{
+          beginNetworkGraphPinch(svg);
+          event.preventDefault();
+          return;
+        }}
         if (networkGraphViewState.pointerId !== null) return;
         cancelNetworkGraphViewAnimation();
         cancelNetworkGraphSceneAnimation();
@@ -5278,6 +5398,19 @@
       }});
 
       svg.addEventListener("pointermove", (event) => {{
+        const activePointers = getNetworkGraphActivePointers();
+        if (activePointers.has(event.pointerId)) {{
+          activePointers.set(event.pointerId, {{
+            clientX: event.clientX,
+            clientY: event.clientY,
+          }});
+        }}
+        if (networkGraphViewState.pinching) {{
+          if (updateNetworkGraphPinch(svg)) {{
+            event.preventDefault();
+          }}
+          return;
+        }}
         if (networkGraphViewState.pointerId !== event.pointerId) return;
         const startViewBox = networkGraphViewState.pointerViewBox;
         if (!startViewBox) return;
@@ -5311,6 +5444,21 @@
       }}, {{ passive: false }});
 
       const finishPan = (event) => {{
+        const activePointers = getNetworkGraphActivePointers();
+        const wasPinching = !!networkGraphViewState.pinching;
+        if (activePointers.has(event.pointerId)) {{
+          activePointers.delete(event.pointerId);
+        }}
+        if (wasPinching) {{
+          if (activePointers.size >= 2) {{
+            beginNetworkGraphPinch(svg);
+          }} else {{
+            stopNetworkGraphPan(svg);
+          }}
+          suppressNextNetworkGraphClick();
+          event.preventDefault();
+          return;
+        }}
         if (networkGraphViewState.pointerId !== event.pointerId) return;
         const wasDragging = networkGraphViewState.dragging;
         const releasedNodeId = resolveNetworkGraphNodeIdFromTarget(event.target);
