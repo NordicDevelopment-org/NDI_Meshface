@@ -439,9 +439,12 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-fullscreen-toggle-btn {" in css
     assert ".network-routes-primary-controls," in css
     assert ".network-routes-primary-controls .network-routes-toolbar {" in css
+    assert ".network-routes-primary-controls .network-routes-refresh-btn {" in css
     assert ".network-routes-primary-controls .network-routes-toolbar .history-window-wrap {" in css
+    assert ".network-graph-summary.is-overlay-docked .network-graph-action-chip {" in css
     assert ".network-top-nodes-primary-controls," in css
     assert ".network-top-nodes-primary-controls .network-top-nodes-toolbar {" in css
+    assert ".network-top-nodes-primary-controls .network-top-nodes-refresh-btn {" in css
     assert ".network-sensors-primary-controls {" in css or ".network-sensors-primary-controls," in css
     assert ".network-sensors-primary-controls .env-metrics-controls {" in css
     assert ".network-sensors-primary-controls .env-metric-select {" in css
