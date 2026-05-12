@@ -234,6 +234,12 @@ def test_dashboard_css_keeps_top_node_bar_below_row_text() -> None:
     assert ".network-top-node-city[hidden]" in css
     assert ".network-top-node-row.has-node-emoji::after" in css
     assert '[data-theme="dark"] .network-top-node-row.has-node-emoji::after' in css
+    watermark_idx = css.index(".network-top-node-row.has-node-emoji::after")
+    content_idx = css.index(".network-top-node-rank,", watermark_idx)
+    watermark_css = css[watermark_idx:content_idx]
+    assert "left: 0;" in watermark_css
+    assert "width: 52px;" in watermark_css
+    assert "text-align: center;" in watermark_css
     assert "position: relative;" in css
     assert "display: block;" in css
     assert "width: 100%;" in css
