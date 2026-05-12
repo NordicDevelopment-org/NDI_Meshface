@@ -354,6 +354,8 @@ def test_network_subviews_follow_workspace_theme_tokens(extract_css_block) -> No
     assert "var(--workspace-shell-border)" in sensors_chart_section
     assert '[data-theme="dark"] .network-routes-primary-controls .history-metric-wrap' in css
     assert '[data-theme="dark"] .network-routes-primary-controls .history-metric-select' in css
+    assert '[data-theme="dark"] .network-top-nodes-primary-controls .history-metric-wrap' in css
+    assert '[data-theme="dark"] .network-top-nodes-primary-controls .history-metric-select' in css
     assert '[data-theme="dark"] .network-sensors-primary-controls .history-metric-wrap' in css
     assert '[data-theme="dark"] .network-sensors-primary-controls .env-metric-select' in css
     assert "var(--workspace-shell-border)" in diagnostics_pane_section
@@ -387,6 +389,11 @@ def test_network_overview_primary_controls_only_show_on_overview_subview() -> No
     assert 'const dockInNetworkRoutes = normalizedView === "network" && normalizedSubview === "routes";' in js
     assert 'syncNetworkRoutesPrimaryControls(activeLayoutView, next);' in js
     assert 'syncNetworkRoutesPrimaryControls(next, activeNetworkSubview);' in js
+    assert 'function syncNetworkTopNodesPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview)' in js
+    assert 'const controlsHost = document.getElementById("network-top-nodes-primary-controls");' in js
+    assert 'const dockInNetworkTopNodes = normalizedView === "network" && normalizedSubview === "top10";' in js
+    assert 'syncNetworkTopNodesPrimaryControls(activeLayoutView, next);' in js
+    assert 'syncNetworkTopNodesPrimaryControls(next, activeNetworkSubview);' in js
     assert 'const networkControlsHost = document.getElementById("network-sensors-primary-controls");' in js
     assert 'const dockInNetworkSensors = normalizedView === "network" && normalizedSubview === "sensors";' in js
     assert 'const controlsTarget = dockInNetworkSensors ? networkControlsHost : explorer;' in js
@@ -448,6 +455,7 @@ def test_history_window_controls_trail_and_stay_right_anchored() -> None:
     assert '<option value="links">Links</option>' in weekly_controls_section
     assert 'data-network-subview="sensors"' in network_tabs_section
     assert 'id="network-routes-primary-controls"' in html
+    assert 'id="network-top-nodes-primary-controls"' in html
     assert 'id="network-map-panel-sensors"' in html
     assert 'id="network-sensors-host"' in html
     assert 'id="network-sensors-primary-controls"' in html

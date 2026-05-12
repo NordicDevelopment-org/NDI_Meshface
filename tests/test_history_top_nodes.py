@@ -186,6 +186,7 @@ def test_dashboard_adds_network_top10_subview() -> None:
 
     assert 'data-network-subview="top10"' in html
     assert 'id="network-map-panel-top10"' in html
+    assert 'id="network-top-nodes-primary-controls"' in html
     assert 'id="network-top-nodes-category"' in html
 
 
@@ -219,6 +220,8 @@ def test_dashboard_js_wires_network_top_nodes_fetch_and_render() -> None:
     assert 'networkTopNodesGroupHtml(group, state, { showHeader: showGroupHeaders })' in js
     assert 'hydrateNetworkTopNodeCities(list);' in js
     assert 'function renderNetworkTopNodes(state = latestState, options = {}) {' in js
+    assert 'function syncNetworkTopNodesPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview)' in js
+    assert 'const controlsHost = document.getElementById("network-top-nodes-primary-controls");' in js
     assert "/api/history/top_nodes?category=" in js
     assert 'if (normalizedView === "network" && next === "top10") {' in js
 

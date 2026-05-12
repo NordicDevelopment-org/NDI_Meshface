@@ -1029,6 +1029,29 @@
       controlsHost.setAttribute("aria-hidden", dockInNetworkRoutes ? "false" : "true");
     }}
 
+    function syncNetworkTopNodesPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
+      const toolbar = document.querySelector(".network-top-nodes-toolbar");
+      const card = document.querySelector(".network-top-nodes-card");
+      const controlsHost = document.getElementById("network-top-nodes-primary-controls");
+      if (!(toolbar instanceof HTMLElement)) return;
+      if (!(card instanceof HTMLElement)) return;
+      if (!(controlsHost instanceof HTMLElement)) return;
+
+      const normalizedView = normalizeLayoutView(viewName);
+      const normalizedSubview = normalizeNetworkSubview(subviewName);
+      const dockInNetworkTopNodes = normalizedView === "network" && normalizedSubview === "top10";
+      const targetHost = dockInNetworkTopNodes ? controlsHost : card;
+      if (toolbar.parentElement !== targetHost) {{
+        if (targetHost === card) {{
+          card.insertBefore(toolbar, card.firstChild || null);
+        }} else {{
+          controlsHost.appendChild(toolbar);
+        }}
+      }}
+      controlsHost.hidden = !dockInNetworkTopNodes;
+      controlsHost.setAttribute("aria-hidden", dockInNetworkTopNodes ? "false" : "true");
+    }}
+
     function syncEnvironmentMetricsDock(viewName = activeLayoutView, subviewName = activeNetworkSubview) {{
       const explorer = document.querySelector(".env-metrics-explorer");
       const controls = document.querySelector(".env-metrics-controls");
@@ -2963,6 +2986,7 @@
       syncMapControlsDock(activeLayoutView, next);
       syncNetworkOverviewPrimaryControls(activeLayoutView, next);
       syncNetworkRoutesPrimaryControls(activeLayoutView, next);
+      syncNetworkTopNodesPrimaryControls(activeLayoutView, next);
       syncEnvironmentMetricsDock(activeLayoutView, next);
 
       try {{
@@ -8033,6 +8057,7 @@
       syncMapControlsDock(next, activeNetworkSubview);
       syncNetworkOverviewPrimaryControls(next, activeNetworkSubview);
       syncNetworkRoutesPrimaryControls(next, activeNetworkSubview);
+      syncNetworkTopNodesPrimaryControls(next, activeNetworkSubview);
       syncEnvironmentMetricsDock(next, activeNetworkSubview);
       if (latestState) {{
         const networkGraphActive = next === "network" && activeNetworkSubview === "graph";

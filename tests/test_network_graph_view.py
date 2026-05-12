@@ -27,6 +27,7 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
     assert 'data-network-subview="routes"' in html
     assert 'id="network-map-panel-routes"' in html
     assert 'id="network-routes-primary-controls"' in html
+    assert 'id="network-top-nodes-primary-controls"' in html
     assert 'data-network-subview="sensors"' in html
     assert 'id="network-map-panel-sensors"' in html
     assert 'id="network-sensors-host"' in html
@@ -117,6 +118,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function syncNetworkRoutesPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview)' in js
     assert 'const controlsHost = document.getElementById("network-routes-primary-controls");' in js
     assert 'const dockInNetworkRoutes = normalizedView === "network" && normalizedSubview === "routes";' in js
+    assert 'function syncNetworkTopNodesPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview)' in js
+    assert 'const controlsHost = document.getElementById("network-top-nodes-primary-controls");' in js
+    assert 'const dockInNetworkTopNodes = normalizedView === "network" && normalizedSubview === "top10";' in js
     assert 'runBootStep("bindMapFullscreenControl", () => bindMapFullscreenControl());' in js
     assert 'requestMapResizeStabilized();' in js
     assert 'activeNetworkSubview === "graph"' in js
@@ -435,12 +439,15 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-fullscreen-toggle-btn {" in css
     assert ".network-routes-primary-controls," in css
     assert ".network-routes-primary-controls .network-routes-toolbar {" in css
+    assert ".network-top-nodes-primary-controls," in css
+    assert ".network-top-nodes-primary-controls .network-top-nodes-toolbar {" in css
     assert ".network-sensors-primary-controls {" in css or ".network-sensors-primary-controls," in css
     assert ".network-sensors-primary-controls .env-metric-select {" in css
     assert ".network-map-subviews:fullscreen {" in css
     assert ".layout.view-network #network-map-panel-overview .network-overview-card {" in css
     assert ".layout.view-network #network-map-panel-overview #network-overview-chart-wrap {" in css
     assert ".layout.view-network #network-map-panel-routes .network-routes-card {" in css
+    assert ".layout.view-network #network-map-panel-top10 .network-top-nodes-card {" in css
     assert ".layout.view-network #network-map-panel-sensors .env-metrics-explorer {" in css
     assert ".layout.view-network #network-map-panel-sensors #env-metrics-chart-wrap {" in css
     assert "border: 0;" in css
@@ -457,9 +464,12 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-route-scope-node-hit {" in css
     assert ".network-route-hop-list {" in css
     assert ".network-route-edge-bar {" in css
-    route_css = css[css.index(".network-routes-card {"):css.index(".network-top-nodes-toolbar {")]
+    route_css_start = css.index(".network-routes-card {")
+    route_css = css[route_css_start:css.index(".network-routes-toolbar {", route_css_start)]
     assert "rgba(249, 253, 249, 0.94)" in route_css
-    assert "rgba(255, 255, 255, 0.72)" in route_css
+    route_hop_css_start = css.index(".network-route-hop {")
+    route_hop_css = css[route_hop_css_start:css.index(".network-route-hop.is-local {", route_hop_css_start)]
+    assert "rgba(255, 255, 255, 0.72)" in route_hop_css
     assert '[data-theme="dark"] .network-routes-card {' in css
     assert '[data-theme="dark"] .network-route-scope {' in css
     assert '[data-theme="dark"] .network-route-scope-reset-btn {' in css

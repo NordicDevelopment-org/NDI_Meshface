@@ -5407,6 +5407,7 @@
     }}
     .network-overview-primary-controls,
     .network-routes-primary-controls,
+    .network-top-nodes-primary-controls,
     .network-sensors-primary-controls {{
       display: flex;
       align-items: center;
@@ -5423,21 +5424,25 @@
       pointer-events: auto;
     }}
     .network-routes-primary-controls,
+    .network-top-nodes-primary-controls,
     .network-sensors-primary-controls {{
       flex: 1 1 auto;
     }}
     .network-overview-primary-controls::-webkit-scrollbar,
     .network-routes-primary-controls::-webkit-scrollbar,
+    .network-top-nodes-primary-controls::-webkit-scrollbar,
     .network-sensors-primary-controls::-webkit-scrollbar {{
       display: none;
     }}
     .network-overview-primary-controls[hidden],
     .network-routes-primary-controls[hidden],
+    .network-top-nodes-primary-controls[hidden],
     .network-sensors-primary-controls[hidden] {{
       display: none !important;
     }}
     .network-overview-primary-controls .history-metric-wrap,
     .network-routes-primary-controls .history-metric-wrap,
+    .network-top-nodes-primary-controls .history-metric-wrap,
     .network-sensors-primary-controls .history-metric-wrap {{
       flex: 0 0 auto;
       gap: 6px;
@@ -5474,6 +5479,19 @@
     }}
     .network-routes-primary-controls .history-metric-select {{
       min-width: 82px;
+    }}
+    .network-top-nodes-primary-controls .network-top-nodes-toolbar {{
+      flex: 1 1 auto;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+    }}
+    .network-top-nodes-primary-controls .network-top-nodes-toolbar::-webkit-scrollbar {{
+      display: none;
+    }}
+    .network-top-nodes-primary-controls .history-metric-select {{
+      min-width: 164px;
     }}
     .network-map-controls-host {{
       display: flex;
