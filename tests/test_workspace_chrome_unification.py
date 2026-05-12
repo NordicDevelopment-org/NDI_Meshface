@@ -343,7 +343,6 @@ def test_network_subviews_follow_workspace_theme_tokens(extract_css_block) -> No
     assert "var(--workspace-shell-active-bg)" in overview_panel_section
     assert "var(--workspace-shell-border-muted)" in overview_control_section
     assert "var(--workspace-shell-active-bg)" in overview_control_section
-    assert "var(--workspace-shell-border-muted)" in overview_primary_control_section
     assert "var(--workspace-shell-active-bg)" in overview_primary_control_section
     assert "var(--workspace-shell-border)" in overview_chart_section
     assert "var(--workspace-shell-bg-alt)" in overview_chart_section
@@ -568,6 +567,8 @@ def test_network_overview_group_chips_hide_titles_in_top_strip() -> None:
     top_lines_section = css.split(".network-overview-primary-controls .history-metric-wrap-lines {", 1)[1].split("}", 1)[0]
     assert "flex-wrap: nowrap;" in top_lines_section
     assert "row-gap: 0;" in top_lines_section
+    assert "border-color: transparent;" in top_lines_section
+    assert "background: transparent;" in top_lines_section
 
 
 def test_network_sensors_top_level_explorer_reuses_light_shell() -> None:
