@@ -428,6 +428,8 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-map-subviews:fullscreen {" in css
     assert ".layout.view-network #network-map-panel-overview .network-overview-card {" in css
     assert ".layout.view-network #network-map-panel-overview #network-overview-chart-wrap {" in css
+    assert ".layout.view-network #network-map-panel-sensors .env-metrics-explorer {" in css
+    assert ".layout.view-network #network-map-panel-sensors #env-metrics-chart-wrap {" in css
     assert "border: 0;" in css
     assert "background: transparent;" in css
     assert '[data-theme="dark"] .map-fullscreen-toggle-btn {' in css
