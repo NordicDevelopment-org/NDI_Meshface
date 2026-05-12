@@ -38,8 +38,10 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
     assert 'id="network-map-panel-diagnostics"' in html
     assert 'hidden aria-hidden="true"' in html
     assert 'id="map-fullscreen-toggle-btn"' in html
-    assert 'aria-label="Enter full screen map"' in html
+    assert 'class="map-fullscreen-toggle-btn network-fullscreen-toggle-btn"' in html
+    assert 'aria-label="Enter full screen network view"' in html
     assert html.index('id="map-heatmap-mode"') < html.index('id="map-fullscreen-toggle-btn"')
+    assert html.index('id="network-map-controls-host"') < html.index('id="map-fullscreen-toggle-btn"')
     assert 'id="network-graph-svg"' in html
     assert 'id="network-graph-back-btn"' not in html
     assert 'id="network-graph-home-btn"' not in html
@@ -103,6 +105,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'name: "maltext"' in js
     assert 'function getNetworkMapFullscreenTarget()' in js
     assert 'function updateMapFullscreenControl(viewName = activeLayoutView, subviewName = activeNetworkSubview)' in js
+    assert 'const showControl = supported && (active || normalizedView === "network");' in js
+    assert 'Enter full screen network view' in js
     assert 'function toggleNetworkMapFullscreen()' in js
     assert 'function bindMapFullscreenControl()' in js
     assert 'runBootStep("bindMapFullscreenControl", () => bindMapFullscreenControl());' in js
@@ -420,7 +424,10 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-layout-control {" in css
     assert ".network-graph-mode-control {" in css
     assert ".map-fullscreen-toggle-btn {" in css
+    assert ".network-fullscreen-toggle-btn {" in css
     assert ".network-map-subviews:fullscreen {" in css
+    assert ".layout.view-network #network-map-panel-overview .network-overview-card {" in css
+    assert "background: transparent;" in css
     assert '[data-theme="dark"] .map-fullscreen-toggle-btn {' in css
     assert ".network-graph-layout-select {" in css
     assert ".network-graph-mode-select {" in css
