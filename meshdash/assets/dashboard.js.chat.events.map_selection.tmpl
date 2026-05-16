@@ -207,8 +207,12 @@
       const activeNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
         ? normalizeNetworkSubview(activeNetworkSubview)
         : String(activeNetworkSubview || "map").trim().toLowerCase();
-      const networkMapVisible = activeLayoutView === "network" && activeNetworkSubviewName === "map";
-      const networkGraphVisible = activeLayoutView === "network" && activeNetworkSubviewName === "graph";
+      const networkMapVisible = activeLayoutView === "network" && (
+        typeof networkSubviewUsesMap === "function"
+          ? networkSubviewUsesMap(activeNetworkSubviewName)
+          : activeNetworkSubviewName === "map"
+      );
+      const networkGraphVisible = activeLayoutView === "network" && activeNetworkSubviewName === "graph" && !networkSubviewUsesMap(activeNetworkSubviewName);
 
       if (activeLayoutView === "saved") {{
         const phaseStartMs = perfToken > 0 ? nodeSelectionPerfNow() : 0;
@@ -930,7 +934,7 @@
       const activeNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
         ? normalizeNetworkSubview(activeNetworkSubview)
         : String(activeNetworkSubview || "map").trim().toLowerCase();
-      const networkGraphSelectionActive = activeLayoutView === "network" && activeNetworkSubviewName === "graph";
+      const networkGraphSelectionActive = activeLayoutView === "network" && activeNetworkSubviewName === "graph" && !networkSubviewUsesMap(activeNetworkSubviewName);
       const syncSelectionToNetworkGraph = (
         networkGraphSelectionActive
         && !networkGraphRootSyncInProgress
@@ -1041,7 +1045,11 @@
         && activeLayoutView !== "saved"
         && (
           activeLayoutView !== "network"
-          || activeNetworkSubviewName === "map"
+          || (
+            typeof networkSubviewUsesMap === "function"
+              ? networkSubviewUsesMap(activeNetworkSubviewName)
+              : activeNetworkSubviewName === "map"
+          )
         )
       );
       pendingMapHistoryFocus = focusSelection;
@@ -1130,6 +1138,7 @@
       if (
         activeLayoutView === "network"
         && activeNetworkSubviewName === "graph"
+        && !networkSubviewUsesMap(activeNetworkSubviewName)
         && typeof renderNetworkGraphView === "function"
       ) {{
         renderNetworkGraphView(latestState);

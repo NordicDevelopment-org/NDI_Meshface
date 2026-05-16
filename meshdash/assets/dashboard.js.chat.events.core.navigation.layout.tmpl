@@ -696,7 +696,7 @@
 
     function isMapVisibleLayoutView(viewName) {{
       const view = normalizeLayoutView(viewName);
-      return view === "saved" || (view === "network" && activeNetworkSubview === "map");
+      return view === "saved" || (view === "network" && networkSubviewUsesMap(activeNetworkSubview));
     }}
 
     const networkDiagnosticsEnabled = !!Number({debug_mode_enabled});
@@ -746,6 +746,11 @@
       if (clean === "overview" || clean === "graph" || clean === "routes" || clean === "top10" || clean === "sensors") return clean;
       if (clean === "diagnostics") return networkDiagnosticsEnabled ? "diagnostics" : "map";
       return "map";
+    }}
+
+    function networkSubviewUsesMap(subviewName = activeNetworkSubview) {{
+      const clean = normalizeNetworkSubview(subviewName);
+      return clean === "map";
     }}
 
     function normalizeNetworkGraphEdgeMode(raw) {{
@@ -956,7 +961,7 @@
 
       const normalizedView = normalizeLayoutView(viewName);
       const normalizedSubview = normalizeNetworkSubview(subviewName);
-      const useOverlayDock = normalizedView === "network" && normalizedSubview === "map";
+      const useOverlayDock = normalizedView === "network" && networkSubviewUsesMap(normalizedSubview);
       const useOverlayGraphSummary = normalizedView === "network" && normalizedSubview === "graph";
       const targetHost = useOverlayDock ? overlayHost : headerHost;
       if (dock instanceof HTMLElement && dock.parentElement !== targetHost) {{
@@ -2983,7 +2988,8 @@
 
       const normalizedView = normalizeLayoutView(activeLayoutView);
       const showTabbedSubview = normalizedView === "network";
-      const showMapPanel = !showTabbedSubview || next === "map";
+      const nextUsesMap = networkSubviewUsesMap(next);
+      const showMapPanel = !showTabbedSubview || nextUsesMap;
       const root = document.getElementById("network-map-subviews");
       if (root instanceof HTMLElement) {{
         root.dataset.activeSubview = next;
@@ -3001,7 +3007,9 @@
       for (const panel of document.querySelectorAll(".network-map-subview-panel")) {{
         if (!(panel instanceof HTMLElement)) continue;
         const panelName = normalizeNetworkSubview(panel.dataset.networkSubviewPanel || "map");
-        const isActive = showTabbedSubview ? panelName === next : panelName === "map";
+        const isActive = showTabbedSubview
+          ? (nextUsesMap ? panelName === "map" : panelName === next)
+          : panelName === "map";
         panel.hidden = !isActive;
         panel.classList.toggle("is-active", isActive);
       }}
@@ -3025,7 +3033,7 @@
 
       if (
         normalizedView === "network"
-        && next !== "map"
+        && !nextUsesMap
         && latestState
         && typeof renderChatNodeNavigatorList === "function"
       ) {{
@@ -3038,6 +3046,9 @@
         }}
       }}
       if (normalizedView === "network" && next === "graph") {{
+        renderNetworkGraphSummaryControlsOnly();
+      }}
+      if (normalizedView === "network" && next === "graph" && !nextUsesMap) {{
         if (typeof renderNetworkGraphView === "function") {{
           renderNetworkGraphView(latestState);
         }}
@@ -3058,7 +3069,10 @@
         void refreshNetworkDiagnosticsPanel(false);
       }}
 
-      if (normalizedView === "network" && next === "map") {{
+      if (normalizedView === "network" && nextUsesMap) {{
+        lastMapSignature = "";
+        lastMapGraphSignature = "";
+        lastMapRenderMode = "";
         if (latestState && typeof renderMap === "function") {{
           const cachedHistory = isSelectableNodeId(selectedNodeId)
             ? cachedNodeHistory(selectedNodeId)
@@ -3433,6 +3447,7 @@
         if (
           activeLayoutView === "network"
           && activeNetworkSubview === "graph"
+          && !networkSubviewUsesMap(activeNetworkSubview)
           && typeof renderNetworkGraphView === "function"
         ) {{
           renderNetworkGraphView(latestState);
@@ -4349,6 +4364,7 @@
       const regions = Array.isArray(safeScene.regions) ? safeScene.regions : [];
       let hash = 2166136261;
       hash = hashMixStr(hash, normalizeNodeId(safeScene.rootId || ""));
+      hash = hashMixStr(hash, normalizeNetworkGraphLayoutMode(safeScene.layoutMode || ""));
       hash = hashMixInt(hash, regions.length);
       for (const region of regions) {{
         hash = hashMixInt(hash, Math.round(Number(region && region.x) * 10) || 0);
@@ -4434,6 +4450,8 @@
         if (edgeEl.style.strokeWidth !== widthValue) {{
           edgeEl.style.strokeWidth = widthValue;
         }}
+        edgeEl.style.removeProperty("--network-graph-edge-strength");
+        edgeEl.style.removeProperty("--network-graph-edge-spread-color");
         const titleEl = edgeEl.querySelector("title");
         if (titleEl instanceof SVGTitleElement) {{
           const nextText = buildEdgeTitle(edge);
@@ -5247,6 +5265,25 @@
       }}
     }}
 
+    function renderNetworkGraphSummaryControlsOnly() {{
+      const summary = document.getElementById("network-graph-summary");
+      if (!(summary instanceof HTMLElement)) return;
+      const edgeMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode);
+      const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
+      const edgeModeOptionsHtml = networkGraphEdgeModeDefs
+        .map((entry) => `<option value="${{entry.id}}"${{edgeMode === entry.id ? " selected" : ""}}>${{entry.label}}</option>`)
+        .join("");
+      const summaryHtml = `<div class="network-graph-summary-main"><label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select"><span class="network-graph-chip-label history-metric-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select history-metric-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label><button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip" type="button" title="Reset links view" aria-controls="network-graph-svg">Reset view</button></div><div class="network-graph-summary-side"><label class="network-graph-mode-control history-metric-wrap history-select-chip-hide-label" for="network-graph-mode-select" title="Choose the link history window for the Links view"><span class="network-graph-chip-label history-metric-label">Links</span><select id="network-graph-mode-select" class="network-graph-mode-select history-metric-select" aria-label="Network links source">${{edgeModeOptionsHtml}}</select></label></div>`;
+      if (summary.__meshNetworkGraphSummaryHtml !== summaryHtml) {{
+        summary.innerHTML = summaryHtml;
+        summary.__meshNetworkGraphSummaryHtml = summaryHtml;
+      }}
+      bindNetworkGraphLayoutSelector();
+      syncNetworkGraphLayoutSelector();
+      bindNetworkGraphSummaryControls();
+      syncNetworkGraphModeSelector();
+    }}
+
     function bindNetworkGraphLayoutSelector() {{
       const select = document.getElementById("network-graph-layout-select");
       if (!(select instanceof HTMLSelectElement) || select.dataset.bound === "1") return;
@@ -5275,9 +5312,25 @@
         && !(options && options.rerender === false)
         && activeLayoutView === "network"
         && activeNetworkSubview === "graph"
-        && typeof renderNetworkGraphView === "function"
       ) {{
-        renderNetworkGraphView(latestState);
+        if (networkSubviewUsesMap(activeNetworkSubview)) {{
+          lastMapSignature = "";
+          lastMapGraphSignature = "";
+          lastMapRenderMode = "";
+          fitDone = false;
+          if (latestState && typeof renderMap === "function") {{
+            const cachedHistory = isSelectableNodeId(selectedNodeId)
+              ? cachedNodeHistory(selectedNodeId)
+              : null;
+            renderMap(
+              latestState.nodes || [],
+              (latestState.traffic || {{}}).edges || [],
+              cachedHistory
+            );
+          }}
+        }} else if (typeof renderNetworkGraphView === "function") {{
+          renderNetworkGraphView(latestState);
+        }}
       }}
       return changed;
     }}
@@ -5306,9 +5359,12 @@
         && !(options && options.rerender === false)
         && activeLayoutView === "network"
         && activeNetworkSubview === "graph"
-        && typeof renderNetworkGraphView === "function"
       ) {{
-        renderNetworkGraphView(latestState);
+        if (typeof setActiveNetworkSubview === "function") {{
+          setActiveNetworkSubview("graph", {{ persist: true }});
+        }} else if (!networkSubviewUsesMap(activeNetworkSubview) && typeof renderNetworkGraphView === "function") {{
+          renderNetworkGraphView(latestState);
+        }}
       }}
       return changed;
     }}
@@ -5330,6 +5386,7 @@
         rerender
         && activeLayoutView === "network"
         && activeNetworkSubview === "graph"
+        && !networkSubviewUsesMap(activeNetworkSubview)
         && typeof renderNetworkGraphView === "function"
       ) {{
         renderNetworkGraphView(latestState);
@@ -5363,6 +5420,7 @@
       if (
         activeLayoutView === "network"
         && activeNetworkSubview === "graph"
+        && !networkSubviewUsesMap(activeNetworkSubview)
         && typeof renderNetworkGraphView === "function"
       ) {{
         renderNetworkGraphView(latestState);
@@ -5810,9 +5868,17 @@
             activeLayoutView === "network"
             && activeNetworkSubview === "graph"
             && normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) === mode
-            && typeof renderNetworkGraphView === "function"
           ) {{
-            renderNetworkGraphView(latestState);
+            if (networkSubviewUsesMap(activeNetworkSubview)) {{
+              lastMapSignature = "";
+              lastMapGraphSignature = "";
+              lastMapRenderMode = "";
+              if (latestState && typeof renderMap === "function") {{
+                renderMap(latestState.nodes || [], ((latestState.traffic || {{}}).edges || []), null);
+              }}
+            }} else if (typeof renderNetworkGraphView === "function") {{
+              renderNetworkGraphView(latestState);
+            }}
           }}
           if (
             activeLayoutView === "network"
@@ -5831,9 +5897,17 @@
             activeLayoutView === "network"
             && activeNetworkSubview === "graph"
             && normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) === mode
-            && typeof renderNetworkGraphView === "function"
           ) {{
-            renderNetworkGraphView(latestState);
+            if (networkSubviewUsesMap(activeNetworkSubview)) {{
+              lastMapSignature = "";
+              lastMapGraphSignature = "";
+              lastMapRenderMode = "";
+              if (latestState && typeof renderMap === "function") {{
+                renderMap(latestState.nodes || [], ((latestState.traffic || {{}}).edges || []), null);
+              }}
+            }} else if (typeof renderNetworkGraphView === "function") {{
+              renderNetworkGraphView(latestState);
+            }}
           }}
           if (
             activeLayoutView === "network"
@@ -7700,18 +7774,7 @@
       empty.hidden = true;
       const selectedId = normalizeNodeId(selectedNodeId || "");
       const localId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
-      const edgeModeOptionsHtml = networkGraphEdgeModeDefs
-        .map((entry) => `<option value="${{entry.id}}"${{edgeMode === entry.id ? " selected" : ""}}>${{entry.label}}</option>`)
-        .join("");
-      const summaryHtml = `<div class="network-graph-summary-main"><label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select"><span class="network-graph-chip-label history-metric-label">View</span><select id="network-graph-layout-select" class="network-graph-layout-select history-metric-select" aria-label="Network links layout"><option value="radial"${{layoutMode === "radial" ? " selected" : ""}}>Radial</option><option value="tree"${{layoutMode === "tree" ? " selected" : ""}}>Tree</option><option value="cluster"${{layoutMode === "cluster" ? " selected" : ""}}>Cluster</option><option value="community"${{layoutMode === "community" ? " selected" : ""}}>Community</option></select></label><button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip" type="button" title="Reset links view" aria-controls="network-graph-svg">Reset view</button></div><div class="network-graph-summary-side"><label class="network-graph-mode-control history-metric-wrap history-select-chip-hide-label" for="network-graph-mode-select" title="Choose the link history window for the Links view"><span class="network-graph-chip-label history-metric-label">Links</span><select id="network-graph-mode-select" class="network-graph-mode-select history-metric-select" aria-label="Network links source">${{edgeModeOptionsHtml}}</select></label></div>`;
-      if (summary.__meshNetworkGraphSummaryHtml !== summaryHtml) {{
-        summary.innerHTML = summaryHtml;
-        summary.__meshNetworkGraphSummaryHtml = summaryHtml;
-      }}
-      bindNetworkGraphLayoutSelector();
-      syncNetworkGraphLayoutSelector();
-      bindNetworkGraphSummaryControls();
-      syncNetworkGraphModeSelector();
+      renderNetworkGraphSummaryControlsOnly();
       const fullBounds = computeNetworkGraphBounds(layout, {{
         topSafeInset: resolveNetworkGraphTopSafeInset(svg),
       }});
@@ -8682,7 +8745,7 @@
       syncNetworkTopNodesPrimaryControls(next, activeNetworkSubview);
       syncEnvironmentMetricsDock(next, activeNetworkSubview);
       if (latestState) {{
-        const networkGraphActive = next === "network" && activeNetworkSubview === "graph";
+        const networkGraphActive = next === "network" && activeNetworkSubview === "graph" && !networkSubviewUsesMap(activeNetworkSubview);
         const networkRoutesActive = next === "network" && activeNetworkSubview === "routes";
         const networkTopNodesActive = next === "network" && activeNetworkSubview === "top10";
         let cachedNodeHistory = null;
@@ -8700,7 +8763,7 @@
         renderSummary(latestState);
         if (
           next === "network"
-          && activeNetworkSubview !== "map"
+          && !networkSubviewUsesMap(activeNetworkSubview)
           && typeof renderChatNodeNavigatorList === "function"
         ) {{
           renderChatNodeNavigatorList(latestState);

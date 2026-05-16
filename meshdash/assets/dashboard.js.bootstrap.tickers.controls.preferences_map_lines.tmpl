@@ -344,7 +344,7 @@
         modeWrap.hidden = !inMapLinkContext;
       }}
       if (modeSelect instanceof HTMLSelectElement) {{
-        modeSelect.value = normalizeMapLinkLayerMode(mapLinkLayerMode);
+        modeSelect.value = mapLinkLayerModeForCurrentView(mapLinkLayerMode);
       }}
     }}
 
@@ -372,6 +372,11 @@
       const clean = String(value || "").trim().toLowerCase();
       if (clean === "none" || clean === "history" || clean === "live" || clean === "both") return clean;
       return "none";
+    }}
+
+    function mapLinkLayerModeForCurrentView(value = mapLinkLayerMode) {{
+      const clean = normalizeMapLinkLayerMode(value);
+      return clean;
     }}
 
     function persistMapLinkLayerModePreference() {{
@@ -444,7 +449,7 @@
       const modeSelect = document.getElementById("map-link-mode");
       if (modeSelect instanceof HTMLSelectElement && modeSelect.dataset.bound !== "1") {{
         modeSelect.dataset.bound = "1";
-        modeSelect.value = normalizeMapLinkLayerMode(mapLinkLayerMode);
+        modeSelect.value = mapLinkLayerModeForCurrentView(mapLinkLayerMode);
         modeSelect.addEventListener("change", () => {{
           mapLinkLayerMode = normalizeMapLinkLayerMode(modeSelect.value);
           persistMapLinkLayerModePreference();

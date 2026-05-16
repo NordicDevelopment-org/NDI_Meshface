@@ -2394,7 +2394,14 @@
         opts.fetchHistory !== false
         && (
           activeLayoutView === "saved"
-          || (activeLayoutView === "network" && activeNetworkSubviewName === "map")
+          || (
+            activeLayoutView === "network"
+            && (
+              typeof networkSubviewUsesMap === "function"
+                ? networkSubviewUsesMap(activeNetworkSubviewName)
+                : activeNetworkSubviewName === "map"
+            )
+          )
           || activeTab === "details"
           || activeTab === "location"
           || activeTab === "history"

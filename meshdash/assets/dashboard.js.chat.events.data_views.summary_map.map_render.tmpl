@@ -97,7 +97,7 @@
         legend instanceof HTMLElement
         && !legend.hidden
         && activeLayoutView === "network"
-        && activeNetworkSubview === "map"
+        && networkSubviewUsesMap(activeNetworkSubview)
       )
         ? Math.ceil(legend.getBoundingClientRect().height + 18)
         : 0;
@@ -115,7 +115,9 @@
     }}
 
     function mapLinkLayerModeParts(modeName = mapLinkLayerMode) {{
-      const mode = normalizeMapLinkLayerMode(modeName);
+      const mode = (typeof mapLinkLayerModeForCurrentView === "function")
+        ? mapLinkLayerModeForCurrentView(modeName)
+        : normalizeMapLinkLayerMode(modeName);
       return {{
         history: mode === "history" || mode === "both",
         live: mode === "live" || mode === "both",
@@ -135,7 +137,7 @@
       lastMapSignature = "";
       lastMapGraphSignature = "";
       lastMapRenderMode = "";
-      if (latestState && activeLayoutView === "network" && activeNetworkSubview === "map") {{
+      if (latestState && activeLayoutView === "network" && networkSubviewUsesMap(activeNetworkSubview)) {{
         renderMap(
           latestState.nodes || [],
           (latestState.traffic || {{}}).edges || [],
@@ -192,7 +194,7 @@
     function renderMapLinkLegend(nodes = [], rawEdges = [], estimatedPositions = new Map(), linkOverlay = null) {{
       const legend = document.getElementById("map-link-legend");
       if (!(legend instanceof HTMLElement)) return;
-      if (activeLayoutView !== "network" || activeNetworkSubview !== "map") {{
+      if (activeLayoutView !== "network" || !networkSubviewUsesMap(activeNetworkSubview)) {{
         legend.innerHTML = "";
         legend.hidden = true;
         scheduleMapLinkLegendOffsetSync();
@@ -248,7 +250,8 @@
     function renderMap(nodes, edges, nodeHistory = null) {{
       ensureMapSizeSync();
       const hideHeatmap = activeLayoutView === "saved";
-      const signatures = buildMapSignatures(nodes, edges, nodeHistory);
+      const mapRenderEdges = edges;
+      const signatures = buildMapSignatures(nodes, mapRenderEdges, nodeHistory);
       const signature = signatures.signature;
       const graphSignature = signatures.graphSignature;
       const savedSelectionMode = signatures.savedSelectionMode;
@@ -403,6 +406,10 @@
         return;
       }}
 
+      const effectiveMapLinkMode = (typeof mapLinkLayerModeForCurrentView === "function")
+        ? mapLinkLayerModeForCurrentView(mapLinkLayerMode)
+        : normalizeMapLinkLayerMode(mapLinkLayerMode);
+      let estimatedPositions = new Map();
       const graphChanged = lastMapRenderMode !== "graph" || graphSignature !== lastMapGraphSignature;
       if (!graphChanged && signature === lastMapSignature) {{
         ensureMapSizeSync();
@@ -426,11 +433,11 @@
         }}
         const linkOverlay = (
           activeLayoutView === "network"
-          && normalizeMapLinkLayerMode(mapLinkLayerMode) !== "none"
+          && effectiveMapLinkMode !== "none"
         )
-          ? buildMapLinkLayerOverlay(nodes, edges, {{ mode: mapLinkLayerMode }})
+          ? buildMapLinkLayerOverlay(nodes, mapRenderEdges, {{ mode: effectiveMapLinkMode }})
           : {{ estimates: new Map(), lines: [] }};
-        const estimatedPositions = linkOverlay.estimates instanceof Map
+        estimatedPositions = linkOverlay.estimates instanceof Map
           ? linkOverlay.estimates
           : new Map();
         const historyCapsById = new Map(
@@ -564,7 +571,7 @@
         if (activeLayoutView === "network" && mapPacketLinesEnabled) {{
           const seenEdgeKeys = new Set();
           const edgeKeyCounts = new Map();
-          for (const edge of (edges || [])) {{
+          for (const edge of (mapRenderEdges || [])) {{
             const fromId = normalizeNodeId(edge && edge.from);
             const toId = normalizeNodeId(edge && edge.to);
             const src = byId[fromId];
@@ -694,7 +701,7 @@
           }}
         }}
 
-        if (activeLayoutView === "network" && normalizeMapLinkLayerMode(mapLinkLayerMode) !== "none") {{
+        if (activeLayoutView === "network" && effectiveMapLinkMode !== "none") {{
           const seenEstimateKeys = new Set();
           for (const estimateLine of (Array.isArray(linkOverlay.lines) ? linkOverlay.lines : [])) {{
             const lineKey = String(estimateLine && estimateLine.key || "");
@@ -805,7 +812,7 @@
             linkEstimateLineMeta.delete(lineKey);
           }}
         }}
-        renderMapLinkLegend(nodes, edges, estimatedPositions, linkOverlay);
+        renderMapLinkLegend(nodes, mapRenderEdges, estimatedPositions, linkOverlay);
       }}
 
       if (networkSelectionMode) {{

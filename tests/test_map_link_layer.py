@@ -80,9 +80,14 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert 'data-map-link-legend-toggle="packet"' in js
     assert 'data-map-link-legend-toggle="history"' in js
     assert 'data-map-link-legend-toggle="live"' in js
-    assert 'renderMapLinkLegend(nodes, edges, estimatedPositions, linkOverlay);' in js
+    assert 'renderMapLinkLegend(nodes, mapRenderEdges, estimatedPositions, linkOverlay);' in js
     assert 'mapElement.style.setProperty("--map-link-legend-space"' in js
-    assert 'activeNetworkSubview === "map"' in js
+    assert "networkSubviewUsesMap(activeNetworkSubview)" in js
+    assert "mapLinkLayerModeForCurrentView(mapLinkLayerMode)" in js
+    assert "networkGraphRawEdgesForMode(edges, spreadEdgeMode)" not in js
+    assert "const mapRenderEdges = edges;" in js
+    assert 'const effectiveMapLinkMode = (typeof mapLinkLayerModeForCurrentView === "function")' in js
+    assert '? (spreadEdgeMode === "live" ? "live" : "history")' not in js
     assert "lastMapSignature = \"\";" in js
     assert "Linked nodes" in js
     assert "Actual GPS nodes" in js

@@ -34,7 +34,7 @@ POLL_RENDER_SKIP_TOKEN_GROUPS: tuple[tuple[str, Sequence[str]], ...] = (
             'const needsChatSection = !renderChatInDrawer || activeDrawerTab === "chat";',
             'const linksSection = needsLinksSection && linkStats',
             "renderChatChangeSummary(nowUnix);",
-            'const networkMapVisible = activeLayoutView === "network" && activeNetworkSubviewName === "map";',
+            "networkSubviewUsesMap(activeNetworkSubviewName)",
             'if (latestState && (activeLayoutView !== "network" || networkMapVisible)) {',
             'const shouldPrefetchNodeHistory = !!(',
             'activeTab === "history"',

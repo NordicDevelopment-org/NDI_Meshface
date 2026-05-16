@@ -24,6 +24,7 @@ def test_dashboard_html_adds_network_graph_subview() -> None:
 
     assert 'data-network-subview="graph"' in html
     assert 'id="network-map-panel-graph"' in html
+    assert 'data-network-subview="spread"' not in html
     assert 'data-network-subview="routes"' in html
     assert 'id="network-map-panel-routes"' in html
     assert 'id="network-routes-primary-controls"' in html
@@ -139,8 +140,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'runBootStep("bindMapFullscreenControl", () => bindMapFullscreenControl());' in js
     assert 'requestMapResizeStabilized();' in js
     assert 'activeNetworkSubview === "graph"' in js
-    assert 'const networkGraphSelectionActive = activeLayoutView === "network" && activeNetworkSubviewName === "graph";' in js
-    assert 'activeLayoutView !== "network"\n          || activeNetworkSubviewName === "map"' in js
+    assert 'const networkGraphSelectionActive = activeLayoutView === "network" && activeNetworkSubviewName === "graph" && !networkSubviewUsesMap(activeNetworkSubviewName);' in js
+    assert "networkSubviewUsesMap(activeNetworkSubviewName)" in js
     assert 'let networkGraphRootNodeId = "";' in js
     assert 'const networkGraphRootHistory = [];' in js
     assert 'const networkGraphViewState = {' in js
@@ -203,6 +204,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function networkGraphEdgeModeUsesHistoryFetch(modeName)' in js
     assert 'function normalizeNetworkGraphLayoutMode(raw)' in js
     assert 'clean === "community"' in js
+    assert 'clean === "spread"' not in js
+    assert 'function buildNetworkGraphSpreadLayout(' not in js
+    assert 'function networkGraphSpreadEdgeSignalScore(edge)' not in js
+    assert 'function networkGraphSpreadDesiredDistanceMeters(edge)' not in js
     assert 'function loadPreferredNetworkGraphEdgeMode()' in js
     assert 'function loadPreferredNetworkGraphLayoutMode()' in js
     assert 'function loadPreferredNetworkGraphHiddenTagRoutePresetIds()' in js
@@ -347,7 +352,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'if (summary.__meshNetworkGraphSummaryHtml !== summaryHtml) {' in js
     assert "summary.__meshNetworkGraphSummaryHtml = summaryHtml;" in js
     assert '<button id="network-graph-reset-view-btn" class="network-graph-chip network-graph-action-chip"' in js
-    assert 'aria-controls="network-graph-svg">Reset view</button>' in js
+    assert 'title="Reset links view" aria-controls="network-graph-svg">Reset view</button>' in js
     assert 'bindNetworkGraphLayoutSelector();' in js
     assert 'syncNetworkGraphLayoutSelector();' in js
     assert 'label class="network-graph-layout-control history-metric-wrap history-select-chip-hide-label" for="network-graph-layout-select"' in js
@@ -370,12 +375,12 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'label: `${layer} hop${layer === 1 ? "" : "s"}`,' in js
     assert 'Choose the link history window for the Links view' in js
     assert '<span class="network-graph-chip-label">1 Hop</span>' not in js
-    assert 'const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph";' in js
+    assert 'const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph" && !networkSubviewUsesMap(activeNetworkSubview);' in js
     assert 'const networkRoutesActive304 = activeLayoutView === "network" && activeNetworkSubview === "routes";' in js
     assert 'const networkSensorsActive = activeLayoutView === "network" && activeNetworkSubview === "sensors";' in js
     assert '|| (activeLayoutView === "network" && !networkSensorsActive)' in js
     assert 'if (weeklySummaryPromise) {' in js
-    assert 'const networkGraphActive = next === "network" && activeNetworkSubview === "graph";' in js
+    assert 'const networkGraphActive = next === "network" && activeNetworkSubview === "graph" && !networkSubviewUsesMap(activeNetworkSubview);' in js
     assert 'const networkRoutesActive = next === "network" && activeNetworkSubview === "routes";' in js
     assert 'const rootChanged = networkGraphViewState.lastRootId !== rootId;' in js
     assert 'const pendingSelectedNodeCenterId = normalizeNodeId(networkGraphViewState.pendingSelectedNodeCenterId || "");' in js
@@ -390,6 +395,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'layoutMode === "tree"' in js
     assert 'layoutMode === "cluster"' in js
     assert 'layoutMode === "community"' in js
+    assert 'layoutMode === "spread"' not in js
+    assert '<option value="spread"' not in js
     assert 'function resolveTreeLabelOffset(index, radius, amplitude = 16) {' in js
     assert 'return radius + amplitude + 2;' in js
     assert 'const compactSingleHopTree = maxTreeLayer === 1 && connectedCount <= 6;' in js
@@ -568,6 +575,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-swatch.is-local-path {" in css
     assert ".network-graph-swatch.is-local {" in css
     assert ".network-graph-edge.is-local-path {" in css
+    assert ".network-graph-edge.is-spread-link {" not in css
     assert "stroke: var(--theme-base-color, var(--accent, #2f855a));" in css
     assert ".network-graph-tag-routes {" in css
     assert ".network-graph-tag-route {" in css
@@ -593,6 +601,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "fill: currentColor;" in css
     assert ".network-graph-tag-filter-label {" in css
     assert "[data-theme=\"dark\"] .network-graph-edge.is-local-path {" in css
+    assert "[data-theme=\"dark\"] .network-graph-edge.is-spread-link {" not in css
     assert "stroke: var(--theme-base-color, var(--ui-accent));" in css
     assert "[data-theme=\"dark\"] .network-graph-tag-route {" in css
     assert "[data-theme=\"dark\"] .network-graph-self-path-segment {" in css
@@ -600,8 +609,11 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-graph-ring.is-broadcast-only {" in css
     assert ".network-graph-node.is-local .network-graph-node-core {" in css
     assert ".network-graph-node.is-tagged .network-graph-node-core {" in css
+    assert ".network-graph-node.is-spread-actual" not in css
+    assert ".network-graph-node.is-spread-estimated" not in css
     assert "stroke: var(--node-tag-color, #2aa85a);" in css
     assert "[data-theme=\"dark\"] .network-graph-node.is-tagged .network-graph-node-core {" in css
+    assert "[data-theme=\"dark\"] .network-graph-node.is-spread-estimated" not in css
     assert "stroke: var(--node-tag-color, #3fb950);" in css
     assert ".network-graph-node-emoji-fo {" in css
     assert ".network-graph-node-emoji {" in css
