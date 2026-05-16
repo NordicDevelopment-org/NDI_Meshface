@@ -3259,6 +3259,7 @@
       selfPathVisible: loadPreferredNetworkGraphSelfPathVisible(),
       selectedTagRouteKey: "",
       manualRootNodeId: "",
+      pendingSelectedNodeCenterId: "",
       pendingEntryViewportSync: false,
       pendingModeViewportSync: false,
       forceCenteredFitOnce: false,
@@ -4650,6 +4651,7 @@
       const aspectRatio = Number.isFinite(requestedAspectRatio) && requestedAspectRatio > 0
         ? requestedAspectRatio
         : getNetworkGraphStageAspectRatio();
+      const preserveRequestedCenter = !!(options && options.preserveRequestedCenter);
       const fallbackWidth = Number.isFinite(next.height) && next.height > 0
         ? (next.height * aspectRatio)
         : networkGraphViewportBase.width;
@@ -4672,16 +4674,25 @@
       const maxX = Number(bounds.maxX) + padX - next.width;
       const minY = Number(bounds.minY) - padY;
       const maxY = Number(bounds.maxY) + padY - next.height;
-      next.x = zoomedOutX
-        ? (graphCenterX - (next.width / 2))
-        : minX <= maxX
-        ? Math.min(maxX, Math.max(minX, next.x))
-        : (graphCenterX - (next.width / 2));
-      next.y = zoomedOutY
-        ? (graphCenterY - (next.height / 2))
-        : minY <= maxY
-        ? Math.min(maxY, Math.max(minY, next.y))
-        : (graphCenterY - (next.height / 2));
+      if (preserveRequestedCenter) {{
+        next.x = minX <= maxX
+          ? Math.min(maxX, Math.max(minX, next.x))
+          : next.x;
+        next.y = minY <= maxY
+          ? Math.min(maxY, Math.max(minY, next.y))
+          : next.y;
+      }} else {{
+        next.x = zoomedOutX
+          ? (graphCenterX - (next.width / 2))
+          : minX <= maxX
+          ? Math.min(maxX, Math.max(minX, next.x))
+          : (graphCenterX - (next.width / 2));
+        next.y = zoomedOutY
+          ? (graphCenterY - (next.height / 2))
+          : minY <= maxY
+          ? Math.min(maxY, Math.max(minY, next.y))
+          : (graphCenterY - (next.height / 2));
+      }}
       return next;
     }}
 
@@ -4795,6 +4806,29 @@
       return fitNetworkGraphViewBoxToCenteredBounds(bounds, svg, center);
     }}
 
+    function resolveNetworkGraphNodeCenterViewBox(svg, nodeId, positions, options = {{}}) {{
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      const safePositions = positions instanceof Map ? positions : new Map();
+      const position = safePositions.get(cleanNodeId) || null;
+      if (!isSelectableNodeId(cleanNodeId) || !position) return null;
+      const focusX = Number(position.x);
+      const focusY = Number(position.y);
+      if (!Number.isFinite(focusX) || !Number.isFinite(focusY)) return null;
+      const preserveScale = !(options && options.preserveScale === false);
+      const sourceViewBox = preserveScale && networkGraphViewState.initialized
+        ? cloneNetworkGraphViewBox(networkGraphViewState.viewBox)
+        : resolveNetworkGraphResetViewBox(svg, options);
+      return clampNetworkGraphViewBox({{
+        x: focusX - (sourceViewBox.width / 2),
+        y: focusY - (sourceViewBox.height / 2),
+        width: sourceViewBox.width,
+        height: sourceViewBox.height,
+      }}, {{
+        aspectRatio: getNetworkGraphStageAspectRatio(svg),
+        preserveRequestedCenter: true,
+      }});
+    }}
+
     function syncNetworkGraphTextZoom(svg, rawViewBox) {{
       if (!(svg instanceof SVGElement)) return;
       const viewBox = cloneNetworkGraphViewBox(rawViewBox);
@@ -4855,7 +4889,10 @@
       if (!(options && options.skipAnimationCancel)) {{
         cancelNetworkGraphViewAnimation();
       }}
-      const next = clampNetworkGraphViewBox(rawViewBox, {{ aspectRatio: getNetworkGraphStageAspectRatio(svg) }});
+      const next = clampNetworkGraphViewBox(rawViewBox, {{
+        aspectRatio: getNetworkGraphStageAspectRatio(svg),
+        preserveRequestedCenter: !!(options && options.preserveRequestedCenter),
+      }});
       svg.setAttribute(
         "viewBox",
         `${{next.x.toFixed(2)}} ${{next.y.toFixed(2)}} ${{next.width.toFixed(2)}} ${{next.height.toFixed(2)}}`
@@ -4869,7 +4906,10 @@
     function animateNetworkGraphViewBox(svg, rawViewBox, options = {{}}) {{
       if (!(svg instanceof SVGElement)) return cloneNetworkGraphViewBox();
       const aspectRatio = getNetworkGraphStageAspectRatio(svg);
-      const target = clampNetworkGraphViewBox(rawViewBox, {{ aspectRatio }});
+      const target = clampNetworkGraphViewBox(rawViewBox, {{
+        aspectRatio,
+        preserveRequestedCenter: !!(options && options.preserveRequestedCenter),
+      }});
       const current = cloneNetworkGraphViewBox(networkGraphViewState.viewBox);
       const onComplete = (options && typeof options.onComplete === "function")
         ? options.onComplete
@@ -5305,9 +5345,12 @@
       cancelNetworkGraphViewAnimation();
       cancelNetworkGraphSceneAnimation();
       networkGraphViewState.pendingFocusTransition = null;
+      networkGraphViewState.pendingSelectedNodeCenterId = nextId;
+      invalidateNetworkGraphRenderCache();
+      networkGraphViewState.skipSceneAnimationOnce = true;
       const changed = setNetworkGraphRootNode(nextId, {{
         pushHistory,
-        rerender: true,
+        rerender: false,
       }});
       if (typeof selectNode === "function") {{
         networkGraphRootSyncInProgress = true;
@@ -5316,6 +5359,13 @@
         }} finally {{
           networkGraphRootSyncInProgress = false;
         }}
+      }}
+      if (
+        activeLayoutView === "network"
+        && activeNetworkSubview === "graph"
+        && typeof renderNetworkGraphView === "function"
+      ) {{
+        renderNetworkGraphView(latestState);
       }}
       return changed;
     }}
@@ -5326,6 +5376,9 @@
       cancelNetworkGraphViewAnimation();
       cancelNetworkGraphSceneAnimation();
       networkGraphViewState.pendingFocusTransition = null;
+      networkGraphViewState.pendingSelectedNodeCenterId = nextId;
+      invalidateNetworkGraphRenderCache();
+      networkGraphViewState.skipSceneAnimationOnce = true;
       const changed = setNetworkGraphRootNode(nextId, {{
         pushHistory: !(options && options.pushHistory === false),
         manual: false,
@@ -7613,6 +7666,7 @@
         networkGraphViewState.cachedCombinedEdges = null;
         networkGraphViewState.cachedLayout = null;
         networkGraphViewState.pendingFocusTransition = null;
+        networkGraphViewState.pendingSelectedNodeCenterId = "";
         networkGraphViewState.resetCenter = null;
         stopNetworkGraphPan(svg);
         applyNetworkGraphViewBox(svg, networkGraphViewportBase);
@@ -7701,6 +7755,24 @@
       const previousLayoutSnapshot = networkGraphViewState.renderedLayoutSnapshot;
       const rootChanged = networkGraphViewState.lastRootId !== rootId;
       const selectionChanged = networkGraphViewState.lastSelectedId !== selectedId;
+      const pendingSelectedNodeCenterId = normalizeNodeId(networkGraphViewState.pendingSelectedNodeCenterId || "");
+      const selectedNodePosition = selectedId ? (layout.positions.get(selectedId) || null) : null;
+      const shouldCenterSelectedNode = !!(
+        selectedId
+        && selectedNodePosition
+        && (
+          selectionChanged
+          || (pendingSelectedNodeCenterId && pendingSelectedNodeCenterId === selectedId)
+        )
+      );
+      const selectedNodeCenterViewBox = shouldCenterSelectedNode
+        ? resolveNetworkGraphNodeCenterViewBox(svg, selectedId, layout.positions, {{
+            bounds: resetBounds,
+            center: selectedNodePosition,
+            layoutMode,
+            preserveScale: true,
+          }})
+        : null;
       const shouldSkipSceneAnimation = !!networkGraphViewState.skipSceneAnimationOnce;
       const shouldAnimateSceneChange = !!(
         previousLayoutSnapshot
@@ -7727,7 +7799,10 @@
         && !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)
       );
       const shouldForceCenteredFit = !!networkGraphViewState.forceCenteredFitOnce;
-      if (!networkGraphViewState.initialized || shouldForceCenteredFit) {{
+      if (selectedNodeCenterViewBox) {{
+        stopNetworkGraphPan(svg);
+        applyNetworkGraphViewBox(svg, selectedNodeCenterViewBox, {{ preserveRequestedCenter: true }});
+      }} else if (!networkGraphViewState.initialized || shouldForceCenteredFit) {{
         stopNetworkGraphPan(svg);
         applyNetworkGraphViewBox(svg, fittedViewBox);
       }} else if (shouldRefitForModeChange) {{
@@ -7747,6 +7822,7 @@
       networkGraphViewState.forceCenteredFitOnce = false;
       networkGraphViewState.skipSceneAnimationOnce = false;
       networkGraphViewState.pendingFocusTransition = null;
+      networkGraphViewState.pendingSelectedNodeCenterId = "";
       networkGraphViewState.lastRootId = rootId;
       networkGraphViewState.lastSelectedId = selectedId;
       networkGraphViewState.renderedPositions = new Map(layout.positions);

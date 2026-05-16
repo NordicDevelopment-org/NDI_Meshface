@@ -927,9 +927,12 @@
       if (!chatFeedSelectionSyncInProgress && typeof clearChatFeedRepeatToggleState === "function") {{
         clearChatFeedRepeatToggleState();
       }}
+      const activeNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
+        ? normalizeNetworkSubview(activeNetworkSubview)
+        : String(activeNetworkSubview || "map").trim().toLowerCase();
+      const networkGraphSelectionActive = activeLayoutView === "network" && activeNetworkSubviewName === "graph";
       const syncSelectionToNetworkGraph = (
-        activeLayoutView === "network"
-        && activeNetworkSubview === "graph"
+        networkGraphSelectionActive
         && !networkGraphRootSyncInProgress
         && typeof focusNetworkGraphNodeFromSelection === "function"
       );
@@ -973,14 +976,14 @@
         typeof renderEnvironmentMetricsView === "function"
         && (
           activeLayoutView === "environment"
-          || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
+          || (activeLayoutView === "network" && activeNetworkSubviewName === "sensors")
         )
       ) {{
         void renderEnvironmentMetricsView(false);
       }}
       if (
         activeLayoutView === "network"
-        && activeNetworkSubview === "routes"
+        && activeNetworkSubviewName === "routes"
         && typeof syncNetworkRoutesFromSelectedNode === "function"
         && typeof renderNetworkRoutes === "function"
       ) {{
@@ -1038,13 +1041,12 @@
         && activeLayoutView !== "saved"
         && (
           activeLayoutView !== "network"
-          || activeNetworkSubview === "map"
+          || activeNetworkSubviewName === "map"
         )
       );
       pendingMapHistoryFocus = focusSelection;
       if (
-        activeLayoutView === "network"
-        && activeNetworkSubview === "graph"
+        networkGraphSelectionActive
         && !networkGraphRootSyncInProgress
         && !(networkGraphViewState && networkGraphViewState.pendingFocusTransition)
         && typeof renderNetworkGraphView === "function"
@@ -1072,11 +1074,14 @@
       if (latestState) {{
         renderSummary(latestState);
       }}
+      const activeNetworkSubviewName = (typeof normalizeNetworkSubview === "function")
+        ? normalizeNetworkSubview(activeNetworkSubview)
+        : String(activeNetworkSubview || "map").trim().toLowerCase();
       if (
         typeof renderEnvironmentMetricsView === "function"
         && (
           activeLayoutView === "environment"
-          || (activeLayoutView === "network" && activeNetworkSubview === "sensors")
+          || (activeLayoutView === "network" && activeNetworkSubviewName === "sensors")
         )
       ) {{
         void renderEnvironmentMetricsView(false);
@@ -1124,7 +1129,7 @@
       }}
       if (
         activeLayoutView === "network"
-        && activeNetworkSubview === "graph"
+        && activeNetworkSubviewName === "graph"
         && typeof renderNetworkGraphView === "function"
       ) {{
         renderNetworkGraphView(latestState);

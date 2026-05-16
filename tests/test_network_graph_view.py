@@ -139,7 +139,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'runBootStep("bindMapFullscreenControl", () => bindMapFullscreenControl());' in js
     assert 'requestMapResizeStabilized();' in js
     assert 'activeNetworkSubview === "graph"' in js
-    assert 'activeLayoutView !== "network"\n          || activeNetworkSubview === "map"' in js
+    assert 'const networkGraphSelectionActive = activeLayoutView === "network" && activeNetworkSubviewName === "graph";' in js
+    assert 'activeLayoutView !== "network"\n          || activeNetworkSubviewName === "map"' in js
     assert 'let networkGraphRootNodeId = "";' in js
     assert 'const networkGraphRootHistory = [];' in js
     assert 'const networkGraphViewState = {' in js
@@ -229,6 +230,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const graphCenterY = Number(bounds.minY) + (spanHeight / 2);' in js
     assert 'const zoomedOutX = next.width >= (spanWidth * 1.06);' in js
     assert 'const zoomedOutY = next.height >= (spanHeight * 1.06);' in js
+    assert 'const preserveRequestedCenter = !!(options && options.preserveRequestedCenter);' in js
     assert 'const panSlackX = Math.max(260, next.width * 0.9, spanWidth * 0.38);' in js
     assert 'const panSlackY = Math.max(220, next.height * 0.9, spanHeight * 0.38);' in js
     assert 'next.x = zoomedOutX' in js
@@ -241,6 +243,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'if (networkGraphViewState.pinching) {' in js
     assert 'updateNetworkGraphPinch(svg)' in js
     assert 'manualRootNodeId: "",' in js
+    assert 'pendingSelectedNodeCenterId: "",' in js
     assert 'function buildNetworkGraphComponentMeta(nodeMap, adjacency, degreeMeta)' in js
     assert 'function compareNetworkGraphComponents(componentA, componentB, degreeMeta, nodeMap)' in js
     assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
@@ -270,6 +273,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'if (excludeDisconnected && item.disconnected) continue;' in js
     assert 'if (excludeDisconnected && includedCount <= 0) {' in js
     assert 'function resolveNetworkGraphResetViewBox(svg, options = {}) {' in js
+    assert 'function resolveNetworkGraphNodeCenterViewBox(svg, nodeId, positions, options = {}) {' in js
+    assert 'preserveRequestedCenter: true,' in js
     assert 'function resolveNetworkGraphStage(svg = null) {' in js
     assert 'function isNetworkGraphOverlayDocked(svg = null) {' in js
     assert 'function resolveNetworkGraphFitZoomOutScale(svg = null) {' in js
@@ -282,9 +287,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function setNetworkGraphRootNode(nodeId, options = {})' in js
     assert 'function navigateNetworkGraphBack()' in js
     assert 'function focusNetworkGraphNodeFromSelection(nodeId, options = {})' in js
+    assert 'networkGraphViewState.pendingSelectedNodeCenterId = nextId;' in js
+    assert 'invalidateNetworkGraphRenderCache();\n      networkGraphViewState.skipSceneAnimationOnce = true;' in js
     assert 'selectNode(row.dataset.nodeId || "", true, true);' in js
     assert 'selectNode(nodeId, true, true);' in js
-    assert 'activeLayoutView === "network"\n        && activeNetworkSubview === "routes"' in js
+    assert 'activeLayoutView === "network"\n        && activeNetworkSubviewName === "routes"' in js
     assert 'syncNetworkRoutesFromSelectedNode();\n        renderNetworkRoutes(latestState);' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'return fitNetworkGraphViewBoxToBounds(bounds, svg);' in js
@@ -371,6 +378,9 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const networkGraphActive = next === "network" && activeNetworkSubview === "graph";' in js
     assert 'const networkRoutesActive = next === "network" && activeNetworkSubview === "routes";' in js
     assert 'const rootChanged = networkGraphViewState.lastRootId !== rootId;' in js
+    assert 'const pendingSelectedNodeCenterId = normalizeNodeId(networkGraphViewState.pendingSelectedNodeCenterId || "");' in js
+    assert 'const selectedNodeCenterViewBox = shouldCenterSelectedNode' in js
+    assert 'applyNetworkGraphViewBox(svg, selectedNodeCenterViewBox, { preserveRequestedCenter: true });' in js
     assert 'hiddenBroadcastOnlyCount: Math.max(0, Number(disconnectedVisibility.hiddenBroadcastOnlyCount) || 0),' in js
     assert 'hiddenDisconnectedCount: Math.max(0, Number(disconnectedVisibility.hiddenDetachedCount) || 0),' in js
     assert '&& !doesNetworkGraphViewBoxContainBounds(networkGraphViewState.viewBox, networkGraphViewState.bounds, 0.05)' in js
