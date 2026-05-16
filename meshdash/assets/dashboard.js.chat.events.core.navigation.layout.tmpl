@@ -3258,6 +3258,7 @@
       hiddenTagRoutePresetIds: loadPreferredNetworkGraphHiddenTagRoutePresetIds(),
       selfPathVisible: loadPreferredNetworkGraphSelfPathVisible(),
       selectedTagRouteKey: "",
+      manualRootNodeId: "",
       pendingEntryViewportSync: false,
       pendingModeViewportSync: false,
       forceCenteredFitOnce: false,
@@ -5282,6 +5283,9 @@
         pushNetworkGraphRootHistory(previousRootId);
       }}
       networkGraphRootNodeId = nextId;
+      if (!(options && options.manual === false)) {{
+        networkGraphViewState.manualRootNodeId = nextId;
+      }}
       if (
         rerender
         && activeLayoutView === "network"
@@ -5324,6 +5328,7 @@
       networkGraphViewState.pendingFocusTransition = null;
       const changed = setNetworkGraphRootNode(nextId, {{
         pushHistory: !(options && options.pushHistory === false),
+        manual: false,
         rerender: !(options && options.rerender === false),
       }});
       if (changed) {{
@@ -5956,6 +5961,88 @@
       return adjacency;
     }}
 
+    function compareNetworkGraphComponents(componentA, componentB, degreeMeta, nodeMap) {{
+      const a = (componentA && typeof componentA === "object") ? componentA : null;
+      const b = (componentB && typeof componentB === "object") ? componentB : null;
+      if (!a && !b) return 0;
+      if (!a) return 1;
+      if (!b) return -1;
+      const edgePresenceDelta = Number((b.edgeCount || 0) > 0) - Number((a.edgeCount || 0) > 0);
+      if (edgePresenceDelta !== 0) return edgePresenceDelta;
+      const nodeDelta = Math.max(0, Number(b.nodeCount) || 0) - Math.max(0, Number(a.nodeCount) || 0);
+      if (nodeDelta !== 0) return nodeDelta;
+      const edgeDelta = Math.max(0, Number(b.edgeCount) || 0) - Math.max(0, Number(a.edgeCount) || 0);
+      if (edgeDelta !== 0) return edgeDelta;
+      const realDelta = Math.max(0, Number(b.realEdgeCount) || 0) - Math.max(0, Number(a.realEdgeCount) || 0);
+      if (realDelta !== 0) return realDelta;
+      const weightDelta = Math.max(0, Number(b.weight) || 0) - Math.max(0, Number(a.weight) || 0);
+      if (weightDelta !== 0) return weightDelta;
+      return compareNetworkGraphNodeIds(a.rootId || "", b.rootId || "", degreeMeta, nodeMap);
+    }}
+
+    function buildNetworkGraphComponentMeta(nodeMap, adjacency, degreeMeta) {{
+      const safeMap = nodeMap instanceof Map ? nodeMap : new Map();
+      const componentByNodeId = new Map();
+      const seen = new Set();
+      let bestComponent = null;
+
+      const chooseComponentRoot = (nodeIds) => {{
+        const ids = Array.isArray(nodeIds) ? nodeIds.slice() : [];
+        ids.sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, safeMap));
+        return ids[0] || "";
+      }};
+
+      for (const startId of safeMap.keys()) {{
+        const cleanStart = normalizeNodeId(startId || "");
+        if (!cleanStart || seen.has(cleanStart)) continue;
+        const queue = [cleanStart];
+        const nodeIds = [];
+        seen.add(cleanStart);
+        let edgeCount = 0;
+        let realEdgeCount = 0;
+        let weight = 0;
+        while (queue.length) {{
+          const nodeId = queue.shift();
+          if (!nodeId) continue;
+          nodeIds.push(nodeId);
+          const peers = adjacency instanceof Map ? (adjacency.get(nodeId) || new Map()) : new Map();
+          for (const [peerIdRaw, edge] of peers.entries()) {{
+            const peerId = normalizeNodeId(peerIdRaw || "");
+            if (!peerId || !safeMap.has(peerId)) continue;
+            if (String(nodeId) < String(peerId)) {{
+              edgeCount += 1;
+              weight += Math.max(0, Number(edge && edge.weight) || 0);
+              if (edge && edge.isReal) {{
+                realEdgeCount += 1;
+              }}
+            }}
+            if (!seen.has(peerId)) {{
+              seen.add(peerId);
+              queue.push(peerId);
+            }}
+          }}
+        }}
+        const rootId = chooseComponentRoot(nodeIds) || cleanStart;
+        const component = {{
+          rootId,
+          nodeCount: nodeIds.length,
+          edgeCount,
+          realEdgeCount,
+          weight,
+          nodeIds: new Set(nodeIds),
+        }};
+        nodeIds.forEach((nodeId) => componentByNodeId.set(nodeId, component));
+        if (!bestComponent || compareNetworkGraphComponents(component, bestComponent, degreeMeta, safeMap) < 0) {{
+          bestComponent = component;
+        }}
+      }}
+
+      return {{
+        componentByNodeId,
+        bestComponent,
+      }};
+    }}
+
     function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null) {{
       const clean = normalizeNodeId(nodeId || "");
       if (!clean || !(adjacency instanceof Map) || !adjacency.has(clean)) return false;
@@ -5968,40 +6055,93 @@
       return false;
     }}
 
+    function networkGraphRootCandidate(nodeId, componentMeta, degreeMeta) {{
+      const clean = normalizeNodeId(nodeId || "");
+      const components = componentMeta && componentMeta.componentByNodeId instanceof Map
+        ? componentMeta.componentByNodeId
+        : new Map();
+      if (!clean || !components.has(clean)) return null;
+      const component = components.get(clean);
+      const meta = degreeMeta instanceof Map ? (degreeMeta.get(clean) || {{ degree: 0, weight: 0 }}) : {{ degree: 0, weight: 0 }};
+      return {{
+        nodeId: clean,
+        component,
+        degree: Math.max(0, Number(meta.degree) || 0),
+        weight: Math.max(0, Number(meta.weight) || 0),
+        hasLinks: Math.max(0, Number(meta.degree) || 0) > 0,
+      }};
+    }}
+
+    function networkGraphComponentIsRelationshipAnchor(candidate, bestComponent) {{
+      if (!(candidate && candidate.component && candidate.hasLinks)) return false;
+      const component = candidate.component;
+      if (Math.max(0, Number(component.edgeCount) || 0) <= 0) return false;
+      if (!(bestComponent && typeof bestComponent === "object")) return true;
+      if (component === bestComponent) return true;
+      const bestNodes = Math.max(1, Number(bestComponent.nodeCount) || 0);
+      const bestEdges = Math.max(1, Number(bestComponent.edgeCount) || 0);
+      const bestWeight = Math.max(1, Number(bestComponent.weight) || 0);
+      const nodeCount = Math.max(0, Number(component.nodeCount) || 0);
+      const edgeCount = Math.max(0, Number(component.edgeCount) || 0);
+      const weight = Math.max(0, Number(component.weight) || 0);
+      return (
+        nodeCount >= 12
+        || edgeCount >= 12
+        || (nodeCount / bestNodes) >= 0.34
+        || (edgeCount / bestEdges) >= 0.34
+        || (weight / bestWeight) >= 0.34
+      );
+    }}
+
     function resolveNetworkGraphRootId(nodeMap, adjacency, degreeMeta, state) {{
+      const componentMeta = buildNetworkGraphComponentMeta(nodeMap, adjacency, degreeMeta);
+      const bestComponent = componentMeta.bestComponent;
       const selectedId = normalizeNodeId(selectedNodeId || "");
       const selectedNodeAvailable = !!(selectedId && nodeMap.has(selectedId));
-      const selectedNodeHasLinkPeers = selectedNodeAvailable
-        ? networkGraphNodeHasLinkPeers(selectedId, adjacency, nodeMap)
-        : false;
       const graphRootId = normalizeNodeId(networkGraphRootNodeId || "");
       const graphRootAvailable = !!(graphRootId && nodeMap.has(graphRootId));
-      const graphRootHasLinkPeers = graphRootAvailable
-        ? networkGraphNodeHasLinkPeers(graphRootId, adjacency, nodeMap)
-        : false;
+      const graphRootCandidate = graphRootAvailable
+        ? networkGraphRootCandidate(graphRootId, componentMeta, degreeMeta)
+        : null;
+      const manualRootId = normalizeNodeId(networkGraphViewState.manualRootNodeId || "");
+      const manualRootAvailable = !!(manualRootId && nodeMap.has(manualRootId));
+      const manualRootCandidate = manualRootAvailable
+        ? networkGraphRootCandidate(manualRootId, componentMeta, degreeMeta)
+        : null;
       const localNodeId = normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || "");
       const localNodeAvailable = !!(localNodeId && nodeMap.has(localNodeId));
-      const localNodeHasLinkPeers = localNodeAvailable
-        ? networkGraphNodeHasLinkPeers(localNodeId, adjacency, nodeMap)
-        : false;
-      let bestId = "";
+      const localCandidate = localNodeAvailable
+        ? networkGraphRootCandidate(localNodeId, componentMeta, degreeMeta)
+        : null;
+      let bestId = bestComponent && bestComponent.rootId ? normalizeNodeId(bestComponent.rootId) : "";
+      let strongestId = "";
       let bestDegree = -1;
       let bestWeight = -1;
       for (const nodeId of nodeMap.keys()) {{
         const peers = adjacency.get(nodeId) || new Map();
         const meta = degreeMeta.get(nodeId) || {{ degree: peers.size, weight: 0 }};
         if (meta.degree > bestDegree || (meta.degree === bestDegree && meta.weight > bestWeight)) {{
-          bestId = nodeId;
+          strongestId = nodeId;
           bestDegree = meta.degree;
           bestWeight = meta.weight;
         }}
       }}
-      if (selectedNodeAvailable && selectedNodeHasLinkPeers) return selectedId;
-      if (graphRootAvailable && graphRootHasLinkPeers) return graphRootId;
-      if (localNodeAvailable && (localNodeHasLinkPeers || bestDegree <= 0)) {{
+      if (selectedNodeAvailable) return selectedId;
+      if (manualRootCandidate && manualRootCandidate.hasLinks) return manualRootCandidate.nodeId;
+      if (graphRootCandidate && networkGraphComponentIsRelationshipAnchor(graphRootCandidate, bestComponent)) {{
+        return graphRootCandidate.nodeId;
+      }}
+      if (
+        localCandidate
+        && (
+          networkGraphComponentIsRelationshipAnchor(localCandidate, bestComponent)
+          || bestDegree <= 0
+        )
+      ) {{
         return localNodeId;
       }}
       if (bestId) return bestId;
+      if (strongestId) return strongestId;
       if (selectedNodeAvailable) return selectedId;
       if (graphRootAvailable) return graphRootId;
       for (const nodeId of nodeMap.keys()) {{
@@ -6131,6 +6271,65 @@
       return bestId;
     }}
 
+    function collectNetworkGraphDisconnectedComponentDescriptors(nodeMap, adjacency, layerByNodeId, degreeMeta) {{
+      const safeMap = nodeMap instanceof Map ? nodeMap : new Map();
+      const safeAdjacency = adjacency instanceof Map ? adjacency : new Map();
+      const rootLayerMap = layerByNodeId instanceof Map ? layerByNodeId : new Map();
+      const seen = new Set();
+      const descriptors = [];
+
+      for (const startIdRaw of safeMap.keys()) {{
+        const startId = normalizeNodeId(startIdRaw || "");
+        if (!startId || rootLayerMap.has(startId) || seen.has(startId)) continue;
+        const queue = [startId];
+        const nodeIds = [];
+        seen.add(startId);
+        let edgeCount = 0;
+        let realEdgeCount = 0;
+        let weight = 0;
+
+        for (let cursor = 0; cursor < queue.length; cursor += 1) {{
+          const nodeId = normalizeNodeId(queue[cursor] || "");
+          if (!nodeId || !safeMap.has(nodeId) || rootLayerMap.has(nodeId)) continue;
+          nodeIds.push(nodeId);
+          const peers = safeAdjacency.get(nodeId) || new Map();
+          for (const [peerIdRaw, edge] of peers.entries()) {{
+            const peerId = normalizeNodeId(peerIdRaw || "");
+            if (!peerId || !safeMap.has(peerId) || rootLayerMap.has(peerId)) continue;
+            if (String(nodeId) < String(peerId)) {{
+              edgeCount += 1;
+              weight += Math.max(0, Number(edge && edge.weight) || 0);
+              if (edge && edge.isReal) {{
+                realEdgeCount += 1;
+              }}
+            }}
+            if (!seen.has(peerId)) {{
+              seen.add(peerId);
+              queue.push(peerId);
+            }}
+          }}
+        }}
+
+        if (edgeCount <= 0 || nodeIds.length <= 1) continue;
+        const sortedNodeIds = nodeIds.slice().sort((a, b) => (
+          compareNetworkGraphNodeIds(a, b, degreeMeta, safeMap)
+        ));
+        const rootId = sortedNodeIds[0] || startId;
+        descriptors.push({{
+          rootId,
+          nodeIds: sortedNodeIds,
+          nodeCount: sortedNodeIds.length,
+          edgeCount,
+          realEdgeCount,
+          weight,
+        }});
+      }}
+
+      return descriptors.sort((componentA, componentB) => (
+        compareNetworkGraphComponents(componentA, componentB, degreeMeta, safeMap)
+      ));
+    }}
+
     function chunkNetworkGraphNodeIds(nodeIds, chunkSize = 1) {{
       const safeNodeIds = Array.isArray(nodeIds)
         ? nodeIds.map((nodeId) => normalizeNodeId(nodeId)).filter(Boolean)
@@ -6233,7 +6432,18 @@
         }};
       }}
       const safeConnectedCount = Math.max(0, Math.trunc(Number(connectedCount) || 0));
-      const preferredVisibleCount = Math.max(0, (totalDisconnectedCount * 2) - safeConnectedCount);
+      const rankedCandidates = candidates.slice().sort((candidateA, candidateB) => (
+        compareNetworkGraphDisconnectedCandidates(candidateA, candidateB, degreeMeta, nodeMap)
+      ));
+      const preservedNodeIds = new Set(
+        rankedCandidates.filter((candidate) => !!candidate.preserve).map((candidate) => candidate.nodeId)
+      );
+      let preferredVisibleCount = Math.max(0, (totalDisconnectedCount * 2) - safeConnectedCount);
+      if (totalDisconnectedCount > 24 && safeConnectedCount <= 3) {{
+        preferredVisibleCount = Math.max(preservedNodeIds.size, 4);
+      }} else if (totalDisconnectedCount > 48 && safeConnectedCount <= 8) {{
+        preferredVisibleCount = Math.max(preservedNodeIds.size, Math.min(12, safeConnectedCount * 2));
+      }}
       if (preferredVisibleCount >= totalDisconnectedCount) {{
         return {{
           broadcastOnlyNodeIds: broadcastCandidates,
@@ -6244,12 +6454,6 @@
           totalCount: totalDisconnectedCount,
         }};
       }}
-      const rankedCandidates = candidates.slice().sort((candidateA, candidateB) => (
-        compareNetworkGraphDisconnectedCandidates(candidateA, candidateB, degreeMeta, nodeMap)
-      ));
-      const preservedNodeIds = new Set(
-        rankedCandidates.filter((candidate) => !!candidate.preserve).map((candidate) => candidate.nodeId)
-      );
       const visibleCount = Math.max(preservedNodeIds.size, preferredVisibleCount);
       const visibleNodeIds = new Set();
       rankedCandidates.forEach((candidate, index) => {{
@@ -6531,6 +6735,8 @@
       const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
       let regions = [];
       const clusterLabelNodeIds = new Set();
+      const externalClusterNodeIds = new Set();
+      const externalClusterComponentNodeIds = new Set();
       if (layoutMode === "tree") {{
         const sortedLayers = Array.from(layers.keys()).sort((a, b) => a - b);
         const treeTopY = 64;
@@ -6549,8 +6755,30 @@
         function resolveTreeLabelOffset(index, radius, amplitude = 16) {{
           return radius + amplitude + 2;
         }}
+        const compactSingleHopTree = maxTreeLayer === 1 && connectedCount <= 6;
+        const compactTreeCenterX = treeLeftX + (treeWidth / 2);
+        const compactTreeCenterY = treeTopY + (treeHeight * 0.44);
+        const compactTreeColumnGap = Math.min(220, Math.max(150, treeWidth * 0.22));
         for (const layer of sortedLayers) {{
           const ids = Array.isArray(layers.get(layer)) ? Array.from(layers.get(layer)) : [];
+          if (compactSingleHopTree) {{
+            const compactX = compactTreeCenterX + ((layer <= 0 ? -1 : 1) * (compactTreeColumnGap / 2));
+            const rowSpacing = Math.max(34, Math.min(52, treeHeight / Math.max(3, ids.length + 1)));
+            const compactTopY = compactTreeCenterY - (((Math.max(1, ids.length) - 1) * rowSpacing) / 2);
+            ids.forEach((nodeId, index) => {{
+              const current = positions.get(nodeId) || {{ layer }};
+              positions.set(nodeId, {{
+                ...current,
+                x: compactX,
+                y: compactTopY + (index * rowSpacing),
+                layer,
+                disconnected: false,
+                broadcastOnly: !!current.broadcastOnly,
+                labelOffsetY: resolveTreeLabelOffset(index, current.radius || 7, 15),
+              }});
+            }});
+            continue;
+          }}
           const layerY = maxTreeLayer <= 0
             ? (treeTopY + (treeHeight / 2))
             : (treeTopY + ((treeHeight * layer) / Math.max(1, maxTreeLayer)));
@@ -6997,18 +7225,156 @@
             }});
           }});
         }});
+        const disconnectedComponentDescriptors = collectNetworkGraphDisconnectedComponentDescriptors(
+          nodeMap,
+          adjacency,
+          layerByNodeId,
+          degreeMeta
+        );
+        const externalClusterLimit = connectedCount <= 4 ? 6 : 4;
+        const externalClusterNodeBudget = connectedCount <= 4 ? 96 : 48;
+        const externalClusterNodeLimit = connectedCount <= 4 ? 64 : 36;
+        let remainingExternalClusterNodeBudget = externalClusterNodeBudget;
+        const visibleExternalClusterDescriptors = [];
+        for (const descriptor of disconnectedComponentDescriptors) {{
+          if (visibleExternalClusterDescriptors.length >= externalClusterLimit) break;
+          if (remainingExternalClusterNodeBudget <= 1) break;
+          const cleanRootId = normalizeNodeId(descriptor && descriptor.rootId || "");
+          const orderedNodeIds = Array.isArray(descriptor && descriptor.nodeIds)
+            ? descriptor.nodeIds.map((nodeId) => normalizeNodeId(nodeId)).filter((nodeId) => nodeId && nodeMap.has(nodeId))
+            : [];
+          const componentRootId = cleanRootId && orderedNodeIds.includes(cleanRootId)
+            ? cleanRootId
+            : (orderedNodeIds[0] || "");
+          if (!componentRootId) continue;
+          const memberNodeIds = orderedNodeIds
+            .filter((nodeId) => nodeId !== componentRootId)
+            .sort((a, b) => compareNetworkGraphNodeIds(a, b, degreeMeta, nodeMap));
+          const visibleNodeLimit = Math.max(
+            2,
+            Math.min(
+              externalClusterNodeLimit,
+              remainingExternalClusterNodeBudget,
+              orderedNodeIds.length
+            )
+          );
+          const visibleNodeIds = [componentRootId].concat(memberNodeIds.slice(0, Math.max(1, visibleNodeLimit - 1)));
+          if (visibleNodeIds.length <= 1) continue;
+          remainingExternalClusterNodeBudget -= visibleNodeIds.length;
+          visibleExternalClusterDescriptors.push({{
+            ...descriptor,
+            rootId: componentRootId,
+            visibleNodeIds,
+            hiddenCount: Math.max(0, orderedNodeIds.length - visibleNodeIds.length),
+          }});
+          orderedNodeIds.forEach((nodeId) => externalClusterComponentNodeIds.add(nodeId));
+        }}
+        if (visibleExternalClusterDescriptors.length) {{
+          const externalClusterColumns = visibleExternalClusterDescriptors.length <= 1 ? 1 : 2;
+          const externalClusterBoxWidth = connectedCount <= 4 ? 284 : 248;
+          const externalClusterGapX = 34;
+          const externalClusterGapY = 30;
+          const externalClusterStartX = 480 + clusterRadius + 176;
+          const externalClusterStartY = Math.max(-84, 310 - (Math.min(3, visibleExternalClusterDescriptors.length) * 88));
+          const externalClusterColumnHeights = new Array(externalClusterColumns).fill(0);
+          visibleExternalClusterDescriptors.forEach((descriptor, descriptorIndex) => {{
+            const visibleNodeIds = Array.isArray(descriptor.visibleNodeIds) ? descriptor.visibleNodeIds : [];
+            const componentRootId = normalizeNodeId(descriptor.rootId || visibleNodeIds[0] || "");
+            if (!componentRootId || !visibleNodeIds.includes(componentRootId)) return;
+            const memberNodeIds = visibleNodeIds.filter((nodeId) => nodeId !== componentRootId);
+            let columnIndex = 0;
+            for (let index = 1; index < externalClusterColumnHeights.length; index += 1) {{
+              if (externalClusterColumnHeights[index] < externalClusterColumnHeights[columnIndex]) {{
+                columnIndex = index;
+              }}
+            }}
+            const columnsInBox = Math.max(2, Math.min(5, Math.ceil(Math.sqrt(Math.max(1, memberNodeIds.length)))));
+            const rowsInBox = Math.max(1, Math.ceil(memberNodeIds.length / columnsInBox));
+            const rowSpacing = 31;
+            const boxHeight = Math.max(132, 92 + (rowsInBox * rowSpacing));
+            const boxX = externalClusterStartX + (columnIndex * (externalClusterBoxWidth + externalClusterGapX));
+            const boxY = externalClusterStartY + externalClusterColumnHeights[columnIndex];
+            externalClusterColumnHeights[columnIndex] += boxHeight + externalClusterGapY;
+            const boxCenterX = boxX + (externalClusterBoxWidth / 2);
+            const rootY = boxY + 48;
+            const hiddenLabel = Math.max(0, Number(descriptor.hiddenCount) || 0) > 0
+              ? ` +${{Math.max(0, Number(descriptor.hiddenCount) || 0)}}`
+              : "";
+            const labelBase = truncateNetworkGraphLabel(networkGraphNodeDisplayName(componentRootId, nodeMap), 18);
+            regions.push({{
+              x: boxX,
+              y: boxY,
+              width: externalClusterBoxWidth,
+              height: boxHeight,
+              label: `Cluster · ${{labelBase}}${{hiddenLabel}}`,
+              isRoot: false,
+            }});
+            positions.set(componentRootId, {{
+              ...(positions.get(componentRootId) || {{}}),
+              x: boxCenterX,
+              y: rootY,
+              layer: maxConnectedLayer + 1 + descriptorIndex,
+              disconnected: true,
+              broadcastOnly: false,
+              labelOffsetY: -18,
+            }});
+            externalClusterNodeIds.add(componentRootId);
+            clusterLabelNodeIds.add(componentRootId);
+            memberNodeIds.forEach((nodeId, memberIndex) => {{
+              const row = Math.floor(memberIndex / columnsInBox);
+              const rowStart = row * columnsInBox;
+              const rowCount = Math.min(columnsInBox, memberNodeIds.length - rowStart);
+              const col = memberIndex % columnsInBox;
+              const cellX = rowCount <= 1
+                ? boxCenterX
+                : (boxX + 24 + ((col + 0.5) * ((externalClusterBoxWidth - 48) / rowCount)));
+              const cellY = boxY + 86 + (row * rowSpacing);
+              positions.set(nodeId, {{
+                ...(positions.get(nodeId) || {{}}),
+                x: cellX,
+                y: cellY,
+                layer: maxConnectedLayer + 2 + descriptorIndex,
+                disconnected: true,
+                broadcastOnly: false,
+              }});
+              externalClusterNodeIds.add(nodeId);
+            }});
+          }});
+        }}
         disconnectedGroups.forEach((group, groupIndex) => {{
-          const ids = Array.isArray(group.nodeIds) ? group.nodeIds : [];
-          const detachedArcRadius = Math.min(688, clusterRadius + 264 + (groupIndex * 44));
-          const laneCenterAngle = group.broadcastOnly ? (Math.PI * 0.08) : (Math.PI * 1.08);
-          const laneArcSpan = Math.min(Math.PI * 0.42, Math.max(Math.PI * 0.18, ids.length * 0.022));
+          const ids = (Array.isArray(group.nodeIds) ? group.nodeIds : [])
+            .filter((nodeId) => !externalClusterComponentNodeIds.has(nodeId));
+          if (!ids.length) return;
+          const residualClusterBoxWidth = 248;
+          const residualClusterColumns = Math.max(2, Math.min(5, Math.ceil(Math.sqrt(Math.max(1, ids.length)))));
+          const residualClusterRows = Math.max(1, Math.ceil(ids.length / residualClusterColumns));
+          const residualClusterRowSpacing = 30;
+          const residualClusterBoxHeight = Math.max(112, 72 + (residualClusterRows * residualClusterRowSpacing));
+          const residualClusterBoxX = 480 - clusterRadius - residualClusterBoxWidth - 176;
+          const residualClusterBoxY = -76 + (groupIndex * (residualClusterBoxHeight + 28));
+          const residualClusterLabel = group.broadcastOnly
+            ? `Heard only · ${{ids.length}}`
+            : `Other detached · ${{ids.length}}`;
+          regions.push({{
+            x: residualClusterBoxX,
+            y: residualClusterBoxY,
+            width: residualClusterBoxWidth,
+            height: residualClusterBoxHeight,
+            label: residualClusterLabel,
+            isRoot: false,
+          }});
           ids.forEach((nodeId, index) => {{
-            const nodeAngle = ids.length <= 1
-              ? laneCenterAngle
-              : (laneCenterAngle - (laneArcSpan / 2) + ((laneArcSpan * index) / Math.max(1, ids.length - 1)));
+            const row = Math.floor(index / residualClusterColumns);
+            const rowStart = row * residualClusterColumns;
+            const rowCount = Math.min(residualClusterColumns, ids.length - rowStart);
+            const col = index % residualClusterColumns;
+            const cellX = rowCount <= 1
+              ? (residualClusterBoxX + (residualClusterBoxWidth / 2))
+              : (residualClusterBoxX + 24 + ((col + 0.5) * ((residualClusterBoxWidth - 48) / rowCount)));
+            const cellY = residualClusterBoxY + 54 + (row * residualClusterRowSpacing);
             positions.set(nodeId, {{
-              x: 480 + (Math.cos(nodeAngle) * detachedArcRadius),
-              y: 310 + (Math.sin(nodeAngle) * detachedArcRadius),
+              x: cellX,
+              y: cellY,
               layer: maxConnectedLayer + 1 + groupIndex,
               disconnected: true,
               broadcastOnly: !!group.broadcastOnly,
@@ -7106,7 +7472,7 @@
               ? 1
               : 0
           ),
-        disconnectedCount: visibleDisconnected.length,
+        disconnectedCount: new Set(visibleDisconnected.concat(Array.from(externalClusterNodeIds))).size,
         hiddenBroadcastOnlyCount: Math.max(0, Number(disconnectedVisibility.hiddenBroadcastOnlyCount) || 0),
         hiddenDisconnectedCount: Math.max(0, Number(disconnectedVisibility.hiddenDetachedCount) || 0),
       }};

@@ -240,7 +240,12 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'event.pointerType !== "mouse" && activePointers.size >= 2' in js
     assert 'if (networkGraphViewState.pinching) {' in js
     assert 'updateNetworkGraphPinch(svg)' in js
+    assert 'manualRootNodeId: "",' in js
+    assert 'function buildNetworkGraphComponentMeta(nodeMap, adjacency, degreeMeta)' in js
+    assert 'function compareNetworkGraphComponents(componentA, componentB, degreeMeta, nodeMap)' in js
     assert 'function networkGraphNodeHasLinkPeers(nodeId, adjacency, nodeMap = null)' in js
+    assert 'function networkGraphRootCandidate(nodeId, componentMeta, degreeMeta)' in js
+    assert 'function networkGraphComponentIsRelationshipAnchor(candidate, bestComponent)' in js
     assert 'function networkGraphNodeDisplayPriority(nodeId, nodeMap)' in js
     assert 'function networkGraphNodeGroupDisplayPriority(nodeIds, nodeMap)' in js
     assert 'function networkGraphAverageParentOrder(nodeId, parentHintsByNodeId, layerOrderIndexByNodeId)' in js
@@ -256,6 +261,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'networkGraphHistoryCapsCache.set(mode, historyCaps);' in js
     assert 'function collectNetworkGraphAncestorScores(nodeId, targetLayer, layerByNodeId, parentHintsByNodeId, memo = new Map())' in js
     assert 'function resolveNetworkGraphBestClusterCandidate(candidateScores, degreeMeta, fallbackId = "")' in js
+    assert 'function collectNetworkGraphDisconnectedComponentDescriptors(nodeMap, adjacency, layerByNodeId, degreeMeta)' in js
     assert 'function chunkNetworkGraphNodeIds(nodeIds, chunkSize = 1)' in js
     assert 'function compareNetworkGraphDisconnectedCandidates(candidateA, candidateB, degreeMeta, nodeMap)' in js
     assert 'function limitNetworkGraphDisconnectedNodeIds(' in js
@@ -282,17 +288,21 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'syncNetworkRoutesFromSelectedNode();\n        renderNetworkRoutes(latestState);' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'return fitNetworkGraphViewBoxToBounds(bounds, svg);' in js
-    assert 'const selectedNodeHasLinkPeers = selectedNodeAvailable' in js
-    assert 'if (selectedNodeAvailable && selectedNodeHasLinkPeers) return selectedId;' in js
-    assert 'if (graphRootAvailable && graphRootHasLinkPeers) return graphRootId;' in js
-    assert 'const localNodeHasLinkPeers = localNodeAvailable' in js
-    assert 'if (localNodeAvailable && (localNodeHasLinkPeers || bestDegree <= 0)) {' in js
+    assert 'const componentMeta = buildNetworkGraphComponentMeta(nodeMap, adjacency, degreeMeta);' in js
+    assert 'const bestComponent = componentMeta.bestComponent;' in js
+    assert 'const manualRootId = normalizeNodeId(networkGraphViewState.manualRootNodeId || "");' in js
+    assert 'if (selectedNodeAvailable) return selectedId;' in js
+    assert 'if (manualRootCandidate && manualRootCandidate.hasLinks) return manualRootCandidate.nodeId;' in js
+    assert 'networkGraphComponentIsRelationshipAnchor(localCandidate, bestComponent)' in js
     assert 'const parentHintsByNodeId = new Map();' in js
     assert 'const layerOrderIndexByNodeId = new Map([[rootId, 0]]);' in js
     assert 'const rootClusterIdSet = new Set(rootClusterIds);' in js
     assert 'const clusterIdByNodeId = new Map([[rootId, rootId]]);' in js
     assert 'const clusterLabelNodeIds = new Set();' in js
-    assert 'const preferredVisibleCount = Math.max(0, (totalDisconnectedCount * 2) - safeConnectedCount);' in js
+    assert 'const externalClusterNodeIds = new Set();' in js
+    assert 'const externalClusterComponentNodeIds = new Set();' in js
+    assert 'let preferredVisibleCount = Math.max(0, (totalDisconnectedCount * 2) - safeConnectedCount);' in js
+    assert 'if (totalDisconnectedCount > 24 && safeConnectedCount <= 3)' in js
     assert 'const visibleCount = Math.max(preservedNodeIds.size, preferredVisibleCount);' in js
     assert 'const disconnectedVisibility = limitNetworkGraphDisconnectedNodeIds(' in js
     assert 'const visibleBroadcastOnlyDisconnected = Array.isArray(disconnectedVisibility.broadcastOnlyNodeIds)' in js
@@ -303,6 +313,15 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const branchWeightTotal = branchDescriptors.reduce((sum, branchDescriptor) => sum + branchDescriptor.weight, 0) || 1;' in js
     assert 'const cellWeightTotal = cellDescriptors.reduce((sum, cellDescriptor) => sum + cellDescriptor.weight, 0) || 1;' in js
     assert 'clusterLabelNodeIds.add(branchDescriptor.subclusterId);' in js
+    assert 'const disconnectedComponentDescriptors = collectNetworkGraphDisconnectedComponentDescriptors(' in js
+    assert 'const visibleExternalClusterDescriptors = [];' in js
+    assert 'label: `Cluster · ${labelBase}${hiddenLabel}`,' in js
+    assert 'orderedNodeIds.forEach((nodeId) => externalClusterComponentNodeIds.add(nodeId));' in js
+    assert '.filter((nodeId) => !externalClusterComponentNodeIds.has(nodeId));' in js
+    assert 'const residualClusterLabel = group.broadcastOnly' in js
+    assert '? `Heard only · ${ids.length}`' in js
+    assert ': `Other detached · ${ids.length}`;' in js
+    assert 'disconnectedCount: new Set(visibleDisconnected.concat(Array.from(externalClusterNodeIds))).size,' in js
     assert 'networkGraphNodeGroupDisplayPriority(b.members, nodeMap)' in js
     assert 'for (const nodeId of clusterLabelNodeIds) {' in js
     assert 'function networkGraphNodeRenderPriority(item)' in js
@@ -363,6 +382,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'layoutMode === "community"' in js
     assert 'function resolveTreeLabelOffset(index, radius, amplitude = 16) {' in js
     assert 'return radius + amplitude + 2;' in js
+    assert 'const compactSingleHopTree = maxTreeLayer === 1 && connectedCount <= 6;' in js
+    assert 'const compactTreeColumnGap = Math.min(220, Math.max(150, treeWidth * 0.22));' in js
     assert 'const localId = normalizeNodeId(resolveLocalNodeId(latestState || {}) || "");' in js
     assert 'const isLocalNode = item.nodeId === localId;' in js
     assert 'const isTaggedNode = !!(tagEntry && tagEntry.preset);' in js
