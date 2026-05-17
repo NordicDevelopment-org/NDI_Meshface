@@ -533,10 +533,11 @@
       const options = (opts && typeof opts === "object") ? opts : {{}};
       const focusView = options.focusView !== false;
       const openPopup = options.openPopup !== false;
-      if (!selectedNodeId) return false;
-      const history = historyOverride || cachedNodeHistory(selectedNodeId);
+      const focusNodeId = normalizeNodeId(options.nodeId || selectedNodeId || "");
+      if (!isSelectableNodeId(focusNodeId)) return false;
+      const history = historyOverride || cachedNodeHistory(focusNodeId);
       const trailPts = collectHistoryLatLngs(history);
-      const marker = nodeMarkers.get(selectedNodeId);
+      const marker = nodeMarkers.get(focusNodeId);
       if (!marker) {{
         let usedHistory = false;
         let usedOverviewFallback = false;
@@ -574,7 +575,7 @@
 
         if (
           !openPopup
-          || selectedNetworkNodeInfoCollapsed(selectedNodeId)
+          || selectedNetworkNodeInfoCollapsed(focusNodeId)
           || (usedOverviewFallback && trailPts.length === 0)
         ) {{
           return usedHistory || usedOverviewFallback;
@@ -582,7 +583,7 @@
         if (activeLayoutView === "network" && typeof L !== "undefined" && map && typeof map.getCenter === "function") {{
           const nodes = latestState && Array.isArray(latestState.nodes) ? latestState.nodes : [];
           const selectedNode = nodes.find((node) => (
-            normalizeNodeId(node && node.id) === selectedNodeId
+            normalizeNodeId(node && node.id) === focusNodeId
           ));
           const popupAnchor = trailPts.length > 0
             ? trailPts[trailPts.length - 1]
@@ -599,7 +600,7 @@
               ? `${{lat.toFixed(5)}}, ${{lon.toFixed(5)}}`
               : "No GPS fix";
             const popupHtml = buildMapNodeInfoHtml(selectedNode, {{
-              nodeId: selectedNodeId || selectedNode.id || "",
+              nodeId: focusNodeId || selectedNode.id || "",
               nowUnix: Math.floor(Date.now() / 1000),
               state: latestState,
               positionBadge: {{
@@ -622,7 +623,7 @@
                 <div class="map-node-info-header">
                   <div class="map-node-info-title-wrap">
                     <div class="map-node-info-title">History-only node</div>
-                    <div class="map-node-info-subtitle">${{escAttr(selectedNodeId || "n/a")}}</div>
+                    <div class="map-node-info-subtitle">${{escAttr(focusNodeId || "n/a")}}</div>
                   </div>
                 </div>
                 <div class="map-node-info-grid">
@@ -672,7 +673,7 @@
       }}
 
       requestMapResize();
-      if (openPopup && !selectedNetworkNodeInfoCollapsed(selectedNodeId)) {{
+      if (openPopup && !selectedNetworkNodeInfoCollapsed(focusNodeId)) {{
         withProgrammaticNetworkNodeInfoPopup(() => {{
           marker.openPopup();
         }});
@@ -1069,6 +1070,7 @@
         clearChatFeedRepeatToggleState();
       }}
       selectedNodeId = null;
+      selfTickerAlternateNodeId = "";
       networkNodeInfoCollapsedNodeId = "";
       chatNodeDetailsDrawerExpanded = false;
       pendingMapHistoryFocus = false;
@@ -1159,7 +1161,7 @@
         if (!(target instanceof Element)) return;
         const row = target.closest("tr.node-selectable");
         if (!(row instanceof HTMLElement)) return;
-        selectNode(row.dataset.nodeId || "", true, true);
+        selectNode(row.dataset.nodeId || "", true, false);
       }});
     }}
 
@@ -1301,7 +1303,7 @@
             toColIndex
           );
           if (!isSelectableNodeId(nodeId)) return;
-          selectNode(nodeId, true, true);
+          selectNode(nodeId, true, false);
         }});
       }};
       bindTable("encription-packets-table", 1, 2);
@@ -1328,6 +1330,6 @@
           2
         );
         if (!isSelectableNodeId(nodeId)) return;
-        selectNode(nodeId, true, true);
+        selectNode(nodeId, true, false);
       }});
     }}

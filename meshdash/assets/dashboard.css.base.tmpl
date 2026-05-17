@@ -847,10 +847,32 @@
       flex-direction: column;
       gap: 2px;
     }}
+    .topbar-view-submenu-item-label-row {{
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }}
     .topbar-view-submenu-item-label {{
       font-size: 12px;
       font-weight: 700;
       color: inherit;
+    }}
+    .topbar-view-submenu-item-beta {{
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, #f8c878 48%, transparent);
+      background: color-mix(in srgb, #f6b763 16%, transparent);
+      color: #ffe9b8;
+      font-size: 8px;
+      line-height: 1.15;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex: 0 0 auto;
     }}
     .topbar-view-submenu-item-meta {{
       font-size: 10px;
@@ -1147,6 +1169,19 @@
       align-self: stretch;
       gap: 2px;
     }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot[role="button"] {{
+      cursor: pointer;
+      border-radius: 9px;
+      transition: background 120ms ease, box-shadow 120ms ease;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot[role="button"]:hover {{
+      background: color-mix(in srgb, var(--accent) 13%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot[role="button"]:focus-visible {{
+      outline: 2px solid color-mix(in srgb, var(--accent-2) 74%, black);
+      outline-offset: 1px;
+    }}
     .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot > * {{
       position: relative;
       z-index: 1;
@@ -1278,6 +1313,22 @@
     .topbar .summary-ticker-item-self > .label.is-dual-node-label .self-node-label-selected {{
       justify-self: end;
       text-align: right;
+    }}
+    .topbar .summary-ticker-item-self .self-node-label-self[role="button"],
+    .topbar .summary-ticker-item-self .self-node-label-selected[role="button"] {{
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 120ms ease, box-shadow 120ms ease;
+    }}
+    .topbar .summary-ticker-item-self .self-node-label-self[role="button"]:hover,
+    .topbar .summary-ticker-item-self .self-node-label-selected[role="button"]:hover {{
+      background: color-mix(in srgb, var(--accent) 11%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+    }}
+    .topbar .summary-ticker-item-self .self-node-label-self[role="button"]:focus-visible,
+    .topbar .summary-ticker-item-self .self-node-label-selected[role="button"]:focus-visible {{
+      outline: 2px solid color-mix(in srgb, var(--accent-2) 74%, black);
+      outline-offset: 1px;
     }}
     .topbar:not(.ticker-expanded) .summary-ticker-item > .label {{
       position: absolute;

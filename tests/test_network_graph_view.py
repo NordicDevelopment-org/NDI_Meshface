@@ -294,8 +294,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function focusNetworkGraphNodeFromSelection(nodeId, options = {})' in js
     assert 'networkGraphViewState.pendingSelectedNodeCenterId = nextId;' in js
     assert 'invalidateNetworkGraphRenderCache();\n      networkGraphViewState.skipSceneAnimationOnce = true;' in js
-    assert 'selectNode(row.dataset.nodeId || "", true, true);' in js
-    assert 'selectNode(nodeId, true, true);' in js
+    assert 'selectNode(row.dataset.nodeId || "", true, false);' in js
+    assert 'selectNode(nodeId, true, false);' in js
     assert 'activeLayoutView === "network"\n        && activeNetworkSubviewName === "routes"' in js
     assert 'syncNetworkRoutesFromSelectedNode();\n        renderNetworkRoutes(latestState);' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js

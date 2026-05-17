@@ -1603,7 +1603,18 @@
       const localId = normalizeNodeId(resolveLocalNodeId(state) || "");
       const localNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === localId) || null;
       const localOwner = localNodeUserFromState(state);
-      const selectedTickerId = normalizeNodeId(selectedNodeId || "");
+      const selectedTickerCurrentId = normalizeNodeId(selectedNodeId || "");
+      if (isSelectableNodeId(selectedTickerCurrentId) && selectedTickerCurrentId !== localId) {{
+        selfTickerAlternateNodeId = selectedTickerCurrentId;
+      }}
+      if (normalizeNodeId(selfTickerAlternateNodeId || "") === localId) {{
+        selfTickerAlternateNodeId = "";
+      }}
+      const selectedTickerId = (
+        isSelectableNodeId(selectedTickerCurrentId) && selectedTickerCurrentId !== localId
+      )
+        ? selectedTickerCurrentId
+        : normalizeNodeId(selfTickerAlternateNodeId || "");
       const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId) && selectedTickerId !== localId;
       const selectedTickerNode = hasSelectedTickerNode
         ? (nodes.find((entry) => normalizeNodeId(entry && entry.id) === selectedTickerId) || null)
@@ -1641,31 +1652,57 @@
           const selfLabelText = document.createElement("span");
           selfLabelText.className = "self-node-label-self";
           selfLabelText.textContent = "Self";
+          if (isSelectableNodeId(localId)) {{
+            selfLabelText.dataset.summaryFocusNodeId = localId;
+            selfLabelText.dataset.summaryFocusKind = "self";
+            selfLabelText.tabIndex = 0;
+            selfLabelText.setAttribute("role", "button");
+            selfLabelText.setAttribute(
+              "aria-label",
+              `Focus self node ${{localNodeName || localId}}`
+            );
+          }}
           selfLabel.appendChild(selfLabelText);
           if (hasSelectedTickerNode) {{
             const selectedLabelText = document.createElement("span");
             selectedLabelText.className = "self-node-label-selected";
             selectedLabelText.textContent = "Selected";
+            if (isSelectableNodeId(selectedTickerId)) {{
+              selectedLabelText.dataset.summaryFocusNodeId = selectedTickerId;
+              selectedLabelText.dataset.summaryFocusKind = "selected";
+              selectedLabelText.tabIndex = 0;
+              selectedLabelText.setAttribute("role", "button");
+              selectedLabelText.setAttribute(
+                "aria-label",
+                `Focus selected node ${{selectedNodeName || selectedTickerId}}`
+              );
+            }}
             selfLabel.appendChild(selectedLabelText);
           }}
         }}
-        const cardNodeId = hasSelectedTickerNode ? selectedTickerId : localId;
-        if (isSelectableNodeId(cardNodeId)) {{
-          selfCard.dataset.nodeId = cardNodeId;
-          selfCard.tabIndex = 0;
-          selfCard.setAttribute("role", "button");
+        const cardLocalNodeId = isSelectableNodeId(localId) ? localId : "";
+        const cardSelectedNodeId = (
+          hasSelectedTickerNode
+          && isSelectableNodeId(selectedTickerId)
+        )
+          ? selectedTickerId
+          : "";
+        selfCard.dataset.localNodeId = cardLocalNodeId;
+        selfCard.dataset.selectedNodeId = cardSelectedNodeId;
+        if (cardLocalNodeId || cardSelectedNodeId) {{
           selfCard.setAttribute(
             "aria-label",
-            hasSelectedTickerNode
-              ? `Local radio ${{localNodeName || localId}}; selected node ${{selectedNodeName || selectedTickerId}}`
-              : `Local radio ${{localNodeName || localId}}`
+            hasSelectedTickerNode && cardSelectedNodeId
+              ? `Local radio ${{localNodeName || localId}} and selected node ${{selectedNodeName || selectedTickerId}}. Click either side to focus it.`
+              : `Local radio ${{localNodeName || localId}}. Click to focus on map.`
           );
         }} else {{
-          delete selfCard.dataset.nodeId;
-          selfCard.removeAttribute("tabindex");
-          selfCard.removeAttribute("role");
+          delete selfCard.dataset.localNodeId;
+          delete selfCard.dataset.selectedNodeId;
           selfCard.removeAttribute("aria-label");
         }}
+        selfCard.removeAttribute("tabindex");
+        selfCard.removeAttribute("role");
       }}
       if (selfMetric instanceof HTMLElement) {{
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
@@ -1692,6 +1729,20 @@
               : (nodeName || fallbackName);
             const slot = document.createElement("div");
             slot.className = `self-node-identity-slot self-node-identity-${{kind}}`;
+            const cleanNodeId = normalizeNodeId(nodeId || "");
+            if (isSelectableNodeId(cleanNodeId)) {{
+              const targetLabel = kind === "selected" ? "selected" : "self";
+              slot.dataset.nodeId = cleanNodeId;
+              slot.dataset.identityKind = targetLabel;
+              slot.tabIndex = 0;
+              slot.setAttribute("role", "button");
+              slot.setAttribute(
+                "aria-label",
+                kind === "selected"
+                  ? `Focus selected node ${{displayName}} (${{cleanNodeId}})`
+                  : `Focus self node ${{displayName}} (${{cleanNodeId}})`
+              );
+            }}
             if (emoji) {{
               if (hasSelectedTickerNode && selfCard instanceof HTMLElement) {{
                 selfCard.classList.add("has-dual-node-watermarks");
@@ -1752,8 +1803,8 @@
           selfMetric.title = metricBaseTitle;
           if (selfCard instanceof HTMLElement) {{
             const cardBaseTitle = hasSelectedTickerNode
-              ? `${{metricBaseTitle}} • Click to select selected node in node list`
-              : `${{metricBaseTitle}} • Click to select local node in node list`;
+              ? `${{metricBaseTitle}} • Click self or selected side to focus that node`
+              : `${{metricBaseTitle}} • Click to focus local node`;
             selfCard.dataset.baseTitle = cardBaseTitle;
             selfCard.title = cardBaseTitle;
           }}

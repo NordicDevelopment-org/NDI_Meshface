@@ -585,7 +585,8 @@ def test_chat_unread_node_click_routes_into_messages_tab(assert_tokens_present) 
 
     assert_tokens_present(peers_src, [
         'const unreadDirectCount = Math.max(0, Math.trunc(Number(member.dataset.unreadDirectCount) || 0));',
-        'selectNode(nodeId, true, true);',
+        'if (!isSelectableNodeId(nodeId)) return;',
+        'selectNode(nodeId, true, false);',
         'if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {',
         'setChatNodeDetailsDrawerTab("messages", {',
         'fetchHistory: false,',
@@ -604,10 +605,8 @@ def test_chat_click_selection_keeps_same_node_selected(assert_tokens_present) ->
     assert "clearNodeSelection();" in bindings_src
     assert "chatFeedRepeatToggleMessageKey = messageSelectionKey;" in bindings_src
     assert_tokens_present(peers_src, [
-        'if (!isSelectableNodeId(nodeId)) {{',
-        'selectNode(nodeId, true, true);',
-        'return;',
-        'selectNode(nodeId, true, true);',
+        'if (!isSelectableNodeId(nodeId)) return;',
+        'selectNode(nodeId, true, false);',
         'if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {{',
         'setChatNodeDetailsDrawerTab("messages", {{',
         'fetchHistory: false,',
@@ -628,12 +627,12 @@ def test_selected_node_clicks_toggle_off_across_views() -> None:
     assert "clearNodeSelection();" in selected_toggle_block
     assert "setChatNodeDetailsDrawerExpanded(true" not in selected_toggle_block
     assert "focusNetworkGraphNodeFromSelection(normalized" not in selected_toggle_block
-    assert 'selectNode(row.dataset.nodeId || "", true, true);' in selection_src
+    assert 'selectNode(row.dataset.nodeId || "", true, false);' in selection_src
     graph_click_start = graph_src.index("const finishPan = (event) => {{")
     graph_click_end = graph_src.index('svg.addEventListener("pointerup", finishPan);', graph_click_start)
     graph_click_block = graph_src[graph_click_start:graph_click_end]
     assert "normalizeNodeId(selectedNodeId || \"\") === nodeId" in graph_click_block
-    assert "selectNode(nodeId, true, true);" in graph_click_block
+    assert "selectNode(nodeId, true, false);" in graph_click_block
 
 
 def test_clear_node_selection_hides_drawer_before_optional_map_redraw() -> None:

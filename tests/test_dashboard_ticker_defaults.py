@@ -466,7 +466,12 @@ def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> Non
     assert 'const selfCard = document.getElementById("summary-ticker-self");' in js
     assert "function resolveSelfNodeCityLocation(state, node, owner, nodeId)" in js
     assert "function resolveSelfNodeNearestCityLabel(location)" in js
-    assert 'const selectedTickerId = normalizeNodeId(selectedNodeId || "");' in js
+    assert 'const selectedTickerCurrentId = normalizeNodeId(selectedNodeId || "");' in js
+    assert "selfTickerAlternateNodeId = selectedTickerCurrentId;" in js
+    assert "normalizeNodeId(selfTickerAlternateNodeId || \"\") === localId" in js
+    assert "const selectedTickerId = (" in js
+    assert '? selectedTickerCurrentId' in js
+    assert ": normalizeNodeId(selfTickerAlternateNodeId || \"\");" in js
     assert "const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId) && selectedTickerId !== localId;" in js
     assert "const selectedTickerNode = hasSelectedTickerNode" in js
     assert "const resolveTickerIdentityName = (nodeId, node, owner, fallbackName) => {" in js
@@ -474,18 +479,25 @@ def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> Non
     assert 'selfLabel.classList.toggle("is-dual-node-label", hasSelectedTickerNode);' in js
     assert 'selfLabelText.className = "self-node-label-self";' in js
     assert 'selfLabelText.textContent = "Self";' in js
+    assert 'selfLabelText.dataset.summaryFocusKind = "self";' in js
     assert 'selectedLabelText.className = "self-node-label-selected";' in js
     assert 'selectedLabelText.textContent = "Selected";' in js
-    assert "const cardNodeId = hasSelectedTickerNode ? selectedTickerId : localId;" in js
-    assert "if (isSelectableNodeId(cardNodeId))" in js
-    assert "Local radio ${localNodeName || localId}; selected node ${selectedNodeName || selectedTickerId}" in js
+    assert 'selectedLabelText.dataset.summaryFocusKind = "selected";' in js
+    assert "const cardLocalNodeId = isSelectableNodeId(localId) ? localId : \"\";" in js
+    assert "const cardSelectedNodeId = (" in js
+    assert "selfCard.dataset.localNodeId = cardLocalNodeId;" in js
+    assert "selfCard.dataset.selectedNodeId = cardSelectedNodeId;" in js
+    assert "Click either side to focus it." in js
     assert 'selfMetric.classList.toggle("is-dual-node-context", hasSelectedTickerNode);' in js
     assert 'const addIdentitySlot = (kind, label, nodeId, node, owner, nodeName, fallbackName) => {' in js
     assert "slot.className = `self-node-identity-slot self-node-identity-${kind}`;" in js
+    assert "slot.dataset.nodeId = cleanNodeId;" in js
+    assert "slot.dataset.identityKind = targetLabel;" in js
+    assert 'slot.setAttribute("role", "button");' in js
     assert 'const localSlot = addIdentitySlot("local", "", localId, localNode, localOwner, localNodeName, "Local node");' in js
     assert "let selectedSlot = null;" in js
     assert 'selectedSlot = addIdentitySlot("selected", "", selectedTickerId, selectedTickerNode, null, selectedNodeName, "Selected node");' in js
-    assert '? `${metricBaseTitle} • Click to select selected node in node list`' in js
+    assert '? `${metricBaseTitle} • Click self or selected side to focus that node`' in js
     assert "nearestOfflineCityHintFromCoords(" in js
     assert 'source: "linked",' in js
     assert "const cityRequests = [];" in js
@@ -594,7 +606,7 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert ".radio-ticker-detail {" in html
 
 
-def test_node_ticker_activation_toggles_selection() -> None:
+def test_node_ticker_activation_focuses_current_view() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
@@ -605,7 +617,12 @@ def test_node_ticker_activation_toggles_selection() -> None:
         1,
     )[0]
 
-    assert "selectNode(nodeId, true, true);" in section
+    assert "const resolveSlotFocusTarget = (target) => {" in section
+    assert "const kind = String(hit && hit.kind ? hit.kind : \"self\").trim().toLowerCase();" in section
+    assert "if (kind === \"self\") {" in section
+    assert "if (isSelectableNodeId(currentSelectedId) && currentSelectedId === localNodeId) {" in section
+    assert "clearNodeSelection();" in section
+    assert "selectNode(cleanNodeId, true, false);" in section
 
 
 def test_self_ticker_id_uses_muted_light_mode_text() -> None:

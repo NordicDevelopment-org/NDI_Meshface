@@ -337,6 +337,7 @@ def test_dashboard_js_tracks_unread_direct_counts_and_priority_sections_in_node_
     assert 'tooltipLines.splice(4, 0, `Unread direct messages: ${unreadDirectCount}`);' in js
     assert '`Pinned: ${((typeof isPinnedNode === "function") && isPinnedNode(nodeId)) ? "yes" : "no"}`' in js
     assert 'data-unread-direct-count="${escAttr(unreadDirectCount)}"' in js
-    assert 'selectNode(nodeId, true, true);' in js
+    assert 'if (!isSelectableNodeId(nodeId)) return;' in js
+    assert 'selectNode(nodeId, true, false);' in js
     assert 'unreadDirectByPeer,' in js
     assert 'directHistoryPeerIds,' in js

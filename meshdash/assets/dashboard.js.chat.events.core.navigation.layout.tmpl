@@ -1213,7 +1213,7 @@
           if (!(row instanceof HTMLElement)) return;
           const nodeId = normalizeNodeId(row.dataset.topNodeId || "");
           if (!isSelectableNodeId(nodeId)) return;
-          selectNode(nodeId, true, true);
+          selectNode(nodeId, true, false);
         }});
       }}
     }}
@@ -1959,7 +1959,7 @@
           if (!(row instanceof Element)) return false;
           const nodeId = normalizeNodeId(row.getAttribute("data-route-node-id") || "");
           if (!isSelectableNodeId(nodeId)) return false;
-          selectNode(nodeId, true, true);
+          selectNode(nodeId, true, false);
           return true;
         }};
         const activateRouteEdgeTarget = (target) => {{
@@ -5614,7 +5614,7 @@
             typeof selectNode === "function"
             && normalizeNodeId(selectedNodeId || "") === nodeId
           ) {{
-            selectNode(nodeId, true, true);
+            selectNode(nodeId, true, false);
             return;
           }}
           focusNetworkGraphNode(nodeId, {{ pushHistory: true, focusSelection: true }});
