@@ -379,6 +379,13 @@
           handleConsolePasteEvent(ev);
         }});
         input.addEventListener("keydown", (ev) => {{
+          const resetInputAfterInterrupt = () => {{
+            input.value = "";
+            consoleCommandHistoryCursor = -1;
+            consoleCommandDraft = "";
+            resetConsoleAutocompleteState();
+            renderConsolePromptBuffer(false);
+          }};
           if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && String(ev.key || "").toLowerCase() === "c") {{
             const pre = document.getElementById("live-console");
             const selection = window.getSelection ? window.getSelection() : null;
@@ -397,12 +404,21 @@
               if (!stopConsoleRunningCommand("interrupted", true)) {{
                 stopConsoleInteractiveSession("interrupted", true);
               }}
-              input.value = "";
-              consoleCommandHistoryCursor = -1;
-              consoleCommandDraft = "";
-              resetConsoleAutocompleteState();
-              renderConsolePromptBuffer(false);
+              resetInputAfterInterrupt();
             }}
+            return;
+          }}
+          if (
+            !ev.ctrlKey
+            && !ev.metaKey
+            && !ev.altKey
+            && String(ev.key || "").toLowerCase() === "q"
+            && consoleRunningCommand
+            && String(consoleRunningCommand.name || "").trim().toLowerCase() === "live"
+          ) {{
+            ev.preventDefault();
+            stopConsoleRunningCommand("quit", true);
+            resetInputAfterInterrupt();
             return;
           }}
           if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{

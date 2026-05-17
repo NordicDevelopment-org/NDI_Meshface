@@ -317,8 +317,12 @@
       if (!line) return;
       pushConsoleHistoryEntry(line);
       if (consoleRunningCommand) {{
+        const runningCommandName = String(consoleRunningCommand.name || "").trim();
+        const stopHint = runningCommandName.toLowerCase() === "live"
+          ? "Press Ctrl+C or q to stop before starting a new command."
+          : "Press Ctrl+C to stop before starting a new command.";
         appendConsoleEventLine(
-          `[console] "${{consoleRunningCommand.name}}" is running. Press Ctrl+C to stop before starting a new command.`
+          `[console] "${{runningCommandName || consoleRunningCommand.name}}" is running. ${{stopHint}}`
         );
         return;
       }}

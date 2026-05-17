@@ -13,7 +13,11 @@
           ? ">"
           : `[${{resolveConsolePromptHostLabel(state)}}]$`;
       const placeholder = runningName
-        ? `ctrl+c to stop ${{runningName}}`
+        ? (
+          String(runningName).trim().toLowerCase() === "live"
+            ? "ctrl+c or q to stop live"
+            : `ctrl+c to stop ${{runningName}}`
+        )
         : interactiveIsZork
           ? "enter zork command  /search or /help for console"
           : interactiveName
