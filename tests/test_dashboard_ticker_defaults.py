@@ -471,7 +471,11 @@ def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> Non
     assert "const selectedTickerNode = hasSelectedTickerNode" in js
     assert "const resolveTickerIdentityName = (nodeId, node, owner, fallbackName) => {" in js
     assert 'selfCard.classList.remove("has-selected-node");' in js
-    assert 'selfLabel.textContent = "Self";' in js
+    assert 'selfLabel.classList.toggle("is-dual-node-label", hasSelectedTickerNode);' in js
+    assert 'selfLabelText.className = "self-node-label-self";' in js
+    assert 'selfLabelText.textContent = "Self";' in js
+    assert 'selectedLabelText.className = "self-node-label-selected";' in js
+    assert 'selectedLabelText.textContent = "Selected";' in js
     assert "const cardNodeId = hasSelectedTickerNode ? selectedTickerId : localId;" in js
     assert "if (isSelectableNodeId(cardNodeId))" in js
     assert "Local radio ${localNodeName || localId}; selected node ${selectedNodeName || selectedTickerId}" in js
@@ -541,6 +545,9 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert ".summary-ticker-item-self.has-dual-node-watermarks::after" in html
     assert "content: attr(data-selected-node-emoji);" in html
     assert "content: attr(data-local-node-emoji);" in html
+    assert ".summary-ticker-item-self > .label.is-dual-node-label" in html
+    assert "justify-content: space-between;" in html
+    assert ".self-node-label-selected" in html
     assert ".self-node-identity-slot {" in html
     assert ".self-node-identity-slot.has-node-emoji::after" in html
     assert ".self-node-slot-label {" in html

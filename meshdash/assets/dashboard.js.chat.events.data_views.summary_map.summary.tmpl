@@ -1631,7 +1631,18 @@
         selfCard.classList.remove("has-selected-node");
         const selfLabel = selfCard.querySelector("[data-ticker-label]");
         if (selfLabel instanceof HTMLElement) {{
-          selfLabel.textContent = "Self";
+          selfLabel.classList.toggle("is-dual-node-label", hasSelectedTickerNode);
+          selfLabel.replaceChildren();
+          const selfLabelText = document.createElement("span");
+          selfLabelText.className = "self-node-label-self";
+          selfLabelText.textContent = "Self";
+          selfLabel.appendChild(selfLabelText);
+          if (hasSelectedTickerNode) {{
+            const selectedLabelText = document.createElement("span");
+            selectedLabelText.className = "self-node-label-selected";
+            selectedLabelText.textContent = "Selected";
+            selfLabel.appendChild(selectedLabelText);
+          }}
         }}
         const cardNodeId = hasSelectedTickerNode ? selectedTickerId : localId;
         if (isSelectableNodeId(cardNodeId)) {{

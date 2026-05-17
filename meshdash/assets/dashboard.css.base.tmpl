@@ -1223,6 +1223,32 @@
       text-overflow: ellipsis;
       max-width: 84px;
     }}
+    .topbar .summary-ticker-item-self > .label.is-dual-node-label {{
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      max-width: 100%;
+      text-align: left;
+    }}
+    .topbar .summary-ticker-item-self > .label.is-dual-node-label .self-node-label-self,
+    .topbar .summary-ticker-item-self > .label.is-dual-node-label .self-node-label-selected {{
+      min-width: 0;
+      font: inherit;
+      line-height: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      color: inherit;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    .topbar .summary-ticker-item-self > .label.is-dual-node-label .self-node-label-selected {{
+      margin-left: auto;
+      text-align: right;
+    }}
     .topbar:not(.ticker-expanded) .summary-ticker-item > .label {{
       position: absolute;
       left: 32%;
@@ -1238,6 +1264,13 @@
       text-align: right;
       pointer-events: none;
       user-select: none;
+    }}
+    .topbar:not(.ticker-expanded) .summary-ticker-item-self > .label.is-dual-node-label {{
+      left: 7px;
+      right: 7px;
+      top: 5px;
+      bottom: auto;
+      max-width: none;
     }}
     .topbar:not(.ticker-expanded) .summary-ticker-item > .value,
     .topbar:not(.ticker-expanded) .summary-ticker-item > .metric-ticker,
@@ -1618,6 +1651,13 @@
       line-height: 1.2;
       letter-spacing: 0.5px;
       white-space: normal;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-self > .label.is-dual-node-label {{
+      grid-column: 1 / -1;
+      display: flex;
+      width: 100%;
+      max-width: 100%;
+      white-space: nowrap;
     }}
     .topbar.ticker-expanded .summary-ticker-item .value {{
       grid-column: 1;
