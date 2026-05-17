@@ -483,10 +483,15 @@ def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> Non
     assert 'const addIdentitySlot = (kind, label, nodeId, node, owner, nodeName, fallbackName) => {' in js
     assert "slot.className = `self-node-identity-slot self-node-identity-${kind}`;" in js
     assert 'const localSlot = addIdentitySlot("local", "", localId, localNode, localOwner, localNodeName, "Local node");' in js
-    assert 'addIdentitySlot("selected", "", selectedTickerId, selectedTickerNode, null, selectedNodeName, "Selected node");' in js
+    assert "let selectedSlot = null;" in js
+    assert 'selectedSlot = addIdentitySlot("selected", "", selectedTickerId, selectedTickerNode, null, selectedNodeName, "Selected node");' in js
     assert '? `${metricBaseTitle} • Click to select selected node in node list`' in js
     assert "nearestOfflineCityHintFromCoords(" in js
     assert 'source: "linked",' in js
+    assert "const cityRequests = [];" in js
+    assert "addIdentityCityRequest(localSlot, localId, localNode, localOwner);" in js
+    assert "addIdentityCityRequest(selectedSlot, selectedTickerId, selectedTickerNode, null);" in js
+    assert "const cityRequestKey = String(++selfNodeNearestCityRenderSeq);" in js
     assert 'selfMetric.classList.add("self-node-value", "node-ticker-value");' in js
     assert 'nameRow.className = "self-node-name";' in js
     assert "nameRow.appendChild(statusText);" not in js

@@ -1543,7 +1543,12 @@
       if (!(cityText instanceof HTMLElement) || !(selfMetric instanceof HTMLElement)) return;
       cityText.textContent = cleanLabel;
       cityText.hidden = !cleanLabel;
-      selfMetric.classList.toggle("has-self-node-city", !!cleanLabel);
+      const hasAnyCityLine = Array.from(selfMetric.querySelectorAll(".self-node-city")).some((line) => (
+        line instanceof HTMLElement
+        && !line.hidden
+        && !!String(line.textContent || "").trim()
+      ));
+      selfMetric.classList.toggle("has-self-node-city", hasAnyCityLine);
       if (!cleanLabel) return;
 
       const sourceLabel = location && location.source === "linked" ? "linked map position" : "GPS position";
@@ -1725,8 +1730,9 @@
             return {{ slot, cityText }};
           }};
           const localSlot = addIdentitySlot("local", "", localId, localNode, localOwner, localNodeName, "Local node");
+          let selectedSlot = null;
           if (hasSelectedTickerNode) {{
-            addIdentitySlot("selected", "", selectedTickerId, selectedTickerNode, null, selectedNodeName, "Selected node");
+            selectedSlot = addIdentitySlot("selected", "", selectedTickerId, selectedTickerNode, null, selectedNodeName, "Selected node");
           }}
           const titleParts = [`Local radio: ${{localNodeName || localId || "n/a"}}`];
           if (isSelectableNodeId(localId)) {{
@@ -1751,24 +1757,34 @@
             selfCard.dataset.baseTitle = cardBaseTitle;
             selfCard.title = cardBaseTitle;
           }}
-          const cityLocation = !hasSelectedTickerNode
-            ? resolveSelfNodeCityLocation(state, localNode, localOwner, localId)
-            : null;
-          const cityCacheKey = selfNodeNearestCityCacheKey(cityLocation);
-          if (cityCacheKey && localSlot && localSlot.cityText instanceof HTMLElement) {{
-            const cityRequestKey = `${{cityCacheKey}}:${{++selfNodeNearestCityRenderSeq}}`;
-            selfMetric.dataset.cityRequestKey = cityRequestKey;
-            if (selfNodeNearestCityCache.has(cityCacheKey)) {{
-              applySelfNodeNearestCityLine(
-                selfMetric,
-                selfCard,
-                localSlot.cityText,
-                selfNodeNearestCityCache.get(cityCacheKey) || "",
-                cityLocation
-              );
-            }} else {{
-              void updateSelfNodeNearestCityLine(selfMetric, selfCard, localSlot.cityText, cityLocation, cityRequestKey);
+          const cityRequests = [];
+          const addIdentityCityRequest = (slotInfo, nodeId, node, owner) => {{
+            const cityLocation = resolveSelfNodeCityLocation(state, node, owner, nodeId);
+            const cityCacheKey = selfNodeNearestCityCacheKey(cityLocation);
+            if (cityCacheKey && slotInfo && slotInfo.cityText instanceof HTMLElement) {{
+              cityRequests.push({{ cityText: slotInfo.cityText, cityLocation, cityCacheKey }});
             }}
+          }};
+          addIdentityCityRequest(localSlot, localId, localNode, localOwner);
+          if (selectedSlot) {{
+            addIdentityCityRequest(selectedSlot, selectedTickerId, selectedTickerNode, null);
+          }}
+          if (cityRequests.length) {{
+            const cityRequestKey = String(++selfNodeNearestCityRenderSeq);
+            selfMetric.dataset.cityRequestKey = cityRequestKey;
+            cityRequests.forEach((request) => {{
+              if (selfNodeNearestCityCache.has(request.cityCacheKey)) {{
+                applySelfNodeNearestCityLine(
+                  selfMetric,
+                  selfCard,
+                  request.cityText,
+                  selfNodeNearestCityCache.get(request.cityCacheKey) || "",
+                  request.cityLocation
+                );
+              }} else {{
+                void updateSelfNodeNearestCityLine(selfMetric, selfCard, request.cityText, request.cityLocation, cityRequestKey);
+              }}
+            }});
           }}
         }} else {{
           if (selfCard instanceof HTMLElement) {{
