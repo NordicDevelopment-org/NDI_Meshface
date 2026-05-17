@@ -884,6 +884,11 @@
       position: relative;
       isolation: isolate;
       overflow: hidden;
+      --self-node-watermark-size: 82px;
+      --self-node-watermark-local-x: 116px;
+      --self-node-watermark-selected-x: calc(100% - 70px);
+      --self-node-single-watermark-size: var(--self-node-watermark-size);
+      --self-node-watermark-single-x: var(--self-node-watermark-local-x);
     }}
     .topbar .summary-ticker-item-bots.has-active-bot-sessions,
     .topbar .summary-ticker-item-bots.has-pending-bot-activity {{
@@ -917,10 +922,10 @@
     .topbar .summary-ticker-item-self.has-node-emoji::after {{
       content: attr(data-node-emoji);
       position: absolute;
-      right: 8px;
+      left: var(--self-node-watermark-single-x);
       top: 50%;
-      transform: translateY(-50%);
-      font-size: clamp(34px, 3.5vw, 52px);
+      transform: translate(-50%, -50%);
+      font-size: var(--self-node-single-watermark-size);
       line-height: 1;
       font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
       opacity: 0.08;
@@ -933,12 +938,14 @@
     .topbar .summary-ticker-item-self.has-dual-node-watermarks::before,
     .topbar .summary-ticker-item-self.has-dual-node-watermarks::after {{
       position: absolute;
-      top: 0;
-      bottom: 0;
+      top: 50%;
+      width: var(--self-node-watermark-size);
+      height: var(--self-node-watermark-size);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: clamp(48px, 4.8vw, 82px);
+      transform: translate(-50%, -50%);
+      font-size: var(--self-node-watermark-size);
       line-height: 1;
       font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
       opacity: 0.065;
@@ -951,13 +958,11 @@
     }}
     .topbar .summary-ticker-item-self.has-dual-node-watermarks::before {{
       content: attr(data-local-node-emoji);
-      left: 0;
-      width: 55%;
+      left: var(--self-node-watermark-local-x);
     }}
     .topbar .summary-ticker-item-self.has-dual-node-watermarks::after {{
       content: attr(data-selected-node-emoji);
-      right: 0;
-      width: 45%;
+      left: var(--self-node-watermark-selected-x);
     }}
     .topbar .summary-ticker-item-self > .label,
     .topbar .summary-ticker-item-self > .value,
@@ -1141,24 +1146,6 @@
       justify-content: center;
       align-self: stretch;
       gap: 2px;
-    }}
-    .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot.has-node-emoji::after {{
-      content: attr(data-node-emoji);
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: clamp(44px, 5.4vw, 82px);
-      line-height: 1;
-      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-      opacity: 0.075;
-      filter: grayscale(0.16) saturate(0.78) blur(0.8px);
-      pointer-events: none;
-      user-select: none;
-      white-space: nowrap;
-      text-align: center;
-      z-index: 0;
     }}
     .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot > * {{
       position: relative;

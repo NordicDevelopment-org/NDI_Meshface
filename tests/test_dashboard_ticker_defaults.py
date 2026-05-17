@@ -541,6 +541,11 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert '[data-theme="dark"] .topbar .summary-ticker-item-bots.has-active-bot-sessions,' in html
     assert ".topbar .summary-ticker-item-self.has-node-emoji::after" in html
     assert "content: attr(data-node-emoji);" in html
+    assert "--self-node-watermark-size: 82px;" in html
+    assert "--self-node-watermark-local-x: 116px;" in html
+    assert "--self-node-watermark-selected-x: calc(100% - 70px);" in html
+    assert "--self-node-single-watermark-size: var(--self-node-watermark-size);" in html
+    assert "--self-node-watermark-single-x: var(--self-node-watermark-local-x);" in html
     assert ".summary-ticker-item-self.has-dual-node-watermarks::before" in html
     assert ".summary-ticker-item-self.has-dual-node-watermarks::after" in html
     assert "content: attr(data-selected-node-emoji);" in html
@@ -549,16 +554,16 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert "justify-content: space-between;" in html
     assert ".self-node-label-selected" in html
     assert ".self-node-identity-slot {" in html
-    assert ".self-node-identity-slot.has-node-emoji::after" in html
     assert ".self-node-slot-label {" in html
     assert ".value.self-node-value.is-dual-node-context" in html
     assert ".self-node-identity-selected {" in html
     assert "position: absolute;" in html
-    assert "inset: 0;" in html
+    assert "left: var(--self-node-watermark-local-x);" in html
+    assert "left: var(--self-node-watermark-selected-x);" in html
+    assert "font-size: var(--self-node-watermark-size);" in html
     assert "justify-content: center;" in html
-    assert "font-size: clamp(44px, 5.4vw, 82px);" in html
     assert "text-align: right;" in html
-    assert '[data-theme="dark"] .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot.has-node-emoji::after' in html
+    assert '[data-theme="dark"] .topbar .summary-ticker-item-self.has-dual-node-watermarks::before' in html
     assert ".self-node-name {" in html
     assert ".self-node-status.chat-member-status {" in html
     assert ".self-node-name-text {" in html
