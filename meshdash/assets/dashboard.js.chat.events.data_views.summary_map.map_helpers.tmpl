@@ -208,11 +208,49 @@
     function fitMapToMostNodes(nodes, opts = {{}}) {{
       const points = collectNodeLatLngs(nodes);
       if (!points.length) return false;
+      const wantsAnimatedFit = !!(opts && opts.animate === true);
+      const reduceMotion = (
+        typeof prefersReducedMotion === "function"
+        && prefersReducedMotion()
+      );
+      const animateFit = wantsAnimatedFit && !reduceMotion;
+      const animationDurationSeconds = Number.isFinite(Number(opts && opts.durationSeconds))
+        ? Math.max(0.08, Math.min(2.4, Number(opts.durationSeconds)))
+        : 0.68;
+      const animationEaseLinearity = Number.isFinite(Number(opts && opts.easeLinearity))
+        ? Math.max(0.08, Math.min(1, Number(opts.easeLinearity)))
+        : 0.25;
+      const animationOptions = animateFit
+        ? {{
+          animate: true,
+          duration: animationDurationSeconds,
+          easeLinearity: animationEaseLinearity,
+        }}
+        : {{ animate: false }};
+      const requestResizeAfterViewMove = () => {{
+        if (!animateFit) {{
+          requestMapResize();
+          return;
+        }}
+        if (map && typeof map.once === "function") {{
+          map.once("moveend", () => {{
+            requestMapResize();
+          }});
+        }}
+        window.setTimeout(() => {{
+          requestMapResize();
+        }}, Math.round(animationDurationSeconds * 1000) + 120);
+      }};
 
       // If we only have one point, zoom in enough to be useful.
       if (points.length === 1) {{
-        map.setView(points[0], Math.max(map.getZoom(), 12), {{ animate: false }});
-        requestMapResize();
+        const nextZoom = Math.max(map.getZoom(), 12);
+        if (animateFit && typeof map.flyTo === "function") {{
+          map.flyTo(points[0], nextZoom, animationOptions);
+        }} else {{
+          map.setView(points[0], nextZoom, animationOptions);
+        }}
+        requestResizeAfterViewMove();
         return true;
       }}
 
@@ -225,12 +263,23 @@
 
       const pad = Number.isFinite(Number(opts.pad)) ? Number(opts.pad) : 0.18;
       const maxZoom = Number.isFinite(Number(opts.maxZoom)) ? Number(opts.maxZoom) : 13;
-      map.fitBounds(bounds.pad(pad), {{ animate: false, maxZoom }});
-      requestMapResize();
+      const paddedBounds = bounds.pad(pad);
+      if (animateFit && typeof map.flyToBounds === "function") {{
+        map.flyToBounds(paddedBounds, {{
+          ...animationOptions,
+          maxZoom,
+        }});
+      }} else {{
+        map.fitBounds(paddedBounds, {{
+          ...animationOptions,
+          maxZoom,
+        }});
+      }}
+      requestResizeAfterViewMove();
       return true;
     }}
 
-    function resetMapViewToMostNodes() {{
+    function resetMapViewToMostNodes(options = null) {{
       if (!map) return false;
       map.closePopup();
       pendingMapHistoryFocus = false;
@@ -239,7 +288,18 @@
         return false;
       }}
       const nodes = Array.isArray(latestState.nodes) ? latestState.nodes : [];
-      return fitMapToMostNodes(nodes, {{ pad: 0.18, maxZoom: 13 }});
+      const opts = (options && typeof options === "object") ? options : {{}};
+      return fitMapToMostNodes(nodes, {{
+        pad: 0.18,
+        maxZoom: 13,
+        animate: opts.animate !== false,
+        durationSeconds: Number.isFinite(Number(opts.durationSeconds))
+          ? Number(opts.durationSeconds)
+          : 0.68,
+        easeLinearity: Number.isFinite(Number(opts.easeLinearity))
+          ? Number(opts.easeLinearity)
+          : 0.25,
+      }});
     }}
 
     function clampMapLinkValue(value, min, max) {{
